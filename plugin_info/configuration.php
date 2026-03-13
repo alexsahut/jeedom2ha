@@ -195,8 +195,9 @@ $(function() {
       },
       error: function(request, status, error) {
         $btn.prop('disabled', false);
-        $result.addClass('label label-danger')
-          .text('{{Le démon ne répond pas — vérifiez qu\'il est bien démarré}}').show();
+        var msg = '{{Erreur de communication avec Jeedom}} (' + status + ')';
+        if (status === 'timeout') msg = '{{Délai d\'attente dépassé (timeout AJAX)}}';
+        $result.addClass('label label-danger').text(msg).show();
       }
     });
   });

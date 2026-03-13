@@ -70,10 +70,12 @@ try {
         'tls'        => (init('tls', '0') === '1'),
         'tls_verify' => (init('tls_verify', '1') === '1'),
       );
-      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST');
+      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST', 15);
       if ($result === null) {
-        throw new Exception(__('Le démon ne répond pas — vérifiez qu\'il est bien démarré', __FILE__));
+        log::add('jeedom2ha', 'error', '[MQTT] Le démon n\'a pas répondu au test de connexion (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré dans l\'onglet Santé', __FILE__));
       }
+      log::add('jeedom2ha', 'debug', '[MQTT] Résultat du test de connexion : ' . json_encode($result));
       ajax::success($result);
     }
 

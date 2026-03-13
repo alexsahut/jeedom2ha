@@ -58,14 +58,15 @@ class jeedom2ha extends eqLogic {
         log::add(__CLASS__, 'debug', '[MQTT] mqtt2 absent ou inactif — configuration manuelle requise');
         return null;
       }
-      // Clés de config mqtt2 — à vérifier sur instance réelle.
-      // Si une clé retourne '' ou null, l'auto-détection est incomplète → fallback manuel.
-      $host = config::byKey('mqtt::ip', 'mqtt2', '');
-      $port = config::byKey('mqtt::port', 'mqtt2', 1883);
-      $user = config::byKey('mqtt::username', 'mqtt2', '');
-      $pass = config::byKey('mqtt::password', 'mqtt2', '');
+      // Clés de config mqtt2 (MQTT Manager)
+      // Note: Les clés peuvent varier selon la version. On teste les plus courantes.
+      $host = config::byKey('mqttAddress', 'mqtt2', config::byKey('mqttaddress', 'mqtt2', ''));
+      $port = config::byKey('mqttPort', 'mqtt2', config::byKey('mqttport', 'mqtt2', 1883));
+      $user = config::byKey('mqttUser', 'mqtt2', config::byKey('mqttusername', 'mqtt2', ''));
+      $pass = config::byKey('mqttPass', 'mqtt2', config::byKey('mqttpassword', 'mqtt2', ''));
+      
       if ($host === '' || $host === null) {
-        log::add(__CLASS__, 'warning', '[MQTT] Auto-détection mqtt2 : clé host vide ou inconnue, fallback manuel');
+        log::add(__CLASS__, 'debug', '[MQTT] Auto-détection mqtt2 : hôte non trouvé dans la configuration mqtt2 (test mqttAddress et mqttaddress)');
         return null;
       }
       log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : host détecté → configuration pré-remplie');
@@ -201,7 +202,7 @@ class jeedom2ha extends eqLogic {
     log::add(__CLASS__, 'info', '[DAEMON] Daemon stopped');
   }
 
-  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET') {
+  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET', $_timeout = 3) {
     $apiPort = config::byKey('daemonApiPort', __CLASS__, '55080');
     $localSecret = config::byKey('localSecret', __CLASS__);
     $url = 'http://127.0.0.1:' . $apiPort . $_endpoint;
@@ -211,7 +212,7 @@ class jeedom2ha extends eqLogic {
         'method' => $_method,
         'header' => "X-Local-Secret: " . $localSecret . "\r\n" .
                     "Content-Type: application/json\r\n",
-        'timeout' => 3,
+        'timeout' => $_timeout,
         'ignore_errors' => true,
       ),
     );
