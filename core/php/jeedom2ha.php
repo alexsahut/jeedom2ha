@@ -18,24 +18,20 @@
 /**
  * Callback stub — daemon → Jeedom
  *
- * This file is the callback endpoint registered with jeedomdaemon via --callback.
- * Without it the daemon exits immediately on a 404 at startup.
+ * Registered with jeedomdaemon via --callback. Without a reachable endpoint
+ * the daemon exits immediately at startup on a non-200 response.
  *
- * Story 1.1: minimal stub — returns HTTP 200 so the daemon stays alive.
- * Full callback logic (state updates, events) is out of scope for Story 1.1
- * and will be implemented in a later story.
+ * Story 1.1: pure HTTP 200 stub, no Jeedom dependencies.
+ * Full callback logic (daemon → Jeedom events, state updates) is out of scope
+ * for Story 1.1 and will be implemented in a later story.
  */
 
 try {
-    require_once __DIR__ . '/../../../core/php/core.inc.php';
-
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code(200);
     echo json_encode(['status' => 'ok']);
-
-} catch (Exception $e) {
-    header('Content-Type: application/json');
+} catch (\Throwable $e) {
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Internal error']);
-    log::add('jeedom2ha', 'error', '[CALLBACK] ' . $e->getMessage());
 }

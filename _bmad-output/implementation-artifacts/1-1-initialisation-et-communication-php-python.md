@@ -215,7 +215,7 @@ Aucun problème bloquant rencontré.
 - **Task 5**: `packages.json` mis à jour avec `jeedomdaemon` et `aiohttp` en pip3. Templates obsolètes (pyserial, requests, npm/composer/yarn) supprimés.
 - **Task 6**: 11 tests daemon (`test_daemon_startup.py`) + 6 tests HTTP (`test_http_server.py`) = 17 nouveaux tests. 28 tests au total, zéro régression. `on_start` mocké proprement (pas de socket réel).
 
-- **Correction post-review — stub callback `core/php/jeedom2ha.php` :** `jeedomdaemon` tente de joindre le callback `--callback` au démarrage et s'arrête si le endpoint retourne 404. Le fichier `core/php/jeedom2ha.php` était absent. Un stub minimal a été créé : `require_once core.inc.php`, réponse HTTP 200 + JSON `{"status":"ok"}`, gestion d'exception en 500. La logique métier complète (remontée d'états, réception d'événements daemon → Jeedom) reste hors scope Story 1.1 et sera implémentée dans une story ultérieure.
+- **Correction post-review — stub callback `core/php/jeedom2ha.php` :** `jeedomdaemon` tente de joindre le callback `--callback` au démarrage et s'arrête si le endpoint retourne une réponse non-200. Une première version du stub incluait `require_once core.inc.php`, ce qui provoquait un HTTP 500 sur la box (chemin `core.inc.php` inaccessible dans ce contexte). Corrigé : le stub est désormais un fichier PHP pur sans aucune dépendance Jeedom — réponse HTTP 200 + `Content-Type: application/json; charset=utf-8` + `{"status":"ok"}`, gestion d'erreur via `catch (\Throwable $e)` → HTTP 500. La logique métier complète (remontée d'états, réception d'événements daemon → Jeedom) reste hors scope Story 1.1 et sera implémentée dans une story ultérieure.
 
 - **Note — emplacement des tests (déviation architecture) :** L'architecture spécifie `resources/daemon/tests/` comme emplacement cible des tests Python. Les tests de cette story sont placés dans `tests/unit/` à la racine du repo, où la structure CI (`pyproject.toml`, `.github/workflows/`) était déjà établie avant cette story. Ce choix préserve le fonctionnement CI actuel sans refactor. À arbitrer en début d'Epic 2 : si l'alignement vers `resources/daemon/tests/` est souhaité, cela implique de déplacer les fichiers de test et d'ajuster `pyproject.toml` (`testpaths`).
 
@@ -229,4 +229,4 @@ Aucun problème bloquant rencontré.
 - `pyproject.toml` (modifié) — Dépendances de test (pytest-aiohttp ajouté)
 - `tests/unit/test_daemon_startup.py` (créé) — 11 tests instanciation/lifecycle daemon, on_start mocké
 - `tests/unit/test_http_server.py` (créé) — 6 tests endpoint status + auth
-- `core/php/jeedom2ha.php` (créé) — Stub callback daemon → Jeedom requis au démarrage jeedomdaemon
+- `core/php/jeedom2ha.php` (créé, corrigé) — Stub callback daemon → Jeedom, HTTP 200 pur sans dépendance Jeedom
