@@ -58,6 +58,22 @@ class jeedom2ha extends eqLogic {
         log::add(__CLASS__, 'debug', '[MQTT] mqtt2 absent ou inactif — configuration manuelle requise');
         return null;
       }
+      // Dump diagnostique : logguer toutes les clés mqtt2 connues avec leur valeur réelle
+      // Cela permet d'identifier les noms de clés exacts utilisés par la version installée
+      $diagKeys = array(
+        'mqttAddress','mqttaddress','mqttbroker','mqttBroker','host',
+        'mqttPort','mqttport','port',
+        'mqttUser','mqttuser','mqttusername','user',
+        'mqtttls','mqttTls','tls','ssl',
+        'mqtttlscheck','mqttTlsVerify','tlscheck','tlsverify',
+      );
+      foreach ($diagKeys as $k) {
+        $v = config::byKey($k, 'mqtt2', null);
+        if ($v !== null && $v !== '') {
+          log::add(__CLASS__, 'debug', '[MQTT-DIAG] mqtt2 key=' . $k . ' value=' . $v);
+        }
+      }
+
       // Clés de config mqtt2 (MQTT Manager)
       // Note: Les clés peuvent varier selon la version. On teste les plus courantes.
       $host = config::byKey('mqttAddress', 'mqtt2', config::byKey('mqttaddress', 'mqtt2', ''));
