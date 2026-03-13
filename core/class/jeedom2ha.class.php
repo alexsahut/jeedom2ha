@@ -70,9 +70,11 @@ class jeedom2ha extends eqLogic {
         return null;
       }
 
-      // Filtrage du port : 55035 est le socket interne, pas le port broker client
-      if (intval($port) === 55035) {
-        log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : port 55035 détecté (socket interne), repli sur 1883');
+      // Filtrage des ports internes connus de MQTT Manager (ne sont pas des ports broker client)
+      // 55035 = socket interne jeedomdaemon, 1885 = port Mosquitto interne MQTT Manager
+      $internalPorts = array(55035, 1885);
+      if (in_array(intval($port), $internalPorts)) {
+        log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : port interne détecté (' . $port . '), repli sur 1883');
         $port = 1883;
       }
 

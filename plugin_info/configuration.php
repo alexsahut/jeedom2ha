@@ -80,7 +80,7 @@ if (!isConnect()) {
         <sup><i class="fas fa-question-circle tooltips" title="{{Valider le certificat du broker. Décocher pour les certificats auto-signés.}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input type="checkbox" class="configKey" data-l1key="mqttTlsVerify" checked/>
+        <input type="checkbox" class="configKey" data-l1key="mqttTlsVerify"/>
       </div>
     </div>
 
