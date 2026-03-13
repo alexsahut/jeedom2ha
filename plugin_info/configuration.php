@@ -106,11 +106,11 @@ $(function() {
     url: 'core/ajax/jeedom2ha.ajax.php',
     data: {action: 'getMqttConfig'},
     dataType: 'json',
-    global: false,
+    error: function() { /* Best-effort — l'absence de résultat ne bloque pas le formulaire manuel */ },
     success: function(data) {
       if (data.state !== 'ok') return;
       var result = data.result;
-      
+
       // Affichage de l'indicateur "Déjà configuré"
       if (result.has_password) {
         $('#span_mqttPasswordStatus').show();
@@ -178,7 +178,6 @@ $(function() {
         tls_verify: $('.configKey[data-l1key=mqttTlsVerify]').is(':checked') ? '1' : '0'
       },
       dataType: 'json',
-      global: false,
       success: function(data) {
         $btn.prop('disabled', false);
         if (data.state !== 'ok') {
