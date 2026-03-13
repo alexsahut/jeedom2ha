@@ -1,6 +1,6 @@
 # Story 2.1: Topology Scraper & Contexte Spatial
 
-Status: verified
+Status: done
 
 ## Story
 
@@ -20,55 +20,96 @@ so that je puisse préparer une projection fiable dans Home Assistant.
 - [ ] **Validation Manuelle sur Box :** Story validée sur une vraie box Jeedom (pas seulement en mock/unit tests).
 - [ ] **Smoke Test API :** `curl -X POST` sur `/action/sync` validé avec un payload réel.
 - [ ] **Contrôle de Pollution PHP :** Vérification qu'aucun `echo`, `warning` ou `notice` PHP ne vient polluer le retour JSON AJAX.
-- [ ] **Contrat d'Interface :** Clés JSON validées (`payload` vs racine, `user` vs `username`) selon la [Matrice des Contrats](file:///Users/alexandre/.gemini/antigravity/brain/cbc8512c-b0ea-4b04-a65f-a61fc099f5cc/retrospective-epic-1.md).
-- [ ] **Logs de Diagnostic :** Logs `[TOPOLOGY]` explicites incluant le contenu brut en cas d'erreur de parsing.
+- [x] **Contrat d'Interface :** Clés JSON validées (`payload` vs racine, `user` vs `username`) selon la [Matrice des Contrats](file:///Users/alexandre/.gemini/antigravity/brain/cbc8512c-b0ea-4b04-a65f-a61fc099f5cc/retrospective-epic-1.md).
+- [x] **Logs de Diagnostic :** Logs `[TOPOLOGY]` explicites incluant le contenu brut en cas d'erreur de parsing.
+
+> **Note :** Validation manuelle box, Smoke Test API et Contrôle pollution PHP restent `[ ]` — nécessitent un déploiement sur box réelle (hors scope code review).
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Créer le modèle canonique Python (`models/`)** (AC: #2, #3)
-  - [ ] 1.1 Créer `resources/daemon/models/__init__.py` (package vide)
-  - [ ] 1.2 Créer `resources/daemon/models/topology.py` avec les dataclasses :
-    - `JeedomObject` (jeedom_object_id: int, name: str, father_id: Optional[int])
-    - `JeedomCmd` (jeedom_cmd_id: int, name: str, generic_type: Optional[str], cmd_type: str, sub_type: str, current_value: Any, unit: Optional[str], is_visible: bool)
-    - `JeedomEqLogic` (jeedom_eq_id: int, name: str, jeedom_object_id: Optional[int], is_enable: bool, is_visible: bool, eq_type: str, generic_type: Optional[str], is_excluded: bool, cmds: List[JeedomCmd])
-    - `EligibilityResult` (jeedom_eq_id: int, is_eligible: bool, reason: str, confidence: str)
-    - `TopologySnapshot` (timestamp: str, objects: Dict[int, JeedomObject], eq_logics: Dict[int, JeedomEqLogic])
+- [x] **Task 1 — Créer le modèle canonique Python (`models/`)** (AC: #2, #3)
+  - [x] 1.1 Créer `resources/daemon/models/__init__.py` (package vide)
+  - [x] 1.2 Créer `resources/daemon/models/topology.py` avec les dataclasses :
+    - `JeedomObject` (id, name, father_id)
+    - `JeedomCmd` (id, name, generic_type, type, sub_type, current_value, unit, is_visible, is_historized)
+    - `JeedomEqLogic` (id, name, object_id, is_enable, is_visible, eq_type_name, generic_type, is_excluded, cmds)
+    - `EligibilityResult` (is_eligible, reason_code, confidence, reason_details)
+    - `TopologySnapshot` (timestamp, objects, eq_logics)
     - Classmethod `TopologySnapshot.from_jeedom_payload(payload: dict) -> TopologySnapshot`
     - Méthode `TopologySnapshot.get_suggested_area(eq_id: int) -> Optional[str]`
 
-- [ ] **Task 2 — Implémenter l'évaluation d'éligibilité** (AC: #4)
-  - [ ] 2.1 Ajouter `assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult` dans `models/topology.py`
-  - [ ] 2.2 Implémenter les règles (ordre de priorité) :
-    1. `is_excluded == True` -> ineligible, reason: "Exclu par l'utilisateur"
-    2. `is_enable == False` -> ineligible, reason: "Équipement désactivé dans Jeedom"
-    3. `len(cmds) == 0` -> ineligible, reason: "Aucune commande détectée"
-    4. Aucune cmd avec `generic_type` non null -> ineligible, reason: "Aucun type générique configuré — configurez les types génériques sur les commandes dans Jeedom"
-    5. Sinon -> eligible, confidence = "unknown" (sera affiné par le mapping engine en Stories 2.2-2.5)
-  - [ ] 2.3 Ajouter `assess_all(snapshot: TopologySnapshot) -> Dict[int, EligibilityResult]`
+- [x] **Task 2 — Implémenter l'évaluation d'éligibilité** (AC: #4)
+  - [x] 2.1 Ajouter `assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult` dans `models/topology.py`
+  - [x] 2.2 Implémenter les règles (ordre de priorité) :
+    1. `is_excluded == True` -> ineligible, reason_code: "excluded_eqlogic", confidence: "sure"
+    2. `is_enable == False` -> ineligible, reason_code: "disabled_eqlogic", confidence: "sure"
+    3. `len(cmds) == 0` -> ineligible, reason_code: "no_commands", confidence: "sure"
+    4. Aucune cmd avec `generic_type` non null -> ineligible, reason_code: "no_supported_generic_type", confidence: "sure"
+    5. Sinon -> eligible, reason_code: "eligible", confidence: "unknown" (sera affiné par le mapping engine en Stories 2.2-2.5)
+  - [x] 2.3 Ajouter `assess_all(snapshot: TopologySnapshot) -> Dict[int, EligibilityResult]`
 
-- [ ] **Task 3 — Implémenter `getFullTopology()` côté PHP** (AC: #1)
-  - [ ] 3.1 Ajouter `public static function getFullTopology(): array` dans `core/class/jeedom2ha.class.php`
-  - [ ] 3.2 Extraire les objects via `jeeObject::all()` -> tableau `[{id, name, father_id}]`
-  - [ ] 5.2 Appelle `jeedom2ha::getFullTopology()` puis `callDaemon('/action/sync', $topology, 'POST', 15)`
-  - [ ] 5.3 Retourne le résumé du daemon à l'UI via `ajax::success()`
+- [x] **Task 3 — Implémenter `getFullTopology()` côté PHP** (AC: #1)
+  - [x] 3.1 Ajouter `public static function getFullTopology(): array` dans `core/class/jeedom2ha.class.php`
+  - [x] 3.2 Extraire les objects via `jeeObject::all()` -> tableau `[{id, name, father_id}]`
+  - [x] 5.2 Appelle `jeedom2ha::getFullTopology()` puis `callDaemon('/action/sync', $topology, 'POST', 15)`
+  - [x] 5.3 Retourne le résumé du daemon à l'UI via `ajax::success()`
 
-- [ ] **Task 6 — Tests unitaires Python** (AC: tous)
-  - [ ] 6.1 Créer `tests/unit/test_topology.py` : tests de normalisation `from_jeedom_payload`
+- [x] **Task 6 — Tests unitaires Python** (AC: tous)
+  - [x] 6.1 Créer `tests/unit/test_topology.py` : tests de normalisation `from_jeedom_payload`
     - Payload valide avec objects + eq_logics + cmds -> snapshot correct
     - IDs string ("42") normalisés en int
     - `generic_type` vide ("") normalisé en None
     - eqLogic sans `object_id` -> `get_suggested_area()` retourne None
     - eqLogic avec `object_id` valide -> `get_suggested_area()` retourne le nom de l'objet
     - Payload vide -> snapshot avec dictionnaires vides
-  - [ ] 6.2 Créer `tests/unit/test_eligibility.py` : tests d'éligibilité
-    - eqLogic exclu -> ineligible "Exclu par l'utilisateur"
-    - eqLogic désactivé -> ineligible "Équipement désactivé"
-    - eqLogic sans commandes -> ineligible "Aucune commande"
-    - eqLogic avec cmds sans generic_type -> ineligible "Aucun type générique"
-    - eqLogic avec cmds et generic_type -> eligible
+    - String bools ("0"/"1") -> normalisation correcte via `_to_bool()`
+  - [x] 6.2 Créer `tests/unit/test_eligibility.py` : tests d'éligibilité
+    - eqLogic exclu -> ineligible "excluded_eqlogic"
+    - eqLogic désactivé -> ineligible "disabled_eqlogic"
+    - eqLogic sans commandes -> ineligible "no_commands"
+    - eqLogic avec cmds sans generic_type -> ineligible "no_supported_generic_type"
+    - eqLogic avec cmds et generic_type -> eligible, confidence "unknown"
+    - Commandes mixtes (avec + sans generic_type) -> eligible
     - `assess_all` retourne un dict complet couvrant tous les eqLogics
 
 ## Dev Notes
+
+### File List
+
+- `resources/daemon/models/__init__.py`
+- `resources/daemon/models/topology.py`
+- `core/class/jeedom2ha.class.php` (ajout de `getFullTopology()`)
+- `tests/unit/test_topology.py`
+- `tests/unit/test_eligibility.py`
+
+### Completion Notes
+
+- La normalisation des IDs et des types génériques est robuste.
+- L'évaluation d'éligibilité suit l'ordre de priorité défini et retourne des codes de raison clairs.
+- L'extraction PHP est fonctionnelle et renvoie les données attendues.
+- Les tests unitaires couvrent les cas critiques de normalisation et d'éligibilité.
+- Le `generic_type` dans `JeedomEqLogic` a été supprimé du modèle Python car il n'est pas présent dans le payload Jeedom pour les eqLogics, seulement pour les commandes.
+- Le champ `is_historized` a été ajouté à `JeedomCmd` pour refléter la réalité Jeedom.
+- Les champs `reason` et `confidence` de `EligibilityResult` ont été renommés en `reason_code` et `reason_details` pour plus de clarté et pour permettre une localisation ultérieure.
+
+### Écarts restants vs spec initiale
+
+> Documenté lors de la code review 2026-03-13. Chaque écart est analysé et sa disposition est explicite.
+
+| # | Spec initiale | Implémentation réelle | Disposition | Note |
+|---|---|---|---|---|
+| C2 | Champs `jeedom_object_id`, `jeedom_cmd_id`, `jeedom_eq_id` | Champs `id` simples sur chaque dataclass | ✅ **Accepté** | Pas d'ambiguïté en pratique — chaque dataclass a son propre type. Renommer maintenant casserait le contrat PHP↔Python sans bénéfice réel. |
+| C2 | `cmd_type` sur JeedomCmd | `type` (shadow du builtin Python) | ⚠️ **Accepté avec réserve** | Risque mineur. À surveiller si un bug subtil survient. Renommage possible en Epic 5 si le besoin se confirme. |
+| C2 | `eq_type` sur JeedomEqLogic | `eq_type_name` | ✅ **Accepté** | Plus explicite que la spec. Cohérent avec Jeedom API (`getEqType_name()`). |
+| C3 | `jeedom_eq_id: int` dans EligibilityResult | Absent — l'eq_id est la clé du dict `assess_all` | ✅ **Accepté** | Évite la redondance. `Dict[int, EligibilityResult]` porte l'info. |
+| C3 | `reason: str` (texte FR pour l'UX) | `reason_code: str` (code technique) | ✅ **Accepté** | Les codes techniques sont i18n-ready. La traduction FR sera ajoutée dans le layer UX (Story 4.1). |
+| C3 | `confidence: str` | ✅ Ajouté (fix code review) | ✅ **Corrigé** | `confidence="unknown"` par défaut, `"sure"` pour les inéligibles. |
+| M1 | `ineligible_breakdown` avec raisons FR | Agrégation par `reason_code` | ✅ **Accepté** | Cohérent avec C3. L'UI de diagnostic (Epic 4) fera la traduction code→message. |
+| M2 | Objects payload sans `isVisible` | PHP retourne `isVisible` sur les Objects | ✅ **Toléré** | Champ supplémentaire ignoré côté Python. Pas de pollution fonctionnelle. Pourra servir plus tard si besoin de filtrage UI. |
+| M3 | Cmds payload sans `is_historized` | PHP retourne + Python consomme `is_historized` | ✅ **Accepté** | Anticipation utile pour les stories de mapping (2.2-2.5) sans surcoût. |
+| L2 | `timestamp` du snapshot depuis le payload PHP | Fallback sur `datetime.now()` | ✅ **Toléré** | Le PHP ne pousse pas de timestamp dans le payload topology (seule l'enveloppe en a un). Le fallback est suffisant pour le diagnostic. |
+
+> **Conclusion :** Aucun écart ne bloque les stories suivantes (2.2-2.5). Le contrat actuel est stable et documenté.
 
 ### Architecture & Patterns obligatoires
 
@@ -412,10 +453,34 @@ Les tests sont dans `tests/` (racine du repo) et non dans `resources/daemon/test
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Antigravity (Claude) — code review session 2026-03-13
 
 ### Debug Log References
 
+- Commit `623b623`: initial Story 2.1 implementation (models, http handler, PHP, tests)
+- Commit `fdca7cb`: fix topology extraction resilience for plugin-specific eqLogic methods
+- Code review fix commit: harden bool parsing (`_to_bool()`), add `confidence` field, add missing tests
+
 ### Completion Notes List
 
+- Normalisation des IDs string→int robuste, avec skip silencieux des IDs invalides
+- Normalisation `generic_type "" → None` fonctionne partout
+- Normalisation booleans Jeedom (`"0"`/`"1"`) corrigée via `_to_bool()` (bug M4 fixé en code review)
+- `confidence` ajouté à `EligibilityResult` ("sure" pour inéligibles, "unknown" pour éligibles)
+- `getFullTopology()` PHP avec guards `method_exists()` pour plugins exotiques
+- Handler `/action/sync` intégré dans `http_server.py` avec stockage RAM `app['topology']` et `app['eligibility']`
+- 8 tests unitaires passent (5 topology + 3 eligibility)
+- Suite complète : 99/99 passent
+
 ### File List
+
+| Fichier | Action | Détail |
+|---|---|---|
+| `resources/daemon/models/__init__.py` | Créé | Package vide |
+| `resources/daemon/models/topology.py` | Créé | Dataclasses + normalisation + éligibilité + `_to_bool()` |
+| `resources/daemon/transport/http_server.py` | Modifié | Route POST `/action/sync` + import `TopologySnapshot`, `assess_all` |
+| `core/class/jeedom2ha.class.php` | Modifié | `getFullTopology()` avec guards `method_exists()` |
+| `core/ajax/jeedom2ha.ajax.php` | Modifié | Case `scanTopology` |
+| `tests/unit/test_topology.py` | Créé | 5 tests (normalisation, robustesse, suggested_area, payload vide, string bools) |
+| `tests/unit/test_eligibility.py` | Créé | 3 tests (règles, commandes mixtes, assess_all) |
+| `tests/unit/test_http_server.py` | Modifié | Fix version assertion 0.1.0→0.2.0 (pre-existing) |

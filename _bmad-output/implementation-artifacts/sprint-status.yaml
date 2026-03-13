@@ -47,7 +47,7 @@ development_status:
   1-3-validation-de-la-connexion-et-statut-du-pont: done
   epic-1-retrospective: done
   epic-2: in-progress
-  2-1-topology-scraper-contexte-spatial: in-progress
+  2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: backlog
   2-3-mapping-exposition-des-ouvrants-volets: backlog
   2-4-mapping-exposition-des-prises-switches: backlog

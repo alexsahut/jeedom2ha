@@ -101,3 +101,51 @@ def test_suggested_area():
     assert snapshot.get_suggested_area(10) == "Living Room"
     assert snapshot.get_suggested_area(11) is None
     assert snapshot.get_suggested_area(999) is None
+
+def test_topology_snapshot_empty_payload():
+    """L1: Empty payload should produce a snapshot with empty dicts."""
+    snapshot = TopologySnapshot.from_jeedom_payload({})
+    assert snapshot.objects == {}
+    assert snapshot.eq_logics == {}
+    assert snapshot.timestamp  # should have a fallback timestamp
+
+def test_topology_string_bool_normalisation():
+    """M4: Jeedom returns "0"/"1" strings for booleans — bool("0") is True in Python!"""
+    payload = {
+        "eq_logics": [
+            {
+                "id": 1,
+                "name": "Disabled EqLogic",
+                "is_enable": "0",
+                "is_visible": "1",
+                "is_excluded": "0",
+                "cmds": [
+                    {
+                        "id": 10,
+                        "name": "Hidden Cmd",
+                        "is_visible": "0",
+                        "is_historized": "0",
+                    }
+                ],
+            },
+            {
+                "id": 2,
+                "name": "Excluded EqLogic",
+                "is_excluded": "1",
+                "is_enable": "1",
+            },
+        ]
+    }
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+
+    eq1 = snapshot.eq_logics[1]
+    assert eq1.is_enable is False, "String '0' must be False"
+    assert eq1.is_visible is True, "String '1' must be True"
+    assert eq1.is_excluded is False
+    cmd = eq1.cmds[0]
+    assert cmd.is_visible is False, "String '0' must be False for cmd"
+    assert cmd.is_historized is False
+
+    eq2 = snapshot.eq_logics[2]
+    assert eq2.is_excluded is True, "String '1' must be True"
+    assert eq2.is_enable is True
