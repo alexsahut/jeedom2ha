@@ -57,16 +57,19 @@ def _sync_mqtt_connect(host, port, user, password, tls_enabled, tls_verify) -> d
     Never logs passwords — errors are categorized for user display.
     """
     # V1 — CA système uniquement (pas de CA custom ni mTLS)
+    # Unique client_id per test to avoid broker disconnecting a previous test session
+    # with the same client_id (would cause ConnectionResetError on rapid successive tests)
+    client_id = f"jeedom2ha_test_{uuid.uuid4().hex[:8]}"
     try:
         # paho-mqtt 2.0+
         client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
-            client_id="jeedom2ha_test",
+            client_id=client_id,
             clean_session=True,
         )
     except AttributeError:
         # paho-mqtt < 2.0
-        client = mqtt.Client(client_id="jeedom2ha_test", clean_session=True)
+        client = mqtt.Client(client_id=client_id, clean_session=True)
     connect_result = {"rc": None}
 
     def on_connect(_client, _userdata, _flags, rc):
