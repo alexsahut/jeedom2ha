@@ -463,6 +463,12 @@ Les tests sont dans `tests/unit/` (racine du repo) et non dans `resources/daemon
     - `postSaveConfiguration` ne sauvegarde le mot de passe que s'il est non vide dans la requête (évite l'écrasement par du vide).
     - `testMqttConnection` implémente la priorité Formulaire > Stored Secret > Aucun.
     - UI mise à jour : champ password masqué par défaut, indicateur visuel "déjà configuré", ne charge jamais le secret dans le DOM.
+- **2026-03-13** (Bugs Runtime) : Correction de bugs découverts sur instance réelle Jeedom.
+    - **JSON Parsing** : Synchronisation du format JSON entre PHP (`callDaemon`) et le Daemon. Utilisation d'un wrapper `{"action": "...", "payload": {...}}`.
+    - **paho-mqtt 2.x** : Ajout du support de `CallbackAPIVersion.VERSION1` pour éviter le `ValueError` sur les versions récentes de paho-mqtt.
+    - **Port MQTT Manager** : Filtrage automatique du port `55035` (socket interne) pour préférer `1883`.
+    - **Auth parsing** : Support du format `user:pass` dans certains champs MQTT Manager.
+    - **Input Validation** : Ajout de codes d'erreur `missing_host` et `invalid_port` pour éviter les `unknown_error`.
 
 ## Dev Agent Record
 

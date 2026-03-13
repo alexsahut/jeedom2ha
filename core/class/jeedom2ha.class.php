@@ -69,6 +69,21 @@ class jeedom2ha extends eqLogic {
         log::add(__CLASS__, 'debug', '[MQTT] Auto-détection mqtt2 : hôte non trouvé dans la configuration mqtt2 (test mqttAddress et mqttaddress)');
         return null;
       }
+
+      // Filtrage du port : 55035 est le socket interne, pas le port broker client
+      if (intval($port) === 55035) {
+        log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : port 55035 détecté (socket interne), repli sur 1883');
+        $port = 1883;
+      }
+
+      // Parsing éventuel de l'auth "user:pass"
+      if (strpos($user, ':') !== false && ($pass === '' || $pass === null)) {
+        log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : format user:pass détecté');
+        list($detectedUser, $detectedPass) = explode(':', $user, 2);
+        $user = $detectedUser;
+        $pass = $detectedPass;
+      }
+
       log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : host détecté → configuration pré-remplie');
       return array(
         'host' => $host,
@@ -218,7 +233,17 @@ class jeedom2ha extends eqLogic {
     );
 
     if ($_method === 'POST' && !empty($_payload)) {
-      $opts['http']['content'] = json_encode($_payload);
+      $action = ltrim($_endpoint, '/');
+      $action = str_replace('action/', '', $action);
+      $action = str_replace('/', '.', $action);
+      
+      $wrappedPayload = array(
+        'action' => $action,
+        'payload' => $_payload,
+        'request_id' => bin2hex(random_bytes(8)),
+        'timestamp' => date('c'),
+      );
+      $opts['http']['content'] = json_encode($wrappedPayload);
     }
 
     $context = stream_context_create($opts);
