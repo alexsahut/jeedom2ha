@@ -103,7 +103,7 @@ $(function() {
   // ---- Auto-détection MQTT Manager au chargement ----
   $.ajax({
     type: 'POST',
-    url: 'core/ajax/jeedom2ha.ajax.php',
+    url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     data: {action: 'getMqttConfig'},
     dataType: 'json',
     error: function() { /* Best-effort — l'absence de résultat ne bloque pas le formulaire manuel */ },
@@ -167,7 +167,7 @@ $(function() {
       .text('{{Test en cours...}}').show();
     $.ajax({
       type: 'POST',
-      url: 'core/ajax/jeedom2ha.ajax.php',
+      url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
       data: {
         action: 'testMqttConnection',
         host:       $('.configKey[data-l1key=mqttHost]').val(),
