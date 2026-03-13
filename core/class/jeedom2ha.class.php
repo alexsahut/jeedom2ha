@@ -371,12 +371,12 @@ class jeedom2ha extends eqLogic {
       $result['eq_logics'][] = array(
         'id'           => intval($eq->getId()),
         'name'         => $eq->getName(),
-        'object_id'    => ($eq->getObject_id() !== null) ? intval($eq->getObject_id()) : null,
-        'is_enable'    => (bool)$eq->getIsEnable(),
-        'is_visible'   => (bool)$eq->getIsVisible(),
-        'eq_type'      => $eq->getEqType_name(),
-        'generic_type' => $eq->getGeneric_type() ?: null,
-        'is_excluded'  => (bool)$eq->getConfiguration('jeedom2ha_excluded', false),
+        'object_id'    => (method_exists($eq, 'getObject_id') && $eq->getObject_id() !== null) ? intval($eq->getObject_id()) : null,
+        'is_enable'    => method_exists($eq, 'getIsEnable') ? (bool)$eq->getIsEnable() : true, // Actif par défaut si on ne peut pas savoir
+        'is_visible'   => method_exists($eq, 'getIsVisible') ? (bool)$eq->getIsVisible() : true,
+        'eq_type'      => method_exists($eq, 'getEqType_name') ? $eq->getEqType_name() : 'unknown',
+        'generic_type' => method_exists($eq, 'getGeneric_type') ? ($eq->getGeneric_type() ?: null) : null,
+        'is_excluded'  => method_exists($eq, 'getConfiguration') ? (bool)$eq->getConfiguration('jeedom2ha_excluded', false) : false,
         'cmds'         => $cmds,
       );
     }
