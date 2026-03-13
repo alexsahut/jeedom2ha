@@ -36,6 +36,36 @@ _LIGHT_GENERIC_TYPES = {
     "LIGHT_SET_COLOR", "LIGHT_COLOR", "LIGHT_COLOR_TEMP",
 }
 
+# Generic types that strongly imply the equipment is NOT primarily a light
+# (Heaters, Covers, Plugs, Sensors, Sirens)
+_ANTI_LIGHT_GENERIC_TYPES = {
+    "HEATING_STATE", "HEATING_ON", "HEATING_OFF", "HEATING_OTHER",
+    "THERMOSTAT_STATE", "THERMOSTAT_MODE", "THERMOSTAT_SETPOINT",
+    "WATER_HEATER_STATE", "WATER_HEATER_ON", "WATER_HEATER_OFF",
+    "FLAP_STATE", "FLAP_UP", "FLAP_DOWN", "FLAP_STOP", "FLAP_SLIDER",
+    "ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "ENERGY_POWER", "POWER", "CONSUMPTION",
+    "SMOKE", "MOTION", "PRESENCE", "OPENING", "OPENING_WINDOW", "OPENING_DOOR",
+    "SIREN_STATE", "SIREN_ON", "SIREN_OFF",
+    "ALARM_STATE", "ALARM_ENABLE", "ALARM_DISABLE",
+    "LOCK_STATE", "LOCK_OPEN", "LOCK_CLOSE",
+}
+
+# Keywords in equipment name that strongly imply it's not a light
+_NON_LIGHT_KEYWORDS = {
+    # Chauffage
+    "chauffage", "radiateur", "thermostat", "heater", "chaudiere", "chaudière", "poele", "poêle",
+    # Eau / Chauffe-eau
+    "chauffe-eau", "eau", "water", "cumulus", "ballon",
+    # Piscine
+    "piscine", "pool", "filtration", "filtre", "pompe",
+    # Prises (relays often using LIGHT_ON/OFF)
+    "prise", "plug", "socket", 
+    # Sécurité
+    "fumée", "smoke", "incendie", "feu", "fire", "alarme", "sirene", "sirène",
+    # Volets
+    "volet", "store", "cover", "blind", "shutter", "garage", "portail",
+}
+
 
 def _min_confidence(*confidences: str) -> str:
     """Return the worst confidence among the given values.
@@ -63,8 +93,10 @@ class LightMapper:
 
         Returns None if the equipment contains no LIGHT_* commands.
         """
-        # Collect LIGHT_* commands by generic_type
+        # Collect LIGHT_* commands and detect ANTI_LIGHT_* commands
         light_cmds: Dict[str, JeedomCmd] = {}
+        anti_light_cmds = set()
+        
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in _LIGHT_GENERIC_TYPES:
                 if cmd.generic_type in light_cmds:
@@ -89,9 +121,62 @@ class LightMapper:
                         reason_details={"duplicate_type": cmd.generic_type},
                     )
                 light_cmds[cmd.generic_type] = cmd
+            elif cmd.generic_type and cmd.generic_type in _ANTI_LIGHT_GENERIC_TYPES:
+                anti_light_cmds.add(cmd.generic_type)
 
         if not light_cmds:
             return None  # Not a light
+            
+        # GUARDRAILS against false positives (Story 2.2 hardened)
+        # 1. Equipment generic type explicitly set to something else (if provided by Jeedom v4)
+        if eq.generic_type and eq.generic_type.lower() not in ("light", ""):
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d name='%s': eq.generic_type is '%s' (not light) → ignore",
+                eq.id, eq.name, eq.generic_type
+            )
+            return None
+
+        # 2. Conflicting command generic types (Anti-affinity)
+        if anti_light_cmds:
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d name='%s': conflicting generic types found %s → ambiguous",
+                eq.id, eq.name, list(anti_light_cmds)
+            )
+            capabilities = LightCapabilities()
+            return MappingResult(
+                ha_entity_type="light",
+                confidence="ambiguous",
+                reason_code="conflicting_generic_types",
+                jeedom_eq_id=eq.id,
+                ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+                ha_name=eq.name,
+                suggested_area=snapshot.get_suggested_area(eq.id),
+                commands=light_cmds,
+                capabilities=capabilities,
+                reason_details={"conflicting_types": list(anti_light_cmds)},
+            )
+            
+        # 3. Name heuristics (Detecting plugs, heaters, pumps misconfigured as lights)
+        name_lower = eq.name.lower()
+        matched_kw = next((kw for kw in _NON_LIGHT_KEYWORDS if kw in name_lower), None)
+        if matched_kw:
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d name='%s': name contains non-light keyword '%s' → ambiguous",
+                eq.id, eq.name, matched_kw
+            )
+            capabilities = LightCapabilities()
+            return MappingResult(
+                ha_entity_type="light",
+                confidence="ambiguous",
+                reason_code="name_heuristic_rejection",
+                jeedom_eq_id=eq.id,
+                ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+                ha_name=eq.name,
+                suggested_area=snapshot.get_suggested_area(eq.id),
+                commands=light_cmds,
+                capabilities=capabilities,
+                reason_details={"matched_keyword": matched_kw},
+            )
 
         # Check if ONLY color commands exist (V1 unsupported)
         non_color_cmds = {gt for gt in light_cmds if gt not in _COLOR_GENERIC_TYPES}

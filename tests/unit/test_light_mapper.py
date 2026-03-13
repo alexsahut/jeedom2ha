@@ -224,7 +224,62 @@ class TestAmbiguousCases:
 
 
 # ==============================================================================
-# Test: Mixed commands (LIGHT + non-LIGHT)
+# Test: False Positives Guardrails
+# ==============================================================================
+
+class TestFalsePositivesGuardrails:
+    def test_explicit_non_light_generic_type_returns_none(self, mapper, snapshot):
+        """Si l'équipement a un eq.generic_type différent de 'light', on ignore."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        eq.generic_type = "HEATER"  # Explicitly not a light
+        result = mapper.map(eq, snapshot)
+        assert result is None
+
+    def test_conflicting_generic_types_ambiguous(self, mapper, snapshot):
+        """LIGHT_ON + HEATING_STATE → ambiguous (conflit de domaines)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("HEATING_STATE", id=200, type="info", sub_type="binary"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "conflicting_generic_types"
+        assert "HEATING_STATE" in result.reason_details["conflicting_types"]
+
+    def test_name_heuristic_rejection(self, mapper, snapshot):
+        """Nom contenant 'prise' ou 'chauffage' avec des commandes lumière → ambiguous."""
+        eq = _make_eq(id=99, name="Prise TV Salon", cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+        assert result.reason_details["matched_keyword"] == "prise"
+
+    def test_smoke_detector_with_light_led_ambiguous(self, mapper, snapshot):
+        """Détecteur de fumée avec une LED type LIGHT_STATE → ambiguous (conflit SMOKE)."""
+        eq = _make_eq(name="Détecteur Fumée Couloir", cmds=[
+            _cmd("SMOKE", id=300, type="info", sub_type="binary"),
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "conflicting_generic_types"
+
+
+# ==============================================================================
+# Test: Mixed commands (LIGHT + non-LIGHT neutral)
 # ==============================================================================
 
 class TestMixedCommands:

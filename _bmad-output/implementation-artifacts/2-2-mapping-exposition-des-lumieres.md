@@ -323,6 +323,13 @@ Les conteneurs `app['mappings']` et `app['publications']` doivent être pré-ini
 
 Lors de chaque appel global `/action/sync`, le plugin maintient une liste des équipements publiés et purge (RAM + unpublish MQTT) tous les équipements Jeedom qui étaient précédemment éligibles/lus mais qui ne remontent plus dans la nouvelle payload d'éligibilité (ou dont le type générique ne match plus). Cela prévient les "Entités fantômes" dans HA.
 
+### Durcissement du Mapping (Faux Positifs)
+
+Suite au Smoke Test, des équipements non-lumière (chauffage, chauffe-eau, module piscine, prise) étaient exposés à tort car historiquement typés `LIGHT_ON`/`LIGHT_OFF` dans Jeedom par certains plugins relais. Pour y remédier, des garde-fous stricts ont été ajoutés dans `LightMapper` :
+1. **Exclusion explicite :** Si `eq.generic_type` est fourni et différent de `light` (ex: `HEATER`, `FLAP`), le mapping est purement annulé.
+2. **Anti-affinité (Conflits) :** Si l'équipement possède des commandes de domaines antagonistes (`HEATING_*`, `SMOKE`, `ENERGY_POWER`, `FLAP_*`, etc.), le mapping devient `ambiguous` avec motif `conflicting_generic_types`.
+3. **Heuristiques de Noms :** Si le nom de l'équipement contient des mots-clés d'autres domaines (chauffage, prise, piscine, fumée, etc.), le mapping devient `ambiguous` avec motif `name_heuristic_rejection`.
+
 ### Pièges à éviter
 
 - **NE PAS** traiter le mapping comme des lignes exclusives — les capacités sont **cumulées** (on/off + brightness forment une seule entité)
@@ -386,6 +393,7 @@ Les tests sont dans `tests/` (racine du repo) et non dans `resources/daemon/test
 - 2026-03-13: Implémentation complète Tasks 1-4 — mapping engine capability-based, discovery publisher MQTT, intégration sync handler, 34 tests unitaires ajoutés (136 total pass).
 - 2026-03-13: Refinement post Code Review (Fix Doublons de generic_type: passe l'équipement en Ambigu, Fix RAM leak & MQTT Ghost entities: `unpublish` des disparus de l'éligibilité, unpublish by id plus robuste, documentation dette HA UX inerte).
 - 2026-03-13: Fix bug `_min_confidence` — utilisait `min()` (meilleure confiance) au lieu de `max()` (pire confiance) pour le calcul semantique.
+- 2026-03-13: Smoke Test terrain partiel — Validation de la publication MQTT, mais détection de faux-positifs (chauffage, modules piscines exposés en `light`). Durcissement du `LightMapper` via 3 garde-fous (type explicite, anti-affinité de commandes, heuristique de nom). Faux-positifs corrigés et couverts par tests.
 
 ## Dev Agent Record
 
