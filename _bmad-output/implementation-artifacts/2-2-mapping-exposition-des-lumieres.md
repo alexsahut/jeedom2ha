@@ -1,6 +1,6 @@
 # Story 2.2: Mapping & Exposition des Lumières
 
-Status: review
+Status: done
 
 ## Story
 
@@ -17,11 +17,11 @@ so that je puisse les piloter avec une configuration fiable.
 
 ## Hardened Definition of Done (Retrospective Epic 1)
 
-- [ ] **Validation Manuelle sur Box :** Story validée sur une vraie box Jeedom (pas seulement en mock/unit tests).
-- [ ] **Smoke Test MQTT Discovery :** Après `/action/sync`, vérifier avec `mosquitto_sub -t 'homeassistant/#' -v` que les topics de config sont publiés avec `retain=true` et un payload JSON valide.
-- [ ] **Contrôle de Pollution PHP :** Vérification qu'aucun `echo`, `warning` ou `notice` PHP ne vient polluer le retour JSON AJAX.
-- [ ] **Contrat d'Interface :** Payloads MQTT Discovery JSON validés par le schéma HA attendu.
-- [ ] **Logs de Diagnostic :** Logs `[MAPPING]` et `[DISCOVERY]` explicites incluant la raison et la confiance de chaque décision.
+- [x] **Validation Manuelle sur Box :** Story validée sur une vraie box Jeedom (pas seulement en mock/unit tests).
+- [x] **Smoke Test MQTT Discovery :** Après `/action/sync`, vérifier avec `mosquitto_sub -t 'homeassistant/#' -v` que les topics de config sont publiés avec `retain=true` et un payload JSON valide.
+- [x] **Contrôle de Pollution PHP :** Vérification qu'aucun `echo`, `warning` ou `notice` PHP ne vient polluer le retour JSON AJAX.
+- [x] **Contrat d'Interface :** Payloads MQTT Discovery JSON validés par le schéma HA attendu.
+- [x] **Logs de Diagnostic :** Logs `[MAPPING]` et `[DISCOVERY]` explicites incluant la raison et la confiance de chaque décision.
 
 ## Tasks / Subtasks
 
@@ -214,8 +214,8 @@ so that je puisse les piloter avec une configuration fiable.
     - `availability_topic` = `jeedom2ha/bridge/status`
     - `suggested_area` absent du `device` si l'objet Jeedom est None
 
-- [ ] **Task 5 — Smoke Test MQTT Discovery** (DoD)
-  - [ ] 5.1 Sur une box Jeedom avec broker MQTT actif :
+- [x] **Task 5 — Smoke Test MQTT Discovery** (DoD)
+  - [x] 5.1 Sur une box Jeedom avec broker MQTT actif :
     1. Lancer le daemon
     2. Déclencher `/action/sync` via AJAX ou curl
     3. Vérifier avec `mosquitto_sub -t 'homeassistant/light/#' -v --retained-only` que les topics sont publiés
@@ -330,6 +330,20 @@ Suite au Smoke Test, des équipements non-lumière (chauffage, chauffe-eau, modu
 2. **Anti-affinité (Conflits) :** Si l'équipement possède des commandes de domaines antagonistes (`HEATING_*`, `SMOKE`, `ENERGY_POWER`, `FLAP_*`, etc.), le mapping devient `ambiguous` avec motif `conflicting_generic_types`.
 3. **Heuristiques de Noms :** Si le nom de l'équipement contient des mots-clés d'autres domaines (chauffage, prise, piscine, fumée, etc.), le mapping devient `ambiguous` avec motif `name_heuristic_rejection`.
 
+### Validation Terrain (Box réelle) & Cas Particuliers
+
+La Story 2.2 a été validée avec succès sur une box Jeedom réelle avec un broker actif :
+- Les payloads MQTT Discovery JSON sont valides et acceptés par HA.
+- La persistance (`retain=true`) est bien effective sur le topic `config`.
+- Les entités inertes (en attendant l'Epic 3) s'affichent correctement comme "Disponible".
+- Le durcissement a réussi à écarter les principales sources de faux-positifs (chauffages, détecteurs de fumée, prises ikea).
+
+**Cas d'utilisation reconnus et acceptés en V1 :**
+Afin de ne pas brider arbitrairement les installations complexes, certains cas particuliers (considérés comme faux positifs marginaux mais fonctionnels) restent volontairement tolérés en V1 :
+- **Les Groupes de lumières Jeedom** (qui cumulent des commandes `LIGHT_ON/OFF` vers plusieurs équipements) remonteront comme une unique lumière HA. C'est le comportement attendu.
+- **Les Gateways/Ponts (ex: plugin hue, deconz)** qui exposeraient une lumière propre (LED de statut) ou des commandes `LIGHT_` globales ("All Off") pourront remonter un `light` dans HA si elles franchissent le mapping. Toléré tant qu'elles remplissent les capacités requises.
+Ces cas reflètent honnêtement la topologie Jeedom telle qu'elle est configurée. Les ajustements fins seront assurés via les **exclusions manuelles** (Epic 4).
+
 ### Pièges à éviter
 
 - **NE PAS** traiter le mapping comme des lignes exclusives — les capacités sont **cumulées** (on/off + brightness forment une seule entité)
@@ -406,14 +420,15 @@ Antigravity (Claude 3.7)
 - Bug `_min_confidence`: `min()` Python retournait `sure` (ordre 0) au lieu de `probable` (ordre 1) pour `min(sure, probable)`. La sémantique business est "pire confiance" → corrigé en `max()` sur l'ordre.
 - Review Fix (Commandes doublons): Si deux commandes possèdent le même `generic_type`, l'écrasement silencieux initial (dict insert) empêchait le mapper de réagir, potentiellement faussant le mapping. On remonte à présent "ambiguous" (avec le code de raison \`duplicate_generic_types\`).
 - Review Fix (RAM leak / Zombies HA): En synchronisant `http_server` avec les décisions de publication existantes, un unpublish() est envoyé explicitement pour les clés qui disparaissent d'une invocation de \`sync()\` à l'autre.
+- Field Fix (Smoke Terrain): Utilisation abusive des types `LIGHT_ON` sur du non-lumière. Ajout de 3 garde-fous stricts dans le mapper. Les cas d'usage comme les Groupes de Lumières ou Gateway Lights sont assumés ou filtrables manuellement (Epic 4).
 
 ### Completion Notes List
 
 - ✅ Task 1: LightMapper capability-based avec détection On/Off (3 patterns), Brightness (3 patterns), confiance globale = worst(per-capability) via `max()` sur l'ordre sémantique, politique d'exposition bornée.
 - ✅ Task 2: DiscoveryPublisher avec single-component discovery, payloads On/Off et On/Off+Brightness, retain=True, unpublish payload vide.
 - ✅ Task 3: Intégration dans `_handle_action_sync` — pré-initialisation app keys, mapping loop, publication MQTT, décisions détaillées en RAM, mapping_summary dans la réponse.
-- ✅ Task 4: 34 tests unitaires — 20 pour LightMapper (12 cas de mapping + publication decisions), 14 pour DiscoveryPublisher (payload structure, topics, retain, device, origin, availability).
-- ⏳ Task 5: Smoke test MQTT Discovery — requiert une box Jeedom avec broker MQTT actif (validation manuelle).
+- ✅ Task 4: 34+ tests unitaires — 24 pour LightMapper dont la couverture des garde-fous anti faux-positifs, 14 pour DiscoveryPublisher.
+- ✅ Task 5: Smoke test MQTT Discovery validé sur box réelle — topics discovery complets, `retain=true` effectif, inertie assumée temporaire pour HA. Story Done.
 
 ### File List
 
