@@ -12,6 +12,14 @@ $eqLogics = eqLogic::byType($plugin->getId());
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
+
+		<!-- Zone statut pont MQTT — badge distinct du badge daemon natif Jeedom -->
+		<div id="div_bridgeStatus" class="well well-sm" style="margin:10px 5px;">
+			<i class="fas fa-network-wired"></i> <strong>{{Pont MQTT}}</strong> :
+			<span id="span_mqttStatus" class="label label-default">{{Chargement...}}</span>
+			<span id="span_mqttBroker" style="margin-left:10px;color:#666;font-size:0.9em;"></span>
+		</div>
+
 		<!-- Boutons de gestion du plugin -->
 		<div class="eqLogicThumbnailContainer">
 			<div class="cursor eqLogicAction logoPrimary" data-action="add">

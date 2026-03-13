@@ -14,6 +14,61 @@
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* Statut du pont MQTT — badge distinct du badge daemon natif Jeedom */
+function refreshBridgeStatus() {
+  $.ajax({
+    type: 'POST',
+    url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    data: {action: 'getBridgeStatus'},
+    dataType: 'json',
+    success: function(data) {
+      if (data.state !== 'ok') {
+        $('#span_mqttStatus').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
+        return;
+      }
+      var r = data.result;
+      var $badge = $('#span_mqttStatus');
+      var $broker = $('#span_mqttBroker');
+      if (!r.daemon) {
+        $badge.removeClass().addClass('label label-default').text('{{Démon arrêté}}');
+        $broker.text('');
+        return;
+      }
+      var mqtt = r.mqtt || {};
+      switch (mqtt.state) {
+        case 'connected':
+          $badge.removeClass().addClass('label label-success').text('{{MQTT Connecté}}');
+          break;
+        case 'reconnecting':
+          $badge.removeClass().addClass('label label-warning').text('{{MQTT Reconnexion...}}');
+          break;
+        case 'connecting':
+          $badge.removeClass().addClass('label label-warning').text('{{MQTT Connexion...}}');
+          break;
+        case 'disconnected':
+          $badge.removeClass().addClass('label label-warning').text('{{MQTT Déconnecté}}');
+          break;
+        default:
+          $badge.removeClass().addClass('label label-default').text('{{MQTT Non configuré}}');
+      }
+      $broker.text(mqtt.broker || '');
+    },
+    error: function() {
+      $('#span_mqttStatus').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
+    }
+  });
+}
+
+$(function() {
+  // Refresh MQTT badge on page load and every 30s when visible
+  refreshBridgeStatus();
+  setInterval(function() {
+    if ($('#div_bridgeStatus').is(':visible')) {
+      refreshBridgeStatus();
+    }
+  }, 5000);
+});
+
 /* Permet la réorganisation des commandes dans l'équipement */
 $("#table_cmd").sortable({
   axis: "y",

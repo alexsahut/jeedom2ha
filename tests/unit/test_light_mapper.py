@@ -1,0 +1,369 @@
+"""test_light_mapper.py — Unit tests for the capability-based light mapper.
+
+Story 2.2: Tests covering all mapping scenarios for LIGHT_* generic types.
+"""
+import sys
+import os
+import pytest
+
+# Add daemon to path for direct model imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'daemon'))
+
+from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
+from mapping.light import LightMapper
+
+
+@pytest.fixture
+def mapper():
+    return LightMapper()
+
+
+@pytest.fixture
+def snapshot():
+    """Minimal snapshot with one object for suggested_area testing."""
+    return TopologySnapshot(
+        timestamp="2026-03-13T20:00:00+01:00",
+        objects={10: JeedomObject(id=10, name="Salon")},
+        eq_logics={},
+    )
+
+
+def _make_eq(id=1, name="Test Light", object_id=10, cmds=None):
+    """Helper to create a JeedomEqLogic with given commands."""
+    return JeedomEqLogic(
+        id=id,
+        name=name,
+        object_id=object_id,
+        eq_type_name="zwave",
+        cmds=cmds or [],
+    )
+
+
+def _cmd(generic_type, id=100, type="info", sub_type="binary", name=None):
+    """Helper to create a JeedomCmd."""
+    return JeedomCmd(
+        id=id,
+        name=name or generic_type,
+        generic_type=generic_type,
+        type=type,
+        sub_type=sub_type,
+    )
+
+
+# ==============================================================================
+# Test: EqLogic without LIGHT_* commands → returns None
+# ==============================================================================
+
+class TestNonLightEquipment:
+    def test_no_light_commands_returns_none(self, mapper, snapshot):
+        """EqLogic sans aucun LIGHT_* → retourne None (pas une lumière)."""
+        eq = _make_eq(cmds=[
+            _cmd("TEMPERATURE", id=100, type="info", sub_type="numeric"),
+            _cmd("HUMIDITY", id=101, type="info", sub_type="numeric"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is None
+
+    def test_empty_commands_returns_none(self, mapper, snapshot):
+        """EqLogic sans commandes → retourne None."""
+        eq = _make_eq(cmds=[])
+        result = mapper.map(eq, snapshot)
+        assert result is None
+
+
+# ==============================================================================
+# Test: On/Off detection (Phase 1)
+# ==============================================================================
+
+class TestOnOffDetection:
+    def test_state_on_off_sure(self, mapper, snapshot):
+        """LIGHT_STATE + LIGHT_ON + LIGHT_OFF → On/Off sure."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "sure"
+        assert result.capabilities.has_on_off is True
+        assert result.capabilities.on_off_confidence == "sure"
+        assert result.capabilities.has_brightness is False
+
+    def test_state_on_missing_off_probable(self, mapper, snapshot):
+        """LIGHT_STATE + LIGHT_ON (sans LIGHT_OFF) → On/Off probable."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "probable"
+        assert result.capabilities.has_on_off is True
+        assert result.capabilities.on_off_confidence == "probable"
+
+    def test_state_off_missing_on_probable(self, mapper, snapshot):
+        """LIGHT_STATE + LIGHT_OFF (sans LIGHT_ON) → On/Off probable."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "probable"
+        assert result.capabilities.has_on_off is True
+        assert result.capabilities.on_off_confidence == "probable"
+
+
+# ==============================================================================
+# Test: Brightness detection (Phase 2)
+# ==============================================================================
+
+class TestBrightnessDetection:
+    def test_brightness_info_plus_slider_sure(self, mapper, snapshot):
+        """LIGHT_BRIGHTNESS (info) + LIGHT_SLIDER (action) → brightness sure."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_BRIGHTNESS", id=100, type="info", sub_type="numeric"),
+            _cmd("LIGHT_SLIDER", id=101, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.has_brightness is True
+        assert result.capabilities.brightness_confidence == "sure"
+
+    def test_slider_without_brightness_info_probable(self, mapper, snapshot):
+        """LIGHT_STATE + LIGHT_SLIDER (sans LIGHT_BRIGHTNESS) → brightness probable."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_SLIDER", id=101, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.has_brightness is True
+        assert result.capabilities.brightness_confidence == "probable"
+
+
+# ==============================================================================
+# Test: Cumulated capabilities (Phase 3)
+# ==============================================================================
+
+class TestCumulatedCapabilities:
+    def test_full_light_sure(self, mapper, snapshot):
+        """LIGHT_STATE + ON + OFF + BRIGHTNESS + SLIDER → une seule entité sure."""
+        eq = _make_eq(id=42, cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("LIGHT_BRIGHTNESS", id=103, type="info", sub_type="numeric"),
+            _cmd("LIGHT_SLIDER", id=104, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.ha_entity_type == "light"
+        assert result.confidence == "sure"
+        assert result.capabilities.has_on_off is True
+        assert result.capabilities.has_brightness is True
+        assert result.capabilities.on_off_confidence == "sure"
+        assert result.capabilities.brightness_confidence == "sure"
+        assert result.reason_code == "light_on_off_brightness"
+
+    def test_partial_cumulated_probable(self, mapper, snapshot):
+        """LIGHT_STATE + LIGHT_ON + LIGHT_SLIDER → both probable, global probable."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_SLIDER", id=104, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.has_on_off is True
+        assert result.capabilities.on_off_confidence == "probable"
+        assert result.capabilities.has_brightness is True
+        assert result.capabilities.brightness_confidence == "probable"
+        assert result.confidence == "probable"
+
+    def test_on_off_sure_brightness_probable_yields_probable(self, mapper, snapshot):
+        """On/Off sure + brightness probable → global probable (min)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("LIGHT_SLIDER", id=104, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.on_off_confidence == "sure"
+        assert result.capabilities.brightness_confidence == "probable"
+        assert result.confidence == "probable"
+
+
+# ==============================================================================
+# Test: Ambiguous / edge cases
+# ==============================================================================
+
+class TestAmbiguousCases:
+    def test_color_only_ambiguous(self, mapper, snapshot):
+        """LIGHT_SET_COLOR seul → confidence ambiguous (V1 non supporté)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_SET_COLOR", id=100, type="action", sub_type="color"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "color_only_unsupported"
+
+    def test_state_orphan_ambiguous(self, mapper, snapshot):
+        """LIGHT_STATE seul → confidence ambiguous."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "state_orphan"
+
+
+# ==============================================================================
+# Test: Mixed commands (LIGHT + non-LIGHT)
+# ==============================================================================
+
+class TestMixedCommands:
+    def test_light_and_temperature_only_light_retained(self, mapper, snapshot):
+        """EqLogic avec LIGHT_* + TEMPERATURE → seules LIGHT_* retenues."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("TEMPERATURE", id=200, type="info", sub_type="numeric"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "sure"
+        assert "TEMPERATURE" not in result.commands
+
+
+# ==============================================================================
+# Test: ID and area generation
+# ==============================================================================
+
+class TestIdGeneration:
+    def test_ha_unique_id_format(self, mapper, snapshot):
+        """ha_unique_id == jeedom2ha_eq_{id}."""
+        eq = _make_eq(id=42, cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.ha_unique_id == "jeedom2ha_eq_42"
+        assert result.jeedom_eq_id == 42
+
+    def test_suggested_area_from_snapshot(self, mapper, snapshot):
+        """suggested_area extrait du snapshot (objet Jeedom)."""
+        eq = _make_eq(id=42, object_id=10, cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        # Add eq to snapshot for get_suggested_area
+        snapshot.eq_logics[42] = eq
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.suggested_area == "Salon"
+
+    def test_suggested_area_none_when_no_object(self, mapper):
+        """suggested_area == None quand pas d'objet Jeedom."""
+        snapshot = TopologySnapshot(
+            timestamp="2026-03-13T20:00:00+01:00",
+            objects={},
+            eq_logics={},
+        )
+        eq = _make_eq(id=42, object_id=None, cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.suggested_area is None
+
+
+# ==============================================================================
+# Test: Publication decision (bounded policy)
+# ==============================================================================
+
+class TestPublicationDecision:
+    def test_sure_publishes(self, mapper, snapshot):
+        """Confidence sure → always publish."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        mapping = mapper.map(eq, snapshot)
+        decision = mapper.decide_publication(mapping)
+        assert decision.should_publish is True
+        assert decision.reason == "sure"
+
+    def test_probable_publishes(self, mapper, snapshot):
+        """Confidence probable → publish (bounded to Story 2.2 light cases)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+        ])
+        mapping = mapper.map(eq, snapshot)
+        decision = mapper.decide_publication(mapping)
+        assert decision.should_publish is True
+
+    def test_ambiguous_skipped(self, mapper, snapshot):
+        """Confidence ambiguous → never publish."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_SET_COLOR", id=100, type="action", sub_type="color"),
+        ])
+        mapping = mapper.map(eq, snapshot)
+        decision = mapper.decide_publication(mapping)
+        assert decision.should_publish is False
+        assert decision.reason == "ambiguous_skipped"
+
+    def test_decision_has_mapping_ref(self, mapper, snapshot):
+        """PublicationDecision must reference its MappingResult."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        mapping = mapper.map(eq, snapshot)
+        decision = mapper.decide_publication(mapping)
+        assert decision.mapping_result is mapping
+
+
+# ==============================================================================
+# Test: State numeric as brightness fallback
+# ==============================================================================
+
+class TestStateNumericFallback:
+    def test_state_numeric_as_brightness_probable(self, mapper, snapshot):
+        """LIGHT_STATE (numeric sub_type) sans slider → brightness probable via fallback."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="numeric"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.has_brightness is True
+        assert result.capabilities.brightness_confidence == "probable"
+        assert result.reason_code == "light_on_off_brightness"
+
+    def test_state_binary_no_brightness(self, mapper, snapshot):
+        """LIGHT_STATE (binary) sans slider → pas de brightness."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.capabilities.has_brightness is False
+        assert result.reason_code == "light_on_off_only"

@@ -26,6 +26,17 @@ if (!isConnect()) {
 <!-- Bandeau d'auto-détection MQTT -->
 <div class="alert" id="div_mqtt_autodetect_status" style="display:none;"></div>
 
+<!-- Actions d'import / reset -->
+<div style="margin-bottom:12px;">
+  <button type="button" class="btn btn-info btn-sm" id="bt_importMqttManager">
+    <i class="fas fa-download"></i> {{Récupérer depuis MQTT Manager}}
+  </button>
+  &nbsp;
+  <a href="#" id="lnk_resetMqttForm" style="font-size:0.85em; color: #999;">
+    <i class="fas fa-times"></i> {{Réinitialiser le formulaire}}
+  </a>
+</div>
+
 <form class="form-horizontal">
   <fieldset>
     <legend><i class="fas fa-network-wired"></i> {{Configuration MQTT}}</legend>
@@ -124,6 +135,9 @@ $(function() {
           $('.configKey[data-l1key=mqttHost]').val(result.host);
           $('.configKey[data-l1key=mqttPort]').val(result.port);
           $('.configKey[data-l1key=mqttUser]').val(result.user);
+          if (result.tls) {
+            $('.configKey[data-l1key=mqttTls]').prop('checked', true);
+          }
         }
         // Sécurité : le mot de passe n'est JAMAIS chargé dans le DOM (result.password est inexistant)
         $('#div_mqtt_autodetect_status')
@@ -156,6 +170,69 @@ $(function() {
     } else {
       $(this).removeClass('configKey');
     }
+  });
+
+  // ---- Import forcé depuis MQTT Manager ----
+  $('#bt_importMqttManager').on('click', function() {
+    var $btn = $(this);
+    var $status = $('#div_mqtt_autodetect_status');
+    $btn.prop('disabled', true);
+    $status.removeClass()
+      .addClass('alert alert-info')
+      .html('<i class="fas fa-spinner fa-spin"></i> {{Import en cours...}}')
+      .show();
+    $.ajax({
+      type: 'POST',
+      url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+      data: {action: 'forceMqttManagerImport'},
+      dataType: 'json',
+      success: function(data) {
+        $btn.prop('disabled', false);
+        if (data.state !== 'ok') {
+          $status.removeClass().addClass('alert alert-warning')
+            .html('<i class="fas fa-exclamation-triangle"></i> ' + (data.result || '{{Erreur de communication}}'))
+            .show();
+          return;
+        }
+        var r = data.result;
+        if (r.status === 'ok') {
+          $('.configKey[data-l1key=mqttHost]').val(r.host);
+          $('.configKey[data-l1key=mqttPort]').val(r.port);
+          $('.configKey[data-l1key=mqttUser]').val(r.user);
+          $('.configKey[data-l1key=mqttTls]').prop('checked', r.tls === true);
+          if (r.has_password) {
+            $('#span_mqttPasswordStatus').show();
+            $('#in_mqttPassword').val('').removeClass('configKey');
+          }
+          $status.removeClass().addClass('alert alert-success')
+            .html('<i class="fas fa-check-circle"></i> {{Configuration importée depuis MQTT Manager}}')
+            .show();
+        } else {
+          $status.removeClass().addClass('alert alert-warning')
+            .html('<i class="fas fa-exclamation-triangle"></i> ' + r.message)
+            .show();
+        }
+      },
+      error: function(request) {
+        $btn.prop('disabled', false);
+        $status.removeClass().addClass('alert alert-warning')
+          .html('<i class="fas fa-exclamation-triangle"></i> {{Erreur de communication}} (HTTP ' + request.status + ')')
+          .show();
+      }
+    });
+  });
+
+  // ---- Réinitialiser le formulaire (front uniquement, sans sauvegarder) ----
+  $('#lnk_resetMqttForm').on('click', function(e) {
+    e.preventDefault();
+    $('.configKey[data-l1key=mqttHost]').val('');
+    $('.configKey[data-l1key=mqttPort]').val('');
+    $('.configKey[data-l1key=mqttUser]').val('');
+    $('#in_mqttPassword').val('').removeClass('configKey');
+    $('.configKey[data-l1key=mqttTls]').prop('checked', false);
+    $('.configKey[data-l1key=mqttTlsVerify]').prop('checked', false);
+    $('#span_mqttPasswordStatus').hide();
+    $('#div_mqtt_autodetect_status').hide();
   });
 
   // ---- Test de connexion MQTT ----

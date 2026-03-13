@@ -16,6 +16,9 @@ from aiohttp import web
 
 from .mqtt_client import MqttBridge
 from models.topology import TopologySnapshot, assess_all
+from models.mapping import MappingResult, PublicationDecision
+from mapping.light import LightMapper
+from discovery.publisher import DiscoveryPublisher
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -281,7 +284,7 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
 
 async def _handle_action_sync(request: web.Request) -> web.Response:
-    """Handle POST /action/sync — synchronize Jeedom topology and assess eligibility."""
+    """Handle POST /action/sync — synchronize Jeedom topology, assess eligibility, map and publish."""
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
         return web.json_response(
@@ -302,7 +305,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     eligibility = assess_all(snapshot)
     request.app["eligibility"] = eligibility
     
-    # 3. Build light summary response
+    # 3. Build eligibility summary
     eligible_count = sum(1 for res in eligibility.values() if res.is_eligible)
     ineligible_count = len(eligibility) - eligible_count
     
@@ -313,19 +316,102 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             
     total_cmds = sum(len(eq.cmds) for eq in snapshot.eq_logics.values())
     
+    _LOGGER.info(
+        "[TOPOLOGY] Sync complete: %d eligible, %d ineligible",
+        eligible_count, ineligible_count
+    )
+    
+    # 4. Nettoyage (RAM + MQTT) des anciens équipements disparus ou devenus inéligibles
+    anciens_eq_ids = set(request.app["mappings"].keys())
+    nouveaux_eq_ids = set()
+
+    # 5. Map eligible eqLogics to HA entities (Story 2.2)
+    mapper = LightMapper()
+    mappings = {}       # Dict[int, MappingResult]
+    publications = {}   # Dict[int, PublicationDecision]
+    
+    mapping_counters = {
+        "lights_sure": 0,
+        "lights_probable": 0,
+        "lights_ambiguous": 0,
+        "lights_published": 0,
+        "lights_skipped": 0,
+    }
+    
+    mqtt_bridge = request.app.get("mqtt_bridge")
+    publisher = DiscoveryPublisher(mqtt_bridge) if mqtt_bridge else None
+    
+    for eq_id, result in eligibility.items():
+        if not result.is_eligible:
+            continue
+        
+        eq = snapshot.eq_logics.get(eq_id)
+        if not eq:
+            continue
+        
+        mapping = mapper.map(eq, snapshot)
+        if mapping is None:
+            continue  # Not a light
+        
+        mappings[eq_id] = mapping
+        
+        # Count by confidence
+        if mapping.confidence == "sure":
+            mapping_counters["lights_sure"] += 1
+        elif mapping.confidence == "probable":
+            mapping_counters["lights_probable"] += 1
+        elif mapping.confidence == "ambiguous":
+            mapping_counters["lights_ambiguous"] += 1
+        
+        # Decide publication
+        decision = mapper.decide_publication(mapping)
+        publications[eq_id] = decision
+        nouveaux_eq_ids.add(eq_id)
+        
+        if decision.should_publish:
+            mapping_counters["lights_published"] += 1
+            # Publish via MQTT Discovery if bridge is connected
+            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                await publisher.publish_light(mapping, snapshot)
+        else:
+            mapping_counters["lights_skipped"] += 1
+            
+    # Purge des équipements qui ne sont plus remontés ou plus éligibles
+    eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
+    for old_eq_id in eq_ids_supprimes:
+        # Si c'était publié avant, on l'unpublish
+        old_decision = request.app["publications"].get(old_eq_id)
+        if old_decision and old_decision.should_publish:
+            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                await publisher.unpublish_by_eq_id(old_eq_id)
+                _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
+                
+        # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
+        request.app["mappings"].pop(old_eq_id, None)
+        request.app["publications"].pop(old_eq_id, None)
+    
+    # Store detailed decisions in RAM for Epic 4 (diagnostic)
+    request.app["mappings"].update(mappings)
+    request.app["publications"].update(publications)
+    
+    _LOGGER.info(
+        "[MAPPING] Summary: sure=%d probable=%d ambiguous=%d published=%d skipped=%d",
+        mapping_counters["lights_sure"],
+        mapping_counters["lights_probable"],
+        mapping_counters["lights_ambiguous"],
+        mapping_counters["lights_published"],
+        mapping_counters["lights_skipped"],
+    )
+    
     summary = {
         "total_objects": len(snapshot.objects),
         "total_eq_logics": len(snapshot.eq_logics),
         "total_cmds": total_cmds,
         "eligible_count": eligible_count,
         "ineligible_count": ineligible_count,
-        "ineligible_breakdown": breakdown
+        "ineligible_breakdown": breakdown,
+        "mapping_summary": mapping_counters,
     }
-    
-    _LOGGER.info(
-        "[TOPOLOGY] Sync complete: %d eligible, %d ineligible",
-        eligible_count, ineligible_count
-    )
     
     return web.json_response({
         "action": "sync",
@@ -343,6 +429,9 @@ def create_app(local_secret: str) -> web.Application:
     app["start_time"] = time.monotonic()
     # Pre-initialize bridge to avoid DeprecationWarning when re-assigning app keys later
     app["mqtt_bridge"] = MqttBridge()
+    # Pre-initialize mapping/publication containers (Story 2.2 — aiohttp guard-rail)
+    app["mappings"] = {}       # Dict[int, MappingResult]
+    app["publications"] = {}   # Dict[int, PublicationDecision]
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
