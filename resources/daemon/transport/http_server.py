@@ -82,7 +82,8 @@ def _sync_mqtt_connect(host, port, user, password, tls_enabled, tls_verify) -> d
                 ctx.verify_mode = ssl.CERT_NONE
             client.tls_set_context(ctx)
         if user:
-            client.username_pw_set(user, password)
+            _LOGGER.debug("[MQTT] username_pw_set called for user=%s", user)
+            client.username_pw_set(username=user, password=password)
 
         client.connect(host, port, keepalive=10)
         client.loop_start()
@@ -185,7 +186,18 @@ async def _handle_mqtt_test(request: web.Request) -> web.Response:
             "message": f"Port MQTT invalide : {port_raw}",
         })
 
-    _LOGGER.info("[MQTT] Testing connection to %s:%s (TLS: %s)", host, port, payload.get("tls", False))
+    # Support "username" (direct curl / docs format) and "user" (PHP callDaemon format)
+    # "username" takes priority when both are present
+    user = payload.get("username") or payload.get("user", "")
+    password = payload.get("password", "")
+    tls_enabled = bool(payload.get("tls", False))
+    tls_verify = bool(payload.get("tls_verify", True))
+
+    _LOGGER.info("[MQTT] Testing connection to %s:%s (TLS: %s)", host, port, tls_enabled)
+    _LOGGER.debug(
+        "[MQTT] Test params — username=%s password_present=%s tls=%s tls_verify=%s",
+        user or "(anonymous)", bool(password), tls_enabled, tls_verify,
+    )
 
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(
@@ -193,10 +205,10 @@ async def _handle_mqtt_test(request: web.Request) -> web.Response:
         _sync_mqtt_connect,
         host,
         port,
-        payload.get("user", ""),
-        payload.get("password", ""),
-        bool(payload.get("tls", False)),
-        bool(payload.get("tls_verify", True)),
+        user,
+        password,
+        tls_enabled,
+        tls_verify,
     )
 
     status = "ok" if result["ok"] else "error"

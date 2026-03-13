@@ -456,6 +456,15 @@ Les tests sont dans `tests/unit/` (racine du repo) et non dans `resources/daemon
 
 ## Change Log
 
+- **2026-03-13** (Credentials fix) : Correction du bug `auth_failed` sur instance réelle.
+    - **Preuve terrain** : `mosquitto_pub -h 127.0.0.1 -p 1883 -u jeedom -P '<pass>' -t jeedom2ha/test -m hello` réussit. `/action/mqtt_test` retournait `auth_failed` avec les mêmes credentials.
+    - **Cause racine** : `_handle_mqtt_test` lisait `payload.get("user", "")` mais le payload curl/docs envoie le champ `"username"`. Résultat : `user = ""` → `if user:` est **False** → `username_pw_set()` jamais appelé → connexion anonyme → Mosquitto RC=5.
+    - **Correction** : support explicite des deux clés avec priorité `"username"` > `"user"` : `user = payload.get("username") or payload.get("user", "")`.
+    - **Logs de debug sûrs** : ajout de logs debug dans `_handle_mqtt_test` (host, port, username, password_present) et dans `_sync_mqtt_connect` (confirmation appel `username_pw_set`). Aucun mot de passe en clair.
+    - **Arguments nommés** : `username_pw_set(username=user, password=password)` utilise des kwargs explicites.
+    - **6 nouveaux tests** dans `TestMqttCredentialsParsing` : champ `"username"`, fallback `"user"`, priorité `"username"` > `"user"`, ordre `username_pw_set` avant `connect`, absence de `username_pw_set` si user vide, absence du mot de passe dans les logs.
+    - **Régression** : 54/54 tests verts.
+
 - **2026-03-13**: Implémentation complète de la story 1.2 — auto-détection MQTT Manager (best effort), formulaire de configuration MQTT avec TLS, endpoint daemon `/action/mqtt_test` avec erreurs catégorisées, AJAX PHP, JS inline dans configuration.php, paho-mqtt ajouté aux dépendances, 18 tests unitaires.
 - **2026-03-13** (code review): Corrections post-revue — (C1) `postSaveConfiguration()` remplace `$_encryptConfigKey` inopérant pour config plugin-level ; (C2) message `unknown_error` ne propage plus `str(e)` (fuite potentielle de credentials) ; (C3) `resources/daemon/main.py` ajouté au File List ; (M1) `asyncio.get_running_loop()` remplace `get_event_loop()` déprécié ; (M2) `<button>` remplace `<a>` + `prop('disabled')` pour blocage réel des clics concurrents ; (M3) badge "Configuration manuelle" ajouté pour `source='manual'` ; (M4) `aiohttp` ajouté aux dépendances `pyproject.toml` ; (M5) `pyproject.toml` ajouté au File List. 18 tests toujours verts.
 - **2026-03-13** (Sécurité MQTT) : Correction de la gestion du mot de passe MQTT.

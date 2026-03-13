@@ -346,3 +346,142 @@ class TestSyncMqttConnect:
         assert result["error_code"] == "unknown_error"
         # Password must NOT appear in the user-facing message
         assert secret_password not in result["message"]
+
+
+class TestMqttCredentialsParsing:
+    """Tests for correct credential parsing and username_pw_set call order."""
+
+    async def test_username_field_passed_to_sync_connect(self, http_client):
+        """Payload with 'username' key must be forwarded to _sync_mqtt_connect as user."""
+        with patch(
+            "resources.daemon.transport.http_server._sync_mqtt_connect"
+        ) as mock_connect:
+            mock_connect.return_value = {"ok": True, "message": "Connexion réussie"}
+            resp = await http_client.post(
+                "/action/mqtt_test",
+                json=_wrap_mqtt_payload({
+                    "host": "127.0.0.1",
+                    "port": 1883,
+                    "username": "jeedom",
+                    "password": "secret",
+                    "tls": False,
+                    "tls_verify": False,
+                }),
+                headers={"X-Local-Secret": LOCAL_SECRET},
+            )
+        assert resp.status == 200
+        mock_connect.assert_called_once()
+        call_args = mock_connect.call_args[0]
+        assert call_args[2] == "jeedom", "user arg must be 'jeedom' when 'username' key is sent"
+        assert call_args[3] == "secret", "password arg must be forwarded"
+
+    async def test_user_field_fallback_passed_to_sync_connect(self, http_client):
+        """Payload with 'user' key (PHP callDaemon format) must also be forwarded correctly."""
+        with patch(
+            "resources.daemon.transport.http_server._sync_mqtt_connect"
+        ) as mock_connect:
+            mock_connect.return_value = {"ok": True, "message": "Connexion réussie"}
+            resp = await http_client.post(
+                "/action/mqtt_test",
+                json=_wrap_mqtt_payload({
+                    "host": "127.0.0.1",
+                    "port": 1883,
+                    "user": "jeedom",
+                    "password": "secret",
+                    "tls": False,
+                    "tls_verify": True,
+                }),
+                headers={"X-Local-Secret": LOCAL_SECRET},
+            )
+        assert resp.status == 200
+        mock_connect.assert_called_once()
+        call_args = mock_connect.call_args[0]
+        assert call_args[2] == "jeedom", "user arg must be 'jeedom' when 'user' key is sent"
+        assert call_args[3] == "secret"
+
+    async def test_username_takes_priority_over_user(self, http_client):
+        """When both 'username' and 'user' are present, 'username' wins."""
+        with patch(
+            "resources.daemon.transport.http_server._sync_mqtt_connect"
+        ) as mock_connect:
+            mock_connect.return_value = {"ok": True, "message": "Connexion réussie"}
+            await http_client.post(
+                "/action/mqtt_test",
+                json=_wrap_mqtt_payload({
+                    "host": "127.0.0.1",
+                    "port": 1883,
+                    "username": "from_username",
+                    "user": "from_user",
+                    "password": "secret",
+                    "tls": False,
+                    "tls_verify": True,
+                }),
+                headers={"X-Local-Secret": LOCAL_SECRET},
+            )
+        call_args = mock_connect.call_args[0]
+        assert call_args[2] == "from_username", "'username' must take priority over 'user'"
+
+    def test_username_pw_set_called_before_connect(self):
+        """username_pw_set must be called BEFORE connect, with named arguments."""
+        from resources.daemon.transport.http_server import _sync_mqtt_connect
+        mock_client = MagicMock()
+        call_order = []
+
+        def track_username_pw_set(*args, **kwargs):
+            call_order.append("username_pw_set")
+
+        def track_connect(*args, **kwargs):
+            call_order.append("connect")
+
+        def fake_loop_start():
+            mock_client.on_connect(mock_client, None, {}, 0)
+
+        mock_client.username_pw_set = MagicMock(side_effect=track_username_pw_set)
+        mock_client.connect = MagicMock(side_effect=track_connect)
+        mock_client.loop_start = fake_loop_start
+        mock_client.loop_stop = MagicMock()
+        mock_client.disconnect = MagicMock()
+
+        with patch("resources.daemon.transport.http_server.mqtt.Client", return_value=mock_client):
+            result = _sync_mqtt_connect("127.0.0.1", 1883, "jeedom", "secret", False, True)
+
+        assert result["ok"] is True
+        mock_client.username_pw_set.assert_called_once_with(username="jeedom", password="secret")
+        assert call_order == ["username_pw_set", "connect"], (
+            f"Expected username_pw_set before connect, got: {call_order}"
+        )
+
+    def test_username_pw_set_not_called_when_no_user(self):
+        """When user is empty, username_pw_set must NOT be called (anonymous)."""
+        from resources.daemon.transport.http_server import _sync_mqtt_connect
+        mock_client = MagicMock()
+
+        def fake_loop_start():
+            mock_client.on_connect(mock_client, None, {}, 0)
+
+        mock_client.loop_start = fake_loop_start
+        mock_client.loop_stop = MagicMock()
+        mock_client.disconnect = MagicMock()
+
+        with patch("resources.daemon.transport.http_server.mqtt.Client", return_value=mock_client):
+            result = _sync_mqtt_connect("127.0.0.1", 1883, "", "", False, True)
+
+        assert result["ok"] is True
+        mock_client.username_pw_set.assert_not_called()
+
+    def test_password_not_in_sync_connect_logs(self, caplog):
+        """Password must never appear in log records from _sync_mqtt_connect."""
+        import logging
+        from resources.daemon.transport.http_server import _sync_mqtt_connect
+        mock_client = MagicMock()
+        secret = "tmgFd7bXGBuTgEikEM31DwCX5LCT0S4F"
+        mock_client.connect.side_effect = ConnectionRefusedError("refused")
+
+        with patch("resources.daemon.transport.http_server.mqtt.Client", return_value=mock_client):
+            with caplog.at_level(logging.DEBUG):
+                _sync_mqtt_connect("127.0.0.1", 1883, "jeedom", secret, False, True)
+
+        for record in caplog.records:
+            assert secret not in record.getMessage(), (
+                f"Password leaked in log: {record.getMessage()}"
+            )
