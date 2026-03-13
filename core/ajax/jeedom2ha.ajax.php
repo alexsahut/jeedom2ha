@@ -29,7 +29,53 @@ try {
   */
     ajax::init();
 
+    if (init('action') == 'getMqttConfig') {
+      $hasPassword = (config::byKey('mqttPassword', 'jeedom2ha', '') !== '');
+      // Tente l'auto-détection mqtt2, sinon retourne la config manuelle stockée
+      $mqtt2Config = jeedom2ha::getMqttManagerConfig();
+      if ($mqtt2Config !== null) {
+        unset($mqtt2Config['password']); // Sécurité : ne jamais renvoyer le password
+        $mqtt2Config['has_password'] = $hasPassword;
+        ajax::success($mqtt2Config);
+      }
+      // Fallback : retourner la config manuelle si elle existe
+      $host = config::byKey('mqttHost', 'jeedom2ha', '');
+      if ($host !== '') {
+        ajax::success(array(
+          'host' => $host,
+          'port' => intval(config::byKey('mqttPort', 'jeedom2ha', 1883)),
+          'user' => config::byKey('mqttUser', 'jeedom2ha', ''),
+          'has_password' => $hasPassword,
+          'source' => 'manual',
+        ));
+      }
+      ajax::success(array('source' => 'none', 'has_password' => $hasPassword));
+    }
 
+    if (init('action') == 'testMqttConnection') {
+      $password = init('password', '');
+      // Priorité : Formulaire > Secret Stocké > Aucun
+      if ($password === '') {
+        $storedPassword = config::byKey('mqttPassword', 'jeedom2ha', '');
+        if ($storedPassword !== '') {
+          $password = utils::decrypt($storedPassword);
+        }
+      }
+
+      $params = array(
+        'host'       => init('host', ''),
+        'port'       => intval(init('port', 1883)),
+        'user'       => init('user', ''),
+        'password'   => $password,
+        'tls'        => (init('tls', '0') === '1'),
+        'tls_verify' => (init('tls_verify', '1') === '1'),
+      );
+      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST');
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
 
     throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
     /*     * *********Catch exeption*************** */
