@@ -194,8 +194,14 @@ $(function() {
       },
       error: function(request, status, error) {
         $btn.prop('disabled', false);
-        var msg = '{{Erreur de communication avec Jeedom}} (' + status + ')';
-        if (status === 'timeout') msg = '{{Délai d\'attente dépassé (timeout AJAX)}}';
+        // HTTP status code visible pour diagnostic (ex: HTTP 401, HTTP 500, HTTP 0)
+        var httpCode = request.status;
+        var msg;
+        if (status === 'timeout') {
+          msg = '{{Délai d\'attente dépassé (timeout AJAX)}}';
+        } else {
+          msg = '{{Erreur de communication avec Jeedom}} (HTTP ' + httpCode + ' / ' + status + ')';
+        }
         $result.addClass('label label-danger').text(msg).show();
       }
     });

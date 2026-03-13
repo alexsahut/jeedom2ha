@@ -53,6 +53,7 @@ try {
     }
 
     if (init('action') == 'testMqttConnection') {
+      log::add('jeedom2ha', 'debug', '[MQTT-DIAG] testMqttConnection atteint — isConnect=' . (isConnect('admin') ? 'true' : 'false') . ' host=' . init('host', '(vide)'));
       $password = init('password', '');
       // Priorité : Formulaire > Secret Stocké > Aucun
       if ($password === '') {
