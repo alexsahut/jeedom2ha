@@ -29,7 +29,9 @@ try {
   */
     ajax::init();
 
-    if (init('action') == 'getMqttConfig') {
+    $action = init('action');
+
+    if ($action == 'getMqttConfig') {
       $hasPassword = (config::byKey('mqttPassword', 'jeedom2ha', '') !== '');
       // Tente l'auto-détection mqtt2, sinon retourne la config manuelle stockée
       $mqtt2Config = jeedom2ha::getMqttManagerConfig();
@@ -51,9 +53,42 @@ try {
       }
       ajax::success(array('source' => 'none', 'has_password' => $hasPassword));
     }
-
-    if (init('action') == 'testMqttConnection') {
-      log::add('jeedom2ha', 'debug', '[MQTT-DIAG] testMqttConnection atteint — isConnect=' . (isConnect('admin') ? 'true' : 'false') . ' host=' . init('host', '(vide)'));
+    else if ($action == 'forceMqttManagerImport') {
+      $config = jeedom2ha::getMqttManagerConfig();
+      if ($config === null) {
+        $reason = jeedom2ha::$_lastDetectionReason;
+        $messages = array(
+          'plugin_inactive' => __('Plugin MQTT Manager (mqtt2) non détecté ou inactif', __FILE__),
+          'keys_not_found'  => __('Configuration MQTT Manager non trouvable — saisissez les paramètres manuellement', __FILE__),
+          'unknown'         => __('Auto-détection MQTT Manager échouée', __FILE__),
+        );
+        ajax::success(array(
+          'status'  => 'not_found',
+          'reason'  => $reason,
+          'message' => isset($messages[$reason]) ? $messages[$reason] : $messages['unknown'],
+        ));
+      }
+      // Stocker la config détectée directement côté serveur
+      // Le password ne quitte JAMAIS le serveur — stocké chiffré uniquement
+      config::save('mqttHost', $config['host'], 'jeedom2ha');
+      config::save('mqttPort', $config['port'], 'jeedom2ha');
+      config::save('mqttUser', $config['user'], 'jeedom2ha');
+      config::save('mqttTls', $config['tls'] ? '1' : '0', 'jeedom2ha');
+      if ($config['password'] !== '' && $config['password'] !== null) {
+        config::save('mqttPassword', utils::encrypt($config['password']), 'jeedom2ha');
+      }
+      log::add('jeedom2ha', 'info', '[MQTT] Import forcé depuis MQTT Manager : host=' . $config['host'] . ' port=' . $config['port']);
+      ajax::success(array(
+        'status'       => 'ok',
+        'host'         => $config['host'],
+        'port'         => $config['port'],
+        'user'         => $config['user'],
+        'tls'          => $config['tls'],
+        'has_password' => ($config['password'] !== '' && $config['password'] !== null),
+        'message'      => __('Configuration importée depuis MQTT Manager', __FILE__),
+      ));
+    }
+    else if ($action == 'testMqttConnection') {
       $password = init('password', '');
       // Priorité : Formulaire > Secret Stocké > Aucun
       if ($password === '') {
@@ -79,9 +114,26 @@ try {
       log::add('jeedom2ha', 'debug', '[MQTT] Résultat du test de connexion : ' . json_encode($result));
       ajax::success($result);
     }
-
-    throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
-    /*     * *********Catch exeption*************** */
+    else if ($action == 'getBridgeStatus') {
+      $status = jeedom2ha::callDaemon('/system/status');
+      if ($status === null) {
+        ajax::success(array('daemon' => false, 'mqtt' => array('state' => 'unknown', 'connected' => false, 'broker' => '')));
+      }
+      $mqtt = (isset($status['payload']['mqtt'])) ? $status['payload']['mqtt'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
+      ajax::success(array('daemon' => true, 'mqtt' => $mqtt));
+    }
+    else if ($action == 'scanTopology') {
+      $topology = jeedom2ha::getFullTopology();
+      $result = jeedom2ha::callDaemon('/action/sync', $topology, 'POST', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[TOPOLOGY] Le démon n\'a pas répondu au scan de topologie (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else {
+      throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
+    }
 }
 catch (Exception $e) {
     ajax::error(displayException($e), $e->getCode());

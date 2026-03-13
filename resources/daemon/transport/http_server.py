@@ -14,9 +14,12 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 from aiohttp import web
 
+from .mqtt_client import MqttBridge
+from models.topology import TopologySnapshot, assess_all
+
 _LOGGER = logging.getLogger(__name__)
 
-_VERSION = "0.1.0"
+_VERSION = "0.2.0"
 
 
 def _check_secret(request: web.Request, local_secret: str) -> bool:
@@ -37,12 +40,21 @@ async def _handle_system_status(request: web.Request) -> web.Response:
         )
 
     uptime = time.monotonic() - request.app["start_time"]
+
+    mqtt_bridge = request.app.get("mqtt_bridge")
+    mqtt_section = {
+        "connected": mqtt_bridge.is_connected if mqtt_bridge else False,
+        "state": mqtt_bridge.state if mqtt_bridge else "disconnected",
+        "broker": mqtt_bridge.broker_info if mqtt_bridge else "",
+    }
+
     payload = {
         "action": "system.status",
         "status": "ok",
         "payload": {
             "version": _VERSION,
             "uptime": round(uptime, 2),
+            "mqtt": mqtt_section,
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -232,13 +244,109 @@ async def _handle_mqtt_test(request: web.Request) -> web.Response:
     return web.json_response(payload)
 
 
+async def _handle_mqtt_connect(request: web.Request) -> web.Response:
+    """Handle POST /action/mqtt_connect — initiate persistent MQTT connection."""
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    data = await request.json()
+    # Envelope format: params may be under "payload" key (callDaemon wrapping)
+    params = data.get("payload", data)
+    host = params.get("host", "")
+    if not host:
+        return web.json_response({
+            "action": "mqtt.connect",
+            "status": "error",
+            "message": "Paramètre 'host' requis",
+        })
+
+    # Stop existing bridge if any (config change without daemon restart)
+    bridge = request.app["mqtt_bridge"]
+    await bridge.stop()
+
+    # Start the persistent bridge with new params
+    await bridge.start(params)
+
+    return web.json_response({
+        "action": "mqtt.connect",
+        "status": "ok",
+        "payload": {"state": bridge.state, "broker": bridge.broker_info},
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def _handle_action_sync(request: web.Request) -> web.Response:
+    """Handle POST /action/sync — synchronize Jeedom topology and assess eligibility."""
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    data = await request.json()
+    payload = data.get("payload", {})
+    
+    _LOGGER.info("[TOPOLOGY] Received sync request")
+    
+    # 1. Normalize and store snapshot
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+    request.app["topology"] = snapshot
+    
+    # 2. Assess eligibility
+    eligibility = assess_all(snapshot)
+    request.app["eligibility"] = eligibility
+    
+    # 3. Build light summary response
+    eligible_count = sum(1 for res in eligibility.values() if res.is_eligible)
+    ineligible_count = len(eligibility) - eligible_count
+    
+    breakdown = {}
+    for res in eligibility.values():
+        if not res.is_eligible:
+            breakdown[res.reason_code] = breakdown.get(res.reason_code, 0) + 1
+            
+    total_cmds = sum(len(eq.cmds) for eq in snapshot.eq_logics.values())
+    
+    summary = {
+        "total_objects": len(snapshot.objects),
+        "total_eq_logics": len(snapshot.eq_logics),
+        "total_cmds": total_cmds,
+        "eligible_count": eligible_count,
+        "ineligible_count": ineligible_count,
+        "ineligible_breakdown": breakdown
+    }
+    
+    _LOGGER.info(
+        "[TOPOLOGY] Sync complete: %d eligible, %d ineligible",
+        eligible_count, ineligible_count
+    )
+    
+    return web.json_response({
+        "action": "sync",
+        "status": "ok",
+        "payload": summary,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application()
     app["local_secret"] = local_secret
     app["start_time"] = time.monotonic()
+    # Pre-initialize bridge to avoid DeprecationWarning when re-assigning app keys later
+    app["mqtt_bridge"] = MqttBridge()
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
+    app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
+    app.router.add_post("/action/sync", _handle_action_sync)
     return app
 
 

@@ -1,0 +1,71 @@
+# generated: 2026-03-13
+# project: jeedom2ha
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: /Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-13
+project: jeedom2ha
+project_key: NOKEY
+tracking_system: file-system
+story_location: /Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: done
+  1-1-initialisation-et-communication-php-python: done
+  1-2-configuration-et-onboarding-mqtt-auto-manuel: done
+  1-2-bis-fiabilisation-auto-detection-mqtt-manager-import-force: done
+  1-3-validation-de-la-connexion-et-statut-du-pont: done
+  epic-1-retrospective: done
+  epic-2: in-progress
+  2-1-topology-scraper-contexte-spatial: in-progress
+  2-2-mapping-exposition-des-lumieres: backlog
+  2-3-mapping-exposition-des-ouvrants-volets: backlog
+  2-4-mapping-exposition-des-prises-switches: backlog
+  2-5-mapping-exposition-des-capteurs-numeriques-binaires: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-synchronisation-incrementale-des-etats-jeedom-ha: backlog
+  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: backlog
+  3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: backlog
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-interface-de-diagnostic-de-couverture: backlog
+  4-2-diagnostic-detaille-et-suggestions-de-remediation: backlog
+  4-3-gestion-des-exclusions-et-actions-manuelles: backlog
+  4-4-export-de-diagnostic-pour-support: backlog
+  epic-4-retrospective: optional
+  epic-5: backlog
+  5-1-persistance-et-republication-post-reboot: backlog
+  5-2-stabilite-des-identifiants-et-renommages: backlog
+  5-3-nettoyage-automatique-et-gestion-des-ecarts: backlog
+  epic-5-retrospective: optional

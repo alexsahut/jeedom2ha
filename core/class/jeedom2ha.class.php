@@ -27,6 +27,13 @@ class jeedom2ha extends eqLogic {
   public static $_widgetPossibility = array();
   */
 
+  /**
+   * Raison du dernier échec d'auto-détection MQTT Manager.
+   * Valeurs possibles : 'plugin_inactive', 'keys_not_found', 'unknown'
+   * Mis à jour par getMqttManagerConfig() avant chaque retour null.
+   */
+  public static $_lastDetectionReason = 'unknown';
+
   /*     * ***********************Methode static*************************** */
 
   /**
@@ -44,74 +51,85 @@ class jeedom2ha extends eqLogic {
 
   /**
    * Auto-détection best effort de la configuration MQTT Manager (mqtt2).
-   * Retourne un tableau [host, port, user, password, source] ou null si indisponible.
+   * Retourne un tableau [host, port, user, password, tls, source] ou null si indisponible.
    * Ne lève jamais d'exception — log un warning et retourne null en cas d'échec.
+   * En cas d'échec, $_lastDetectionReason indique la cause ('plugin_inactive', 'keys_not_found', 'unknown').
+   *
+   * Clés réelles utilisées par mqtt2 (Mips2648) :
+   *   mode          : 'local' | 'remote' | 'docker'
+   *   remote::ip    : adresse IP/hostname du broker distant (mode remote uniquement)
+   *   remote::port  : port du broker distant (mode remote uniquement)
+   *   remote::protocol : 'mqtt' | 'mqtts' (TLS en mode remote)
+   *   mqtt::password : credentials au format "user:password\n..." (première ligne utilisée)
    */
   public static function getMqttManagerConfig(): ?array {
     try {
       if (!class_exists('plugin')) {
         log::add(__CLASS__, 'debug', '[MQTT] Classe plugin indisponible — configuration manuelle requise');
+        self::$_lastDetectionReason = 'plugin_inactive';
         return null;
       }
       $mqtt2Plugin = plugin::byId('mqtt2');
       if (!is_object($mqtt2Plugin) || !$mqtt2Plugin->isActive()) {
         log::add(__CLASS__, 'debug', '[MQTT] mqtt2 absent ou inactif — configuration manuelle requise');
+        self::$_lastDetectionReason = 'plugin_inactive';
         return null;
       }
-      // Dump diagnostique : logguer toutes les clés mqtt2 connues avec leur valeur réelle
-      // Cela permet d'identifier les noms de clés exacts utilisés par la version installée
-      $diagKeys = array(
-        'mqttAddress','mqttaddress','mqttbroker','mqttBroker','host',
-        'mqttPort','mqttport','port',
-        'mqttUser','mqttuser','mqttusername','user',
-        'mqtttls','mqttTls','tls','ssl',
-        'mqtttlscheck','mqttTlsVerify','tlscheck','tlsverify',
-      );
-      foreach ($diagKeys as $k) {
-        $v = config::byKey($k, 'mqtt2', null);
-        if ($v !== null && $v !== '') {
-          log::add(__CLASS__, 'debug', '[MQTT-DIAG] mqtt2 key=' . $k . ' value=' . $v);
-        }
+
+      // Détecter le mode mqtt2 : 'local', 'remote' ou 'docker'
+      $mode = config::byKey('mode', 'mqtt2', 'local');
+
+      if ($mode === 'remote') {
+        $host = config::byKey('remote::ip', 'mqtt2', '');
+        $port = intval(config::byKey('remote::port', 'mqtt2', 1883));
+        $protocol = config::byKey('remote::protocol', 'mqtt2', 'mqtt');
+        $tls = ($protocol === 'mqtts');
+      } else {
+        // Mode local ou docker : broker Mosquitto interne sur 127.0.0.1:1883
+        $host = '127.0.0.1';
+        $port = 1883;
+        $tls = false;
       }
 
-      // Clés de config mqtt2 (MQTT Manager)
-      // Note: Les clés peuvent varier selon la version. On teste les plus courantes.
-      $host = config::byKey('mqttAddress', 'mqtt2', config::byKey('mqttaddress', 'mqtt2', ''));
-      $port = config::byKey('mqttPort', 'mqtt2', config::byKey('mqttport', 'mqtt2', 1883));
-      $user = config::byKey('mqttUser', 'mqtt2', config::byKey('mqttusername', 'mqtt2', ''));
-      $pass = config::byKey('mqttPass', 'mqtt2', config::byKey('mqttpassword', 'mqtt2', ''));
-      
       if ($host === '' || $host === null) {
-        log::add(__CLASS__, 'debug', '[MQTT] Auto-détection mqtt2 : hôte non trouvé dans la configuration mqtt2 (test mqttAddress et mqttaddress)');
+        log::add(__CLASS__, 'debug', '[MQTT] Auto-détection mqtt2 : hôte non trouvé (mode=' . $mode . ')');
+        self::$_lastDetectionReason = 'keys_not_found';
         return null;
       }
 
-      // Filtrage des ports internes connus de MQTT Manager (ne sont pas des ports broker client)
-      // 55035 = socket interne jeedomdaemon, 1885 = port Mosquitto interne MQTT Manager
+      // Filtrage de sécurité : ports internes connus de MQTT Manager
+      // 55035 = socket interne jeedomdaemon, 1885 = port Mosquitto interne
       $internalPorts = array(55035, 1885);
-      if (in_array(intval($port), $internalPorts)) {
+      if (in_array($port, $internalPorts)) {
         log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : port interne détecté (' . $port . '), repli sur 1883');
         $port = 1883;
       }
 
-      // Parsing éventuel de l'auth "user:pass"
-      if (strpos($user, ':') !== false && ($pass === '' || $pass === null)) {
-        log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : format user:pass détecté');
-        list($detectedUser, $detectedPass) = explode(':', $user, 2);
-        $user = $detectedUser;
-        $pass = $detectedPass;
+      // Authentification : clé 'mqtt::password' au format "user:password" (première ligne)
+      $user = '';
+      $pass = '';
+      $authRaw = config::byKey('mqtt::password', 'mqtt2', '');
+      if ($authRaw !== '' && $authRaw !== null) {
+        $firstLine = explode("\n", $authRaw)[0];
+        if (strpos($firstLine, ':') !== false) {
+          list($user, $pass) = explode(':', $firstLine, 2);
+        } else {
+          $user = $firstLine;
+        }
       }
 
-      log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : host détecté → configuration pré-remplie');
+      log::add(__CLASS__, 'info', '[MQTT] Auto-détection mqtt2 : host=' . $host . ' port=' . $port . ' mode=' . $mode . ' tls=' . ($tls ? 'true' : 'false'));
       return array(
-        'host' => $host,
-        'port' => intval($port),
-        'user' => $user,
+        'host'     => $host,
+        'port'     => $port,
+        'user'     => $user,
         'password' => $pass,
-        'source' => 'mqtt2',
+        'tls'      => $tls,
+        'source'   => 'mqtt2',
       );
     } catch (\Throwable $e) {
-      log::add(__CLASS__, 'warning', '[MQTT] Auto-détection mqtt2 : exception → ' . $e->getMessage() . ' — fallback manuel');
+      log::add(__CLASS__, 'warning', '[MQTT] Auto-détection mqtt2 : exception → ' . $e->getMessage());
+      self::$_lastDetectionReason = 'unknown';
       return null;
     }
   }
@@ -205,6 +223,27 @@ class jeedom2ha extends eqLogic {
       return false;
     }
     log::add(__CLASS__, 'info', '[DAEMON] Daemon started successfully');
+
+    // Send MQTT config to daemon (non-blocking — connect_async on daemon side)
+    $mqttHost = config::byKey('mqttHost', __CLASS__, '');
+    if ($mqttHost !== '') {
+      $mqttConfig = array(
+        'host'       => $mqttHost,
+        'port'       => intval(config::byKey('mqttPort', __CLASS__, 1883)),
+        'user'       => config::byKey('mqttUser', __CLASS__, ''),
+        'password'   => utils::decrypt(config::byKey('mqttPassword', __CLASS__, '')),
+        'tls'        => config::byKey('mqttTls', __CLASS__, '0') === '1',
+        'tls_verify' => config::byKey('mqttTlsVerify', __CLASS__, '1') === '1',
+      );
+      log::add(__CLASS__, 'info', '[MQTT] Connexion MQTT initiée vers ' . $mqttHost . ':' . $mqttConfig['port'] . ' (user=' . ($mqttConfig['user'] !== '' ? $mqttConfig['user'] : 'anonymous') . ' tls=' . ($mqttConfig['tls'] ? 'true' : 'false') . ')');
+      $result = self::callDaemon('/action/mqtt_connect', $mqttConfig, 'POST');
+      if ($result === null || !isset($result['status']) || $result['status'] !== 'ok') {
+        log::add(__CLASS__, 'warning', '[MQTT] Échec initiation MQTT — le démon reste actif sans broker');
+      }
+    } else {
+      log::add(__CLASS__, 'info', '[DAEMON] Pas de configuration MQTT, connexion différée');
+    }
+
     return true;
   }
 
@@ -288,6 +327,62 @@ class jeedom2ha extends eqLogic {
 
     log::add(__CLASS__, 'debug', '[API] Daemon unreachable at ' . $url . ': ' . ($lastError['message'] ?? 'unknown error'));
     return null;
+  }
+
+  /**
+   * Extrait la topologie complète de Jeedom pour synchronisation daemon.
+   * Strictement Read-Only : utilise le cache pour les valeurs, jamais execCmd.
+   */
+  public static function getFullTopology(): array {
+    $result = array('objects' => array(), 'eq_logics' => array());
+
+    // 1. Objects Jeedom (contexte spatial / suggested_area)
+    foreach (jeeObject::all() as $obj) {
+      $result['objects'][] = array(
+        'id'        => intval($obj->getId()),
+        'name'      => $obj->getName(),
+        'father_id' => ($obj->getFather_id() !== null) ? intval($obj->getFather_id()) : null,
+        'isVisible' => (bool)$obj->getIsVisible(),
+      );
+    }
+
+    // 2. EqLogics (équipements)
+    foreach (eqLogic::all() as $eq) {
+      // Exclure les équipements de ce plugin
+      if ($eq->getEqType_name() === __CLASS__) {
+        continue;
+      }
+
+      $cmds = array();
+      foreach (cmd::byEqLogicId($eq->getId()) as $cmd) {
+        $cmds[] = array(
+          'id'            => intval($cmd->getId()),
+          'name'          => $cmd->getName(),
+          'generic_type'  => $cmd->getGeneric_type() ?: null,
+          'type'          => $cmd->getType(),
+          'sub_type'      => $cmd->getSubType(),
+          'current_value' => $cmd->getCache('value', null),
+          'unit'          => $cmd->getUnite() ?: null,
+          'is_visible'    => (bool)$cmd->getIsVisible(),
+          'is_historized' => (bool)$cmd->getIsHistorized(),
+        );
+      }
+
+      $result['eq_logics'][] = array(
+        'id'           => intval($eq->getId()),
+        'name'         => $eq->getName(),
+        'object_id'    => ($eq->getObject_id() !== null) ? intval($eq->getObject_id()) : null,
+        'is_enable'    => (bool)$eq->getIsEnable(),
+        'is_visible'   => (bool)$eq->getIsVisible(),
+        'eq_type'      => $eq->getEqType_name(),
+        'generic_type' => $eq->getGeneric_type() ?: null,
+        'is_excluded'  => (bool)$eq->getConfiguration('jeedom2ha_excluded', false),
+        'cmds'         => $cmds,
+      );
+    }
+
+    log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics');
+    return $result;
   }
 
   /*     * *********************Méthodes d'instance************************* */
