@@ -2,6 +2,7 @@
 
 Story 2.2: Tests covering payload structure validations for light discovery.
 Story 2.3: Extended for cover entity discovery payload validation.
+Story 2.4: Extended for switch entity discovery payload validation.
 """
 import json
 import sys
@@ -13,7 +14,7 @@ from unittest.mock import MagicMock, AsyncMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'daemon'))
 
 from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
-from models.mapping import LightCapabilities, CoverCapabilities, MappingResult
+from models.mapping import LightCapabilities, CoverCapabilities, SwitchCapabilities, MappingResult
 from discovery.publisher import DiscoveryPublisher
 
 
@@ -437,3 +438,145 @@ class TestCoverSuggestedArea:
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert "suggested_area" not in payload["device"]
+
+
+# ==============================================================================
+# Helpers for Switch tests (Story 2.4)
+# ==============================================================================
+
+def _make_switch_mapping(
+    eq_id=42, name="Prise Cuisine", confidence="sure",
+    has_on_off=True, has_state=True, device_class=None,
+    suggested_area="Cuisine",
+):
+    """Helper to create a switch MappingResult."""
+    capabilities = SwitchCapabilities(
+        has_on_off=has_on_off,
+        has_state=has_state,
+        on_off_confidence="sure" if confidence == "sure" else "probable",
+        device_class=device_class,
+    )
+
+    return MappingResult(
+        ha_entity_type="switch",
+        confidence=confidence,
+        reason_code="switch_on_off_state",
+        jeedom_eq_id=eq_id,
+        ha_unique_id=f"jeedom2ha_eq_{eq_id}",
+        ha_name=name,
+        suggested_area=suggested_area,
+        commands={},
+        capabilities=capabilities,
+    )
+
+
+# ==============================================================================
+# Test: Switch — basic payload structure (Story 2.4)
+# ==============================================================================
+
+class TestSwitchBasicPayload:
+    @pytest.mark.asyncio
+    async def test_switch_payload_has_required_fields(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload switch basique contient tous les champs requis."""
+        mapping = _make_switch_mapping()
+        await publisher.publish_switch(mapping, snapshot)
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+
+        assert payload["command_topic"] == "jeedom2ha/42/set"
+        assert payload["payload_on"] == "ON"
+        assert payload["payload_off"] == "OFF"
+        assert payload["state_topic"] == "jeedom2ha/42/state"
+        assert payload["state_on"] == "ON"
+        assert payload["state_off"] == "OFF"
+        assert payload["availability_topic"] == "jeedom2ha/bridge/status"
+        assert "device" in payload
+        assert "origin" in payload
+        assert "name" in payload
+        assert "unique_id" in payload
+
+    @pytest.mark.asyncio
+    async def test_switch_payload_no_device_class_when_none(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload switch avec device_class=None → champ 'device_class' ABSENT du payload."""
+        mapping = _make_switch_mapping(device_class=None)
+        await publisher.publish_switch(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "device_class" not in payload
+
+    @pytest.mark.asyncio
+    async def test_switch_payload_device_class_outlet(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload switch avec device_class='outlet' → champ 'device_class' présent et = 'outlet'."""
+        mapping = _make_switch_mapping(device_class="outlet")
+        await publisher.publish_switch(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["device_class"] == "outlet"
+
+    @pytest.mark.asyncio
+    async def test_switch_payload_no_icon_field(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload switch ne contient jamais de champ 'icon'."""
+        for dc in [None, "outlet"]:
+            mock_mqtt_bridge.publish_message.reset_mock()
+            mapping = _make_switch_mapping(device_class=dc)
+            await publisher.publish_switch(mapping, snapshot)
+            payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+            assert "icon" not in payload
+
+
+class TestSwitchTopicFormat:
+    @pytest.mark.asyncio
+    async def test_switch_topic_format(self, publisher, snapshot, mock_mqtt_bridge):
+        """Topic = homeassistant/switch/jeedom2ha_{id}/config."""
+        mapping = _make_switch_mapping(eq_id=42)
+        await publisher.publish_switch(mapping, snapshot)
+
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
+        assert topic == "homeassistant/switch/jeedom2ha_42/config"
+
+
+class TestSwitchRetainFlag:
+    @pytest.mark.asyncio
+    async def test_switch_publish_with_retain(self, publisher, snapshot, mock_mqtt_bridge):
+        """Switch publish avec retain=True."""
+        mapping = _make_switch_mapping()
+        await publisher.publish_switch(mapping, snapshot)
+
+        call_kwargs = mock_mqtt_bridge.publish_message.call_args
+        assert call_kwargs[1]["retain"] is True or call_kwargs[0][3] is True
+
+
+class TestSwitchUnpublish:
+    @pytest.mark.asyncio
+    async def test_unpublish_switch_sends_empty_on_switch_topic(self, publisher, mock_mqtt_bridge):
+        """Unpublish switch envoie payload vide avec retain=True sur le topic switch."""
+        await publisher.unpublish_by_eq_id(42, entity_type="switch")
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        call_args = mock_mqtt_bridge.publish_message.call_args
+        topic = call_args[0][0]
+        payload_val = call_args[0][1]
+        assert topic == "homeassistant/switch/jeedom2ha_42/config"
+        assert payload_val == ""
+        assert call_args[1]["retain"] is True or call_args[0][3] is True
+
+
+class TestSwitchSuggestedArea:
+    @pytest.mark.asyncio
+    async def test_switch_suggested_area_absent_when_none(self, publisher, snapshot, mock_mqtt_bridge):
+        """suggested_area absent du device switch si None."""
+        mapping = _make_switch_mapping(suggested_area=None)
+        await publisher.publish_switch(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "suggested_area" not in payload["device"]
+
+    @pytest.mark.asyncio
+    async def test_switch_suggested_area_present_when_set(self, publisher, snapshot, mock_mqtt_bridge):
+        """suggested_area présent dans device switch quand défini."""
+        mapping = _make_switch_mapping(suggested_area="Cuisine")
+        await publisher.publish_switch(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["device"]["suggested_area"] == "Cuisine"

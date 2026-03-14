@@ -2,6 +2,7 @@
 
 Introduced in Story 2.2 for capability-based light mapping.
 Extended in Story 2.3 for cover mapping.
+Extended in Story 2.4 for switch mapping.
 """
 from __future__ import annotations
 
@@ -40,6 +41,18 @@ class CoverCapabilities:
 
 
 @dataclass
+class SwitchCapabilities:
+    """Switch capabilities detected from Jeedom ENERGY_* commands.
+
+    Story 2.4 — one SwitchCapabilities per eqLogic.
+    """
+    has_on_off: bool = False
+    has_state: bool = False              # ENERGY_STATE present among cmds
+    on_off_confidence: str = "unknown"   # "sure", "probable", "ambiguous"
+    device_class: Optional[str] = None   # "outlet" if confirmed by eq_type_name, None otherwise
+
+
+@dataclass
 class MappingResult:
     """Result of mapping a single Jeedom eqLogic to a Home Assistant entity.
 
@@ -58,7 +71,7 @@ class MappingResult:
     commands: Dict[str, JeedomCmd] = field(default_factory=dict)   # generic_type -> JeedomCmd
     # Sentinel default=None so dataclass field ordering is respected.
     # __post_init__ enforces that callers always provide an explicit value.
-    capabilities: Optional[Union[LightCapabilities, CoverCapabilities]] = None
+    capabilities: Optional[Union[LightCapabilities, CoverCapabilities, "SwitchCapabilities"]] = None
     reason_details: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:

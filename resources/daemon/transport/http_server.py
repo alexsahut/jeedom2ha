@@ -19,6 +19,7 @@ from models.topology import TopologySnapshot, assess_all
 from models.mapping import MappingResult, PublicationDecision
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
+from mapping.switch import SwitchMapper
 from discovery.publisher import DiscoveryPublisher
 
 _LOGGER = logging.getLogger(__name__)
@@ -326,9 +327,10 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     anciens_eq_ids = set(request.app["mappings"].keys())
     nouveaux_eq_ids = set()
 
-    # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3)
+    # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3 + 2.4)
     light_mapper = LightMapper()
     cover_mapper = CoverMapper()
+    switch_mapper = SwitchMapper()
     mappings = {}       # Dict[int, MappingResult]
     publications = {}   # Dict[int, PublicationDecision]
     
@@ -343,6 +345,11 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         "covers_ambiguous": 0,
         "covers_published": 0,
         "covers_skipped": 0,
+        "switches_sure": 0,
+        "switches_probable": 0,
+        "switches_ambiguous": 0,
+        "switches_published": 0,
+        "switches_skipped": 0,
     }
     
     mqtt_bridge = request.app.get("mqtt_bridge")
@@ -356,10 +363,12 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
         
-        # Try light first, then cover (first mapper that returns non-None wins)
+        # Try light first, then cover, then switch (first mapper that returns non-None wins)
         mapping = light_mapper.map(eq, snapshot)
         if mapping is None:
             mapping = cover_mapper.map(eq, snapshot)
+        if mapping is None:
+            mapping = switch_mapper.map(eq, snapshot)
         
         if mapping is None:
             continue  # Not mapped by any mapper
@@ -407,6 +416,27 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     await publisher.publish_cover(mapping, snapshot)
             else:
                 mapping_counters["covers_skipped"] += 1
+
+        elif mapping.ha_entity_type == "switch":
+            # Count by confidence
+            if mapping.confidence == "sure":
+                mapping_counters["switches_sure"] += 1
+            elif mapping.confidence == "probable":
+                mapping_counters["switches_probable"] += 1
+            elif mapping.confidence == "ambiguous":
+                mapping_counters["switches_ambiguous"] += 1
+
+            # Decide publication
+            decision = switch_mapper.decide_publication(mapping)
+            publications[eq_id] = decision
+            nouveaux_eq_ids.add(eq_id)
+
+            if decision.should_publish:
+                mapping_counters["switches_published"] += 1
+                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                    await publisher.publish_switch(mapping, snapshot)
+            else:
+                mapping_counters["switches_skipped"] += 1
             
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
@@ -429,7 +459,8 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     
     _LOGGER.info(
         "[MAPPING] Summary: lights(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
-        "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d)",
+        "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
+        "switches(sure=%d probable=%d ambiguous=%d published=%d skipped=%d)",
         mapping_counters["lights_sure"],
         mapping_counters["lights_probable"],
         mapping_counters["lights_ambiguous"],
@@ -440,6 +471,11 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         mapping_counters["covers_ambiguous"],
         mapping_counters["covers_published"],
         mapping_counters["covers_skipped"],
+        mapping_counters["switches_sure"],
+        mapping_counters["switches_probable"],
+        mapping_counters["switches_ambiguous"],
+        mapping_counters["switches_published"],
+        mapping_counters["switches_skipped"],
     )
     
     summary = {
