@@ -1,9 +1,12 @@
 """mapping.py — Data models for the mapping and publication pipeline.
 
 Introduced in Story 2.2 for capability-based light mapping.
+Extended in Story 2.3 for cover mapping.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Dict, Optional, Union
 
 from models.topology import JeedomCmd
 
@@ -22,21 +25,49 @@ class LightCapabilities:
 
 
 @dataclass
+class CoverCapabilities:
+    """Cumulated cover capabilities detected from Jeedom FLAP_* commands.
+
+    Each capability is detected independently and cumulated into a single
+    cover entity per eqLogic. Story 2.3.
+    """
+    has_open_close: bool = False
+    has_stop: bool = False
+    has_position: bool = False
+    is_bso: bool = False                     # Brise-Soleil Orientable
+    open_close_confidence: str = "unknown"   # "sure", "probable", "ambiguous"
+    position_confidence: str = "unknown"     # "sure", "probable"
+
+
+@dataclass
 class MappingResult:
     """Result of mapping a single Jeedom eqLogic to a Home Assistant entity.
 
     One MappingResult per eqLogic, with cumulated capabilities.
+
+    ``capabilities`` is a REQUIRED field even though it has a sentinel default of None.
+    Always pass it explicitly — omitting it raises ValueError at construction time.
     """
-    ha_entity_type: str                       # "light"
+    ha_entity_type: str                       # "light", "cover"
     confidence: str                           # global: worst(per-capability) = max() on semantic order
-    reason_code: str                          # e.g. "light_on_off_brightness", "light_on_off_only"
+    reason_code: str                          # e.g. "light_on_off_brightness", "cover_open_close"
     jeedom_eq_id: int
     ha_unique_id: str                         # "jeedom2ha_eq_{id}"
     ha_name: str
     suggested_area: Optional[str] = None
     commands: Dict[str, JeedomCmd] = field(default_factory=dict)   # generic_type -> JeedomCmd
-    capabilities: LightCapabilities = field(default_factory=LightCapabilities)
-    reason_details: Optional[Dict[str, Any]] = None
+    # Sentinel default=None so dataclass field ordering is respected.
+    # __post_init__ enforces that callers always provide an explicit value.
+    capabilities: Optional[Union[LightCapabilities, CoverCapabilities]] = None
+    reason_details: Optional[Dict[str, object]] = None
+
+    def __post_init__(self) -> None:
+        if self.capabilities is None:
+            raise ValueError(
+                "MappingResult requires an explicit 'capabilities' argument "
+                "(LightCapabilities or CoverCapabilities). "
+                "Do not rely on the default — it is a sentinel, not a usable value."
+            )
 
 
 @dataclass

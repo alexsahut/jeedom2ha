@@ -1,6 +1,7 @@
 """test_discovery_publisher.py — Unit tests for MQTT Discovery publisher.
 
 Story 2.2: Tests covering payload structure validations for light discovery.
+Story 2.3: Extended for cover entity discovery payload validation.
 """
 import json
 import sys
@@ -12,16 +13,15 @@ from unittest.mock import MagicMock, AsyncMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'resources', 'daemon'))
 
 from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
-from models.mapping import LightCapabilities, MappingResult
+from models.mapping import LightCapabilities, CoverCapabilities, MappingResult
 from discovery.publisher import DiscoveryPublisher
 
 
 @pytest.fixture
 def mock_mqtt_bridge():
-    """Mock MqttBridge with a mock _client.publish."""
+    """Mock MqttBridge with a mock publish_message method."""
     bridge = MagicMock()
-    bridge._client = MagicMock()
-    bridge._client.publish = MagicMock()
+    bridge.publish_message = MagicMock(return_value=True)
     bridge.is_connected = True
     return bridge
 
@@ -51,7 +51,7 @@ def _make_mapping(
     eq_id=42, name="Plafonnier Salon", confidence="sure",
     has_on_off=True, has_brightness=False, suggested_area="Salon",
 ):
-    """Helper to create a MappingResult."""
+    """Helper to create a light MappingResult."""
     capabilities = LightCapabilities(
         has_on_off=has_on_off,
         has_brightness=has_brightness,
@@ -74,6 +74,34 @@ def _make_mapping(
     )
 
 
+def _make_cover_mapping(
+    eq_id=42, name="Volet Salon", confidence="sure",
+    has_open_close=True, has_stop=False, has_position=False,
+    is_bso=False, suggested_area="Salon",
+):
+    """Helper to create a cover MappingResult."""
+    capabilities = CoverCapabilities(
+        has_open_close=has_open_close,
+        has_stop=has_stop,
+        has_position=has_position,
+        is_bso=is_bso,
+        open_close_confidence="sure" if has_open_close else "unknown",
+        position_confidence="sure" if has_position else "unknown",
+    )
+
+    return MappingResult(
+        ha_entity_type="cover",
+        confidence=confidence,
+        reason_code="cover_open_close",
+        jeedom_eq_id=eq_id,
+        ha_unique_id=f"jeedom2ha_eq_{eq_id}",
+        ha_name=name,
+        suggested_area=suggested_area,
+        commands={},
+        capabilities=capabilities,
+    )
+
+
 # ==============================================================================
 # Test: On/Off payload structure
 # ==============================================================================
@@ -85,8 +113,8 @@ class TestOnOffPayload:
         mapping = _make_mapping(has_brightness=False)
         await publisher.publish_light(mapping, snapshot)
 
-        mock_mqtt_bridge._client.publish.assert_called_once()
-        call_args = mock_mqtt_bridge._client.publish.call_args
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        call_args = mock_mqtt_bridge.publish_message.call_args
         topic = call_args[0][0]
         payload = json.loads(call_args[0][1])
 
@@ -106,7 +134,7 @@ class TestOnOffPayload:
         mapping = _make_mapping(has_brightness=False)
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert "brightness_state_topic" not in payload
         assert "brightness_command_topic" not in payload
         assert "brightness_scale" not in payload
@@ -125,7 +153,7 @@ class TestBrightnessPayload:
         mapping = _make_mapping(has_brightness=True)
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["brightness_state_topic"] == "jeedom2ha/42/brightness"
         assert payload["brightness_command_topic"] == "jeedom2ha/42/brightness/set"
         assert payload["brightness_scale"] == 100
@@ -144,7 +172,7 @@ class TestTopicFormat:
         mapping = _make_mapping(eq_id=42)
         await publisher.publish_light(mapping, snapshot)
 
-        topic = mock_mqtt_bridge._client.publish.call_args[0][0]
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
         assert topic == "homeassistant/light/jeedom2ha_42/config"
 
     @pytest.mark.asyncio
@@ -154,7 +182,7 @@ class TestTopicFormat:
         mapping = _make_mapping(eq_id=42)
         await publisher.publish_light(mapping, snapshot)
 
-        topic = mock_mqtt_bridge._client.publish.call_args[0][0]
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
         assert topic == "custom_ha/light/jeedom2ha_42/config"
 
 
@@ -169,8 +197,8 @@ class TestRetainFlag:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        call_kwargs = mock_mqtt_bridge._client.publish.call_args
-        # publish(topic, payload, qos=1, retain=True)
+        call_kwargs = mock_mqtt_bridge.publish_message.call_args
+        # publish_message(topic, payload, qos=1, retain=True)
         assert call_kwargs[1]["retain"] is True or call_kwargs[0][3] is True
 
 
@@ -184,8 +212,8 @@ class TestUnpublish:
         """Unpublish envoie payload vide avec retain=True."""
         await publisher.unpublish("jeedom2ha_eq_42")
 
-        mock_mqtt_bridge._client.publish.assert_called_once()
-        call_args = mock_mqtt_bridge._client.publish.call_args
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        call_args = mock_mqtt_bridge.publish_message.call_args
         topic = call_args[0][0]
         payload = call_args[0][1]
         assert topic == "homeassistant/light/jeedom2ha_42/config"
@@ -205,7 +233,7 @@ class TestDeviceBlock:
         mapping = _make_mapping(eq_id=42)
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert "jeedom2ha_42" in payload["device"]["identifiers"]
 
     @pytest.mark.asyncio
@@ -214,7 +242,7 @@ class TestDeviceBlock:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["device"]["via_device"] == "jeedom2ha_bridge"
 
     @pytest.mark.asyncio
@@ -223,7 +251,7 @@ class TestDeviceBlock:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["device"]["manufacturer"] == "Jeedom (zwave)"
 
 
@@ -238,7 +266,7 @@ class TestOriginBlock:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["origin"]["name"] == "jeedom2ha"
 
     @pytest.mark.asyncio
@@ -247,7 +275,7 @@ class TestOriginBlock:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert "sw_version" in payload["origin"]
 
 
@@ -262,7 +290,7 @@ class TestAvailability:
         mapping = _make_mapping()
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["availability_topic"] == "jeedom2ha/bridge/status"
 
 
@@ -277,7 +305,7 @@ class TestSuggestedArea:
         mapping = _make_mapping(suggested_area=None)
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert "suggested_area" not in payload["device"]
 
     @pytest.mark.asyncio
@@ -286,5 +314,126 @@ class TestSuggestedArea:
         mapping = _make_mapping(suggested_area="Salon")
         await publisher.publish_light(mapping, snapshot)
 
-        payload = json.loads(mock_mqtt_bridge._client.publish.call_args[0][1])
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["device"]["suggested_area"] == "Salon"
+
+
+# ==============================================================================
+# Test: Cover payload structure (Story 2.3)
+# ==============================================================================
+
+class TestCoverBasicPayload:
+    @pytest.mark.asyncio
+    async def test_cover_payload_has_required_fields(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload cover basique contient tous les champs requis."""
+        mapping = _make_cover_mapping()
+        await publisher.publish_cover(mapping, snapshot)
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+
+        assert payload["command_topic"] == "jeedom2ha/42/set"
+        assert payload["payload_open"] == "OPEN"
+        assert payload["payload_close"] == "CLOSE"
+        assert payload["state_topic"] == "jeedom2ha/42/state"
+        assert payload["state_open"] == "open"
+        assert payload["state_closed"] == "closed"
+        assert payload["device_class"] == "shutter"
+        assert "device" in payload
+        assert "origin" in payload
+        assert payload["availability_topic"] == "jeedom2ha/bridge/status"
+
+    @pytest.mark.asyncio
+    async def test_cover_no_stop_no_position(self, publisher, snapshot, mock_mqtt_bridge):
+        """Cover basique sans stop ni position → pas de champs optionnels."""
+        mapping = _make_cover_mapping(has_stop=False, has_position=False)
+        await publisher.publish_cover(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "payload_stop" not in payload
+        assert "position_topic" not in payload
+        assert "set_position_topic" not in payload
+
+
+class TestCoverStopPayload:
+    @pytest.mark.asyncio
+    async def test_cover_with_stop(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload cover avec stop contient payload_stop."""
+        mapping = _make_cover_mapping(has_stop=True)
+        await publisher.publish_cover(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["payload_stop"] == "STOP"
+
+
+class TestCoverPositionPayload:
+    @pytest.mark.asyncio
+    async def test_cover_with_position(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload cover avec position contient les champs position."""
+        mapping = _make_cover_mapping(has_position=True)
+        await publisher.publish_cover(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["position_topic"] == "jeedom2ha/42/position"
+        assert payload["set_position_topic"] == "jeedom2ha/42/position/set"
+        assert payload["position_open"] == 100
+        assert payload["position_closed"] == 0
+
+
+class TestCoverBSOPayload:
+    @pytest.mark.asyncio
+    async def test_bso_device_class_blind(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload BSO a device_class: 'blind' au lieu de 'shutter'."""
+        mapping = _make_cover_mapping(is_bso=True)
+        await publisher.publish_cover(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["device_class"] == "blind"
+
+
+class TestCoverTopicFormat:
+    @pytest.mark.asyncio
+    async def test_cover_topic_format(self, publisher, snapshot, mock_mqtt_bridge):
+        """Topic = homeassistant/cover/jeedom2ha_{id}/config."""
+        mapping = _make_cover_mapping(eq_id=42)
+        await publisher.publish_cover(mapping, snapshot)
+
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
+        assert topic == "homeassistant/cover/jeedom2ha_42/config"
+
+
+class TestCoverRetainFlag:
+    @pytest.mark.asyncio
+    async def test_cover_publish_with_retain(self, publisher, snapshot, mock_mqtt_bridge):
+        """Cover publish avec retain=True."""
+        mapping = _make_cover_mapping()
+        await publisher.publish_cover(mapping, snapshot)
+
+        call_kwargs = mock_mqtt_bridge.publish_message.call_args
+        assert call_kwargs[1]["retain"] is True or call_kwargs[0][3] is True
+
+
+class TestCoverUnpublish:
+    @pytest.mark.asyncio
+    async def test_unpublish_cover_sends_empty_on_cover_topic(self, publisher, mock_mqtt_bridge):
+        """Unpublish cover envoie payload vide avec retain=True sur le topic cover."""
+        await publisher.unpublish_by_eq_id(42, entity_type="cover")
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        call_args = mock_mqtt_bridge.publish_message.call_args
+        topic = call_args[0][0]
+        payload_val = call_args[0][1]
+        assert topic == "homeassistant/cover/jeedom2ha_42/config"
+        assert payload_val == ""
+        assert call_args[1]["retain"] is True or call_args[0][3] is True
+
+
+class TestCoverSuggestedArea:
+    @pytest.mark.asyncio
+    async def test_cover_suggested_area_absent_when_none(self, publisher, snapshot, mock_mqtt_bridge):
+        """suggested_area absent du device cover si l'objet Jeedom est None."""
+        mapping = _make_cover_mapping(suggested_area=None)
+        await publisher.publish_cover(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "suggested_area" not in payload["device"]

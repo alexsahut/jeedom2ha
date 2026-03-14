@@ -166,3 +166,19 @@ class MqttBridge:
     def broker_info(self) -> str:
         """'host:port' string, empty if not yet configured."""
         return f"{self._broker_host}:{self._broker_port}" if self._broker_host else ""
+
+    def publish_message(self, topic: str, payload: str, qos: int = 1, retain: bool = False) -> bool:
+        """Publish an MQTT message safely.
+
+        Returns True if the message was queued, False if the client is not available.
+        This is the safe public API for publishing — never access _client directly from outside.
+        """
+        if self._client is None:
+            _LOGGER.warning("[MQTT] publish_message called but _client is None (bridge stopped?), topic=%s", topic)
+            return False
+        try:
+            self._client.publish(topic, payload, qos=qos, retain=retain)
+            return True
+        except Exception as e:
+            _LOGGER.error("[MQTT] publish_message failed on topic=%s: %s", topic, e)
+            return False

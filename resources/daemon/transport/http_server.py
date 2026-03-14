@@ -18,6 +18,7 @@ from .mqtt_client import MqttBridge
 from models.topology import TopologySnapshot, assess_all
 from models.mapping import MappingResult, PublicationDecision
 from mapping.light import LightMapper
+from mapping.cover import CoverMapper
 from discovery.publisher import DiscoveryPublisher
 
 _LOGGER = logging.getLogger(__name__)
@@ -325,8 +326,9 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     anciens_eq_ids = set(request.app["mappings"].keys())
     nouveaux_eq_ids = set()
 
-    # 5. Map eligible eqLogics to HA entities (Story 2.2)
-    mapper = LightMapper()
+    # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3)
+    light_mapper = LightMapper()
+    cover_mapper = CoverMapper()
     mappings = {}       # Dict[int, MappingResult]
     publications = {}   # Dict[int, PublicationDecision]
     
@@ -336,6 +338,11 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         "lights_ambiguous": 0,
         "lights_published": 0,
         "lights_skipped": 0,
+        "covers_sure": 0,
+        "covers_probable": 0,
+        "covers_ambiguous": 0,
+        "covers_published": 0,
+        "covers_skipped": 0,
     }
     
     mqtt_bridge = request.app.get("mqtt_bridge")
@@ -349,32 +356,57 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
         
-        mapping = mapper.map(eq, snapshot)
+        # Try light first, then cover (first mapper that returns non-None wins)
+        mapping = light_mapper.map(eq, snapshot)
         if mapping is None:
-            continue  # Not a light
+            mapping = cover_mapper.map(eq, snapshot)
+        
+        if mapping is None:
+            continue  # Not mapped by any mapper
         
         mappings[eq_id] = mapping
         
-        # Count by confidence
-        if mapping.confidence == "sure":
-            mapping_counters["lights_sure"] += 1
-        elif mapping.confidence == "probable":
-            mapping_counters["lights_probable"] += 1
-        elif mapping.confidence == "ambiguous":
-            mapping_counters["lights_ambiguous"] += 1
-        
-        # Decide publication
-        decision = mapper.decide_publication(mapping)
-        publications[eq_id] = decision
-        nouveaux_eq_ids.add(eq_id)
-        
-        if decision.should_publish:
-            mapping_counters["lights_published"] += 1
-            # Publish via MQTT Discovery if bridge is connected
-            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                await publisher.publish_light(mapping, snapshot)
-        else:
-            mapping_counters["lights_skipped"] += 1
+        if mapping.ha_entity_type == "light":
+            # Count by confidence
+            if mapping.confidence == "sure":
+                mapping_counters["lights_sure"] += 1
+            elif mapping.confidence == "probable":
+                mapping_counters["lights_probable"] += 1
+            elif mapping.confidence == "ambiguous":
+                mapping_counters["lights_ambiguous"] += 1
+            
+            # Decide publication
+            decision = light_mapper.decide_publication(mapping)
+            publications[eq_id] = decision
+            nouveaux_eq_ids.add(eq_id)
+            
+            if decision.should_publish:
+                mapping_counters["lights_published"] += 1
+                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                    await publisher.publish_light(mapping, snapshot)
+            else:
+                mapping_counters["lights_skipped"] += 1
+
+        elif mapping.ha_entity_type == "cover":
+            # Count by confidence
+            if mapping.confidence == "sure":
+                mapping_counters["covers_sure"] += 1
+            elif mapping.confidence == "probable":
+                mapping_counters["covers_probable"] += 1
+            elif mapping.confidence == "ambiguous":
+                mapping_counters["covers_ambiguous"] += 1
+            
+            # Decide publication
+            decision = cover_mapper.decide_publication(mapping)
+            publications[eq_id] = decision
+            nouveaux_eq_ids.add(eq_id)
+            
+            if decision.should_publish:
+                mapping_counters["covers_published"] += 1
+                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                    await publisher.publish_cover(mapping, snapshot)
+            else:
+                mapping_counters["covers_skipped"] += 1
             
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
@@ -382,8 +414,9 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         # Si c'était publié avant, on l'unpublish
         old_decision = request.app["publications"].get(old_eq_id)
         if old_decision and old_decision.should_publish:
+            entity_type = old_decision.mapping_result.ha_entity_type
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                await publisher.unpublish_by_eq_id(old_eq_id)
+                await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
                 _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
                 
         # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
@@ -395,12 +428,18 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     request.app["publications"].update(publications)
     
     _LOGGER.info(
-        "[MAPPING] Summary: sure=%d probable=%d ambiguous=%d published=%d skipped=%d",
+        "[MAPPING] Summary: lights(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
+        "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d)",
         mapping_counters["lights_sure"],
         mapping_counters["lights_probable"],
         mapping_counters["lights_ambiguous"],
         mapping_counters["lights_published"],
         mapping_counters["lights_skipped"],
+        mapping_counters["covers_sure"],
+        mapping_counters["covers_probable"],
+        mapping_counters["covers_ambiguous"],
+        mapping_counters["covers_published"],
+        mapping_counters["covers_skipped"],
     )
     
     summary = {
@@ -430,6 +469,8 @@ def create_app(local_secret: str) -> web.Application:
     # Pre-initialize bridge to avoid DeprecationWarning when re-assigning app keys later
     app["mqtt_bridge"] = MqttBridge()
     # Pre-initialize mapping/publication containers (Story 2.2 — aiohttp guard-rail)
+    app["topology"] = None       # TopologySnapshot | None — populated on first sync
+    app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app.router.add_get("/system/status", _handle_system_status)
