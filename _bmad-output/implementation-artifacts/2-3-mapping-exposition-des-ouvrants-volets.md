@@ -1,6 +1,6 @@
 # Story 2.3: Mapping & Exposition des Ouvrants (Volets)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -326,14 +326,14 @@ so that je gère les ouvertures de ma maison sereinement.
     - Unpublish cover envoie payload vide avec retain=True sur le topic cover
     - `suggested_area` absent du `device` si l'objet Jeedom est None
 
-- [ ] **Task 5 — Smoke Test MQTT Discovery** (DoD) — Requiert une box Jeedom
-  - [ ] 5.1 Sur une box Jeedom avec broker MQTT actif :
-    1. Lancer le daemon
-    2. Déclencher `/action/sync` via AJAX ou curl
-    3. Vérifier avec `mosquitto_sub -t 'homeassistant/cover/#' -v --retained-only` que les topics sont publiés
-    4. Vérifier que le payload JSON est valide et contient les champs requis
-    5. Vérifier que `retain=true` est effectif
-    6. Vérifier que les lumières (Story 2.2) continuent de fonctionner correctement (pas de régression)
+- [x] **Task 5 — Smoke Test MQTT Discovery** (DoD) — ✅ Validé sur box Jeedom 2026-03-14
+  - [x] 5.1 Sur une box Jeedom avec broker MQTT actif :
+    1. Daemon lancé
+    2. `/action/sync` déclenché
+    3. `mosquitto_sub -t 'homeassistant/cover/#' -v --retained-only` : topics publiés ✅
+    4. Payload JSON valide avec champs requis ✅
+    5. `retain=true` effectif ✅
+    6. Lumières (Story 2.2) continuent de fonctionner ✅ (pas de régression)
 
 ## Dev Notes
 

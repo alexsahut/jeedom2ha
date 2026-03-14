@@ -1,4 +1,4 @@
-# generated: 2026-03-13
+  # generated: 2026-03-13
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   epic-2: in-progress
   2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: done
-  2-3-mapping-exposition-des-ouvrants-volets: backlog
+  2-3-mapping-exposition-des-ouvrants-volets: done
   2-4-mapping-exposition-des-prises-switches: backlog
   2-5-mapping-exposition-des-capteurs-numeriques-binaires: backlog
   epic-2-retrospective: optional
