@@ -50,7 +50,7 @@ development_status:
   2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: done
   2-3-mapping-exposition-des-ouvrants-volets: done
-  2-4-mapping-exposition-des-prises-switches: backlog
+  2-4-mapping-exposition-des-prises-switches: ready-for-dev
   2-5-mapping-exposition-des-capteurs-numeriques-binaires: backlog
   epic-2-retrospective: optional
   epic-3: backlog

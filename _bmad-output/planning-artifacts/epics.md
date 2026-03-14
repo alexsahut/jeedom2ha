@@ -34,7 +34,7 @@ FR14: Support Capteurs binaires (ouverture, mouvement, fuite, fumée)
 FR15: Pilotage HA -> Jeedom (actionneurs)
 FR16: Retour d'état Jeedom -> HA
 FR17: Synchronisation incrémentale d'état (event::changes)
-FR18: Exclusion d'équipement spécifique
+FR18: Exclusion multicritères d'équipements (par équipement, plugin source, pièce/objet Jeedom)
 FR19: Republication propre après modification des exclusions
 FR20: Détection ajout équipement via rescan
 FR21: Détection renommage (unique_id stables)
@@ -53,6 +53,7 @@ FR33: Guidance en cas d'absence de Broker MQTT
 FR34: Configuration globale du plugin (logs, etc.)
 FR35: Support authentification MQTT Broker
 FR36: Déclenchement manuel de republication complète
+FR37: Politique de confiance configurable (sûr uniquement / sûr + probable)
 
 ### NonFunctional Requirements
 
@@ -114,7 +115,7 @@ FR14: Epic 2 - Support Capteurs binaires
 FR15: Epic 3 - Pilotage HA -> Jeedom
 FR16: Epic 3 - Retour d'état
 FR17: Epic 3 - Synchro temps réel
-FR18: Epic 4 - Exclusion équipement
+FR18: Epic 4 - Exclusion multicritères (équipement, plugin, pièce)
 FR19: Epic 4 - Republication après exclusion
 FR20: Epic 5 - Détection ajout rescan
 FR21: Epic 5 - Détection renommage
@@ -133,6 +134,7 @@ FR33: Epic 1 - Guidance MQTT
 FR34: Epic 1 - Config globale
 FR35: Epic 1 - Auth MQTT
 FR36: Epic 4 - Republication manuelle
+FR37: Epic 4 - Politique de confiance configurable
 
 ## Epic List
 
@@ -150,7 +152,7 @@ Objectif : L'utilisateur pilote ses équipements depuis HA et voit les retours d
 
 ### Epic 4: Maîtrise du Périmètre & Diagnostic
 Objectif : L'utilisateur affine ce qui est publié (exclusions) et résout les problèmes via l'interface de diagnostic.
-**FRs covered:** FR6, FR18, FR19, FR26, FR27, FR28, FR30, FR36
+**FRs covered:** FR6, FR18, FR19, FR26, FR27, FR28, FR30, FR36, FR37
 
 ### Epic 5: Fiabilité & Cycle de Vie
 Objectif : Le système gère les redémarrages, les renommages et les suppressions sans créer d'entités fantômes dans le cas nominal.
@@ -383,19 +385,46 @@ So that je puisse rendre ma maison HA plus complète en autonomie.
 **And** le système distingue clairement : problème de typage Jeedom, type non supporté en V1, exclusion volontaire, mapping ambigu
 **And** les conseils de correction sont spécifiques à la cause détectée (ex: "Configurez le type générique sur la commande 'Etat'")
 
-### Story 4.3: Gestion des Exclusions et Actions Manuelles
+### Story 4.3: Exclusion Multicritères et Gestion du Périmètre Publié
 
 As a utilisateur Jeedom,
-I want pouvoir exclure un équipement de HA ou forcer un rescan complet,
-So that je garde mon installation Home Assistant propre.
+I want configurer finement ce qui est publié vers HA selon plusieurs critères d'exclusion et forcer un rescan complet,
+So that je garde mon installation Home Assistant propre et sans doublons inutiles.
 
 **Acceptance Criteria:**
 
-**Given** le plugin est configuré
-**When** j'effectue une action manuelle sur un équipement (Exclure) ou globalement (Rescan)
-**Then** l'exclusion par équipement est appliquée avec retrait immédiat dans HA (Unpublish MQTT)
-**And** le système permet un rescan / republication complète avec purge contrôlée du cache local
-**And** toute action manuelle est confirmée visuellement dans l'UI avec un résultat clair (Succès / Partiel / Échec)
+**Partie A — Moteur de filtrage (daemon)**
+
+**Given** des critères d'exclusion sont configurés
+**When** un sync/rescan est déclenché
+**Then** les équipements correspondant à au moins un critère d'exclusion ne sont pas publiés
+**And** les critères supportés sont : par plugin source (eqType_name), par pièce/objet Jeedom, par équipement individuel
+**And** les exclusions sont cumulatives et évaluées avant le moteur de mapping
+**And** un équipement précédemment publié puis exclu est retiré de HA (Unpublish MQTT)
+**And** les équipements exclus restent visibles dans le diagnostic avec la raison d'exclusion appliquée
+
+**Partie B — Politique de confiance configurable**
+
+**Given** l'utilisateur a choisi une politique de confiance
+**When** le moteur de mapping produit un résultat
+**Then** seuls les niveaux de confiance autorisés par la politique sont publiés
+**And** les options sont : « Publier uniquement les mappings sûrs » ou « Publier les mappings sûrs et probables » (défaut)
+**And** le réglage est global et s'applique à tous les domaines de mapping
+
+**Partie C — Configuration et UI**
+
+**Given** l'utilisateur accède à la configuration du plugin
+**When** il configure les critères d'exclusion ou la politique de confiance
+**Then** les champs de configuration sont accessibles dans la page de configuration du plugin
+**And** la configuration est persistée via les mécanismes standards Jeedom
+**And** les libellés et descriptions sont clairs et orientés métier
+
+**Partie D — Rescan et application**
+
+**Given** la configuration d'exclusion a été modifiée
+**When** l'utilisateur déclenche un rescan / republication complète
+**Then** les nouvelles exclusions sont appliquées avec mise à jour du périmètre publié et unpublish des équipements qui ne doivent plus être exposés
+**And** toute action est confirmée visuellement dans l'UI avec un résultat clair (Succès / Partiel / Échec)
 
 ### Story 4.4: Export de Diagnostic pour Support
 

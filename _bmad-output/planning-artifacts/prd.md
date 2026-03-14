@@ -583,7 +583,7 @@ Bootstrap automatique + mapping conservative des usages essentiels + round-trip 
 
 ### Périmètre & Exclusions
 
-- **FR18 :** L'utilisateur peut exclure un équipement spécifique de la publication.
+- **FR18 :** L'utilisateur peut exclure des équipements de la publication selon plusieurs critères : par équipement individuel, par plugin source (eqType_name) et par pièce / objet Jeedom. Les exclusions sont cumulatives : tout équipement correspondant à au moins un critère d'exclusion n'est pas publié. La configuration est persistée et réappliquée à chaque synchronisation / rescan.
 - **FR19 :** Le système peut republier proprement après modification des exclusions (les entités exclues disparaissent de HA, les entités restantes sont inchangées).
 
 ### Cycle de Vie des Entités
@@ -614,6 +614,7 @@ Bootstrap automatique + mapping conservative des usages essentiels + round-trip 
 ### Republication & Maintenance
 
 - **FR36 :** L'utilisateur peut déclencher une republication complète propre de la configuration publiée vers HA.
+- **FR37 :** L'utilisateur peut configurer la politique de confiance de publication : publier uniquement les équipements mappés avec une confiance « sûre », ou publier les équipements « sûrs » et « probables ». Le réglage par défaut est « sûr + probable ». Ce paramètre est global et s'applique à tous les domaines de mapping.
 
 ## Exigences Non-Fonctionnelles
 
