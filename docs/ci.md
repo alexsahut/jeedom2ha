@@ -24,6 +24,8 @@ Les fichiers de configuration se trouvent dans :
 - **PR Routing Policy** : vérifie que les PR de développement ciblent `main`, que les promotions vers `beta` viennent de `main`, et que les promotions vers `stable` viennent de `beta`.
 - **PR Metadata Policy** : vérifie qu'une PR de développement vers `main` utilise un titre compatible Conventional Commits.
 - **Cohérence minimale des branches source** : les PR vers `main` refusent les branches protégées comme source et valident un format simple pour les branches nommées avec préfixe.
+- **Précondition locale hors CI** : la CI ne remplace pas le préflight Git local obligatoire défini dans `docs/git-strategy.md`.
+- **Attendu d'entrée** : une PR de développement valide provient d'une branche dédiée portée par un worktree dédié, créée depuis un clone principal local propre.
 
 ## Scripts Utilitaires
 Des scripts sont disponibles dans le dossier `scripts/` pour faciliter le développement :
