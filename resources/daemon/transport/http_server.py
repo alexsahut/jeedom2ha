@@ -35,6 +35,14 @@ def _check_secret(request: web.Request, local_secret: str) -> bool:
     return provided == local_secret
 
 
+def _resolve_state_topic(mapping: MappingResult) -> str:
+    """Resolve runtime state topic for a published actuator mapping."""
+    if mapping.ha_entity_type in ("light", "cover", "switch"):
+        return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
+
+    return ""
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -386,14 +394,33 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             
             # Decide publication
             decision = light_mapper.decide_publication(mapping)
+            config_published = False
+            decision.state_topic = _resolve_state_topic(mapping)
+            decision.active_or_alive = False
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
             if decision.should_publish:
-                mapping_counters["lights_published"] += 1
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_light(mapping, snapshot)
-            else:
+                    config_published = await publisher.publish_light(mapping, snapshot)
+                else:
+                    _LOGGER.warning(
+                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
+                        eq_id,
+                    )
+                if not config_published:
+                    decision = PublicationDecision(
+                        should_publish=False,
+                        reason="discovery_publish_failed",
+                        mapping_result=mapping,
+                        state_topic=decision.state_topic,
+                        active_or_alive=False,
+                    )
+                    publications[eq_id] = decision
+                else:
+                    decision.active_or_alive = True
+                    mapping_counters["lights_published"] += 1
+            if not decision.active_or_alive:
                 mapping_counters["lights_skipped"] += 1
 
         elif mapping.ha_entity_type == "cover":
@@ -407,14 +434,33 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             
             # Decide publication
             decision = cover_mapper.decide_publication(mapping)
+            config_published = False
+            decision.state_topic = _resolve_state_topic(mapping)
+            decision.active_or_alive = False
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
             if decision.should_publish:
-                mapping_counters["covers_published"] += 1
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_cover(mapping, snapshot)
-            else:
+                    config_published = await publisher.publish_cover(mapping, snapshot)
+                else:
+                    _LOGGER.warning(
+                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
+                        eq_id,
+                    )
+                if not config_published:
+                    decision = PublicationDecision(
+                        should_publish=False,
+                        reason="discovery_publish_failed",
+                        mapping_result=mapping,
+                        state_topic=decision.state_topic,
+                        active_or_alive=False,
+                    )
+                    publications[eq_id] = decision
+                else:
+                    decision.active_or_alive = True
+                    mapping_counters["covers_published"] += 1
+            if not decision.active_or_alive:
                 mapping_counters["covers_skipped"] += 1
 
         elif mapping.ha_entity_type == "switch":
@@ -428,14 +474,33 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
 
             # Decide publication
             decision = switch_mapper.decide_publication(mapping)
+            config_published = False
+            decision.state_topic = _resolve_state_topic(mapping)
+            decision.active_or_alive = False
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
 
             if decision.should_publish:
-                mapping_counters["switches_published"] += 1
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_switch(mapping, snapshot)
-            else:
+                    config_published = await publisher.publish_switch(mapping, snapshot)
+                else:
+                    _LOGGER.warning(
+                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
+                        eq_id,
+                    )
+                if not config_published:
+                    decision = PublicationDecision(
+                        should_publish=False,
+                        reason="discovery_publish_failed",
+                        mapping_result=mapping,
+                        state_topic=decision.state_topic,
+                        active_or_alive=False,
+                    )
+                    publications[eq_id] = decision
+                else:
+                    decision.active_or_alive = True
+                    mapping_counters["switches_published"] += 1
+            if not decision.active_or_alive:
                 mapping_counters["switches_skipped"] += 1
             
     # Purge des équipements qui ne sont plus remontés ou plus éligibles

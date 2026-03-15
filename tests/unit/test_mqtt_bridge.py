@@ -11,7 +11,11 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock, call, PropertyMock
 from aiohttp import web
 
-from resources.daemon.transport.mqtt_client import MqttBridge, BRIDGE_STATUS_TOPIC
+from resources.daemon.transport.mqtt_client import (
+    BRIDGE_STATUS_TOPIC,
+    COMMAND_SUBSCRIPTION_TOPICS,
+    MqttBridge,
+)
 
 
 LOCAL_SECRET = "test-secret-bridge"
@@ -53,6 +57,8 @@ def _make_mock_paho_client():
     client = MagicMock()
     client.on_connect = None
     client.on_disconnect = None
+    client.on_message = None
+    client.subscribe.return_value = (0, 1)
     return client
 
 
@@ -139,6 +145,7 @@ class TestMqttBridgeStart:
             await bridge.start({"host": "localhost", "port": 1883})
         assert mock_paho.on_connect == bridge._on_connect
         assert mock_paho.on_disconnect == bridge._on_disconnect
+        assert mock_paho.on_message == bridge._on_message
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +233,33 @@ class TestMqttBridgeCallbacks:
         assert mock_paho.publish.call_count == 2
         for c in mock_paho.publish.call_args_list:
             assert c == call(BRIDGE_STATUS_TOPIC, "online", qos=1, retain=True)
+
+    async def test_on_connect_subscribes_command_topics(self):
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        bridge._broker_host = "localhost"
+        bridge._broker_port = 1883
+        mock_paho = _make_mock_paho_client()
+
+        bridge._on_connect(mock_paho, None, {}, 0)
+        await asyncio.sleep(0)
+
+        assert mock_paho.subscribe.call_args_list == [
+            call(topic, qos=1) for topic in COMMAND_SUBSCRIPTION_TOPICS
+        ]
+
+    async def test_on_message_dispatches_to_command_handler(self):
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        handler = AsyncMock()
+        bridge.set_command_handler(handler)
+        message = MagicMock(topic="jeedom2ha/2/set", payload=b"ON")
+
+        bridge._on_message(None, None, message)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        handler.assert_awaited_once_with("jeedom2ha/2/set", "ON")
 
 
 # ---------------------------------------------------------------------------

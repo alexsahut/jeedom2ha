@@ -5,7 +5,7 @@ Tests the /system/status endpoint, local_secret authentication,
 and server lifecycle (start/stop).
 """
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from aiohttp import web
 
 _FAKE_CLI_ARGS = [
@@ -115,3 +115,84 @@ class TestLocalSecretAuth:
             headers={"X-Local-Secret": ""},
         )
         assert resp.status == 401
+
+
+class TestSyncAction:
+    @pytest.fixture
+    def mock_mqtt(self, http_app):
+        bridge = MagicMock()
+        bridge.is_connected = True
+        bridge.publish_message.return_value = True
+        http_app["mqtt_bridge"] = bridge
+        return bridge
+
+    async def test_sync_no_secret_returns_401(self, http_client):
+        resp = await http_client.post("/action/sync", json={})
+        assert resp.status == 401
+
+    async def test_sync_populates_runtime_gating_fields_for_switch(self, http_client, http_app, mock_mqtt):
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+
+        assert resp.status == 200
+        decision = http_app["publications"][2]
+        assert decision.should_publish is True
+        assert decision.active_or_alive is True
+        assert decision.state_topic == "jeedom2ha/2/state"
+        mock_mqtt.publish_message.assert_called_once()
+
+    async def test_sync_disables_runtime_gating_when_discovery_publish_fails(self, http_client, http_app, mock_mqtt):
+        mock_mqtt.publish_message.return_value = False
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+
+        assert resp.status == 200
+        decision = http_app["publications"][2]
+        assert decision.should_publish is False
+        assert decision.active_or_alive is False
+        assert decision.reason == "discovery_publish_failed"
+        assert decision.state_topic == "jeedom2ha/2/state"
