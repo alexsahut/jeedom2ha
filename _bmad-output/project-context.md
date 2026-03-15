@@ -1,10 +1,10 @@
 ---
 project_name: 'jeedom2ha'
 user_name: 'Alexandre'
-date: '2026-03-12'
+date: '2026-03-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 52
+rule_count: 58
 optimized_for_llm: true
 ---
 
@@ -147,9 +147,13 @@ jeedom2ha/
 - **Fork du plugin-template** : point de départ depuis `jeedom/plugin-template`, renommer `template` → `jeedom2ha` dans tous les fichiers
 - **Modèle Git canonique** : `story branch -> main -> beta -> stable`
 - **Branche d'intégration** : `main` est la seule branche d'intégration canonique du projet
+- **Clone principal local** : le clone principal local doit rester un miroir propre de `origin/main` et servir uniquement à la synchronisation, à la review et à la création des branches et worktrees de travail
 - **Branches de publication** : `beta` et `stable` sont les branches de publication Jeedom Market ; `beta` reçoit uniquement des changements déjà intégrés sur `main`, `stable` uniquement des changements déjà passés par `beta`
 - **Branches non canoniques** : `develop` n'est pas une branche canonique et ne doit plus apparaître dans la gouvernance cible
-- **Règle agents IA** : les agents IA ne doivent jamais pousser directement sur `main`, `beta` ou `stable` ; ils travaillent sur des branches courtes dédiées créées depuis `main`
+- **Développement local obligatoire** : aucune story, aucun fix et aucun sujet équivalent ne doivent être développés dans le clone principal local
+- **Branche + worktree dédiés** : toute story ou tout fix doit être traité dans une branche dédiée créée depuis `main` et dans un worktree dédié attaché à cette branche
+- **Préflight Git bloquant** : avant toute modification, vérifier que la branche courante n'est pas protégée, que le working tree est propre, que la branche est cohérente avec le sujet demandé et qu'elle ne contient pas déjà un autre sujet non validé ; si un contrôle échoue, l'agent doit s'arrêter
+- **Règle agents IA** : les agents IA ne doivent jamais pousser directement sur `main`, `beta` ou `stable`
 - **Référence de gouvernance** : voir `docs/git-strategy.md` pour la politique Git, commit, PR, merge et release
 - **`info.json`** : fichier obligatoire dans `plugin_info/` — contient l'ID, le nom, la version, les `require` (version min Jeedom), les fonctionnalités activées (hasOwnDeamon, hasDependency, etc.)
 
@@ -209,6 +213,8 @@ jeedom2ha/
 - Lire ce fichier avant d'implémenter du code
 - Suivre TOUTES les règles exactement comme documentées
 - En cas de doute, préférer l'option la plus restrictive
+- Ne jamais développer dans le clone principal local
+- Ne jamais démarrer un travail si le préflight Git bloque
 - Mettre à jour ce fichier si de nouveaux patterns émergent
 
 **Pour les humains :**
@@ -218,4 +224,4 @@ jeedom2ha/
 - Réviser périodiquement pour retirer les règles devenues évidentes
 - Ajouter les nouvelles conventions découvertes en cours de développement
 
-Last Updated: 2026-03-12
+Last Updated: 2026-03-15
