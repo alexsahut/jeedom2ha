@@ -18,8 +18,14 @@ test = [
     "pytest",
     "pytest-cov",
     "pytest-asyncio",
+    "pytest-aiohttp",
     "flake8",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["resources.daemon*"]
+namespaces = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
