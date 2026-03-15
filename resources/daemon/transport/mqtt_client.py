@@ -12,12 +12,18 @@ thread-unsafe structures from a non-async context.
 import asyncio
 import logging
 import ssl
+from typing import Any, Callable, Dict, Optional
 
 import paho.mqtt.client as mqtt
 
 _LOGGER = logging.getLogger(__name__)
 
 BRIDGE_STATUS_TOPIC = "jeedom2ha/bridge/status"
+COMMAND_SUBSCRIPTION_TOPICS = (
+    "jeedom2ha/+/set",
+    "jeedom2ha/+/brightness/set",
+    "jeedom2ha/+/position/set",
+)
 
 
 class MqttBridge:
@@ -34,6 +40,8 @@ class MqttBridge:
         self._loop = None
         self._broker_host = ""
         self._broker_port = 0
+        self._command_handler: Optional[Callable[[str, str], Any]] = None
+        self._pending_command_tasks: Dict[str, asyncio.Task[Any]] = {}
 
     # ------------------------------------------------------------------
     # Public async API
@@ -69,6 +77,7 @@ class MqttBridge:
         # Register callbacks (called from paho thread)
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
+        self._client.on_message = self._on_message
 
         # Built-in exponential backoff reconnection (NFR6: < 30s)
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
@@ -112,6 +121,7 @@ class MqttBridge:
         self._client.loop_stop()
         self._client = None
         self._state = "disconnected"
+        self._pending_command_tasks.clear()
 
     # ------------------------------------------------------------------
     # paho callbacks — executed in the paho network thread
@@ -125,6 +135,7 @@ class MqttBridge:
                 self._broker_host,
                 self._broker_port,
             )
+            self._subscribe_command_topics(client)
             # Birth message — signals bridge availability to HA
             client.publish(BRIDGE_STATUS_TOPIC, "online", qos=1, retain=True)
             if self._loop is not None:
@@ -133,6 +144,86 @@ class MqttBridge:
             _LOGGER.warning("[MQTT] Connection refused by broker (rc=%d)", rc)
             if self._loop is not None:
                 self._loop.call_soon_threadsafe(self._set_state, "disconnected")
+
+    def _on_message(self, client, userdata, message):
+        """Called by paho when a subscribed message is received (paho thread)."""
+        if self._command_handler is None:
+            return
+
+        topic = str(getattr(message, "topic", "") or "")
+        payload_raw = getattr(message, "payload", b"")
+        if isinstance(payload_raw, (bytes, bytearray)):
+            payload = payload_raw.decode("utf-8", errors="ignore")
+        else:
+            payload = str(payload_raw)
+
+        if self._loop is not None:
+            self._loop.call_soon_threadsafe(self._dispatch_command_message, topic, payload)
+
+    def _subscribe_command_topics(self, client) -> None:
+        """Subscribe to HA command topics in the jeedom2ha namespace only."""
+        for subscription_topic in COMMAND_SUBSCRIPTION_TOPICS:
+            subscribe_result = client.subscribe(subscription_topic, qos=1)
+            if isinstance(subscribe_result, tuple):
+                result = subscribe_result[0] if subscribe_result else mqtt.MQTT_ERR_UNKNOWN
+            elif isinstance(subscribe_result, int):
+                result = subscribe_result
+            else:
+                result = mqtt.MQTT_ERR_SUCCESS
+
+            if result == mqtt.MQTT_ERR_SUCCESS:
+                _LOGGER.info("[MQTT] Subscribed to command topic: %s", subscription_topic)
+            else:
+                _LOGGER.warning(
+                    "[MQTT] Failed to subscribe to command topic=%s result=%s",
+                    subscription_topic,
+                    result,
+                )
+
+    def _dispatch_command_message(self, topic: str, payload: str) -> None:
+        """Dispatch command messages on the asyncio loop thread."""
+        if self._command_handler is None:
+            return
+
+        try:
+            maybe_coro = self._command_handler(topic, payload)
+            if asyncio.iscoroutine(maybe_coro):
+                dispatch_key = self._command_dispatch_key(topic)
+                previous_task = self._pending_command_tasks.get(dispatch_key)
+                task = asyncio.create_task(
+                    self._run_serialized_command(dispatch_key, maybe_coro, previous_task)
+                )
+                self._pending_command_tasks[dispatch_key] = task
+        except Exception:
+            _LOGGER.exception("[MQTT] Command handler raised an exception")
+
+    def _command_dispatch_key(self, topic: str) -> str:
+        """Serialize commands per Jeedom entity to preserve arrival order."""
+        parts = topic.split("/")
+        if len(parts) >= 3 and parts[0] == "jeedom2ha" and parts[1].isdigit():
+            return f"eq:{parts[1]}"
+        return f"topic:{topic}"
+
+    async def _run_serialized_command(
+        self,
+        dispatch_key: str,
+        command_coro: Any,
+        previous_task: Optional[asyncio.Task[Any]],
+    ) -> None:
+        """Run one command only after the previous command for the same entity completes."""
+        try:
+            if previous_task is not None:
+                try:
+                    await previous_task
+                except Exception:
+                    pass
+            await command_coro
+        except Exception:
+            _LOGGER.exception("[MQTT] Command handler raised an exception")
+        finally:
+            current_task = asyncio.current_task()
+            if current_task is not None and self._pending_command_tasks.get(dispatch_key) is current_task:
+                self._pending_command_tasks.pop(dispatch_key, None)
 
     def _on_disconnect(self, client, userdata, rc):
         """Called by paho on disconnect (paho thread). rc=0 = clean, rc!=0 = unexpected."""
@@ -182,3 +273,7 @@ class MqttBridge:
         except Exception as e:
             _LOGGER.error("[MQTT] publish_message failed on topic=%s: %s", topic, e)
             return False
+
+    def set_command_handler(self, handler: Optional[Callable[[str, str], Any]]) -> None:
+        """Register a command message handler called for subscribed command topics."""
+        self._command_handler = handler

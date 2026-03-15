@@ -89,3 +89,5 @@ class PublicationDecision:
     should_publish: bool
     reason: str                               # e.g. "sure", "probable_bounded", "ambiguous_skipped"
     mapping_result: MappingResult = field(default=None)  # type: ignore[assignment]
+    state_topic: Optional[str] = None
+    active_or_alive: bool = True

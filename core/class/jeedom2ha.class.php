@@ -188,6 +188,7 @@ class jeedom2ha extends eqLogic {
     $pidFile = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
     $callbackUrl = network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/plugins/jeedom2ha/core/php/jeedom2ha.php';
     $apiKey = jeedom::getApiKey(__CLASS__);
+    $jeedomCoreApiKey = config::byKey('api');
     $socketPort = config::byKey('socketport', __CLASS__, '55081');
     $logLevel = log::convertLogLevel(log::getLogLevel(__CLASS__));
 
@@ -197,12 +198,14 @@ class jeedom2ha extends eqLogic {
     $cmd .= ' --socketport ' . $socketPort;
     $cmd .= ' --callback ' . $callbackUrl;
     $cmd .= ' --apikey ' . $apiKey;
+    $cmd .= ' --jeedomcoreapikey ' . escapeshellarg((string) $jeedomCoreApiKey);
     $cmd .= ' --pid ' . $pidFile;
     $cmd .= ' --apiport ' . $apiPort;
     $cmd .= ' --localsecret ' . $localSecret;
 
     $cmdLog = preg_replace('/--localsecret\s+\S+/', '--localsecret ***', $cmd);
     $cmdLog = preg_replace('/--apikey\s+\S+/', '--apikey ***', $cmdLog);
+    $cmdLog = preg_replace('/--jeedomcoreapikey\s+\S+/', '--jeedomcoreapikey ***', $cmdLog);
     log::add(__CLASS__, 'info', '[DAEMON] Launching: ' . $cmdLog);
     $result = exec($cmd . ' >> ' . log::getPathToLog(__CLASS__ . '_daemon') . ' 2>&1 &');
     // Use wall-clock deadline: callDaemon has a 3s timeout per attempt (2 attempts for GET),

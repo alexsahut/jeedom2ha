@@ -15,6 +15,7 @@ _FAKE_CLI_ARGS = [
     "--socketport", "0",
     "--callback", "http://127.0.0.1/fake",
     "--apikey", "test-api-key",
+    "--jeedomcoreapikey", "test-core-api-key",
     "--pid", "/tmp/test-jeedom2ha.pid",
     "--cycle", "0.5",
 ]
@@ -101,6 +102,13 @@ class TestDaemonInstantiation:
             daemon = Jeedom2haDaemon()
             assert daemon._config.apiport == 9999
 
+    def test_daemon_config_has_core_api_key_argument(self):
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon._config, "jeedomcoreapikey")
+        assert daemon._config.jeedomcoreapikey == "test-core-api-key"
+
 
 class TestDaemonOnStart:
     """Test on_start callback behavior."""
@@ -131,6 +139,49 @@ class TestDaemonOnStart:
         args, kwargs = mock_start.call_args
         assert kwargs.get("host", args[1] if len(args) > 1 else None) == "127.0.0.1"
 
+    async def test_on_start_wires_command_handler_and_core_api_key(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_app = {"mqtt_bridge": fake_bridge}
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+        fake_runner = MagicMock()
+
+        with patch("resources.daemon.main.create_app", return_value=fake_app), \
+             patch("resources.daemon.main.CommandSynchronizer", return_value=fake_sync) as mock_sync_cls, \
+             patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=fake_runner):
+            await daemon.on_start()
+
+        assert fake_app["jeedom_api"]["core_apikey"] == "test-core-api-key"
+        assert mock_sync_cls.call_args.kwargs["jeedom_core_apikey"] == "test-core-api-key"
+        fake_bridge.set_command_handler.assert_called_once_with(fake_sync.handle_command_message)
+
+    async def test_on_start_rolls_back_command_sync_when_http_start_fails(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_app = {"mqtt_bridge": fake_bridge}
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+
+        with patch("resources.daemon.main.create_app", return_value=fake_app), \
+             patch("resources.daemon.main.CommandSynchronizer", return_value=fake_sync), \
+             patch("resources.daemon.main.start_server", new_callable=AsyncMock, side_effect=RuntimeError("http startup failed")):
+            with pytest.raises(RuntimeError):
+                await daemon.on_start()
+
+        fake_sync.stop.assert_awaited_once()
+        fake_bridge.set_command_handler.assert_any_call(fake_sync.handle_command_message)
+        fake_bridge.set_command_handler.assert_any_call(None)
+        assert daemon._command_synchronizer is None
+        assert daemon._http_runner is None
+        assert daemon._app is None
+
 
 class TestDaemonOnStop:
     """Test on_stop callback behavior."""
@@ -143,6 +194,26 @@ class TestDaemonOnStop:
 
         daemon = Jeedom2haDaemon()
         await daemon.on_stop()
+
+    async def test_on_stop_clears_command_handler_and_stops_sync(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_bridge.stop = AsyncMock()
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+        daemon._app = {
+            "mqtt_bridge": fake_bridge,
+            "command_synchronizer": fake_sync,
+        }
+
+        await daemon.on_stop()
+
+        fake_sync.stop.assert_awaited_once()
+        fake_bridge.set_command_handler.assert_called_once_with(None)
+        fake_bridge.stop.assert_awaited_once()
 
 
 class TestDaemonOnMessage:
