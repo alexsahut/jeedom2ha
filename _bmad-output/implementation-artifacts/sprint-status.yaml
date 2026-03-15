@@ -34,6 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
+last_updated: 2026-03-15
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -50,12 +51,13 @@ development_status:
   2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: done
   2-3-mapping-exposition-des-ouvrants-volets: done
-  2-4-mapping-exposition-des-prises-switches: review
-  2-5-mapping-exposition-des-capteurs-numeriques-binaires: backlog
-  epic-2-retrospective: optional
-  epic-3: backlog
-  3-1-synchronisation-incrementale-des-etats-jeedom-ha: backlog
-  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: backlog
+  2-4-mapping-exposition-des-prises-switches: done
+  2-5-mapping-exposition-des-capteurs-numeriques-binaires: done
+  epic-2-retrospective: done
+  epic-3: in-progress
+  3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
+  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: review
+  3-2-bis-bootstrap-runtime-apres-restart-daemon: done  # cloture produit/projet; validation terrain 3.2b-A/B/C differee et non executee
   3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: backlog
   epic-3-retrospective: optional
   epic-4: backlog
