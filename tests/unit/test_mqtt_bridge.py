@@ -261,6 +261,40 @@ class TestMqttBridgeCallbacks:
 
         handler.assert_awaited_once_with("jeedom2ha/2/set", "ON")
 
+    async def test_on_message_serializes_commands_for_same_entity(self):
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        first_can_finish = asyncio.Event()
+        second_started = asyncio.Event()
+        events = []
+
+        async def handler(topic, payload):
+            events.append(f"start:{payload}")
+            if payload == "ON":
+                await first_can_finish.wait()
+            else:
+                second_started.set()
+            events.append(f"end:{payload}")
+
+        bridge.set_command_handler(handler)
+        first_message = MagicMock(topic="jeedom2ha/2/set", payload=b"ON")
+        second_message = MagicMock(topic="jeedom2ha/2/set", payload=b"OFF")
+
+        bridge._on_message(None, None, first_message)
+        bridge._on_message(None, None, second_message)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert events == ["start:ON"]
+        assert second_started.is_set() is False
+
+        first_can_finish.set()
+        await asyncio.wait_for(second_started.wait(), timeout=1)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert events == ["start:ON", "end:ON", "start:OFF", "end:OFF"]
+
 
 # ---------------------------------------------------------------------------
 # Task 6.3 — Error handling: broker unreachable

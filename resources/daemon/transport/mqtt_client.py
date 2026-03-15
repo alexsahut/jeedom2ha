@@ -12,7 +12,7 @@ thread-unsafe structures from a non-async context.
 import asyncio
 import logging
 import ssl
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 import paho.mqtt.client as mqtt
 
@@ -41,6 +41,7 @@ class MqttBridge:
         self._broker_host = ""
         self._broker_port = 0
         self._command_handler: Optional[Callable[[str, str], Any]] = None
+        self._pending_command_tasks: Dict[str, asyncio.Task[Any]] = {}
 
     # ------------------------------------------------------------------
     # Public async API
@@ -120,6 +121,7 @@ class MqttBridge:
         self._client.loop_stop()
         self._client = None
         self._state = "disconnected"
+        self._pending_command_tasks.clear()
 
     # ------------------------------------------------------------------
     # paho callbacks — executed in the paho network thread
@@ -186,9 +188,42 @@ class MqttBridge:
         try:
             maybe_coro = self._command_handler(topic, payload)
             if asyncio.iscoroutine(maybe_coro):
-                asyncio.create_task(maybe_coro)
+                dispatch_key = self._command_dispatch_key(topic)
+                previous_task = self._pending_command_tasks.get(dispatch_key)
+                task = asyncio.create_task(
+                    self._run_serialized_command(dispatch_key, maybe_coro, previous_task)
+                )
+                self._pending_command_tasks[dispatch_key] = task
         except Exception:
             _LOGGER.exception("[MQTT] Command handler raised an exception")
+
+    def _command_dispatch_key(self, topic: str) -> str:
+        """Serialize commands per Jeedom entity to preserve arrival order."""
+        parts = topic.split("/")
+        if len(parts) >= 3 and parts[0] == "jeedom2ha" and parts[1].isdigit():
+            return f"eq:{parts[1]}"
+        return f"topic:{topic}"
+
+    async def _run_serialized_command(
+        self,
+        dispatch_key: str,
+        command_coro: Any,
+        previous_task: Optional[asyncio.Task[Any]],
+    ) -> None:
+        """Run one command only after the previous command for the same entity completes."""
+        try:
+            if previous_task is not None:
+                try:
+                    await previous_task
+                except Exception:
+                    pass
+            await command_coro
+        except Exception:
+            _LOGGER.exception("[MQTT] Command handler raised an exception")
+        finally:
+            current_task = asyncio.current_task()
+            if current_task is not None and self._pending_command_tasks.get(dispatch_key) is current_task:
+                self._pending_command_tasks.pop(dispatch_key, None)
 
     def _on_disconnect(self, client, userdata, rc):
         """Called by paho on disconnect (paho thread). rc=0 = clean, rc!=0 = unexpected."""
