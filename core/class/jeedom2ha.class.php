@@ -242,12 +242,108 @@ class jeedom2ha extends eqLogic {
       $result = self::callDaemon('/action/mqtt_connect', $mqttConfig, 'POST');
       if ($result === null || !isset($result['status']) || $result['status'] !== 'ok') {
         log::add(__CLASS__, 'warning', '[MQTT] Échec initiation MQTT — le démon reste actif sans broker');
+      } else {
+        self::bootstrapRuntimeAfterDaemonStart();
       }
     } else {
       log::add(__CLASS__, 'info', '[DAEMON] Pas de configuration MQTT, connexion différée');
     }
 
     return true;
+  }
+
+  public static function isDaemonMqttReady(?array $_status): bool {
+    if (!is_array($_status) || ($_status['status'] ?? null) !== 'ok') {
+      return false;
+    }
+
+    $payload = $_status['payload'] ?? null;
+    if (!is_array($payload)) {
+      return false;
+    }
+
+    $mqtt = $payload['mqtt'] ?? null;
+    if (!is_array($mqtt)) {
+      return false;
+    }
+
+    return ($mqtt['connected'] ?? false) === true && ($mqtt['state'] ?? null) === 'connected';
+  }
+
+  public static function bootstrapRuntimeAfterDaemonStart(
+    float $_timeoutSeconds = 10.0,
+    int $_pollIntervalMillis = 500,
+    ?callable $_statusFetcher = null,
+    ?callable $_topologyFetcher = null,
+    ?callable $_syncCaller = null
+  ): array {
+    $statusFetcher = $_statusFetcher ?: function() {
+      return self::callDaemon('/system/status');
+    };
+    $topologyFetcher = $_topologyFetcher ?: function() {
+      return self::getFullTopology();
+    };
+    $syncCaller = $_syncCaller ?: function(array $topology) {
+      return self::callDaemon('/action/sync', $topology, 'POST', 15);
+    };
+
+    $timeoutSeconds = max(0.0, $_timeoutSeconds);
+    $pollMicros = max(1, $_pollIntervalMillis) * 1000;
+    $deadline = microtime(true) + $timeoutSeconds;
+
+    log::add(__CLASS__, 'info', '[DAEMON] Runtime bootstrap startup: waiting for MQTT readiness');
+
+    while (true) {
+      try {
+        $status = $statusFetcher();
+      } catch (\Throwable $e) {
+        log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=status_request_failed): ' . $e->getMessage());
+        return array('status' => 'failed', 'reason' => 'status_request_failed');
+      }
+
+      if (!is_array($status)) {
+        log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=status_request_failed): /system/status returned no usable payload');
+        return array('status' => 'failed', 'reason' => 'status_request_failed');
+      }
+
+      if (self::isDaemonMqttReady($status)) {
+        try {
+          $topology = $topologyFetcher();
+        } catch (\Throwable $e) {
+          log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=topology_fetch_failed): ' . $e->getMessage());
+          return array('status' => 'failed', 'reason' => 'topology_fetch_failed');
+        }
+
+        if (!is_array($topology)) {
+          log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=topology_fetch_failed): topology payload is invalid');
+          return array('status' => 'failed', 'reason' => 'topology_fetch_failed');
+        }
+
+        try {
+          $syncResult = $syncCaller($topology);
+        } catch (\Throwable $e) {
+          log::add(__CLASS__, 'warning', '[SYNC] Runtime bootstrap failed (reason=sync_failed): ' . $e->getMessage());
+          return array('status' => 'failed', 'reason' => 'sync_failed');
+        }
+
+        if (!is_array($syncResult) || ($syncResult['status'] ?? null) !== 'ok') {
+          $message = is_array($syncResult) ? ($syncResult['message'] ?? 'unexpected sync response') : 'no response from /action/sync';
+          log::add(__CLASS__, 'warning', '[SYNC] Runtime bootstrap failed (reason=sync_failed): ' . $message);
+          return array('status' => 'failed', 'reason' => 'sync_failed');
+        }
+
+        log::add(__CLASS__, 'info', '[SYNC] Runtime bootstrap startup sync succeeded');
+        return array('status' => 'success', 'reason' => 'sync_completed');
+      }
+
+      $remainingMicros = (int) round(($deadline - microtime(true)) * 1000000);
+      if ($remainingMicros <= 0) {
+        log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap skipped (reason=mqtt_not_ready_timeout): MQTT readiness window expired');
+        return array('status' => 'skipped', 'reason' => 'mqtt_not_ready_timeout');
+      }
+
+      usleep(min($pollMicros, $remainingMicros));
+    }
   }
 
   public static function deamon_stop() {
