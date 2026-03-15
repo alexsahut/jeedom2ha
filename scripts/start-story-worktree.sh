@@ -30,7 +30,17 @@ CUSTOM_PATH="${2:-}"
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || fail "run this command from inside the repository."
 cd "$REPO_ROOT"
 
-MAIN_WORKTREE=$(git worktree list --porcelain | awk '$1 == "worktree" { print $2; exit }')
+MAIN_WORKTREE=""
+while IFS= read -r line; do
+    case "$line" in
+        worktree\ *)
+            MAIN_WORKTREE=${line#worktree }
+            break
+            ;;
+    esac
+done < <(git worktree list --porcelain)
+
+[[ -n "$MAIN_WORKTREE" ]] || fail "unable to detect the main clone worktree."
 CURRENT_PATH=$(pwd -P)
 
 [[ "$CURRENT_PATH" == "$MAIN_WORKTREE" ]] || fail "run this helper from the main clone, not from a linked worktree."
