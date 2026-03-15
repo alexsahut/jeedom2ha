@@ -8,7 +8,7 @@ updates:
   # Maintain python pip dependencies in your 'requirement.txt' file
   - package-ecosystem: "pip"
     directory: "/resources"
-    target-branch: "beta"
+    target-branch: "main"
     schedule:
       interval: weekly
   
@@ -19,7 +19,7 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     versioning-strategy: increase
-    target-branch: "beta"
+    target-branch: "main"
 
   # Maintain any github-actions workflow
   # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/keeping-your-actions-up-to-date-with-dependabot    
@@ -27,4 +27,4 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    target-branch: "beta"
+    target-branch: "main"

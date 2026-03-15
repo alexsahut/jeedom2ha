@@ -145,7 +145,12 @@ jeedom2ha/
 
 #### Structure du projet
 - **Fork du plugin-template** : point de départ depuis `jeedom/plugin-template`, renommer `template` → `jeedom2ha` dans tous les fichiers
-- **Branches** : `beta` et `stable` synchronisées avec le Market Jeedom (sync quotidienne à 12:10 UTC)
+- **Modèle Git canonique** : `story branch -> main -> beta -> stable`
+- **Branche d'intégration** : `main` est la seule branche d'intégration canonique du projet
+- **Branches de publication** : `beta` et `stable` sont les branches de publication Jeedom Market ; `beta` reçoit uniquement des changements déjà intégrés sur `main`, `stable` uniquement des changements déjà passés par `beta`
+- **Branches non canoniques** : `develop` n'est pas une branche canonique et ne doit plus apparaître dans la gouvernance cible
+- **Règle agents IA** : les agents IA ne doivent jamais pousser directement sur `main`, `beta` ou `stable` ; ils travaillent sur des branches courtes dédiées créées depuis `main`
+- **Référence de gouvernance** : voir `docs/git-strategy.md` pour la politique Git, commit, PR, merge et release
 - **`info.json`** : fichier obligatoire dans `plugin_info/` — contient l'ID, le nom, la version, les `require` (version min Jeedom), les fonctionnalités activées (hasOwnDeamon, hasDependency, etc.)
 
 #### Gestion des dépendances

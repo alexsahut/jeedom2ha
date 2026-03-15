@@ -3,10 +3,11 @@ on:
   push:
     branches:
       - beta
+      - stable
   pull_request:
     branches:
       - beta
-      - master
+      - stable
       
 name : 'Full Workflows Plugin Jeedom'
 

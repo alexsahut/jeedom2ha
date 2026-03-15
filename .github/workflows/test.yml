@@ -7,9 +7,9 @@ name: Test Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, beta, stable]
   pull_request:
-    branches: [main, develop]
+    branches: [main, beta, stable]
     types: [opened, synchronize, reopened, labeled]
   schedule:
     # Weekly burn-in on Sundays at 2 AM UTC
@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           # Security: inputs passed through env: to prevent script injection
-          python -m pytest --cov=resources/daemon --cov-report=xml --cov-report=term-missing tests/
+          python -m pytest --cov=resources/daemon --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage report
         if: always()
@@ -122,7 +122,7 @@ jobs:
             echo "🔥 Burn-in iteration $i/10"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             # Burn-in must use the same command scope as main tests for consistency
-            python -m pytest --cov=resources/daemon --cov-report=term-missing tests/ || exit 1
+            python -m pytest --cov=resources/daemon --cov-report=term-missing || exit 1
           done
           echo "✅ Burn-in complete - no flaky tests detected"
 
