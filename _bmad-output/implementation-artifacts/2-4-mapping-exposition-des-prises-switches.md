@@ -1,6 +1,6 @@
 # Story 2.4: Mapping & Exposition des Prises / Switches
 
-Status: ready-for-review
+Status: done
 
 ## Story
 

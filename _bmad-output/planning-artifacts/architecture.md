@@ -120,6 +120,7 @@ Le starter template fournit l’ossature, pas l’architecture métier ; le MVP 
 **Critical Decisions (Block Implementation):**
 - **State Management:** Cache hybride RAM/Disque (Jeedom = source de vérité).
 - **Transport Interne:** HTTP local + callbacks API Jeedom.
+- **Contrat d'authentification Jeedom:** séparation stricte `plugin API key` / `core API key` / `local secret`, avec validation terrain obligatoire des permissions effectives par méthode.
 - **Core Persistence:** Natif Jeedom (JSON in `eqLogic`/`cmd` tables), aucune DB externe.
 
 **Important Decisions (Shape Architecture):**
@@ -140,11 +141,58 @@ Le starter template fournit l’ossature, pas l’architecture métier ; le MVP 
 - Mécanisme de fallback radical : En cas de doute ou incohérence : purge cache + rescan complet.
 - Ne *pas* utiliser SQLite ou autre base de données custom en V1.
 
+### Authentication & Security
+
+**Contrat d'authentification API Jeedom du projet**
+- Le projet manipule trois secrets distincts qui ne sont pas interchangeables :
+  - `plugin API key`
+  - `core API key`
+  - `local secret`
+- Le contrat d'authentification doit être défini **par flux et par méthode**, jamais "par analogie" à partir d'une autre méthode Jeedom.
+- Une preuve locale de payload (`pytest`, mocks, assertions sur le JSON envoyé) ne démontre pas qu'une clé est effectivement autorisée par la box Jeedom réelle.
+
+**Hiérarchie de vérité en cas de divergence**
+1. **Box réelle / test terrain reproductible** : source de vérité pour les permissions effectives et les formats réellement acceptés.
+2. **Code local + tests locaux** : source utile pour le câblage, l'injection et les invariants internes, mais insuffisante seule pour valider l'authentification Jeedom.
+3. **Documentation officielle Jeedom** : source utile pour le format d'appel et l'intention produit, mais non suffisante si le comportement observé sur box réelle diverge.
+4. **Hypothèses non vérifiées** : interdites comme base d'une story ou d'un contrat d'architecture.
+
+**Inventaire des secrets / clés**
+
+| Secret / clé | Source de lecture / configuration | Injection runtime | Rôle réel dans le projet | Statut |
+| --- | --- | --- | --- | --- |
+| `plugin API key` | `jeedom::getApiKey(__CLASS__)` dans `core/class/jeedom2ha.class.php` | `--apikey` au démarrage du daemon | clé plugin injectée dans le daemon ; utilisée actuellement par `CommandSynchronizer` pour construire les appels `cmd::execCmd` ; tout autre usage effectif doit etre considere comme non demontre tant qu'il n'est pas observe sur box reelle | **Prouvé** pour l'injection ; **non validé terrain** pour `cmd::execCmd` |
+| `core API key` | `config::byKey('api')` dans `core/class/jeedom2ha.class.php` | `--jeedomcoreapikey` au démarrage du daemon | clé coeur globale injectée séparément ; utilisée par `StateSynchronizer` pour `event::changes` ; validée terrain pour `cmd::execCmd` sur la box testée | **Prouvé** |
+| `local secret` | `config::byKey('localSecret', __CLASS__)`, généré si absent | `--localsecret` + header HTTP `X-Local-Secret` | authentification **uniquement** de l'API HTTP locale PHP -> daemon (`127.0.0.1`) | **Prouvé** |
+
+**Matrice explicite endpoint / méthode -> clé attendue**
+
+| Endpoint / méthode | Clé attendue | Source de vérité prioritaire | Preuve disponible | Niveau de confiance |
+| --- | --- | --- | --- | --- |
+| `GET /system/status` | `local secret` dans `X-Local-Secret` | Code local + tests unitaires | `callDaemon()` envoie `X-Local-Secret`; `_handle_system_status()` refuse sans secret; tests `test_http_server.py` valident `401` sans secret et `200` avec secret | Élevé |
+| `POST /action/sync` | `local secret` dans `X-Local-Secret` | Code local + tests unitaires | `_handle_action_sync()` refuse sans secret; tests `test_http_server.py` valident `401` sans secret et `200` avec secret | Élevé |
+| `POST /core/api/jeeApi.php` méthode `event::changes` | `core API key` | Box réelle + code local + tests locaux | `StateSynchronizer` envoie `params.apikey = core_apikey`; tests `resources/daemon/tests/unit/test_state_sync.py` et `test_state_sync_lifecycle.py`; validation Story 3.1 sur box réelle | Élevé |
+| `POST /core/api/jeeApi.php` méthode `cmd::execCmd` | `core API key` sur la box réelle testée | **Box réelle** | preuve terrain : `config::byKey("api","jeedom2ha")` -> `Vous n'êtes pas autorisé à effectuer cette action`; `config::byKey("api")` -> `result: "ok"` ; le code local actuel envoie encore la clé plugin et ne doit donc pas être pris comme contrat validé | Élevé sur la box testée |
+
+**Conséquences d'architecture**
+- `event::changes` et `cmd::execCmd` doivent être validés **indépendamment**. Le fait qu'une clé fonctionne pour l'un n'autorise aucune déduction pour l'autre.
+- `local secret` n'est jamais une clé Jeedom JSON-RPC. Il protège seulement l'API HTTP locale du daemon.
+- Le code local actuel prouve l'intention d'injection séparée des clés plugin/core, mais il ne peut pas renverser une preuve terrain contraire.
+- Toute divergence entre code local et box réelle doit être traitée comme un **écart d'architecture prioritaire** avant d'écrire ou rejouer une story liée à l'authentification.
+
+**Hypothèses interdites**
+- Ne jamais supposer qu'une clé API Jeedom valide pour une méthode `jeeApi.php` l'est aussi pour une autre.
+- Ne jamais figer dans une story une hypothèse d'authentification non vérifiée sur box réelle.
+- Ne jamais considérer un test local vert comme preuve suffisante pour un changement touchant l'authentification Jeedom.
+- Ne jamais utiliser la documentation officielle seule pour conclure au contrat d'autorisation effectif si la box réelle montre autre chose.
+- Ne jamais confondre `local secret` (HTTP local daemon) et clé API Jeedom (`plugin` ou `core`).
+
 ### API & Internal Communication Patterns
 
 **Transport de contrôle (PHP ↔ Python) : HTTP Local + Callbacks API Jeedom**
-- PHP → Daemon : Requêtes gérées via l'API HTTP locale exposée par le daemon asynchrone sur `127.0.0.1` (pas exposée sur le LAN).
-- Daemon → PHP : Callbacks asynchrones transmis via l'API Jeedom sécurisée par la clé API du plugin (`jeeApi.php`).
+- PHP → Daemon : Requêtes gérées via l'API HTTP locale exposée par le daemon asynchrone sur `127.0.0.1` (pas exposée sur le LAN), authentifiées par `X-Local-Secret`.
+- Daemon → Jeedom JSON-RPC : appels vers `/core/api/jeeApi.php` avec contrat d'authentification **dépendant de la méthode** ; voir la matrice d'authentification ci-dessus.
+- Daemon → PHP callback : l'endpoint plugin `core/php/jeedom2ha.php` existe, mais le mécanisme exact d'authentification de ce callback n'est pas démontré par les artefacts locaux actuels et ne fait pas partie du présent contrat.
 - Aucune dépendance du transport interne au broker MQTT, garantissant le maintien d'un canal de diagnostic et de contrôle même si la liaison MQTT est rompue.
 
 *Guardrails :* Surface HTTP minimale avec messages structurés/idempotents. Timeouts courts. Gestion explicite des erreurs et codes de retour.
@@ -234,6 +282,12 @@ Le starter template fournit l’ossature, pas l’architecture métier ; le MVP 
 - Tous les payloads doivent être tolérants aux champs inconnus mais stricts sur les champs requis.
 - Les commandes doivent être idempotentes quand c’est possible (ex : rescan demandé plusieurs fois).
 - Les erreurs doivent toujours être explicites et structurées ; jamais de simple "fail" silencieux.
+
+**Guardrails d'authentification Jeedom :**
+- `local secret` protège l'API HTTP locale du daemon ; il ne valide aucun appel `jeeApi.php`.
+- Pour `/core/api/jeeApi.php`, la clé attendue est un contrat **par méthode**, pas un contrat global.
+- Une assertion de test qui vérifie seulement le payload émis (`apikey` envoyé) ne valide pas l'autorisation effective côté box Jeedom.
+- Toute story touchant auth Jeedom, démarrage daemon, `event::changes`, `cmd::execCmd`, `/action/sync` ou JSON-RPC Jeedom doit exécuter le protocole terrain minimal documenté dans `_bmad-output/implementation-artifacts/jeedom2ha-test-context-jeedom-reel.md`.
 
 ### 3. File, Module & Log Structure
 

@@ -22,6 +22,6 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
+testpaths = ["tests", "resources/daemon/tests"]
+pythonpath = [".", "resources/daemon"]
 asyncio_mode = "auto"

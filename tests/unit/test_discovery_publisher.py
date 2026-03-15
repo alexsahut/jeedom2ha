@@ -580,3 +580,119 @@ class TestSwitchSuggestedArea:
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["device"]["suggested_area"] == "Cuisine"
+
+
+# ==============================================================================
+# Helpers for Sensor tests (Story 2.5)
+# ==============================================================================
+
+from models.mapping import SensorCapabilities
+
+def _make_sensor_mapping(
+    cmd_id=101, eq_id=42, name="Salon Température", confidence="sure",
+    is_binary=False, device_class=None, unit_of_measurement=None, state_class=None,
+    suggested_area="Salon",
+):
+    """Helper to create a sensor/binary_sensor MappingResult."""
+    capabilities = SensorCapabilities(
+        is_binary=is_binary,
+        device_class=device_class,
+        unit_of_measurement=unit_of_measurement,
+        state_class=state_class,
+    )
+
+    ha_unique_id = f"jeedom2ha_cmd_{cmd_id}"
+    reason_code = f"{'binary_' if is_binary else ''}sensor_mapped"
+
+    return MappingResult(
+        ha_entity_type="binary_sensor" if is_binary else "sensor",
+        confidence=confidence,
+        reason_code=reason_code,
+        jeedom_eq_id=eq_id,
+        ha_unique_id=ha_unique_id,
+        ha_name=name,
+        suggested_area=suggested_area,
+        commands={"sensor": JeedomCmd(id=cmd_id, name="Temp", type="info")},
+        capabilities=capabilities,
+    )
+
+
+# ==============================================================================
+# Test: Sensor & Binary Sensor payload structure (Story 2.5)
+# ==============================================================================
+
+class TestSensorPayload:
+    @pytest.mark.asyncio
+    async def test_sensor_payload_has_required_fields(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload sensor basique contient tous les champs requis."""
+        mapping = _make_sensor_mapping()
+        await publisher.publish_sensor(mapping, snapshot)
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+
+        assert payload["name"] == "Salon Température"
+        assert payload["unique_id"] == "jeedom2ha_cmd_101"
+        assert payload["object_id"] == "jeedom2ha_cmd_101"
+        assert payload["state_topic"] == "jeedom2ha/cmd/101/state"
+        assert payload["availability_topic"] == "jeedom2ha/bridge/status"
+        assert "device" in payload
+        assert "jeedom2ha_42" in payload["device"]["identifiers"]
+
+    @pytest.mark.asyncio
+    async def test_sensor_conditionals(self, publisher, snapshot, mock_mqtt_bridge):
+        """Conditionals are omitted if None, included if present."""
+        # None
+        mapping_none = _make_sensor_mapping()
+        await publisher.publish_sensor(mapping_none, snapshot)
+        payload1 = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "device_class" not in payload1
+        assert "unit_of_measurement" not in payload1
+        assert "state_class" not in payload1
+
+        # Present
+        mock_mqtt_bridge.publish_message.reset_mock()
+        mapping_full = _make_sensor_mapping(
+            device_class="temperature", unit_of_measurement="°C", state_class="measurement"
+        )
+        await publisher.publish_sensor(mapping_full, snapshot)
+        payload2 = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload2["device_class"] == "temperature"
+        assert payload2["unit_of_measurement"] == "°C"
+        assert payload2["state_class"] == "measurement"
+
+
+class TestBinarySensorPayload:
+    @pytest.mark.asyncio
+    async def test_binary_sensor_payload_has_required_fields(self, publisher, snapshot, mock_mqtt_bridge):
+        """Payload binary_sensor basique contient payload_on/off obligatoires."""
+        mapping = _make_sensor_mapping(is_binary=True, device_class="opening")
+        await publisher.publish_binary_sensor(mapping, snapshot)
+
+        mock_mqtt_bridge.publish_message.assert_called_once()
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+
+        assert payload["payload_on"] == "ON"
+        assert payload["payload_off"] == "OFF"
+        assert payload["state_topic"] == "jeedom2ha/cmd/101/state"
+        assert payload["device_class"] == "opening"
+
+
+class TestSensorTopicFormat:
+    @pytest.mark.asyncio
+    async def test_sensor_topic_format(self, publisher, snapshot, mock_mqtt_bridge):
+        """Topic = homeassistant/sensor/jeedom2ha_cmd_{id}/config."""
+        mapping = _make_sensor_mapping(cmd_id=999)
+        await publisher.publish_sensor(mapping, snapshot)
+
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
+        assert topic == "homeassistant/sensor/jeedom2ha_cmd_999/config"
+
+    @pytest.mark.asyncio
+    async def test_binary_sensor_topic_format(self, publisher, snapshot, mock_mqtt_bridge):
+        """Topic = homeassistant/binary_sensor/jeedom2ha_cmd_{id}/config."""
+        mapping = _make_sensor_mapping(is_binary=True, cmd_id=888)
+        await publisher.publish_binary_sensor(mapping, snapshot)
+
+        topic = mock_mqtt_bridge.publish_message.call_args[0][0]
+        assert topic == "homeassistant/binary_sensor/jeedom2ha_cmd_888/config"

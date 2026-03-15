@@ -20,6 +20,7 @@ from models.mapping import MappingResult, PublicationDecision
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
+from mapping.sensor import SensorMapper
 from discovery.publisher import DiscoveryPublisher
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,25 @@ def _check_secret(request: web.Request, local_secret: str) -> bool:
     if not provided or not local_secret:
         return False
     return provided == local_secret
+
+
+def _resolve_state_topic(mapping: MappingResult) -> str:
+    """Resolve runtime state topic for a published mapping.
+
+    The result is stored in the runtime publication registry and then reused by
+    incremental sync as source of truth.
+    """
+    if mapping.ha_entity_type in ("sensor", "binary_sensor"):
+        info_cmd = next((cmd for cmd in mapping.commands.values() if getattr(cmd, "type", "info") == "info"), None)
+        cmd = info_cmd or next(iter(mapping.commands.values()), None)
+        if cmd is None:
+            return ""
+        return f"jeedom2ha/cmd/{cmd.id}/state"
+
+    if mapping.ha_entity_type in ("light", "cover", "switch"):
+        return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
+
+    return ""
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -324,37 +344,153 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     )
     
     # 4. Nettoyage (RAM + MQTT) des anciens équipements disparus ou devenus inéligibles
-    anciens_eq_ids = set(request.app["mappings"].keys())
-    nouveaux_eq_ids = set()
+    anciens_uids = set(request.app["mappings"].keys())
+    nouveaux_uids = set()
 
-    # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3 + 2.4)
+    # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3 + 2.4 + 2.5)
     light_mapper = LightMapper()
     cover_mapper = CoverMapper()
     switch_mapper = SwitchMapper()
-    mappings = {}       # Dict[int, MappingResult]
-    publications = {}   # Dict[int, PublicationDecision]
+    sensor_mapper = SensorMapper()
+    mappings = {}       # Dict[str, MappingResult]
+    publications = {}   # Dict[str, PublicationDecision]
     
-    mapping_counters = {
-        "lights_sure": 0,
-        "lights_probable": 0,
-        "lights_ambiguous": 0,
-        "lights_published": 0,
-        "lights_skipped": 0,
-        "covers_sure": 0,
-        "covers_probable": 0,
-        "covers_ambiguous": 0,
-        "covers_published": 0,
-        "covers_skipped": 0,
-        "switches_sure": 0,
-        "switches_probable": 0,
-        "switches_ambiguous": 0,
-        "switches_published": 0,
-        "switches_skipped": 0,
+    mapping_counters = {}
+    for cat in ["lights", "covers", "switches", "sensors", "binary_sensors"]:
+        for conf in ["sure", "probable", "ambiguous", "published", "skipped"]:
+            mapping_counters[f"{cat}_{conf}"] = 0
+
+    entity_to_counter_group = {
+        "light": "lights",
+        "cover": "covers",
+        "switch": "switches",
+        "sensor": "sensors",
+        "binary_sensor": "binary_sensors",
     }
+
+    def _counter_group(entity_type: str) -> str:
+        return entity_to_counter_group.get(entity_type, f"{entity_type}s")
+
+    def _inc_counter(entity_type: str, status: str) -> None:
+        group = _counter_group(entity_type)
+        key = f"{group}_{status}"
+        mapping_counters[key] = mapping_counters.get(key, 0) + 1
     
     mqtt_bridge = request.app.get("mqtt_bridge")
     publisher = DiscoveryPublisher(mqtt_bridge) if mqtt_bridge else None
     
+    async def _process_mapping(mapping: MappingResult, mapper):
+        if mapping.confidence == "sure":
+            _inc_counter(mapping.ha_entity_type, "sure")
+        elif mapping.confidence == "probable":
+            _inc_counter(mapping.ha_entity_type, "probable")
+        elif mapping.confidence == "ambiguous":
+            _inc_counter(mapping.ha_entity_type, "ambiguous")
+        else:
+            _inc_counter(mapping.ha_entity_type, mapping.confidence)
+
+        decision = mapper.decide_publication(mapping)
+        runtime_state_topic = _resolve_state_topic(mapping)
+        norm_val = None
+        cmd = None
+        config_published = False
+
+        # Story 2.5 strictness: invalid initial state blocks BOTH discovery config and state
+        # publication, with explicit diagnostic reason.
+        if decision.should_publish and mapping.ha_entity_type in ("sensor", "binary_sensor"):
+            cmd = next(iter(mapping.commands.values()))
+            raw_val = cmd.current_value
+
+            is_valid = True
+            if mapping.ha_entity_type == "sensor":
+                try:
+                    if raw_val is not None:
+                        norm_val = float(raw_val)
+                except (ValueError, TypeError):
+                    is_valid = False
+            else:  # binary_sensor
+                norm_val = sensor_mapper.normalize_binary_value(raw_val)
+                if norm_val is None and raw_val is not None:
+                    is_valid = False
+
+            if not is_valid:
+                mapping.reason_code = "invalid_initial_state"
+                reason_details = dict(mapping.reason_details or {})
+                reason_details["invalid_initial_state"] = {
+                    "ha_entity_type": mapping.ha_entity_type,
+                    "cmd_id": cmd.id,
+                    "raw_value": raw_val,
+                }
+                mapping.reason_details = reason_details
+                decision = PublicationDecision(
+                    should_publish=False,
+                    reason="invalid_initial_state",
+                    mapping_result=mapping,
+                )
+                _LOGGER.warning(
+                    "[MAPPING] Strict rejection of %s due to invalid initial state: %s",
+                    mapping.ha_unique_id,
+                    raw_val,
+                )
+
+        if decision.should_publish:
+            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                # Dispatch publisher call
+                if mapping.ha_entity_type == "light":
+                    config_published = await publisher.publish_light(mapping, snapshot)
+                elif mapping.ha_entity_type == "cover":
+                    config_published = await publisher.publish_cover(mapping, snapshot)
+                elif mapping.ha_entity_type == "switch":
+                    config_published = await publisher.publish_switch(mapping, snapshot)
+                elif mapping.ha_entity_type == "sensor":
+                    config_published = await publisher.publish_sensor(mapping, snapshot)
+                elif mapping.ha_entity_type == "binary_sensor":
+                    config_published = await publisher.publish_binary_sensor(mapping, snapshot)
+
+                # AC 2.8 strict order: state can be published only after successful config publish.
+                if (
+                    mapping.ha_entity_type in ("sensor", "binary_sensor")
+                    and norm_val is not None
+                    and config_published
+                    and cmd is not None
+                ):
+                    state_topic = f"jeedom2ha/cmd/{cmd.id}/state"
+                    mqtt_bridge.publish_message(state_topic, str(norm_val), qos=1, retain=True)
+                elif mapping.ha_entity_type in ("sensor", "binary_sensor") and norm_val is not None and not config_published:
+                    _LOGGER.warning(
+                        "[MAPPING] Skipping initial state for %s because discovery config publish failed",
+                        mapping.ha_unique_id,
+                    )
+            else:
+                _LOGGER.warning(
+                    "[MAPPING] Discovery publish unavailable for %s (bridge missing/disconnected)",
+                    mapping.ha_unique_id,
+                )
+
+        if decision.should_publish and not config_published:
+            decision = PublicationDecision(
+                should_publish=False,
+                reason="discovery_publish_failed",
+                mapping_result=mapping,
+            )
+            _LOGGER.warning(
+                "[MAPPING] Runtime gating disabled for %s because discovery publish did not succeed",
+                mapping.ha_unique_id,
+            )
+
+        decision.state_topic = runtime_state_topic
+        decision.active_or_alive = bool(decision.should_publish and config_published)
+
+        nouveaux_uids.add(mapping.ha_unique_id)
+        mappings[mapping.ha_unique_id] = mapping
+        publications[mapping.ha_unique_id] = decision
+
+        if decision.active_or_alive:
+            _inc_counter(mapping.ha_entity_type, "published")
+        else:
+            _inc_counter(mapping.ha_entity_type, "skipped")
+
+
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
             continue
@@ -363,119 +499,63 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
         
-        # Try light first, then cover, then switch (first mapper that returns non-None wins)
-        mapping = light_mapper.map(eq, snapshot)
-        if mapping is None:
-            mapping = cover_mapper.map(eq, snapshot)
-        if mapping is None:
-            mapping = switch_mapper.map(eq, snapshot)
+        # Actuators (Light, Cover, Switch) -> mutually exclusive
+        actuator_mapping = light_mapper.map(eq, snapshot)
+        used_mapper = light_mapper
+        if not actuator_mapping:
+            actuator_mapping = cover_mapper.map(eq, snapshot)
+            used_mapper = cover_mapper
+        if not actuator_mapping:
+            actuator_mapping = switch_mapper.map(eq, snapshot)
+            used_mapper = switch_mapper
         
-        if mapping is None:
-            continue  # Not mapped by any mapper
-        
-        mappings[eq_id] = mapping
-        
-        if mapping.ha_entity_type == "light":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["lights_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["lights_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["lights_ambiguous"] += 1
+        if actuator_mapping:
+            await _process_mapping(actuator_mapping, used_mapper)
             
-            # Decide publication
-            decision = light_mapper.decide_publication(mapping)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-            
-            if decision.should_publish:
-                mapping_counters["lights_published"] += 1
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_light(mapping, snapshot)
-            else:
-                mapping_counters["lights_skipped"] += 1
+        # Sensors -> multiple valid sensors per eqLogic
+        sensor_mappings = sensor_mapper.map(eq, snapshot)
+        for s_mapping in sensor_mappings:
+            await _process_mapping(s_mapping, sensor_mapper)
 
-        elif mapping.ha_entity_type == "cover":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["covers_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["covers_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["covers_ambiguous"] += 1
             
-            # Decide publication
-            decision = cover_mapper.decide_publication(mapping)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-            
-            if decision.should_publish:
-                mapping_counters["covers_published"] += 1
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_cover(mapping, snapshot)
-            else:
-                mapping_counters["covers_skipped"] += 1
-
-        elif mapping.ha_entity_type == "switch":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["switches_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["switches_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["switches_ambiguous"] += 1
-
-            # Decide publication
-            decision = switch_mapper.decide_publication(mapping)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-
-            if decision.should_publish:
-                mapping_counters["switches_published"] += 1
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    await publisher.publish_switch(mapping, snapshot)
-            else:
-                mapping_counters["switches_skipped"] += 1
-            
-    # Purge des équipements qui ne sont plus remontés ou plus éligibles
-    eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
-    for old_eq_id in eq_ids_supprimes:
+    # Purge des équipements et capteurs qui ne sont plus remontés ou plus éligibles
+    uids_supprimes = anciens_uids - nouveaux_uids
+    for old_uid in uids_supprimes:
         # Si c'était publié avant, on l'unpublish
-        old_decision = request.app["publications"].get(old_eq_id)
+        old_decision = request.app["publications"].get(old_uid)
         if old_decision and old_decision.should_publish:
             entity_type = old_decision.mapping_result.ha_entity_type
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
-                _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
+                if entity_type in ("sensor", "binary_sensor"):
+                    await publisher.unpublish_entity(old_uid, entity_type=entity_type)
+                else:
+                    await publisher.unpublish_by_eq_id(
+                        old_decision.mapping_result.jeedom_eq_id,
+                        entity_type=entity_type,
+                    )
+                _LOGGER.info("[MAPPING] entity %s est devenu inéligible ou supprimé → MQTT unpublish effectif", old_uid)
                 
         # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
-        request.app["mappings"].pop(old_eq_id, None)
-        request.app["publications"].pop(old_eq_id, None)
+        request.app["mappings"].pop(old_uid, None)
+        request.app["publications"].pop(old_uid, None)
     
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
     request.app["publications"].update(publications)
     
     _LOGGER.info(
-        "[MAPPING] Summary: lights(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
-        "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
-        "switches(sure=%d probable=%d ambiguous=%d published=%d skipped=%d)",
-        mapping_counters["lights_sure"],
-        mapping_counters["lights_probable"],
-        mapping_counters["lights_ambiguous"],
-        mapping_counters["lights_published"],
-        mapping_counters["lights_skipped"],
-        mapping_counters["covers_sure"],
-        mapping_counters["covers_probable"],
-        mapping_counters["covers_ambiguous"],
-        mapping_counters["covers_published"],
-        mapping_counters["covers_skipped"],
-        mapping_counters["switches_sure"],
-        mapping_counters["switches_probable"],
-        mapping_counters["switches_ambiguous"],
-        mapping_counters["switches_published"],
-        mapping_counters["switches_skipped"],
+        "[MAPPING] Summary: lights(S:%d P:%d A:%d | pub:%d skip:%d) "
+        "covers(S:%d P:%d A:%d | pub:%d skip:%d) "
+        "switches(S:%d P:%d A:%d | pub:%d skip:%d) "
+        "sensors(S:%d P:%d A:%d | pub:%d skip:%d)",
+        mapping_counters["lights_sure"], mapping_counters["lights_probable"], mapping_counters["lights_ambiguous"], mapping_counters["lights_published"], mapping_counters["lights_skipped"],
+        mapping_counters["covers_sure"], mapping_counters["covers_probable"], mapping_counters["covers_ambiguous"], mapping_counters["covers_published"], mapping_counters["covers_skipped"],
+        mapping_counters["switches_sure"], mapping_counters["switches_probable"], mapping_counters["switches_ambiguous"], mapping_counters["switches_published"], mapping_counters["switches_skipped"],
+        mapping_counters["sensors_sure"] + mapping_counters.get("binary_sensors_sure", 0), 
+        mapping_counters["sensors_probable"] + mapping_counters.get("binary_sensors_probable", 0), 
+        mapping_counters["sensors_ambiguous"] + mapping_counters.get("binary_sensors_ambiguous", 0), 
+        mapping_counters["sensors_published"] + mapping_counters.get("binary_sensors_published", 0), 
+        mapping_counters["sensors_skipped"] + mapping_counters.get("binary_sensors_skipped", 0),
     )
     
     summary = {

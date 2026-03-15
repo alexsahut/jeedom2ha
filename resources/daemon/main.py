@@ -18,6 +18,8 @@ from jeedomdaemon.base_daemon import BaseDaemon
 from jeedomdaemon.base_config import BaseConfig
 
 from transport.http_server import create_app, start_server, stop_server
+from sync.command import CommandSynchronizer
+from sync.state import StateSynchronizer, derive_jeedom_api_endpoint
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ class Jeedom2haConfig(BaseConfig):
         super().__init__()
         self.add_argument("--apiport", type=int, default=55080)
         self.add_argument("--localsecret", type=str, default="")
+        self.add_argument("--jeedomcoreapikey", type=str, default="")
 
 
 class Jeedom2haDaemon(BaseDaemon):
@@ -50,6 +53,8 @@ class Jeedom2haDaemon(BaseDaemon):
         )
         self._http_runner = None
         self._app = None  # stored for access in on_stop()
+        self._command_synchronizer = None
+        self._state_synchronizer = None
 
     async def on_start(self):
         """Called once after daemon connects to Jeedom.
@@ -63,11 +68,59 @@ class Jeedom2haDaemon(BaseDaemon):
             _LOGGER.warning("[DAEMON] No local_secret provided — HTTP API will reject all requests")
 
         self._app = create_app(local_secret=local_secret)
-        self._http_runner = await start_server(
-            self._app,
-            host="127.0.0.1",
-            port=self._config.apiport,
+        jeedom_api_endpoint = derive_jeedom_api_endpoint(getattr(self._config, "callback", ""))
+        plugin_apikey = getattr(self._config, "apikey", "")
+        core_apikey = getattr(self._config, "jeedomcoreapikey", "")
+        self._app["jeedom_api"] = {
+            "endpoint": jeedom_api_endpoint,
+            "apikey": plugin_apikey,
+            "core_apikey": core_apikey,
+        }
+        self._command_synchronizer = CommandSynchronizer(
+            app=self._app,
+            mqtt_bridge=self._app.get("mqtt_bridge"),
+            jeedom_api_endpoint=jeedom_api_endpoint,
+            jeedom_core_apikey=core_apikey,
+            request_timeout=2.0,
         )
+        self._app["command_synchronizer"] = self._command_synchronizer
+        mqtt_bridge = self._app.get("mqtt_bridge")
+        if mqtt_bridge is not None:
+            mqtt_bridge.set_command_handler(self._command_synchronizer.handle_command_message)
+        self._state_synchronizer = StateSynchronizer(
+            app=self._app,
+            mqtt_bridge=self._app.get("mqtt_bridge"),
+            jeedom_api_endpoint=jeedom_api_endpoint,
+            jeedom_core_apikey=core_apikey,
+            poll_interval=1.0,
+        )
+        self._app["state_synchronizer"] = self._state_synchronizer
+        try:
+            await self._state_synchronizer.start()
+            self._http_runner = await start_server(
+                self._app,
+                host="127.0.0.1",
+                port=self._config.apiport,
+            )
+        except Exception:
+            if self._state_synchronizer is not None:
+                try:
+                    await self._state_synchronizer.stop()
+                except Exception:
+                    _LOGGER.exception("[DAEMON] Failed to stop state synchronizer during startup rollback")
+            if self._command_synchronizer is not None:
+                try:
+                    await self._command_synchronizer.stop()
+                except Exception:
+                    _LOGGER.exception("[DAEMON] Failed to stop command synchronizer during startup rollback")
+            self._state_synchronizer = None
+            self._command_synchronizer = None
+            self._http_runner = None
+            mqtt_bridge = self._app.get("mqtt_bridge")
+            if mqtt_bridge is not None:
+                mqtt_bridge.set_command_handler(None)
+            self._app = None
+            raise
 
     async def on_message(self, message: list):
         """Handle incoming messages from Jeedom PHP core.
@@ -86,8 +139,17 @@ class Jeedom2haDaemon(BaseDaemon):
         _LOGGER.info("[DAEMON] jeedom2ha daemon stopping")
         # 1. Stop MQTT bridge (publish offline before TCP connection drops)
         if self._app is not None:
+            state_sync = self._state_synchronizer or self._app.get("state_synchronizer")
+            if state_sync is not None:
+                await state_sync.stop()
+                self._state_synchronizer = None
+            command_sync = self._command_synchronizer or self._app.get("command_synchronizer")
+            if command_sync is not None:
+                await command_sync.stop()
+                self._command_synchronizer = None
             mqtt_bridge = self._app.get("mqtt_bridge")
             if mqtt_bridge is not None:
+                mqtt_bridge.set_command_handler(None)
                 await mqtt_bridge.stop()
         # 2. Stop HTTP server
         await stop_server(self._http_runner)

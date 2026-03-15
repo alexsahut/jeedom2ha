@@ -312,11 +312,28 @@ So that j'aie une vision juste de ma maison en temps réel.
 
 **Acceptance Criteria:**
 
-**Given** des équipements sont déjà publiés dans HA
+**Given** des équipements sont publiés dans HA par `jeedom2ha` et marqués vivants dans le registre runtime
 **When** un changement d'état survient dans Jeedom (via `event::changes`)
-**Then** le démon Python détecte le changement pour la commande mappée
-**And** le démon déclenche une publication MQTT vers le `state_topic` correspondant
-**And** la latence cible est proche de 1s, et acceptable ≤ 2s en contexte nominal sur le périmètre V1
+**Then** le démon ne traite que les commandes reliées à des entités réellement publiées et vivantes
+**And** le démon ignore (avec trace runtime exploitable dans les logs) tout événement lié à une entité non publiée, exclue, supprimée ou non vivante
+**And** le démon publie l'état uniquement sur le `state_topic` de l'entité `jeedom2ha` correspondante, sans interaction avec les topics d'autres publishers
+**And** la latence cible reste proche de 1s, et acceptable ≤ 2s en contexte nominal sur le périmètre V1
+**And** la synchro incrémentale n'amplifie pas les faux positifs de mapping : aucune nouvelle entité n'est créée par le flux d'état
+**And** lorsqu'une entité sort du registre actif via un mécanisme existant, le cleanup discovery est fait via payload vide retained sur le topic discovery exact de l'entité concernée (pas de purge globale broker)
+
+**Dev Notes (garde-fous runtime Epic 3):**
+
+- Source de vérité runtime obligatoire : registre des entités publiées/vivantes avant toute publication d'état.
+- `event::changes` sert à synchroniser des entités déjà valides, jamais à inférer/créer de nouvelles entités.
+- Toute publication d'état reste strictement dans le namespace `jeedom2ha`.
+- Cleanup lifecycle : suppression ciblée par topic discovery exact (`homeassistant/<entity_type>/jeedom2ha_<id>/config`), jamais "vider le broker".
+
+**Tests minimum (réels + traçabilité homogène):**
+
+- Test réel 3.1-A : box Jeedom + broker MQTT + HA avec coexistence d'au moins un autre publisher MQTT ; vérifier qu'aucun topic externe n'est touché.
+- Test réel 3.1-B : événement sur entité non publiée/non vivante -> aucun publish `state_topic`, trace runtime exploitable dans les logs.
+- Test réel 3.1-C : retrait d'une entité publiée -> payload vide retained sur topic discovery exact, disparition HA sans ghost entity.
+- Preuve standard obligatoire : préconditions, commande/événement, extraits logs runtime, topics observés, verdict.
 
 ### Story 3.2: Pilotage HA → Jeedom avec confirmation honnête d'état
 
@@ -326,12 +343,58 @@ So that je sois sûr que mes ordres sont exécutés.
 
 **Acceptance Criteria:**
 
-**Given** un actionneur est disponible dans HA
+**Given** un actionneur est publié par `jeedom2ha`, vivant, et autorisé au pilotage
 **When** j'envoie une commande (ON/OFF, position, niveau, etc.) depuis HA
-**Then** le démon écoute le `command_topic` MQTT et traduit l'ordre
-**And** l'ordre est transmis à Jeedom via l'interface standard retenue par l'architecture (API Jeedom)
-**And** le plugin privilégie la confirmation par état réel quand elle existe
-**And** pour les commandes sans retour fiable, il applique la politique prévue (optimiste contrôlé ou action stateless), sans comportement mensonger
+**Then** le démon traduit l'ordre et l'exécute via l'interface Jeedom standard retenue par l'architecture (API Jeedom)
+**And** le démon rejette (avec trace runtime exploitable dans les logs) toute commande visant une entité non publiée, non vivante, inconnue ou retirée
+**And** le plugin privilégie la confirmation par état réel quand elle existe, sans publier d'état mensonger
+**And** pour les commandes sans retour fiable, il applique la politique prévue (optimiste contrôlé ou action stateless), de manière explicable et traçable
+**And** le traitement des commandes reste strictement borné aux topics `jeedom2ha`, sans collision avec d'autres publishers/intégrations HA
+**And** aucune commande ne réactive une ghost entity : une entité retirée reste non pilotable tant qu'elle n'est pas republiée proprement
+
+**Dev Notes (garde-fous runtime Epic 3):**
+
+- Gating commande : résolution `entity_id/topic -> publication registry` avant exécution.
+- Rejet explicite des commandes hors registre actif avec code raison runtime dans les logs.
+- Anti-boucle : séparation claire des flux commande et confirmation d'état.
+- Ne jamais créer/modifier des entités discovery depuis le flux de commande.
+
+**Tests minimum (réels + traçabilité homogène):**
+
+- Test réel 3.2-A : commande HA valide sur entité publiée/vivante -> exécution Jeedom + confirmation cohérente.
+- Test réel 3.2-B : commande vers entité supprimée/non publiée -> rejet propre + aucun effet Jeedom + preuve log runtime.
+- Test réel 3.2-C : coexistence avec autre publisher (topic voisin) -> aucune consommation/effet hors namespace `jeedom2ha`.
+- Preuve standard obligatoire : préconditions, commande, observation broker, observation Jeedom, extraits logs runtime, verdict.
+
+### Story 3.2-bis: Bootstrap runtime après restart daemon
+
+As a utilisateur Home Assistant,
+I want que les entités `jeedom2ha` déjà publiées redeviennent pilotables automatiquement après restart daemon,
+So that le pont retrouve un comportement nominal sans nécessiter de `/action/sync` manuel.
+
+**Acceptance Criteria:**
+
+**Given** des entités `jeedom2ha` ont déjà été publiées dans HA
+**When** le daemon redémarre et que les prérequis minimums du pont sont réunis
+**Then** un bootstrap runtime one-shot réhydrate automatiquement le registre runtime nécessaire au gating commande sans action manuelle utilisateur
+**And** tant que ce bootstrap n'est pas terminé ou a échoué explicitement, toute commande HA reste rejetée proprement avec trace runtime exploitable dans les logs
+**And** une fois le bootstrap terminé, une commande valide sur une entité précédemment publiée/vivante s'exécute dans Jeedom sans `/action/sync` manuel
+**And** le bootstrap réutilise les mécanismes existants de topologie/sync et n'introduit ni purge globale broker, ni boucle de resync implicite, ni réactivation d'entité retirée
+**And** le mécanisme reste strictement borné au startup daemon et n'étend pas le périmètre Epic 5
+
+**Dev Notes (garde-fous runtime Epic 3):**
+
+- Chemin préféré : réutiliser l'orchestration existante de démarrage et le pipeline `getFullTopology()` + `POST /action/sync`, au lieu d'introduire un nouveau moteur lifecycle.
+- Le registre runtime `app["publications"]` reste la source de vérité du gating commande ; ne jamais le contourner.
+- Si l'état MQTT requis pour publier n'est pas atteint dans une fenêtre bornée, comportement safe = rejet explicite + log exploitable ; aucun déverrouillage implicite des commandes.
+- Hors périmètre explicite : persistance cache autoritative, republication post-reboot générale daemon/HA/broker/Jeedom, lissage de charge avancé, réconciliation lifecycle Epic 5.
+
+**Tests minimum (réels + traçabilité homogène):**
+
+- Test réel 3.2b-A : restart daemon -> aucune action manuelle -> commande HA valide sur `eq_id=391` -> exécution Jeedom + confirmation cohérente.
+- Test réel 3.2b-B : restart daemon -> entité retirée/non publiée -> rejet propre + aucun effet Jeedom.
+- Test réel 3.2b-C : coexistence avec autre publisher MQTT pendant bootstrap -> aucun topic hors namespace `jeedom2ha` touché.
+- Preuve standard obligatoire : préconditions, redémarrage, observation `/system/status`, commande injectée, logs runtime, observation broker, observation Jeedom/HA, verdict.
 
 ### Story 3.3: Disponibilité du pont et des entités quand l'information est fiable
 
@@ -341,12 +404,27 @@ So that je sache si mon système est opérationnel.
 
 **Acceptance Criteria:**
 
-**Given** le pont est en service
+**Given** le pont `jeedom2ha` est en service avec LWT global actif
 **When** l'état de connectivité change (pont ou équipement)
-**Then** le plugin expose une disponibilité cohérente pour le pont via le LWT global
-**And** le plugin expose une disponibilité pour les entités quand une information fiable d'indisponibilité existe côté Jeedom
-**And** en cas d'arrêt du pont ou de perte de connectivité broker, les entités concernées sont marquées indisponibles
-**And** le plugin distingue l'indisponibilité du pont (problème global) d'une indisponibilité propre à un équipement (problème local) quand l'info est disponible
+**Then** le plugin expose une disponibilité bridge cohérente via le LWT global et la reflète sur les entités gérées
+**And** la disponibilité entité est publiée uniquement pour des entités réellement publiées et vivantes
+**And** en cas d'arrêt du pont ou de perte de connectivité broker, les entités `jeedom2ha` concernées passent indisponibles de manière cohérente
+**And** le plugin distingue indisponibilité globale (bridge) et locale (entité) quand l'information fiable existe
+**And** la gestion lifecycle évite les ghost entities : lorsqu'une entité sort du registre actif via un mécanisme existant, un payload vide retained est publié sur son topic discovery exact
+**And** le plugin n'altère jamais les retained discovery d'autres intégrations/publishers MQTT
+
+**Dev Notes (garde-fous runtime Epic 3):**
+
+- Disponibilité = combinaison de l'état bridge + état registre entités vivantes.
+- Cleanup lifecycle strict : suppression ciblée par topic exact, jamais purge générique broker.
+- Conserver une séparation explicite entre "indisponible" et "supprimé".
+
+**Tests minimum (réels + traçabilité homogène):**
+
+- Test réel 3.3-A : arrêt/redémarrage bridge -> transitions availability bridge + entités conformes.
+- Test réel 3.3-B : perte/rétablissement broker -> comportement availability cohérent sans créations fantômes.
+- Test réel 3.3-C : suppression d'une entité publiée -> cleanup topic exact retained + disparition HA sans toucher aux entités non-`jeedom2ha`.
+- Preuve standard obligatoire : préconditions, événement, observation broker/HA, extraits logs runtime, verdict.
 
 ---
 

@@ -1,0 +1,24 @@
+# Protéger le runtime local côté box si tu synchronises un vrai dossier plugin
+P /data/
+P /data/***
+
+# Exclure les tests embarqués dans resources
+- /resources/**/tests/***
+- /resources/**/__pycache__/***
+- /resources/**/*.py[cod]
+
+# Autoriser uniquement l'arborescence plugin Jeedom + doc utile
++ /plugin_info/***
++ /core/***
++ /desktop/***
++ /mobile/***
++ /3rdparty/***
++ /resources/***
++ /docs/
++ /docs/fr_FR/***
++ /docs/index.md
++ /README.md
++ /LICENSE
+
+# Tout le reste est hors déploiement
+- *

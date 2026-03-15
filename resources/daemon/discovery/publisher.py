@@ -3,8 +3,15 @@
 Story 2.2: Publishes light entity discovery payloads to the MQTT broker.
 Story 2.3: Extended for cover entity discovery payloads.
 Story 2.4: Extended for switch entity discovery payloads.
+Story 2.5: Extended for sensor/binary_sensor entity discovery payloads.
+
 Uses single-component discovery (homeassistant/{entity_type}/...).
+Story 2.5 Convention: sensors use 'jeedom2ha_cmd_{id}' as discovery identifier.
+This is a justified deviation from the 'eq_id' convention used for actuators,
+as a single Jeedom equipment can host multiple sensors (1:N relationship).
+The 'device' block remains linked to 'jeedom2ha_eq_{id}' for aggregation in HA.
 """
+
 import json
 import logging
 from typing import Optional
@@ -117,6 +124,62 @@ class DiscoveryPublisher:
             )
         return ok
 
+    async def publish_sensor(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a numeric sensor discovery config to MQTT.
+
+        Args:
+            mapping: MappingResult with SensorCapabilities and confidence.
+            snapshot: TopologySnapshot to extract device info.
+
+        Returns:
+            True if publish succeeded, False otherwise.
+        """
+        topic = self._build_sensor_topic(mapping, entity_type="sensor")
+        payload = self._build_sensor_payload(mapping, snapshot, is_binary=False)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing sensor config: topic=%s unique_id=%s name='%s' confidence=%s",
+            topic, mapping.ha_unique_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish sensor config for unique_id=%s (bridge unavailable)",
+                mapping.ha_unique_id,
+            )
+        return ok
+
+    async def publish_binary_sensor(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a binary sensor discovery config to MQTT.
+
+        Args:
+            mapping: MappingResult with SensorCapabilities and confidence.
+            snapshot: TopologySnapshot to extract device info.
+
+        Returns:
+            True if publish succeeded, False otherwise.
+        """
+        topic = self._build_sensor_topic(mapping, entity_type="binary_sensor")
+        payload = self._build_sensor_payload(mapping, snapshot, is_binary=True)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing binary_sensor config: topic=%s unique_id=%s name='%s' confidence=%s",
+            topic, mapping.ha_unique_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish binary_sensor config for unique_id=%s (bridge unavailable)",
+                mapping.ha_unique_id,
+            )
+        return ok
+
     async def unpublish(self, ha_unique_id: str) -> bool:
         """Remove a discovery config by publishing empty payload with retain.
 
@@ -148,6 +211,16 @@ class DiscoveryPublisher:
             _LOGGER.error("[DISCOVERY] Failed to unpublish %s (bridge unavailable)", topic)
         return ok
 
+    async def unpublish_entity(self, unique_id: str, entity_type: str) -> bool:
+        """Remove a discovery config by ha_unique_id directly."""
+        topic = f"{self._topic_prefix}/{entity_type}/{unique_id}/config"
+        _LOGGER.info("[DISCOVERY] Unpublishing entity: topic=%s", topic)
+
+        ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
+        if not ok:
+            _LOGGER.error("[DISCOVERY] Failed to unpublish entity %s (bridge unavailable)", topic)
+        return ok
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -155,6 +228,12 @@ class DiscoveryPublisher:
     def _build_topic(self, eq_id: int, entity_type: str = "light") -> str:
         """Build the MQTT discovery topic for an entity."""
         return f"{self._topic_prefix}/{entity_type}/jeedom2ha_{eq_id}/config"
+
+    def _build_sensor_topic(self, mapping: MappingResult, entity_type: str = "sensor") -> str:
+        """Build the MQTT discovery topic for a sensor (using cmd id instead of eq id).
+        Format strict for Story 2.5: homeassistant/(binary_)sensor/jeedom2ha_cmd_{cmd.id}/config
+        """
+        return f"{self._topic_prefix}/{entity_type}/{mapping.ha_unique_id}/config"
 
     def _build_device_block(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the common device block for discovery payloads."""
@@ -289,5 +368,45 @@ class DiscoveryPublisher:
         # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch"
         if caps.device_class == "outlet":
             payload["device_class"] = "outlet"
+
+        return payload
+
+    def _build_sensor_payload(self, mapping: MappingResult, snapshot: TopologySnapshot, is_binary: bool) -> dict:
+        """Build the MQTT Discovery JSON payload for a sensor or binary_sensor entity.
+
+        Includes conditional metadata: device_class, unit_of_measurement, state_class.
+        If binary_sensor, defines payload_on and payload_off explicitly.
+        """
+        device = self._build_device_block(mapping, snapshot)
+        caps = mapping.capabilities
+
+        cmd_id = mapping.ha_unique_id.replace("jeedom2ha_cmd_", "")
+
+        payload = {
+            "name": mapping.ha_name,
+            "unique_id": mapping.ha_unique_id,
+            "object_id": mapping.ha_unique_id, # Strict from AC 2.2
+            "state_topic": f"jeedom2ha/cmd/{cmd_id}/state",
+            "availability_topic": "jeedom2ha/bridge/status",
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+
+        if is_binary:
+            payload["payload_on"] = "ON"
+            payload["payload_off"] = "OFF"
+
+        # Conditionals
+        if caps.device_class:
+            payload["device_class"] = caps.device_class
+            
+        if caps.unit_of_measurement: # Only numeric
+            payload["unit_of_measurement"] = caps.unit_of_measurement
+            
+        if caps.state_class: # Only numeric
+            payload["state_class"] = caps.state_class
 
         return payload

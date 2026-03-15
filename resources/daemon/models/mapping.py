@@ -13,6 +13,18 @@ from models.topology import JeedomCmd
 
 
 @dataclass
+class SensorCapabilities:
+    """Capabilities for a single sensor (numeric or binary) entity.
+
+    Story 2.5 — one SensorCapabilities per mapped command.
+    """
+    is_binary: bool = False
+    device_class: Optional[str] = None
+    unit_of_measurement: Optional[str] = None
+    state_class: Optional[str] = None
+
+
+@dataclass
 class LightCapabilities:
     """Cumulated light capabilities detected from Jeedom commands.
 
@@ -71,14 +83,14 @@ class MappingResult:
     commands: Dict[str, JeedomCmd] = field(default_factory=dict)   # generic_type -> JeedomCmd
     # Sentinel default=None so dataclass field ordering is respected.
     # __post_init__ enforces that callers always provide an explicit value.
-    capabilities: Optional[Union[LightCapabilities, CoverCapabilities, "SwitchCapabilities"]] = None
+    capabilities: Optional[Union[LightCapabilities, CoverCapabilities, SwitchCapabilities, "SensorCapabilities"]] = None
     reason_details: Optional[Dict[str, object]] = None
 
     def __post_init__(self) -> None:
         if self.capabilities is None:
             raise ValueError(
                 "MappingResult requires an explicit 'capabilities' argument "
-                "(LightCapabilities or CoverCapabilities). "
+                "(LightCapabilities, CoverCapabilities, SwitchCapabilities, or SensorCapabilities). "
                 "Do not rely on the default — it is a sentinel, not a usable value."
             )
 
@@ -89,3 +101,5 @@ class PublicationDecision:
     should_publish: bool
     reason: str                               # e.g. "sure", "probable_bounded", "ambiguous_skipped"
     mapping_result: MappingResult = field(default=None)  # type: ignore[assignment]
+    state_topic: Optional[str] = None
+    active_or_alive: bool = True
