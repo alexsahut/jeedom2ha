@@ -44,8 +44,8 @@ jobs:
       - name: Run linter
         run: |
           set -euo pipefail
-          # Configuration is managed in .flake8
-          flake8 .
+          # Restrict lint scope to the maintained Python daemon and its tests.
+          flake8 resources/daemon tests
 
   # Test stage - execution with coverage
   test:

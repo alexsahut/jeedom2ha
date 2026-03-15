@@ -28,9 +28,29 @@ Les rôles des branches sont figés :
 Les automatisations de contribution, y compris Dependabot, doivent cibler `main` par défaut.
 Une exception ne doit exister que si elle est explicitement justifiée et documentée.
 
+## Protocole local obligatoire
+
+- Le clone principal local sert de miroir propre de `origin/main`.
+- Le clone principal local sert uniquement à la synchronisation, à la review et à la création des branches et worktrees de travail.
+- Le clone principal local doit rester sur `main`, propre, sans développement actif.
+- Aucun développement de story, de fix ou de sujet équivalent ne doit être réalisé dans le clone principal local.
+- Toute story ou tout fix doit être réalisé dans une branche dédiée créée depuis `main`.
+- Toute story ou tout fix doit être réalisé dans un worktree dédié attaché à cette branche dédiée.
+- Une branche active ne doit porter qu'un seul sujet non validé.
+- Un worktree actif ne doit porter qu'un seul sujet non validé.
+
+## Préflight Git bloquant avant tout développement
+
+- Avant tout travail de développement, l'agent ou le contributeur doit vérifier que la branche courante n'est pas une branche protégée.
+- Avant tout travail de développement, l'agent ou le contributeur doit vérifier que le working tree est propre.
+- Avant tout travail de développement, l'agent ou le contributeur doit vérifier que la branche courante est cohérente avec la story, le fix ou le sujet demandé.
+- Avant tout travail de développement, l'agent ou le contributeur doit vérifier que la branche active ne contient pas déjà un autre sujet non validé.
+- Si une vérification de préflight échoue, l'agent ou le contributeur doit s'arrêter et réaligner le contexte Git avant de poursuivre.
+
 ## Règles de création de branches
 
 - Tout développement doit partir d'une branche courte créée depuis `main`.
+- Toute branche de travail doit être utilisée depuis un worktree dédié.
 - Une branche de travail doit porter un seul objectif livrable.
 - Une branche de travail doit correspondre à une story, un fix ou un changement documentaire clairement identifié.
 - Le nom de branche doit décrire explicitement l'objectif traité.
@@ -98,8 +118,10 @@ Une exception ne doit exister que si elle est explicitement justifiée et docume
 ## Règles spécifiques pour les agents IA multi-IDE
 
 - L'outil utilisé ne change pas la politique Git du projet.
+- Un agent IA doit considérer le clone principal local comme un miroir propre de `origin/main`, pas comme un espace de développement.
 - Un agent IA doit se comporter comme un contributeur sur branche courte.
 - Un agent IA doit travailler sur une branche dédiée à l'objectif courant.
+- Un agent IA doit travailler dans un worktree dédié à l'objectif courant.
 - Un agent IA ne doit pas réutiliser une branche active pour un autre objectif.
 - Un agent IA ne doit pas prendre pour cible une branche contenant déjà un travail non validé sur un sujet distinct.
 - Si plusieurs agents IA interviennent sur le même sujet, un humain doit désigner une branche de référence unique.
@@ -110,22 +132,25 @@ Une exception ne doit exister que si elle est explicitement justifiée et docume
 
 ## Traitement du baseline historique pré-gouvernance
 
-Le dépôt contient actuellement `27` commits locaux en avance sur `origin/main`.
-Ces commits constituent le baseline d'intégration pré-gouvernance.
+Le baseline historique pré-gouvernance du projet a été intégré et publié.
+Il reste un repère historique, mais il ne constitue plus un régime d'exception actif.
 
 Les règles applicables sont :
 
-- Ce baseline doit être traité comme un lot d'intégration historique.
+- Ce baseline doit être conservé comme repère d'intégration historique.
 - Ce baseline ne doit pas être réécrit rétroactivement pour "faire propre".
 - Ce baseline ne doit pas être rebasé, re-squashé ou re-découpé a posteriori comme politique de normalisation.
 - La normalisation doit conserver un repère explicite de ce baseline historique.
-- Une fois ce baseline normalisé et publié sur `origin/main`, toute nouvelle évolution doit suivre strictement la présente politique.
+- Toute nouvelle évolution doit suivre strictement la présente politique.
 
 ## Ce qui est interdit
 
+- Développer une story ou un fix dans le clone principal local.
 - Travailler directement sur `main` pour développer une story ou un fix.
 - Travailler directement sur `beta` pour développer une story ou un fix.
 - Travailler directement sur `stable` pour développer une story ou un fix.
+- Utiliser le clone principal local comme worktree de développement.
+- Utiliser un worktree actif pour plusieurs sujets non validés.
 - Utiliser `develop` comme branche cible, branche d'intégration ou branche documentée.
 - Merger une branche de travail directement dans `beta`.
 - Merger une branche de travail directement dans `stable`.
@@ -135,17 +160,19 @@ Les règles applicables sont :
 - Corriger `beta` ou `stable` par un correctif direct hors du flux canonique.
 - Utiliser le push direct comme mécanisme normal de release.
 - Laisser Dependabot cibler une autre branche que `main` sans justification explicite.
-- Réécrire rétroactivement le baseline historique pré-gouvernance de `27` commits.
+- Réécrire rétroactivement le baseline historique pré-gouvernance déjà publié.
 
 ## Résumé opérationnel
 
-1. Toute évolution part d'une branche courte créée depuis `main`.
-2. Une branche de travail porte un seul objectif livrable.
-3. Tous les commits suivent Conventional Commits.
-4. `main` est la seule branche d'intégration canonique.
-5. Les branches de travail sont mergées vers `main` par squash merge.
-6. `beta` ne reçoit que des changements déjà passés par `main`.
-7. `stable` ne reçoit que des changements déjà passés par `beta`.
-8. Toute correction détectée en `beta` repart sur une nouvelle branche depuis `main`.
-9. Aucun agent IA ne pousse directement sur `main`, `beta` ou `stable`.
-10. Le baseline historique de `27` commits sur `main` est conservé comme baseline pré-gouvernance non réécrit.
+1. Le clone principal local reste un miroir propre de `origin/main`.
+2. Aucune story ni aucun fix n'est développé dans le clone principal local.
+3. Toute évolution part d'une branche courte créée depuis `main` et utilisée dans un worktree dédié.
+4. Une branche active porte un seul objectif livrable et aucun autre sujet non validé.
+5. Le préflight Git est bloquant avant tout développement.
+6. Tous les commits suivent Conventional Commits.
+7. `main` est la seule branche d'intégration canonique.
+8. Les branches de travail sont mergées vers `main` par squash merge.
+9. `beta` ne reçoit que des changements déjà passés par `main`.
+10. `stable` ne reçoit que des changements déjà passés par `beta`.
+11. Toute correction détectée en `beta` repart sur une nouvelle branche depuis `main`.
+12. Aucun agent IA ne pousse directement sur `main`, `beta` ou `stable`.
