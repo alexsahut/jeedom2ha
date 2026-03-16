@@ -196,3 +196,133 @@ class TestSyncAction:
         assert decision.active_or_alive is False
         assert decision.reason == "discovery_publish_failed"
         assert decision.state_topic == "jeedom2ha/2/state"
+
+    async def test_sync_publishes_local_availability_retained_when_timeout_is_reliable(
+        self,
+        http_client,
+        http_app,
+        mock_mqtt,
+    ):
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {"timeout": "1"},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+        assert resp.status == 200
+
+        publish_calls = mock_mqtt.publish_message.call_args_list
+        topics = [call.args[0] for call in publish_calls]
+        assert "homeassistant/switch/jeedom2ha_2/config" in topics
+        assert "jeedom2ha/2/availability" in topics
+
+        availability_calls = [call for call in publish_calls if call.args[0] == "jeedom2ha/2/availability"]
+        assert len(availability_calls) == 1
+        assert availability_calls[0].args[1] == "offline"
+        assert availability_calls[0].kwargs["retain"] is True
+
+    async def test_sync_does_not_publish_local_availability_when_timeout_not_reliable(
+        self,
+        http_client,
+        http_app,
+        mock_mqtt,
+    ):
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {"timeout": "unknown"},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+        assert resp.status == 200
+
+        topics = [call.args[0] for call in mock_mqtt.publish_message.call_args_list]
+        assert "homeassistant/switch/jeedom2ha_2/config" in topics
+        assert "jeedom2ha/2/availability" not in topics
+
+    async def test_sync_unpublish_cleans_local_availability_topic(
+        self,
+        http_client,
+        http_app,
+        mock_mqtt,
+    ):
+        payload_present = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {"timeout": "0"},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+        payload_removed = {"version": "1.0", "eq_logics": [], "objects": [{"id": "1", "name": "Salon"}]}
+
+        resp_first = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_present},
+        )
+        assert resp_first.status == 200
+
+        resp_second = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_removed},
+        )
+        assert resp_second.status == 200
+
+        availability_calls = [
+            call for call in mock_mqtt.publish_message.call_args_list
+            if call.args[0] == "jeedom2ha/2/availability"
+        ]
+        assert len(availability_calls) >= 2
+        assert availability_calls[0].args[1] == "online"
+        assert availability_calls[-1].args[1] == ""
+        assert availability_calls[-1].kwargs["retain"] is True

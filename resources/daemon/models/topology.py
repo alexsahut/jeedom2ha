@@ -2,6 +2,12 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
+from models.availability import (
+    AVAILABILITY_OFFLINE,
+    AVAILABILITY_ONLINE,
+    AVAILABILITY_UNKNOWN,
+)
+
 
 def _to_bool(value: Union[bool, str, int, None], default: bool = True) -> bool:
     """Convert Jeedom-style booleans to Python bool.
@@ -16,6 +22,46 @@ def _to_bool(value: Union[bool, str, int, None], default: bool = True) -> bool:
     if isinstance(value, str):
         return value not in ('0', '', 'false', 'False')
     return bool(value)
+
+
+def _normalize_timeout(value: Any) -> Optional[int]:
+    """Normalize Jeedom timeout status to 0/1 when reliable."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, int):
+        return value if value in (0, 1) else None
+    if isinstance(value, float):
+        as_int = int(value)
+        return as_int if as_int in (0, 1) and value == as_int else None
+    if isinstance(value, str):
+        clean = value.strip().lower()
+        if clean in ("0", "false", "off", "no"):
+            return 0
+        if clean in ("1", "true", "on", "yes"):
+            return 1
+    return None
+
+
+def _normalize_local_availability(status_raw: Any) -> tuple[bool, str, str, Optional[str]]:
+    """Normalize eqLogic local availability from standard Jeedom status fields."""
+    if not isinstance(status_raw, dict):
+        return False, AVAILABILITY_UNKNOWN, "timeout_missing", None
+
+    timeout_raw = status_raw.get("timeout")
+    timeout = _normalize_timeout(timeout_raw)
+    last_communication = status_raw.get("lastCommunication")
+    if last_communication is not None:
+        last_communication = str(last_communication)
+
+    if timeout == 1:
+        return True, AVAILABILITY_OFFLINE, "timeout_one", last_communication
+    if timeout == 0:
+        return True, AVAILABILITY_ONLINE, "timeout_zero", last_communication
+    if "timeout" in status_raw:
+        return False, AVAILABILITY_UNKNOWN, "timeout_unreliable", last_communication
+    return False, AVAILABILITY_UNKNOWN, "timeout_missing", last_communication
 
 @dataclass
 class JeedomObject:
@@ -45,6 +91,10 @@ class JeedomEqLogic:
     eq_type_name: str = ""          # nom du plugin source (zwave, zigbee, virtual, etc.)
     generic_type: Optional[str] = None
     is_excluded: bool = False       # flag d'exclusion jeedom2ha
+    local_availability_supported: bool = False
+    local_availability_state: str = AVAILABILITY_UNKNOWN
+    local_availability_reason: str = "timeout_missing"
+    last_communication: Optional[str] = None
     cmds: List[JeedomCmd] = field(default_factory=list)
 
 @dataclass
@@ -104,6 +154,13 @@ class TopologySnapshot:
                     except (ValueError, TypeError, KeyError):
                         continue
                 
+                (
+                    local_supported,
+                    local_state,
+                    local_reason,
+                    last_communication,
+                ) = _normalize_local_availability(eq_raw.get("status"))
+
                 eq_logics[eq_id] = JeedomEqLogic(
                     id=eq_id,
                     name=str(eq_raw.get("name", f"Eq {eq_id}")),
@@ -113,6 +170,10 @@ class TopologySnapshot:
                     eq_type_name=str(eq_raw.get("eq_type", "")),
                     generic_type=eq_raw.get("generic_type") or None,
                     is_excluded=_to_bool(eq_raw.get("is_excluded"), default=False),
+                    local_availability_supported=local_supported,
+                    local_availability_state=local_state,
+                    local_availability_reason=local_reason,
+                    last_communication=last_communication,
                     cmds=cmds
                 )
             except (ValueError, TypeError, KeyError):

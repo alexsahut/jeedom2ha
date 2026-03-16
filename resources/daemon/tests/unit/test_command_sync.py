@@ -210,6 +210,31 @@ async def test_gating_rejects_non_alive_entity_before_rpc(caplog):
 
 
 @pytest.mark.asyncio
+async def test_gating_rejects_locally_unavailable_entity_before_rpc(caplog):
+    mapping = _switch_mapping(eq_id=2)
+    decision = _decision(mapping, alive=True)
+    decision.local_availability_supported = True
+    decision.local_availability_state = "offline"
+    app = {
+        "mappings": {mapping.ha_unique_id: mapping},
+        "publications": {mapping.ha_unique_id: decision},
+        "state_synchronizer": object(),
+    }
+    bridge = MagicMock()
+    bridge.is_connected = True
+
+    sync = _make_sync(app, bridge)
+    sync._execute_exec_cmd = AsyncMock(return_value=True)
+
+    with caplog.at_level("INFO"):
+        ok = await sync.handle_command_message("jeedom2ha/2/set", "ON")
+
+    assert ok is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert "reason_code=entity_unavailable" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_empty_publication_registry_rejects_command_until_runtime_is_rehydrated(caplog):
     mapping = _switch_mapping(eq_id=2, with_state_info=True)
     app = {

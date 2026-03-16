@@ -1,6 +1,6 @@
 # Story 3.3: Disponibilite du pont et des entites quand l'information est fiable
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -57,57 +57,57 @@ so that je sache si mon systeme est operationnel.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 - Introduire un modele de disponibilite runtime distinct du gating `active_or_alive`** (AC: #6, #8, #15, #24)
-  - [ ] 1.1 Etendre `PublicationDecision` ou ajouter une structure auxiliaire pour porter explicitement:
-    - [ ] `bridge_availability_topic`
-    - [ ] `eqlogic_availability_topic` (optionnel, toujours `jeedom2ha/{eq_id}/availability`)
-    - [ ] `local_availability_supported`
-    - [ ] `local_availability_state` (`online`, `offline`, `unknown`)
-    - [ ] `availability_reason`
-  - [ ] 1.2 Conserver `active_or_alive` avec son sens actuel: discovery publiee avec succes et runtime commandable au sens Stories 3.2 / 3.2-bis.
-  - [ ] 1.3 Centraliser les constantes MQTT de disponibilite (`online`, `offline`, topic global du pont) pour eviter les chaines dupliquees.
+- [x] **Task 1 - Introduire un modele de disponibilite runtime distinct du gating `active_or_alive`** (AC: #6, #8, #15, #24)
+  - [x] 1.1 Etendre `PublicationDecision` ou ajouter une structure auxiliaire pour porter explicitement:
+    - [x] `bridge_availability_topic`
+    - [x] `eqlogic_availability_topic` (optionnel, toujours `jeedom2ha/{eq_id}/availability`)
+    - [x] `local_availability_supported`
+    - [x] `local_availability_state` (`online`, `offline`, `unknown`)
+    - [x] `availability_reason`
+  - [x] 1.2 Conserver `active_or_alive` avec son sens actuel: discovery publiee avec succes et runtime commandable au sens Stories 3.2 / 3.2-bis.
+  - [x] 1.3 Centraliser les constantes MQTT de disponibilite (`online`, `offline`, topic global du pont) pour eviter les chaines dupliquees.
 
-- [ ] **Task 2 - Extraire un signal local fiable depuis la topologie Jeedom sans heuristique opaque** (AC: #6, #11, #15, #20)
-  - [ ] 2.1 Etendre `core/class/jeedom2ha.class.php::getFullTopology()` pour exposer un bloc de statut minimal d'equipement quand les getters standards Jeedom sont disponibles.
-  - [ ] 2.2 Prioriser des signaux standards issus du core Jeedom, en particulier les statuts `timeout` et `lastCommunication`, plutot que des conventions de plugins tiers.
-  - [ ] 2.3 Normaliser ce bloc dans `resources/daemon/models/topology.py` avec une semantique conservative:
-    - [ ] `timeout === 1` -> indisponibilite locale fiable
-    - [ ] `timeout === 0` -> disponibilite locale fiable
-    - [ ] valeur absente / non interpretable -> disponibilite locale non supportee
-  - [ ] 2.4 Garder `is_enable == false`, exclusion explicite et absence d'eligibilite dans le flux actuel d'unpublish, pas dans le flux availability.
+- [x] **Task 2 - Extraire un signal local fiable depuis la topologie Jeedom sans heuristique opaque** (AC: #6, #11, #15, #20)
+  - [x] 2.1 Etendre `core/class/jeedom2ha.class.php::getFullTopology()` pour exposer un bloc de statut minimal d'equipement quand les getters standards Jeedom sont disponibles.
+  - [x] 2.2 Prioriser des signaux standards issus du core Jeedom, en particulier les statuts `timeout` et `lastCommunication`, plutot que des conventions de plugins tiers.
+  - [x] 2.3 Normaliser ce bloc dans `resources/daemon/models/topology.py` avec une semantique conservative:
+    - [x] `timeout === 1` -> indisponibilite locale fiable
+    - [x] `timeout === 0` -> disponibilite locale fiable
+    - [x] valeur absente / non interpretable -> disponibilite locale non supportee
+  - [x] 2.4 Garder `is_enable == false`, exclusion explicite et absence d'eligibilite dans le flux actuel d'unpublish, pas dans le flux availability.
 
-- [ ] **Task 3 - Adapter `DiscoveryPublisher` a la disponibilite bridge-only ou composee** (AC: #8, #11, #13)
-  - [ ] 3.1 Ajouter un helper commun pour construire les champs availability des payloads `light`, `cover` et `switch`.
-  - [ ] 3.2 Si `local_availability_supported == false`, conserver le schema actuel `availability_topic = jeedom2ha/bridge/status`.
-  - [ ] 3.3 Si `local_availability_supported == true`, publier un schema officiel Home Assistant avec:
-    - [ ] une liste `availability` contenant le topic global du pont et le topic local unique de l'`eqLogic` `jeedom2ha/{eq_id}/availability`
-    - [ ] `availability_mode = all`
-    - [ ] `payload_available = online`
-    - [ ] `payload_not_available = offline`
-  - [ ] 3.4 Preserver strictement les topics de commande/etat existants (`state_topic`, `command_topic`, `brightness_command_topic`, `set_position_topic`).
+- [x] **Task 3 - Adapter `DiscoveryPublisher` a la disponibilite bridge-only ou composee** (AC: #8, #11, #13)
+  - [x] 3.1 Ajouter un helper commun pour construire les champs availability des payloads `light`, `cover` et `switch`.
+  - [x] 3.2 Si `local_availability_supported == false`, conserver le schema actuel `availability_topic = jeedom2ha/bridge/status`.
+  - [x] 3.3 Si `local_availability_supported == true`, publier un schema officiel Home Assistant avec:
+    - [x] une liste `availability` contenant le topic global du pont et le topic local unique de l'`eqLogic` `jeedom2ha/{eq_id}/availability`
+    - [x] `availability_mode = all`
+    - [x] `payload_available = online`
+    - [x] `payload_not_available = offline`
+  - [x] 3.4 Preserver strictement les topics de commande/etat existants (`state_topic`, `command_topic`, `brightness_command_topic`, `set_position_topic`).
 
-- [ ] **Task 4 - Publier et nettoyer les topics de disponibilite locale au bon moment** (AC: #15, #17, #20, #22)
-  - [ ] 4.1 Lors de `/action/sync`, apres publication discovery reussie, publier un message retained sur `jeedom2ha/{eq_id}/availability` uniquement pour les entites HA dont l'`eqLogic` source supporte une disponibilite locale fiable.
-  - [ ] 4.2 Si une entite bascule de "support local availability" vers "bridge-only", nettoyer le topic local retained devenu obsolete.
-  - [ ] 4.3 Lors d'un unpublish d'entite (suppression, exclusion, ineligibilite), nettoyer aussi le topic local d'availability pour eviter des traces retained orphelines.
-  - [ ] 4.4 Ne pas republier artificiellement tous les topics locaux lors d'une simple deconnexion broker: le LWT global doit suffire a marquer les entites indisponibles via `availability_mode = all`.
+- [x] **Task 4 - Publier et nettoyer les topics de disponibilite locale au bon moment** (AC: #15, #17, #20, #22)
+  - [x] 4.1 Lors de `/action/sync`, apres publication discovery reussie, publier un message retained sur `jeedom2ha/{eq_id}/availability` uniquement pour les entites HA dont l'`eqLogic` source supporte une disponibilite locale fiable.
+  - [x] 4.2 Si une entite bascule de "support local availability" vers "bridge-only", nettoyer le topic local retained devenu obsolete.
+  - [x] 4.3 Lors d'un unpublish d'entite (suppression, exclusion, ineligibilite), nettoyer aussi le topic local d'availability pour eviter des traces retained orphelines.
+  - [x] 4.4 Ne pas republier artificiellement tous les topics locaux lors d'une simple deconnexion broker: le LWT global doit suffire a marquer les entites indisponibles via `availability_mode = all`.
 
-- [ ] **Task 5 - Aligner le flux commande avec l'indisponibilite locale explicite** (AC: #24, #26)
-  - [ ] 5.1 Etendre `resources/daemon/sync/command.py` pour rejeter une commande quand une entite est explicitement `offline` localement.
-  - [ ] 5.2 Journaliser ce rejet avec un `reason_code` dedie (ex: `entity_unavailable`) sans casser les garde-fous existants (`mqtt_unavailable`, `entity_not_alive`, `entity_not_published`).
-  - [ ] 5.3 Ne pas changer la politique de confirmation honnete d'etat de Story 3.2 au-dela de ce gating supplementaire.
+- [x] **Task 5 - Aligner le flux commande avec l'indisponibilite locale explicite** (AC: #24, #26)
+  - [x] 5.1 Etendre `resources/daemon/sync/command.py` pour rejeter une commande quand une entite est explicitement `offline` localement.
+  - [x] 5.2 Journaliser ce rejet avec un `reason_code` dedie (ex: `entity_unavailable`) sans casser les garde-fous existants (`mqtt_unavailable`, `entity_not_alive`, `entity_not_published`).
+  - [x] 5.3 Ne pas changer la politique de confirmation honnete d'etat de Story 3.2 au-dela de ce gating supplementaire.
 
-- [ ] **Task 6 - Couverture automatisee minimale obligatoire** (AC: #1, #8, #13, #17, #22, #26)
-  - [ ] 6.1 Etendre `tests/unit/test_discovery_publisher.py` pour couvrir les deux modes:
-    - [ ] bridge-only
-    - [ ] bridge + entite avec `availability_mode = all`
-  - [ ] 6.2 Ajouter des tests de normalisation topologie/statut dans `tests/unit/test_topology.py`.
-  - [ ] 6.3 Ajouter des tests `http_server` verifies:
-    - [ ] publication d'un topic local retained quand le signal est fiable
-    - [ ] absence de topic local quand le signal ne l'est pas
-    - [ ] nettoyage du topic local lors d'un unpublish
-  - [ ] 6.4 Ajouter des tests `resources/daemon/tests/unit/test_command_sync.py` pour le rejet `entity_unavailable`.
-  - [ ] 6.5 Preserver les tests existants Story 1.3, 3.2 et 3.2-bis sur LWT, commande et bootstrap runtime.
+- [x] **Task 6 - Couverture automatisee minimale obligatoire** (AC: #1, #8, #13, #17, #22, #26)
+  - [x] 6.1 Etendre `tests/unit/test_discovery_publisher.py` pour couvrir les deux modes:
+    - [x] bridge-only
+    - [x] bridge + entite avec `availability_mode = all`
+  - [x] 6.2 Ajouter des tests de normalisation topologie/statut dans `tests/unit/test_topology.py`.
+  - [x] 6.3 Ajouter des tests `http_server` verifies:
+    - [x] publication d'un topic local retained quand le signal est fiable
+    - [x] absence de topic local quand le signal ne l'est pas
+    - [x] nettoyage du topic local lors d'un unpublish
+  - [x] 6.4 Ajouter des tests `resources/daemon/tests/unit/test_command_sync.py` pour le rejet `entity_unavailable`.
+  - [x] 6.5 Preserver les tests existants Story 1.3, 3.2 et 3.2-bis sur LWT, commande et bootstrap runtime.
 
 ## Plan de tests reels minimum (obligatoire)
 
@@ -269,18 +269,48 @@ so that je sache si mon systeme est operationnel.
 
 ### Agent Model Used
 
-Codex GPT-5 (create-story workflow)
+Codex GPT-5 (dev-story workflow)
 
 ### Debug Log References
 
-- Story creee a partir du backlog detecte dans `sprint-status.yaml` le 2026-03-16.
+- Preflight Git execute et valide sur la branche `codex/story-3-3-disponibilite-fiable` avant toute implementation.
+- `sprint-status.yaml` passe de `ready-for-dev` a `in-progress` au demarrage de l'implementation.
+- Story 3.3 implementee uniquement dans le worktree dedie, sans modification metier dans le clone principal.
+- Couverture locale executee:
+  - `python3 -m pytest tests/unit/test_topology.py tests/unit/test_discovery_publisher.py tests/unit/test_http_server.py resources/daemon/tests/unit/test_command_sync.py -q` -> `69 passed`
+  - `python3 -m pytest -q` -> `251 passed`
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story basee sur l'etat reel du workspace courant, y compris l'absence de `resources/daemon/sync/state.py`.
-- Guardrails ajoutes pour distinguer disponibilite, ineligibilite et suppression sans regression sur Stories 1.3, 3.2 et 3.2-bis.
+- Ajout d'un contrat availability centralise (`resources/daemon/models/availability.py`) pour eliminer les chaines dupliquees (`online`, `offline`, topic pont, topic local).
+- Extension de `PublicationDecision` avec metadata availability dediee, en conservant strictement le sens existant de `active_or_alive`.
+- Extension de `getFullTopology()` PHP pour exposer un bloc `status` minimal (`timeout`, `lastCommunication`) sans heuristique plugin-specifique.
+- Normalisation conservative dans `topology.py`: `timeout=1 -> offline`, `timeout=0 -> online`, sinon `unknown` et bridge-only.
+- `DiscoveryPublisher` adapte en bridge-only ou compose (`availability` + `availability_mode=all`) sans toucher aux topics de commande/etat existants.
+- `/action/sync` etendu pour publier le topic local retained uniquement quand le signal est fiable, nettoyer ce topic lors d'un downgrade bridge-only et lors d'un unpublish.
+- `CommandSynchronizer` etendu pour rejeter une commande avec `reason_code=entity_unavailable` quand l'entite est explicitement `offline` localement.
+- Separation unavailable vs unpublish conservee; aucun basculement vers device discovery; aucune dependance introduite sur `resources/daemon/sync/state.py`.
 
 ### File List
 
 - _bmad-output/implementation-artifacts/3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- core/class/jeedom2ha.class.php
+- resources/daemon/discovery/publisher.py
+- resources/daemon/models/availability.py
+- resources/daemon/models/mapping.py
+- resources/daemon/models/topology.py
+- resources/daemon/sync/command.py
+- resources/daemon/transport/http_server.py
+- resources/daemon/transport/mqtt_client.py
+- resources/daemon/tests/unit/test_command_sync.py
+- tests/unit/test_discovery_publisher.py
+- tests/unit/test_http_server.py
+- tests/unit/test_topology.py
+
+### Change Log
+
+- 2026-03-16: Story passee en `in-progress` et implementation chirurgicale du contrat availability local (`jeedom2ha/{eq_id}/availability`) sans changement de scope.
+- 2026-03-16: Ajout du module `models/availability.py` + integration dans `mapping`, `publisher`, `http_server`, `command` et centralisation des constantes availability dans `mqtt_client`.
+- 2026-03-16: Extension de la topologie PHP/Python pour transporter et normaliser les signaux standards Jeedom (`timeout`, `lastCommunication`) en bridge-only vs compose.
+- 2026-03-16: Ajout/ajustement des tests unitaires Story 3.3 (publisher, topology, http_server, command sync) et validation complete locale (`251 passed`).

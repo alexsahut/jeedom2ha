@@ -149,3 +149,47 @@ def test_topology_string_bool_normalisation():
     eq2 = snapshot.eq_logics[2]
     assert eq2.is_excluded is True, "String '1' must be True"
     assert eq2.is_enable is True
+
+
+def test_topology_local_availability_timeout_online_offline():
+    payload = {
+        "eq_logics": [
+            {"id": 10, "name": "Eq Online", "status": {"timeout": "0", "lastCommunication": "2026-03-16 10:00:00"}},
+            {"id": 11, "name": "Eq Offline", "status": {"timeout": 1, "lastCommunication": "2026-03-16 10:01:00"}},
+        ]
+    }
+
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+
+    eq_online = snapshot.eq_logics[10]
+    assert eq_online.local_availability_supported is True
+    assert eq_online.local_availability_state == "online"
+    assert eq_online.local_availability_reason == "timeout_zero"
+    assert eq_online.last_communication == "2026-03-16 10:00:00"
+
+    eq_offline = snapshot.eq_logics[11]
+    assert eq_offline.local_availability_supported is True
+    assert eq_offline.local_availability_state == "offline"
+    assert eq_offline.local_availability_reason == "timeout_one"
+    assert eq_offline.last_communication == "2026-03-16 10:01:00"
+
+
+def test_topology_local_availability_timeout_unknown_when_not_reliable():
+    payload = {
+        "eq_logics": [
+            {"id": 20, "name": "Eq Unknown", "status": {"timeout": "bad"}},
+            {"id": 21, "name": "Eq Missing", "status": {}},
+        ]
+    }
+
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+
+    eq_unknown = snapshot.eq_logics[20]
+    assert eq_unknown.local_availability_supported is False
+    assert eq_unknown.local_availability_state == "unknown"
+    assert eq_unknown.local_availability_reason == "timeout_unreliable"
+
+    eq_missing = snapshot.eq_logics[21]
+    assert eq_missing.local_availability_supported is False
+    assert eq_missing.local_availability_state == "unknown"
+    assert eq_missing.local_availability_reason == "timeout_missing"

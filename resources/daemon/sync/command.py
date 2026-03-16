@@ -10,6 +10,7 @@ from typing import Any, Dict, Mapping, Optional, Tuple
 
 import aiohttp
 
+from models.availability import AVAILABILITY_OFFLINE
 from models.mapping import MappingResult, PublicationDecision
 
 _LOGGER = logging.getLogger(__name__)
@@ -191,6 +192,12 @@ class CommandSynchronizer:
             expected_topics = self._expected_command_topics(mapping)
             if topic not in expected_topics.values():
                 continue
+
+            if (
+                bool(getattr(decision, "local_availability_supported", False))
+                and str(getattr(decision, "local_availability_state", "")).lower() == AVAILABILITY_OFFLINE
+            ):
+                return None, None, "entity_unavailable"
 
             return decision, mapping, None
 

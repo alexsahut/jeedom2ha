@@ -10,11 +10,18 @@ import ssl
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 import paho.mqtt.client as mqtt
 from aiohttp import web
 
 from .mqtt_client import MqttBridge
+from models.availability import (
+    AVAILABILITY_OFFLINE,
+    AVAILABILITY_ONLINE,
+    availability_from_snapshot,
+    build_local_availability_topic,
+)
 from models.topology import TopologySnapshot, assess_all
 from models.mapping import MappingResult, PublicationDecision
 from mapping.light import LightMapper
@@ -41,6 +48,62 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""
+
+
+def _apply_availability_metadata(
+    decision: PublicationDecision,
+    mapping: MappingResult,
+    snapshot: TopologySnapshot,
+) -> None:
+    """Populate availability metadata on runtime publication decisions."""
+    entity_availability = availability_from_snapshot(mapping.jeedom_eq_id, snapshot)
+    decision.bridge_availability_topic = entity_availability.bridge_availability_topic
+    decision.eqlogic_availability_topic = entity_availability.eqlogic_availability_topic
+    decision.local_availability_supported = entity_availability.local_availability_supported
+    decision.local_availability_state = entity_availability.local_availability_state
+    decision.availability_reason = entity_availability.availability_reason
+
+
+def _publish_local_availability_state(
+    mqtt_bridge: MqttBridge,
+    eq_id: int,
+    decision: PublicationDecision,
+) -> bool:
+    """Publish retained local availability when a reliable eqLogic signal exists."""
+    if not decision.local_availability_supported:
+        return True
+
+    topic = decision.eqlogic_availability_topic or build_local_availability_topic(eq_id)
+    payload = str(decision.local_availability_state or "").lower()
+    if payload not in (AVAILABILITY_ONLINE, AVAILABILITY_OFFLINE):
+        _LOGGER.warning(
+            "[AVAIL] Skip local availability publish for eq_id=%d (unsupported payload=%s)",
+            eq_id,
+            payload,
+        )
+        return False
+
+    ok = mqtt_bridge.publish_message(topic, payload, qos=1, retain=True)
+    if ok:
+        _LOGGER.info("[AVAIL] Published retained local availability eq_id=%d topic=%s payload=%s", eq_id, topic, payload)
+    else:
+        _LOGGER.warning("[AVAIL] Failed to publish local availability eq_id=%d topic=%s", eq_id, topic)
+    return ok
+
+
+def _clear_local_availability_topic(
+    mqtt_bridge: MqttBridge,
+    eq_id: int,
+    topic: Optional[str],
+) -> bool:
+    """Remove retained local availability topic payload to avoid orphan traces."""
+    local_topic = topic or build_local_availability_topic(eq_id)
+    ok = mqtt_bridge.publish_message(local_topic, "", qos=1, retain=True)
+    if ok:
+        _LOGGER.info("[AVAIL] Cleared retained local availability eq_id=%d topic=%s", eq_id, local_topic)
+    else:
+        _LOGGER.warning("[AVAIL] Failed to clear local availability eq_id=%d topic=%s", eq_id, local_topic)
+    return ok
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -382,6 +445,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             continue  # Not mapped by any mapper
         
         mappings[eq_id] = mapping
+        previous_decision = request.app["publications"].get(eq_id)
         
         if mapping.ha_entity_type == "light":
             # Count by confidence
@@ -397,6 +461,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
+            _apply_availability_metadata(decision, mapping, snapshot)
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
@@ -415,10 +480,17 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        bridge_availability_topic=decision.bridge_availability_topic,
+                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
+                        local_availability_supported=decision.local_availability_supported,
+                        local_availability_state=decision.local_availability_state,
+                        availability_reason=decision.availability_reason,
                     )
                     publications[eq_id] = decision
                 else:
                     decision.active_or_alive = True
+                    if decision.local_availability_supported:
+                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     mapping_counters["lights_published"] += 1
             if not decision.active_or_alive:
                 mapping_counters["lights_skipped"] += 1
@@ -437,6 +509,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
+            _apply_availability_metadata(decision, mapping, snapshot)
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
@@ -455,10 +528,17 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        bridge_availability_topic=decision.bridge_availability_topic,
+                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
+                        local_availability_supported=decision.local_availability_supported,
+                        local_availability_state=decision.local_availability_state,
+                        availability_reason=decision.availability_reason,
                     )
                     publications[eq_id] = decision
                 else:
                     decision.active_or_alive = True
+                    if decision.local_availability_supported:
+                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     mapping_counters["covers_published"] += 1
             if not decision.active_or_alive:
                 mapping_counters["covers_skipped"] += 1
@@ -477,6 +557,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
+            _apply_availability_metadata(decision, mapping, snapshot)
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
 
@@ -495,13 +576,36 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        bridge_availability_topic=decision.bridge_availability_topic,
+                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
+                        local_availability_supported=decision.local_availability_supported,
+                        local_availability_state=decision.local_availability_state,
+                        availability_reason=decision.availability_reason,
                     )
                     publications[eq_id] = decision
                 else:
                     decision.active_or_alive = True
+                    if decision.local_availability_supported:
+                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     mapping_counters["switches_published"] += 1
             if not decision.active_or_alive:
                 mapping_counters["switches_skipped"] += 1
+
+        previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
+        previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+        current_local_supported = bool(getattr(decision, "local_availability_supported", False))
+        current_local_topic = getattr(decision, "eqlogic_availability_topic", None)
+        should_clear_local = previous_local_supported and (
+            (not current_local_supported) or (previous_local_topic != current_local_topic)
+        )
+        if should_clear_local:
+            if mqtt_bridge and mqtt_bridge.is_connected:
+                _clear_local_availability_topic(mqtt_bridge, eq_id, previous_local_topic)
+            else:
+                _LOGGER.warning(
+                    "[AVAIL] Cannot clear stale local availability eq_id=%d (bridge missing/disconnected)",
+                    eq_id,
+                )
             
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
@@ -513,6 +617,17 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
                 await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
                 _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
+                if bool(getattr(old_decision, "local_availability_supported", False)):
+                    _clear_local_availability_topic(
+                        mqtt_bridge,
+                        old_eq_id,
+                        getattr(old_decision, "eqlogic_availability_topic", None),
+                    )
+            elif bool(getattr(old_decision, "local_availability_supported", False)):
+                _LOGGER.warning(
+                    "[AVAIL] Cannot clear local availability during unpublish for eq_id=%d (bridge missing/disconnected)",
+                    old_eq_id,
+                )
                 
         # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
         request.app["mappings"].pop(old_eq_id, None)
