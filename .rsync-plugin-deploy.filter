@@ -1,0 +1,10 @@
+- .git/
+- .DS_Store
+- tests/
+- scripts/
+- docs/
+- _bmad/
+- _bmad-output/
+- .vscode/
+- .venv/
+- __pycache__/

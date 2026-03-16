@@ -32,6 +32,11 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				<br>
 				<span>{{Configuration}}</span>
 			</div>
+			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic">
+				<i class="fas fa-stethoscope"></i>
+				<br>
+				<span>{{Diagnostic}}</span>
+			</div>
 		</div>
 		<legend><i class="fas fa-table"></i> {{Mes templates}}</legend>
 		<?php
