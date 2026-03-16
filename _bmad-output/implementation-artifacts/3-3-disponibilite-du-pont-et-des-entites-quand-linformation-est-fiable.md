@@ -280,6 +280,10 @@ Codex GPT-5 (dev-story workflow)
   - `python3 -m pytest tests/unit/test_discovery_publisher.py tests/unit/test_http_server.py resources/daemon/tests/unit/test_command_sync.py -q` -> `64 passed`
   - `python3 -m pytest -q` -> `253 passed`
 - Reprise suite code review `changes requested`: corrections ciblees sur schema HA availability, gestion echec publish local retained, et regression downgrade `local -> bridge-only`.
+- Reprise blocker review additionnel (cleanup local retained perdu hors connexion broker): ajout d'une file de cleanup differe en runtime et replay au sync reconnecte.
+- Validation post-fix blocker:
+  - `python3 -m pytest tests/unit/test_http_server.py -q` -> `16 passed`
+  - `python3 -m pytest -q` -> `255 passed`
 
 ### Completion Notes List
 
@@ -317,3 +321,4 @@ Codex GPT-5 (dev-story workflow)
 - 2026-03-16: Ajout/ajustement des tests unitaires Story 3.3 (publisher, topology, http_server, command sync) et validation complete locale (`251 passed`).
 - 2026-03-16: Corrections post-review: `availability` conforme schema officiel HA (liste d'objets `topic`), retrait de l'ignorance d'echec publish local (decision runtime safe `local_availability_publish_failed`), ajout du test de regression downgrade `local -> bridge-only` avec nettoyage retained obligatoire.
 - 2026-03-16: Story passee en `review` apres materialisation des changements en commits Git et revalidation complete (`253 passed`).
+- 2026-03-16: Fix blocker review final: persistance + replay du cleanup differe `jeedom2ha/{eq_id}/availability` quand downgrade `local -> bridge-only` ou unpublish survient broker deconnecte; ajout de 2 tests de regression dedies; validation locale complete (`255 passed`).
