@@ -153,6 +153,34 @@ def _replay_deferred_local_availability_cleanup(
             pending_cleanup.pop(pending_eq_id, None)
 
 
+def _defer_discovery_unpublish(
+    pending_unpublish: Dict[int, str],
+    eq_id: int,
+    entity_type: str,
+) -> None:
+    """Track one discovery unpublish to replay later when broker is connected."""
+    normalized_entity_type = str(entity_type or "light")
+    pending_unpublish[int(eq_id)] = normalized_entity_type
+    _LOGGER.info(
+        "[DISCOVERY] Deferred unpublish eq_id=%d entity_type=%s",
+        eq_id,
+        normalized_entity_type,
+    )
+
+
+async def _replay_deferred_discovery_unpublish(
+    publisher: DiscoveryPublisher,
+    pending_unpublish: Dict[int, str],
+) -> None:
+    """Replay deferred discovery unpublish messages when broker is connected."""
+    if not pending_unpublish:
+        return
+
+    for pending_eq_id, pending_entity_type in list(pending_unpublish.items()):
+        if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=pending_entity_type):
+            pending_unpublish.pop(pending_eq_id, None)
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -473,7 +501,10 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     mqtt_bridge = request.app.get("mqtt_bridge")
     publisher = DiscoveryPublisher(mqtt_bridge) if mqtt_bridge else None
     pending_local_cleanup = request.app["pending_local_availability_cleanup"]
+    pending_discovery_unpublish = request.app["pending_discovery_unpublish"]
 
+    if mqtt_bridge and mqtt_bridge.is_connected and publisher:
+        await _replay_deferred_discovery_unpublish(publisher, pending_discovery_unpublish)
     if mqtt_bridge and mqtt_bridge.is_connected:
         _replay_deferred_local_availability_cleanup(mqtt_bridge, pending_local_cleanup)
     
@@ -686,9 +717,25 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         if old_decision and old_decision.should_publish:
             entity_type = old_decision.mapping_result.ha_entity_type
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
-                _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
-                if bool(getattr(old_decision, "local_availability_supported", False)):
+                unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
+                if unpublish_ok:
+                    pending_discovery_unpublish.pop(old_eq_id, None)
+                    _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
+                else:
+                    _LOGGER.warning(
+                        "[MAPPING] Cannot unpublish discovery for eq_id=%d (publish failed) — deferring",
+                        old_eq_id,
+                    )
+                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+            else:
+                _LOGGER.warning(
+                    "[MAPPING] Cannot unpublish discovery for eq_id=%d (bridge missing/disconnected) — deferring",
+                    old_eq_id,
+                )
+                _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+
+            if bool(getattr(old_decision, "local_availability_supported", False)):
+                if mqtt_bridge and mqtt_bridge.is_connected:
                     clear_ok = _clear_local_availability_topic(
                         mqtt_bridge,
                         old_eq_id,
@@ -702,16 +749,16 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                             old_eq_id,
                             getattr(old_decision, "eqlogic_availability_topic", None),
                         )
-            elif bool(getattr(old_decision, "local_availability_supported", False)):
-                _LOGGER.warning(
-                    "[AVAIL] Cannot clear local availability during unpublish for eq_id=%d (bridge missing/disconnected)",
-                    old_eq_id,
-                )
-                _defer_local_availability_cleanup(
-                    pending_local_cleanup,
-                    old_eq_id,
-                    getattr(old_decision, "eqlogic_availability_topic", None),
-                )
+                else:
+                    _LOGGER.warning(
+                        "[AVAIL] Cannot clear local availability during unpublish for eq_id=%d (bridge missing/disconnected)",
+                        old_eq_id,
+                    )
+                    _defer_local_availability_cleanup(
+                        pending_local_cleanup,
+                        old_eq_id,
+                        getattr(old_decision, "eqlogic_availability_topic", None),
+                    )
                 
         # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
         request.app["mappings"].pop(old_eq_id, None)
@@ -773,6 +820,7 @@ def create_app(local_secret: str) -> web.Application:
     app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
+    app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
