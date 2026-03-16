@@ -92,6 +92,7 @@ class PublicationDecision:
     mapping_result: MappingResult = field(default=None)  # type: ignore[assignment]
     state_topic: Optional[str] = None
     active_or_alive: bool = True
+    discovery_published: bool = False
     bridge_availability_topic: str = BRIDGE_AVAILABILITY_TOPIC
     eqlogic_availability_topic: Optional[str] = None
     local_availability_supported: bool = False

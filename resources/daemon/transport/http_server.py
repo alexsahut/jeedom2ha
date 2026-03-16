@@ -117,12 +117,23 @@ def _mark_local_availability_publish_failed(
         mapping_result=mapping,
         state_topic=decision.state_topic,
         active_or_alive=False,
+        discovery_published=decision.discovery_published,
         bridge_availability_topic=decision.bridge_availability_topic,
         eqlogic_availability_topic=decision.eqlogic_availability_topic,
         local_availability_supported=decision.local_availability_supported,
         local_availability_state=decision.local_availability_state,
         availability_reason=decision.availability_reason,
     )
+
+
+def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
+    """Return True when a discovery unpublish is still required for one entity."""
+    if decision is None:
+        return False
+    if bool(getattr(decision, "discovery_published", False)):
+        return True
+    # Backward compatibility with pre-flag runtime decisions.
+    return bool(getattr(decision, "should_publish", False))
 
 
 def _defer_local_availability_cleanup(
@@ -562,6 +573,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        discovery_published=False,
                         bridge_availability_topic=decision.bridge_availability_topic,
                         eqlogic_availability_topic=decision.eqlogic_availability_topic,
                         local_availability_supported=decision.local_availability_supported,
@@ -570,6 +582,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
+                    decision.discovery_published = True
                     local_ok = True
                     if decision.local_availability_supported:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
@@ -615,6 +628,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        discovery_published=False,
                         bridge_availability_topic=decision.bridge_availability_topic,
                         eqlogic_availability_topic=decision.eqlogic_availability_topic,
                         local_availability_supported=decision.local_availability_supported,
@@ -623,6 +637,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
+                    decision.discovery_published = True
                     local_ok = True
                     if decision.local_availability_supported:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
@@ -668,6 +683,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                         mapping_result=mapping,
                         state_topic=decision.state_topic,
                         active_or_alive=False,
+                        discovery_published=False,
                         bridge_availability_topic=decision.bridge_availability_topic,
                         eqlogic_availability_topic=decision.eqlogic_availability_topic,
                         local_availability_supported=decision.local_availability_supported,
@@ -676,6 +692,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
+                    decision.discovery_published = True
                     local_ok = True
                     if decision.local_availability_supported:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
@@ -714,7 +731,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     for old_eq_id in eq_ids_supprimes:
         # Si c'était publié avant, on l'unpublish
         old_decision = request.app["publications"].get(old_eq_id)
-        if old_decision and old_decision.should_publish:
+        if _needs_discovery_unpublish(old_decision):
             entity_type = old_decision.mapping_result.ha_entity_type
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
                 unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
