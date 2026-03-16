@@ -825,6 +825,100 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_diagnostics(request: web.Request) -> web.Response:
+    """Handle GET /system/diagnostics — return coverage diagnostics."""
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    topology = request.app.get("topology")
+    if not topology:
+        return web.json_response({
+            "status": "error",
+            "message": "Diagnostic indisponible : aucune donnée en mémoire (appelez /action/sync d'abord)."
+        })
+
+    eligibility = request.app.get("eligibility", {})
+    mappings = request.app.get("mappings", {})
+    publications = request.app.get("publications", {})
+    
+    equipments = []
+    
+    for eq_id, eq in topology.eq_logics.items():
+        object_name = topology.get_suggested_area(eq_id) or "Aucun"
+        
+        status = "Non publié"
+        confidence = "Ignoré"
+        reason_code = "unknown"
+        
+        el_result = eligibility.get(eq_id)
+        if el_result:
+            reason_code = el_result.reason_code
+            if not el_result.is_eligible:
+                if el_result.reason_code == "excluded_eqlogic":
+                    status = "Exclu"
+                    confidence = "Ignoré"
+                else:
+                    status = "Non publié"
+                    confidence = "Ignoré"
+            else:
+                map_result = mappings.get(eq_id)
+                pub_decision = publications.get(eq_id)
+                
+                if map_result:
+                    reason_code = map_result.reason_code
+                    confidence_map = {
+                        "sure": "Sûr",
+                        "probable": "Probable",
+                        "ambiguous": "Ambigu",
+                        "ignore": "Ignoré",
+                        "unknown": "Ignoré"
+                    }
+                    confidence = confidence_map.get(map_result.confidence, "Ignoré")
+                    
+                    if pub_decision and pub_decision.active_or_alive:
+                        mapped_cmd_ids = {c.id for c in map_result.commands.values()}
+                        coverable_cmds = {c.id for c in eq.cmds if c.generic_type}
+                        unmapped = coverable_cmds - mapped_cmd_ids
+                        
+                        if unmapped:
+                            status = "Partiellement publié"
+                        else:
+                            status = "Publié"
+                        reason_code = pub_decision.reason
+                    else:
+                        status = "Non publié"
+                        if pub_decision:
+                            reason_code = pub_decision.reason
+                else:
+                    reason_code = "no_mapping"
+                    confidence = "Ignoré"
+                    status = "Non publié"
+                    
+        equipments.append({
+            "eq_id": eq_id,
+            "object_name": object_name,
+            "name": eq.name,
+            "status": status,
+            "confidence": confidence,
+            "reason_code": reason_code
+        })
+        
+    return web.json_response({
+        "action": "system.diagnostics",
+        "status": "ok",
+        "payload": {
+            "equipments": equipments
+        },
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application()
@@ -843,6 +937,7 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
     app.router.add_post("/action/sync", _handle_action_sync)
+    app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
     return app
 
 

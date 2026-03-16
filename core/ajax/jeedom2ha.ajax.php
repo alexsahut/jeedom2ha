@@ -131,6 +131,14 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'getDiagnostics') {
+      $result = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[DIAGNOSTICS] Le démon n\'a pas répondu (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
     else {
       throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
     }

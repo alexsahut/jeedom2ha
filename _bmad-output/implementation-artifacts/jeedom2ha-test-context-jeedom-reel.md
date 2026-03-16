@@ -284,6 +284,39 @@ Verdict attendu :
 - Si seuls les tests locaux sont verts, le sujet auth Jeedom reste **non valide**.
 - Toute nouvelle methode `jeeApi.php` introduite dans une story doit etre marquee `non demontree` tant qu'un test reel n'a pas ete capture.
 
+## Déploiement Local vers Box de Test (Rsync)
+
+Pour pousser une branche de travail locale (Story ou Fix) vers la box Jeedom de test afin d'y exécuter le pré-flight ou les validations, voici la procédure standard basée sur `rsync` :
+
+### 1. Sur la machine locale (Mac/Linux)
+
+Définir le chemin absolu direct du dépôt local (ou du worktree) et utiliser le filtre rsync du projet pour pousser vers le home de l'utilisateur sur la box (adapter les chemins et IP si nécessaire). Utiliser un chemin absolu pour la variable `REPO` permet de lancer cette commande depuis n'importe quel dossier :
+
+```sh
+# Remplacer le chemin absolu par celui de votre dossier clone ou de votre worktree
+export REPO="/Users/alexandre/Dev/jeedom/plugins/jeedom2ha"
+export DEST="asahut@192.168.1.21:/home/asahut/jeedom2ha/"
+
+rsync -az --delete --delete-after --prune-empty-dirs \
+  --filter="merge ${REPO}/.rsync-plugin-deploy.filter" \
+  "${REPO}/" \
+  "${DEST}"
+```
+
+### 2. Sur la box Jeedom de test (en root)
+
+Synchroniser le home vers le répertoire des plugins d'Apache, puis restaurer les permissions standards Jeedom :
+
+```sh
+rsync -a --delete \
+  --exclude 'data/' \
+  /home/asahut/jeedom2ha/ /var/www/html/plugins/jeedom2ha/ && \
+chown -R www-data:www-data /var/www/html/plugins/jeedom2ha && \
+find /var/www/html/plugins/jeedom2ha -type d -exec chmod 755 {} \; && \
+find /var/www/html/plugins/jeedom2ha -type f -exec chmod 644 {} \; && \
+chmod +x /var/www/html/plugins/jeedom2ha/resources/daemon/main.py
+```
+
 ## Proposition d'artefact de preflight
 
 Script propose : `scripts/check_jeedom_api_contract.sh`

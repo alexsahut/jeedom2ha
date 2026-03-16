@@ -47,21 +47,21 @@ development_status:
   1-2-bis-fiabilisation-auto-detection-mqtt-manager-import-force: done
   1-3-validation-de-la-connexion-et-statut-du-pont: done
   epic-1-retrospective: done
-  epic-2: in-progress
+  epic-2: done
   2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: done
   2-3-mapping-exposition-des-ouvrants-volets: done
   2-4-mapping-exposition-des-prises-switches: done
   2-5-mapping-exposition-des-capteurs-numeriques-binaires: done
   epic-2-retrospective: done
-  epic-3: in-progress
+  epic-3: done
   3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
   3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: done
   3-2-bis-bootstrap-runtime-apres-restart-daemon: done  # cloture produit/projet; validation terrain 3.2b-A/B/C differee et non executee
   3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: done  # tests terrain 3.3-A/B/C valides sur box reelle (2026-03-16)
-  epic-3-retrospective: optional
-  epic-4: backlog
-  4-1-interface-de-diagnostic-de-couverture: backlog
+  epic-3-retrospective: done
+  epic-4: in-progress
+  4-1-interface-de-diagnostic-de-couverture: done
   4-2-diagnostic-detaille-et-suggestions-de-remediation: backlog
   4-3-gestion-des-exclusions-et-actions-manuelles: backlog
   4-4-export-de-diagnostic-pour-support: backlog

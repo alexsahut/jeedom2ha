@@ -140,3 +140,137 @@ function addCmdToTable(_cmd) {
     }
   })
 }
+
+$('.eqLogicAction[data-action=diagnostic]').on('click', function() {
+  $.ajax({
+    type: 'POST',
+    url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    data: {action: 'getDiagnostics'},
+    dataType: 'json',
+    error: function(request, status, error) {
+      handleAjaxError(request, status, error);
+    },
+    success: function(data) {
+      if (data.state != 'ok') {
+        $('#div_alert').showAlert({message: data.result, level: 'danger'});
+        return;
+      }
+      
+      var equipments = [];
+      if (data.result && data.result.payload && data.result.payload.equipments) {
+        equipments = data.result.payload.equipments;
+      }
+
+      if (equipments.length === 0) {
+        bootbox.alert("{{Aucune donnée de couverture disponible. Le diagnostic nécessite qu'une synchronisation ait eu lieu.}}");
+        return;
+      }
+      
+      var reasonLabels = {
+        'sure': 'Mapping identifié avec certitude',
+        'probable': 'Mapping probable détecté',
+        'ambiguous_skipped': 'Ambiguïté détectée (plusieurs types possibles)',
+        'no_mapping': 'Aucun mapping compatible trouvé',
+        'no_commands': 'Équipement sans commandes exploitables',
+        'no_supported_generic_type': 'Type générique non supporté',
+        'disabled_eqlogic': 'Équipement désactivé dans Jeedom',
+        'excluded_by_user': 'Exclu manuellement par l\'utilisateur',
+        'low_confidence': 'Confiance trop faible pour publication'
+      };
+
+      var getStatusLabel = function(status) {
+        if (status === 'Publié') return '<span class="label label-success">' + status + '</span>';
+        if (status === 'Exclu') return '<span class="label label-danger">' + status + '</span>';
+        if (status === 'Partiellement publié') return '<span class="label label-info">' + status + '</span>';
+        if (status === 'Non publié') return '<span class="label label-warning">' + status + '</span>';
+        return '<span class="label label-default">' + status + '</span>';
+      };
+
+      var getConfidenceLabel = function(conf) {
+        if (conf === 'Sûr') return '<span class="label label-success">' + conf + '</span>';
+        if (conf === 'Probable') return '<span class="label label-info">' + conf + '</span>';
+        if (conf === 'Ambigu') return '<span class="label label-warning">' + conf + '</span>';
+        return '<span class="label" style="background-color:#777!important;color:#fff!important;">' + conf + '</span>';
+      };
+
+      var renderTable = function(filterText) {
+        filterText = (filterText || '').toLowerCase();
+        
+        // Group by object_name and filter
+        var byObject = {};
+        var matchCount = 0;
+        for (var i = 0; i < equipments.length; i++) {
+          var eq = equipments[i];
+          var objName = eq.object_name || "Aucun";
+          
+          if (filterText !== '') {
+             var searchStr = (objName + ' ' + eq.name + ' ' + eq.status + ' ' + (reasonLabels[eq.reason_code] || '')).toLowerCase();
+             if (searchStr.indexOf(filterText) === -1) continue;
+          }
+
+          if (!byObject[objName]) {
+            byObject[objName] = [];
+          }
+          byObject[objName].push(eq);
+          matchCount++;
+        }
+        
+        var html = '<table class="table table-bordered table-condensed table-hover" id="table_diagnostic" style="width:100%;table-layout:auto;">';
+        html += '<thead><tr><th>{{Objet/Pièce}}</th><th>{{Equipement}}</th><th style="width:120px;">{{Statut}}</th><th style="width:100px;">{{Confiance}}</th><th>{{Raison : Explication}}</th></tr></thead>';
+        html += '<tbody>';
+        
+        var objects = Object.keys(byObject).sort();
+        for (var objIdx = 0; objIdx < objects.length; objIdx++) {
+          var objName = objects[objIdx];
+          var eqs = byObject[objName];
+          
+          for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
+            var eq = eqs[eqIdx];
+            var reasonDescription = reasonLabels[eq.reason_code] || 'Code inconnu';
+            html += '<tr>';
+            if (eqIdx === 0) {
+              html += '<td rowspan="' + eqs.length + '" style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
+            }
+            html += '<td style="white-space:nowrap;">' + eq.name + '</td>';
+            html += '<td>' + getStatusLabel(eq.status) + '</td>';
+            html += '<td>' + getConfidenceLabel(eq.confidence) + '</td>';
+            html += '<td><span style="color:#888;font-family:monospace;font-size:0.9em;">' + eq.reason_code + '</span> : <span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
+            html += '</tr>';
+          }
+        }
+        
+        if (matchCount === 0) {
+           html += '<tr><td colspan="5" class="text-center"><i>{{Aucun résultat pour cette recherche}}</i></td></tr>';
+        }
+        
+        html += '</tbody></table>';
+        return html;
+      };
+
+      var modalHtml = '<div style="margin-bottom:10px;">';
+      modalHtml += '<div class="input-group">';
+      modalHtml += '<span class="input-group-addon"><i class="fas fa-search"></i></span>';
+      modalHtml += '<input type="text" id="in_searchDiagnostic" class="form-control" placeholder="{{Filtrer par équipement, pièce, statut ou raison...}}">';
+      modalHtml += '</div>';
+      modalHtml += '</div>';
+      modalHtml += '<div id="div_diagnosticTable" style="max-height:calc(100vh - 250px);overflow-y:auto;">' + renderTable() + '</div>';
+      
+      bootbox.dialog({
+        title: "{{Diagnostic de Couverture}}",
+        message: modalHtml,
+        size: "large",
+        className: "modal-diagnostic",
+        onEscape: true,
+        backdrop: true
+      });
+      
+      // Force modal width for large screens
+      $('.modal-diagnostic .modal-dialog').css('width', '90%').css('max-width', '1200px');
+      
+      $('#in_searchDiagnostic').off('keyup').on('keyup', function() {
+         var val = $(this).val();
+         $('#div_diagnosticTable').html(renderTable(val));
+      });    }
+  });
+});
+
