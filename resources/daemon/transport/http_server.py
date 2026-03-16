@@ -10,7 +10,7 @@ import ssl
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 import paho.mqtt.client as mqtt
 from aiohttp import web
@@ -123,6 +123,34 @@ def _mark_local_availability_publish_failed(
         local_availability_state=decision.local_availability_state,
         availability_reason=decision.availability_reason,
     )
+
+
+def _defer_local_availability_cleanup(
+    pending_cleanup: Dict[int, str],
+    eq_id: int,
+    topic: Optional[str],
+) -> None:
+    """Track one retained local availability topic cleanup to replay later."""
+    resolved_topic = topic or build_local_availability_topic(eq_id)
+    pending_cleanup[int(eq_id)] = resolved_topic
+    _LOGGER.info(
+        "[AVAIL] Deferred local availability cleanup eq_id=%d topic=%s",
+        eq_id,
+        resolved_topic,
+    )
+
+
+def _replay_deferred_local_availability_cleanup(
+    mqtt_bridge: MqttBridge,
+    pending_cleanup: Dict[int, str],
+) -> None:
+    """Replay deferred local availability cleanup when broker is connected."""
+    if not pending_cleanup:
+        return
+
+    for pending_eq_id, pending_topic in list(pending_cleanup.items()):
+        if _clear_local_availability_topic(mqtt_bridge, pending_eq_id, pending_topic):
+            pending_cleanup.pop(pending_eq_id, None)
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -444,6 +472,10 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     
     mqtt_bridge = request.app.get("mqtt_bridge")
     publisher = DiscoveryPublisher(mqtt_bridge) if mqtt_bridge else None
+    pending_local_cleanup = request.app["pending_local_availability_cleanup"]
+
+    if mqtt_bridge and mqtt_bridge.is_connected:
+        _replay_deferred_local_availability_cleanup(mqtt_bridge, pending_local_cleanup)
     
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
@@ -634,12 +666,17 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         )
         if should_clear_local:
             if mqtt_bridge and mqtt_bridge.is_connected:
-                _clear_local_availability_topic(mqtt_bridge, eq_id, previous_local_topic)
+                clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, previous_local_topic)
+                if clear_ok:
+                    pending_local_cleanup.pop(eq_id, None)
+                else:
+                    _defer_local_availability_cleanup(pending_local_cleanup, eq_id, previous_local_topic)
             else:
                 _LOGGER.warning(
                     "[AVAIL] Cannot clear stale local availability eq_id=%d (bridge missing/disconnected)",
                     eq_id,
                 )
+                _defer_local_availability_cleanup(pending_local_cleanup, eq_id, previous_local_topic)
             
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
@@ -652,15 +689,28 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                 await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
                 _LOGGER.info("[MAPPING] eq_id=%d est devenu inéligible ou supprimé → MQTT unpublish effectif", old_eq_id)
                 if bool(getattr(old_decision, "local_availability_supported", False)):
-                    _clear_local_availability_topic(
+                    clear_ok = _clear_local_availability_topic(
                         mqtt_bridge,
                         old_eq_id,
                         getattr(old_decision, "eqlogic_availability_topic", None),
                     )
+                    if clear_ok:
+                        pending_local_cleanup.pop(old_eq_id, None)
+                    else:
+                        _defer_local_availability_cleanup(
+                            pending_local_cleanup,
+                            old_eq_id,
+                            getattr(old_decision, "eqlogic_availability_topic", None),
+                        )
             elif bool(getattr(old_decision, "local_availability_supported", False)):
                 _LOGGER.warning(
                     "[AVAIL] Cannot clear local availability during unpublish for eq_id=%d (bridge missing/disconnected)",
                     old_eq_id,
+                )
+                _defer_local_availability_cleanup(
+                    pending_local_cleanup,
+                    old_eq_id,
+                    getattr(old_decision, "eqlogic_availability_topic", None),
                 )
                 
         # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
@@ -723,6 +773,7 @@ def create_app(local_secret: str) -> web.Application:
     app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
+    app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)

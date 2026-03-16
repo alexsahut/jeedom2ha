@@ -447,3 +447,143 @@ class TestSyncAction:
         assert availability_calls[0].args[1] == "online"
         assert availability_calls[-1].args[1] == ""
         assert availability_calls[-1].kwargs["retain"] is True
+
+    async def test_sync_downgrade_cleanup_is_deferred_when_broker_disconnected_then_replayed(
+        self,
+        http_client,
+        http_app,
+        mock_mqtt,
+    ):
+        payload_local = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {"timeout": "0"},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+        payload_bridge_only = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp_first = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_local},
+        )
+        assert resp_first.status == 200
+
+        mock_mqtt.is_connected = False
+        resp_second = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_bridge_only},
+        )
+        assert resp_second.status == 200
+        assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
+
+        mock_mqtt.publish_message.reset_mock()
+        mock_mqtt.is_connected = True
+        resp_third = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_bridge_only},
+        )
+        assert resp_third.status == 200
+
+        availability_calls = [
+            call for call in mock_mqtt.publish_message.call_args_list
+            if call.args[0] == "jeedom2ha/2/availability"
+        ]
+        assert len(availability_calls) == 1
+        assert availability_calls[0].args[1] == ""
+        assert availability_calls[0].kwargs["retain"] is True
+        assert http_app["pending_local_availability_cleanup"] == {}
+
+    async def test_sync_unpublish_cleanup_is_deferred_when_broker_disconnected_then_replayed(
+        self,
+        http_client,
+        http_app,
+        mock_mqtt,
+    ):
+        payload_present = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "status": {"timeout": "0"},
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+        payload_removed = {"version": "1.0", "eq_logics": [], "objects": [{"id": "1", "name": "Salon"}]}
+
+        resp_first = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_present},
+        )
+        assert resp_first.status == 200
+
+        mock_mqtt.is_connected = False
+        resp_second = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_removed},
+        )
+        assert resp_second.status == 200
+        assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
+
+        mock_mqtt.publish_message.reset_mock()
+        mock_mqtt.is_connected = True
+        resp_third = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload_removed},
+        )
+        assert resp_third.status == 200
+
+        availability_calls = [
+            call for call in mock_mqtt.publish_message.call_args_list
+            if call.args[0] == "jeedom2ha/2/availability"
+        ]
+        assert len(availability_calls) == 1
+        assert availability_calls[0].args[1] == ""
+        assert availability_calls[0].kwargs["retain"] is True
+        assert http_app["pending_local_availability_cleanup"] == {}
