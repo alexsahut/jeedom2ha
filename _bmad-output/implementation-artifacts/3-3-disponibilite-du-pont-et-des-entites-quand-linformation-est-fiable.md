@@ -288,6 +288,10 @@ Codex GPT-5 (dev-story workflow)
 - Validation post-fix unpublish differe:
   - `python3 -m pytest tests/unit/test_http_server.py -q` -> `18 passed`
   - `python3 -m pytest -q` -> `257 passed`
+- Reprise blocker review final (cas partiel "discovery publiee / publish local KO"): decouplage runtime entre intention de publication et discovery effectivement publiee.
+- Validation post-fix final:
+  - `python3 -m pytest tests/unit/test_http_server.py -q` -> `20 passed`
+  - `python3 -m pytest -q` -> `259 passed`
 
 ### Completion Notes List
 
@@ -298,6 +302,7 @@ Codex GPT-5 (dev-story workflow)
 - `DiscoveryPublisher` adapte en bridge-only ou compose (`availability` + `availability_mode=all`) sans toucher aux topics de commande/etat existants.
 - `/action/sync` etendu pour publier le topic local retained uniquement quand le signal est fiable, nettoyer ce topic lors d'un downgrade bridge-only et lors d'un unpublish.
 - `/action/sync` etendu pour memoriser/rejouer les unpublish discovery impossibles broker deconnecte, sans perdre la separation unavailable vs unpublish.
+- `PublicationDecision` etendu avec `discovery_published` pour conserver la trace d'une discovery effectivement publiee meme quand `should_publish` bascule ensuite a `False` (echec publish local availability).
 - `CommandSynchronizer` etendu pour rejeter une commande avec `reason_code=entity_unavailable` quand l'entite est explicitement `offline` localement.
 - Separation unavailable vs unpublish conservee; aucun basculement vers device discovery; aucune dependance introduite sur `resources/daemon/sync/state.py`.
 
@@ -328,3 +333,4 @@ Codex GPT-5 (dev-story workflow)
 - 2026-03-16: Story passee en `review` apres materialisation des changements en commits Git et revalidation complete (`253 passed`).
 - 2026-03-16: Fix blocker review final: persistance + replay du cleanup differe `jeedom2ha/{eq_id}/availability` quand downgrade `local -> bridge-only` ou unpublish survient broker deconnecte; ajout de 2 tests de regression dedies; validation locale complete (`255 passed`).
 - 2026-03-16: Fix blocker review unpublish: persistance + replay des payloads discovery vides quand suppression/exclusion/ineligibilite survient broker deconnecte; ajout/extension de 3 tests de regression sur unpublish differe; validation locale complete (`257 passed`).
+- 2026-03-16: Fix blocker review final bis: unpublish discovery conserve/rejoue meme apres echec partiel `discovery OK + local availability KO` via flag runtime `discovery_published`; ajout de 2 tests de regression dedies (suppression/ineligibilite hors ligne) et extension d'un test existant; validation locale complete (`259 passed`).
