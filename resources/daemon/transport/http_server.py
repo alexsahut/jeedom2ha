@@ -106,6 +106,25 @@ def _clear_local_availability_topic(
     return ok
 
 
+def _mark_local_availability_publish_failed(
+    decision: PublicationDecision,
+    mapping: MappingResult,
+) -> PublicationDecision:
+    """Build a safe runtime decision when local availability retained publish fails."""
+    return PublicationDecision(
+        should_publish=False,
+        reason="local_availability_publish_failed",
+        mapping_result=mapping,
+        state_topic=decision.state_topic,
+        active_or_alive=False,
+        bridge_availability_topic=decision.bridge_availability_topic,
+        eqlogic_availability_topic=decision.eqlogic_availability_topic,
+        local_availability_supported=decision.local_availability_supported,
+        local_availability_state=decision.local_availability_state,
+        availability_reason=decision.availability_reason,
+    )
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -488,10 +507,15 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
-                    decision.active_or_alive = True
+                    local_ok = True
                     if decision.local_availability_supported:
-                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    mapping_counters["lights_published"] += 1
+                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+                    if local_ok:
+                        decision.active_or_alive = True
+                        mapping_counters["lights_published"] += 1
+                    else:
+                        decision = _mark_local_availability_publish_failed(decision, mapping)
+                        publications[eq_id] = decision
             if not decision.active_or_alive:
                 mapping_counters["lights_skipped"] += 1
 
@@ -536,10 +560,15 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
-                    decision.active_or_alive = True
+                    local_ok = True
                     if decision.local_availability_supported:
-                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    mapping_counters["covers_published"] += 1
+                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+                    if local_ok:
+                        decision.active_or_alive = True
+                        mapping_counters["covers_published"] += 1
+                    else:
+                        decision = _mark_local_availability_publish_failed(decision, mapping)
+                        publications[eq_id] = decision
             if not decision.active_or_alive:
                 mapping_counters["covers_skipped"] += 1
 
@@ -584,10 +613,15 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                     )
                     publications[eq_id] = decision
                 else:
-                    decision.active_or_alive = True
+                    local_ok = True
                     if decision.local_availability_supported:
-                        _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    mapping_counters["switches_published"] += 1
+                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+                    if local_ok:
+                        decision.active_or_alive = True
+                        mapping_counters["switches_published"] += 1
+                    else:
+                        decision = _mark_local_availability_publish_failed(decision, mapping)
+                        publications[eq_id] = decision
             if not decision.active_or_alive:
                 mapping_counters["switches_skipped"] += 1
 

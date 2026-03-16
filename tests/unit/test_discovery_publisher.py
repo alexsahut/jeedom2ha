@@ -324,8 +324,8 @@ class TestAvailability:
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["availability"] == [
-            "jeedom2ha/bridge/status",
-            "jeedom2ha/42/availability",
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
         ]
         assert payload["availability_mode"] == "all"
         assert payload["payload_available"] == "online"
@@ -394,8 +394,8 @@ class TestCoverBasicPayload:
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["availability"] == [
-            "jeedom2ha/bridge/status",
-            "jeedom2ha/42/availability",
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
         ]
         assert payload["availability_mode"] == "all"
         assert payload["payload_available"] == "online"
@@ -566,8 +566,8 @@ class TestSwitchBasicPayload:
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["availability"] == [
-            "jeedom2ha/bridge/status",
-            "jeedom2ha/42/availability",
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
         ]
         assert payload["availability_mode"] == "all"
         assert payload["payload_available"] == "online"

@@ -72,8 +72,8 @@ def build_discovery_availability_fields(entity_availability: EntityAvailability)
 
     return {
         "availability": [
-            entity_availability.bridge_availability_topic,
-            entity_availability.eqlogic_availability_topic,
+            {"topic": entity_availability.bridge_availability_topic},
+            {"topic": entity_availability.eqlogic_availability_topic},
         ],
         "availability_mode": AVAILABILITY_MODE_ALL,
         "payload_available": AVAILABILITY_ONLINE,
