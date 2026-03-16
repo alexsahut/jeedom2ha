@@ -15,10 +15,15 @@ import ssl
 from typing import Any, Callable, Dict, Optional
 
 import paho.mqtt.client as mqtt
+from models.availability import (
+    AVAILABILITY_OFFLINE,
+    AVAILABILITY_ONLINE,
+    BRIDGE_AVAILABILITY_TOPIC,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-BRIDGE_STATUS_TOPIC = "jeedom2ha/bridge/status"
+BRIDGE_STATUS_TOPIC = BRIDGE_AVAILABILITY_TOPIC
 COMMAND_SUBSCRIPTION_TOPICS = (
     "jeedom2ha/+/set",
     "jeedom2ha/+/brightness/set",
@@ -68,7 +73,7 @@ class MqttBridge:
             self._client = mqtt.Client(client_id="jeedom2ha_bridge", clean_session=True)
 
         # LWT — broker publishes "offline" automatically on unclean disconnect
-        self._client.will_set(BRIDGE_STATUS_TOPIC, "offline", qos=1, retain=True)
+        self._client.will_set(BRIDGE_STATUS_TOPIC, AVAILABILITY_OFFLINE, qos=1, retain=True)
         _LOGGER.debug(
             "[MQTT] LWT configured: topic=%s payload=offline qos=1 retain=True",
             BRIDGE_STATUS_TOPIC,
@@ -112,7 +117,7 @@ class MqttBridge:
             return
         _LOGGER.info("[MQTT] Stopping bridge, publishing offline status")
         try:
-            msg_info = self._client.publish(BRIDGE_STATUS_TOPIC, "offline", qos=1, retain=True)
+            msg_info = self._client.publish(BRIDGE_STATUS_TOPIC, AVAILABILITY_OFFLINE, qos=1, retain=True)
             # Ensure the offline message is sent before severing TCP connection (Fix for Finding 1)
             msg_info.wait_for_publish(timeout=2.0)
             self._client.disconnect()
@@ -137,7 +142,7 @@ class MqttBridge:
             )
             self._subscribe_command_topics(client)
             # Birth message — signals bridge availability to HA
-            client.publish(BRIDGE_STATUS_TOPIC, "online", qos=1, retain=True)
+            client.publish(BRIDGE_STATUS_TOPIC, AVAILABILITY_ONLINE, qos=1, retain=True)
             if self._loop is not None:
                 self._loop.call_soon_threadsafe(self._set_state, "connected")
         else:

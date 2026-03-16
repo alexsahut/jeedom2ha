@@ -452,6 +452,19 @@ class jeedom2ha extends eqLogic {
         continue;
       }
 
+      $status = array();
+      if (method_exists($eq, 'getStatus')) {
+        $timeout = $eq->getStatus('timeout', null);
+        if ($timeout !== null && $timeout !== '') {
+          $status['timeout'] = $timeout;
+        }
+
+        $lastCommunication = $eq->getStatus('lastCommunication', null);
+        if ($lastCommunication !== null && $lastCommunication !== '') {
+          $status['lastCommunication'] = strval($lastCommunication);
+        }
+      }
+
       $cmds = array();
       foreach (cmd::byEqLogicId($eq->getId()) as $cmd) {
         $cmds[] = array(
@@ -476,6 +489,7 @@ class jeedom2ha extends eqLogic {
         'eq_type'      => method_exists($eq, 'getEqType_name') ? $eq->getEqType_name() : 'unknown',
         'generic_type' => method_exists($eq, 'getGeneric_type') ? ($eq->getGeneric_type() ?: null) : null,
         'is_excluded'  => method_exists($eq, 'getConfiguration') ? (bool)$eq->getConfiguration('jeedom2ha_excluded', false) : false,
+        'status'       => $status,
         'cmds'         => $cmds,
       );
     }

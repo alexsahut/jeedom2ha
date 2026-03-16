@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-15
+last_updated: 2026-03-16
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -56,9 +56,9 @@ development_status:
   epic-2-retrospective: done
   epic-3: in-progress
   3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
-  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: review
+  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: done
   3-2-bis-bootstrap-runtime-apres-restart-daemon: done  # cloture produit/projet; validation terrain 3.2b-A/B/C differee et non executee
-  3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: backlog
+  3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: done  # tests terrain 3.3-A/B/C valides sur box reelle (2026-03-16)
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-interface-de-diagnostic-de-couverture: backlog

@@ -48,6 +48,24 @@ def snapshot():
     )
 
 
+@pytest.fixture
+def snapshot_with_local_availability():
+    eq = JeedomEqLogic(
+        id=42,
+        name="Plafonnier Salon",
+        object_id=10,
+        eq_type_name="zwave",
+    )
+    eq.local_availability_supported = True
+    eq.local_availability_state = "offline"
+    eq.local_availability_reason = "timeout_one"
+    return TopologySnapshot(
+        timestamp="2026-03-13T20:00:00+01:00",
+        objects={10: JeedomObject(id=10, name="Salon")},
+        eq_logics={42: eq},
+    )
+
+
 def _make_mapping(
     eq_id=42, name="Plafonnier Salon", confidence="sure",
     has_on_off=True, has_brightness=False, suggested_area="Salon",
@@ -294,6 +312,26 @@ class TestAvailability:
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
         assert payload["availability_topic"] == "jeedom2ha/bridge/status"
 
+    @pytest.mark.asyncio
+    async def test_light_availability_can_be_composed_with_local_topic(
+        self,
+        publisher,
+        snapshot_with_local_availability,
+        mock_mqtt_bridge,
+    ):
+        mapping = _make_mapping()
+        await publisher.publish_light(mapping, snapshot_with_local_availability)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["availability"] == [
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
+        ]
+        assert payload["availability_mode"] == "all"
+        assert payload["payload_available"] == "online"
+        assert payload["payload_not_available"] == "offline"
+        assert "availability_topic" not in payload
+
 
 # ==============================================================================
 # Test: Suggested area absent when None
@@ -343,6 +381,26 @@ class TestCoverBasicPayload:
         assert "device" in payload
         assert "origin" in payload
         assert payload["availability_topic"] == "jeedom2ha/bridge/status"
+
+    @pytest.mark.asyncio
+    async def test_cover_payload_with_composed_availability(
+        self,
+        publisher,
+        snapshot_with_local_availability,
+        mock_mqtt_bridge,
+    ):
+        mapping = _make_cover_mapping()
+        await publisher.publish_cover(mapping, snapshot_with_local_availability)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["availability"] == [
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
+        ]
+        assert payload["availability_mode"] == "all"
+        assert payload["payload_available"] == "online"
+        assert payload["payload_not_available"] == "offline"
+        assert "availability_topic" not in payload
 
     @pytest.mark.asyncio
     async def test_cover_no_stop_no_position(self, publisher, snapshot, mock_mqtt_bridge):
@@ -495,6 +553,26 @@ class TestSwitchBasicPayload:
         assert "origin" in payload
         assert "name" in payload
         assert "unique_id" in payload
+
+    @pytest.mark.asyncio
+    async def test_switch_payload_with_composed_availability(
+        self,
+        publisher,
+        snapshot_with_local_availability,
+        mock_mqtt_bridge,
+    ):
+        mapping = _make_switch_mapping()
+        await publisher.publish_switch(mapping, snapshot_with_local_availability)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert payload["availability"] == [
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/42/availability"},
+        ]
+        assert payload["availability_mode"] == "all"
+        assert payload["payload_available"] == "online"
+        assert payload["payload_not_available"] == "offline"
+        assert "availability_topic" not in payload
 
     @pytest.mark.asyncio
     async def test_switch_payload_no_device_class_when_none(self, publisher, snapshot, mock_mqtt_bridge):

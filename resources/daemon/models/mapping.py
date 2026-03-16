@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Union
 
+from models.availability import BRIDGE_AVAILABILITY_TOPIC, AVAILABILITY_UNKNOWN
 from models.topology import JeedomCmd
 
 
@@ -91,3 +92,9 @@ class PublicationDecision:
     mapping_result: MappingResult = field(default=None)  # type: ignore[assignment]
     state_topic: Optional[str] = None
     active_or_alive: bool = True
+    discovery_published: bool = False
+    bridge_availability_topic: str = BRIDGE_AVAILABILITY_TOPIC
+    eqlogic_availability_topic: Optional[str] = None
+    local_availability_supported: bool = False
+    local_availability_state: str = AVAILABILITY_UNKNOWN
+    availability_reason: str = "bridge_only_no_reliable_signal"

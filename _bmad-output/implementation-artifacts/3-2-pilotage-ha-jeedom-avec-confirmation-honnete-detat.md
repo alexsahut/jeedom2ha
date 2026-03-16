@@ -1,6 +1,6 @@
 # Story 3.2: Pilotage HA → Jeedom avec confirmation honnête d'état
 
-Status: review
+Status: done
 
 ## Story
 
@@ -289,3 +289,17 @@ Codex GPT-5 (dev-story workflow)
 - 2026-03-15: Validation non-régression Story 3.1 + suite globale pytest au vert (`284 passed`), story passée en `review`.
 - 2026-03-15: Reprise ciblée review Story 3.2 (3 écarts bloquants corrigés: topics Discovery strict sensor/binary, fiabilité state sync réellement active, séparation plugin/core API keys) + validation complète (`17/40/287` tests passés).
 - 2026-03-15: Réalignement Story 3.2 sur vérité terrain auth Jeedom: `cmd::execCmd` basculé sur `core API key`, tests Story 3.2 corrigés, non-régressions Story 3.1 ciblées rejouées (`23 passed`) et suite globale confirmée (`287 passed`).
+- 2026-03-16: Clôture documentaire en `done` après correction des écarts de code review; les tests terrain 3.2-A/B/C restent différés et non exécutés dans cette clôture, avec risque accepté pour cette itération.
+
+## Decision de cloture
+
+### Decision de cloture
+
+- Story `3.2` closee en `done` pour cette iteration.
+- Les correctifs issus de la code review ont ete integres et les validations automatisees locales ont ete rejouees avec succes.
+- Les tests terrain 3.2-A / 3.2-B / 3.2-C restent differes et non executes dans cette cloture; aucune preuve terrain supplementaire n'est revendiquee ici.
+
+### Risques acceptes
+
+- Un ecart reste possible entre la couverture automatisee locale et le comportement reel Jeedom / MQTT / Home Assistant sur le flux commande.
+- Les scenarios terrain happy path, anti-ghost et coexistence namespace ne sont pas reproves dans cette cloture.

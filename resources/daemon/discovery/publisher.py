@@ -9,6 +9,10 @@ import json
 import logging
 from typing import Optional
 
+from models.availability import (
+    availability_from_snapshot,
+    build_discovery_availability_fields,
+)
 from models.mapping import MappingResult
 from models.topology import TopologySnapshot
 
@@ -176,6 +180,11 @@ class DiscoveryPublisher:
 
         return device
 
+    def _build_availability_fields(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build availability payload fields (bridge-only or bridge+local)."""
+        entity_availability = availability_from_snapshot(mapping.jeedom_eq_id, snapshot)
+        return build_discovery_availability_fields(entity_availability)
+
     def _build_light_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the MQTT Discovery JSON payload for a light entity.
 
@@ -192,13 +201,13 @@ class DiscoveryPublisher:
             "command_topic": f"jeedom2ha/{eq_id}/set",
             "payload_on": "ON",
             "payload_off": "OFF",
-            "availability_topic": "jeedom2ha/bridge/status",
             "device": device,
             "origin": {
                 "name": "jeedom2ha",
                 "sw_version": _SW_VERSION,
             },
         }
+        payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Add brightness fields if capability detected
         if mapping.capabilities.has_brightness:
@@ -236,13 +245,13 @@ class DiscoveryPublisher:
             "state_open": "open",
             "state_closed": "closed",
             "device_class": device_class,
-            "availability_topic": "jeedom2ha/bridge/status",
             "device": device,
             "origin": {
                 "name": "jeedom2ha",
                 "sw_version": _SW_VERSION,
             },
         }
+        payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Conditional: Stop
         if caps.has_stop:
@@ -278,13 +287,13 @@ class DiscoveryPublisher:
             "state_topic": f"jeedom2ha/{eq_id}/state",
             "state_on": "ON",
             "state_off": "OFF",
-            "availability_topic": "jeedom2ha/bridge/status",
             "device": device,
             "origin": {
                 "name": "jeedom2ha",
                 "sw_version": _SW_VERSION,
             },
         }
+        payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch"
         if caps.device_class == "outlet":
