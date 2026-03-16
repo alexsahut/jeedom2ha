@@ -67,6 +67,10 @@ export CMD_OFF=3269
 export PLUGIN_API_KEY="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; echo jeedom::getApiKey("jeedom2ha");')"
 export CORE_API_KEY="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; echo config::byKey("api");')"
 export LOCAL_SECRET="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; echo config::byKey("localSecret", "jeedom2ha");')"
+
+# Credentials broker MQTT (extraites de la config mqtt2 / MQTT Manager)
+export MQTT_USER="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; $raw = config::byKey("mqtt::password","mqtt2",""); $line = explode("\n",$raw)[0]; if(strpos($line,":")!==false){list($u,$p)=explode(":",$line,2); echo $u;} else {echo $line;}')"
+export MQTT_PASS="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; $raw = config::byKey("mqtt::password","mqtt2",""); $line = explode("\n",$raw)[0]; if(strpos($line,":")!==false){list($u,$p)=explode(":",$line,2); echo $p;} else {echo "";}')"
 ```
 
 ### 1. Verifier le demarrage daemon et l'auth locale
@@ -192,7 +196,11 @@ export PLUGIN_API_KEY="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php
 export CORE_API_KEY="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; echo config::byKey("api");')"
 export LOCAL_SECRET="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; echo config::byKey("localSecret", "jeedom2ha");')"
 
-printf 'PLUGIN_API_KEY=%s\nCORE_API_KEY=%s\nLOCAL_SECRET=%s\n' "$PLUGIN_API_KEY" "$CORE_API_KEY" "$LOCAL_SECRET"
+# Credentials broker MQTT (extraites de la config mqtt2 / MQTT Manager)
+export MQTT_USER="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; $raw = config::byKey("mqtt::password","mqtt2",""); $line = explode("\n",$raw)[0]; if(strpos($line,":")!==false){list($u,$p)=explode(":",$line,2); echo $u;} else {echo $line;}')"
+export MQTT_PASS="$(php -r 'require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php"; $raw = config::byKey("mqtt::password","mqtt2",""); $line = explode("\n",$raw)[0]; if(strpos($line,":")!==false){list($u,$p)=explode(":",$line,2); echo $p;} else {echo "";}')"
+
+printf 'PLUGIN_API_KEY=%s\nCORE_API_KEY=%s\nLOCAL_SECRET=%s\nMQTT_USER=%s\nMQTT_PASS_LEN=%d\n' "$PLUGIN_API_KEY" "$CORE_API_KEY" "$LOCAL_SECRET" "$MQTT_USER" "${#MQTT_PASS}"
 ```
 
 Verifier `/system/status` :
