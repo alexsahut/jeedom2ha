@@ -284,6 +284,10 @@ Codex GPT-5 (dev-story workflow)
 - Validation post-fix blocker:
   - `python3 -m pytest tests/unit/test_http_server.py -q` -> `16 passed`
   - `python3 -m pytest -q` -> `255 passed`
+- Reprise blocker review additionnel (unpublish discovery perdu hors connexion broker): ajout d'une file runtime `pending_discovery_unpublish` et replay au sync reconnecte.
+- Validation post-fix unpublish differe:
+  - `python3 -m pytest tests/unit/test_http_server.py -q` -> `18 passed`
+  - `python3 -m pytest -q` -> `257 passed`
 
 ### Completion Notes List
 
@@ -293,6 +297,7 @@ Codex GPT-5 (dev-story workflow)
 - Normalisation conservative dans `topology.py`: `timeout=1 -> offline`, `timeout=0 -> online`, sinon `unknown` et bridge-only.
 - `DiscoveryPublisher` adapte en bridge-only ou compose (`availability` + `availability_mode=all`) sans toucher aux topics de commande/etat existants.
 - `/action/sync` etendu pour publier le topic local retained uniquement quand le signal est fiable, nettoyer ce topic lors d'un downgrade bridge-only et lors d'un unpublish.
+- `/action/sync` etendu pour memoriser/rejouer les unpublish discovery impossibles broker deconnecte, sans perdre la separation unavailable vs unpublish.
 - `CommandSynchronizer` etendu pour rejeter une commande avec `reason_code=entity_unavailable` quand l'entite est explicitement `offline` localement.
 - Separation unavailable vs unpublish conservee; aucun basculement vers device discovery; aucune dependance introduite sur `resources/daemon/sync/state.py`.
 
@@ -322,3 +327,4 @@ Codex GPT-5 (dev-story workflow)
 - 2026-03-16: Corrections post-review: `availability` conforme schema officiel HA (liste d'objets `topic`), retrait de l'ignorance d'echec publish local (decision runtime safe `local_availability_publish_failed`), ajout du test de regression downgrade `local -> bridge-only` avec nettoyage retained obligatoire.
 - 2026-03-16: Story passee en `review` apres materialisation des changements en commits Git et revalidation complete (`253 passed`).
 - 2026-03-16: Fix blocker review final: persistance + replay du cleanup differe `jeedom2ha/{eq_id}/availability` quand downgrade `local -> bridge-only` ou unpublish survient broker deconnecte; ajout de 2 tests de regression dedies; validation locale complete (`255 passed`).
+- 2026-03-16: Fix blocker review unpublish: persistance + replay des payloads discovery vides quand suppression/exclusion/ineligibilite survient broker deconnecte; ajout/extension de 3 tests de regression sur unpublish differe; validation locale complete (`257 passed`).
