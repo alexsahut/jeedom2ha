@@ -1,6 +1,6 @@
 # Story 3.3: Disponibilite du pont et des entites quand l'information est fiable
 
-Status: review
+Status: done
 
 ## Story
 
@@ -111,31 +111,31 @@ so that je sache si mon systeme est operationnel.
 
 ## Plan de tests reels minimum (obligatoire)
 
-- [ ] **Test reel 3.3-A (pont offline global):**
-  - [ ] partir d'au moins deux entites `jeedom2ha` publiees dans HA
-  - [ ] arreter brutalement le daemon ou couper le broker
-  - [ ] verifier que `jeedom2ha/bridge/status` passe a `offline` en retained
-  - [ ] verifier que les entites deviennent `unavailable` dans HA sans disparition des entites
+- [x] **Test reel 3.3-A (pont offline global):** (2026-03-16, box 192.168.1.21)
+  - [x] partir d'au moins deux entites `jeedom2ha` publiees dans HA (57 entites publiees)
+  - [x] arreter brutalement le daemon ou couper le broker (kill -9 du process daemon)
+  - [x] verifier que `jeedom2ha/bridge/status` passe a `offline` en retained (confirme via mosquitto_sub)
+  - [x] verifier que les entites deviennent `unavailable` dans HA sans disparition des entites (confirme via MCP GetLiveContext: toutes entites jeedom2ha unavailable, entites non-jeedom2ha intactes)
 
-- [ ] **Test reel 3.3-B (indisponibilite locale d'une seule entite):**
-  - [ ] choisir un equipement dont le plugin source remonte un statut standard Jeedom interpretable (`timeout` ou equivalent normalise)
-  - [ ] provoquer l'indisponibilite locale de cet equipement sans supprimer l'equipement Jeedom
-  - [ ] verifier qu'un seul topic `jeedom2ha/{eq_id}/availability` passe a `offline`
-  - [ ] verifier que l'entite cible devient `unavailable` tandis qu'une autre entite du meme pont reste disponible
-  - [ ] si aucun equipement de la box de validation ne remonte un `timeout` fiable exploitable, marquer ce test terrain comme **conditionnel non executable sur cette box**
-  - [ ] dans ce cas, fournir obligatoirement la preuve automatisee locale du chemin `timeout=1 -> jeedom2ha/{eq_id}/availability=offline -> entite unavailable -> rejet commande`
+- [x] **Test reel 3.3-B (indisponibilite locale d'une seule entite):** (2026-03-16, box 192.168.1.21)
+  - [x] choisir un equipement dont le plugin source remonte un statut standard Jeedom interpretable (`timeout` ou equivalent normalise) (eq_id=613 buffet, deconz, getStatus('timeout')=0)
+  - [x] provoquer l'indisponibilite locale de cet equipement sans supprimer l'equipement Jeedom (setStatus('timeout',1) + sync avec topologie reelle)
+  - [x] verifier qu'un seul topic `jeedom2ha/{eq_id}/availability` passe a `offline` (confirme: jeedom2ha/613/availability offline, log [AVAIL] payload=offline)
+  - [x] verifier que l'entite cible devient `unavailable` tandis qu'une autre entite du meme pont reste disponible (confirme via MCP: buffet buffet unavailable, autres entites jeedom2ha en unknown/on/off)
+  - [x] ~~si aucun equipement de la box de validation ne remonte un `timeout` fiable exploitable~~ — non applicable: 57+ eqLogics avec getStatus('timeout')=0 sur cette box
+  - [x] ~~dans ce cas, fournir obligatoirement la preuve automatisee locale~~ — non applicable: test terrain execute avec succes
 
-- [ ] **Test reel 3.3-C (suppression vs indisponibilite):**
-  - [ ] supprimer ou exclure un equipement Jeedom deja publie
-  - [ ] verifier qu'un payload vide retained est publie sur son topic discovery
-  - [ ] verifier que l'entite disparait proprement de HA
-  - [ ] verifier qu'on n'observe pas un simple basculement persistant en `unavailable`
+- [x] **Test reel 3.3-C (suppression vs indisponibilite):** (2026-03-16, box 192.168.1.21)
+  - [x] supprimer ou exclure un equipement Jeedom deja publie (setConfiguration('jeedom2ha_excluded', true) sur eq_id=613 + sync)
+  - [x] verifier qu'un payload vide retained est publie sur son topic discovery (confirme: log [DISCOVERY] Unpublishing + mosquitto_sub Timed out sur retained = topic vide)
+  - [x] verifier que l'entite disparait proprement de HA (confirme via MCP: buffet buffet absent du listing HA)
+  - [x] verifier qu'on n'observe pas un simple basculement persistant en `unavailable` (confirme: entite disparue, pas unavailable)
 
-- [ ] **Contexte terrain obligatoire:**
-  - [ ] relire les secrets actifs (`plugin API key`, `core API key`, `local secret`) depuis la box reelle
-  - [ ] capturer les logs `[MQTT]`, `[DISCOVERY]`, `[SYNC]`, `[SYNC-CMD]`, et idealement un prefixe `[AVAIL]` si ajoute
-  - [ ] observer les topics MQTT retenus avant/apres chaque test
-  - [ ] conserver la box Jeedom et le broker reels comme source de verite si le comportement diverge du code local
+- [x] **Contexte terrain obligatoire:**
+  - [x] relire les secrets actifs (`plugin API key`, `core API key`, `local secret`) depuis la box reelle
+  - [x] capturer les logs `[MQTT]`, `[DISCOVERY]`, `[SYNC]`, `[SYNC-CMD]`, et idealement un prefixe `[AVAIL]` si ajoute (logs [AVAIL], [DISCOVERY], [MAPPING] captures et exploites)
+  - [x] observer les topics MQTT retenus avant/apres chaque test (mosquitto_sub avec -v et -W utilise systematiquement)
+  - [x] conserver la box Jeedom et le broker reels comme source de verite si le comportement diverge du code local
 
 ## Risques / Pieges a eviter
 
