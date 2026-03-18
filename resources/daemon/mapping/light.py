@@ -50,6 +50,13 @@ _ANTI_LIGHT_GENERIC_TYPES = {
     "LOCK_STATE", "LOCK_OPEN", "LOCK_CLOSE",
 }
 
+# Sub-type preference table for deduplication (Story 2.6)
+# generic_type → preferred sub_type when a duplicate is detected
+_LIGHT_DEDUP_PREFERENCE = {
+    "LIGHT_STATE": "binary",      # state is an on/off info → binary wins
+    "LIGHT_BRIGHTNESS": "numeric",  # brightness is a numeric info → numeric wins
+}
+
 # Keywords in equipment name that strongly imply it's not a light
 _NON_LIGHT_KEYWORDS = {
     # Chauffage
@@ -96,31 +103,59 @@ class LightMapper:
         # Collect LIGHT_* commands and detect ANTI_LIGHT_* commands
         light_cmds: Dict[str, JeedomCmd] = {}
         anti_light_cmds = set()
-        
+        _dedup_events: list = []  # resolved dedup metadata (Story 2.6)
+
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in _LIGHT_GENERIC_TYPES:
                 if cmd.generic_type in light_cmds:
-                    # Duplicate generic_type found (e.g. equipment misconfigured)
-                    _LOGGER.warning(
-                        "[MAPPING] eq_id=%d name='%s': duplicate command for generic_type '%s' "
-                        "(cmd1=%s, cmd2=%s) → ambiguous",
-                        eq.id, eq.name, cmd.generic_type,
-                        light_cmds[cmd.generic_type].id, cmd.id,
-                    )
-                    capabilities = LightCapabilities()
-                    return MappingResult(
-                        ha_entity_type="light",
-                        confidence="ambiguous",
-                        reason_code="duplicate_generic_types",
-                        jeedom_eq_id=eq.id,
-                        ha_unique_id=f"jeedom2ha_eq_{eq.id}",
-                        ha_name=eq.name,
-                        suggested_area=snapshot.get_suggested_area(eq.id),
-                        commands=light_cmds,
-                        capabilities=capabilities,
-                        reason_details={"duplicate_type": cmd.generic_type},
-                    )
-                light_cmds[cmd.generic_type] = cmd
+                    # Duplicate generic_type — attempt deterministic arbitration (Story 2.6)
+                    existing = light_cmds[cmd.generic_type]
+                    preferred = _LIGHT_DEDUP_PREFERENCE.get(cmd.generic_type)
+
+                    if (existing.sub_type != cmd.sub_type
+                            and preferred is not None
+                            and (existing.sub_type == preferred or cmd.sub_type == preferred)):
+                        # Sub-types differ and exactly one matches the preference → resolve
+                        winner = cmd if cmd.sub_type == preferred else existing
+                        loser = existing if winner is cmd else cmd
+                        light_cmds[cmd.generic_type] = winner
+                        _dedup_events.append({
+                            "deduplicated": True,
+                            "duplicate_type": cmd.generic_type,
+                            "kept_cmd_id": winner.id,
+                            "discarded_cmd_id": loser.id,
+                            "criterion": "sub_type",
+                        })
+                        _LOGGER.info(
+                            "[MAPPING] eq_id=%d: deduplicated %s "
+                            "(kept cmd %d sub_type=%s, discarded cmd %d sub_type=%s)",
+                            eq.id, cmd.generic_type,
+                            winner.id, winner.sub_type,
+                            loser.id, loser.sub_type,
+                        )
+                    else:
+                        # Same sub_type, no rule, or neither matches preference → conservative: ambiguous
+                        _LOGGER.warning(
+                            "[MAPPING] eq_id=%d name='%s': duplicate command for generic_type '%s' "
+                            "(cmd1=%s, cmd2=%s) → ambiguous",
+                            eq.id, eq.name, cmd.generic_type,
+                            existing.id, cmd.id,
+                        )
+                        capabilities = LightCapabilities()
+                        return MappingResult(
+                            ha_entity_type="light",
+                            confidence="ambiguous",
+                            reason_code="duplicate_generic_types",
+                            jeedom_eq_id=eq.id,
+                            ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+                            ha_name=eq.name,
+                            suggested_area=snapshot.get_suggested_area(eq.id),
+                            commands=light_cmds,
+                            capabilities=capabilities,
+                            reason_details={"duplicate_type": cmd.generic_type},
+                        )
+                else:
+                    light_cmds[cmd.generic_type] = cmd
             elif cmd.generic_type and cmd.generic_type in _ANTI_LIGHT_GENERIC_TYPES:
                 anti_light_cmds.add(cmd.generic_type)
 
@@ -244,6 +279,10 @@ class LightMapper:
 
         global_confidence = _min_confidence(*active_confidences) if active_confidences else "unknown"
 
+        # Apply dedup confidence floor: at least "probable" if any dedup occurred (Story 2.6)
+        if _dedup_events:
+            global_confidence = _min_confidence(global_confidence, "probable")
+
         # Build reason code
         if has_on_off and has_brightness:
             reason_code = "light_on_off_brightness"
@@ -258,6 +297,9 @@ class LightMapper:
             reason_details["on_off"] = on_off_reason
         if brightness_reason:
             reason_details["brightness"] = brightness_reason
+        # Enrich with dedup metadata (Story 2.6) — last event wins if multiple
+        if _dedup_events:
+            reason_details.update(_dedup_events[-1])
 
         _LOGGER.info(
             "[MAPPING] eq_id=%d name='%s': %s confidence=%s (on_off=%s/%s, brightness=%s/%s)",
