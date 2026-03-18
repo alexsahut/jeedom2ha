@@ -905,6 +905,116 @@ def _get_diagnostic_enrichment(reason_code: str) -> tuple:
     return _DIAGNOSTIC_MESSAGES.get(reason_code, _DIAGNOSTIC_DEFAULT)
 
 
+# AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
+# Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
+#                no_generic_type_configured, no_supported_generic_type, discovery_publish_failed
+_CLOSED_REASON_MAP: dict = {
+    # Eligibility — codes normalisés
+    "excluded_eqlogic": "excluded",
+    "excluded": "excluded",
+    "disabled": "disabled_eqlogic",            # legacy alias (ancienne v1 du plugin)
+    "disabled_eqlogic": "disabled_eqlogic",
+    "no_commands": "no_commands",
+    # Type générique — distinction "non configuré" vs "hors V1"
+    "no_supported_generic_type": "no_generic_type_configured",  # commandes sans type générique
+    "no_generic_type_configured": "no_generic_type_configured",  # idempotent
+    # Publication / mapping
+    "ambiguous_skipped": "ambiguous_skipped",
+    "ambiguous": "ambiguous_skipped",           # legacy map_result.reason_code
+    "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
+    "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
+    "discovery_publish_failed": "discovery_publish_failed",
+    "local_availability_publish_failed": "discovery_publish_failed",  # famille infra
+    # États publiés (garde-fou si status check ne les attrape pas)
+    "sure_mapping": "published",
+    "sure": "published",
+    "probable_bounded": "published",
+}
+
+# AC5 — Types HA compatibles V1 (light, cover, switch, sensor, binary_sensor)
+_V1_COMPATIBLE_TYPES: frozenset = frozenset({"light", "cover", "switch", "sensor", "binary_sensor"})
+
+# Mapping confidence interne → taxonomie architecture
+_CONFIDENCE_CLOSED: dict = {
+    "sure": "sure",
+    "probable": "probable",
+    "ambiguous": "ambiguous",
+    "ignore": "ignore",
+    "unknown": "ambiguous",
+}
+
+
+def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_code: str) -> dict:
+    """Construit l'objet traceability complet pour un équipement (AC1).
+
+    Politique de présence : tableaux peuvent être vides [], objets jamais omis.
+    """
+    # Section 1 — Commandes observées
+    observed_commands = [
+        {"id": c.id, "name": c.name, "generic_type": c.generic_type}
+        for c in eq.cmds
+    ]
+
+    # Section 2 — Typage Jeedom (depuis mapping.commands)
+    typing_trace = []
+    if map_result and map_result.commands:
+        for role, cmd in map_result.commands.items():
+            typing_trace.append({
+                "logical_role": role,
+                "command_id": cmd.id,
+                "configured_type": cmd.generic_type,
+                "used_type": cmd.generic_type,  # configuré = utilisé en V1
+            })
+
+    # Section 3 — Logique de décision (taxonomie fermée)
+    published_statuses = {"Publié", "Partiellement publié"}
+    if status in published_statuses:
+        closed_reason = "published"
+    else:
+        mapped = _CLOSED_REASON_MAP.get(top_reason_code)
+        if mapped is not None:
+            closed_reason = mapped
+        elif map_result is not None:
+            # Mapping trouvé mais publication bloquée par une cause non reconnue
+            closed_reason = "discovery_publish_failed"
+        else:
+            # Aucun mapping, cause non reconnue → fallback conservateur
+            closed_reason = "no_commands"
+
+    if map_result:
+        confidence_value = _CONFIDENCE_CLOSED.get(map_result.confidence, "ambiguous")
+        ha_entity_type = map_result.ha_entity_type
+    else:
+        confidence_value = "ignore"
+        ha_entity_type = None
+
+    decision_trace = {
+        "ha_entity_type": ha_entity_type,
+        "confidence": confidence_value,
+        "reason_code": closed_reason,
+    }
+
+    # Section 4 — Résultat de publication
+    if status in published_statuses:
+        pub_result = "success"
+    elif closed_reason == "discovery_publish_failed":
+        pub_result = "failed"
+    else:
+        pub_result = "not_attempted"
+
+    publication_trace = {
+        "last_discovery_publish_result": pub_result,
+        "last_publish_timestamp": None,  # non persisté en V1
+    }
+
+    return {
+        "observed_commands": observed_commands,
+        "typing_trace": typing_trace,
+        "decision_trace": decision_trace,
+        "publication_trace": publication_trace,
+    }
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -935,6 +1045,8 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         reason_code = "unknown"
         matched_commands = []
         unmatched_commands = []
+        map_result = None
+        pub_decision = None
 
         el_result = eligibility.get(eq_id)
         if el_result:
@@ -1019,6 +1131,15 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                     "generic_type": c.generic_type,
                 })
 
+        # AC5 — v1_compatibility: True si ha_entity_type dans le périmètre V1
+        v1_compatibility = (
+            map_result is not None
+            and map_result.ha_entity_type in _V1_COMPATIBLE_TYPES
+        )
+
+        # AC1 — Traceability: chaîne de décision complète
+        traceability = _build_traceability(eq, map_result, pub_decision, status, reason_code)
+
         equipments.append({
             "eq_id": eq_id,
             "object_name": object_name,
@@ -1033,6 +1154,8 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "matched_commands": matched_commands,
             "unmatched_commands": unmatched_commands,
             "detected_generic_types": detected_generic_types,
+            "v1_compatibility": v1_compatibility,
+            "traceability": traceability,
         })
 
     return web.json_response({

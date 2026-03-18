@@ -193,78 +193,155 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         return '<span class="label" style="background-color:#777!important;color:#fff!important;">' + conf + '</span>';
       };
 
-      // Doctrine: reason_codes triggering "action requise" => show Jeedom link
-      var actionRequiredCodes = {
-        'no_commands': true,
-        'no_supported_generic_type': true,
+      // AC4 — Reason codes de typage → lien contextualisé vers #commandtab
+      var commandTabReasonCodes = {
+        'no_generic_type_configured': true,  // taxonomie fermée AC2
         'ambiguous_skipped': true,
-        'disabled': true,
-        'disabled_eqlogic': true
+        'no_supported_generic_type': true    // rétro-compat ancien backend
       };
 
-      // Doctrine: detail panel background by family
-      var getDetailBg = function(reasonCode, status) {
-        return 'transparent';
-      };
-
+      // AC3 — Accordéon homogène en 5 sections fixes pour TOUS les équipements
       var buildDetailRow = function(eq) {
-        var bg = getDetailBg(eq.reason_code, eq.status);
-        var showLink = actionRequiredCodes[eq.reason_code] || eq.status === 'Partiellement publié';
+        var tr = eq.traceability || {};
+        var observedCmds = tr.observed_commands || [];
+        var typingTrace = tr.typing_trace || [];
+        var dt = tr.decision_trace || {};
+        var pt = tr.publication_trace || {};
 
-        // Use !important on both TR and TD to resist Jeedom/Bootstrap hover overrides
-        var html = '<tr class="diag-detail-row" style="display:none;background:' + bg + '!important;">';
-        html += '<td colspan="5" style="background:' + bg + '!important;padding:12px 20px;border-top:none;">';
+        var closedReason = dt.reason_code || '';
+        var isPublished = (eq.status === 'Publié' || eq.status === 'Partiellement publié');
+        // AC4: lien #commandtab pour causes de typage (taxonomie fermée ou legacy)
+        var linkToCommandTab = commandTabReasonCodes[closedReason] || commandTabReasonCodes[eq.reason_code];
 
-        if (eq.detail) {
-          html += '<div><strong>{{Cause}}&nbsp;:</strong> ' + eq.detail + '</div>';
-        }
+        // Use !important on TR and TD to resist Jeedom/Bootstrap hover overrides
+        var html = '<tr class="diag-detail-row" style="display:none;background:transparent!important;">';
+        html += '<td colspan="5" style="background:transparent!important;padding:12px 20px;border-top:none;">';
 
-        if (eq.remediation) {
-          html += '<div style="margin-top:5px;"><strong>{{Action}}&nbsp;:</strong> ' + eq.remediation + '</div>';
-        }
-
-        if (eq.v1_limitation) {
-          html += '<div style="margin-top:6px;">';
-          html += '<span class="label label-default">{{Hors périmètre V1}}</span>';
-          html += '<small style="margin-left:6px;color:#888;">{{Ce type d\'équipement n\'est pas encore supporté dans cette version.}}</small>';
-          html += '</div>';
-        }
-
-        if (eq.matched_commands && eq.matched_commands.length > 0) {
-          html += '<div style="margin-top:8px;"><strong>{{Commandes publiées (OK)}}&nbsp;:</strong>';
+        // --- Section 1 : Commandes observées ---
+        html += '<div style="margin-bottom:10px;"><strong>{{Commandes observées}}</strong>';
+        if (observedCmds.length > 0) {
           html += '<ul style="margin:4px 0 0 16px;">';
-          for (var i = 0; i < eq.matched_commands.length; i++) {
-            var cmd = eq.matched_commands[i];
-            html += '<li style="color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;font-size:0.9em;"></i> <span style="font-weight:600;font-family:monospace;">' + cmd.cmd_name + '</span> <span style="color:#aaa;font-size:0.8em;">(#' + cmd.cmd_id + ')</span> — {{type générique}} : <span style="background-color:#e8f5e9;color:#2e7d32;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #c8e6c9;">' + cmd.generic_type + '</span></li>';
+          for (var i = 0; i < observedCmds.length; i++) {
+            var oc = observedCmds[i];
+            var gt = oc.generic_type
+              ? '<span style="background-color:#e8e8e8;color:#333;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ccc;">' + oc.generic_type + '</span>'
+              : '<em style="color:#aaa;">{{Aucun type}}</em>';
+            html += '<li><span style="font-weight:600;font-family:monospace;">' + oc.name + '</span> <span style="color:#aaa;font-size:0.8em;">(#' + oc.id + ')</span> \u2192 ' + gt + '</li>';
           }
-          html += '</ul></div>';
+          html += '</ul>';
+        } else {
+          html += ' <span style="color:#aaa;font-style:italic;">{{Aucune commande observée}}</span>';
         }
+        html += '</div>';
 
+        // --- Section 2 : Typage Jeedom (configured_type vs used_type — AC1) ---
+        html += '<div style="margin-bottom:10px;"><strong>{{Typage Jeedom}}</strong>';
+        if (typingTrace.length > 0) {
+          html += '<ul style="margin:4px 0 0 16px;">';
+          for (var j = 0; j < typingTrace.length; j++) {
+            var tt = typingTrace[j];
+            html += '<li style="color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;font-size:0.9em;"></i>';
+            html += ' <span style="font-family:monospace;font-size:0.9em;">' + tt.logical_role + '</span>';
+            html += ' <span style="color:#aaa;font-size:0.8em;">(#' + tt.command_id + ')</span>';
+            // Afficher configured_type → used_type (distincts si déviation heuristique)
+            var confType = tt.configured_type || '<em style="color:#aaa;">{{—}}</em>';
+            var usedType = tt.used_type || '<em style="color:#aaa;">{{—}}</em>';
+            if (tt.configured_type && tt.used_type && tt.configured_type !== tt.used_type) {
+              html += ' \u2014 <span style="color:#888;font-size:0.8em;">{{configuré}}</span> <span style="background-color:#fff3e0;color:#e65100;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ffe0b2;">' + confType + '</span>';
+              html += ' \u2192 <span style="color:#888;font-size:0.8em;">{{utilisé}}</span> <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
+            } else {
+              html += ' \u2014 <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
+            }
+            html += '</li>';
+          }
+          html += '</ul>';
+        }
         if (eq.unmatched_commands && eq.unmatched_commands.length > 0) {
-          var cmdLabel = (eq.reason_code === 'no_supported_generic_type' || eq.reason_code === 'ambiguous_skipped') ? '{{Commandes concernées}}' : '{{Commandes non couvertes}}';
-          html += '<div style="margin-top:8px;"><strong>' + cmdLabel + '&nbsp;:</strong>';
           html += '<ul style="margin:4px 0 0 16px;">';
-          for (var i = 0; i < eq.unmatched_commands.length; i++) {
-            var cmd = eq.unmatched_commands[i];
-            var gtype = cmd.generic_type ? cmd.generic_type : '<em>Aucun</em>';
-            html += '<li style="color:#d32f2f;"><i class="fas fa-exclamation-circle" style="margin-right:5px;font-size:0.9em;"></i> <span style="font-weight:600;font-family:monospace;">' + cmd.cmd_name + '</span> <span style="color:#aaa;font-size:0.8em;">(#' + cmd.cmd_id + ')</span> — {{type générique}} : <span style="background-color:#ffebee;color:#c62828;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #ffcdd2;">' + gtype + '</span></li>';
+          for (var k = 0; k < eq.unmatched_commands.length; k++) {
+            var uc = eq.unmatched_commands[k];
+            var ucGt = uc.generic_type ? uc.generic_type : '{{Aucun}}';
+            html += '<li style="color:#d32f2f;"><i class="fas fa-exclamation-circle" style="margin-right:5px;font-size:0.9em;"></i>';
+            html += ' <span style="font-family:monospace;font-size:0.9em;">' + uc.cmd_name + '</span>';
+            html += ' <span style="color:#aaa;font-size:0.8em;">(#' + uc.cmd_id + ')</span>';
+            html += ' \u2014 <em>{{non mappé}}</em> : <span style="background-color:#ffebee;color:#c62828;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ffcdd2;">' + ucGt + '</span></li>';
           }
-          html += '</ul></div>';
-        } else if (eq.detected_generic_types && eq.detected_generic_types.length > 0) {
-          html += '<div style="margin-top:8px;"><strong>{{Types génériques détectés}}&nbsp;:</strong> ';
+          html += '</ul>';
+        }
+        if (typingTrace.length === 0 && (!eq.unmatched_commands || eq.unmatched_commands.length === 0)) {
+          html += ' <span style="color:#aaa;font-style:italic;">{{Aucun typage appliqué}}</span>';
+        }
+        if (eq.detected_generic_types && eq.detected_generic_types.length > 0) {
+          html += '<div style="margin-top:4px;"><em>{{Types détectés}}&nbsp;: </em>';
           for (var g = 0; g < eq.detected_generic_types.length; g++) {
             if (g > 0) html += ', ';
-            html += '<span style="background-color:#e8e8e8;color:#333;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #ccc;">' + eq.detected_generic_types[g] + '</span>';
+            html += '<span style="background-color:#e8e8e8;color:#333;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ccc;">' + eq.detected_generic_types[g] + '</span>';
           }
           html += '</div>';
         }
+        html += '</div>';
 
-        if (showLink && eq.eq_type_name) {
-          html += '<div style="margin-top:8px;">';
-          html += '<a href="index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id + '#commandtab" target="_blank" class="btn btn-xs btn-default">';
-          html += '<i class="fas fa-external-link-alt"></i> {{Configurer dans Jeedom}}';
-          html += '</a></div>';
+        // --- Section 3 : Logique de décision (decision_trace sémantique) ---
+        html += '<div style="margin-bottom:10px;"><strong>{{Logique de décision}}</strong>';
+        // Type HA détecté + confiance (depuis decision_trace)
+        var entityTypeLabels = {
+          'light': '{{Lumière}}', 'cover': '{{Ouvrant}}', 'switch': '{{Prise / Switch}}',
+          'sensor': '{{Capteur}}', 'binary_sensor': '{{Capteur binaire}}'
+        };
+        var closedConfLabels = {
+          'sure': '{{Sûr}}', 'probable': '{{Probable}}', 'ambiguous': '{{Ambigu}}', 'ignore': '{{Ignoré}}'
+        };
+        if (dt.ha_entity_type) {
+          var typeLabel = entityTypeLabels[dt.ha_entity_type] || dt.ha_entity_type;
+          html += '<div style="margin-top:4px;font-size:0.9em;">';
+          html += '<span style="color:#555;">{{Type HA}}&nbsp;: </span><strong>' + typeLabel + '</strong>';
+          if (dt.confidence && dt.confidence !== 'ignore') {
+            var confLabel = closedConfLabels[dt.confidence] || dt.confidence;
+            html += ' <span style="color:#aaa;margin-left:8px;">\u2014 {{confiance}}&nbsp;: ' + confLabel + '</span>';
+          }
+          html += '</div>';
         }
+        // Cause métier (detail) ou message de succès
+        if (eq.detail) {
+          html += '<div style="margin-top:4px;color:#555;">' + eq.detail + '</div>';
+        } else if (isPublished) {
+          html += '<div style="margin-top:4px;color:#2f7d32;">{{Mapping réussi \u2014 équipement éligible et publié.}}</div>';
+        }
+        if (eq.v1_limitation) {
+          html += '<div style="margin-top:6px;"><span class="label label-default">{{Hors périmètre V1}}</span>';
+          html += ' <small style="margin-left:6px;color:#888;">{{Ce type d\'équipement n\'est pas encore supporté dans cette version.}}</small></div>';
+        }
+        html += '</div>';
+
+        // --- Section 4 : Résultat de publication ---
+        html += '<div style="margin-bottom:10px;"><strong>{{Résultat de publication}}</strong> ';
+        var pubResult = pt.last_discovery_publish_result || 'not_attempted';
+        if (pubResult === 'success') {
+          html += '<span class="label label-success">{{Succès}}</span>';
+        } else if (pubResult === 'failed') {
+          html += '<span class="label label-danger">{{Échec}}</span>';
+        } else {
+          html += '<span class="label label-default">{{Non tenté}}</span>';
+        }
+        html += '</div>';
+
+        // --- Section 5 : Action recommandée ---
+        html += '<div><strong>{{Action recommandée}}</strong>';
+        if (eq.status === 'Publié' && (!eq.unmatched_commands || eq.unmatched_commands.length === 0)) {
+          html += '<div style="margin-top:4px;color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;"></i>{{Aucune action requise. L\'équipement est correctement exposé.}}</div>';
+        } else if (eq.remediation) {
+          html += '<div style="margin-top:4px;">' + eq.remediation + '</div>';
+          if (eq.eq_type_name) {
+            var href = linkToCommandTab
+              ? 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id + '#commandtab'
+              : 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id;
+            html += '<div style="margin-top:6px;"><a href="' + href + '" target="_blank" class="btn btn-xs btn-default">';
+            html += '<i class="fas fa-external-link-alt"></i> {{Configurer dans Jeedom}}</a></div>';
+          }
+        } else {
+          html += '<div style="margin-top:4px;color:#aaa;font-style:italic;">{{Aucune action disponible.}}</div>';
+        }
+        html += '</div>';
 
         html += '</td></tr>';
         return html;
@@ -304,11 +381,10 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
             var eq = eqs[eqIdx];
             var reasonDescription = reasonLabels[eq.reason_code] || 'Code inconnu';
-            var isExpandable = eq.status !== 'Publié';
-            var rowStyle = isExpandable ? 'cursor:pointer;' : '';
-            var chevron = isExpandable ? '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>' : '';
+            // AC3 — accordéon disponible pour TOUS les équipements (y compris Publié)
+            var chevron = '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>';
 
-            // Encode enriched data as JSON in data attribute
+            // Encode enriched data as JSON in data attribute (inclut traceability AC1)
             var detailData = JSON.stringify({
               eq_id: eq.eq_id,
               eq_type_name: eq.eq_type_name || '',
@@ -319,10 +395,11 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
               matched_commands: eq.matched_commands || [],
               detected_generic_types: eq.detected_generic_types || [],
               reason_code: eq.reason_code,
-              status: eq.status
+              status: eq.status,
+              traceability: eq.traceability || {}
             });
 
-            html += '<tr class="' + (isExpandable ? 'diag-expandable' : '') + '" style="' + rowStyle + '" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
+            html += '<tr class="diag-expandable" style="cursor:pointer;" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
             html += '<td style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
             html += '<td style="white-space:nowrap;">' + chevron + eq.name + '</td>';
             html += '<td>' + getStatusLabel(eq.status) + '</td>';
@@ -330,9 +407,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             html += '<td><span style="color:#888;font-family:monospace;font-size:0.9em;">' + eq.reason_code + '</span> : <span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
             html += '</tr>';
 
-            if (isExpandable) {
-              html += buildDetailRow(eq);
-            }
+            html += buildDetailRow(eq);
           }
         }
 

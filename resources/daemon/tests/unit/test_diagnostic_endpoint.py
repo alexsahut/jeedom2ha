@@ -599,3 +599,450 @@ async def test_diagnostics_infra_family_doctrine(aiohttp_client):
     assert eq["detail"] != ""
     assert eq["remediation"] != ""
     assert eq["detected_generic_types"] == []
+
+
+# ---------------------------------------------------------------------------
+# Story 4.2bis — AC1: Contrat Backend Structuré (Traceability)
+# AC2: Taxonomie normative des reason_codes
+# AC5: Correction v1_compatibility (Binary Sensor)
+# ---------------------------------------------------------------------------
+
+_CLOSED_REASON_CODES = {
+    "published", "excluded", "disabled_eqlogic", "no_commands",
+    "ambiguous_skipped", "no_generic_type_configured",
+    "no_supported_generic_type", "discovery_publish_failed",
+}
+
+
+async def test_diagnostics_traceability_schema_published(aiohttp_client):
+    """AC1 — traceability complet pour un équipement publié; AC5 v1_compatibility light."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9100, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={600: JeedomEqLogic(id=600, name="Lumiere V1", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=600,
+        ha_unique_id="light_600",
+        ha_name="Lumiere V1",
+        commands={"LIGHT_ON": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {600: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {600: mapping_res}
+    app["publications"] = {
+        600: PublicationDecision(
+            should_publish=True,
+            reason="sure_mapping",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 600)
+
+    # AC1: structure traceability obligatoire
+    assert "traceability" in eq
+    tr = eq["traceability"]
+    assert "observed_commands" in tr
+    assert "typing_trace" in tr
+    assert "decision_trace" in tr
+    assert "publication_trace" in tr
+
+    # observed_commands: toutes les commandes
+    assert len(tr["observed_commands"]) == 1
+    oc = tr["observed_commands"][0]
+    assert oc["id"] == 9100
+    assert oc["name"] == "On"
+    assert oc["generic_type"] == "LIGHT_ON"
+
+    # typing_trace: depuis mapping.commands
+    assert len(tr["typing_trace"]) == 1
+    tt = tr["typing_trace"][0]
+    assert tt["logical_role"] == "LIGHT_ON"
+    assert tt["command_id"] == 9100
+    assert tt["configured_type"] == "LIGHT_ON"
+    assert tt["used_type"] == "LIGHT_ON"
+
+    # decision_trace: taxonomie fermée
+    dt = tr["decision_trace"]
+    assert dt["ha_entity_type"] == "light"
+    assert dt["confidence"] == "sure"
+    assert dt["reason_code"] == "published"  # AC2: published pour équipement publié
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+    # publication_trace
+    pt = tr["publication_trace"]
+    assert pt["last_discovery_publish_result"] == "success"
+    assert pt["last_discovery_publish_result"] in ("success", "failed", "not_attempted")
+    assert "last_publish_timestamp" in pt
+
+    # AC5: v1_compatibility True pour light
+    assert eq["v1_compatibility"] is True
+
+
+async def test_diagnostics_traceability_excluded(aiohttp_client):
+    """AC1 — traceability présent avec valeurs neutres pour équipement exclu."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={601: JeedomEqLogic(id=601, name="Eq Exclu V1", object_id=1, is_excluded=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {601: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 601)
+
+    tr = eq["traceability"]
+    assert tr["observed_commands"] == []
+    assert tr["typing_trace"] == []
+
+    dt = tr["decision_trace"]
+    assert dt["ha_entity_type"] is None
+    assert dt["confidence"] == "ignore"
+    assert dt["reason_code"] == "excluded"  # AC2: excluded_eqlogic → excluded
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+    assert tr["publication_trace"]["last_discovery_publish_result"] == "not_attempted"
+    assert eq["v1_compatibility"] is False
+
+
+async def test_diagnostics_v1_compatibility_binary_sensor(aiohttp_client):
+    """AC5 — v1_compatibility=True pour binary_sensor."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9200, name="Etat", generic_type="OPENING")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Entrée")},
+        eq_logics={700: JeedomEqLogic(id=700, name="Porte", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="binary_sensor",
+        confidence="sure",
+        reason_code="binary_sensor_opening",
+        jeedom_eq_id=700,
+        ha_unique_id="binary_sensor_700",
+        ha_name="Porte",
+        commands={"OPENING": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {700: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {700: mapping_res}
+    app["publications"] = {
+        700: PublicationDecision(
+            should_publish=True,
+            reason="sure_mapping",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 700)
+
+    # AC5: binary_sensor fait partie du périmètre V1
+    assert eq["v1_compatibility"] is True
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["ha_entity_type"] == "binary_sensor"
+    assert dt["reason_code"] == "published"
+
+
+async def test_diagnostics_reason_code_normalization_no_generic_type(aiohttp_client):
+    """AC2 — decision_trace.reason_code: no_supported_generic_type → no_generic_type_configured."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={800: JeedomEqLogic(id=800, name="Eq No GT", object_id=1, is_enable=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {
+        800: EligibilityResult(is_eligible=False, reason_code="no_supported_generic_type")
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 800)
+
+    # Top-level reason_code inchangé (rétro-compat 4.1/4.2)
+    assert eq["reason_code"] == "no_supported_generic_type"
+    # decision_trace.reason_code normalisé vers taxonomie fermée
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "no_generic_type_configured"
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+
+async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
+    """AC2 — decision_trace.reason_code: no_mapping → no_supported_generic_type."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={801: JeedomEqLogic(id=801, name="Thermostat", object_id=1, is_enable=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {801: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {}  # no mapping → reason_code="no_mapping"
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 801)
+
+    assert eq["reason_code"] == "no_mapping"  # top-level inchangé
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "no_supported_generic_type"  # types configurés hors V1
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+
+async def test_diagnostics_traceability_discovery_failed(aiohttp_client):
+    """AC1 — publication_trace.last_discovery_publish_result='failed' quand discovery_publish_failed."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9300, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={802: JeedomEqLogic(id=802, name="Lumiere KO", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=802,
+        ha_unique_id="light_802",
+        ha_name="Lumiere KO",
+        commands={"LIGHT_ON": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {802: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {802: mapping_res}
+    app["publications"] = {
+        802: PublicationDecision(
+            should_publish=False,
+            reason="discovery_publish_failed",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 802)
+
+    pt = eq["traceability"]["publication_trace"]
+    assert pt["last_discovery_publish_result"] == "failed"
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "discovery_publish_failed"
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+
+# ---------------------------------------------------------------------------
+# Story 4.2bis retouches — AC2 taxonomie fermée : cas legacy
+# AC5 : non publié mais V1-compatible
+# typing_trace : configured_type vs used_type
+# ---------------------------------------------------------------------------
+
+async def test_diagnostics_reason_code_disabled_legacy(aiohttp_client):
+    """AC2 — reason_code legacy 'disabled' → 'disabled_eqlogic' dans decision_trace."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={900: JeedomEqLogic(id=900, name="Eq Disabled Legacy", object_id=1, is_enable=False)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {900: EligibilityResult(is_eligible=False, reason_code="disabled")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 900)
+
+    assert eq["reason_code"] == "disabled"  # top-level inchangé
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "disabled_eqlogic"
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+
+async def test_diagnostics_reason_code_local_availability_publish_failed(aiohttp_client):
+    """AC2 — 'local_availability_publish_failed' → 'discovery_publish_failed' dans decision_trace."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9500, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={901: JeedomEqLogic(id=901, name="Lumiere Avail KO", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=901,
+        ha_unique_id="light_901",
+        ha_name="Lumiere Avail KO",
+        commands={"LIGHT_ON": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {901: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {901: mapping_res}
+    app["publications"] = {
+        901: PublicationDecision(
+            should_publish=False,
+            reason="local_availability_publish_failed",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 901)
+
+    assert eq["reason_code"] == "local_availability_publish_failed"  # top-level inchangé
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "discovery_publish_failed"  # normalisé dans la famille infra
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+    # H2 review fix: publication_trace cohérent avec decision_trace
+    pt = eq["traceability"]["publication_trace"]
+    assert pt["last_discovery_publish_result"] == "failed"
+
+
+async def test_diagnostics_reason_code_unknown_fallback(aiohttp_client):
+    """AC2 — reason_code 'unknown' (pas d'eligibility) → code fermé dans decision_trace."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={902: JeedomEqLogic(id=902, name="Eq Sans Eligibility", object_id=1, is_enable=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {}  # no eligibility result for this eq
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 902)
+
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] in _CLOSED_REASON_CODES, (
+        f"decision_trace.reason_code '{dt['reason_code']}' n'est pas dans la taxonomie fermée"
+    )
+
+
+async def test_diagnostics_v1_compatibility_not_published_but_v1(aiohttp_client):
+    """AC5 — v1_compatibility=True même pour équipement non publié (ambiguous_skipped) mais V1-compatible."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9600, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={903: JeedomEqLogic(id=903, name="Lumiere Ambigue", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="ambiguous",
+        reason_code="ambiguous",
+        jeedom_eq_id=903,
+        ha_unique_id="light_903",
+        ha_name="Lumiere Ambigue",
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {903: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {903: mapping_res}
+    app["publications"] = {
+        903: PublicationDecision(
+            should_publish=False,
+            reason="ambiguous_skipped",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 903)
+
+    assert eq["status"] == "Non publié"
+    # AC5 : même non publié, si un type V1-compatible a été détecté, v1_compatibility=True
+    assert eq["v1_compatibility"] is True
+
+
+async def test_diagnostics_typing_trace_configured_vs_used(aiohttp_client):
+    """AC1 — typing_trace expose bien configured_type et used_type séparément."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=9700, name="Slider", generic_type="LIGHT_SLIDER")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={904: JeedomEqLogic(id=904, name="Lumiere Slider", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off_brightness",
+        jeedom_eq_id=904,
+        ha_unique_id="light_904",
+        ha_name="Lumiere Slider",
+        commands={"LIGHT_SLIDER": cmd},
+        capabilities=LightCapabilities(has_on_off=True, has_brightness=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {904: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {904: mapping_res}
+    app["publications"] = {
+        904: PublicationDecision(
+            should_publish=True,
+            reason="sure_mapping",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 904)
+
+    tr = eq["traceability"]
+    assert len(tr["typing_trace"]) == 1
+    tt = tr["typing_trace"][0]
+    # Les deux champs doivent être présents et distincts (ou identiques si pas de déviation)
+    assert "configured_type" in tt
+    assert "used_type" in tt
+    assert tt["configured_type"] == "LIGHT_SLIDER"
+    assert tt["used_type"] == "LIGHT_SLIDER"
+    assert tt["logical_role"] == "LIGHT_SLIDER"
