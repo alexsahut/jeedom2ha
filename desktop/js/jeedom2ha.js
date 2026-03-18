@@ -167,7 +167,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       }
       
       var reasonLabels = {
-        'sure': 'Mapping identifié avec certitude',
+        'sure': 'Mapping identifié avec certitude (partiel)',
         'probable': 'Mapping probable détecté',
         'ambiguous_skipped': 'Ambiguïté détectée (plusieurs types possibles)',
         'no_mapping': 'Aucun mapping compatible trouvé',
@@ -180,7 +180,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
 
       var getStatusLabel = function(status) {
         if (status === 'Publié') return '<span class="label label-success">' + status + '</span>';
-        if (status === 'Exclu') return '<span class="label label-danger">' + status + '</span>';
+        if (status === 'Exclu') return '<span class="label label-default">' + status + '</span>';
         if (status === 'Partiellement publié') return '<span class="label label-info">' + status + '</span>';
         if (status === 'Non publié') return '<span class="label label-warning">' + status + '</span>';
         return '<span class="label label-default">' + status + '</span>';
@@ -193,16 +193,93 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         return '<span class="label" style="background-color:#777!important;color:#fff!important;">' + conf + '</span>';
       };
 
+      // Doctrine: reason_codes triggering "action requise" => show Jeedom link
+      var actionRequiredCodes = {
+        'no_commands': true,
+        'no_supported_generic_type': true,
+        'ambiguous_skipped': true,
+        'disabled': true,
+        'disabled_eqlogic': true
+      };
+
+      // Doctrine: detail panel background by family
+      var getDetailBg = function(reasonCode, status) {
+        return 'transparent';
+      };
+
+      var buildDetailRow = function(eq) {
+        var bg = getDetailBg(eq.reason_code, eq.status);
+        var showLink = actionRequiredCodes[eq.reason_code] || eq.status === 'Partiellement publié';
+
+        // Use !important on both TR and TD to resist Jeedom/Bootstrap hover overrides
+        var html = '<tr class="diag-detail-row" style="display:none;background:' + bg + '!important;">';
+        html += '<td colspan="5" style="background:' + bg + '!important;padding:12px 20px;border-top:none;">';
+
+        if (eq.detail) {
+          html += '<div><strong>{{Cause}}&nbsp;:</strong> ' + eq.detail + '</div>';
+        }
+
+        if (eq.remediation) {
+          html += '<div style="margin-top:5px;"><strong>{{Action}}&nbsp;:</strong> ' + eq.remediation + '</div>';
+        }
+
+        if (eq.v1_limitation) {
+          html += '<div style="margin-top:6px;">';
+          html += '<span class="label label-default">{{Hors périmètre V1}}</span>';
+          html += '<small style="margin-left:6px;color:#888;">{{Ce type d\'équipement n\'est pas encore supporté dans cette version.}}</small>';
+          html += '</div>';
+        }
+
+        if (eq.matched_commands && eq.matched_commands.length > 0) {
+          html += '<div style="margin-top:8px;"><strong>{{Commandes publiées (OK)}}&nbsp;:</strong>';
+          html += '<ul style="margin:4px 0 0 16px;">';
+          for (var i = 0; i < eq.matched_commands.length; i++) {
+            var cmd = eq.matched_commands[i];
+            html += '<li style="color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;font-size:0.9em;"></i> <span style="font-weight:600;font-family:monospace;">' + cmd.cmd_name + '</span> <span style="color:#aaa;font-size:0.8em;">(#' + cmd.cmd_id + ')</span> — {{type générique}} : <span style="background-color:#e8f5e9;color:#2e7d32;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #c8e6c9;">' + cmd.generic_type + '</span></li>';
+          }
+          html += '</ul></div>';
+        }
+
+        if (eq.unmatched_commands && eq.unmatched_commands.length > 0) {
+          var cmdLabel = (eq.reason_code === 'no_supported_generic_type' || eq.reason_code === 'ambiguous_skipped') ? '{{Commandes concernées}}' : '{{Commandes non couvertes}}';
+          html += '<div style="margin-top:8px;"><strong>' + cmdLabel + '&nbsp;:</strong>';
+          html += '<ul style="margin:4px 0 0 16px;">';
+          for (var i = 0; i < eq.unmatched_commands.length; i++) {
+            var cmd = eq.unmatched_commands[i];
+            var gtype = cmd.generic_type ? cmd.generic_type : '<em>Aucun</em>';
+            html += '<li style="color:#d32f2f;"><i class="fas fa-exclamation-circle" style="margin-right:5px;font-size:0.9em;"></i> <span style="font-weight:600;font-family:monospace;">' + cmd.cmd_name + '</span> <span style="color:#aaa;font-size:0.8em;">(#' + cmd.cmd_id + ')</span> — {{type générique}} : <span style="background-color:#ffebee;color:#c62828;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #ffcdd2;">' + gtype + '</span></li>';
+          }
+          html += '</ul></div>';
+        } else if (eq.detected_generic_types && eq.detected_generic_types.length > 0) {
+          html += '<div style="margin-top:8px;"><strong>{{Types génériques détectés}}&nbsp;:</strong> ';
+          for (var g = 0; g < eq.detected_generic_types.length; g++) {
+            if (g > 0) html += ', ';
+            html += '<span style="background-color:#e8e8e8;color:#333;padding:2px 4px;border-radius:3px;font-size:0.9em;font-family:monospace;border:1px solid #ccc;">' + eq.detected_generic_types[g] + '</span>';
+          }
+          html += '</div>';
+        }
+
+        if (showLink && eq.eq_type_name) {
+          html += '<div style="margin-top:8px;">';
+          html += '<a href="index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id + '#commandtab" target="_blank" class="btn btn-xs btn-default">';
+          html += '<i class="fas fa-external-link-alt"></i> {{Configurer dans Jeedom}}';
+          html += '</a></div>';
+        }
+
+        html += '</td></tr>';
+        return html;
+      };
+
       var renderTable = function(filterText) {
         filterText = (filterText || '').toLowerCase();
-        
+
         // Group by object_name and filter
         var byObject = {};
         var matchCount = 0;
         for (var i = 0; i < equipments.length; i++) {
           var eq = equipments[i];
           var objName = eq.object_name || "Aucun";
-          
+
           if (filterText !== '') {
              var searchStr = (objName + ' ' + eq.name + ' ' + eq.status + ' ' + (reasonLabels[eq.reason_code] || '')).toLowerCase();
              if (searchStr.indexOf(filterText) === -1) continue;
@@ -214,37 +291,74 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           byObject[objName].push(eq);
           matchCount++;
         }
-        
-        var html = '<table class="table table-bordered table-condensed table-hover" id="table_diagnostic" style="width:100%;table-layout:auto;">';
+
+        var html = '<table class="table table-bordered table-condensed" id="table_diagnostic" style="width:100%;table-layout:auto;">';
         html += '<thead><tr><th>{{Objet/Pièce}}</th><th>{{Equipement}}</th><th style="width:120px;">{{Statut}}</th><th style="width:100px;">{{Confiance}}</th><th>{{Raison : Explication}}</th></tr></thead>';
         html += '<tbody>';
-        
+
         var objects = Object.keys(byObject).sort();
         for (var objIdx = 0; objIdx < objects.length; objIdx++) {
           var objName = objects[objIdx];
           var eqs = byObject[objName];
-          
+
           for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
             var eq = eqs[eqIdx];
             var reasonDescription = reasonLabels[eq.reason_code] || 'Code inconnu';
-            html += '<tr>';
-            if (eqIdx === 0) {
-              html += '<td rowspan="' + eqs.length + '" style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
-            }
-            html += '<td style="white-space:nowrap;">' + eq.name + '</td>';
+            var isExpandable = eq.status !== 'Publié';
+            var rowStyle = isExpandable ? 'cursor:pointer;' : '';
+            var chevron = isExpandable ? '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>' : '';
+
+            // Encode enriched data as JSON in data attribute
+            var detailData = JSON.stringify({
+              eq_id: eq.eq_id,
+              eq_type_name: eq.eq_type_name || '',
+              detail: eq.detail || '',
+              remediation: eq.remediation || '',
+              v1_limitation: eq.v1_limitation || false,
+              unmatched_commands: eq.unmatched_commands || [],
+              matched_commands: eq.matched_commands || [],
+              detected_generic_types: eq.detected_generic_types || [],
+              reason_code: eq.reason_code,
+              status: eq.status
+            });
+
+            html += '<tr class="' + (isExpandable ? 'diag-expandable' : '') + '" style="' + rowStyle + '" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
+            html += '<td style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
+            html += '<td style="white-space:nowrap;">' + chevron + eq.name + '</td>';
             html += '<td>' + getStatusLabel(eq.status) + '</td>';
             html += '<td>' + getConfidenceLabel(eq.confidence) + '</td>';
             html += '<td><span style="color:#888;font-family:monospace;font-size:0.9em;">' + eq.reason_code + '</span> : <span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
             html += '</tr>';
+
+            if (isExpandable) {
+              html += buildDetailRow(eq);
+            }
           }
         }
-        
+
         if (matchCount === 0) {
            html += '<tr><td colspan="5" class="text-center"><i>{{Aucun résultat pour cette recherche}}</i></td></tr>';
         }
-        
+
         html += '</tbody></table>';
         return html;
+      };
+
+      var bindAccordion = function(container) {
+        $(container).off('click', '.diag-expandable').on('click', '.diag-expandable', function() {
+          var $row = $(this);
+          var $detail = $row.next('.diag-detail-row');
+          var isOpen = $detail.is(':visible');
+
+          // Close all open detail rows
+          $(container).find('.diag-detail-row:visible').hide();
+          $(container).find('.diag-chevron').css('transform', '');
+
+          if (!isOpen) {
+            $detail.show();
+            $row.find('.diag-chevron').css('transform', 'rotate(90deg)');
+          }
+        });
       };
 
       var modalHtml = '<div style="margin-bottom:10px;">';
@@ -254,7 +368,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       modalHtml += '</div>';
       modalHtml += '</div>';
       modalHtml += '<div id="div_diagnosticTable" style="max-height:calc(100vh - 250px);overflow-y:auto;">' + renderTable() + '</div>';
-      
+
       bootbox.dialog({
         title: "{{Diagnostic de Couverture}}",
         message: modalHtml,
@@ -263,13 +377,18 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         onEscape: true,
         backdrop: true
       });
-      
+
       // Force modal width for large screens
       $('.modal-diagnostic .modal-dialog').css('width', '90%').css('max-width', '1200px');
-      
+
+      // Bind accordion on initial render
+      bindAccordion('#div_diagnosticTable');
+
       $('#in_searchDiagnostic').off('keyup').on('keyup', function() {
          var val = $(this).val();
          $('#div_diagnosticTable').html(renderTable(val));
+         // Re-bind accordion after re-render
+         bindAccordion('#div_diagnosticTable');
       });    }
   });
 });
