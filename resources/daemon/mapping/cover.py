@@ -44,6 +44,12 @@ _ANTI_COVER_GENERIC_TYPES = {
 # Allowed eq.generic_type values for covers
 _ALLOWED_EQ_GENERIC_TYPES = {"shutter", "cover", "blind", "flap", ""}
 
+# Sub-type preference table for deduplication (Story 2.6)
+# generic_type → preferred sub_type when a duplicate is detected
+_COVER_DEDUP_PREFERENCE = {
+    "FLAP_STATE": "binary",   # state is an open/close info → binary wins
+}
+
 # Keywords in equipment name that strongly imply it's not a cover
 _NON_COVER_KEYWORDS = {
     "lumière", "lumiere", "light", "lampe", "ampoule",
@@ -82,31 +88,59 @@ class CoverMapper:
         # Collect FLAP_* commands and detect ANTI_COVER_* commands
         flap_cmds: Dict[str, JeedomCmd] = {}
         anti_cover_cmds: Set[str] = set()
+        _dedup_events: list = []  # resolved dedup metadata (Story 2.6)
 
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in _FLAP_GENERIC_TYPES:
                 if cmd.generic_type in flap_cmds:
-                    # Duplicate generic_type found
-                    _LOGGER.warning(
-                        "[MAPPING] eq_id=%d name='%s': duplicate command for generic_type '%s' "
-                        "(cmd1=%s, cmd2=%s) → ambiguous",
-                        eq.id, eq.name, cmd.generic_type,
-                        flap_cmds[cmd.generic_type].id, cmd.id,
-                    )
-                    capabilities = CoverCapabilities()
-                    return MappingResult(
-                        ha_entity_type="cover",
-                        confidence="ambiguous",
-                        reason_code="duplicate_generic_types",
-                        jeedom_eq_id=eq.id,
-                        ha_unique_id=f"jeedom2ha_eq_{eq.id}",
-                        ha_name=eq.name,
-                        suggested_area=snapshot.get_suggested_area(eq.id),
-                        commands=flap_cmds,
-                        capabilities=capabilities,
-                        reason_details={"duplicate_type": cmd.generic_type},
-                    )
-                flap_cmds[cmd.generic_type] = cmd
+                    # Duplicate generic_type — attempt deterministic arbitration (Story 2.6)
+                    existing = flap_cmds[cmd.generic_type]
+                    preferred = _COVER_DEDUP_PREFERENCE.get(cmd.generic_type)
+
+                    if (existing.sub_type != cmd.sub_type
+                            and preferred is not None
+                            and (existing.sub_type == preferred or cmd.sub_type == preferred)):
+                        # Sub-types differ and exactly one matches the preference → resolve
+                        winner = cmd if cmd.sub_type == preferred else existing
+                        loser = existing if winner is cmd else cmd
+                        flap_cmds[cmd.generic_type] = winner
+                        _dedup_events.append({
+                            "deduplicated": True,
+                            "duplicate_type": cmd.generic_type,
+                            "kept_cmd_id": winner.id,
+                            "discarded_cmd_id": loser.id,
+                            "criterion": "sub_type",
+                        })
+                        _LOGGER.info(
+                            "[MAPPING] eq_id=%d: deduplicated %s "
+                            "(kept cmd %d sub_type=%s, discarded cmd %d sub_type=%s)",
+                            eq.id, cmd.generic_type,
+                            winner.id, winner.sub_type,
+                            loser.id, loser.sub_type,
+                        )
+                    else:
+                        # Same sub_type, no rule, or neither matches preference → conservative: ambiguous
+                        _LOGGER.warning(
+                            "[MAPPING] eq_id=%d name='%s': duplicate command for generic_type '%s' "
+                            "(cmd1=%s, cmd2=%s) → ambiguous",
+                            eq.id, eq.name, cmd.generic_type,
+                            existing.id, cmd.id,
+                        )
+                        capabilities = CoverCapabilities()
+                        return MappingResult(
+                            ha_entity_type="cover",
+                            confidence="ambiguous",
+                            reason_code="duplicate_generic_types",
+                            jeedom_eq_id=eq.id,
+                            ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+                            ha_name=eq.name,
+                            suggested_area=snapshot.get_suggested_area(eq.id),
+                            commands=flap_cmds,
+                            capabilities=capabilities,
+                            reason_details={"duplicate_type": cmd.generic_type},
+                        )
+                else:
+                    flap_cmds[cmd.generic_type] = cmd
             elif cmd.generic_type and cmd.generic_type in _ANTI_COVER_GENERIC_TYPES:
                 anti_cover_cmds.add(cmd.generic_type)
 
@@ -215,6 +249,10 @@ class CoverMapper:
 
         global_confidence = _min_confidence(*active_confidences) if active_confidences else "unknown"
 
+        # Apply dedup confidence floor: at least "probable" if any dedup occurred (Story 2.6)
+        if _dedup_events:
+            global_confidence = _min_confidence(global_confidence, "probable")
+
         # Build reason code
         parts = []
         if has_open_close:
@@ -233,6 +271,9 @@ class CoverMapper:
             reason_details["open_close"] = oc_reason
         if pos_reason:
             reason_details["position"] = pos_reason
+        # Enrich with dedup metadata (Story 2.6) — last event wins if multiple
+        if _dedup_events:
+            reason_details.update(_dedup_events[-1])
 
         _LOGGER.info(
             "[MAPPING] eq_id=%d name='%s': %s confidence=%s (open_close=%s/%s, stop=%s, "

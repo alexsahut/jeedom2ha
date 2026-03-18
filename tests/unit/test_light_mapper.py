@@ -422,3 +422,71 @@ class TestStateNumericFallback:
         assert result is not None
         assert result.capabilities.has_brightness is False
         assert result.reason_code == "light_on_off_only"
+
+
+# ==============================================================================
+# Test: Déduplication (Story 2.6)
+# ==============================================================================
+
+class TestDeduplication:
+    def test_light_state_duplicate_binary_numeric_resolved(self, mapper, snapshot):
+        """2× LIGHT_STATE (binary + numeric) → binary gagne, confidence=probable, deduplicated=True."""
+        eq = _make_eq(id=510, cmds=[
+            _cmd("LIGHT_STATE", id=4655, type="info", sub_type="binary"),
+            _cmd("LIGHT_STATE", id=4658, type="info", sub_type="numeric"),
+            _cmd("LIGHT_ON", id=4659, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=4660, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "probable"
+        # reason_code : code métier standard, pas un code dedup
+        assert result.reason_code == "light_on_off_only"
+        assert result.reason_details is not None
+        assert result.reason_details["deduplicated"] is True
+        assert result.reason_details["kept_cmd_id"] == 4655
+        assert result.reason_details["discarded_cmd_id"] == 4658
+        assert result.reason_details["criterion"] == "sub_type"
+        # Le gagnant (binary) est dans les commandes résolues
+        assert result.commands["LIGHT_STATE"].id == 4655
+        assert result.commands["LIGHT_STATE"].sub_type == "binary"
+
+    def test_light_state_duplicate_same_subtype_ambiguous(self, mapper, snapshot):
+        """2× LIGHT_STATE (numeric + numeric) → même sub_type → ambiguous (comportement actuel)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="numeric"),
+            _cmd("LIGHT_STATE", id=200, type="info", sub_type="numeric"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "duplicate_generic_types"
+
+    def test_light_state_duplicate_no_preferred_match_ambiguous(self, mapper, snapshot):
+        """2× LIGHT_STATE (string + other) → aucun ne correspond à 'binary' → ambiguous conservatif."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="string"),
+            _cmd("LIGHT_STATE", id=200, type="info", sub_type="other"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "duplicate_generic_types"
+
+    def test_nominal_light_no_duplicate_no_regression(self, mapper, snapshot):
+        """Cas nominal sans doublon → confidence=sure (pas de régression)."""
+        eq = _make_eq(id=42, cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("LIGHT_BRIGHTNESS", id=103, type="info", sub_type="numeric"),
+            _cmd("LIGHT_SLIDER", id=104, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "sure"
+        assert result.reason_code == "light_on_off_brightness"
+        # Pas de metadata dedup dans reason_details
+        assert result.reason_details is None or "deduplicated" not in result.reason_details

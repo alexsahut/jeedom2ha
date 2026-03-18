@@ -405,3 +405,60 @@ class TestPublicationDecision:
         mapping = mapper.map(eq, snapshot)
         decision = mapper.decide_publication(mapping)
         assert decision.mapping_result is mapping
+
+
+# ==============================================================================
+# Test: Déduplication (Story 2.6)
+# ==============================================================================
+
+class TestDeduplication:
+    def test_flap_state_duplicate_binary_numeric_resolved(self, mapper, snapshot):
+        """2× FLAP_STATE (binary + numeric) → binary gagne, confidence=probable, deduplicated=True."""
+        eq = _make_eq(id=446, cmds=[
+            _cmd("FLAP_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("FLAP_STATE", id=200, type="info", sub_type="numeric"),
+            _cmd("FLAP_UP", id=101, type="action", sub_type="other"),
+            _cmd("FLAP_DOWN", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "probable"
+        # reason_code : code métier standard, pas un code dedup
+        assert result.reason_code == "cover_open_close"
+        assert result.reason_details is not None
+        assert result.reason_details["deduplicated"] is True
+        assert result.reason_details["kept_cmd_id"] == 100
+        assert result.reason_details["discarded_cmd_id"] == 200
+        assert result.reason_details["criterion"] == "sub_type"
+        # Le gagnant (binary) est dans les commandes résolues
+        assert result.commands["FLAP_STATE"].id == 100
+        assert result.commands["FLAP_STATE"].sub_type == "binary"
+
+    def test_flap_state_duplicate_no_preferred_match_ambiguous(self, mapper, snapshot):
+        """2× FLAP_STATE (string + other) → aucun ne correspond à 'binary' → ambiguous conservatif."""
+        eq = _make_eq(cmds=[
+            _cmd("FLAP_STATE", id=100, type="info", sub_type="string"),
+            _cmd("FLAP_STATE", id=200, type="info", sub_type="other"),
+            _cmd("FLAP_UP", id=101, type="action", sub_type="other"),
+            _cmd("FLAP_DOWN", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "duplicate_generic_types"
+
+    def test_nominal_cover_no_duplicate_no_regression(self, mapper, snapshot):
+        """Cas nominal sans doublon → confidence=sure (pas de régression)."""
+        eq = _make_eq(id=42, cmds=[
+            _cmd("FLAP_STATE", id=100, type="info", sub_type="numeric"),
+            _cmd("FLAP_UP", id=101, type="action", sub_type="other"),
+            _cmd("FLAP_DOWN", id=102, type="action", sub_type="other"),
+            _cmd("FLAP_STOP", id=103, type="action", sub_type="other"),
+            _cmd("FLAP_SLIDER", id=104, type="action", sub_type="slider"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "sure"
+        assert result.ha_entity_type == "cover"
+        # Pas de metadata dedup dans reason_details
+        assert result.reason_details is None or "deduplicated" not in result.reason_details
