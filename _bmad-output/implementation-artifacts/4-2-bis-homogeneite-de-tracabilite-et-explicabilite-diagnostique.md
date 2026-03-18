@@ -1,6 +1,6 @@
 # Story 4.2bis: Homogénéité de Traçabilité et Explicabilité Diagnostique
 
-Status: review
+Status: done
 
 ## Story
 
@@ -141,6 +141,25 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 - `_bmad-output/implementation-artifacts/4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique.md` — story mise à jour
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut → review
 
+### Field Validation (Box Jeedom réelle — 192.168.1.21)
+
+Déployé via rsync, daemon redémarré (219 eligible, 68 ineligible, 57 published).
+
+| Cas de test | Résultat |
+|-------------|----------|
+| Ouverture modale diagnostic | OK |
+| Chevron sur TOUS les équipements y compris "Publié" (AC3) | OK |
+| "Publié" — 5 sections, badge Succès, confirmation verte | OK |
+| "Non publié" (ambiguous_skipped) — 5 sections, badge Non tenté, remédiation | OK |
+| "Partiellement publié" — commandes mappées + non mappées, badge Succès | OK |
+| Lien `#commandtab` pour causes de typage (AC4) | OK |
+| Pas de JSON brut / logs techniques dans l'UI | OK |
+| Pas de régression visible Story 4.1 / 4.2 (badges, couleurs, colonnes) | OK |
+| Pas d'erreur JS console | OK |
+
+**Limite connue** : Le cas "Exclu" n'a pas pu être observé sur la config réelle (aucun équipement exclu configuré). Couvert par le test unitaire `test_diagnostics_traceability_excluded`.
+
 ### Change Log
 - 2026-03-18 : Implémentation Story 4.2bis — traceability backend, accordéon 5 sections frontend, v1_compatibility binary_sensor
 - 2026-03-18 : Retouches 4.2bis — taxonomie AC2 fermée (legacy codes, fallback conditionnel), configured_type vs used_type Section 2, decision_trace sémantique Section 3 (289 tests)
+- 2026-03-18 : PR #14 mergée sur main (e6ca336). Story clôturée — validation terrain documentée.

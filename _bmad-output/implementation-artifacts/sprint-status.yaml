@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-18  # in-progress: 4.2bis
+last_updated: 2026-03-18
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -47,12 +47,13 @@ development_status:
   1-2-bis-fiabilisation-auto-detection-mqtt-manager-import-force: done
   1-3-validation-de-la-connexion-et-statut-du-pont: done
   epic-1-retrospective: done
-  epic-2: done
+  epic-2: in-progress  # reopened for bug fix story 2.6 (duplicate generic_type deduplication)
   2-1-topology-scraper-contexte-spatial: done
   2-2-mapping-exposition-des-lumieres: done
   2-3-mapping-exposition-des-ouvrants-volets: done
   2-4-mapping-exposition-des-prises-switches: done
   2-5-mapping-exposition-des-capteurs-numeriques-binaires: done
+  2-6-deduplication-commandes-generic-type-dupliquees: backlog  # bug terrain decouvert pendant validation 4.2bis
   epic-2-retrospective: done
   epic-3: done
   3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
@@ -63,7 +64,7 @@ development_status:
   epic-4: in-progress
   4-1-interface-de-diagnostic-de-couverture: done
   4-2-diagnostic-detaille-et-suggestions-de-remediation: done
-  4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: review
+  4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: done  # PR #14 merged 2026-03-18, validation terrain OK
   4-3-gestion-des-exclusions-et-actions-manuelles: backlog
   4-4-export-de-diagnostic-pour-support: backlog
   epic-4-retrospective: optional
