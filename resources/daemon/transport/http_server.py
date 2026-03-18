@@ -997,7 +997,7 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
     # Section 4 — Résultat de publication
     if status in published_statuses:
         pub_result = "success"
-    elif top_reason_code == "discovery_publish_failed":
+    elif closed_reason == "discovery_publish_failed":
         pub_result = "failed"
     else:
         pub_result = "not_attempted"

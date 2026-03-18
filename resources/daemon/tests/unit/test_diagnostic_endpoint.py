@@ -931,6 +931,9 @@ async def test_diagnostics_reason_code_local_availability_publish_failed(aiohttp
     dt = eq["traceability"]["decision_trace"]
     assert dt["reason_code"] == "discovery_publish_failed"  # normalisé dans la famille infra
     assert dt["reason_code"] in _CLOSED_REASON_CODES
+    # H2 review fix: publication_trace cohérent avec decision_trace
+    pt = eq["traceability"]["publication_trace"]
+    assert pt["last_discovery_publish_result"] == "failed"
 
 
 async def test_diagnostics_reason_code_unknown_fallback(aiohttp_client):
