@@ -825,6 +825,86 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     })
 
 
+_DIAGNOSTIC_MESSAGES = {
+    "no_commands": (
+        "Cet équipement n'a aucune commande configurée dans Jeedom.",
+        "Vérifiez que l'équipement possède des commandes actives dans Jeedom.",
+        False,
+    ),
+    "no_supported_generic_type": (
+        "Aucune commande de cet équipement n'a un type générique supporté par le plugin.",
+        "Ce type d'équipement n'est pas encore supporté en V1, ou les types génériques "
+        "ne sont pas configurés. Aucune action Jeedom ne permettra de le publier pour le moment.",
+        True,
+    ),
+    "disabled": (
+        "Cet équipement est désactivé dans Jeedom.",
+        "Activez l'équipement dans sa page de configuration Jeedom pour qu'il devienne éligible.",
+        False,
+    ),
+    "disabled_eqlogic": (
+        "Cet équipement est désactivé dans Jeedom.",
+        "Activez l'équipement dans sa page de configuration Jeedom pour qu'il devienne éligible.",
+        False,
+    ),
+    "excluded_eqlogic": (
+        "Cet équipement est exclu manuellement de la publication vers Home Assistant.",
+        "Pour le publier, retirez-le de la liste d'exclusions dans la configuration du plugin.",
+        False,
+    ),
+    "ambiguous_skipped": (
+        "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. "
+        "Le plugin ne publie pas en cas d'ambiguïté.",
+        "Précisez les types génériques sur les commandes pour lever l'ambiguïté "
+        "et permettre une publication fiable.",
+        False,
+    ),
+    "no_mapping": (
+        "Aucun type d'équipement Home Assistant ne correspond à cet équipement dans la V1 du plugin.",
+        "Ce type d'équipement n'est pas encore supporté. "
+        "Consultez la documentation du plugin pour connaître le périmètre V1 supporté.",
+        True,
+    ),
+    "discovery_publish_failed": (
+        "La publication MQTT de cet équipement a échoué lors du dernier sync.",
+        "Vérifiez la connexion au broker MQTT et relancez un diagnostic après résolution.",
+        False,
+    ),
+    "local_availability_publish_failed": (
+        "La publication de la disponibilité locale de cet équipement a échoué.",
+        "Vérifiez la connexion au broker MQTT et relancez un sync.",
+        False,
+    ),
+    "sure_mapping": (
+        "Cet équipement est publié mais certaines commandes ne sont pas couvertes par le mapping V1.",
+        "Configurez les types génériques manquants sur les commandes listées "
+        "ci-dessous pour une couverture complète.",
+        False,
+    ),
+    "sure": (
+        "Cet équipement est publié mais certaines commandes ne sont pas couvertes par le mapping V1.",
+        "Configurez les types génériques manquants sur les commandes pour une couverture complète.",
+        False,
+    ),
+    "eligible": (
+        "Cet équipement est éligible mais n'a pas été publié lors du dernier sync.",
+        "Relancez un sync complet depuis l'interface du plugin.",
+        False,
+    ),
+}
+
+_DIAGNOSTIC_DEFAULT = (
+    "Cause inconnue.",
+    "Relancez un sync. Si le problème persiste, consultez les logs du démon.",
+    False,
+)
+
+
+def _get_diagnostic_enrichment(reason_code: str) -> tuple:
+    """Return (detail, remediation, v1_limitation) for a given reason_code."""
+    return _DIAGNOSTIC_MESSAGES.get(reason_code, _DIAGNOSTIC_DEFAULT)
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -844,16 +924,18 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     eligibility = request.app.get("eligibility", {})
     mappings = request.app.get("mappings", {})
     publications = request.app.get("publications", {})
-    
+
     equipments = []
-    
+
     for eq_id, eq in topology.eq_logics.items():
         object_name = topology.get_suggested_area(eq_id) or "Aucun"
-        
+
         status = "Non publié"
         confidence = "Ignoré"
         reason_code = "unknown"
-        
+        matched_commands = []
+        unmatched_commands = []
+
         el_result = eligibility.get(eq_id)
         if el_result:
             reason_code = el_result.reason_code
@@ -867,7 +949,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             else:
                 map_result = mappings.get(eq_id)
                 pub_decision = publications.get(eq_id)
-                
+
                 if map_result:
                     reason_code = map_result.reason_code
                     confidence_map = {
@@ -878,14 +960,30 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                         "unknown": "Ignoré"
                     }
                     confidence = confidence_map.get(map_result.confidence, "Ignoré")
-                    
+
                     if pub_decision and pub_decision.active_or_alive:
                         mapped_cmd_ids = {c.id for c in map_result.commands.values()}
-                        coverable_cmds = {c.id for c in eq.cmds if c.generic_type}
-                        unmapped = coverable_cmds - mapped_cmd_ids
-                        
-                        if unmapped:
+                        coverable_cmds = [c for c in eq.cmds if c.generic_type]
+                        unmapped_cmds = [c for c in coverable_cmds if c.id not in mapped_cmd_ids]
+
+                        matched_commands = [
+                            {
+                                "cmd_id": c.id,
+                                "cmd_name": c.name,
+                                "generic_type": c.generic_type,
+                            }
+                            for c in eq.cmds if c.id in mapped_cmd_ids
+                        ]
+                        if unmapped_cmds:
                             status = "Partiellement publié"
+                            unmatched_commands = [
+                                {
+                                    "cmd_id": c.id,
+                                    "cmd_name": c.name,
+                                    "generic_type": c.generic_type,
+                                }
+                                for c in unmapped_cmds
+                            ]
                         else:
                             status = "Publié"
                         reason_code = pub_decision.reason
@@ -897,16 +995,46 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                     reason_code = "no_mapping"
                     confidence = "Ignoré"
                     status = "Non publié"
-                    
+
+        # Enrich with human-readable detail and remediation
+        if status == "Publié":
+            detail = ""
+            remediation = ""
+            v1_limitation = False
+        else:
+            detail, remediation, v1_limitation = _get_diagnostic_enrichment(reason_code)
+
+        # Collect detected generic_types for actionable diagnosis (no_supported_generic_type, ambiguous_skipped)
+        detected_generic_types: list = []
+        if reason_code in ("no_supported_generic_type", "ambiguous_skipped"):
+            seen: set = set()
+            for c in eq.cmds:
+                if c.generic_type:
+                    if c.generic_type not in seen:
+                        seen.add(c.generic_type)
+                        detected_generic_types.append(c.generic_type)
+                unmatched_commands.append({
+                    "cmd_id": c.id,
+                    "cmd_name": c.name,
+                    "generic_type": c.generic_type,
+                })
+
         equipments.append({
             "eq_id": eq_id,
             "object_name": object_name,
             "name": eq.name,
+            "eq_type_name": eq.eq_type_name,
             "status": status,
             "confidence": confidence,
-            "reason_code": reason_code
+            "reason_code": reason_code,
+            "detail": detail,
+            "remediation": remediation,
+            "v1_limitation": v1_limitation,
+            "matched_commands": matched_commands,
+            "unmatched_commands": unmatched_commands,
+            "detected_generic_types": detected_generic_types,
         })
-        
+
     return web.json_response({
         "action": "system.diagnostics",
         "status": "ok",

@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-16
+last_updated: 2026-03-17
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -62,7 +62,7 @@ development_status:
   epic-3-retrospective: done
   epic-4: in-progress
   4-1-interface-de-diagnostic-de-couverture: done
-  4-2-diagnostic-detaille-et-suggestions-de-remediation: backlog
+  4-2-diagnostic-detaille-et-suggestions-de-remediation: done
   4-3-gestion-des-exclusions-et-actions-manuelles: backlog
   4-4-export-de-diagnostic-pour-support: backlog
   epic-4-retrospective: optional
