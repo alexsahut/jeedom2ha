@@ -1,6 +1,6 @@
 # Story 2.6: Déduplication des commandes à generic_type dupliqué
 
-Status: review
+Status: done
 
 ## Story
 
