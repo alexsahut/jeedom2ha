@@ -234,7 +234,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         }
         html += '</div>';
 
-        // --- Section 2 : Typage Jeedom ---
+        // --- Section 2 : Typage Jeedom (configured_type vs used_type — AC1) ---
         html += '<div style="margin-bottom:10px;"><strong>{{Typage Jeedom}}</strong>';
         if (typingTrace.length > 0) {
           html += '<ul style="margin:4px 0 0 16px;">';
@@ -243,7 +243,16 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             html += '<li style="color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;font-size:0.9em;"></i>';
             html += ' <span style="font-family:monospace;font-size:0.9em;">' + tt.logical_role + '</span>';
             html += ' <span style="color:#aaa;font-size:0.8em;">(#' + tt.command_id + ')</span>';
-            html += ' \u2014 <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + tt.used_type + '</span></li>';
+            // Afficher configured_type → used_type (distincts si déviation heuristique)
+            var confType = tt.configured_type || '<em style="color:#aaa;">{{—}}</em>';
+            var usedType = tt.used_type || '<em style="color:#aaa;">{{—}}</em>';
+            if (tt.configured_type && tt.used_type && tt.configured_type !== tt.used_type) {
+              html += ' \u2014 <span style="color:#888;font-size:0.8em;">{{configuré}}</span> <span style="background-color:#fff3e0;color:#e65100;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ffe0b2;">' + confType + '</span>';
+              html += ' \u2192 <span style="color:#888;font-size:0.8em;">{{utilisé}}</span> <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
+            } else {
+              html += ' \u2014 <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
+            }
+            html += '</li>';
           }
           html += '</ul>';
         }
@@ -272,8 +281,27 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         }
         html += '</div>';
 
-        // --- Section 3 : Logique de décision ---
+        // --- Section 3 : Logique de décision (decision_trace sémantique) ---
         html += '<div style="margin-bottom:10px;"><strong>{{Logique de décision}}</strong>';
+        // Type HA détecté + confiance (depuis decision_trace)
+        var entityTypeLabels = {
+          'light': '{{Lumière}}', 'cover': '{{Ouvrant}}', 'switch': '{{Prise / Switch}}',
+          'sensor': '{{Capteur}}', 'binary_sensor': '{{Capteur binaire}}'
+        };
+        var closedConfLabels = {
+          'sure': '{{Sûr}}', 'probable': '{{Probable}}', 'ambiguous': '{{Ambigu}}', 'ignore': '{{Ignoré}}'
+        };
+        if (dt.ha_entity_type) {
+          var typeLabel = entityTypeLabels[dt.ha_entity_type] || dt.ha_entity_type;
+          html += '<div style="margin-top:4px;font-size:0.9em;">';
+          html += '<span style="color:#555;">{{Type HA}}&nbsp;: </span><strong>' + typeLabel + '</strong>';
+          if (dt.confidence && dt.confidence !== 'ignore') {
+            var confLabel = closedConfLabels[dt.confidence] || dt.confidence;
+            html += ' <span style="color:#aaa;margin-left:8px;">\u2014 {{confiance}}&nbsp;: ' + confLabel + '</span>';
+          }
+          html += '</div>';
+        }
+        // Cause métier (detail) ou message de succès
         if (eq.detail) {
           html += '<div style="margin-top:4px;color:#555;">' + eq.detail + '</div>';
         } else if (isPublished) {

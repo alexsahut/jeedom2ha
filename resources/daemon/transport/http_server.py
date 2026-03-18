@@ -906,14 +906,29 @@ def _get_diagnostic_enrichment(reason_code: str) -> tuple:
 
 
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
+# Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
+#                no_generic_type_configured, no_supported_generic_type, discovery_publish_failed
 _CLOSED_REASON_MAP: dict = {
+    # Eligibility — codes normalisés
     "excluded_eqlogic": "excluded",
+    "excluded": "excluded",
+    "disabled": "disabled_eqlogic",            # legacy alias (ancienne v1 du plugin)
     "disabled_eqlogic": "disabled_eqlogic",
     "no_commands": "no_commands",
+    # Type générique — distinction "non configuré" vs "hors V1"
     "no_supported_generic_type": "no_generic_type_configured",  # commandes sans type générique
+    "no_generic_type_configured": "no_generic_type_configured",  # idempotent
+    # Publication / mapping
     "ambiguous_skipped": "ambiguous_skipped",
-    "no_mapping": "no_supported_generic_type",  # types génériques configurés hors périmètre V1
+    "ambiguous": "ambiguous_skipped",           # legacy map_result.reason_code
+    "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
+    "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
     "discovery_publish_failed": "discovery_publish_failed",
+    "local_availability_publish_failed": "discovery_publish_failed",  # famille infra
+    # États publiés (garde-fou si status check ne les attrape pas)
+    "sure_mapping": "published",
+    "sure": "published",
+    "probable_bounded": "published",
 }
 
 # AC5 — Types HA compatibles V1 (light, cover, switch, sensor, binary_sensor)
@@ -956,7 +971,15 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
     if status in published_statuses:
         closed_reason = "published"
     else:
-        closed_reason = _CLOSED_REASON_MAP.get(top_reason_code, top_reason_code)
+        mapped = _CLOSED_REASON_MAP.get(top_reason_code)
+        if mapped is not None:
+            closed_reason = mapped
+        elif map_result is not None:
+            # Mapping trouvé mais publication bloquée par une cause non reconnue
+            closed_reason = "discovery_publish_failed"
+        else:
+            # Aucun mapping, cause non reconnue → fallback conservateur
+            closed_reason = "no_commands"
 
     if map_result:
         confidence_value = _CONFIDENCE_CLOSED.get(map_result.confidence, "ambiguous")

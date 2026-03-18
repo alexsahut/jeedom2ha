@@ -84,6 +84,9 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 ### Automated Tests (Backend)
 - [x] Test unitaire vérifiant que l'endpoint `/system/diagnostics` respecte le schéma JSON enrichi (objet `traceability` complet). — `test_diagnostics_traceability_schema_published`, `test_diagnostics_traceability_excluded`, `test_diagnostics_traceability_discovery_failed`
 - [x] Test de non-régression sur le calcul de `v1_compatibility` incluant les `binary_sensor`. — `test_diagnostics_v1_compatibility_binary_sensor`
+- [x] Tests taxonomie fermée AC2 — cas legacy : `disabled`, `local_availability_publish_failed`, `unknown` fallback
+- [x] Test AC5 — non publié mais V1-compatible : `test_diagnostics_v1_compatibility_not_published_but_v1`
+- [x] Test typing_trace — `configured_type` vs `used_type` : `test_diagnostics_typing_trace_configured_vs_used`
 
 ### Manual Verification (Frontend)
 - [x] Smoke test documenté validant l'affichage des 5 sections pour les 4 cas types :
@@ -118,7 +121,9 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 
 ### Implementation Plan
 - Backend : ajout de `_build_traceability()`, `_CLOSED_REASON_MAP`, `_V1_COMPATIBLE_TYPES`, `_CONFIDENCE_CLOSED` dans `transport/http_server.py`. Les champs `map_result` et `pub_decision` initialisés à `None` en début de boucle pour garantir la portée.
+- Retouche 4.2bis : `_CLOSED_REASON_MAP` étendu (disabled, local_availability_publish_failed, eligible, sure/probable_bounded, etc.) ; fallback passthrough remplacé par logique conditionnelle (map_result → discovery_publish_failed, else → no_commands).
 - Frontend : remplacement de `buildDetailRow` par la structure fixe 5 sections ; `isExpandable` supprimé — tous les équipements ont un chevron et un détail ; `traceability` inclus dans `detailData`.
+- Retouche 4.2bis frontend : Section 2 affiche `configured_type → used_type` (distinction visible si déviation) ; Section 3 enrichie avec `ha_entity_type` + `confidence` depuis `decision_trace`.
 - Tests : 6 nouveaux tests unitaires dans `resources/daemon/tests/unit/test_diagnostic_endpoint.py`.
 
 ### Completion Notes
@@ -138,3 +143,4 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 
 ### Change Log
 - 2026-03-18 : Implémentation Story 4.2bis — traceability backend, accordéon 5 sections frontend, v1_compatibility binary_sensor
+- 2026-03-18 : Retouches 4.2bis — taxonomie AC2 fermée (legacy codes, fallback conditionnel), configured_type vs used_type Section 2, decision_trace sémantique Section 3 (289 tests)
