@@ -4,9 +4,9 @@ Status: ready-for-dev
 
 ## Story
 
-As a utilisateur Jeedom,
-I want une expérience de diagnostic homogène et une traçabilité claire du moteur de mapping,
-so that je comprenne exactement pourquoi un équipement est "Partiellement publié" ou "Non publié" sans ambiguïté technique.
+As an **utilisateur Jeedom**,
+I want **une traçabilité homogène et complète de la chaîne de décision pour chaque équipement**,
+so that **je comprenne exactement pourquoi un équipement est publié (ou non) et quelles commandes ont été utilisées.**
 
 ## Contexte
 
@@ -24,16 +24,23 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 **Then** chaque équipement contient un objet `traceability` non nul respectant cette structure :
 ```json
 "traceability": {
-  "observed_commands": ["list of strings"],
-  "typing_trace": ["Detected types in Jeedom"],
-  "decision_trace": "Explanation of the mapping choice",
+  "observed_commands": [{"id": 123, "name": "On", "generic_type": "LIGHT_ON"}],
+  "typing_trace": [{"logical_role": "brightness", "command_id": 456, "configured_type": "LIGHT_SLIDER", "used_type": "LIGHT_SLIDER"}],
+  "decision_trace": {"ha_entity_type": "light", "confidence": "sure", "reason_code": "published"},
   "publication_trace": {
-    "last_discovery_publish_result": "success | failed | not_attempted"
+    "last_discovery_publish_result": "success | failed | not_attempted",
+    "last_publish_timestamp": "2026-03-18T09:00:00Z"
   }
 }
 ```
+- `observed_commands` : Tableau obligatoire d'objets `{id, name, generic_type}` de toutes les commandes vues par le démon.
+- `typing_trace` : Tableau `{logical_role, command_id, configured_type, used_type}` montrant l'origine du type utilisé pour chaque rôle. `used_type` est le type final (configuré ou déduit).
+- `decision_trace` : Objet `{ha_entity_type, confidence, reason_code}` détaillant le choix final du moteur. `confidence` utilise la taxonomie architecture : `sure`, `probable`, `ambiguous`, `ignore`.
+- `publication_trace` : Objet `{last_discovery_publish_result, last_publish_timestamp}`.
+- `last_discovery_publish_result` normé : `success`, `failed`, `not_attempted` (résultat de la tentative locale du plugin, pas d'une confirmation HA).
+
 > [!IMPORTANT]
-> Politique de présence : Tous les champs sont obligatoires. Les tableaux vides sont autorisés, mais les objets ne doivent pas être omis.
+> **Politique de présence** : Champs obligatoires. Les tableaux peuvent être vides `[]`, les objets ne sont pas omis (utilisent des valeurs neutres ou `null` si non applicable).
 
 ### AC2 — Taxonomie Normative des Reason Codes
 **Then** le système utilise exclusivement la liste fermée suivante pour `reason_code` :
@@ -50,10 +57,12 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 **Given** la modale de diagnostic est ouverte
 **Then** l'accordéon est disponible pour **TOUS** les équipements (y compris "Publié") et respecte cette structure fixe :
 1. **Commandes observées** : Liste des commandes brutes vues par le démon.
-2. **Typage Jeedom** : Types génériques détectés.
+2. **Typage Jeedom** : Détail configured vs used.
 3. **Logique de décision** : Pourquoi ce mapping a été choisi (ou pourquoi il a échoué).
 4. **Résultat de publication** : Statut du dernier envoi MQTT.
-5. **Action recommandée** : Texte de remédiation (ou "Aucune action requise. L'équipement est correctement exposé.").
+5. **Action recommandée** :
+        - Si publié/OK : "Aucune action requise. L'équipement est correctement exposé." (Wording neutre).
+        - Si actionnable : Bouton/Lien contextualisé.
 
 ### AC4 — Liens Jeedom Contextuels
 **Given** une cause liée au typage (`no_generic_type_configured`, `ambiguous_skipped`)
@@ -65,8 +74,9 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 
 ## Guardrails (Non-régression)
 
-- **UI 4.1/4.2** : Ne pas modifier le calcul des badges de couleur ou des statuts globaux livrés précédemment.
-- **Pureté métier** : L'interface utilisateur finale ne doit jamais afficher de JSON brut ou de stacktrace Python. Tout doit être traduit en langage métier.
+- **UI 4.1** : Ne pas modifier les badges de statut (couleurs/labels) de Story 4.1.
+- **Remédiation 4.2** : Conserver l'efficacité des messages de remédiation textuels de Story 4.2.
+- **Doctrine Epic 4** : Rester sur du diagnostic métier. Ne pas afficher de logs bruts ou de JSON technique dans l'UI finale.
 - **Performance** : La traçabilité est calculée à la volée ou stockée en RAM, aucune persistance DB n'est requise.
 
 ## Verification Plan (Proofs)
@@ -85,14 +95,21 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 ## Tasks
 
 ### Task 1 — Backend
-- [ ] Enrichir `_handle_system_diagnostics` avec l'objet `traceability`.
+- [ ] Mettre à jour les modèles Python pour porter l'objet `traceability`.
+- [ ] Enrichir le handler `/system/diagnostics` pour remplir les traces pour tous les cas.
 - [ ] Normaliser les `reason_code` selon la taxonomie AC2.
 - [ ] Intégrer `binary_sensor` dans le calcul de compatibilité.
 
 ### Task 2 — Frontend
-- [ ] Refondre `renderTable` pour la structure à 5 sections.
+- [ ] Refondre `renderTable` pour utiliser le template de sections fixes.
+- [ ] Gérer l'affichage des états neutres ("Aucun", "N/A").
 - [ ] Implémenter le lien contextuel `#commandtab`.
 
 ### Task 3 — Proofs
-- [ ] Produire un rapport de test unitaire.
-- [ ] Produire une capture d'écran de l'accordéon "Publié" (nouveauté).
+- [ ] **Backend** : Test unitaire validant le schéma JSON du payload enrichi.
+- [ ] **Frontend** : Smoke test documenté sur 4 cas clés (Publié, Partiel, Non publié, Exclu).
+
+## Dev Notes
+
+- **CSS** : Utiliser `background: ... !important` sur les lignes de détail pour éviter les conflits au hover Jeedom.
+- **Wording** : Préférer "Typage détecté" à "Heuristique de mapping".
