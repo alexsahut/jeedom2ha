@@ -1,6 +1,6 @@
 # Story 4.2: Diagnostic Détaillé et Suggestions de Remédiation
 
-Status: review
+Status: done
 
 ## Story
 
@@ -616,3 +616,4 @@ claude-opus-4-6 (dev-story implementation, 2026-03-17)
 | 2026-03-17 | Implémentation complète : backend enrichi (detail/remediation/v1_limitation/unmatched_commands), accordéon frontend, 7 nouveaux tests unitaires |
 | 2026-03-17 | Correctifs post-validation-terrain : lien Jeedom corrigé (eq_type_name), detected_generic_types exposés, badge Exclu grisé, background !important, 4 tests ajoutés (31/31) |
 | 2026-03-17 | Correctif post-code-review : suppression du `rowspan` sur la colonne Objet/Pièce — répétition du nom sur chaque ligne d'équipement (274/274 tests verts) |
+| 2026-03-18 | Clôture finale : validation terrain PASS, accordéon enrichi (commandes OK/KO), style Jeedom réel validé, story marquée DONE |
