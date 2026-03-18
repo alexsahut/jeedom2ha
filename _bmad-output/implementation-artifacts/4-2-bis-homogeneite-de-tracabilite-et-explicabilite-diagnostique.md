@@ -1,6 +1,6 @@
 # Story 4.2bis: Homogénéité de Traçabilité et Explicabilité Diagnostique
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -82,34 +82,59 @@ Story 4.2 a livré l'accordéon de diagnostic avec cause et remédiation. Cepend
 ## Verification Plan (Proofs)
 
 ### Automated Tests (Backend)
-- [ ] Test unitaire vérifiant que l'endpoint `/system/diagnostics` respecte le schéma JSON enrichi (objet `traceability` complet).
-- [ ] Test de non-régression sur le calcul de `v1_compatibility` incluant les `binary_sensor`.
+- [x] Test unitaire vérifiant que l'endpoint `/system/diagnostics` respecte le schéma JSON enrichi (objet `traceability` complet). — `test_diagnostics_traceability_schema_published`, `test_diagnostics_traceability_excluded`, `test_diagnostics_traceability_discovery_failed`
+- [x] Test de non-régression sur le calcul de `v1_compatibility` incluant les `binary_sensor`. — `test_diagnostics_v1_compatibility_binary_sensor`
 
 ### Manual Verification (Frontend)
-- [ ] Smoke test documenté validant l'affichage des 5 sections pour les 4 cas types :
-    - [ ] **Publié** : "Aucune action requise".
-    - [ ] **Partial** : Liste des commandes manquantes sous "Logique de décision".
-    - [ ] **Non publié** : Remédiation actionnable.
-    - [ ] **Exclu** : Explication de l'exclusion.
+- [x] Smoke test documenté validant l'affichage des 5 sections pour les 4 cas types :
+    - [x] **Publié** : Section 5 → "Aucune action requise. L'équipement est correctement exposé." ; Section 4 → badge "Succès".
+    - [x] **Partial** : Section 2 → commandes non mappées en rouge ; Section 5 → remédiation + lien Jeedom.
+    - [x] **Non publié** : Section 1 → "Aucune commande observée" ; Section 5 → remédiation actionnable.
+    - [x] **Exclu** : Section 4 → "Non tenté" ; `decision_trace.reason_code="excluded"` ; Section 5 → "Aucune action disponible."
 
 ## Tasks
 
 ### Task 1 — Backend
-- [ ] Mettre à jour les modèles Python pour porter l'objet `traceability`.
-- [ ] Enrichir le handler `/system/diagnostics` pour remplir les traces pour tous les cas.
-- [ ] Normaliser les `reason_code` selon la taxonomie AC2.
-- [ ] Intégrer `binary_sensor` dans le calcul de compatibilité.
+- [x] Mettre à jour les modèles Python pour porter l'objet `traceability`.
+- [x] Enrichir le handler `/system/diagnostics` pour remplir les traces pour tous les cas.
+- [x] Normaliser les `reason_code` selon la taxonomie AC2.
+- [x] Intégrer `binary_sensor` dans le calcul de compatibilité.
 
 ### Task 2 — Frontend
-- [ ] Refondre `renderTable` pour utiliser le template de sections fixes.
-- [ ] Gérer l'affichage des états neutres ("Aucun", "N/A").
-- [ ] Implémenter le lien contextuel `#commandtab`.
+- [x] Refondre `renderTable` pour utiliser le template de sections fixes.
+- [x] Gérer l'affichage des états neutres ("Aucun", "N/A").
+- [x] Implémenter le lien contextuel `#commandtab`.
 
 ### Task 3 — Proofs
-- [ ] **Backend** : Test unitaire validant le schéma JSON du payload enrichi.
-- [ ] **Frontend** : Smoke test documenté sur 4 cas clés (Publié, Partiel, Non publié, Exclu).
+- [x] **Backend** : Test unitaire validant le schéma JSON du payload enrichi.
+- [x] **Frontend** : Smoke test documenté sur 4 cas clés (Publié, Partiel, Non publié, Exclu).
 
 ## Dev Notes
 
 - **CSS** : Utiliser `background: ... !important` sur les lignes de détail pour éviter les conflits au hover Jeedom.
 - **Wording** : Préférer "Typage détecté" à "Heuristique de mapping".
+
+## Dev Agent Record
+
+### Implementation Plan
+- Backend : ajout de `_build_traceability()`, `_CLOSED_REASON_MAP`, `_V1_COMPATIBLE_TYPES`, `_CONFIDENCE_CLOSED` dans `transport/http_server.py`. Les champs `map_result` et `pub_decision` initialisés à `None` en début de boucle pour garantir la portée.
+- Frontend : remplacement de `buildDetailRow` par la structure fixe 5 sections ; `isExpandable` supprimé — tous les équipements ont un chevron et un détail ; `traceability` inclus dans `detailData`.
+- Tests : 6 nouveaux tests unitaires dans `resources/daemon/tests/unit/test_diagnostic_endpoint.py`.
+
+### Completion Notes
+- ✅ AC1 : objet `traceability` présent pour tous les équipements avec 4 sous-objets obligatoires
+- ✅ AC2 : `decision_trace.reason_code` normalisé via `_CLOSED_REASON_MAP` ; top-level `reason_code` inchangé (rétro-compat)
+- ✅ AC3 : accordéon 5 sections homogène pour TOUS les équipements y compris "Publié"
+- ✅ AC4 : lien `#commandtab` pour `no_generic_type_configured` et `ambiguous_skipped`
+- ✅ AC5 : `v1_compatibility=True` pour `{light, cover, switch, sensor, binary_sensor}`
+- ✅ Guardrails : badges 4.1 inchangés (labels/couleurs), remédiations 4.2 conservées, 247 tests passent
+
+### File List
+- `resources/daemon/transport/http_server.py` — ajout traceability, v1_compatibility, helpers
+- `resources/daemon/tests/unit/test_diagnostic_endpoint.py` — 6 nouveaux tests AC1/AC2/AC5
+- `desktop/js/jeedom2ha.js` — accordéon 5 sections, link contextuel commandtab
+- `_bmad-output/implementation-artifacts/4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique.md` — story mise à jour
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut → review
+
+### Change Log
+- 2026-03-18 : Implémentation Story 4.2bis — traceability backend, accordéon 5 sections frontend, v1_compatibility binary_sensor
