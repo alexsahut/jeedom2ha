@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-18
+last_updated: 2026-03-19  # story 4-3 review approved → done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   2-3-mapping-exposition-des-ouvrants-volets: done
   2-4-mapping-exposition-des-prises-switches: done
   2-5-mapping-exposition-des-capteurs-numeriques-binaires: done
-  2-6-deduplication-commandes-generic-type-dupliquees: done  # PR #15 merged 2026-03-18, validation terrain eq_id=510 reste a faire
+  2-6-deduplication-commandes-generic-type-dupliquees: done  # PR #15 merged 2026-03-18, validation terrain 2026-03-19: aucun cas binary+numeric sur le parc — comportement conservatif (ambiguous) conforme sur eq_id 510/511/446
   epic-2-retrospective: done
   epic-3: done
   3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
@@ -65,7 +65,7 @@ development_status:
   4-1-interface-de-diagnostic-de-couverture: done
   4-2-diagnostic-detaille-et-suggestions-de-remediation: done
   4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: done  # PR #14 merged 2026-03-18, validation terrain OK
-  4-3-gestion-des-exclusions-et-actions-manuelles: backlog
+  4-3-gestion-des-exclusions-et-actions-manuelles: done
   4-4-export-de-diagnostic-pour-support: backlog
   epic-4-retrospective: optional
   epic-5: backlog

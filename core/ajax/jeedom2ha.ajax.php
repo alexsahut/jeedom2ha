@@ -139,6 +139,22 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'saveFilteringConfig') {
+      $excludedPlugins  = init('excludedPlugins', '');
+      $excludedObjects  = init('excludedObjects', '');
+      $confidencePolicy = init('confidencePolicy', 'sure_probable');
+      // Validation : valeurs autorisées uniquement
+      if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
+        $confidencePolicy = 'sure_probable';
+      }
+      config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');
+      config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');
+      config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');
+      log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins="'
+        . $excludedPlugins . '" excludedObjects="' . $excludedObjects
+        . '" confidencePolicy="' . $confidencePolicy . '"');
+      ajax::success(['saved' => true]);
+    }
     else {
       throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
     }

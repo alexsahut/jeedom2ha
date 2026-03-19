@@ -106,6 +106,55 @@ if (!isConnect()) {
   </fieldset>
 </form>
 
+<form class="form-horizontal">
+  <fieldset>
+    <legend><i class="fas fa-filter"></i> {{Filtrage &amp; Publication}}</legend>
+
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Plugins exclus}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Noms des plugins à exclure de la publication (eq_type_name)}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="excludedPlugins"
+               placeholder="virtual,zwave,rfxcom"/>
+        <span class="help-block">{{Noms de plugins séparés par des virgules (eq_type_name). Laisser vide = aucune exclusion.}}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Pièces exclues}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{IDs numériques des objets/pièces Jeedom à exclure}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="excludedObjects"
+               placeholder="1,5,12"/>
+        <span class="help-block">{{IDs d'objets Jeedom séparés par des virgules. Laisser vide = aucune exclusion.}}</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Politique de publication}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Niveau de confiance minimum pour publier un équipement}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <select class="configKey form-control" data-l1key="confidencePolicy">
+          <option value="sure_probable">{{Publier les équipements sûrs et probables (recommandé)}}</option>
+          <option value="sure_only">{{Publier uniquement les équipements sûrs}}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="col-md-offset-4 col-md-4">
+        <button type="button" id="bt_applyAndRescan" class="btn btn-primary">
+          <i class="fas fa-sync"></i> {{Appliquer et Rescanner}}
+        </button>
+        <span id="span_rescanResult" class="label" style="display:none; margin-left:10px;"></span>
+      </div>
+    </div>
+  </fieldset>
+</form>
+
 <script>
 // JS inline dans configuration.php — NE PAS déplacer dans desktop/js/jeedom2ha.js
 // Ce fichier n'est pas chargé sur la vue de configuration plugin.
@@ -233,6 +282,70 @@ $(function() {
     $('.configKey[data-l1key=mqttTlsVerify]').prop('checked', false);
     $('#span_mqttPasswordStatus').hide();
     $('#div_mqtt_autodetect_status').hide();
+  });
+
+  // ---- Appliquer et Rescanner : save → scan chaîné (Story 4.3) ----
+  // JS inline dans configuration.php — NE PAS déplacer dans desktop/js/jeedom2ha.js
+  $('#bt_applyAndRescan').on('click', function() {
+    var $btn = $(this);
+    var $status = $('#span_rescanResult');
+    $btn.prop('disabled', true);
+    $status.removeClass('label-success label-danger label-warning')
+           .text('{{Sauvegarde en cours...}}').show();
+
+    // Étape 1 : sauvegarder les champs de filtrage explicitement
+    $.ajax({
+      type: 'POST',
+      url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+      data: {
+        action:           'saveFilteringConfig',
+        excludedPlugins:  $('.configKey[data-l1key=excludedPlugins]').val(),
+        excludedObjects:  $('.configKey[data-l1key=excludedObjects]').val(),
+        confidencePolicy: $('.configKey[data-l1key=confidencePolicy]').val()
+      },
+      dataType: 'json',
+      timeout: 10000,
+      success: function(saveData) {
+        if (saveData.state !== 'ok') {
+          $btn.prop('disabled', false);
+          $status.addClass('label-danger')
+                 .text(saveData.result || '{{Erreur lors de la sauvegarde}}');
+          return;
+        }
+        // Étape 2 : lancer le rescan avec la config fraîchement sauvegardée
+        $status.text('{{Rescan en cours...}}');
+        $.ajax({
+          type: 'POST',
+          url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+          data: {action: 'scanTopology'},
+          dataType: 'json',
+          timeout: 20000,
+          success: function(scanData) {
+            $btn.prop('disabled', false);
+            if (scanData.state !== 'ok') {
+              $status.addClass('label-danger')
+                     .text(scanData.result || '{{Erreur lors du rescan}}');
+              return;
+            }
+            var r = scanData.result || {};
+            var summary = (r.payload && r.payload.mapping_summary) ? r.payload.mapping_summary : {};
+            var published = (summary.lights_published || 0)
+                          + (summary.covers_published || 0)
+                          + (summary.switches_published || 0);
+            $status.addClass('label-success')
+                   .text('{{Appliqué & Rescan terminé}} — ' + published + ' {{équipement(s) publié(s)}}');
+          },
+          error: function() {
+            $btn.prop('disabled', false);
+            $status.addClass('label-danger').text('{{Erreur de communication lors du rescan}}');
+          }
+        });
+      },
+      error: function() {
+        $btn.prop('disabled', false);
+        $status.addClass('label-danger').text('{{Erreur de communication lors de la sauvegarde}}');
+      }
+    });
   });
 
   // ---- Test de connexion MQTT ----

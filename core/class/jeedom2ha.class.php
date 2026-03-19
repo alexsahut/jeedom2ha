@@ -445,6 +445,15 @@ class jeedom2ha extends eqLogic {
       );
     }
 
+    // Filtrage multicritères (Story 4.3) — lire la config avant la boucle eqLogic
+    $excludedPlugins = array_filter(array_unique(array_map('trim', explode(',', config::byKey('excludedPlugins', __CLASS__, '')))));
+    $excludedObjectsRaw = array_filter(array_unique(array_map('trim', explode(',', config::byKey('excludedObjects', __CLASS__, '')))), 'is_numeric');
+    $excludedObjects = array_map('intval', $excludedObjectsRaw);
+    $confidencePolicy = config::byKey('confidencePolicy', __CLASS__, 'sure_probable');
+    if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
+      $confidencePolicy = 'sure_probable';
+    }
+
     // 2. EqLogics (équipements)
     foreach (eqLogic::all() as $eq) {
       // Exclure les équipements de ce plugin
@@ -480,7 +489,21 @@ class jeedom2ha extends eqLogic {
         );
       }
 
-      $result['eq_logics'][] = array(
+      // Calcul de l'exclusion avec priorité : eqlogic > plugin > object (Story 4.3)
+      $isExcluded = false;
+      $exclusionSource = null;
+      if (method_exists($eq, 'getConfiguration') && (bool)$eq->getConfiguration('jeedom2ha_excluded', false)) {
+        $isExcluded = true;
+        $exclusionSource = 'eqlogic'; // Priorité 1 — exclusion individuelle
+      } elseif (!empty($excludedPlugins) && method_exists($eq, 'getEqType_name') && in_array($eq->getEqType_name(), $excludedPlugins)) {
+        $isExcluded = true;
+        $exclusionSource = 'plugin'; // Priorité 2 — exclusion par plugin
+      } elseif (!empty($excludedObjects) && method_exists($eq, 'getObject_id') && $eq->getObject_id() !== null && in_array((int)$eq->getObject_id(), $excludedObjects)) {
+        $isExcluded = true;
+        $exclusionSource = 'object'; // Priorité 3 — exclusion par pièce
+      }
+
+      $eqData = array(
         'id'           => intval($eq->getId()),
         'name'         => $eq->getName(),
         'object_id'    => (method_exists($eq, 'getObject_id') && $eq->getObject_id() !== null) ? intval($eq->getObject_id()) : null,
@@ -488,11 +511,19 @@ class jeedom2ha extends eqLogic {
         'is_visible'   => method_exists($eq, 'getIsVisible') ? (bool)$eq->getIsVisible() : true,
         'eq_type'      => method_exists($eq, 'getEqType_name') ? $eq->getEqType_name() : 'unknown',
         'generic_type' => method_exists($eq, 'getGeneric_type') ? ($eq->getGeneric_type() ?: null) : null,
-        'is_excluded'  => method_exists($eq, 'getConfiguration') ? (bool)$eq->getConfiguration('jeedom2ha_excluded', false) : false,
+        'is_excluded'  => $isExcluded,
         'status'       => $status,
         'cmds'         => $cmds,
       );
+      // Ajouter exclusion_source uniquement si exclu (ne pas polluer le payload)
+      if ($isExcluded) {
+        $eqData['exclusion_source'] = $exclusionSource;
+      }
+      $result['eq_logics'][] = $eqData;
     }
+
+    // Ajout de sync_config pour la politique de confiance (Story 4.3)
+    $result['sync_config'] = array('confidence_policy' => $confidencePolicy);
 
     log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics');
     return $result;
