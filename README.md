@@ -9,7 +9,7 @@ jeedom2ha est un plugin Jeedom avec démon Python qui expose automatiquement vos
 ## Ce que fait le plugin
 
 - **Discovery automatique** : publie vos équipements Jeedom vers Home Assistant via MQTT Discovery (device discovery mode). Home Assistant les intègre sans configuration manuelle.
-- **Synchronisation des états en temps réel** : les changements d'état Jeedom (allumage, température, position volet…) remontent dans HA en continu.
+- **Synchronisation des états en temps réel** : les changements d'état Jeedom (allumage, position volet, état switch…) remontent dans HA en continu, sur le périmètre publié (lumières, volets, prises).
 - **Pilotage bidirectionnel** : les commandes HA (allumer une lumière, fermer un volet, activer une prise) sont exécutées dans Jeedom avec retour d'état honnête.
 - **Diagnostic intégré** : l'interface explique pourquoi un équipement est publié, non publié, ou ambigu — avec des pistes de remédiation.
 - **Filtrage et exclusions** : excluez des plugins entiers, des pièces Jeedom, ou des équipements individuels. Politique de confiance configurable (sûr uniquement / sûr + probable).
@@ -24,15 +24,14 @@ jeedom2ha est un plugin Jeedom avec démon Python qui expose automatiquement vos
 | Lumières couleur RGB | + `LIGHT_COLOR` | `light` (avec color) |
 | Volets / stores | `FLAP_STATE` + commandes | `cover` |
 | Prises / interrupteurs | `ENERGY_STATE` + `ENERGY_ON`/`ENERGY_OFF` | `switch` |
-| Capteurs numériques | `TEMPERATURE`, `HUMIDITY`, `POWER`… | `sensor` |
-| Capteurs binaires | `DOOR_STATE`, `MOTION_STATE`… | `binary_sensor` |
-
-**Ce que le plugin ne fait pas en V1 :**
-- Thermostats / climate (hors périmètre V1)
+**Ce que le plugin ne fait pas encore :**
+- Capteurs numériques (`TEMPERATURE`, `HUMIDITY`, `POWER`…) → `sensor` : prévu, non implémenté
+- Capteurs binaires (`DOOR_STATE`, `MOTION_STATE`…) → `binary_sensor` : prévu, non implémenté
+- Thermostats / climate
 - Scénarios Jeedom → HA
 - Équipements sans `generic_type` assigné (non publiés, signalés dans le diagnostic)
-- Persistance de la discovery après reboot HA ou Jeedom (en cours de développement)
-- Export de diagnostic (prévu dans une prochaine version)
+- Republication automatique si le broker MQTT est redémarré (les messages retain sont perdus — rescan manuel nécessaire)
+- Export de diagnostic
 
 ---
 
@@ -158,7 +157,9 @@ Niveaux utiles :
 | Statut | Beta — fonctionnel sur périmètre V1, en développement actif |
 | Auteur | Alexandre SAHUT |
 
-Le plugin est en développement actif. La persistance post-reboot, l'export de diagnostic et le nettoyage automatique des entités HA sont prévus dans les prochaines versions.
+Le plugin est en développement actif. Le mapping des capteurs (sensor / binary_sensor), l'export de diagnostic et la republication automatique après redémarrage broker sont prévus dans les prochaines versions.
+
+> **Note restart** : après un redémarrage du démon jeedom2ha (sans redémarrage de Jeedom), les entités redeviennent pilotables automatiquement. Après un redémarrage du broker MQTT, un rescan manuel est nécessaire.
 
 ---
 

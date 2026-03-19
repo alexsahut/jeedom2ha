@@ -38,6 +38,7 @@
 - Story 2.3 : mapping et exposition des volets/covers
 - Story 2.2 : mapping et exposition des lumières (on/off, dimmable, RGB)
 - Story 2.1 : topology scraper, contexte spatial (pièces Jeedom → suggested_area)
+- Story 2.5 (capteurs numériques et binaires) : non intégré — prévu dans une prochaine version
 - Story 1.3 : validation de la connexion et statut du pont (badge MQTT)
 - Story 1.2-bis : fiabilisation de l'auto-détection MQTT Manager, import forcé
 - Story 1.2 : configuration et onboarding MQTT (auto-détection / manuel, TLS)

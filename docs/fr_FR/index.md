@@ -34,10 +34,9 @@ jeedom2ha fonctionne comme un pont local : le démon Python scrute votre install
 | Lumières RGB | `light` | + `LIGHT_COLOR` |
 | Volets / stores | `cover` | `FLAP_STATE` + commandes |
 | Prises / switches | `switch` | `ENERGY_STATE` + `ENERGY_ON`/`ENERGY_OFF` |
-| Capteurs numériques | `sensor` | `TEMPERATURE`, `HUMIDITY`, `POWER`… |
-| Capteurs binaires | `binary_sensor` | `DOOR_STATE`, `MOTION_STATE`… |
+**Hors périmètre V1 (non encore implémenté) :** capteurs numériques (`sensor`), capteurs binaires (`binary_sensor`), thermostats, scénarios, équipements sans `generic_type`.
 
-**Hors périmètre V1 :** thermostats, scénarios, équipements sans `generic_type`.
+> Les capteurs figurent dans le diagnostic avec un statut "type V1 compatible" mais ne sont pas publiés dans cette version.
 
 ---
 
@@ -98,6 +97,9 @@ Après modification, cliquez **"Appliquer et Rescanner"** pour propager vers HA.
 4. Dans Home Assistant → **Paramètres → Appareils & Services → MQTT**, vos équipements apparaissent.
 
 > Si des équipements n'apparaissent pas, consultez le **Diagnostic** depuis la page principale du plugin.
+
+> **Après un redémarrage du démon** (sans redémarrage de Jeedom) : les entités redeviennent pilotables automatiquement.
+> **Après un redémarrage du broker MQTT** : les messages retain sont perdus — relancez un rescan depuis la configuration.
 
 ---
 
