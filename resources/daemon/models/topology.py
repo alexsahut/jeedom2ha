@@ -91,6 +91,7 @@ class JeedomEqLogic:
     eq_type_name: str = ""          # nom du plugin source (zwave, zigbee, virtual, etc.)
     generic_type: Optional[str] = None
     is_excluded: bool = False       # flag d'exclusion jeedom2ha
+    exclusion_source: Optional[str] = None  # "eqlogic" | "plugin" | "object" (Story 4.3)
     local_availability_supported: bool = False
     local_availability_state: str = AVAILABILITY_UNKNOWN
     local_availability_reason: str = "timeout_missing"
@@ -170,6 +171,7 @@ class TopologySnapshot:
                     eq_type_name=str(eq_raw.get("eq_type", "")),
                     generic_type=eq_raw.get("generic_type") or None,
                     is_excluded=_to_bool(eq_raw.get("is_excluded"), default=False),
+                    exclusion_source=eq_raw.get("exclusion_source") or None,
                     local_availability_supported=local_supported,
                     local_availability_state=local_state,
                     local_availability_reason=local_reason,
@@ -192,13 +194,23 @@ class TopologySnapshot:
             return self.objects[eq.object_id].name
         return None
 
+_EXCLUSION_SOURCE_TO_REASON = {
+    "eqlogic": "excluded_eqlogic",
+    "plugin":  "excluded_plugin",
+    "object":  "excluded_object",
+}
+
+
 def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
     """
     Évalue l'éligibilité d'un équipement selon les règles métier.
     Ordre de priorité : Exclu > Désactivé > Sans commandes > Sans type générique.
     """
     if eq.is_excluded:
-        return EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic", confidence="sure")
+        # Story 4.3 : utiliser exclusion_source pour affiner le reason_code
+        source = eq.exclusion_source or "eqlogic"  # défaut rétro-compatible
+        reason_code = _EXCLUSION_SOURCE_TO_REASON.get(source, "excluded_eqlogic")
+        return EligibilityResult(is_eligible=False, reason_code=reason_code, confidence="sure")
 
     if not eq.is_enable:
         return EligibilityResult(is_eligible=False, reason_code="disabled_eqlogic", confidence="sure")

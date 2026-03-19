@@ -249,12 +249,17 @@ class SwitchMapper:
             reason_details={"device_class_source": eq.eq_type_name or ""},
         )
 
-    def decide_publication(self, mapping: MappingResult) -> PublicationDecision:
+    def decide_publication(self, mapping: MappingResult, confidence_policy: str = "sure_probable") -> PublicationDecision:
         """Apply the bounded publication policy for Story 2.4.
 
+        confidence_policy: "sure_probable" (default) publie sure+probable.
+        confidence_policy: "sure_only" bloque probable (Story 4.3).
         Returns a PublicationDecision indicating whether to publish.
         """
-        should_publish = SWITCH_PUBLICATION_POLICY.get(mapping.confidence, False)
+        policy = dict(SWITCH_PUBLICATION_POLICY)  # copie locale — ne jamais modifier la constante
+        if confidence_policy == "sure_only":
+            policy["probable"] = False
+        should_publish = policy.get(mapping.confidence, False)
 
         if should_publish:
             reason = mapping.confidence

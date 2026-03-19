@@ -453,9 +453,16 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
 
     data = await request.json()
     payload = data.get("payload", {})
-    
-    _LOGGER.info("[TOPOLOGY] Received sync request")
-    
+
+    # Story 4.3 — Extraire et valider confidence_policy avant de traiter la topologie
+    sync_config = payload.get("sync_config", {})
+    confidence_policy = sync_config.get("confidence_policy", "sure_probable")
+    if confidence_policy not in ("sure_only", "sure_probable"):
+        _LOGGER.warning("[SYNC] confidence_policy invalide '%s' → fallback sure_probable", confidence_policy)
+        confidence_policy = "sure_probable"
+
+    _LOGGER.info("[TOPOLOGY] Received sync request (confidence_policy=%s)", confidence_policy)
+
     # 1. Normalize and store snapshot
     snapshot = TopologySnapshot.from_jeedom_payload(payload)
     request.app["topology"] = snapshot
@@ -550,7 +557,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                 mapping_counters["lights_ambiguous"] += 1
             
             # Decide publication
-            decision = light_mapper.decide_publication(mapping)
+            decision = light_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
@@ -605,7 +612,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                 mapping_counters["covers_ambiguous"] += 1
             
             # Decide publication
-            decision = cover_mapper.decide_publication(mapping)
+            decision = cover_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
@@ -660,7 +667,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                 mapping_counters["switches_ambiguous"] += 1
 
             # Decide publication
-            decision = switch_mapper.decide_publication(mapping)
+            decision = switch_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
@@ -726,6 +733,49 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
                 )
                 _defer_local_availability_cleanup(pending_local_cleanup, eq_id, previous_local_topic)
             
+    # Story 4.3 — Task 2.7 : dépublication des équipements éligibles mais bloqués par la policy
+    # Cas : était publié avec "probable" sous "sure_probable", maintenant "sure_only" → unpublish
+    # Ces eq_ids sont dans nouveaux_eq_ids (toujours éligibles) donc NON couverts par eq_ids_supprimes
+    for eq_id in nouveaux_eq_ids:
+        previous_decision = request.app["publications"].get(eq_id)
+        current_decision = publications.get(eq_id)
+        if (previous_decision is not None
+                and _needs_discovery_unpublish(previous_decision)
+                and current_decision is not None
+                and not current_decision.should_publish):
+            entity_type = previous_decision.mapping_result.ha_entity_type
+            _LOGGER.info(
+                "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
+                eq_id, previous_decision.reason, current_decision.reason,
+            )
+            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+                if unpublish_ok:
+                    pending_discovery_unpublish.pop(eq_id, None)
+                else:
+                    _LOGGER.warning(
+                        "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
+                        eq_id,
+                    )
+                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+            else:
+                _LOGGER.warning(
+                    "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
+                    eq_id,
+                )
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+            # Nettoyer la disponibilité locale si elle était présente
+            if bool(getattr(previous_decision, "local_availability_supported", False)):
+                prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+                if mqtt_bridge and mqtt_bridge.is_connected:
+                    clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, prev_local_topic)
+                    if clear_ok:
+                        pending_local_cleanup.pop(eq_id, None)
+                    else:
+                        _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+                else:
+                    _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
     for old_eq_id in eq_ids_supprimes:
@@ -831,6 +881,16 @@ _DIAGNOSTIC_MESSAGES = {
         "Vérifiez que l'équipement possède des commandes actives dans Jeedom.",
         False,
     ),
+    "excluded_plugin": (
+        "Cet équipement est exclu car son plugin source figure dans la liste d'exclusions.",
+        "Pour le publier, retirez son plugin de la liste d'exclusions dans la configuration.",
+        False,
+    ),
+    "excluded_object": (
+        "Cet équipement est exclu car sa pièce/objet figure dans la liste d'exclusions.",
+        "Pour le publier, retirez sa pièce de la liste d'exclusions dans la configuration.",
+        False,
+    ),
     "no_supported_generic_type": (
         "Aucune commande de cet équipement n'a un type générique supporté par le plugin.",
         "Ce type d'équipement n'est pas encore supporté en V1, ou les types génériques "
@@ -857,6 +917,13 @@ _DIAGNOSTIC_MESSAGES = {
         "Le plugin ne publie pas en cas d'ambiguïté.",
         "Précisez les types génériques sur les commandes pour lever l'ambiguïté "
         "et permettre une publication fiable.",
+        False,
+    ),
+    "probable_skipped": (
+        "Cet équipement a un niveau de confiance 'probable' mais la politique de publication "
+        "est configurée sur 'sûr uniquement'. Il n'est donc pas publié.",
+        "Pour le publier, passez la politique de publication à 'sûr et probable' "
+        "dans la configuration du plugin, puis relancez un rescan.",
         False,
     ),
     "no_mapping": (
@@ -905,12 +972,18 @@ def _get_diagnostic_enrichment(reason_code: str) -> tuple:
     return _DIAGNOSTIC_MESSAGES.get(reason_code, _DIAGNOSTIC_DEFAULT)
 
 
+# Ensemble des reason_codes correspondant à une exclusion (Story 4.3)
+_EXCLUDED_REASON_CODES: frozenset = frozenset({"excluded_eqlogic", "excluded_plugin", "excluded_object"})
+
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
 # Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
-#                no_generic_type_configured, no_supported_generic_type, discovery_publish_failed
+#                confidence_policy_skipped, no_generic_type_configured,
+#                no_supported_generic_type, discovery_publish_failed
 _CLOSED_REASON_MAP: dict = {
     # Eligibility — codes normalisés
     "excluded_eqlogic": "excluded",
+    "excluded_plugin":  "excluded",   # Story 4.3
+    "excluded_object":  "excluded",   # Story 4.3
     "excluded": "excluded",
     "disabled": "disabled_eqlogic",            # legacy alias (ancienne v1 du plugin)
     "disabled_eqlogic": "disabled_eqlogic",
@@ -921,6 +994,7 @@ _CLOSED_REASON_MAP: dict = {
     # Publication / mapping
     "ambiguous_skipped": "ambiguous_skipped",
     "ambiguous": "ambiguous_skipped",           # legacy map_result.reason_code
+    "probable_skipped": "confidence_policy_skipped",  # Story 4.3 — bloqué par politique de confiance sure_only
     "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
     "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
     "discovery_publish_failed": "discovery_publish_failed",
@@ -1052,7 +1126,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         if el_result:
             reason_code = el_result.reason_code
             if not el_result.is_eligible:
-                if el_result.reason_code == "excluded_eqlogic":
+                if el_result.reason_code in _EXCLUDED_REASON_CODES:
                     status = "Exclu"
                     confidence = "Ignoré"
                 else:
