@@ -99,7 +99,7 @@ Après modification, cliquez **"Appliquer et Rescanner"** pour propager vers HA.
 > Si des équipements n'apparaissent pas, consultez le **Diagnostic** depuis la page principale du plugin.
 
 > **Après un redémarrage du démon** (sans redémarrage de Jeedom) : les entités redeviennent pilotables automatiquement.
-> **Après un redémarrage du broker MQTT** : les messages retain sont perdus — relancez un rescan depuis la configuration.
+> **Après un redémarrage du broker MQTT** : le comportement dépend de la configuration de persistance du broker. Si les messages retained sont conservés, Home Assistant retrouve les entités sans action. Sinon, relancez un rescan depuis la configuration.
 
 ---
 

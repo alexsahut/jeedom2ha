@@ -159,7 +159,7 @@ Niveaux utiles :
 
 Le plugin est en développement actif. Le mapping des capteurs (sensor / binary_sensor), l'export de diagnostic et la republication automatique après redémarrage broker sont prévus dans les prochaines versions.
 
-> **Note restart** : après un redémarrage du démon jeedom2ha (sans redémarrage de Jeedom), les entités redeviennent pilotables automatiquement. Après un redémarrage du broker MQTT, un rescan manuel est nécessaire.
+> **Note restart** : après un redémarrage du démon jeedom2ha (sans redémarrage de Jeedom), les entités redeviennent pilotables automatiquement. Après un redémarrage du broker MQTT, le comportement dépend de la configuration de persistance du broker : si les messages retained sont conservés, Home Assistant retrouve les entités sans action ; sinon, un rescan manuel depuis la configuration est nécessaire.
 
 ---
 
