@@ -1,18 +1,137 @@
-# Plugin template
+# Jeedom2HA — Documentation
 
-Ce "template de plugin" sert de base à la réalisation de plugins pour **Jeedom**.
+**Plugin de pont Jeedom → Home Assistant via MQTT Discovery**
 
-La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/).
+Ce plugin expose automatiquement vos équipements Jeedom comme des entités natives Home Assistant, sans migration ni reconstruction manuelle.
 
-Dans le détail :   
-* [Utilisation du template de plugin](https://doc.jeedom.com/fr_FR/dev/plugin_template) : Le template de plugin est une base de plugin pour Jeedom qui doit être adaptée avec l'id de votre plugin et à laquelle il suffit d'ajouter vos propres fonctions.
+---
 
-* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
+## Table des matières
 
-* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Afin de pouvoir être publié sur le Market Jeedom, tout plugin doit disposer d’une icône. Attention à ne pas utiliser le même code couleur que les icônes des plugins Jeedom officiels.
+- [Présentation](#présentation)
+- [Prérequis](#prérequis)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Première synchronisation](#première-synchronisation)
+- [Diagnostic](#diagnostic)
+- [Troubleshooting](#troubleshooting)
+- [Changelog](changelog.md)
 
-* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Présentation des différentes manières d'inclure des widgets personnalisés au plugin.
+---
 
-* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Présentation de la mise en place d'une documentation car un bon plugin n'est rien sans documentation adéquate.
+## Présentation
 
-* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Description des pré-requis indispensables à la publication du plugin.
+jeedom2ha fonctionne comme un pont local : le démon Python scrute votre installation Jeedom via l'API JSON-RPC, construit un mapping `generic_type → entité HA`, et publie le résultat vers Home Assistant via MQTT Discovery.
+
+**Jeedom reste le moteur d'exécution.** Home Assistant voit les entités comme des appareils natifs, avec états, disponibilité et suggested_area (depuis vos pièces Jeedom).
+
+### Périmètre V1
+
+| Type | Entité HA | Conditions |
+|---|---|---|
+| Lumières on/off | `light` | `LIGHT_STATE` + `LIGHT_ON`/`LIGHT_OFF` |
+| Lumières dimmables | `light` | + `LIGHT_SLIDER` |
+| Lumières RGB | `light` | + `LIGHT_COLOR` |
+| Volets / stores | `cover` | `FLAP_STATE` + commandes |
+| Prises / switches | `switch` | `ENERGY_STATE` + `ENERGY_ON`/`ENERGY_OFF` |
+**Hors périmètre V1 (non encore implémenté) :** capteurs numériques (`sensor`), capteurs binaires (`binary_sensor`), thermostats, scénarios, équipements sans `generic_type`.
+
+> Les capteurs figurent dans le diagnostic avec un statut "type V1 compatible" mais ne sont pas publiés dans cette version.
+
+---
+
+## Prérequis
+
+- Jeedom Core **v4.4.9+** (PHP 8.x)
+- Debian **12+** ou Raspberry Pi OS récent
+- Python **3.9+**
+- Broker MQTT — MQTT Manager (mqtt2, recommandé) ou broker externe (Mosquitto, etc.)
+- Home Assistant avec intégration MQTT activée et device discovery actif
+
+---
+
+## Installation
+
+1. Installez le plugin depuis le Market Jeedom ou depuis GitHub (branche `beta`).
+2. Sur la page du plugin, cliquez **"Installer les dépendances"**.
+3. Attendez la fin de l'installation (suivi dans les logs `jeedom2ha`).
+4. Démarrez le démon.
+
+---
+
+## Configuration
+
+Accédez à la configuration via : **Plugins → Jeedom2HA → icône Configuration (roue dentée)**.
+
+### Broker MQTT
+
+Si MQTT Manager est installé et actif, les paramètres broker sont pré-remplis automatiquement. Utilisez **"Tester la connexion"** pour valider.
+
+Sans MQTT Manager :
+
+| Champ | Valeur |
+|---|---|
+| Hôte MQTT | Adresse IP ou hostname du broker |
+| Port | 1883 (standard) ou 8883 (TLS) |
+| Utilisateur | Si authentification requise |
+| Mot de passe | Si authentification requise |
+| TLS | Cocher pour connexion chiffrée |
+
+### Filtrage & Publication
+
+| Option | Description |
+|---|---|
+| Plugins exclus | Noms de plugins à ne pas publier (ex: `virtual,zwave`) |
+| Pièces exclues | IDs numériques des objets Jeedom à exclure |
+| Politique de publication | `Sûr + Probable` (recommandé) ou `Sûr uniquement` |
+
+Après modification, cliquez **"Appliquer et Rescanner"** pour propager vers HA.
+
+---
+
+## Première synchronisation
+
+1. Configurez le broker MQTT et testez la connexion.
+2. Ajustez les filtres si nécessaire.
+3. Cliquez **"Appliquer et Rescanner"**.
+4. Dans Home Assistant → **Paramètres → Appareils & Services → MQTT**, vos équipements apparaissent.
+
+> Si des équipements n'apparaissent pas, consultez le **Diagnostic** depuis la page principale du plugin.
+
+> **Après un redémarrage du démon** (sans redémarrage de Jeedom) : les entités redeviennent pilotables automatiquement.
+> **Après un redémarrage du broker MQTT** : le comportement dépend de la configuration de persistance du broker. Si les messages retained sont conservés, Home Assistant retrouve les entités sans action. Sinon, relancez un rescan depuis la configuration.
+
+---
+
+## Diagnostic
+
+Depuis la page principale : bouton **"Diagnostic"**.
+
+L'interface affiche pour chaque équipement Jeedom :
+- **Statut** : publié / non publié / ambigu
+- **Raison** : generic_type manquant, structure incomplète, exclu manuellement…
+- **Suggestion** : action corrective proposée
+
+### Logs
+
+**Jeedom → Analyse → Logs → `jeedom2ha`**
+
+Niveaux recommandés :
+- `info` : synchronisation, connexion, publication discovery
+- `debug` : détail MQTT, mapping équipement par équipement
+
+---
+
+## Troubleshooting
+
+| Symptôme | Cause probable | Action |
+|---|---|---|
+| Démon ne démarre pas | Dépendances manquantes | Relancer l'installation des dépendances |
+| Broker non joignable | Mauvais paramètres | Tester connexion depuis la configuration |
+| Équipements absents dans HA | `generic_type` non assigné | Diagnostic → colonne Raison |
+| États non mis à jour | Démon stoppé ou broker coupé | Vérifier statut démon + logs |
+| Entités dupliquées dans HA | Rescan après changement d'ID | Supprimer orphelins dans HA → rescanner |
+
+---
+
+Pour signaler un problème : [github.com/alexsahut/jeedom2ha/issues](https://github.com/alexsahut/jeedom2ha/issues)
