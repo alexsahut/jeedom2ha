@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient: deep navy to slate blue -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2744"/>
+      <stop offset="100%" style="stop-color:#243056"/>
+    </linearGradient>
+    <!-- Left node glow (Jeedom green) -->
+    <radialGradient id="left-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#4cde6a;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#4cde6a;stop-opacity:0"/>
+    </radialGradient>
+    <!-- Right node glow (HA blue) -->
+    <radialGradient id="right-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#38bdf8;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Subtle grid / connector track -->
+  <line x1="136" y1="256" x2="376" y2="256" stroke="#ffffff" stroke-width="3" stroke-opacity="0.12" stroke-dasharray="8,6"/>
+
+  <!-- Left glow aura -->
+  <circle cx="152" cy="256" r="90" fill="url(#left-glow)"/>
+  <!-- Right glow aura -->
+  <circle cx="360" cy="256" r="90" fill="url(#right-glow)"/>
+
+  <!-- Left node: Jeedom — filled circle, green -->
+  <circle cx="152" cy="256" r="60" fill="#22c55e" opacity="0.15"/>
+  <circle cx="152" cy="256" r="48" fill="#16a34a"/>
+  <circle cx="152" cy="256" r="44" fill="none" stroke="#4ade80" stroke-width="2" stroke-opacity="0.6"/>
+  <!-- "J" letter -->
+  <text x="152" y="275" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="44" font-weight="700"
+        text-anchor="middle" fill="#ffffff" opacity="0.95">J</text>
+
+  <!-- Bridge connector with arrowhead -->
+  <!-- Line shaft -->
+  <line x1="206" y1="256" x2="296" y2="256" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-opacity="0.85"/>
+  <!-- Arrowhead (pointing right) -->
+  <polygon points="302,256 285,246 285,266" fill="#ffffff" opacity="0.85"/>
+
+  <!-- Right node: Home Assistant — filled circle, sky blue -->
+  <circle cx="360" cy="256" r="60" fill="#0ea5e9" opacity="0.15"/>
+  <circle cx="360" cy="256" r="48" fill="#0369a1"/>
+  <circle cx="360" cy="256" r="44" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.6"/>
+  <!-- "HA" letters -->
+  <text x="360" y="275" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="30" font-weight="700"
+        text-anchor="middle" fill="#ffffff" opacity="0.95">HA</text>
+
+  <!-- Bottom label: plugin name in small caps -->
+  <text x="256" y="432" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="28" font-weight="600"
+        text-anchor="middle" fill="#ffffff" opacity="0.40" letter-spacing="3">jeedom2ha</text>
+</svg>

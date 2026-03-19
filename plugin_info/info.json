@@ -4,7 +4,8 @@
 	"pluginVersion": "0.1",
 	"specialAttributes": {},
 	"description": {
-		"fr_FR": "Plugin de pont Jeedom vers Home Assistant via MQTT Discovery"
+		"fr_FR": "Plugin de pont Jeedom vers Home Assistant via MQTT Discovery",
+		"en_US": "Jeedom to Home Assistant bridge plugin via MQTT Discovery"
 	},
 	"licence": "AGPL",
 	"author": "Alexandre SAHUT",
