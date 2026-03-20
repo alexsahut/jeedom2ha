@@ -4,7 +4,7 @@ user_name: 'Alexandre'
 date: '2026-03-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 58
+rule_count: 60
 optimized_for_llm: true
 ---
 
@@ -163,8 +163,12 @@ jeedom2ha/
 - **MQTT Manager (`mqtt2`)** : chemin privilégié (détection auto du broker), mais le plugin doit aussi supporter un broker MQTT externe configuré manuellement. Ne pas coder une dépendance structurelle à MQTT Manager.
 
 #### Déploiement
-- **Publication Market** : via token GitHub, synchronisation automatique branche → Market
+- **Publication Market** : via token GitHub, synchronisation automatique branche → Market. Cycle canonique : `main → beta → stable → Jeedom Market`.
 - **Environnement de test** : instance Jeedom de dev avec le plugin installé en mode développeur
+- **Déploiement terrain DEV/TEST ONLY** : utiliser **exclusivement** `scripts/deploy-to-box.sh` pour pousser une branche vers la box Jeedom de test. Ne jamais improviser de rsync ad hoc ou de copie SSH manuelle. Voir `_bmad-output/implementation-artifacts/jeedom2ha-test-context-jeedom-reel.md` pour la documentation complète. Modes disponibles :
+  - `--dry-run` : simulation sans transfert
+  - `--stop-daemon-cleanup` : arrêt daemon + purge discovery HA (entités disparaissent sans republication)
+  - `--cleanup-discovery --restart-daemon` : cycle complet republication + validation discovery
 - **Logs exploitables** : niveaux debug/info/warning/error, toujours via `log::add()` côté PHP et le logger `jeedomdaemon` côté Python
 
 ### Règles Critiques — Anti-Patterns & Edge Cases
@@ -177,6 +181,7 @@ jeedom2ha/
 #### Anti-patterns interdits
 - **NE JAMAIS** créer un type HA "riche" incorrect (ex: `climate`) si la structure Jeedom est insuffisante → publier seulement les commandes individuelles honnêtes (sensor / binary_sensor / switch / number / button / select selon les cas) ou ne pas publier.
 - **NE JAMAIS** utiliser les noms d'équipements comme identifiants → toujours les IDs numériques Jeedom
+- **NE JAMAIS** improviser de déploiement terrain (rsync ad hoc, copie SSH manuelle, procédure parallèle) → utiliser exclusivement `scripts/deploy-to-box.sh`
 - **NE JAMAIS** publier automatiquement sans que l'utilisateur ait validé le périmètre
 - **NE JAMAIS** laisser d'entités orphelines dans HA après suppression côté Jeedom
 - **Préférer l'état réel** relu depuis Jeedom, mais accepter le mode optimiste ou stateless quand aucun retour d'état fiable n'existe. Ne jamais mentir sur l'état — signaler clairement l'absence de retour plutôt que simuler un état faux.
@@ -224,4 +229,4 @@ jeedom2ha/
 - Réviser périodiquement pour retirer les règles devenues évidentes
 - Ajouter les nouvelles conventions découvertes en cours de développement
 
-Last Updated: 2026-03-15
+Last Updated: 2026-03-19
