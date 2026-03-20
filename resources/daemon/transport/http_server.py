@@ -7,6 +7,7 @@ import asyncio
 import logging
 import socket
 import ssl
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -217,6 +218,7 @@ async def _handle_system_status(request: web.Request) -> web.Response:
             "version": _VERSION,
             "uptime": round(uptime, 2),
             "mqtt": mqtt_section,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -975,6 +977,14 @@ def _get_diagnostic_enrichment(reason_code: str) -> tuple:
 # Ensemble des reason_codes correspondant à une exclusion (Story 4.3)
 _EXCLUDED_REASON_CODES: frozenset = frozenset({"excluded_eqlogic", "excluded_plugin", "excluded_object"})
 
+# Mapping statut UX → code machine stable pour l'export de diagnostic (Story 4.4)
+_STATUS_CODE_MAP: dict = {
+    "Publié":               "published",
+    "Partiellement publié": "partially_published",
+    "Non publié":           "not_published",
+    "Exclu":                "excluded",
+}
+
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
 # Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
 #                confidence_policy_skipped, no_generic_type_configured,
@@ -1214,12 +1224,16 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # AC1 — Traceability: chaîne de décision complète
         traceability = _build_traceability(eq, map_result, pub_decision, status, reason_code)
 
+        # Story 4.4 — code machine stable pour l'export de diagnostic
+        status_code = _STATUS_CODE_MAP.get(status, "not_published")
+
         equipments.append({
             "eq_id": eq_id,
             "object_name": object_name,
             "name": eq.name,
             "eq_type_name": eq.eq_type_name,
             "status": status,
+            "status_code": status_code,
             "confidence": confidence,
             "reason_code": reason_code,
             "detail": detail,

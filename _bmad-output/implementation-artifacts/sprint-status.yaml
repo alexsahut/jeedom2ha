@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-19  # story 4-3 review approved → done
+last_updated: 2026-03-20  # story 4-4 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -66,7 +66,7 @@ development_status:
   4-2-diagnostic-detaille-et-suggestions-de-remediation: done
   4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: done  # PR #14 merged 2026-03-18, validation terrain OK
   4-3-gestion-des-exclusions-et-actions-manuelles: done
-  4-4-export-de-diagnostic-pour-support: backlog
+  4-4-export-de-diagnostic-pour-support: done  # validation terrain 2026-03-20, 2 fixes post-recette (JS blob anchor, PHP cmd_name pseudo)
   epic-4-retrospective: optional
   epic-5: backlog
   5-1-persistance-et-republication-post-reboot: backlog
