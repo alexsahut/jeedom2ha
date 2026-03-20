@@ -20,6 +20,20 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<span id="span_mqttBroker" style="margin-left:10px;color:#666;font-size:0.9em;"></span>
 		</div>
 
+		<!-- Export diagnostic support -->
+		<div class="form-group" style="margin:4px 5px 10px 5px;">
+			<div class="col-sm-12">
+				<label style="font-weight:normal; margin-right:8px;">
+					<input type="checkbox" id="cb_pseudonymize" style="margin-right:4px;"/>
+					{{Pseudonymiser les noms d'équipements}}
+				</label>
+				<button id="bt_exportDiagnostic" class="btn btn-default btn-sm">
+					<i class="fas fa-download"></i> {{Télécharger le diagnostic support}}
+				</button>
+				<span id="span_exportResult" style="display:none; margin-left:8px;"></span>
+			</div>
+		</div>
+
 		<!-- Boutons de gestion du plugin -->
 		<div class="eqLogicThumbnailContainer">
 			<div class="cursor eqLogicAction logoPrimary" data-action="add">
