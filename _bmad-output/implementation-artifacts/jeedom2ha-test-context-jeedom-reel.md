@@ -284,38 +284,59 @@ Verdict attendu :
 - Si seuls les tests locaux sont verts, le sujet auth Jeedom reste **non valide**.
 - Toute nouvelle methode `jeeApi.php` introduite dans une story doit etre marquee `non demontree` tant qu'un test reel n'a pas ete capture.
 
-## Déploiement Local vers Box de Test (Rsync)
+## Script de Déploiement Local vers Box de Test
 
-Pour pousser une branche de travail locale (Story ou Fix) vers la box Jeedom de test afin d'y exécuter le pré-flight ou les validations, voici la procédure standard basée sur `rsync` :
+> **DEV/TEST ONLY** — Ce script n'est **pas** la procédure de release du projet.
+> Cycle de distribution canonique : `main → beta → stable → Jeedom Market`.
 
-### 1. Sur la machine locale (Mac/Linux)
+Le script de référence pour tout déploiement terrain est : **`scripts/deploy-to-box.sh`**
 
-Définir le chemin absolu direct du dépôt local (ou du worktree) et utiliser le filtre rsync du projet pour pousser vers le home de l'utilisateur sur la box (adapter les chemins et IP si nécessaire). Utiliser un chemin absolu pour la variable `REPO` permet de lancer cette commande depuis n'importe quel dossier :
+Il remplace toute procédure rsync manuelle, copie SSH ad hoc ou improvisation de déploiement. Ce script est la seule interface de déploiement terrain autorisée pour les agents BMAD.
 
-```sh
-# Remplacer le chemin absolu par celui de votre dossier clone ou de votre worktree
-export REPO="/Users/alexandre/Dev/jeedom/plugins/jeedom2ha"
-export DEST="asahut@192.168.1.21:/home/asahut/jeedom2ha/"
+### Guardrail — Règle absolue
 
-rsync -az --delete --delete-after --prune-empty-dirs \
-  --filter="merge ${REPO}/.rsync-plugin-deploy.filter" \
-  "${REPO}/" \
-  "${DEST}"
-```
+> Pour toute story nécessitant un test terrain sur la box Jeedom réelle, utiliser **exclusivement** `scripts/deploy-to-box.sh`.
+> Ne pas improviser de rsync ad hoc, copie SSH manuelle ou procédure parallèle.
 
-### 2. Sur la box Jeedom de test (en root)
+### Prérequis
 
-Synchroniser le home vers le répertoire des plugins d'Apache, puis restaurer les permissions standards Jeedom :
+- Connexion SSH configurée pour l'utilisateur `asahut` (sudo NOPASSWD requis)
+- Variable `JEEDOM_BOX_HOST` définie dans `.env` (voir `.env.example`)
+- `jq` installé localement (`brew install jq`)
 
-```sh
-rsync -a --delete \
-  --exclude 'data/' \
-  /home/asahut/jeedom2ha/ /var/www/html/plugins/jeedom2ha/ && \
-chown -R www-data:www-data /var/www/html/plugins/jeedom2ha && \
-find /var/www/html/plugins/jeedom2ha -type d -exec chmod 755 {} \; && \
-find /var/www/html/plugins/jeedom2ha -type f -exec chmod 644 {} \; && \
-chmod +x /var/www/html/plugins/jeedom2ha/resources/daemon/main.py
-```
+### Modes d'utilisation
+
+| Mode | Commande | Quand l'utiliser |
+|------|----------|-----------------|
+| **Dry-run** | `./scripts/deploy-to-box.sh --dry-run` | Vérifier ce qui sera transféré sans rien déployer |
+| **Stop + cleanup** | `./scripts/deploy-to-box.sh --stop-daemon-cleanup` | Arrêter le daemon + purger les retained discovery HA sans republier — vérifier que les entités disparaissent proprement de HA |
+| **Deploy nominal** | `./scripts/deploy-to-box.sh` | Déployer sans restart ni cleanup (daemon doit être actif) |
+| **Deploy + cleanup + restart** | `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon` | Cycle complet : deploy → cleanup → restart daemon → readiness MQTT → sync → vérification discovery |
+| **Deploy + skip post-deploy** | `./scripts/deploy-to-box.sh --skip-post-deploy` | Déployer sans healthcheck ni sync (daemon non démarré) |
+
+### Cycle complet validé terrain
+
+Le script orchestre dans l'ordre (selon les flags activés) :
+
+1. Pré-checks SSH + sudo
+2. Rsync local → staging (`/home/asahut/jeedom2ha-staging/`)
+3. Sudo promotion staging → `/var/www/html/plugins/jeedom2ha/` + permissions `www-data`
+4. Cleanup retained MQTT discovery (`homeassistant/+/jeedom2ha_*/config`) si `--cleanup-discovery`
+5. Restart daemon (`jeedom2ha::deamon_start`) + boucle readiness MQTT (condition terrain 3.2b-A) si `--restart-daemon`
+6. Healthcheck `GET /system/status` avec `X-Local-Secret`
+7. Build sync body (`jeedom2ha::getFullTopology`)
+8. `POST /action/sync`
+9. Vérification post-sync des topics discovery (si cleanup actif)
+
+### Distinction distribution canonique vs déploiement local
+
+| Dimension | Distribution canonique | Déploiement local DEV/TEST |
+|-----------|----------------------|---------------------------|
+| Chemin | `main → beta → stable → Jeedom Market` | `scripts/deploy-to-box.sh` |
+| Destination | Jeedom Market (utilisateurs finaux) | Box de test (`asahut@<JEEDOM_BOX_HOST>`) |
+| Finalité | Release utilisateur final | Validation terrain d'une story |
+| Permanence | Définitive | Éphémère, remplaçable à tout moment |
+| Droits requis | Token GitHub Market | SSH `asahut` + sudo NOPASSWD |
 
 ## Proposition d'artefact de preflight
 
@@ -328,3 +349,42 @@ Responsabilites attendues :
 - tester `cmd::execCmd` avec `plugin API key` puis `core API key` ;
 - produire une matrice courte `methode -> cle testee -> resultat -> verdict` ;
 - sortir en erreur si le resultat ne correspond pas au contrat d'architecture en vigueur.
+
+## Template Task 0 — Pre-flight terrain (à injecter dans les stories)
+
+Modèle de première tâche à insérer dans toute story nécessitant un test terrain sur la box Jeedom réelle.
+
+---
+
+**Task 0 — Pre-flight terrain**
+
+> Déployer la branche de travail sur la box de test avant tout test métier.
+
+1. Vérification sans transfert (dry-run) :
+   ```sh
+   ./scripts/deploy-to-box.sh --dry-run
+   ```
+2. Choisir le mode selon l'objectif de la story :
+   - Pour vérifier que les entités HA disparaissent sans republier :
+     ```sh
+     ./scripts/deploy-to-box.sh --stop-daemon-cleanup
+     ```
+   - Pour republier et valider le cycle complet (cas nominal) :
+     ```sh
+     ./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon
+     ```
+3. Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
+
+> **Règle** : ne jamais improviser de rsync, copie SSH ou procédure alternative. `scripts/deploy-to-box.sh` est l'unique interface de déploiement terrain DEV/TEST.
+
+---
+
+**Prompt court réutilisable pour agents dev-story :**
+
+```
+Avant tout test terrain, utiliser scripts/deploy-to-box.sh (DEV/TEST ONLY — pas la release Market).
+Dry-run d'abord, puis choisir :
+  - stop-daemon-cleanup : vérifier disparition entités HA sans republier
+  - cleanup-discovery + restart-daemon : cycle complet republication et validation
+Ne jamais improviser de rsync ou copie SSH manuelle.
+```
