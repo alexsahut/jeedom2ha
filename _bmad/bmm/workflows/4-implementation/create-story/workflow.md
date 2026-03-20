@@ -345,6 +345,41 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
   <template-output file="{default_output_file}">
   story_completion_status</template-output>
 
+  <!-- DÉTECTION TERRAIN : injection automatique Task 0 si la story nécessite un test sur box réelle -->
+  <action>Analyser le contenu complet de {default_output_file} (titre, AC, tâches, Dev Notes)
+    pour détecter les mots-clés terrain suivants :
+    daemon, MQTT, discovery HA, bootstrap, runtime, restart daemon, deamon_start, deamon_stop,
+    X-Local-Secret, /system/status, /action/sync, localSecret, box réelle, box Jeedom,
+    test terrain, pré-flight terrain, mosquitto, mqtt2, mosquitto_sub, mosquitto_pub
+  </action>
+  <check if="un ou plusieurs mots-clés terrain sont présents dans la story (titre, AC, tâches ou Dev Notes)">
+    <action>Marquer {{terrain_story}} = true</action>
+    <action>Injecter en tête de la section "Tasks / Subtasks" de {default_output_file},
+      avant toute autre tâche, le bloc suivant :
+
+      - [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+        - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
+        - [ ] Sélectionner le mode selon l'objectif de la story :
+          - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
+          - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
+        - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
+    </action>
+    <action>Ajouter dans la section "Dev Agent Guardrails" de {default_output_file} la sous-section suivante :
+
+      ### Guardrail — Déploiement terrain (DEV/TEST ONLY)
+
+      - Utiliser **exclusivement** `scripts/deploy-to-box.sh` pour tout test sur la box Jeedom réelle
+      - Ne jamais improviser de rsync ad hoc, copie SSH manuelle ou procédure parallèle
+      - Référence complète modes + cycle validé terrain :
+        `_bmad-output/implementation-artifacts/jeedom2ha-test-context-jeedom-reel.md`
+      - Cycle canonique (NON remplacé par le script) : `main → beta → stable → Jeedom Market`
+    </action>
+    <output>⚠️ Story terrain détectée — Task 0 Pre-flight terrain injectée en tête des tâches.</output>
+  </check>
+  <check if="aucun mot-clé terrain détecté dans la story">
+    <action>Marquer {{terrain_story}} = false</action>
+  </check>
+
   <!-- CRITICAL: Set status to ready-for-dev -->
   <action>Set story Status to: "ready-for-dev"</action>
   <action>Add completion note: "Ultimate
@@ -352,6 +387,17 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 </step>
 
 <step n="6" goal="Update sprint status and finalize">
+  <!-- GARDE-FOU TERRAIN : une story terrain n'est pas prête sans Task 0 -->
+  <check if="{{terrain_story}} == true">
+    <action>Vérifier que la section "Tasks / Subtasks" de {default_output_file} contient
+      le bloc "Task 0 — Pre-flight terrain"</action>
+    <check if="Task 0 — Pre-flight terrain est absente de la story">
+      <action>HALT : une story terrain doit contenir la Task 0 Pre-flight terrain
+        avant d'être marquée ready-for-dev.
+        Injecter la Task 0 (contenu défini dans le Step 5 terrain) et relancer la validation Step 6.</action>
+    </check>
+  </check>
+
   <action>Validate the newly created story file {story_file} against {installed_path}/checklist.md and apply any required fixes before finalizing</action>
   <action>Save story document unconditionally</action>
 
