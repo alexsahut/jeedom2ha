@@ -1,4 +1,5 @@
-.PHONY: test test-unit test-integration test-cov
+.PHONY: test test-unit test-integration test-cov \
+        deploy deploy-dry deploy-restart deploy-clean
 
 test:
 	python3 -m pytest tests/ -v
@@ -11,3 +12,16 @@ test-integration:
 
 test-cov:
 	python3 -m pytest --cov=resources/daemon --cov-report=term-missing tests/
+
+# DEV/TEST ONLY — deploy to local test box (not a release procedure)
+deploy:
+	./scripts/deploy-to-box.sh
+
+deploy-dry:
+	./scripts/deploy-to-box.sh --dry-run
+
+deploy-restart:
+	./scripts/deploy-to-box.sh --restart-daemon
+
+deploy-clean:
+	./scripts/deploy-to-box.sh --cleanup-discovery
