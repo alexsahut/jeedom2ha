@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-21  # BUG-1 done
+last_updated: 2026-03-21  # BUG-1 done, story 5.2 rebased
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -61,16 +61,17 @@ development_status:
   3-2-bis-bootstrap-runtime-apres-restart-daemon: done  # cloture produit/projet; validation terrain 3.2b-A/B/C differee et non executee
   3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: done  # tests terrain 3.3-A/B/C valides sur box reelle (2026-03-16)
   epic-3-retrospective: done
-  epic-4: in-progress
+  epic-4: done
   4-1-interface-de-diagnostic-de-couverture: done
   4-2-diagnostic-detaille-et-suggestions-de-remediation: done
   4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: done  # PR #14 merged 2026-03-18, validation terrain OK
   4-3-gestion-des-exclusions-et-actions-manuelles: done
   4-4-export-de-diagnostic-pour-support: done  # validation terrain 2026-03-20, 2 fixes post-recette (JS blob anchor, PHP cmd_name pseudo)
-  epic-4-retrospective: optional
-  epic-5: backlog
-  5-1-persistance-et-republication-post-reboot: backlog
-  5-2-stabilite-des-identifiants-et-renommages: backlog
+  epic-4-retrospective: done  # 2026-03-20
+  epic-5: in-progress
+  5-1-persistance-et-republication-post-reboot: done  # terrain TC-A/B/C/D PASS, code-review APPROVED WITH FOLLOW-UP, 2026-03-20
+  5-1-bis-creation-automatique-repertoire-data: done  # terrain validé 2026-03-21, tous les AC PASS
+  5-2-stabilite-des-identifiants-et-renommages: done  # terrain TC-1/TC-2/TC-3 PASS 2026-03-21
   5-3-nettoyage-automatique-et-gestion-des-ecarts: backlog
   BUG-1-correctif-keyword-matching-substring: done  # faux positifs substring dans mappers, identifié terrain 5.2 (2026-03-21)
   epic-5-retrospective: optional
