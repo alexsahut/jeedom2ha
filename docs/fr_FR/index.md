@@ -14,6 +14,8 @@ Ce plugin expose automatiquement vos équipements Jeedom comme des entités nati
 - [Configuration](#configuration)
 - [Première synchronisation](#première-synchronisation)
 - [Diagnostic](#diagnostic)
+- [Comportement des pièces (suggested_area)](#comportement-des-pièces-suggested_area)
+- [Nommage des équipements](#nommage-des-équipements)
 - [Troubleshooting](#troubleshooting)
 - [Changelog](changelog.md)
 
@@ -119,6 +121,99 @@ L'interface affiche pour chaque équipement Jeedom :
 Niveaux recommandés :
 - `info` : synchronisation, connexion, publication discovery
 - `debug` : détail MQTT, mapping équipement par équipement
+
+---
+
+## Comportement des pièces (suggested_area)
+
+Le plugin publie le champ `suggested_area` dans le payload MQTT Discovery à chaque synchronisation. Ce champ correspond à la **pièce Jeedom** (objet parent) de l'équipement.
+
+### Ce que le plugin fait
+
+- Lors de la première publication, `suggested_area` indique à Home Assistant dans quelle pièce placer le device.
+- Si vous renommez la pièce Jeedom, le plugin met à jour `suggested_area` dans le payload et journalise le changement (`[LIFECYCLE] area change`).
+
+### Ce que Home Assistant ne fait PAS
+
+Home Assistant utilise `suggested_area` **uniquement à la création** du device. Pour les devices déjà enregistrés, HA **ignore** les changements de `suggested_area` dans les messages discovery suivants. C'est un comportement normal documenté dans la spécification MQTT Discovery de HA.
+
+Concrètement : si vous déplacez un équipement d'une pièce à l'autre dans Jeedom, le device reste dans son ancienne zone dans HA.
+
+### Comment déplacer un device vers sa nouvelle pièce
+
+**Option 1 — Cleanup discovery** (réinitialise l'enregistrement HA)
+
+Exécutez depuis le serveur Jeedom :
+
+```bash
+./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon
+```
+
+> Cette opération supprime puis recrée les entités HA. Les personnalisations manuelles (icônes, alias) sont perdues.
+
+**Option 2 — Déplacement manuel dans HA**
+
+Dans Home Assistant : **Paramètres → Appareils et services** → trouvez le device → modifiez la zone.
+
+---
+
+## Nommage des équipements
+
+Le plugin détermine le type d'entité HA (`light`, `switch`, `cover`) en combinant le `generic_type` des commandes Jeedom et le **nom de l'équipement**. Certains mots-clés dans le nom peuvent bloquer ou modifier le mapping attendu.
+
+### Logique de priorité
+
+1. Le `generic_type` des commandes Jeedom est le critère principal.
+2. Quand le `generic_type` est ambigu (ex. `LIGHT_STATE` utilisé pour une prise), le plugin analyse le nom de l'équipement pour trancher.
+3. Si le nom contient un mot-clé contradictoire, l'équipement est marqué **ambiguous** dans le diagnostic.
+
+### Mots-clés par type
+
+**Lumières (`light`)** — mots-clés qui **bloquent** le mapping light :
+
+| Catégorie | Mots-clés |
+|---|---|
+| Chauffage | `chauffage`, `radiateur`, `thermostat`, `heater`, `chaudiere`, `chaudière`, `poele`, `poêle` |
+| Eau | `chauffe-eau`, `eau`, `water`, `cumulus`, `ballon` |
+| Piscine | `piscine`, `pool`, `filtration`, `filtre`, `pompe` |
+| Prises | `prise`, `plug`, `socket` |
+| Sécurité | `fumée`, `smoke`, `incendie`, `feu`, `fire`, `alarme`, `sirene`, `sirène` |
+| Volets | `volet`, `store`, `cover`, `blind`, `shutter`, `garage`, `portail` |
+
+**Switches (`switch`)** — mots-clés qui **bloquent** le mapping switch :
+
+| Catégorie | Mots-clés |
+|---|---|
+| Lumières | `lumière`, `lumiere`, `light`, `lampe`, `ampoule` |
+| Volets | `volet`, `store`, `cover`, `blind`, `shutter`, `portail`, `garage` |
+| Chauffage | `chauffage`, `radiateur`, `thermostat`, `heater` |
+| Sécurité | `fumée`, `smoke`, `alarme`, `sirene` |
+
+**Volets (`cover`)** — mots-clés qui **bloquent** le mapping cover :
+
+| Catégorie | Mots-clés |
+|---|---|
+| Lumières | `lumière`, `lumiere`, `light`, `lampe`, `ampoule` |
+| Chauffage | `chauffage`, `radiateur`, `thermostat`, `heater` |
+| Prises | `prise`, `plug`, `socket` |
+| Sécurité | `fumée`, `smoke`, `alarme`, `sirene` |
+
+### Piège : le matching par sous-chaîne
+
+Le plugin recherche les mots-clés **à l'intérieur** du nom (matching substring). Un mot-clé présent comme sous-chaîne d'un autre mot provoque un faux positif.
+
+Exemples de noms problématiques :
+
+| Nom de l'équipement | Sous-chaîne détectée | Conséquence |
+|---|---|---|
+| `lampe bureau (ex-chevet)` | `eau` dans "bur**eau**" | Bloque le mapping light → ambiguous |
+| `lampe (ex-chevet)` | `lampe` | Bloque le mapping switch (si `generic_type` ambigu) |
+
+### Recommandations
+
+- Vérifiez le diagnostic après chaque rescan pour repérer les équipements marqués **ambiguous**.
+- Évitez les noms contenant involontairement un mot-clé listé ci-dessus.
+- En cas d'ambiguïté, renommez l'équipement dans Jeedom puis relancez un rescan.
 
 ---
 
