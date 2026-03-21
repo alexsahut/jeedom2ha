@@ -19,10 +19,26 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // Fonction exécutée automatiquement après l'installation du plugin
 function jeedom2ha_install() {
+    $dataDir = __DIR__ . '/../data';
+    if (!is_dir($dataDir)) {
+        if (!mkdir($dataDir, 0775, true)) {
+            log::add('jeedom2ha', 'error', 'Impossible de créer le répertoire data/ : ' . $dataDir);
+        } else {
+            log::add('jeedom2ha', 'info', 'Répertoire data/ créé automatiquement : ' . $dataDir);
+        }
+    }
 }
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
 function jeedom2ha_update() {
+    $dataDir = __DIR__ . '/../data';
+    if (!is_dir($dataDir)) {
+        if (!mkdir($dataDir, 0775, true)) {
+            log::add('jeedom2ha', 'error', 'Impossible de créer le répertoire data/ : ' . $dataDir);
+        } else {
+            log::add('jeedom2ha', 'info', 'Répertoire data/ créé automatiquement : ' . $dataDir);
+        }
+    }
 }
 
 // Fonction exécutée automatiquement après la suppression du plugin
