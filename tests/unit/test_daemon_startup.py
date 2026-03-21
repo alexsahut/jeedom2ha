@@ -3,7 +3,10 @@ test_daemon_startup.py — Unit tests for Jeedom2haDaemon class instantiation an
 
 Tests the daemon skeleton: class creation, on_start/on_stop/on_message callbacks,
 and custom CLI argument (--apiport).
+
+Story 5.1 — tests for boot watchdog and boot_cache loading.
 """
+import asyncio
 import pytest
 from unittest.mock import patch
 
@@ -227,3 +230,128 @@ class TestDaemonOnMessage:
 
         daemon = Jeedom2haDaemon()
         await daemon.on_message({"action": "test", "apikey": "fake"})
+
+
+# ---------------------------------------------------------------------------
+# Story 5.1 — Boot watchdog (AC #4) and boot_cache loading (AC #2, #3)
+# ---------------------------------------------------------------------------
+
+class TestBootWatchdog:
+    """AC #4 — boot watchdog logs WARNING after 90s if no sync received."""
+
+    async def test_watchdog_logs_warning_after_timeout_if_publications_empty(self, caplog):
+        """AC #4: If publications stay empty after timeout, watchdog logs WARNING."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        app = {"publications": {}, "boot_sync_received": asyncio.Event()}
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.01)
+
+        assert any("BOOTSTRAP" in r.message and "Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_cancels_when_sync_received(self, caplog):
+        """AC #4: Watchdog does not log if sync event is set before timeout."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        event = asyncio.Event()
+        app = {"publications": {1: "something"}, "boot_sync_received": event}
+
+        # Set event before watchdog fires
+        event.set()
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.1)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_cancels_when_event_set_before_timeout(self, caplog):
+        """Watchdog silently exits when event is set concurrently."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        event = asyncio.Event()
+        app = {"publications": {}, "boot_sync_received": event}
+
+        async def set_event_soon():
+            await asyncio.sleep(0.005)
+            event.set()
+
+        asyncio.create_task(set_event_soon())
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=1.0)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_no_log_if_publications_non_empty_after_timeout(self, caplog):
+        """If publications is non-empty when timeout fires, no WARNING."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        app = {
+            "publications": {1: object()},
+            "boot_sync_received": asyncio.Event(),
+        }
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.01)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    def test_watchdog_is_coroutine_function(self):
+        from resources.daemon.main import _boot_watchdog
+        assert asyncio.iscoroutinefunction(_boot_watchdog)
+
+
+class TestOnStartBootCache:
+    """AC #2, #3 — on_start loads boot_cache and initializes boot_sync_received."""
+
+    async def test_on_start_loads_boot_cache_into_app(self):
+        """on_start() populates app['boot_cache'] from disk cache."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+        fake_cache = {42: {"entity_type": "light", "published": True}}
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value=fake_cache) as mock_load:
+            await daemon.on_start()
+
+        mock_load.assert_called_once()
+        assert daemon._app["boot_cache"] == fake_cache
+
+    async def test_on_start_initializes_boot_sync_received_event(self):
+        """on_start() creates the asyncio.Event for watchdog signaling."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value={}):
+            await daemon.on_start()
+
+        event = daemon._app.get("boot_sync_received")
+        assert event is not None
+        assert isinstance(event, asyncio.Event)
+        assert not event.is_set()
+
+    async def test_on_start_cold_start_boot_cache_empty(self):
+        """AC #3: cold start with no cache file → boot_cache = {}."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value={}):
+            await daemon.on_start()
+
+        assert daemon._app["boot_cache"] == {}

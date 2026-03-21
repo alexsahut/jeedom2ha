@@ -5,6 +5,7 @@ Listens on 127.0.0.1 only, protected by a local_secret shared with the PHP plugi
 
 import asyncio
 import logging
+import os
 import socket
 import ssl
 import sys
@@ -29,6 +30,11 @@ from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
 from discovery.publisher import DiscoveryPublisher
+from cache.disk_cache import save_publications_cache
+
+# Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
+_HTTP_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+_DATA_DIR = os.path.normpath(os.path.join(_HTTP_SERVER_DIR, "..", "..", "..", "data"))
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -191,6 +197,156 @@ async def _replay_deferred_discovery_unpublish(
     for pending_eq_id, pending_entity_type in list(pending_unpublish.items()):
         if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=pending_entity_type):
             pending_unpublish.pop(pending_eq_id, None)
+
+
+async def _detect_lifecycle_changes(
+    eq_id: int,
+    mapping,
+    previous_decision,
+    boot_cache: dict,
+    is_first_sync: bool,
+    publisher,
+    pending_discovery_unpublish: dict,
+) -> None:
+    """Detect and handle rename, area change, and retyping for a single eq_id.
+
+    Called once per eq_id in the mapping loop, before publish.
+    Guardrail: never publishes — only unpublishes stale topics and logs.
+
+    - Rename (runtime or boot): logs INFO [LIFECYCLE], no topic/unique_id change.
+    - Area change (runtime): logs INFO [LIFECYCLE].
+    - Retyping (runtime or boot): unpublishes old topic BEFORE new publish.
+      If unpublish fails: defers into pending_discovery_unpublish and continues.
+    """
+    # --- Runtime detection (previous_decision from app["publications"]) ---
+    if previous_decision is not None and getattr(previous_decision, "mapping_result", None) is not None:
+        prev_mr = previous_decision.mapping_result
+        # Retypage runtime: unpublish old topic if entity_type changed
+        if prev_mr.ha_entity_type != mapping.ha_entity_type and _needs_discovery_unpublish(previous_decision):
+            _LOGGER.info(
+                "[LIFECYCLE] eq_id=%d: retypage détecté (%s → %s) → unpublish ancien topic",
+                eq_id, prev_mr.ha_entity_type, mapping.ha_entity_type,
+            )
+            if publisher is not None:
+                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=prev_mr.ha_entity_type)
+            else:
+                unpublish_ok = False
+            if not unpublish_ok:
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, prev_mr.ha_entity_type)
+        # Rename / area change logs (publication already handled by handler with fresh data)
+        if prev_mr.ha_name != mapping.ha_name:
+            _LOGGER.info(
+                "[LIFECYCLE] eq_id=%d: rename détecté ('%s' → '%s')",
+                eq_id, prev_mr.ha_name, mapping.ha_name,
+            )
+        if prev_mr.suggested_area != mapping.suggested_area:
+            _LOGGER.info(
+                "[LIFECYCLE] eq_id=%d: area change ('%s' → '%s')",
+                eq_id, prev_mr.suggested_area, mapping.suggested_area,
+            )
+
+    # --- Boot detection (boot_cache loaded from disk) ---
+    if is_first_sync:
+        boot_entry = boot_cache.get(eq_id)
+        if boot_entry:
+            boot_type = boot_entry.get("entity_type", "")
+            boot_name = boot_entry.get("ha_name", "")
+            # Retypage au boot (guard: ne tenter unpublish que si réellement publié — Guardrail 5)
+            if boot_type and boot_type != mapping.ha_entity_type and boot_entry.get("published", False):
+                _LOGGER.info(
+                    "[LIFECYCLE] eq_id=%d: retypage au boot (%s → %s) → unpublish ancien topic",
+                    eq_id, boot_type, mapping.ha_entity_type,
+                )
+                if publisher is not None:
+                    unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=boot_type)
+                else:
+                    unpublish_ok = False
+                if not unpublish_ok:
+                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, boot_type)
+            # Rename au boot
+            if boot_name and boot_name != mapping.ha_name:
+                _LOGGER.info(
+                    "[LIFECYCLE] eq_id=%d: rename détecté depuis boot_cache ('%s' → '%s')",
+                    eq_id, boot_name, mapping.ha_name,
+                )
+
+
+async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
+    """Republish all published entities from the RAM cache (app["publications"]).
+
+    Called on:
+      - homeassistant/status = online  (birth HA, reason="ha_birth")
+      - MQTT broker reconnect          (reason="broker_reconnect")
+
+    Guardrail: NEVER publishes from the disk cache (app["boot_cache"]).
+               Only reads app["publications"] (live RAM cache).
+    Lissage (Décision 8): delay = max(0.1, 10.0 / N) between each publish (batch only).
+
+    For broker_reconnect, pending_discovery_unpublish is replayed FIRST (AC #11).
+    """
+    publications = app.get("publications", {})
+    published_entries = [
+        (eq_id, dec)
+        for eq_id, dec in publications.items()
+        if getattr(dec, "discovery_published", False)
+    ]
+
+    if not published_entries:
+        if reason == "ha_birth":
+            _LOGGER.info(
+                "[BOOTSTRAP] Birth HA reçu — aucune entité publiée en mémoire, republication ignorée "
+                "(la prochaine /action/sync publiera toutes les entités éligibles)"
+            )
+        return
+
+    mqtt_bridge = app.get("mqtt_bridge")
+    if not mqtt_bridge or not mqtt_bridge.is_connected:
+        _LOGGER.warning(
+            "[DISCOVERY] Republication annulée (reason=%s) — broker non connecté", reason
+        )
+        return
+
+    publisher = DiscoveryPublisher(mqtt_bridge)
+
+    # AC #11: rejouer les pending_discovery_unpublish AVANT la republication (reconnect uniquement)
+    if reason == "broker_reconnect":
+        pending_unpublish = app.get("pending_discovery_unpublish", {})
+        await _replay_deferred_discovery_unpublish(publisher, pending_unpublish)
+
+    topology = app.get("topology")
+    nb_entites = len(published_entries)
+    delay = max(0.1, 10.0 / nb_entites)
+
+    _LOGGER.info(
+        "[DISCOVERY] Republication batch (reason=%s) : %d entités, délai=%.2fs",
+        reason, nb_entites, delay,
+    )
+
+    for eq_id, decision in published_entries:
+        mapping = getattr(decision, "mapping_result", None)
+        if mapping is None:
+            continue
+        entity_type = getattr(mapping, "ha_entity_type", "") or ""
+        try:
+            if entity_type == "light":
+                ok = await publisher.publish_light(mapping, topology)
+            elif entity_type == "cover":
+                ok = await publisher.publish_cover(mapping, topology)
+            elif entity_type == "switch":
+                ok = await publisher.publish_switch(mapping, topology)
+            else:
+                ok = False
+            if not ok:
+                _LOGGER.error(
+                    "[DISCOVERY] eq_id=%d entity_type=%s : échec publish — bridge indisponible",
+                    eq_id, entity_type,
+                )
+        except Exception as exc:
+            _LOGGER.error(
+                "[DISCOVERY] eq_id=%d entity_type=%s : échec publish — %s",
+                eq_id, entity_type, exc,
+            )
+        await asyncio.sleep(delay)
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -432,8 +588,24 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     bridge = request.app["mqtt_bridge"]
     await bridge.stop()
 
-    # Start the persistent bridge with new params
-    await bridge.start(params)
+    # Story 5.1 — Task 4.3: injecter les callbacks de republication dans le bridge
+    app = request.app
+
+    async def _reconnect_cb():
+        """Called when broker reconnects — republish from RAM cache if non-empty."""
+        if app.get("publications"):
+            await _republish_all_from_cache(app, "broker_reconnect")
+        else:
+            _LOGGER.info(
+                "[BOOTSTRAP] Reconnect broker — aucune entité publiée en mémoire, republication ignorée"
+            )
+
+    async def _ha_birth_cb():
+        """Called when homeassistant/status = online — republish from RAM cache."""
+        await _republish_all_from_cache(app, "ha_birth")
+
+    # Start the persistent bridge with new params and republication callbacks
+    await bridge.start(params, on_reconnect_cb=_reconnect_cb, on_ha_birth_cb=_ha_birth_cb)
 
     return web.json_response({
         "action": "mqtt.connect",
@@ -490,7 +662,20 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     )
     
     # 4. Nettoyage (RAM + MQTT) des anciens équipements disparus ou devenus inéligibles
-    anciens_eq_ids = set(request.app["mappings"].keys())
+    # Story 5.1 — Task 7.1: si premier sync post-boot (mappings vide), initialiser
+    # anciens_eq_ids depuis boot_cache (eq_id published=True) pour détecter suppressions
+    # survenues pendant le downtime daemon (ghost-risk).
+    is_first_sync = not request.app["mappings"]
+    if is_first_sync:
+        boot_cache = request.app.get("boot_cache", {})
+        anciens_eq_ids = {eq_id for eq_id, entry in boot_cache.items() if entry.get("published")}
+        if anciens_eq_ids:
+            _LOGGER.info(
+                "[CACHE] Premier sync post-boot : %d anciens eq_ids issus du cache disque",
+                len(anciens_eq_ids),
+            )
+    else:
+        anciens_eq_ids = set(request.app["mappings"].keys())
     nouveaux_eq_ids = set()
 
     # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3 + 2.4)
@@ -548,7 +733,17 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         
         mappings[eq_id] = mapping
         previous_decision = request.app["publications"].get(eq_id)
-        
+
+        # Story 5.2 — detect lifecycle changes (rename, area change, retyping)
+        # Called once per eq_id, before publish, common to all type branches
+        await _detect_lifecycle_changes(
+            eq_id, mapping, previous_decision,
+            boot_cache=request.app.get("boot_cache", {}),
+            is_first_sync=is_first_sync,
+            publisher=publisher,
+            pending_discovery_unpublish=pending_discovery_unpublish,
+        )
+
         if mapping.ha_entity_type == "light":
             # Count by confidence
             if mapping.confidence == "sure":
@@ -783,6 +978,38 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     for old_eq_id in eq_ids_supprimes:
         # Si c'était publié avant, on l'unpublish
         old_decision = request.app["publications"].get(old_eq_id)
+
+        # Story 5.1 — Task 7.1: au premier sync post-boot, old_decision peut être None
+        # (entité présente dans boot_cache mais jamais dans publications RAM).
+        # Dans ce cas, utiliser l'entity_type du boot_cache pour l'unpublish.
+        if old_decision is None and is_first_sync:
+            boot_cache = request.app.get("boot_cache", {})
+            boot_entry = boot_cache.get(old_eq_id)
+            if boot_entry and boot_entry.get("published"):
+                boot_entity_type = boot_entry.get("entity_type") or "light"
+                _LOGGER.info(
+                    "[CACHE] eq_id=%d disparu depuis downtime daemon → unpublish depuis boot_cache (entity_type=%s)",
+                    old_eq_id, boot_entity_type,
+                )
+                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+                    unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=boot_entity_type)
+                    if unpublish_ok:
+                        pending_discovery_unpublish.pop(old_eq_id, None)
+                        _LOGGER.info("[MAPPING] eq_id=%d (boot_cache) supprimé → MQTT unpublish effectif", old_eq_id)
+                    else:
+                        _LOGGER.warning(
+                            "[MAPPING] Cannot unpublish boot_cache eq_id=%d (publish failed) — deferring",
+                            old_eq_id,
+                        )
+                        _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+                else:
+                    _LOGGER.warning(
+                        "[MAPPING] Cannot unpublish boot_cache eq_id=%d (bridge missing/disconnected) — deferring",
+                        old_eq_id,
+                    )
+                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+            continue  # old_decision is None — skip the standard unpublish path below
+
         if _needs_discovery_unpublish(old_decision):
             entity_type = old_decision.mapping_result.ha_entity_type
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
@@ -836,7 +1063,20 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
     request.app["publications"].update(publications)
-    
+
+    # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
+    save_publications_cache(request.app["publications"], _DATA_DIR)
+
+    # Story 5.1 — Task 7.3: purger boot_cache après le premier sync (rôle accompli)
+    if is_first_sync and request.app.get("boot_cache"):
+        request.app["boot_cache"] = {}
+        _LOGGER.info("[CACHE] boot_cache purgé après premier sync")
+
+    # Story 5.1 — Task 2.1: signaler que le premier sync a été reçu (annule le watchdog)
+    boot_sync_event = request.app.get("boot_sync_received")
+    if boot_sync_event is not None and not boot_sync_event.is_set():
+        boot_sync_event.set()
+
     _LOGGER.info(
         "[MAPPING] Summary: lights(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
         "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
@@ -1272,6 +1512,9 @@ def create_app(local_secret: str) -> web.Application:
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
+    # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
+    app["boot_cache"] = {}       # Dict[int, dict] — chargé du disque au boot, purgé après 1er sync
+    app["boot_sync_received"] = None  # asyncio.Event — initialisé dans on_start()
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)

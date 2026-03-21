@@ -29,6 +29,8 @@ COMMAND_SUBSCRIPTION_TOPICS = (
     "jeedom2ha/+/brightness/set",
     "jeedom2ha/+/position/set",
 )
+# Story 5.1 — Topic birth message Home Assistant (souscrit pour republication)
+HA_STATUS_TOPIC = "homeassistant/status"
 
 
 class MqttBridge:
@@ -47,17 +49,28 @@ class MqttBridge:
         self._broker_port = 0
         self._command_handler: Optional[Callable[[str, str], Any]] = None
         self._pending_command_tasks: Dict[str, asyncio.Task[Any]] = {}
+        # Story 5.1 — Callbacks for republication (injected via start())
+        # Called via call_soon_threadsafe → run in asyncio thread → can use asyncio.create_task()
+        self._on_reconnect_cb: Optional[Callable[[], Any]] = None
+        self._on_ha_birth_cb: Optional[Callable[[], Any]] = None
 
     # ------------------------------------------------------------------
     # Public async API
     # ------------------------------------------------------------------
 
-    async def start(self, config: dict):
+    async def start(self, config: dict, on_reconnect_cb=None, on_ha_birth_cb=None):
         """Initiate persistent MQTT connection. Non-blocking — returns immediately.
 
         Args:
             config: dict with keys host, port, user, password, tls, tls_verify
+            on_reconnect_cb: callable() — called via call_soon_threadsafe on broker reconnect.
+                             May call asyncio.create_task() (runs in asyncio thread).
+                             Used for broker reconnect republication (Story 5.1).
+            on_ha_birth_cb: callable() — called via call_soon_threadsafe on HA birth message.
+                             Used for HA restart republication (Story 5.1).
         """
+        self._on_reconnect_cb = on_reconnect_cb
+        self._on_ha_birth_cb = on_ha_birth_cb
         self._loop = asyncio.get_running_loop()
         self._broker_host = config["host"]
         self._broker_port = int(config.get("port", 1883))
@@ -141,10 +154,14 @@ class MqttBridge:
                 self._broker_port,
             )
             self._subscribe_command_topics(client)
-            # Birth message — signals bridge availability to HA
+            # Birth message — signals bridge availability to HA (AC #17: before republication)
             client.publish(BRIDGE_STATUS_TOPIC, AVAILABILITY_ONLINE, qos=1, retain=True)
             if self._loop is not None:
                 self._loop.call_soon_threadsafe(self._set_state, "connected")
+                # Story 5.1 — Task 4.1: déclencher republication sur reconnect (si callback injecté)
+                # Le callback vérifiera si app["publications"] est non vide (AC #6/#10)
+                if self._on_reconnect_cb is not None:
+                    self._loop.call_soon_threadsafe(self._trigger_reconnect_republish)
         else:
             _LOGGER.warning("[MQTT] Connection refused by broker (rc=%d)", rc)
             if self._loop is not None:
@@ -152,9 +169,6 @@ class MqttBridge:
 
     def _on_message(self, client, userdata, message):
         """Called by paho when a subscribed message is received (paho thread)."""
-        if self._command_handler is None:
-            return
-
         topic = str(getattr(message, "topic", "") or "")
         payload_raw = getattr(message, "payload", b"")
         if isinstance(payload_raw, (bytes, bytearray)):
@@ -162,12 +176,23 @@ class MqttBridge:
         else:
             payload = str(payload_raw)
 
+        # Story 5.1 — Task 3.2: détecter le birth message Home Assistant
+        if topic == HA_STATUS_TOPIC and payload == "online":
+            if self._loop is not None and self._on_ha_birth_cb is not None:
+                self._loop.call_soon_threadsafe(self._trigger_ha_birth_republish)
+            return
+
+        if self._command_handler is None:
+            return
+
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._dispatch_command_message, topic, payload)
 
     def _subscribe_command_topics(self, client) -> None:
-        """Subscribe to HA command topics in the jeedom2ha namespace only."""
-        for subscription_topic in COMMAND_SUBSCRIPTION_TOPICS:
+        """Subscribe to HA command topics and homeassistant/status."""
+        # Story 5.1 — Task 3.1: inclure homeassistant/status pour la republication birth HA
+        all_topics = list(COMMAND_SUBSCRIPTION_TOPICS) + [HA_STATUS_TOPIC]
+        for subscription_topic in all_topics:
             subscribe_result = client.subscribe(subscription_topic, qos=1)
             if isinstance(subscribe_result, tuple):
                 result = subscribe_result[0] if subscribe_result else mqtt.MQTT_ERR_UNKNOWN
@@ -240,6 +265,29 @@ class MqttBridge:
             _LOGGER.info("[MQTT] Clean disconnect")
             if self._loop is not None:
                 self._loop.call_soon_threadsafe(self._set_state, "disconnected")
+
+    def _trigger_reconnect_republish(self) -> None:
+        """Trigger broker reconnect republication. Runs in asyncio thread (via call_soon_threadsafe).
+
+        Story 5.1 — Task 4.1: appelle on_reconnect_cb qui crée une tâche asyncio.
+        Le callback vérifie si publications non vides (AC #6/#10).
+        """
+        if self._on_reconnect_cb is not None:
+            try:
+                asyncio.create_task(self._on_reconnect_cb())
+            except Exception:
+                _LOGGER.exception("[MQTT] _trigger_reconnect_republish: erreur inattendue")
+
+    def _trigger_ha_birth_republish(self) -> None:
+        """Trigger HA birth republication. Runs in asyncio thread (via call_soon_threadsafe).
+
+        Story 5.1 — Task 3.3: appelle on_ha_birth_cb qui crée une tâche asyncio.
+        """
+        if self._on_ha_birth_cb is not None:
+            try:
+                asyncio.create_task(self._on_ha_birth_cb())
+            except Exception:
+                _LOGGER.exception("[MQTT] _trigger_ha_birth_republish: erreur inattendue")
 
     def _set_state(self, new_state: str):
         """State transition — must be called from asyncio thread via call_soon_threadsafe."""

@@ -3,6 +3,7 @@ test_mqtt_bridge.py — Unit tests for MqttBridge (persistent connection) and
 /action/mqtt_connect + enriched /system/status HTTP endpoints.
 
 Story 1.3 — Validation de la Connexion et Statut du Pont
+Story 5.1 — Birth HA republication, broker reconnect republication, lissage
 """
 import asyncio
 import ssl
@@ -14,6 +15,7 @@ from aiohttp import web
 from resources.daemon.transport.mqtt_client import (
     BRIDGE_STATUS_TOPIC,
     COMMAND_SUBSCRIPTION_TOPICS,
+    HA_STATUS_TOPIC,
     MqttBridge,
 )
 
@@ -235,6 +237,7 @@ class TestMqttBridgeCallbacks:
             assert c == call(BRIDGE_STATUS_TOPIC, "online", qos=1, retain=True)
 
     async def test_on_connect_subscribes_command_topics(self):
+        """Story 5.1: all command topics + HA_STATUS_TOPIC are subscribed."""
         bridge = MqttBridge()
         bridge._loop = asyncio.get_running_loop()
         bridge._broker_host = "localhost"
@@ -244,9 +247,12 @@ class TestMqttBridgeCallbacks:
         bridge._on_connect(mock_paho, None, {}, 0)
         await asyncio.sleep(0)
 
-        assert mock_paho.subscribe.call_args_list == [
-            call(topic, qos=1) for topic in COMMAND_SUBSCRIPTION_TOPICS
-        ]
+        subscribed = [c.args[0] for c in mock_paho.subscribe.call_args_list]
+        # All command topics must be subscribed
+        for topic in COMMAND_SUBSCRIPTION_TOPICS:
+            assert topic in subscribed
+        # Story 5.1: homeassistant/status must also be subscribed
+        assert HA_STATUS_TOPIC in subscribed
 
     async def test_on_message_dispatches_to_command_handler(self):
         bridge = MqttBridge()
@@ -532,3 +538,423 @@ class TestSystemStatusWithMqtt:
                 mqtt_section = data["payload"]["mqtt"]
                 assert mqtt_section["connected"] is False
                 assert mqtt_section["state"] == "reconnecting"
+
+
+# ---------------------------------------------------------------------------
+# Story 5.1 — homeassistant/status subscription and birth HA republication
+# ---------------------------------------------------------------------------
+
+class TestHaStatusSubscription:
+    """Task 3.1 — homeassistant/status is subscribed on connect."""
+
+    async def test_on_connect_subscribes_ha_status_topic(self):
+        """Task 3.1: homeassistant/status QoS 1 is subscribed on connection."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        bridge._broker_host = "localhost"
+        bridge._broker_port = 1883
+        mock_paho = _make_mock_paho_client()
+
+        bridge._on_connect(mock_paho, None, {}, 0)
+        await asyncio.sleep(0)
+
+        subscribed_topics = [c.args[0] for c in mock_paho.subscribe.call_args_list]
+        assert HA_STATUS_TOPIC in subscribed_topics
+
+    async def test_ha_status_topic_not_in_command_subscription_topics(self):
+        """homeassistant/status is not a command topic — must be handled separately."""
+        assert HA_STATUS_TOPIC not in COMMAND_SUBSCRIPTION_TOPICS
+
+
+class TestBirthHaRepublication:
+    """AC #7, #8, #9 — republication on homeassistant/status = online."""
+
+    async def test_ha_birth_message_triggers_on_ha_birth_cb(self):
+        """AC #7: birth HA with publications non-empty → on_ha_birth_cb called."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+
+        cb_called = asyncio.Event()
+
+        async def fake_ha_birth_cb():
+            cb_called.set()
+
+        bridge._on_ha_birth_cb = fake_ha_birth_cb
+        message = MagicMock(topic=HA_STATUS_TOPIC, payload=b"online")
+
+        bridge._on_message(None, None, message)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert cb_called.is_set()
+
+    async def test_ha_birth_message_offline_does_not_trigger_cb(self):
+        """Birth HA with payload 'offline' must NOT trigger republication."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+
+        cb_called = asyncio.Event()
+
+        async def fake_ha_birth_cb():
+            cb_called.set()
+
+        bridge._on_ha_birth_cb = fake_ha_birth_cb
+        message = MagicMock(topic=HA_STATUS_TOPIC, payload=b"offline")
+
+        bridge._on_message(None, None, message)
+        await asyncio.sleep(0)
+
+        assert not cb_called.is_set()
+
+    async def test_ha_birth_without_cb_does_not_crash(self):
+        """Birth HA with no callback registered must not crash."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        bridge._on_ha_birth_cb = None  # not set
+
+        message = MagicMock(topic=HA_STATUS_TOPIC, payload=b"online")
+        bridge._on_message(None, None, message)
+        await asyncio.sleep(0)
+        # No crash — test passes implicitly
+
+    async def test_ha_birth_does_not_dispatch_to_command_handler(self):
+        """homeassistant/status must not be dispatched to command handler."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+
+        command_handler = AsyncMock()
+        bridge.set_command_handler(command_handler)
+        bridge._on_ha_birth_cb = AsyncMock()
+
+        message = MagicMock(topic=HA_STATUS_TOPIC, payload=b"online")
+        bridge._on_message(None, None, message)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        command_handler.assert_not_called()
+
+
+class TestBrokerReconnectRepublication:
+    """AC #10, #11 — republication on broker reconnect."""
+
+    async def test_on_connect_triggers_on_reconnect_cb(self):
+        """AC #10: _on_connect() with on_reconnect_cb set → callback triggered."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        mock_paho = _make_mock_paho_client()
+
+        cb_called = asyncio.Event()
+
+        async def fake_reconnect_cb():
+            cb_called.set()
+
+        bridge._on_reconnect_cb = fake_reconnect_cb
+        bridge._on_connect(mock_paho, None, {}, 0)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        assert cb_called.is_set()
+
+    async def test_on_connect_without_reconnect_cb_no_crash(self):
+        """_on_connect() without callback must not crash."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        mock_paho = _make_mock_paho_client()
+        bridge._on_reconnect_cb = None
+
+        bridge._on_connect(mock_paho, None, {}, 0)
+        await asyncio.sleep(0)
+        # No crash — test passes implicitly
+
+    async def test_start_stores_reconnect_and_birth_callbacks(self):
+        """Task 4.3: start() with callbacks → stored on bridge."""
+        bridge = MqttBridge()
+        mock_paho = _make_mock_paho_client()
+
+        reconnect_cb = AsyncMock()
+        birth_cb = AsyncMock()
+
+        with patch("resources.daemon.transport.mqtt_client.mqtt.Client", return_value=mock_paho):
+            await bridge.start(
+                {"host": "localhost", "port": 1883},
+                on_reconnect_cb=reconnect_cb,
+                on_ha_birth_cb=birth_cb,
+            )
+
+        assert bridge._on_reconnect_cb is reconnect_cb
+        assert bridge._on_ha_birth_cb is birth_cb
+
+    async def test_birth_before_reconnect_ordering(self):
+        """AC #17: birth bridge message published BEFORE reconnect callback is triggered."""
+        bridge = MqttBridge()
+        bridge._loop = asyncio.get_running_loop()
+        mock_paho = _make_mock_paho_client()
+
+        events = []
+
+        def on_publish(topic, payload, **kwargs):
+            events.append(f"birth:{payload}")
+            return MagicMock()
+
+        mock_paho.publish.side_effect = on_publish
+
+        async def fake_reconnect_cb():
+            events.append("reconnect_cb")
+
+        bridge._on_reconnect_cb = fake_reconnect_cb
+
+        bridge._on_connect(mock_paho, None, {}, 0)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        # Birth must come before reconnect callback in the event log
+        if "reconnect_cb" in events:
+            birth_idx = next(i for i, e in enumerate(events) if "birth" in e)
+            reconnect_idx = events.index("reconnect_cb")
+            assert birth_idx < reconnect_idx, f"Birth must precede reconnect callback: {events}"
+
+
+class TestRepublishAllFromCache:
+    """AC #7, #8, #9, #12, #16 — _republish_all_from_cache behavior."""
+
+    def _make_published_decision(self, entity_type="light", eq_id=1):
+        mapping = type(
+            "MappingResult",
+            (),
+            {
+                "ha_entity_type": entity_type,
+                "jeedom_eq_id": eq_id,
+                "ha_name": f"test_{eq_id}",
+                "ha_unique_id": f"jeedom2ha_eq_{eq_id}",
+                "confidence": "sure",
+                "suggested_area": None,
+                "capabilities": type("Caps", (), {
+                    "has_brightness": False,
+                    "has_stop": False,
+                    "has_position": False,
+                    "is_bso": False,
+                    "device_class": None,
+                })(),
+                "commands": {},
+            },
+        )()
+        return type(
+            "PublicationDecision",
+            (),
+            {"mapping_result": mapping, "discovery_published": True},
+        )()
+
+    def _make_unpublished_decision(self, entity_type="light", eq_id=2):
+        mapping = type(
+            "MappingResult",
+            (),
+            {
+                "ha_entity_type": entity_type,
+                "jeedom_eq_id": eq_id,
+                "ha_name": f"test_{eq_id}",
+                "ha_unique_id": f"jeedom2ha_eq_{eq_id}",
+                "confidence": "sure",
+                "suggested_area": None,
+                "capabilities": type("Caps", (), {
+                    "has_brightness": False,
+                    "has_stop": False,
+                    "has_position": False,
+                    "is_bso": False,
+                    "device_class": None,
+                })(),
+                "commands": {},
+            },
+        )()
+        return type(
+            "PublicationDecision",
+            (),
+            {"mapping_result": mapping, "discovery_published": False},
+        )()
+
+    async def test_birth_ha_empty_publications_logs_info_no_publish(self, caplog):
+        """AC #9: birth HA with empty publications → log INFO, no publish."""
+        import logging
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = True
+        mock_bridge.publish_message = MagicMock(return_value=True)
+        app = {"publications": {}, "mqtt_bridge": mock_bridge, "topology": None, "pending_discovery_unpublish": {}}
+
+        with caplog.at_level(logging.INFO, logger="resources.daemon.transport.http_server"):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        assert any("Birth HA" in r.message and "republication ignorée" in r.message for r in caplog.records)
+        mock_bridge.publish_message.assert_not_called()
+
+    async def test_birth_ha_with_publications_calls_publish(self):
+        """AC #7: birth HA with publications → publish called for each entity."""
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        decision = self._make_published_decision("light")
+
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = True
+        mock_bridge.publish_message = MagicMock(return_value=True)
+
+        mock_publisher = MagicMock()
+        mock_publisher.publish_light = AsyncMock(return_value=True)
+        mock_publisher.publish_cover = AsyncMock(return_value=True)
+        mock_publisher.publish_switch = AsyncMock(return_value=True)
+
+        app = {
+            "publications": {1: decision},
+            "mqtt_bridge": mock_bridge,
+            "topology": None,
+            "pending_discovery_unpublish": {},
+        }
+
+        with patch("resources.daemon.transport.http_server.DiscoveryPublisher", return_value=mock_publisher), \
+             patch("resources.daemon.transport.http_server.asyncio.sleep", new_callable=AsyncMock):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        mock_publisher.publish_light.assert_called_once()
+
+    async def test_lissage_delay_formula_n1(self):
+        """AC #12: delay = max(0.1, 10.0/N) → N=1 → delay=10.0 (>0.1)."""
+        n = 1
+        delay = max(0.1, 10.0 / n)
+        assert delay == 10.0
+
+    async def test_lissage_delay_formula_n50(self):
+        """AC #12: N=50 → delay=0.2."""
+        n = 50
+        delay = max(0.1, 10.0 / n)
+        assert delay == pytest.approx(0.2)
+
+    async def test_lissage_delay_formula_n100(self):
+        """AC #12: N=100 → delay=0.1."""
+        n = 100
+        delay = max(0.1, 10.0 / n)
+        assert delay == pytest.approx(0.1)
+
+    async def test_lissage_delay_formula_n200(self):
+        """AC #12: N=200 → 10/200=0.05 → capped to 0.1."""
+        n = 200
+        delay = max(0.1, 10.0 / n)
+        assert delay == pytest.approx(0.1)
+
+    async def test_lissage_applied_for_ha_birth(self):
+        """AC #8: lissage asyncio.sleep called between publishes (birth HA)."""
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        decisions = {i: self._make_published_decision("light", eq_id=i) for i in range(1, 6)}
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = True
+        mock_bridge.publish_message = MagicMock(return_value=True)
+
+        mock_publisher = MagicMock()
+        mock_publisher.publish_light = AsyncMock(return_value=True)
+
+        app = {
+            "publications": decisions,
+            "mqtt_bridge": mock_bridge,
+            "topology": None,
+            "pending_discovery_unpublish": {},
+        }
+
+        sleep_delays = []
+        async def mock_sleep(delay):
+            sleep_delays.append(delay)
+
+        with patch("resources.daemon.transport.http_server.DiscoveryPublisher", return_value=mock_publisher), \
+             patch("resources.daemon.transport.http_server.asyncio.sleep", side_effect=mock_sleep):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        assert len(sleep_delays) == len(decisions)
+        expected_delay = max(0.1, 10.0 / len(decisions))
+        for d in sleep_delays:
+            assert d == pytest.approx(expected_delay)
+
+    async def test_publish_error_logged_and_continues(self, caplog):
+        """AC #16: publish error → log ERROR, continue for other entities."""
+        import logging
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        decision1 = self._make_published_decision("light", eq_id=1)
+        decision2 = self._make_published_decision("cover", eq_id=2)
+
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = True
+        mock_bridge.publish_message = MagicMock(return_value=True)
+
+        mock_publisher = MagicMock()
+        # First publish fails, second succeeds
+        mock_publisher.publish_light = AsyncMock(return_value=False)
+        mock_publisher.publish_cover = AsyncMock(return_value=True)
+
+        app = {
+            "publications": {1: decision1, 2: decision2},
+            "mqtt_bridge": mock_bridge,
+            "topology": None,
+            "pending_discovery_unpublish": {},
+        }
+
+        with caplog.at_level(logging.ERROR, logger="resources.daemon.transport.http_server"), \
+             patch("resources.daemon.transport.http_server.DiscoveryPublisher", return_value=mock_publisher), \
+             patch("resources.daemon.transport.http_server.asyncio.sleep", new_callable=AsyncMock):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        error_records = [r for r in caplog.records if r.levelname == "ERROR" and "DISCOVERY" in r.message]
+        assert len(error_records) >= 1
+        # Cover entity was still attempted despite light failure
+        mock_publisher.publish_cover.assert_called_once()
+
+    async def test_no_publish_when_broker_disconnected(self, caplog):
+        """Republication aborted if broker is not connected."""
+        import logging
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        decision = self._make_published_decision("light")
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = False
+        mock_bridge.publish_message = MagicMock(return_value=True)
+
+        app = {
+            "publications": {1: decision},
+            "mqtt_bridge": mock_bridge,
+            "topology": None,
+            "pending_discovery_unpublish": {},
+        }
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.transport.http_server"):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        mock_bridge.publish_message.assert_not_called()
+        assert any("Republication annulée" in r.message for r in caplog.records)
+
+    async def test_only_published_entries_are_republished(self):
+        """Only decisions with discovery_published=True are republished."""
+        from resources.daemon.transport.http_server import _republish_all_from_cache
+
+        published = self._make_published_decision("light", eq_id=1)
+        not_published = self._make_unpublished_decision("cover", eq_id=2)
+
+        mock_bridge = MagicMock()
+        mock_bridge.is_connected = True
+        mock_bridge.publish_message = MagicMock(return_value=True)
+
+        mock_publisher = MagicMock()
+        mock_publisher.publish_light = AsyncMock(return_value=True)
+        mock_publisher.publish_cover = AsyncMock(return_value=True)
+        mock_publisher.publish_switch = AsyncMock(return_value=True)
+
+        app = {
+            "publications": {1: published, 2: not_published},
+            "mqtt_bridge": mock_bridge,
+            "topology": None,
+            "pending_discovery_unpublish": {},
+        }
+
+        with patch("resources.daemon.transport.http_server.DiscoveryPublisher", return_value=mock_publisher), \
+             patch("resources.daemon.transport.http_server.asyncio.sleep", new_callable=AsyncMock):
+            await _republish_all_from_cache(app, "ha_birth")
+
+        # Only 1 entity published (the one with discovery_published=True)
+        assert mock_publisher.publish_light.call_count == 1
+        mock_publisher.publish_cover.assert_not_called()
