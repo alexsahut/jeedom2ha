@@ -399,6 +399,42 @@ class TestNameHeuristics:
         assert result is not None
         assert result.confidence in ("sure", "probable")
 
+    def test_lampe_standalone_still_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "Lampe salon" avec ENERGY_ON + ENERGY_OFF,
+        When le mapper évalue,
+        Then confidence == "ambiguous" et reason_code == "name_heuristic_rejection" — "lampe" est un mot entier.
+        Régression : confirme que le word-boundary matching préserve la détection des mots entiers.
+        """
+        eq = _make_eq(
+            name="Lampe salon",
+            cmds=[
+                _cmd("ENERGY_ON", id=101),
+                _cmd("ENERGY_OFF", id=102),
+            ],
+        )
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+        assert result.reason_details["matched_keyword"] == "lampe"
+
+    def test_prechauffage_not_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "Préchauffage moteur" avec ENERGY_ON + ENERGY_OFF,
+        When le mapper évalue,
+        Then confidence in ("sure", "probable") — "chauffage" ne matche pas comme mot entier dans "préchauffage".
+        Ce test échoue avant le correctif (substring match) et passe après (word boundary).
+        """
+        eq = _make_eq(
+            name="Préchauffage moteur",
+            cmds=[
+                _cmd("ENERGY_ON", id=101),
+                _cmd("ENERGY_OFF", id=102),
+            ],
+        )
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence in ("sure", "probable")
+
 
 # ==============================================================================
 # Test: ID and area generation

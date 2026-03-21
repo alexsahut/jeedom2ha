@@ -266,6 +266,66 @@ class TestFalsePositivesGuardrails:
         assert result.reason_code == "name_heuristic_rejection"
         assert result.reason_details["matched_keyword"] == "prise"
 
+    def test_bureau_with_light_cmds_not_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "lampe bureau" avec LIGHT_STATE/ON/OFF,
+        When le mapper évalue,
+        Then confidence in ("sure", "probable") — "eau" ne matche pas comme mot entier dans "bureau".
+        """
+        eq = _make_eq(name="lampe bureau", cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence in ("sure", "probable")
+
+    def test_eau_standalone_still_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "eau chaude salon" avec LIGHT_STATE/ON/OFF,
+        When le mapper évalue,
+        Then confidence == "ambiguous" et reason_code == "name_heuristic_rejection" — "eau" est un mot entier.
+        """
+        eq = _make_eq(name="eau chaude salon", cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+        assert result.reason_details["matched_keyword"] == "eau"
+
+    def test_chauffe_eau_still_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "chauffe-eau garage" avec LIGHT_STATE/ON/OFF,
+        When le mapper évalue,
+        Then confidence == "ambiguous" et reason_code == "name_heuristic_rejection".
+        Ne pas asserter matched_keyword exact : "chauffe-eau" ou "eau" peuvent tous deux matcher via word boundary.
+        """
+        eq = _make_eq(name="chauffe-eau garage", cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+
+    def test_bateau_not_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "bateau salon" avec LIGHT_STATE/ON/OFF,
+        When le mapper évalue,
+        Then confidence in ("sure", "probable") — "eau" ne matche pas comme mot entier dans "bateau".
+        """
+        eq = _make_eq(name="bateau salon", cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence in ("sure", "probable")
+
     def test_smoke_detector_with_light_led_ambiguous(self, mapper, snapshot):
         """Détecteur de fumée avec une LED type LIGHT_STATE → ambiguous (conflit SMOKE)."""
         eq = _make_eq(name="Détecteur Fumée Couloir", cmds=[
