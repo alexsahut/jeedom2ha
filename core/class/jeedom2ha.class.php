@@ -307,16 +307,43 @@ class jeedom2ha extends eqLogic {
       }
 
       if (self::isDaemonMqttReady($status)) {
-        try {
-          $topology = $topologyFetcher();
-        } catch (\Throwable $e) {
-          log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=topology_fetch_failed): ' . $e->getMessage());
-          return array('status' => 'failed', 'reason' => 'topology_fetch_failed');
+        // Story 5.1 — Task 6.1: retry backoff borné 5s pour getFullTopology() (NFR2)
+        // Budget total : 5s. Tentatives : 2 retries avec attente 1s puis 2s.
+        $topologyBudgetSec = 5.0;
+        $topologyDeadline = microtime(true) + $topologyBudgetSec;
+        $topologyRetryDelays = array(1, 2); // secondes (backoff exponentiel borné)
+        $topologyAttempt = 0;
+        $topology = null;
+
+        while (true) {
+          try {
+            $topology = $topologyFetcher();
+          } catch (\Throwable $e) {
+            log::add(__CLASS__, 'warning', '[BOOTSTRAP] Jeedom API indisponible — retry dans ' . ($topologyRetryDelays[$topologyAttempt] ?? 'N') . 's : ' . $e->getMessage());
+            $topology = null;
+          }
+
+          if (is_array($topology)) {
+            break; // Succès — topologie valide (peut être vide si aucun équipement)
+          }
+
+          $remaining = $topologyDeadline - microtime(true);
+          if ($topologyAttempt >= count($topologyRetryDelays) || $remaining <= 0) {
+            $elapsed = round($topologyBudgetSec - max(0.0, $remaining), 1);
+            log::add(__CLASS__, 'warning', '[BOOTSTRAP] Jeedom API indisponible après ' . $elapsed . 's — bootstrap différé au prochain cycle Jeedom');
+            return array('status' => 'skipped', 'reason' => 'topology_unavailable');
+          }
+
+          $delay = min($topologyRetryDelays[$topologyAttempt], $remaining);
+          log::add(__CLASS__, 'warning', '[BOOTSTRAP] Jeedom API indisponible — retry dans ' . $delay . 's');
+          sleep((int) ceil($delay));
+          $topologyAttempt++;
         }
 
+        // Task 6.3: topologie invalide → ne pas appeler /action/sync
         if (!is_array($topology)) {
-          log::add(__CLASS__, 'warning', '[DAEMON] Runtime bootstrap failed (reason=topology_fetch_failed): topology payload is invalid');
-          return array('status' => 'failed', 'reason' => 'topology_fetch_failed');
+          log::add(__CLASS__, 'warning', '[BOOTSTRAP] Jeedom API indisponible après retries — bootstrap différé au prochain cycle Jeedom');
+          return array('status' => 'skipped', 'reason' => 'topology_unavailable');
         }
 
         try {
