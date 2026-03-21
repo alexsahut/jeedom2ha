@@ -5,6 +5,7 @@ Capabilities (open/close, stop, position, BSO) are detected independently and
 cumulated into a single MappingResult per eqLogic.
 """
 import logging
+import re
 from typing import Dict, Optional, Set
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
@@ -178,7 +179,7 @@ class CoverMapper:
 
         # 3. Name heuristics
         name_lower = eq.name.lower()
-        matched_kw = next((kw for kw in _NON_COVER_KEYWORDS if kw in name_lower), None)
+        matched_kw = next((kw for kw in _NON_COVER_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)), None)
         if matched_kw:
             _LOGGER.info(
                 "[MAPPING] eq_id=%d name='%s': name contains non-cover keyword '%s' → ambiguous",

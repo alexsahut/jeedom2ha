@@ -327,6 +327,38 @@ class TestFalsePositivesGuardrails:
         assert result.reason_code == "name_heuristic_rejection"
         assert result.reason_details["matched_keyword"] == "lampe"
 
+    def test_prise_standalone_still_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "Prise USB bureau" avec FLAP_STATE/UP/DOWN,
+        When le mapper évalue,
+        Then confidence == "ambiguous" et reason_code == "name_heuristic_rejection" — "prise" est un mot entier.
+        Régression : confirme que le word-boundary matching préserve la détection des mots entiers.
+        """
+        eq = _make_eq(name="Prise USB bureau", cmds=[
+            _cmd("FLAP_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("FLAP_UP", id=101, type="action", sub_type="other"),
+            _cmd("FLAP_DOWN", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+        assert result.reason_details["matched_keyword"] == "prise"
+
+    def test_reprise_not_ambiguous(self, mapper, snapshot):
+        """Given équipement nommé "Reprise ventilation" avec FLAP_STATE/UP/DOWN,
+        When le mapper évalue,
+        Then confidence in ("sure", "probable") — "prise" ne matche pas comme mot entier dans "reprise".
+        Ce test échoue avant le correctif (substring match) et passe après (word boundary).
+        """
+        eq = _make_eq(name="Reprise ventilation", cmds=[
+            _cmd("FLAP_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("FLAP_UP", id=101, type="action", sub_type="other"),
+            _cmd("FLAP_DOWN", id=102, type="action", sub_type="other"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence in ("sure", "probable")
+
 
 # ==============================================================================
 # Test: ID and area generation

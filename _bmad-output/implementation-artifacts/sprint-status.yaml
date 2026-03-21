@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-20  # story 4-4 done
+last_updated: 2026-03-21  # BUG-1 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -72,4 +72,5 @@ development_status:
   5-1-persistance-et-republication-post-reboot: backlog
   5-2-stabilite-des-identifiants-et-renommages: backlog
   5-3-nettoyage-automatique-et-gestion-des-ecarts: backlog
+  BUG-1-correctif-keyword-matching-substring: done  # faux positifs substring dans mappers, identifié terrain 5.2 (2026-03-21)
   epic-5-retrospective: optional

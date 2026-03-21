@@ -6,6 +6,7 @@ and applies anti-false-positive guardrails (anti-affinity, name heuristics,
 eq.generic_type exclusion).
 """
 import logging
+import re
 from typing import Dict, Optional, Set
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
@@ -133,7 +134,7 @@ class SwitchMapper:
 
         # 3. Name heuristics
         name_lower = eq.name.lower()
-        matched_kw = next((kw for kw in _NON_SWITCH_KEYWORDS if kw in name_lower), None)
+        matched_kw = next((kw for kw in _NON_SWITCH_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)), None)
         if matched_kw:
             _LOGGER.info(
                 "[MAPPING] eq_id=%d name='%s': name contains non-switch keyword '%s' → ambiguous",
