@@ -170,7 +170,7 @@ async def test_published_scope_legacy_plugin_fallback_avoids_include_drift(http_
     assert eq["effective_state"] == "exclude"
 
 
-async def test_published_scope_contract_fields_for_ui_summary_are_stable(http_client):
+async def test_published_scope_contract_fields_for_ui_console_are_stable(http_client):
     payload = {
         "version": "1.0",
         "objects": [
@@ -223,6 +223,17 @@ async def test_published_scope_contract_fields_for_ui_summary_are_stable(http_cl
     for piece in contract["pieces"]:
         assert {"object_id", "object_name", "counts"}.issubset(piece.keys())
         assert set(piece["counts"].keys()) == {"total", "include", "exclude", "exceptions"}
+    assert isinstance(contract["equipements"], list)
+    assert len(contract["equipements"]) == 2
+    for equipment in contract["equipements"]:
+        assert {
+            "eq_id",
+            "object_id",
+            "effective_state",
+            "decision_source",
+            "is_exception",
+            "has_pending_home_assistant_changes",
+        }.issubset(equipment.keys())
 
     scope_resp = await http_client.get(
         "/system/published_scope",

@@ -29,12 +29,32 @@ assertTrueRelay(
 $backendContract = array(
   'global' => array(
     'counts' => array('total' => 3, 'include' => 1, 'exclude' => 2, 'exceptions' => 1),
+    'has_pending_home_assistant_changes' => false,
   ),
   'pieces' => array(
     array(
       'object_id' => 1,
       'object_name' => 'Salon',
       'counts' => array('total' => 3, 'include' => 1, 'exclude' => 2, 'exceptions' => 1),
+      'has_pending_home_assistant_changes' => false,
+    ),
+  ),
+  'equipements' => array(
+    array(
+      'eq_id' => 10,
+      'object_id' => 1,
+      'effective_state' => 'exclude',
+      'decision_source' => 'piece',
+      'is_exception' => false,
+      'has_pending_home_assistant_changes' => false,
+    ),
+    array(
+      'eq_id' => 11,
+      'object_id' => 1,
+      'effective_state' => 'include',
+      'decision_source' => 'exception_equipement',
+      'is_exception' => true,
+      'has_pending_home_assistant_changes' => false,
     ),
   ),
 );
@@ -48,6 +68,7 @@ $relayOk = jeedom2ha::getPublishedScopeForConsole(function () use ($backendContr
 
 assertSameRelay('ok', $relayOk['status'] ?? null, 'Relay returns status ok when daemon contract is available');
 assertSameRelay($backendContract, $relayOk['published_scope'] ?? null, 'Relay forwards backend contract without recompute or regroup');
+assertSameRelay(2, count($relayOk['published_scope']['equipements'] ?? array()), 'Relay keeps excluded and exception equipment entries visible for UI');
 
 $relayUnavailable = jeedom2ha::getPublishedScopeForConsole(function () {
   return array(
