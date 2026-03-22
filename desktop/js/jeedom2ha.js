@@ -59,6 +59,46 @@ function refreshBridgeStatus() {
   });
 }
 
+function renderPublishedScopeSummary(result) {
+  if (typeof Jeedom2haScopeSummary === 'undefined' || !Jeedom2haScopeSummary) {
+    $('#div_scopeSummaryContent').html('<div class="alert alert-danger" style="margin-bottom:0;">{{Module de synthèse indisponible côté UI}}</div>');
+    return;
+  }
+
+  var model = Jeedom2haScopeSummary.createModel(result || {});
+  $('#div_scopeSummaryContent').html(Jeedom2haScopeSummary.render(model));
+}
+
+function refreshPublishedScopeSummary() {
+  $('#div_scopeSummaryContent').html('<div class="text-muted">{{Chargement de la synthèse backend...}}</div>');
+  $.ajax({
+    type: 'POST',
+    url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    data: {action: 'getPublishedScopeForConsole'},
+    dataType: 'json',
+    timeout: 15000,
+    success: function(data) {
+      if (data.state !== 'ok') {
+        renderPublishedScopeSummary({
+          status: 'unavailable',
+          message: '{{Impossible de lire la synthèse backend}}',
+        });
+        return;
+      }
+      renderPublishedScopeSummary(data.result || {
+        status: 'unavailable',
+        message: "{{Contrat published_scope indisponible : lancez d'abord une synchronisation.}}",
+      });
+    },
+    error: function() {
+      renderPublishedScopeSummary({
+        status: 'unavailable',
+        message: '{{Erreur de communication avec le backend}}',
+      });
+    }
+  });
+}
+
 $(function() {
   // Refresh MQTT badge on page load and every 30s when visible
   refreshBridgeStatus();
@@ -67,6 +107,18 @@ $(function() {
       refreshBridgeStatus();
     }
   }, 5000);
+
+  // Story 1.2 — lecture stricte du contrat published_scope (aucun recalcul métier local)
+  refreshPublishedScopeSummary();
+  setInterval(function() {
+    if ($('#div_scopeSummary').is(':visible')) {
+      refreshPublishedScopeSummary();
+    }
+  }, 10000);
+
+  $('#bt_refreshScopeSummary').on('click', function() {
+    refreshPublishedScopeSummary();
+  });
 
   // Export diagnostic support — Story 4.4
   $('#bt_exportDiagnostic').on('click', function () {
@@ -507,4 +559,3 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       });    }
   });
 });
-

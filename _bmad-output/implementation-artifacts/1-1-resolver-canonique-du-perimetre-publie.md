@@ -35,6 +35,18 @@ afin que les décisions `global -> pièce -> équipement` soient prédictibles e
    **When** le resolver est exécuté plusieurs fois  
    **Then** il produit exactement les mêmes décisions et compteurs
 
+## Reopening Note
+
+- Réouverture documentée le 2026-03-22 après échec terrain d'AC3 de Story 1.2.
+- Le défaut observé est amont sur la chaîne backend `excludedObjects -> getFullTopology() -> /action/sync -> /system/published_scope`.
+- Story 1.1 est la story productrice backend rouverte et doit être refermée avant toute revalidation de clôture de Story 1.2.
+
+## Terrain Closure Note
+
+- Cloture terrain du 2026-03-22: la reprise backend Story 1.1 a permis la revalidation finale PASS de Story 1.2.
+- La chaine `/system/published_scope` reflete correctement un changement de perimetre reversible, avec rollback backend + UI valide lors du protocole rejoue.
+- Aucune derive terrain observee vers Story 1.3 ni Story 1.4 depuis cette reprise backend.
+
 ## Tasks / Subtasks
 
 - [x] Task 1 - Etendre le contrat d'entrée backend du périmètre publié sans calcul frontend (AC: 1, 2, 3)
@@ -67,6 +79,11 @@ afin que les décisions `global -> pièce -> équipement` soient prédictibles e
   - [x] 5.3 Ajouter un test de déterminisme: même snapshot + même configuration => mêmes décisions et mêmes compteurs sur plusieurs exécutions
   - [x] 5.4 Ajouter au moins un test d'intégration backend via `/action/sync` (ou le point d'entrée backend retenu) qui prouve que la résolution canonique est calculée côté backend puis réutilisable telle quelle, avec présence du mini contrat minimal `global / pièce / équipement`
   - [x] 5.5 Etendre les tests de non-régression déjà présents sur la topologie, les exclusions et le diagnostic pour vérifier que le resolver n'introduit ni duplicat de logique UI ni rupture des contrats MVP conservés
+
+- [x] Task 6 - Fermer le trou legacy backend rouvert sur `excludedObjects` et ses preuves de tests (AC: 1, 3)
+  - [x] 6.1 Vérifier et corriger si nécessaire la chaîne backend `excludedObjects -> getFullTopology() -> /action/sync -> /system/published_scope` pour qu'un changement local pièce soit bien reflété dans le contrat `published_scope`
+  - [x] 6.2 Ajouter ou ajuster la preuve d'intégration backend couvrant le cas réel où `published_scope.pieces[*]` est pré-rempli avec `raw_state = inherit`
+  - [x] 6.3 Ajouter ou ajuster la preuve de non-régression montrant que le contrat `published_scope` persisté est bien remplacé après changement de configuration locale, sans déplacer de logique vers le frontend
 
 ## Dev Notes
 
@@ -195,6 +212,9 @@ Notes de contrat:
   - calcul du resolver au moment du sync
   - disponibilité du contrat backend canonique après sync, avec présence des champs minimaux `global / pièce / équipement`
   - absence de recalcul parallèle côté UI/PHP template
+  - couverture explicite du chemin legacy `excludedObjects -> getFullTopology() -> /action/sync -> /system/published_scope`
+  - preuve que le fallback pièce legacy reste actif même si `published_scope.pieces[*]` est présent avec `raw_state = inherit` par défaut
+  - preuve que le contrat `published_scope` persisté est bien remplacé après changement de configuration locale
 - Tests de contrat / non-régression obligatoires:
   - stabilité du mini contrat renvoyé aux futures stories de console
   - non-régression des suites MVP conservées sur topologie, exclusions, lifecycle, diagnostic, `unique_id`
@@ -217,6 +237,10 @@ Notes de contrat:
   - `resources/daemon/tests/unit/test_exclusion_filtering.py`
   - `tests/test_php_topology_extraction.php`
 
+## Historical Record (Pre-reopening)
+
+Les sections ci-dessous (`Dev Agent Record`, `Completion Notes`, `Change Log` et `Senior Developer Review`) documentent l'historique pre-reouverture de Story 1.1. Elles servent de contexte de reprise uniquement et ne doivent pas etre lues comme l'etat courant d'une story de nouveau prete a cloture.
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -226,6 +250,10 @@ GPT-5 Codex
 ### Debug Log References
 
 - `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py tests/unit/test_topology.py tests/unit/test_http_server.py resources/daemon/tests/unit/test_exclusion_filtering.py resources/daemon/tests/unit/test_diagnostic_endpoint.py -q` (127 passed, warnings `DeprecationWarning` aiohttp déjà connus)
+- `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py -q` (rouge attendu après ajout des preuves Task 6: 3 failed / 39 passed, cas legacy `default_inherit` reproduit)
+- `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py -q` (vert après correctif resolver: 42 passed)
+- `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py tests/unit/test_topology.py tests/unit/test_http_server.py resources/daemon/tests/unit/test_exclusion_filtering.py resources/daemon/tests/unit/test_diagnostic_endpoint.py -q` (132 passed, non-régression backend Story 1.1)
+- `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py -q` (42 passed après ajout de la preuve PHP producteur fresh-context)
 - `command -v php` retourne vide (`exit 1`) dans cet environnement
 - `php -l core/class/jeedom2ha.class.php` impossible dans cet environnement (`php: command not found`)
 - `php tests/test_php_topology_extraction.php` impossible dans cet environnement (`php: command not found`)
@@ -236,7 +264,10 @@ GPT-5 Codex
 - Contrat d'entrée étendu dans `jeedom2ha::getFullTopology()` via bloc `published_scope` brut (`global`, `pieces`, `equipements`) sans calcul métier frontend/PHP.
 - Contrat backend persistant branché sur `/action/sync` (`app["published_scope"]`) et exposé via `/system/published_scope` pour consommation future sans recalcul UI.
 - Compatibilité technique traitée comme hypothèse backend testée: fallback legacy `exclusion_source=eqlogic/object/plugin` appliqué uniquement si scope canonique explicite absent, pour éviter tout drift contrat `published_scope` vs pipeline d'éligibilité.
-- Test de contrat PHP étendu (`tests/test_php_topology_extraction.php`) pour vérifier la présence du bloc `published_scope` et des clés racines minimales `global / pieces / equipements` sans déplacer de logique métier.
+- Correctif Task 6 appliqué dans le resolver: une entrée préremplie `raw_state=inherit` avec `source=default_inherit` n'est plus interprétée comme règle explicite, ce qui réactive correctement le fallback legacy pièce sur `excludedObjects`.
+- Preuves de tests ajoutées sur la chaîne réelle backend: cas d'intégration `/action/sync` avec `published_scope.pieces[*].raw_state=inherit` prérempli et preuve de remplacement du contrat persisté `/system/published_scope` après changement local legacy.
+- Preuve producteur PHP étendue dans `tests/test_php_topology_extraction.php`: couverture explicite de la chaîne `excludedObjects -> getFullTopology()` avec vérification des marqueurs `default_inherit` (`published_scope.pieces` et `published_scope.equipements`) et de `exclusion_source=object` sur l'équipement ciblé.
+- Le test PHP producteur restaure systématiquement la configuration plugin modifiée pendant l'exécution (`excludedObjects`, `excludedPlugins`, `publishedScope*`) pour éviter les effets de bord.
 - Vérification de non-régression exécutée sur topologie, sync HTTP, exclusions et diagnostic; fichiers UI `desktop/js/jeedom2ha.js` et `desktop/php/jeedom2ha.php` non modifiés.
 
 ### File List
@@ -256,6 +287,10 @@ GPT-5 Codex
 - 2026-03-22: Code review BMAD IA — verdict `changes requested`; story repassée `in-progress` tant que le fallback legacy `excludedPlugins` n'est pas reflété ou explicitement écarté du contrat canonique.
 - 2026-03-22: Correction suite code review — fallback legacy plugin (`exclusion_source=plugin`) aligné et testé dans le resolver, test PHP de contrat `published_scope` ajouté, story remise en `review`.
 - 2026-03-22: Code review BMAD IA — re-review après correction approuvé; P1 legacy plugin fermé, couverture PHP minimale `published_scope` confirmée, story passée `done`.
+- 2026-03-22: Réouverture backend Task 6 clôturée — correction du cas `default_inherit` sur la chaîne `excludedObjects -> getFullTopology() -> /action/sync -> /system/published_scope`, nouvelles preuves d'intégration/non-régression, story repassée `review`.
+- 2026-03-22: Code review BMAD IA fresh-context Task 6 — verdict `changes requested`; story repassée `in-progress` tant que la preuve automatisée ne couvre pas explicitement le segment producteur `excludedObjects -> getFullTopology()` du défaut rouvert.
+- 2026-03-22: Fermeture du gap de preuve fresh-context — extension de `tests/test_php_topology_extraction.php` pour couvrir explicitement le segment producteur `excludedObjects -> getFullTopology()` (cas réel `default_inherit`), story repassée `review`.
+- 2026-03-22: Code review BMAD IA fresh-context après ajout de la preuve PHP producteur — verdict `approved`; fermeture du gap `excludedObjects -> getFullTopology()` confirmée, story repassée `done`.
 
 ## Senior Developer Review (AI)
 
@@ -299,3 +334,43 @@ approved
 
 - `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py tests/unit/test_topology.py tests/unit/test_http_server.py resources/daemon/tests/unit/test_exclusion_filtering.py resources/daemon/tests/unit/test_diagnostic_endpoint.py -q` (127 passed, warnings `DeprecationWarning` aiohttp déjà connus sur les mutations `request.app[...]`)
 - `command -v php` -> binaire absent dans cet environnement; `php -l core/class/jeedom2ha.class.php` et `php tests/test_php_topology_extraction.php` non vérifiables localement
+
+### Fresh-context Re-review Date
+
+2026-03-22 21:34:00 CET
+
+### Fresh-context Re-review Verdict
+
+changes requested
+
+### Fresh-context Re-review Findings
+
+- [medium] Le correctif du resolver traite bien le cas `default_inherit` côté daemon, mais la preuve automatique ajoutée ne couvre toujours pas explicitement le segment producteur PHP `excludedObjects -> getFullTopology()`. Les nouveaux tests backend injectent un payload déjà formé avec `published_scope` et `is_excluded`, tandis que le seul test PHP actuel vérifie seulement la présence des clés racines `published_scope` sans asserter le cas réel `excludedObjects` + marqueurs `default_inherit`. Après une réouverture motivée par un échec terrain sur cette chaîne exacte, la couverture reste donc partielle et ne ferme pas complètement le risque de régression producteur.
+- [low] Réserve documentaire mineure: la completion note qui parle de "preuves de tests ajoutées sur la chaîne réelle backend" est un peu trop large au vu du dépôt actuel, car la portion `getFullTopology()` n'est pas démontrée automatiquement par un test dédié.
+
+### Fresh-context Re-review Tests
+
+- `python3 -m pytest tests/unit/test_published_scope.py -q` (35 passed)
+- `python3 -m pytest tests/unit/test_published_scope_http.py -q` (7 passed, warnings `DeprecationWarning` aiohttp déjà connus sur les mutations `request.app[...]`)
+- `command -v php` -> binaire absent dans cet environnement; `php tests/test_php_topology_extraction.php` non vérifiable localement
+
+### Fresh-context Closure Re-review Date
+
+2026-03-22 21:45:44 CET
+
+### Fresh-context Closure Re-review Verdict
+
+approved
+
+### Fresh-context Closure Re-review Findings
+
+- Aucun finding bloquant sur cette passe.
+- Le gap de preuve demandé précédemment est fermé: `tests/test_php_topology_extraction.php` couvre explicitement le segment producteur `excludedObjects -> getFullTopology()` avec les marqueurs `default_inherit`, tandis que `tests/unit/test_published_scope_http.py` couvre explicitement la suite `/action/sync -> /system/published_scope`.
+- Le correctif backend du resolver reste cohérent avec cette preuve: une entrée `inherit/default_inherit` n'est plus traitée comme une règle explicite et laisse bien le fallback legacy pièce se déclencher.
+- Aucune logique métier de résolution, de source de décision ou de comptage n'a été déplacée vers le frontend; la chaîne UI inspectée reste un relais/une présentation du contrat backend.
+- Réserve non bloquante d'environnement: le binaire PHP est absent ici, donc la preuve PHP producteur n'a pas pu être exécutée localement dans cette session.
+
+### Fresh-context Closure Re-review Tests
+
+- `python3 -m pytest tests/unit/test_published_scope.py tests/unit/test_published_scope_http.py -q` (42 passed, warnings `DeprecationWarning` aiohttp déjà connus sur les mutations `request.app[...]`)
+- `command -v php` -> binaire absent dans cet environnement; `php tests/test_php_topology_extraction.php` non vérifiable localement

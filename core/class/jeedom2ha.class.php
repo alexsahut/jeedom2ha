@@ -455,6 +455,53 @@ class jeedom2ha extends eqLogic {
     return null;
   }
 
+  /**
+   * Story 1.2 — relai de lecture du contrat published_scope pour l'UI Jeedom.
+   * Le contrat backend est renvoyé tel quel: aucun recalcul métier ici.
+   */
+  public static function getPublishedScopeForConsole(?callable $_daemonFetcher = null): array {
+    $daemonFetcher = $_daemonFetcher ?: function() {
+      return self::callDaemon('/system/published_scope', null, 'GET', 15);
+    };
+
+    try {
+      $response = $daemonFetcher();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'warning', '[SCOPE] Lecture contrat published_scope impossible: ' . $e->getMessage());
+      return array(
+        'status' => 'unavailable',
+        'message' => 'Contrat published_scope indisponible : lancez une synchronisation.',
+      );
+    }
+
+    if (!is_array($response)) {
+      return array(
+        'status' => 'unavailable',
+        'message' => 'Contrat published_scope indisponible : lancez une synchronisation.',
+      );
+    }
+
+    if (($response['status'] ?? null) !== 'ok') {
+      return array(
+        'status' => 'unavailable',
+        'message' => strval($response['message'] ?? 'Contrat published_scope indisponible : lancez une synchronisation.'),
+      );
+    }
+
+    $payload = $response['payload'] ?? null;
+    if (!is_array($payload)) {
+      return array(
+        'status' => 'unavailable',
+        'message' => 'Contrat published_scope invalide : relancez une synchronisation.',
+      );
+    }
+
+    return array(
+      'status' => 'ok',
+      'published_scope' => $payload,
+    );
+  }
+
   private static function _scopeRawStateToString($_value): string {
     if ($_value === null) {
       return '';

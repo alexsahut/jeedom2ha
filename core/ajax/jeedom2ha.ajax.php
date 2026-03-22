@@ -188,6 +188,9 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'getPublishedScopeForConsole') {
+      ajax::success(jeedom2ha::getPublishedScopeForConsole());
+    }
     else if ($action == 'exportDiagnostic') {
       $pseudonymize = (init('pseudonymize', '0') === '1');
 
