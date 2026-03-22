@@ -28,18 +28,35 @@ def _extract_raw_state(entry: Any) -> Any:
     return entry
 
 
-def _state_by_id(scope_map: Any, identifier: int) -> Any:
+def _extract_scope_entry(entry: Any) -> tuple[Any, Any]:
+    """Extract (raw_state, source) from scope entries."""
+    if isinstance(entry, dict):
+        return entry.get("raw_state"), entry.get("source")
+    return entry, None
+
+
+def _state_entry_by_id(scope_map: Any, identifier: int) -> tuple[Any, Any]:
     if not isinstance(scope_map, dict):
-        return None
+        return None, None
     if identifier in scope_map:
-        return _extract_raw_state(scope_map.get(identifier))
-    return _extract_raw_state(scope_map.get(str(identifier)))
+        return _extract_scope_entry(scope_map.get(identifier))
+    return _extract_scope_entry(scope_map.get(str(identifier)))
 
 
 def _normalized_state_and_explicit(scope_map: Any, identifier: int) -> tuple[str, bool]:
-    raw_state = _state_by_id(scope_map, identifier)
+    raw_state, source = _state_entry_by_id(scope_map, identifier)
     normalized_state = normalize_scope_state(raw_state, default=STATE_INHERIT)
-    is_explicit = isinstance(raw_state, str) and raw_state.strip().lower() in _SUPPORTED_STATES
+    has_supported_raw_state = (
+        isinstance(raw_state, str) and raw_state.strip().lower() in _SUPPORTED_STATES
+    )
+    source_value = source.strip().lower() if isinstance(source, str) else ""
+
+    # getFullTopology pre-remplit "inherit/default_inherit" pour chaque pièce/équipement:
+    # ce cas n'est pas une règle utilisateur explicite et doit conserver les fallbacks legacy.
+    is_default_inherit_marker = (
+        normalized_state == STATE_INHERIT and source_value == "default_inherit"
+    )
+    is_explicit = has_supported_raw_state and not is_default_inherit_marker
     return normalized_state, is_explicit
 
 

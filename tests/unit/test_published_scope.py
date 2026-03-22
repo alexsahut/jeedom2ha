@@ -219,3 +219,34 @@ def test_resolver_legacy_plugin_exclusion_fallback_is_tested():
     assert eq["effective_state"] == "exclude"
     assert eq["decision_source"] == "exception_equipement"
     assert eq["is_exception"] is True
+
+
+def test_resolver_legacy_object_exclusion_fallback_with_default_inherit_piece_entry():
+    payload = {
+        "objects": [{"id": 1, "name": "Salon"}],
+        "eq_logics": [
+            {
+                "id": 10,
+                "name": "Eq Legacy Piece Exclue",
+                "object_id": 1,
+                "is_excluded": True,
+                "exclusion_source": "object",
+            }
+        ],
+    }
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+
+    # Cas réel getFullTopology(): entrée pièce préremplie "inherit/default_inherit".
+    resolved = resolve_published_scope(
+        snapshot,
+        raw_scope={
+            "global": {"raw_state": "include"},
+            "pieces": {"1": {"raw_state": "inherit", "source": "default_inherit"}},
+            "equipements": {"10": {"raw_state": "inherit", "source": "default_inherit"}},
+        },
+    )
+    eq = resolved["equipements"][0]
+
+    assert eq["effective_state"] == "exclude"
+    assert eq["decision_source"] == "piece"
+    assert eq["is_exception"] is False
