@@ -1,6 +1,6 @@
 # Story 1.3: Exceptions équipement et visibilité continue des exclus
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -297,6 +297,9 @@ GPT-5 Codex
 - Les synthèses globales et par pièce de Story 1.2 sont conservées, le refresh remplace entièrement le rendu avec le payload backend le plus récent
 - Couverture de test étendue sur le présentateur UI, la stabilité du contrat backend et le relai PHP prévu pour la console
 - Régression Python complète verte; vérification PHP non exécutable dans cet environnement faute de binaire `php`
+- Code review : PASS
+- Validation terrain : PASS — AC1 OK, AC2 OK, AC3 OK, guardrails OK, aucun finding
+- Story closée le 2026-03-23 — PR #35 mergée sur `main` (merge commit `3f254a9`)
 
 ### File List
 
