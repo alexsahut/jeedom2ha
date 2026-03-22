@@ -570,7 +570,7 @@ class TestSyncAction:
         )
         assert resp_second.status == 200
         assert http_app["pending_discovery_unpublish"] == {2: "switch"}
-        assert http_app["pending_local_availability_cleanup"] == {}
+        assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True
