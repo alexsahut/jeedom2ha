@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-03-22 14:53:22 CET
+# last_updated: 2026-03-22 22:18:52 CET
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-22 14:53:22 CET'
+last_updated: '2026-03-22 22:18:52 CET'
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -43,8 +43,11 @@ story_location: '/Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/impl
 
 development_status:
   epic-1: in-progress
+  # 1-1 refermee; reprise backend validee en terrain
   1-1-resolver-canonique-du-perimetre-publie: done
-  1-2-vue-globale-et-synthese-par-piece-sans-recalcul-frontend: backlog
+  # 1-2 revalidation terrain PASS le 2026-03-22; limitation pre-sync documentee comme protocole, non comme echec story
+  1-2-vue-globale-et-synthese-par-piece-sans-recalcul-frontend: done
+  # 1-3 et 1-4 restent a planifier; Epic 1 demeure in-progress
   1-3-exceptions-equipement-et-visibilite-continue-des-exclus: backlog
   1-4-changements-locaux-en-attente-d-application-home-assistant: backlog
   epic-1-retrospective: optional

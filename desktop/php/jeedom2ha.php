@@ -20,6 +20,27 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<span id="span_mqttBroker" style="margin-left:10px;color:#666;font-size:0.9em;"></span>
 		</div>
 
+		<div id="div_scopeSummary" class="well well-sm" style="margin:10px 5px;">
+			<div class="clearfix">
+				<div class="pull-left">
+					<i class="fas fa-layer-group"></i> <strong>{{Synthèse du périmètre publié}}</strong>
+					<span class="label label-default" style="margin-left:8px;">{{Contrat backend}}</span>
+				</div>
+				<div class="pull-right">
+					<button id="bt_refreshScopeSummary" class="btn btn-default btn-xs">
+						<i class="fas fa-sync-alt"></i> {{Rafraîchir}}
+					</button>
+				</div>
+			</div>
+			<div id="div_scopeSummaryContent" style="margin-top:10px;">
+				<div class="text-muted">{{Chargement de la synthèse backend...}}</div>
+			</div>
+			<div style="margin-top:8px;color:#666;font-size:0.9em;">
+				<i class="fas fa-info-circle"></i>
+				{{Cette synthèse décrit le périmètre local calculé par le backend. Elle ne confirme pas à elle seule une application Home Assistant.}}
+			</div>
+		</div>
+
 		<!-- Export diagnostic support -->
 		<div class="form-group" style="margin:4px 5px 10px 5px;">
 			<div class="col-sm-12">
@@ -231,6 +252,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 </div><!-- /.row row-overflow -->
 
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
+<?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
