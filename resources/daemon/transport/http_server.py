@@ -12,7 +12,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import paho.mqtt.client as mqtt
 from aiohttp import web
@@ -25,6 +25,7 @@ from models.availability import (
     build_local_availability_topic,
 )
 from models.topology import TopologySnapshot, assess_all
+from models.published_scope import resolve_published_scope
 from models.mapping import MappingResult, PublicationDecision
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
@@ -131,6 +132,46 @@ def _mark_local_availability_publish_failed(
         local_availability_state=decision.local_availability_state,
         availability_reason=decision.availability_reason,
     )
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _apply_pending_scope_flags(
+    scope_contract: Dict[str, Any],
+    publications: Dict[int, PublicationDecision],
+    pending_discovery_unpublish: Dict[int, str],
+) -> Dict[str, Any]:
+    """Enrich canonical scope with pending HA changes without recalculating business resolution."""
+    equipements = scope_contract.get("equipements", [])
+    piece_pending: Dict[int, bool] = {}
+
+    for eq_entry in equipements:
+        eq_id = _to_int(eq_entry.get("eq_id"), default=0)
+        desired_include = eq_entry.get("effective_state") == "include"
+        decision = publications.get(eq_id)
+        is_active = bool(decision and getattr(decision, "active_or_alive", False))
+        if eq_id in pending_discovery_unpublish:
+            # Unpublish deferred => still active in HA until replay.
+            is_active = True
+        has_pending = desired_include != is_active
+        eq_entry["has_pending_home_assistant_changes"] = has_pending
+
+        piece_id = _to_int(eq_entry.get("object_id"), default=0)
+        piece_pending[piece_id] = piece_pending.get(piece_id, False) or has_pending
+
+    for piece in scope_contract.get("pieces", []):
+        piece_id = _to_int(piece.get("object_id"), default=0)
+        piece["has_pending_home_assistant_changes"] = piece_pending.get(piece_id, False)
+
+    global_section = scope_contract.get("global", {})
+    global_section["has_pending_home_assistant_changes"] = any(piece_pending.values())
+    scope_contract["global"] = global_section
+    return scope_contract
 
 
 def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
@@ -640,6 +681,10 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     # 1. Normalize and store snapshot
     snapshot = TopologySnapshot.from_jeedom_payload(payload)
     request.app["topology"] = snapshot
+
+    # Story 1.1 — resolver canonique du périmètre publié (global -> piece -> equipement).
+    published_scope_raw = payload.get("published_scope", {})
+    published_scope_contract = resolve_published_scope(snapshot, raw_scope=published_scope_raw)
     
     # 2. Assess eligibility
     eligibility = assess_all(snapshot)
@@ -1082,6 +1127,11 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
     request.app["publications"].update(publications)
+    request.app["published_scope"] = _apply_pending_scope_flags(
+        published_scope_contract,
+        request.app["publications"],
+        request.app["pending_discovery_unpublish"],
+    )
 
     # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
     save_publications_cache(request.app["publications"], _DATA_DIR)
@@ -1125,6 +1175,7 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         "ineligible_count": ineligible_count,
         "ineligible_breakdown": breakdown,
         "mapping_summary": mapping_counters,
+        "published_scope": request.app["published_scope"],
     }
     
     return web.json_response({
@@ -1516,6 +1567,31 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_published_scope(request: web.Request) -> web.Response:
+    """Handle GET /system/published_scope — return canonical backend scope contract."""
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    published_scope = request.app.get("published_scope")
+    if not published_scope:
+        return web.json_response({
+            "status": "error",
+            "message": "Contrat published_scope indisponible : appelez /action/sync d'abord.",
+        })
+
+    return web.json_response({
+        "action": "system.published_scope",
+        "status": "ok",
+        "payload": published_scope,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
@@ -1529,6 +1605,7 @@ def create_app(local_secret: str) -> web.Application:
     app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
+    app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
@@ -1539,6 +1616,7 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
     app.router.add_post("/action/sync", _handle_action_sync)
     app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
+    app.router.add_get("/system/published_scope", _handle_system_published_scope)
     return app
 
 

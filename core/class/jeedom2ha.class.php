@@ -455,6 +455,39 @@ class jeedom2ha extends eqLogic {
     return null;
   }
 
+  private static function _scopeRawStateToString($_value): string {
+    if ($_value === null) {
+      return '';
+    }
+    if (is_bool($_value)) {
+      return $_value ? '1' : '0';
+    }
+    if (is_scalar($_value)) {
+      return trim(strval($_value));
+    }
+    return '';
+  }
+
+  private static function _decodeScopeStateMap($_raw): array {
+    if (!is_string($_raw) || trim($_raw) === '') {
+      return array();
+    }
+
+    $decoded = json_decode($_raw, true);
+    if (!is_array($decoded)) {
+      return array();
+    }
+
+    $result = array();
+    foreach ($decoded as $id => $state) {
+      if (!is_scalar($state) && $state !== null) {
+        continue;
+      }
+      $result[strval($id)] = self::_scopeRawStateToString($state);
+    }
+    return $result;
+  }
+
   /**
    * Extrait la topologie complète de Jeedom pour synchronisation daemon.
    * Strictement Read-Only : utilise le cache pour les valeurs, jamais execCmd.
@@ -479,6 +512,34 @@ class jeedom2ha extends eqLogic {
     $confidencePolicy = config::byKey('confidencePolicy', __CLASS__, 'sure_probable');
     if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
       $confidencePolicy = 'sure_probable';
+    }
+
+    // Story 1.1 — Scope canonique brut (la normalisation métier reste backend-only, côté daemon).
+    $globalScopeRaw = self::_scopeRawStateToString(config::byKey('publishedScopeGlobalState', __CLASS__, 'inherit'));
+    $scopeObjectsRawMap = self::_decodeScopeStateMap(config::byKey('publishedScopeObjectsStates', __CLASS__, '{}'));
+    $scopeEqLogicsRawMap = self::_decodeScopeStateMap(config::byKey('publishedScopeEqLogicsStates', __CLASS__, '{}'));
+    $publishedScope = array(
+      'global' => array(
+        'raw_state' => ($globalScopeRaw !== '') ? $globalScopeRaw : 'inherit',
+        'source' => 'config_scope_global',
+      ),
+      'pieces' => array(),
+      'equipements' => array(),
+    );
+
+    foreach ($result['objects'] as $objData) {
+      $objectId = intval($objData['id']);
+      $pieceKey = strval($objectId);
+      $pieceRawState = 'inherit';
+      $pieceSource = 'default_inherit';
+      if (array_key_exists($pieceKey, $scopeObjectsRawMap) && $scopeObjectsRawMap[$pieceKey] !== '') {
+        $pieceRawState = $scopeObjectsRawMap[$pieceKey];
+        $pieceSource = 'config_scope_piece';
+      }
+      $publishedScope['pieces'][$pieceKey] = array(
+        'raw_state' => $pieceRawState,
+        'source' => $pieceSource,
+      );
     }
 
     // 2. EqLogics (équipements)
@@ -547,10 +608,34 @@ class jeedom2ha extends eqLogic {
         $eqData['exclusion_source'] = $exclusionSource;
       }
       $result['eq_logics'][] = $eqData;
+
+      // Scope équipement brut (sans normalisation métier ici).
+      $eqId = intval($eq->getId());
+      $eqKey = strval($eqId);
+      $eqScopeRawState = null;
+      $eqScopeSource = 'default_inherit';
+      if (method_exists($eq, 'getConfiguration')) {
+        $eqScopeRawState = self::_scopeRawStateToString($eq->getConfiguration('jeedom2ha_scope_state', null));
+        if ($eqScopeRawState !== '') {
+          $eqScopeSource = 'config_scope_equipement';
+        }
+      }
+      if (($eqScopeRawState === null || $eqScopeRawState === '') && array_key_exists($eqKey, $scopeEqLogicsRawMap) && $scopeEqLogicsRawMap[$eqKey] !== '') {
+        $eqScopeRawState = $scopeEqLogicsRawMap[$eqKey];
+        $eqScopeSource = 'config_scope_equipement_map';
+      }
+      if ($eqScopeRawState === null || $eqScopeRawState === '') {
+        $eqScopeRawState = 'inherit';
+      }
+      $publishedScope['equipements'][$eqKey] = array(
+        'raw_state' => $eqScopeRawState,
+        'source' => $eqScopeSource,
+      );
     }
 
     // Ajout de sync_config pour la politique de confiance (Story 4.3)
     $result['sync_config'] = array('confidence_policy' => $confidencePolicy);
+    $result['published_scope'] = $publishedScope;
 
     log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics');
     return $result;

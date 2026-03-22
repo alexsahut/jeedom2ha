@@ -28,6 +28,19 @@ try {
     echo "SUCCESS: Topology extracted safely.\n";
     echo "Objects: " . count($topology['objects']) . "\n";
     echo "EqLogics: " . count($topology['eq_logics']) . "\n";
+
+    // Story 1.1 contract check: published_scope minimal root keys must be present.
+    if (!isset($topology['published_scope']) || !is_array($topology['published_scope'])) {
+        throw new Exception("published_scope missing in topology payload");
+    }
+
+    $scope = $topology['published_scope'];
+    foreach (['global', 'pieces', 'equipements'] as $requiredKey) {
+        if (!array_key_exists($requiredKey, $scope)) {
+            throw new Exception("published_scope.$requiredKey missing in topology payload");
+        }
+    }
+    echo "published_scope contract roots: OK (global/pieces/equipements)\n";
     exit(0);
 } catch (Throwable $e) {
     echo "FATAL ERROR: " . $e->getMessage() . "\n";
