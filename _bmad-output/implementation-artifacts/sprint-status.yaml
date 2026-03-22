@@ -1,9 +1,10 @@
-  # generated: 2026-03-13
+# generated: 2026-03-22 10:33:12 CET
+# last_updated: 2026-03-22 10:33:12 CET
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
 # story_location: /Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts
-
+#
 # STATUS DEFINITIONS:
 # ==================
 # Epic Status:
@@ -12,8 +13,8 @@
 #   - done: All stories in epic completed
 #
 # Epic Status Transitions:
-#   - backlog → in-progress: Automatically when first story is created (via create-story)
-#   - in-progress → done: Manually when all stories reach 'done' status
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
 #
 # Story Status:
 #   - backlog: Story only exists in epic file
@@ -33,45 +34,38 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-03-13
-last_updated: 2026-03-22  # story 5.3 review (TC-4 waiver documenté)
+generated: '2026-03-22 10:33:12 CET'
+last_updated: '2026-03-22 10:33:12 CET'
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
-story_location: /Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts
+story_location: '/Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts'
 
 development_status:
-  epic-1: done
-  1-1-initialisation-et-communication-php-python: done
-  1-2-configuration-et-onboarding-mqtt-auto-manuel: done
-  1-2-bis-fiabilisation-auto-detection-mqtt-manager-import-force: done
-  1-3-validation-de-la-connexion-et-statut-du-pont: done
-  epic-1-retrospective: done
-  epic-2: done  # reopened for 2.6, now closed — PR #15 merged 2026-03-18
-  2-1-topology-scraper-contexte-spatial: done
-  2-2-mapping-exposition-des-lumieres: done
-  2-3-mapping-exposition-des-ouvrants-volets: done
-  2-4-mapping-exposition-des-prises-switches: done
-  2-5-mapping-exposition-des-capteurs-numeriques-binaires: done
-  2-6-deduplication-commandes-generic-type-dupliquees: done  # PR #15 merged 2026-03-18, validation terrain 2026-03-19: aucun cas binary+numeric sur le parc — comportement conservatif (ambiguous) conforme sur eq_id 510/511/446
-  epic-2-retrospective: done
-  epic-3: done
-  3-1-synchronisation-incrementale-des-etats-jeedom-ha: done
-  3-2-pilotage-ha-jeedom-avec-confirmation-honnete-detat: done
-  3-2-bis-bootstrap-runtime-apres-restart-daemon: done  # cloture produit/projet; validation terrain 3.2b-A/B/C differee et non executee
-  3-3-disponibilite-du-pont-et-des-entites-quand-linformation-est-fiable: done  # tests terrain 3.3-A/B/C valides sur box reelle (2026-03-16)
-  epic-3-retrospective: done
-  epic-4: done
-  4-1-interface-de-diagnostic-de-couverture: done
-  4-2-diagnostic-detaille-et-suggestions-de-remediation: done
-  4-2-bis-homogeneite-de-tracabilite-et-explicabilite-diagnostique: done  # PR #14 merged 2026-03-18, validation terrain OK
-  4-3-gestion-des-exclusions-et-actions-manuelles: done
-  4-4-export-de-diagnostic-pour-support: done  # validation terrain 2026-03-20, 2 fixes post-recette (JS blob anchor, PHP cmd_name pseudo)
-  epic-4-retrospective: done  # 2026-03-20
-  epic-5: in-progress
-  5-1-persistance-et-republication-post-reboot: done  # terrain TC-A/B/C/D PASS, code-review APPROVED WITH FOLLOW-UP, 2026-03-20
-  5-1-bis-creation-automatique-repertoire-data: done  # terrain validé 2026-03-21, tous les AC PASS
-  5-2-stabilite-des-identifiants-et-renommages: done  # terrain TC-1/TC-2/TC-3 PASS 2026-03-21
-  5-3-nettoyage-automatique-et-gestion-des-ecarts: review  # TC-1/2/3 terrain PASS; TC-4 bypass avec dérogation explicite documentée
-  BUG-1-correctif-keyword-matching-substring: done  # faux positifs substring dans mappers, identifié terrain 5.2 (2026-03-21)
-  epic-5-retrospective: optional
+  epic-1: backlog
+  1-1-resolver-canonique-du-perimetre-publie: backlog
+  1-2-vue-globale-et-synthese-par-piece-sans-recalcul-frontend: backlog
+  1-3-exceptions-equipement-et-visibilite-continue-des-exclus: backlog
+  1-4-changements-locaux-en-attente-d-application-home-assistant: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-contrat-backend-de-sante-minimale: backlog
+  2-2-bandeau-global-de-sante-toujours-visible: backlog
+  2-3-gating-des-actions-home-assistant-selon-la-sante-du-pont: backlog
+  2-4-distinction-stable-entre-infrastructure-et-configuration: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-taxonomie-principale-de-statuts-d-equipement: backlog
+  3-2-reason-code-stables-raison-lisible-et-action-recommandee: backlog
+  3-3-agregations-piece-et-global-coherentes: backlog
+  3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-facade-backend-unique-des-operations-v1-1: backlog
+  4-2-flux-republier-non-destructif-multi-portee: backlog
+  4-3-flux-supprimer-puis-recreer-avec-confirmations-fortes: backlog
+  4-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: backlog
+  epic-4-retrospective: optional
