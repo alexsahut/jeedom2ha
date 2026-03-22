@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-13
-last_updated: 2026-03-21  # BUG-1 done, story 5.2 rebased
+last_updated: 2026-03-22  # story 5.3 review (TC-4 waiver documenté)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -72,6 +72,6 @@ development_status:
   5-1-persistance-et-republication-post-reboot: done  # terrain TC-A/B/C/D PASS, code-review APPROVED WITH FOLLOW-UP, 2026-03-20
   5-1-bis-creation-automatique-repertoire-data: done  # terrain validé 2026-03-21, tous les AC PASS
   5-2-stabilite-des-identifiants-et-renommages: done  # terrain TC-1/TC-2/TC-3 PASS 2026-03-21
-  5-3-nettoyage-automatique-et-gestion-des-ecarts: backlog
+  5-3-nettoyage-automatique-et-gestion-des-ecarts: review  # TC-1/2/3 terrain PASS; TC-4 bypass avec dérogation explicite documentée
   BUG-1-correctif-keyword-matching-substring: done  # faux positifs substring dans mappers, identifié terrain 5.2 (2026-03-21)
   epic-5-retrospective: optional
