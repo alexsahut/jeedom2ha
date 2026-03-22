@@ -21,6 +21,7 @@ Eviter tout melange entre les artefacts historiques du MVP et les artefacts acti
 | UX | `_bmad-output/planning-artifacts/ux-delta-review-post-mvp-v1-1-pilotable.md` |
 | Architecture | `_bmad-output/planning-artifacts/architecture-delta-review-post-mvp-v1-1-pilotable.md` |
 | Epics / story breakdown | `_bmad-output/planning-artifacts/epics-post-mvp-v1-1-pilotable.md` |
+| Test strategy | `_bmad-output/planning-artifacts/test-strategy-post-mvp-v1-1-pilotable.md` |
 | Sprint status | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 | Readiness report | `_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-22.md` |
 
@@ -65,4 +66,4 @@ Utiliser ce manifeste comme point d'entree avant tout workflow BMAD d'execution,
 
 ## 10. Resume ultra court a copier dans les prompts
 
-Cycle actif = **Post-MVP Phase 1 - V1.1 Pilotable**. Sources de verite actives = `product-brief-jeedom2ha-post-mvp-refresh.md`, `prd-post-mvp-v1-1-pilotable.md`, `ux-delta-review-post-mvp-v1-1-pilotable.md`, `architecture-delta-review-post-mvp-v1-1-pilotable.md`, `epics-post-mvp-v1-1-pilotable.md`, `implementation-readiness-report-2026-03-22.md`, `sprint-status.yaml`. Les artefacts MVP historiques sont du contexte secondaire uniquement. Aucun agent ne doit deviner la source de verite.
+Cycle actif = **Post-MVP Phase 1 - V1.1 Pilotable**. Sources de verite actives = `product-brief-jeedom2ha-post-mvp-refresh.md`, `prd-post-mvp-v1-1-pilotable.md`, `ux-delta-review-post-mvp-v1-1-pilotable.md`, `architecture-delta-review-post-mvp-v1-1-pilotable.md`, `epics-post-mvp-v1-1-pilotable.md`, `test-strategy-post-mvp-v1-1-pilotable.md`, `implementation-readiness-report-2026-03-22.md`, `sprint-status.yaml`. Les artefacts MVP historiques sont du contexte secondaire uniquement. Aucun agent ne doit deviner la source de verite.
