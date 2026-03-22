@@ -25,6 +25,13 @@
     return fallback;
   }
 
+  function readBoolean(value, fallback) {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    return fallback;
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -40,6 +47,27 @@
       include: readCount(rawCounts, 'include'),
       exclude: readCount(rawCounts, 'exclude'),
       exceptions: readCount(rawCounts, 'exceptions'),
+    };
+  }
+
+  function buildDecisionSourceLabel(decisionSource, isException) {
+    if (decisionSource === 'piece') {
+      return 'Hérite de la pièce';
+    }
+    if (decisionSource === 'exception_equipement' && isException === true) {
+      return 'Exception locale';
+    }
+    return '';
+  }
+
+  function buildEquipmentModel(entry) {
+    return {
+      eq_id: entry.eq_id,
+      effective_state: readString(entry.effective_state, ''),
+      decision_source_label: buildDecisionSourceLabel(
+        readString(entry.decision_source, ''),
+        readBoolean(entry.is_exception, false)
+      ),
     };
   }
 
@@ -65,18 +93,37 @@
     var scope = safeResponse.published_scope;
     var globalSection = (scope.global && typeof scope.global === 'object') ? scope.global : {};
     var pieces = Array.isArray(scope.pieces) ? scope.pieces : [];
+    var equipements = Array.isArray(scope.equipements) ? scope.equipements : [];
     var normalizedPieces = [];
+    var piecesByObjectId = {};
 
     for (var i = 0; i < pieces.length; i++) {
       var piece = pieces[i];
       if (!piece || typeof piece !== 'object') {
         continue;
       }
-      normalizedPieces.push({
+      var normalizedPiece = {
         object_id: piece.object_id,
         object_name: readString(piece.object_name, 'Aucune pièce'),
         counts: buildCounts(piece.counts),
-      });
+        equipements: [],
+      };
+      normalizedPieces.push(normalizedPiece);
+      piecesByObjectId[String(piece.object_id)] = normalizedPiece;
+    }
+
+    for (var j = 0; j < equipements.length; j++) {
+      var equipement = equipements[j];
+      if (!equipement || typeof equipement !== 'object') {
+        continue;
+      }
+
+      var pieceModel = piecesByObjectId[String(equipement.object_id)];
+      if (!pieceModel) {
+        continue;
+      }
+
+      pieceModel.equipements.push(buildEquipmentModel(equipement));
     }
 
     return {
@@ -92,6 +139,39 @@
     html += '<div style="font-size:0.85em;color:#666;">' + escapeHtml(title) + '</div>';
     html += '<div style="font-size:1.35em;font-weight:600;line-height:1.2;">' + toDisplayCount(value) + '</div>';
     html += '</div></div>';
+    return html;
+  }
+
+  function renderEquipmentState(state) {
+    var normalizedState = readString(state, '');
+    var cssClass = 'label label-default';
+    if (normalizedState === 'include') {
+      cssClass = 'label label-success';
+    }
+    return '<span class="' + cssClass + '">' + escapeHtml(normalizedState || 'inconnu') + '</span>';
+  }
+
+  function renderPieceEquipements(piece) {
+    var equipements = Array.isArray(piece.equipements) ? piece.equipements : [];
+    var html = '<div><strong>{{Équipements}}</strong></div>';
+
+    if (equipements.length === 0) {
+      html += '<div class="text-muted" style="margin-top:6px;"><em>{{Aucun équipement visible dans cette pièce côté contrat backend}}</em></div>';
+      return html;
+    }
+
+    html += '<ul class="list-unstyled" style="margin:8px 0 0 0;">';
+    for (var i = 0; i < equipements.length; i++) {
+      var equipement = equipements[i];
+      html += '<li style="padding:6px 0;' + (i > 0 ? 'border-top:1px solid #eee;' : '') + '">';
+      html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
+      html += '<span style="margin-left:8px;">' + renderEquipmentState(equipement.effective_state) + '</span>';
+      if (equipement.decision_source_label !== '') {
+        html += '<span class="label label-default" style="margin-left:8px;">' + escapeHtml(equipement.decision_source_label) + '</span>';
+      }
+      html += '</li>';
+    }
+    html += '</ul>';
     return html;
   }
 
@@ -130,6 +210,9 @@
         html += '<td>' + toDisplayCount(piece.counts.include) + '</td>';
         html += '<td>' + toDisplayCount(piece.counts.exclude) + '</td>';
         html += '<td>' + toDisplayCount(piece.counts.exceptions) + '</td>';
+        html += '</tr>';
+        html += '<tr>';
+        html += '<td colspan="5">' + renderPieceEquipements(piece) + '</td>';
         html += '</tr>';
       }
     }
