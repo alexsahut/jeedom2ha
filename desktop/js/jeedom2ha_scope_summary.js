@@ -68,6 +68,7 @@
         readString(entry.decision_source, ''),
         readBoolean(entry.is_exception, false)
       ),
+      has_pending_home_assistant_changes: readBoolean(entry.has_pending_home_assistant_changes, false),
     };
   }
 
@@ -106,6 +107,7 @@
         object_id: piece.object_id,
         object_name: readString(piece.object_name, 'Aucune pièce'),
         counts: buildCounts(piece.counts),
+        has_pending_home_assistant_changes: readBoolean(piece.has_pending_home_assistant_changes, false),
         equipements: [],
       };
       normalizedPieces.push(normalizedPiece);
@@ -129,6 +131,7 @@
     return {
       has_contract: true,
       global_counts: buildCounts(globalSection.counts),
+      global_pending: readBoolean(globalSection.has_pending_home_assistant_changes, false),
       pieces: normalizedPieces,
     };
   }
@@ -169,6 +172,9 @@
       if (equipement.decision_source_label !== '') {
         html += '<span class="label label-default" style="margin-left:8px;">' + escapeHtml(equipement.decision_source_label) + '</span>';
       }
+      if (equipement.has_pending_home_assistant_changes === true) {
+        html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
+      }
       html += '</li>';
     }
     html += '</ul>';
@@ -188,6 +194,9 @@
     html += renderStat('Exclus', model.global_counts.exclude);
     html += renderStat('Exceptions', model.global_counts.exceptions);
     html += '</div>';
+    if (model.global_pending === true) {
+      html += '<div style="margin-bottom:8px;"><span class="label label-warning">Changements à appliquer</span></div>';
+    }
 
     html += '<div class="table-responsive" style="margin-top:10px;">';
     html += '<table class="table table-condensed table-bordered" id="table_scopeSummaryPieces">';
@@ -205,7 +214,12 @@
       for (var i = 0; i < model.pieces.length; i++) {
         var piece = model.pieces[i];
         html += '<tr>';
-        html += '<td>' + escapeHtml(piece.object_name) + '</td>';
+        html += '<td>';
+        html += escapeHtml(piece.object_name);
+        if (piece.has_pending_home_assistant_changes === true) {
+          html += ' <span class="label label-warning">Changements à appliquer</span>';
+        }
+        html += '</td>';
         html += '<td>' + toDisplayCount(piece.counts.total) + '</td>';
         html += '<td>' + toDisplayCount(piece.counts.include) + '</td>';
         html += '<td>' + toDisplayCount(piece.counts.exclude) + '</td>';
