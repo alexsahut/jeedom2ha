@@ -252,3 +252,169 @@ test("story-1.4: has_contract false - aucun libellé Changements à appliquer et
   assert.doesNotMatch(html, /Changements à appliquer/);
   assert.match(html, /Pas de sync effectuée/);
 });
+
+// --- Story 1.5 tests ---
+
+test("story-1.5: render génère une structure accordéon avec lignes de détail masquées par défaut", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 2, include: 1, exclude: 1, exceptions: 0 } },
+      pieces: [
+        { object_id: 10, object_name: "Salon", counts: { total: 2, include: 1, exclude: 1, exceptions: 0 } },
+      ],
+      equipements: [
+        { eq_id: 101, object_id: 10, effective_state: "include", decision_source: "piece", is_exception: false },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Ligne synthèse cliquable avec identifiant de pièce
+  assert.match(html, /class="j2ha-piece-summary"/);
+  assert.match(html, /data-piece-id="10"/);
+  // Indicateur de toggle présent dans la ligne synthèse
+  assert.match(html, /j2ha-toggle-icon/);
+  // Ligne de détail masquée par défaut
+  assert.match(html, /class="j2ha-piece-detail"/);
+  assert.match(html, /display:none/);
+  // Nom de la pièce présent dans la synthèse
+  assert.match(html, /Salon/);
+});
+
+test("story-1.5: Changements à appliquer reste visible dans la ligne synthèse même quand la pièce est repliée", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: {
+        counts: { total: 1, include: 1, exclude: 0, exceptions: 0 },
+        has_pending_home_assistant_changes: true,
+      },
+      pieces: [
+        {
+          object_id: 20,
+          object_name: "Cuisine",
+          counts: { total: 1, include: 1, exclude: 0, exceptions: 0 },
+          has_pending_home_assistant_changes: true,
+        },
+      ],
+      equipements: [
+        { eq_id: 201, object_id: 20, effective_state: "include", decision_source: "piece", is_exception: false, has_pending_home_assistant_changes: true },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Le badge pièce doit être dans la ligne synthèse (j2ha-piece-summary), pas uniquement dans la ligne de détail masquée
+  const summaryRowMatch = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/);
+  assert.ok(summaryRowMatch, "La ligne synthèse j2ha-piece-summary doit être présente");
+  assert.ok(
+    summaryRowMatch[0].includes("Changements à appliquer"),
+    "Le badge Changements à appliquer doit être dans la ligne synthèse visible"
+  );
+});
+
+test("story-1.5: badge exclude a un style inactif sans couleur rouge", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 1, include: 0, exclude: 1, exceptions: 0 } },
+      pieces: [{ object_id: 5, object_name: "Chambre", counts: { total: 1, include: 0, exclude: 1, exceptions: 0 } }],
+      equipements: [
+        { eq_id: 55, object_id: 5, effective_state: "exclude", decision_source: "piece", is_exception: false },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Badge exclude présent
+  assert.match(html, />exclude<\/span>/);
+  // Communique un état inactif (fond gris explicite, visible en thème sombre)
+  assert.match(html, /background-color:#999/);
+  // N'utilise pas la couleur rouge réservée aux incidents d'infrastructure
+  assert.doesNotMatch(html, /label-danger/);
+  // N'utilise pas le vert réservé à include
+  const includeCount = (html.match(/label-success/g) || []).length;
+  assert.equal(includeCount, 0, "label-success ne doit pas apparaître pour exclude");
+  // N'utilise pas l'orange déjà réservé à Changements à appliquer
+  assert.doesNotMatch(html, /label-warning/);
+});
+
+test("story-1.5: badge Exception locale visuellement distinct de Hérite de la pièce", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 2, include: 1, exclude: 1, exceptions: 1 } },
+      pieces: [{ object_id: 7, object_name: "Bureau", counts: { total: 2, include: 1, exclude: 1, exceptions: 1 } }],
+      equipements: [
+        { eq_id: 71, object_id: 7, effective_state: "exclude", decision_source: "piece", is_exception: false },
+        { eq_id: 72, object_id: 7, effective_state: "include", decision_source: "exception_equipement", is_exception: true },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Les deux libellés sont présents
+  assert.match(html, /Hérite de la pièce/);
+  assert.match(html, /Exception locale/);
+  // Exception locale utilise label-info (bleu informatif)
+  assert.match(html, /label-info[^>]*>Exception locale<\/span>/);
+  // Hérite de la pièce n'utilise pas label-info et a un fond gris explicite
+  assert.doesNotMatch(html, /label-info[^>]*>Hérite de la pièce<\/span>/);
+  assert.match(html, /background-color:#777[^>]*>Hérite de la pièce<\/span>/);
+});
+
+test("story-1.5: badge Exclue sur la ligne synthèse quand la pièce est entièrement exclue", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 2, include: 0, exclude: 2, exceptions: 0 } },
+      pieces: [{ object_id: 8, object_name: "Garage", counts: { total: 2, include: 0, exclude: 2, exceptions: 0 } }],
+      equipements: [
+        { eq_id: 81, object_id: 8, effective_state: "exclude", decision_source: "piece", is_exception: false },
+        { eq_id: 82, object_id: 8, effective_state: "exclude", decision_source: "piece", is_exception: false },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Le badge Exclue doit être dans la ligne synthèse
+  const summaryRowMatch = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/);
+  assert.ok(summaryRowMatch, "La ligne synthèse j2ha-piece-summary doit être présente");
+  assert.ok(
+    summaryRowMatch[0].includes("Exclue"),
+    "Le badge Exclue doit apparaître dans la ligne synthèse quand tous les équipements sont exclus"
+  );
+  // Le badge utilise le style inactif (fond gris explicite)
+  assert.match(html, /background-color:#999[^>]*>Exclue<\/span>/);
+});
+
+test("story-1.5: pas de badge Exclue sur la ligne synthèse quand la pièce est mixte", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 3, include: 2, exclude: 1, exceptions: 0 } },
+      pieces: [{ object_id: 9, object_name: "Terrasse", counts: { total: 3, include: 2, exclude: 1, exceptions: 0 } }],
+      equipements: [
+        { eq_id: 91, object_id: 9, effective_state: "include", decision_source: "piece", is_exception: false },
+        { eq_id: 92, object_id: 9, effective_state: "exclude", decision_source: "piece", is_exception: false },
+        { eq_id: 93, object_id: 9, effective_state: "include", decision_source: "piece", is_exception: false },
+      ],
+    },
+  };
+
+  const html = scopeSummary.render(scopeSummary.createModel(response));
+
+  // Le badge Exclue NE doit PAS apparaître pour une pièce mixte
+  const summaryRowMatch = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/);
+  assert.ok(summaryRowMatch, "La ligne synthèse j2ha-piece-summary doit être présente");
+  assert.ok(
+    !summaryRowMatch[0].includes("Exclue"),
+    "Le badge Exclue ne doit PAS apparaître quand la pièce contient des inclus"
+  );
+});
