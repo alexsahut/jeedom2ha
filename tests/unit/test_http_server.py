@@ -1136,3 +1136,152 @@ class TestSyncAction:
         assert discovery_unpublish_calls[0].kwargs["retain"] is True
         assert http_app["pending_discovery_unpublish"] == {}
         assert http_app["pending_local_availability_cleanup"] == {}
+
+
+class TestHealthCheckContract:
+    """Story 2.1 — Contrat backend de santé minimale."""
+
+    @pytest.fixture
+    def mock_mqtt(self, http_app):
+        bridge = MagicMock()
+        bridge.is_connected = True
+        bridge.publish_message.return_value = True
+        http_app["mqtt_bridge"] = bridge
+        return bridge
+
+    async def test_system_status_returns_minimal_health_contract(self, http_client, http_app):
+        """Given le daemon est actif,
+        When le backend expose l'état du pont,
+        Then il retourne demon, broker, derniere_synchro_terminee, derniere_operation_resultat."""
+        http_app["derniere_operation_resultat"] = "succes"
+        http_app["derniere_synchro_terminee"] = "2026-03-24T12:00:00+00:00"
+        
+        resp = await http_client.get(
+            "/system/status",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        payload = data["payload"]
+        
+        # Backward compatibility
+        assert "version" in payload
+        assert "uptime" in payload
+        
+        # New unified contract
+        assert "demon" in payload
+        assert "version" in payload["demon"]
+        assert "broker" in payload
+        assert "connected" in payload["broker"]
+        
+        assert payload["derniere_synchro_terminee"] == "2026-03-24T12:00:00+00:00"
+        assert payload["derniere_operation_resultat"] == "succes"
+
+    async def test_initial_state_before_any_sync(self, http_client):
+        """Given qu'aucune opération n'a encore été exécutée,
+        When l'état est demandé,
+        Then derniere_operation_resultat vaut 'aucun'."""
+        resp = await http_client.get(
+            "/system/status",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["payload"]["derniere_operation_resultat"] == "aucun"
+        assert data["payload"]["derniere_synchro_terminee"] is None
+
+    async def test_sync_success_updates_health_contract(self, http_client, http_app, mock_mqtt):
+        """Given a successful sync, it updates health contract to succes."""
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+        assert resp.status == 200
+        assert http_app["derniere_operation_resultat"] == "succes"
+        assert http_app["derniere_synchro_terminee"] is not None
+
+    async def test_sync_partial_failure_updates_health_contract(self, http_client, http_app, mock_mqtt):
+        """Given a partial failure (e.g. 1 publish success, 1 publish fail), updates to partiel."""
+        payload = {
+            "version": "1.0",
+            "eq_logics": [
+                {
+                    "id": "2",
+                    "name": "Prise Salon",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "cmds": [
+                        {"id": "210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "211", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "212", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                },
+                {
+                    "id": "3",
+                    "name": "Prise Cuisine",
+                    "object_id": "1",
+                    "is_enable": "1",
+                    "eq_type": "virtual",
+                    "cmds": [
+                        {"id": "310", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                        {"id": "311", "name": "On", "type": "action", "sub_type": "other", "generic_type": "ENERGY_ON"},
+                        {"id": "312", "name": "Off", "type": "action", "sub_type": "other", "generic_type": "ENERGY_OFF"},
+                    ],
+                }
+            ],
+            "objects": [{"id": "1", "name": "Salon"}],
+        }
+
+        def publish_side_effect(topic, payload_value, qos=1, retain=False):  # noqa: ARG001
+            # Fail publish for eq_id=3
+            if "jeedom2ha_3" in topic:
+                return False
+            return True
+
+        mock_mqtt.publish_message.side_effect = publish_side_effect
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+        assert resp.status == 200
+        assert http_app["derniere_operation_resultat"] == "partiel"
+
+    async def test_sync_global_error_updates_health_contract(self, http_client, http_app):
+        """Given a global error during sync processing, updates to echec."""
+        payload = {
+            "version": "1.0",
+            "eq_logics": "malformed_string_causes_exception",
+        }
+
+        resp = await http_client.post(
+            "/action/sync",
+            headers={"X-Local-Secret": LOCAL_SECRET},
+            json={"payload": payload},
+        )
+        assert resp.status == 500
+        assert http_app["derniere_operation_resultat"] == "echec"
+        assert http_app["derniere_synchro_terminee"] is not None
+
