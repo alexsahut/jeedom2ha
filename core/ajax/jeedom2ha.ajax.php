@@ -166,10 +166,28 @@ try {
     else if ($action == 'getBridgeStatus') {
       $status = jeedom2ha::callDaemon('/system/status');
       if ($status === null) {
-        ajax::success(array('daemon' => false, 'mqtt' => array('state' => 'unknown', 'connected' => false, 'broker' => '')));
+        ajax::success(array(
+            'daemon' => false,
+            'mqtt'   => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
+            'demon'  => array(),
+            'broker' => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
+            'derniere_synchro_terminee' => null,
+            'derniere_operation_resultat' => 'aucun'
+        ));
       }
       $mqtt = (isset($status['payload']['mqtt'])) ? $status['payload']['mqtt'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
-      ajax::success(array('daemon' => true, 'mqtt' => $mqtt));
+      $demon = (isset($status['payload']['demon'])) ? $status['payload']['demon'] : array();
+      $broker = (isset($status['payload']['broker'])) ? $status['payload']['broker'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
+      $derniere_synchro_terminee = (isset($status['payload']['derniere_synchro_terminee'])) ? $status['payload']['derniere_synchro_terminee'] : null;
+      $derniere_operation_resultat = (isset($status['payload']['derniere_operation_resultat'])) ? $status['payload']['derniere_operation_resultat'] : 'aucun';
+      ajax::success(array(
+        'daemon' => true,
+        'mqtt' => $mqtt,
+        'demon' => $demon,
+        'broker' => $broker,
+        'derniere_synchro_terminee' => $derniere_synchro_terminee,
+        'derniere_operation_resultat' => $derniere_operation_resultat
+      ));
     }
     else if ($action == 'scanTopology') {
       $topology = jeedom2ha::getFullTopology();
