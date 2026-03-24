@@ -51,12 +51,14 @@ test("scope summary presenter keeps backend counts unchanged for mixed include/e
   assert.equal(model.pieces[0].equipements.length, 2);
   assert.deepEqual(model.pieces[0].equipements[0], {
     eq_id: 98,
+    name: "",
     effective_state: "exclude",
     decision_source_label: "Hérite de la pièce",
     has_pending_home_assistant_changes: false,
   });
   assert.deepEqual(model.pieces[0].equipements[1], {
     eq_id: 99,
+    name: "",
     effective_state: "include",
     decision_source_label: "Exception locale",
     has_pending_home_assistant_changes: false,
@@ -417,4 +419,38 @@ test("story-1.5: pas de badge Exclue sur la ligne synthèse quand la pièce est 
     !summaryRowMatch[0].includes("Exclue"),
     "Le badge Exclue ne doit PAS apparaître quand la pièce contient des inclus"
   );
+});
+
+// --- Story 1.7 tests ---
+
+test("story-1.7: render correctly displays name and eq_id fallback", () => {
+  const response = {
+    status: "ok",
+    published_scope: {
+      global: { counts: { total: 2, include: 2, exclude: 0, exceptions: 0 } },
+      pieces: [{ object_id: 1, object_name: "Cuisine", counts: { total: 2, include: 2, exclude: 0, exceptions: 0 } }],
+      equipements: [
+        { eq_id: 41, name: "Prise Four", object_id: 1, effective_state: "include", decision_source: "piece", is_exception: false },
+        { eq_id: 42, name: "", object_id: 1, effective_state: "include", decision_source: "piece", is_exception: false },
+        { eq_id: 43, object_id: 1, effective_state: "include", decision_source: "piece", is_exception: false },
+      ],
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  assert.equal(model.pieces[0].equipements[0].name, "Prise Four");
+  assert.equal(model.pieces[0].equipements[1].name, "");
+  assert.equal(model.pieces[0].equipements[2].name, "");
+
+  const html = scopeSummary.render(model);
+
+  // Avec nom: Prise Four en gras, et (#41) en grisé
+  assert.match(html, /font-weight:bold[^>]*>Prise Four<\/span>/);
+  assert.match(html, /font-size:0.9em[^>]*>\(\#41\)<\/span>/);
+  // label-info badge doit être absent
+  assert.doesNotMatch(html, /label-info[^>]*>\#41<\/span>/);
+
+  // Sans nom (fallback): seulement le badge label-info pour #42 et #43
+  assert.match(html, /label-info[^>]*>\#42<\/span>/);
+  assert.match(html, /label-info[^>]*>\#43<\/span>/);
 });

@@ -54,6 +54,8 @@ development_status:
   epic-1-retrospective: done
   # 1-5 mini-story corrective UX console — action item retro Epic 1 du 2026-03-23 — bloquant avant Epic 2
   1-5-correction-ux-console: done
+  # 1-7 story backlog autonome issue de la rétro Epic 1 — lisibilité d'équipement
+  1-7-lisibilite-metier-des-equipements: done
 
   epic-2: backlog
   2-1-contrat-backend-de-sante-minimale: backlog

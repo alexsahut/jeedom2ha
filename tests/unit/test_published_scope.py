@@ -56,6 +56,7 @@ def test_resolver_matrix_global_piece_eq_states(global_state, piece_state, eq_st
     assert eq["effective_state"] == expected_effective
     assert eq["decision_source"] == expected_source
     assert eq["is_exception"] == expected_exception
+    assert eq["name"] == "Lampe"
     assert resolved["global"]["counts"]["total"] == 1
     assert resolved["global"]["counts"][expected_effective] == 1
 
@@ -141,6 +142,26 @@ def test_resolver_invalid_values_fallback_is_deterministic():
     assert eq["decision_source"] == "global"
     assert eq["is_exception"] is False
     assert resolved["global"]["effective_state"] == "include"
+
+
+def test_resolver_equipement_name_fallback_empty_string_if_falsy():
+    payload = {
+        "objects": [{"id": 1, "name": "Salon"}],
+        "eq_logics": [
+            {
+                "id": 10,
+                "name": "",  # Le nom est textuellement vide
+                "object_id": 1,
+            }
+        ],
+    }
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+
+    resolved = resolve_published_scope(snapshot, raw_scope={})
+    eq = resolved["equipements"][0]
+
+    # Verification stricte du contrat: si falsy, retourne chaine vide "" et jamais null ou "Eq 10"
+    assert eq["name"] == ""
 
 
 def test_resolver_legacy_eqlogic_exclusion_fallback_is_tested():

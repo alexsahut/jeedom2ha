@@ -42,6 +42,7 @@ $backendContract = array(
   'equipements' => array(
     array(
       'eq_id' => 10,
+      'name' => 'Lampe exclue',
       'object_id' => 1,
       'effective_state' => 'exclude',
       'decision_source' => 'piece',
@@ -50,6 +51,7 @@ $backendContract = array(
     ),
     array(
       'eq_id' => 11,
+      'name' => 'Lampe incluse locale',
       'object_id' => 1,
       'effective_state' => 'include',
       'decision_source' => 'exception_equipement',

@@ -164,6 +164,7 @@ def resolve_published_scope(
         equipement_entries.append(
             {
                 "eq_id": eq_id,
+                "name": eq.name or "",
                 "object_id": piece_id,
                 "effective_state": effective_state,
                 "decision_source": decision_source,
