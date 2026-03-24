@@ -14,7 +14,7 @@
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Statut du pont MQTT — badge distinct du badge daemon natif Jeedom */
+/* Statut du pont MQTT et santé globale (Story 2.2) */
 function refreshBridgeStatus() {
   $.ajax({
     type: 'POST',
@@ -23,38 +23,84 @@ function refreshBridgeStatus() {
     dataType: 'json',
     success: function(data) {
       if (data.state !== 'ok') {
-        $('#span_mqttStatus').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
+        $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
+        $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
         return;
       }
       var r = data.result;
-      var $badge = $('#span_mqttStatus');
-      var $broker = $('#span_mqttBroker');
+      var $bridge = $('#span_healthBridge');
+      var $mqtt = $('#span_healthMqtt');
+      var $broker = $('#span_healthMqttBroker');
+      var $sync = $('#span_healthSync');
+      var $op = $('#span_healthOp');
+
+      // 1. Bridge (Démon)
       if (!r.daemon) {
-        $badge.removeClass().addClass('label label-default').text('{{Démon arrêté}}');
+        // Incident d'infrastructure -> ROUGE
+        $bridge.removeClass().addClass('label label-danger').text('{{Arrêté}}');
+        $mqtt.removeClass().addClass('label label-default').text('{{Inconnu}}');
         $broker.text('');
+        $sync.text('{{Inconnue}}');
+        $op.removeClass().addClass('label label-default').text('{{Inconnue}}');
         return;
+      } else {
+        $bridge.removeClass().addClass('label label-success').text('{{Actif}}');
       }
-      var mqtt = r.mqtt || {};
-      switch (mqtt.state) {
+
+      // 2. MQTT
+      var brokerInfo = r.broker || r.mqtt || {};
+      switch (brokerInfo.state) {
         case 'connected':
-          $badge.removeClass().addClass('label label-success').text('{{MQTT Connecté}}');
+          $mqtt.removeClass().addClass('label label-success').text('{{Connecté}}');
           break;
         case 'reconnecting':
-          $badge.removeClass().addClass('label label-warning').text('{{MQTT Reconnexion...}}');
+          $mqtt.removeClass().addClass('label label-warning').text('{{Reconnexion...}}');
           break;
         case 'connecting':
-          $badge.removeClass().addClass('label label-warning').text('{{MQTT Connexion...}}');
+          $mqtt.removeClass().addClass('label label-warning').text('{{Connexion...}}');
           break;
         case 'disconnected':
-          $badge.removeClass().addClass('label label-warning').text('{{MQTT Déconnecté}}');
+          // Incident d'infrastructure -> ROUGE absolument (Guardrail Story 2.2)
+          $mqtt.removeClass().addClass('label label-danger').text('{{Déconnecté}}');
           break;
         default:
-          $badge.removeClass().addClass('label label-default').text('{{MQTT Non configuré}}');
+          $mqtt.removeClass().addClass('label label-default').text('{{Non configuré}}');
       }
-      $broker.text(mqtt.broker || '');
+      $broker.text(brokerInfo.broker || '');
+
+      // 3. Dernière synchro
+      if (r.derniere_synchro_terminee) {
+        var d = new Date(r.derniere_synchro_terminee);
+        var dateStr = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+        $sync.text(dateStr);
+      } else {
+        $sync.text('{{Jamais}}');
+      }
+
+      // 4. Dernière opération
+      var op = r.derniere_operation_resultat || 'aucun';
+      switch (op) {
+        case 'succes':
+          $op.removeClass().addClass('label label-success').text('{{Succès}}');
+          break;
+        case 'partiel':
+          // Problème de configuration -> NON ROUGE (Warning orange)
+          $op.removeClass().addClass('label label-warning').text('{{Partiel}}').css('background-color', '#e67e22');
+          break;
+        case 'echec':
+          // Problème de configuration complet -> NON ROUGE (Warning orange)
+          $op.removeClass().addClass('label label-warning').text('{{Échec}}').css('background-color', '#e67e22');
+          break;
+        case 'aucun':
+          $op.removeClass().addClass('label label-default').text('{{Aucune}}');
+          break;
+        default:
+          $op.removeClass().addClass('label label-default').text('{{' + op + '}}');
+      }
     },
     error: function() {
-      $('#span_mqttStatus').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
+      $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
+      $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
     }
   });
 }

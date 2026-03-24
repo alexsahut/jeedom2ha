@@ -13,11 +13,25 @@ $eqLogics = eqLogic::byType($plugin->getId());
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
 
-		<!-- Zone statut pont MQTT — badge distinct du badge daemon natif Jeedom -->
-		<div id="div_bridgeStatus" class="well well-sm" style="margin:10px 5px;">
-			<i class="fas fa-network-wired"></i> <strong>{{Pont MQTT}}</strong> :
-			<span id="span_mqttStatus" class="label label-default">{{Chargement...}}</span>
-			<span id="span_mqttBroker" style="margin-left:10px;color:#666;font-size:0.9em;"></span>
+		<!-- Bandeau global de santé toujours visible (Story 2.2) -->
+		<div id="div_bridgeHealthBanner" class="well well-sm" style="margin:10px 5px; display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
+			<div style="display:flex; align-items:center;">
+				<i class="fas fa-server" style="margin-right:5px;"></i> <strong>{{Bridge}}</strong> :
+				<span id="span_healthBridge" class="label label-default" style="margin-left:5px;">{{Chargement...}}</span>
+			</div>
+			<div style="display:flex; align-items:center;">
+				<i class="fas fa-network-wired" style="margin-right:5px;"></i> <strong>{{MQTT}}</strong> :
+				<span id="span_healthMqtt" class="label label-default" style="margin-left:5px;">{{Chargement...}}</span>
+				<span id="span_healthMqttBroker" style="margin-left:8px; color:#666; font-size:0.9em;"></span>
+			</div>
+			<div style="display:flex; align-items:center;">
+				<i class="fas fa-sync-alt" style="margin-right:5px;"></i> <strong>{{Dernière synchro}}</strong> :
+				<span id="span_healthSync" style="margin-left:5px; font-weight:500; color:#555;">{{...}}</span>
+			</div>
+			<div style="display:flex; align-items:center;">
+				<i class="fas fa-tasks" style="margin-right:5px;"></i> <strong>{{Dernière opération}}</strong> :
+				<span id="span_healthOp" class="label label-default" style="margin-left:5px;">{{...}}</span>
+			</div>
 		</div>
 
 		<div id="div_scopeSummary" class="well well-sm" style="margin:10px 5px;">
