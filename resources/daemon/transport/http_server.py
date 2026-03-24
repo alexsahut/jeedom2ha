@@ -412,10 +412,20 @@ async def _handle_system_status(request: web.Request) -> web.Response:
         "action": "system.status",
         "status": "ok",
         "payload": {
+            # Legacy fields (do not remove for V1.1 backward compat)
             "version": _VERSION,
             "uptime": round(uptime, 2),
             "mqtt": mqtt_section,
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            # New unified scope for bridge health
+            "demon": {
+                "version": _VERSION,
+                "uptime": round(uptime, 2),
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            },
+            "broker": mqtt_section,
+            "derniere_synchro_terminee": request.app.get("derniere_synchro_terminee"),
+            "derniere_operation_resultat": request.app.get("derniere_operation_resultat", "aucun"),
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -658,6 +668,16 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
 
 async def _handle_action_sync(request: web.Request) -> web.Response:
+    """Wrapper pour la synchronisation afin de capter l'état global en cas d'erreur inattendue."""
+    try:
+        return await _do_handle_action_sync(request)
+    except Exception as e:
+        request.app["derniere_operation_resultat"] = "echec"
+        request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
+        _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
+        raise
+
+async def _do_handle_action_sync(request: web.Request) -> web.Response:
     """Handle POST /action/sync — synchronize Jeedom topology, assess eligibility, map and publish."""
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
@@ -1178,6 +1198,22 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         "published_scope": request.app["published_scope"],
     }
     
+    # Validation du statut global de l'operation de synchronisation
+    _has_failures = any(
+        d.reason in ("discovery_publish_failed", "local_availability_publish_failed")
+        for d in request.app["publications"].values()
+    )
+    _has_deferred = bool(request.app.get("pending_discovery_unpublish") or request.app.get("pending_local_availability_cleanup"))
+    _has_successes = any(getattr(d, "active_or_alive", False) for d in request.app["publications"].values())
+
+    if _has_failures or _has_deferred:
+        request.app["derniere_operation_resultat"] = "partiel" if _has_successes else "echec"
+    else:
+        # Même si rien n'est publié (0 éligibles), s'il n'y a eu aucune erreur, c'est un succès structurel
+        request.app["derniere_operation_resultat"] = "succes"
+        
+    request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
+    
     return web.json_response({
         "action": "sync",
         "status": "ok",
@@ -1608,6 +1644,11 @@ def create_app(local_secret: str) -> web.Application:
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
+    
+    # Story 2.1 — Etat minimal de santé du pont
+    app["derniere_operation_resultat"] = "aucun"
+    app["derniere_synchro_terminee"] = None
+
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
     app["boot_cache"] = {}       # Dict[int, dict] — chargé du disque au boot, purgé après 1er sync
     app["boot_sync_received"] = None  # asyncio.Event — initialisé dans on_start()
