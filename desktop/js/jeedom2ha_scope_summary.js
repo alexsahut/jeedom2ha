@@ -63,6 +63,7 @@
   function buildEquipmentModel(entry) {
     return {
       eq_id: entry.eq_id,
+      name: readString(entry.name, ''),
       effective_state: readString(entry.effective_state, ''),
       decision_source_label: buildDecisionSourceLabel(
         readString(entry.decision_source, ''),
@@ -169,7 +170,12 @@
     for (var i = 0; i < equipements.length; i++) {
       var equipement = equipements[i];
       html += '<li style="padding:6px 0;' + (i > 0 ? 'border-top:1px solid #eee;' : '') + '">';
-      html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
+      if (equipement.name !== '') {
+        html += '<span style="font-weight:bold;margin-right:8px;">' + escapeHtml(equipement.name) + '</span>';
+        html += '<span style="font-size:0.9em;color:#777;">(#' + escapeHtml(equipement.eq_id) + ')</span>';
+      } else {
+        html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
+      }
       html += '<span style="margin-left:8px;">' + renderEquipmentState(equipement.effective_state) + '</span>';
       if (equipement.decision_source_label !== '') {
         var isException = equipement.decision_source_label === 'Exception locale';

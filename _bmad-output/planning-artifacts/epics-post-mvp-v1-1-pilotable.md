@@ -612,6 +612,29 @@ afin de ne pas croire qu'un toggle modifie instantanément HA.
 **Then** l'état `changements à appliquer` reste visible de manière cohérente  
 **And** il dépend uniquement du payload backend de périmètre en attente, sans recalcul métier frontend
 
+##### Story 1.7 - Lisibilité métier des équipements (Backlog issu Rétro)
+
+**User story**  
+En tant qu'utilisateur Jeedom,  
+je veux voir un libellé compréhensible pour mes équipements dans la vue par pièce au lieu d'un ID brut,  
+afin de repérer facilement l'équipement concerné sans devoir déchiffrer des identifiants techniques.
+
+**Dépendances autorisées:** Epic 1  
+**Owner:** PM (priorisation) → Architect (vérification contrat backend)  
+**Réduction de dette support:** évite à l'utilisateur de devoir chercher l'ID de l'équipement dans Jeedom pour faire la correspondance.
+
+**Acceptance Criteria**
+
+**Given** la console V1.1 affiche un équipement dans une pièce  
+**When** l'utilisateur lit la ligne de cet équipement  
+**Then** un libellé métier compréhensible est affiché à la place ou en complément de l'ID brut  
+**And** si le contrat backend actuel `published_scope` ne transporte pas ce libellé, alors le resolver doit être étendu pour le fournir de manière prédictible
+
+**Guardrails spécifiques**
+- **Architecture:** Si le changement nécessite une mise à jour du contrat backend (`published_scope`), cela doit être traité intégralement dans la story, y compris l'évolution du resolver.
+- **Produit:** La modification ne doit pas altérer la logique de calcul de l'héritage ni masquer un fonctionnement existant.
+- **Séquencement:** C'est une story backlog distincte, pas un patch UX implicite de la console. Ne bloque pas le démarrage de l'Epic 2.
+
 #### Epic 2 - Santé minimale du pont et lisibilité opérationnelle globale
 
 ##### Story 2.1 - Contrat backend de santé minimale
