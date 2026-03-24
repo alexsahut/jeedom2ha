@@ -147,11 +147,13 @@
 
   function renderEquipmentState(state) {
     var normalizedState = readString(state, '');
-    var cssClass = 'label label-default';
     if (normalizedState === 'include') {
-      cssClass = 'label label-success';
+      return '<span class="label label-success">' + escapeHtml(normalizedState) + '</span>';
     }
-    return '<span class="' + cssClass + '">' + escapeHtml(normalizedState || 'inconnu') + '</span>';
+    if (normalizedState === 'exclude') {
+      return '<span class="label" style="background-color:#999;color:#fff;">' + escapeHtml(normalizedState) + '</span>';
+    }
+    return '<span class="label label-default">' + escapeHtml(normalizedState || 'inconnu') + '</span>';
   }
 
   function renderPieceEquipements(piece) {
@@ -170,7 +172,10 @@
       html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
       html += '<span style="margin-left:8px;">' + renderEquipmentState(equipement.effective_state) + '</span>';
       if (equipement.decision_source_label !== '') {
-        html += '<span class="label label-default" style="margin-left:8px;">' + escapeHtml(equipement.decision_source_label) + '</span>';
+        var isException = equipement.decision_source_label === 'Exception locale';
+        var decisionLabelClass = isException ? 'label label-info' : 'label';
+        var decisionLabelStyle = isException ? 'margin-left:8px;' : 'margin-left:8px;background-color:#777;color:#fff;';
+        html += '<span class="' + decisionLabelClass + '" style="' + decisionLabelStyle + '">' + escapeHtml(equipement.decision_source_label) + '</span>';
       }
       if (equipement.has_pending_home_assistant_changes === true) {
         html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
@@ -213,11 +218,16 @@
     } else {
       for (var i = 0; i < model.pieces.length; i++) {
         var piece = model.pieces[i];
-        html += '<tr>';
+        var pieceIdAttr = escapeHtml(String(piece.object_id));
+        html += '<tr class="j2ha-piece-summary" data-piece-id="' + pieceIdAttr + '" style="cursor:pointer;">';
         html += '<td>';
+        html += '<span class="j2ha-toggle-icon" style="margin-right:6px;font-size:0.8em;color:#888;">&#9654;</span>';
         html += escapeHtml(piece.object_name);
         if (piece.has_pending_home_assistant_changes === true) {
           html += ' <span class="label label-warning">Changements à appliquer</span>';
+        }
+        if (piece.counts.total > 0 && piece.counts.exclude === piece.counts.total) {
+          html += ' <span class="label" style="background-color:#999;color:#fff;">Exclue</span>';
         }
         html += '</td>';
         html += '<td>' + toDisplayCount(piece.counts.total) + '</td>';
@@ -225,7 +235,7 @@
         html += '<td>' + toDisplayCount(piece.counts.exclude) + '</td>';
         html += '<td>' + toDisplayCount(piece.counts.exceptions) + '</td>';
         html += '</tr>';
-        html += '<tr>';
+        html += '<tr class="j2ha-piece-detail" data-piece-id="' + pieceIdAttr + '" style="display:none;">';
         html += '<td colspan="5">' + renderPieceEquipements(piece) + '</td>';
         html += '</tr>';
       }

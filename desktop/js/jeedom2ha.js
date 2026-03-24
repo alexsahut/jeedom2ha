@@ -59,7 +59,32 @@ function refreshBridgeStatus() {
   });
 }
 
-function renderPublishedScopeSummary(result) {
+function _captureNavState() {
+  var expanded = [];
+  $('#div_scopeSummaryContent .j2ha-piece-detail:visible').each(function() {
+    expanded.push($(this).data('piece-id'));
+  });
+  return {
+    expandedPieceIds: expanded,
+    scrollTop: $(window).scrollTop(),
+  };
+}
+
+function _restoreNavState(navState) {
+  if (!navState || !navState.expandedPieceIds) { return; }
+  for (var i = 0; i < navState.expandedPieceIds.length; i++) {
+    var pieceId = navState.expandedPieceIds[i];
+    var $detail = $('#div_scopeSummaryContent .j2ha-piece-detail[data-piece-id="' + pieceId + '"]');
+    if ($detail.length) {
+      $detail.show();
+      $('#div_scopeSummaryContent .j2ha-piece-summary[data-piece-id="' + pieceId + '"]')
+        .find('.j2ha-toggle-icon').html('&#9660;');
+    }
+  }
+  $(window).scrollTop(navState.scrollTop);
+}
+
+function renderPublishedScopeSummary(result, navState) {
   if (typeof Jeedom2haScopeSummary === 'undefined' || !Jeedom2haScopeSummary) {
     $('#div_scopeSummaryContent').html('<div class="alert alert-danger" style="margin-bottom:0;">{{Module de synthèse indisponible côté UI}}</div>');
     return;
@@ -67,10 +92,14 @@ function renderPublishedScopeSummary(result) {
 
   var model = Jeedom2haScopeSummary.createModel(result || {});
   $('#div_scopeSummaryContent').html(Jeedom2haScopeSummary.render(model));
+  _restoreNavState(navState || null);
 }
 
-function refreshPublishedScopeSummary() {
-  $('#div_scopeSummaryContent').html('<div class="text-muted">{{Chargement de la synthèse backend...}}</div>');
+function refreshPublishedScopeSummary(preserveNavState) {
+  var navState = preserveNavState ? _captureNavState() : null;
+  if (!preserveNavState) {
+    $('#div_scopeSummaryContent').html('<div class="text-muted">{{Chargement de la synthèse backend...}}</div>');
+  }
   $.ajax({
     type: 'POST',
     url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -82,19 +111,19 @@ function refreshPublishedScopeSummary() {
         renderPublishedScopeSummary({
           status: 'unavailable',
           message: '{{Impossible de lire la synthèse backend}}',
-        });
+        }, null);
         return;
       }
       renderPublishedScopeSummary(data.result || {
         status: 'unavailable',
         message: "{{Contrat published_scope indisponible : lancez d'abord une synchronisation.}}",
-      });
+      }, navState);
     },
     error: function() {
       renderPublishedScopeSummary({
         status: 'unavailable',
         message: '{{Erreur de communication avec le backend}}',
-      });
+      }, null);
     }
   });
 }
@@ -109,15 +138,29 @@ $(function() {
   }, 5000);
 
   // Story 1.2 — lecture stricte du contrat published_scope (aucun recalcul métier local)
+  // Story 1.5 — toggle accordéon des pièces (délégation sur le conteneur persistant)
+  $('#div_scopeSummaryContent').on('click', '.j2ha-piece-summary', function() {
+    var pieceId = $(this).data('piece-id');
+    var $detail = $('#div_scopeSummaryContent .j2ha-piece-detail[data-piece-id="' + pieceId + '"]');
+    var $icon = $(this).find('.j2ha-toggle-icon');
+    if ($detail.is(':visible')) {
+      $detail.hide();
+      $icon.html('&#9654;');
+    } else {
+      $detail.show();
+      $icon.html('&#9660;');
+    }
+  });
+
   refreshPublishedScopeSummary();
   setInterval(function() {
     if ($('#div_scopeSummary').is(':visible')) {
-      refreshPublishedScopeSummary();
+      refreshPublishedScopeSummary(true); // Story 1.5 — préserve l'état de navigation
     }
   }, 10000);
 
   $('#bt_refreshScopeSummary').on('click', function() {
-    refreshPublishedScopeSummary();
+    refreshPublishedScopeSummary(); // rafraîchissement manuel : repart de l'état initial
   });
 
   // Export diagnostic support — Story 4.4
