@@ -25,6 +25,7 @@ function refreshBridgeStatus() {
       if (data.state !== 'ok') {
         $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
         $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+        applyHAGating(null);
         return;
       }
       var r = data.result;
@@ -42,6 +43,7 @@ function refreshBridgeStatus() {
         $broker.text('');
         $sync.text('{{Inconnue}}');
         $op.removeClass().addClass('label label-default').text('{{Inconnue}}');
+        applyHAGating(r);
         return;
       } else {
         $bridge.removeClass().addClass('label label-success').text('{{Actif}}');
@@ -97,12 +99,52 @@ function refreshBridgeStatus() {
         default:
           $op.removeClass().addClass('label label-default').text('{{' + op + '}}');
       }
+      applyHAGating(r);
     },
     error: function() {
       $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
       $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+      applyHAGating(null);
     }
   });
+}
+
+/* Gating des actions Home Assistant selon la santé du pont (Story 2.3) */
+
+/**
+ * Retourne true si le pont est opérationnel pour des actions HA.
+ * Source unique : payload r de /system/status (Story 2.1 contrat).
+ * @param {Object} r - data.result de l'appel getBridgeStatus
+ */
+function isHABridgeAvailable(r) {
+  if (!r || !r.daemon) return false;
+  var brokerInfo = r.broker || r.mqtt || {};
+  return brokerInfo.state === 'connected';
+}
+
+/**
+ * Applique ou lève le gating sur tous les éléments [data-ha-action].
+ * Ne touche PAS aux éléments locaux de périmètre.
+ * @param {Object} r - data.result de l'appel getBridgeStatus (peut être null si erreur)
+ */
+function applyHAGating(r) {
+  var available = r ? isHABridgeAvailable(r) : false;
+  var $haActions = $('[data-ha-action]');
+  var $reason = $('#div_haGatingReason');
+
+  if (available) {
+    $haActions.prop('disabled', false).removeClass('j2ha-ha-gated');
+    $reason.hide();
+  } else {
+    $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
+    var reason = '{{Bridge ou MQTT indisponible — actions Home Assistant bloquées.}}';
+    if (r && !r.daemon) {
+      reason = '{{Daemon arrêté — actions Home Assistant bloquées.}}';
+    } else if (r) {
+      reason = '{{MQTT déconnecté — actions Home Assistant bloquées.}}';
+    }
+    $reason.text(reason).show();
+  }
 }
 
 function _captureNavState() {
@@ -175,10 +217,10 @@ function refreshPublishedScopeSummary(preserveNavState) {
 }
 
 $(function() {
-  // Refresh MQTT badge on page load and every 30s when visible
+  // Refresh MQTT badge on page load and every 5s when visible
   refreshBridgeStatus();
   setInterval(function() {
-    if ($('#div_bridgeStatus').is(':visible')) {
+    if ($('#div_bridgeHealthBanner').is(':visible')) {
       refreshBridgeStatus();
     }
   }, 5000);

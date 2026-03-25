@@ -55,6 +55,32 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			</div>
 		</div>
 
+		<!-- Zone Actions Home Assistant — Story 2.3
+		     Boutons visibles et soumis au gating. Aucun handler click câblé ici.
+		     Logique opérationnelle complète → Epic 4 (Stories 4.2 et 4.3). -->
+		<div id="div_haActions" class="well well-sm" style="margin:10px 5px;">
+			<strong>{{Actions Home Assistant}}</strong>
+			<div style="margin-top:8px;">
+				<button type="button"
+				        class="btn btn-default btn-sm j2ha-ha-action"
+				        data-ha-action="republier"
+				        disabled>
+					<i class="fas fa-upload"></i> {{Republier dans Home Assistant}}
+				</button>
+				<button type="button"
+				        class="btn btn-default btn-sm j2ha-ha-action"
+				        data-ha-action="supprimer-recreer"
+				        disabled
+				        style="margin-left:8px;">
+					<i class="fas fa-recycle"></i> {{Supprimer puis recréer dans Home Assistant}}
+				</button>
+			</div>
+			<div id="div_haGatingReason"
+			     class="text-muted"
+			     style="margin-top:6px; font-size:0.9em; display:none;">
+			</div>
+		</div>
+
 		<!-- Export diagnostic support -->
 		<div class="form-group" style="margin:4px 5px 10px 5px;">
 			<div class="col-sm-12">
