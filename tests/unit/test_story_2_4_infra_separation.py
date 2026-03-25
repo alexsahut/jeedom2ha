@@ -140,7 +140,8 @@ async def test_ambiguous_reason_stable_under_mqtt_state(aiohttp_client, mqtt_con
     assert eq["reason_code"] == "ambiguous_skipped", (
         f"mqtt_connected={mqtt_connected}: expected 'ambiguous_skipped', got '{eq['reason_code']}'"
     )
-    assert eq["status"] == "Non publié"
+    # Story 3.1 : ambiguous_skipped → "Ambigu" (taxonomie principale)
+    assert eq["status"] == "Ambigu"
     # AC2: reason_code décrit un problème de couverture, pas d'infrastructure
     assert eq["reason_code"] in _COVERAGE_REASON_CODES
     assert eq["reason_code"] not in _INFRA_REASON_CODES

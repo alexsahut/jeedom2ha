@@ -27,6 +27,7 @@ from models.availability import (
 from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
 from models.mapping import MappingResult, PublicationDecision
+from models.taxonomy import get_primary_status
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
@@ -1320,15 +1321,13 @@ def _get_diagnostic_enrichment(reason_code: str) -> tuple:
     return _DIAGNOSTIC_MESSAGES.get(reason_code, _DIAGNOSTIC_DEFAULT)
 
 
-# Ensemble des reason_codes correspondant à une exclusion (Story 4.3)
-_EXCLUDED_REASON_CODES: frozenset = frozenset({"excluded_eqlogic", "excluded_plugin", "excluded_object"})
-
-# Mapping statut UX → code machine stable pour l'export de diagnostic (Story 4.4)
+# Mapping statut UX → code machine stable pour l'export de diagnostic (Story 4.4 / Story 3.1)
 _STATUS_CODE_MAP: dict = {
     "Publié":               "published",
-    "Partiellement publié": "partially_published",
-    "Non publié":           "not_published",
     "Exclu":                "excluded",
+    "Ambigu":               "ambiguous",
+    "Non supporté":         "not_supported",
+    "Incident infrastructure": "infra_incident",
 }
 
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
@@ -1397,8 +1396,7 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
             })
 
     # Section 3 — Logique de décision (taxonomie fermée)
-    published_statuses = {"Publié", "Partiellement publié"}
-    if status in published_statuses:
+    if status == "Publié":
         closed_reason = "published"
     else:
         mapped = _CLOSED_REASON_MAP.get(top_reason_code)
@@ -1425,7 +1423,7 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
     }
 
     # Section 4 — Résultat de publication
-    if status in published_statuses:
+    if status == "Publié":
         pub_result = "success"
     elif closed_reason == "discovery_publish_failed":
         pub_result = "failed"
@@ -1470,7 +1468,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     for eq_id, eq in topology.eq_logics.items():
         object_name = topology.get_suggested_area(eq_id) or "Aucun"
 
-        status = "Non publié"
+        status = get_primary_status("unknown")  # fallback — surchargé ci-dessous
         confidence = "Ignoré"
         reason_code = "unknown"
         matched_commands = []
@@ -1482,12 +1480,8 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         if el_result:
             reason_code = el_result.reason_code
             if not el_result.is_eligible:
-                if el_result.reason_code in _EXCLUDED_REASON_CODES:
-                    status = "Exclu"
-                    confidence = "Ignoré"
-                else:
-                    status = "Non publié"
-                    confidence = "Ignoré"
+                status = get_primary_status(reason_code)
+                confidence = "Ignoré"
             else:
                 map_result = mappings.get(eq_id)
                 pub_decision = publications.get(eq_id)
@@ -1504,6 +1498,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                     confidence = confidence_map.get(map_result.confidence, "Ignoré")
 
                     if pub_decision and pub_decision.active_or_alive:
+                        reason_code = pub_decision.reason
                         mapped_cmd_ids = {c.id for c in map_result.commands.values()}
                         coverable_cmds = [c for c in eq.cmds if c.generic_type]
                         unmapped_cmds = [c for c in coverable_cmds if c.id not in mapped_cmd_ids]
@@ -1517,7 +1512,6 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                             for c in eq.cmds if c.id in mapped_cmd_ids
                         ]
                         if unmapped_cmds:
-                            status = "Partiellement publié"
                             unmatched_commands = [
                                 {
                                     "cmd_id": c.id,
@@ -1526,17 +1520,15 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                                 }
                                 for c in unmapped_cmds
                             ]
-                        else:
-                            status = "Publié"
-                        reason_code = pub_decision.reason
+                        status = get_primary_status(reason_code)
                     else:
-                        status = "Non publié"
                         if pub_decision:
                             reason_code = pub_decision.reason
+                        status = get_primary_status(reason_code)
                 else:
                     reason_code = "no_mapping"
                     confidence = "Ignoré"
-                    status = "Non publié"
+                    status = get_primary_status(reason_code)
 
         # Enrich with human-readable detail and remediation
         if status == "Publié":
