@@ -390,15 +390,27 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       }
       
       var reasonLabels = {
+        // Codes de publication (état publié partiel)
         'sure': 'Mapping identifié avec certitude (partiel)',
         'probable': 'Mapping probable détecté',
+        // Couverture / scope
         'ambiguous_skipped': 'Ambiguïté détectée (plusieurs types possibles)',
         'no_mapping': 'Aucun mapping compatible trouvé',
-        'no_commands': 'Équipement sans commandes exploitables',
         'no_supported_generic_type': 'Type générique non supporté',
+        'no_generic_type_configured': 'Types génériques non configurés sur les commandes',
+        'probable_skipped': 'Confiance probable — politique de publication "sûr uniquement"',
+        // Configuration (décision utilisateur ou état Jeedom)
+        'no_commands': 'Équipement sans commandes exploitables',
         'disabled_eqlogic': 'Équipement désactivé dans Jeedom',
+        'disabled': 'Équipement désactivé dans Jeedom',
+        'excluded_eqlogic': 'Exclu manuellement de la publication',
         'excluded_by_user': 'Exclu manuellement par l\'utilisateur',
-        'low_confidence': 'Confiance trop faible pour publication'
+        'excluded_plugin': 'Plugin source exclu de la publication',
+        'excluded_object': 'Pièce exclue de la publication',
+        'low_confidence': 'Confiance trop faible pour publication',
+        // Infrastructure (pannes publiables — réservé au bandeau global et au résultat de publication)
+        'discovery_publish_failed': 'Échec de publication MQTT (infrastructure)',
+        'local_availability_publish_failed': 'Échec de publication de la disponibilité (infrastructure)'
       };
 
       var getStatusLabel = function(status) {
