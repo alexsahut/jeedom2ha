@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-25 CET'  # 2-4 done (code review PASS)
+last_updated: '2026-03-25 CET'  # Story 3.1 done (PR #44 merged)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -57,15 +57,15 @@ development_status:
   # 1-7 story backlog autonome issue de la rétro Epic 1 — lisibilité d'équipement
   1-7-lisibilite-metier-des-equipements: done
 
-  epic-2: in-progress
+  epic-2: done  # 4/4 stories done, retro done 2026-03-25
   2-1-contrat-backend-de-sante-minimale: done
   2-2-bandeau-global-de-sante-toujours-visible: done
   2-3-gating-des-actions-home-assistant-selon-la-sante-du-pont: done
   2-4-distinction-stable-entre-infrastructure-et-configuration: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done  # retro 2026-03-25, 8 action items, 0 blocker pour Epic 3
 
-  epic-3: backlog
-  3-1-taxonomie-principale-de-statuts-d-equipement: backlog
+  epic-3: in-progress
+  3-1-taxonomie-principale-de-statuts-d-equipement: done  # PR #44 merged 2026-03-25, terrain PASS (AC1/AC2/AC3/AC6), code review PASS
   3-2-reason-code-stables-raison-lisible-et-action-recommandee: backlog
   3-3-agregations-piece-et-global-coherentes: backlog
   3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: backlog
