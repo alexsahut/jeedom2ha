@@ -416,8 +416,9 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       var getStatusLabel = function(status) {
         if (status === 'Publié') return '<span class="label label-success">' + status + '</span>';
         if (status === 'Exclu') return '<span class="label label-default">' + status + '</span>';
-        if (status === 'Partiellement publié') return '<span class="label label-info">' + status + '</span>';
-        if (status === 'Non publié') return '<span class="label label-warning">' + status + '</span>';
+        if (status === 'Ambigu') return '<span class="label label-warning">' + status + '</span>';
+        if (status === 'Non supporté') return '<span class="label label-default" style="background-color:#666!important;">' + status + '</span>';
+        if (status === 'Incident infrastructure') return '<span class="label label-danger">' + status + '</span>';
         return '<span class="label label-default">' + status + '</span>';
       };
 
@@ -444,7 +445,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         var pt = tr.publication_trace || {};
 
         var closedReason = dt.reason_code || '';
-        var isPublished = (eq.status === 'Publié' || eq.status === 'Partiellement publié');
+        var isPublished = (eq.status === 'Publié');
         // AC4: lien #commandtab pour causes de typage (taxonomie fermée ou legacy)
         var linkToCommandTab = commandTabReasonCodes[closedReason] || commandTabReasonCodes[eq.reason_code];
 
@@ -637,7 +638,11 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             html += '<tr class="diag-expandable" style="cursor:pointer;" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
             html += '<td style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
             html += '<td style="white-space:nowrap;">' + chevron + eq.name + '</td>';
-            html += '<td>' + getStatusLabel(eq.status) + '</td>';
+            var partialSuffix = '';
+            if (eq.status === 'Publié' && eq.unmatched_commands && eq.unmatched_commands.length > 0) {
+              partialSuffix = ' <span class="text-muted" style="font-size:0.85em">(partiel)</span>';
+            }
+            html += '<td>' + getStatusLabel(eq.status) + partialSuffix + '</td>';
             html += '<td>' + getConfidenceLabel(eq.confidence) + '</td>';
             html += '<td><span style="color:#888;font-family:monospace;font-size:0.9em;">' + eq.reason_code + '</span> : <span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
             html += '</tr>';

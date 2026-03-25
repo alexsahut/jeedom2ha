@@ -18,16 +18,18 @@ const assert = require("node:assert/strict");
 // Ces fonctions sont définies ici pour rester testables en Node.js (sans jQuery).
 // ============================================================
 
-// AC2 : getStatusLabel — codes couleur des statuts d'équipement
+// AC2 : getStatusLabel — codes couleur des statuts d'équipement (Story 3.1 : taxonomie à 5 statuts)
 function getStatusLabel(status) {
   if (status === "Publié")
     return '<span class="label label-success">' + status + "</span>";
   if (status === "Exclu")
     return '<span class="label label-default">' + status + "</span>";
-  if (status === "Partiellement publié")
-    return '<span class="label label-info">' + status + "</span>";
-  if (status === "Non publié")
+  if (status === "Ambigu")
     return '<span class="label label-warning">' + status + "</span>";
+  if (status === "Non supporté")
+    return '<span class="label label-default" style="background-color:#666!important;">' + status + "</span>";
+  if (status === "Incident infrastructure")
+    return '<span class="label label-danger">' + status + "</span>";
   return '<span class="label label-default">' + status + "</span>";
 }
 
@@ -71,9 +73,11 @@ function getPubResultLabel(pubResult) {
 // Les raisons métier (config, couverture, scope) n'utilisent PAS label-danger
 // ============================================================
 
-test("story-2.4: getStatusLabel — 'Non publié' utilise label-warning (non rouge)", () => {
+test("story-2.4: getStatusLabel — 'Non publié' (statut legacy) tombe en label-default (non rouge)", () => {
+  // Story 3.1 : 'Non publié' n'est plus un statut nominal — tombe dans le fallback label-default.
+  // L'essentiel : pas de label-danger (rouge).
   const html = getStatusLabel("Non publié");
-  assert.match(html, /label-warning/);
+  assert.match(html, /label-default/);
   assert.doesNotMatch(html, /label-danger/);
 });
 
@@ -83,9 +87,11 @@ test("story-2.4: getStatusLabel — 'Exclu' utilise label-default (gris, non rou
   assert.doesNotMatch(html, /label-danger/);
 });
 
-test("story-2.4: getStatusLabel — 'Partiellement publié' utilise label-info (non rouge)", () => {
+test("story-2.4: getStatusLabel — 'Partiellement publié' (statut legacy) tombe en label-default (non rouge)", () => {
+  // Story 3.1 : 'Partiellement publié' n'est plus un statut nominal — tombe dans le fallback label-default.
+  // L'essentiel : pas de label-danger (rouge).
   const html = getStatusLabel("Partiellement publié");
-  assert.match(html, /label-info/);
+  assert.match(html, /label-default/);
   assert.doesNotMatch(html, /label-danger/);
 });
 
