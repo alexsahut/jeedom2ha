@@ -49,12 +49,17 @@ test("scope summary presenter keeps backend counts unchanged for mixed include/e
   assert.equal(model.pieces[0].counts.exclude, 3);
   assert.equal(model.pieces[0].counts.exceptions, 2);
   assert.equal(model.pieces[0].equipements.length, 2);
+  // Story 3.4 : le modèle inclut maintenant les champs diagnostic (vides si pas de données)
   assert.deepEqual(model.pieces[0].equipements[0], {
     eq_id: 98,
     name: "",
     effective_state: "exclude",
     decision_source_label: "Hérite de la pièce",
     has_pending_home_assistant_changes: false,
+    status_code: "",
+    detail: "",
+    remediation: "",
+    v1_limitation: false,
   });
   assert.deepEqual(model.pieces[0].equipements[1], {
     eq_id: 99,
@@ -62,6 +67,10 @@ test("scope summary presenter keeps backend counts unchanged for mixed include/e
     effective_state: "include",
     decision_source_label: "Exception locale",
     has_pending_home_assistant_changes: false,
+    status_code: "",
+    detail: "",
+    remediation: "",
+    v1_limitation: false,
   });
 });
 

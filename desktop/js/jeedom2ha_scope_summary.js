@@ -41,6 +41,40 @@
       .replace(/'/g, '&#39;');
   }
 
+  // Story 3.4 — Task 5 : mapper statuts agrégés backend → badge UI (status_code canonique)
+  // Pure présentation — aucune logique métier. La source de vérité reste aggregation.py.
+  function getAggregatedStatusLabel(statusCode) {
+    var s = (typeof statusCode === 'string') ? statusCode : '';
+    if (s === 'published')           return '<span class="label label-success">Publié</span>';
+    if (s === 'excluded')            return '<span class="label" style="background-color:#999;color:#fff;">Exclu</span>';
+    if (s === 'ambiguous')           return '<span class="label label-warning">Ambigu</span>';
+    if (s === 'not_supported')       return '<span class="label label-default" style="background-color:#666!important;">Non supporté</span>';
+    if (s === 'infra_incident')      return '<span class="label label-danger">Incident infrastructure</span>';
+    if (s === 'partially_published') return '<span class="label label-info">Partiellement publié</span>';
+    if (s === 'empty')               return '<span class="label label-default">Vide</span>';
+    return '';
+  }
+
+  // Story 3.4 — Compteurs compacts counts_by_status (lecture seule depuis backend)
+  function renderCountsByStatus(counts) {
+    if (!counts || typeof counts !== 'object') { return ''; }
+    var order = ['published', 'partially_published', 'ambiguous', 'excluded', 'not_supported', 'infra_incident'];
+    var labels = {
+      'published': 'Publié', 'partially_published': 'Partiel',
+      'ambiguous': 'Ambigu', 'excluded': 'Exclu',
+      'not_supported': 'Non sup.', 'infra_incident': 'Infra'
+    };
+    var parts = [];
+    for (var s = 0; s < order.length; s++) {
+      var code = order[s];
+      var count = counts[code];
+      if (isFiniteNumber(count) && count > 0) {
+        parts.push('<span style="font-size:0.8em;margin-left:4px;color:#555;">' + escapeHtml(labels[code] || code) + ':&nbsp;' + count + '</span>');
+      }
+    }
+    return parts.join('');
+  }
+
   function buildCounts(rawCounts) {
     return {
       total: readCount(rawCounts, 'total'),
@@ -60,7 +94,9 @@
     return '';
   }
 
-  function buildEquipmentModel(entry) {
+  // Story 3.4 — equipDiag : données diagnostic backend pour cet équipement (null si absent)
+  function buildEquipmentModel(entry, equipDiag) {
+    var diag = (equipDiag && typeof equipDiag === 'object') ? equipDiag : {};
     return {
       eq_id: entry.eq_id,
       name: readString(entry.name, ''),
@@ -70,6 +106,11 @@
         readBoolean(entry.is_exception, false)
       ),
       has_pending_home_assistant_changes: readBoolean(entry.has_pending_home_assistant_changes, false),
+      // Story 3.4 — contrat métier backend (lecture seule — source : taxonomy.py + _DIAGNOSTIC_MESSAGES)
+      status_code:   readString(diag.status_code, ''),
+      detail:        readString(diag.detail, ''),
+      remediation:   readString(diag.remediation, ''),
+      v1_limitation: readBoolean(diag.v1_limitation, false),
     };
   }
 
@@ -96,6 +137,25 @@
     var globalSection = (scope.global && typeof scope.global === 'object') ? scope.global : {};
     var pieces = Array.isArray(scope.pieces) ? scope.pieces : [];
     var equipements = Array.isArray(scope.equipements) ? scope.equipements : [];
+
+    // Story 3.4 — données diagnostic (soft : absent si daemon indisponible)
+    var diagEquipments = (safeResponse.diagnostic_equipments && typeof safeResponse.diagnostic_equipments === 'object')
+      ? safeResponse.diagnostic_equipments : {};
+    var diagRooms = Array.isArray(safeResponse.diagnostic_rooms) ? safeResponse.diagnostic_rooms : [];
+    var diagSummary = (safeResponse.diagnostic_summary && typeof safeResponse.diagnostic_summary === 'object')
+      ? safeResponse.diagnostic_summary : null;
+
+    // Index rooms diagnostic par object_id pour lookup O(1)
+    var diagRoomByObjectId = {};
+    for (var r = 0; r < diagRooms.length; r++) {
+      var dr = diagRooms[r];
+      if (dr && typeof dr === 'object') {
+        // Normalise object_id : le scope utilise 0 pour "Aucun", le diagnostic utilise null
+        var roomObjId = (dr.object_id != null) ? dr.object_id : 0;
+        diagRoomByObjectId[String(roomObjId)] = (dr.summary && typeof dr.summary === 'object') ? dr.summary : null;
+      }
+    }
+
     var normalizedPieces = [];
     var piecesByObjectId = {};
 
@@ -110,6 +170,8 @@
         counts: buildCounts(piece.counts),
         has_pending_home_assistant_changes: readBoolean(piece.has_pending_home_assistant_changes, false),
         equipements: [],
+        // Story 3.4 — agrégation backend par pièce (null si daemon absent)
+        diagnostic_summary: diagRoomByObjectId[String(piece.object_id)] || null,
       };
       normalizedPieces.push(normalizedPiece);
       piecesByObjectId[String(piece.object_id)] = normalizedPiece;
@@ -126,7 +188,9 @@
         continue;
       }
 
-      pieceModel.equipements.push(buildEquipmentModel(equipement));
+      // Story 3.4 — lookup données diagnostic par eq_id (clés numériques JSON → prop string en JS)
+      var eqDiag = diagEquipments[equipement.eq_id] || diagEquipments[String(equipement.eq_id)] || null;
+      pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag));
     }
 
     return {
@@ -134,6 +198,8 @@
       global_counts: buildCounts(globalSection.counts),
       global_pending: readBoolean(globalSection.has_pending_home_assistant_changes, false),
       pieces: normalizedPieces,
+      // Story 3.4 — agrégation backend globale (null si daemon absent)
+      diagnostic_summary: diagSummary,
     };
   }
 
@@ -186,6 +252,23 @@
       if (equipement.has_pending_home_assistant_changes === true) {
         html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
       }
+      // Story 3.4 — Task 2 : contrat métier backend (lecture seule)
+      // Dimension 1 : badge statut HA (status_code canonique → getAggregatedStatusLabel)
+      if (equipement.status_code !== '') {
+        html += '<span style="margin-left:8px;">' + getAggregatedStatusLabel(equipement.status_code) + '</span>';
+      }
+      // Dimension 2 : raison principale (detail tel quel depuis backend — jamais reformulé)
+      if (equipement.detail !== '') {
+        html += '<div style="margin-top:4px;font-size:0.9em;color:#555;margin-left:4px;">' + escapeHtml(equipement.detail) + '</div>';
+      }
+      // Dimension 3 : action recommandée (remediation tel quel depuis backend, si non vide)
+      if (equipement.remediation !== '') {
+        html += '<div style="margin-top:2px;font-size:0.9em;color:#888;margin-left:4px;"><em>Action recommandée</em> : ' + escapeHtml(equipement.remediation) + '</div>';
+      }
+      // Dimension 4 : limitation Home Assistant explicite (v1_limitation=true)
+      if (equipement.v1_limitation === true) {
+        html += '<div style="margin-top:4px;margin-left:4px;"><span class="label label-default">Limitation Home Assistant</span></div>';
+      }
       html += '</li>';
     }
     html += '</ul>';
@@ -207,6 +290,15 @@
     html += '</div>';
     if (model.global_pending === true) {
       html += '<div style="margin-bottom:8px;"><span class="label label-warning">Changements à appliquer</span></div>';
+    }
+
+    // Story 3.4 — Task 3 : agrégation backend globale (primary_aggregated_status + counts)
+    if (model.diagnostic_summary && model.diagnostic_summary.primary_aggregated_status) {
+      html += '<div style="margin-bottom:8px;">';
+      html += '<strong>Statut global HA</strong> ';
+      html += getAggregatedStatusLabel(model.diagnostic_summary.primary_aggregated_status);
+      html += renderCountsByStatus(model.diagnostic_summary.counts_by_status);
+      html += '</div>';
     }
 
     html += '<div class="table-responsive" style="margin-top:10px;">';
@@ -232,7 +324,12 @@
         if (piece.has_pending_home_assistant_changes === true) {
           html += ' <span class="label label-warning">Changements à appliquer</span>';
         }
-        if (piece.counts.total > 0 && piece.counts.exclude === piece.counts.total) {
+        // Story 3.4 — primary_aggregated_status depuis backend (priorité sur la déduction locale)
+        if (piece.diagnostic_summary && piece.diagnostic_summary.primary_aggregated_status) {
+          html += ' ' + getAggregatedStatusLabel(piece.diagnostic_summary.primary_aggregated_status);
+          html += renderCountsByStatus(piece.diagnostic_summary.counts_by_status);
+        } else if (piece.counts.total > 0 && piece.counts.exclude === piece.counts.total) {
+          // Fallback scope-only : badge local quand aucune donnée diagnostic disponible
           html += ' <span class="label" style="background-color:#999;color:#fff;">Exclue</span>';
         }
         html += '</td>';
@@ -254,5 +351,6 @@
   return {
     createModel: createModel,
     render: render,
+    getAggregatedStatusLabel: getAggregatedStatusLabel,
   };
 }));
