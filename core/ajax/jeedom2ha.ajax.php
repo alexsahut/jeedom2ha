@@ -207,7 +207,33 @@ try {
       ajax::success($result);
     }
     else if ($action == 'getPublishedScopeForConsole') {
-      ajax::success(jeedom2ha::getPublishedScopeForConsole());
+      $result = jeedom2ha::getPublishedScopeForConsole();
+      // Story 3.4 — Option B : merge diagnostic data into scope response (soft-fail)
+      // Si le daemon ne répond pas, la vue scope-only reste affichée sans diagnostic.
+      if ($result['status'] === 'ok') {
+        $diagResult = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 10);
+        if ($diagResult !== null && isset($diagResult['payload'])) {
+          $dp = $diagResult['payload'];
+          $result['diagnostic_summary'] = $dp['summary'] ?? null;
+          $result['diagnostic_rooms']   = $dp['rooms'] ?? [];
+          // Index équipements par eq_id pour lookup O(1) côté JS
+          $eqDiag = [];
+          foreach ($dp['equipments'] ?? [] as $eq) {
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId > 0) {
+              $eqDiag[$eqId] = [
+                'status_code'   => (string)($eq['status_code'] ?? ''),
+                'reason_code'   => (string)($eq['reason_code'] ?? ''),
+                'detail'        => (string)($eq['detail'] ?? ''),
+                'remediation'   => (string)($eq['remediation'] ?? ''),
+                'v1_limitation' => (bool)($eq['v1_limitation'] ?? false),
+              ];
+            }
+          }
+          $result['diagnostic_equipments'] = $eqDiag;
+        }
+      }
+      ajax::success($result);
     }
     else if ($action == 'exportDiagnostic') {
       $pseudonymize = (init('pseudonymize', '0') === '1');
