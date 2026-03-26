@@ -351,12 +351,12 @@ def test_closed_reason_map_excluded_object():
     assert _CLOSED_REASON_MAP["excluded_object"] == "excluded"
 
 
-def test_excluded_reason_codes_set():
-    """_EXCLUDED_REASON_CODES contient les 3 codes d'exclusion."""
-    from transport.http_server import _EXCLUDED_REASON_CODES
-    assert "excluded_eqlogic" in _EXCLUDED_REASON_CODES
-    assert "excluded_plugin" in _EXCLUDED_REASON_CODES
-    assert "excluded_object" in _EXCLUDED_REASON_CODES
+def test_excluded_reason_codes_in_closed_reason_map():
+    """_CLOSED_REASON_MAP contient les 3 codes d'exclusion mappés vers 'excluded'."""
+    from transport.http_server import _CLOSED_REASON_MAP
+    assert _CLOSED_REASON_MAP["excluded_eqlogic"] == "excluded"
+    assert _CLOSED_REASON_MAP["excluded_plugin"] == "excluded"
+    assert _CLOSED_REASON_MAP["excluded_object"] == "excluded"
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +505,8 @@ async def test_diagnostic_probable_skipped_shows_correct_detail(aiohttp_client):
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 400)
 
     # H1: detail et remediation explicites (pas "Cause inconnue")
-    assert eq["status"] == "Non publié"
+    # Story 3.1 : probable_skipped → "Ambigu" (pas "Non publié")
+    assert eq["status"] == "Ambigu"
     assert eq["reason_code"] == "probable_skipped"
     assert "probable" in eq["detail"].lower()
     assert "sûr uniquement" in eq["detail"].lower() or "sure_only" in eq["detail"].lower()

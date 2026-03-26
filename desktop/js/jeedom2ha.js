@@ -544,8 +544,8 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           html += '<div style="margin-top:4px;color:#2f7d32;">{{Mapping réussi \u2014 équipement éligible et publié.}}</div>';
         }
         if (eq.v1_limitation) {
-          html += '<div style="margin-top:6px;"><span class="label label-default">{{Hors périmètre V1}}</span>';
-          html += ' <small style="margin-left:6px;color:#888;">{{Ce type d\'équipement n\'est pas encore supporté dans cette version.}}</small></div>';
+          html += '<div style="margin-top:6px;"><span class="label label-default">{{Hors périmètre V1 — Home Assistant}}</span>';
+          html += ' <small style="margin-left:6px;color:#888;">{{Ce type d\'équipement n\'est pas encore couvert vers Home Assistant dans cette version.}}</small></div>';
         }
         html += '</div>';
 

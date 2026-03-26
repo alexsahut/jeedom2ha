@@ -1241,9 +1241,9 @@ _DIAGNOSTIC_MESSAGES = {
         False,
     ),
     "no_supported_generic_type": (
-        "Aucune commande de cet équipement n'a un type générique supporté par le plugin.",
-        "Ce type d'équipement n'est pas encore supporté en V1, ou les types génériques "
-        "ne sont pas configurés. Aucune action Jeedom ne permettra de le publier pour le moment.",
+        "Aucune commande de cet équipement n'a un type générique supporté vers Home Assistant dans la V1 du plugin.",
+        "Ce type d'équipement n'est pas encore couvert par le périmètre V1 vers Home Assistant. "
+        "Aucune action Jeedom ne permettra de le publier pour le moment.",
         True,
     ),
     "disabled": (
@@ -1291,6 +1291,18 @@ _DIAGNOSTIC_MESSAGES = {
         "Vérifiez la connexion au broker MQTT et relancez un sync.",
         False,
     ),
+    "no_generic_type_configured": (
+        "Les commandes de cet équipement n'ont pas de types génériques configurés dans Jeedom.",
+        "Configurez les types génériques sur les commandes via le plugin Jeedom concerné, "
+        "puis relancez un rescan.",
+        False,
+    ),
+    "low_confidence": (
+        "La correspondance vers un type Home Assistant est trop incertaine pour une publication automatique.",
+        "Configurez les types génériques sur les commandes pour améliorer la précision du mapping, "
+        "puis relancez un rescan.",
+        False,
+    ),
     "sure_mapping": (
         "Cet équipement est publié mais certaines commandes ne sont pas couvertes par le mapping V1.",
         "Configurez les types génériques manquants sur les commandes listées "
@@ -1300,6 +1312,11 @@ _DIAGNOSTIC_MESSAGES = {
     "sure": (
         "Cet équipement est publié mais certaines commandes ne sont pas couvertes par le mapping V1.",
         "Configurez les types génériques manquants sur les commandes pour une couverture complète.",
+        False,
+    ),
+    "probable": (
+        "Cet équipement est publié vers Home Assistant avec une correspondance probable.",
+        "",
         False,
     ),
     "eligible": (

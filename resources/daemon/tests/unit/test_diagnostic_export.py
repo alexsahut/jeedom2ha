@@ -20,7 +20,8 @@ from models.topology import (
 )
 from models.mapping import MappingResult, PublicationDecision, LightCapabilities
 
-_VALID_STATUS_CODES = {"published", "partially_published", "not_published", "excluded"}
+# Story 3.1 : taxonomie fermée à 5 statuts — plus de "partially_published" ni "not_published"
+_VALID_STATUS_CODES = {"published", "excluded", "ambiguous", "not_supported", "infra_incident"}
 
 # ---------------------------------------------------------------------------
 # /system/status — python_version (Task 1.1 / 1.2)
@@ -120,7 +121,7 @@ def _make_simple_app_with_published_eq():
     app["publications"] = {
         10: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
@@ -184,7 +185,7 @@ async def test_diagnostics_status_code_excluded(aiohttp_client):
 
 
 async def test_diagnostics_status_code_not_published(aiohttp_client):
-    """Équipement non publié → status_code='not_published'."""
+    """Équipement non supporté → status_code='not_supported' (Story 3.1 : taxonomie fermée)."""
     app = _make_simple_app_with_published_eq()
     cli = await aiohttp_client(app)
 
@@ -192,12 +193,12 @@ async def test_diagnostics_status_code_not_published(aiohttp_client):
     data = await resp.json()
 
     eq_12 = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 12)
-    assert eq_12["status"] == "Non publié"
-    assert eq_12["status_code"] == "not_published"
+    assert eq_12["status"] == "Non supporté"
+    assert eq_12["status_code"] == "not_supported"
 
 
-async def test_diagnostics_status_code_partially_published(aiohttp_client):
-    """Équipement partiellement publié → status_code='partially_published'."""
+async def test_diagnostics_status_code_published_with_unmatched(aiohttp_client):
+    """Équipement publié avec commandes non couvertes → status_code='published' (Story 3.1)."""
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -224,7 +225,7 @@ async def test_diagnostics_status_code_partially_published(aiohttp_client):
     app["publications"] = {
         20: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
@@ -234,8 +235,9 @@ async def test_diagnostics_status_code_partially_published(aiohttp_client):
     data = await resp.json()
 
     eq_20 = data["payload"]["equipments"][0]
-    assert eq_20["status"] == "Partiellement publié"
-    assert eq_20["status_code"] == "partially_published"
+    # Story 3.1 : publication partielle → "Publié" + unmatched_commands
+    assert eq_20["status"] == "Publié"
+    assert eq_20["status_code"] == "published"
 
 
 async def test_diagnostics_non_regression_existing_fields(aiohttp_client):
