@@ -28,6 +28,7 @@ from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
 from models.mapping import MappingResult, PublicationDecision
 from models.taxonomy import get_primary_status
+from models.aggregation import build_summary
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
@@ -1481,6 +1482,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     publications = request.app.get("publications", {})
 
     equipments = []
+    rooms_equips: dict = {}  # (object_id, object_name) -> list[dict]
 
     for eq_id, eq in topology.eq_logics.items():
         object_name = topology.get_suggested_area(eq_id) or "Aucun"
@@ -1582,7 +1584,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # Story 4.4 — code machine stable pour l'export de diagnostic
         status_code = _STATUS_CODE_MAP.get(status, "not_published")
 
-        equipments.append({
+        eq_dict = {
             "eq_id": eq_id,
             "object_name": object_name,
             "name": eq.name,
@@ -1599,13 +1601,28 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "detected_generic_types": detected_generic_types,
             "v1_compatibility": v1_compatibility,
             "traceability": traceability,
-        })
+        }
+        equipments.append(eq_dict)
+        room_key = (eq.object_id, object_name)
+        rooms_equips.setdefault(room_key, []).append(eq_dict)
+
+    summary = build_summary(equipments)
+    rooms = [
+        {
+            "object_id": object_id,
+            "object_name": object_name_val,
+            "summary": build_summary(room_eqs),
+        }
+        for (object_id, object_name_val), room_eqs in rooms_equips.items()
+    ]
 
     return web.json_response({
         "action": "system.diagnostics",
         "status": "ok",
         "payload": {
-            "equipments": equipments
+            "summary": summary,
+            "rooms": rooms,
+            "equipments": equipments,
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),

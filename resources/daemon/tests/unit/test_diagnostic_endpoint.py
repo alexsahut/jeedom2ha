@@ -1049,3 +1049,203 @@ async def test_diagnostics_typing_trace_configured_vs_used(aiohttp_client):
     assert tt["configured_type"] == "LIGHT_SLIDER"
     assert tt["used_type"] == "LIGHT_SLIDER"
     assert tt["logical_role"] == "LIGHT_SLIDER"
+
+
+# ---------------------------------------------------------------------------
+# Story 3.3 — Tests de contrat du payload agrégé
+# ---------------------------------------------------------------------------
+
+async def test_diagnostics_payload_has_summary_rooms_equipments(aiohttp_client):
+    """Le payload doit contenir les trois clés summary, rooms, equipments."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={
+            500: JeedomEqLogic(id=500, name="Lumiere", object_id=1, is_enable=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {500: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    assert resp.status == 200
+    data = await resp.json()
+    payload = data["payload"]
+
+    assert "summary" in payload
+    assert "rooms" in payload
+    assert "equipments" in payload
+
+
+async def test_diagnostics_summary_structure(aiohttp_client):
+    """Le summary global doit avoir tous les champs du contrat 3.3."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={
+            501: JeedomEqLogic(id=501, name="Prise", object_id=1, is_enable=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {501: EligibilityResult(is_eligible=False, reason_code="no_commands")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    summary = data["payload"]["summary"]
+
+    assert "primary_aggregated_status" in summary
+    assert "total_equipments" in summary
+    assert "counts_by_status" in summary
+    assert "counts_by_reason" in summary
+    assert isinstance(summary["total_equipments"], int)
+    assert isinstance(summary["counts_by_status"], dict)
+    assert isinstance(summary["counts_by_reason"], dict)
+
+
+async def test_diagnostics_rooms_structure(aiohttp_client):
+    """Chaque entrée rooms doit contenir object_id, object_name, summary."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={2: JeedomObject(id=2, name="Cuisine")},
+        eq_logics={
+            502: JeedomEqLogic(id=502, name="Detecteur", object_id=2, is_enable=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {502: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    rooms = data["payload"]["rooms"]
+
+    assert len(rooms) == 1
+    room = rooms[0]
+    assert "object_id" in room
+    assert "object_name" in room
+    assert "summary" in room
+    room_summary = room["summary"]
+    assert "primary_aggregated_status" in room_summary
+    assert "total_equipments" in room_summary
+    assert "counts_by_status" in room_summary
+    assert "counts_by_reason" in room_summary
+
+
+async def test_diagnostics_individual_equipments_unchanged(aiohttp_client):
+    """AC 6 — La structure des équipements individuels est inchangée après l'ajout des agrégats."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={
+            503: JeedomEqLogic(id=503, name="Lumiere Test", object_id=1, is_enable=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {503: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    equipments = data["payload"]["equipments"]
+
+    assert len(equipments) == 1
+    eq = equipments[0]
+    # Tous les champs existants doivent être présents
+    expected_fields = {
+        "eq_id", "object_name", "name", "eq_type_name", "status", "status_code",
+        "confidence", "reason_code", "detail", "remediation", "v1_limitation",
+        "matched_commands", "unmatched_commands", "detected_generic_types",
+        "v1_compatibility", "traceability",
+    }
+    assert expected_fields.issubset(set(eq.keys()))
+    assert eq["eq_id"] == 503
+    assert eq["status"] == "Exclu"
+    assert eq["status_code"] == "excluded"
+    assert eq["reason_code"] == "excluded_eqlogic"
+
+
+async def test_diagnostics_global_summary_counts_match_equipments(aiohttp_client):
+    """La somme des counts_by_status global == total_equipments."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={
+            504: JeedomEqLogic(id=504, name="A", object_id=1, is_enable=True),
+            505: JeedomEqLogic(id=505, name="B", object_id=1, is_excluded=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {
+        504: EligibilityResult(is_eligible=False, reason_code="no_commands"),
+        505: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic"),
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    summary = data["payload"]["summary"]
+
+    assert summary["total_equipments"] == 2
+    assert sum(summary["counts_by_status"].values()) == summary["total_equipments"]
+
+
+async def test_diagnostics_room_summary_partial_published(aiohttp_client):
+    """Une pièce avec publié + exclu → primary_aggregated_status = partially_published."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=506,
+        ha_unique_id="light_506",
+        ha_name="Lumiere Pub",
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-26T00:00:00Z",
+        objects={3: JeedomObject(id=3, name="Bureau")},
+        eq_logics={
+            506: JeedomEqLogic(id=506, name="Lumiere Pub", object_id=3, is_enable=True),
+            507: JeedomEqLogic(id=507, name="Prise Exclue", object_id=3, is_excluded=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {
+        506: EligibilityResult(is_eligible=True, reason_code="eligible"),
+        507: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic"),
+    }
+    app["mappings"] = {506: mapping_res}
+    app["publications"] = {
+        506: PublicationDecision(
+            should_publish=True,
+            reason="sure",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    rooms = data["payload"]["rooms"]
+
+    assert len(rooms) == 1
+    bureau = rooms[0]
+    assert bureau["object_name"] == "Bureau"
+    assert bureau["summary"]["primary_aggregated_status"] == "partially_published"
+    assert bureau["summary"]["counts_by_status"]["published"] == 1
+    assert bureau["summary"]["counts_by_status"]["excluded"] == 1
