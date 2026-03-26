@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-25 CET'  # Story 3.1 done (PR #44 merged)
+last_updated: '2026-03-26 CET'  # Story 3.3 review
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -66,8 +66,8 @@ development_status:
 
   epic-3: in-progress
   3-1-taxonomie-principale-de-statuts-d-equipement: done  # PR #44 merged 2026-03-25, terrain PASS (AC1/AC2/AC3/AC6), code review PASS
-  3-2-reason-code-stables-raison-lisible-et-action-recommandee: backlog
-  3-3-agregations-piece-et-global-coherentes: backlog
+  3-2-reason-code-stables-raison-lisible-et-action-recommandee: done  # code review PASS 2026-03-26
+  3-3-agregations-piece-et-global-coherentes: review
   3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: backlog
   epic-3-retrospective: optional
 
