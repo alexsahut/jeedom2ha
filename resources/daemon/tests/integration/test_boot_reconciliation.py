@@ -154,6 +154,7 @@ async def test_disabled_equipment_is_unpublished_then_republished_after_reactiva
     assert publisher.publish_light.await_count == 2
 
     eq = next(item for item in diagnostics_payload["payload"]["equipments"] if item["eq_id"] == 355)
-    assert eq["status"] == "Non publié"
+    # Story 3.1 : disabled_eqlogic → "Non supporté" (pas "Non publié")
+    assert eq["status"] == "Non supporté"
     assert eq["reason_code"] == "disabled_eqlogic"
     assert app["publications"][355].should_publish is True

@@ -65,7 +65,7 @@ async def test_diagnostics_with_data(cli, app):
     publications = {
         100: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True
         )
@@ -79,27 +79,27 @@ async def test_diagnostics_with_data(cli, app):
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
     assert resp.status == 200
     data = await resp.json()
-    
+
     assert data["status"] == "ok"
     equipments = data["payload"]["equipments"]
     assert len(equipments) == 3
-    
+
     eq_100 = next(e for e in equipments if e["eq_id"] == 100)
     assert eq_100["object_name"] == "Salon"
     assert eq_100["name"] == "Lumiere"
     assert eq_100["status"] == "Publié"
     assert eq_100["confidence"] == "Sûr"
-    assert eq_100["reason_code"] == "sure_mapping"
+    assert eq_100["reason_code"] == "sure"
     assert "matched_commands" in eq_100
     assert len(eq_100["matched_commands"]) == 0  # No commands mocked in eq_logics[100] in this test
-    
+
     eq_101 = next(e for e in equipments if e["eq_id"] == 101)
     assert eq_101["status"] == "Exclu"
     assert eq_101["confidence"] == "Ignoré"
     assert eq_101["reason_code"] == "excluded_eqlogic"
-    
+
     eq_102 = next(e for e in equipments if e["eq_id"] == 102)
-    assert eq_102["status"] == "Non publié"
+    assert eq_102["status"] == "Non supporté"
     assert eq_102["confidence"] == "Ignoré"
     assert eq_102["reason_code"] == "no_commands"
 
@@ -139,7 +139,7 @@ async def test_diagnostics_partial_or_not_published(cli, app):
     equipments = data["payload"]["equipments"]
     eq_200 = equipments[0]
     
-    assert eq_200["status"] == "Non publié"
+    assert eq_200["status"] == "Ambigu"
     assert eq_200["confidence"] == "Ambigu"
     assert eq_200["reason_code"] == "ambiguous_skipped"
 
@@ -171,7 +171,7 @@ async def test_diagnostics_partiellement_publie(cli, app):
     app["publications"] = {
         300: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True
         )
@@ -181,10 +181,11 @@ async def test_diagnostics_partiellement_publie(cli, app):
     data = await resp.json()
     equipments = data["payload"]["equipments"]
     eq_300 = equipments[0]
-    
-    assert eq_300["status"] == "Partiellement publié"
+
+    # Story 3.1 : "Partiellement publié" supprimé — publication partielle → "Publié" + unmatched_commands
+    assert eq_300["status"] == "Publié"
     assert eq_300["confidence"] == "Sûr"
-    assert eq_300["reason_code"] == "sure_mapping"
+    assert eq_300["reason_code"] == "sure"
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +234,7 @@ async def test_diagnostics_detail_and_remediation_no_mapping(aiohttp_client):
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 401)
 
-    assert eq["status"] == "Non publié"
+    assert eq["status"] == "Non supporté"
     assert eq["reason_code"] == "no_mapping"
     assert eq["v1_limitation"] is True
     assert eq["detail"] != ""
@@ -372,7 +373,7 @@ async def test_diagnostics_unmatched_commands_present(aiohttp_client):
     app["publications"] = {
         404: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
@@ -382,14 +383,15 @@ async def test_diagnostics_unmatched_commands_present(aiohttp_client):
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 404)
 
-    assert eq["status"] == "Partiellement publié"
+    # Story 3.1 : publication partielle → "Publié" avec unmatched_commands (pas "Partiellement publié")
+    assert eq["status"] == "Publié"
     assert len(eq["unmatched_commands"]) == 1
     unmatched = eq["unmatched_commands"][0]
     assert unmatched["cmd_id"] == 5002
     assert unmatched["cmd_name"] == "Couleur"
     assert unmatched["generic_type"] == "LIGHT_COLOR"
-    assert eq["detail"] != ""
-    assert eq["remediation"] != ""
+    assert eq["detail"] == ""
+    assert eq["remediation"] == ""
     assert eq["v1_limitation"] is False
     assert len(eq["matched_commands"]) == 1
     assert eq["matched_commands"][0]["cmd_id"] == 5001
@@ -424,7 +426,7 @@ async def test_diagnostics_published_fields_empty(aiohttp_client):
     app["publications"] = {
         405: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
@@ -641,7 +643,7 @@ async def test_diagnostics_traceability_schema_published(aiohttp_client):
     app["publications"] = {
         600: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
@@ -995,7 +997,8 @@ async def test_diagnostics_v1_compatibility_not_published_but_v1(aiohttp_client)
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 903)
 
-    assert eq["status"] == "Non publié"
+    # Story 3.1 : ambiguous_skipped → "Ambigu" (pas "Non publié")
+    assert eq["status"] == "Ambigu"
     # AC5 : même non publié, si un type V1-compatible a été détecté, v1_compatibility=True
     assert eq["v1_compatibility"] is True
 
@@ -1027,7 +1030,7 @@ async def test_diagnostics_typing_trace_configured_vs_used(aiohttp_client):
     app["publications"] = {
         904: PublicationDecision(
             should_publish=True,
-            reason="sure_mapping",
+            reason="sure",
             mapping_result=mapping_res,
             active_or_alive=True,
         )
