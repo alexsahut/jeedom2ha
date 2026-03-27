@@ -3,17 +3,23 @@ document_type: architecture_delta_review
 project: jeedom2ha
 phase: post_mvp_phase_1
 version_label: v1_1_pilotable
-date: 2026-03-22
-status: ready_for_epic_planning_with_delta_guardrails
+date: 2026-03-27
+status: ready_for_epic_planning_with_recadrage_ux
 source_documents:
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/planning-artifacts/prd-post-mvp-v1-1-pilotable.md
   - _bmad-output/planning-artifacts/product-brief-jeedom2ha-post-mvp-refresh.md
   - _bmad-output/planning-artifacts/ux-delta-review-post-mvp-v1-1-pilotable.md
   - _bmad-output/planning-artifacts/ux-design-specification.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-03-26.md
   - _bmad-output/project-context.md
   - _bmad-output/planning-artifacts/epics.md
   - _bmad-output/planning-artifacts/prd.md
+revision_history:
+  - date: 2026-03-27
+    changes: "Recadrage UX — intégration du modèle Périmètre/Statut/Écart/Cause, contrat dual reason_code/cause_code, définition technique de l'écart, compteurs pièce/global, filtrage diagnostic in-scope, traitement Partiellement publié."
+  - date: 2026-03-22
+    changes: "Revue delta initiale — addendum structurel sur 4 sujets."
 ---
 
 # Revue d'architecture delta - Post-MVP V1.1 Pilotable
@@ -24,16 +30,17 @@ Le socle actuel de `jeedom2ha` est **compatible avec la V1.1 Pilotable sans refo
 
 Le point fort du socle est clair: la logique critique est deja largement centralisee autour d'un pipeline unique `topologie -> eligibilite -> mapping -> decision de publication -> publication MQTT -> diagnostic`. Cette base est saine pour proteger la predictibilite, l'explicabilite, la stabilite des identifiants et la maintenabilite.
 
-La V1.1 ne demande donc pas une nouvelle architecture. Elle demande un **addendum structurel cible** sur quatre sujets seulement:
+La V1.1 ne demande donc pas une nouvelle architecture. Elle demande un **addendum structurel cible** sur cinq sujets:
 
 1. **Un modele canonique du perimetre publie** qui rende explicite la hierarchie `global -> piece -> equipement`.
 2. **Un contrat d'operations explicites** qui distingue clairement `Republier` et `Supprimer/Recreer` a toutes les portees.
 3. **Un moteur de statuts / raisons lisibles unifie cote backend**, pour ne pas disperser la logique entre daemon, PHP et JS.
 4. **Un contrat minimal de sante du pont** incluant la derniere synchronisation, sans introduire une couche d'observabilite lourde.
+5. **Un modele utilisateur a 4 dimensions (Perimetre / Statut / Ecart / Cause)** avec un contrat dual `reason_code` (backend stable) / `cause_code` + `cause_label` (contrat UI), des compteurs backend pre-calcules, un diagnostic filtre in-scope cote backend, et l'absorption du cas historique "Partiellement publie".
 
 Verdict de synthese:
 - **Oui, l'architecture est suffisamment cadree pour lancer l'epic planning.**
-- **Non, elle n'est pas prete a etre decoupee proprement si ces quatre decisions restent implicites.**
+- **Les cinq sujets ci-dessus sont desormais figes et documentes dans cette revue (§6 a §10).**
 
 ## 2. Ce qui reste valide dans l'architecture actuelle
 
@@ -185,6 +192,8 @@ Le daemon porte deja l'essentiel des raisons lisibles, mais le frontend conserve
 - dans le daemon,
 - dans le PHP,
 - dans le JS.
+
+**Resolution (recadrage 2026-03-27):** le modele Perimetre/Statut/Ecart/Cause est desormais integralement calcule par le backend. Le frontend recoit les 4 dimensions pre-resolues et les compteurs pre-calcules. Il ne fait aucune interpretation, aucun mapping local, aucun calcul de compteur. Voir §8 pour le contrat detaille.
 
 ### R4. Sante du pont encore insuffisamment contractuelle
 
@@ -338,6 +347,23 @@ Ce resolver doit fournir au minimum:
 - un code stable pour le diagnostic,
 - les informations necessaires aux compteurs globaux et par piece.
 
+### 6.6 Expression technique des sources d'exclusion
+
+Le resolver canonique continue d'operer avec `inherit / include / exclude` et la precedence `equipement > piece > global`. La couche de presentation traduit la decision effective en source d'exclusion lisible pour l'API et le frontend.
+
+| Resolution interne | Sortie `perimetre` pour l'API | Libelle UI |
+|---|---|---|
+| include (effectif, quelle que soit l'origine) | `inclus` | Inclus |
+| exclude, source = regle objet/piece | `exclu_par_piece` | Exclu par la piece |
+| exclude, source = filtre plugin | `exclu_par_plugin` | Exclu par le plugin |
+| exclude, source = override equipement | `exclu_sur_equipement` | Exclu sur cet equipement |
+
+Decisions:
+- `inherit` n'apparait jamais dans la reponse API. Il est toujours resolu avant serialisation.
+- La source d'exclusion est tracee par le resolver (il sait deja d'ou vient la decision via `exclusion_source`).
+- Le frontend ne voit que les quatre valeurs `inclus`, `exclu_par_piece`, `exclu_par_plugin`, `exclu_sur_equipement`.
+- Cette traduction est un mapping deterministe, pas une heuristique. Elle est testable en isolation.
+
 ## 7. Recommandations sur la granularite des operations global / piece / equipement
 
 ### 7.1 Decision de principe
@@ -405,67 +431,229 @@ Pourquoi:
 - c'est aligne avec la revue UX,
 - cela borne clairement les effets cote Home Assistant.
 
-## 8. Recommandations sur le moteur de statuts / raisons lisibles
+## 8. Recommandations sur le moteur de statuts et la couche d'explicabilite
 
-### 8.1 Decision de separation semantique
+### 8.1 Modele utilisateur cible : Perimetre → Statut → Ecart → Cause
 
-Le systeme doit separer au moins quatre dimensions:
+Le systeme expose quatre dimensions au niveau equipement:
 
-| Dimension | Question couverte |
+| Dimension | Question couverte | Valeurs |
+|---|---|---|
+| Perimetre | cet element fait-il partie du scope voulu ? | `inclus`, `exclu_par_piece`, `exclu_par_plugin`, `exclu_sur_equipement` |
+| Statut | est-il actuellement projete dans HA ? | `publie`, `non_publie` |
+| Ecart | y a-t-il un desalignement decision ↔ etat ? | `true`, `false` |
+| Cause | pourquoi cet etat ou cet ecart ? | `cause_code` + `cause_label` + optionnellement `cause_action` |
+
+Ce modele remplace le decoupage precedent (Perimetre / Projection / Raison principale / Infrastructure).
+
+Decisions:
+- Le statut binaire `publie` / `non_publie` n'existe qu'au niveau equipement.
+- Les niveaux piece et global sont lus par compteurs uniquement (voir §8.5).
+- L'ancien statut `Ambigu` devient: Perimetre=inclus, Statut=non_publie, Ecart=true, Cause=mapping ambigu.
+- L'ancien statut `Non supporte` devient: Perimetre=inclus, Statut=non_publie, Ecart=true, Cause=type non supporte.
+- L'ancien statut `Exclu` devient: Perimetre=exclu_par_[source], Statut=non_publie, Ecart=false.
+- L'ancien `Incident infrastructure` reste un motif d'ecart: Ecart=true, Cause=infra_unavailable.
+- Voir §8.7 pour le traitement du cas `Partiellement publie`.
+
+### 8.2 Definition technique de l'ecart
+
+L'ecart est un booleen calcule par le backend. Il signale un desalignement entre la decision effective du resolver et l'etat de publication reel dans Home Assistant.
+
+**Formule exacte:**
+
+```
+ecart = (decision_effective == "inclus" AND NOT est_publie_ha)
+     OR (decision_effective != "inclus" AND est_publie_ha)
+```
+
+**Bidirectionnalite:**
+
+| Decision effective | Etat projete HA | Ecart | Direction |
+|---|---|---|---|
+| inclus | publie | false | aligne |
+| inclus | non_publie | **true** | inclus mais non publie |
+| exclu_* | non_publie | false | aligne |
+| exclu_* | publie | **true** | exclu mais encore publie |
+
+**Relation avec l'etat projete et l'etat actif:**
+- `decision_effective` = sortie du resolver canonique (`inherit/include/exclude` resolu en `inclus` ou `exclu_par_*`).
+- `est_publie_ha` = presence effective d'une configuration discovery MQTT retained pour cet equipement. Cet etat est porte par le cache runtime du daemon.
+- L'ecart est calcule *apres* le resolver et *apres* la verification de l'etat de publication.
+
+**Lieu de calcul:**
+- Le calcul de l'ecart se fait dans le backend, au moment de la construction de la reponse API.
+- Le frontend recoit `ecart: true/false` pre-calcule et ne fait aucune deduction.
+
+### 8.3 Contrat dual reason_code / cause_code
+
+Le systeme maintient deux couches de codes:
+
+| Couche | Audience | Stabilite | Cycle de vie |
+|---|---|---|---|
+| `reason_code` | Backend, diagnostic technique, export support | Stable — herite d'Epic 3, jamais renomme | Produit par le pipeline de decision |
+| `cause_code` / `cause_label` / `cause_action` | Contrat UI canonique | Stable pour le contrat frontend | Derive du `reason_code` par une couche de traduction |
+
+**Ou la traduction est faite:**
+- Dans la couche de serialisation de la reponse API, apres que le pipeline a produit ses resultats avec `reason_code`.
+- La traduction est une **fonction pure**: `reason_code → (cause_code, cause_label, cause_action)`.
+- Elle est implementee comme une table de correspondance dans le backend Python.
+
+**A quel niveau du pipeline:**
+
+```
+Topologie → Eligibilite → Mapping → Decision → reason_code
+                                                      ↓
+                                              Traduction (table)
+                                                      ↓
+                                       cause_code / cause_label / cause_action
+                                                      ↓
+                                              Reponse API
+```
+
+Le pipeline central ne change pas. La couche de traduction est ajoutee *en sortie* du pipeline, pas *dans* le pipeline.
+
+**Stabilite et testabilite:**
+- Les `reason_code` sont les codes techniques stables du pipeline. Ils ne sont pas exposes en UI.
+- La table de traduction `reason_code → cause_code` est une fonction pure, testable en isolation par tests unitaires.
+- L'ajout d'un nouveau `reason_code` (futur) requiert l'ajout d'une entree dans la table de traduction.
+- Le contrat UI est testable par assertions sur les reponses API.
+
+**Table de traduction cible (direction 1 — inclus mais non publie):**
+
+| `reason_code` (backend) | `cause_code` (UI) | `cause_label` |
+|---|---|---|
+| `no_mapping` | `no_mapping` | Aucun mapping compatible |
+| `ambiguous_mapping` | `ambiguous_skipped` | Mapping ambigu — plusieurs types possibles |
+| `unsupported_generic_type` | `no_supported_generic_type` | Type non supporte en V1 |
+| `no_generic_type` | `no_generic_type_configured` | Types generiques non configures sur les commandes |
+| `disabled` | `disabled_eqlogic` | Equipement desactive dans Jeedom |
+| `no_commands` | `no_commands` | Equipement sans commandes exploitables |
+| `publish_failed` | `discovery_publish_failed` | Publication MQTT echouee |
+| `infra_unavailable` | `infra_unavailable` | Bridge indisponible |
+
+**Table de traduction cible (direction 2 — exclu mais encore publie):**
+
+| `reason_code` (backend) | `cause_code` (UI) | `cause_label` |
+|---|---|---|
+| *(genere par detection d'ecart)* | `pending_unpublish` | Changement en attente d'application |
+
+Note: certains `cause_code` sont identiques au `reason_code` quand la correspondance est directe. La table reste la source de verite, meme si le mapping est trivial. Le `cause_code` `pending_unpublish` est un cas special: il n'est pas derive d'un `reason_code` pipeline mais de la detection d'ecart direction 2.
+
+### 8.4 Compteurs piece et global
+
+Les niveaux piece et global ne portent pas de statut binaire. Leur lecture principale repose sur quatre compteurs pre-calcules par le backend.
+
+**Compteurs:**
+
+| Compteur | Definition | Source |
+|---|---|---|
+| Total | nombre total d'equipements dans la piece / dans le parc | agregation backend |
+| Inclus | equipements ou `perimetre = inclus` | agregation backend |
+| Exclus | equipements ou `perimetre` commence par `exclu_` | agregation backend |
+| Ecarts | equipements ou `ecart = true` | agregation backend |
+
+**Invariant arithmetique:**
+
+```
+Total = Inclus + Exclus
+Ecarts ⊆ (Inclus ∪ Exclus)   // un ecart peut exister dans les deux populations
+```
+
+Un ecart de direction 1 (inclus mais non publie) est dans la population Inclus. Un ecart de direction 2 (exclu mais encore publie) est dans la population Exclus. Les deux comptent dans le compteur Ecarts.
+
+**Source de verite:**
+- Les compteurs sont calcules par le backend par agregation des etats equipement resolus.
+- Les compteurs sont exposes dans la reponse API aux niveaux piece et global.
+- Le frontend ne fait aucun calcul de compteur localement.
+
+**Indicateur synthetique piece/global:**
+- Si un indicateur visuel synthetique est conserve au niveau piece ou global (ex: badge d'alerte quand `ecarts > 0`), il doit etre defini comme un indicateur derive des compteurs, pas comme une extension du statut equipement, et nomme differemment (ex: `Ecarts a traiter`).
+
+### 8.5 Filtrage du diagnostic principal in-scope
+
+Le diagnostic principal utilisateur ne porte que sur les equipements dont `perimetre = inclus`. Le filtrage est fait **cote backend**, dans la construction de la reponse API.
+
+**Trois surfaces, trois populations:**
+
+| Surface | Population | Filtrage |
+|---|---|---|
+| Console principale (synthese perimetre) | Tous les equipements | Aucun — compteurs + perimetre par source pour les exclus |
+| Diagnostic principal utilisateur | `perimetre = inclus` uniquement | Backend filtre avant envoi |
+| Export support complet | Tous les equipements | Aucun — vue technique exhaustive |
+
+Le filtrage est un simple `WHERE perimetre = 'inclus'` sur la collection d'equipements resolus. Il ne modifie ni le pipeline ni le resolver.
+
+**Contenu du diagnostic utilisateur (equipements in-scope):**
+- Statut, ecart, cause (comme en console).
+- Details supplementaires: commandes observees, typage Jeedom, confiance (`Sur`/`Probable`/`Ambigu`).
+- La confiance n'est visible qu'en diagnostic, jamais en console principale.
+
+**Export support complet:**
+- Contient tous les equipements, in-scope et exclus.
+- Inclut les `reason_code` techniques (pas seulement les `cause_code`).
+- Inclut la confiance, les commandes, le typage, les metadata pipeline.
+- N'est pas filtre par le perimetre.
+
+### 8.6 Traitement du cas historique "Partiellement publie"
+
+"Partiellement publie" est **absorbe comme statut principal** de la console, mais **conserve comme indicateur de diagnostic detaille** pour la couverture commandes.
+
+#### 8.6.1 Statut principal : absorption
+
+| Ancien statut | Nouveau modele (console) |
 |---|---|
-| Perimetre | cet element est-il dans le scope voulu ? |
-| Projection | est-il actuellement publie dans HA ? |
-| Raison principale | pourquoi cet etat ? |
-| Infrastructure | le pont peut-il executer l'action ? |
+| `Partiellement publie` | Perimetre=inclus, Statut=publie, Ecart=false |
 
-Cette separation est necessaire pour eviter qu'un seul badge tente de tout dire.
+Un equipement "partiellement publie" est un equipement pour lequel une configuration discovery a ete envoyee a HA. L'entite existe cote HA. Du point de vue du modele principal Perimetre/Statut/Ecart/Cause, cet equipement est **publie**.
 
-### 8.2 Decision sur les statuts principaux d'equipement
+Le fait que certaines commandes ne soient pas mappees (ex: lumiere avec ON/OFF mais sans dimmer) est un **detail de couverture**, pas un statut fondamental. Ce detail ne doit pas remonter comme statut principal ni comme ecart dans la console.
 
-Pour la V1.1, le niveau equipement doit converger vers un jeu de statuts principaux restreint:
-- `Publie`
-- `Exclu`
-- `Ambigu`
-- `Non supporte`
-- `Incident infrastructure`
+#### 8.6.2 Diagnostic : conservation comme indicateur de couverture
 
-Recommendation complementaire:
-- `Partiellement publie` peut rester utile comme statut agrege ou comme detail secondaire,
-- il ne doit pas devenir le statut semantique principal du moteur de decision V1.1 au niveau equipement.
+L'information de couverture partielle reste disponible dans le **diagnostic detaille** et l'**export support**. Elle permet de distinguer, pour un equipement publie, les commandes/capacites correctement projetees de celles qui ne le sont pas.
 
-### 8.3 Decision sur la raison principale
+**Ou vit cette information:**
+- Dans le diagnostic detaille par equipement (accessible depuis la console pour les equipements in-scope).
+- Dans l'export support complet.
+- Elle est portee par la granularite commande deja existante dans le pipeline (commandes observees vs commandes mappees).
 
-La raison principale doit vivre cote backend sous la forme:
-- d'un `reason_code` stable,
-- d'un message lisible,
-- d'une action recommandee optionnelle,
-- d'une mention explicite quand la limite vient de Home Assistant.
+**Comment elle reste disponible:**
+- Le pipeline produit deja le detail commande par equipement (commandes Jeedom detectees, commandes effectivement mappees, commandes ignorees).
+- Ce detail est inclus dans la reponse diagnostic et dans l'export support.
+- Un equipement publie avec couverture partielle est identifiable dans le diagnostic par la presence de commandes non mappees parmi les commandes observees.
 
-Le socle actuel de messages de diagnostic est reutilisable.  
-La bonne decision est de l'etendre, pas de la repliquer.
+**Ce qui n'est pas fait:**
+- "Partiellement publie" ne reapparait jamais comme statut principal de la console.
+- "Partiellement publie" ne genere pas d'ecart (`ecart` reste `false` — l'equipement est bien publie comme voulu).
+- "Partiellement publie" n'est pas un `cause_code` du contrat UI principal.
 
-### 8.4 Decision de gouvernance de la logique
+#### 8.6.3 Champ technique complementaire
 
-Le frontend ne doit plus porter la responsabilite de reconstruire les statuts metier.
+Aucun nouveau champ obligatoire n'est introduit dans le contrat principal pour la V1.1. Le diagnostic detaille existant (granularite commande) suffit a porter l'information de couverture partielle.
 
-Decision:
-- le backend calcule,
-- le frontend affiche,
-- le frontend peut filtrer et presenter,
-- le frontend ne doit pas inventer de nouvelles raisons ni de nouvelles regles d'etat.
+Si un indicateur synthetique de couverture s'avere utile en diagnostic (ex: `commandes_mappees: 5/8`), il peut etre ajoute au niveau story comme enrichissement du contrat diagnostic, sans modifier le contrat principal de la console.
 
-### 8.5 Decision sur l'incident d'infrastructure
+### 8.7 Gouvernance : le frontend n'interprete jamais
 
-Un incident infrastructure doit etre distingue d'un probleme de mapping ou de scope.
+Decision inchangee et renforcee par le nouveau modele:
+- Le backend calcule les 4 dimensions (perimetre, statut, ecart, cause).
+- Le backend calcule les compteurs par piece et globaux.
+- Le frontend affiche les valeurs recues.
+- Le frontend peut filtrer, trier, masquer.
+- Le frontend ne doit pas:
+  - deriver un statut a partir d'autres champs,
+  - recomposer une cause a partir de `cause_code`,
+  - calculer un compteur localement,
+  - inventer un libelle non fourni par le backend.
 
-Decision:
-- l'incident bridge doit etre un motif de statut explicite,
-- pas une simple variante de `Non publie`.
+### 8.8 Incident d'infrastructure
 
-Pourquoi:
-- c'est critique pour le support,
-- c'est critique pour la comprehension utilisateur,
-- cela evite d'attribuer au perimetre un probleme qui releve du demon ou du broker.
+Decision maintenue et alignee avec le nouveau modele:
+- Un incident infrastructure (bridge/broker indisponible) reste un motif d'ecart explicite.
+- Au niveau equipement: Ecart=true, Cause=`infra_unavailable` / `Bridge indisponible`.
+- Il ne doit pas etre confondu avec un probleme de mapping ou de perimetre.
+- Le bandeau de sante (§9) reste la surface principale pour les incidents d'infrastructure.
+- Le rouge reste reserve a l'infrastructure — aucun probleme de mapping ou de perimetre ne doit etre affiche en rouge.
 
 ## 9. Recommandations sur la sante minimale du pont
 
@@ -516,33 +704,48 @@ Decision complementaire:
 Les decisions suivantes doivent etre figees avant de decouper les epics:
 
 1. **Modele canonique du perimetre publie**
-   `global -> piece -> equipement`, avec `inherit/include/exclude` et precedence explicite.
+   `global -> piece -> equipement`, avec `inherit/include/exclude` en representation interne et precedence explicite.
 
-2. **Statut du niveau global dans le modele**
-   Le niveau global existe comme racine de resolution et comme portee d'operations, meme si l'UI V1.1 ne lui donne pas encore un jeu de regles complexe.
+2. **Expression des sources d'exclusion**
+   L'API expose `inclus`, `exclu_par_piece`, `exclu_par_plugin`, `exclu_sur_equipement`. Le frontend ne voit jamais `inherit`. Voir §6.6.
 
-3. **Statut des filtres techniques existants**
-   Les exclusions plugin restent compatibles mais secondaires par rapport au modele principal de perimetre.
+3. **Modele utilisateur a 4 dimensions**
+   Perimetre → Statut → Ecart → Cause. Le statut binaire `publie`/`non_publie` n'existe qu'au niveau equipement. Voir §8.1.
 
-4. **Contrat d'operations V1.1**
+4. **Definition technique de l'ecart**
+   Booleen bidirectionnel calcule par le backend. Formule, lieu de calcul et relation avec l'etat projete figes en §8.2.
+
+5. **Contrat dual reason_code / cause_code**
+   `reason_code` stable (backend, pipeline, Epic 3). `cause_code`/`cause_label`/`cause_action` derive par traduction (table pure). Le frontend ne voit que le contrat UI. Voir §8.3.
+
+6. **Compteurs piece et global**
+   Total, Inclus, Exclus, Ecarts. Pre-calcules par le backend. Invariant `Total = Inclus + Exclus`. Pas de calcul frontend. Voir §8.4.
+
+7. **Filtrage du diagnostic principal in-scope**
+   Le diagnostic utilisateur ne porte que sur `perimetre = inclus`. Filtre cote backend. Export support complet non filtre. Voir §8.5.
+
+8. **Traitement de "Partiellement publie"**
+   Absorbe comme statut principal (Perimetre=inclus, Statut=publie, Ecart=false). Conserve comme indicateur de couverture en diagnostic detaille. Pas de champ obligatoire dans le contrat principal. Voir §8.6.
+
+9. **Contrat d'operations V1.1**
    `Republier` et `Supprimer/Recreer` doivent etre figes comme deux intentions distinctes, reutilisables aux trois portees.
 
-5. **Separation entre decision locale et application a HA**
-   Un changement de perimetre ne doit pas etre semantiquement confondu avec une action destructive ou une republication.
+10. **Separation entre decision locale et application a HA**
+    Un changement de perimetre ne doit pas etre semantiquement confondu avec une action destructive ou une republication.
 
-6. **Source unique des statuts et raisons lisibles**
-   Le backend porte la logique, le frontend ne fait que l'afficher.
+11. **Contrat minimal de sante du pont**
+    Demon, broker, derniere synchro terminee, resultat court obligatoire de la derniere operation.
 
-7. **Contrat minimal de sante du pont**
-   Demon, broker, derniere synchro terminee, resultat court obligatoire de la derniere operation.
+12. **Invariants d'impact HA**
+    - `unique_id` stable tant que l'ID Jeedom reste stable,
+    - `Republier` non destructif par intention,
+    - `Supprimer/Recreer` seul flux destructif explicite,
+    - recalcul du scope deterministe a partir d'un snapshot et d'une configuration donnes.
 
-8. **Invariants d'impact HA**
-   - `unique_id` stable tant que l'ID Jeedom reste stable,
-   - `Republier` non destructif par intention,
-   - `Supprimer/Recreer` seul flux destructif explicite,
-   - recalcul du scope deterministe a partir d'un snapshot et d'une configuration donnes.
+13. **Gouvernance frontend**
+    Le frontend ne fait aucune interpretation, aucun mapping local, aucun calcul de compteur, aucune invention de libelle. Voir §8.7.
 
-Sans ces huit points, les epics risquent de se decouper par ecrans ou par actions UI au lieu de se decouper autour d'un coeur de contrat stable.
+Sans ces treize points, les epics risquent de se decouper par ecrans ou par actions UI au lieu de se decouper autour d'un coeur de contrat stable.
 
 ## 11. Ce qui peut rester ouvert jusqu'aux stories
 
@@ -594,25 +797,41 @@ Elle reste strictement alignee avec la priorite produit V1.1 Pilotable.
 
 ### Verdict
 
-**Architecture suffisamment cadree pour lancer l'epic planning, sous reserve de figer l'addendum delta decrit dans cette revue.**
+**Architecture suffisamment cadree pour lancer l'epic planning, avec le recadrage UX du 2026-03-27 integre.**
 
 ### Formulation decisionnelle
 
 - **Pas de refonte complete necessaire.**
 - **Le socle actuel est reutilisable et pertinent.**
-- **Les ajustements necessaires sont limites mais structurants.**
-- **Le point critique n'est pas la technique bas niveau, mais le contrat de pilotage.**
+- **Le pipeline central, le resolver canonique et les `reason_code` restent stables.**
+- **Le point critique est le contrat backend → UI, desormais fige autour de 4 dimensions et d'un contrat dual reason_code / cause_code.**
+
+### Ce que le recadrage a tranche
+
+Les six points demandes sont resolus:
+
+1. **Definition technique de l'ecart** — formule exacte, bidirectionnalite, relation avec l'etat projete/actif (§8.2).
+2. **Contrat dual reason_code / cause_code** — lieu de traduction, niveau pipeline, stabilite et testabilite (§8.3).
+3. **Filtrage du diagnostic in-scope** — cote backend, export support non filtre (§8.5).
+4. **Compteurs piece/global** — source backend, ecart bidirectionnel inclus, pas de calcul frontend (§8.4).
+5. **Sources d'exclusion** — `exclu_par_piece`, `exclu_par_plugin`, `exclu_sur_equipement` (§6.6).
+6. **Traitement de "Partiellement publie"** — absorbe comme statut principal, conserve comme indicateur de diagnostic de couverture (§8.6).
+
+### Ambiguites residuelles
+
+Aucune ambiguite bloquante pour l'epic planning. Les points suivants restent a affiner au niveau story:
+- Le nom exact des `reason_code` existants dans le code doit etre verifie pour confirmer la table de traduction §8.3.
+- Le `cause_code` `pending_unpublish` (direction 2) est un cas special non derive d'un `reason_code` pipeline — sa generation est un calcul dedie a documenter en story.
+- Un indicateur synthetique de couverture commandes en diagnostic (ex: `commandes_mappees: 5/8`) peut etre ajoute au niveau story si le detail commande brut s'avere insuffisamment lisible, sans modifier le contrat principal.
 
 ### Conclusion finale
 
-Le socle actuel supporte proprement la V1.1 Pilotable **a condition de ne pas bricoler la phase comme une simple extension d'ecran ou une addition d'actions AJAX**.
-
-La bonne trajectoire est:
-- conserver le pipeline actuel,
-- figer un modele canonique de perimetre publie,
-- figer un contrat d'operations explicites,
-- figer un moteur de statuts lisibles cote backend,
-- et ajouter une sante minimale du pont contractuelle.
+Le socle actuel supporte proprement la V1.1 Pilotable. Le recadrage UX ne modifie pas le pipeline central. Il ajoute:
+- une couche de traduction `reason_code → cause_code` en sortie de pipeline,
+- un calcul d'ecart bidirectionnel backend,
+- des compteurs pre-calcules pour piece/global,
+- un filtrage in-scope du diagnostic cote backend,
+- une expression des exclusions par source pour l'API.
 
 Dans ce cadre, la V1.1 reste:
 - previsible,
@@ -620,3 +839,7 @@ Dans ce cadre, la V1.1 reste:
 - sure a l'usage,
 - testable,
 - et soutenable cote support.
+
+### Handoff
+
+Prochaine etape : mise a jour des epics (`epics-post-mvp-v1-1-pilotable.md`) pour inserer le nouvel Epic 4 (recadrage UX) et renumeroter l'actuel Epic 4 en Epic 5, en s'appuyant sur les 13 points figes en §10 et les contrats techniques definis en §8.

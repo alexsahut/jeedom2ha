@@ -4,7 +4,7 @@ workflow: 'edit'
 project: 'jeedom2ha'
 phase: 'post_mvp_phase_1'
 version_label: 'v1.1_pilotable'
-date: '2026-03-22'
+date: '2026-03-26'
 status: 'ready_for_epic_planning'
 source_prd: '_bmad-output/planning-artifacts/prd.md'
 inputDocuments:
@@ -19,8 +19,10 @@ stepsCompleted:
   - step-e-01-discovery
   - step-e-02-review
   - step-e-03-edit
-lastEdited: '2026-03-22'
+lastEdited: '2026-03-26'
 editHistory:
+  - date: '2026-03-26'
+    changes: 'Recadrage UX V1.1 — intégration du modèle utilisateur Périmètre/Statut/Écart/Cause, disparition du concept exception, confiance en diagnostic technique uniquement, diagnostic centré in-scope, distinction reason_code/cause_code.'
   - date: '2026-03-22'
     changes: 'Update structurant post-MVP: recentrage produit sur V1.1 Pilotable et priorisation pilotage/ops avant extension du scope.'
 ---
@@ -81,7 +83,7 @@ Vision inchangée:
 
 Problèmes P0 à résoudre:
 - L’utilisateur ne maîtrise pas précisément ce qui est publié dans HA.
-- L’utilisateur ne comprend pas pourquoi un équipement est publié, exclu, ambigu ou non supporté.
+- L’utilisateur ne comprend pas pourquoi un équipement est publié ou non publié, ni la cause d’un éventuel écart.
 - Les opérations de maintenance discovery sont confondues et risquées perçues.
 - Les impacts forts côté HA (historique, dashboards, automatisations) sont mal anticipés.
 - La santé minimale du pont n’est pas suffisamment visible pour diagnostiquer rapidement.
@@ -90,9 +92,10 @@ Problèmes P0 à résoudre:
 
 Objectifs court terme (V1.1 Pilotable):
 - Installer une console de configuration et d’opérations centrée sur le périmètre publié.
-- Permettre le pilotage par pièce avec exceptions par équipement.
+- Permettre le pilotage par pièce avec décisions d’inclusion/exclusion par équipement, exprimées par leur source.
+- Centrer le diagnostic utilisateur sur les équipements in-scope uniquement.
 - Rendre explicite la différence entre republier et supprimer/recréer.
-- Afficher une raison lisible par équipement pour tout statut.
+- Afficher une cause métier lisible par équipement pour tout écart entre décision et état projeté.
 - Exposer un état minimal du pont: démon, broker, dernière synchro.
 - Réduire les tickets d’incompréhension publication/diagnostic.
 
@@ -117,10 +120,16 @@ Règle de dernier recours:
 ### 8.1 Console de pilotage du périmètre publié
 
 Capacités minimales requises:
-- Vue principale **par pièce** (objet Jeedom) avec statut de publication agrégé et compteurs.
+- Vue principale **par pièce** (objet Jeedom) avec compteurs : Total, Inclus, Exclus, Écarts.
 - Inclusion/exclusion au niveau pièce.
-- Exceptions au niveau équipement dans chaque pièce.
-- Maintien de la visibilité des exclus (pas de disparition silencieuse de la console).
+- Inclusion ou exclusion au niveau équipement, exprimée par sa source (pièce, plugin, équipement).
+- Maintien de la visibilité des exclus avec leur source d'exclusion (pas de disparition silencieuse de la console).
+
+Modèle de lecture par niveau:
+- **Équipement:** statut binaire `Publié` / `Non publié` — seul niveau où ce statut existe.
+- **Pièce et global:** lecture par compteurs uniquement (Total, Inclus, Exclus, Écarts). Pas de statut agrégé réutilisant le champ statut équipement.
+
+Le concept d'**exception** disparaît de l'interface utilisateur. Les exclusions sont toujours exprimées par leur source : exclu par la pièce, exclu par le plugin, exclu sur cet équipement.
 
 ### 8.2 Opérations discovery explicites
 
@@ -135,10 +144,16 @@ Impact utilisateur à rendre visible avant confirmation:
 
 ### 8.3 Explicabilité par équipement
 
-Pour chaque équipement, la console doit fournir:
-- Statut lisible: `Publié`, `Exclu`, `Ambigu`, `Non supporté` (et variantes opérationnelles utiles).
-- Raison principale obligatoire (une formulation orientée utilisateur, non brute technique).
+Pour chaque équipement in-scope, la console doit fournir un modèle à 4 dimensions:
+- **Périmètre:** Inclus · Exclu par la pièce · Exclu par le plugin · Exclu sur cet équipement.
+- **Statut:** Publié · Non publié (binaire, niveau équipement uniquement).
+- **Écart:** indication bidirectionnelle de désalignement entre la décision locale et l’état projeté (inclus mais non publié, ou exclu mais encore publié).
+- **Cause métier obligatoire:** libellé explicite et lisible pour tout écart (ex: "Aucun mapping compatible", "Changement en attente d’application").
 - Indication de l’action recommandée quand une remédiation simple existe.
+
+Le backend conserve des `reason_code` stables (hérités d’Epic 3, non exposés en UI) et expose en complément un contrat UI canonique (`cause_code`, `cause_label`, optionnellement `cause_action`). Le PRD exige cette distinction ; la spécification technique détaillée du contrat vit dans l’architecture.
+
+La confiance (Sûr / Probable / Ambigu) ne fait pas partie de la console principale. Elle reste visible uniquement dans le diagnostic technique détaillé.
 
 ### 8.4 Santé minimale du pont
 
@@ -152,15 +167,17 @@ Indicateurs visibles en permanence:
 Le chantier 1 “Pilotage du périmètre publié” est terminé si et seulement si:
 
 1. L’utilisateur peut inclure/exclure une pièce complète.
-2. L’utilisateur peut définir des exceptions équipement dans une pièce incluse/exclue.
-3. Les statuts par équipement sont visibles et cohérents avec l’état réel de publication.
-4. Chaque statut dispose d’une raison lisible.
+2. L’utilisateur peut définir des décisions d’inclusion/exclusion par équipement, exprimées par leur source.
+3. Le modèle Périmètre / Statut / Écart / Cause est lisible et cohérent avec l’état réel de publication pour chaque équipement.
+4. Chaque écart dispose d’une cause métier lisible.
 5. La distinction `Republier` vs `Supprimer/Recréer` est explicite dans l’UI et dans les confirmations.
 6. Les opérations à impact fort HA nécessitent une confirmation explicite avec rappel des conséquences.
 7. Le niveau global (parc), pièce et équipement couvre les opérations essentielles de maintenance du périmètre.
 8. L’état minimal du pont (démon, broker, dernière synchro) est visible sans navigation technique.
 9. Les erreurs d’infrastructure sont distinguées des problèmes de configuration.
-10. Le comportement observé reste aligné avec les principes de prédictibilité et d’explicabilité.
+10. Le diagnostic utilisateur est centré sur les équipements in-scope ; la confiance n’est visible qu’en diagnostic technique.
+11. La distinction `reason_code` (backend stable) / `cause_code` + `cause_label` (contrat UI) est respectée dans l’architecture.
+12. Le comportement observé reste aligné avec les principes de prédictibilité et d’explicabilité.
 
 ## 10. Non-objectifs / hors périmètre court terme
 
@@ -227,9 +244,10 @@ Exigences UX:
 - Une hiérarchie claire entre action globale, action pièce et action équipement.
 
 Exigences d’explicabilité:
-- Chaque décision de publication/exclusion/ambiguïté/non-support doit afficher une raison.
-- Les causes techniques doivent être traduites en langage produit compréhensible.
+- Chaque équipement in-scope en écart doit afficher une cause métier lisible.
+- Les causes techniques doivent être traduites en langage produit compréhensible via le contrat UI (`cause_label`).
 - Les limites dues à Home Assistant doivent être signalées explicitement comme limites externes.
+- La confiance (Sûr / Probable / Ambigu) n’est visible qu’en diagnostic technique, pas en console principale.
 
 Exigences de sécurité d’usage:
 - Confirmation obligatoire des actions à impact fort côté HA.
@@ -246,7 +264,7 @@ La V1.1 doit rendre visibles, sans outil externe:
 - État du broker MQTT.
 - Dernière synchronisation terminée (timestamp).
 - Résultat de la dernière opération de maintenance (succès/partiel/échec).
-- Statut et raison au niveau équipement.
+- Modèle Périmètre / Statut / Écart / Cause au niveau équipement.
 
 Actions opérationnelles minimales:
 - Republier la configuration: global, pièce, équipement.
@@ -261,7 +279,7 @@ Dépendances et limites à expliciter:
 ## 14. KPIs / success metrics de la phase
 
 KPIs de pilotage V1.1:
-- Équipements avec statut et raison lisibles: **> 95%**.
+- Équipements avec statut et cause métier lisibles: **> 95%**.
 - Temps médian pour comprendre un “non publié”: **< 3 minutes**.
 - Taux de réussite des opérations de maintenance (global/pièce/équipement): **>= 95%**.
 - Réduction des tickets “incompréhension de publication”: **-20% par trimestre**.
@@ -295,11 +313,12 @@ Arbitrages décidés:
 Ce PRD est conçu pour un découpage epic-first sans produire de stories à ce stade.
 
 Axes de découpage recommandés pour la planification:
-- **Axe 1:** Console de pilotage par pièce + exceptions équipement.
+- **Axe 1:** Console de pilotage par pièce + décisions d’inclusion/exclusion par équipement.
 - **Axe 2:** Opérations discovery explicites (`Republier` vs `Supprimer/Recréer`) et sécurité d’usage.
-- **Axe 3:** Moteur de statuts/raisons lisibles et cohérence explicative.
-- **Axe 4:** Santé minimale du pont et retour opérationnel visible.
-- **Axe 5:** Extension fonctionnelle ordonnée (button → number → select → climate minimal/strict).
+- **Axe 3:** Modèle Périmètre / Statut / Écart / Cause et cohérence explicative.
+- **Axe 4:** Recadrage UX — alignement de la console et du diagnostic sur le modèle mental utilisateur.
+- **Axe 5:** Santé minimale du pont et retour opérationnel visible.
+- **Axe 6:** Extension fonctionnelle ordonnée (button → number → select → climate minimal/strict).
 
 Règles de planification:
 - Les epics V1.1 ne doivent pas introduire d’extension massive de scope.
