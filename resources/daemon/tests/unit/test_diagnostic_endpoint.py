@@ -1249,3 +1249,181 @@ async def test_diagnostics_room_summary_partial_published(aiohttp_client):
     assert bureau["summary"]["primary_aggregated_status"] == "partially_published"
     assert bureau["summary"]["counts_by_status"]["published"] == 1
     assert bureau["summary"]["counts_by_status"]["excluded"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Story 4.1 — Contrat UI canonique 4D : perimetre / statut / ecart / cause
+# ---------------------------------------------------------------------------
+
+async def test_diagnostics_4d_fields_present_published(aiohttp_client):
+    """Task 6.1 — Champs UI canoniques présents pour un équipement publié."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=4100, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4100: JeedomEqLogic(id=4100, name="Lumiere Pub 4D", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=4100,
+        ha_unique_id="light_4100",
+        ha_name="Lumiere Pub 4D",
+        commands={"LIGHT_ON": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4100: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {4100: mapping_res}
+    app["publications"] = {
+        4100: PublicationDecision(
+            should_publish=True,
+            reason="sure",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4100)
+
+    # Task 6.1 — Champs UI canoniques présents
+    assert "perimetre" in eq
+    assert "statut" in eq
+    assert "ecart" in eq
+    assert "cause_code" in eq
+    assert "cause_label" in eq
+    assert "cause_action" in eq
+    assert "ha_type" in eq
+
+    # Cas 1 : inclus + publié + aligné
+    assert eq["perimetre"] == "inclus"
+    assert eq["statut"] == "publie"
+    assert eq["ecart"] is False
+    assert eq["cause_code"] is None
+    assert eq["cause_label"] is None
+    assert eq["cause_action"] is None
+    assert eq["ha_type"] == "light"
+
+
+async def test_diagnostics_4d_compteurs_in_summary_and_rooms(aiohttp_client):
+    """Task 6.2 — compteurs présents dans payload.summary et chaque entrée payload.rooms."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={
+            4200: JeedomEqLogic(id=4200, name="Eq Inclu", object_id=1, is_enable=True),
+            4201: JeedomEqLogic(id=4201, name="Eq Exclu", object_id=1, is_excluded=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {
+        4200: EligibilityResult(is_eligible=False, reason_code="no_commands"),
+        4201: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic"),
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    payload = data["payload"]
+
+    # summary global — compteurs présents
+    assert "compteurs" in payload["summary"]
+    cpt = payload["summary"]["compteurs"]
+    assert "total" in cpt
+    assert "inclus" in cpt
+    assert "exclus" in cpt
+    assert "ecarts" in cpt
+    assert cpt["total"] == 2
+    assert cpt["inclus"] + cpt["exclus"] == cpt["total"]  # invariant
+
+    # rooms — compteurs présents dans chaque entrée
+    assert len(payload["rooms"]) == 1
+    room = payload["rooms"][0]
+    assert "compteurs" in room
+    room_cpt = room["compteurs"]
+    assert "total" in room_cpt
+    assert "inclus" in room_cpt
+    assert "exclus" in room_cpt
+    assert "ecarts" in room_cpt
+    assert room_cpt["inclus"] + room_cpt["exclus"] == room_cpt["total"]
+
+
+async def test_diagnostics_4d_technical_fields_preserved(aiohttp_client):
+    """Task 6.3 — Non-régression : champs techniques conservés après ajout du contrat 4D."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4300: JeedomEqLogic(id=4300, name="Eq Exclu Tech", object_id=1, is_excluded=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4300: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4300)
+
+    # Couche technique intacte (backward compat)
+    assert "status_code" in eq
+    assert "reason_code" in eq
+    assert "detail" in eq
+    assert "remediation" in eq
+    assert "v1_limitation" in eq
+    assert "matched_commands" in eq
+    assert "unmatched_commands" in eq
+    assert eq["status_code"] == "excluded"
+    assert eq["reason_code"] == "excluded_eqlogic"
+
+
+async def test_diagnostics_4d_direction2_exclu_has_pending(aiohttp_client):
+    """Task 6.4 — Direction 2 : équipement exclu avec has_pending_home_assistant_changes=True.
+
+    Simule un équipement exclu encore présent dans HA via retained MQTT.
+    Attendu : statut='publie', ecart=True, cause_code='pending_unpublish'.
+    """
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Entrée")},
+        eq_logics={4400: JeedomEqLogic(id=4400, name="Lampe Entrée Exclue", object_id=1, is_excluded=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4400: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+
+    # Simuler published_scope avec has_pending_home_assistant_changes=True
+    app["published_scope"] = {
+        "equipements": [
+            {
+                "eq_id": 4400,
+                "has_pending_home_assistant_changes": True,
+            }
+        ]
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4400)
+
+    # Direction 2 : exclu mais encore présent dans HA
+    assert eq["perimetre"] == "exclu_sur_equipement"
+    assert eq["statut"] == "publie"
+    assert eq["ecart"] is True
+    assert eq["cause_code"] == "pending_unpublish"
+    assert eq["cause_label"] == "Changement en attente d'application"
+    assert eq["cause_action"] == "Republier pour appliquer le changement"
+
+    # Couche technique inchangée
+    assert eq["status_code"] == "excluded"
+    assert eq["reason_code"] == "excluded_eqlogic"

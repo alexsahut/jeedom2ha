@@ -29,6 +29,8 @@ from models.published_scope import resolve_published_scope
 from models.mapping import MappingResult, PublicationDecision
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
+from models.cause_mapping import reason_code_to_cause, build_cause_for_pending_unpublish
+from models.ui_contract_4d import reason_code_to_perimetre, compute_ecart, build_ui_counters
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
@@ -1481,6 +1483,13 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     mappings = request.app.get("mappings", {})
     publications = request.app.get("publications", {})
 
+    # Story 4.1 — Lookup eq_id → has_pending_home_assistant_changes (soft-fail)
+    published_scope = request.app.get("published_scope") or {}
+    _pending_by_eq_id: dict[int, bool] = {
+        int(entry.get("eq_id", 0)): bool(entry.get("has_pending_home_assistant_changes", False))
+        for entry in published_scope.get("equipements", [])
+    }
+
     equipments = []
     rooms_equips: dict = {}  # (object_id, object_name) -> list[dict]
 
@@ -1584,11 +1593,33 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # Story 4.4 — code machine stable pour l'export de diagnostic
         status_code = _STATUS_CODE_MAP.get(status, "not_published")
 
+        # Story 4.1 — Contrat UI canonique 4D (additif — couche technique preservée ci-dessous)
+        has_pending = _pending_by_eq_id.get(eq_id, False)
+        perimetre = reason_code_to_perimetre(reason_code)
+        statut = "publie" if (status_code == "published" or has_pending) else "non_publie"
+        ecart = compute_ecart(perimetre, statut, has_pending)
+        if ecart and perimetre == "inclus":
+            cause_code, cause_label, cause_action = reason_code_to_cause(reason_code)
+        elif ecart and perimetre.startswith("exclu_"):
+            cause_code, cause_label, cause_action = build_cause_for_pending_unpublish()
+        else:
+            cause_code, cause_label, cause_action = None, None, None
+        ha_type = map_result.ha_entity_type if map_result else None
+
         eq_dict = {
             "eq_id": eq_id,
             "object_name": object_name,
             "name": eq.name,
             "eq_type_name": eq.eq_type_name,
+            # Contrat UI canonique 4D (Story 4.1)
+            "perimetre": perimetre,
+            "statut": statut,
+            "ecart": ecart,
+            "cause_code": cause_code,
+            "cause_label": cause_label,
+            "cause_action": cause_action,
+            "ha_type": ha_type,
+            # Couche technique / support (backward compat — ne jamais supprimer)
             "status": status,
             "status_code": status_code,
             "confidence": confidence,
@@ -1607,11 +1638,13 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         rooms_equips.setdefault(room_key, []).append(eq_dict)
 
     summary = build_summary(equipments)
+    summary["compteurs"] = build_ui_counters(equipments)
     rooms = [
         {
             "object_id": object_id,
             "object_name": object_name_val,
             "summary": build_summary(room_eqs),
+            "compteurs": build_ui_counters(room_eqs),
         }
         for (object_id, object_name_val), room_eqs in rooms_equips.items()
     ]

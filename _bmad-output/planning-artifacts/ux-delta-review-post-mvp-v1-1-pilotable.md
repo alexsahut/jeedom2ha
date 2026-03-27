@@ -9,9 +9,9 @@ La décision UX centrale est la suivante:
 - **Non, elle ne doit pas devenir l'unique modèle de lecture**, sinon l'utilisateur perd la vision globale, mélange les statuts et ne comprend plus les impacts HA.
 
 La console V1.1 doit donc être structurée en **trois niveaux explicites**:
-1. **Global**: santé minimale du pont, compteurs, actions globales.
-2. **Pièce**: inclusion/exclusion, synthèse des statuts, actions de maintenance de portée pièce.
-3. **Équipement**: exception locale, raison principale, action recommandée, actions de maintenance fines.
+1. **Global**: santé minimale du pont, compteurs (Total, Inclus, Exclus, Écarts), actions globales.
+2. **Pièce**: inclusion/exclusion, compteurs, actions de maintenance de portée pièce.
+3. **Équipement**: périmètre par source d'exclusion, statut binaire (Publié / Non publié), écart, cause métier, action recommandée.
 
 Le principal risque UX de V1.1 n'est pas le manque de fonctionnalités. C'est la **confusion**:
 - confusion entre état du bridge et état de configuration,
@@ -20,10 +20,14 @@ Le principal risque UX de V1.1 n'est pas le manque de fonctionnalités. C'est la
 
 Conclusion de la revue: **l'UX est suffisamment cadrée pour lancer l'epic planning**, à condition de figer immédiatement:
 - la hiérarchie `global -> pièce -> équipement`,
-- le modèle de vocabulaire et de statuts,
+- le modèle utilisateur **Périmètre → Statut → Écart → Cause**,
+- les compteurs (Total, Inclus, Exclus, Écarts) comme lecture principale pièce/global,
+- la disparition du concept d'exception au profit d'exclusions par source,
+- le diagnostic utilisateur centré sur les équipements in-scope,
+- la confiance visible uniquement en diagnostic technique,
 - la gradation des confirmations,
 - le placement de la santé minimale du pont,
-- la distinction nette entre configuration locale et action appliquée à Home Assistant.
+- la distinction nette entre décision locale et application à Home Assistant.
 
 ## 2. Ce qui reste valide dans l'UX actuelle
 
@@ -102,7 +106,7 @@ Conséquence:
 - tickets de support évitables.
 
 Décision:
-- **séparer visuellement l'état, la cause et l'action possible**.
+- **séparer visuellement le périmètre, le statut, l'écart et la cause** (modèle à 4 dimensions validé en §6.1).
 
 ### 4.3 Le statut `Partiel` trop général
 
@@ -115,7 +119,7 @@ Conséquence:
 
 Décision:
 - **ne pas utiliser `Partiel` comme statut principal de lecture au niveau équipement**.
-- Le réserver à une synthèse agrégée pièce/global ou à un détail explicatif.
+- Le statut est strictement binaire: `Publié` / `Non publié`. Le détail vit dans la cause et le diagnostic.
 
 ### 4.4 `Republier` vs `Supprimer/Recréer` insuffisamment différenciés
 
@@ -152,8 +156,8 @@ Risque:
   - état bridge,
   - compteurs,
   - inclusion,
-  - exceptions,
-  - raisons,
+  - exclusions par source,
+  - causes,
   - actions.
 
 Conséquence:
@@ -175,7 +179,7 @@ Recommandation:
 Pourquoi:
 - cohérent avec `jeeObject -> eqLogic -> cmd`,
 - cohérent avec le besoin utilisateur "je veux une maison HA propre par zones",
-- cohérent avec l'épique attendu "pilotage par pièce + exceptions équipement".
+- cohérent avec l'épique attendu "pilotage par pièce + exclusions par source au niveau équipement".
 
 ### 5.2 Adopter une console en trois couches
 
@@ -184,27 +188,31 @@ Structure recommandée:
 | Couche | Rôle UX | Contenu visible par défaut |
 |---|---|---|
 | Global | Comprendre l'état global et lancer les actions globales | santé du pont, compteurs, filtres globaux, actions globales |
-| Pièce | Piloter le périmètre à la bonne granularité | nom pièce, inclusion/exclusion, compteurs par statut, exceptions, actions pièce |
-| Équipement | Expliquer et corriger | exception locale, état, raison principale, action recommandée, actions équipement |
+| Pièce | Piloter le périmètre à la bonne granularité | nom pièce, inclusion/exclusion, compteurs (Total/Inclus/Exclus/Écarts), actions pièce |
+| Équipement | Expliquer et corriger | périmètre par source, statut binaire, écart, cause métier, action recommandée, actions équipement |
 
 Décision:
 - **pas d'écran flat "100 équipements + 12 actions" comme vue primaire**.
 - **pas de navigation séparée par onglets globaux/pièces/équipements** qui casserait la relation d'héritage.
 
-### 5.3 Rendre visible l'héritage de décision
+### 5.3 Exprimer les exclusions par leur source
 
 Recommandation:
-- Chaque équipement doit indiquer clairement s'il:
-  - **hérite de la règle de la pièce**,
-  - ou fait l'objet d'une **exception locale**.
+- Le concept d'**exception** disparaît de l'interface utilisateur.
+- Chaque exclusion est exprimée par sa **source**, dans un vocabulaire métier immédiatement compréhensible:
+  - `Exclu par la pièce`
+  - `Exclu par le plugin`
+  - `Exclu sur cet équipement`
+- Un équipement inclus est simplement `Inclus` — sans mention d'héritage.
 
 Pourquoi:
-- sinon l'utilisateur ne comprend pas pourquoi un équipement reste publié dans une pièce exclue, ou inversement.
+- Le vocabulaire `Hérite de la pièce` / `Exception locale` reflète le modèle d'implémentation, pas le modèle mental utilisateur.
+- L'utilisateur ne raisonne pas en termes d'héritage ni de déviation par rapport à une règle parent.
+- Il raisonne en termes de **source de la décision** : "Qui a exclu cet équipement ?"
 
 Décision:
-- Introduire un indicateur simple de source de décision:
-  - `Hérite de la pièce`
-  - `Exception locale`
+- Supprimer les termes `Hérite de la pièce`, `Exception locale`, le compteur `Exceptions`.
+- Le détail par source d'exclusion est accessible en niveau secondaire (synthèse de périmètre).
 
 ### 5.4 Séparer configuration locale et application à HA
 
@@ -213,88 +221,152 @@ Recommandation:
 - Leur effet sur Home Assistant doit être **annoncé explicitement**, pas exécuté de manière ambiguë.
 
 Décision:
-- Après modification locale, afficher un état du type:
-  - `Changements à appliquer à Home Assistant`
+- Après modification locale, signaler l'écart créé via le modèle standard:
+  - Écart = Oui, Cause = `Changement en attente d'application à Home Assistant`
+- Le signal est porté par le modèle existant (dimension Écart + Cause), pas par un badge générique additionnel.
 - Éviter qu'un simple toggle donne l'impression d'une suppression immédiate côté HA.
 
 ### 5.5 Limiter le nombre d'éléments visibles par niveau
 
 Règle de densité recommandée:
 - **Global**: 4 indicateurs santé compacts et obligatoires max + compteurs + 2 actions majeures visibles.
-- **Pièce**: nom, inclusion, 3-4 compteurs, 1 indicateur de mixité, 1-2 actions.
-- **Équipement**: état, raison principale, exception oui/non, action recommandée, 1 menu d'actions.
+- **Pièce**: nom, inclusion, 4 compteurs (Total/Inclus/Exclus/Écarts), 1-2 actions.
+- **Équipement**: périmètre par source, statut binaire, indicateur d'écart, cause (si écart), action recommandée, 1 menu d'actions.
 
 Décision:
 - Tout le reste doit être au niveau détail, accordéon ou panneau secondaire.
 
+### 5.6 Distinguer le rôle de la console et du diagnostic
+
+Recommandation:
+- La **console** est la surface de pilotage lisible. Elle permet de comprendre le périmètre, d'identifier les écarts et d'agir.
+- Le **diagnostic** est la surface d'explicabilité détaillée. Il fournit les détails techniques pour comprendre *pourquoi* un écart existe.
+
+| Surface | Rôle | Population | Contenu principal |
+|---|---|---|---|
+| **Console principale** | Pilotage et action | Tous les équipements (in-scope + exclus via synthèse de périmètre) | Compteurs, périmètre par source, statut, écart, cause métier, actions |
+| **Diagnostic utilisateur** | Explicabilité in-scope | Équipements in-scope uniquement (`périmètre = Inclus`) | Statut, écart, cause, détails commandes/typage, confiance |
+| **Export support complet** | Support technique | Tous les équipements | Vue technique exhaustive (confiance, commandes, typage, reason_code) |
+
+Décision:
+- La console et le diagnostic partagent la même taxonomie de base (Périmètre/Statut/Écart/Cause).
+- Le diagnostic ajoute un niveau de détail supplémentaire (confiance, commandes observées, typage Jeedom).
+- La **confiance** (`Sûr` / `Probable` / `Ambigu`) n'est jamais visible en console. Elle est réservée au diagnostic technique.
+- Les équipements **exclus** restent visibles dans la synthèse de périmètre (console) avec leur source d'exclusion, mais ne produisent pas d'entrée diagnostic détaillée.
+
 ## 6. Recommandations de vocabulaire / statuts / messages
 
-### 6.1 Ne pas faire porter tout le sens par un seul badge
+### 6.1 Modèle utilisateur à 4 dimensions : Périmètre → Statut → Écart → Cause
 
-Le modèle recommandé distingue **quatre dimensions**:
+Le modèle utilisateur de la console V1.1 repose sur **quatre dimensions**, lues dans cet ordre:
 
-| Dimension | Question utilisateur | Recommandation |
-|---|---|---|
-| Périmètre | "Cet élément est-il inclus dans mon scope ?" | `Incluse`, `Exclue`, `Exception locale`, `Hérite de la pièce` |
-| État de projection | "Est-il présent ou non dans HA ?" | `Publié`, `Non publié`, `Mise à jour en cours`, `Échec bridge` |
-| Raison principale | "Pourquoi ?" | `Exclusion volontaire`, `Couverture limitée`, `Mapping ambigu`, `Configuration incomplète`, `Incident bridge` |
-| Impact en attente | "Y a-t-il un changement non appliqué ?" | `Changements à appliquer` |
+| Dimension | Question utilisateur | Valeurs / Libellés | Niveau de lecture |
+|---|---|---|---|
+| **Périmètre** | "Cet équipement fait-il partie de mon scope ?" | `Inclus` · `Exclu par la pièce` · `Exclu par le plugin` · `Exclu sur cet équipement` | Équipement, pièce (compteurs), global (compteurs) |
+| **Statut** | "Est-il projeté dans Home Assistant ?" | `Publié` · `Non publié` | Équipement uniquement (binaire) |
+| **Écart** | "Y a-t-il un désalignement ?" | Oui / Non (bidirectionnel) | Équipement, pièce (compteur), global (compteur) |
+| **Cause** | "Pourquoi ce statut ou cet écart ?" | Libellés métier explicites (`cause_label`) | Équipement uniquement (si écart = Oui) |
 
-Ce découpage est plus clair qu'un unique catalogue de statuts hétérogènes.
+Ce modèle remplace le découpage précédent (Périmètre / État de projection / Raison principale / Impact en attente) et unifie la lecture console et diagnostic.
+
+Changements clés par rapport à la version précédente:
+- `État de projection` → `Statut` : strictement binaire (`Publié` / `Non publié`), n'existe qu'au niveau équipement.
+- `Raison principale` → `Cause` : libellé métier explicite, dérivé du `reason_code` backend via le contrat `cause_code`/`cause_label`.
+- `Impact en attente` → absorbé par `Écart` : un exclu encore publié est un écart avec cause "Changement en attente d'application".
+- `Exception locale` / `Hérite de la pièce` → supprimés : remplacés par l'expression du périmètre par source.
+
+L'écart est **bidirectionnel**:
+
+| Décision locale | État projeté | Écart | Cause type |
+|---|---|---|---|
+| Inclus | Publié | Non | — |
+| Inclus | Non publié | **Oui** | Mapping ambigu, Type non supporté, Bridge indisponible… |
+| Exclu | Non publié | Non | — |
+| Exclu | Publié | **Oui** | Changement en attente d'application |
 
 ### 6.2 Vocabulaire recommandé
 
-Libellés à privilégier:
-- **Action**:
-  - `Republier dans Home Assistant`
-  - `Supprimer puis recréer dans Home Assistant`
-- **Portée**:
-  - `Global`
-  - `Pièce`
-  - `Équipement`
-- **Santé**:
-  - `Bridge`
-  - `MQTT`
-  - `Dernière synchro`
+#### Libellés du modèle utilisateur
 
-Libellés à éviter en premier niveau:
-- `Discovery`
-- `Rescan` comme libellé principal utilisateur
-- `Partiel` sans explication
-- `Erreur` si la situation est en réalité une action de configuration requise
+**Périmètre:**
+- `Inclus`
+- `Exclu par la pièce`
+- `Exclu par le plugin`
+- `Exclu sur cet équipement`
+
+**Statut (niveau équipement uniquement):**
+- `Publié`
+- `Non publié`
+
+**Compteurs (niveaux pièce et global):**
+- `Total`
+- `Inclus`
+- `Exclus`
+- `Écarts`
+
+**Actions:**
+- `Republier dans Home Assistant`
+- `Supprimer puis recréer dans Home Assistant`
+
+**Portée:**
+- `Global`
+- `Pièce`
+- `Équipement`
+
+**Santé:**
+- `Bridge`
+- `MQTT`
+- `Dernière synchro`
+
+#### Termes interdits en interface utilisateur
+
+Les termes suivants ne doivent jamais apparaître dans la console ni dans le diagnostic utilisateur:
+
+| Terme interdit | Remplacement | Raison |
+|---|---|---|
+| `Hérite de la pièce` | `Inclus` ou `Exclu par la pièce` | Concept d'implémentation, pas modèle utilisateur |
+| `Exception locale` | `Exclu sur cet équipement` | Même raison |
+| `is_exception` | *(supprimé)* | Concept interne |
+| `decision_source` | *(supprimé)* | Concept interne |
+| `inherit` | *(supprimé)* | Concept interne |
+| `include` / `exclude` (anglais) | `Inclus` / `Exclu par [source]` | Langue et abstraction techniques |
+| `Partiellement publié` | `Publié` + diagnostic détaillé | Statut fourre-tout anxiogène |
+| `Ambigu` (comme statut) | `Non publié`, Cause = `Mapping ambigu` | Mélange état et cause |
+| `Non supporté` (comme statut) | `Non publié`, Cause = `Type non supporté en V1` | Mélange état et cause |
+| `Exceptions` (compteur) | `Exclus` + détail par source en secondaire | Le terme ne correspond pas au vécu utilisateur |
 
 Le mot `discovery` peut rester présent dans un niveau expert ou support, mais **pas comme libellé d'action primaire**.
 
 ### 6.3 Structure standard de message par équipement
 
-Structure recommandée:
-1. **État court**
-2. **Raison principale**
-3. **Action recommandée**
-4. **Impact HA** si pertinent
+Structure recommandée pour chaque équipement in-scope en écart:
+1. **Statut** (binaire)
+2. **Cause** (libellé métier)
+3. **Action recommandée** (si remédiation simple)
+4. **Impact HA** (si pertinent)
 
-Exemples:
+Exemples alignés sur le modèle Périmètre/Statut/Écart/Cause:
 
-**Exclusion volontaire**
-- État: `Non publié`
-- Raison principale: `Équipement exclu par votre configuration.`
-- Action recommandée: `Réinclure cet équipement si vous voulez le republier.`
-- Impact HA: `Le retrait effectif dépendra de la prochaine application des changements.`
-
-**Couverture limitée**
-- État: `Non publié`
-- Raison principale: `Ce type d'équipement n'est pas couvert en V1.1.`
-- Action recommandée: `Aucune action immédiate. Cette limite relève du périmètre produit.`
-
-**Mapping ambigu**
-- État: `Non publié`
-- Raison principale: `Le mapping est ambigu et la publication est bloquée par sécurité.`
+**Inclus, Non publié — Mapping ambigu**
+- Statut: `Non publié`
+- Cause: `Mapping ambigu — plusieurs types possibles`
 - Action recommandée: `Vérifier le type générique ou la structure des commandes dans Jeedom.`
 
-**Incident bridge**
-- État: `Échec bridge`
-- Raison principale: `Le bridge ne peut pas publier car la connexion MQTT est indisponible.`
+**Inclus, Non publié — Type non supporté**
+- Statut: `Non publié`
+- Cause: `Type non supporté en V1`
+- Action recommandée: `Aucune action immédiate. Cette limite relève du périmètre produit.`
+
+**Inclus, Non publié — Bridge indisponible**
+- Statut: `Non publié`
+- Cause: `Bridge indisponible`
 - Action recommandée: `Vérifier MQTT puis relancer l'opération.`
+
+**Exclu mais encore publié — Changement en attente**
+- Statut: `Publié` *(écart)*
+- Cause: `Changement en attente d'application`
+- Action recommandée: `Republier pour appliquer le changement.`
+- Impact HA: `Le retrait effectif dépendra de la prochaine application des changements.`
 
 ### 6.4 Règle de formulation critique
 
@@ -305,6 +377,27 @@ Formulation recommandée:
 Exemples:
 - `Limitation Home Assistant: la suppression/recréation peut casser l'historique des entités.`
 - `Limitation Home Assistant: l'entity_id final peut évoluer selon les règles de déduplication de HA.`
+
+### 6.5 Table de mapping ancien → nouveau modèle
+
+Cette table formalise la correspondance entre l'ancien modèle de statuts (Epic 3) et le nouveau modèle à 4 dimensions:
+
+| Ancien statut (Epic 3) | Périmètre | Statut | Écart | Cause |
+|---|---|---|---|---|
+| `Publié` | Inclus | Publié | Non | — |
+| `Partiellement publié` | Inclus | Publié | Non | *(détail en diagnostic)* |
+| `Exclu` | Exclu par [source] | Non publié | Non | — |
+| `Ambigu` | Inclus | Non publié | **Oui** | Mapping ambigu |
+| `Non supporté` | Inclus | Non publié | **Oui** | Type non supporté en V1 |
+| `Incident infrastructure` | *(inchangé)* | Non publié | **Oui** | Bridge indisponible |
+
+Cas d'écart bidirectionnel ajouté:
+
+| Situation | Périmètre | Statut | Écart | Cause |
+|---|---|---|---|---|
+| Exclu mais encore publié | Exclu par [source] | Publié | **Oui** | Changement en attente d'application |
+
+Règle: le frontend ne fait aucun mapping. Le backend fournit les 4 dimensions déjà résolues.
 
 ## 7. Recommandations sur confirmations et sécurité d'usage
 
@@ -358,7 +451,7 @@ Cela évite de faire croire à l'utilisateur qu'une action sera appliquée alors
 
 Doit répondre à:
 - `Le bridge fonctionne-t-il ?`
-- `Combien d'éléments sont publiés, non publiés, à revoir ?`
+- `Combien d'équipements sont inclus, exclus, en écart ?`
 - `Quelle action globale puis-je lancer ?`
 
 Contenu recommandé:
@@ -371,34 +464,40 @@ Contenu recommandé:
 
 Doit répondre à:
 - `Cette pièce est-elle incluse dans le périmètre ?`
-- `Quel est son état global ?`
-- `Y a-t-il des exceptions ou des problèmes ?`
+- `Combien d'équipements sont inclus, exclus, en écart ?`
+- `Quelle action de portée pièce puis-je lancer ?`
 
 Contenu recommandé:
 - nom pièce,
 - état d'inclusion,
-- compteurs:
-  - publiés,
-  - non publiés,
-  - exceptions,
-  - problèmes à revoir,
+- **compteurs** (lecture principale à ce niveau):
+  - Total,
+  - Inclus,
+  - Exclus,
+  - Écarts,
 - action `Republier la pièce`,
 - accès aux détails équipements.
+
+Il n'y a **pas de statut agrégé** pièce réutilisant le champ `Publié`/`Non publié` du niveau équipement. Si un indicateur visuel synthétique est conservé (badge d'alerte quand `Écarts > 0`), il doit être défini comme dérivé des compteurs et nommé différemment.
 
 ### 8.3 Niveau équipement
 
 Doit répondre à:
-- `Cet équipement est-il publié ?`
-- `Pourquoi ?`
-- `Est-ce un cas hérité ou une exception ?`
+- `Cet équipement fait-il partie de mon scope ?` → **Périmètre**
+- `Est-il projeté dans HA ?` → **Statut** (Publié / Non publié)
+- `Y a-t-il un désalignement ?` → **Écart**
+- `Pourquoi ?` → **Cause** (si écart)
 - `Quelle action simple est pertinente ?`
 
 Contenu recommandé:
-- état de projection,
-- raison principale,
-- source de décision (`hérite` / `exception locale`),
+- périmètre par source (`Inclus` / `Exclu par [source]`),
+- statut binaire (`Publié` / `Non publié`) — seul niveau où ce statut existe,
+- indicateur d'écart,
+- cause métier lisible (si écart = Oui),
 - action recommandée,
 - menu d'actions.
+
+La confiance (`Sûr` / `Probable` / `Ambigu`) n'apparaît pas à ce niveau. Elle est accessible uniquement dans le diagnostic technique détaillé.
 
 ### 8.4 Règle structurante
 
@@ -457,27 +556,42 @@ Les décisions suivantes doivent être figées maintenant:
 1. **Architecture d'information**
    - console en trois niveaux `global -> pièce -> équipement`
 
-2. **Modèle d'héritage**
-   - un équipement hérite de la pièce ou passe en exception locale
+2. **Modèle utilisateur à 4 dimensions**
+   - Périmètre → Statut → Écart → Cause
+   - Le statut binaire `Publié`/`Non publié` n'existe qu'au niveau équipement
+   - Les niveaux pièce/global sont lus par compteurs (Total, Inclus, Exclus, Écarts)
 
-3. **Séparation des dimensions**
-   - périmètre
-   - état de projection
-   - raison principale
-   - santé du bridge
+3. **Disparition du concept d'exception**
+   - Toute exclusion est exprimée par sa source (pièce, plugin, équipement)
+   - Le compteur `Exceptions` est remplacé par `Exclus`
 
-4. **Vocabulaire des actions**
+4. **Diagnostic centré in-scope**
+   - Le diagnostic utilisateur ne porte que sur les équipements inclus
+   - Les exclus restent visibles en synthèse de périmètre
+
+5. **Placement de la confiance**
+   - `Sûr` / `Probable` / `Ambigu` visible uniquement en diagnostic technique, jamais en console
+
+6. **Vocabulaire des actions**
    - `Republier dans Home Assistant`
    - `Supprimer puis recréer dans Home Assistant`
 
-5. **Matrice de sécurité**
+7. **Matrice de sécurité**
    - quel niveau de confirmation selon action et portée
 
-6. **Placement de la santé minimale**
+8. **Placement de la santé minimale**
    - bandeau global distinct, toujours visible
 
-7. **Traitement des changements de périmètre**
+9. **Traitement des changements de périmètre**
    - distinguer clairement la décision locale et son application à HA
+
+10. **Rôle console vs diagnostic**
+    - console = pilotage lisible, diagnostic = explicabilité détaillée
+    - même taxonomie de base, le diagnostic ajoute la confiance et les détails techniques
+
+11. **Contrat backend → UI**
+    - le frontend ne fait aucune interprétation, le backend fournit les 4 dimensions résolues
+    - distinction `reason_code` (backend stable) / `cause_code`+`cause_label` (contrat UI)
 
 Sans ces points, les epics risquent de mélanger architecture UX, wording, sécurité d'usage et logique d'exploitation.
 
@@ -531,11 +645,15 @@ Non empiétement:
 
 **Verdict: UX suffisamment cadrée pour lancer l'epic planning, sous réserve de figer les décisions structurantes listées en section 10.**
 
-La V1.1 Pilotable n'a pas besoin d'une refonte complète de l'UX spec. Elle a besoin d'un **addendum de clarification opérationnelle**. Le cœur de ce cadrage tient en une idée simple: **ne pas demander à un seul écran, à un seul badge ou à un seul bouton d'expliquer à la fois le périmètre, l'état réel, la cause, l'impact et la maintenance**.
+La V1.1 Pilotable n'a pas besoin d'une refonte complète de l'UX spec. Elle a besoin d'un **addendum de clarification opérationnelle**, centré sur le modèle utilisateur **Périmètre → Statut → Écart → Cause**. Le cœur de ce cadrage tient en une idée simple: **ne pas demander à un seul écran, à un seul badge ou à un seul bouton d'expliquer à la fois le périmètre, l'état réel, la cause, l'impact et la maintenance**.
 
 Si la planification des epics respecte:
 - la hiérarchie `global -> pièce -> équipement`,
-- la séparation entre état, cause et santé du bridge,
+- le modèle à 4 dimensions Périmètre/Statut/Écart/Cause,
+- les compteurs (Total, Inclus, Exclus, Écarts) comme lecture principale pièce/global,
+- la disparition du concept d'exception au profit d'exclusions par source,
+- le diagnostic centré in-scope avec confiance en diagnostic technique uniquement,
+- la distinction entre `reason_code` (backend) et `cause_code`/`cause_label` (contrat UI),
 - la différenciation forte `Republier` vs `Supprimer/Recréer`,
 - et la visibilité explicite des impacts Home Assistant,
 
