@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-26 CET'  # Story 3.4 done
+last_updated: '2026-03-27 CET'  # Story 4.1 → done (PR #52 merged)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -71,9 +71,16 @@ development_status:
   3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: done  # code review PASS, terrain PASS + micro-fix object_id:null, 73/73 JS 128/128 pytest
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-facade-backend-unique-des-operations-v1-1: backlog
-  4-2-flux-republier-non-destructif-multi-portee: backlog
-  4-3-flux-supprimer-puis-recreer-avec-confirmations-fortes: backlog
-  4-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: backlog
+  epic-4: in-progress  # Recadrage UX — modèle Périmètre / Statut / Écart / Cause
+  4-1-contrat-backend-du-modele-perimetre-statut-ecart-cause: done  # code review PASS, PR #52 merged 2026-03-27
+  4-2-vocabulaire-d-exclusion-par-source-disparition-du-concept-exception: backlog
+  4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: backlog
+  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: backlog
   epic-4-retrospective: optional
+
+  epic-5: backlog  # Opérations HA explicites, graduées et sûres (ex-Epic 4, renuméroté 2026-03-26)
+  5-1-facade-backend-unique-des-operations-v1-1: backlog
+  5-2-flux-republier-non-destructif-multi-portee: backlog
+  5-3-flux-supprimer-puis-recreer-avec-confirmations-fortes: backlog
+  5-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: backlog
+  epic-5-retrospective: optional
