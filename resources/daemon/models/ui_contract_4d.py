@@ -1,10 +1,15 @@
-# ARTEFACT FIGÉ — Story 4.1. Ne pas modifier sans story dédiée.
+# ARTEFACT — Story 4.1 (corrigé 4.1-fix terrain 2026-03-27).
 from __future__ import annotations
 
 """Fonctions de calcul du contrat UI canonique 4D.
 
 Périmètre / Statut / Écart / Cause — couche de sérialisation API uniquement.
 Aucune dépendance sur http_server, aggregation, taxonomy.
+
+NOTE TERRAIN 2026-03-27 : has_pending_home_assistant_changes N'EST PAS un
+indicateur de présence HA réelle. C'est un XOR (desired != actual) qui vaut
+True aussi bien pour un inclus-non-publié que pour un exclu-encore-publié.
+Le vrai signal est publications[eq_id].active_or_alive || pending_discovery_unpublish.
 """
 
 _EXCLUSION_REASON_TO_PERIMETRE: dict[str, str] = {
@@ -24,16 +29,18 @@ def reason_code_to_perimetre(reason_code: str) -> str:
     return _EXCLUSION_REASON_TO_PERIMETRE.get(reason_code, "inclus")
 
 
-def compute_ecart(perimetre: str, statut: str, has_pending: bool) -> bool:
+def compute_ecart(perimetre: str, statut: str) -> bool:
     """Calcule l'écart bidirectionnel entre périmètre et état HA réel.
 
     Direction 1 : inclus dans le périmètre mais non publié dans HA.
     Direction 2 : exclu du périmètre mais encore physiquement présent dans HA.
 
-    Formule canonique unique — source de vérité exclusive pour le calcul d'écart.
+    Fonction pure de (perimetre, statut) uniquement — pas de has_pending.
+    Le champ statut doit refléter l'état HA réel (via publications/pending_discovery_unpublish),
+    pas le flag has_pending_home_assistant_changes qui est un XOR ambigü.
     """
     direction_1 = (perimetre == "inclus") and (statut == "non_publie")
-    direction_2 = perimetre.startswith("exclu_") and has_pending
+    direction_2 = perimetre.startswith("exclu_") and (statut == "publie")
     return direction_1 or direction_2
 
 

@@ -2,6 +2,10 @@
 
 Couvre : reason_code_to_perimetre, compute_ecart, build_ui_counters.
 Isolation totale — aucune dépendance sur http_server, aggregation, taxonomy.
+
+Fix terrain 2026-03-27 : compute_ecart est fonction pure de (perimetre, statut).
+has_pending_home_assistant_changes n'est plus un paramètre — c'est un XOR ambigü
+qui ne peut pas servir de proxy de présence HA réelle.
 """
 
 import pytest
@@ -50,38 +54,56 @@ def test_perimetre_never_inherit():
 
 # ---------------------------------------------------------------------------
 # Task 5.2 — compute_ecart : matrice des 4 cas obligatoires
+# Fix terrain 2026-03-27 : compute_ecart(perimetre, statut) sans has_pending
 # ---------------------------------------------------------------------------
 
 def test_ecart_aligne_inclus_publie():
     """Cas aligné : inclus + publié → ecart = false."""
-    assert compute_ecart("inclus", "publie", False) is False
+    assert compute_ecart("inclus", "publie") is False
 
 
 def test_ecart_direction_1_inclus_non_publie():
     """Direction 1 : inclus + non_publie → ecart = true."""
-    assert compute_ecart("inclus", "non_publie", False) is True
+    assert compute_ecart("inclus", "non_publie") is True
 
 
 def test_ecart_aligne_exclu_non_publie():
     """Cas aligné : exclu + non_publie → ecart = false."""
-    assert compute_ecart("exclu_sur_equipement", "non_publie", False) is False
+    assert compute_ecart("exclu_sur_equipement", "non_publie") is False
 
 
-def test_ecart_direction_2_exclu_has_pending():
-    """Direction 2 : exclu + has_pending = True → ecart = true.
-    statut = 'publie' découle de has_pending via la formule canonique.
-    """
-    assert compute_ecart("exclu_sur_equipement", "publie", True) is True
+def test_ecart_direction_2_exclu_publie():
+    """Direction 2 : exclu + statut=publie (présence HA réelle) → ecart = true."""
+    assert compute_ecart("exclu_sur_equipement", "publie") is True
 
 
 def test_ecart_direction_2_exclu_par_plugin():
     """Direction 2 fonctionne aussi pour exclu_par_plugin."""
-    assert compute_ecart("exclu_par_plugin", "publie", True) is True
+    assert compute_ecart("exclu_par_plugin", "publie") is True
 
 
 def test_ecart_direction_2_exclu_par_piece():
     """Direction 2 fonctionne aussi pour exclu_par_piece."""
-    assert compute_ecart("exclu_par_piece", "publie", True) is True
+    assert compute_ecart("exclu_par_piece", "publie") is True
+
+
+# ---------------------------------------------------------------------------
+# Garde-fou sémantique : has_pending != présence HA réelle
+# ---------------------------------------------------------------------------
+
+def test_ecart_signature_rejects_has_pending_parameter():
+    """compute_ecart n'accepte que (perimetre, statut) — pas de has_pending.
+
+    Garde-fou : empêche de re-canoniser has_pending comme proxy de présence HA.
+    Le terrain 2026-03-27 a prouvé que has_pending est un XOR ambigü.
+    """
+    import inspect
+    sig = inspect.signature(compute_ecart)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["perimetre", "statut"], (
+        f"compute_ecart ne doit accepter que (perimetre, statut), pas {param_names}. "
+        "has_pending_home_assistant_changes n'est PAS un indicateur de présence HA."
+    )
 
 
 # ---------------------------------------------------------------------------
