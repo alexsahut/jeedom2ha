@@ -21,18 +21,18 @@ function makeResponse(overrides) {
   const base = {
     status: "ok",
     published_scope: {
-      global: { counts: { total: 3, include: 1, exclude: 1, exceptions: 1 } },
+      global: { counts: { total: 3, include: 1, exclude: 1 } },
       pieces: [
         {
           object_id: 5,
           object_name: "Salon",
-          counts: { total: 3, include: 1, exclude: 1, exceptions: 1 },
+          counts: { total: 3, include: 1, exclude: 1 },
         },
       ],
       equipements: [
-        { eq_id: 42, object_id: 5, name: "Lampe Salon", effective_state: "include", decision_source: "piece", is_exception: false },
-        { eq_id: 43, object_id: 5, name: "Volet Salon", effective_state: "exclude", decision_source: "piece", is_exception: false },
-        { eq_id: 44, object_id: 5, name: "Thermostat Salon", effective_state: "include", decision_source: "exception_equipement", is_exception: true },
+        { eq_id: 42, object_id: 5, name: "Lampe Salon", effective_state: "include" },
+        { eq_id: 43, object_id: 5, name: "Volet Salon", effective_state: "exclude" },
+        { eq_id: 44, object_id: 5, name: "Thermostat Salon", effective_state: "include" },
       ],
     },
     diagnostic_summary: {
@@ -201,10 +201,10 @@ test("AI-5.10: sans données diagnostic, la vue scope-only s'affiche normalement
   const response = {
     status: "ok",
     published_scope: {
-      global: { counts: { total: 2, include: 2, exclude: 0, exceptions: 0 } },
-      pieces: [{ object_id: 1, object_name: "Cuisine", counts: { total: 2, include: 2, exclude: 0, exceptions: 0 } }],
+      global: { counts: { total: 2, include: 2, exclude: 0 } },
+      pieces: [{ object_id: 1, object_name: "Cuisine", counts: { total: 2, include: 2, exclude: 0 } }],
       equipements: [
-        { eq_id: 10, object_id: 1, effective_state: "include", decision_source: "piece", is_exception: false },
+        { eq_id: 10, object_id: 1, effective_state: "include" },
       ],
     },
     // Pas de diagnostic_summary / diagnostic_rooms / diagnostic_equipments
@@ -265,14 +265,14 @@ test("AI-5.12: pièce 'Aucun' (scope object_id:0, diag object_id:null) reçoit s
   const response = {
     status: "ok",
     published_scope: {
-      global: { counts: { total: 5, include: 2, exclude: 3, exceptions: 0 } },
+      global: { counts: { total: 5, include: 2, exclude: 3 } },
       pieces: [
-        { object_id: 0, object_name: "Aucun", counts: { total: 3, include: 1, exclude: 2, exceptions: 0 } },
-        { object_id: 10, object_name: "Salon", counts: { total: 2, include: 1, exclude: 1, exceptions: 0 } },
+        { object_id: 0, object_name: "Aucun", counts: { total: 3, include: 1, exclude: 2 } },
+        { object_id: 10, object_name: "Salon", counts: { total: 2, include: 1, exclude: 1 } },
       ],
       equipements: [
-        { eq_id: 1, object_id: 0, effective_state: "exclude", decision_source: "piece", is_exception: false },
-        { eq_id: 2, object_id: 10, effective_state: "include", decision_source: "piece", is_exception: false },
+        { eq_id: 1, object_id: 0, effective_state: "exclude" },
+        { eq_id: 2, object_id: 10, effective_state: "include" },
       ],
     },
     diagnostic_summary: {

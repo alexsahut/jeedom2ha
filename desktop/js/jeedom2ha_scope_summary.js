@@ -75,36 +75,43 @@
     return parts.join('');
   }
 
-  function buildCounts(rawCounts) {
-    return {
-      total: readCount(rawCounts, 'total'),
-      include: readCount(rawCounts, 'include'),
-      exclude: readCount(rawCounts, 'exclude'),
-      exceptions: readCount(rawCounts, 'exceptions'),
-    };
-  }
-
-  function buildDecisionSourceLabel(decisionSource, isException) {
-    if (decisionSource === 'piece') {
-      return 'Hérite de la pièce';
-    }
-    if (decisionSource === 'exception_equipement' && isException === true) {
-      return 'Exception locale';
-    }
+  // Story 4.2 — table de correspondance perimetre backend → libellé UI (source de vérité unique)
+  function buildPerimetreLabel(perimetre) {
+    if (perimetre === 'exclu_par_piece')      return 'Exclu par la pièce';
+    if (perimetre === 'exclu_par_plugin')     return 'Exclu par le plugin';
+    if (perimetre === 'exclu_sur_equipement') return 'Exclu sur cet équipement';
     return '';
   }
 
+  // Story 4.2 — lit les compteurs depuis le contrat diagnostics 4.1 (inclus/exclus/ecarts)
+  function buildCompteurs(rawCompteurs) {
+    return {
+      total:  readCount(rawCompteurs, 'total'),
+      inclus: readCount(rawCompteurs, 'inclus'),
+      exclus: readCount(rawCompteurs, 'exclus'),
+      ecarts: readCount(rawCompteurs, 'ecarts'),
+    };
+  }
+
+  // Story 4.2 — fallback daemon-down : traduit les clés scope (include/exclude) vers le nouveau modèle
+  function buildCompteursFallback(rawScopeCounts) {
+    return {
+      total:  readCount(rawScopeCounts, 'total'),
+      inclus: readCount(rawScopeCounts, 'include'),
+      exclus: readCount(rawScopeCounts, 'exclude'),
+      ecarts: null,
+    };
+  }
+
   // Story 3.4 — equipDiag : données diagnostic backend pour cet équipement (null si absent)
+  // Story 4.2 — perimetre_label depuis contrat diagnostics 4.1 (lecture seule)
   function buildEquipmentModel(entry, equipDiag) {
     var diag = (equipDiag && typeof equipDiag === 'object') ? equipDiag : {};
     return {
       eq_id: entry.eq_id,
       name: readString(entry.name, ''),
       effective_state: readString(entry.effective_state, ''),
-      decision_source_label: buildDecisionSourceLabel(
-        readString(entry.decision_source, ''),
-        readBoolean(entry.is_exception, false)
-      ),
+      perimetre_label: buildPerimetreLabel(readString(diag.perimetre, '')),
       has_pending_home_assistant_changes: readBoolean(entry.has_pending_home_assistant_changes, false),
       // Story 3.4 — contrat métier backend (lecture seule — source : taxonomy.py + _DIAGNOSTIC_MESSAGES)
       status_code:   readString(diag.status_code, ''),
@@ -147,12 +154,15 @@
 
     // Index rooms diagnostic par object_id pour lookup O(1)
     var diagRoomByObjectId = {};
+    var diagRoomCompteursByObjectId = {};
     for (var r = 0; r < diagRooms.length; r++) {
       var dr = diagRooms[r];
       if (dr && typeof dr === 'object') {
         // Normalise object_id : le scope utilise 0 pour "Aucun", le diagnostic utilise null
         var roomObjId = (dr.object_id != null) ? dr.object_id : 0;
         diagRoomByObjectId[String(roomObjId)] = (dr.summary && typeof dr.summary === 'object') ? dr.summary : null;
+        // Story 4.2 — compteurs par pièce depuis contrat diagnostics 4.1
+        diagRoomCompteursByObjectId[String(roomObjId)] = (dr.compteurs && typeof dr.compteurs === 'object') ? dr.compteurs : null;
       }
     }
 
@@ -164,10 +174,12 @@
       if (!piece || typeof piece !== 'object') {
         continue;
       }
+      // Story 4.2 — compteurs depuis diagnostics si disponibles, sinon fallback scope
+      var diagCompteurs = diagRoomCompteursByObjectId[String(piece.object_id)] || null;
       var normalizedPiece = {
         object_id: piece.object_id,
         object_name: readString(piece.object_name, 'Aucune pièce'),
-        counts: buildCounts(piece.counts),
+        counts: diagCompteurs ? buildCompteurs(diagCompteurs) : buildCompteursFallback(piece.counts),
         has_pending_home_assistant_changes: readBoolean(piece.has_pending_home_assistant_changes, false),
         equipements: [],
         // Story 3.4 — agrégation backend par pièce (null si daemon absent)
@@ -193,9 +205,11 @@
       pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag));
     }
 
+    // Story 4.2 — compteurs globaux depuis diagnostics si disponibles, sinon fallback scope
+    var globalCompteurs = (diagSummary && diagSummary.compteurs && typeof diagSummary.compteurs === 'object') ? diagSummary.compteurs : null;
     return {
       has_contract: true,
-      global_counts: buildCounts(globalSection.counts),
+      global_counts: globalCompteurs ? buildCompteurs(globalCompteurs) : buildCompteursFallback(globalSection.counts),
       global_pending: readBoolean(globalSection.has_pending_home_assistant_changes, false),
       pieces: normalizedPieces,
       // Story 3.4 — agrégation backend globale (null si daemon absent)
@@ -243,11 +257,9 @@
         html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
       }
       html += '<span style="margin-left:8px;">' + renderEquipmentState(equipement.effective_state) + '</span>';
-      if (equipement.decision_source_label !== '') {
-        var isException = equipement.decision_source_label === 'Exception locale';
-        var decisionLabelClass = isException ? 'label label-info' : 'label';
-        var decisionLabelStyle = isException ? 'margin-left:8px;' : 'margin-left:8px;background-color:#777;color:#fff;';
-        html += '<span class="' + decisionLabelClass + '" style="' + decisionLabelStyle + '">' + escapeHtml(equipement.decision_source_label) + '</span>';
+      // Story 4.2 — badge source d'exclusion uniforme (gris neutre, pas de label-info conditionnel)
+      if (equipement.perimetre_label !== '') {
+        html += '<span class="label" style="margin-left:8px;background-color:#777;color:#fff;">' + escapeHtml(equipement.perimetre_label) + '</span>';
       }
       if (equipement.has_pending_home_assistant_changes === true) {
         html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
@@ -284,9 +296,9 @@
     var html = '';
     html += '<div class="row">';
     html += renderStat('Total', model.global_counts.total);
-    html += renderStat('Inclus', model.global_counts.include);
-    html += renderStat('Exclus', model.global_counts.exclude);
-    html += renderStat('Exceptions', model.global_counts.exceptions);
+    html += renderStat('Inclus', model.global_counts.inclus);
+    html += renderStat('Exclus', model.global_counts.exclus);
+    html += renderStat('Écarts', model.global_counts.ecarts);
     html += '</div>';
     if (model.global_pending === true) {
       html += '<div style="margin-bottom:8px;"><span class="label label-warning">Changements à appliquer</span></div>';
@@ -308,7 +320,7 @@
     html += '<th style="width:90px;">{{Total}}</th>';
     html += '<th style="width:90px;">{{Inclus}}</th>';
     html += '<th style="width:90px;">{{Exclus}}</th>';
-    html += '<th style="width:110px;">{{Exceptions}}</th>';
+    html += '<th style="width:110px;">{{Écarts}}</th>';
     html += '</tr></thead><tbody>';
 
     if (model.pieces.length === 0) {
@@ -328,15 +340,15 @@
         if (piece.diagnostic_summary && piece.diagnostic_summary.primary_aggregated_status) {
           html += ' ' + getAggregatedStatusLabel(piece.diagnostic_summary.primary_aggregated_status);
           html += renderCountsByStatus(piece.diagnostic_summary.counts_by_status);
-        } else if (piece.counts.total > 0 && piece.counts.exclude === piece.counts.total) {
+        } else if (piece.counts.total > 0 && piece.counts.exclus === piece.counts.total) {
           // Fallback scope-only : badge local quand aucune donnée diagnostic disponible
           html += ' <span class="label" style="background-color:#999;color:#fff;">Exclue</span>';
         }
         html += '</td>';
         html += '<td>' + toDisplayCount(piece.counts.total) + '</td>';
-        html += '<td>' + toDisplayCount(piece.counts.include) + '</td>';
-        html += '<td>' + toDisplayCount(piece.counts.exclude) + '</td>';
-        html += '<td>' + toDisplayCount(piece.counts.exceptions) + '</td>';
+        html += '<td>' + toDisplayCount(piece.counts.inclus) + '</td>';
+        html += '<td>' + toDisplayCount(piece.counts.exclus) + '</td>';
+        html += '<td>' + toDisplayCount(piece.counts.ecarts) + '</td>';
         html += '</tr>';
         html += '<tr class="j2ha-piece-detail" data-piece-id="' + pieceIdAttr + '" style="display:none;">';
         html += '<td colspan="5">' + renderPieceEquipements(piece) + '</td>';
@@ -352,5 +364,6 @@
     createModel: createModel,
     render: render,
     getAggregatedStatusLabel: getAggregatedStatusLabel,
+    buildPerimetreLabel: buildPerimetreLabel,
   };
 }));
