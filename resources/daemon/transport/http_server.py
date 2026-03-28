@@ -1483,12 +1483,11 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     mappings = request.app.get("mappings", {})
     publications = request.app.get("publications", {})
 
-    # Story 4.1 — Lookup eq_id → has_pending_home_assistant_changes (soft-fail)
-    published_scope = request.app.get("published_scope") or {}
-    _pending_by_eq_id: dict[int, bool] = {
-        int(entry.get("eq_id", 0)): bool(entry.get("has_pending_home_assistant_changes", False))
-        for entry in published_scope.get("equipements", [])
-    }
+    # Story 4.1-fix — Lookup pour déterminer la présence HA réelle.
+    # has_pending_home_assistant_changes est un XOR (desired != actual) : il ne
+    # peut PAS servir de proxy de présence HA (terrain 2026-03-27 : 69 faux positifs).
+    # Les vrais signaux sont publications[eq_id].active_or_alive et pending_discovery_unpublish.
+    pending_discovery_unpublish = request.app.get("pending_discovery_unpublish") or {}
 
     equipments = []
     rooms_equips: dict = {}  # (object_id, object_name) -> list[dict]
@@ -1593,11 +1592,14 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # Story 4.4 — code machine stable pour l'export de diagnostic
         status_code = _STATUS_CODE_MAP.get(status, "not_published")
 
-        # Story 4.1 — Contrat UI canonique 4D (additif — couche technique preservée ci-dessous)
-        has_pending = _pending_by_eq_id.get(eq_id, False)
+        # Story 4.1-fix — Contrat UI canonique 4D (additif — couche technique preservée ci-dessous)
+        # statut reflète la présence HA réelle via publications + pending_discovery_unpublish,
+        # PAS via has_pending_home_assistant_changes (XOR ambigü — voir diagnostic terrain).
+        _pub = publications.get(eq_id)
+        is_published_in_ha = bool(_pub and _pub.active_or_alive) or eq_id in pending_discovery_unpublish
         perimetre = reason_code_to_perimetre(reason_code)
-        statut = "publie" if (status_code == "published" or has_pending) else "non_publie"
-        ecart = compute_ecart(perimetre, statut, has_pending)
+        statut = "publie" if is_published_in_ha else "non_publie"
+        ecart = compute_ecart(perimetre, statut)
         if ecart and perimetre == "inclus":
             cause_code, cause_label, cause_action = reason_code_to_cause(reason_code)
         elif ecart and perimetre.startswith("exclu_"):

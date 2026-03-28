@@ -1,6 +1,6 @@
 # Story 4.1 : Contrat backend du modèle Périmètre / Statut / Écart / Cause
 
-Status: review
+Status: done
 
 ## Story
 
@@ -37,11 +37,13 @@ Aucune dépendance en avant.
 
 ### AC 3 — Direction 2 : exclu mais encore publié dans HA
 
-**Given** un équipement dont `perimetre` commence par `exclu_` ET dont `has_pending_home_assistant_changes = True` dans le `published_scope` (l'équipement est encore physiquement présent dans HA via retained MQTT)
+**Given** un équipement dont `perimetre` commence par `exclu_` ET dont la présence HA réelle est confirmée par `publications[eq_id].active_or_alive == True` OU `eq_id in pending_discovery_unpublish` (l'équipement est encore physiquement présent dans HA)
 **When** le contrat API est construit
 **Then** `statut` = `publie`, `ecart` = `true`
 **And** `cause_code` = `pending_unpublish`, `cause_label` = `Changement en attente d'application`
 **And** `cause_action` = `Republier pour appliquer le changement`
+
+> **NOTE TERRAIN 2026-03-27** : `has_pending_home_assistant_changes` ne peut PAS servir de signal direction 2. C'est un XOR (`desired != actual`) qui est aussi `True` pour les inclus-non-publiés (direction 1). Le terrain a montré 69 faux positifs causés par cette confusion.
 
 ### AC 4 — Couche de traduction reason_code → cause_code (fonction pure)
 
@@ -74,7 +76,7 @@ Aucune dépendance en avant.
 **When** le contrat API est construit
 **Then** `ecart` = `false`, `cause_code` = `null`, `cause_label` = `null`, `cause_action` = `null`
 
-**Given** un équipement exclu ET non présent dans HA (`has_pending_home_assistant_changes = False`)
+**Given** un équipement exclu ET non présent dans HA (`publications[eq_id]` absent ou `active_or_alive == False`, et `eq_id` absent de `pending_discovery_unpublish`)
 **When** le contrat API est construit
 **Then** `ecart` = `false`, `cause_code` = `null`, `cause_label` = `null`, `cause_action` = `null`
 
@@ -96,17 +98,17 @@ Aucune dépendance en avant.
 
 - [x] Task 2 — Créer `resources/daemon/models/ui_contract_4d.py` (AC 1, AC 2, AC 3, AC 5, AC 6, AC 7)
   - [x] 2.1 Implémenter `reason_code_to_perimetre(reason_code: str) -> str` — mapping deterministe (voir table dans Dev Notes)
-  - [x] 2.2 Implémenter `compute_ecart(perimetre: str, statut: str, has_pending: bool) -> bool` — formule exacte : `(perimetre == "inclus" AND statut == "non_publie") OR (perimetre.startswith("exclu_") AND has_pending)`
+  - [x] 2.2 Implémenter `compute_ecart(perimetre: str, statut: str) -> bool` — formule exacte : `(perimetre == "inclus" AND statut == "non_publie") OR (perimetre.startswith("exclu_") AND statut == "publie")` — `has_pending` supprimé (XOR ambigü, invalidé terrain 2026-03-27)
   - [x] 2.3 Implémenter `build_ui_counters(equipments_4d: list[dict]) -> dict` — calcule `total`, `inclus`, `exclus`, `ecarts` par agrégation des champs `perimetre` et `ecart` déjà résolus dans la liste passée en paramètre
   - [x] 2.4 S'assurer que `build_ui_counters` respecte l'invariant `total = inclus + exclus` (assertion ou retour cohérent documenté)
 
 - [x] Task 3 — Modifier `resources/daemon/transport/http_server.py` (AC 1–7)
-  - [x] 3.1 Dans `_handle_system_diagnostics`, construire un lookup dict `eq_id → has_pending_home_assistant_changes` depuis `request.app.get("published_scope") or {}` → clé `"equipements"` (soft-fail : si `published_scope` est `None`, dict vide, tous `has_pending` valent `False`)
+  - [x] 3.1 Dans `_handle_system_diagnostics`, récupérer `pending_discovery_unpublish` depuis `request.app` (soft-fail : si absent, dict vide). `publications` est déjà accessible via `request.app.get("publications", {})`
   - [x] 3.2 Pour chaque `eq_dict` construit dans la boucle équipement, calculer et ajouter les champs dans cet ordre :
-    - `has_pending` : lookup dans le dict construit en 3.1 par `eq_id` (défaut `False`)
+    - `is_published_in_ha` : `bool(publications.get(eq_id) and pub.active_or_alive) or eq_id in pending_discovery_unpublish` — reflète la présence HA réelle
     - `perimetre` : via `reason_code_to_perimetre(reason_code)`
-    - `statut` : `"publie"` si `status_code == "published"` OU si `has_pending == True`, sinon `"non_publie"` — reflète l'état HA réel (voir Dev Notes)
-    - `ecart` : via `compute_ecart(perimetre, statut, has_pending)`
+    - `statut` : `"publie"` si `is_published_in_ha`, sinon `"non_publie"` (FIX terrain 2026-03-27 — l'ancienne formule avec `has_pending` était fausse)
+    - `ecart` : via `compute_ecart(perimetre, statut)` — fonction pure, sans `has_pending`
     - `cause_code, cause_label, cause_action` : si `ecart` ET direction 1 (`perimetre == "inclus"`) → `reason_code_to_cause(reason_code)` ; si `ecart` ET direction 2 (`perimetre.startswith("exclu_")`) → `build_cause_for_pending_unpublish()` ; sinon → `(None, None, None)`
     - `ha_type` : `map_result.ha_entity_type if map_result else None`
   - [x] 3.3 Ajouter `"compteurs": build_ui_counters(equipments)` dans `summary` global (après `summary = build_summary(equipments)` — additive, ne pas modifier `build_summary`)
@@ -131,7 +133,7 @@ Aucune dépendance en avant.
   - [x] 6.1 Vérifier la présence des champs UI canoniques dans la réponse d'un équipement publié : `perimetre`, `statut`, `ecart`, `cause_code`, `cause_label`, `cause_action`, `ha_type`
   - [x] 6.2 Vérifier la présence de `compteurs` dans `payload.summary` et dans chaque entrée `payload.rooms`
   - [x] 6.3 Vérifier que les champs techniques (`status_code`, `reason_code`, `detail`, etc.) restent présents (non-régression couche support)
-  - [x] 6.4 Tester le cas direction 2 : simuler un équipement exclu avec `has_pending_home_assistant_changes = True` dans le published_scope de `request.app` → vérifier `statut = "publie"`, `ecart = true`, `cause_code = "pending_unpublish"`
+  - [x] 6.4 Tester le cas direction 2 : simuler un équipement exclu encore présent dans HA via `publications[eq_id].active_or_alive = True` ou via `pending_discovery_unpublish` → vérifier `statut = "publie"`, `ecart = true`, `cause_code = "pending_unpublish"`
 
 - [x] Task 7 — Exécuter la suite de tests complète (AC 8)
   - [x] 7.1 `pytest resources/daemon/tests/` → 169/169 PASS (128 existants + 41 nouveaux)
@@ -312,7 +314,9 @@ Invariant obligatoire : `total = inclus + exclus`. Les `ecarts` couvrent les deu
 
 | Signal | cause_code | cause_label | cause_action |
 |---|---|---|---|
-| `has_pending_home_assistant_changes = True` sur équipement `perimetre = exclu_*` | `pending_unpublish` | `Changement en attente d'application` | `Republier pour appliquer le changement` |
+| `is_published_in_ha == True` sur équipement `perimetre = exclu_*` | `pending_unpublish` | `Changement en attente d'application` | `Republier pour appliquer le changement` |
+
+> `is_published_in_ha` = `publications[eq_id].active_or_alive` OR `eq_id in pending_discovery_unpublish`. Pas `has_pending`.
 
 ### Dérivation du champ `perimetre`
 
@@ -329,58 +333,61 @@ Rationale : l'exclusion d'un équipement passe toujours par l'un de ces 3 reason
 
 ### Dérivation canonique de `statut`
 
-`statut` reflète l'état HA réel (est-ce que l'équipement est physiquement présent dans HA via retained MQTT ?), pas uniquement la décision du pipeline.
+`statut` reflète l'état HA réel (est-ce que l'équipement est physiquement présent dans HA ?), pas la décision du pipeline ni le flag `has_pending`.
 
-**Formule unique — source de vérité exclusive :**
+**Formule unique — source de vérité exclusive (corrigée terrain 2026-03-27) :**
 
 ```python
-statut = "publie" if (status_code == "published" or has_pending) else "non_publie"
+_pub = publications.get(eq_id)
+is_published_in_ha = bool(_pub and _pub.active_or_alive) or eq_id in pending_discovery_unpublish
+statut = "publie" if is_published_in_ha else "non_publie"
 ```
 
-- `status_code == "published"` : le pipeline a confirmé la publication (direction normale).
-- `has_pending == True` : l'équipement est encore physiquement dans HA malgré une décision d'exclusion locale. C'est le signal `has_pending_home_assistant_changes` issu de `_apply_pending_scope_flags` (http_server.py:146). C'est le cas direction 2.
+- `_pub.active_or_alive == True` : le daemon a une publication active et vivante pour cet équipement dans HA.
+- `eq_id in pending_discovery_unpublish` : un unpublish a été reporté (deferred) → l'équipement est encore retained dans le broker MQTT.
 
-`has_pending` est lu depuis le dict construit en Task 3.1. `status_code` est déjà calculé dans la boucle via `_STATUS_CODE_MAP`. Cette formule est la seule règle de calcul de `statut` — elle s'applique à tous les équipements sans exception.
+**HYPOTHÈSE INVALIDÉE (terrain 2026-03-27)** : L'ancienne formule `statut = "publie" if (status_code == "published" or has_pending) else "non_publie"` était fausse. `has_pending_home_assistant_changes` est un XOR (`desired_state != actual_state`) qui vaut `True` aussi bien pour un inclus-non-publié que pour un exclu-encore-publié. Sur 69 équipements inclus non publiés, `has_pending=True` provoquait `statut="publie"` — un faux positif massif.
 
-### Formule exacte de l'écart
+### Formule exacte de l'écart (corrigée terrain 2026-03-27)
 
 ```python
-def compute_ecart(perimetre: str, statut: str, has_pending: bool) -> bool:
+def compute_ecart(perimetre: str, statut: str) -> bool:
     direction_1 = (perimetre == "inclus") and (statut == "non_publie")
-    direction_2 = perimetre.startswith("exclu_") and has_pending
+    direction_2 = perimetre.startswith("exclu_") and (statut == "publie")
     return direction_1 or direction_2
 ```
 
+`compute_ecart` est une fonction pure de `(perimetre, statut)` uniquement. Le paramètre `has_pending` a été supprimé — c'est un XOR ambigü qui ne peut pas discriminer les directions.
+
 **Matrice des 4 cas (tous testés obligatoirement) :**
 
-| perimetre | statut (calculé via formule canonique) | has_pending | ecart | direction |
+| perimetre | is_published_in_ha | statut | ecart | direction |
 |---|---|---|---|---|
-| `inclus` | `publie` | False | `false` | aligné |
-| `inclus` | `non_publie` | False | `true` | direction 1 |
-| `exclu_*` | `non_publie` | False | `false` | aligné |
-| `exclu_*` | `publie` | True | `true` | direction 2 |
+| `inclus` | True | `publie` | `false` | aligné |
+| `inclus` | False | `non_publie` | `true` | direction 1 |
+| `exclu_*` | False | `non_publie` | `false` | aligné |
+| `exclu_*` | True | `publie` | `true` | direction 2 |
 
-Note : dans la ligne direction 2, `statut = "publie"` découle de `has_pending = True` via la formule canonique ci-dessus.
+### Comment déterminer la présence HA réelle dans le diagnostics handler
 
-### Comment accéder à `has_pending_home_assistant_changes` dans le diagnostics handler
+**FIX terrain 2026-03-27** : l'ancienne section utilisait `has_pending_home_assistant_changes` via `published_scope`. Ce signal est un XOR (`desired != actual`) et ne peut PAS servir de proxy de présence HA.
 
-Dans `_handle_system_diagnostics`, ajouter AVANT la boucle équipement :
+Dans `_handle_system_diagnostics`, AVANT la boucle équipement :
 
 ```python
-# Build lookup: eq_id → has_pending_home_assistant_changes
-published_scope = request.app.get("published_scope") or {}
-_pending_by_eq_id: dict[int, bool] = {
-    int(entry.get("eq_id", 0)): bool(entry.get("has_pending_home_assistant_changes", False))
-    for entry in published_scope.get("equipements", [])
-}
+# Vrais signaux de présence HA réelle (pas has_pending — XOR ambigü)
+pending_discovery_unpublish = request.app.get("pending_discovery_unpublish") or {}
+# publications est déjà accessible : publications = request.app.get("publications", {})
 ```
 
 Puis dans la boucle, pour chaque `eq` :
 ```python
-has_pending = _pending_by_eq_id.get(eq_id, False)
+_pub = publications.get(eq_id)
+is_published_in_ha = bool(_pub and _pub.active_or_alive) or eq_id in pending_discovery_unpublish
+statut = "publie" if is_published_in_ha else "non_publie"
 ```
 
-Soft-fail : si `published_scope` est `None` (pas encore de sync), le dict est vide, tous les `has_pending` valent `False`. Aucune exception. L'écart direction 2 sera simplement absent du résultat jusqu'au premier sync.
+Soft-fail : si `publications` est vide (pas encore de sync), aucun équipement n'est marqué publié. Si `pending_discovery_unpublish` est vide, aucun deferred unpublish. Aucune exception.
 
 ### Fichiers à créer / modifier
 
@@ -404,7 +411,7 @@ Soft-fail : si `published_scope` est `None` (pas encore de sync), le dict est vi
 1. **Ne jamais renommer les `reason_code`** — stables Epic 3, restent dans la couche technique de la réponse.
 2. **Ne jamais supprimer les champs techniques** (`status_code`, `reason_code`, `detail`, `remediation`, `v1_limitation`, etc.) — la réponse est strictement additive.
 3. **Ne jamais exposer `inherit`** dans `perimetre` — la valeur est toujours résolue avant sérialisation.
-4. **Une seule formule pour `statut`** : `"publie" if (status_code == "published" or has_pending) else "non_publie"`. Ne pas utiliser `status_code == "published"` seul.
+4. **Une seule formule pour `statut`** : `"publie" if is_published_in_ha else "non_publie"` où `is_published_in_ha = bool(pub and pub.active_or_alive) or eq_id in pending_discovery_unpublish`. NE JAMAIS utiliser `has_pending_home_assistant_changes` comme proxy de présence HA (XOR ambigü — invalidé terrain 2026-03-27).
 5. **Ne jamais calculer `ecart` côté UI** (JS ou PHP) — ce booléen est calculé uniquement en Python backend.
 6. **`cause_mapping.py` est une table statique** — pas de logique conditionnelle, pas d'appel externe, pas de dépendance sur d'autres modules.
 7. **`aggregation.py` est figé** — `build_summary` n'est pas modifié. `compteurs` est ajouté à côté du résultat de `build_summary`, jamais à l'intérieur.
@@ -459,20 +466,26 @@ Harness de test existant : `pytest resources/daemon/tests/` depuis la racine du 
 
 ### Agent Model Used
 
-claude-sonnet-4-6
+claude-sonnet-4-6 (implémentation initiale), claude-opus-4-6 (correction terrain 2026-03-27)
 
 ### Debug Log References
 
-Aucun blocage majeur. Un ajustement de syntaxe de type Python 3.9 (`str | None` → `from __future__ import annotations` + `Optional`) résolu immédiatement lors de la première exécution des tests.
+Implémentation initiale : ajustement syntaxe Python 3.9 résolu immédiatement.
+Correction terrain 2026-03-27 : `has_pending_home_assistant_changes` utilisé comme proxy de présence HA → 69 faux positifs sur terrain réel (inclus non publiés marqués `statut="publie"`). Cause racine : `has_pending` est un XOR (`desired != actual`), pas un indicateur de présence.
 
 ### Completion Notes List
 
-- `cause_mapping.py` créé : table figée 12 entrées actives + 3 published + 1 fallback + direction 2. Module pur, standalone, zéro dépendance externe.
-- `ui_contract_4d.py` créé : `reason_code_to_perimetre`, `compute_ecart` (formule bidirectionnelle canonique), `build_ui_counters` (invariant `total = inclus + exclus` garanti).
-- `http_server.py` modifié de façon strictement additive : lookup `_pending_by_eq_id` (soft-fail), champs 4D insérés dans chaque `eq_dict`, `compteurs` ajoutés dans `summary` et `rooms`. Aucun champ technique existant supprimé.
-- 41 nouveaux tests : 18 `test_cause_mapping.py` + 19 `test_ui_contract_4d.py` + 4 `test_diagnostic_endpoint.py`.
-- Suite complète : 169/169 pytest PASS, 73/73 JS PASS.
-- Tous les guardrails respectés : `taxonomy.py`, `aggregation.py`, `published_scope.py` non modifiés. Distinction `reason_code` / `cause_code` préservée. Frontend en lecture seule (aucun fichier JS/PHP modifié).
+- **Implémentation initiale** :
+  - `cause_mapping.py` créé : table figée 12 entrées actives + 3 published + 1 fallback + direction 2. Module pur, standalone.
+  - `ui_contract_4d.py` créé : `reason_code_to_perimetre`, `compute_ecart`, `build_ui_counters`.
+  - `http_server.py` modifié additivement : champs 4D insérés dans chaque `eq_dict`, `compteurs` ajoutés.
+- **Correction terrain 2026-03-27 (4.1-fix)** :
+  - `ui_contract_4d.py` corrigé : `compute_ecart(perimetre, statut)` — paramètre `has_pending` supprimé. Direction 2 utilise `statut == "publie"` au lieu de `has_pending`.
+  - `http_server.py` corrigé : formule `statut` remplacée par `is_published_in_ha` basé sur `publications[eq_id].active_or_alive` + `pending_discovery_unpublish`. Suppression du lookup `_pending_by_eq_id` (plus nécessaire).
+  - Guardrail levé : ancien guardrail 4 (formule `has_pending`) remplacé par la formule correcte.
+  - Guardrail ajouté : test de signature `compute_ecart` empêche la ré-introduction de `has_pending` comme paramètre.
+- Suite complète : 173/173 pytest PASS, 73/73 JS PASS.
+- Guardrails respectés : `taxonomy.py`, `aggregation.py`, `published_scope.py` non modifiés. `cause_mapping.py` non modifié. Séparation `reason_code` / `cause_code` préservée. Réponse additive. Compteurs intacts. Frontend non touché.
 
 ### File List
 
@@ -484,3 +497,8 @@ Aucun blocage majeur. Un ajustement de syntaxe de type Python 3.9 (`str | None` 
 - `resources/daemon/tests/unit/test_diagnostic_endpoint.py` — MODIFIÉ
 - `_bmad-output/implementation-artifacts/4-1-contrat-backend-du-modele-perimetre-statut-ecart-cause.md` — MODIFIÉ
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIÉ
+
+## Change Log
+
+- **2026-03-27 (implémentation initiale)** : Story 4.1 livrée — 7 tasks, 41 nouveaux tests, 169/169 pytest, 73/73 JS. Contrat 4D additif dans `_handle_system_diagnostics`.
+- **2026-03-27 (correction terrain 4.1-fix)** : Terrain FAIL — 69 inclus non publiés avaient `statut="publie"` à cause de `has_pending` (XOR ambigü). Correction : `statut` dérivé de `publications[eq_id].active_or_alive || pending_discovery_unpublish`, `compute_ecart` simplifié à `(perimetre, statut)`. 4 nouveaux tests garde-fou. 173/173 pytest, 73/73 JS.

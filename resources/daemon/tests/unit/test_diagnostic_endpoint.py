@@ -1385,11 +1385,11 @@ async def test_diagnostics_4d_technical_fields_preserved(aiohttp_client):
     assert eq["reason_code"] == "excluded_eqlogic"
 
 
-async def test_diagnostics_4d_direction2_exclu_has_pending(aiohttp_client):
-    """Task 6.4 — Direction 2 : équipement exclu avec has_pending_home_assistant_changes=True.
+async def test_diagnostics_4d_direction2_exclu_still_active(aiohttp_client):
+    """Task 6.4 — Direction 2 : équipement exclu encore présent dans HA (active_or_alive=True).
 
-    Simule un équipement exclu encore présent dans HA via retained MQTT.
-    Attendu : statut='publie', ecart=True, cause_code='pending_unpublish'.
+    Fix terrain 2026-03-27 : le vrai signal de présence HA est publications[eq_id].active_or_alive,
+    PAS has_pending_home_assistant_changes (XOR ambigü).
     """
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
@@ -1399,17 +1399,25 @@ async def test_diagnostics_4d_direction2_exclu_has_pending(aiohttp_client):
         objects={1: JeedomObject(id=1, name="Entrée")},
         eq_logics={4400: JeedomEqLogic(id=4400, name="Lampe Entrée Exclue", object_id=1, is_excluded=True)},
     )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_on_off",
+        jeedom_eq_id=4400,
+        ha_unique_id="light_4400",
+        ha_name="Lampe Entrée Exclue",
+        capabilities=LightCapabilities(has_on_off=True),
+    )
     app["topology"] = snapshot
     app["eligibility"] = {4400: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
-
-    # Simuler published_scope avec has_pending_home_assistant_changes=True
-    app["published_scope"] = {
-        "equipements": [
-            {
-                "eq_id": 4400,
-                "has_pending_home_assistant_changes": True,
-            }
-        ]
+    # L'équipement est exclu mais sa publication est encore active dans HA
+    app["publications"] = {
+        4400: PublicationDecision(
+            should_publish=False,
+            reason="excluded_eqlogic",
+            mapping_result=mapping_res,
+            active_or_alive=True,
+        )
     }
 
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
@@ -1427,3 +1435,111 @@ async def test_diagnostics_4d_direction2_exclu_has_pending(aiohttp_client):
     # Couche technique inchangée
     assert eq["status_code"] == "excluded"
     assert eq["reason_code"] == "excluded_eqlogic"
+
+
+async def test_diagnostics_4d_direction2_pending_unpublish(aiohttp_client):
+    """Direction 2 variante : équipement exclu avec deferred discovery unpublish.
+
+    Quand l'unpublish échoue et est reporté dans pending_discovery_unpublish,
+    l'équipement est encore retained dans HA → statut=publie, ecart=true.
+    """
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Entrée")},
+        eq_logics={4401: JeedomEqLogic(id=4401, name="Prise Exclue Deferred", object_id=1, is_excluded=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4401: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+    # Pas de publication active, mais un unpublish deferred → encore dans HA
+    app["pending_discovery_unpublish"] = {4401: "switch"}
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4401)
+
+    assert eq["perimetre"] == "exclu_sur_equipement"
+    assert eq["statut"] == "publie"
+    assert eq["ecart"] is True
+    assert eq["cause_code"] == "pending_unpublish"
+
+
+async def test_diagnostics_4d_inclus_non_publie_has_pending_not_publie(aiohttp_client):
+    """Garde-fou terrain : un équipement inclus non publié avec has_pending=True
+    doit avoir statut='non_publie', PAS 'publie'.
+
+    C'est exactement le bug terrain 2026-03-27 (69 faux positifs).
+    has_pending=True signifie 'desired!=actual', pas 'présent dans HA'.
+    """
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4500: JeedomEqLogic(id=4500, name="Capteur Ambigu", object_id=1, is_enable=True)},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="ambiguous",
+        reason_code="ambiguous",
+        jeedom_eq_id=4500,
+        ha_unique_id="light_4500",
+        ha_name="Capteur Ambigu",
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4500: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {4500: mapping_res}
+    # Publication non active (ambiguous → skipped)
+    app["publications"] = {
+        4500: PublicationDecision(
+            should_publish=False,
+            reason="ambiguous_skipped",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+    # Même si published_scope dit has_pending=True (le XOR), statut doit être non_publie
+    app["published_scope"] = {
+        "equipements": [{"eq_id": 4500, "has_pending_home_assistant_changes": True}]
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4500)
+
+    # GARDE-FOU : statut=non_publie malgré has_pending=True
+    assert eq["perimetre"] == "inclus"
+    assert eq["statut"] == "non_publie", (
+        "Bug terrain 2026-03-27 : un inclus non publié avec has_pending=True "
+        "ne doit PAS avoir statut='publie'. has_pending est un XOR, pas un indicateur de présence HA."
+    )
+    assert eq["ecart"] is True
+    assert eq["cause_code"] == "ambiguous_skipped"
+
+
+async def test_diagnostics_4d_exclu_aligne_not_in_ha(aiohttp_client):
+    """Cas 3 aligné : exclu + pas dans HA → statut=non_publie, ecart=false."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-27T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4600: JeedomEqLogic(id=4600, name="Thermostat Exclu", object_id=1, is_excluded=True)},
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4600: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic")}
+    # Pas de publication, pas de pending_discovery_unpublish
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4600)
+
+    assert eq["perimetre"] == "exclu_sur_equipement"
+    assert eq["statut"] == "non_publie"
+    assert eq["ecart"] is False
+    assert eq["cause_code"] is None
