@@ -227,10 +227,23 @@ try {
                 'detail'        => (string)($eq['detail'] ?? ''),
                 'remediation'   => (string)($eq['remediation'] ?? ''),
                 'v1_limitation' => (bool)($eq['v1_limitation'] ?? false),
+                // Story 4.3 — champs ajoutés pour badge source d'exclusion et diagnostic technique
+                'perimetre'     => (string)($eq['perimetre'] ?? ''),
+                'confidence'    => (string)($eq['confidence'] ?? ''),
               ];
             }
           }
           $result['diagnostic_equipments'] = $eqDiag;
+
+          // Story 4.3 — surface filtrée in-scope (perimetre=inclus uniquement) pour le frontend
+          $inScopeEquipments = [];
+          foreach ($dp['in_scope_equipments'] ?? [] as $eq) {
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId > 0) {
+              $inScopeEquipments[] = ['eq_id' => $eqId];
+            }
+          }
+          $result['in_scope_equipments'] = $inScopeEquipments;
         }
       }
       ajax::success($result);
@@ -271,6 +284,7 @@ try {
       ];
 
       // 4. Extraction par allowlist explicite — aucun passthrough brut
+      // Story 4.3 — ajout champs 4D : perimetre, statut, ecart, cause_code, cause_label, cause_action
       $equipments = [];
       foreach ($rawEquipments as $rawEq) {
         $equipments[] = [
@@ -278,6 +292,14 @@ try {
           'eq_type_name'           => (string)($rawEq['eq_type_name'] ?? ''),
           'name'                   => (string)($rawEq['name'] ?? ''),
           'object_name'            => (string)($rawEq['object_name'] ?? ''),
+          // Contrat 4D (Story 4.3)
+          'perimetre'              => (string)($rawEq['perimetre'] ?? ''),
+          'statut'                 => (string)($rawEq['statut'] ?? ''),
+          'ecart'                  => (bool)($rawEq['ecart'] ?? false),
+          'cause_code'             => isset($rawEq['cause_code']) ? (string)$rawEq['cause_code'] : null,
+          'cause_label'            => isset($rawEq['cause_label']) ? (string)$rawEq['cause_label'] : null,
+          'cause_action'           => isset($rawEq['cause_action']) ? (string)$rawEq['cause_action'] : null,
+          // Couche technique (backward compat — ne jamais supprimer)
           'status'                 => (string)($rawEq['status'] ?? ''),
           'status_code'            => (string)($rawEq['status_code'] ?? 'not_published'),
           'confidence'             => (string)($rawEq['confidence'] ?? ''),
@@ -293,13 +315,25 @@ try {
         ];
       }
 
-      // 5. Summary calculé depuis status_code machine (jamais depuis le libellé localisé status)
-      $summary    = ['total' => 0, 'published' => 0, 'partially_published' => 0, 'not_published' => 0, 'excluded' => 0];
-      $validCodes = ['published', 'partially_published', 'not_published', 'excluded'];
+      // 5. Story 4.3 — Résumé basé sur le modèle 4D (perimetre + statut)
+      // La catégorie partially_published disparaît — absorbée par statut=publie, ecart=false
+      $summary = ['total' => 0, 'inclus' => 0, 'exclus' => 0, 'ecarts' => 0, 'publies' => 0, 'non_publies' => 0];
       foreach ($equipments as $eq) {
         $summary['total']++;
-        $code = $eq['status_code'];
-        $summary[in_array($code, $validCodes, true) ? $code : 'not_published']++;
+        $p = $eq['perimetre'];
+        if ($p === 'inclus') {
+          $summary['inclus']++;
+        } elseif ($p !== '') {
+          $summary['exclus']++;
+        }
+        if ($eq['ecart'] === true) {
+          $summary['ecarts']++;
+        }
+        if ($eq['statut'] === 'publie') {
+          $summary['publies']++;
+        } elseif ($eq['statut'] === 'non_publie') {
+          $summary['non_publies']++;
+        }
       }
 
       // 6. Warning si aucun équipement en mémoire
@@ -317,7 +351,7 @@ try {
       }
 
       ajax::success([
-        'export_format_version' => '1.0',
+        'export_format_version' => '2.0',  // Story 4.3 : ajout champs 4D, résumé 4D (plus de partially_published)
         'generated_at'          => gmdate('Y-m-d\TH:i:s\Z'),
         'pseudonymized'         => $pseudonymize,
         'versions'              => $versions,

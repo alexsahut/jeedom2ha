@@ -1651,6 +1651,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         for (object_id, object_name_val), room_eqs in rooms_equips.items()
     ]
 
+    # Story 4.3 — Surface filtrée in-scope : équipements avec perimetre == "inclus" uniquement.
+    # Filtre de population en sortie — ne modifie pas le pipeline ni le resolver canonique.
+    in_scope_equipments = [eq for eq in equipments if eq.get("perimetre") == "inclus"]
+
     return web.json_response({
         "action": "system.diagnostics",
         "status": "ok",
@@ -1658,6 +1662,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "summary": summary,
             "rooms": rooms,
             "equipments": equipments,
+            "in_scope_equipments": in_scope_equipments,
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
