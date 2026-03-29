@@ -64,6 +64,65 @@ function _jeedom2ha_pseudonymize(array $equipments): array {
     return $equipments;
 }
 
+/**
+ * Helper — Normalise un équipement export via allowlist explicite.
+ * Story 4.4 — contrat export inchangé, cohérence 4D garantie.
+ */
+function _jeedom2ha_build_export_equipment(array $rawEq): array {
+    return [
+        'eq_id'                  => (int)($rawEq['eq_id'] ?? 0),
+        'eq_type_name'           => (string)($rawEq['eq_type_name'] ?? ''),
+        'name'                   => (string)($rawEq['name'] ?? ''),
+        'object_name'            => (string)($rawEq['object_name'] ?? ''),
+        // Contrat 4D (Story 4.3)
+        'perimetre'              => (string)($rawEq['perimetre'] ?? ''),
+        'statut'                 => (string)($rawEq['statut'] ?? ''),
+        'ecart'                  => (bool)($rawEq['ecart'] ?? false),
+        'cause_code'             => isset($rawEq['cause_code']) ? (string)$rawEq['cause_code'] : null,
+        'cause_label'            => isset($rawEq['cause_label']) ? (string)$rawEq['cause_label'] : null,
+        'cause_action'           => isset($rawEq['cause_action']) ? (string)$rawEq['cause_action'] : null,
+        // Couche technique (backward compat — ne jamais supprimer)
+        'status'                 => (string)($rawEq['status'] ?? ''),
+        'status_code'            => (string)($rawEq['status_code'] ?? 'not_published'),
+        'confidence'             => (string)($rawEq['confidence'] ?? ''),
+        'reason_code'            => (string)($rawEq['reason_code'] ?? ''),
+        'detail'                 => (string)($rawEq['detail'] ?? ''),
+        'remediation'            => (string)($rawEq['remediation'] ?? ''),
+        'v1_limitation'          => (bool)($rawEq['v1_limitation'] ?? false),
+        'v1_compatibility'       => (bool)($rawEq['v1_compatibility'] ?? false),
+        'detected_generic_types' => (array)($rawEq['detected_generic_types'] ?? []),
+        'traceability'           => $rawEq['traceability'] ?? null,
+        'matched_commands'       => _jeedom2ha_extract_commands($rawEq['matched_commands'] ?? []),
+        'unmatched_commands'     => _jeedom2ha_extract_commands($rawEq['unmatched_commands'] ?? []),
+    ];
+}
+
+/**
+ * Helper — Résumé export 4D (cohérence console/diagnostic/export).
+ */
+function _jeedom2ha_build_export_summary(array $equipments): array {
+    $summary = ['total' => 0, 'inclus' => 0, 'exclus' => 0, 'ecarts' => 0, 'publies' => 0, 'non_publies' => 0];
+    foreach ($equipments as $eq) {
+        $summary['total']++;
+        $p = $eq['perimetre'] ?? '';
+        if ($p === 'inclus') {
+            $summary['inclus']++;
+        } elseif ($p !== '') {
+            $summary['exclus']++;
+        }
+        if (($eq['ecart'] ?? false) === true) {
+            $summary['ecarts']++;
+        }
+        if (($eq['statut'] ?? '') === 'publie') {
+            $summary['publies']++;
+        } elseif (($eq['statut'] ?? '') === 'non_publie') {
+            $summary['non_publies']++;
+        }
+    }
+    return $summary;
+}
+
+if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
 try {
     require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
     include_file('core', 'authentification', 'php');
@@ -222,6 +281,12 @@ try {
             $eqId = (int)($eq['eq_id'] ?? 0);
             if ($eqId > 0) {
               $eqDiag[$eqId] = [
+                // Story 4.4 — contrat 4D frontend (lecture stricte backend)
+                'statut'       => (string)($eq['statut'] ?? ''),
+                'ecart'        => array_key_exists('ecart', $eq) ? (bool)$eq['ecart'] : null,
+                'cause_code'   => isset($eq['cause_code']) ? (string)$eq['cause_code'] : '',
+                'cause_label'  => isset($eq['cause_label']) ? (string)$eq['cause_label'] : '',
+                'cause_action' => isset($eq['cause_action']) ? (string)$eq['cause_action'] : '',
                 'status_code'   => (string)($eq['status_code'] ?? ''),
                 'reason_code'   => (string)($eq['reason_code'] ?? ''),
                 'detail'        => (string)($eq['detail'] ?? ''),
@@ -230,6 +295,9 @@ try {
                 // Story 4.3 — champs ajoutés pour badge source d'exclusion et diagnostic technique
                 'perimetre'     => (string)($eq['perimetre'] ?? ''),
                 'confidence'    => (string)($eq['confidence'] ?? ''),
+                // Story 4.4 / AC8 — détails techniques de couverture commandes (surface technique uniquement)
+                'matched_commands'   => _jeedom2ha_extract_commands($eq['matched_commands'] ?? []),
+                'unmatched_commands' => _jeedom2ha_extract_commands($eq['unmatched_commands'] ?? []),
               ];
             }
           }
@@ -284,57 +352,14 @@ try {
       ];
 
       // 4. Extraction par allowlist explicite — aucun passthrough brut
-      // Story 4.3 — ajout champs 4D : perimetre, statut, ecart, cause_code, cause_label, cause_action
       $equipments = [];
       foreach ($rawEquipments as $rawEq) {
-        $equipments[] = [
-          'eq_id'                  => (int)($rawEq['eq_id'] ?? 0),
-          'eq_type_name'           => (string)($rawEq['eq_type_name'] ?? ''),
-          'name'                   => (string)($rawEq['name'] ?? ''),
-          'object_name'            => (string)($rawEq['object_name'] ?? ''),
-          // Contrat 4D (Story 4.3)
-          'perimetre'              => (string)($rawEq['perimetre'] ?? ''),
-          'statut'                 => (string)($rawEq['statut'] ?? ''),
-          'ecart'                  => (bool)($rawEq['ecart'] ?? false),
-          'cause_code'             => isset($rawEq['cause_code']) ? (string)$rawEq['cause_code'] : null,
-          'cause_label'            => isset($rawEq['cause_label']) ? (string)$rawEq['cause_label'] : null,
-          'cause_action'           => isset($rawEq['cause_action']) ? (string)$rawEq['cause_action'] : null,
-          // Couche technique (backward compat — ne jamais supprimer)
-          'status'                 => (string)($rawEq['status'] ?? ''),
-          'status_code'            => (string)($rawEq['status_code'] ?? 'not_published'),
-          'confidence'             => (string)($rawEq['confidence'] ?? ''),
-          'reason_code'            => (string)($rawEq['reason_code'] ?? ''),
-          'detail'                 => (string)($rawEq['detail'] ?? ''),
-          'remediation'            => (string)($rawEq['remediation'] ?? ''),
-          'v1_limitation'          => (bool)($rawEq['v1_limitation'] ?? false),
-          'v1_compatibility'       => (bool)($rawEq['v1_compatibility'] ?? false),
-          'detected_generic_types' => (array)($rawEq['detected_generic_types'] ?? []),
-          'traceability'           => $rawEq['traceability'] ?? null,
-          'matched_commands'       => _jeedom2ha_extract_commands($rawEq['matched_commands'] ?? []),
-          'unmatched_commands'     => _jeedom2ha_extract_commands($rawEq['unmatched_commands'] ?? []),
-        ];
+        $equipments[] = _jeedom2ha_build_export_equipment($rawEq);
       }
 
       // 5. Story 4.3 — Résumé basé sur le modèle 4D (perimetre + statut)
       // La catégorie partially_published disparaît — absorbée par statut=publie, ecart=false
-      $summary = ['total' => 0, 'inclus' => 0, 'exclus' => 0, 'ecarts' => 0, 'publies' => 0, 'non_publies' => 0];
-      foreach ($equipments as $eq) {
-        $summary['total']++;
-        $p = $eq['perimetre'];
-        if ($p === 'inclus') {
-          $summary['inclus']++;
-        } elseif ($p !== '') {
-          $summary['exclus']++;
-        }
-        if ($eq['ecart'] === true) {
-          $summary['ecarts']++;
-        }
-        if ($eq['statut'] === 'publie') {
-          $summary['publies']++;
-        } elseif ($eq['statut'] === 'non_publie') {
-          $summary['non_publies']++;
-        }
-      }
+      $summary = _jeedom2ha_build_export_summary($equipments);
 
       // 6. Warning si aucun équipement en mémoire
       $warning = empty($equipments) ? 'Aucune donnée en mémoire : effectuez un scan d\'abord.' : null;
@@ -382,4 +407,5 @@ try {
 }
 catch (Exception $e) {
     ajax::error(displayException($e), $e->getCode());
+}
 }
