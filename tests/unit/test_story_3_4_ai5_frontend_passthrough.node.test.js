@@ -106,10 +106,10 @@ test("AI-5.2: counts_by_status globaux (published:1, ambiguous:1, excluded:1) ap
 // AI-5.3 — primary_aggregated_status par pièce vient du backend, pas d'un recalcul
 // ---------------------------------------------------------------------------
 
-test("AI-5.3: primary_aggregated_status de la pièce 'partially_published' (Partiellement publié) sans recalcul local", () => {
+test("AI-5.3: primary_aggregated_status de la pièce 'partially_published' (transformé en Publié) sans recalcul local", () => {
   const html = scopeSummary.render(scopeSummary.createModel(makeResponse()));
-  // Le badge pièce doit refléter exactly la valeur backend 'partially_published'
-  assert.match(html, /Partiellement publié/, "Badge partially_published de la pièce doit être présent");
+  // Le badge de la pièce est absorbé en Publié (Story 4.3)
+  assert.match(html, /Publié/, "Badge partially_published de la pièce doit être affiché comme Publié");
   // Et ne pas utiliser l'ancien badge local 'Exclue' (qui n'est plus pertinent ici)
   const summaryRowMatch = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/);
   assert.ok(summaryRowMatch, "Ligne synthèse pièce doit exister");
@@ -244,9 +244,9 @@ test("AI-5.11: getAggregatedStatusLabel — tous les codes canoniques mappent ve
   assert.match(fn("infra_incident"),      /label-danger/);
   assert.match(fn("infra_incident"),      /Incident infrastructure/);
 
-  assert.match(fn("partially_published"), /label-info/);
-  assert.match(fn("partially_published"), /Partiellement publié/);
-  assert.doesNotMatch(fn("partially_published"), /label-success/);
+  assert.match(fn("partially_published"), /label-success/);
+  assert.match(fn("partially_published"), /Publié/);
+  assert.doesNotMatch(fn("partially_published"), /label-info/);
 
   assert.match(fn("empty"),              /Vide/);
 
@@ -315,7 +315,7 @@ test("AI-5.12: pièce 'Aucun' (scope object_id:0, diag object_id:null) reçoit s
   // Le HTML doit contenir le badge de la pièce "Aucun"
   const html = scopeSummary.render(model);
   assert.match(html, /Non supporté/, "Le badge 'Non supporté' doit apparaître pour la pièce Aucun");
-  assert.match(html, /Partiellement publié/, "Le badge 'Partiellement publié' doit apparaître pour Salon");
+  assert.match(html, /Publié/, "Le badge 'Partiellement publié' doit être absorbé en 'Publié' pour Salon");
 
   // Vérifier que le badge est bien dans la ligne synthèse de la pièce "Aucun"
   const summaryRows = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/g);

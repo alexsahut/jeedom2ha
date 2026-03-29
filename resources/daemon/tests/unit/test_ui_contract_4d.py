@@ -184,3 +184,34 @@ def test_build_ui_counters_only_direction_2():
     assert result["exclus"] == 2
     assert result["ecarts"] == 1
     assert result["total"] == result["inclus"] + result["exclus"]
+
+
+# ---------------------------------------------------------------------------
+# Story 4.3 — Task 7.2 : absorption "Partiellement publié" via le contrat 4D
+# ---------------------------------------------------------------------------
+
+def test_absorption_partially_published_sure_mapping():
+    """Story 4.3 / Task 7.2 — reason_code=sure_mapping, matched_commands < total_commands
+    → perimetre=inclus, ecart=false, cause_code=null.
+    Le cas "Partiellement publié" (ancienne dénomination) est absorbé dans statut=publie.
+    """
+    # sure_mapping → perimetre=inclus (règle reason_code_to_perimetre : tout non-exclusion → inclus)
+    perimetre = reason_code_to_perimetre("sure_mapping")
+    assert perimetre == "inclus"
+
+    # statut=publie (présence HA réelle simulée)
+    statut = "publie"
+
+    # ecart = compute_ecart("inclus", "publie") → False
+    ecart = compute_ecart(perimetre, statut)
+    assert ecart is False, "Un équipement inclus + publié ne doit pas générer d'écart"
+
+
+def test_absorption_sure_reason_code_no_ecart():
+    """Story 4.3 — reason_code=sure + statut=publie → pas d'écart."""
+    assert compute_ecart(reason_code_to_perimetre("sure"), "publie") is False
+
+
+def test_absorption_probable_reason_code_no_ecart():
+    """Story 4.3 — reason_code=probable + statut=publie → pas d'écart."""
+    assert compute_ecart(reason_code_to_perimetre("probable"), "publie") is False

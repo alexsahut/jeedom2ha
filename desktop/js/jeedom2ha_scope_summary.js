@@ -50,7 +50,8 @@
     if (s === 'ambiguous')           return '<span class="label label-warning">Ambigu</span>';
     if (s === 'not_supported')       return '<span class="label label-default" style="background-color:#666!important;">Non supporté</span>';
     if (s === 'infra_incident')      return '<span class="label label-danger">Incident infrastructure</span>';
-    if (s === 'partially_published') return '<span class="label label-info">Partiellement publié</span>';
+    // Story 4.3 : "Partiellement publié" absorbé — statut principal = Publié
+    if (s === 'partially_published') return '<span class="label label-success">Publié</span>';
     if (s === 'empty')               return '<span class="label label-default">Vide</span>';
     return '';
   }
@@ -103,9 +104,18 @@
     };
   }
 
+  // Story 4.3 — table de traduction confidence backend → libellé UI (diagnostic technique uniquement)
+  function translateConfidence(value) {
+    if (value === 'sure')      return 'Sûr';
+    if (value === 'probable')  return 'Probable';
+    if (value === 'ambiguous') return 'Ambigu';
+    return '';
+  }
+
   // Story 3.4 — equipDiag : données diagnostic backend pour cet équipement (null si absent)
   // Story 4.2 — perimetre_label depuis contrat diagnostics 4.1 (lecture seule)
-  function buildEquipmentModel(entry, equipDiag) {
+  // Story 4.3 — confidence et in_scope ajoutés (lecture seule)
+  function buildEquipmentModel(entry, equipDiag, isInScope) {
     var diag = (equipDiag && typeof equipDiag === 'object') ? equipDiag : {};
     return {
       eq_id: entry.eq_id,
@@ -118,6 +128,10 @@
       detail:        readString(diag.detail, ''),
       remediation:   readString(diag.remediation, ''),
       v1_limitation: readBoolean(diag.v1_limitation, false),
+      // Story 4.3 — confiance visible uniquement en diagnostic technique détaillé
+      confidence: readString(diag.confidence, ''),
+      // Story 4.3 — in_scope : true si l'équipement est dans la surface filtrée backend
+      in_scope: isInScope === true,
     };
   }
 
@@ -144,6 +158,20 @@
     var globalSection = (scope.global && typeof scope.global === 'object') ? scope.global : {};
     var pieces = Array.isArray(scope.pieces) ? scope.pieces : [];
     var equipements = Array.isArray(scope.equipements) ? scope.equipements : [];
+
+    // Story 4.3 — surface filtrée in-scope depuis backend (perimetre=inclus uniquement)
+    // Graceful degradation : absent → fallback comportement actuel (tous les détails affichés)
+    var inScopeRaw = Array.isArray(safeResponse.in_scope_equipments) ? safeResponse.in_scope_equipments : null;
+    var inScopeByEqId = null;
+    if (inScopeRaw !== null) {
+      inScopeByEqId = {};
+      for (var k = 0; k < inScopeRaw.length; k++) {
+        var ise = inScopeRaw[k];
+        if (ise && ise.eq_id != null) {
+          inScopeByEqId[String(ise.eq_id)] = true;
+        }
+      }
+    }
 
     // Story 3.4 — données diagnostic (soft : absent si daemon indisponible)
     var diagEquipments = (safeResponse.diagnostic_equipments && typeof safeResponse.diagnostic_equipments === 'object')
@@ -202,7 +230,10 @@
 
       // Story 3.4 — lookup données diagnostic par eq_id (clés numériques JSON → prop string en JS)
       var eqDiag = diagEquipments[equipement.eq_id] || diagEquipments[String(equipement.eq_id)] || null;
-      pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag));
+      // Story 4.3 — isInScope : true si in_scope_equipments disponible ET eq_id présent dedans
+      //              fallback (inScopeByEqId=null) : tous les détails affichés (comportement pré-4.3)
+      var isInScope = (inScopeByEqId === null) ? true : (inScopeByEqId[String(equipement.eq_id)] === true);
+      pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag, isInScope));
     }
 
     // Story 4.2 — compteurs globaux depuis diagnostics si disponibles, sinon fallback scope
@@ -265,21 +296,29 @@
         html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
       }
       // Story 3.4 — Task 2 : contrat métier backend (lecture seule)
-      // Dimension 1 : badge statut HA (status_code canonique → getAggregatedStatusLabel)
-      if (equipement.status_code !== '') {
-        html += '<span style="margin-left:8px;">' + getAggregatedStatusLabel(equipement.status_code) + '</span>';
-      }
-      // Dimension 2 : raison principale (detail tel quel depuis backend — jamais reformulé)
-      if (equipement.detail !== '') {
-        html += '<div style="margin-top:4px;font-size:0.9em;color:#555;margin-left:4px;">' + escapeHtml(equipement.detail) + '</div>';
-      }
-      // Dimension 3 : action recommandée (remediation tel quel depuis backend, si non vide)
-      if (equipement.remediation !== '') {
-        html += '<div style="margin-top:2px;font-size:0.9em;color:#888;margin-left:4px;"><em>Action recommandée</em> : ' + escapeHtml(equipement.remediation) + '</div>';
-      }
-      // Dimension 4 : limitation Home Assistant explicite (v1_limitation=true)
-      if (equipement.v1_limitation === true) {
-        html += '<div style="margin-top:4px;margin-left:4px;"><span class="label label-default">Limitation Home Assistant</span></div>';
+      // Story 4.3 — diagnostic détaillé conditionné à in_scope (équipements exclus : pas de détails)
+      if (equipement.in_scope !== false) {
+        // Dimension 1 : badge statut HA (status_code canonique → getAggregatedStatusLabel)
+        if (equipement.status_code !== '') {
+          html += '<span style="margin-left:8px;">' + getAggregatedStatusLabel(equipement.status_code) + '</span>';
+        }
+        // Dimension 2 : raison principale (detail tel quel depuis backend — jamais reformulé)
+        if (equipement.detail !== '') {
+          html += '<div style="margin-top:4px;font-size:0.9em;color:#555;margin-left:4px;">' + escapeHtml(equipement.detail) + '</div>';
+        }
+        // Dimension 3 : action recommandée (remediation tel quel depuis backend, si non vide)
+        if (equipement.remediation !== '') {
+          html += '<div style="margin-top:2px;font-size:0.9em;color:#888;margin-left:4px;"><em>Action recommandée</em> : ' + escapeHtml(equipement.remediation) + '</div>';
+        }
+        // Dimension 4 : limitation Home Assistant explicite (v1_limitation=true)
+        if (equipement.v1_limitation === true) {
+          html += '<div style="margin-top:4px;margin-left:4px;"><span class="label label-default">Limitation Home Assistant</span></div>';
+        }
+        // Story 4.3 — Confiance : visible uniquement en diagnostic technique détaillé (jamais en console principale)
+        var confidenceLabel = translateConfidence(equipement.confidence);
+        if (confidenceLabel !== '') {
+          html += '<div style="margin-top:2px;margin-left:4px;font-size:0.85em;color:#777;"><em>Confiance</em> : ' + escapeHtml(confidenceLabel) + '</div>';
+        }
       }
       html += '</li>';
     }

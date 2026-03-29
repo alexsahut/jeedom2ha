@@ -61,6 +61,8 @@ test("scope summary presenter keeps backend counts for mixed include/exclude pay
     detail: "",
     remediation: "",
     v1_limitation: false,
+    confidence: "",
+    in_scope: true,
   });
   assert.deepEqual(model.pieces[0].equipements[1], {
     eq_id: 99,
@@ -72,6 +74,8 @@ test("scope summary presenter keeps backend counts for mixed include/exclude pay
     detail: "",
     remediation: "",
     v1_limitation: false,
+    confidence: "",
+    in_scope: true,
   });
 });
 
