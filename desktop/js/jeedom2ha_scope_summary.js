@@ -32,6 +32,25 @@
     return fallback;
   }
 
+  function readCommandCoverage(commands) {
+    if (!Array.isArray(commands)) {
+      return [];
+    }
+    var normalized = [];
+    for (var i = 0; i < commands.length; i++) {
+      var cmd = commands[i];
+      if (!cmd || typeof cmd !== 'object') {
+        continue;
+      }
+      normalized.push({
+        cmd_id: isFiniteNumber(cmd.cmd_id) ? cmd.cmd_id : null,
+        cmd_name: readString(cmd.cmd_name, ''),
+        generic_type: readString(cmd.generic_type, ''),
+      });
+    }
+    return normalized;
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -117,19 +136,29 @@
   // Story 4.3 — confidence et in_scope ajoutés (lecture seule)
   function buildEquipmentModel(entry, equipDiag, isInScope) {
     var diag = (equipDiag && typeof equipDiag === 'object') ? equipDiag : {};
+    var perimetre = readString(diag.perimetre, '');
     return {
       eq_id: entry.eq_id,
       name: readString(entry.name, ''),
       effective_state: readString(entry.effective_state, ''),
-      perimetre_label: buildPerimetreLabel(readString(diag.perimetre, '')),
+      perimetre: perimetre,
+      perimetre_label: buildPerimetreLabel(perimetre),
+      statut: readString(diag.statut, ''),
+      ecart: (typeof diag.ecart === 'boolean') ? diag.ecart : null,
+      cause_label: readString(diag.cause_label, ''),
+      cause_action: readString(diag.cause_action, ''),
       has_pending_home_assistant_changes: readBoolean(entry.has_pending_home_assistant_changes, false),
       // Story 3.4 — contrat métier backend (lecture seule — source : taxonomy.py + _DIAGNOSTIC_MESSAGES)
       status_code:   readString(diag.status_code, ''),
+      reason_code:   readString(diag.reason_code, ''),
       detail:        readString(diag.detail, ''),
       remediation:   readString(diag.remediation, ''),
       v1_limitation: readBoolean(diag.v1_limitation, false),
       // Story 4.3 — confiance visible uniquement en diagnostic technique détaillé
       confidence: readString(diag.confidence, ''),
+      // Story 4.4 / AC8 — détails de couverture commandes (surface technique uniquement)
+      matched_commands: readCommandCoverage(diag.matched_commands),
+      unmatched_commands: readCommandCoverage(diag.unmatched_commands),
       // Story 4.3 — in_scope : true si l'équipement est dans la surface filtrée backend
       in_scope: isInScope === true,
     };
@@ -140,6 +169,131 @@
       return String(value);
     }
     return '&mdash;';
+  }
+
+  function getPerimetreDisplayLabel(perimetre) {
+    if (perimetre === 'inclus')                 return 'Inclus';
+    if (perimetre === 'exclu_par_piece')        return 'Exclu par la pièce';
+    if (perimetre === 'exclu_par_plugin')       return 'Exclu par le plugin';
+    if (perimetre === 'exclu_sur_equipement')   return 'Exclu sur cet équipement';
+    return 'Périmètre inconnu';
+  }
+
+  function getStatutDisplayLabel(statut) {
+    if (statut === 'publie')     return 'Publié';
+    if (statut === 'non_publie') return 'Non publié';
+    return 'Statut inconnu';
+  }
+
+  function getEcartDisplayLabel(ecart) {
+    if (ecart === true)  return 'Écart à traiter';
+    if (ecart === false) return 'Aligné';
+    return 'Écart inconnu';
+  }
+
+  function renderPerimetreBadge(perimetre) {
+    var label = getPerimetreDisplayLabel(perimetre);
+    if (perimetre === 'inclus') {
+      return '<span class="label label-success">Périmètre : ' + escapeHtml(label) + '</span>';
+    }
+    if (perimetre.indexOf('exclu_') === 0) {
+      return '<span class="label" style="background-color:#777;color:#fff;">Périmètre : ' + escapeHtml(label) + '</span>';
+    }
+    return '<span class="label label-default">Périmètre : ' + escapeHtml(label) + '</span>';
+  }
+
+  function renderStatutBadge(statut) {
+    var label = getStatutDisplayLabel(statut);
+    if (statut === 'publie') {
+      return '<span class="label label-success">Statut : ' + escapeHtml(label) + '</span>';
+    }
+    if (statut === 'non_publie') {
+      return '<span class="label label-default" style="background-color:#666!important;">Statut : ' + escapeHtml(label) + '</span>';
+    }
+    return '<span class="label label-default">Statut : ' + escapeHtml(label) + '</span>';
+  }
+
+  function renderEcartBadge(ecart) {
+    var label = getEcartDisplayLabel(ecart);
+    if (ecart === true) {
+      return '<span class="label label-warning">Écart : ' + escapeHtml(label) + '</span>';
+    }
+    if (ecart === false) {
+      return '<span class="label label-default">Écart : ' + escapeHtml(label) + '</span>';
+    }
+    return '<span class="label label-default">Écart : ' + escapeHtml(label) + '</span>';
+  }
+
+  function renderCauseLines(equipement) {
+    if (equipement.ecart !== true) {
+      return '';
+    }
+    var causeLabel = (equipement.cause_label !== '') ? equipement.cause_label : 'Cause non renseignée';
+    var html = '';
+    html += '<div style="margin-top:4px;font-size:0.9em;color:#555;"><em>Cause</em> : ' + escapeHtml(causeLabel) + '</div>';
+    if (equipement.cause_action !== '') {
+      html += '<div style="margin-top:2px;font-size:0.9em;color:#777;"><em>Action</em> : ' + escapeHtml(equipement.cause_action) + '</div>';
+    }
+    return html;
+  }
+
+  function renderCommandCoverageItems(commands) {
+    var items = [];
+    for (var i = 0; i < commands.length; i++) {
+      var cmd = commands[i];
+      var parts = [];
+      if (cmd.cmd_id !== null) {
+        parts.push('#' + String(cmd.cmd_id));
+      }
+      if (cmd.cmd_name !== '') {
+        parts.push(cmd.cmd_name);
+      }
+      if (cmd.generic_type !== '') {
+        parts.push('(' + cmd.generic_type + ')');
+      }
+      if (parts.length === 0) {
+        parts.push('commande non renseignée');
+      }
+      items.push('<li>' + escapeHtml(parts.join(' ')) + '</li>');
+    }
+    return '<ul style="margin:4px 0 0 16px;padding:0;">' + items.join('') + '</ul>';
+  }
+
+  function renderCommandCoverageSection(equipement) {
+    var matched = Array.isArray(equipement.matched_commands) ? equipement.matched_commands : [];
+    var unmatched = Array.isArray(equipement.unmatched_commands) ? equipement.unmatched_commands : [];
+    if (matched.length === 0 && unmatched.length === 0) {
+      return '';
+    }
+
+    var html = '';
+    html += '<div style="margin-top:4px;font-size:0.9em;color:#555;">';
+    html += '<em>Couverture commandes</em> : ' + matched.length + ' mappée(s), ' + unmatched.length + ' non mappée(s)';
+    html += '</div>';
+
+    if (matched.length > 0) {
+      html += '<div style="margin-top:2px;font-size:0.85em;color:#666;"><em>matched_commands</em></div>';
+      html += renderCommandCoverageItems(matched);
+    }
+    if (unmatched.length > 0) {
+      html += '<div style="margin-top:2px;font-size:0.85em;color:#666;"><em>unmatched_commands</em></div>';
+      html += renderCommandCoverageItems(unmatched);
+    }
+
+    return html;
+  }
+
+  function renderFourDSurface(surfaceClassName, surfaceTitle, equipement) {
+    var html = '<div class="' + surfaceClassName + '" style="margin-top:6px;margin-left:4px;">';
+    html += '<div style="font-size:0.85em;color:#666;"><strong>' + escapeHtml(surfaceTitle) + '</strong></div>';
+    html += '<div style="margin-top:3px;">';
+    html += renderPerimetreBadge(equipement.perimetre);
+    html += '<span style="margin-left:6px;">' + renderStatutBadge(equipement.statut) + '</span>';
+    html += '<span style="margin-left:6px;">' + renderEcartBadge(equipement.ecart) + '</span>';
+    html += '</div>';
+    html += renderCauseLines(equipement);
+    html += '</div>';
+    return html;
   }
 
   function createModel(response) {
@@ -231,8 +385,15 @@
       // Story 3.4 — lookup données diagnostic par eq_id (clés numériques JSON → prop string en JS)
       var eqDiag = diagEquipments[equipement.eq_id] || diagEquipments[String(equipement.eq_id)] || null;
       // Story 4.3 — isInScope : true si in_scope_equipments disponible ET eq_id présent dedans
-      //              fallback (inScopeByEqId=null) : tous les détails affichés (comportement pré-4.3)
-      var isInScope = (inScopeByEqId === null) ? true : (inScopeByEqId[String(equipement.eq_id)] === true);
+      // Story 4.4 — fallback robuste non-sémantique : si la surface in_scope est absente,
+      // s'appuyer uniquement sur perimetre backend quand il est fourni.
+      var isInScope = false;
+      if (inScopeByEqId === null) {
+        var diagPerimetre = (eqDiag && typeof eqDiag === 'object') ? readString(eqDiag.perimetre, '') : '';
+        isInScope = (diagPerimetre === '') ? true : (diagPerimetre === 'inclus');
+      } else {
+        isInScope = (inScopeByEqId[String(equipement.eq_id)] === true);
+      }
       pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag, isInScope));
     }
 
@@ -287,38 +448,46 @@
       } else {
         html += '<span class="label label-info">#' + escapeHtml(equipement.eq_id) + '</span>';
       }
-      html += '<span style="margin-left:8px;">' + renderEquipmentState(equipement.effective_state) + '</span>';
-      // Story 4.2 — badge source d'exclusion uniforme (gris neutre, pas de label-info conditionnel)
-      if (equipement.perimetre_label !== '') {
-        html += '<span class="label" style="margin-left:8px;background-color:#777;color:#fff;">' + escapeHtml(equipement.perimetre_label) + '</span>';
-      }
       if (equipement.has_pending_home_assistant_changes === true) {
         html += '<span class="label label-warning" style="margin-left:8px;">Changements à appliquer</span>';
       }
-      // Story 3.4 — Task 2 : contrat métier backend (lecture seule)
-      // Story 4.3 — diagnostic détaillé conditionné à in_scope (équipements exclus : pas de détails)
-      if (equipement.in_scope !== false) {
-        // Dimension 1 : badge statut HA (status_code canonique → getAggregatedStatusLabel)
+
+      // Surface 1 — Console principale : lecture 4D native, visible pour tous les équipements
+      html += renderFourDSurface('j2ha-surface-console', 'Console principale', equipement);
+
+      // Surfaces 2/3 — uniquement in-scope : diagnostic utilisateur + diagnostic technique détaillé
+      if (equipement.in_scope === true) {
+        html += renderFourDSurface('j2ha-surface-diagnostic-user', 'Diagnostic utilisateur', equipement);
+
+        html += '<details class="j2ha-surface-diagnostic-tech" style="margin-top:6px;margin-left:4px;">';
+        html += '<summary style="font-size:0.85em;color:#666;"><strong>Diagnostic technique détaillé</strong></summary>';
+
         if (equipement.status_code !== '') {
-          html += '<span style="margin-left:8px;">' + getAggregatedStatusLabel(equipement.status_code) + '</span>';
+          html += '<div style="margin-top:4px;font-size:0.9em;color:#555;"><em>status_code</em> : ' + escapeHtml(equipement.status_code);
+          var statusCodeLabel = getAggregatedStatusLabel(equipement.status_code);
+          if (statusCodeLabel !== '') {
+            html += ' <span style="margin-left:4px;">' + statusCodeLabel + '</span>';
+          }
+          html += '</div>';
         }
-        // Dimension 2 : raison principale (detail tel quel depuis backend — jamais reformulé)
+        if (equipement.reason_code !== '') {
+          html += '<div style="margin-top:2px;font-size:0.9em;color:#555;"><em>reason_code</em> : ' + escapeHtml(equipement.reason_code) + '</div>';
+        }
         if (equipement.detail !== '') {
-          html += '<div style="margin-top:4px;font-size:0.9em;color:#555;margin-left:4px;">' + escapeHtml(equipement.detail) + '</div>';
+          html += '<div style="margin-top:2px;font-size:0.9em;color:#555;">' + escapeHtml(equipement.detail) + '</div>';
         }
-        // Dimension 3 : action recommandée (remediation tel quel depuis backend, si non vide)
         if (equipement.remediation !== '') {
-          html += '<div style="margin-top:2px;font-size:0.9em;color:#888;margin-left:4px;"><em>Action recommandée</em> : ' + escapeHtml(equipement.remediation) + '</div>';
+          html += '<div style="margin-top:2px;font-size:0.9em;color:#777;"><em>Action recommandée</em> : ' + escapeHtml(equipement.remediation) + '</div>';
         }
-        // Dimension 4 : limitation Home Assistant explicite (v1_limitation=true)
         if (equipement.v1_limitation === true) {
-          html += '<div style="margin-top:4px;margin-left:4px;"><span class="label label-default">Limitation Home Assistant</span></div>';
+          html += '<div style="margin-top:4px;"><span class="label label-default">Limitation Home Assistant</span></div>';
         }
-        // Story 4.3 — Confiance : visible uniquement en diagnostic technique détaillé (jamais en console principale)
         var confidenceLabel = translateConfidence(equipement.confidence);
         if (confidenceLabel !== '') {
-          html += '<div style="margin-top:2px;margin-left:4px;font-size:0.85em;color:#777;"><em>Confiance</em> : ' + escapeHtml(confidenceLabel) + '</div>';
+          html += '<div style="margin-top:2px;font-size:0.85em;color:#777;"><em>Confiance</em> : ' + escapeHtml(confidenceLabel) + '</div>';
         }
+        html += renderCommandCoverageSection(equipement);
+        html += '</details>';
       }
       html += '</li>';
     }
@@ -343,15 +512,6 @@
       html += '<div style="margin-bottom:8px;"><span class="label label-warning">Changements à appliquer</span></div>';
     }
 
-    // Story 3.4 — Task 3 : agrégation backend globale (primary_aggregated_status + counts)
-    if (model.diagnostic_summary && model.diagnostic_summary.primary_aggregated_status) {
-      html += '<div style="margin-bottom:8px;">';
-      html += '<strong>Statut global HA</strong> ';
-      html += getAggregatedStatusLabel(model.diagnostic_summary.primary_aggregated_status);
-      html += renderCountsByStatus(model.diagnostic_summary.counts_by_status);
-      html += '</div>';
-    }
-
     html += '<div class="table-responsive" style="margin-top:10px;">';
     html += '<table class="table table-condensed table-bordered" id="table_scopeSummaryPieces">';
     html += '<thead><tr>';
@@ -374,14 +534,6 @@
         html += escapeHtml(piece.object_name);
         if (piece.has_pending_home_assistant_changes === true) {
           html += ' <span class="label label-warning">Changements à appliquer</span>';
-        }
-        // Story 3.4 — primary_aggregated_status depuis backend (priorité sur la déduction locale)
-        if (piece.diagnostic_summary && piece.diagnostic_summary.primary_aggregated_status) {
-          html += ' ' + getAggregatedStatusLabel(piece.diagnostic_summary.primary_aggregated_status);
-          html += renderCountsByStatus(piece.diagnostic_summary.counts_by_status);
-        } else if (piece.counts.total > 0 && piece.counts.exclus === piece.counts.total) {
-          // Fallback scope-only : badge local quand aucune donnée diagnostic disponible
-          html += ' <span class="label" style="background-color:#999;color:#fff;">Exclue</span>';
         }
         html += '</td>';
         html += '<td>' + toDisplayCount(piece.counts.total) + '</td>';

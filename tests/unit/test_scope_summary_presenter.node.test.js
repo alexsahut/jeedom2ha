@@ -55,26 +55,42 @@ test("scope summary presenter keeps backend counts for mixed include/exclude pay
     eq_id: 98,
     name: "",
     effective_state: "exclude",
+    perimetre: "exclu_par_piece",
     perimetre_label: "Exclu par la pièce",
+    statut: "",
+    ecart: null,
+    cause_label: "",
+    cause_action: "",
     has_pending_home_assistant_changes: false,
     status_code: "",
+    reason_code: "",
     detail: "",
     remediation: "",
     v1_limitation: false,
     confidence: "",
-    in_scope: true,
+    matched_commands: [],
+    unmatched_commands: [],
+    in_scope: false,
   });
   assert.deepEqual(model.pieces[0].equipements[1], {
     eq_id: 99,
     name: "",
     effective_state: "include",
+    perimetre: "",
     perimetre_label: "",
+    statut: "",
+    ecart: null,
+    cause_label: "",
+    cause_action: "",
     has_pending_home_assistant_changes: false,
     status_code: "",
+    reason_code: "",
     detail: "",
     remediation: "",
     v1_limitation: false,
     confidence: "",
+    matched_commands: [],
+    unmatched_commands: [],
     in_scope: true,
   });
 });
@@ -99,9 +115,10 @@ test("scope summary presenter renders backend-first equipment details without ex
   const html = scopeSummary.render(scopeSummary.createModel(response));
 
   assert.match(html, /#41/);
-  assert.match(html, />exclude<\/span>/);
+  assert.match(html, /Console principale/);
   assert.match(html, /Exclu par la pièce/);
   assert.equal((html.match(/Exclu par la pièce/g) || []).length, 1);
+  assert.doesNotMatch(html, />exclude<\/span>/);
   assert.doesNotMatch(html, /H\u00e9rite de la pi\u00e8ce/);
   assert.doesNotMatch(html, /[Ee]xception/);
   assert.doesNotMatch(html, /R\u00e8gle locale/);
@@ -354,17 +371,19 @@ test("story-1.5: badge exclude a un style inactif sans couleur rouge", () => {
         { eq_id: 55, object_id: 5, effective_state: "exclude" },
       ],
     },
+    diagnostic_equipments: {
+      55: { perimetre: "exclu_sur_equipement" },
+    },
   };
 
   const html = scopeSummary.render(scopeSummary.createModel(response));
 
-  // Badge exclude présent
-  assert.match(html, />exclude<\/span>/);
-  // Communique un état inactif (fond gris explicite, visible en thème sombre)
-  assert.match(html, /background-color:#999/);
+  // Surface console 4D + source d'exclusion en gris neutre
+  assert.match(html, /Périmètre : Exclu sur cet équipement/);
+  assert.match(html, /background-color:#777/);
   // N'utilise pas la couleur rouge réservée aux incidents d'infrastructure
   assert.doesNotMatch(html, /label-danger/);
-  // N'utilise pas le vert réservé à include
+  // N'utilise pas le vert réservé à include sur ce cas d'exclusion
   const includeCount = (html.match(/label-success/g) || []).length;
   assert.equal(includeCount, 0, "label-success ne doit pas apparaître pour exclude");
   // N'utilise pas l'orange déjà réservé à Changements à appliquer
@@ -391,11 +410,10 @@ test("story-1.5: badge Exclue sur la ligne synthèse quand la pièce est entièr
   const summaryRowMatch = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/);
   assert.ok(summaryRowMatch, "La ligne synthèse j2ha-piece-summary doit être présente");
   assert.ok(
-    summaryRowMatch[0].includes("Exclue"),
-    "Le badge Exclue doit apparaître dans la ligne synthèse quand tous les équipements sont exclus"
+    !summaryRowMatch[0].includes("Exclue"),
+    "La synthèse pièce 4.4 n'utilise plus le badge Exclue, la lecture se fait par compteurs"
   );
-  // Le badge utilise le style inactif (fond gris explicite)
-  assert.match(html, /background-color:#999[^>]*>Exclue<\/span>/);
+  assert.match(summaryRowMatch[0], /Garage/);
   assert.doesNotMatch(html, /[Ee]xception/);
 });
 
