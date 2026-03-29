@@ -54,11 +54,14 @@ function makeResponse(overrides) {
     ],
     diagnostic_equipments: {
       42: {
+        perimetre: "inclus",
         status_code: "published",
         reason_code: "sure",
         detail: "",
         remediation: "",
         v1_limitation: false,
+        matched_commands: [{ cmd_id: 4201, cmd_name: "On", generic_type: "LIGHT_STATE" }],
+        unmatched_commands: [{ cmd_id: 4202, cmd_name: "Dim", generic_type: "BRIGHTNESS" }],
       },
       43: {
         status_code: "excluded",
@@ -80,26 +83,47 @@ function makeResponse(overrides) {
 }
 
 // ---------------------------------------------------------------------------
-// AI-5.1 — Le statut global primary_aggregated_status est affiché depuis le backend
+// AI-5.1 — Story 4.4 : la narration globale dominante repose sur les compteurs 4D
 // ---------------------------------------------------------------------------
 
-test("AI-5.1: primary_aggregated_status global 'ambiguous' apparaît dans le HTML rendu sans recalcul", () => {
+test("AI-5.1: la synthèse globale affiche les compteurs canoniques sans badge de statut global dominant", () => {
   const html = scopeSummary.render(scopeSummary.createModel(makeResponse()));
-  // La valeur exacte du backend ('ambiguous') est reflétée dans le badge
-  assert.match(html, /Ambigu/, "Le statut global ambiguous doit apparaître comme 'Ambigu'");
-  assert.match(html, /Statut global HA/, "La section Statut global HA doit être présente");
+  assert.match(html, /\{\{Total\}\}/);
+  assert.match(html, /\{\{Inclus\}\}/);
+  assert.match(html, /\{\{Exclus\}\}/);
+  assert.match(html, /\{\{Écarts\}\}/);
+  assert.doesNotMatch(html, /Statut global HA/, "Le badge global legacy n'est plus la lecture dominante en 4.4");
 });
 
 // ---------------------------------------------------------------------------
-// AI-5.2 — Les counts_by_status globaux sont affichés depuis le backend
+// AI-5.2 — Les statuts techniques restent disponibles en diagnostic détaillé
 // ---------------------------------------------------------------------------
 
-test("AI-5.2: counts_by_status globaux (published:1, ambiguous:1, excluded:1) apparaissent dans le HTML", () => {
+test("AI-5.2: status_code techniques publiés en diagnostic détaillé équipement", () => {
   const html = scopeSummary.render(scopeSummary.createModel(makeResponse()));
-  // Les compteurs doivent apparaître sous forme de chips compacts
-  assert.match(html, /Publié:&nbsp;1/, "Compteur published:1 doit être visible");
-  assert.match(html, /Ambigu:&nbsp;1/, "Compteur ambiguous:1 doit être visible");
-  assert.match(html, /Exclu:&nbsp;1/, "Compteur excluded:1 doit être visible");
+  assert.match(html, /status_code/, "Le diagnostic technique doit exposer status_code");
+  assert.match(html, /Publié/, "Le badge technique published doit rester visible");
+  assert.match(html, /Exclu/, "Le badge technique excluded doit rester visible");
+  assert.match(html, /Non supporté/, "Le badge technique not_supported doit rester visible");
+});
+
+test("AI-5.2b: la couverture commandes reste cantonnée au diagnostic technique détaillé", () => {
+  const html = scopeSummary.render(scopeSummary.createModel(makeResponse()));
+  const lampeBlock = html.match(/Lampe Salon[\s\S]*?<\/details><\/li>/);
+  assert.ok(lampeBlock, "Le bloc HTML de Lampe Salon doit exister");
+
+  assert.match(lampeBlock[0], /Diagnostic technique détaillé/);
+  assert.match(lampeBlock[0], /Couverture commandes/);
+  assert.match(lampeBlock[0], /matched_commands/);
+  assert.match(lampeBlock[0], /unmatched_commands/);
+
+  const consoleBlock = lampeBlock[0].match(/Console principale[\s\S]*?Diagnostic utilisateur/);
+  assert.ok(consoleBlock, "Le bloc console principale doit exister");
+  assert.doesNotMatch(consoleBlock[0], /Couverture commandes|matched_commands|unmatched_commands/);
+
+  const userDiagnosticBlock = lampeBlock[0].match(/Diagnostic utilisateur[\s\S]*?Diagnostic technique détaillé/);
+  assert.ok(userDiagnosticBlock, "Le bloc diagnostic utilisateur doit exister");
+  assert.doesNotMatch(userDiagnosticBlock[0], /Couverture commandes|matched_commands|unmatched_commands/);
 });
 
 // ---------------------------------------------------------------------------
@@ -259,7 +283,7 @@ test("AI-5.11: getAggregatedStatusLabel — tous les codes canoniques mappent ve
 // AI-5.12 — Pièce avec object_id: null reçoit son diagnostic_summary backend
 // ---------------------------------------------------------------------------
 
-test("AI-5.12: pièce 'Aucun' (scope object_id:0, diag object_id:null) reçoit son badge diagnostic", () => {
+test("AI-5.12: pièce 'Aucun' (scope object_id:0, diag object_id:null) reçoit son diagnostic_summary sans badge synthèse legacy", () => {
   // Contrat terrain réel : le scope retourne object_id:0 pour "Aucun",
   // le diagnostic retourne object_id:null pour la même pièce.
   const response = {
@@ -312,16 +336,15 @@ test("AI-5.12: pièce 'Aucun' (scope object_id:0, diag object_id:null) reçoit s
   assert.ok(model.pieces[1].diagnostic_summary, "La pièce object_id:10 doit avoir un diagnostic_summary");
   assert.equal(model.pieces[1].diagnostic_summary.primary_aggregated_status, "partially_published");
 
-  // Le HTML doit contenir le badge de la pièce "Aucun"
+  // Le HTML conserve les deux lignes pièce sans badge legacy dominant
   const html = scopeSummary.render(model);
-  assert.match(html, /Non supporté/, "Le badge 'Non supporté' doit apparaître pour la pièce Aucun");
-  assert.match(html, /Publié/, "Le badge 'Partiellement publié' doit être absorbé en 'Publié' pour Salon");
+  assert.match(html, /Aucun/);
+  assert.match(html, /Salon/);
+  assert.doesNotMatch(html, /Statut global HA/);
 
-  // Vérifier que le badge est bien dans la ligne synthèse de la pièce "Aucun"
+  // Vérifier la présence des lignes synthèse pièce
   const summaryRows = html.match(/<tr class="j2ha-piece-summary"[^>]*>[\s\S]*?<\/tr>/g);
   assert.ok(summaryRows && summaryRows.length >= 2, "Au moins 2 lignes synthèse pièce");
-  // La première pièce (Aucun) doit avoir le badge Non supporté
-  assert.ok(summaryRows[0].includes("Non supporté"), "La ligne synthèse 'Aucun' doit contenir le badge 'Non supporté'");
-  // Elle ne doit PAS utiliser le fallback "Exclue" quand le diagnostic est disponible
-  assert.ok(!summaryRows[0].includes("Exclue"), "Le badge local 'Exclue' ne doit pas apparaître quand le diagnostic backend est fourni");
+  assert.ok(summaryRows[0].includes("Aucun"), "La première ligne doit correspondre à la pièce 'Aucun'");
+  assert.ok(!summaryRows[0].includes("Exclue"), "Le badge local 'Exclue' ne doit pas apparaître en synthèse");
 });
