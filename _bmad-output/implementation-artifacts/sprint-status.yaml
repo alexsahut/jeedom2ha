@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-03-23 CET
+# last_updated: 2026-03-29 CET
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-29 CET'  # Story 4.3 done après merge PR #57 ; 4.4 reste review
+last_updated: '2026-03-29 CET'  # Story 4.4 done après merge PR #58 ; epic-4 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -71,11 +71,11 @@ development_status:
   3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: done  # code review PASS, terrain PASS + micro-fix object_id:null, 73/73 JS 128/128 pytest
   epic-3-retrospective: optional
 
-  epic-4: in-progress  # Recadrage UX — modèle Périmètre / Statut / Écart / Cause
+  epic-4: done  # Recadrage UX — modèle Périmètre / Statut / Écart / Cause
   4-1-contrat-backend-du-modele-perimetre-statut-ecart-cause: done  # terrain FAIL 2026-03-27 (69 faux positifs has_pending) → 4.1-fix, code review PASS, PR merged 2026-03-28
   4-2-vocabulaire-d-exclusion-par-source-disparition-du-concept-exception: done  # code review PASS 2026-03-28 — 81 JS PASS, 0 finding, non-régression Story 3.4 OK
   4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: done  # PR #57 squash merge dans main (commit 9cf4cadcb4df08b81e163ca79aaec3d8419a422b) ; traçabilité documentaire réalignée
-  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: review
+  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: done  # PR #58 mergee ; closeout post-merge aligne la story
   epic-4-retrospective: optional
 
   epic-5: backlog  # Opérations HA explicites, graduées et sûres (ex-Epic 4, renuméroté 2026-03-26)

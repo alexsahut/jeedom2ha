@@ -1,6 +1,6 @@
 # Story 4.4 : Intégration UI du nouveau modèle (console + diagnostic)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -17,7 +17,7 @@ Point de départ réel (verrouillé) avant ouverture de 4.4 :
 
 - Story 4.1 : `done` (contrat backend 4D stabilisé en production de payload).
 - Story 4.2 : `done` (vocabulaire d'exclusion par source et compteurs `Total/Inclus/Exclus/Écarts` stabilisés).
-- Story 4.3 : `review` avec **candidat figé et traçable** (`8c57808d9fe2b1ae00db0cc7bbd9cd16ab4a9752`) et verdict terrain **GO avec réserve levée côté pilotage**.
+- Story 4.3 : `done` avec **candidat figé et traçable** (`8c57808d9fe2b1ae00db0cc7bbd9cd16ab4a9752`) et merge effectif sur `main` via PR #57.
 
 Constats terrain à capitaliser (non renégociables) :
 
