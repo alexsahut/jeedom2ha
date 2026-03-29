@@ -1,6 +1,6 @@
 # Story 4.3 : Diagnostic centré in-scope, confiance en diagnostic uniquement, traitement de "Partiellement publié"
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -10,7 +10,7 @@ afin de me concentrer sur ce qui compte et de ne pas être noyé par des informa
 
 ## Contexte / Objectif produit
 
-Le modèle 4D (Périmètre / Statut / Écart / Cause) est implémenté côté backend par Story 4.1 (en review après fix terrain) et le vocabulaire d'exclusion par source est spécifié pour le frontend par Story 4.2 (ready-for-dev). Toutefois, trois problèmes UX persistent :
+Le modèle 4D (Périmètre / Statut / Écart / Cause) est désormais figé côté backend par Story 4.1 (done — PR #52 mergée le 2026-03-28) et le vocabulaire d'exclusion par source est stabilisé côté frontend par Story 4.2 (done — code review PASS le 2026-03-28). Toutefois, trois problèmes UX persistent :
 
 1. **Le diagnostic principal ne filtre pas** — les équipements exclus encombrent la vue diagnostic utilisateur, ce qui noie l'information utile.
 2. **La confiance technique est exposable partout** — le champ `confidence` (Sûr / Probable / Ambigu) est disponible dans la réponse backend mais ne doit apparaître qu'en diagnostic technique détaillé, jamais en console principale.
@@ -59,7 +59,7 @@ Le filtrage in-scope est une **règle de population de surface** appliquée côt
 
 - **Story 3.1** (done — PR #44) — `taxonomy.py` figé, `REASON_CODE_TO_PRIMARY_STATUS`, 5 statuts primaires.
 - **Story 3.2** (done — PR #46) — `_DIAGNOSTIC_MESSAGES`, `reason_code` enrichis, `detail`, `remediation`, `v1_limitation`.
-- **Story 4.1** (review — PR #52, fix terrain appliqué) — contrat 4D backend (`perimetre`, `statut`, `ecart`, `cause_code`, `cause_label`, `cause_action`), compteurs 4D (`compteurs.total`, `compteurs.inclus`, `compteurs.exclus`, `compteurs.ecarts`) dans `/system/diagnostics`.
+- **Story 4.1** (done — PR #52 mergée le 2026-03-28) — contrat 4D backend (`perimetre`, `statut`, `ecart`, `cause_code`, `cause_label`, `cause_action`), compteurs 4D (`compteurs.total`, `compteurs.inclus`, `compteurs.exclus`, `compteurs.ecarts`) dans `/system/diagnostics`.
 
 **Aucune dépendance en avant.** Story 4.4 peut s'appuyer sur le filtrage et le traitement de "Partiellement publié" stabilisés ici.
 
@@ -67,16 +67,16 @@ Le filtrage in-scope est une **règle de population de surface** appliquée côt
 
 Le prérequis de Story 4.3 sur Story 4.1 est strictement contractuel : la réponse `/system/diagnostics` doit exposer, pour chaque équipement, les 6 champs 4D (`perimetre`, `statut`, `ecart`, `cause_code`, `cause_label`, `cause_action`) et les compteurs 4D par pièce et global. Story 4.3 consomme ce contrat, pas le code interne de 4.1.
 
-**Condition de démarrage dev** : la story 4.3 peut être spécifiée et créée maintenant. Son démarrage dev effectif est conditionné à la stabilisation de Story 4.1 — c'est-à-dire au merge de la PR #52 (ou de son fix terrain) dans main. Si Story 4.1 est mergée avec des ajustements par rapport au contrat attendu, les tâches backend de Story 4.3 doivent s'adapter au contrat réel mergé, pas au contrat prévu.
+**État réel du prérequis** : Story 4.1 est désormais mergée dans `main`. La story 4.3 consomme le contrat 4D réellement stabilisé, sans dépendance ouverte restante sur 4.1.
 
 ### Coexistence avec Story 4.2
 
 Story 4.3 **ne dépend pas fonctionnellement** de Story 4.2. Aucun des AC de 4.3 ne requiert que le vocabulaire d'exclusion par source soit migré pour passer.
 
-En revanche, les deux stories modifient `jeedom2ha_scope_summary.js`. Contrainte de coexistence :
-- Si Story 4.2 est mergée avant le dev de 4.3 : le dev agent part du JS post-4.2 (vocabulaire migré). Aucun conflit structurel attendu — les zones modifiées sont distinctes (`buildPerimetreLabel` / compteurs pour 4.2, diagnostic détaillé / confiance pour 4.3).
-- Si Story 4.3 est devée avant le merge de 4.2 : le dev agent part du JS sur main. Les modifications de 4.3 (confiance, filtrage diagnostic, neutralisation `partially_published`) n'entrent pas en conflit avec celles de 4.2 (badges périmètre, compteurs). Le merge des deux PRs peut nécessiter une résolution triviale de conflit sur le même fichier.
-- **Dans tous les cas** : les tests de non-régression de chaque story doivent passer après merge.
+État réel de coexistence :
+- Story 4.2 est déjà `done` et 4.3 part du JS post-4.2.
+- Les acquis 4.2 (badges périmètre, compteurs 4D) restent intacts dans le candidat 4.3.
+- Les tests de non-régression 4.2 / 4.3 passent sur le même état figé.
 
 ## Acceptance Criteria
 
@@ -470,19 +470,17 @@ Vérification : `reason_code` apparaît dans l'export et le diagnostic technique
 - [x] Suite pytest complète PASS
 - [x] Suite JS complète PASS
 - [x] Non-régression Stories 3.4 et 4.1 confirmée ; coexistence Story 4.2 vérifiée
-- [x] Code review PASS
+- [ ] Code review PASS
 
 ## Risques / ambiguïtés restantes
 
-1. **Story 4.1 en review** — Story 4.1 (PR #52) est en review après fix terrain (69 faux positifs `has_pending`). Le démarrage dev de 4.3 est conditionné au merge effectif de 4.1. Si le fix terrain modifie le contrat 4D, les tâches backend de 4.3 doivent s'adapter au contrat réellement mergé. Ce risque est atténué par le fait que le fix terrain porte sur la formule de détection d'écart, pas sur la structure du contrat.
+1. **Clôture review / merge final hors périmètre immédiat** — le présent réalignement documentaire maintient la story en `review`. La clôture code review et le merge final restent des étapes distinctes du pilotage d'ouverture de 4.4.
 
-2. **Coexistence Story 4.2** — Les deux stories modifient `jeedom2ha_scope_summary.js` dans des zones distinctes. Un conflit de merge est possible mais devrait être trivial. Si les deux sont développées en parallèle, la seconde PR à merger devra résoudre le conflit. Voir la section "Coexistence avec Story 4.2" pour les détails.
+2. **`partially_published` status_code — origine résiduelle** — Il n'est pas clair si le backend génère encore `partially_published` comme `status_code` dans des chemins legacy secondaires. La story le neutralise côté lecture et le couvre par tests, sans rouvrir `taxonomy.py`.
 
-3. **`partially_published` status_code — origine résiduelle** — Il n'est pas clair si le backend génère encore `partially_published` comme `status_code`. Story 3.1 a défini 5 statuts primaires sans `partially_published`, mais un mapping résiduel pourrait exister dans d'anciens paths. Task 2.1 vérifie ce point. Si un tel mapping existe, la story le documente mais ne modifie pas `taxonomy.py`.
+3. **Performance du filtrage** — La surface filtrée in-scope duplique les données des équipements inclus. Pour un parc de ~200 équipements, ce doublon est négligeable. Si le parc dépasse 1000 équipements, une optimisation future pourrait être nécessaire — hors scope V1.1.
 
-4. **Performance du filtrage** — La surface filtrée in-scope duplique les données des équipements inclus. Pour un parc de ~200 équipements, ce doublon est négligeable. Si le parc dépasse 1000 équipements, une optimisation future pourrait être nécessaire — hors scope V1.1.
-
-5. **Diagnostic technique détaillé vs diagnostic principal utilisateur en UI** — La distinction entre ces deux surfaces est architecturalement claire (avec/sans confiance), mais leur rendu visuel est identique dans le code JS actuel (même section). Story 4.3 ajoute la confiance dans la section diagnostic existante, ce qui en fait de facto le "diagnostic technique détaillé". La séparation visuelle plus fine (onglets, niveaux de détail progressifs) relève de Story 4.4.
+4. **Diagnostic technique détaillé vs diagnostic principal utilisateur en UI** — La distinction entre ces deux surfaces est architecturalement claire (avec/sans confiance), mais leur rendu visuel est identique dans le code JS actuel (même section). Story 4.3 ajoute la confiance dans la section diagnostic existante, ce qui en fait de facto le "diagnostic technique détaillé". La séparation visuelle plus fine (onglets, niveaux de détail progressifs) relève de Story 4.4.
 
 ## Dev Agent Record
 
@@ -495,8 +493,10 @@ Gemini 3.1 Pro (High)
 ### Completion Notes List
 
 - Implémentation code, UX et tests exécutée entièrement et avec succès.
-- Tests (182 Pytest, 95 JS) PASS. Rendu des modifications UI validé.
-- Traçabilité et File List mises à jour manuellement par l'agent superviseur (bmad-sm) pour clore la review. La PR et le merge sont validés.
+- Tests locaux confirmés sur l'état figé : 182 Pytest PASS, 95 JS PASS.
+- Verdict terrain déjà obtenu : GO avec réserve. Aucune correction produit / code métier supplémentaire n'est requise avant 4.4.
+- Candidat terrain figé en git sur `story/4.3-diagnostic-centre-in-scope`, commit `8c57808d9fe2b1ae00db0cc7bbd9cd16ab4a9752`, tag `story-4.3-terrain-go-avec-reserve`.
+- Traçabilité documentaire réalignée par le SM ; story maintenue en `review` en attendant les étapes finales hors périmètre immédiat (code review / merge).
 
 ### File List
 
@@ -508,4 +508,5 @@ Gemini 3.1 Pro (High)
 - `resources/daemon/tests/unit/test_ui_contract_4d.py`
 - `tests/unit/test_scope_summary_presenter.node.test.js`
 - `tests/unit/test_story_3_4_ai5_frontend_passthrough.node.test.js`
+- `_bmad-output/implementation-artifacts/4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
