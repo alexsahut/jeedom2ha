@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-30 CET'  # ux-spec V3 validée ; paquet minimal correctif Epic 4 dérivé (stories 4.5-4.6) ; Epic 5 reste gelé
+last_updated: '2026-03-30 CET'  # Story 4.5 done après merge PR #60 ; gate ux-spec 10.2 OK ; Epic 4 correctif toujours en cours (4.6)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   4-2-vocabulaire-d-exclusion-par-source-disparition-du-concept-exception: done  # code review PASS 2026-03-28 — 81 JS PASS, 0 finding, non-régression Story 3.4 OK
   4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: done  # PR #57 squash merge dans main (commit 9cf4cadcb4df08b81e163ca79aaec3d8419a422b) ; traçabilité documentaire réalignée
   4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: done  # PR #58 mergee ; closeout post-merge aligne la story
-  4-5-atterrissage-home-tableau-hierarchique-et-point-d-entree-diagnostic: review  # test terrain final OK ; gate terrain ux-spec 10.2 soldee ; micro-correctifs UX valides
+  4-5-atterrissage-home-tableau-hierarchique-et-point-d-entree-diagnostic: done  # test terrain final OK ; gate terrain ux-spec 10.2 soldee ; merge PR #60
   4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home: ready-for-dev  # diagnostic = explicabilite in-scope ; meme modal ; scroll/depliage/focus depuis badge Ecart home ; gate terrain avant done
   epic-4-retrospective: done  # retro 2026-03-29 ; Epic 5 gele jusqu au correctif prioritaire Epic 4 valide en terrain
 
