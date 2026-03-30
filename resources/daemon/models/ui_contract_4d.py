@@ -61,3 +61,23 @@ def build_ui_counters(equipments_4d: list[dict]) -> dict:
         "exclus": exclus,
         "ecarts": ecarts,
     }
+
+
+def compute_home_statut(equipments_4d: list[dict]) -> str:
+    """Calcule le statut synthétique home-only à partir des équipements inclus.
+
+    Règle produit:
+    - tous les inclus publiés => "Publiee"
+    - au moins un inclus publié et un inclus non publié => "Partiellement publiee"
+    - sinon => "Non publiee"
+    - garde-fou: 0 équipement inclus => "Non publiee"
+    """
+    included = [eq for eq in equipments_4d if eq.get("perimetre") == "inclus"]
+    if not included:
+        return "Non publiee"
+    published = sum(1 for eq in included if eq.get("statut") == "publie")
+    if published <= 0:
+        return "Non publiee"
+    if published >= len(included):
+        return "Publiee"
+    return "Partiellement publiee"

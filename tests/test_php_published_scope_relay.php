@@ -36,6 +36,7 @@ $backendContract = array(
       'object_id' => 1,
       'object_name' => 'Salon',
       'counts' => array('total' => 3, 'include' => 1, 'exclude' => 2, 'exceptions' => 1),
+      'home_perimetre' => 'Incluse',
       'has_pending_home_assistant_changes' => false,
     ),
   ),
@@ -71,6 +72,7 @@ $relayOk = jeedom2ha::getPublishedScopeForConsole(function () use ($backendContr
 assertSameRelay('ok', $relayOk['status'] ?? null, 'Relay returns status ok when daemon contract is available');
 assertSameRelay($backendContract, $relayOk['published_scope'] ?? null, 'Relay forwards backend contract without recompute or regroup');
 assertSameRelay(2, count($relayOk['published_scope']['equipements'] ?? array()), 'Relay keeps excluded and exception equipment entries visible for UI');
+assertSameRelay('Incluse', $relayOk['published_scope']['pieces'][0]['home_perimetre'] ?? null, 'Relay forwards home_perimetre without recompute');
 
 $relayUnavailable = jeedom2ha::getPublishedScopeForConsole(function () {
   return array(

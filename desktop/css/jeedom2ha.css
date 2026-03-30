@@ -1,0 +1,21 @@
+#table_scopeSummaryHierarchy {
+  table-layout: fixed;
+  width: 100%;
+}
+
+#table_scopeSummaryHierarchy th:first-child,
+#table_scopeSummaryHierarchy td:first-child {
+  width: 30%;
+}
+
+.j2ha-ecart-affordance {
+  cursor: pointer !important;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.j2ha-ecart-affordance:hover,
+.j2ha-ecart-affordance:focus {
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}

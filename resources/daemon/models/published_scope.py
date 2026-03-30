@@ -148,10 +148,12 @@ def resolve_published_scope(
             else:
                 obj = snapshot.objects.get(piece_id)
                 object_name = obj.name if obj is not None else "Aucun"
+            home_perimetre = "Incluse" if piece_effective == STATE_INCLUDE else "Exclue"
             piece_entries[piece_id] = {
                 "object_id": piece_id,
                 "object_name": object_name,
                 "counts": _new_counts(),
+                "home_perimetre": home_perimetre,
                 "has_pending_home_assistant_changes": False,
             }
 

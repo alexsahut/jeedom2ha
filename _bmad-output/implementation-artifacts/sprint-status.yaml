@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-03-23 CET
+# last_updated: 2026-03-30 CET
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-03-29 CET'  # Story 4.3 done après merge PR #57 ; 4.4 reste review
+last_updated: '2026-03-30 CET'  # ux-spec V3 validée ; paquet minimal correctif Epic 4 dérivé (stories 4.5-4.6) ; Epic 5 reste gelé
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -71,14 +71,22 @@ development_status:
   3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: done  # code review PASS, terrain PASS + micro-fix object_id:null, 73/73 JS 128/128 pytest
   epic-3-retrospective: optional
 
-  epic-4: in-progress  # Recadrage UX — modèle Périmètre / Statut / Écart / Cause
+  epic-4: in-progress  # Correctif prioritaire post-retro relance sur la base de ux-spec V3 ; home et diagnostic a re-atterrir sans rouvrir le socle 4D
   4-1-contrat-backend-du-modele-perimetre-statut-ecart-cause: done  # terrain FAIL 2026-03-27 (69 faux positifs has_pending) → 4.1-fix, code review PASS, PR merged 2026-03-28
   4-2-vocabulaire-d-exclusion-par-source-disparition-du-concept-exception: done  # code review PASS 2026-03-28 — 81 JS PASS, 0 finding, non-régression Story 3.4 OK
   4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: done  # PR #57 squash merge dans main (commit 9cf4cadcb4df08b81e163ca79aaec3d8419a422b) ; traçabilité documentaire réalignée
-  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: review
-  epic-4-retrospective: optional
+  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: done  # PR #58 mergee ; closeout post-merge aligne la story
+  4-5-atterrissage-home-tableau-hierarchique-et-point-d-entree-diagnostic: review  # test terrain final OK ; gate terrain ux-spec 10.2 soldee ; micro-correctifs UX valides
+  4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home: ready-for-dev  # diagnostic = explicabilite in-scope ; meme modal ; scroll/depliage/focus depuis badge Ecart home ; gate terrain avant done
+  epic-4-retrospective: done  # retro 2026-03-29 ; Epic 5 gele jusqu au correctif prioritaire Epic 4 valide en terrain
 
-  epic-5: backlog  # Opérations HA explicites, graduées et sûres (ex-Epic 4, renuméroté 2026-03-26)
+  # Correctif prioritaire Epic 4 (post-retro 2026-03-29) :
+  # - livrable 0 bloqueur (artefact visuel home vs diagnostic) : VALIDE via ux-spec V3
+  # - paquet minimal derive : 4.5 home ; 4.6 diagnostic + flux cible
+  # - aucune mini-story Epic 5 ou refonte 4D melees a ce correctif
+  # - gate terrain bloquant avant done pour 4.5 et 4.6
+
+  epic-5: backlog  # GELE — Operations HA explicites, graduees et sures (ex-Epic 4, renumerote 2026-03-26)
   5-1-facade-backend-unique-des-operations-v1-1: backlog
   5-2-flux-republier-non-destructif-multi-portee: backlog
   5-3-flux-supprimer-puis-recreer-avec-confirmations-fortes: backlog

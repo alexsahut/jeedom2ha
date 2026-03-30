@@ -92,6 +92,9 @@ async def test_published_scope_contract_is_available_after_sync(http_client, htt
     assert contract["global"]["counts"]["exceptions"] == 1
     assert "has_pending_home_assistant_changes" in contract["global"]
 
+    piece = contract["pieces"][0]
+    assert piece["home_perimetre"] == "Exclue"
+
     eq_by_id = {eq["eq_id"]: eq for eq in contract["equipements"]}
     assert 10 in eq_by_id
     assert 11 in eq_by_id  # Exclu mais visible dans le contrat backend
@@ -221,7 +224,7 @@ async def test_published_scope_contract_fields_for_ui_console_are_stable(http_cl
     assert isinstance(contract["pieces"], list)
     assert len(contract["pieces"]) == 2
     for piece in contract["pieces"]:
-        assert {"object_id", "object_name", "counts"}.issubset(piece.keys())
+        assert {"object_id", "object_name", "counts", "home_perimetre"}.issubset(piece.keys())
         assert set(piece["counts"].keys()) == {"total", "include", "exclude", "exceptions"}
     assert isinstance(contract["equipements"], list)
     assert len(contract["equipements"]) == 2
@@ -317,6 +320,55 @@ async def test_published_scope_contract_is_replaced_after_second_sync(http_clien
     scope_data = await scope_resp.json()
     assert scope_data["status"] == "ok"
     assert scope_data["payload"] == second_contract
+
+
+async def test_published_scope_home_perimetre_uses_piece_decision_not_counts(http_client):
+    payload = {
+        "version": "1.0",
+        "objects": [{"id": "1", "name": "Salon"}],
+        "eq_logics": [
+            {
+                "id": "60",
+                "name": "Eq Exclu A",
+                "object_id": "1",
+                "is_enable": "1",
+                "eq_type": "virtual",
+                "cmds": [
+                    {"id": "1110", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                ],
+            },
+            {
+                "id": "61",
+                "name": "Eq Exclu B",
+                "object_id": "1",
+                "is_enable": "1",
+                "eq_type": "virtual",
+                "cmds": [
+                    {"id": "1210", "name": "Etat", "type": "info", "sub_type": "binary", "generic_type": "ENERGY_STATE"},
+                ],
+            },
+        ],
+        "published_scope": {
+            "global": {"raw_state": "include"},
+            "pieces": {},
+            "equipements": {
+                "60": {"raw_state": "exclude"},
+                "61": {"raw_state": "exclude"},
+            },
+        },
+    }
+
+    resp = await http_client.post(
+        "/action/sync",
+        headers={"X-Local-Secret": LOCAL_SECRET},
+        json={"payload": payload},
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    piece = data["payload"]["published_scope"]["pieces"][0]
+    assert piece["counts"]["include"] == 0
+    assert piece["counts"]["exclude"] == 2
+    assert piece["home_perimetre"] == "Incluse"
 
 
 async def test_published_scope_legacy_object_fallback_with_default_inherit_piece_entry(http_client):

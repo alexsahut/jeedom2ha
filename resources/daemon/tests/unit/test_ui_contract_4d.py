@@ -9,7 +9,12 @@ qui ne peut pas servir de proxy de présence HA réelle.
 """
 
 import pytest
-from models.ui_contract_4d import reason_code_to_perimetre, compute_ecart, build_ui_counters
+from models.ui_contract_4d import (
+    reason_code_to_perimetre,
+    compute_ecart,
+    build_ui_counters,
+    compute_home_statut,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -215,3 +220,40 @@ def test_absorption_sure_reason_code_no_ecart():
 def test_absorption_probable_reason_code_no_ecart():
     """Story 4.3 — reason_code=probable + statut=publie → pas d'écart."""
     assert compute_ecart(reason_code_to_perimetre("probable"), "publie") is False
+
+
+# ---------------------------------------------------------------------------
+# Story 4.5 — home_statut (P0 post-terrain)
+# ---------------------------------------------------------------------------
+
+def test_compute_home_statut_all_published():
+    equipments = [
+        {"perimetre": "inclus", "statut": "publie"},
+        {"perimetre": "inclus", "statut": "publie"},
+        {"perimetre": "exclu_par_piece", "statut": "non_publie"},
+    ]
+    assert compute_home_statut(equipments) == "Publiee"
+
+
+def test_compute_home_statut_partial():
+    equipments = [
+        {"perimetre": "inclus", "statut": "publie"},
+        {"perimetre": "inclus", "statut": "non_publie"},
+    ]
+    assert compute_home_statut(equipments) == "Partiellement publiee"
+
+
+def test_compute_home_statut_none_published():
+    equipments = [
+        {"perimetre": "inclus", "statut": "non_publie"},
+        {"perimetre": "inclus", "statut": "non_publie"},
+    ]
+    assert compute_home_statut(equipments) == "Non publiee"
+
+
+def test_compute_home_statut_zero_included():
+    equipments = [
+        {"perimetre": "exclu_par_plugin", "statut": "publie"},
+        {"perimetre": "exclu_sur_equipement", "statut": "non_publie"},
+    ]
+    assert compute_home_statut(equipments) == "Non publiee"

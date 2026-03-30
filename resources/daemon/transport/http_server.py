@@ -30,7 +30,12 @@ from models.mapping import MappingResult, PublicationDecision
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
 from models.cause_mapping import reason_code_to_cause, build_cause_for_pending_unpublish
-from models.ui_contract_4d import reason_code_to_perimetre, compute_ecart, build_ui_counters
+from models.ui_contract_4d import (
+    reason_code_to_perimetre,
+    compute_ecart,
+    build_ui_counters,
+    compute_home_statut,
+)
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
@@ -1641,15 +1646,17 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
 
     summary = build_summary(equipments)
     summary["compteurs"] = build_ui_counters(equipments)
-    rooms = [
-        {
+    summary["home_statut"] = compute_home_statut(equipments)
+    rooms = []
+    for (object_id, object_name_val), room_eqs in rooms_equips.items():
+        room_summary = build_summary(room_eqs)
+        rooms.append({
             "object_id": object_id,
             "object_name": object_name_val,
-            "summary": build_summary(room_eqs),
+            "summary": room_summary,
             "compteurs": build_ui_counters(room_eqs),
-        }
-        for (object_id, object_name_val), room_eqs in rooms_equips.items()
-    ]
+            "home_statut": compute_home_statut(room_eqs),
+        })
 
     # Story 4.3 — Surface filtrée in-scope : équipements avec perimetre == "inclus" uniquement.
     # Filtre de population en sortie — ne modifie pas le pipeline ni le resolver canonique.
