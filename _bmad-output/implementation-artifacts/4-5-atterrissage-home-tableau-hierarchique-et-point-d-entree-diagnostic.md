@@ -1,6 +1,6 @@
 # Story 4.5 : Atterrissage home — tableau hiérarchique unique, statut synthétique de pièce et point d'entrée vers diagnostic
 
-Status: review
+Status: done
 
 Epic: Epic 4 — Recadrage UX : modèle utilisateur Périmètre / Statut / Écart / Cause (correctif prioritaire post-rétro)
 
@@ -652,6 +652,7 @@ GPT-5 Codex (CLI)
 - Ajout de la couverture tests Story 4.5 + test PHP minimal de contrat relay.
 - Réalignement complet des suites héritées impactées 4.2/4.3/3.4 sur le contrat home 4.5, sans réintroduction de diagnostic inline et sans logique métier frontend implicite.
 - Gate terrain `ux-spec.md` section 10.2 exécuté et validé (test terrain final OK).
+- Code review PASS ; PR #60 squash-merge dans `main` (closeout post-merge).
 - Suppression du badge `Contrat backend` et du texte d'aide sous le tableau ; auto-refresh périodique retiré (bouton `Rafraîchir` conservé).
 - Badge `Ecart` rendu visiblement cliquable ; `Aligné/Alignée` passent en vert ; badges gris harmonisés (`Exclue`, `Non publiee`, états neutres).
 - Décalage horizontal réduit au dépliage ; rendu binaire équipement basculé en `vide / coche` avec centrage des colonnes.
@@ -663,6 +664,7 @@ GPT-5 Codex (CLI)
 ### Change Log
 
 - 2026-03-30 — Micro-correctif UX résiduel : curseur main + hover discret sur le badge `Ecart` ; alignement des colonnes figé au dépliage ; tests JS story 4.5 + scope summary.
+- 2026-03-30 — Closeout post-merge : status `done` après merge PR #60.
 
 ### File List
 
