@@ -1662,6 +1662,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     # Filtre de population en sortie — ne modifie pas le pipeline ni le resolver canonique.
     in_scope_equipments = [eq for eq in equipments if eq.get("perimetre") == "inclus"]
 
+    # Story 4.3 — Surface filtrée in-scope : équipements avec perimetre == "inclus" uniquement.
+    # Filtre de population en sortie — ne modifie pas le pipeline ni le resolver canonique.
+    in_scope_equipments = [eq for eq in equipments if eq.get("perimetre") == "inclus"]
+
     return web.json_response({
         "action": "system.diagnostics",
         "status": "ok",

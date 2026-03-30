@@ -12,6 +12,7 @@ inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-jeedom2ha-post-mvp-refresh.md
   - _bmad-output/planning-artifacts/ux-delta-review-post-mvp-v1-1-pilotable.md
   - _bmad-output/planning-artifacts/architecture-delta-review-post-mvp-v1-1-pilotable.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-03-29.md
   - _bmad-output/planning-artifacts/sprint-change-proposal-2026-03-26.md
   - _bmad-output/planning-artifacts/implementation-readiness-report-2026-03-27.md
 secondaryContextDocuments:
@@ -21,8 +22,10 @@ secondaryContextDocuments:
 stepsCompleted:
   - step-01-validate-prerequisites
   - step-02-design-epics
-lastEdited: '2026-03-27'
+lastEdited: '2026-03-29'
 editHistory:
+  - date: '2026-03-29'
+    changes: 'Post-retro Epic 4 — gel explicite d Epic 5, ouverture d un correctif prioritaire Epic 4 borne, livrable initial = artefact visuel prescriptif home vs diagnostic, prochaine etape reoriente vers bmad-create-ux-design.'
   - date: '2026-03-27'
     changes: 'Recadrage UX — insertion Epic 4 (modèle Périmètre/Statut/Écart/Cause, contrat dual reason_code/cause_code, diagnostic in-scope, disparition exception), renumérotation Epic 5 (ex-Epic 4 opérations HA), réalignement vocabulaire documentaire Epics 1-3.'
   - date: '2026-03-22'
@@ -40,6 +43,13 @@ Les **Epics 1, 2 et 3 sont livrés**. Ils constituent les fondations backend et 
 Le **Sprint Change Proposal du 2026-03-26** (approuvé) a identifié un désalignement entre le modèle d'implémentation interne et le modèle mental utilisateur. Les artefacts amont (PRD, UX delta review, Architecture delta review) ont été mis à jour en conséquence.
 
 Ce recadrage est porté par un **nouvel Epic 4** dédié, qui aligne la couche de présentation sur le modèle utilisateur à 4 dimensions **Périmètre → Statut → Écart → Cause**. L'ancien Epic 4 (opérations HA) est renuméroté **Epic 5**.
+
+La retrospective Epic 4 du 2026-03-29 ajoute un reroutage de plan strictement borne :
+- Epic 4 est **reussi sur le fond mais non encore atterri sur la forme** ;
+- Epic 5 reste **gele** ;
+- le prochain chantier prioritaire est un **correctif Epic 4** distinct d'Epic 5 ;
+- ce correctif commence obligatoirement par un **artefact visuel prescriptif et testable home vs diagnostic** ;
+- aucune story corrective de dev n'est ouverte avant validation de cet artefact.
 
 Le découpage reste centré sur des **contrats stables**, pas sur des écrans isolés :
 1. modèle canonique du périmètre publié (Epic 1 — livré) ;
@@ -366,6 +376,29 @@ L'utilisateur comprend immédiatement si un équipement est dans son périmètre
 
 L'interface de la console V1.1 expose directement le modèle d'implémentation interne à l'utilisateur : la taxonomie backend à 6 statuts, les concepts `Hérite de la pièce` / `Exception locale`, la confiance tripartite et le compteur séparé `Exceptions` sont projetés tels quels dans l'UI au lieu d'être traduits en modèle mental utilisateur.
 
+**Addendum post-rétro du 2026-03-29 — correctif prioritaire avant Epic 5**
+
+Le travail 4.1 → 4.4 a livré le socle attendu, mais la retrospective Epic 4 a conclu que **l'objectif produit UX/UI n'est pas encore atteint en usage reel**.
+
+Le correctif prioritaire Epic 4 est donc formule comme suit :
+- **objectif** : restaurer la cible UX/UI attendue ;
+- **cible produit** :
+  - `home = console de synthese et de pilotage`
+  - `diagnostic = surface dediee d'explicabilite detaillee, recentree sur le perimetre`
+- **hors scope** :
+  - ne pas rouvrir le modele 4D ;
+  - ne pas rouvrir les compteurs backend ;
+  - ne pas rouvrir la sortie du vocabulaire legacy ;
+  - ne pas lancer Epic 5 ;
+- **premier livrable bloquant** :
+  - un artefact visuel prescriptif et testable ;
+  - definissant le message dominant de la home, le message dominant du diagnostic, ce qui est absent par design, et ce qui est non duplicable entre les surfaces.
+
+Regle de sequencing :
+- aucune story corrective de dev n'est ouverte avant validation de cet artefact ;
+- le paquet correctif Epic 4 ne sera derive qu'apres cet artefact ;
+- le correctif portera un gate terrain bloquant avant `done`.
+
 **Périmètre in**
 - Contrat backend → UI du modèle à 4 dimensions : `perimetre`, `statut` (binaire), `ecart` (booléen bidirectionnel), `cause_code` / `cause_label` / `cause_action`.
 - Couche de traduction `reason_code` → `cause_code` / `cause_label` (fonction pure, table de correspondance).
@@ -430,7 +463,14 @@ L'interface de la console V1.1 expose directement le modèle d'implémentation i
 
 ### Epic 5 — Opérations HA explicites, graduées et sûres
 
-**Statut : backlog.** Renuméroté depuis l'ancien Epic 4 suite au Sprint Change Proposal du 2026-03-26. L'intention produit et le scope restent inchangés. Les ajustements sont principalement terminologiques et contractuels : les opérations utilisent désormais le vocabulaire et le modèle 4 dimensions stabilisés par l'Epic 4.
+**Statut : backlog — gele.** Renuméroté depuis l'ancien Epic 4 suite au Sprint Change Proposal du 2026-03-26. L'intention produit et le scope restent inchangés. Les ajustements sont principalement terminologiques et contractuels : les opérations utilisent désormais le vocabulaire et le modèle 4 dimensions stabilisés par l'Epic 4.
+
+**Gate de demarrage**
+
+Epic 5 ne doit pas demarrer tant que :
+- l'artefact visuel prescriptif home vs diagnostic n'est pas valide ;
+- le paquet correctif Epic 4 strictement borne n'est pas defini ;
+- le correctif Epic 4 n'a pas passe son gate terrain bloquant.
 
 **Objectif**
 
@@ -529,13 +569,20 @@ Conclusion : **les epics V1.1 restent strictement dans la frontière "pilotage d
 3. **Epic 3 — Moteur de statuts, reason_code stables et explicabilité** (livré)
    Troisième car il consolide l'infrastructure backend de diagnostic sur le périmètre et la santé déjà stabilisés.
 
-4. **Epic 4 — Recadrage UX : modèle utilisateur Périmètre / Statut / Écart / Cause** (backlog — prochain)
-   Quatrième car il aligne la couche de présentation sur le modèle mental utilisateur, en s'appuyant sur les fondations des Epics 1-3 et en stabilisant le vocabulaire avant les opérations HA.
+4. **Correctif prioritaire Epic 4 — restauration UX/UI home vs diagnostic** (priorite immediate)
+   Quatrième car la retrospective Epic 4 a conclu que la cible produit n'est pas encore atteinte en usage reel. Ce chantier commence par un artefact visuel prescriptif et testable, sans rouvrir le socle 4D ni lancer Epic 5.
 
-5. **Epic 5 — Opérations HA explicites, graduées et sûres** (backlog)
-   Dernier car il porte les impacts HA les plus sensibles et doit s'appuyer sur un scope canonique, une santé minimale fiable, une explicabilité déjà en place et un modèle utilisateur stabilisé.
+5. **Epic 5 — Opérations HA explicites, graduées et sûres** (backlog — gele)
+   Dernier car il porte les impacts HA les plus sensibles et doit s'appuyer sur un scope canonique, une santé minimale fiable, une explicabilité déjà en place, un modele utilisateur stabilise et le correctif prioritaire Epic 4 valide en terrain.
 
 Cet ordre ne remet pas en cause la priorité produit du PRD. Il sécurise la mise en oeuvre autour d'un contrat stable avant d'ouvrir les flux à impact fort.
+
+Chemin critique post-retro Epic 4 :
+1. produire l'artefact visuel prescriptif home vs diagnostic ;
+2. valider cet artefact ;
+3. deriver ensuite le paquet correctif Epic 4 strictement borne ;
+4. implementer puis passer le gate terrain bloquant ;
+5. reevaluer seulement ensuite le demarrage d'Epic 5.
 
 ## 8. Vérification finale
 
@@ -555,8 +602,9 @@ Ce que le plan **ne fait pas** :
 - il ne découpe pas par bouton `Republier` ou `Supprimer/Recréer` ;
 - il ne renvoie pas les décisions structurantes UX/architecture au niveau story.
 
-Signal faible à surveiller au passage vers `create-story` :
-- si les stories futures se mettent à découper "la vue globale", "la ligne pièce", "le bouton republier", sans rappeler le contrat backend unique qu'elles servent, alors le découpage dérive hors du cadrage validé.
+Signal faible à surveiller au passage vers les prochains workflows :
+- si une correction de surface principale part directement en `create-story` sans artefact visuel prescriptif valide, alors le cadrage dérive hors de la decision retro ;
+- si les stories futures se mettent a decouper "la vue globale", "la ligne piece", "le bouton republier", sans rappeler le contrat backend unique qu'elles servent, alors le decoupage derive hors du cadrage valide.
 
 ## 9. Plan de correction readiness et décomposition story-level
 
@@ -565,6 +613,7 @@ Signal faible à surveiller au passage vers `create-story` :
 - Le readiness report du 2026-03-22 avait identifié l'absence d'un package story-level prêt à implémenter.
 - Le Sprint Change Proposal du 2026-03-26 ajoute un nouvel epic (recadrage UX) et une renumérotation.
 - La présente section 9 fournit la décomposition story-level complète pour les 5 epics.
+- La retrospective Epic 4 du 2026-03-29 ajoute un blocage supplementaire : **aucune nouvelle story corrective Epic 4 ne doit etre ouverte avant validation d'un artefact visuel prescriptif home vs diagnostic**.
 
 ### 9.2 Correction documentaire obligatoire
 
@@ -580,6 +629,20 @@ Règles non négociables pour toutes les stories :
 8. La **confiance** ne doit jamais apparaître en console principale.
 9. La distinction `reason_code` (backend stable) / `cause_code` + `cause_label` (contrat UI canonique) est structurante.
 10. `Partiellement publié` ne doit jamais apparaître comme statut principal de console.
+
+### 9.2.b Reroutage obligatoire post-rétro Epic 4
+
+Avant toute nouvelle production de stories correctives :
+- produire un artefact visuel prescriptif et testable home vs diagnostic ;
+- valider cet artefact comme reference de responsabilite entre surfaces ;
+- garder Epic 5 gele ;
+- ne deriver le paquet correctif Epic 4 qu'apres cette validation.
+
+Ce reroutage ne reouvre pas :
+- le modele 4D ;
+- les compteurs backend ;
+- la sortie du vocabulaire legacy ;
+- le scope Epic 5.
 
 ### 9.3 Décomposition story-level complète
 
@@ -1220,12 +1283,12 @@ Le gate de sortie est couvert par ce document, sous réserve d'une validation fi
 
 ## 10. Recommandation finale
 
-**Recommandation : le plan d'epics est réaligné avec le recadrage UX validé et prêt pour validation story-level, puis génération des fichiers story individuels.**
+**Recommandation : le plan d'epics est réaligné avec le recadrage UX valide et reroute par la retrospective Epic 4. La prochaine etape n'est pas encore la generation de stories correctives, mais la production d'un artefact visuel prescriptif home vs diagnostic.**
 
-Le plan d'epics est robuste, cohérent et borné. Les 5 epics couvrent la totalité du scope V1.1 Pilotable :
+Le plan d'epics est robuste, coherent et borne. Les 5 epics couvrent la totalite du scope V1.1 Pilotable :
 - Epics 1-3 livrés, fondations solides ;
-- Epic 4 aligne la couche de présentation sur le modèle mental utilisateur ;
-- Epic 5 porte les opérations HA sur un vocabulaire stabilisé.
+- Epic 4 a aligne le socle de presentation sur le modele mental utilisateur, mais son atterrissage UX/UI doit etre corrige ;
+- Epic 5 porte les operations HA sur un vocabulaire stabilise, mais reste gele.
 
 **Points à figer avant `create-story`**
 
@@ -1251,4 +1314,4 @@ Ces points sont des **invariants non renégociables** dans les stories :
 
 Si ces invariants sont repris tels quels, ce document peut servir de source unique pour créer les fichiers story individuels sans reprise de cadrage epic-level.
 
-**Prochaine étape recommandée :** `sprint-planning` pour intégrer l'Epic 4 et l'Epic 5 dans le sprint actif, puis `create-story` pour les stories 4.1 à 4.4.
+**Prochaine étape recommandée :** `bmad-create-ux-design` pour produire l'artefact visuel prescriptif home vs diagnostic, puis seulement apres validation deriver le paquet de stories correctives Epic 4 strictement borne.

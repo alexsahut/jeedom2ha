@@ -35,6 +35,32 @@
     return fallback;
   }
 
+  function readBoolean(value, fallback) {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    return fallback;
+  }
+
+  function readCommandCoverage(commands) {
+    if (!Array.isArray(commands)) {
+      return [];
+    }
+    var normalized = [];
+    for (var i = 0; i < commands.length; i++) {
+      var cmd = commands[i];
+      if (!cmd || typeof cmd !== 'object') {
+        continue;
+      }
+      normalized.push({
+        cmd_id: isFiniteNumber(cmd.cmd_id) ? cmd.cmd_id : null,
+        cmd_name: readString(cmd.cmd_name, ''),
+        generic_type: readString(cmd.generic_type, ''),
+      });
+    }
+    return normalized;
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -157,7 +183,7 @@
     };
   }
 
-  function buildEquipmentModel(entry, equipDiag) {
+  function buildEquipmentModel(entry, equipDiag, isInScope) {
     var diag = (equipDiag && typeof equipDiag === 'object') ? equipDiag : {};
     var perimetre = readString(diag.perimetre, '');
     var ecart = (typeof diag.ecart === 'boolean') ? diag.ecart : null;
@@ -167,11 +193,23 @@
       level: 'equipement',
       eq_id: entry.eq_id,
       name: readString(entry.name, ''),
+      effective_state: readString(entry.effective_state, ''),
       perimetre: perimetre,
       perimetre_label: buildPerimetreLabel(perimetre),
       statut: readString(diag.statut, ''),
       ecart: ecart,
       cause_label: readString(diag.cause_label, ''),
+      cause_action: readString(diag.cause_action, ''),
+      has_pending_home_assistant_changes: readBoolean(entry.has_pending_home_assistant_changes, false),
+      status_code: readString(diag.status_code, ''),
+      reason_code: readString(diag.reason_code, ''),
+      detail: readString(diag.detail, ''),
+      remediation: readString(diag.remediation, ''),
+      v1_limitation: readBoolean(diag.v1_limitation, false),
+      confidence: readString(diag.confidence, ''),
+      matched_commands: readCommandCoverage(diag.matched_commands),
+      unmatched_commands: readCommandCoverage(diag.unmatched_commands),
+      in_scope: isInScope === true,
       counts: {
         total: 1,
         exclus: isExclu ? 1 : 0,
@@ -198,6 +236,18 @@
     var globalSection = (scope.global && typeof scope.global === 'object') ? scope.global : {};
     var pieces = Array.isArray(scope.pieces) ? scope.pieces : [];
     var equipements = Array.isArray(scope.equipements) ? scope.equipements : [];
+
+    var inScopeRaw = Array.isArray(safeResponse.in_scope_equipments) ? safeResponse.in_scope_equipments : null;
+    var inScopeByEqId = null;
+    if (inScopeRaw !== null) {
+      inScopeByEqId = {};
+      for (var s = 0; s < inScopeRaw.length; s++) {
+        var scoped = inScopeRaw[s];
+        if (scoped && scoped.eq_id != null) {
+          inScopeByEqId[String(scoped.eq_id)] = true;
+        }
+      }
+    }
 
     var diagEquipments = (safeResponse.diagnostic_equipments && typeof safeResponse.diagnostic_equipments === 'object')
       ? safeResponse.diagnostic_equipments : {};
@@ -258,7 +308,8 @@
       }
 
       var eqDiag = diagEquipments[equipement.eq_id] || diagEquipments[String(equipement.eq_id)] || null;
-      pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag));
+      var isInScope = inScopeByEqId ? inScopeByEqId[String(equipement.eq_id)] === true : false;
+      pieceModel.equipements.push(buildEquipmentModel(equipement, eqDiag, isInScope));
     }
 
     var globalCompteurs = (diagSummary && diagSummary.compteurs && typeof diagSummary.compteurs === 'object')

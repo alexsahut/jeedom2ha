@@ -15,8 +15,11 @@ active_inputs:
   - _bmad-output/planning-artifacts/ux-delta-review-post-mvp-v1-1-pilotable.md
   - _bmad-output/planning-artifacts/epics-post-mvp-v1-1-pilotable.md
   - _bmad-output/planning-artifacts/implementation-readiness-report-2026-03-22.md
+  - _bmad-output/planning-artifacts/sprint-change-proposal-2026-03-29.md
   - _bmad-output/planning-artifacts/sprint-change-proposal-2026-03-26.md
 revision_history:
+  - date: 2026-03-29
+    changes: "Post-retro Epic 4 — gel explicite d Epic 5, prerequis d un artefact visuel prescriptif home vs diagnostic avant toute story corrective, gate terrain bloquant et nouvelle regle de methode pour les stories de surface principale."
   - date: 2026-03-27
     changes: "Recadrage UX — realignement sur le modele utilisateur 4D (Perimetre/Statut/Ecart/Cause), structure a 5 epics, contrat dual reason_code/cause_code, obligations de couverture compteurs et ecart bidirectionnel."
   - date: 2026-03-22
@@ -36,6 +39,12 @@ La V1.1 Pilotable ne remplace pas la strategie de test MVP. Elle la **rebranche 
 Le Sprint Change Proposal du 2026-03-26 (approuve) a recadre le modele utilisateur V1.1 autour de **4 dimensions: Perimetre → Statut → Ecart → Cause**. Ce recadrage a entraine la mise a jour du PRD, de l'UX delta review, de l'architecture delta review et des epics. Le cycle actif comporte desormais **5 epics**: Epics 1-3 (livres — resolver, sante, reason_code), Epic 4 (backlog — recadrage UX, modele 4D, contrat dual reason_code/cause_code), Epic 5 (backlog — operations HA explicites).
 
 La strategie de test s'aligne sur ce recadrage en ajoutant les obligations de couverture sur: **le contrat backend 4D, le contrat dual reason_code/cause_code, les compteurs backend pre-calcules, l'ecart bidirectionnel, le filtrage diagnostic in-scope, l'absence de logique metier dans le frontend, et la disparition du concept d'exception**.
+
+La retrospective Epic 4 du 2026-03-29 ajoute une contrainte de methode :
+- **Epic 5 reste gele** tant que le correctif prioritaire Epic 4 n'est pas valide en terrain ;
+- le correctif prioritaire Epic 4 commence par un **artefact visuel prescriptif et testable home vs diagnostic** ;
+- aucune story corrective de dev n'est `ready-for-dev` avant validation de cet artefact ;
+- toute story touchant une surface principale ou redistribuant la responsabilite entre surfaces doit porter un **gate terrain bloquant avant `done`**.
 
 La regle directrice reste: on conserve l'approche MVP **backend-first, majoritairement unitaire et integration backend**, et on ajoute en delta des tests contractuels sur les invariants V1.1 recadres. Les tests UI restent cibles et ne deviennent obligatoires que lorsqu'une story modifie un contrat visible critique. Le frontend est en **lecture seule** du contrat backend — il ne calcule pas, ne derive pas, ne recompose pas.
 
@@ -186,6 +195,12 @@ Chaque story V1.1 doit expliciter, dans ses Dev Notes et ses AC:
 
 ### Exigences specifiques par epic
 
+**Correctif prioritaire Epic 4 (post-retro 2026-03-29)** — avant toute story corrective de dev :
+- produire et valider un artefact visuel prescriptif et testable home vs diagnostic ;
+- refuser toute story corrective qui ne cite pas explicitement cet artefact comme reference d'acceptation ;
+- rendre le gate terrain bloquant avant `done` pour ce correctif ;
+- maintenir Epic 5 gele tant que ce correctif n'est pas valide en terrain.
+
 **Stories Epic 4 (recadrage UX)** — doivent en plus:
 - prouver la traduction `reason_code` → `cause_code`/`cause_label` (invariant 16);
 - prouver la forme 4D du contrat JSON backend → UI (invariant 10);
@@ -203,6 +218,11 @@ Chaque story V1.1 doit expliciter, dans ses Dev Notes et ses AC:
 ### Critere de readiness
 
 Une story n'est pas "ready-for-dev" si elle parle d'UI, d'operations ou de statuts sans nommer le backend comme source de verite, le contrat 4D comme modele de lecture, le contrat dual reason_code/cause_code comme regle d'etancheite, et la preuve de non-regression attendue.
+
+Une story n'est pas non plus "ready-for-dev" si elle touche une surface principale ou redistribue la responsabilite entre surfaces sans :
+- artefact visuel prescriptif valide ;
+- review orientee responsabilite des surfaces ;
+- gate terrain explicite avant `done`.
 
 ## 8. Ce qui peut rester hors scope test a ce stade
 
@@ -229,6 +249,7 @@ Peut rester hors scope V1.1, sauf story qui le demande explicitement:
 ### Pour tous les epics
 
 - **`dev-story`**: implementer les tests dans le meme changement que la fonctionnalite, en etendant d'abord les suites `pytest` / PHP existantes. Les tests UI ne viennent qu'en complement sur les contrats visibles critiques.
+- **Regle de methode durable**: pour toute future story touchant une surface principale ou redistribuant la responsabilite entre surfaces, exiger l'enchainement `artefact visuel prescriptif -> story -> implementation -> gate terrain bloquant avant done`.
 
 ## 10. Ambiguite residuelle
 
