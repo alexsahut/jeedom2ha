@@ -83,6 +83,8 @@ async def test_diagnostics_with_data(cli, app):
     assert data["status"] == "ok"
     equipments = data["payload"]["equipments"]
     assert len(equipments) == 3
+    assert data["payload"]["summary"]["home_statut"] == "Partiellement publiee"
+    assert data["payload"]["rooms"][0]["home_statut"] == "Partiellement publiee"
 
     eq_100 = next(e for e in equipments if e["eq_id"] == 100)
     assert eq_100["object_name"] == "Salon"
@@ -103,6 +105,27 @@ async def test_diagnostics_with_data(cli, app):
     assert eq_102["confidence"] == "Ignoré"
     assert eq_102["reason_code"] == "no_commands"
 
+
+async def test_diagnostics_home_statut_zero_inclus(cli, app):
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-16T12:00:00Z",
+        objects={1: JeedomObject(id=1, name="Garage")},
+        eq_logics={
+            150: JeedomEqLogic(id=150, name="Eq Exclu 1", object_id=1, is_excluded=True),
+            151: JeedomEqLogic(id=151, name="Eq Exclu 2", object_id=1, is_excluded=True),
+        },
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {
+        150: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic"),
+        151: EligibilityResult(is_eligible=False, reason_code="excluded_eqlogic"),
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+
+    assert data["payload"]["summary"]["home_statut"] == "Non publiee"
+    assert data["payload"]["rooms"][0]["home_statut"] == "Non publiee"
 async def test_diagnostics_partial_or_not_published(cli, app):
     # Test valid eligibility but not published
     snapshot = TopologySnapshot(

@@ -38,7 +38,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<div class="clearfix">
 				<div class="pull-left">
 					<i class="fas fa-layer-group"></i> <strong>{{Synthèse du périmètre publié}}</strong>
-					<span class="label label-default" style="margin-left:8px;">{{Contrat backend}}</span>
 				</div>
 				<div class="pull-right">
 					<button id="bt_refreshScopeSummary" class="btn btn-default btn-xs">
@@ -48,10 +47,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			</div>
 			<div id="div_scopeSummaryContent" style="margin-top:10px;">
 				<div class="text-muted">{{Chargement de la synthèse backend...}}</div>
-			</div>
-			<div style="margin-top:8px;color:#666;font-size:0.9em;">
-				<i class="fas fa-info-circle"></i>
-				{{Cette synthèse décrit le périmètre local calculé par le backend. Elle ne confirme pas à elle seule une application Home Assistant.}}
 			</div>
 		</div>
 
@@ -291,6 +286,8 @@ $eqLogics = eqLogic::byType($plugin->getId());
 	</div><!-- /.eqLogic -->
 </div><!-- /.row row-overflow -->
 
+<!-- Inclusion du fichier CSS du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
+<?php include_file('desktop', 'jeedom2ha', 'css', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>

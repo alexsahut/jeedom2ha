@@ -32,6 +32,171 @@ function _jeedom2ha_extract_commands(array $cmds): array {
 }
 
 /**
+ * Story 4.5 — Signal synthétique pièce home-only.
+ * Domaine contractuel fermé: Publiee / Partiellement publiee / Non publiee.
+ */
+function _jeedom2ha_build_home_room_status(?int $publies, ?int $total): string {
+    if ($publies === null || $total === null || $total <= 0) {
+        return '';
+    }
+    if ($publies <= 0) {
+        return 'Non publiee';
+    }
+    if ($publies >= $total) {
+        return 'Publiee';
+    }
+    return 'Partiellement publiee';
+}
+
+/**
+ * Story 4.5 — Lecture stricte d'un signal contractuel Statut pièce/global.
+ * Domaine fermé: Publiee / Partiellement publiee / Non publiee.
+ */
+function _jeedom2ha_read_home_room_status_signal($rawStatus): string {
+    if (!is_string($rawStatus)) {
+        return '';
+    }
+    $status = trim($rawStatus);
+    if ($status === 'Publiee' || $status === 'Partiellement publiee' || $status === 'Non publiee') {
+        return $status;
+    }
+    return '';
+}
+
+/**
+ * Story 4.5 — Signal contractuel Perimetre au niveau pièce.
+ * Domaine fermé: Incluse / Exclue.
+ */
+function _jeedom2ha_build_home_piece_perimetre(array $piece): string {
+    $rawPerimetre = $piece['home_perimetre'] ?? null;
+    if (!is_string($rawPerimetre)) {
+        return '';
+    }
+    $perimetre = trim($rawPerimetre);
+    if ($perimetre === 'Incluse' || $perimetre === 'Exclue') {
+        return $perimetre;
+    }
+    return '';
+}
+
+/**
+ * Story 4.5 — Delta contractuel minimal relay home.
+ * Limité strictement à:
+ *  - Publies
+ *  - Statut synthétique de pièce (home-only)
+ */
+function _jeedom2ha_build_home_signals(array $publishedScope, array $diagnosticPayload): array {
+    $empty = array(
+        'global' => array('publies' => null, 'statut' => ''),
+        'pieces' => array(),
+    );
+
+    $diagEquipments = (isset($diagnosticPayload['equipments']) && is_array($diagnosticPayload['equipments']))
+        ? $diagnosticPayload['equipments']
+        : null;
+    $diagSummary = (isset($diagnosticPayload['summary']) && is_array($diagnosticPayload['summary']))
+        ? $diagnosticPayload['summary']
+        : array();
+    $diagRooms = (isset($diagnosticPayload['rooms']) && is_array($diagnosticPayload['rooms']))
+        ? $diagnosticPayload['rooms']
+        : array();
+
+    $pieceTotals = array();
+    $piecePerimetres = array();
+    foreach ($publishedScope['pieces'] ?? array() as $piece) {
+        if (!is_array($piece)) {
+            continue;
+        }
+        $objectId = (int)($piece['object_id'] ?? 0);
+        $rawTotal = $piece['counts']['total'] ?? null;
+        $total = is_numeric($rawTotal) ? (int)$rawTotal : null;
+        $pieceTotals[$objectId] = $total;
+        $piecePerimetres[$objectId] = _jeedom2ha_build_home_piece_perimetre($piece);
+    }
+
+    if (empty($pieceTotals) && $diagEquipments === null) {
+        return $empty;
+    }
+
+    $eqObjectMap = array();
+    foreach ($publishedScope['equipements'] ?? array() as $eq) {
+        if (!is_array($eq)) {
+            continue;
+        }
+        $eqId = (int)($eq['eq_id'] ?? 0);
+        if ($eqId <= 0) {
+            continue;
+        }
+        $eqObjectMap[$eqId] = (int)($eq['object_id'] ?? 0);
+    }
+
+    $piecePublies = array();
+    foreach (array_keys($pieceTotals) as $objectId) {
+        $piecePublies[$objectId] = null;
+    }
+
+    $globalPublies = null;
+    if ($diagEquipments !== null) {
+        $globalPublies = 0;
+        foreach (array_keys($piecePublies) as $objectId) {
+            $piecePublies[$objectId] = 0;
+        }
+
+        foreach ($diagEquipments as $eq) {
+            if (!is_array($eq)) {
+                continue;
+            }
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId <= 0) {
+                continue;
+            }
+            if (($eq['statut'] ?? '') !== 'publie') {
+                continue;
+            }
+            $globalPublies++;
+            if (array_key_exists($eqId, $eqObjectMap)) {
+                $objectId = $eqObjectMap[$eqId];
+                if (!array_key_exists($objectId, $piecePublies) || !is_int($piecePublies[$objectId])) {
+                    $piecePublies[$objectId] = 0;
+                }
+                $piecePublies[$objectId]++;
+            }
+        }
+    }
+
+    $diagRoomsByObjectId = array();
+    foreach ($diagRooms as $room) {
+        if (!is_array($room)) {
+            continue;
+        }
+        $objectId = array_key_exists('object_id', $room) && $room['object_id'] !== null
+            ? (int)$room['object_id']
+            : 0;
+        $diagRoomsByObjectId[$objectId] = $room;
+    }
+
+    $piecesSignals = array();
+    foreach (array_keys($pieceTotals) as $objectId) {
+        $piecePublished = array_key_exists($objectId, $piecePublies) ? $piecePublies[$objectId] : null;
+        $roomSignal = $diagRoomsByObjectId[$objectId] ?? array();
+        $piecesSignals[] = array(
+            'object_id' => $objectId,
+            'perimetre' => $piecePerimetres[$objectId] ?? '',
+            'publies' => $piecePublished,
+            'statut' => _jeedom2ha_read_home_room_status_signal($roomSignal['home_statut'] ?? null),
+        );
+    }
+
+    return array(
+        'global' => array(
+            'publies' => $globalPublies,
+            'statut' => _jeedom2ha_read_home_room_status_signal($diagSummary['home_statut'] ?? null),
+        ),
+        'pieces' => $piecesSignals,
+    );
+}
+
+/**
  * Helper — Pseudonymise les champs PII d'un tableau d'équipements.
  *   name       → Équipement_N  (trié par eq_id croissant, index 1-based)
  *   object_name → Pièce_M      (index 1-based par ordre d'apparition)
@@ -283,6 +448,8 @@ try {
               $eqDiag[$eqId] = [
                 // Story 4.4 — contrat 4D frontend (lecture stricte backend)
                 'statut'       => (string)($eq['statut'] ?? ''),
+                // Story 4.5 — signal Publies (niveau équipement) exposé tel quel
+                'publies'      => (($eq['statut'] ?? '') === 'publie') ? 1 : 0,
                 'ecart'        => array_key_exists('ecart', $eq) ? (bool)$eq['ecart'] : null,
                 'cause_code'   => isset($eq['cause_code']) ? (string)$eq['cause_code'] : '',
                 'cause_label'  => isset($eq['cause_label']) ? (string)$eq['cause_label'] : '',
@@ -312,7 +479,18 @@ try {
             }
           }
           $result['in_scope_equipments'] = $inScopeEquipments;
+          // Story 4.5 — delta relay minimal strictement borné à Publies + Statut pièce.
+          $result['home_signals'] = _jeedom2ha_build_home_signals(
+            $result['published_scope'] ?? array(),
+            $dp
+          );
         }
+      }
+      if (!array_key_exists('home_signals', $result)) {
+        $result['home_signals'] = array(
+          'global' => array('publies' => null, 'statut' => ''),
+          'pieces' => array(),
+        );
       }
       ajax::success($result);
     }

@@ -148,28 +148,90 @@ function applyHAGating(r) {
 }
 
 function _captureNavState() {
-  var expanded = [];
-  $('#div_scopeSummaryContent .j2ha-piece-detail:visible').each(function() {
-    expanded.push($(this).data('piece-id'));
+  var expandedNodeIds = [];
+  $('#div_scopeSummaryContent .j2ha-row-toggle[data-expanded="true"]').each(function() {
+    var nodeId = $(this).attr('data-node-id');
+    if (typeof nodeId === 'string' && nodeId !== '') {
+      expandedNodeIds.push(nodeId);
+    }
   });
   return {
-    expandedPieceIds: expanded,
+    expandedNodeIds: expandedNodeIds,
     scrollTop: $(window).scrollTop(),
   };
 }
 
-function _restoreNavState(navState) {
-  if (!navState || !navState.expandedPieceIds) { return; }
-  for (var i = 0; i < navState.expandedPieceIds.length; i++) {
-    var pieceId = navState.expandedPieceIds[i];
-    var $detail = $('#div_scopeSummaryContent .j2ha-piece-detail[data-piece-id="' + pieceId + '"]');
-    if ($detail.length) {
-      $detail.show();
-      $('#div_scopeSummaryContent .j2ha-piece-summary[data-piece-id="' + pieceId + '"]')
-        .find('.j2ha-toggle-icon').html('&#9660;');
+function _setScopeSummaryToggleVisual($row, expanded) {
+  var icon = expanded ? '&#9660;' : '&#9654;';
+  $row.attr('data-expanded', expanded ? 'true' : 'false');
+  $row.find('.j2ha-toggle-icon').first().html(icon);
+}
+
+function _toggleScopeSummaryHierarchyRow($row, forceExpanded) {
+  if (!$row || $row.length === 0) {
+    return;
+  }
+  var nodeType = $row.attr('data-node-type');
+  var isExpanded = ($row.attr('data-expanded') === 'true');
+  var expanded = (typeof forceExpanded === 'boolean') ? forceExpanded : !isExpanded;
+
+  if (nodeType === 'global') {
+    _setScopeSummaryToggleVisual($row, expanded);
+    var $pieceRows = $('#div_scopeSummaryContent .j2ha-child-of-global');
+    if (expanded) {
+      $pieceRows.show();
+      return;
+    }
+    $pieceRows.hide();
+    $('#div_scopeSummaryContent .j2ha-row-equipement').hide();
+    $('#div_scopeSummaryContent .j2ha-row-toggle[data-node-type="piece"]').each(function() {
+      _setScopeSummaryToggleVisual($(this), false);
+    });
+    return;
+  }
+
+  if (nodeType === 'piece') {
+    var pieceId = $row.attr('data-piece-id');
+    if (typeof pieceId !== 'string' || pieceId === '') {
+      return;
+    }
+    _setScopeSummaryToggleVisual($row, expanded);
+    var selector = '.j2ha-child-of-piece-' + pieceId;
+    if (expanded) {
+      $('#div_scopeSummaryContent ' + selector).show();
+    } else {
+      $('#div_scopeSummaryContent ' + selector).hide();
     }
   }
-  $(window).scrollTop(navState.scrollTop);
+}
+
+function _restoreNavState(navState) {
+  if (!navState || !Array.isArray(navState.expandedNodeIds)) {
+    return;
+  }
+
+  var expandedByNodeId = {};
+  for (var i = 0; i < navState.expandedNodeIds.length; i++) {
+    expandedByNodeId[String(navState.expandedNodeIds[i])] = true;
+  }
+
+  if (expandedByNodeId.global === true) {
+    _toggleScopeSummaryHierarchyRow(
+      $('#div_scopeSummaryContent .j2ha-row-toggle[data-node-id="global"]').first(),
+      true
+    );
+  }
+
+  $('#div_scopeSummaryContent .j2ha-row-toggle[data-node-type="piece"]').each(function() {
+    var nodeId = $(this).attr('data-node-id');
+    if (expandedByNodeId[String(nodeId)] === true) {
+      _toggleScopeSummaryHierarchyRow($(this), true);
+    }
+  });
+
+  if (typeof navState.scrollTop === 'number' && Number.isFinite(navState.scrollTop)) {
+    $(window).scrollTop(navState.scrollTop);
+  }
 }
 
 function renderPublishedScopeSummary(result, navState) {
@@ -217,35 +279,41 @@ function refreshPublishedScopeSummary(preserveNavState) {
 }
 
 $(function() {
-  // Refresh MQTT badge on page load and every 5s when visible
+  // Refresh MQTT badge on page load (no auto-refresh)
   refreshBridgeStatus();
-  setInterval(function() {
-    if ($('#div_bridgeHealthBanner').is(':visible')) {
-      refreshBridgeStatus();
-    }
-  }, 5000);
 
-  // Story 1.2 — lecture stricte du contrat published_scope (aucun recalcul métier local)
-  // Story 1.5 — toggle accordéon des pièces (délégation sur le conteneur persistant)
-  $('#div_scopeSummaryContent').on('click', '.j2ha-piece-summary', function() {
-    var pieceId = $(this).data('piece-id');
-    var $detail = $('#div_scopeSummaryContent .j2ha-piece-detail[data-piece-id="' + pieceId + '"]');
-    var $icon = $(this).find('.j2ha-toggle-icon');
-    if ($detail.is(':visible')) {
-      $detail.hide();
-      $icon.html('&#9654;');
-    } else {
-      $detail.show();
-      $icon.html('&#9660;');
+  // Story 4.5 — tableau hiérarchique unique (global -> pièce -> équipement)
+  $('#div_scopeSummaryContent').on('click', '.j2ha-row-toggle', function() {
+    _toggleScopeSummaryHierarchyRow($(this));
+  });
+
+  // Story 4.5 — badge Écart équipement = point d'entrée diagnostic unique (eq_id stable).
+  $('#div_scopeSummaryContent').on('click', '.j2ha-ecart-clickable', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var eqId = parseInt($(this).attr('data-eq-id'), 10);
+    if (!Number.isFinite(eqId) || eqId <= 0) {
+      return;
     }
+    var request = {
+      eq_id: eqId,
+      source: 'home-ecart-badge',
+      timestamp: Date.now(),
+    };
+    window.jeedom2haHomeDiagnosticTarget = request;
+    $(document).trigger('jeedom2ha:diagnostic-open-request', request);
+    $('.eqLogicAction[data-action=diagnostic]').first().trigger('click');
+  });
+
+  $('#div_scopeSummaryContent').on('keydown', '.j2ha-ecart-clickable', function(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    $(this).trigger('click');
   });
 
   refreshPublishedScopeSummary();
-  setInterval(function() {
-    if ($('#div_scopeSummary').is(':visible')) {
-      refreshPublishedScopeSummary(true); // Story 1.5 — préserve l'état de navigation
-    }
-  }, 10000);
 
   $('#bt_refreshScopeSummary').on('click', function() {
     refreshPublishedScopeSummary(); // rafraîchissement manuel : repart de l'état initial
