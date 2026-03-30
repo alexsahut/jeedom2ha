@@ -1,6 +1,6 @@
 # Story 4.3 : Diagnostic centré in-scope, confiance en diagnostic uniquement, traitement de "Partiellement publié"
 
-Status: review
+Status: done
 
 ## Story
 
@@ -470,11 +470,11 @@ Vérification : `reason_code` apparaît dans l'export et le diagnostic technique
 - [x] Suite pytest complète PASS
 - [x] Suite JS complète PASS
 - [x] Non-régression Stories 3.4 et 4.1 confirmée ; coexistence Story 4.2 vérifiée
-- [ ] Code review PASS
+- [x] Code review PASS
 
 ## Risques / ambiguïtés restantes
 
-1. **Clôture review / merge final hors périmètre immédiat** — le présent réalignement documentaire maintient la story en `review`. La clôture code review et le merge final restent des étapes distinctes du pilotage d'ouverture de 4.4.
+1. **Clôture review / merge final** — réalisée par le squash merge de la PR #57 dans `main` (commit `9cf4cadcb4df08b81e163ca79aaec3d8419a422b`). La story est alignée sur l'état réel et ne porte plus d'écart documentaire.
 
 2. **`partially_published` status_code — origine résiduelle** — Il n'est pas clair si le backend génère encore `partially_published` comme `status_code` dans des chemins legacy secondaires. La story le neutralise côté lecture et le couvre par tests, sans rouvrir `taxonomy.py`.
 
@@ -496,7 +496,7 @@ Gemini 3.1 Pro (High)
 - Tests locaux confirmés sur l'état figé : 182 Pytest PASS, 95 JS PASS.
 - Verdict terrain déjà obtenu : GO avec réserve. Aucune correction produit / code métier supplémentaire n'est requise avant 4.4.
 - Candidat terrain figé en git sur `story/4.3-diagnostic-centre-in-scope`, commit `8c57808d9fe2b1ae00db0cc7bbd9cd16ab4a9752`, tag `story-4.3-terrain-go-avec-reserve`.
-- Traçabilité documentaire réalignée par le SM ; story maintenue en `review` en attendant les étapes finales hors périmètre immédiat (code review / merge).
+- Traçabilité documentaire réalignée par le SM ; story alignée sur le squash merge de la PR #57 dans `main` (commit `9cf4cadcb4df08b81e163ca79aaec3d8419a422b`) et clôturée en `done`.
 
 ### File List
 
