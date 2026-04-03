@@ -497,6 +497,15 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         return '<span class="label" style="background-color:#777!important;color:#fff!important;">' + conf + '</span>';
       };
 
+      // Story 4.6 — AC 2 : badge Écart du diagnostic (lecture stricte backend).
+      var getEcartBadge = (typeof Jeedom2haDiagnosticHelpers !== 'undefined')
+        ? function(ecart) { return Jeedom2haDiagnosticHelpers.getEcartBadgeHtml(ecart); }
+        : function(ecart) {
+            if (ecart === true) return '<span class="label label-warning">Ecart</span>';
+            if (ecart === false) return '<span class="label label-success">Aligne</span>';
+            return '<span class="label label-default">&mdash;</span>';
+          };
+
       // AC4 — Reason codes de typage → lien contextualisé vers #commandtab
       var commandTabReasonCodes = {
         'no_generic_type_configured': true,  // taxonomie fermée AC2
@@ -519,7 +528,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
 
         // Use !important on TR and TD to resist Jeedom/Bootstrap hover overrides
         var html = '<tr class="diag-detail-row" style="display:none;background:transparent!important;">';
-        html += '<td colspan="5" style="background:transparent!important;padding:12px 20px;border-top:none;">';
+        html += '<td colspan="6" style="background:transparent!important;padding:12px 20px;border-top:none;">';
 
         // --- Section 1 : Commandes observées ---
         html += '<div style="margin-bottom:10px;"><strong>{{Commandes observées}}</strong>';
@@ -654,11 +663,18 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       var renderTable = function(filterText) {
         filterText = (filterText || '').toLowerCase();
 
-        // Group by object_name and filter
+        // Story 4.6 — AC 5 : in-scope only.
+        // Le diagnostic standard n'affiche que les équipements inclus dans le périmètre.
+        // Les exclus restent absents par design de la vue diagnostic standard.
+        var inScopeEquipments = equipments.filter(function(eq) {
+          return (eq.perimetre || '') === 'inclus';
+        });
+
+        // Group by object_name and apply user filter
         var byObject = {};
         var matchCount = 0;
-        for (var i = 0; i < equipments.length; i++) {
-          var eq = equipments[i];
+        for (var i = 0; i < inScopeEquipments.length; i++) {
+          var eq = inScopeEquipments[i];
           var objName = eq.object_name || "Aucun";
 
           if (filterText !== '') {
@@ -673,8 +689,9 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           matchCount++;
         }
 
+        // Story 4.6 — AC 2 : 6 colonnes exactes et ordonnées : Piece | Nom | Ecart | Statut | Confiance | Raison.
         var html = '<table class="table table-bordered table-condensed" id="table_diagnostic" style="width:100%;table-layout:auto;">';
-        html += '<thead><tr><th>{{Objet/Pièce}}</th><th>{{Equipement}}</th><th style="width:120px;">{{Statut}}</th><th style="width:100px;">{{Confiance}}</th><th>{{Raison : Explication}}</th></tr></thead>';
+        html += '<thead><tr><th>{{Piece}}</th><th>{{Nom}}</th><th style="width:80px;">{{Ecart}}</th><th style="width:120px;">{{Statut}}</th><th style="width:100px;">{{Confiance}}</th><th>{{Raison}}</th></tr></thead>';
         html += '<tbody>';
 
         var objects = Object.keys(byObject).sort();
@@ -684,11 +701,11 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
 
           for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
             var eq = eqs[eqIdx];
-            var reasonDescription = reasonLabels[eq.reason_code] || 'Code inconnu';
-            // AC3 — accordéon disponible pour TOUS les équipements (y compris Publié)
+            var reasonDescription = reasonLabels[eq.reason_code] || '';
+            // Accordéon disponible pour TOUS les équipements in-scope (y compris Publié)
             var chevron = '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>';
 
-            // Encode enriched data as JSON in data attribute (inclut traceability AC1)
+            // Encode enriched data as JSON in data attribute (inclut traceability)
             var detailData = JSON.stringify({
               eq_id: eq.eq_id,
               eq_type_name: eq.eq_type_name || '',
@@ -703,16 +720,20 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
               traceability: eq.traceability || {}
             });
 
-            html += '<tr class="diag-expandable" style="cursor:pointer;" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
+            // Story 4.6 — AC 6 : data-eq-id sur chaque ligne pour le ciblage depuis la home.
+            html += '<tr class="diag-expandable" style="cursor:pointer;" data-eq-id="' + eq.eq_id + '" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
             html += '<td style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
             html += '<td style="white-space:nowrap;">' + chevron + eq.name + '</td>';
+            // Story 4.6 — AC 2 : colonne Écart (nouvelle, avant Statut).
+            html += '<td>' + getEcartBadge(eq.ecart) + '</td>';
             var partialSuffix = '';
             if (eq.status === 'Publié' && eq.unmatched_commands && eq.unmatched_commands.length > 0) {
               partialSuffix = ' <span class="text-muted" style="font-size:0.85em">(partiel)</span>';
             }
             html += '<td>' + getStatusLabel(eq.status) + partialSuffix + '</td>';
             html += '<td>' + getConfidenceLabel(eq.confidence) + '</td>';
-            html += '<td><span style="color:#888;font-family:monospace;font-size:0.9em;">' + eq.reason_code + '</span> : <span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
+            // Story 4.6 — AC 2 : Raison lisible (pas de reason_code interne exposé).
+            html += '<td><span style="font-size:0.9em;">' + reasonDescription + '</span></td>';
             html += '</tr>';
 
             html += buildDetailRow(eq);
@@ -720,7 +741,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         }
 
         if (matchCount === 0) {
-           html += '<tr><td colspan="5" class="text-center"><i>{{Aucun résultat pour cette recherche}}</i></td></tr>';
+           html += '<tr><td colspan="6" class="text-center"><i>{{Aucun résultat pour cette recherche}}</i></td></tr>';
         }
 
         html += '</tbody></table>';
@@ -766,6 +787,32 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
 
       // Bind accordion on initial render
       bindAccordion('#div_diagnosticTable');
+
+      // Story 4.6 — AC 6 / AC 7 : ouverture ciblée depuis la home via badge Écart.
+      // Si window.jeedom2haHomeDiagnosticTarget est présent, cibler l'équipement correspondant.
+      var homeTarget = window.jeedom2haHomeDiagnosticTarget || null;
+      window.jeedom2haHomeDiagnosticTarget = null; // consommer la cible une seule fois
+      if (homeTarget && homeTarget.eq_id) {
+        var targetEqId = String(homeTarget.eq_id);
+        setTimeout(function() {
+          var $container = $('#div_diagnosticTable');
+          var $targetRow = $container.find('.diag-expandable[data-eq-id="' + targetEqId + '"]');
+          if ($targetRow.length > 0) {
+            // Scroll vers la ligne
+            var rowTop = $targetRow.position() ? $targetRow.position().top : 0;
+            var scrollPos = $container.scrollTop() + rowTop - 40;
+            $container.scrollTop(Math.max(0, scrollPos));
+            // Déplier la ligne (utilise l'accordéon existant)
+            $targetRow.trigger('click');
+            // Mise en évidence visuelle temporaire
+            $targetRow.addClass('j2ha-diag-target-highlight');
+            setTimeout(function() {
+              $targetRow.removeClass('j2ha-diag-target-highlight');
+            }, 2500);
+          }
+          // AC 7 : si la cible n'est pas trouvée, la modal reste ouverte en mode général sans erreur.
+        }, 150);
+      }
 
       $('#in_searchDiagnostic').off('keyup').on('keyup', function() {
          var val = $(this).val();
