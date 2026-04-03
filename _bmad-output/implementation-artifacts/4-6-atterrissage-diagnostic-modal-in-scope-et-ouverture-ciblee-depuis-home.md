@@ -1,6 +1,6 @@
 # Story 4.6 : Atterrissage diagnostic — modal in-scope et ouverture ciblée depuis la home
 
-Status: ready-for-dev
+Status: in-progress
 
 Epic: Epic 4 — Recadrage UX : modèle utilisateur Périmètre / Statut / Écart / Cause (correctif prioritaire post-rétro)
 
@@ -336,16 +336,31 @@ Lecture utile :
 
 ### Agent Model Used
 
-TBD
+claude-sonnet-4.6
 
 ### Debug Log References
 
-- À compléter pendant l'implémentation.
+- `node --check desktop/js/jeedom2ha_diagnostic_helpers.js` (PASS)
+- `node --check desktop/js/jeedom2ha.js` (PASS)
+- `node --test tests/unit/test_story_4_6_diagnostic_modal.node.test.js` (PASS — 19/19)
+- `node --test tests/unit/test_story_4_6_diagnostic_modal.node.test.js tests/unit/test_scope_summary_presenter.node.test.js tests/unit/test_story_4_4_integration_ui_4d.node.test.js tests/unit/test_story_4_5_home_landing.node.test.js tests/unit/test_story_4_2_vocab_exclusion.node.test.js tests/unit/test_story_4_3_diagnostic_in_scope.node.test.js tests/unit/test_story_3_4_ai5_frontend_passthrough.node.test.js` (PASS — 63/63)
 
 ### Completion Notes List
 
-- À compléter pendant l'implémentation.
+- Nouveau module pur `desktop/js/jeedom2ha_diagnostic_helpers.js` : `filterInScopeEquipments`, `getDiagnosticColumns`, `getEcartBadgeHtml`, `findTargetEquipmentIndex`.
+- `desktop/js/jeedom2ha.js` — refactor du modal diagnostic : filtre in-scope, 6 colonnes `Piece|Nom|Ecart|Statut|Confiance|Raison`, `data-eq-id` sur chaque ligne, Raison lisible sans reason_code interne, colspan 5→6 dans buildDetailRow (conservé tel quel).
+- Ouverture ciblée depuis la home : consomme `window.jeedom2haHomeDiagnosticTarget`, scroll + dépliage + highlight temporaire `j2ha-diag-target-highlight` (2,5 s), fallback propre si cible absente.
+- `desktop/css/jeedom2ha.css` : ajout de `.j2ha-diag-target-highlight` (fond jaune clair, transition 0,5 s).
+- `desktop/php/jeedom2ha.php` : inclusion du nouveau module helpers avant `jeedom2ha.js`.
+- 19 tests Story 4.6 PASS ; 63/63 total suite PASS (non-régression 4.2/4.3/4.4/4.5 OK).
+- Gate terrain obligatoire avant done : checklist ux-spec.md section 10.2 à exécuter.
 
 ### File List
 
-- À compléter pendant l'implémentation.
+- `desktop/js/jeedom2ha_diagnostic_helpers.js` (nouveau)
+- `desktop/js/jeedom2ha.js`
+- `desktop/css/jeedom2ha.css`
+- `desktop/php/jeedom2ha.php`
+- `tests/unit/test_story_4_6_diagnostic_modal.node.test.js` (nouveau)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home.md`
