@@ -290,6 +290,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 <?php include_file('desktop', 'jeedom2ha', 'css', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_diagnostic_helpers', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
