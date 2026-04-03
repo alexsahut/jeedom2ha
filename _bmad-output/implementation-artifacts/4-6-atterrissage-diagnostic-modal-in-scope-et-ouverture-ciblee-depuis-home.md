@@ -1,6 +1,6 @@
 # Story 4.6 : Atterrissage diagnostic — modal in-scope et ouverture ciblée depuis la home
 
-Status: in-progress
+Status: done
 
 Epic: Epic 4 — Recadrage UX : modèle utilisateur Périmètre / Statut / Écart / Cause (correctif prioritaire post-rétro)
 
@@ -344,6 +344,7 @@ claude-sonnet-4.6
 - `node --check desktop/js/jeedom2ha.js` (PASS)
 - `node --test tests/unit/test_story_4_6_diagnostic_modal.node.test.js` (PASS — 19/19)
 - `node --test tests/unit/test_story_4_6_diagnostic_modal.node.test.js tests/unit/test_scope_summary_presenter.node.test.js tests/unit/test_story_4_4_integration_ui_4d.node.test.js tests/unit/test_story_4_5_home_landing.node.test.js tests/unit/test_story_4_2_vocab_exclusion.node.test.js tests/unit/test_story_4_3_diagnostic_in_scope.node.test.js tests/unit/test_story_3_4_ai5_frontend_passthrough.node.test.js` (PASS — 63/63)
+- Micro-fix highlight CSS (2026-04-03) : `node --test …/test_story_4_6_diagnostic_modal.node.test.js … (PASS — 63/63)`
 
 ### Completion Notes List
 
@@ -354,6 +355,7 @@ claude-sonnet-4.6
 - `desktop/php/jeedom2ha.php` : inclusion du nouveau module helpers avant `jeedom2ha.js`.
 - 19 tests Story 4.6 PASS ; 63/63 total suite PASS (non-régression 4.2/4.3/4.4/4.5 OK).
 - Gate terrain obligatoire avant done : checklist ux-spec.md section 10.2 à exécuter.
+- Micro-fix highlight (2026-04-03) : cause racine = `background-color` posé sur `<tr>` recouvert par les `<td>` Bootstrap/Jeedom ; transition non jouée au retrait car portée par la classe supprimée. Fix CSS-only : `#div_diagnosticTable td { transition: background-color 0.5s; }` + `.j2ha-diag-target-highlight > td { background-color: #fff9c4 !important; }`. Aucun changement JS. 63/63 PASS.
 
 ### File List
 

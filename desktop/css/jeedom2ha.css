@@ -21,7 +21,11 @@
 }
 
 /* Story 4.6 — mise en évidence temporaire lors d'une ouverture ciblée depuis la home */
-.j2ha-diag-target-highlight {
-  background-color: #fff9c4 !important;
+/* Transition permanente sur les td du diagnostic : garantit le fade-out même lors du retrait de la classe parente */
+#div_diagnosticTable td {
   transition: background-color 0.5s;
+}
+/* La classe est posée sur le <tr> ; on cible les <td> pour passer devant les fonds Bootstrap/Jeedom */
+.j2ha-diag-target-highlight > td {
+  background-color: #fff9c4 !important;
 }

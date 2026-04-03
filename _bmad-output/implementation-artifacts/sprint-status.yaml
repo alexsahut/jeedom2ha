@@ -77,7 +77,7 @@ development_status:
   4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: done  # PR #57 squash merge dans main (commit 9cf4cadcb4df08b81e163ca79aaec3d8419a422b) ; traçabilité documentaire réalignée
   4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: done  # PR #58 mergee ; closeout post-merge aligne la story
   4-5-atterrissage-home-tableau-hierarchique-et-point-d-entree-diagnostic: done  # test terrain final OK ; gate terrain ux-spec 10.2 soldee ; merge PR #60
-  4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home: done  # gate terrain PASS, PR #63 mergee, closeout complet
+  4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home: done  # gate terrain PASS, code review PASS, 63/63 tests, PR #63 merge closeout
   epic-4-retrospective: done  # retro 2026-03-29 ; Epic 5 gele jusqu au correctif prioritaire Epic 4 valide en terrain
 
   # Correctif prioritaire Epic 4 (post-retro 2026-03-29) :
