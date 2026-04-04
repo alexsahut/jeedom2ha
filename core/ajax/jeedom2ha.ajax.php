@@ -465,6 +465,8 @@ try {
                 // Story 4.4 / AC8 — détails techniques de couverture commandes (surface technique uniquement)
                 'matched_commands'   => _jeedom2ha_extract_commands($eq['matched_commands'] ?? []),
                 'unmatched_commands' => _jeedom2ha_extract_commands($eq['unmatched_commands'] ?? []),
+                // Story 5.1 — signal actions_ha en passthrough strict (aucun calcul local)
+                'actions_ha'         => $eq['actions_ha'] ?? null,
               ];
             }
           }
@@ -578,6 +580,24 @@ try {
         . $excludedPlugins . '" excludedObjects="' . $excludedObjects
         . '" confidencePolicy="' . $confidencePolicy . '"');
       ajax::success(['saved' => true]);
+    }
+    else if ($action == 'executeHaAction') {
+      // Story 5.1 — Relay strict de la façade backend unique /action/execute.
+      // Aucun calcul local : les paramètres sont transmis au daemon tel quel.
+      $params = array(
+        'intention' => init('intention', ''),
+        'portee'    => init('portee', ''),
+        'selection' => json_decode(init('selection', '[]'), true),
+      );
+      if (!is_array($params['selection'])) {
+        $params['selection'] = [];
+      }
+      $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[ACTION] Le démon n\'a pas répondu à /action/execute (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
     }
     else {
       throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
