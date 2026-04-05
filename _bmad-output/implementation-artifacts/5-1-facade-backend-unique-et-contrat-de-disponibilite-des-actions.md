@@ -248,10 +248,10 @@ Aucune dépendance en avant. Cette story fournit le socle consommé par 5.2, 5.3
   - [x] Tests relay PHP :
     - passthrough strict du signal `actions_ha` sans enrichissement local
 
-- [x] Task 6 — Déploiement terrain DEV/TEST (si applicable)
-  - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Vérification terrain du signal `actions_ha` dans le payload réel
-  - [ ] Vérification terrain du label contextuel et de la disponibilité des boutons
+- [ ] Task 6 — Déploiement terrain DEV/TEST (si applicable)
+  - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` — bloqué (`JEEDOM_BOX_HOST` non configuré, box indisponible)
+  - [ ] Vérification terrain du signal `actions_ha` dans le payload réel — **bloqué : box de test indisponible**
+  - [ ] Vérification terrain du label contextuel et de la disponibilité des boutons — **bloqué : box de test indisponible**
 
 ## Dev Notes
 
@@ -404,6 +404,7 @@ Fichiers principaux candidats à la modification :
 - [x] Le contrat 4D existant n'est pas altéré.
 - [x] Les suites de tests MVP et Epic 4 ne régressent pas.
 - [x] Le code est prêt pour la review (`bmad-code-review`).
+- [ ] **Gate terrain** : validation terrain du signal `actions_ha` et du label contextuel — bloquée (box indisponible). Non bloquant pour `review`, bloquant pour `done`.
 
 ## References
 
@@ -437,7 +438,7 @@ Fichiers principaux candidats à la modification :
 - Gating bridge : toutes actions grisées si `MqttBridge.is_connected == False`.
 - Frontend en lecture seule stricte : `readActionsHa()` normalise, `renderActionButtons()` rend.
 - Relay PHP passthrough strict : aucun calcul de label ni de disponibilité.
-- Task 6 (terrain) : dry-run bloqué par absence de `JEEDOM_BOX_HOST` — à valider quand box disponible.
+- Task 6 (terrain) : dry-run exécuté mais bloqué par absence de `JEEDOM_BOX_HOST` (box indisponible). Vérification terrain du signal `actions_ha` et du label contextuel différée — **non bloquant pour code review**, à valider avant `done`.
 
 ### Debug Log
 
@@ -470,3 +471,4 @@ Aucun incident bloquant.
 ## Change Log
 
 - **2026-04-04** — Story 5.1 implémentée : façade backend unique (`POST /action/execute`), signal `actions_ha` par équipement, relay PHP passthrough, consommation frontend en lecture seule. 228 pytest + 120 JS + 7 PHP = 355 tests PASS, 0 régression.
+- **2026-04-05** — Reprise ciblée BMAD : réalignement artefacts (Task 6 terrain décochée car box indisponible, gate terrain ajoutée en DoD, sprint-status last_updated corrigé). Vérification de scope confirmée — aucune dérive 5.2/5.3/5.4. Tests re-validés : 228 pytest + 120 JS + 7 PHP = 355 PASS, 0 régression.

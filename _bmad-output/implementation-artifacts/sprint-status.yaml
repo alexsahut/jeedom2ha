@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-04 CET'  # Story 5.1 in-progress
+last_updated: '2026-04-05 CET'  # Story 5.1 review — artefacts realignes
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
