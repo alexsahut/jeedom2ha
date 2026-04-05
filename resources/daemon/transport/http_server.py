@@ -36,6 +36,7 @@ from models.ui_contract_4d import (
     build_ui_counters,
     compute_home_statut,
 )
+from models.actions_ha import build_actions_ha
 from mapping.light import LightMapper
 from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
@@ -1613,6 +1614,21 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             cause_code, cause_label, cause_action = None, None, None
         ha_type = map_result.ha_entity_type if map_result else None
 
+        # Story 5.1 — Signal actions_ha par équipement (AC 2, 3, 4, 5)
+        # Le signal n'est généré que pour les équipements inclus.
+        # est_publie_ha = is_published_in_ha (déjà calculé au-dessus).
+        est_inclus = (perimetre == "inclus")
+        mqtt_bridge = request.app.get("mqtt_bridge")
+        bridge_ok = bool(mqtt_bridge and mqtt_bridge.is_connected)
+        if est_inclus:
+            actions_ha = build_actions_ha(
+                est_publie_ha=is_published_in_ha,
+                est_inclus=True,
+                bridge_disponible=bridge_ok,
+            )
+        else:
+            actions_ha = None
+
         eq_dict = {
             "eq_id": eq_id,
             "object_name": object_name,
@@ -1626,6 +1642,8 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "cause_label": cause_label,
             "cause_action": cause_action,
             "ha_type": ha_type,
+            # Story 5.1 — Signal actions_ha (None si non inclus)
+            "actions_ha": actions_ha,
             # Couche technique / support (backward compat — ne jamais supprimer)
             "status": status,
             "status_code": status_code,
@@ -1706,6 +1724,91 @@ async def _handle_system_published_scope(request: web.Request) -> web.Response:
 
 
 
+# ---------------------------------------------------------------------------
+# Story 5.1 — Façade backend unique d'opérations HA
+# ---------------------------------------------------------------------------
+
+_INTENTIONS_VALIDES = frozenset(("publier", "supprimer"))
+_PORTEES_VALIDES = frozenset(("global", "piece", "equipement"))
+
+
+async def _handle_action_execute(request: web.Request) -> web.Response:
+    """Handle POST /action/execute — façade unique des opérations HA.
+
+    Paramètres attendus (JSON body) :
+      intention : 'publier' | 'supprimer'
+      portee    : 'global' | 'piece' | 'equipement'
+      selection : liste non vide d'identifiants cible
+
+    Story 5.1 = socle contractuel. L'exécution réelle est Story 5.2 (publier) / 5.3 (supprimer).
+    La façade valide et accepte les appels mais retourne 'non_implemente' pour l'exécution.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response(
+            {"status": "error", "message": "Corps de requête JSON invalide."},
+            status=400,
+        )
+
+    intention = body.get("intention")
+    portee = body.get("portee")
+    selection = body.get("selection")
+
+    # Validation — intention
+    if intention not in _INTENTIONS_VALIDES:
+        return web.json_response(
+            {
+                "status": "error",
+                "message": f"Intention non reconnue : '{intention}'. Valeurs acceptées : {', '.join(sorted(_INTENTIONS_VALIDES))}.",
+            },
+            status=400,
+        )
+
+    # Validation — portée
+    if portee not in _PORTEES_VALIDES:
+        return web.json_response(
+            {
+                "status": "error",
+                "message": f"Portée non reconnue : '{portee}'. Valeurs acceptées : {', '.join(sorted(_PORTEES_VALIDES))}.",
+            },
+            status=400,
+        )
+
+    # Validation — sélection non vide
+    if not selection or not isinstance(selection, list) or len(selection) == 0:
+        return web.json_response(
+            {
+                "status": "error",
+                "message": "Le champ 'selection' est obligatoire et doit être une liste non vide.",
+            },
+            status=400,
+        )
+
+    # Story 5.1 — stub : la façade accepte les appels valides mais ne les exécute pas encore.
+    # L'exécution réelle sera Story 5.2 (publier) et Story 5.3 (supprimer).
+    return web.json_response({
+        "action": "action.execute",
+        "status": "ok",
+        "payload": {
+            "intention": intention,
+            "portee": portee,
+            "selection": selection,
+            "resultat": "non_implemente",
+            "message": f"L'exécution de l'intention '{intention}' sera implémentée dans une story ultérieure.",
+        },
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application()
@@ -1735,6 +1838,8 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/sync", _handle_action_sync)
     app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
+    # Story 5.1 — Façade backend unique des opérations HA
+    app.router.add_post("/action/execute", _handle_action_execute)
     return app
 
 

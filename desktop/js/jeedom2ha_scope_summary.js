@@ -61,6 +61,29 @@
     return normalized;
   }
 
+  // Story 5.1 — Lecture stricte du signal actions_ha (aucun recalcul local).
+  function readActionsHa(rawActionsHa) {
+    if (!rawActionsHa || typeof rawActionsHa !== 'object') {
+      return null;
+    }
+    var result = {};
+    var keys = ['publier', 'supprimer'];
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var action = rawActionsHa[key];
+      if (!action || typeof action !== 'object') {
+        return null;
+      }
+      result[key] = {
+        label: readString(action.label, ''),
+        disponible: action.disponible === true,
+        raison_indisponibilite: (typeof action.raison_indisponibilite === 'string') ? action.raison_indisponibilite : null,
+        niveau_confirmation: readString(action.niveau_confirmation, ''),
+      };
+    }
+    return result;
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -209,6 +232,8 @@
       confidence: readString(diag.confidence, ''),
       matched_commands: readCommandCoverage(diag.matched_commands),
       unmatched_commands: readCommandCoverage(diag.unmatched_commands),
+      // Story 5.1 — signal actions_ha en lecture seule (null si absent ou non inclus)
+      actions_ha: readActionsHa(diag.actions_ha),
       in_scope: isInScope === true,
       counts: {
         total: 1,
@@ -343,6 +368,7 @@
     html += '<th>Inclus</th>';
     html += '<th>Publies</th>';
     html += '<th>Ecarts</th>';
+    html += '<th>Actions</th>';
     html += '</tr></thead>';
     return html;
   }
@@ -457,6 +483,32 @@
     return html;
   }
 
+  // Story 5.1 — Rendu des boutons d'action HA strictement depuis actions_ha (aucun recalcul).
+  function renderActionButtons(actionsHa, eqId) {
+    if (!actionsHa) {
+      return '';
+    }
+    var html = '<div class="j2ha-actions-ha" style="white-space:nowrap;">';
+    var publier = actionsHa.publier;
+    var supprimer = actionsHa.supprimer;
+    if (publier && publier.label) {
+      var disabledPub = !publier.disponible;
+      html += '<button class="btn btn-xs btn-success j2ha-action-ha-btn" data-ha-action="publier"'
+        + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
+        + (disabledPub ? ' disabled title="' + escapeHtml(publier.raison_indisponibilite || '') + '"' : '')
+        + '>' + escapeHtml(publier.label) + '</button> ';
+    }
+    if (supprimer && supprimer.label) {
+      var disabledSup = !supprimer.disponible;
+      html += '<button class="btn btn-xs btn-danger j2ha-action-ha-btn" data-ha-action="supprimer"'
+        + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
+        + (disabledSup ? ' disabled title="' + escapeHtml(supprimer.raison_indisponibilite || '') + '"' : '')
+        + '>' + escapeHtml(supprimer.label) + '</button>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function render(model) {
     if (!model || model.has_contract !== true) {
       var message = readString(model && model.message, "Aucune synthèse backend disponible. Lancez d'abord une synchronisation.");
@@ -479,6 +531,7 @@
       toDisplayCount(model.global.counts.inclus),
       toDisplayCount(model.global.counts.publies),
       toDisplayCount(model.global.counts.ecarts),
+      '',
     ];
 
     html += renderRow(globalColumns, {
@@ -500,6 +553,7 @@
         toDisplayCount(piece.counts.inclus),
         toDisplayCount(piece.counts.publies),
         toDisplayCount(piece.counts.ecarts),
+        '',
       ];
 
       html += renderRow(pieceColumns, {
@@ -521,6 +575,7 @@
           renderBinaryCount(eq.counts.inclus),
           renderBinaryCount(eq.counts.publies),
           renderBinaryCount(eq.counts.ecarts),
+          renderActionButtons(eq.actions_ha, eq.eq_id),
         ];
 
         html += renderRow(eqColumns, {
@@ -532,7 +587,7 @@
     }
 
     if (model.pieces.length === 0) {
-      html += '<tr><td colspan="9" class="text-center"><em>Aucune pièce disponible dans le contrat backend</em></td></tr>';
+      html += '<tr><td colspan="10" class="text-center"><em>Aucune pièce disponible dans le contrat backend</em></td></tr>';
     }
 
     html += '</tbody></table></div>';
@@ -544,5 +599,7 @@
     render: render,
     getAggregatedStatusLabel: getAggregatedStatusLabel,
     buildPerimetreLabel: buildPerimetreLabel,
+    readActionsHa: readActionsHa,
+    renderActionButtons: renderActionButtons,
   };
 }));
