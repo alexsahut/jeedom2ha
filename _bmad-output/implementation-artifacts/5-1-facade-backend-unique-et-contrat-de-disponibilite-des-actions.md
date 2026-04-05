@@ -439,6 +439,7 @@ Fichiers principaux candidats à la modification :
 - Frontend en lecture seule stricte : `readActionsHa()` normalise, `renderActionButtons()` rend.
 - Relay PHP passthrough strict : aucun calcul de label ni de disponibilité.
 - Task 6 (terrain) : dry-run exécuté mais bloqué par absence de `JEEDOM_BOX_HOST` (box indisponible). Vérification terrain du signal `actions_ha` et du label contextuel différée — **non bloquant pour code review**, à valider avant `done`.
+- **Fix post-review M1 (2026-04-05)** : assertion tautologique corrigée dans `test_story_5_1_actions_ha_frontend.node.test.js:67` — remplacement de `!A || !B` (always-true) par regex ciblé sur l'élément `data-ha-action="publier"`. 11/11 tests PASS, suite complète 120/120 PASS, 0 régression.
 
 ### Debug Log
 
@@ -472,3 +473,4 @@ Aucun incident bloquant.
 
 - **2026-04-04** — Story 5.1 implémentée : façade backend unique (`POST /action/execute`), signal `actions_ha` par équipement, relay PHP passthrough, consommation frontend en lecture seule. 228 pytest + 120 JS + 7 PHP = 355 tests PASS, 0 régression.
 - **2026-04-05** — Reprise ciblée BMAD : réalignement artefacts (Task 6 terrain décochée car box indisponible, gate terrain ajoutée en DoD, sprint-status last_updated corrigé). Vérification de scope confirmée — aucune dérive 5.2/5.3/5.4. Tests re-validés : 228 pytest + 120 JS + 7 PHP = 355 PASS, 0 régression.
+- **2026-04-05** — Fix post-review M1 : assertion JS tautologique corrigée dans `test_story_5_1_actions_ha_frontend.node.test.js:67` (ligne `!A || !B` always-true → regex `data-ha-action="publier"[^>]*>` + vérification absence `disabled`). 120/120 JS PASS, 0 régression.

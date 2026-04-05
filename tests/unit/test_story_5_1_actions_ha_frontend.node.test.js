@@ -63,8 +63,10 @@ describe('5.1 / AC6 — renderActionButtons : rendu strictement depuis actions_h
     const html = Jeedom2haScopeSummary.renderActionButtons(actions, 42);
     assert.ok(html.includes('Créer dans Home Assistant'));
     assert.ok(html.includes('Supprimer de Home Assistant'));
-    // Publier actif (pas de disabled)
-    assert.ok(!html.includes('data-ha-action="publier" disabled') || !html.includes('data-ha-action=\"publier\" disabled'));
+    // Publier actif (pas de disabled sur l'élément publier)
+    const publierEl = html.match(/data-ha-action="publier"[^>]*>/);
+    assert.ok(publierEl, 'Bouton publier absent du HTML');
+    assert.ok(!publierEl[0].includes('disabled'), 'Bouton publier ne doit pas être disabled');
     // Supprimer grisé (disabled)
     assert.ok(html.includes('disabled'));
     assert.ok(html.includes('Aucune entité publiée'));
