@@ -87,7 +87,7 @@ development_status:
   # - gate terrain bloquant avant done pour 4.5 et 4.6
 
   epic-5: in-progress  # Operations HA contextuelles — Creer/Republier + Supprimer (correct-course V3 2026-04-04, ex-Epic 4 renumerote 2026-03-26)
-  5-1-facade-backend-unique-et-contrat-de-disponibilite-des-actions: merged  # PR #65 merged 2026-04-05 (1e0a0ab) — code review PASS, gate terrain DIFFÉRÉ sur main — ne pas marquer done avant validation terrain
+  5-1-facade-backend-unique-et-contrat-de-disponibilite-des-actions: review  # PR #65 merged 2026-04-05 (1e0a0ab) — code review PASS, code dans main, gate terrain DIFFÉRÉ — done seulement après validation terrain
   5-2-flux-positif-contextuel-creer-republier-multi-portee: backlog
   5-3-flux-supprimer-standalone-avec-confirmations-fortes: backlog
   5-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: backlog

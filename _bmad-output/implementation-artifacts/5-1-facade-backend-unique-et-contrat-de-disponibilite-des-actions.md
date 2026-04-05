@@ -1,6 +1,6 @@
 # Story 5.1 : Façade backend unique et contrat de disponibilité des actions
 
-Status: merged
+Status: review
 
 > **Merge closeout 2026-04-05** — PR #65 squash-merged dans `main` (commit `1e0a0abc376c`).
 > Code review final : PASS. Gate terrain : **DIFFÉRÉ** — à exécuter sur `main` avant passage à `done`.
