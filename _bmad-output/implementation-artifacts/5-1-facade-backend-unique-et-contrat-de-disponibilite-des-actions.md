@@ -1,6 +1,11 @@
 # Story 5.1 : Façade backend unique et contrat de disponibilité des actions
 
-Status: review
+Status: merged
+
+> **Merge closeout 2026-04-05** — PR #65 squash-merged dans `main` (commit `1e0a0abc376c`).
+> Code review final : PASS. Gate terrain : **DIFFÉRÉ** — à exécuter sur `main` avant passage à `done`.
+> Le passage à `done` est conditionné à la validation terrain réelle du signal `actions_ha`,
+> du label contextuel Créer/Republier, de la matrice de disponibilité et du gating par état du pont.
 
 Epic: Epic 5 — Opérations HA explicites, contextuelles et sûres
 
