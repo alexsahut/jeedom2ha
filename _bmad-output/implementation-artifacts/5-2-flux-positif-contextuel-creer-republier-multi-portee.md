@@ -2,6 +2,10 @@
 
 Status: review
 
+> **Merge closeout 2026-04-06** — PR #67 squash-merged dans `main` (commit `8d60a02`).
+> Code review final : PASS. Gate terrain : **différé** — bloquant avant `done`.
+> Story en `review` jusqu'à validation terrain réelle depuis l'environnement canonique.
+
 ## Story
 
 En tant qu'utilisateur Jeedom,
