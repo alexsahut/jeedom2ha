@@ -20,6 +20,39 @@
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
+/* Story 5.5 — Rééquilibrage colonnes métier
+   Nom 30% | Statut 13% | Écart 7% | Actions 9% | 6 cols restantes ~6.8% chacune */
+
+/* Largeurs explicites (pilotées par <th>, table-layout: fixed)
+   Périmètre 11% : couvre "Exclu par le plugin" (~126px) à 1280px
+   Statut 12% : couvre "Partiellement publiee" (~138px) à 1280px avec respiration
+   Écart 7% / Actions 9% : inchangés */
+#table_scopeSummaryHierarchy th:nth-child(2) { width: 11%; }
+#table_scopeSummaryHierarchy th:nth-child(3) { width: 12%; }
+#table_scopeSummaryHierarchy th:nth-child(4) { width: 7%; }
+#table_scopeSummaryHierarchy th:nth-child(5) { width: 9%; text-align: right; padding-right: 14px; }
+
+/* Respiration inter-colonnes métier : règle uniforme sur Périmètre (col 2) et Statut (col 3).
+   Produit 21px de blanc entre badges adjacents (16px droite + 5px gauche suivante). */
+#table_scopeSummaryHierarchy th:nth-child(2),
+#table_scopeSummaryHierarchy td:nth-child(2),
+#table_scopeSummaryHierarchy th:nth-child(3),
+#table_scopeSummaryHierarchy td:nth-child(3) {
+  padding-right: 16px;
+}
+
+/* Respiration droite colonne Actions → Total */
+#table_scopeSummaryHierarchy td:nth-child(5) { padding-right: 14px; }
+
+/* Conteneur boutons Actions : flex stable, aligné à droite */
+.j2ha-actions-ha {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 /* Story 4.6 — mise en évidence temporaire lors d'une ouverture ciblée depuis la home */
 /* Transition permanente sur les td du diagnostic : garantit le fade-out même lors du retrait de la classe parente */
 #div_diagnosticTable td {

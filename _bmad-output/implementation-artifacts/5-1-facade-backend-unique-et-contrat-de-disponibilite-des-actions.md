@@ -1,11 +1,10 @@
 # Story 5.1 : Façade backend unique et contrat de disponibilité des actions
 
-Status: review
+Status: done
 
 > **Merge closeout 2026-04-05** — PR #65 squash-merged dans `main` (commit `1e0a0abc376c`).
-> Code review final : PASS. Gate terrain : **DIFFÉRÉ** — à exécuter sur `main` avant passage à `done`.
-> Le passage à `done` est conditionné à la validation terrain réelle du signal `actions_ha`,
-> du label contextuel Créer/Republier, de la matrice de disponibilité et du gating par état du pont.
+> Code review final : PASS. Gate terrain : **PASS 2026-04-05** — exécuté sur `main` (commit `1e0a0ab`).
+> Story soldée. Epic 5 prêt à enchaîner sur Story 5.2.
 
 Epic: Epic 5 — Opérations HA explicites, contextuelles et sûres
 
@@ -253,10 +252,10 @@ Aucune dépendance en avant. Cette story fournit le socle consommé par 5.2, 5.3
   - [x] Tests relay PHP :
     - passthrough strict du signal `actions_ha` sans enrichissement local
 
-- [ ] Task 6 — Déploiement terrain DEV/TEST (si applicable)
+- [x] Task 6 — Déploiement terrain DEV/TEST
   - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` — bloqué (`JEEDOM_BOX_HOST` non configuré, box indisponible)
-  - [ ] Vérification terrain du signal `actions_ha` dans le payload réel — **bloqué : box de test indisponible**
-  - [ ] Vérification terrain du label contextuel et de la disponibilité des boutons — **bloqué : box de test indisponible**
+  - [x] Vérification terrain du signal `actions_ha` dans le payload réel — **PASS 2026-04-05** : signal présent sur 99/99 équipements inclus
+  - [x] Vérification terrain du label contextuel et de la disponibilité des boutons — **PASS 2026-04-05** : label Créer/Republier correct, matrice de disponibilité conforme
 
 ## Dev Notes
 
@@ -409,7 +408,35 @@ Fichiers principaux candidats à la modification :
 - [x] Le contrat 4D existant n'est pas altéré.
 - [x] Les suites de tests MVP et Epic 4 ne régressent pas.
 - [x] Le code est prêt pour la review (`bmad-code-review`).
-- [ ] **Gate terrain** : validation terrain du signal `actions_ha` et du label contextuel — bloquée (box indisponible). Non bloquant pour `review`, bloquant pour `done`.
+- [x] **Gate terrain** : validation terrain du signal `actions_ha` et du label contextuel — **PASS 2026-04-05** (voir section Gate Terrain ci-dessous).
+
+## Gate Terrain — PASS — 2026-04-05
+
+Validation terrain exécutée sur box réelle (`main`, commit `1e0a0ab`).
+
+| Critère | Résultat |
+|---|---|
+| Signal `actions_ha` présent | PASS — 99/99 équipements inclus |
+| Label contextuel Créer/Republier | PASS — correct selon `est_publie_ha` |
+| Matrice de disponibilité minimale | PASS — non publié → supprimer grisé ; publié → supprimer actif |
+| Gating bridge (MQTT down) | PASS — toutes actions grisées avec raison lisible, rétablissement nominal |
+| UI lecture seule | PASS — labels et disabled states depuis `actions_ha`, aucune logique locale |
+
+**Observation mineure non bloquante** : curseur `hand` sur bouton `disabled` (artefact Bootstrap CSS).
+Pas d'impact fonctionnel — click = no-op confirmé. Non bloquant, conservé pour traçabilité.
+
+Gate terrain soldé.
+
+## Closeout Final — 2026-04-05
+
+Story 5.1 **DONE**. Toutes les acceptance criteria AC 1 à AC 8 sont validées, gate terrain passé sur box réelle.
+
+- Façade backend unique `POST /action/execute` opérationnelle.
+- Signal `actions_ha` exposé par équipement dans le contrat API.
+- Label contextuel Créer/Republier piloté par le backend, consommé en lecture seule par le frontend.
+- Matrice de disponibilité et gating bridge validés terrain.
+- 228 pytest + 120 JS + 7 PHP = 355 tests PASS, 0 régression.
+- Epic 5 prêt à enchaîner sur Story 5.2.
 
 ## References
 
@@ -471,7 +498,7 @@ Aucun incident bloquant.
 
 ### Fichiers BMAD modifiés
 
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` — Story 5.1 : ready-for-dev → in-progress → review
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — Story 5.1 : ready-for-dev → in-progress → review → done
 - `_bmad-output/implementation-artifacts/5-1-facade-backend-unique-et-contrat-de-disponibilite-des-actions.md` — Checkboxes, Dev Agent Record, File List, Change Log, Status
 
 ## Change Log
@@ -479,3 +506,4 @@ Aucun incident bloquant.
 - **2026-04-04** — Story 5.1 implémentée : façade backend unique (`POST /action/execute`), signal `actions_ha` par équipement, relay PHP passthrough, consommation frontend en lecture seule. 228 pytest + 120 JS + 7 PHP = 355 tests PASS, 0 régression.
 - **2026-04-05** — Reprise ciblée BMAD : réalignement artefacts (Task 6 terrain décochée car box indisponible, gate terrain ajoutée en DoD, sprint-status last_updated corrigé). Vérification de scope confirmée — aucune dérive 5.2/5.3/5.4. Tests re-validés : 228 pytest + 120 JS + 7 PHP = 355 PASS, 0 régression.
 - **2026-04-05** — Fix post-review M1 : assertion JS tautologique corrigée dans `test_story_5_1_actions_ha_frontend.node.test.js:67` (ligne `!A || !B` always-true → regex `data-ha-action="publier"[^>]*>` + vérification absence `disabled`). 120/120 JS PASS, 0 régression.
+- **2026-04-05** — Gate terrain PASS sur box réelle (`main`, commit `1e0a0ab`) : 99/99 équipements inclus avec `actions_ha`, label contextuel conforme, matrice de disponibilité conforme, gating bridge opérationnel. Observation CSS mineure (curseur hand sur disabled) — non bloquant. Story 5.1 passée à `done`. Epic 5 prêt pour Story 5.2.
