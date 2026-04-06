@@ -151,6 +151,177 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _resolve_eq_ids_for_portee(
+    portee: str,
+    selection: list,
+    topology: TopologySnapshot,
+) -> list[int]:
+    """Resolve eqLogic ids from the requested scope using the in-memory topology only."""
+    if portee == "equipement":
+        eq_ids: list[int] = []
+        for raw_eq_id in selection:
+            eq_id = _to_int(raw_eq_id, default=0)
+            if eq_id <= 0:
+                raise ValueError("Sélection équipement invalide.")
+            eq_ids.append(eq_id)
+        return eq_ids
+
+    if portee == "piece":
+        eq_ids = []
+        seen_eq_ids = set()
+        for raw_piece_id in selection:
+            piece_id = _to_int(raw_piece_id, default=0)
+            if piece_id <= 0 or piece_id not in topology.objects:
+                raise ValueError(f"Pièce inconnue : {raw_piece_id}.")
+            for eq_id, eq in topology.eq_logics.items():
+                if eq.object_id == piece_id and eq_id not in seen_eq_ids:
+                    eq_ids.append(eq_id)
+                    seen_eq_ids.add(eq_id)
+        return eq_ids
+
+    if portee == "global":
+        return list(topology.eq_logics.keys())
+
+    raise ValueError(f"Portée non reconnue : {portee}.")
+
+
+def _build_action_execute_response(
+    *,
+    payload: Dict[str, Any],
+    http_status: int = 200,
+    top_status: str = "ok",
+) -> web.Response:
+    return web.json_response(
+        {
+            "action": "action.execute",
+            "status": top_status,
+            "payload": payload,
+            "request_id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+        status=http_status,
+    )
+
+
+def _normalize_action_execute_body(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept direct JSON calls and the PHP relay wrapper `{payload: ...}`."""
+    wrapped_payload = body.get("payload")
+    if (
+        isinstance(wrapped_payload, dict)
+        and "intention" in wrapped_payload
+        and "portee" in wrapped_payload
+    ):
+        return wrapped_payload
+    return body
+
+
+def _scope_entry_is_included(
+    eq_id: int,
+    scope_entry: Optional[Dict[str, Any]],
+    eligibility: Optional[Dict[int, Any]],
+) -> bool:
+    if scope_entry is not None:
+        return scope_entry.get("effective_state") == "include"
+    if eligibility and eq_id in eligibility:
+        return bool(getattr(eligibility[eq_id], "is_eligible", False))
+    return False
+
+
+def _is_currently_published_in_ha(
+    eq_id: int,
+    decision: Optional[PublicationDecision],
+    pending_discovery_unpublish: Dict[int, str],
+) -> bool:
+    if eq_id in pending_discovery_unpublish:
+        return True
+    if decision is None:
+        return False
+    return bool(
+        getattr(decision, "active_or_alive", False)
+        or getattr(decision, "discovery_published", False)
+    )
+
+
+def _should_attempt_publish(
+    mapping: Optional[MappingResult],
+    decision: Optional[PublicationDecision],
+) -> bool:
+    if mapping is None:
+        return False
+    if mapping.confidence not in ("sure", "probable"):
+        return False
+    if decision is None:
+        return True
+    return getattr(decision, "reason", "") not in (
+        "ambiguous_skipped",
+        "probable_skipped",
+        "unknown_skipped",
+        "ignore_skipped",
+    )
+
+
+async def _publish_mapping_for_action(
+    publisher: DiscoveryPublisher,
+    mapping: MappingResult,
+    topology: TopologySnapshot,
+) -> bool:
+    if mapping.ha_entity_type == "light":
+        return await publisher.publish_light(mapping, topology)
+    if mapping.ha_entity_type == "cover":
+        return await publisher.publish_cover(mapping, topology)
+    if mapping.ha_entity_type == "switch":
+        return await publisher.publish_switch(mapping, topology)
+    return False
+
+
+def _build_action_perimetre_impacte(
+    *,
+    portee: str,
+    selection: list,
+    topology: TopologySnapshot,
+    eq_ids: list[int],
+    equipements_inclus: int,
+) -> Dict[str, Any]:
+    if portee == "equipement":
+        eq_id = eq_ids[0] if eq_ids else _to_int(selection[0], default=0)
+        eq = topology.eq_logics.get(eq_id)
+        return {
+            "nom": eq.name if eq else f"Équipement #{eq_id}",
+            "equipements_inclus": equipements_inclus,
+        }
+
+    if portee == "piece":
+        piece_id = _to_int(selection[0], default=0)
+        piece = topology.objects.get(piece_id)
+        return {
+            "nom": piece.name if piece else f"Pièce #{piece_id}",
+            "equipements_inclus": equipements_inclus,
+        }
+
+    return {
+        "nom": "Parc global",
+        "equipements_inclus": equipements_inclus,
+    }
+
+
+def _build_publier_message(
+    *,
+    resultat: str,
+    equipements_publies_ou_crees: int,
+    publish_errors: int,
+) -> str:
+    if resultat == "succes_partiel":
+        return (
+            f"{equipements_publies_ou_crees} équipements mis à jour, "
+            f"{publish_errors} n'ont pas pu être traités."
+        )
+    if resultat == "succes" and equipements_publies_ou_crees == 0:
+        return "Configuration déjà à jour dans Home Assistant."
+    if resultat == "succes":
+        return f"{equipements_publies_ou_crees} équipements mis à jour dans Home Assistant."
+    return "L'action n'a pas pu être exécutée. Vérifiez la connexion Home Assistant."
+
+
 def _apply_pending_scope_flags(
     scope_contract: Dict[str, Any],
     publications: Dict[int, PublicationDecision],
@@ -1751,13 +1922,14 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         )
 
     try:
-        body = await request.json()
+        raw_body = await request.json()
     except Exception:
         return web.json_response(
             {"status": "error", "message": "Corps de requête JSON invalide."},
             status=400,
         )
 
+    body = _normalize_action_execute_body(raw_body)
     intention = body.get("intention")
     portee = body.get("portee")
     selection = body.get("selection")
@@ -1792,21 +1964,281 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             status=400,
         )
 
-    # Story 5.1 — stub : la façade accepte les appels valides mais ne les exécute pas encore.
-    # L'exécution réelle sera Story 5.2 (publier) et Story 5.3 (supprimer).
-    return web.json_response({
-        "action": "action.execute",
-        "status": "ok",
-        "payload": {
-            "intention": intention,
-            "portee": portee,
-            "selection": selection,
-            "resultat": "non_implemente",
-            "message": f"L'exécution de l'intention '{intention}' sera implémentée dans une story ultérieure.",
+    if intention == "supprimer":
+        return _build_action_execute_response(
+            payload={
+                "intention": intention,
+                "portee": portee,
+                "selection": selection,
+                "resultat": "non_implemente",
+                "message": f"L'exécution de l'intention '{intention}' sera implémentée dans une story ultérieure.",
+            }
+        )
+
+    topology = request.app.get("topology")
+    published_scope = request.app.get("published_scope")
+    if topology is None or published_scope is None:
+        return _build_action_execute_response(
+            payload={
+                "intention": intention,
+                "portee": portee,
+                "selection": selection,
+                "resultat": "echec",
+                "message": "Aucune synchronisation disponible. Lancez une synchronisation d'abord.",
+                "perimetre_impacte": {
+                    "nom": "Parc global" if portee == "global" else ("Pièce" if portee == "piece" else "Équipement"),
+                    "equipements_inclus": 0,
+                },
+                "scope_reel": {
+                    "equipements_inclus": 0,
+                    "equipements_publies_ou_crees": 0,
+                    "ecarts_resolus": 0,
+                    "skips": 0,
+                },
+                "aucun_flux_supprimer_recree": True,
+            },
+            http_status=409,
+            top_status="error",
+        )
+
+    mqtt_bridge = request.app.get("mqtt_bridge")
+    if not mqtt_bridge or not mqtt_bridge.is_connected:
+        return _build_action_execute_response(
+            payload={
+                "intention": intention,
+                "portee": portee,
+                "selection": selection,
+                "resultat": "echec",
+                "message": "L'action n'a pas pu être exécutée. Vérifiez la connexion Home Assistant.",
+                "perimetre_impacte": _build_action_perimetre_impacte(
+                    portee=portee,
+                    selection=selection,
+                    topology=topology,
+                    eq_ids=[],
+                    equipements_inclus=0,
+                ),
+                "scope_reel": {
+                    "equipements_inclus": 0,
+                    "equipements_publies_ou_crees": 0,
+                    "ecarts_resolus": 0,
+                    "skips": 0,
+                },
+                "aucun_flux_supprimer_recree": True,
+            },
+            http_status=503,
+            top_status="error",
+        )
+
+    try:
+        eq_ids = list(dict.fromkeys(_resolve_eq_ids_for_portee(portee, selection, topology)))
+    except ValueError as exc:
+        return web.json_response(
+            {"status": "error", "message": str(exc)},
+            status=400,
+        )
+
+    eligibility = request.app.get("eligibility") or {}
+    mappings = request.app.get("mappings") or {}
+    publications = request.app.get("publications")
+    if publications is None:
+        publications = {}
+        request.app["publications"] = publications
+    pending_discovery_unpublish = request.app.get("pending_discovery_unpublish")
+    if pending_discovery_unpublish is None:
+        pending_discovery_unpublish = {}
+        request.app["pending_discovery_unpublish"] = pending_discovery_unpublish
+    pending_local_cleanup = request.app.get("pending_local_availability_cleanup")
+    if pending_local_cleanup is None:
+        pending_local_cleanup = {}
+        request.app["pending_local_availability_cleanup"] = pending_local_cleanup
+
+    scope_entries = {
+        _to_int(entry.get("eq_id"), default=0): entry
+        for entry in published_scope.get("equipements", [])
+    }
+    publisher = DiscoveryPublisher(mqtt_bridge)
+
+    equipements_inclus = 0
+    equipements_publies_ou_crees = 0
+    ecarts_resolus = 0
+    skips = 0
+    publish_errors = 0
+    _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+
+    for eq_id in eq_ids:
+        scope_entry = scope_entries.get(eq_id)
+        mapping = mappings.get(eq_id)
+        previous_decision = publications.get(eq_id)
+        is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
+
+        if is_included:
+            equipements_inclus += 1
+            pending_discovery_unpublish.pop(eq_id, None)
+            pending_local_cleanup.pop(eq_id, None)
+
+            if not _should_attempt_publish(mapping, previous_decision):
+                skips += 1
+                continue
+
+            publish_ok = await _publish_mapping_for_action(publisher, mapping, topology)
+            await asyncio.sleep(_action_delay)
+            if not publish_ok:
+                failed_decision = PublicationDecision(
+                    should_publish=False,
+                    reason="discovery_publish_failed",
+                    mapping_result=mapping,
+                    state_topic=_resolve_state_topic(mapping),
+                    active_or_alive=False,
+                    discovery_published=False,
+                )
+                _apply_availability_metadata(failed_decision, mapping, topology)
+                publications[eq_id] = failed_decision
+                publish_errors += 1
+                continue
+
+            publish_reason = getattr(previous_decision, "reason", "") if previous_decision else ""
+            if publish_reason in (
+                "",
+                "discovery_publish_failed",
+                "local_availability_publish_failed",
+                "ambiguous_skipped",
+                "probable_skipped",
+                "unknown_skipped",
+                "ignore_skipped",
+            ):
+                publish_reason = mapping.confidence
+
+            decision = PublicationDecision(
+                should_publish=True,
+                reason=publish_reason,
+                mapping_result=mapping,
+                state_topic=_resolve_state_topic(mapping),
+                active_or_alive=False,
+                discovery_published=True,
+            )
+            _apply_availability_metadata(decision, mapping, topology)
+
+            local_ok = True
+            if decision.local_availability_supported:
+                local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+
+            if not local_ok:
+                publications[eq_id] = _mark_local_availability_publish_failed(decision, mapping)
+                publish_errors += 1
+                continue
+
+            decision.active_or_alive = True
+            publications[eq_id] = decision
+            equipements_publies_ou_crees += 1
+            continue
+
+        if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
+            continue
+
+        if previous_decision and previous_decision.mapping_result is not None:
+            entity_type = previous_decision.mapping_result.ha_entity_type
+        elif mapping is not None:
+            entity_type = mapping.ha_entity_type
+        else:
+            entity_type = "light"
+
+        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+        await asyncio.sleep(_action_delay)
+        if not unpublish_ok:
+            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+            continue
+
+        pending_discovery_unpublish.pop(eq_id, None)
+
+        previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
+        previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+        pending_local_topic = pending_local_cleanup.get(eq_id)
+        if previous_local_supported or previous_local_topic or pending_local_topic:
+            clear_ok = _clear_local_availability_topic(
+                mqtt_bridge,
+                eq_id,
+                previous_local_topic or pending_local_topic,
+            )
+            if clear_ok:
+                pending_local_cleanup.pop(eq_id, None)
+            else:
+                _defer_local_availability_cleanup(
+                    pending_local_cleanup,
+                    eq_id,
+                    previous_local_topic or pending_local_topic,
+                )
+        else:
+            pending_local_cleanup.pop(eq_id, None)
+
+        if previous_decision and previous_decision.mapping_result is not None:
+            publications[eq_id] = PublicationDecision(
+                should_publish=False,
+                reason=getattr(previous_decision, "reason", "excluded"),
+                mapping_result=previous_decision.mapping_result,
+                state_topic=previous_decision.state_topic,
+                active_or_alive=False,
+                discovery_published=False,
+                bridge_availability_topic=previous_decision.bridge_availability_topic,
+                eqlogic_availability_topic=previous_decision.eqlogic_availability_topic,
+                local_availability_supported=previous_decision.local_availability_supported,
+                local_availability_state=previous_decision.local_availability_state,
+                availability_reason=previous_decision.availability_reason,
+            )
+        elif mapping is not None:
+            resolved_decision = PublicationDecision(
+                should_publish=False,
+                reason="excluded",
+                mapping_result=mapping,
+                state_topic=_resolve_state_topic(mapping),
+                active_or_alive=False,
+                discovery_published=False,
+            )
+            _apply_availability_metadata(resolved_decision, mapping, topology)
+            publications[eq_id] = resolved_decision
+
+        ecarts_resolus += 1
+
+    if publish_errors > 0 and equipements_publies_ou_crees == 0:
+        resultat = "echec"
+    elif publish_errors > 0 and equipements_publies_ou_crees > 0:
+        resultat = "succes_partiel"
+    else:
+        resultat = "succes"
+
+    request.app["published_scope"] = _apply_pending_scope_flags(
+        published_scope,
+        publications,
+        pending_discovery_unpublish,
+    )
+    save_publications_cache(publications, _DATA_DIR)
+    request.app["derniere_operation_resultat"] = "partiel" if resultat == "succes_partiel" else resultat
+
+    payload = {
+        "intention": intention,
+        "portee": portee,
+        "selection": selection,
+        "resultat": resultat,
+        "message": _build_publier_message(
+            resultat=resultat,
+            equipements_publies_ou_crees=equipements_publies_ou_crees,
+            publish_errors=publish_errors,
+        ),
+        "perimetre_impacte": _build_action_perimetre_impacte(
+            portee=portee,
+            selection=selection,
+            topology=topology,
+            eq_ids=eq_ids,
+            equipements_inclus=equipements_inclus,
+        ),
+        "scope_reel": {
+            "equipements_inclus": equipements_inclus,
+            "equipements_publies_ou_crees": equipements_publies_ou_crees,
+            "ecarts_resolus": ecarts_resolus,
+            "skips": skips,
         },
-        "request_id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+        "aucun_flux_supprimer_recree": True,
+    }
+    return _build_action_execute_response(payload=payload)
 
 
 def create_app(local_secret: str) -> web.Application:

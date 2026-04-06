@@ -9,17 +9,57 @@ from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from transport.http_server import create_app
+from models.topology import JeedomEqLogic, JeedomObject, TopologySnapshot
 
 
 SECRET = "test-secret-5.1"
 VALID_HEADERS = {"X-Local-Secret": SECRET}
 
 
+def _seed_story_5_2_ready_state(app):
+    """Prepare the facade app with the minimal in-memory state required post-Story 5.2."""
+    app["mqtt_bridge"]._state = "connected"
+    app["topology"] = TopologySnapshot(
+        timestamp="2026-04-06T08:00:00Z",
+        objects={10: JeedomObject(id=10, name="Salon")},
+        eq_logics={42: JeedomEqLogic(id=42, name="Lampe", object_id=10, is_enable=True)},
+    )
+    app["published_scope"] = {
+        "global": {
+            "counts": {"total": 1, "include": 1, "exclude": 0, "exceptions": 0},
+            "effective_state": "include",
+            "has_pending_home_assistant_changes": True,
+        },
+        "pieces": [
+            {
+                "object_id": 10,
+                "object_name": "Salon",
+                "counts": {"total": 1, "include": 1, "exclude": 0, "exceptions": 0},
+                "home_perimetre": "Incluse",
+                "has_pending_home_assistant_changes": True,
+            }
+        ],
+        "equipements": [
+            {
+                "eq_id": 42,
+                "object_id": 10,
+                "name": "Lampe",
+                "effective_state": "include",
+                "decision_source": "global",
+                "is_exception": False,
+                "has_pending_home_assistant_changes": True,
+            }
+        ],
+    }
+
+
 class TestFacadeValidation(AioHTTPTestCase):
     """AC 1 — Validation des paramètres et rejet explicite."""
 
     async def get_application(self):
-        return create_app(SECRET)
+        app = create_app(SECRET)
+        _seed_story_5_2_ready_state(app)
+        return app
 
     @unittest_run_loop
     async def test_intention_inconnue_rejet(self):
@@ -107,7 +147,9 @@ class TestFacadeReponseHomogene(AioHTTPTestCase):
     """AC 1 — Contrat de réponse homogène quelle que soit la portée."""
 
     async def get_application(self):
-        return create_app(SECRET)
+        app = create_app(SECRET)
+        _seed_story_5_2_ready_state(app)
+        return app
 
     ENVELOPE_KEYS = {"action", "status", "payload", "request_id", "timestamp"}
     PAYLOAD_KEYS = {"intention", "portee", "selection", "resultat", "message"}

@@ -23,12 +23,14 @@ function refreshBridgeStatus() {
     dataType: 'json',
     success: function(data) {
       if (data.state !== 'ok') {
+        window.jeedom2haLastBridgeStatus = null;
         $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
         $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
         applyHAGating(null);
         return;
       }
       var r = data.result;
+      window.jeedom2haLastBridgeStatus = r;
       var $bridge = $('#span_healthBridge');
       var $mqtt = $('#span_healthMqtt');
       var $broker = $('#span_healthMqttBroker');
@@ -102,6 +104,7 @@ function refreshBridgeStatus() {
       applyHAGating(r);
     },
     error: function() {
+      window.jeedom2haLastBridgeStatus = null;
       $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
       $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
       applyHAGating(null);
@@ -234,6 +237,162 @@ function _restoreNavState(navState) {
   }
 }
 
+function _readHaActionCount(value) {
+  var count = parseInt(value, 10);
+  if (Number.isFinite(count) && count >= 0) {
+    return count;
+  }
+  return 0;
+}
+
+function buildHaActionUserMessage(payload) {
+  var message = (payload && typeof payload.message === 'string' && payload.message !== '')
+    ? payload.message
+    : '{{Action Home Assistant exécutée.}}';
+  var impactedName = payload && payload.perimetre_impacte && typeof payload.perimetre_impacte.nom === 'string'
+    ? payload.perimetre_impacte.nom
+    : '';
+  return impactedName !== '' ? (impactedName + ' — ' + message) : message;
+}
+
+function getHaActionAlertLevel(payload) {
+  var resultat = payload && typeof payload.resultat === 'string' ? payload.resultat : '';
+  if (resultat === 'succes') {
+    return 'success';
+  }
+  if (resultat === 'succes_partiel') {
+    return 'warning';
+  }
+  return 'danger';
+}
+
+function shouldRefreshPublishedScopeAfterHaAction(payload) {
+  if (!payload || typeof payload.resultat !== 'string') {
+    return false;
+  }
+  return payload.resultat === 'succes' || payload.resultat === 'succes_partiel';
+}
+
+function setHaActionPendingState($button, pendingLabel) {
+  var snapshot = {
+    html: $button.html(),
+    disabled: $button.prop('disabled') === true,
+  };
+  $button.prop('disabled', true);
+  $button.html('<i class="fas fa-spinner fa-spin"></i> ' + pendingLabel);
+  return snapshot;
+}
+
+function restoreHaActionPendingState($button, snapshot) {
+  if (!$button || $button.length === 0) {
+    return;
+  }
+  if (snapshot && typeof snapshot.html === 'string') {
+    $button.html(snapshot.html);
+  }
+  $button.prop('disabled', snapshot && snapshot.disabled === true);
+}
+
+function showHaActionFeedback(payload) {
+  $('#div_alert').showAlert({
+    message: buildHaActionUserMessage(payload),
+    level: getHaActionAlertLevel(payload),
+  });
+}
+
+function confirmHaPublishAction(title, message, confirmLabel, onConfirm) {
+  if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
+    bootbox.dialog({
+      title: title,
+      message: '<div>' + message + '</div>',
+      buttons: {
+        cancel: {
+          label: '{{Annuler}}',
+          className: 'btn-default',
+        },
+        confirm: {
+          label: confirmLabel,
+          className: 'btn-primary',
+          callback: function() {
+            onConfirm();
+          },
+        },
+      },
+    });
+    return;
+  }
+  if (window.confirm(message)) {
+    onConfirm();
+  }
+}
+
+function executeHaAction(intention, portee, selection, handlers) {
+  $.ajax({
+    type: 'POST',
+    url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    data: {
+      action: 'executeHaAction',
+      intention: intention,
+      portee: portee,
+      selection: JSON.stringify(selection || []),
+    },
+    dataType: 'json',
+    timeout: 20000,
+    success: function(data) {
+      if (data.state !== 'ok') {
+        if (handlers && typeof handlers.onError === 'function') {
+          handlers.onError(data.result || '{{Impossible d\'exécuter l\'action Home Assistant.}}');
+        }
+        return;
+      }
+      var daemonResult = (data && data.result && typeof data.result === 'object') ? data.result : {};
+      var payload = (daemonResult && daemonResult.payload && typeof daemonResult.payload === 'object')
+        ? daemonResult.payload
+        : null;
+      if (!payload) {
+        if (handlers && typeof handlers.onError === 'function') {
+          handlers.onError('{{Réponse backend incomplète pour l\'action Home Assistant.}}');
+        }
+        return;
+      }
+      if (handlers && typeof handlers.onSuccess === 'function') {
+        handlers.onSuccess(payload, daemonResult);
+      }
+    },
+    error: function(request, status, error) {
+      var message = '{{Erreur de communication avec le backend Home Assistant.}}';
+      if (handlers && typeof handlers.onError === 'function') {
+        handlers.onError(message);
+      }
+    },
+    complete: function() {
+      if (handlers && typeof handlers.onComplete === 'function') {
+        handlers.onComplete();
+      }
+    },
+  });
+}
+
+function triggerPublierAction($button, portee, selection) {
+  var pendingState = setHaActionPendingState($button, '{{En cours...}}');
+  executeHaAction('publier', portee, selection, {
+    onSuccess: function(payload) {
+      showHaActionFeedback(payload);
+      if (shouldRefreshPublishedScopeAfterHaAction(payload)) {
+        var preserveNavState = true;
+        refreshPublishedScopeSummary(preserveNavState);
+      }
+      refreshBridgeStatus();
+    },
+    onError: function(message) {
+      $('#div_alert').showAlert({message: message, level: 'danger'});
+    },
+    onComplete: function() {
+      restoreHaActionPendingState($button, pendingState);
+    },
+  });
+}
+
 function renderPublishedScopeSummary(result, navState) {
   if (typeof Jeedom2haScopeSummary === 'undefined' || !Jeedom2haScopeSummary) {
     $('#div_scopeSummaryContent').html('<div class="alert alert-danger" style="margin-bottom:0;">{{Module de synthèse indisponible côté UI}}</div>');
@@ -242,7 +401,12 @@ function renderPublishedScopeSummary(result, navState) {
 
   var model = Jeedom2haScopeSummary.createModel(result || {});
   $('#div_scopeSummaryContent').html(Jeedom2haScopeSummary.render(model));
+  var includedCount = (model && model.has_contract === true && model.global && model.global.counts)
+    ? _readHaActionCount(model.global.counts.inclus)
+    : 0;
+  $('.j2ha-ha-action[data-ha-action="republier"]').attr('data-scope-count', String(includedCount));
   _restoreNavState(navState || null);
+  applyHAGating(window.jeedom2haLastBridgeStatus || null);
 }
 
 function refreshPublishedScopeSummary(preserveNavState) {
@@ -313,10 +477,64 @@ $(function() {
     $(this).trigger('click');
   });
 
+  $('#div_scopeSummaryContent').on('click', '.j2ha-action-ha-btn[data-ha-action="publier"]', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var eqId = parseInt($button.attr('data-eq-id'), 10);
+    if (!Number.isFinite(eqId) || eqId <= 0) {
+      return;
+    }
+    triggerPublierAction($button, 'equipement', [eqId]);
+  });
+
+  $('#div_scopeSummaryContent').on('click', '.j2ha-piece-action-btn[data-ha-action="publier"]', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var pieceId = parseInt($button.attr('data-piece-id'), 10);
+    if (!Number.isFinite(pieceId) || pieceId <= 0) {
+      return;
+    }
+    var pieceName = $button.attr('data-piece-name') || '{{Pièce}}';
+    var includedCount = _readHaActionCount($button.attr('data-piece-equipements-inclus'));
+    confirmHaPublishAction(
+      '{{Republier la pièce}}',
+      pieceName + ' — ' + includedCount + ' {{équipements inclus. Confirmer ?}}',
+      '{{Republier}} ' + includedCount + ' {{équipements}}',
+      function() {
+        triggerPublierAction($button, 'piece', [pieceId]);
+      }
+    );
+  });
+
   refreshPublishedScopeSummary();
 
   $('#bt_refreshScopeSummary').on('click', function() {
     refreshPublishedScopeSummary(); // rafraîchissement manuel : repart de l'état initial
+  });
+
+  $('.j2ha-ha-action[data-ha-action="republier"]').on('click', function(event) {
+    event.preventDefault();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var includedCount = _readHaActionCount($button.attr('data-scope-count'));
+    confirmHaPublishAction(
+      '{{Republier dans Home Assistant}}',
+      '{{Republier dans Home Assistant}} — ' + includedCount + ' {{équipements inclus. Confirmer ?}}',
+      '{{Republier}} ' + includedCount + ' {{équipements}}',
+      function() {
+        triggerPublierAction($button, 'global', ['all']);
+      }
+    );
   });
 
   // Export diagnostic support — Story 4.4

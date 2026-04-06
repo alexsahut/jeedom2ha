@@ -521,6 +521,18 @@
     return html;
   }
 
+  function renderPiecePublishButton(piece) {
+    if (!piece || !piece.counts || !isFiniteNumber(piece.counts.inclus) || piece.counts.inclus <= 0) {
+      return '';
+    }
+    return '<button class="btn btn-xs btn-primary j2ha-piece-action-btn" data-ha-action="publier"'
+      + ' data-portee="piece"'
+      + ' data-piece-id="' + escapeHtml(String(piece.object_id)) + '"'
+      + ' data-piece-name="' + escapeHtml(piece.object_name) + '"'
+      + ' data-piece-equipements-inclus="' + escapeHtml(String(piece.counts.inclus)) + '"'
+      + '>Republier</button>';
+  }
+
   function render(model) {
     if (!model || model.has_contract !== true) {
       var message = readString(model && model.message, "Aucune synthèse backend disponible. Lancez d'abord une synchronisation.");
@@ -560,7 +572,7 @@
         renderRoomPerimetreBadge(piece.perimetre_room),
         renderRoomStatusBadge(piece.status_room),
         renderPieceEcartBadge(piece.counts.ecarts),
-        '',
+        renderPiecePublishButton(piece),
         toDisplayCount(piece.counts.total),
         toDisplayCount(piece.counts.exclus),
         toDisplayCount(piece.counts.inclus),
@@ -613,6 +625,7 @@
     buildPerimetreLabel: buildPerimetreLabel,
     readActionsHa: readActionsHa,
     renderActionButtons: renderActionButtons,
+    renderPiecePublishButton: renderPiecePublishButton,
     renderTableHeader: renderTableHeader,
   };
 }));
