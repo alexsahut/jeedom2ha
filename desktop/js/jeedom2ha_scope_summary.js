@@ -363,12 +363,12 @@
     html += '<th>Perimetre</th>';
     html += '<th>Statut</th>';
     html += '<th>Ecart</th>';
+    html += '<th>Actions</th>';
     html += '<th>Total</th>';
     html += '<th>Exclus</th>';
     html += '<th>Inclus</th>';
     html += '<th>Publies</th>';
     html += '<th>Ecarts</th>';
-    html += '<th>Actions</th>';
     html += '</tr></thead>';
     return html;
   }
@@ -483,27 +483,39 @@
     return html;
   }
 
+  // Story 5.5 — Libellé court display-only (backend reste source de vérité).
+  function shortLabel(label) {
+    var idx = label.indexOf(' dans ');
+    if (idx >= 0) return label.substring(0, idx);
+    idx = label.indexOf(' de ');
+    if (idx >= 0) return label.substring(0, idx);
+    return label;
+  }
+
   // Story 5.1 — Rendu des boutons d'action HA strictement depuis actions_ha (aucun recalcul).
+  // Story 5.5 — Libellés courts affichés ; Republier → btn-primary, Créer → btn-success.
   function renderActionButtons(actionsHa, eqId) {
     if (!actionsHa) {
       return '';
     }
-    var html = '<div class="j2ha-actions-ha" style="white-space:nowrap;">';
+    var html = '<div class="j2ha-actions-ha">';
     var publier = actionsHa.publier;
     var supprimer = actionsHa.supprimer;
     if (publier && publier.label) {
       var disabledPub = !publier.disponible;
-      html += '<button class="btn btn-xs btn-success j2ha-action-ha-btn" data-ha-action="publier"'
+      var shortPub = shortLabel(publier.label);
+      var colorPub = (shortPub === 'Republier') ? 'btn-primary' : 'btn-success';
+      html += '<button class="btn btn-xs ' + colorPub + ' j2ha-action-ha-btn" data-ha-action="publier"'
         + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
         + (disabledPub ? ' disabled title="' + escapeHtml(publier.raison_indisponibilite || '') + '"' : '')
-        + '>' + escapeHtml(publier.label) + '</button> ';
+        + '>' + escapeHtml(shortPub) + '</button>';
     }
     if (supprimer && supprimer.label) {
       var disabledSup = !supprimer.disponible;
       html += '<button class="btn btn-xs btn-danger j2ha-action-ha-btn" data-ha-action="supprimer"'
         + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
         + (disabledSup ? ' disabled title="' + escapeHtml(supprimer.raison_indisponibilite || '') + '"' : '')
-        + '>' + escapeHtml(supprimer.label) + '</button>';
+        + '>' + escapeHtml(shortLabel(supprimer.label)) + '</button>';
     }
     html += '</div>';
     return html;
@@ -526,12 +538,12 @@
       renderMutedBadge('&mdash;'),
       renderMutedBadge('&mdash;'),
       renderPieceEcartBadge(model.global.counts.ecarts),
+      '',
       toDisplayCount(model.global.counts.total),
       toDisplayCount(model.global.counts.exclus),
       toDisplayCount(model.global.counts.inclus),
       toDisplayCount(model.global.counts.publies),
       toDisplayCount(model.global.counts.ecarts),
-      '',
     ];
 
     html += renderRow(globalColumns, {
@@ -548,12 +560,12 @@
         renderRoomPerimetreBadge(piece.perimetre_room),
         renderRoomStatusBadge(piece.status_room),
         renderPieceEcartBadge(piece.counts.ecarts),
+        '',
         toDisplayCount(piece.counts.total),
         toDisplayCount(piece.counts.exclus),
         toDisplayCount(piece.counts.inclus),
         toDisplayCount(piece.counts.publies),
         toDisplayCount(piece.counts.ecarts),
-        '',
       ];
 
       html += renderRow(pieceColumns, {
@@ -570,12 +582,12 @@
           renderPerimetreBadge(eq.perimetre, 'equipement'),
           renderEquipmentStatutBadge(eq.statut),
           renderEquipmentEcartBadge(eq),
+          renderActionButtons(eq.actions_ha, eq.eq_id),
           renderBinaryCount(eq.counts.total),
           renderBinaryCount(eq.counts.exclus),
           renderBinaryCount(eq.counts.inclus),
           renderBinaryCount(eq.counts.publies),
           renderBinaryCount(eq.counts.ecarts),
-          renderActionButtons(eq.actions_ha, eq.eq_id),
         ];
 
         html += renderRow(eqColumns, {
@@ -601,5 +613,6 @@
     buildPerimetreLabel: buildPerimetreLabel,
     readActionsHa: readActionsHa,
     renderActionButtons: renderActionButtons,
+    renderTableHeader: renderTableHeader,
   };
 }));

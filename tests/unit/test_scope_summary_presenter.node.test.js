@@ -99,7 +99,7 @@ test("render expose les colonnes exactes dans l'ordre contractuel", () => {
 
   assert.match(
     html,
-    /<th>Nom<\/th>\s*<th>Perimetre<\/th>\s*<th>Statut<\/th>\s*<th>Ecart<\/th>\s*<th>Total<\/th>\s*<th>Exclus<\/th>\s*<th>Inclus<\/th>\s*<th>Publies<\/th>\s*<th>Ecarts<\/th>/
+    /<th>Nom<\/th>\s*<th>Perimetre<\/th>\s*<th>Statut<\/th>\s*<th>Ecart<\/th>\s*<th>Actions<\/th>\s*<th>Total<\/th>\s*<th>Exclus<\/th>\s*<th>Inclus<\/th>\s*<th>Publies<\/th>\s*<th>Ecarts<\/th>/
   );
 });
 

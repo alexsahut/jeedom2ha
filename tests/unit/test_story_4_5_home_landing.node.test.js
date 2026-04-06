@@ -90,7 +90,7 @@ test("4.5 / AC1+AC2: vue initiale limitée à Parc global + colonnes exactes", (
 
   assert.match(
     html,
-    /<th>Nom<\/th>\s*<th>Perimetre<\/th>\s*<th>Statut<\/th>\s*<th>Ecart<\/th>\s*<th>Total<\/th>\s*<th>Exclus<\/th>\s*<th>Inclus<\/th>\s*<th>Publies<\/th>\s*<th>Ecarts<\/th>/
+    /<th>Nom<\/th>\s*<th>Perimetre<\/th>\s*<th>Statut<\/th>\s*<th>Ecart<\/th>\s*<th>Actions<\/th>\s*<th>Total<\/th>\s*<th>Exclus<\/th>\s*<th>Inclus<\/th>\s*<th>Publies<\/th>\s*<th>Ecarts<\/th>/
   );
 
   const globalRow = html.match(/<tr class="j2ha-row-global[\s\S]*?<\/tr>/);
