@@ -53,6 +53,13 @@
   white-space: nowrap;
 }
 
+/* Story 5.6 — Affordance disabled renforcée : bridge down (.j2ha-ha-gated) et non-publiable ([disabled]) */
+.j2ha-action-ha-btn[disabled],
+.j2ha-action-ha-btn.j2ha-ha-gated {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}
+
 /* Story 4.6 — mise en évidence temporaire lors d'une ouverture ciblée depuis la home */
 /* Transition permanente sur les td du diagnostic : garantit le fade-out même lors du retrait de la classe parente */
 #div_diagnosticTable td {
