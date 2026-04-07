@@ -87,12 +87,12 @@ test('5.2 / frontend — ligne pièce rend un bouton Republier contextualisé en
   assert.match(pieceRow[0], />Republier<\/button>/);
 });
 
-test('5.2 / frontend — ligne pièce sans inclus ne rend pas de bouton local', () => {
+test('5.2 / frontend — ligne pièce sans inclus ne rend pas de bouton Republier', () => {
   const html = Jeedom2haScopeSummary.render(Jeedom2haScopeSummary.createModel(makeScopeResponse(0)));
   const pieceRow = html.match(/<tr class="[^"]*j2ha-row-piece[^"]*"[\s\S]*?<\/tr>/);
 
   assert.ok(pieceRow, 'Ligne pièce absente');
-  assert.doesNotMatch(pieceRow[0], /j2ha-piece-action-btn/);
+  assert.doesNotMatch(pieceRow[0], /data-ha-action="publier"/);
 });
 
 test('5.2 / frontend — click équipement sans modale, appel direct sur portée equipement', () => {

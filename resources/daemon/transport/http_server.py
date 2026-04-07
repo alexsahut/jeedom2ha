@@ -322,6 +322,25 @@ def _build_publier_message(
     return "L'action n'a pas pu être exécutée. Vérifiez la connexion Home Assistant."
 
 
+def _build_supprimer_message(
+    *,
+    resultat: str,
+    equipements_supprimes: int,
+    supprimer_errors: int,
+) -> str:
+    if resultat == "succes_partiel":
+        return (
+            f"{equipements_supprimes} supprimé(s), "
+            f"{supprimer_errors} n'ont pas pu être traité(s)."
+        )
+    if resultat == "succes" and equipements_supprimes == 0:
+        return "Configuration déjà à jour dans Home Assistant."
+    if resultat == "succes":
+        s = "s" if equipements_supprimes > 1 else ""
+        return f"{equipements_supprimes} équipement{s} supprimé{s} de Home Assistant."
+    return "L'action n'a pas pu être exécutée. Vérifiez la connexion Home Assistant."
+
+
 def _apply_pending_scope_flags(
     scope_contract: Dict[str, Any],
     publications: Dict[int, PublicationDecision],
@@ -1789,6 +1808,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # Le signal n'est généré que pour les équipements inclus.
         # est_publie_ha = is_published_in_ha (déjà calculé au-dessus).
         est_inclus = (perimetre == "inclus")
+        # Story 5.6 — est_publiable : True uniquement si le pipeline a produit pub_decision.should_publish=True.
+        # pub_decision=None → inéligible ou non-mappé → non publiable.
+        # pub_decision.should_publish=False → ambiguous_skipped, probable_skipped, disabled_eqlogic → non publiable.
+        est_publiable = bool(pub_decision and getattr(pub_decision, 'should_publish', False))
         mqtt_bridge = request.app.get("mqtt_bridge")
         bridge_ok = bool(mqtt_bridge and mqtt_bridge.is_connected)
         if est_inclus:
@@ -1796,6 +1819,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                 est_publie_ha=is_published_in_ha,
                 est_inclus=True,
                 bridge_disponible=bridge_ok,
+                est_publiable=est_publiable,
             )
         else:
             actions_ha = None
@@ -1964,17 +1988,6 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             status=400,
         )
 
-    if intention == "supprimer":
-        return _build_action_execute_response(
-            payload={
-                "intention": intention,
-                "portee": portee,
-                "selection": selection,
-                "resultat": "non_implemente",
-                "message": f"L'exécution de l'intention '{intention}' sera implémentée dans une story ultérieure.",
-            }
-        )
-
     topology = request.app.get("topology")
     published_scope = request.app.get("published_scope")
     if topology is None or published_scope is None:
@@ -2052,6 +2065,132 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         pending_local_cleanup = {}
         request.app["pending_local_availability_cleanup"] = pending_local_cleanup
 
+    # --- Branche supprimer (Story 5.3) ---
+    if intention == "supprimer":
+        publisher = DiscoveryPublisher(mqtt_bridge)
+        equipements_supprimes = 0
+        supprimer_errors = 0
+        skips = 0
+        _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+
+        for eq_id in eq_ids:
+            previous_decision = publications.get(eq_id)
+
+            if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
+                skips += 1
+                continue
+
+            if previous_decision and previous_decision.mapping_result is not None:
+                entity_type = previous_decision.mapping_result.ha_entity_type
+            elif mappings.get(eq_id) is not None:
+                entity_type = mappings[eq_id].ha_entity_type
+            else:
+                entity_type = "light"
+
+            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+            await asyncio.sleep(_action_delay)
+            if not unpublish_ok:
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                supprimer_errors += 1
+                continue
+
+            pending_discovery_unpublish.pop(eq_id, None)
+
+            previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
+            previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+            pending_local_topic = pending_local_cleanup.get(eq_id)
+            if previous_local_supported or previous_local_topic or pending_local_topic:
+                clear_ok = _clear_local_availability_topic(
+                    mqtt_bridge,
+                    eq_id,
+                    previous_local_topic or pending_local_topic,
+                )
+                if clear_ok:
+                    pending_local_cleanup.pop(eq_id, None)
+                else:
+                    _defer_local_availability_cleanup(
+                        pending_local_cleanup,
+                        eq_id,
+                        previous_local_topic or pending_local_topic,
+                    )
+            else:
+                pending_local_cleanup.pop(eq_id, None)
+
+            if previous_decision and previous_decision.mapping_result is not None:
+                publications[eq_id] = PublicationDecision(
+                    should_publish=False,
+                    reason=getattr(previous_decision, "reason", "excluded"),
+                    mapping_result=previous_decision.mapping_result,
+                    state_topic=previous_decision.state_topic,
+                    active_or_alive=False,
+                    discovery_published=False,
+                    bridge_availability_topic=previous_decision.bridge_availability_topic,
+                    eqlogic_availability_topic=previous_decision.eqlogic_availability_topic,
+                    local_availability_supported=previous_decision.local_availability_supported,
+                    local_availability_state=previous_decision.local_availability_state,
+                    availability_reason=previous_decision.availability_reason,
+                )
+            elif mappings.get(eq_id) is not None:
+                mapping = mappings[eq_id]
+                resolved_decision = PublicationDecision(
+                    should_publish=False,
+                    reason="excluded",
+                    mapping_result=mapping,
+                    state_topic=_resolve_state_topic(mapping),
+                    active_or_alive=False,
+                    discovery_published=False,
+                )
+                _apply_availability_metadata(resolved_decision, mapping, topology)
+                publications[eq_id] = resolved_decision
+
+            equipements_supprimes += 1
+
+        if supprimer_errors > 0 and equipements_supprimes == 0:
+            resultat = "echec"
+        elif supprimer_errors > 0 and equipements_supprimes > 0:
+            resultat = "succes_partiel"
+        else:
+            resultat = "succes"
+
+        perimetre = _build_action_perimetre_impacte(
+            portee=portee,
+            selection=selection,
+            topology=topology,
+            eq_ids=eq_ids,
+            equipements_inclus=len(eq_ids),
+        )
+
+        request.app["published_scope"] = _apply_pending_scope_flags(
+            published_scope,
+            publications,
+            pending_discovery_unpublish,
+        )
+        save_publications_cache(publications, _DATA_DIR)
+        request.app["derniere_operation_resultat"] = "partiel" if resultat == "succes_partiel" else resultat
+
+        payload = {
+            "intention": intention,
+            "portee": portee,
+            "selection": selection,
+            "resultat": resultat,
+            "message": _build_supprimer_message(
+                resultat=resultat,
+                equipements_supprimes=equipements_supprimes,
+                supprimer_errors=supprimer_errors,
+            ),
+            "perimetre_impacte": {
+                "nom": perimetre["nom"],
+                "equipements_publies": equipements_supprimes + supprimer_errors + skips,
+            },
+            "scope_reel": {
+                "equipements_supprimes": equipements_supprimes,
+                "supprimer_errors": supprimer_errors,
+                "skips": skips,
+            },
+        }
+        return _build_action_execute_response(payload=payload)
+
+    # --- Branche publier (Story 5.2) ---
     scope_entries = {
         _to_int(entry.get("eq_id"), default=0): entry
         for entry in published_scope.get("equipements", [])
