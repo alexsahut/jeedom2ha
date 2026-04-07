@@ -510,11 +510,9 @@
         + (disabledPub ? ' disabled title="' + escapeHtml(publier.raison_indisponibilite || '') + '"' : '')
         + '>' + escapeHtml(shortPub) + '</button>';
     }
-    if (supprimer && supprimer.label) {
-      var disabledSup = !supprimer.disponible;
+    if (supprimer && supprimer.label && supprimer.disponible) {
       html += '<button class="btn btn-xs btn-danger j2ha-action-ha-btn" data-ha-action="supprimer"'
         + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
-        + (disabledSup ? ' disabled title="' + escapeHtml(supprimer.raison_indisponibilite || '') + '"' : '')
         + '>' + escapeHtml(shortLabel(supprimer.label)) + '</button>';
     }
     html += '</div>';
@@ -531,6 +529,27 @@
       + ' data-piece-name="' + escapeHtml(piece.object_name) + '"'
       + ' data-piece-equipements-inclus="' + escapeHtml(String(piece.counts.inclus)) + '"'
       + '>Republier</button>';
+  }
+
+  // Story 5.3 — Bouton Supprimer par ligne pièce
+  function renderPieceSupprimerButton(piece) {
+    var publies = (piece && piece.counts && isFiniteNumber(piece.counts.publies)) ? piece.counts.publies : 0;
+    if (publies <= 0) {
+      return '';
+    }
+    return ' <button class="btn btn-xs btn-danger j2ha-piece-action-btn" data-ha-action="supprimer"'
+      + ' data-portee="piece"'
+      + ' data-piece-id="' + escapeHtml(String(piece.object_id)) + '"'
+      + ' data-piece-name="' + escapeHtml(piece.object_name) + '"'
+      + ' data-piece-publies="' + escapeHtml(String(publies)) + '"'
+      + '>Suppr.</button>';
+  }
+
+  function renderPieceActionButtons(piece) {
+    var pub = renderPiecePublishButton(piece);
+    var sup = renderPieceSupprimerButton(piece);
+    if (!pub && !sup) return '';
+    return '<div class="j2ha-actions-ha">' + pub + sup + '</div>';
   }
 
   function render(model) {
@@ -572,7 +591,7 @@
         renderRoomPerimetreBadge(piece.perimetre_room),
         renderRoomStatusBadge(piece.status_room),
         renderPieceEcartBadge(piece.counts.ecarts),
-        renderPiecePublishButton(piece),
+        renderPieceActionButtons(piece),
         toDisplayCount(piece.counts.total),
         toDisplayCount(piece.counts.exclus),
         toDisplayCount(piece.counts.inclus),
