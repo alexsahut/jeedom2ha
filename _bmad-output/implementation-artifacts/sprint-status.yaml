@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-06 CET'  # Story 5.2 PR #67 mergée dans main (8d60a02) — gate terrain différé, story reste review
+last_updated: '2026-04-08 CET'  # Story 5.3 done — PR #69 merged ; Story 5.6 done — PR #70 merged
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -88,9 +88,11 @@ development_status:
 
   epic-5: in-progress  # Operations HA contextuelles — Creer/Republier + Supprimer (correct-course V3 2026-04-04, ex-Epic 4 renumerote 2026-03-26)
   5-1-facade-backend-unique-et-contrat-de-disponibilite-des-actions: done  # gate terrain PASS 2026-04-05 box réelle (1e0a0ab) — 99/99 équipements, label contextuel conforme, matrice disponibilité OK, gating bridge OK
-  5-2-flux-positif-contextuel-creer-republier-multi-portee: review  # implémentation + tests locaux PASS ; gate terrain bloqué sans JEEDOM_BOX_HOST
+  5-2-flux-positif-contextuel-creer-republier-multi-portee: done  # gate terrain box réelle 2026-04-07 : 6/7 PASS, waiver checkpoint Créer individuel (report vers 5.3), story done
   # 5-5 micro-story corrective UX/UI — constat terrain post-Story 5.1 — reposition colonne Actions + libellés courts
   5-5-compacite-visuelle-table-home-colonne-actions: done  # gate terrain UX PASS 2026-04-06 — 125/125 JS PASS
-  5-3-flux-supprimer-standalone-avec-confirmations-fortes: backlog
+  5-3-flux-supprimer-standalone-avec-confirmations-fortes: done  # gate terrain PASS 2026-04-08 — PR #69 merged — waiver terrain 5.2 soldé (boucle Supprimer→Créer)
   5-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: backlog
+  # 5-6 micro-story corrective UX/UI — constat terrain post-Story 5.2 — cohérence visuelle disabled boutons HA
+  5-6-coherence-visuelle-disabled-boutons-ha: done  # code review PASS 2026-04-07 — 254 pytest, 133 JS, 0 régression
   epic-5-retrospective: optional

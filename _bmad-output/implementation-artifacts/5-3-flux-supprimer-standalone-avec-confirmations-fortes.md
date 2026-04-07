@@ -1,6 +1,6 @@
 # Story 5.3 : Flux Supprimer standalone avec confirmations fortes
 
-Status: review
+Status: done
 
 ## Story
 
