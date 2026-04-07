@@ -1,10 +1,10 @@
 # Story 5.2 : Flux positif contextuel — Créer / Republier multi-portée
 
-Status: review
+Status: done
 
 > **Merge closeout 2026-04-06** — PR #67 squash-merged dans `main` (commit `8d60a02`).
-> Code review final : PASS. Gate terrain : **différé** — bloquant avant `done`.
-> Story en `review` jusqu'à validation terrain réelle depuis l'environnement canonique.
+> Code review final : PASS. Gate terrain : **exécuté 2026-04-07** — 6 PASS, 1 NOT EXECUTED (waiver assumé).
+> Story clôturée à `done` avec note de clôture et waiver explicites.
 
 ## Story
 
@@ -323,16 +323,15 @@ Note : le cas `equipements_publies_ou_crees = 0` et `publish_errors = 0` (tout d
     - Aucune logique locale de calcul de portée ou de scope
   - [x] Non-régression : 782 pytest + 133 JS + 3 PHP exécutables PASS ; 3 scripts PHP supplémentaires restent bloqués par l'absence du bootstrap Jeedom local.
 
-- [ ] Task 6 — Gate terrain (bloquant avant done)
-  - [ ] `deploy-to-box.sh --cleanup-discovery --restart-daemon` : succès
-  - [ ] Bouton "Republier dans Home Assistant" (global) → `mosquitto_sub` confirme les topics discovery republied
-  - [ ] Équipement inclus non publié → bouton "Créer" (vert) → clic → entité créée dans HA, `unique_id` conforme
-  - [ ] Équipement inclus déjà publié → bouton "Republier" (bleu) → clic → entité mise à jour, `unique_id` inchangé, aucun doublon HA
-  - [ ] Scope enforcement : exclure un équipement → Republier → entité disparaît de HA, `has_pending_home_assistant_changes = false` après rafraîchissement
-  - [ ] Idempotence : relancer la même action → `resultat = "succes"`, 0 erreur, table inchangée
-  - [ ] Bridge down simulé (arrêt mosquitto) → boutons déjà disabled, aucun appel possible
-  - [ ] Message lisible affiché côté console pour chaque cas (succès, partiel, déjà à jour)
-  - Bloqué au `2026-04-06` : `./scripts/deploy-to-box.sh --dry-run` et `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon` échouent immédiatement avec `ERROR: JEEDOM_BOX_HOST is not set.`
+- [x] Task 6 — Gate terrain (exécuté 2026-04-07 — voir section Gate terrain ci-dessous)
+  - [x] Déploiement sur box canonique : effectué manuellement (JEEDOM_BOX_HOST non défini en local)
+  - [x] Bouton "Republier dans Home Assistant" (global) → 30 équipements republiés, toast vert conforme
+  - [~] Équipement inclus non publié → bouton "Créer" (vert) → clic → entité créée dans HA : **NOT EXECUTED** — waiver assumé (voir note de clôture)
+  - [x] Équipement inclus déjà publié → bouton "Republier" (bleu) → clic → entité mise à jour, aucun doublon HA
+  - [x] Scope enforcement : exclure pièce Buanderie → entités disparaissent de HA, 0 écarts résiduels
+  - [x] Idempotence : relancer la même action → succes, 0 erreur, table inchangée
+  - [x] Bridge down simulé (arrêt mosquitto) → boutons disabled, aucun appel possible
+  - [x] Messages lisibles affichés côté console pour chaque cas
 
 ## Dev Notes
 
@@ -455,6 +454,33 @@ Codex (GPT-5)
 - `tests/unit/test_story_5_2_frontend.node.test.js`
 - `_bmad-output/implementation-artifacts/5-2-flux-positif-contextuel-creer-republier-multi-portee.md`
 
+## Gate terrain 2026-04-07
+
+| # | Étape | Observation | Verdict |
+|---|---|---|---|
+| 1 | Préflight — démon, MQTT, home plugin | Page accessible, démon OK, MQTT connecté, aucune erreur visible | **PASS** |
+| 2 | Global — Republier | Modale conforme ("99 équipements inclus"), toast vert "Parc global — 30 équipements republiés". 69 skippés (mappings absents/ambigus — attendu). Aucune erreur. | **PASS** |
+| 3 | Équipement non publié → Créer (bouton individuel) | NOT EXECUTED — Story 5.3 absente : impossible de remettre un équipement mappable *actif* en état "non publié". Deux cas observés : (a) capteur sans mapping : bouton "Créer" actif + "déjà à jour" ; (b) "buanderie plafond" désactivé dans Jeedom → affiché "Inclus / Non publié" en UI mais backend skip (hors topology) → "déjà à jour" + entité absente de HA. UX issue transverse : boutons non grisés pour équipements sans mapping ou désactivés. À traiter hors scope 5.2. Couverture indirecte via Republier global (30 publiés). | **NOT EXECUTED** |
+| 4 | Équipement déjà publié → Republier individuel | Toast vert "buanderie plafond — 1 équipements mis à jour dans Home Assistant." Bouton resté "Republier" (bleu) après refresh. `est_publie_ha` maintenu. Aucun doublon signalé. | **PASS** |
+| 5 | Scope enforcement — pièce Buanderie exclue | Exclusion pièce + appliquer/rescanner → 11 équipements "Alignés / Non publiés", 0 écarts. Entités confirmées absentes de HA (dont "buanderie plafond" republié en étape 4). Trigger : rescan post-exclusion (pas le bouton Republier explicitement). Résultat conforme. | **PASS** |
+| 6 | Idempotence | Republier individuel lancé 2 fois de suite — même feedback aux deux clics, aucun doublon, aucune erreur. | **PASS** |
+| 7 | Bridge down / gating | Broker MQTT coupé → aucune action ne part au clic. Fonctionnellement correct. Observation UX : curseur reste `pointer` au survol → boutons semblent cliquables visuellement. À améliorer : fond gris + `cursor: not-allowed` (comme badges "non publié"). Non bloquant pour ce gate. | **PASS** |
+
+### Verdict gate terrain : PARTIAL — clôturé avec waiver
+
+**6/7 PASS — 1 NOT EXECUTED**
+
+**Waiver assumé sur le checkpoint 3 (Créer individuel) :**
+- Raison d'inexécution : Story 5.3 (Supprimer) non encore disponible — impossible de remettre un équipement mappable actif en état "non publié" sans levier de dépublication. Le Republier global (étape 2) a consommé tous les candidats avant que le test individuel puisse être exécuté.
+- Couverture indirecte disponible : les 30 équipements publiés lors du Republier global incluaient des premières créations ; les tests unitaires story-level (`test_story_5_2_execute_publier.py`) couvrent explicitement le cas "inclus non publié → publish → `equipements_publies_ou_crees = 1`".
+- **Report vers Story 5.3** : le flux `Supprimer` permettra de remettre un équipement mappable actif en état "non publié" de manière contrôlée. Le test terrain "Créer" individuel sera exécuté dans le gate terrain de Story 5.3.
+- Décision produit : clôture à `done` acceptée avec ce waiver documenté.
+
+**Observations UX hors clôture fonctionnelle (à traiter en backlog) :**
+1. Boutons "Créer"/"Republier" actifs pour équipements sans mapping ou désactivés dans Jeedom → feedback "déjà à jour" sémantiquement trompeur (équipement absent de HA). À corriger : griser le bouton ou afficher un tooltip explicite quand le mapping est absent.
+2. Boutons grisés en mode bridge-down mais curseur `pointer` au survol → manque `cursor: not-allowed` pour rendre le disabled visuellement explicite (alignement avec le style des badges "non publié").
+
 ## Change Log
 
 - **2026-04-06** — Story 5.2 implémentée dans le worktree dédié : backend `publier` multi-portée, handlers frontend équipement/pièce/global, feedback utilisateur, suites story-level ajoutées. Non-régression locale validée : `782 pytest` + `133 JS` + `3 PHP` exécutables PASS. Gate terrain tenté mais bloqué car `JEEDOM_BOX_HOST` n'est pas défini.
+- **2026-04-07** — Gate terrain exécuté sur box réelle. 6/7 PASS, 1 NOT EXECUTED (Créer individuel — waiver assumé, report vers Story 5.3). Story passée à `done`.

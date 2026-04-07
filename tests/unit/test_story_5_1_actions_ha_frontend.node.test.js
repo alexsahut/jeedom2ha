@@ -63,18 +63,15 @@ describe('5.1 / AC6 — renderActionButtons : rendu strictement depuis actions_h
     const html = Jeedom2haScopeSummary.renderActionButtons(actions, 42);
     // Libellés courts affichés (Story 5.5)
     assert.ok(html.includes('>Créer<'), 'Bouton doit afficher le libellé court "Créer"');
-    assert.ok(html.includes('>Supprimer<'), 'Bouton doit afficher le libellé court "Supprimer"');
     assert.ok(!html.includes('dans Home Assistant'), 'Suffixe long ne doit pas apparaître');
-    assert.ok(!html.includes('de Home Assistant'), 'Suffixe long ne doit pas apparaître');
     // Couleur Créer = btn-success
     assert.ok(html.includes('btn-success'), 'Bouton Créer doit être btn-success');
     // Publier actif (pas de disabled sur l'élément publier)
     const publierEl = html.match(/data-ha-action="publier"[^>]*>/);
     assert.ok(publierEl, 'Bouton publier absent du HTML');
     assert.ok(!publierEl[0].includes('disabled'), 'Bouton publier ne doit pas être disabled');
-    // Supprimer grisé (disabled)
-    assert.ok(html.includes('disabled'));
-    assert.ok(html.includes('Aucune entité publiée'));
+    // Story 5.3 fix : Supprimer non rendu quand disponible=false (pas de cohabitation Créer+Supprimer)
+    assert.ok(!html.includes('data-ha-action="supprimer"'), 'Bouton Supprimer ne doit pas être rendu quand disponible=false');
   });
 
   it('rend Republier avec libellé court et couleur btn-primary (Story 5.5)', () => {
@@ -215,7 +212,7 @@ describe('5.5 / AC2 — renderActionButtons : libellés courts et couleurs', () 
     assert.ok(html.includes('btn-danger'), 'Classe btn-danger attendue pour Supprimer');
   });
 
-  it('bouton disabled conserve son title de raison_indisponibilite malgré le libellé court', () => {
+  it('bouton publier disabled conserve son title de raison_indisponibilite malgré le libellé court', () => {
     const actions = {
       publier: { label: 'Créer dans Home Assistant', disponible: false, raison_indisponibilite: 'Pont indisponible', niveau_confirmation: 'aucune' },
       supprimer: { label: 'Supprimer de Home Assistant', disponible: false, raison_indisponibilite: 'Aucune entité publiée', niveau_confirmation: 'forte' },
@@ -223,9 +220,10 @@ describe('5.5 / AC2 — renderActionButtons : libellés courts et couleurs', () 
     const html = Jeedom2haScopeSummary.renderActionButtons(actions, 4);
     assert.ok(html.includes('>Créer<'), 'Libellé court affiché même si désactivé');
     assert.ok(html.includes('title="Pont indisponible"'), 'Title raison_indisponibilite conservé sur publier');
-    assert.ok(html.includes('title="Aucune entité publiée"'), 'Title raison_indisponibilite conservé sur supprimer');
     const publierEl = html.match(/data-ha-action="publier"[^>]*>/);
     assert.ok(publierEl[0].includes('disabled'), 'Bouton publier doit être disabled');
+    // Story 5.3 fix : Supprimer non rendu quand disponible=false
+    assert.ok(!html.includes('data-ha-action="supprimer"'), 'Bouton Supprimer ne doit pas être rendu quand disponible=false');
   });
 });
 

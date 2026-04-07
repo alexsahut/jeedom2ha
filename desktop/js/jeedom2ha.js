@@ -393,6 +393,52 @@ function triggerPublierAction($button, portee, selection) {
   });
 }
 
+function triggerSupprimerAction($button, portee, selection) {
+  var pendingState = setHaActionPendingState($button, '{{Suppression...}}');
+  executeHaAction('supprimer', portee, selection, {
+    onSuccess: function(payload) {
+      showHaActionFeedback(payload);
+      if (shouldRefreshPublishedScopeAfterHaAction(payload)) {
+        var preserveNavState = true;
+        refreshPublishedScopeSummary(preserveNavState);
+      }
+      refreshBridgeStatus();
+    },
+    onError: function(message) {
+      $('#div_alert').showAlert({message: message, level: 'danger'});
+    },
+    onComplete: function() {
+      restoreHaActionPendingState($button, pendingState);
+    },
+  });
+}
+
+function confirmHaSupprimerAction(title, message, confirmLabel, onConfirm) {
+  if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
+    bootbox.dialog({
+      title: title,
+      message: '<div>' + message + '</div>',
+      buttons: {
+        cancel: {
+          label: '{{Annuler}}',
+          className: 'btn-default',
+        },
+        confirm: {
+          label: confirmLabel,
+          className: 'btn-danger',
+          callback: function() {
+            onConfirm();
+          },
+        },
+      },
+    });
+    return;
+  }
+  if (window.confirm(message)) {
+    onConfirm();
+  }
+}
+
 function renderPublishedScopeSummary(result, navState) {
   if (typeof Jeedom2haScopeSummary === 'undefined' || !Jeedom2haScopeSummary) {
     $('#div_scopeSummaryContent').html('<div class="alert alert-danger" style="margin-bottom:0;">{{Module de synthèse indisponible côté UI}}</div>');
@@ -405,6 +451,10 @@ function renderPublishedScopeSummary(result, navState) {
     ? _readHaActionCount(model.global.counts.inclus)
     : 0;
   $('.j2ha-ha-action[data-ha-action="republier"]').attr('data-scope-count', String(includedCount));
+  var publiesCount = (model && model.has_contract === true && model.global && model.global.counts)
+    ? _readHaActionCount(model.global.counts.publies)
+    : 0;
+  $('.j2ha-ha-action[data-ha-action="supprimer-recreer"]').attr('data-scope-publies', String(publiesCount));
   _restoreNavState(navState || null);
   applyHAGating(window.jeedom2haLastBridgeStatus || null);
 }
@@ -491,6 +541,30 @@ $(function() {
     triggerPublierAction($button, 'equipement', [eqId]);
   });
 
+  // Story 5.3 — Click handler équipement Supprimer avec confirmation forte
+  $('#div_scopeSummaryContent').on('click', '.j2ha-action-ha-btn[data-ha-action="supprimer"]', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var eqId = parseInt($button.attr('data-eq-id'), 10);
+    if (!Number.isFinite(eqId) || eqId <= 0) {
+      return;
+    }
+    var eqName = $button.closest('tr').find('td:first').text().trim() || '{{Équipement}}';
+    confirmHaSupprimerAction(
+      '{{Supprimer puis recréer dans Home Assistant}}',
+      '{{Supprimer}} "' + eqName + '" {{de Home Assistant.}}'
+        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à cette entité peuvent être impactés.}}',
+      '{{Supprimer 1 équipement}}',
+      function() {
+        triggerSupprimerAction($button, 'equipement', [eqId]);
+      }
+    );
+  });
+
   $('#div_scopeSummaryContent').on('click', '.j2ha-piece-action-btn[data-ha-action="publier"]', function(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -514,6 +588,31 @@ $(function() {
     );
   });
 
+  // Story 5.3 — Click handler pièce Supprimer avec confirmation forte
+  $('#div_scopeSummaryContent').on('click', '.j2ha-piece-action-btn[data-ha-action="supprimer"]', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var pieceId = parseInt($button.attr('data-piece-id'), 10);
+    if (!Number.isFinite(pieceId) || pieceId <= 0) {
+      return;
+    }
+    var pieceName = $button.attr('data-piece-name') || '{{Pièce}}';
+    var publiesCount = _readHaActionCount($button.attr('data-piece-publies'));
+    confirmHaSupprimerAction(
+      '{{Supprimer puis recréer dans Home Assistant}}',
+      '{{Supprimer}} "' + pieceName + '" — ' + publiesCount + ' {{équipement(s) publié(s).}}'
+        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}',
+      '{{Supprimer}} ' + publiesCount + ' {{équipements}}',
+      function() {
+        triggerSupprimerAction($button, 'piece', [pieceId]);
+      }
+    );
+  });
+
   refreshPublishedScopeSummary();
 
   $('#bt_refreshScopeSummary').on('click', function() {
@@ -533,6 +632,25 @@ $(function() {
       '{{Republier}} ' + includedCount + ' {{équipements}}',
       function() {
         triggerPublierAction($button, 'global', ['all']);
+      }
+    );
+  });
+
+  // Story 5.3 — Click handler global Supprimer avec confirmation forte
+  $('.j2ha-ha-action[data-ha-action="supprimer-recreer"]').on('click', function(event) {
+    event.preventDefault();
+    var $button = $(this);
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var publiesCount = _readHaActionCount($button.attr('data-scope-publies'));
+    confirmHaSupprimerAction(
+      '{{Supprimer puis recréer dans Home Assistant}}',
+      '{{Supprimer puis recréer dans Home Assistant}} — ' + publiesCount + ' {{équipement(s) publié(s).}}'
+        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}',
+      '{{Supprimer}} ' + publiesCount + ' {{équipements}}',
+      function() {
+        triggerSupprimerAction($button, 'global', ['all']);
       }
     );
   });
