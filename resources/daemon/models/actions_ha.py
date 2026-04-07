@@ -18,6 +18,7 @@ _LABEL_SUPPRIMER = "Supprimer de Home Assistant"
 # Raisons d'indisponibilité canoniques.
 _RAISON_BRIDGE_INDISPONIBLE = "Le pont Home Assistant est indisponible (démon ou broker hors service)"
 _RAISON_AUCUNE_ENTITE = "Aucune entité publiée dans Home Assistant"
+_RAISON_NON_PUBLIABLE = "Cet équipement ne peut pas être publié dans Home Assistant"
 
 # Niveaux de confirmation (cf. ux-delta-review §7.2).
 CONFIRMATION_AUCUNE = "aucune"
@@ -36,6 +37,7 @@ def build_actions_ha(
     est_publie_ha: bool,
     est_inclus: bool,
     bridge_disponible: bool,
+    est_publiable: bool = True,
 ) -> dict:
     """Construit le signal `actions_ha` pour un équipement donné.
 
@@ -44,6 +46,12 @@ def build_actions_ha(
     - est_publie_ha=False, inclus → publier actif, supprimer grisé
     - est_publie_ha=True, inclus → publier actif, supprimer actif
     - non inclus → pas de signal actions_ha (géré par l'appelant)
+
+    Story 5.6 — paramètre est_publiable :
+    - est_publiable=True (défaut) : comportement Story 5.1 inchangé
+    - est_publiable=False + bridge OK : publier.disponible=False avec raison lisible
+    - supprimer reste indépendant de est_publiable (dépend uniquement de est_publie_ha)
+    - bridge indisponible reste prioritaire sur est_publiable
 
     Niveaux de confirmation (scope équipement uniquement) :
     - publier : "aucune" (pas de modale si scope explicite)
@@ -69,7 +77,7 @@ def build_actions_ha(
         }
 
     # Matrice nominale (bridge disponible)
-    publier_disponible = est_inclus
+    publier_disponible = est_inclus and est_publiable
     supprimer_disponible = est_inclus and est_publie_ha
 
     supprimer_raison = None
@@ -79,8 +87,8 @@ def build_actions_ha(
         supprimer_raison = _RAISON_AUCUNE_ENTITE
 
     publier_raison = None
-    if not est_inclus:
-        publier_raison = None  # caller should not generate signal for non-inclus
+    if est_inclus and not est_publiable:
+        publier_raison = _RAISON_NON_PUBLIABLE
 
     return {
         "publier": {
