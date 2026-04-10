@@ -1,6 +1,6 @@
 # Story 1.1 : Contrat du pipeline — MappingResult à sous-blocs bornés et ordre d'évaluation stable
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -27,31 +27,31 @@ afin que chaque étape soit développable et testable en isolation et que le dia
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Définir le type `MappingCapabilities` dans `models/mapping.py` (AC: #1)
-  - [ ] Ajouter après les imports : `MappingCapabilities = Union[LightCapabilities, CoverCapabilities, SwitchCapabilities]`
-  - [ ] Ce type est le contrat d'entrée de `validate_projection()` définie en Epic 3 — le définir ici comme point d'ancrage du contrat
+- [x] Task 1 — Définir le type `MappingCapabilities` dans `models/mapping.py` (AC: #1)
+  - [x] Ajouter après les imports : `MappingCapabilities = Union[LightCapabilities, CoverCapabilities, SwitchCapabilities]`
+  - [x] Ce type est le contrat d'entrée de `validate_projection()` définie en Epic 3 — le définir ici comme point d'ancrage du contrat
 
-- [ ] Task 2 — Définir le dataclass `ProjectionValidity` dans `models/mapping.py` (AC: #1, #2)
-  - [ ] Ajouter un dataclass `ProjectionValidity` entre `SwitchCapabilities` et `MappingResult` avec : `is_valid: Optional[bool]`, `reason_code: Optional[str]`, `missing_fields: List[str]`, `missing_capabilities: List[str]`
-  - [ ] Sémantique : `is_valid=None` = sous-bloc skipped (étape 3 non exécutée) ; `is_valid=True/False` = résultat de validation effective
+- [x] Task 2 — Définir le dataclass `ProjectionValidity` dans `models/mapping.py` (AC: #1, #2)
+  - [x] Ajouter un dataclass `ProjectionValidity` entre `SwitchCapabilities` et `MappingResult` avec : `is_valid: Optional[bool]`, `reason_code: Optional[str]`, `missing_fields: List[str]`, `missing_capabilities: List[str]`
+  - [x] Sémantique : `is_valid=None` = sous-bloc skipped (étape 3 non exécutée) ; `is_valid=True/False` = résultat de validation effective
 
-- [ ] Task 3 — Étendre `MappingResult` avec les deux nouveaux sous-blocs (AC: #1, #2)
-  - [ ] Ajouter `projection_validity: Optional[ProjectionValidity] = None` dans `MappingResult` APRÈS les champs existants
-  - [ ] Ajouter `publication_decision_ref: Optional["PublicationDecision"] = None` dans `MappingResult` APRÈS les champs existants (nommer avec `_ref` pour éviter la collision de nom avec le champ existant de `PublicationDecision`)
-  - [ ] Ne PAS modifier `__post_init__` — ces champs restent `None` jusqu'au câblage effectif en Epic 5
-  - [ ] Les champs existants de `MappingResult` (`ha_entity_type`, `confidence`, `reason_code`, `capabilities`, `commands`, etc.) constituent le sous-bloc `mapping` (étape 2) — pas de modification
+- [x] Task 3 — Étendre `MappingResult` avec les deux nouveaux sous-blocs (AC: #1, #2)
+  - [x] Ajouter `projection_validity: Optional[ProjectionValidity] = None` dans `MappingResult` APRÈS les champs existants
+  - [x] Ajouter `publication_decision_ref: Optional["PublicationDecision"] = None` dans `MappingResult` APRÈS les champs existants (nommer avec `_ref` pour éviter la collision de nom avec le champ existant de `PublicationDecision`)
+  - [x] Ne PAS modifier `__post_init__` — ces champs restent `None` jusqu'au câblage effectif en Epic 5
+  - [x] Les champs existants de `MappingResult` (`ha_entity_type`, `confidence`, `reason_code`, `capabilities`, `commands`, etc.) constituent le sous-bloc `mapping` (étape 2) — pas de modification
 
-- [ ] Task 4 — Écrire les tests du contrat du pipeline (AC: #1, #2, #3)
-  - [ ] Créer `resources/daemon/tests/unit/test_pipeline_contract.py`
-  - [ ] Test structurel : vérifier que `MappingResult` possède les attributs `projection_validity` et `publication_decision_ref` (isinstance + hasattr)
-  - [ ] Test type `ProjectionValidity` — cas nominal : `is_valid=True, reason_code=None, missing_fields=[], missing_capabilities=[]`
-  - [ ] Test type `ProjectionValidity` — cas skip : `is_valid=None, reason_code="skipped_no_mapping_candidate", missing_fields=[], missing_capabilities=[]`
-  - [ ] Test type `ProjectionValidity` — cas invalide : `is_valid=False, reason_code="ha_missing_command_topic", missing_fields=["command_topic"], missing_capabilities=["has_command"]`
-  - [ ] Test trace complète (AR2) : construire un `MappingResult` complet avec les 3 sous-blocs renseignés → vérifier qu'aucun champ attendu n'est absent
-  - [ ] Test déterminisme (NFR1) : appeler `assess_eligibility()` deux fois avec le même `JeedomEqLogic` → `EligibilityResult` identique (même `is_eligible`, même `reason_code`, même `confidence`)
+- [x] Task 4 — Écrire les tests du contrat du pipeline (AC: #1, #2, #3)
+  - [x] Créer `resources/daemon/tests/unit/test_pipeline_contract.py`
+  - [x] Test structurel : vérifier que `MappingResult` possède les attributs `projection_validity` et `publication_decision_ref` (isinstance + hasattr)
+  - [x] Test type `ProjectionValidity` — cas nominal : `is_valid=True, reason_code=None, missing_fields=[], missing_capabilities=[]`
+  - [x] Test type `ProjectionValidity` — cas skip : `is_valid=None, reason_code="skipped_no_mapping_candidate", missing_fields=[], missing_capabilities=[]`
+  - [x] Test type `ProjectionValidity` — cas invalide : `is_valid=False, reason_code="ha_missing_command_topic", missing_fields=["command_topic"], missing_capabilities=["has_command"]`
+  - [x] Test trace complète (AR2) : construire un `MappingResult` complet avec les 3 sous-blocs renseignés → vérifier qu'aucun champ attendu n'est absent
+  - [x] Test déterminisme (NFR1) : appeler `assess_eligibility()` deux fois avec le même `JeedomEqLogic` → `EligibilityResult` identique (même `is_eligible`, même `reason_code`, même `confidence`)
 
-- [ ] Task 5 — Vérifier la non-régression
-  - [ ] Lancer `pytest resources/daemon/tests/` depuis `resources/daemon/` : tous les tests existants PASS (les nouveaux champs sont optionnels, les instanciations existantes non modifiées)
+- [x] Task 5 — Vérifier la non-régression
+  - [x] Lancer `pytest resources/daemon/tests/` depuis `resources/daemon/` : tous les tests existants PASS (les nouveaux champs sont optionnels, les instanciations existantes non modifiées)
 
 ## Dev Notes
 
@@ -166,6 +166,21 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+Aucun — implémentation directe sans blocage.
+
 ### Completion Notes List
 
+- Task 1 : `MappingCapabilities = Union[LightCapabilities, CoverCapabilities, SwitchCapabilities]` ajouté après les dataclasses de capabilities dans `models/mapping.py`. Import `List` ajouté dans `from typing`.
+- Task 2 : dataclass `ProjectionValidity` (4 champs : `is_valid`, `reason_code`, `missing_fields`, `missing_capabilities`) inséré entre `SwitchCapabilities` et `MappingResult`.
+- Task 3 : `MappingResult` étendu de `projection_validity: Optional[ProjectionValidity] = None` et `publication_decision_ref: Optional["PublicationDecision"] = None`. `__post_init__` non modifié. Pipeline en production inchangé (champs optionnels).
+- Task 4 : 11 tests dans `test_pipeline_contract.py` — 3 cas `ProjectionValidity`, type alias `MappingCapabilities`, 2 champs struct, trace complète AR2, 3 variantes déterminisme NFR1. 11/11 PASS.
+- Task 5 : 290/290 PASS — zéro régression.
+
 ### File List
+
+- `resources/daemon/models/mapping.py` — modifié (T1, T2, T3)
+- `resources/daemon/tests/unit/test_pipeline_contract.py` — créé (T4)
+
+## Change Log
+
+- 2026-04-10 : Story 1.1 implémentée — `MappingCapabilities`, `ProjectionValidity` et deux sous-blocs optionnels dans `MappingResult`. 11 tests pipeline contract ajoutés. 290/290 PASS.

@@ -7,7 +7,7 @@ Extended in Story 2.4 for switch mapping.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from models.availability import BRIDGE_AVAILABILITY_TOPIC, AVAILABILITY_UNKNOWN
 from models.topology import JeedomCmd
@@ -53,6 +53,26 @@ class SwitchCapabilities:
     device_class: Optional[str] = None   # "outlet" if confirmed by eq_type_name, None otherwise
 
 
+MappingCapabilities = Union[LightCapabilities, CoverCapabilities, SwitchCapabilities]
+
+
+@dataclass
+class ProjectionValidity:
+    """Résultat de validation HA pour un candidat de mapping (étape 3 du pipeline).
+
+    Sémantique de is_valid :
+    - None  : sous-bloc skipped — étape 3 non exécutée (upstream a échoué)
+    - True  : candidat valide, projection autorisée
+    - False : candidat invalide, publication bloquée
+
+    Introduit en Story 1.1 — câblage effectif en Epic 3.
+    """
+    is_valid: Optional[bool]           # True/False/None (None = skipped)
+    reason_code: Optional[str]         # None si valide
+    missing_fields: List[str]          # champs HA requis non satisfaits
+    missing_capabilities: List[str]    # capabilities moteur absentes
+
+
 @dataclass
 class MappingResult:
     """Result of mapping a single Jeedom eqLogic to a Home Assistant entity.
@@ -74,6 +94,8 @@ class MappingResult:
     # __post_init__ enforces that callers always provide an explicit value.
     capabilities: Optional[Union[LightCapabilities, CoverCapabilities, "SwitchCapabilities"]] = None
     reason_details: Optional[Dict[str, object]] = None
+    projection_validity: Optional[ProjectionValidity] = None
+    publication_decision_ref: Optional["PublicationDecision"] = None
 
     def __post_init__(self) -> None:
         if self.capabilities is None:

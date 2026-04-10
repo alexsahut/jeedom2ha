@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-10'  # Sprint planning — ajout cycle Moteur de Projection Explicable (6 epics, 17 stories) ; cycle V1.1 Pilotable conservé comme historique (toutes done) | Story 1.1 ready-for-dev, pe-epic-1 in-progress
+last_updated: '2026-04-10'  # Story 1.1 review
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -124,7 +124,7 @@ development_status:
   # ==============================================================
 
   pe-epic-1: in-progress  # Le pipeline canonique établit un contrat de décision déterministe — l'éligibilité est sa première étape formalisée (3 stories)
-  1-1-contrat-du-pipeline-mappingresult-a-sous-blocs-bornes-et-ordre-d-evaluation-stable: ready-for-dev
+  1-1-contrat-du-pipeline-mappingresult-a-sous-blocs-bornes-et-ordre-d-evaluation-stable: review
   1-2-etape-1-l-eligibilite-classe-chaque-equipement-jeedom-dans-une-categorie-stable-avant-tout-mapping: backlog
   1-3-diagnostic-d-eligibilite-l-utilisateur-lit-l-etape-1-comme-point-de-blocage-avec-cause-categorisee-et-action-de-scope-applicable: backlog
   pe-epic-1-retrospective: optional
