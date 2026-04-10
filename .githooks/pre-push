@@ -1,0 +1,34 @@
+#!/bin/bash
+set -euo pipefail
+
+REMOTE_NAME=${1:-origin}
+REMOTE_URL=${2:-}
+BLOCKED=0
+
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+    [[ -n "${LOCAL_REF:-}" ]] || continue
+
+    LOCAL_BRANCH=${LOCAL_REF#refs/heads/}
+    REMOTE_BRANCH=${REMOTE_REF#refs/heads/}
+
+    case "$LOCAL_BRANCH" in
+        main|beta|stable)
+            echo "Push blocked: refusing to push protected local branch '$LOCAL_BRANCH' to '$REMOTE_NAME'." >&2
+            echo "Open a pull request instead of pushing directly to a protected branch." >&2
+            BLOCKED=1
+            ;;
+    esac
+
+    case "$REMOTE_BRANCH" in
+        main|beta|stable)
+            echo "Push blocked: refusing direct push to protected remote branch '$REMOTE_BRANCH' on '$REMOTE_NAME'." >&2
+            if [[ -n "$REMOTE_URL" ]]; then
+                echo "Remote: $REMOTE_URL" >&2
+            fi
+            echo "Push a work branch and open a pull request instead." >&2
+            BLOCKED=1
+            ;;
+    esac
+done
+
+exit "$BLOCKED"

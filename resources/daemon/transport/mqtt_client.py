@@ -1,0 +1,332 @@
+"""mqtt_client.py — Persistent MQTT bridge client for jeedom2ha.
+
+Manages a long-lived MQTT connection with automatic reconnection (paho built-in),
+LWT (Last Will and Testament), and birth messages.
+
+Threading model: paho-mqtt runs its own network thread via loop_start().
+Callbacks (on_connect, on_disconnect) execute in the paho thread.
+State updates are marshalled back to the asyncio event loop via
+loop.call_soon_threadsafe() so the rest of the daemon never touches
+thread-unsafe structures from a non-async context.
+"""
+import asyncio
+import logging
+import ssl
+from typing import Any, Callable, Dict, Optional
+
+import paho.mqtt.client as mqtt
+from models.availability import (
+    AVAILABILITY_OFFLINE,
+    AVAILABILITY_ONLINE,
+    BRIDGE_AVAILABILITY_TOPIC,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+BRIDGE_STATUS_TOPIC = BRIDGE_AVAILABILITY_TOPIC
+COMMAND_SUBSCRIPTION_TOPICS = (
+    "jeedom2ha/+/set",
+    "jeedom2ha/+/brightness/set",
+    "jeedom2ha/+/position/set",
+)
+# Story 5.1 — Topic birth message Home Assistant (souscrit pour republication)
+HA_STATUS_TOPIC = "homeassistant/status"
+
+
+class MqttBridge:
+    """Persistent MQTT connection with LWT, birth message, and auto-reconnect.
+
+    Lifecycle:
+        await bridge.start(config)  — non-blocking, returns after initiating connect
+        await bridge.stop()         — graceful: publishes offline, disconnects
+    """
+
+    def __init__(self):
+        self._client = None
+        self._state = "disconnected"  # disconnected | connecting | connected | reconnecting
+        self._loop = None
+        self._broker_host = ""
+        self._broker_port = 0
+        self._command_handler: Optional[Callable[[str, str], Any]] = None
+        self._pending_command_tasks: Dict[str, asyncio.Task[Any]] = {}
+        # Story 5.1 — Callbacks for republication (injected via start())
+        # Called via call_soon_threadsafe → run in asyncio thread → can use asyncio.create_task()
+        self._on_reconnect_cb: Optional[Callable[[], Any]] = None
+        self._on_ha_birth_cb: Optional[Callable[[], Any]] = None
+
+    # ------------------------------------------------------------------
+    # Public async API
+    # ------------------------------------------------------------------
+
+    async def start(self, config: dict, on_reconnect_cb=None, on_ha_birth_cb=None):
+        """Initiate persistent MQTT connection. Non-blocking — returns immediately.
+
+        Args:
+            config: dict with keys host, port, user, password, tls, tls_verify
+            on_reconnect_cb: callable() — called via call_soon_threadsafe on broker reconnect.
+                             May call asyncio.create_task() (runs in asyncio thread).
+                             Used for broker reconnect republication (Story 5.1).
+            on_ha_birth_cb: callable() — called via call_soon_threadsafe on HA birth message.
+                             Used for HA restart republication (Story 5.1).
+        """
+        self._on_reconnect_cb = on_reconnect_cb
+        self._on_ha_birth_cb = on_ha_birth_cb
+        self._loop = asyncio.get_running_loop()
+        self._broker_host = config["host"]
+        self._broker_port = int(config.get("port", 1883))
+
+        # paho-mqtt 2.0+ compat: try new API, fall back to v1
+        try:
+            self._client = mqtt.Client(
+                callback_api_version=mqtt.CallbackAPIVersion.VERSION1,
+                client_id="jeedom2ha_bridge",
+                clean_session=True,
+            )
+        except AttributeError:
+            self._client = mqtt.Client(client_id="jeedom2ha_bridge", clean_session=True)
+
+        # LWT — broker publishes "offline" automatically on unclean disconnect
+        self._client.will_set(BRIDGE_STATUS_TOPIC, AVAILABILITY_OFFLINE, qos=1, retain=True)
+        _LOGGER.debug(
+            "[MQTT] LWT configured: topic=%s payload=offline qos=1 retain=True",
+            BRIDGE_STATUS_TOPIC,
+        )
+
+        # Register callbacks (called from paho thread)
+        self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
+        self._client.on_message = self._on_message
+
+        # Built-in exponential backoff reconnection (NFR6: < 30s)
+        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
+
+        # TLS (V1 — system CA only, no custom CA or mTLS)
+        if config.get("tls", False):
+            ctx = ssl.create_default_context()
+            if not config.get("tls_verify", True):
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            self._client.tls_set_context(ctx)
+
+        # Authentication
+        user = config.get("user", "")
+        if user:
+            _LOGGER.debug("[MQTT] Setting credentials for user=%s", user)
+            self._client.username_pw_set(user, config.get("password", ""))
+
+        self._state = "connecting"
+        _LOGGER.info(
+            "[MQTT] Initiating persistent connection to %s:%d",
+            self._broker_host,
+            self._broker_port,
+        )
+        # Non-blocking connect — loop_start() drives the network thread
+        self._client.connect_async(self._broker_host, self._broker_port, keepalive=60)
+        self._client.loop_start()
+
+    async def stop(self):
+        """Graceful shutdown: publish offline status, disconnect, stop network thread."""
+        if self._client is None:
+            return
+        _LOGGER.info("[MQTT] Stopping bridge, publishing offline status")
+        try:
+            msg_info = self._client.publish(BRIDGE_STATUS_TOPIC, AVAILABILITY_OFFLINE, qos=1, retain=True)
+            # Ensure the offline message is sent before severing TCP connection (Fix for Finding 1)
+            msg_info.wait_for_publish(timeout=2.0)
+            self._client.disconnect()
+        except Exception:
+            pass
+        self._client.loop_stop()
+        self._client = None
+        self._state = "disconnected"
+        self._pending_command_tasks.clear()
+
+    # ------------------------------------------------------------------
+    # paho callbacks — executed in the paho network thread
+    # ------------------------------------------------------------------
+
+    def _on_connect(self, client, userdata, flags, rc):
+        """Called by paho on connection result (paho thread)."""
+        if rc == 0:
+            _LOGGER.info(
+                "[MQTT] Connected to broker %s:%d",
+                self._broker_host,
+                self._broker_port,
+            )
+            self._subscribe_command_topics(client)
+            # Birth message — signals bridge availability to HA (AC #17: before republication)
+            client.publish(BRIDGE_STATUS_TOPIC, AVAILABILITY_ONLINE, qos=1, retain=True)
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._set_state, "connected")
+                # Story 5.1 — Task 4.1: déclencher republication sur reconnect (si callback injecté)
+                # Le callback vérifiera si app["publications"] est non vide (AC #6/#10)
+                if self._on_reconnect_cb is not None:
+                    self._loop.call_soon_threadsafe(self._trigger_reconnect_republish)
+        else:
+            _LOGGER.warning("[MQTT] Connection refused by broker (rc=%d)", rc)
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._set_state, "disconnected")
+
+    def _on_message(self, client, userdata, message):
+        """Called by paho when a subscribed message is received (paho thread)."""
+        topic = str(getattr(message, "topic", "") or "")
+        payload_raw = getattr(message, "payload", b"")
+        if isinstance(payload_raw, (bytes, bytearray)):
+            payload = payload_raw.decode("utf-8", errors="ignore")
+        else:
+            payload = str(payload_raw)
+
+        # Story 5.1 — Task 3.2: détecter le birth message Home Assistant
+        if topic == HA_STATUS_TOPIC and payload == "online":
+            if self._loop is not None and self._on_ha_birth_cb is not None:
+                self._loop.call_soon_threadsafe(self._trigger_ha_birth_republish)
+            return
+
+        if self._command_handler is None:
+            return
+
+        if self._loop is not None:
+            self._loop.call_soon_threadsafe(self._dispatch_command_message, topic, payload)
+
+    def _subscribe_command_topics(self, client) -> None:
+        """Subscribe to HA command topics and homeassistant/status."""
+        # Story 5.1 — Task 3.1: inclure homeassistant/status pour la republication birth HA
+        all_topics = list(COMMAND_SUBSCRIPTION_TOPICS) + [HA_STATUS_TOPIC]
+        for subscription_topic in all_topics:
+            subscribe_result = client.subscribe(subscription_topic, qos=1)
+            if isinstance(subscribe_result, tuple):
+                result = subscribe_result[0] if subscribe_result else mqtt.MQTT_ERR_UNKNOWN
+            elif isinstance(subscribe_result, int):
+                result = subscribe_result
+            else:
+                result = mqtt.MQTT_ERR_SUCCESS
+
+            if result == mqtt.MQTT_ERR_SUCCESS:
+                _LOGGER.info("[MQTT] Subscribed to command topic: %s", subscription_topic)
+            else:
+                _LOGGER.warning(
+                    "[MQTT] Failed to subscribe to command topic=%s result=%s",
+                    subscription_topic,
+                    result,
+                )
+
+    def _dispatch_command_message(self, topic: str, payload: str) -> None:
+        """Dispatch command messages on the asyncio loop thread."""
+        if self._command_handler is None:
+            return
+
+        try:
+            maybe_coro = self._command_handler(topic, payload)
+            if asyncio.iscoroutine(maybe_coro):
+                dispatch_key = self._command_dispatch_key(topic)
+                previous_task = self._pending_command_tasks.get(dispatch_key)
+                task = asyncio.create_task(
+                    self._run_serialized_command(dispatch_key, maybe_coro, previous_task)
+                )
+                self._pending_command_tasks[dispatch_key] = task
+        except Exception:
+            _LOGGER.exception("[MQTT] Command handler raised an exception")
+
+    def _command_dispatch_key(self, topic: str) -> str:
+        """Serialize commands per Jeedom entity to preserve arrival order."""
+        parts = topic.split("/")
+        if len(parts) >= 3 and parts[0] == "jeedom2ha" and parts[1].isdigit():
+            return f"eq:{parts[1]}"
+        return f"topic:{topic}"
+
+    async def _run_serialized_command(
+        self,
+        dispatch_key: str,
+        command_coro: Any,
+        previous_task: Optional[asyncio.Task[Any]],
+    ) -> None:
+        """Run one command only after the previous command for the same entity completes."""
+        try:
+            if previous_task is not None:
+                try:
+                    await previous_task
+                except Exception:
+                    pass
+            await command_coro
+        except Exception:
+            _LOGGER.exception("[MQTT] Command handler raised an exception")
+        finally:
+            current_task = asyncio.current_task()
+            if current_task is not None and self._pending_command_tasks.get(dispatch_key) is current_task:
+                self._pending_command_tasks.pop(dispatch_key, None)
+
+    def _on_disconnect(self, client, userdata, rc):
+        """Called by paho on disconnect (paho thread). rc=0 = clean, rc!=0 = unexpected."""
+        if rc != 0:
+            _LOGGER.info("[MQTT] Unexpected disconnect (rc=%d), auto-reconnect in progress", rc)
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._set_state, "reconnecting")
+        else:
+            _LOGGER.info("[MQTT] Clean disconnect")
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._set_state, "disconnected")
+
+    def _trigger_reconnect_republish(self) -> None:
+        """Trigger broker reconnect republication. Runs in asyncio thread (via call_soon_threadsafe).
+
+        Story 5.1 — Task 4.1: appelle on_reconnect_cb qui crée une tâche asyncio.
+        Le callback vérifie si publications non vides (AC #6/#10).
+        """
+        if self._on_reconnect_cb is not None:
+            try:
+                asyncio.create_task(self._on_reconnect_cb())
+            except Exception:
+                _LOGGER.exception("[MQTT] _trigger_reconnect_republish: erreur inattendue")
+
+    def _trigger_ha_birth_republish(self) -> None:
+        """Trigger HA birth republication. Runs in asyncio thread (via call_soon_threadsafe).
+
+        Story 5.1 — Task 3.3: appelle on_ha_birth_cb qui crée une tâche asyncio.
+        """
+        if self._on_ha_birth_cb is not None:
+            try:
+                asyncio.create_task(self._on_ha_birth_cb())
+            except Exception:
+                _LOGGER.exception("[MQTT] _trigger_ha_birth_republish: erreur inattendue")
+
+    def _set_state(self, new_state: str):
+        """State transition — must be called from asyncio thread via call_soon_threadsafe."""
+        self._state = new_state
+
+    # ------------------------------------------------------------------
+    # Read-only properties
+    # ------------------------------------------------------------------
+
+    @property
+    def state(self) -> str:
+        """Current connection state string."""
+        return self._state
+
+    @property
+    def is_connected(self) -> bool:
+        return self._state == "connected"
+
+    @property
+    def broker_info(self) -> str:
+        """'host:port' string, empty if not yet configured."""
+        return f"{self._broker_host}:{self._broker_port}" if self._broker_host else ""
+
+    def publish_message(self, topic: str, payload: str, qos: int = 1, retain: bool = False) -> bool:
+        """Publish an MQTT message safely.
+
+        Returns True if the message was queued, False if the client is not available.
+        This is the safe public API for publishing — never access _client directly from outside.
+        """
+        if self._client is None:
+            _LOGGER.warning("[MQTT] publish_message called but _client is None (bridge stopped?), topic=%s", topic)
+            return False
+        try:
+            self._client.publish(topic, payload, qos=qos, retain=retain)
+            return True
+        except Exception as e:
+            _LOGGER.error("[MQTT] publish_message failed on topic=%s: %s", topic, e)
+            return False
+
+    def set_command_handler(self, handler: Optional[Callable[[str, str], Any]]) -> None:
+        """Register a command message handler called for subscribed command topics."""
+        self._command_handler = handler

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jeedom2ha - Design Direction Explorations</title>
+    <style>
+        :root {
+            --jeedom-bg: #f4f5f7;
+            --jeedom-panel: #ffffff;
+            --jeedom-text: #333333;
+            --color-ready: #28a745;
+            --color-warning: #ffc107;
+            --color-muted: #6c757d;
+            --color-info: #17a2b8;
+            --border: #dee2e6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--jeedom-bg);
+            color: var(--jeedom-text);
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2, h3 { color: #2c3e50; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* Navigation / Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+        .tab-btn {
+            padding: 10px 20px; background: none; border: none; cursor: pointer;
+            font-size: 16px; font-weight: bold; color: var(--color-muted);
+            border-bottom: 3px solid transparent; margin-bottom: -2px;
+        }
+        .tab-btn.active { color: #007bff; border-bottom-color: #007bff; }
+
+        /* Mockup Container */
+        .mockup {
+            background: var(--jeedom-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 20px;
+            min-height: 500px;
+            display: none;
+        }
+        .mockup.active { display: block; }
+
+        /* Generic UI Elements */
+        .badge {
+            display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; margin-right: 5px;
+        }
+        .b-ready { background-color: var(--color-ready); }
+        .b-warn { background-color: var(--color-warning); color: #333; }
+        .b-muted { background-color: var(--color-muted); }
+        
+        .btn { padding: 6px 12px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; border-color: #007bff; }
+
+        /* V1: Filter First Table */
+        .v1-filters { display: flex; gap: 10px; margin-bottom: 20px; }
+        .v1-filter { padding: 8px 16px; background: #e9ecef; border-radius: 20px; cursor: pointer; border: 1px solid transparent; }
+        .v1-filter.active { background: #e0f3ff; border-color: #007bff; color: #007bff; font-weight: bold; }
+        .v1-table { width: 100%; border-collapse: collapse; }
+        .v1-table th, .v1-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .v1-table th { background: #f8f9fa; font-weight: 600; }
+        
+        /* V2: Master Detail (Split View) */
+        .v2-layout { display: flex; gap: 20px; height: 450px; }
+        .v2-list { flex: 1; border-right: 1px solid var(--border); overflow-y: auto; padding-right: 10px; }
+        .v2-detail { flex: 2; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+        .v2-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; }
+        .v2-item:hover, .v2-item.active { background: #e9ecef; }
+        
+        /* V3: Accordion Table */
+        .v3-row { border-bottom: 1px solid var(--border); }
+        .v3-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white; }
+        .v3-header:hover { background: #f8f9fa; }
+        .v3-details { padding: 20px; background: #fdfdfd; border-top: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: flex-start;}
+        
+        /* Top Status Bar (Sticky Header Concept) */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #2c3e50; color: white; padding: 10px 20px; border-radius: 6px; margin-bottom: 20px;
+        }
+        .stats { display: flex; gap: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>jeedom2ha - Design Direction Explorations</h1>
+    <p>Please review these layout variations which apply the "Native-Clean" design system choice and focus on the core "Diagnostic → Validation → Publication" loop. <strong>(This is a generated mockup, buttons do not work).</strong></p>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('v1')">Direction 1: Filter-First Table (Your Preference)</button>
+        <button class="tab-btn" onclick="showTab('v2')">Direction 2: Master-Detail (Split View)</button>
+        <button class="tab-btn" onclick="showTab('v3')">Direction 3: Accordion List (Detail on demand)</button>
+    </div>
+
+    <!-- Direction 1: Filter First Table -->
+    <div id="v1" class="mockup active">
+        <div class="top-bar">
+            <div><strong>jeedom2ha</strong> | Broker: <span style="color:#28a745">✔ En ligne</span> | Démon: <span style="color:#28a745">✔ OK</span></div>
+            <div class="stats">
+                <span>Total: 45</span>
+                <span>Prêts: 12</span>
+                <span>Actions Req: 5</span>
+                <span>Publiés: 20</span>
+            </div>
+            <button class="btn btn-primary" style="background:#28a745;border:none;">Tout Publier</button>
+        </div>
+
+        <h3>Validation du périmètre</h3>
+        <div class="v1-filters">
+            <div class="v1-filter">Tous (45)</div>
+            <div class="v1-filter active">Prêts (12)</div>
+            <div class="v1-filter">Actions Requises (5)</div>
+            <div class="v1-filter">Publiés (20)</div>
+            <div class="v1-filter">Exclus (8)</div>
+        </div>
+
+        <table class="v1-table">
+            <thead>
+                <tr>
+                    <th>Statut</th>
+                    <th>Équipement</th>
+                    <th>Objet/Zone</th>
+                    <th>Type HA cible</th>
+                    <th>Diagnostic</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge b-ready">✔ Prêt</span></td>
+                    <td><strong>Lumière Salon</strong></td>
+                    <td><small class="color-muted">Salon</small></td>
+                    <td><code style="background:#eee;padding:2px 4px;">light</code></td>
+                    <td>Typage OK.</td>
+                    <td>
+                        <button class="btn">Exclure</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td><span class="badge b-warn">⚠️ Action Req.</span></td>
+                    <td><strong>Volet Chambre</strong></td>
+                    <td><small class="color-muted">Chambre 1</small></td>
+                    <td><code style="background:#eee;padding:2px 4px;">cover</code></td>
+                    <td>Type "État" manquant.</td>
+                    <td>
+                        <button class="btn btn-primary">Corriger</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td><span class="badge b-muted">⊘ Exclu</span></td>
+                    <td><strong>Alarme Globale</strong></td>
+                    <td><small class="color-muted">Maison</small></td>
+                    <td>-</td>
+                    <td>Exclu manuellement.</td>
+                    <td>
+                        <button class="btn">Inclure</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top:40px; color:#666;"><em>Note : Ce design suit exactement vos recommandations. Filtrage central au-dessus du tableau, 6 colonnes max, statuts condensés avec icônes. C'est idéal pour scanner rapidement et traiter par lots (ex: filtrer sur "Action Req." et tout corriger).</em></p>
+    </div>
+
+    <!-- Direction 2: Master Detail -->
+    <div id="v2" class="mockup">
+        <div class="top-bar">
+            <div><strong>jeedom2ha</strong> | Broker: <span style="color:#28a745">✔ En ligne</span></div>
+            <button class="btn btn-primary">Publier (12 en attente)</button>
+        </div>
+
+        <div class="v2-layout">
+            <div class="v2-list">
+                <h4 style="margin-top:0;">Équipements (45)</h4>
+                <div class="v2-item active" style="background:#e0f3ff; border-left:4px solid #007bff;">
+                    <div><strong>Volet Chambre</strong><br><small>Action requise</small></div>
+                    <div><span class="badge b-warn">⚠️</span></div>
+                </div>
+                <div class="v2-item">
+                    <div><strong>Lumière Salon</strong><br><small>Prêt</small></div>
+                    <div><span class="badge b-ready">✔</span></div>
+                </div>
+                <div class="v2-item">
+                    <div><strong>Télé Moteur</strong><br><small>Partiel</small></div>
+                    <div><span class="badge b-warn">⚠️</span></div>
+                </div>
+                <div class="v2-item">
+                    <div><strong>Alarme Globale</strong><br><small>Exclu</small></div>
+                    <div><span class="badge b-muted">⊘</span></div>
+                </div>
+            </div>
+            <div class="v2-detail">
+                <h2 style="margin-top:0;">Volet Chambre</h2>
+                <span class="badge b-warn" style="font-size:14px;">⚠️ Action Requise</span>
+                <span style="color:#666; margin-left:10px;">Objet: Chambre 1</span>
+                
+                <h4 style="margin-top:30px; border-bottom:1px solid #ccc; padding-bottom:5px;">Diagnostic de publication</h4>
+                <div style="background:white; padding:15px; border-left:4px solid var(--color-warning); border-radius:4px;">
+                    <p>Cet équipement a été identifié comme un <code>cover</code>, mais il manque des types génériques pour le piloter depuis Home Assistant.</p>
+                    <ul style="line-height:1.6;">
+                        <li>► Typage : <code>cover</code> (Détecté via la commande 'Monter')</li>
+                        <li>► Commande 'Monter' : <span style="color:#28a745">OK</span> (Flap_up)</li>
+                        <li>► Commande 'Descendre' : <span style="color:#28a745">OK</span> (Flap_down)</li>
+                        <li>► Commande 'État' : <span style="color:red;font-weight:bold;">Manquant</span></li>
+                    </ul>
+                    <button class="btn btn-primary" style="margin-top:10px;">Ouvrir la configuration Jeedom</button>
+                    <button class="btn" style="margin-top:10px; margin-left:10px;">Voir la raw payload MQTT</button>
+                </div>
+                
+                <div style="margin-top:30px; padding-top:20px; border-top:1px solid #ddd;">
+                    <label><input type="checkbox"> Exclure intentionnellement cet équipement de MQTT Discovery</label>
+                </div>
+            </div>
+        </div>
+        <p style="margin-top:40px; color:#666;"><em>Note : Un design "Split View". Excellent pour plonger profondément dans le diagnostic (la remédiation) d'un équipement spécifique, mais fait perdre la scannabilité tabulaire globale.</em></p>
+    </div>
+
+    <!-- Direction 3: Accordion Table -->
+    <div id="v3" class="mockup">
+        <div class="top-bar">
+            <div><strong>jeedom2ha</strong> | Broker: <span style="color:#28a745">✔ En ligne</span></div>
+            <div class="stats">
+                 <select style="padding:5px; border-radius:4px;"><option>Filtre: Tous (45)</option><option selected>Filtre: Actions Requises (5)</option></select>
+            </div>
+            <button class="btn btn-primary">Tout Publier</button>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+            <!-- Row 1 -->
+            <div class="v3-row">
+                <div class="v3-header" style="background:#e0f3ff;">
+                    <div style="width:150px;"><span class="badge b-warn">⚠️ Action Req.</span></div>
+                    <div style="flex:1;"><strong>Volet Chambre</strong> <span style="color:#666;">(Chambre 1)</span></div>
+                    <div style="width:100px;text-align:center;"><code style="background:#eee;padding:2px 4px;">cover</code></div>
+                    <div style="font-weight:bold;">▼ Fermer détails</div>
+                </div>
+                <div class="v3-details">
+                    <div style="flex:3;">
+                        <p style="margin-top:0;"><strong>Diagnostic:</strong> <span style="color:red;">Type générique "État" manquant pour une entité `cover`.</span></p>
+                        <ul style="font-size:14px; color:#555;">
+                            <li>[ID 45] Up: detecté (flap_up)</li>
+                            <li>[ID 46] Down: detecté (flap_down)</li>
+                        </ul>
+                        <button class="btn" style="font-size:12px;">Voir Payload JSON Générée</button>
+                    </div>
+                    <div style="flex:1; text-align:right;">
+                        <button class="btn btn-primary" style="margin-bottom:10px; width:100%;">Aller à la configuration (Nouvel onglet)</button><br>
+                        <button class="btn" style="width:100%;">Ignorer / Exclure</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Row 2 -->
+            <div class="v3-row">
+                <div class="v3-header">
+                    <div style="width:150px;"><span class="badge b-warn">⚠️ Action Req.</span></div>
+                    <div style="flex:1;"><strong>Capteur Mouvement Garage</strong> <span style="color:#666;">(Garage)</span></div>
+                    <div style="width:100px;text-align:center;"><code style="background:#eee;padding:2px 4px;">binary_s...</code></div>
+                    <div>▶ Détails</div>
+                </div>
+            </div>
+        </div>
+        <p style="margin-top:40px; color:#666;"><em>Note : Le compromis Accordion. Conserve la liste principale propre (quand replié), mais permet d'afficher des données techniques denses et de la remédiation avancée (quand déplié) sans avoir un panneau latéral lourd.</em></p>
+    </div>
+
+</div>
+
+<script>
+    function showTab(tabId) {
+        document.querySelectorAll('.mockup').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+</script>
+
+</body>
+</html>

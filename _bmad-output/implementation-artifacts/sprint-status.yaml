@@ -1,0 +1,159 @@
+# generated: 2026-03-22 10:33:12 CET
+# last_updated: 2026-03-30 CET
+# project: jeedom2ha
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: /Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts
+#
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+# CYCLES:
+# =======
+# Cycle V1.1 Pilotable — COMPLETED (2026-04-09)
+#   Source: epics-post-mvp-v1-1-pilotable.md | Epics: epic-1 à epic-5 (toutes done)
+#
+# Cycle Moteur de Projection Explicable — CYCLE COURANT
+#   Source: epics-projection-engine.md | Démarré: 2026-04-10
+#   Epics: pe-epic-1 à pe-epic-6 (17 stories, toutes backlog)
+#   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
+#             registre HA gouverné à 3 états, diagnostic explicable et actionnable
+
+generated: '2026-03-22 10:33:12 CET'
+last_updated: '2026-04-10'  # Sprint planning — ajout cycle Moteur de Projection Explicable (6 epics, 17 stories) ; cycle V1.1 Pilotable conservé comme historique (toutes done)
+project: jeedom2ha
+project_key: NOKEY
+tracking_system: file-system
+story_location: '/Users/alexandre/Dev/jeedom/plugins/jeedom2ha/_bmad-output/implementation-artifacts'
+
+development_status:
+
+  # ==============================================================
+  # CYCLE V1.1 PILOTABLE — TOUTES HISTOIRES SOLDÉES (2026-04-09)
+  # Source: _bmad-output/planning-artifacts/epics-post-mvp-v1-1-pilotable.md
+  # ==============================================================
+
+  epic-1: done  # 1-5 terminée
+  # 1-1 refermee; reprise backend validee en terrain
+  1-1-resolver-canonique-du-perimetre-publie: done
+  # 1-2 revalidation terrain PASS le 2026-03-22; limitation pre-sync documentee comme protocole, non comme echec story
+  1-2-vue-globale-et-synthese-par-piece-sans-recalcul-frontend: done
+  # 1-3 done — terrain PASS le 2026-03-23; PR #35 mergee
+  1-3-exceptions-equipement-et-visibilite-continue-des-exclus: done
+  # 1-4 code review PASS le 2026-03-23; Epic 1 cloture
+  1-4-changements-locaux-en-attente-d-application-home-assistant: done
+  epic-1-retrospective: done
+  # 1-5 mini-story corrective UX console — action item retro Epic 1 du 2026-03-23 — bloquant avant Epic 2
+  1-5-correction-ux-console: done
+  # 1-7 story backlog autonome issue de la rétro Epic 1 — lisibilité d'équipement
+  1-7-lisibilite-metier-des-equipements: done
+
+  epic-2: done  # 4/4 stories done, retro done 2026-03-25
+  2-1-contrat-backend-de-sante-minimale: done
+  2-2-bandeau-global-de-sante-toujours-visible: done
+  2-3-gating-des-actions-home-assistant-selon-la-sante-du-pont: done
+  2-4-distinction-stable-entre-infrastructure-et-configuration: done
+  epic-2-retrospective: done  # retro 2026-03-25, 8 action items, 0 blocker pour Epic 3
+
+  epic-3: done  # 3-4 done — PR #50 merged 2026-03-26
+  3-1-taxonomie-principale-de-statuts-d-equipement: done  # PR #44 merged 2026-03-25, terrain PASS (AC1/AC2/AC3/AC6), code review PASS
+  3-2-reason-code-stables-raison-lisible-et-action-recommandee: done  # code review PASS 2026-03-26
+  3-3-agregations-piece-et-global-coherentes: done  # code review PASS, smoke test PASS, PR #48 merged 2026-03-26
+  3-4-integration-ui-en-lecture-seule-du-contrat-metier-backend: done  # code review PASS, terrain PASS + micro-fix object_id:null, 73/73 JS 128/128 pytest
+  epic-3-retrospective: optional
+
+  epic-4: done  # 4.1→4.6 done, retro done, gate terrain 4.5+4.6 PASS, PR #64 mergée 2026-04-04
+  4-1-contrat-backend-du-modele-perimetre-statut-ecart-cause: done  # terrain FAIL 2026-03-27 (69 faux positifs has_pending) → 4.1-fix, code review PASS, PR merged 2026-03-28
+  4-2-vocabulaire-d-exclusion-par-source-disparition-du-concept-exception: done  # code review PASS 2026-03-28 — 81 JS PASS, 0 finding, non-régression Story 3.4 OK
+  4-3-diagnostic-centre-in-scope-confiance-en-diagnostic-uniquement-traitement-de-partiellement-publie: done  # PR #57 squash merge dans main (commit 9cf4cadcb4df08b81e163ca79aaec3d8419a422b) ; traçabilité documentaire réalignée
+  4-4-integration-ui-du-nouveau-modele-console-et-diagnostic: done  # PR #58 mergee ; closeout post-merge aligne la story
+  4-5-atterrissage-home-tableau-hierarchique-et-point-d-entree-diagnostic: done  # test terrain final OK ; gate terrain ux-spec 10.2 soldee ; merge PR #60
+  4-6-atterrissage-diagnostic-modal-in-scope-et-ouverture-ciblee-depuis-home: done  # gate terrain PASS, code review PASS, 63/63 tests, PR #63 merge closeout
+  epic-4-retrospective: done  # retro 2026-03-29 ; Epic 5 gele jusqu au correctif prioritaire Epic 4 valide en terrain
+
+  # Correctif prioritaire Epic 4 (post-retro 2026-03-29) :
+  # - livrable 0 bloqueur (artefact visuel home vs diagnostic) : VALIDE via ux-spec V3
+  # - paquet minimal derive : 4.5 home ; 4.6 diagnostic + flux cible
+  # - aucune mini-story Epic 5 ou refonte 4D melees a ce correctif
+  # - gate terrain bloquant avant done pour 4.5 et 4.6
+
+  epic-5: done  # Operations HA contextuelles — toutes stories soldées 2026-04-09 (5-1, 5-2, 5-3, 5-4, 5-5, 5-6, 5-7)
+  5-1-facade-backend-unique-et-contrat-de-disponibilite-des-actions: done  # gate terrain PASS 2026-04-05 box réelle (1e0a0ab) — 99/99 équipements, label contextuel conforme, matrice disponibilité OK, gating bridge OK
+  5-2-flux-positif-contextuel-creer-republier-multi-portee: done  # gate terrain box réelle 2026-04-07 : 6/7 PASS, waiver checkpoint Créer individuel (report vers 5.3), story done
+  # 5-5 micro-story corrective UX/UI — constat terrain post-Story 5.1 — reposition colonne Actions + libellés courts
+  5-5-compacite-visuelle-table-home-colonne-actions: done  # gate terrain UX PASS 2026-04-06 — 125/125 JS PASS
+  5-3-flux-supprimer-standalone-avec-confirmations-fortes: done  # gate terrain PASS 2026-04-08 — PR #69 merged — waiver terrain 5.2 soldé (boucle Supprimer→Créer)
+  5-4-retour-d-operation-lisible-et-memorisation-du-dernier-resultat: done  # code review APPROVE, gate terrain PASS 2026-04-09 box réelle — AC4 validé structurellement (auto-sync Jeedom masque état initial)
+  # 5-6 micro-story corrective UX/UI — constat terrain post-Story 5.2 — cohérence visuelle disabled boutons HA
+  5-6-coherence-visuelle-disabled-boutons-ha: done  # code review PASS 2026-04-07 — 254 pytest, 133 JS, 0 régression
+  # 5-7 micro-story corrective UX/UI — dette identifiée post-Story 5.3 — harmonisation badge Suppr. pièce/équipement
+  5-7-harmonisation-badge-suppr-piece-et-equipement: done  # code review APPROVE, gate terrain PASS 2026-04-08 — 153 JS PASS, 270 pytest PASS
+  epic-5-retrospective: done  # retro 2026-04-09 — 3 action items, AI-3 prérequis absolu avant prochain cycle
+
+  # ==============================================================
+  # CYCLE MOTEUR DE PROJECTION EXPLICABLE — CYCLE COURANT
+  # Source: _bmad-output/planning-artifacts/epics-projection-engine.md
+  # Objectif: Pipeline canonique à 5 étapes — moteur de projection explicable
+  # Démarré: 2026-04-10
+  # ==============================================================
+
+  pe-epic-1: backlog  # Le pipeline canonique établit un contrat de décision déterministe — l'éligibilité est sa première étape formalisée (3 stories)
+  1-1-contrat-du-pipeline-mappingresult-a-sous-blocs-bornes-et-ordre-d-evaluation-stable: backlog
+  1-2-etape-1-l-eligibilite-classe-chaque-equipement-jeedom-dans-une-categorie-stable-avant-tout-mapping: backlog
+  1-3-diagnostic-d-eligibilite-l-utilisateur-lit-l-etape-1-comme-point-de-blocage-avec-cause-categorisee-et-action-de-scope-applicable: backlog
+  pe-epic-1-retrospective: optional
+
+  pe-epic-2: backlog  # Le moteur produit un candidat de mapping structuré sans présupposer la validité HA (2 stories)
+  2-1-mapping-candidat-le-moteur-produit-un-candidat-de-projection-ha-annote-avec-niveau-de-confiance-dans-le-sous-bloc-mapping-borne: backlog
+  2-2-echec-et-ambiguite-de-mapping-le-moteur-signale-explicitement-un-mapping-impossible-ou-ambigu-et-les-sous-blocs-suivants-refletent-le-skip: backlog
+  pe-epic-2-retrospective: optional
+
+  pe-epic-3: backlog  # Validation HA obligatoire avant publication + registre gouverné à 3 états (3 stories)
+  3-1-registre-ha-le-module-validation-definit-les-composants-connus-avec-leurs-contraintes-en-3-etats-distincts: backlog
+  3-2-validation-ha-la-fonction-pure-validate-projection-verifie-que-le-candidat-de-mapping-peut-produire-un-payload-structurellement-valide-pour-le-composant-ha-cible: backlog
+  3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: backlog
+  pe-epic-3-retrospective: optional
+
+  pe-epic-4: backlog  # Décision de publication explicite + contrat de testabilité/rétrocompatibilité garanti (4 stories)
+  4-1-etape-4-decide-publication-arbitre-la-publication-a-partir-de-la-projection-validee-de-la-politique-de-confiance-et-du-product-scope: backlog
+  4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: backlog
+  4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: backlog
+  4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: backlog
+  pe-epic-4-retrospective: optional
+
+  pe-epic-5: backlog  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories)
+  5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: backlog
+  5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: backlog
+  pe-epic-5-retrospective: optional
+
+  pe-epic-6: backlog  # Diagnostic explicable et actionnable pour chaque équipement (3 stories)
+  6-1-diagnostic-par-etape-de-pipeline-l-utilisateur-consulte-pour-chaque-equipement-l-etape-de-blocage-et-la-cause-principale-canonique-unique-ordonnee-par-pipeline: backlog
+  6-2-enrichissement-additif-du-contrat-4d-projection-validity-est-ajoute-comme-sous-bloc-pur-sans-modifier-les-champs-existants: backlog
+  6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: backlog
+  pe-epic-6-retrospective: optional

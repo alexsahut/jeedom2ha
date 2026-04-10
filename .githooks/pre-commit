@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euo pipefail
+
+CURRENT_BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+
+if [[ -z "$CURRENT_BRANCH" ]]; then
+    echo "Commit blocked: detached HEAD is not allowed for local development." >&2
+    exit 1
+fi
+
+case "$CURRENT_BRANCH" in
+    main|beta|stable)
+        echo "Commit blocked: branch '$CURRENT_BRANCH' is protected." >&2
+        echo "Create or switch to a dedicated story, fix, docs, or chore branch before committing." >&2
+        exit 1
+        ;;
+esac
+
+exit 0
