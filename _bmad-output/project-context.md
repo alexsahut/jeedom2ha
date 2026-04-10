@@ -154,6 +154,7 @@ jeedom2ha/
 - **Branche + worktree dédiés** : toute story ou tout fix doit être traité dans une branche dédiée créée depuis `main` et dans un worktree dédié attaché à cette branche
 - **Préflight Git bloquant** : avant toute modification, vérifier que la branche courante n'est pas protégée, que le working tree est propre, que la branche est cohérente avec le sujet demandé et qu'elle ne contient pas déjà un autre sujet non validé ; si un contrôle échoue, l'agent doit s'arrêter
 - **Règle agents IA** : les agents IA ne doivent jamais pousser directement sur `main`, `beta` ou `stable`
+- **Branches de maintenance (exception)** : des branches `maint/vX.Y` peuvent exister ponctuellement pour des correctifs sur une version figée. Elles sont exceptionnelles, non canoniques, et ne doivent jamais servir de base pour des stories ou des évolutions. Voir `docs/git-strategy.md` section "Maintenance versions".
 - **Référence de gouvernance** : voir `docs/git-strategy.md` pour la politique Git, commit, PR, merge et release
 - **`info.json`** : fichier obligatoire dans `plugin_info/` — contient l'ID, le nom, la version, les `require` (version min Jeedom), les fonctionnalités activées (hasOwnDeamon, hasDependency, etc.)
 
