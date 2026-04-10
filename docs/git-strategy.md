@@ -143,6 +143,42 @@ Les règles applicables sont :
 - La normalisation doit conserver un repère explicite de ce baseline historique.
 - Toute nouvelle évolution doit suivre strictement la présente politique.
 
+## Maintenance versions (exception gouvernée)
+
+Une branche `maint/vX.Y` est une **exception au modèle canonique**.
+Elle ne fait pas partie du flux normal `story branch → main → beta → stable`.
+
+### Conditions de création
+
+Une branche `maint/vX.Y` est créée :
+- **Uniquement si un hotfix est nécessaire sur une version figée**.
+- Jamais préventiment.
+- Depuis le tag `vX.Y.0` correspondant, pas depuis `stable`.
+
+### Règles applicables
+
+- Nommage branche de maintenance : `maint/vX.Y` (ex. `maint/v1.1`)
+- Nommage des branches de fix : `hotfix/vX.Y-nom-du-fix` créées depuis `maint/vX.Y`
+- Nommage des tags de patch : `vX.Y.Z` (ex. `v1.1.1`)
+- Protection GitHub : "Require PR before merging" obligatoire dès création
+- Suppression : dès que la branche n'est plus utilisée après clôture du hotfix
+
+### Forward-port obligatoire
+
+Tout correctif appliqué sur `maint/vX.Y` **doit être forward-porté vers `main`**
+via une branche `fix/vX.Y-nom-du-fix-port-to-main` créée depuis `main`, avec cherry-pick du commit de fix, et une PR squash standard vers `main`.
+
+Le forward-port vers `main` fait partie de la **définition of done d'un hotfix**.
+Un incident de maintenance n'est pas clos tant que ce forward-port n'est pas mergé sur `main`.
+
+### Ce qui est interdit sur maint/vX.Y
+
+- Créer une branche `maint/vX.Y` préventiment, sans hotfix réel à traiter.
+- Utiliser `maint/vX.Y` comme base pour des stories ou des évolutions.
+- Merger `maint/vX.Y` directement dans `main` — seul le cherry-pick ciblé est autorisé.
+- Laisser une branche `maint/vX.Y` ouverte sans activité après clôture du hotfix.
+- Oublier le forward-port vers `main` — l'incident reste ouvert jusqu'à son merge.
+
 ## Ce qui est interdit
 
 - Développer une story ou un fix dans le clone principal local.
