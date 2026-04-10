@@ -36,6 +36,7 @@ function refreshBridgeStatus() {
       var $broker = $('#span_healthMqttBroker');
       var $sync = $('#span_healthSync');
       var $op = $('#span_healthOp');
+      var $opMsg = $('#span_healthOpMsg');
 
       // 1. Bridge (Démon)
       if (!r.daemon) {
@@ -45,6 +46,7 @@ function refreshBridgeStatus() {
         $broker.text('');
         $sync.text('{{Inconnue}}');
         $op.removeClass().addClass('label label-default').text('{{Inconnue}}');
+        $opMsg.text('');
         applyHAGating(r);
         return;
       } else {
@@ -82,8 +84,8 @@ function refreshBridgeStatus() {
       }
 
       // 4. Dernière opération
-      var op = r.derniere_operation_resultat || 'aucun';
-      switch (op) {
+      var _opObj = Jeedom2haScopeSummary.readOperationSnapshot(r.derniere_operation_resultat);
+      switch (_opObj.resultat) {
         case 'succes':
           $op.removeClass().addClass('label label-success').text('{{Succès}}');
           break;
@@ -99,8 +101,9 @@ function refreshBridgeStatus() {
           $op.removeClass().addClass('label label-default').text('{{Aucune}}');
           break;
         default:
-          $op.removeClass().addClass('label label-default').text('{{' + op + '}}');
+          $op.removeClass().addClass('label label-default').text('{{' + _opObj.resultat + '}}');
       }
+      $opMsg.text(_opObj.message || '');
       applyHAGating(r);
     },
     error: function() {
