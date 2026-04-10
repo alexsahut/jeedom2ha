@@ -1,0 +1,142 @@
+name: PR Governance
+
+on:
+  pull_request_target:
+    branches: [main, beta, stable]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  routing-policy:
+    name: PR Routing Policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate base and head branch routing
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # Security: inputs passed through env: to prevent script injection
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          base = os.environ["BASE_REF"]
+          head = os.environ["HEAD_REF"]
+          protected = {"main", "beta", "stable"}
+
+          def fail(message: str) -> None:
+              print(message, file=sys.stderr)
+              raise SystemExit(1)
+
+          if base == "main":
+              if head in protected:
+                  fail(
+                      f"PR vers main invalide: la branche source '{head}' est réservée. "
+                      "Utilise une branche courte dédiée créée depuis main."
+                  )
+
+              if head.startswith("dependabot/"):
+                  print("PR Dependabot vers main détectée: routage accepté.")
+                  raise SystemExit(0)
+
+              normalized = head
+              if normalized.startswith("codex/"):
+                  normalized = normalized[len("codex/"):]
+
+              if "/" in normalized:
+                  prefix = normalized.split("/", 1)[0]
+                  allowed_prefixes = {
+                      "story",
+                      "fix",
+                      "doc",
+                      "docs",
+                      "chore",
+                      "refactor",
+                      "ci",
+                      "test",
+                      "hotfix",
+                  }
+                  if prefix not in allowed_prefixes:
+                      fail(
+                          f"Branche source '{head}' invalide pour une PR vers main: "
+                          "utilise une branche courte dédiée ou un prefixe parmi "
+                          "story/, fix/, docs/, chore/, refactor/, ci/, test/, hotfix/."
+                      )
+              elif not re.fullmatch(r"[A-Za-z0-9._-]+", normalized):
+                  fail(
+                      f"Nom de branche source '{head}' invalide pour une PR vers main: "
+                      "utilise uniquement des lettres, chiffres, '.', '_' ou '-'."
+                  )
+
+              print(f"PR de developpement valide: {head} -> {base}")
+          elif base == "beta":
+              if head != "main":
+                  fail(
+                      f"Promotion invalide: une PR vers beta doit venir de main, pas de '{head}'."
+                  )
+              print("Promotion valide detectee: main -> beta")
+          elif base == "stable":
+              if head != "beta":
+                  fail(
+                      f"Promotion invalide: une PR vers stable doit venir de beta, pas de '{head}'."
+                  )
+              print("Promotion valide detectee: beta -> stable")
+          else:
+              fail(f"Base non supportee par la gouvernance: '{base}'.")
+          PY
+
+  metadata-policy:
+    name: PR Metadata Policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title for development changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_REF: ${{ github.head_ref }}
+          GITHUB_ACTOR_NAME: ${{ github.actor }}
+        run: |
+          # Security: inputs passed through env: to prevent script injection
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          base = os.environ["BASE_REF"]
+          title = os.environ["PR_TITLE"].strip()
+          head = os.environ["HEAD_REF"]
+          actor = os.environ["GITHUB_ACTOR_NAME"]
+
+          if base != "main":
+              print("Controle du titre non applicable: la PR cible une branche de promotion.")
+              raise SystemExit(0)
+
+          if actor.endswith("[bot]") or head.startswith("dependabot/"):
+              print("PR automatisee detectee: controle du titre ignore.")
+              raise SystemExit(0)
+
+          conventional_pattern = re.compile(
+              r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|test)(\([^)]+\))?!?: .+"
+          )
+          if not conventional_pattern.match(title):
+              print(
+                  "Titre de PR invalide pour une PR vers main. "
+                  "Utilise un titre compatible Conventional Commits, "
+                  "par exemple 'feat(mapping): add sensor sync guard'.",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+
+          print("Titre de PR compatible Conventional Commits.")
+          PY

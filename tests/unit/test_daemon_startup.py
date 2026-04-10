@@ -1,0 +1,357 @@
+"""
+test_daemon_startup.py — Unit tests for Jeedom2haDaemon class instantiation and lifecycle.
+
+Tests the daemon skeleton: class creation, on_start/on_stop/on_message callbacks,
+and custom CLI argument (--apiport).
+
+Story 5.1 — tests for boot watchdog and boot_cache loading.
+"""
+import asyncio
+import pytest
+from unittest.mock import patch
+
+
+# Fake CLI args to satisfy BaseConfig.parse() without real CLI
+_FAKE_CLI_ARGS = [
+    "--loglevel", "debug",
+    "--sockethost", "127.0.0.1",
+    "--socketport", "0",
+    "--callback", "http://127.0.0.1/fake",
+    "--apikey", "test-api-key",
+    "--jeedomcoreapikey", "test-core-api-key",
+    "--pid", "/tmp/test-jeedom2ha.pid",
+    "--cycle", "0.5",
+]
+
+
+@pytest.fixture(autouse=True)
+def fake_cli_args():
+    """Inject fake CLI args so BaseConfig.parse() succeeds without real CLI."""
+    with patch("sys.argv", ["main.py"] + _FAKE_CLI_ARGS):
+        yield
+
+
+class TestDaemonInstantiation:
+    """Test that Jeedom2haDaemon can be created and has expected interface."""
+
+    def test_daemon_class_exists_and_inherits_base_daemon(self):
+        """Given jeedomdaemon is available,
+        When we import Jeedom2haDaemon,
+        Then it should be a subclass of BaseDaemon."""
+        from jeedomdaemon.base_daemon import BaseDaemon
+        from resources.daemon.main import Jeedom2haDaemon
+
+        assert issubclass(Jeedom2haDaemon, BaseDaemon)
+
+    def test_daemon_can_be_instantiated(self):
+        """Given the daemon class exists,
+        When we instantiate it,
+        Then it should not raise."""
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        assert daemon is not None
+
+    def test_daemon_has_on_start_callback(self):
+        """Given a daemon instance,
+        When we check for on_start,
+        Then it should be a callable async method."""
+        from resources.daemon.main import Jeedom2haDaemon
+        import asyncio
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon, "on_start")
+        assert asyncio.iscoroutinefunction(daemon.on_start)
+
+    def test_daemon_has_on_stop_callback(self):
+        """Given a daemon instance,
+        When we check for on_stop,
+        Then it should be a callable async method."""
+        from resources.daemon.main import Jeedom2haDaemon
+        import asyncio
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon, "on_stop")
+        assert asyncio.iscoroutinefunction(daemon.on_stop)
+
+    def test_daemon_has_on_message_callback(self):
+        """Given a daemon instance,
+        When we check for on_message,
+        Then it should be a callable async method."""
+        from resources.daemon.main import Jeedom2haDaemon
+        import asyncio
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon, "on_message")
+        assert asyncio.iscoroutinefunction(daemon.on_message)
+
+    def test_daemon_config_has_apiport_argument(self):
+        """Given the daemon's custom config,
+        When we check the parsed config,
+        Then --apiport should be available with default 55080."""
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon._config, "apiport")
+        assert daemon._config.apiport == 55080
+
+    def test_daemon_config_custom_apiport(self):
+        """Given custom --apiport CLI arg,
+        When daemon is instantiated,
+        Then config should reflect the custom port."""
+        from resources.daemon.main import Jeedom2haDaemon
+
+        with patch("sys.argv", ["main.py"] + _FAKE_CLI_ARGS + ["--apiport", "9999"]):
+            daemon = Jeedom2haDaemon()
+            assert daemon._config.apiport == 9999
+
+    def test_daemon_config_has_core_api_key_argument(self):
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        assert hasattr(daemon._config, "jeedomcoreapikey")
+        assert daemon._config.jeedomcoreapikey == "test-core-api-key"
+
+
+class TestDaemonOnStart:
+    """Test on_start callback behavior."""
+
+    async def test_on_start_runs_without_error(self):
+        """Given a daemon instance,
+        When on_start is called with a mocked HTTP server,
+        Then it should complete without raising and assign the runner."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner):
+            await daemon.on_start()
+        assert daemon._http_runner is mock_runner
+
+    async def test_on_start_calls_start_server_with_localhost(self):
+        """Given a daemon instance,
+        When on_start is called,
+        Then start_server must be called with host='127.0.0.1'."""
+        from unittest.mock import AsyncMock, MagicMock, call
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=MagicMock()) as mock_start:
+            await daemon.on_start()
+        args, kwargs = mock_start.call_args
+        assert kwargs.get("host", args[1] if len(args) > 1 else None) == "127.0.0.1"
+
+    async def test_on_start_wires_command_handler_and_core_api_key(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_app = {"mqtt_bridge": fake_bridge}
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+        fake_runner = MagicMock()
+
+        with patch("resources.daemon.main.create_app", return_value=fake_app), \
+             patch("resources.daemon.main.CommandSynchronizer", return_value=fake_sync) as mock_sync_cls, \
+             patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=fake_runner):
+            await daemon.on_start()
+
+        assert fake_app["jeedom_api"]["core_apikey"] == "test-core-api-key"
+        assert mock_sync_cls.call_args.kwargs["jeedom_core_apikey"] == "test-core-api-key"
+        fake_bridge.set_command_handler.assert_called_once_with(fake_sync.handle_command_message)
+
+    async def test_on_start_rolls_back_command_sync_when_http_start_fails(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_app = {"mqtt_bridge": fake_bridge}
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+
+        with patch("resources.daemon.main.create_app", return_value=fake_app), \
+             patch("resources.daemon.main.CommandSynchronizer", return_value=fake_sync), \
+             patch("resources.daemon.main.start_server", new_callable=AsyncMock, side_effect=RuntimeError("http startup failed")):
+            with pytest.raises(RuntimeError):
+                await daemon.on_start()
+
+        fake_sync.stop.assert_awaited_once()
+        fake_bridge.set_command_handler.assert_any_call(fake_sync.handle_command_message)
+        fake_bridge.set_command_handler.assert_any_call(None)
+        assert daemon._command_synchronizer is None
+        assert daemon._http_runner is None
+        assert daemon._app is None
+
+
+class TestDaemonOnStop:
+    """Test on_stop callback behavior."""
+
+    async def test_on_stop_runs_without_error(self):
+        """Given a daemon instance,
+        When on_stop is called,
+        Then it should complete without raising."""
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        await daemon.on_stop()
+
+    async def test_on_stop_clears_command_handler_and_stops_sync(self):
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        fake_bridge = MagicMock()
+        fake_bridge.stop = AsyncMock()
+        fake_sync = MagicMock()
+        fake_sync.stop = AsyncMock()
+        daemon._app = {
+            "mqtt_bridge": fake_bridge,
+            "command_synchronizer": fake_sync,
+        }
+
+        await daemon.on_stop()
+
+        fake_sync.stop.assert_awaited_once()
+        fake_bridge.set_command_handler.assert_called_once_with(None)
+        fake_bridge.stop.assert_awaited_once()
+
+
+class TestDaemonOnMessage:
+    """Test on_message callback behavior."""
+
+    async def test_on_message_accepts_dict(self):
+        """Given a daemon instance,
+        When on_message is called with a message dict,
+        Then it should complete without raising."""
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        await daemon.on_message({"action": "test", "apikey": "fake"})
+
+
+# ---------------------------------------------------------------------------
+# Story 5.1 — Boot watchdog (AC #4) and boot_cache loading (AC #2, #3)
+# ---------------------------------------------------------------------------
+
+class TestBootWatchdog:
+    """AC #4 — boot watchdog logs WARNING after 90s if no sync received."""
+
+    async def test_watchdog_logs_warning_after_timeout_if_publications_empty(self, caplog):
+        """AC #4: If publications stay empty after timeout, watchdog logs WARNING."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        app = {"publications": {}, "boot_sync_received": asyncio.Event()}
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.01)
+
+        assert any("BOOTSTRAP" in r.message and "Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_cancels_when_sync_received(self, caplog):
+        """AC #4: Watchdog does not log if sync event is set before timeout."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        event = asyncio.Event()
+        app = {"publications": {1: "something"}, "boot_sync_received": event}
+
+        # Set event before watchdog fires
+        event.set()
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.1)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_cancels_when_event_set_before_timeout(self, caplog):
+        """Watchdog silently exits when event is set concurrently."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        event = asyncio.Event()
+        app = {"publications": {}, "boot_sync_received": event}
+
+        async def set_event_soon():
+            await asyncio.sleep(0.005)
+            event.set()
+
+        asyncio.create_task(set_event_soon())
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=1.0)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    async def test_watchdog_no_log_if_publications_non_empty_after_timeout(self, caplog):
+        """If publications is non-empty when timeout fires, no WARNING."""
+        import logging
+        from resources.daemon.main import _boot_watchdog
+
+        app = {
+            "publications": {1: object()},
+            "boot_sync_received": asyncio.Event(),
+        }
+
+        with caplog.at_level(logging.WARNING, logger="resources.daemon.main"):
+            await _boot_watchdog(app, timeout_s=0.01)
+
+        assert not any("Aucune topologie" in r.message for r in caplog.records)
+
+    def test_watchdog_is_coroutine_function(self):
+        from resources.daemon.main import _boot_watchdog
+        assert asyncio.iscoroutinefunction(_boot_watchdog)
+
+
+class TestOnStartBootCache:
+    """AC #2, #3 — on_start loads boot_cache and initializes boot_sync_received."""
+
+    async def test_on_start_loads_boot_cache_into_app(self):
+        """on_start() populates app['boot_cache'] from disk cache."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+        fake_cache = {42: {"entity_type": "light", "published": True}}
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value=fake_cache) as mock_load:
+            await daemon.on_start()
+
+        mock_load.assert_called_once()
+        assert daemon._app["boot_cache"] == fake_cache
+
+    async def test_on_start_initializes_boot_sync_received_event(self):
+        """on_start() creates the asyncio.Event for watchdog signaling."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value={}):
+            await daemon.on_start()
+
+        event = daemon._app.get("boot_sync_received")
+        assert event is not None
+        assert isinstance(event, asyncio.Event)
+        assert not event.is_set()
+
+    async def test_on_start_cold_start_boot_cache_empty(self):
+        """AC #3: cold start with no cache file → boot_cache = {}."""
+        from unittest.mock import AsyncMock, MagicMock
+        from resources.daemon.main import Jeedom2haDaemon
+
+        daemon = Jeedom2haDaemon()
+        mock_runner = MagicMock()
+
+        with patch("resources.daemon.main.start_server", new_callable=AsyncMock, return_value=mock_runner), \
+             patch("resources.daemon.main.load_publications_cache", return_value={}):
+            await daemon.on_start()
+
+        assert daemon._app["boot_cache"] == {}

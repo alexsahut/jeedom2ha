@@ -1,0 +1,609 @@
+<?php
+/* This file is part of Jeedom.
+ *
+ * Jeedom is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Jeedom is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
+ * Story 4.4 — aucun champ hors allowlist ne passe.
+ */
+function _jeedom2ha_extract_commands(array $cmds): array {
+    $result = [];
+    foreach ($cmds as $cmd) {
+        $result[] = [
+            'cmd_id'       => (int)($cmd['cmd_id'] ?? 0),
+            'cmd_name'     => (string)($cmd['cmd_name'] ?? ''),
+            'generic_type' => (string)($cmd['generic_type'] ?? ''),
+        ];
+    }
+    return $result;
+}
+
+/**
+ * Story 4.5 — Signal synthétique pièce home-only.
+ * Domaine contractuel fermé: Publiee / Partiellement publiee / Non publiee.
+ */
+function _jeedom2ha_build_home_room_status(?int $publies, ?int $total): string {
+    if ($publies === null || $total === null || $total <= 0) {
+        return '';
+    }
+    if ($publies <= 0) {
+        return 'Non publiee';
+    }
+    if ($publies >= $total) {
+        return 'Publiee';
+    }
+    return 'Partiellement publiee';
+}
+
+/**
+ * Story 4.5 — Lecture stricte d'un signal contractuel Statut pièce/global.
+ * Domaine fermé: Publiee / Partiellement publiee / Non publiee.
+ */
+function _jeedom2ha_read_home_room_status_signal($rawStatus): string {
+    if (!is_string($rawStatus)) {
+        return '';
+    }
+    $status = trim($rawStatus);
+    if ($status === 'Publiee' || $status === 'Partiellement publiee' || $status === 'Non publiee') {
+        return $status;
+    }
+    return '';
+}
+
+/**
+ * Story 4.5 — Signal contractuel Perimetre au niveau pièce.
+ * Domaine fermé: Incluse / Exclue.
+ */
+function _jeedom2ha_build_home_piece_perimetre(array $piece): string {
+    $rawPerimetre = $piece['home_perimetre'] ?? null;
+    if (!is_string($rawPerimetre)) {
+        return '';
+    }
+    $perimetre = trim($rawPerimetre);
+    if ($perimetre === 'Incluse' || $perimetre === 'Exclue') {
+        return $perimetre;
+    }
+    return '';
+}
+
+/**
+ * Story 4.5 — Delta contractuel minimal relay home.
+ * Limité strictement à:
+ *  - Publies
+ *  - Statut synthétique de pièce (home-only)
+ */
+function _jeedom2ha_build_home_signals(array $publishedScope, array $diagnosticPayload): array {
+    $empty = array(
+        'global' => array('publies' => null, 'statut' => ''),
+        'pieces' => array(),
+    );
+
+    $diagEquipments = (isset($diagnosticPayload['equipments']) && is_array($diagnosticPayload['equipments']))
+        ? $diagnosticPayload['equipments']
+        : null;
+    $diagSummary = (isset($diagnosticPayload['summary']) && is_array($diagnosticPayload['summary']))
+        ? $diagnosticPayload['summary']
+        : array();
+    $diagRooms = (isset($diagnosticPayload['rooms']) && is_array($diagnosticPayload['rooms']))
+        ? $diagnosticPayload['rooms']
+        : array();
+
+    $pieceTotals = array();
+    $piecePerimetres = array();
+    foreach ($publishedScope['pieces'] ?? array() as $piece) {
+        if (!is_array($piece)) {
+            continue;
+        }
+        $objectId = (int)($piece['object_id'] ?? 0);
+        $rawTotal = $piece['counts']['total'] ?? null;
+        $total = is_numeric($rawTotal) ? (int)$rawTotal : null;
+        $pieceTotals[$objectId] = $total;
+        $piecePerimetres[$objectId] = _jeedom2ha_build_home_piece_perimetre($piece);
+    }
+
+    if (empty($pieceTotals) && $diagEquipments === null) {
+        return $empty;
+    }
+
+    $eqObjectMap = array();
+    foreach ($publishedScope['equipements'] ?? array() as $eq) {
+        if (!is_array($eq)) {
+            continue;
+        }
+        $eqId = (int)($eq['eq_id'] ?? 0);
+        if ($eqId <= 0) {
+            continue;
+        }
+        $eqObjectMap[$eqId] = (int)($eq['object_id'] ?? 0);
+    }
+
+    $piecePublies = array();
+    foreach (array_keys($pieceTotals) as $objectId) {
+        $piecePublies[$objectId] = null;
+    }
+
+    $globalPublies = null;
+    if ($diagEquipments !== null) {
+        $globalPublies = 0;
+        foreach (array_keys($piecePublies) as $objectId) {
+            $piecePublies[$objectId] = 0;
+        }
+
+        foreach ($diagEquipments as $eq) {
+            if (!is_array($eq)) {
+                continue;
+            }
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId <= 0) {
+                continue;
+            }
+            if (($eq['statut'] ?? '') !== 'publie') {
+                continue;
+            }
+            $globalPublies++;
+            if (array_key_exists($eqId, $eqObjectMap)) {
+                $objectId = $eqObjectMap[$eqId];
+                if (!array_key_exists($objectId, $piecePublies) || !is_int($piecePublies[$objectId])) {
+                    $piecePublies[$objectId] = 0;
+                }
+                $piecePublies[$objectId]++;
+            }
+        }
+    }
+
+    $diagRoomsByObjectId = array();
+    foreach ($diagRooms as $room) {
+        if (!is_array($room)) {
+            continue;
+        }
+        $objectId = array_key_exists('object_id', $room) && $room['object_id'] !== null
+            ? (int)$room['object_id']
+            : 0;
+        $diagRoomsByObjectId[$objectId] = $room;
+    }
+
+    $piecesSignals = array();
+    foreach (array_keys($pieceTotals) as $objectId) {
+        $piecePublished = array_key_exists($objectId, $piecePublies) ? $piecePublies[$objectId] : null;
+        $roomSignal = $diagRoomsByObjectId[$objectId] ?? array();
+        $piecesSignals[] = array(
+            'object_id' => $objectId,
+            'perimetre' => $piecePerimetres[$objectId] ?? '',
+            'publies' => $piecePublished,
+            'statut' => _jeedom2ha_read_home_room_status_signal($roomSignal['home_statut'] ?? null),
+        );
+    }
+
+    return array(
+        'global' => array(
+            'publies' => $globalPublies,
+            'statut' => _jeedom2ha_read_home_room_status_signal($diagSummary['home_statut'] ?? null),
+        ),
+        'pieces' => $piecesSignals,
+    );
+}
+
+/**
+ * Helper — Pseudonymise les champs PII d'un tableau d'équipements.
+ *   name       → Équipement_N  (trié par eq_id croissant, index 1-based)
+ *   object_name → Pièce_M      (index 1-based par ordre d'apparition)
+ *   cmd_name   → Cmd_{cmd_id}  (dans matched_commands et unmatched_commands)
+ * Les champs techniques (eq_id, reason_code, confidence, etc.) restent inchangés.
+ * Story 4.4 — appliqué uniquement si mode pseudo activé.
+ */
+function _jeedom2ha_pseudonymize(array $equipments): array {
+    usort($equipments, fn($a, $b) => ($a['eq_id'] ?? 0) <=> ($b['eq_id'] ?? 0));
+    $objectMap = [];
+    $objectIdx = 1;
+    $eqIdx     = 1;
+    foreach ($equipments as &$eq) {
+        $eq['name'] = 'Équipement_' . $eqIdx++;
+        $origObj    = $eq['object_name'] ?? '';
+        if (!isset($objectMap[$origObj])) {
+            $objectMap[$origObj] = 'Pièce_' . $objectIdx++;
+        }
+        $eq['object_name'] = $objectMap[$origObj];
+        foreach (['matched_commands', 'unmatched_commands'] as $key) {
+            $rebuilt = [];
+            foreach ($eq[$key] ?? [] as $cmd) {
+                $cmd['cmd_name'] = 'Cmd_' . ($cmd['cmd_id'] ?? '?');
+                $rebuilt[] = $cmd;
+            }
+            $eq[$key] = $rebuilt;
+        }
+    }
+    unset($eq);
+    return $equipments;
+}
+
+/**
+ * Helper — Normalise un équipement export via allowlist explicite.
+ * Story 4.4 — contrat export inchangé, cohérence 4D garantie.
+ */
+function _jeedom2ha_build_export_equipment(array $rawEq): array {
+    return [
+        'eq_id'                  => (int)($rawEq['eq_id'] ?? 0),
+        'eq_type_name'           => (string)($rawEq['eq_type_name'] ?? ''),
+        'name'                   => (string)($rawEq['name'] ?? ''),
+        'object_name'            => (string)($rawEq['object_name'] ?? ''),
+        // Contrat 4D (Story 4.3)
+        'perimetre'              => (string)($rawEq['perimetre'] ?? ''),
+        'statut'                 => (string)($rawEq['statut'] ?? ''),
+        'ecart'                  => (bool)($rawEq['ecart'] ?? false),
+        'cause_code'             => isset($rawEq['cause_code']) ? (string)$rawEq['cause_code'] : null,
+        'cause_label'            => isset($rawEq['cause_label']) ? (string)$rawEq['cause_label'] : null,
+        'cause_action'           => isset($rawEq['cause_action']) ? (string)$rawEq['cause_action'] : null,
+        // Couche technique (backward compat — ne jamais supprimer)
+        'status'                 => (string)($rawEq['status'] ?? ''),
+        'status_code'            => (string)($rawEq['status_code'] ?? 'not_published'),
+        'confidence'             => (string)($rawEq['confidence'] ?? ''),
+        'reason_code'            => (string)($rawEq['reason_code'] ?? ''),
+        'detail'                 => (string)($rawEq['detail'] ?? ''),
+        'remediation'            => (string)($rawEq['remediation'] ?? ''),
+        'v1_limitation'          => (bool)($rawEq['v1_limitation'] ?? false),
+        'v1_compatibility'       => (bool)($rawEq['v1_compatibility'] ?? false),
+        'detected_generic_types' => (array)($rawEq['detected_generic_types'] ?? []),
+        'traceability'           => $rawEq['traceability'] ?? null,
+        'matched_commands'       => _jeedom2ha_extract_commands($rawEq['matched_commands'] ?? []),
+        'unmatched_commands'     => _jeedom2ha_extract_commands($rawEq['unmatched_commands'] ?? []),
+    ];
+}
+
+/**
+ * Helper — Résumé export 4D (cohérence console/diagnostic/export).
+ */
+function _jeedom2ha_build_export_summary(array $equipments): array {
+    $summary = ['total' => 0, 'inclus' => 0, 'exclus' => 0, 'ecarts' => 0, 'publies' => 0, 'non_publies' => 0];
+    foreach ($equipments as $eq) {
+        $summary['total']++;
+        $p = $eq['perimetre'] ?? '';
+        if ($p === 'inclus') {
+            $summary['inclus']++;
+        } elseif ($p !== '') {
+            $summary['exclus']++;
+        }
+        if (($eq['ecart'] ?? false) === true) {
+            $summary['ecarts']++;
+        }
+        if (($eq['statut'] ?? '') === 'publie') {
+            $summary['publies']++;
+        } elseif (($eq['statut'] ?? '') === 'non_publie') {
+            $summary['non_publies']++;
+        }
+    }
+    return $summary;
+}
+
+if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
+try {
+    require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
+    include_file('core', 'authentification', 'php');
+
+    if (!isConnect('admin')) {
+        throw new Exception(__('401 - Accès non autorisé', __FILE__));
+    }
+
+  /* Fonction permettant l'envoi de l'entête 'Content-Type: application/json'
+    En V3 : indiquer l'argument 'true' pour contrôler le token d'accès Jeedom
+    En V4 : autoriser l'exécution d'une méthode 'action' en GET en indiquant le(s) nom(s) de(s) action(s) dans un tableau en argument
+  */
+    ajax::init();
+
+    $action = init('action');
+
+    if ($action == 'getMqttConfig') {
+      $hasPassword = (config::byKey('mqttPassword', 'jeedom2ha', '') !== '');
+      // Tente l'auto-détection mqtt2, sinon retourne la config manuelle stockée
+      $mqtt2Config = jeedom2ha::getMqttManagerConfig();
+      if ($mqtt2Config !== null) {
+        unset($mqtt2Config['password']); // Sécurité : ne jamais renvoyer le password
+        $mqtt2Config['has_password'] = $hasPassword;
+        ajax::success($mqtt2Config);
+      }
+      // Fallback : retourner la config manuelle si elle existe
+      $host = config::byKey('mqttHost', 'jeedom2ha', '');
+      if ($host !== '') {
+        ajax::success(array(
+          'host' => $host,
+          'port' => intval(config::byKey('mqttPort', 'jeedom2ha', 1883)),
+          'user' => config::byKey('mqttUser', 'jeedom2ha', ''),
+          'has_password' => $hasPassword,
+          'source' => 'manual',
+        ));
+      }
+      ajax::success(array('source' => 'none', 'has_password' => $hasPassword));
+    }
+    else if ($action == 'forceMqttManagerImport') {
+      $config = jeedom2ha::getMqttManagerConfig();
+      if ($config === null) {
+        $reason = jeedom2ha::$_lastDetectionReason;
+        $messages = array(
+          'plugin_inactive' => __('Plugin MQTT Manager (mqtt2) non détecté ou inactif', __FILE__),
+          'keys_not_found'  => __('Configuration MQTT Manager non trouvable — saisissez les paramètres manuellement', __FILE__),
+          'unknown'         => __('Auto-détection MQTT Manager échouée', __FILE__),
+        );
+        ajax::success(array(
+          'status'  => 'not_found',
+          'reason'  => $reason,
+          'message' => isset($messages[$reason]) ? $messages[$reason] : $messages['unknown'],
+        ));
+      }
+      // Stocker la config détectée directement côté serveur
+      // Le password ne quitte JAMAIS le serveur — stocké chiffré uniquement
+      config::save('mqttHost', $config['host'], 'jeedom2ha');
+      config::save('mqttPort', $config['port'], 'jeedom2ha');
+      config::save('mqttUser', $config['user'], 'jeedom2ha');
+      config::save('mqttTls', $config['tls'] ? '1' : '0', 'jeedom2ha');
+      if ($config['password'] !== '' && $config['password'] !== null) {
+        config::save('mqttPassword', utils::encrypt($config['password']), 'jeedom2ha');
+      }
+      log::add('jeedom2ha', 'info', '[MQTT] Import forcé depuis MQTT Manager : host=' . $config['host'] . ' port=' . $config['port']);
+      ajax::success(array(
+        'status'       => 'ok',
+        'host'         => $config['host'],
+        'port'         => $config['port'],
+        'user'         => $config['user'],
+        'tls'          => $config['tls'],
+        'has_password' => ($config['password'] !== '' && $config['password'] !== null),
+        'message'      => __('Configuration importée depuis MQTT Manager', __FILE__),
+      ));
+    }
+    else if ($action == 'testMqttConnection') {
+      $password = init('password', '');
+      // Priorité : Formulaire > Secret Stocké > Aucun
+      if ($password === '') {
+        $storedPassword = config::byKey('mqttPassword', 'jeedom2ha', '');
+        if ($storedPassword !== '') {
+          $password = utils::decrypt($storedPassword);
+        }
+      }
+
+      $params = array(
+        'host'       => init('host', ''),
+        'port'       => intval(init('port', 1883)),
+        'user'       => init('user', ''),
+        'password'   => $password,
+        'tls'        => (init('tls', '0') === '1'),
+        'tls_verify' => (init('tls_verify', '1') === '1'),
+      );
+      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[MQTT] Le démon n\'a pas répondu au test de connexion (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré dans l\'onglet Santé', __FILE__));
+      }
+      log::add('jeedom2ha', 'debug', '[MQTT] Résultat du test de connexion : ' . json_encode($result));
+      ajax::success($result);
+    }
+    else if ($action == 'getBridgeStatus') {
+      $status = jeedom2ha::callDaemon('/system/status');
+      if ($status === null) {
+        ajax::success(array(
+            'daemon' => false,
+            'mqtt'   => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
+            'demon'  => array(),
+            'broker' => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
+            'derniere_synchro_terminee' => null,
+            'derniere_operation_resultat' => 'aucun'
+        ));
+      }
+      $mqtt = (isset($status['payload']['mqtt'])) ? $status['payload']['mqtt'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
+      $demon = (isset($status['payload']['demon'])) ? $status['payload']['demon'] : array();
+      $broker = (isset($status['payload']['broker'])) ? $status['payload']['broker'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
+      $derniere_synchro_terminee = (isset($status['payload']['derniere_synchro_terminee'])) ? $status['payload']['derniere_synchro_terminee'] : null;
+      $derniere_operation_resultat = (isset($status['payload']['derniere_operation_resultat'])) ? $status['payload']['derniere_operation_resultat'] : 'aucun';
+      ajax::success(array(
+        'daemon' => true,
+        'mqtt' => $mqtt,
+        'demon' => $demon,
+        'broker' => $broker,
+        'derniere_synchro_terminee' => $derniere_synchro_terminee,
+        'derniere_operation_resultat' => $derniere_operation_resultat
+      ));
+    }
+    else if ($action == 'scanTopology') {
+      $topology = jeedom2ha::getFullTopology();
+      $result = jeedom2ha::callDaemon('/action/sync', $topology, 'POST', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[TOPOLOGY] Le démon n\'a pas répondu au scan de topologie (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'getDiagnostics') {
+      $result = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[DIAGNOSTICS] Le démon n\'a pas répondu (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'getPublishedScopeForConsole') {
+      $result = jeedom2ha::getPublishedScopeForConsole();
+      // Story 3.4 — Option B : merge diagnostic data into scope response (soft-fail)
+      // Si le daemon ne répond pas, la vue scope-only reste affichée sans diagnostic.
+      if ($result['status'] === 'ok') {
+        $diagResult = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 10);
+        if ($diagResult !== null && isset($diagResult['payload'])) {
+          $dp = $diagResult['payload'];
+          $result['diagnostic_summary'] = $dp['summary'] ?? null;
+          $result['diagnostic_rooms']   = $dp['rooms'] ?? [];
+          // Index équipements par eq_id pour lookup O(1) côté JS
+          $eqDiag = [];
+          foreach ($dp['equipments'] ?? [] as $eq) {
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId > 0) {
+              $eqDiag[$eqId] = [
+                // Story 4.4 — contrat 4D frontend (lecture stricte backend)
+                'statut'       => (string)($eq['statut'] ?? ''),
+                // Story 4.5 — signal Publies (niveau équipement) exposé tel quel
+                'publies'      => (($eq['statut'] ?? '') === 'publie') ? 1 : 0,
+                'ecart'        => array_key_exists('ecart', $eq) ? (bool)$eq['ecart'] : null,
+                'cause_code'   => isset($eq['cause_code']) ? (string)$eq['cause_code'] : '',
+                'cause_label'  => isset($eq['cause_label']) ? (string)$eq['cause_label'] : '',
+                'cause_action' => isset($eq['cause_action']) ? (string)$eq['cause_action'] : '',
+                'status_code'   => (string)($eq['status_code'] ?? ''),
+                'reason_code'   => (string)($eq['reason_code'] ?? ''),
+                'detail'        => (string)($eq['detail'] ?? ''),
+                'remediation'   => (string)($eq['remediation'] ?? ''),
+                'v1_limitation' => (bool)($eq['v1_limitation'] ?? false),
+                // Story 4.3 — champs ajoutés pour badge source d'exclusion et diagnostic technique
+                'perimetre'     => (string)($eq['perimetre'] ?? ''),
+                'confidence'    => (string)($eq['confidence'] ?? ''),
+                // Story 4.4 / AC8 — détails techniques de couverture commandes (surface technique uniquement)
+                'matched_commands'   => _jeedom2ha_extract_commands($eq['matched_commands'] ?? []),
+                'unmatched_commands' => _jeedom2ha_extract_commands($eq['unmatched_commands'] ?? []),
+                // Story 5.1 — signal actions_ha en passthrough strict (aucun calcul local)
+                'actions_ha'         => $eq['actions_ha'] ?? null,
+              ];
+            }
+          }
+          $result['diagnostic_equipments'] = $eqDiag;
+
+          // Story 4.3 — surface filtrée in-scope (perimetre=inclus uniquement) pour le frontend
+          $inScopeEquipments = [];
+          foreach ($dp['in_scope_equipments'] ?? [] as $eq) {
+            $eqId = (int)($eq['eq_id'] ?? 0);
+            if ($eqId > 0) {
+              $inScopeEquipments[] = ['eq_id' => $eqId];
+            }
+          }
+          $result['in_scope_equipments'] = $inScopeEquipments;
+          // Story 4.5 — delta relay minimal strictement borné à Publies + Statut pièce.
+          $result['home_signals'] = _jeedom2ha_build_home_signals(
+            $result['published_scope'] ?? array(),
+            $dp
+          );
+        }
+      }
+      if (!array_key_exists('home_signals', $result)) {
+        $result['home_signals'] = array(
+          'global' => array('publies' => null, 'statut' => ''),
+          'pieces' => array(),
+        );
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'exportDiagnostic') {
+      $pseudonymize = (init('pseudonymize', '0') === '1');
+
+      // 1. Diagnostics (timeout 15s — source principale de l'export)
+      $diagResult = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 15);
+      if ($diagResult === null) {
+        log::add('jeedom2ha', 'error', '[EXPORT] Le démon n\'a pas répondu (timeout 15s)');
+        ajax::error(__('Démon indisponible ou timeout — relancez le démon et réessayez.', __FILE__));
+      }
+      $rawEquipments = $diagResult['payload']['equipments'] ?? [];
+
+      // 2. Statut daemon (timeout 5s — info version/broker, non bloquant)
+      $statusResult  = jeedom2ha::callDaemon('/system/status', null, 'GET', 5);
+      $statusPayload = $statusResult['payload'] ?? [];
+
+      // 3. Versions — construction PHP stricte, jamais passthrough daemon
+      $pluginInfo  = json_decode(file_get_contents(dirname(__FILE__) . '/../../plugin_info/info.json'), true);
+      $mqttInfo    = $statusPayload['mqtt'] ?? [];
+      $brokerParts = !empty($mqttInfo['broker']) ? explode(':', $mqttInfo['broker'], 2) : [];
+      if ($pseudonymize) {
+        $brokerHost = 'masked';
+        $brokerPort = null;
+      } else {
+        $brokerHost = $brokerParts[0] ?? 'unknown';
+        $brokerPort = isset($brokerParts[1]) ? (int)$brokerParts[1] : null;
+      }
+      $versions = [
+        'plugin'      => $pluginInfo['pluginVersion'] ?? 'unknown',
+        'jeedom'      => jeedom::version(),
+        'daemon'      => $statusPayload['version'] ?? 'unknown',
+        'python'      => $statusPayload['python_version'] ?? 'unknown',
+        'broker_host' => $brokerHost,
+        'broker_port' => $brokerPort,
+      ];
+
+      // 4. Extraction par allowlist explicite — aucun passthrough brut
+      $equipments = [];
+      foreach ($rawEquipments as $rawEq) {
+        $equipments[] = _jeedom2ha_build_export_equipment($rawEq);
+      }
+
+      // 5. Story 4.3 — Résumé basé sur le modèle 4D (perimetre + statut)
+      // La catégorie partially_published disparaît — absorbée par statut=publie, ecart=false
+      $summary = _jeedom2ha_build_export_summary($equipments);
+
+      // 6. Warning si aucun équipement en mémoire
+      $warning = empty($equipments) ? 'Aucune donnée en mémoire : effectuez un scan d\'abord.' : null;
+
+      // 7. Pseudonymisation + exclusion traceability si mode pseudo activé
+      // Note : detail et remediation proviennent de templates fixes sans noms réels
+      // (_DIAGNOSTIC_MESSAGES côté daemon) — ils sont conservés en mode pseudo.
+      if ($pseudonymize && !empty($equipments)) {
+        $equipments = _jeedom2ha_pseudonymize($equipments);
+        foreach ($equipments as &$eq) {
+          unset($eq['traceability']);  // traceability exclu en mode pseudo (risque champs contextuels)
+        }
+        unset($eq);
+      }
+
+      ajax::success([
+        'export_format_version' => '2.0',  // Story 4.3 : ajout champs 4D, résumé 4D (plus de partially_published)
+        'generated_at'          => gmdate('Y-m-d\TH:i:s\Z'),
+        'pseudonymized'         => $pseudonymize,
+        'versions'              => $versions,
+        'summary'               => $summary,
+        'warning'               => $warning,
+        'equipments'            => $equipments,
+      ]);
+    }
+    else if ($action == 'saveFilteringConfig') {
+      $excludedPlugins  = init('excludedPlugins', '');
+      $excludedObjects  = init('excludedObjects', '');
+      $confidencePolicy = init('confidencePolicy', 'sure_probable');
+      // Validation : valeurs autorisées uniquement
+      if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
+        $confidencePolicy = 'sure_probable';
+      }
+      config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');
+      config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');
+      config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');
+      log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins="'
+        . $excludedPlugins . '" excludedObjects="' . $excludedObjects
+        . '" confidencePolicy="' . $confidencePolicy . '"');
+      ajax::success(['saved' => true]);
+    }
+    else if ($action == 'executeHaAction') {
+      // Story 5.1 — Relay strict de la façade backend unique /action/execute.
+      // Aucun calcul local : les paramètres sont transmis au daemon tel quel.
+      $params = array(
+        'intention' => init('intention', ''),
+        'portee'    => init('portee', ''),
+        'selection' => json_decode(init('selection', '[]'), true),
+      );
+      if (!is_array($params['selection'])) {
+        $params['selection'] = [];
+      }
+      $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[ACTION] Le démon n\'a pas répondu à /action/execute (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else {
+      throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
+    }
+}
+catch (Exception $e) {
+    ajax::error(displayException($e), $e->getCode());
+}
+}

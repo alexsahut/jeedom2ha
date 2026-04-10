@@ -1,0 +1,38 @@
+{
+	"id": "jeedom2ha",
+	"name": "Jeedom2HA",
+	"pluginVersion": "0.1",
+	"specialAttributes": {},
+	"description": {
+		"fr_FR": "Plugin de pont Jeedom vers Home Assistant via MQTT Discovery",
+		"en_US": "Jeedom to Home Assistant bridge plugin via MQTT Discovery"
+	},
+	"licence": "AGPL",
+	"author": "Alexandre SAHUT",
+	"require": "4.4",
+	"os" : {
+		"min" : 10,
+		"max" : 12.99
+	},
+	"category": "home automation protocol",
+	"hasDependency": true,
+	"hasOwnDeamon": true,
+	"maxDependancyInstallTime": 5,
+	"changelog": "https://github.com/alexsahut/jeedom2ha/blob/main/docs/fr_FR/changelog.md",
+	"documentation": "https://github.com/alexsahut/jeedom2ha/blob/main/docs/fr_FR/index.md",
+	"link": {
+		"forum": ""
+	},
+	"language": [
+		"fr_FR",
+		"en_US"
+	],
+	"compatibility": [
+		"smart",
+		"luna",
+		"atlas",
+		"rpi",
+		"docker",
+		"diy"
+	]
+}
