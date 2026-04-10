@@ -1153,7 +1153,7 @@ class TestHealthCheckContract:
         """Given le daemon est actif,
         When le backend expose l'état du pont,
         Then il retourne demon, broker, derniere_synchro_terminee, derniere_operation_resultat."""
-        http_app["derniere_operation_resultat"] = "succes"
+        http_app["derniere_operation_resultat"] = {"resultat": "succes", "intention": "publier", "portee": "global", "message": "Test.", "volume": 1, "timestamp": "2026-03-24T12:00:00+00:00"}
         http_app["derniere_synchro_terminee"] = "2026-03-24T12:00:00+00:00"
         
         resp = await http_client.get(
@@ -1175,7 +1175,8 @@ class TestHealthCheckContract:
         assert "connected" in payload["broker"]
         
         assert payload["derniere_synchro_terminee"] == "2026-03-24T12:00:00+00:00"
-        assert payload["derniere_operation_resultat"] == "succes"
+        assert isinstance(payload["derniere_operation_resultat"], dict)
+        assert payload["derniere_operation_resultat"]["resultat"] == "succes"
 
     async def test_initial_state_before_any_sync(self, http_client):
         """Given qu'aucune opération n'a encore été exécutée,
@@ -1187,7 +1188,8 @@ class TestHealthCheckContract:
         )
         assert resp.status == 200
         data = await resp.json()
-        assert data["payload"]["derniere_operation_resultat"] == "aucun"
+        assert isinstance(data["payload"]["derniere_operation_resultat"], dict)
+        assert data["payload"]["derniere_operation_resultat"]["resultat"] == "aucun"
         assert data["payload"]["derniere_synchro_terminee"] is None
 
     async def test_sync_success_updates_health_contract(self, http_client, http_app, mock_mqtt):
@@ -1217,7 +1219,8 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
-        assert http_app["derniere_operation_resultat"] == "succes"
+        assert isinstance(http_app["derniere_operation_resultat"], dict)
+        assert http_app["derniere_operation_resultat"]["resultat"] == "succes"
         assert http_app["derniere_synchro_terminee"] is not None
 
     async def test_sync_partial_failure_updates_health_contract(self, http_client, http_app, mock_mqtt):
@@ -1267,7 +1270,8 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
-        assert http_app["derniere_operation_resultat"] == "partiel"
+        assert isinstance(http_app["derniere_operation_resultat"], dict)
+        assert http_app["derniere_operation_resultat"]["resultat"] == "partiel"
 
     async def test_sync_global_error_updates_health_contract(self, http_client, http_app):
         """Given a global error during sync processing, updates to echec."""
@@ -1282,6 +1286,7 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 500
-        assert http_app["derniere_operation_resultat"] == "echec"
+        assert isinstance(http_app["derniere_operation_resultat"], dict)
+        assert http_app["derniere_operation_resultat"]["resultat"] == "echec"
         assert http_app["derniere_synchro_terminee"] is not None
 

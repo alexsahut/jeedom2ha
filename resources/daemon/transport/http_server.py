@@ -341,6 +341,24 @@ def _build_supprimer_message(
     return "L'action n'a pas pu être exécutée. Vérifiez la connexion Home Assistant."
 
 
+def _build_operation_snapshot(
+    *,
+    resultat: str,
+    intention: Optional[str] = None,
+    portee: Optional[str] = None,
+    message: Optional[str] = None,
+    volume: Optional[int] = None,
+) -> dict:
+    return {
+        "resultat": resultat,
+        "intention": intention,
+        "portee": portee,
+        "message": message,
+        "volume": volume,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _apply_pending_scope_flags(
     scope_contract: Dict[str, Any],
     publications: Dict[int, PublicationDecision],
@@ -872,7 +890,11 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     try:
         return await _do_handle_action_sync(request)
     except Exception as e:
-        request.app["derniere_operation_resultat"] = "echec"
+        request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+            resultat="echec",
+            intention="sync",
+            message="Synchronisation échouée — erreur inattendue.",
+        )
         request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
         _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
         raise
@@ -1406,11 +1428,21 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     _has_deferred = bool(request.app.get("pending_discovery_unpublish") or request.app.get("pending_local_availability_cleanup"))
     _has_successes = any(getattr(d, "active_or_alive", False) for d in request.app["publications"].values())
 
+    _SYNC_MESSAGES = {
+        "succes": "Synchronisation terminée.",
+        "partiel": "Synchronisation terminée avec avertissements.",
+        "echec": "Synchronisation échouée.",
+    }
     if _has_failures or _has_deferred:
-        request.app["derniere_operation_resultat"] = "partiel" if _has_successes else "echec"
+        _snap_res = "partiel" if _has_successes else "echec"
     else:
         # Même si rien n'est publié (0 éligibles), s'il n'y a eu aucune erreur, c'est un succès structurel
-        request.app["derniere_operation_resultat"] = "succes"
+        _snap_res = "succes"
+    request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+        resultat=_snap_res,
+        intention="sync",
+        message=_SYNC_MESSAGES[_snap_res],
+    )
         
     request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
     
@@ -2166,18 +2198,25 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             pending_discovery_unpublish,
         )
         save_publications_cache(publications, _DATA_DIR)
-        request.app["derniere_operation_resultat"] = "partiel" if resultat == "succes_partiel" else resultat
+        _supprimer_msg = _build_supprimer_message(
+            resultat=resultat,
+            equipements_supprimes=equipements_supprimes,
+            supprimer_errors=supprimer_errors,
+        )
+        request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+            resultat="partiel" if resultat == "succes_partiel" else resultat,
+            intention="supprimer",
+            portee=portee,
+            message=_supprimer_msg,
+            volume=equipements_supprimes,
+        )
 
         payload = {
             "intention": intention,
             "portee": portee,
             "selection": selection,
             "resultat": resultat,
-            "message": _build_supprimer_message(
-                resultat=resultat,
-                equipements_supprimes=equipements_supprimes,
-                supprimer_errors=supprimer_errors,
-            ),
+            "message": _supprimer_msg,
             "perimetre_impacte": {
                 "nom": perimetre["nom"],
                 "equipements_publies": equipements_supprimes + supprimer_errors + skips,
@@ -2350,18 +2389,25 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         pending_discovery_unpublish,
     )
     save_publications_cache(publications, _DATA_DIR)
-    request.app["derniere_operation_resultat"] = "partiel" if resultat == "succes_partiel" else resultat
+    _publier_msg = _build_publier_message(
+        resultat=resultat,
+        equipements_publies_ou_crees=equipements_publies_ou_crees,
+        publish_errors=publish_errors,
+    )
+    request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+        resultat="partiel" if resultat == "succes_partiel" else resultat,
+        intention="publier",
+        portee=portee,
+        message=_publier_msg,
+        volume=equipements_publies_ou_crees,
+    )
 
     payload = {
         "intention": intention,
         "portee": portee,
         "selection": selection,
         "resultat": resultat,
-        "message": _build_publier_message(
-            resultat=resultat,
-            equipements_publies_ou_crees=equipements_publies_ou_crees,
-            publish_errors=publish_errors,
-        ),
+        "message": _publier_msg,
         "perimetre_impacte": _build_action_perimetre_impacte(
             portee=portee,
             selection=selection,
@@ -2397,7 +2443,7 @@ def create_app(local_secret: str) -> web.Application:
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
     
     # Story 2.1 — Etat minimal de santé du pont
-    app["derniere_operation_resultat"] = "aucun"
+    app["derniere_operation_resultat"] = _build_operation_snapshot(resultat="aucun")
     app["derniere_synchro_terminee"] = None
 
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)

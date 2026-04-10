@@ -202,14 +202,16 @@ describe('5.5 / AC2 — renderActionButtons : libellés courts et couleurs', () 
     assert.ok(!html.includes('btn-success'), 'btn-success ne doit pas être présent pour Republier');
   });
 
-  it('Supprimer → libellé "Supprimer", classe btn-danger', () => {
+  it('Supprimer → libellé "Suppr.", classe btn-danger, tooltip présent', () => {
     const actions = {
       publier: { label: 'Créer dans Home Assistant', disponible: true, raison_indisponibilite: null, niveau_confirmation: 'aucune' },
       supprimer: { label: 'Supprimer de Home Assistant', disponible: true, raison_indisponibilite: null, niveau_confirmation: 'forte' },
     };
     const html = Jeedom2haScopeSummary.renderActionButtons(actions, 3);
-    assert.ok(html.includes('>Supprimer<'), 'Libellé court "Supprimer" attendu');
+    assert.ok(html.includes('>Suppr.<'), 'Libellé court "Suppr." attendu');
+    assert.ok(!html.includes('>Supprimer<'), 'Libellé long "Supprimer" ne doit plus être présent');
     assert.ok(html.includes('btn-danger'), 'Classe btn-danger attendue pour Supprimer');
+    assert.ok(html.includes('title="Supprimer de Home Assistant"'), 'Tooltip badge Supprimer attendu');
   });
 
   it('bouton publier disabled conserve son title de raison_indisponibilite malgré le libellé court', () => {

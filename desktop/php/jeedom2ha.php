@@ -31,6 +31,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<div style="display:flex; align-items:center;">
 				<i class="fas fa-tasks" style="margin-right:5px;"></i> <strong>{{Dernière opération}}</strong> :
 				<span id="span_healthOp" class="label label-default" style="margin-left:5px;">{{...}}</span>
+				<span id="span_healthOpMsg" style="margin-left:8px; color:#666; font-size:0.9em;"></span>
 			</div>
 		</div>
 

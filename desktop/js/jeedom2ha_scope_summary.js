@@ -484,12 +484,14 @@
   }
 
   // Story 5.5 — Libellé court display-only (backend reste source de vérité).
+  // Story 5.7 — LABEL_SHORT_MAP ajoute la transformation "Supprimer" → "Suppr." après coupe de suffixe.
   function shortLabel(label) {
+    var LABEL_SHORT_MAP = { 'Supprimer': 'Suppr.' };
+    var result = label;
     var idx = label.indexOf(' dans ');
-    if (idx >= 0) return label.substring(0, idx);
-    idx = label.indexOf(' de ');
-    if (idx >= 0) return label.substring(0, idx);
-    return label;
+    if (idx >= 0) result = label.substring(0, idx);
+    else { idx = label.indexOf(' de '); if (idx >= 0) result = label.substring(0, idx); }
+    return LABEL_SHORT_MAP[result] || result;
   }
 
   // Story 5.1 — Rendu des boutons d'action HA strictement depuis actions_ha (aucun recalcul).
@@ -513,6 +515,7 @@
     if (supprimer && supprimer.label && supprimer.disponible) {
       html += '<button class="btn btn-xs btn-danger j2ha-action-ha-btn" data-ha-action="supprimer"'
         + ' data-eq-id="' + escapeHtml(String(eqId)) + '"'
+        + ' title="' + escapeHtml(supprimer.label) + '"'
         + '>' + escapeHtml(shortLabel(supprimer.label)) + '</button>';
     }
     html += '</div>';
@@ -532,17 +535,20 @@
   }
 
   // Story 5.3 — Bouton Supprimer par ligne pièce
+  // Story 5.7 — Libellé via shortLabel (source unifiée) + tooltip nominal.
   function renderPieceSupprimerButton(piece) {
     var publies = (piece && piece.counts && isFiniteNumber(piece.counts.publies)) ? piece.counts.publies : 0;
     if (publies <= 0) {
       return '';
     }
+    var label = shortLabel('Supprimer de Home Assistant');
     return ' <button class="btn btn-xs btn-danger j2ha-piece-action-btn" data-ha-action="supprimer"'
       + ' data-portee="piece"'
       + ' data-piece-id="' + escapeHtml(String(piece.object_id)) + '"'
       + ' data-piece-name="' + escapeHtml(piece.object_name) + '"'
       + ' data-piece-publies="' + escapeHtml(String(publies)) + '"'
-      + '>Suppr.</button>';
+      + ' title="Supprimer de Home Assistant"'
+      + '>' + escapeHtml(label) + '</button>';
   }
 
   function renderPieceActionButtons(piece) {
@@ -637,6 +643,25 @@
     return html;
   }
 
+  function readOperationSnapshot(raw) {
+    var VALID_RESULTATS = { succes: true, partiel: true, echec: true, aucun: true };
+    var empty = { resultat: 'aucun', intention: null, portee: null, message: null, volume: null, timestamp: null };
+    if (raw === null || raw === undefined) return empty;
+    if (typeof raw === 'string') {
+      return Object.assign({}, empty, { resultat: VALID_RESULTATS[raw] ? raw : 'aucun' });
+    }
+    if (typeof raw !== 'object') return empty;
+    var resultat = (typeof raw.resultat === 'string' && VALID_RESULTATS[raw.resultat]) ? raw.resultat : 'aucun';
+    return {
+      resultat: resultat,
+      intention: typeof raw.intention === 'string' ? raw.intention : null,
+      portee: typeof raw.portee === 'string' ? raw.portee : null,
+      message: (typeof raw.message === 'string' && raw.message !== '') ? raw.message : null,
+      volume: (typeof raw.volume === 'number' && Number.isFinite(raw.volume)) ? raw.volume : null,
+      timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : null,
+    };
+  }
+
   return {
     createModel: createModel,
     render: render,
@@ -645,6 +670,8 @@
     readActionsHa: readActionsHa,
     renderActionButtons: renderActionButtons,
     renderPiecePublishButton: renderPiecePublishButton,
+    renderPieceActionButtons: renderPieceActionButtons,
     renderTableHeader: renderTableHeader,
+    readOperationSnapshot: readOperationSnapshot,
   };
 }));
