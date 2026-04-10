@@ -1,6 +1,6 @@
 # Story 1.1 : Contrat du pipeline — MappingResult à sous-blocs bornés et ordre d'évaluation stable
 
-Status: review
+Status: done
 
 ## Story
 
