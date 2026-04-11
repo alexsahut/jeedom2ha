@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-11'  # pe-epic-1 done — Story 1.3 APPROVE, 3/3 stories soldées
+last_updated: '2026-04-11'  # pe-epic-2 — Story 2.1 done (code review APPROVE)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -129,8 +129,8 @@ development_status:
   1-3-diagnostic-d-eligibilite-l-utilisateur-lit-l-etape-1-comme-point-de-blocage-avec-cause-categorisee-et-action-de-scope-applicable: done  # code review APPROVE 2026-04-11 — 12/12 tests, 316/316 non-régression, 0 finding HIGH/MEDIUM
   pe-epic-1-retrospective: optional
 
-  pe-epic-2: backlog  # Le moteur produit un candidat de mapping structuré sans présupposer la validité HA (2 stories)
-  2-1-mapping-candidat-le-moteur-produit-un-candidat-de-projection-ha-annote-avec-niveau-de-confiance-dans-le-sous-bloc-mapping-borne: backlog
+  pe-epic-2: in-progress  # Le moteur produit un candidat de mapping structuré sans présupposer la validité HA (2 stories)
+  2-1-mapping-candidat-le-moteur-produit-un-candidat-de-projection-ha-annote-avec-niveau-de-confiance-dans-le-sous-bloc-mapping-borne: done  # code review APPROVE 2026-04-11 — 0 finding, 9/9 tests, 325/325 non-régression
   2-2-echec-et-ambiguite-de-mapping-le-moteur-signale-explicitement-un-mapping-impossible-ou-ambigu-et-les-sous-blocs-suivants-refletent-le-skip: backlog
   pe-epic-2-retrospective: optional
 
