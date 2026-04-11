@@ -1,6 +1,10 @@
 # Story 3.1 : Registre HA — le module validation/ définit les composants connus avec leurs contraintes en 3 états distincts
 
-Status: review
+Status: done
+
+> **Merge closeout 2026-04-12** — PR #81 squash-merged dans `main` (commit `a90a730213a8`).
+> Code review final : PASS. Gate terrain : **N/A**.
+> Story soldée. Epic 3 peut enchaîner sur Story 3.2.
 
 ## Story
 
@@ -277,4 +281,5 @@ Codex (GPT-5)
 
 ## Change Log
 
+- 2026-04-12 : closeout post-merge — PR #81 squash-merged dans `main` (commit `a90a730213a8`), story passee a `done`, sprint-status realigne.
 - 2026-04-12 : implementation complete de la Story 3.1, ajout du registre HA statique, des tests d'integrite associes et validation de non-regression du daemon.
