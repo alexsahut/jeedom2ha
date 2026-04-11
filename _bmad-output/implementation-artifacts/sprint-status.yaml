@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-10'  # Story 1.1 done — code review PASS (0 finding, 290/290 tests, alignement archi D1/D4/P1-P3 vérifié)
+last_updated: '2026-04-10'  # Story 1.2 done — code review APPROVE, 14/14 tests step1 eligibility, 304/304 non-régression, 0 finding bloquant
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -125,7 +125,7 @@ development_status:
 
   pe-epic-1: in-progress  # Le pipeline canonique établit un contrat de décision déterministe — l'éligibilité est sa première étape formalisée (3 stories)
   1-1-contrat-du-pipeline-mappingresult-a-sous-blocs-bornes-et-ordre-d-evaluation-stable: done  # code review PASS 2026-04-10 — 0 finding, 290/290 tests, archi D1/D4/P1-P3 aligné
-  1-2-etape-1-l-eligibilite-classe-chaque-equipement-jeedom-dans-une-categorie-stable-avant-tout-mapping: backlog
+  1-2-etape-1-l-eligibilite-classe-chaque-equipement-jeedom-dans-une-categorie-stable-avant-tout-mapping: done  # code review APPROVE 2026-04-10 — 14/14 tests, 304/304 non-régression, 0 prod change
   1-3-diagnostic-d-eligibilite-l-utilisateur-lit-l-etape-1-comme-point-de-blocage-avec-cause-categorisee-et-action-de-scope-applicable: backlog
   pe-epic-1-retrospective: optional
 
