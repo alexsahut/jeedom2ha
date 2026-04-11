@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-11'  # pe-epic-3 — Story 3.1 review
+last_updated: '2026-04-12'  # pe-epic-3 — Story 3.1 done (merge PR #81)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -135,7 +135,7 @@ development_status:
   pe-epic-2-retrospective: optional
 
   pe-epic-3: in-progress  # Validation HA obligatoire avant publication + registre gouverné à 3 états (3 stories)
-  3-1-registre-ha-le-module-validation-definit-les-composants-connus-avec-leurs-contraintes-en-3-etats-distincts: review
+  3-1-registre-ha-le-module-validation-definit-les-composants-connus-avec-leurs-contraintes-en-3-etats-distincts: done  # squash merge PR #81 -> main (a90a730), code review PASS, 8/8 tests, 345/345 non-régression
   3-2-validation-ha-la-fonction-pure-validate-projection-verifie-que-le-candidat-de-mapping-peut-produire-un-payload-structurellement-valide-pour-le-composant-ha-cible: backlog
   3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: backlog
   pe-epic-3-retrospective: optional
