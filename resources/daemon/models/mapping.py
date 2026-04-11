@@ -96,6 +96,9 @@ class MappingResult:
     reason_details: Optional[Dict[str, object]] = None
     projection_validity: Optional[ProjectionValidity] = None
     publication_decision_ref: Optional["PublicationDecision"] = None
+    pipeline_step_reached: Optional[int] = None
+    # 2 = mapping atteint ; 3 = validation HA exécutée ; 4 = décision publication ;
+    # 5 = publié. None = champ non câblé (avant Epic 5).
 
     def __post_init__(self) -> None:
         if self.capabilities is None:
