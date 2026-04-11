@@ -2,7 +2,7 @@
 """Table de traduction reason_code → (cause_code, cause_label, cause_action).
 
 Module pur, standalone — aucune dépendance sur http_server, aggregation, taxonomy.
-Direction 1 : inclus mais non publié (12 entrées actives + 3 published + 1 fallback).
+Direction 1 : inclus mais non publié (15 entrées actives + 3 published + 1 fallback).
 Direction 2 : exclu mais encore publié dans HA (build_cause_for_pending_unpublish).
 """
 
@@ -13,7 +13,23 @@ from typing import Optional, Tuple
 # Table figée : reason_code → (cause_code, cause_label, cause_action)
 # None dans cause_action signifie "aucune action recommandée pour ce cas".
 _REASON_CODE_TO_CAUSE: dict = {
-    # --- 12 entrées actives (direction 1 — inclus mais non publié) ---
+    # --- 15 entrées actives (direction 1 — inclus mais non publié) ---
+    # --- Exclusions de scope utilisateur (étape 1 — ordre canonique : exclu > désactivé > ...) ---
+    "excluded_eqlogic": (
+        "excluded_eqlogic",
+        "Équipement exclu du scope de synchronisation",
+        "Retirer l'équipement de la liste d'exclusion dans les réglages jeedom2ha",
+    ),
+    "excluded_plugin": (
+        "excluded_plugin",
+        "Plugin exclu du scope de synchronisation",
+        "Retirer le plugin de la liste d'exclusion dans les réglages jeedom2ha",
+    ),
+    "excluded_object": (
+        "excluded_object",
+        "Objet Jeedom exclu du scope de synchronisation",
+        "Retirer l'objet de la liste d'exclusion dans les réglages jeedom2ha",
+    ),
     "ambiguous_skipped": (
         "ambiguous_skipped",
         "Mapping ambigu — plusieurs types possibles",
