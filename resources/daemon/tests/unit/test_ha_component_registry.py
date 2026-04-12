@@ -7,7 +7,11 @@ Tests en isolation totale : aucune dependance MQTT, daemon, pytest-asyncio.
 import ast
 import pathlib
 
-from validation.ha_component_registry import HA_COMPONENT_REGISTRY, PRODUCT_SCOPE
+from validation.ha_component_registry import (
+    HA_COMPONENT_REGISTRY,
+    PRODUCT_SCOPE,
+    _CAPABILITY_TO_REASON,
+)
 
 
 def test_module_exports_registry_and_product_scope():
@@ -72,3 +76,19 @@ def test_product_scope_modification_requires_fr40():
 
     # AR13 : toute modification de PRODUCT_SCOPE exige les tests FR40 dans le meme increment.
     assert "PRODUCT_SCOPE =" in source
+
+
+def test_all_registry_capabilities_have_reason_mapping():
+    """Story 3.2 review — chaque capability abstraite du registre est couverte par _CAPABILITY_TO_REASON.
+
+    Garantit que validate_projection() ne peut jamais produire un reason_code
+    brut (nom de capability) au lieu d'un vrai code metier ha_*.
+    """
+    all_caps = {
+        cap
+        for spec in HA_COMPONENT_REGISTRY.values()
+        for cap in spec["required_capabilities"]
+    }
+    assert all_caps <= set(_CAPABILITY_TO_REASON.keys()), (
+        f"Capabilities sans reason_code : {all_caps - set(_CAPABILITY_TO_REASON.keys())}"
+    )
