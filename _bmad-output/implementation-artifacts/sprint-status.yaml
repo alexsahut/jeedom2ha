@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-12'  # pe-epic-3 — Story 3.2 done (code review PASS)
+last_updated: '2026-04-13'  # pe-epic-3 done — Story 3.3 done, 3/3 stories soldées
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -134,10 +134,10 @@ development_status:
   2-2-echec-et-ambiguite-de-mapping-le-moteur-signale-explicitement-un-mapping-impossible-ou-ambigu-et-les-sous-blocs-suivants-refletent-le-skip: done  # code review PASS 2026-04-11 — 0 finding HIGH/MEDIUM, 12/12 tests, 337/337 non-régression
   pe-epic-2-retrospective: optional
 
-  pe-epic-3: in-progress  # Validation HA obligatoire avant publication + registre gouverné à 3 états (3 stories)
+  pe-epic-3: done  # Validation HA obligatoire avant publication + registre gouverné à 3 états (3/3 stories done)
   3-1-registre-ha-le-module-validation-definit-les-composants-connus-avec-leurs-contraintes-en-3-etats-distincts: done  # squash merge PR #81 -> main (a90a730), code review PASS, 8/8 tests, 345/345 non-régression
   3-2-validation-ha-la-fonction-pure-validate-projection-verifie-que-le-candidat-de-mapping-peut-produire-un-payload-structurellement-valide-pour-le-composant-ha-cible: done  # code review PASS, 357/357 tests, 0 régression
-  3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: backlog
+  3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: done  # code review PASS (0 finding), 365/365 tests, 0 régression
   pe-epic-3-retrospective: optional
 
   pe-epic-4: backlog  # Décision de publication explicite + contrat de testabilité/rétrocompatibilité garanti (4 stories)
