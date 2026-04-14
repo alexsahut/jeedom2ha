@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-13'  # pe-epic-3 done — Story 3.3 done, 3/3 stories soldées
+last_updated: '2026-04-14'  # pe-epic-4 en cours — story 4.1 done (code review APPROVE)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -138,10 +138,10 @@ development_status:
   3-1-registre-ha-le-module-validation-definit-les-composants-connus-avec-leurs-contraintes-en-3-etats-distincts: done  # squash merge PR #81 -> main (a90a730), code review PASS, 8/8 tests, 345/345 non-régression
   3-2-validation-ha-la-fonction-pure-validate-projection-verifie-que-le-candidat-de-mapping-peut-produire-un-payload-structurellement-valide-pour-le-composant-ha-cible: done  # code review PASS, 357/357 tests, 0 régression
   3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: done  # code review PASS (0 finding), 365/365 tests, 0 régression
-  pe-epic-3-retrospective: optional
+  pe-epic-3-retrospective: done  # retro 2026-04-13 — 5 action items, AI-1 prérequis absolu avant pe-epic-4
 
-  pe-epic-4: backlog  # Décision de publication explicite + contrat de testabilité/rétrocompatibilité garanti (4 stories)
-  4-1-etape-4-decide-publication-arbitre-la-publication-a-partir-de-la-projection-validee-de-la-politique-de-confiance-et-du-product-scope: backlog
+  pe-epic-4: in-progress  # démarré 2026-04-14
+  4-1-etape-4-decide-publication-arbitre-la-publication-a-partir-de-la-projection-validee-de-la-politique-de-confiance-et-du-product-scope: done  # code review APPROVE 2026-04-14 — 0 finding HIGH/MEDIUM, 19/19 tests, 384/384 non-régression
   4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: backlog
   4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: backlog
   4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: backlog
