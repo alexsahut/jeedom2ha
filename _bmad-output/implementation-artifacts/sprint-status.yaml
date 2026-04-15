@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-14'  # pe-epic-4 en cours — story 4.1 done (code review APPROVE)
+last_updated: '2026-04-15'  # pe-epic-4 en cours — story 4.2 done, story 4.3 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -142,8 +142,8 @@ development_status:
 
   pe-epic-4: in-progress  # démarré 2026-04-14
   4-1-etape-4-decide-publication-arbitre-la-publication-a-partir-de-la-projection-validee-de-la-politique-de-confiance-et-du-product-scope: done  # code review APPROVE 2026-04-14 — 0 finding HIGH/MEDIUM, 19/19 tests, 384/384 non-régression
-  4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: review
-  4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: backlog
+  4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: done  # PR #86 squash merge 53d1c34 — 175 JS + 928 pytest PASS, gate terrain PASS via fixture contrôlée
+  4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: done  # code review APPROVE 2026-04-15 — 0 finding HIGH/MEDIUM, 31/31 tests, 940/940 non-régression
   4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: backlog
   pe-epic-4-retrospective: optional
 

@@ -1,8 +1,8 @@
-# ARTEFACT FIGÉ — Story 4.1. Ne pas modifier sans story dédiée.
+# ARTEFACT FIGÉ — Story 4.1 / Story 4.3. Ne pas modifier sans story dédiée.
 """Table de traduction reason_code → (cause_code, cause_label, cause_action).
 
 Module pur, standalone — aucune dépendance sur http_server, aggregation, taxonomy.
-Direction 1 : inclus mais non publié (15 entrées actives + 3 published + 1 fallback).
+Direction 1 : inclus mais non publié (20 entrées actives + 3 published + fallback contractuel).
 Direction 2 : exclu mais encore publié dans HA (build_cause_for_pending_unpublish).
 """
 
@@ -13,7 +13,7 @@ from typing import Optional, Tuple
 # Table figée : reason_code → (cause_code, cause_label, cause_action)
 # None dans cause_action signifie "aucune action recommandée pour ce cas".
 _REASON_CODE_TO_CAUSE: dict = {
-    # --- 15 entrées actives (direction 1 — inclus mais non publié) ---
+    # --- 20 entrées actives (direction 1 — inclus mais non publié) ---
     # --- Exclusions de scope utilisateur (étape 1 — ordre canonique : exclu > désactivé > ...) ---
     "excluded_eqlogic": (
         "excluded_eqlogic",
@@ -94,6 +94,27 @@ _REASON_CODE_TO_CAUSE: dict = {
         "no_mapping",
         "Aucun mapping compatible",
         "Relancer un sync complet depuis l'interface du plugin",
+    ),
+    # --- Codes classe 2 — Validation HA (étape 3, AR8) ---
+    "ha_missing_command_topic": (
+        "ha_missing_command_topic",
+        "Projection HA invalide — commande d'action manquante",
+        "Vérifier que les commandes de l'équipement incluent une commande d'action compatible dans Jeedom",
+    ),
+    "ha_missing_state_topic": (
+        "ha_missing_state_topic",
+        "Projection HA invalide — commande d'état manquante",
+        "Vérifier que les commandes de l'équipement incluent une commande d'état compatible dans Jeedom",
+    ),
+    "ha_missing_required_option": (
+        "ha_missing_required_option",
+        "Projection HA invalide — option requise par le composant Home Assistant manquante",
+        "Vérifier que les commandes de l'équipement couvrent les options requises par le composant Home Assistant cible",
+    ),
+    "ha_component_unknown": (
+        "ha_component_unknown",
+        "Composant Home Assistant non reconnu par le moteur",
+        None,  # FR33 — aucune remédiation utilisateur directe
     ),
     # --- 3 codes published → pas d'écart direction 1 ---
     "sure": (None, None, None),
