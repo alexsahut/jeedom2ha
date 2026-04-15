@@ -94,11 +94,11 @@ def test_local_availability_publish_failed():
 
 
 def test_low_confidence():
-    """low_confidence → cause_code no_mapping."""
+    """low_confidence → cause décisionnelle dédiée, distincte du no_mapping générique."""
     assert reason_code_to_cause("low_confidence") == (
-        "no_mapping",
-        "Aucun mapping compatible",
-        "Vérifier les types génériques des commandes dans Jeedom",
+        "low_confidence",
+        "Confiance insuffisante pour la politique active",
+        "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable.",
     )
 
 
@@ -108,6 +108,15 @@ def test_eligible():
         "no_mapping",
         "Aucun mapping compatible",
         "Relancer un sync complet depuis l'interface du plugin",
+    )
+
+
+def test_ha_component_not_in_product_scope():
+    """Étape 4 — composant hors scope produit → cause dédiée et non assimilable au mapping."""
+    assert reason_code_to_cause("ha_component_not_in_product_scope") == (
+        "not_in_product_scope",
+        "Composant Home Assistant non ouvert dans ce cycle",
+        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
     )
 
 

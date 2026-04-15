@@ -1529,9 +1529,13 @@ _DIAGNOSTIC_MESSAGES = {
         False,
     ),
     "low_confidence": (
-        "La correspondance vers un type Home Assistant est trop incertaine pour une publication automatique.",
-        "Configurez les types génériques sur les commandes pour améliorer la précision du mapping, "
-        "puis relancez un rescan.",
+        "La projection Home Assistant de cet équipement est valide, mais sa confiance est insuffisante pour la politique active.",
+        "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable.",
+        False,
+    ),
+    "ha_component_not_in_product_scope": (
+        "La projection de cet équipement est valide, mais son composant Home Assistant n'est pas ouvert dans le cycle courant.",
+        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
         False,
     ),
     "sure_mapping": (

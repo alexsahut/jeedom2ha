@@ -1,6 +1,6 @@
-/* Story 4.6 — Helpers purs du diagnostic modal (in-scope, colonnes, ciblage).
- * Séparé pour testabilité. Aucune logique métier : passthrough strict du contrat backend.
- * Ce module ne contient AUCUN calcul ou recombination des valeurs backend.
+/* Story 4.6+ — Helpers purs du diagnostic modal (in-scope, colonnes, ciblage, libellés visibles).
+ * Séparé pour testabilité. Aucune logique métier : passthrough strict du contrat backend
+ * avec fallback legacy borné quand les champs enrichis ne sont pas disponibles.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -60,10 +60,54 @@
     return -1;
   }
 
+  // Story 4.2 — La raison visible doit d'abord refléter cause_label.
+  // Fallback legacy borné sur le mapping JS local uniquement si cause_label est absent.
+  function getDiagnosticReasonLabel(eq, legacyReasonLabels) {
+    if (eq && typeof eq.cause_label === 'string' && eq.cause_label !== '') {
+      return eq.cause_label;
+    }
+    if (
+      eq
+      && legacyReasonLabels
+      && typeof eq.reason_code === 'string'
+      && typeof legacyReasonLabels[eq.reason_code] === 'string'
+      && legacyReasonLabels[eq.reason_code] !== ''
+    ) {
+      return legacyReasonLabels[eq.reason_code];
+    }
+    return '';
+  }
+
+  // Story 4.2 — cause_action prime sur remediation et ne doit pas déclencher
+  // de CTA de configuration générique qui contredirait la lecture visible.
+  function resolveDiagnosticAction(eq) {
+    if (eq && typeof eq.cause_action === 'string' && eq.cause_action !== '') {
+      return {
+        text: eq.cause_action,
+        source: 'cause_action',
+        showConfigLink: false,
+      };
+    }
+    if (eq && typeof eq.remediation === 'string' && eq.remediation !== '') {
+      return {
+        text: eq.remediation,
+        source: 'remediation',
+        showConfigLink: true,
+      };
+    }
+    return {
+      text: '',
+      source: 'none',
+      showConfigLink: false,
+    };
+  }
+
   return {
     filterInScopeEquipments: filterInScopeEquipments,
     getDiagnosticColumns: getDiagnosticColumns,
     getEcartBadgeHtml: getEcartBadgeHtml,
     findTargetEquipmentIndex: findTargetEquipmentIndex,
+    getDiagnosticReasonLabel: getDiagnosticReasonLabel,
+    resolveDiagnosticAction: resolveDiagnosticAction,
   };
 }));
