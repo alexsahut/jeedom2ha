@@ -1,6 +1,6 @@
 # Story 4.2 : Diagnostic de la décision — l'utilisateur distingue un refus de politique produit d'un refus de gouvernance d'ouverture
 
-Status: review
+Status: done
 
 Epic: pe-epic-4 — Décision de publication explicite + contrat de testabilité/rétrocompatibilité garanti
 
