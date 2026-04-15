@@ -81,9 +81,14 @@ _REASON_CODE_TO_CAUSE: dict = {
         "Vérifier la connexion au broker MQTT et relancer un diagnostic après résolution",
     ),
     "low_confidence": (
-        "no_mapping",
-        "Aucun mapping compatible",
-        "Vérifier les types génériques des commandes dans Jeedom",
+        "low_confidence",
+        "Confiance insuffisante pour la politique active",
+        "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable.",
+    ),
+    "ha_component_not_in_product_scope": (
+        "not_in_product_scope",
+        "Composant Home Assistant non ouvert dans ce cycle",
+        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
     ),
     "eligible": (
         "no_mapping",

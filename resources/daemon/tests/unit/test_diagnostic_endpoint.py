@@ -215,6 +215,104 @@ async def test_diagnostics_partiellement_publie(cli, app):
 # Story 4.2 — Tests for enriched diagnostic fields
 # ---------------------------------------------------------------------------
 
+async def test_diagnostics_story_4_2_low_confidence_exposes_policy_cause(aiohttp_client):
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=4601, name="On", generic_type="LIGHT_ON")
+    snapshot = TopologySnapshot(
+        timestamp="2026-04-14T12:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4600: JeedomEqLogic(id=4600, name="Lampe Buffet", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="probable",
+        reason_code="light_on_off",
+        jeedom_eq_id=4600,
+        ha_unique_id="light_4600",
+        ha_name="Lampe Buffet",
+        commands={"LIGHT_ON": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4600: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {4600: mapping_res}
+    app["publications"] = {
+        4600: PublicationDecision(
+            should_publish=False,
+            reason="low_confidence",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4600)
+
+    assert eq["reason_code"] == "low_confidence"
+    assert eq["cause_code"] == "low_confidence"
+    assert eq["cause_label"] == "Confiance insuffisante pour la politique active"
+    assert eq["cause_action"] == (
+        "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable."
+    )
+    assert "politique active" in eq["detail"]
+    assert eq["detail"] != "Cause inconnue."
+    assert eq["remediation"] == (
+        "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable."
+    )
+
+
+async def test_diagnostics_story_4_2_not_in_product_scope_exposes_governance_cause(aiohttp_client):
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=4701, name="Etat", generic_type="LIGHT_STATE")
+    snapshot = TopologySnapshot(
+        timestamp="2026-04-14T12:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={4700: JeedomEqLogic(id=4700, name="Détecteur multi-capteurs", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",
+        reason_code="light_state_only",
+        jeedom_eq_id=4700,
+        ha_unique_id="light_4700",
+        ha_name="Détecteur multi-capteurs",
+        commands={"LIGHT_STATE": cmd},
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {4700: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {4700: mapping_res}
+    app["publications"] = {
+        4700: PublicationDecision(
+            should_publish=False,
+            reason="ha_component_not_in_product_scope",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 4700)
+
+    assert eq["reason_code"] == "ha_component_not_in_product_scope"
+    assert eq["cause_code"] == "not_in_product_scope"
+    assert eq["cause_label"] == "Composant Home Assistant non ouvert dans ce cycle"
+    assert eq["cause_action"] == (
+        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant."
+    )
+    assert "cycle courant" in eq["detail"]
+    assert eq["detail"] != "Cause inconnue."
+    assert eq["remediation"] == (
+        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant."
+    )
+    assert eq["cause_label"] != "Aucun mapping compatible"
+
 async def test_diagnostics_detail_and_remediation_no_commands(aiohttp_client):
     """no_commands => action requise, v1_limitation=False, detail/remediation non vides."""
     app = create_app(local_secret="test_secret")

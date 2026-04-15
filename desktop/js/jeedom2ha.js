@@ -814,11 +814,37 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         'excluded_by_user': 'Exclu manuellement par l\'utilisateur',
         'excluded_plugin': 'Plugin source exclu de la publication',
         'excluded_object': 'Pièce exclue de la publication',
-        'low_confidence': 'Confiance trop faible pour publication',
+        'low_confidence': 'Confiance insuffisante pour la politique active',
+        'ha_component_not_in_product_scope': 'Composant Home Assistant non ouvert dans ce cycle',
         // Infrastructure (pannes publiables — réservé au bandeau global et au résultat de publication)
         'discovery_publish_failed': 'Échec de publication MQTT (infrastructure)',
         'local_availability_publish_failed': 'Échec de publication de la disponibilité (infrastructure)'
       };
+
+      var getDiagnosticReasonLabel = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
+        && Jeedom2haDiagnosticHelpers
+        && typeof Jeedom2haDiagnosticHelpers.getDiagnosticReasonLabel === 'function')
+        ? function(eq) { return Jeedom2haDiagnosticHelpers.getDiagnosticReasonLabel(eq, reasonLabels); }
+        : function(eq) {
+            if (eq && typeof eq.cause_label === 'string' && eq.cause_label !== '') {
+              return eq.cause_label;
+            }
+            return (eq && eq.reason_code) ? (reasonLabels[eq.reason_code] || '') : '';
+          };
+
+      var resolveDiagnosticAction = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
+        && Jeedom2haDiagnosticHelpers
+        && typeof Jeedom2haDiagnosticHelpers.resolveDiagnosticAction === 'function')
+        ? function(eq) { return Jeedom2haDiagnosticHelpers.resolveDiagnosticAction(eq); }
+        : function(eq) {
+            if (eq && typeof eq.cause_action === 'string' && eq.cause_action !== '') {
+              return { text: eq.cause_action, source: 'cause_action', showConfigLink: false };
+            }
+            if (eq && typeof eq.remediation === 'string' && eq.remediation !== '') {
+              return { text: eq.remediation, source: 'remediation', showConfigLink: true };
+            }
+            return { text: '', source: 'none', showConfigLink: false };
+          };
 
       var getStatusLabel = function(status) {
         if (status === 'Publié') return '<span class="label label-success">' + status + '</span>';
@@ -981,17 +1007,20 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         html += '<div><strong>{{Action recommandée}}</strong>';
         if (eq.status === 'Publié' && (!eq.unmatched_commands || eq.unmatched_commands.length === 0)) {
           html += '<div style="margin-top:4px;color:#2f7d32;"><i class="fas fa-check-circle" style="margin-right:5px;"></i>{{Aucune action requise. L\'équipement est correctement exposé.}}</div>';
-        } else if (eq.remediation) {
-          html += '<div style="margin-top:4px;">' + eq.remediation + '</div>';
-          if (eq.eq_type_name) {
+        } else {
+          var resolvedAction = resolveDiagnosticAction(eq);
+          if (resolvedAction.text) {
+            html += '<div style="margin-top:4px;">' + resolvedAction.text + '</div>';
+          }
+          if (resolvedAction.showConfigLink && eq.eq_type_name) {
             var href = linkToCommandTab
               ? 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id + '#commandtab'
               : 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id;
             html += '<div style="margin-top:6px;"><a href="' + href + '" target="_blank" class="btn btn-xs btn-default">';
             html += '<i class="fas fa-external-link-alt"></i> {{Configurer dans Jeedom}}</a></div>';
+          } else if (!resolvedAction.text) {
+            html += '<div style="margin-top:4px;color:#aaa;font-style:italic;">{{Aucune action disponible.}}</div>';
           }
-        } else {
-          html += '<div style="margin-top:4px;color:#aaa;font-style:italic;">{{Aucune action disponible.}}</div>';
         }
         html += '</div>';
 
@@ -1017,7 +1046,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           var objName = eq.object_name || "Aucun";
 
           if (filterText !== '') {
-             var searchStr = (objName + ' ' + eq.name + ' ' + eq.status + ' ' + (reasonLabels[eq.reason_code] || '')).toLowerCase();
+             var searchStr = (objName + ' ' + eq.name + ' ' + eq.status + ' ' + getDiagnosticReasonLabel(eq)).toLowerCase();
              if (searchStr.indexOf(filterText) === -1) continue;
           }
 
@@ -1040,7 +1069,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
 
           for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
             var eq = eqs[eqIdx];
-            var reasonDescription = reasonLabels[eq.reason_code] || '';
+            var reasonDescription = getDiagnosticReasonLabel(eq);
             // Accordéon disponible pour TOUS les équipements in-scope (y compris Publié)
             var chevron = '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>';
 
@@ -1050,6 +1079,8 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
               eq_type_name: eq.eq_type_name || '',
               detail: eq.detail || '',
               remediation: eq.remediation || '',
+              cause_label: eq.cause_label || '',
+              cause_action: eq.cause_action || '',
               v1_limitation: eq.v1_limitation || false,
               unmatched_commands: eq.unmatched_commands || [],
               matched_commands: eq.matched_commands || [],
