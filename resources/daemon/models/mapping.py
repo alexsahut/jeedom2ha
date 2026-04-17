@@ -74,6 +74,24 @@ class ProjectionValidity:
 
 
 @dataclass
+class PublicationResult:
+    """Résultat technique de publication MQTT — sous-bloc exclusif de l'étape 5.
+
+    Ownership : étape 5 uniquement. Ne modifie jamais la décision produit (étape 4).
+
+    status:
+        "success"       : publication MQTT réussie
+        "failed"        : publication MQTT échouée (technical_reason_code renseigné)
+        "not_attempted" : publication non tentée (should_publish=False en étape 4)
+
+    Introduit en Story 5.2 PE (pe-epic-5).
+    """
+    status: str                            # "success" | "failed" | "not_attempted"
+    technical_reason_code: Optional[str] = None   # e.g. "discovery_publish_failed"
+    attempted_at: Optional[str] = None            # ISO timestamp UTC
+
+
+@dataclass
 class MappingResult:
     """Result of mapping a single Jeedom eqLogic to a Home Assistant entity.
 
@@ -98,7 +116,8 @@ class MappingResult:
     publication_decision_ref: Optional["PublicationDecision"] = None
     pipeline_step_reached: Optional[int] = None
     # 2 = mapping atteint ; 3 = validation HA exécutée ; 4 = décision publication ;
-    # 5 = publié. None = champ non câblé (avant Epic 5).
+    # 5 = résultat technique de publication enregistré. None = champ non câblé (avant PE Epic 5).
+    publication_result: Optional["PublicationResult"] = None
 
     def __post_init__(self) -> None:
         if self.capabilities is None:

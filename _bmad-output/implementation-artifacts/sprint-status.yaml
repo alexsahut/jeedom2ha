@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-15'  # pe-epic-4 soldé apres merge PR #90 (story 4.4 done)
+last_updated: '2026-04-17'  # Story 5.2: follow-up post-review terminé, story repassée done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -145,11 +145,11 @@ development_status:
   4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: done  # PR #86 squash merge 53d1c34 — 175 JS + 928 pytest PASS, gate terrain PASS via fixture contrôlée
   4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: done  # code review APPROVE 2026-04-15 — 0 finding HIGH/MEDIUM, 31/31 tests, 940/940 non-régression
   4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: done  # PR #90 mergee ; tests PASS
-  pe-epic-4-retrospective: optional
+  pe-epic-4-retrospective: done  # retro 2026-04-15 — pe-epic-5 bloque tant que preuve d'alignement non validée
 
-  pe-epic-5: backlog  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories)
-  5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: backlog
-  5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: backlog
+  pe-epic-5: in-progress  # GO gate 2026-04-16 (prep): voir pe-epic-5-alignment-gate.md + pe-epic-5-governance-exceptions-register.md + pe-epic-5-document-precedence.md + pe-epic-5-gov-reference-micro-protocol.md
+  5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: done  # closeout documentaire post-review
+  5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
   pe-epic-5-retrospective: optional
 
   pe-epic-6: backlog  # Diagnostic explicable et actionnable pour chaque équipement (3 stories)
