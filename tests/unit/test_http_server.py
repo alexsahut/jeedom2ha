@@ -192,10 +192,14 @@ class TestSyncAction:
 
         assert resp.status == 200
         decision = http_app["publications"][2]
-        assert decision.should_publish is False
+        mapping = http_app["mappings"][2]
+        assert decision.should_publish is True
         assert decision.active_or_alive is False
-        assert decision.reason == "discovery_publish_failed"
+        assert decision.reason in {"sure", "probable", "sure_mapping", "probable_bounded"}
         assert decision.state_topic == "jeedom2ha/2/state"
+        assert mapping.publication_result is not None
+        assert mapping.publication_result.status == "failed"
+        assert mapping.publication_result.technical_reason_code == "discovery_publish_failed"
 
     async def test_sync_publishes_local_availability_retained_when_timeout_is_reliable(
         self,
@@ -281,12 +285,16 @@ class TestSyncAction:
         assert resp.status == 200
 
         decision = http_app["publications"][2]
-        assert decision.should_publish is False
+        mapping = http_app["mappings"][2]
+        assert decision.should_publish is True
         assert decision.active_or_alive is False
         assert decision.discovery_published is True
-        assert decision.reason == "local_availability_publish_failed"
+        assert decision.reason in {"sure", "probable", "sure_mapping", "probable_bounded"}
         assert decision.local_availability_supported is True
         assert decision.local_availability_state == "offline"
+        assert mapping.publication_result is not None
+        assert mapping.publication_result.status == "failed"
+        assert mapping.publication_result.technical_reason_code == "local_availability_publish_failed"
 
         availability_calls = [
             call for call in mock_mqtt.publish_message.call_args_list
@@ -1017,8 +1025,10 @@ class TestSyncAction:
             json={"payload": payload_present},
         )
         assert resp_first.status == 200
-        assert http_app["publications"][2].reason == "local_availability_publish_failed"
+        assert http_app["publications"][2].reason in {"sure", "probable", "sure_mapping", "probable_bounded"}
         assert http_app["publications"][2].discovery_published is True
+        assert http_app["mappings"][2].publication_result is not None
+        assert http_app["mappings"][2].publication_result.technical_reason_code == "local_availability_publish_failed"
 
         mock_mqtt.is_connected = False
         resp_second = await http_client.post(
@@ -1106,8 +1116,10 @@ class TestSyncAction:
             json={"payload": payload_present},
         )
         assert resp_first.status == 200
-        assert http_app["publications"][2].reason == "local_availability_publish_failed"
+        assert http_app["publications"][2].reason in {"sure", "probable", "sure_mapping", "probable_bounded"}
         assert http_app["publications"][2].discovery_published is True
+        assert http_app["mappings"][2].publication_result is not None
+        assert http_app["mappings"][2].publication_result.technical_reason_code == "local_availability_publish_failed"
 
         mock_mqtt.is_connected = False
         resp_second = await http_client.post(
@@ -1289,4 +1301,3 @@ class TestHealthCheckContract:
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "echec"
         assert http_app["derniere_synchro_terminee"] is not None
-
