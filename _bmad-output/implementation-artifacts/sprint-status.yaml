@@ -46,7 +46,7 @@
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-15'  # pe-epic-4 en cours — story 4.2 done, story 4.3 done
+last_updated: '2026-04-17'  # micro-closeout statutaire: story PE 5.2 alignée done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -149,7 +149,7 @@ development_status:
 
   pe-epic-5: backlog  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories)
   5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: backlog
-  5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: backlog
+  5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
   pe-epic-5-retrospective: optional
 
   pe-epic-6: backlog  # Diagnostic explicable et actionnable pour chaque équipement (3 stories)
