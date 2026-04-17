@@ -26,7 +26,7 @@ from models.availability import (
 )
 from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
-from models.mapping import MappingResult, PublicationDecision
+from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
 from models.cause_mapping import reason_code_to_cause, build_cause_for_pending_unpublish
@@ -149,6 +149,22 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _make_publication_result(
+    status: str,
+    technical_reason_code: Optional[str] = None,
+) -> PublicationResult:
+    """Construire le sous-bloc technique de l'étape 5 (Story 5.2 PE).
+
+    Owner exclusif : étape 5 du pipeline canonique.
+    Ne doit jamais modifier la décision produit (étape 4).
+    """
+    return PublicationResult(
+        status=status,
+        technical_reason_code=technical_reason_code,
+        attempted_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 def _resolve_eq_ids_for_portee(
@@ -398,6 +414,12 @@ def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
         return False
     if bool(getattr(decision, "discovery_published", False)):
         return True
+    # Story 5.2 PE : si publication_result existe, l'état de publication Discovery
+    # est explicitement connu (success/failed/not_attempted). Sans discovery_published,
+    # il n'y a donc rien à unpublish.
+    mapping_result = getattr(decision, "mapping_result", None)
+    if mapping_result is not None and getattr(mapping_result, "publication_result", None) is not None:
+        return False
     # Backward compatibility with pre-flag runtime decisions.
     return bool(getattr(decision, "should_publish", False))
 
@@ -1040,7 +1062,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["lights_ambiguous"] += 1
             
-            # Decide publication
             decision = light_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
@@ -1049,29 +1070,23 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
+            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
             if decision.should_publish:
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
                     config_published = await publisher.publish_light(mapping, snapshot)
                 else:
+                    config_published = False
                     _LOGGER.warning(
                         "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
                         eq_id,
                     )
                 if not config_published:
-                    decision = PublicationDecision(
-                        should_publish=False,
-                        reason="discovery_publish_failed",
-                        mapping_result=mapping,
-                        state_topic=decision.state_topic,
-                        active_or_alive=False,
-                        discovery_published=_needs_discovery_unpublish(previous_decision),
-                        bridge_availability_topic=decision.bridge_availability_topic,
-                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
-                        local_availability_supported=decision.local_availability_supported,
-                        local_availability_state=decision.local_availability_state,
-                        availability_reason=decision.availability_reason,
+                    # Préserver le marqueur HA stale si l'entité était précédemment publiée
+                    if _needs_discovery_unpublish(previous_decision):
+                        decision.discovery_published = True
+                    mapping.publication_result = _make_publication_result(
+                        "failed", "discovery_publish_failed"
                     )
-                    publications[eq_id] = decision
                 else:
                     decision.discovery_published = True
                     local_ok = True
@@ -1079,10 +1094,15 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     if local_ok:
                         decision.active_or_alive = True
+                        mapping.publication_result = _make_publication_result("success")
                         mapping_counters["lights_published"] += 1
                     else:
-                        decision = _mark_local_availability_publish_failed(decision, mapping)
-                        publications[eq_id] = decision
+                        mapping.publication_result = _make_publication_result(
+                            "failed", "local_availability_publish_failed"
+                        )
+            else:
+                mapping.publication_result = _make_publication_result("not_attempted")
+            mapping.pipeline_step_reached = 5
             if not decision.active_or_alive:
                 mapping_counters["lights_skipped"] += 1
 
@@ -1095,7 +1115,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["covers_ambiguous"] += 1
             
-            # Decide publication
             decision = cover_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
@@ -1104,29 +1123,22 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
             
+            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
             if decision.should_publish:
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
                     config_published = await publisher.publish_cover(mapping, snapshot)
                 else:
+                    config_published = False
                     _LOGGER.warning(
                         "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
                         eq_id,
                     )
                 if not config_published:
-                    decision = PublicationDecision(
-                        should_publish=False,
-                        reason="discovery_publish_failed",
-                        mapping_result=mapping,
-                        state_topic=decision.state_topic,
-                        active_or_alive=False,
-                        discovery_published=_needs_discovery_unpublish(previous_decision),
-                        bridge_availability_topic=decision.bridge_availability_topic,
-                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
-                        local_availability_supported=decision.local_availability_supported,
-                        local_availability_state=decision.local_availability_state,
-                        availability_reason=decision.availability_reason,
+                    if _needs_discovery_unpublish(previous_decision):
+                        decision.discovery_published = True
+                    mapping.publication_result = _make_publication_result(
+                        "failed", "discovery_publish_failed"
                     )
-                    publications[eq_id] = decision
                 else:
                     decision.discovery_published = True
                     local_ok = True
@@ -1134,10 +1146,15 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     if local_ok:
                         decision.active_or_alive = True
+                        mapping.publication_result = _make_publication_result("success")
                         mapping_counters["covers_published"] += 1
                     else:
-                        decision = _mark_local_availability_publish_failed(decision, mapping)
-                        publications[eq_id] = decision
+                        mapping.publication_result = _make_publication_result(
+                            "failed", "local_availability_publish_failed"
+                        )
+            else:
+                mapping.publication_result = _make_publication_result("not_attempted")
+            mapping.pipeline_step_reached = 5
             if not decision.active_or_alive:
                 mapping_counters["covers_skipped"] += 1
 
@@ -1150,7 +1167,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["switches_ambiguous"] += 1
 
-            # Decide publication
             decision = switch_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
@@ -1159,29 +1175,22 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publications[eq_id] = decision
             nouveaux_eq_ids.add(eq_id)
 
+            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
             if decision.should_publish:
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
                     config_published = await publisher.publish_switch(mapping, snapshot)
                 else:
+                    config_published = False
                     _LOGGER.warning(
                         "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
                         eq_id,
                     )
                 if not config_published:
-                    decision = PublicationDecision(
-                        should_publish=False,
-                        reason="discovery_publish_failed",
-                        mapping_result=mapping,
-                        state_topic=decision.state_topic,
-                        active_or_alive=False,
-                        discovery_published=_needs_discovery_unpublish(previous_decision),
-                        bridge_availability_topic=decision.bridge_availability_topic,
-                        eqlogic_availability_topic=decision.eqlogic_availability_topic,
-                        local_availability_supported=decision.local_availability_supported,
-                        local_availability_state=decision.local_availability_state,
-                        availability_reason=decision.availability_reason,
+                    if _needs_discovery_unpublish(previous_decision):
+                        decision.discovery_published = True
+                    mapping.publication_result = _make_publication_result(
+                        "failed", "discovery_publish_failed"
                     )
-                    publications[eq_id] = decision
                 else:
                     decision.discovery_published = True
                     local_ok = True
@@ -1189,10 +1198,15 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                         local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
                     if local_ok:
                         decision.active_or_alive = True
+                        mapping.publication_result = _make_publication_result("success")
                         mapping_counters["switches_published"] += 1
                     else:
-                        decision = _mark_local_availability_publish_failed(decision, mapping)
-                        publications[eq_id] = decision
+                        mapping.publication_result = _make_publication_result(
+                            "failed", "local_availability_publish_failed"
+                        )
+            else:
+                mapping.publication_result = _make_publication_result("not_attempted")
+            mapping.pipeline_step_reached = 5
             if not decision.active_or_alive:
                 mapping_counters["switches_skipped"] += 1
 
@@ -1421,8 +1435,18 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     }
     
     # Validation du statut global de l'operation de synchronisation
+    # Story 5.2 PE : lire le résultat technique depuis publication_result (sous-bloc étape 5)
+    def _publication_has_technical_failure(dec: PublicationDecision) -> bool:
+        mr = getattr(dec, "mapping_result", None)
+        if mr is not None:
+            pr = getattr(mr, "publication_result", None)
+            if pr is not None:
+                return pr.status == "failed"
+        # Aucun publication_result → pas de failure technique connue (Story 5.2 PE strict)
+        return False
+
     _has_failures = any(
-        d.reason in ("discovery_publish_failed", "local_availability_publish_failed")
+        _publication_has_technical_failure(d)
         for d in request.app["publications"].values()
     )
     _has_deferred = bool(request.app.get("pending_discovery_unpublish") or request.app.get("pending_local_availability_cleanup"))
@@ -1647,16 +1671,23 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
                 "used_type": cmd.generic_type,  # configuré = utilisé en V1
             })
 
-    # Section 3 — Logique de décision (taxonomie fermée)
+    # Section 3 — Logique de décision (taxonomie fermée, Story 5.2 PE)
+    # Source canonique : publication_decision_ref (étape 4) quand disponible,
+    # fallback sur pub_decision pour compatibilité backward (tests directs, action handler).
+    canonical_decision = (
+        getattr(map_result, "publication_decision_ref", None) if map_result else None
+    ) or pub_decision
+    canonical_reason = getattr(canonical_decision, "reason", top_reason_code) if canonical_decision else top_reason_code
+
     if status == "Publié":
         closed_reason = "published"
     else:
-        mapped = _CLOSED_REASON_MAP.get(top_reason_code)
+        mapped = _CLOSED_REASON_MAP.get(canonical_reason)
         if mapped is not None:
             closed_reason = mapped
         elif map_result is not None:
-            # Mapping trouvé mais publication bloquée par une cause non reconnue
-            closed_reason = "discovery_publish_failed"
+            # Mapping trouvé mais décision non reconnue — conserver la cause canonique telle quelle
+            closed_reason = canonical_reason
         else:
             # Aucun mapping, cause non reconnue → fallback conservateur
             closed_reason = "no_commands"
@@ -1674,18 +1705,24 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
         "reason_code": closed_reason,
     }
 
-    # Section 4 — Résultat de publication
-    if status == "Publié":
+    # Section 4 — Résultat de publication (Story 5.2 PE : lire depuis publication_result si disponible)
+    pub_result_obj = getattr(map_result, "publication_result", None) if map_result else None
+    if pub_result_obj is not None:
+        pub_result = pub_result_obj.status  # "success" | "failed" | "not_attempted"
+    elif status == "Publié":
         pub_result = "success"
     elif closed_reason == "discovery_publish_failed":
         pub_result = "failed"
     else:
         pub_result = "not_attempted"
 
-    publication_trace = {
+    publication_trace: Dict[str, Any] = {
         "last_discovery_publish_result": pub_result,
         "last_publish_timestamp": None,  # non persisté en V1
     }
+    # Exposer le technical_reason_code quand disponible (Story 5.2 PE — dimension technique)
+    if pub_result_obj is not None and pub_result_obj.technical_reason_code:
+        publication_trace["technical_reason_code"] = pub_result_obj.technical_reason_code
 
     return {
         "observed_commands": observed_commands,
@@ -1693,6 +1730,20 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
         "decision_trace": decision_trace,
         "publication_trace": publication_trace,
     }
+
+
+def _get_technical_publication_failure_reason(
+    map_result: Optional[MappingResult],
+    pub_decision: Optional[PublicationDecision],
+) -> Optional[str]:
+    """Return a technical publication failure reason when stage 5 failed."""
+    pub_result_obj = getattr(map_result, "publication_result", None) if map_result else None
+    if pub_result_obj is not None and pub_result_obj.status == "failed":
+        return pub_result_obj.technical_reason_code or "discovery_publish_failed"
+    # Legacy fallback: old runtime states may only carry infra reason on decision.
+    if pub_decision and pub_decision.reason in ("discovery_publish_failed", "local_availability_publish_failed"):
+        return pub_decision.reason
+    return None
 
 
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
@@ -1782,7 +1833,20 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                         status = get_primary_status(reason_code)
                     else:
                         if pub_decision:
-                            reason_code = pub_decision.reason
+                            # Story 5.2 PE : reason_code = cause décisionnelle canonique (étapes 1–4)
+                            # Le résultat technique (étape 5) ne remplace jamais la cause principale.
+                            canonical_dec = (
+                                getattr(map_result, "publication_decision_ref", None) if map_result else None
+                            ) or pub_decision
+                            reason_code = canonical_dec.reason
+                            # En diagnostic global, un échec technique de l'étape 5 reste prioritaire
+                            # pour la remédiation opératoire (infra MQTT).
+                            technical_failure_reason = _get_technical_publication_failure_reason(
+                                map_result,
+                                pub_decision,
+                            )
+                            if technical_failure_reason:
+                                reason_code = technical_failure_reason
                         status = get_primary_status(reason_code)
                 else:
                     reason_code = "no_mapping"
