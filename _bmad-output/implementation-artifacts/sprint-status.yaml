@@ -41,12 +41,12 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-6 (17 stories, toutes backlog)
+#   Epics: pe-epic-1 à pe-epic-6 (17 stories — pe-epic-1/2/3/4 done, pe-epic-5 in-progress, pe-epic-6 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-17'  # micro-closeout statutaire: story PE 5.2 alignée done
+last_updated: '2026-04-18'  # repair tracker: pe-epic-4 done, pe-epic-5 in-progress, 4-4 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -140,14 +140,14 @@ development_status:
   3-3-gouvernance-d-ouverture-un-composant-validable-peut-etre-ajoute-a-product-scope-si-et-seulement-si-les-3-conditions-de-fr40-sont-satisfaites-dans-le-meme-increment: done  # code review PASS (0 finding), 365/365 tests, 0 régression
   pe-epic-3-retrospective: done  # retro 2026-04-13 — 5 action items, AI-1 prérequis absolu avant pe-epic-4
 
-  pe-epic-4: in-progress  # démarré 2026-04-14
+  pe-epic-4: done  # 4/4 stories done 2026-04-17 (4-1, 4-2, 4-3, 4-4)
   4-1-etape-4-decide-publication-arbitre-la-publication-a-partir-de-la-projection-validee-de-la-politique-de-confiance-et-du-product-scope: done  # code review APPROVE 2026-04-14 — 0 finding HIGH/MEDIUM, 19/19 tests, 384/384 non-régression
   4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: done  # PR #86 squash merge 53d1c34 — 175 JS + 928 pytest PASS, gate terrain PASS via fixture contrôlée
   4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: done  # code review APPROVE 2026-04-15 — 0 finding HIGH/MEDIUM, 31/31 tests, 940/940 non-régression
-  4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: backlog
+  4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: done  # Status: done — stories/4-4-suite-de-tests-....md
   pe-epic-4-retrospective: optional
 
-  pe-epic-5: backlog  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories)
+  pe-epic-5: in-progress  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories — 5-2 done, 5-1 backlog)
   5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: backlog
   5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
   pe-epic-5-retrospective: optional
