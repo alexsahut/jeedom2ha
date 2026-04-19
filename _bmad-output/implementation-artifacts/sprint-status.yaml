@@ -145,10 +145,10 @@ development_status:
   4-2-diagnostic-de-la-decision-l-utilisateur-distingue-un-refus-de-politique-produit-d-un-refus-de-gouvernance-d-ouverture: done  # PR #86 squash merge 53d1c34 — 175 JS + 928 pytest PASS, gate terrain PASS via fixture contrôlée
   4-3-migration-additive-des-reason-codes-les-codes-de-classe-2-et-3-s-ajoutent-sans-regression-sur-les-codes-existants-ni-sur-le-contrat-4d: done  # code review APPROVE 2026-04-15 — 0 finding HIGH/MEDIUM, 31/31 tests, 940/940 non-régression
   4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: done  # Status: done — stories/4-4-suite-de-tests-....md
-  pe-epic-4-retrospective: optional
+  pe-epic-4-retrospective: done  # retro 2026-04-15 — restaurée avec PE 5.1 depuis stash f55973a
 
   pe-epic-5: in-progress  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories — 5-2 done, 5-1 backlog)
-  5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: backlog
+  5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: done  # PR #95 squash merge d3da08c — 426/426 PASS, orchestration centralisée étapes 3+4
   5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
   pe-epic-5-retrospective: optional
 
