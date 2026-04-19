@@ -165,12 +165,12 @@ def test_component_not_in_scope():
 
 
 def test_low_confidence_sure_only_policy():
-    """confidence=probable, policy=sure_only → should_publish=False, reason="low_confidence"."""
+    """confidence=probable, policy=sure_only → should_publish=False, reason="probable_skipped"."""
     mapping = _make_mapping(ha_entity_type="light", confidence="probable")
     result = decide_publication(mapping, confidence_policy="sure_only")
 
     assert result.should_publish is False
-    assert result.reason == "low_confidence"
+    assert result.reason == "probable_skipped"
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@ from models.availability import (
 )
 from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
+from models.decide_publication import decide_publication
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
@@ -42,6 +43,7 @@ from mapping.cover import CoverMapper
 from mapping.switch import SwitchMapper
 from discovery.publisher import DiscoveryPublisher
 from cache.disk_cache import save_publications_cache
+from validation.ha_component_registry import validate_projection
 
 # Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
 _HTTP_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1052,6 +1054,16 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publisher=publisher,
             pending_discovery_unpublish=pending_discovery_unpublish,
         )
+        # Pipeline canonique Story 5.1 :
+        # étape 3 (validate_projection) puis étape 4 (decide_publication),
+        # sans court-circuit pour les équipements éligibles mappés.
+        projection_validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
+        mapping.projection_validity = projection_validity
+        mapping.pipeline_step_reached = 3
+        decision = decide_publication(mapping, confidence_policy=confidence_policy)
+        decision.mapping_result = mapping
+        mapping.publication_decision_ref = decision
+        mapping.pipeline_step_reached = 4
 
         if mapping.ha_entity_type == "light":
             # Count by confidence
@@ -1062,7 +1074,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["lights_ambiguous"] += 1
             
-            decision = light_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
@@ -1115,7 +1126,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["covers_ambiguous"] += 1
             
-            decision = cover_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False
@@ -1167,7 +1177,6 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             elif mapping.confidence == "ambiguous":
                 mapping_counters["switches_ambiguous"] += 1
 
-            decision = switch_mapper.decide_publication(mapping, confidence_policy=confidence_policy)
             config_published = False
             decision.state_topic = _resolve_state_topic(mapping)
             decision.active_or_alive = False

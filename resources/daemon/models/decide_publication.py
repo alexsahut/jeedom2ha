@@ -86,7 +86,7 @@ def decide_publication(
 
     # Niveau 4 — Cause étape 4b : confiance conforme à la politique ?
     if confidence_policy == "sure_only" and mapping.confidence == "probable":
-        return PublicationDecision(should_publish=False, reason="low_confidence")
+        return PublicationDecision(should_publish=False, reason="probable_skipped")
 
     # Niveau 5 — Nominal : publication autorisée
     return PublicationDecision(should_publish=True, reason=mapping.confidence)
