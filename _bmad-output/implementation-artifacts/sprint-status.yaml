@@ -41,12 +41,12 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-6 (17 stories — pe-epic-1/2/3/4 done, pe-epic-5 in-progress, pe-epic-6 backlog)
+#   Epics: pe-epic-1 à pe-epic-6 (17 stories — pe-epic-1/2/3/4/5 done, pe-epic-6 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-18'  # repair tracker: pe-epic-4 done, pe-epic-5 in-progress, 4-4 done
+last_updated: '2026-04-19'  # gate terrain pe-epic-5 leve avec niveau de preuve realiste ; readiness pe-epic-6 OK
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -147,12 +147,12 @@ development_status:
   4-4-suite-de-tests-de-non-regression-des-5-etapes-le-mainteneur-peut-tester-chaque-etape-du-pipeline-en-isolation: done  # Status: done — stories/4-4-suite-de-tests-....md
   pe-epic-4-retrospective: done  # retro 2026-04-15 — restaurée avec PE 5.1 depuis stash f55973a
 
-  pe-epic-5: in-progress  # Projections autorisées publiées vers Home Assistant avec résultat traçable (2 stories — 5-2 done, 5-1 backlog)
+  pe-epic-5: done  # 2/2 stories done ; gate terrain leve le 2026-04-19 avec niveau de preuve realiste (dataset contraint)
   5-1-orchestration-des-5-etapes-le-sync-handler-enchaine-eligibilite-mapping-validation-ha-decision-publication-sans-court-circuit: done  # PR #95 squash merge d3da08c — 426/426 PASS, orchestration centralisée étapes 3+4
   5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
-  pe-epic-5-retrospective: optional
+  pe-epic-5-retrospective: done  # retro 2026-04-19 — P-1/P-2/P-3/P-4 OK ; terrain pe-epic-5 valide ; gate pe-epic-6 leve
 
-  pe-epic-6: backlog  # Diagnostic explicable et actionnable pour chaque équipement (3 stories)
+  pe-epic-6: backlog  # Diagnostic explicable et actionnable pour chaque équipement (3 stories) ; readiness OK le 2026-04-19 ; GO create-story 6-1
   6-1-diagnostic-par-etape-de-pipeline-l-utilisateur-consulte-pour-chaque-equipement-l-etape-de-blocage-et-la-cause-principale-canonique-unique-ordonnee-par-pipeline: backlog
   6-2-enrichissement-additif-du-contrat-4d-projection-validity-est-ajoute-comme-sous-bloc-pur-sans-modifier-les-champs-existants: backlog
   6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: backlog
