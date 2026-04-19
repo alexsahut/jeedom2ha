@@ -557,7 +557,7 @@ def test_decision_trace_reason_code_is_canonical_not_technical_when_ambiguous_an
     from models.taxonomy import get_primary_status
     status = get_primary_status("ambiguous_skipped")  # → "ambiguous"
 
-    result = _build_traceability(eq, mr, pd, status, "ambiguous_skipped")
+    result = _build_traceability(eq, mr, status, "ambiguous_skipped")
 
     decision_trace = result["decision_trace"]
     publication_trace = result["publication_trace"]

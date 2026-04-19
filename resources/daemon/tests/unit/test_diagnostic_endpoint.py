@@ -8,7 +8,7 @@ from transport.http_server import create_app
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd, EligibilityResult
 )
-from models.mapping import MappingResult, PublicationDecision, LightCapabilities
+from models.mapping import MappingResult, PublicationDecision, PublicationResult, LightCapabilities
 
 @pytest.fixture
 def app():
@@ -733,7 +733,8 @@ async def test_diagnostics_infra_family_doctrine(aiohttp_client):
 _CLOSED_REASON_CODES = {
     "published", "excluded", "disabled_eqlogic", "no_commands",
     "ambiguous_skipped", "no_generic_type_configured",
-    "no_supported_generic_type", "discovery_publish_failed",
+    "no_supported_generic_type",
+    # "discovery_publish_failed" retiré : code technique step-5, interdit dans decision_trace (I7)
 }
 
 
@@ -941,7 +942,13 @@ async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
 
 
 async def test_diagnostics_traceability_discovery_failed(aiohttp_client):
-    """AC1 — publication_trace.last_discovery_publish_result='failed' quand discovery_publish_failed."""
+    """AC1/I7 — step-5 failure : publication_trace porte le résultat technique, decision_trace reste canonique.
+
+    Étape 4 décide should_publish=True (reason='sure').
+    Étape 5 échoue (discovery_publish_failed).
+    Invariant I7 : decision_trace.reason_code = 'published' (step-4), jamais 'discovery_publish_failed'.
+    technical_reason_code visible dans publication_trace uniquement.
+    """
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -961,27 +968,37 @@ async def test_diagnostics_traceability_discovery_failed(aiohttp_client):
         commands={"LIGHT_ON": cmd},
         capabilities=LightCapabilities(has_on_off=True),
     )
+    pub_decision = PublicationDecision(
+        should_publish=True,
+        reason="sure",
+        mapping_result=mapping_res,
+        active_or_alive=False,
+    )
+    mapping_res.publication_decision_ref = pub_decision
+    mapping_res.publication_result = PublicationResult(
+        status="failed",
+        technical_reason_code="discovery_publish_failed",
+    )
     app["topology"] = snapshot
     app["eligibility"] = {802: EligibilityResult(is_eligible=True, reason_code="eligible")}
     app["mappings"] = {802: mapping_res}
-    app["publications"] = {
-        802: PublicationDecision(
-            should_publish=False,
-            reason="discovery_publish_failed",
-            mapping_result=mapping_res,
-            active_or_alive=False,
-        )
-    }
+    app["publications"] = {802: pub_decision}
 
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 802)
 
+    # I7 — cause canonique (step 4) dans decision_trace, jamais le code technique step-5
+    dt = eq["traceability"]["decision_trace"]
+    assert dt["reason_code"] == "published", (
+        f"VIOLATION I7 : decision_trace.reason_code={dt['reason_code']!r}, attendu 'published'"
+    )
+    assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+    # Résultat technique step-5 dans publication_trace uniquement
     pt = eq["traceability"]["publication_trace"]
     assert pt["last_discovery_publish_result"] == "failed"
-    dt = eq["traceability"]["decision_trace"]
-    assert dt["reason_code"] == "discovery_publish_failed"
-    assert dt["reason_code"] in _CLOSED_REASON_CODES
+    assert pt.get("technical_reason_code") == "discovery_publish_failed"
 
 
 # ---------------------------------------------------------------------------
@@ -1014,7 +1031,13 @@ async def test_diagnostics_reason_code_disabled_legacy(aiohttp_client):
 
 
 async def test_diagnostics_reason_code_local_availability_publish_failed(aiohttp_client):
-    """AC2 — 'local_availability_publish_failed' → 'discovery_publish_failed' dans decision_trace."""
+    """AC2/I7 — échec availability step-5 : publication_trace porte le code technique, decision_trace reste canonique.
+
+    Étape 4 décide should_publish=True (reason='sure').
+    Étape 5 échoue sur le topic availability (local_availability_publish_failed).
+    Invariant I7 : decision_trace.reason_code = 'published' (step-4), jamais le code technique step-5.
+    Le code technique reste visible dans publication_trace.technical_reason_code uniquement.
+    """
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -1034,29 +1057,37 @@ async def test_diagnostics_reason_code_local_availability_publish_failed(aiohttp
         commands={"LIGHT_ON": cmd},
         capabilities=LightCapabilities(has_on_off=True),
     )
+    pub_decision = PublicationDecision(
+        should_publish=True,
+        reason="sure",
+        mapping_result=mapping_res,
+        active_or_alive=False,
+    )
+    mapping_res.publication_decision_ref = pub_decision
+    mapping_res.publication_result = PublicationResult(
+        status="failed",
+        technical_reason_code="local_availability_publish_failed",
+    )
     app["topology"] = snapshot
     app["eligibility"] = {901: EligibilityResult(is_eligible=True, reason_code="eligible")}
     app["mappings"] = {901: mapping_res}
-    app["publications"] = {
-        901: PublicationDecision(
-            should_publish=False,
-            reason="local_availability_publish_failed",
-            mapping_result=mapping_res,
-            active_or_alive=False,
-        )
-    }
+    app["publications"] = {901: pub_decision}
 
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 901)
 
-    assert eq["reason_code"] == "local_availability_publish_failed"  # top-level inchangé
+    # I7 — cause canonique (step 4) dans decision_trace, jamais le code technique step-5
     dt = eq["traceability"]["decision_trace"]
-    assert dt["reason_code"] == "discovery_publish_failed"  # normalisé dans la famille infra
+    assert dt["reason_code"] == "published", (
+        f"VIOLATION I7 : decision_trace.reason_code={dt['reason_code']!r}, attendu 'published'"
+    )
     assert dt["reason_code"] in _CLOSED_REASON_CODES
-    # H2 review fix: publication_trace cohérent avec decision_trace
+
+    # Résultat technique step-5 dans publication_trace uniquement
     pt = eq["traceability"]["publication_trace"]
     assert pt["last_discovery_publish_result"] == "failed"
+    assert pt.get("technical_reason_code") == "local_availability_publish_failed"
 
 
 async def test_diagnostics_reason_code_unknown_fallback(aiohttp_client):

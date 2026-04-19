@@ -1616,9 +1616,11 @@ _STATUS_CODE_MAP: dict = {
 }
 
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
-# Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
-#                confidence_policy_skipped, no_generic_type_configured,
-#                no_supported_generic_type, discovery_publish_failed
+# Liste fermée — codes décisionnels étapes 1-4 uniquement.
+# Les codes techniques de l'étape 5 (discovery_publish_failed, local_availability_publish_failed)
+# sont interdits ici : ils n'appartiennent qu'à publication_trace (invariant I7).
+# Valeurs de sortie : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
+#                    confidence_policy_skipped, no_generic_type_configured, no_supported_generic_type
 _CLOSED_REASON_MAP: dict = {
     # Eligibility — codes normalisés
     "excluded_eqlogic": "excluded",
@@ -1637,8 +1639,6 @@ _CLOSED_REASON_MAP: dict = {
     "probable_skipped": "confidence_policy_skipped",  # Story 4.3 — bloqué par politique de confiance sure_only
     "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
     "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
-    "discovery_publish_failed": "discovery_publish_failed",
-    "local_availability_publish_failed": "discovery_publish_failed",  # famille infra
     # États publiés (garde-fou si status check ne les attrape pas)
     "sure_mapping": "published",
     "sure": "published",
@@ -1658,10 +1658,16 @@ _CONFIDENCE_CLOSED: dict = {
 }
 
 
-def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_code: str) -> dict:
+def _build_traceability(eq, map_result, status: str, top_reason_code: str) -> dict:
     """Construit l'objet traceability complet pour un équipement (AC1).
 
     Politique de présence : tableaux peuvent être vides [], objets jamais omis.
+
+    Source unique de la cause canonique : map_result.publication_decision_ref (étape 4).
+    top_reason_code est un fallback transitoire — uniquement si publication_decision_ref est
+    absent (objets antérieurs à story 5.2 sans step-4 explicite). Il ne constitue pas une
+    seconde source de vérité canonique. Invariant I7 : un code technique de l'étape 5 ne peut
+    jamais atteindre decision_trace.reason_code via canonical_reason.
     """
     # Section 1 — Commandes observées
     observed_commands = [
@@ -1680,13 +1686,12 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
                 "used_type": cmd.generic_type,  # configuré = utilisé en V1
             })
 
-    # Section 3 — Logique de décision (taxonomie fermée, Story 5.2 PE)
-    # Source canonique : publication_decision_ref (étape 4) quand disponible,
-    # fallback sur pub_decision pour compatibilité backward (tests directs, action handler).
-    canonical_decision = (
-        getattr(map_result, "publication_decision_ref", None) if map_result else None
-    ) or pub_decision
-    canonical_reason = getattr(canonical_decision, "reason", top_reason_code) if canonical_decision else top_reason_code
+    # Section 3 — Logique de décision (taxonomie fermée)
+    # Source canonique exclusive : map_result.publication_decision_ref (étape 4).
+    # top_reason_code sert de fallback uniquement si publication_decision_ref est absent
+    # (compatibilité transitoire — état legacy sans step-4 explicite, pré-story-5.2).
+    canonical_decision = map_result.publication_decision_ref if map_result else None
+    canonical_reason = canonical_decision.reason if canonical_decision else top_reason_code
 
     if status == "Publié":
         closed_reason = "published"
@@ -1892,7 +1897,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         )
 
         # AC1 — Traceability: chaîne de décision complète
-        traceability = _build_traceability(eq, map_result, pub_decision, status, reason_code)
+        traceability = _build_traceability(eq, map_result, status, reason_code)
 
         # Story 4.4 — code machine stable pour l'export de diagnostic
         status_code = _STATUS_CODE_MAP.get(status, "not_published")
