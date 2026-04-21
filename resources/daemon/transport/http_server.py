@@ -1755,6 +1755,33 @@ def _get_technical_publication_failure_reason(
     return None
 
 
+def _compute_pipeline_step_visible(el_result, map_result, pub_decision) -> int:
+    """Retourne l'étape visible du pipeline canonique (1-5) pour un équipement.
+
+    Ordre de priorité canonique : 1 → 2 → 3 → 4 → 5.
+    Une étape aval ne remplace jamais une étape amont comme point de blocage.
+
+    - 1 : inéligibilité (el_result absent ou is_eligible=False)
+    - 2 : éligible mais pas de mapping
+    - 3 : projection HA invalide (projection_validity.is_valid=False)
+    - 4 : décision de publication bloquée (should_publish=False)
+    - 5 : publication tentée (succès ou échec technique)
+
+    I7 : technical_reason_code (étape 5) n'influence jamais cette valeur.
+    """
+    if el_result is None or not el_result.is_eligible:
+        return 1
+    if map_result is None:
+        return 2
+    pv = map_result.projection_validity
+    if pv is not None and pv.is_valid is False:
+        return 3
+    canonical_dec = getattr(map_result, "publication_decision_ref", None) or pub_decision
+    if canonical_dec is None or not canonical_dec.should_publish:
+        return 4
+    return 5
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -1961,6 +1988,9 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "detected_generic_types": detected_generic_types,
             "v1_compatibility": v1_compatibility,
             "traceability": traceability,
+            # Story 6.1 — Étape visible du pipeline (1-5), calculée backend-first.
+            # Lecture stricte côté frontend — ne jamais recalculer localement.
+            "pipeline_step_visible": _compute_pipeline_step_visible(el_result, map_result, pub_decision),
         }
         equipments.append(eq_dict)
         room_key = (eq.object_id, object_name)

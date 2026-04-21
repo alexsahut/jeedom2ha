@@ -863,12 +863,25 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       };
 
       // Story 4.6 — AC 2 : badge Écart du diagnostic (lecture stricte backend).
-      var getEcartBadge = (typeof Jeedom2haDiagnosticHelpers !== 'undefined')
+      var getEcartBadge = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
+        && Jeedom2haDiagnosticHelpers
+        && typeof Jeedom2haDiagnosticHelpers.getEcartBadgeHtml === 'function')
         ? function(ecart) { return Jeedom2haDiagnosticHelpers.getEcartBadgeHtml(ecart); }
         : function(ecart) {
             if (ecart === true) return '<span class="label label-warning">Ecart</span>';
             if (ecart === false) return '<span class="label label-success">Aligne</span>';
             return '<span class="label label-default">&mdash;</span>';
+          };
+
+      // Story 6.1 — AC2 / I7 : source canonique centralisée de la cause (avec fallback sûr).
+      var getCanonicalDiagnosticCause = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
+        && Jeedom2haDiagnosticHelpers
+        && typeof Jeedom2haDiagnosticHelpers.getCanonicalDiagnosticCause === 'function')
+        ? function(eq) { return Jeedom2haDiagnosticHelpers.getCanonicalDiagnosticCause(eq); }
+        : function(eq) {
+            var tr = (eq && eq.traceability) ? eq.traceability : {};
+            var dt = tr.decision_trace || {};
+            return dt.reason_code || '';
           };
 
       // AC4 — Reason codes de typage → lien contextualisé vers #commandtab
@@ -879,12 +892,24 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
       };
 
       // AC3 — Accordéon homogène en 5 sections fixes pour TOUS les équipements
+      // Story 6.1 — Labels canoniques des étapes du pipeline (lecture backend uniquement).
+      var PIPELINE_STEP_LABELS = {
+        1: '{{Éligibilité}}',
+        2: '{{Mapping}}',
+        3: '{{Validation HA}}',
+        4: '{{Décision}}',
+        5: '{{Publication}}'
+      };
+
       var buildDetailRow = function(eq) {
         var tr = eq.traceability || {};
         var observedCmds = tr.observed_commands || [];
         var typingTrace = tr.typing_trace || [];
         var dt = tr.decision_trace || {};
         var pt = tr.publication_trace || {};
+
+        // Story 6.1 — Étape visible fournie par le backend (lecture stricte — jamais déduite localement).
+        var pipelineStep = typeof eq.pipeline_step_visible === 'number' ? eq.pipeline_step_visible : null;
 
         var closedReason = dt.reason_code || '';
         var isPublished = (eq.status === 'Publié');
@@ -894,6 +919,27 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         // Use !important on TR and TD to resist Jeedom/Bootstrap hover overrides
         var html = '<tr class="diag-detail-row" style="display:none;background:transparent!important;">';
         html += '<td colspan="6" style="background:transparent!important;padding:12px 20px;border-top:none;">';
+
+        // --- Story 6.1 : Étape pipeline ---
+        if (pipelineStep !== null) {
+          html += '<div style="margin-bottom:12px;padding:8px 10px;background:#f8f9fa;border-radius:4px;border:1px solid #e9ecef;">';
+          html += '<strong style="font-size:0.9em;">{{Étape pipeline}}</strong>';
+          html += '<div style="margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:0;">';
+          for (var step = 1; step <= 5; step++) {
+            var stepLabel = PIPELINE_STEP_LABELS[step] || String(step);
+            var isActive = (step === pipelineStep);
+            var bg = isActive ? '#0066cc' : '#e9ecef';
+            var color = isActive ? '#fff' : '#888';
+            var fw = isActive ? '600' : '400';
+            var border = isActive ? '1px solid #0055b3' : '1px solid #ced4da';
+            html += '<span style="background:' + bg + ';color:' + color + ';font-weight:' + fw + ';border:' + border + ';padding:2px 8px;font-size:0.8em;border-radius:3px;">' + step + ' — ' + stepLabel + '</span>';
+            if (step < 5) {
+              html += '<span style="color:#ccc;margin:0 2px;font-size:0.8em;">\u2192</span>';
+            }
+          }
+          html += '</div>';
+          html += '</div>';
+        }
 
         // --- Section 1 : Commandes observées ---
         html += '<div style="margin-bottom:10px;"><strong>{{Commandes observées}}</strong>';
@@ -992,16 +1038,45 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         html += '</div>';
 
         // --- Section 4 : Résultat de publication ---
-        html += '<div style="margin-bottom:10px;"><strong>{{Résultat de publication}}</strong> ';
+        // Story 6.1 AC4 — step 5 failed : deux blocs séparés Décision pipeline / Résultat technique.
         var pubResult = pt.last_discovery_publish_result || 'not_attempted';
-        if (pubResult === 'success') {
-          html += '<span class="label label-success">{{Succès}}</span>';
-        } else if (pubResult === 'failed') {
+        var isStep5Failed = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
+          && Jeedom2haDiagnosticHelpers
+          && typeof Jeedom2haDiagnosticHelpers.isStep5Failed === 'function')
+          ? Jeedom2haDiagnosticHelpers.isStep5Failed(pipelineStep, pubResult)
+          : (pipelineStep === 5 && pubResult === 'failed');
+
+        if (isStep5Failed) {
+          // Bloc A — Décision pipeline (cause canonique = décision positive)
+          html += '<div style="margin-bottom:6px;padding:8px 10px;background:#e8f5e9;border-radius:4px;border:1px solid #c8e6c9;">';
+          html += '<strong style="font-size:0.9em;color:#2e7d32;">{{Décision pipeline}}</strong> ';
+          html += '<span class="label label-success">{{Publiée}}</span>';
+          // I7 — cause canonique centralisée dans le helper (fallback local sûr si helper indisponible).
+          var canonicalReason = getCanonicalDiagnosticCause(eq);
+          if (canonicalReason) {
+            html += '<div style="margin-top:4px;font-size:0.85em;color:#555;">{{Cause canonique}}&nbsp;: <span style="font-family:monospace;">' + canonicalReason + '</span></div>';
+          }
+          html += '</div>';
+          // Bloc B — Résultat technique (échec MQTT étape 5)
+          html += '<div style="margin-bottom:10px;padding:8px 10px;background:#ffeaea;border-radius:4px;border:1px solid #ffcdd2;">';
+          html += '<strong style="font-size:0.9em;color:#c62828;">{{Résultat technique}}</strong> ';
           html += '<span class="label label-danger">{{Échec}}</span>';
+          var techCode = pt.technical_reason_code || '';
+          if (techCode) {
+            html += '<div style="margin-top:4px;font-size:0.85em;color:#555;">{{Code technique}}&nbsp;: <span style="font-family:monospace;">' + techCode + '</span></div>';
+          }
+          html += '</div>';
         } else {
-          html += '<span class="label label-default">{{Non tenté}}</span>';
+          html += '<div style="margin-bottom:10px;"><strong>{{Résultat de publication}}</strong> ';
+          if (pubResult === 'success') {
+            html += '<span class="label label-success">{{Succès}}</span>';
+          } else if (pubResult === 'failed') {
+            html += '<span class="label label-danger">{{Échec}}</span>';
+          } else {
+            html += '<span class="label label-default">{{Non tenté}}</span>';
+          }
+          html += '</div>';
         }
-        html += '</div>';
 
         // --- Section 5 : Action recommandée ---
         html += '<div><strong>{{Action recommandée}}</strong>';
