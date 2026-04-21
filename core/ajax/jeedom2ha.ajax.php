@@ -257,6 +257,8 @@ function _jeedom2ha_build_export_equipment(array $rawEq): array {
         'v1_compatibility'       => (bool)($rawEq['v1_compatibility'] ?? false),
         'detected_generic_types' => (array)($rawEq['detected_generic_types'] ?? []),
         'traceability'           => $rawEq['traceability'] ?? null,
+        // Story 6.1 — étape visible du pipeline (additif — ne supprime aucun champ existant)
+        'pipeline_step_visible'  => isset($rawEq['pipeline_step_visible']) ? (int)$rawEq['pipeline_step_visible'] : null,
         'matched_commands'       => _jeedom2ha_extract_commands($rawEq['matched_commands'] ?? []),
         'unmatched_commands'     => _jeedom2ha_extract_commands($rawEq['unmatched_commands'] ?? []),
     ];

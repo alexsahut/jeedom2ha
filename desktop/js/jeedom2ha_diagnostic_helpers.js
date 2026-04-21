@@ -102,6 +102,22 @@
     };
   }
 
+  // Story 6.1 — AC1/AC2/AC4 : détection du cas step 5 failed (deux blocs séparés).
+  // pipelineStepVisible : valeur entière fournie par le backend (jamais déduite localement).
+  // pubResult : traceability.publication_trace.last_discovery_publish_result.
+  function isStep5Failed(pipelineStepVisible, pubResult) {
+    return pipelineStepVisible === 5 && pubResult === 'failed';
+  }
+
+  // Story 6.1 — AC2 / I7 : source canonique de la cause dans le diagnostic.
+  // La cause canonique dérive EXCLUSIVEMENT de traceability.decision_trace.reason_code.
+  // Ne jamais retourner eq.reason_code ni publication_trace.technical_reason_code comme cause principale.
+  function getCanonicalDiagnosticCause(eq) {
+    var tr = (eq && eq.traceability) ? eq.traceability : {};
+    var dt = tr.decision_trace || {};
+    return dt.reason_code || '';
+  }
+
   return {
     filterInScopeEquipments: filterInScopeEquipments,
     getDiagnosticColumns: getDiagnosticColumns,
@@ -109,5 +125,7 @@
     findTargetEquipmentIndex: findTargetEquipmentIndex,
     getDiagnosticReasonLabel: getDiagnosticReasonLabel,
     resolveDiagnosticAction: resolveDiagnosticAction,
+    isStep5Failed: isStep5Failed,
+    getCanonicalDiagnosticCause: getCanonicalDiagnosticCause,
   };
 }));
