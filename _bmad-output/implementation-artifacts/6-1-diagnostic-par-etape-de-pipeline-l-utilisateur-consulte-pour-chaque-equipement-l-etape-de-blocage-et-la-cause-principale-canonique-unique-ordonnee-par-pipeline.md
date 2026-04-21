@@ -1,6 +1,6 @@
 # Story 6.1 : Diagnostic par étape de pipeline — l'utilisateur consulte pour chaque équipement l'étape de blocage et la cause principale canonique unique, ordonnée par pipeline
 
-Status: review
+Status: done
 
 Epic: `pe-epic-6` — Le diagnostic est explicable et actionnable
 
@@ -418,4 +418,4 @@ claude-sonnet-4-6 (Claude Code)
   - AC1/AC2/AC4/AC5/I7 validés ; AC3 couvert par stepper visible + tests automatisés
   - Simulation step 5 failed : bascule temporaire `mqttPort 1883 → 1884` via `config::save`, restart daemon, sync, observation deux blocs UI, restauration complète (`failed_publish=0` vérifié post-restore)
   - Observation UX non bloquante : libellé "Mapping ambigu" identique sur steps 3 et 4 → affinement à instruire en 6.2/6.3
-  - Verdict : **PASS** — story prête à passer `done`
+  - Verdict : **PASS** — story passée `done` après merge PR #98
