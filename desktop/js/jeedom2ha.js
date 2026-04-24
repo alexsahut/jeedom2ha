@@ -796,40 +796,15 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         return;
       }
       
-      var reasonLabels = {
-        // Codes de publication (état publié partiel)
-        'sure': 'Mapping identifié avec certitude (partiel)',
-        'probable': 'Mapping probable détecté',
-        // Couverture / scope
-        'ambiguous_skipped': 'Ambiguïté détectée (plusieurs types possibles)',
-        'no_mapping': 'Aucun mapping compatible trouvé',
-        'no_supported_generic_type': 'Type générique non supporté',
-        'no_generic_type_configured': 'Types génériques non configurés sur les commandes',
-        'probable_skipped': 'Confiance probable — politique de publication "sûr uniquement"',
-        // Configuration (décision utilisateur ou état Jeedom)
-        'no_commands': 'Équipement sans commandes exploitables',
-        'disabled_eqlogic': 'Équipement désactivé dans Jeedom',
-        'disabled': 'Équipement désactivé dans Jeedom',
-        'excluded_eqlogic': 'Exclu manuellement de la publication',
-        'excluded_by_user': 'Exclu manuellement par l\'utilisateur',
-        'excluded_plugin': 'Plugin source exclu de la publication',
-        'excluded_object': 'Pièce exclue de la publication',
-        'low_confidence': 'Confiance insuffisante pour la politique active',
-        'ha_component_not_in_product_scope': 'Composant Home Assistant non ouvert dans ce cycle',
-        // Infrastructure (pannes publiables — réservé au bandeau global et au résultat de publication)
-        'discovery_publish_failed': 'Échec de publication MQTT (infrastructure)',
-        'local_availability_publish_failed': 'Échec de publication de la disponibilité (infrastructure)'
-      };
-
       var getDiagnosticReasonLabel = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
         && Jeedom2haDiagnosticHelpers
         && typeof Jeedom2haDiagnosticHelpers.getDiagnosticReasonLabel === 'function')
-        ? function(eq) { return Jeedom2haDiagnosticHelpers.getDiagnosticReasonLabel(eq, reasonLabels); }
+        ? function(eq) { return Jeedom2haDiagnosticHelpers.getDiagnosticReasonLabel(eq); }
         : function(eq) {
             if (eq && typeof eq.cause_label === 'string' && eq.cause_label !== '') {
               return eq.cause_label;
             }
-            return (eq && eq.reason_code) ? (reasonLabels[eq.reason_code] || '') : '';
+            return '';
           };
 
       var resolveDiagnosticAction = (typeof Jeedom2haDiagnosticHelpers !== 'undefined'
@@ -839,9 +814,6 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         : function(eq) {
             if (eq && typeof eq.cause_action === 'string' && eq.cause_action !== '') {
               return { text: eq.cause_action, source: 'cause_action', showConfigLink: false };
-            }
-            if (eq && typeof eq.remediation === 'string' && eq.remediation !== '') {
-              return { text: eq.remediation, source: 'remediation', showConfigLink: true };
             }
             return { text: '', source: 'none', showConfigLink: false };
           };
@@ -884,13 +856,6 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             return dt.reason_code || '';
           };
 
-      // AC4 — Reason codes de typage → lien contextualisé vers #commandtab
-      var commandTabReasonCodes = {
-        'no_generic_type_configured': true,  // taxonomie fermée AC2
-        'ambiguous_skipped': true,
-        'no_supported_generic_type': true    // rétro-compat ancien backend
-      };
-
       // AC3 — Accordéon homogène en 5 sections fixes pour TOUS les équipements
       // Story 6.1 — Labels canoniques des étapes du pipeline (lecture backend uniquement).
       var PIPELINE_STEP_LABELS = {
@@ -911,10 +876,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         // Story 6.1 — Étape visible fournie par le backend (lecture stricte — jamais déduite localement).
         var pipelineStep = typeof eq.pipeline_step_visible === 'number' ? eq.pipeline_step_visible : null;
 
-        var closedReason = dt.reason_code || '';
         var isPublished = (eq.status === 'Publié');
-        // AC4: lien #commandtab pour causes de typage (taxonomie fermée ou legacy)
-        var linkToCommandTab = commandTabReasonCodes[closedReason] || commandTabReasonCodes[eq.reason_code];
 
         // Use !important on TR and TD to resist Jeedom/Bootstrap hover overrides
         var html = '<tr class="diag-detail-row" style="display:none;background:transparent!important;">';
@@ -1087,14 +1049,8 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           if (resolvedAction.text) {
             html += '<div style="margin-top:4px;">' + resolvedAction.text + '</div>';
           }
-          if (resolvedAction.showConfigLink && eq.eq_type_name) {
-            var href = linkToCommandTab
-              ? 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id + '#commandtab'
-              : 'index.php?v=d&m=' + eq.eq_type_name + '&p=' + eq.eq_type_name + '&id=' + eq.eq_id;
-            html += '<div style="margin-top:6px;"><a href="' + href + '" target="_blank" class="btn btn-xs btn-default">';
-            html += '<i class="fas fa-external-link-alt"></i> {{Configurer dans Jeedom}}</a></div>';
-          } else if (!resolvedAction.text) {
-            html += '<div style="margin-top:4px;color:#aaa;font-style:italic;">{{Aucune action disponible.}}</div>';
+          if (!resolvedAction.text) {
+            html += '<div style="margin-top:4px;color:#aaa;font-style:italic;">Aucune action utilisateur directe possible.</div>';
           }
         }
         html += '</div>';

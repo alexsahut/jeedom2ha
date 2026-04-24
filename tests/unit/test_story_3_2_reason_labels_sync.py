@@ -1,77 +1,23 @@
-# AI-3 guard layer 4 — Story 3.2. Complétude reasonLabels JS. Ne pas affaiblir ni supprimer. Permanent Epic 3+.
-"""Story 3.2 — Garde-fou AI-3 couche 4 : complétude du bloc reasonLabels dans jeedom2ha.js.
+"""Story 6.2 — Guardrail frontend backend-first.
 
-AC 4 — Les gardes-fous AI-3 couches 3 et 4 sont opérationnels.
-AI-3 — Synchronisation backend/frontend des reason_code gouvernés.
-AI-7 — Vérification intégrée à la code review.
-
-Ce test vérifie :
-  1. Le bloc reasonLabels est extractible depuis jeedom2ha.js via regex.
-  2. Chaque code de REASON_CODE_TO_PRIMARY_STATUS a une clé dans ce bloc.
-
-Ne pas affaiblir ni supprimer ce test. Permanent pour Epic 3+.
+Le diagnostic ne doit plus maintenir de mapping local reason_code -> libellé.
+La surface lit exclusivement cause_label/cause_action fournis par le backend.
 """
-import re
-import pathlib
 
-import pytest
-
-from models.taxonomy import REASON_CODE_TO_PRIMARY_STATUS
+from pathlib import Path
 
 
-_JS_FILE = pathlib.Path(__file__).parents[2] / "desktop" / "js" / "jeedom2ha.js"
-
-# Regex pour extraire le bloc reasonLabels (var/let/const, DOTALL pour multilignes)
-_REASON_LABELS_PATTERN = re.compile(
-    r"(?:var|let|const)\s+reasonLabels\s*=\s*\{.*?\};",
-    re.DOTALL,
-)
+_JS_FILE = Path(__file__).parents[2] / "desktop" / "js" / "jeedom2ha.js"
 
 
-@pytest.fixture(scope="module")
-def js_content():
-    return _JS_FILE.read_text(encoding="utf-8")
-
-
-@pytest.fixture(scope="module")
-def reason_labels_block(js_content):
-    """Extrait le bloc reasonLabels depuis jeedom2ha.js.
-
-    Échec ici → le bloc n'est plus localisable, vérifier la structure du fichier JS.
-    """
-    m = _REASON_LABELS_PATTERN.search(js_content)
-    if not m:
-        raise AssertionError(
-            "reasonLabels introuvable dans jeedom2ha.js. "
-            "Le bloc doit être déclaré avec var/let/const reasonLabels = {...};"
-        )
-    return m.group(0)
-
-
-# ---------------------------------------------------------------------------
-# Couche 4.1 — Le bloc reasonLabels est extractible
-# ---------------------------------------------------------------------------
-
-
-def test_reason_labels_block_found(reason_labels_block):
-    """Le bloc reasonLabels doit être localisable via regex dans jeedom2ha.js."""
-    assert len(reason_labels_block) > 0
-
-
-# ---------------------------------------------------------------------------
-# Couche 4.2 — Chaque code du mapping a un label dans le bloc
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("reason_code", list(REASON_CODE_TO_PRIMARY_STATUS.keys()))
-def test_reason_code_has_label_in_js(reason_code, reason_labels_block):
-    """Chaque code de REASON_CODE_TO_PRIMARY_STATUS doit avoir une clé dans le bloc reasonLabels.
-
-    Échec → ajouter l'entrée manquante dans le bloc reasonLabels de jeedom2ha.js.
-    """
-    # On cherche la clé sous forme 'code' ou "code" dans le bloc JS
-    pattern = re.compile(r"""['"]""" + re.escape(reason_code) + r"""['"]""")
-    assert pattern.search(reason_labels_block), (
-        f"Le reason_code '{reason_code}' est absent du bloc reasonLabels dans jeedom2ha.js. "
-        f"Ajouter une entrée dans le bloc reasonLabels."
+def test_no_reason_labels_mapping_in_diagnostic_js():
+    source = _JS_FILE.read_text(encoding="utf-8")
+    assert "reasonLabels" not in source, (
+        "Le diagnostic frontend ne doit plus contenir de table locale reason_code -> libellé."
     )
+
+
+def test_diagnostic_reads_backend_cause_fields():
+    source = _JS_FILE.read_text(encoding="utf-8")
+    assert "eq.cause_label" in source
+    assert "eq.cause_action" in source

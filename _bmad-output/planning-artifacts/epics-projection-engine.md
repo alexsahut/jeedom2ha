@@ -340,6 +340,26 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 
 ---
 
+### Epic 7 — L'actionnabilite devient une capacite produit reelle par ouverture gouvernee du perimetre HA
+
+**Valeur utilisateur :** L'utilisateur ne voit une action que lorsqu'elle repose sur une surface produit reellement ouverte, supportee et testee. Le diagnostic cesse de promettre "quoi faire" au-dela du produit reellement disponible.
+
+**Résultat observable :** Le contrat 4D est enrichi de facon additive avec `projection_validity` pour rendre visible la realite structurelle. Une premiere vague d'ouverture HA est bornee, rendue validable, puis ouverte sous FR40 / NFR10 dans le meme increment. Les CTA utilisateur ne reapparaissent que sur des surfaces reellement disponibles.
+
+**FRs couverts :** FR34 (visibilite `projection_validity`), FR39, FR40, FR42, avec re-usage borne de FR32 / FR33 sur les surfaces reellement ouvertes
+
+**ARs clés :** AR6 (3 etats `connu -> validable -> ouvert`), AR11 (enrichissement additif), AR13 (ouverture de `PRODUCT_SCOPE` dans le meme increment)
+
+**NFRs directement adressés :** NFR5 (composants ouverts = contraintes satisfaites), NFR10 (ouverture = meme increment + tests), NFR12 (schema diagnostic stable)
+
+**Invariants à porter en stories :**
+- aucune story ne modifie `PRODUCT_SCOPE` sans preuves FR40 dans le meme increment
+- `projection_validity` est expose par ajout pur, sans regression du contrat 4D
+- toute action exposee doit etre traçable jusqu'a une surface produit reelle et testee
+- toute story touchant `cause_action` repasse par le gate terrain `no faux CTA`
+
+---
+
 ## Epic 1 — Le pipeline canonique établit un contrat de décision déterministe — l'éligibilité est sa première étape formalisée
 
 L'utilisateur peut s'appuyer sur un moteur de projection déterministe dont l'ordre d'évaluation est stable et testable. Le contrat global du pipeline à 5 étapes est formalisé (Feature 0). L'éligibilité est sa première étape formelle : tout équipement reçoit un résultat explicite avec cause catégorisée (Feature 1). La structure MappingResult à sous-blocs bornés est le contrat de transport de toutes les décisions du pipeline.
@@ -913,6 +933,8 @@ afin que le cycle apporte de nouvelles capacités de diagnostic sans casser la r
 - NFR12 : schéma stable sur 100 % des tests de cohérence hors ajouts additifs documentés
 - Le sous-bloc `projection_validity` est toujours présent (même si `is_valid: null`) — garantit la cohérence du schéma
 - FR34
+- Execution note (correct-course 2026-04-21) : si un gate terrain revele avant 6.3 un echec de semantique honnete `cause_label` / `cause_action`, ne pas transformer 6.2 en gros chantier de rattrapage `projection_validity`. Re-aligner d'abord la promesse story-level, garder 6.2 ouverte, puis faire de 6.3 la prochaine story requise.
+- Disposition post-retro 2026-04-22 : l'intention structurelle non livree de 6.2 n'est plus executee dans Epic 6. Elle est re-homee vers `pe-epic-7`. Epic 6 se clot sur l'explicabilite par etape et la semantique honnete ; aucune reprise de developpement ne repart de 6.2.
 
 ---
 
@@ -952,4 +974,150 @@ afin que le diagnostic soit toujours actionnable quand quelque chose peut être 
 - FR33 : pas de fausse promesse d'action — si rien n'est actionnable par l'utilisateur, l'exprimer explicitement
 - Mise à jour de `cause_mapping.py` pour couvrir tous les nouveaux reason_codes des classes 2 et 3
 - Note UX : story qui modifie `cause_label` / `cause_action` sur une surface critique → artefact visuel prescriptif + gate terrain avant done
+- Regle d'execution : gate terrain "no faux CTA" obligatoire sur les cas step 2 / step 3 / step 4
 - FR32, FR33
+
+---
+
+## Epic 7 — L'actionnabilite devient une capacite produit reelle par ouverture gouvernee du perimetre HA
+
+L'utilisateur ne voit une action que lorsqu'elle repose sur une surface produit reellement ouverte, supportee et testee. Le mainteneur ouvre progressivement le perimetre HA selon FR40 / NFR10, expose `projection_validity` de facon additive, puis n'autorise des CTA utilisateur que pour les remediations effectivement disponibles.
+
+### Story 7.1 : Enrichissement additif du contrat 4D — `projection_validity` est expose de bout en bout sans regression sur le schema canonique
+
+En tant que mainteneur,
+je veux exposer le sous-bloc `projection_validity` de bout en bout dans le contrat 4D sans supprimer, renommer ni deplacer aucun champ existant,
+afin de rendre visible la realite structurelle de la projection avant toute promesse d'action utilisateur.
+
+**Acceptance Criteria :**
+
+**Given** la sortie de diagnostic d'une operation de sync
+**When** elle est comparee au schema baseline du cycle
+**Then** tous les champs historiques restent presents avec les memes noms, types et semantiques
+**And** le diff ne montre que des ajouts additifs documentes
+
+**Given** un equipement ayant atteint l'etape 3
+**When** le diagnostic est inspecte
+**Then** `projection_validity` est present avec `is_valid`, `missing_fields`, `missing_capabilities`, `reason_code`
+
+**Given** un equipement n'ayant pas atteint l'etape 3
+**When** le diagnostic est inspecte
+**Then** `projection_validity` est tout de meme present avec un statut explicite de skip
+
+**Given** une evolution de cette story
+**When** elle est revue
+**Then** elle ne modifie pas `cause_action` et n'introduit aucun nouveau CTA utilisateur
+
+**Dev notes :**
+- reprend l'intention structurelle non livree de la 6.2 initialement planifiee
+- AR11 / FR34 / NFR12
+- aucun recalibrage UX ni wording opportuniste dans cette story
+
+---
+
+### Story 7.2 : Vague cible HA — les types candidats sont modelises dans le registre comme `connus`, avec contraintes explicites et perimetre borne
+
+En tant que mainteneur,
+je veux definir une premiere vague d'ouverture HA explicitement bornee dans le registre, avec contraintes documentees et cas cibles identifies,
+afin de preparer une ouverture produit pilotable plutot qu'une extension opportuniste du scope.
+
+**Acceptance Criteria :**
+
+**Given** la vague cible `pe-epic-7`
+**When** elle est documentee dans le registre et les artefacts de story
+**Then** chaque type vise dispose d'une entree explicite dans `HA_COMPONENT_REGISTRY` avec `required_fields` et `required_capabilities`
+
+**Given** un type hors vague
+**When** l'epic est execute
+**Then** il n'entre pas implicitement dans la vague cible et ne devient pas ouvrable par effet de bord
+
+**Given** la definition de la vague
+**When** elle est relue
+**Then** elle reste bornee a un ensemble restreint de types HA testables dans le meme increment
+
+**Dev notes :**
+- AR4 / AR6
+- cette story construit l'etat `connu`, pas l'etat `ouvert`
+- aucun changement de `PRODUCT_SCOPE` dans cette story
+
+---
+
+### Story 7.3 : Validation de projection de la vague cible — cas nominaux et cas d'echec representatifs rendent les types `validables`
+
+En tant que mainteneur,
+je veux prouver que les types de la vague cible sont structurellement validables par `validate_projection()`,
+afin de satisfaire la condition 2 de FR40 avant toute ouverture produit.
+
+**Acceptance Criteria :**
+
+**Given** chaque type de la vague cible
+**When** `validate_projection()` est executee sur un cas nominal representatif
+**Then** `is_valid=True` est obtenu sans dependance a la pile complete
+
+**Given** chaque type de la vague cible
+**When** `validate_projection()` est executee sur un cas d'echec representatif
+**Then** `is_valid=False` est obtenu avec un `reason_code` explicite et stable
+
+**Given** les etats du registre
+**When** un type a des preuves nominales et d'echec
+**Then** il est traite comme `validable`, distinct de `ouvert`
+
+**Dev notes :**
+- FR42 / AR7 / AR6
+- tests executables en isolation
+- aucun CTA utilisateur nouveau dans cette story
+
+---
+
+### Story 7.4 : Gouvernance d'ouverture de la vague cible — `PRODUCT_SCOPE` n'evolue que sous FR40 / NFR10 dans le meme increment
+
+En tant que mainteneur,
+je veux ouvrir les types de la vague cible dans `PRODUCT_SCOPE` uniquement lorsque les trois preuves FR40 sont reunies dans le meme increment,
+afin que l'ouverture produit soit gouvernee, testable et non arbitraire.
+
+**Acceptance Criteria :**
+
+**Given** un type de la vague cible propose pour ouverture
+**When** son ajout a `PRODUCT_SCOPE` est revu
+**Then** l'increment contient simultanement : l'entree de registre, les preuves nominales et d'echec de validation, et un test de non-regression diagnostic
+
+**Given** une tentative d'ajout a `PRODUCT_SCOPE` sans ces preuves
+**When** la suite FR40 / NFR10 est executee
+**Then** l'ajout est rejete explicitement
+
+**Given** un type ouvert de la vague
+**When** le cycle s'execute
+**Then** il est distingue des types seulement `connus` ou `validables`
+
+**Dev notes :**
+- FR39 / FR40 / NFR10 / AR13
+- story unique autorisee a modifier `PRODUCT_SCOPE`
+- toute regression du diagnostic bloque la cloture
+
+---
+
+### Story 7.5 : Exposition d'actions utilisateur uniquement sur les surfaces reelles et supportees
+
+En tant qu'utilisateur,
+je veux voir une action seulement lorsqu'elle correspond a une remediation reellement disponible dans jeedom2ha ou Jeedom standard,
+afin que le diagnostic reste honnete et utile apres l'ouverture produit.
+
+**Acceptance Criteria :**
+
+**Given** un equipement de la vague ouverte avec une remediation effectivement disponible
+**When** le diagnostic est affiche
+**Then** `cause_action` pointe vers cette action reelle, executable et supportee
+
+**Given** un equipement pour lequel aucune remediation utilisateur directe n'existe
+**When** le diagnostic est affiche
+**Then** `cause_action` reste `null`
+**And** la couche d'affichage conserve le message standardise sans faux CTA
+
+**Given** une story touchant `cause_action` pour la vague ouverte
+**When** elle est validee
+**Then** elle passe un gate terrain `no faux CTA` sur des cas reels representatifs de la vague
+
+**Dev notes :**
+- FR32 / FR33 reappliques uniquement aux surfaces reelles ouvertes par l'epic
+- aucun retour a un CTA speculatif du type "choisir manuellement le type"
+- la story ne promet pas de remediation generique hors vague cible

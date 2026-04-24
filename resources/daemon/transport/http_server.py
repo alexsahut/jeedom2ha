@@ -30,7 +30,11 @@ from models.decide_publication import decide_publication
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
-from models.cause_mapping import reason_code_to_cause, build_cause_for_pending_unpublish
+from models.cause_mapping import (
+    reason_code_to_cause,
+    build_cause_for_pending_unpublish,
+    resolve_cause_ux,
+)
 from models.ui_contract_4d import (
     reason_code_to_perimetre,
     compute_ecart,
@@ -1920,6 +1924,15 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
 
         # AC1 — Traceability: chaîne de décision complète
         traceability = _build_traceability(eq, map_result, pub_decision, status, reason_code)
+        # Story 6.1 — Étape visible du pipeline (1-5), calculée backend-first.
+        # Lecture stricte côté frontend — ne jamais recalculer localement.
+        pipeline_step_visible = _compute_pipeline_step_visible(el_result, map_result, pub_decision)
+        # Story 6.2 — source canonique UX : decision_trace.reason_code + pipeline_step_visible.
+        decision_reason_code = (
+            traceability.get("decision_trace", {}).get("reason_code")
+            if isinstance(traceability, dict)
+            else None
+        ) or ""
 
         # Story 4.4 — code machine stable pour l'export de diagnostic
         status_code = _STATUS_CODE_MAP.get(status, "not_published")
@@ -1933,7 +1946,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         statut = "publie" if is_published_in_ha else "non_publie"
         ecart = compute_ecart(perimetre, statut)
         if ecart and perimetre == "inclus":
-            cause_code, cause_label, cause_action = reason_code_to_cause(reason_code)
+            cause_code, _, _ = reason_code_to_cause(reason_code)
+            cause_ux = resolve_cause_ux(decision_reason_code, pipeline_step_visible)
+            cause_label = cause_ux["cause_label"]
+            cause_action = cause_ux["cause_action"]
         elif ecart and perimetre.startswith("exclu_"):
             cause_code, cause_label, cause_action = build_cause_for_pending_unpublish()
         else:
@@ -1990,7 +2006,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             "traceability": traceability,
             # Story 6.1 — Étape visible du pipeline (1-5), calculée backend-first.
             # Lecture stricte côté frontend — ne jamais recalculer localement.
-            "pipeline_step_visible": _compute_pipeline_step_visible(el_result, map_result, pub_decision),
+            "pipeline_step_visible": pipeline_step_visible,
         }
         equipments.append(eq_dict)
         room_key = (eq.object_id, object_name)
