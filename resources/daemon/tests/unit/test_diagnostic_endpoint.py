@@ -8,7 +8,7 @@ from transport.http_server import create_app
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd, EligibilityResult
 )
-from models.mapping import MappingResult, PublicationDecision, LightCapabilities
+from models.mapping import MappingResult, ProjectionValidity, PublicationDecision, LightCapabilities
 
 @pytest.fixture
 def app():
@@ -758,6 +758,12 @@ async def test_diagnostics_traceability_schema_published(aiohttp_client):
         commands={"LIGHT_ON": cmd},
         capabilities=LightCapabilities(has_on_off=True),
     )
+    mapping_res.projection_validity = ProjectionValidity(
+        is_valid=True,
+        reason_code=None,
+        missing_fields=[],
+        missing_capabilities=[],
+    )
     app["topology"] = snapshot
     app["eligibility"] = {600: EligibilityResult(is_eligible=True, reason_code="eligible")}
     app["mappings"] = {600: mapping_res}
@@ -781,6 +787,7 @@ async def test_diagnostics_traceability_schema_published(aiohttp_client):
     assert "typing_trace" in tr
     assert "decision_trace" in tr
     assert "publication_trace" in tr
+    assert "projection_validity" in tr
 
     # observed_commands: toutes les commandes
     assert len(tr["observed_commands"]) == 1
@@ -809,6 +816,11 @@ async def test_diagnostics_traceability_schema_published(aiohttp_client):
     assert pt["last_discovery_publish_result"] == "success"
     assert pt["last_discovery_publish_result"] in ("success", "failed", "not_attempted")
     assert "last_publish_timestamp" in pt
+
+    pv = tr["projection_validity"]
+    assert set(pv) == {"is_valid", "reason_code", "missing_fields", "missing_capabilities"}
+    assert pv["is_valid"] is True
+    assert pv["reason_code"] is None
 
     # AC5: v1_compatibility True pour light
     assert eq["v1_compatibility"] is True
@@ -842,6 +854,12 @@ async def test_diagnostics_traceability_excluded(aiohttp_client):
     assert dt["reason_code"] in _CLOSED_REASON_CODES
 
     assert tr["publication_trace"]["last_discovery_publish_result"] == "not_attempted"
+    assert tr["projection_validity"] == {
+        "is_valid": None,
+        "reason_code": "skipped_projection_validation_not_reached",
+        "missing_fields": [],
+        "missing_capabilities": [],
+    }
     assert eq["v1_compatibility"] is False
 
 

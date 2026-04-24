@@ -1733,11 +1733,38 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
     if pub_result_obj is not None and pub_result_obj.technical_reason_code:
         publication_trace["technical_reason_code"] = pub_result_obj.technical_reason_code
 
+    projection_validity = _build_projection_validity_trace(map_result)
+
     return {
         "observed_commands": observed_commands,
         "typing_trace": typing_trace,
         "decision_trace": decision_trace,
         "publication_trace": publication_trace,
+        "projection_validity": projection_validity,
+    }
+
+
+def _build_projection_validity_trace(map_result) -> Dict[str, Any]:
+    """Serialize stage-3 projection validity for diagnostic traceability only."""
+    pv = getattr(map_result, "projection_validity", None) if map_result else None
+    if pv is None:
+        reason_code = (
+            "skipped_projection_validation_not_executed"
+            if map_result is not None
+            else "skipped_projection_validation_not_reached"
+        )
+        return {
+            "is_valid": None,
+            "reason_code": reason_code,
+            "missing_fields": [],
+            "missing_capabilities": [],
+        }
+
+    return {
+        "is_valid": pv.is_valid,
+        "reason_code": pv.reason_code,
+        "missing_fields": list(pv.missing_fields or []),
+        "missing_capabilities": list(pv.missing_capabilities or []),
     }
 
 

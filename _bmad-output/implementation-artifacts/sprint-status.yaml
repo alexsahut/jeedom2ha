@@ -41,12 +41,13 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-6 (17 stories — pe-epic-1/2/3/4/5 done, pe-epic-6 backlog)
+#   Epics: pe-epic-1 à pe-epic-7 (pe-epic-7 ouvert pour Story 7.1 ; pe-epic-6 reste à réconcilier séparément)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
-#             registre HA gouverné à 3 états, diagnostic explicable et actionnable
+#             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
+#             puis actionnabilite produit ouverte de facon gouvernee
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-21'  # story 6-1 done — PR #98 merged, tracker realigned for 6.2 kickoff
+last_updated: '2026-04-24'  # story 7.1 code review PASS — done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -157,3 +158,11 @@ development_status:
   6-2-enrichissement-additif-du-contrat-4d-projection-validity-est-ajoute-comme-sous-bloc-pur-sans-modifier-les-champs-existants: backlog
   6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: backlog
   pe-epic-6-retrospective: optional
+
+  pe-epic-7: in-progress  # story 7.1 done 2026-04-24 ; code review PASS après purge scope 7.1 — 438 pytest PASS
+  7-1-enrichissement-additif-du-contrat-4d-projection-validity-est-expose-de-bout-en-bout-sans-regression-sur-le-schema-canonique: done
+  7-2-vague-cible-ha-les-types-candidats-sont-modelises-dans-le-registre-comme-connus-avec-contraintes-explicites-et-perimetre-borne: backlog
+  7-3-validation-de-projection-de-la-vague-cible-cas-nominaux-et-cas-d-echec-representatifs-rendent-les-types-validables: backlog
+  7-4-gouvernance-d-ouverture-de-la-vague-cible-product-scope-n-evolue-que-sous-fr40-nfr10-dans-le-meme-increment: backlog
+  7-5-exposition-d-actions-utilisateur-uniquement-sur-les-surfaces-reelles-et-supportees: backlog
+  pe-epic-7-retrospective: optional

@@ -18,7 +18,7 @@ from transport.http_server import create_app
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd, EligibilityResult
 )
-from models.mapping import MappingResult, PublicationDecision, LightCapabilities
+from models.mapping import MappingResult, ProjectionValidity, PublicationDecision, LightCapabilities
 
 # Story 3.1 : taxonomie fermée à 5 statuts — plus de "partially_published" ni "not_published"
 _VALID_STATUS_CODES = {"published", "excluded", "ambiguous", "not_supported", "infra_incident"}
@@ -110,6 +110,12 @@ def _make_simple_app_with_published_eq():
         ha_name="Lumiere",
         commands={"LIGHT_ON": cmd},
         capabilities=LightCapabilities(has_on_off=True),
+    )
+    mapping_res.projection_validity = ProjectionValidity(
+        is_valid=True,
+        reason_code=None,
+        missing_fields=[],
+        missing_capabilities=[],
     )
     app["topology"] = snapshot
     app["eligibility"] = {
@@ -258,3 +264,10 @@ async def test_diagnostics_non_regression_existing_fields(aiohttp_client):
     for eq in data["payload"]["equipments"]:
         for field in existing_fields:
             assert field in eq, f"Champ existant '{field}' absent pour eq_id={eq.get('eq_id')}"
+        assert "projection_validity" in eq["traceability"]
+        assert set(eq["traceability"]["projection_validity"]) == {
+            "is_valid",
+            "reason_code",
+            "missing_fields",
+            "missing_capabilities",
+        }

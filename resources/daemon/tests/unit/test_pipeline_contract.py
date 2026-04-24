@@ -217,3 +217,39 @@ def test_assess_eligibility_deterministic_no_generic_type():
     assert result1.is_eligible == result2.is_eligible
     assert result1.reason_code == result2.reason_code
     assert result1.confidence == result2.confidence
+
+
+# ---------------------------------------------------------------------------
+# Story 7.1 — Invariants I1 / I5 : _build_projection_validity_trace
+# ---------------------------------------------------------------------------
+
+from transport.http_server import _build_projection_validity_trace  # noqa: E402
+
+
+def test_story_7_1_i1_skip_never_creates_mapping_result():
+    """I1 — Story 7.1 : quand map_result est None (équipement arrêté avant l'étape 3),
+    _build_projection_validity_trace ne crée aucun MappingResult et renvoie un skip
+    explicite. Le pipeline interne n'est pas touché."""
+    result = _build_projection_validity_trace(None)
+    assert isinstance(result, dict)
+    assert result["is_valid"] is None
+    assert result["reason_code"] == "skipped_projection_validation_not_reached"
+    assert result["missing_fields"] == []
+    assert result["missing_capabilities"] == []
+
+
+def test_story_7_1_i5_projection_validity_subbloc_is_strictly_additive():
+    """I5 — Story 7.1 : _build_projection_validity_trace expose exactement les 4 clés
+    documentées, sans modifier le MappingResult source ni déplacer d'autres champs."""
+    mr = _make_mapping_result()
+    mr.projection_validity = ProjectionValidity(
+        is_valid=True,
+        reason_code=None,
+        missing_fields=[],
+        missing_capabilities=[],
+    )
+    result = _build_projection_validity_trace(mr)
+    assert set(result) == {"is_valid", "reason_code", "missing_fields", "missing_capabilities"}
+    # Contrat additif : le MappingResult source reste inchangé après lecture
+    assert mr.projection_validity.is_valid is True
+    assert mr.ha_entity_type == "light"  # champs historiques intacts
