@@ -40,7 +40,7 @@ def test_no_mapping():
 def test_no_supported_generic_type():
     code, label, action = reason_code_to_cause("no_supported_generic_type")
     assert code == "no_supported_generic_type"
-    assert label == "Type non supporté en V1"
+    assert label == "Types génériques Jeedom hors périmètre du cycle courant"  # Story 6.3 — suppression branding V1
     assert action is None
 
 
@@ -113,11 +113,13 @@ def test_eligible():
 
 
 def test_ha_component_not_in_product_scope():
-    """Étape 4 — composant hors scope produit → cause dédiée et non assimilable au mapping."""
+    """Étape 4 — composant hors scope produit → cause dédiée et non assimilable au mapping.
+    Story 6.3 — class 3 : cause_action = None, libellé gouvernance non arbitraire.
+    """
     assert reason_code_to_cause("ha_component_not_in_product_scope") == (
         "not_in_product_scope",
-        "Composant Home Assistant non ouvert dans ce cycle",
-        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
+        "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant",
+        None,
     )
 
 
@@ -200,7 +202,7 @@ _BASELINE_SNAPSHOT = {
         "Aucun mapping compatible",
         "Vérifier les types génériques des commandes dans Jeedom",
     ),
-    "no_supported_generic_type": ("no_supported_generic_type", "Type non supporté en V1", None),
+    "no_supported_generic_type": ("no_supported_generic_type", "Types génériques Jeedom hors périmètre du cycle courant", None),  # Story 6.3
     "no_generic_type_configured": (
         "no_generic_type_configured",
         "Types génériques non configurés sur les commandes",
@@ -236,10 +238,10 @@ _BASELINE_SNAPSHOT = {
         "Confiance insuffisante pour la politique active",
         "Assouplir la politique de confiance si vous souhaitez autoriser un mapping moins fiable.",
     ),
-    "ha_component_not_in_product_scope": (
+    "ha_component_not_in_product_scope": (  # Story 6.3 — class 3 : cause_action = None
         "not_in_product_scope",
-        "Composant Home Assistant non ouvert dans ce cycle",
-        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
+        "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant",
+        None,
     ),
     "eligible": (
         "no_mapping",
@@ -300,34 +302,37 @@ def test_excluded_object():
 # ---------------------------------------------------------------------------
 
 def test_ha_missing_command_topic():
+    # Story 6.3 — class 2 : cause_action = None, libellé "Projection HA incomplète"
     assert reason_code_to_cause("ha_missing_command_topic") == (
         "ha_missing_command_topic",
-        "Projection HA invalide — commande d'action manquante",
-        "Vérifier que les commandes de l'équipement incluent une commande d'action compatible dans Jeedom",
+        "Projection HA incomplète — commande requise absente",
+        None,
     )
 
 
 def test_ha_missing_state_topic():
+    # Story 6.3 — class 2 : cause_action = None, libellé "Projection HA incomplète"
     assert reason_code_to_cause("ha_missing_state_topic") == (
         "ha_missing_state_topic",
-        "Projection HA invalide — commande d'état manquante",
-        "Vérifier que les commandes de l'équipement incluent une commande d'état compatible dans Jeedom",
+        "Projection HA incomplète — état requis absent",
+        None,
     )
 
 
 def test_ha_missing_required_option():
+    # Story 6.3 — class 2 : cause_action = None, libellé "Projection HA incomplète"
     assert reason_code_to_cause("ha_missing_required_option") == (
         "ha_missing_required_option",
-        "Projection HA invalide — option requise par le composant Home Assistant manquante",
-        "Vérifier que les commandes de l'équipement couvrent les options requises par le composant Home Assistant cible",
+        "Projection HA incomplète — champ obligatoire manquant",
+        None,
     )
 
 
 def test_ha_component_unknown():
-    """ha_component_unknown — cause_action None explicite (FR33)."""
+    """ha_component_unknown — cause_action None (FR33). Story 6.3 — libellé simplifié."""
     cause_code, cause_label, cause_action = reason_code_to_cause("ha_component_unknown")
     assert cause_code == "ha_component_unknown"
-    assert cause_label == "Composant Home Assistant non reconnu par le moteur"
+    assert cause_label == "Type d'entité HA inconnu du moteur"
     assert cause_action is None
 
 

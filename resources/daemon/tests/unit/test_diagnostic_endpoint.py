@@ -302,12 +302,13 @@ async def test_diagnostics_story_4_2_not_in_product_scope_exposes_governance_cau
 
     assert eq["reason_code"] == "ha_component_not_in_product_scope"
     assert eq["cause_code"] == "not_in_product_scope"
-    assert eq["cause_label"] == "Composant Home Assistant non ouvert dans ce cycle"
-    assert eq["cause_action"] == (
-        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant."
-    )
+    # Story 6.3 — class 3 : libellé gouvernance non arbitraire
+    assert eq["cause_label"] == "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant"
+    # Story 6.3 — class 3 : cause_action = None (aucune action utilisateur directe)
+    assert eq["cause_action"] is None
     assert "cycle courant" in eq["detail"]
     assert eq["detail"] != "Cause inconnue."
+    # remediation provient de _DIAGNOSTIC_MESSAGES (http_server.py, inchangé)
     assert eq["remediation"] == (
         "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant."
     )

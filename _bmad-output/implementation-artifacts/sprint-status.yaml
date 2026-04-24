@@ -41,12 +41,13 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-6 (17 stories — pe-epic-1/2/3/4/5 done, pe-epic-6 backlog)
+#   Epics: pe-epic-1 à pe-epic-7 (22 stories — pe-epic-1/2/3/4/5/6 done, pe-epic-7 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
-#             registre HA gouverné à 3 états, diagnostic explicable et actionnable
+#             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
+#             puis actionnabilite produit ouverte de facon gouvernee
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-21'  # story 6-1 done — PR #98 merged, tracker realigned for 6.2 kickoff
+last_updated: '2026-04-23'  # story 7.1 creee ready-for-dev ; pe-epic-7 passe en in-progress conformement au workflow create-story
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -152,8 +153,17 @@ development_status:
   5-2-resultat-de-publication-tracable-le-resultat-technique-est-enregistre-separement-de-la-decision-produit-et-ne-masque-pas-la-cause-principale-canonique: done
   pe-epic-5-retrospective: done  # retro 2026-04-19 — P-1/P-2/P-3/P-4 OK ; terrain pe-epic-5 valide ; gate pe-epic-6 leve
 
-  pe-epic-6: in-progress  # Diagnostic explicable et actionnable pour chaque équipement (3 stories) ; Story 6-1 soldée ; 6-2/6-3 à dérouler
+  pe-epic-6: done  # cloture propre apres correct-course 2026-04-22 ; valeur livree = 6.1 + 6.3 ; 6.2 re-homee vers pe-epic-7
   6-1-diagnostic-par-etape-de-pipeline-l-utilisateur-consulte-pour-chaque-equipement-l-etape-de-blocage-et-la-cause-principale-canonique-unique-ordonnee-par-pipeline: done
-  6-2-enrichissement-additif-du-contrat-4d-projection-validity-est-ajoute-comme-sous-bloc-pur-sans-modifier-les-champs-existants: backlog
-  6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: backlog
-  pe-epic-6-retrospective: optional
+  # 6-2 terrain NO-GO 2026-04-21 ; correct-course 2026-04-22 approuve : story retiree du backlog actif Epic 6 et re-homee vers pe-epic-7 comme artefact historique non executable
+  # 6-3 done 2026-04-22 apres code review PASS ; semantique honnete cause_label/cause_action + regle no faux CTA ; 1105 pytest + 198 node PASS ; gate terrain PASS (278 equipements, cas step 2/3/4) ; M3 follow-up retro pe-epic-6 (alignement cause_code sur decision_reason_code dans http_server.py)
+  6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: done
+  pe-epic-6-retrospective: done  # retro partielle 2026-04-22 ; correct-course approuve ensuite — epic cloture, 6.2 re-homee, regle : aucune action exposee sans surface produit reelle
+
+  pe-epic-7: in-progress  # story 7.1 creee ready-for-dev le 2026-04-23 ; epic actif selon le sequencing approuve du 2026-04-22
+  7-1-enrichissement-additif-du-contrat-4d-projection-validity-est-expose-de-bout-en-bout-sans-regression-sur-le-schema-canonique: ready-for-dev
+  7-2-vague-cible-ha-les-types-candidats-sont-modelises-dans-le-registre-comme-connus-avec-contraintes-explicites-et-perimetre-borne: backlog
+  7-3-validation-de-projection-de-la-vague-cible-cas-nominaux-et-cas-d-echec-representatifs-rendent-les-types-validables: backlog
+  7-4-gouvernance-d-ouverture-de-la-vague-cible-product-scope-n-evolue-que-sous-fr40-nfr10-dans-le-meme-increment: backlog
+  7-5-exposition-d-actions-utilisateur-uniquement-sur-les-surfaces-reelles-et-supportees: backlog
+  pe-epic-7-retrospective: optional

@@ -60,39 +60,21 @@
     return -1;
   }
 
-  // Story 4.2 — La raison visible doit d'abord refléter cause_label.
-  // Fallback legacy borné sur le mapping JS local uniquement si cause_label est absent.
-  function getDiagnosticReasonLabel(eq, legacyReasonLabels) {
+  // Story 6.2 — lecture backend stricte : la raison visible vient uniquement de cause_label.
+  function getDiagnosticReasonLabel(eq) {
     if (eq && typeof eq.cause_label === 'string' && eq.cause_label !== '') {
       return eq.cause_label;
-    }
-    if (
-      eq
-      && legacyReasonLabels
-      && typeof eq.reason_code === 'string'
-      && typeof legacyReasonLabels[eq.reason_code] === 'string'
-      && legacyReasonLabels[eq.reason_code] !== ''
-    ) {
-      return legacyReasonLabels[eq.reason_code];
     }
     return '';
   }
 
-  // Story 4.2 — cause_action prime sur remediation et ne doit pas déclencher
-  // de CTA de configuration générique qui contredirait la lecture visible.
+  // Story 6.2 — lecture backend stricte : aucune logique locale de remédiation.
   function resolveDiagnosticAction(eq) {
     if (eq && typeof eq.cause_action === 'string' && eq.cause_action !== '') {
       return {
         text: eq.cause_action,
         source: 'cause_action',
         showConfigLink: false,
-      };
-    }
-    if (eq && typeof eq.remediation === 'string' && eq.remediation !== '') {
-      return {
-        text: eq.remediation,
-        source: 'remediation',
-        showConfigLink: true,
       };
     }
     return {

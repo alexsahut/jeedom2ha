@@ -1,14 +1,19 @@
-# ARTEFACT FIGÉ — Story 4.1 / Story 4.3. Ne pas modifier sans story dédiée.
+# ARTEFACT FIGÉ — Story 4.1 / Story 4.3 / Story 6.2 (CAUSE_MAPPING + resolve_cause_ux) / Story 6.3 (sémantique honnête). Ne pas modifier sans story dédiée.
 """Table de traduction reason_code → (cause_code, cause_label, cause_action).
 
 Module pur, standalone — aucune dépendance sur http_server, aggregation, taxonomy.
 Direction 1 : inclus mais non publié (20 entrées actives + 3 published + fallback contractuel).
 Direction 2 : exclu mais encore publié dans HA (build_cause_for_pending_unpublish).
+
+Règle de contrat cause_action (Story 6.3) :
+- cause_action = None si aucune remédiation utilisateur directe n'existe.
+- class 2 (invalidité HA) et class 3 (scope produit) → cause_action = None.
+- La couche d'affichage présente un message standardisé pour tout cause_action None.
 """
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 # Table figée : reason_code → (cause_code, cause_label, cause_action)
 # None dans cause_action signifie "aucune action recommandée pour ce cas".
@@ -47,7 +52,7 @@ _REASON_CODE_TO_CAUSE: dict = {
     ),
     "no_supported_generic_type": (
         "no_supported_generic_type",
-        "Type non supporté en V1",
+        "Types génériques Jeedom hors périmètre du cycle courant",
         None,
     ),
     "no_generic_type_configured": (
@@ -87,8 +92,8 @@ _REASON_CODE_TO_CAUSE: dict = {
     ),
     "ha_component_not_in_product_scope": (
         "not_in_product_scope",
-        "Composant Home Assistant non ouvert dans ce cycle",
-        "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
+        "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant",
+        None,  # class 3 — gouvernance de cycle, aucune action utilisateur directe
     ),
     "eligible": (
         "no_mapping",
@@ -96,30 +101,67 @@ _REASON_CODE_TO_CAUSE: dict = {
         "Relancer un sync complet depuis l'interface du plugin",
     ),
     # --- Codes classe 2 — Validation HA (étape 3, AR8) ---
+    # cause_action = None : contrainte structurelle de l'appareil physique, pas d'action utilisateur directe
     "ha_missing_command_topic": (
         "ha_missing_command_topic",
-        "Projection HA invalide — commande d'action manquante",
-        "Vérifier que les commandes de l'équipement incluent une commande d'action compatible dans Jeedom",
+        "Projection HA incomplète — commande requise absente",
+        None,
     ),
     "ha_missing_state_topic": (
         "ha_missing_state_topic",
-        "Projection HA invalide — commande d'état manquante",
-        "Vérifier que les commandes de l'équipement incluent une commande d'état compatible dans Jeedom",
+        "Projection HA incomplète — état requis absent",
+        None,
     ),
     "ha_missing_required_option": (
         "ha_missing_required_option",
-        "Projection HA invalide — option requise par le composant Home Assistant manquante",
-        "Vérifier que les commandes de l'équipement couvrent les options requises par le composant Home Assistant cible",
+        "Projection HA incomplète — champ obligatoire manquant",
+        None,
     ),
     "ha_component_unknown": (
         "ha_component_unknown",
-        "Composant Home Assistant non reconnu par le moteur",
-        None,  # FR33 — aucune remédiation utilisateur directe
+        "Type d'entité HA inconnu du moteur",
+        None,
     ),
     # --- 3 codes published → pas d'écart direction 1 ---
     "sure": (None, None, None),
     "probable": (None, None, None),
     "sure_mapping": (None, None, None),
+}
+
+# Story 6.2 / 6.3 — mapping UX contextuel (reason_code canonique + étape pipeline visible).
+# Fonction pure, sans logique métier : traduit uniquement la présentation utilisateur.
+# Règle no faux CTA (Story 6.3) : action = None si aucune surface réelle dans jeedom2ha.
+CAUSE_MAPPING: dict = {
+    "ambiguous": {
+        "step_3": {
+            "label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
+            "action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
+        },
+        "step_4": {
+            "label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
+            "action": None,  # aucune surface dans jeedom2ha pour choisir manuellement le type
+        },
+    },
+    "ambiguous_skipped": {
+        "step_3": {
+            "label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
+            "action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
+        },
+        "step_4": {
+            "label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
+            "action": None,  # aucune surface dans jeedom2ha pour choisir manuellement le type
+        },
+    },
+}
+
+# Alias fermés provenant de la taxonomie decision_trace.reason_code.
+_CAUSE_UX_REASON_ALIASES: dict = {
+    "confidence_policy_skipped": "probable_skipped",
+}
+
+_CAUSE_UX_FALLBACK: dict = {
+    "cause_label": "Cause non catégorisée — vérifier le diagnostic détaillé",
+    "cause_action": "Relancer un sync complet puis consulter les logs du démon si le blocage persiste.",
 }
 
 
@@ -130,6 +172,36 @@ def reason_code_to_cause(reason_code: str) -> Tuple[Optional[str], Optional[str]
     (cas published ou reason_code inconnu — fallback sécuritaire).
     """
     return _REASON_CODE_TO_CAUSE.get(reason_code, (None, None, None))
+
+
+def resolve_cause_ux(reason_code: str, pipeline_step: int) -> Dict[str, Optional[str]]:
+    """Résout (cause_label, cause_action) depuis reason_code + étape visible.
+
+    Règles :
+    - lecture pure depuis des mappings backend (aucune logique métier)
+    - fallback explicite si mapping absent
+    - cause_action = None si aucune remédiation utilisateur directe n'existe (Story 6.3)
+    """
+    normalized_reason = str(reason_code or "").strip()
+    step_key = f"step_{pipeline_step}" if isinstance(pipeline_step, int) else ""
+
+    contextual = CAUSE_MAPPING.get(normalized_reason, {}).get(step_key)
+    if contextual:
+        action_val = contextual.get("action")
+        return {
+            "cause_label": str(contextual.get("label", "")).strip(),
+            "cause_action": action_val if isinstance(action_val, str) and action_val else None,
+        }
+
+    aliased_reason = _CAUSE_UX_REASON_ALIASES.get(normalized_reason, normalized_reason)
+    _, cause_label, cause_action = reason_code_to_cause(aliased_reason)
+    if isinstance(cause_label, str) and cause_label:
+        return {
+            "cause_label": cause_label,
+            "cause_action": cause_action if isinstance(cause_action, str) and cause_action else None,
+        }
+
+    return dict(_CAUSE_UX_FALLBACK)
 
 
 def build_cause_for_pending_unpublish() -> Tuple[str, str, str]:
