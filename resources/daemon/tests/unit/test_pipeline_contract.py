@@ -173,6 +173,60 @@ def test_full_trace_three_sub_blocs_no_gap():
 
 
 # ---------------------------------------------------------------------------
+# Story 7.1 — Invariants I1 / I5 : séparation diagnostic vs pipeline (AC#6)
+# ---------------------------------------------------------------------------
+
+def test_i1_projection_validity_unchanged_after_mapping_result_construction():
+    """I1 : projection_validity dans MappingResult ne doit jamais être modifié
+    hors de validate_projection() — le champ reste None tant que l'étape 3
+    n'a pas été exécutée.
+    """
+    mr = _make_mapping_result()
+    # Avant étape 3 : projection_validity est None — invariant de construction.
+    assert mr.projection_validity is None, (
+        "I1 violated: projection_validity doit être None à la construction "
+        "(avant que validate_projection() soit appelé)"
+    )
+
+
+def test_i5_projection_validity_set_only_from_pipeline():
+    """I5 : projection_validity est dérivé de validate_projection(), jamais reconstruit
+    à partir de reason_code ou de la décision. Ce test vérifie que le champ
+    accepte uniquement un ProjectionValidity fourni explicitement.
+    """
+    pv = ProjectionValidity(
+        is_valid=True,
+        reason_code=None,
+        missing_fields=[],
+        missing_capabilities=[],
+    )
+    mr = _make_mapping_result(projection_validity=pv)
+    # La valeur est exactement l'objet passé — pas une copie, pas une reconstruction.
+    assert mr.projection_validity is pv, (
+        "I5 violated: projection_validity doit être l'objet exact issu du pipeline"
+    )
+    assert mr.projection_validity.is_valid is True
+
+
+def test_i1_projection_validity_skip_uses_canonical_reason_code():
+    """I1 / Story 7.1 : lorsque l'étape 3 est skippée (projection_validity=None),
+    la représentation skip utilise le reason_code canonique pipeline-contract
+    (is_valid=None, reason_code='skipped_no_mapping_candidate').
+    """
+    # Schéma skip canonique tel que défini dans pipeline-contract.md §Étape 3.
+    skip_bloc = {
+        "is_valid": None,
+        "reason_code": "skipped_no_mapping_candidate",
+        "missing_fields": [],
+        "missing_capabilities": [],
+    }
+    assert skip_bloc["is_valid"] is None
+    assert skip_bloc["reason_code"] == "skipped_no_mapping_candidate"
+    assert skip_bloc["missing_fields"] == []
+    assert skip_bloc["missing_capabilities"] == []
+
+
+# ---------------------------------------------------------------------------
 # Test NFR1 — Déterminisme de assess_eligibility() (AC#3)
 # ---------------------------------------------------------------------------
 

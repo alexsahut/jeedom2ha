@@ -339,5 +339,13 @@ async def test_historical_contract_preserved_on_published_eq(cli, app):
                   "traceability", "perimetre", "statut", "ecart"):
         assert field in eq, f"Champ historique manquant : {field}"
 
-    # Nouveau champ 6.1
+    # Champ 6.1
     assert "pipeline_step_visible" in eq
+
+    # Story 7.1 — projection_validity présent dans traceability (ajout additif pur)
+    assert "projection_validity" in eq["traceability"], (
+        "Story 7.1 : sous-bloc projection_validity absent de traceability"
+    )
+    pv = eq["traceability"]["projection_validity"]
+    for key in ("is_valid", "reason_code", "missing_fields", "missing_capabilities"):
+        assert key in pv, f"Story 7.1 : clé '{key}' absente du sous-bloc projection_validity"

@@ -258,3 +258,15 @@ async def test_diagnostics_non_regression_existing_fields(aiohttp_client):
     for eq in data["payload"]["equipments"]:
         for field in existing_fields:
             assert field in eq, f"Champ existant '{field}' absent pour eq_id={eq.get('eq_id')}"
+
+    # Story 7.1 — projection_validity dans traceability (ajout additif pur)
+    for eq in data["payload"]["equipments"]:
+        tr = eq.get("traceability", {})
+        assert "projection_validity" in tr, (
+            f"Story 7.1 : projection_validity absent de traceability pour eq_id={eq.get('eq_id')}"
+        )
+        pv = tr["projection_validity"]
+        for key in ("is_valid", "reason_code", "missing_fields", "missing_capabilities"):
+            assert key in pv, (
+                f"Story 7.1 : clé '{key}' absente du sous-bloc projection_validity pour eq_id={eq.get('eq_id')}"
+            )
