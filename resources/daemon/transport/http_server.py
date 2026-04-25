@@ -1737,11 +1737,34 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
     if pub_result_obj is not None and pub_result_obj.technical_reason_code:
         publication_trace["technical_reason_code"] = pub_result_obj.technical_reason_code
 
+    # Section 5 — Projection validity (Story 7.1 — ajout additif pur, jamais omis)
+    # Source : map_result.projection_validity tel que produit par validate_projection() à l'étape 3.
+    # Invariant : projection_validity est uniquement lu, jamais recalculé ici.
+    _pv = getattr(map_result, "projection_validity", None) if map_result else None
+    if _pv is not None:
+        projection_validity_bloc: dict = {
+            "is_valid": _pv.is_valid,
+            "reason_code": _pv.reason_code,
+            "missing_fields": _pv.missing_fields,
+            "missing_capabilities": _pv.missing_capabilities,
+        }
+    else:
+        # Étape 3 non exécutée (inéligible, pas de mapping, ou pipeline arrêté avant) :
+        # skip explicite documenté — jamais une absence implicite.
+        # Reason_code canonique pipeline-contract : skipped_no_mapping_candidate.
+        projection_validity_bloc = {
+            "is_valid": None,
+            "reason_code": "skipped_no_mapping_candidate",
+            "missing_fields": [],
+            "missing_capabilities": [],
+        }
+
     return {
         "observed_commands": observed_commands,
         "typing_trace": typing_trace,
         "decision_trace": decision_trace,
         "publication_trace": publication_trace,
+        "projection_validity": projection_validity_bloc,
     }
 
 
