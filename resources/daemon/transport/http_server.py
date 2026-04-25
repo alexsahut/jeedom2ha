@@ -1745,8 +1745,8 @@ def _build_traceability(eq, map_result, pub_decision, status: str, top_reason_co
         projection_validity_bloc: dict = {
             "is_valid": _pv.is_valid,
             "reason_code": _pv.reason_code,
-            "missing_fields": _pv.missing_fields,
-            "missing_capabilities": _pv.missing_capabilities,
+            "missing_fields": list(_pv.missing_fields),
+            "missing_capabilities": list(_pv.missing_capabilities),
         }
     else:
         # Étape 3 non exécutée (inéligible, pas de mapping, ou pipeline arrêté avant) :

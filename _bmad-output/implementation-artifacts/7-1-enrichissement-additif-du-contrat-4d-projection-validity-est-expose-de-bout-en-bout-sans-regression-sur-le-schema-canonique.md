@@ -1,6 +1,6 @@
 # Story 7.1 : Enrichissement additif du contrat 4D — `projection_validity` est exposé de bout en bout sans régression sur le schéma canonique
 
-Status: review
+Status: done
 
 <!-- Créée le 2026-04-23 — première story exécutable de pe-epic-7 après correct-course approuvé du 2026-04-22 -->
 <!-- 6.2 re-homée = artefact historique non exécutable ; 7.1 reprend son intention structurelle non livrée -->
@@ -315,3 +315,8 @@ Aucun blocage. Implémentation en une passe : ajout additif pur dans `_build_tra
 ## Change Log
 
 - **2026-04-25** — Story 7.1 implémentée : enrichissement additif du contrat 4D avec `traceability.projection_validity`. Ajout dans `_build_traceability()` uniquement. Skip explicite `skipped_no_mapping_candidate` (reason_code canonique pipeline-contract). 12 nouveaux tests story 7.1 + 3 tests pipeline_contract I1/I5 + renforcements test_diagnostic_export et test_story_6_1. 606/606 PASS, zéro régression.
+- **2026-04-25** — Code review (Opus 4.7) → 3 issues MEDIUM corrigées :
+  - **M1** : ajout d'un test d'invariant direct `test_ac8_invariant_decide_publication_blocks_invalid_projection` qui appelle réellement `decide_publication()` avec `is_valid=False` et vérifie `should_publish=False` + propagation de la cause étape 3 (règle I4).
+  - **M2** : renforcement de `test_historical_traceability_keys_preserved` — assertion exacte `set(tr.keys()) == {observed_commands, typing_trace, decision_trace, publication_trace, projection_validity}` pour détecter tout futur ajout silencieux dans `_build_traceability()`.
+  - **M3** : `_build_traceability()` copie maintenant `missing_fields` et `missing_capabilities` via `list(...)` au lieu de partager la référence du modèle.
+  - Aucune modification du comportement produit, ni de `cause_mapping.py`, `PRODUCT_SCOPE`, JS ou PHP. Suite complète : 1137/1137 PASS.

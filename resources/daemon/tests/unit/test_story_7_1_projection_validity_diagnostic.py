@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from transport.http_server import create_app
+from models.decide_publication import decide_publication
 from models.mapping import (
     LightCapabilities,
     MappingResult,
@@ -281,6 +282,16 @@ async def test_historical_traceability_keys_preserved(cli, app):
     # Le nouveau sous-bloc est bien présent en plus
     assert "projection_validity" in tr
 
+    # AC1 — Schéma fermé : aucune clé inattendue dans traceability.
+    # Garantit qu'un futur ajout silencieux dans _build_traceability() casse le test.
+    assert set(tr.keys()) == {
+        "observed_commands",
+        "typing_trace",
+        "decision_trace",
+        "publication_trace",
+        "projection_validity",
+    }, f"Clés traceability inattendues : {sorted(tr.keys())}"
+
 
 async def test_historical_eq_contract_fields_preserved(cli, app):
     """AC6 — Les champs historiques 4D du contrat équipement restent inchangés."""
@@ -361,6 +372,41 @@ async def test_ac8_invalid_projection_implies_no_publish(cli, app):
 
     # L'équipement ne doit pas être publié
     assert eq["statut"] == "non_publie"
+
+
+def test_ac8_invariant_decide_publication_blocks_invalid_projection():
+    """AC8 — Invariant I2 : decide_publication() ne doit jamais retourner
+    should_publish=True si projection_validity.is_valid=False.
+
+    Test direct de l'invariant (pas de set-up pré-décidé) : on alimente
+    decide_publication() avec un mapping dont l'étape 3 a échoué et on
+    vérifie que la sortie est strictement bloquée.
+    """
+    mapping = MappingResult(
+        ha_entity_type="light",
+        confidence="sure",  # mapping nominal
+        reason_code="light_on_off",
+        jeedom_eq_id=80,
+        ha_unique_id="jeedom2ha_eq_80",
+        ha_name="Eq80",
+        capabilities=LightCapabilities(has_on_off=True),
+    )
+    mapping.projection_validity = ProjectionValidity(
+        is_valid=False,
+        reason_code="ha_missing_state_topic",
+        missing_fields=["state_topic"],
+        missing_capabilities=[],
+    )
+
+    decision = decide_publication(mapping)
+
+    assert decision.should_publish is False, (
+        "AC8 / I2 violated: decide_publication() doit bloquer la publication "
+        "lorsque projection_validity.is_valid=False"
+    )
+    assert decision.reason == "ha_missing_state_topic", (
+        "La cause étape 3 doit être propagée telle quelle (règle I4)"
+    )
 
 
 async def test_ac8_valid_projection_can_lead_to_publication(cli, app):
