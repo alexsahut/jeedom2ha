@@ -1,6 +1,6 @@
 # Story 7.2 : Vague cible HA — les types candidats sont modélisés dans le registre comme `connus`, avec contraintes explicites et périmètre borné
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -95,32 +95,32 @@ _[Source : NFR11, NFR12, FR45]_
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Vérifier et consolider les entrées registry pour la vague cible (AC: #1, #2)
-  - [ ] Relire les entrées `sensor` et `binary_sensor` dans `HA_COMPONENT_REGISTRY` et vérifier leur alignement exact avec l'architecture D3
-  - [ ] Si une entrée dévie de la spec D3, corriger le minimum nécessaire (ne pas enrichir opportunément)
-  - [ ] Vérifier que `_CAPABILITY_TO_REASON` couvre `"has_state"` → `("ha_missing_state_topic", ["state_topic"])` — déjà présent, confirmer
-  - [ ] Poser un commentaire inline dans `ha_component_registry.py` identifiant explicitement `sensor` et `binary_sensor` comme la vague cible pe-epic-7
+- [x] Task 1 — Vérifier et consolider les entrées registry pour la vague cible (AC: #1, #2)
+  - [x] Relire les entrées `sensor` et `binary_sensor` dans `HA_COMPONENT_REGISTRY` et vérifier leur alignement exact avec l'architecture D3
+  - [x] Si une entrée dévie de la spec D3, corriger le minimum nécessaire (ne pas enrichir opportunément)
+  - [x] Vérifier que `_CAPABILITY_TO_REASON` couvre `"has_state"` → `("ha_missing_state_topic", ["state_topic"])` — déjà présent, confirmer
+  - [x] Poser un commentaire inline dans `ha_component_registry.py` identifiant explicitement `sensor` et `binary_sensor` comme la vague cible pe-epic-7
 
-- [ ] Task 2 — Ajouter `SensorCapabilities` dans `models/mapping.py` (AC: #3, #4)
-  - [ ] Ajouter `@dataclass SensorCapabilities` avec `has_state: bool = False` et éventuellement `on_off_confidence: str = "unknown"` si applicable
-  - [ ] Mettre à jour la `Union` `MappingCapabilities` pour inclure `SensorCapabilities`
-  - [ ] Mettre à jour `_resolve_capability()` dans `ha_component_registry.py` avec bloc `isinstance(capabilities, SensorCapabilities)` pour `has_state`
-  - [ ] Vérifier que `from models.mapping import ..., SensorCapabilities` ne crée pas de dépendance circulaire
+- [x] Task 2 — Ajouter `SensorCapabilities` dans `models/mapping.py` (AC: #3, #4)
+  - [x] Ajouter `@dataclass SensorCapabilities` avec `has_state: bool = False` et éventuellement `on_off_confidence: str = "unknown"` si applicable
+  - [x] Mettre à jour la `Union` `MappingCapabilities` pour inclure `SensorCapabilities`
+  - [x] Mettre à jour `_resolve_capability()` dans `ha_component_registry.py` avec bloc `isinstance(capabilities, SensorCapabilities)` pour `has_state`
+  - [x] Vérifier que `from models.mapping import ..., SensorCapabilities` ne crée pas de dépendance circulaire
 
-- [ ] Task 3 — Écrire `test_story_7_2_wave_registry.py` (AC: #1-#6)
-  - [ ] Test AC1 : entrées sensor/binary_sensor présentes avec required_fields et required_capabilities corrects
-  - [ ] Test AC2 : types hors vague non affectés — snapshot pré/post des entrées button/number/select/climate
-  - [ ] Test AC3 : `SensorCapabilities` dataclass importable, `_resolve_capability` via isinstance
-  - [ ] Test AC4 : appels `validate_projection` avec `SensorCapabilities` — cas nominal et cas d'échec pour sensor et binary_sensor
-  - [ ] Test AC5 : `PRODUCT_SCOPE == ["light", "cover", "switch"]` toujours vrai
-  - [ ] Test AC6 (import test) : les doubles locaux `_SensorLikeCapabilities` de `test_step3_validate_projection.py` continuent de fonctionner — à vérifier en exécution, pas à modifier
+- [x] Task 3 — Écrire `test_story_7_2_wave_registry.py` (AC: #1-#6)
+  - [x] Test AC1 : entrées sensor/binary_sensor présentes avec required_fields et required_capabilities corrects
+  - [x] Test AC2 : types hors vague non affectés — snapshot pré/post des entrées button/number/select/climate
+  - [x] Test AC3 : `SensorCapabilities` dataclass importable, `_resolve_capability` via isinstance
+  - [x] Test AC4 : appels `validate_projection` avec `SensorCapabilities` — cas nominal et cas d'échec pour sensor et binary_sensor
+  - [x] Test AC5 : `PRODUCT_SCOPE == ["light", "cover", "switch"]` toujours vrai
+  - [x] Test AC6 (import test) : les doubles locaux `_SensorLikeCapabilities` de `test_step3_validate_projection.py` continuent de fonctionner — à vérifier en exécution, pas à modifier
 
-- [ ] Task 4 — Verrouiller la non-régression et la frontière de périmètre (AC: #2, #5, #6)
-  - [ ] Exécuter le corpus complet — cible : 0 régression
-  - [ ] Vérifier que `test_product_scope_initial_value` passe
-  - [ ] Vérifier que `test_all_registry_capabilities_have_reason_mapping` passe avec les nouvelles capabilities
-  - [ ] Confirmer qu'aucun fichier `cause_mapping.py`, `PRODUCT_SCOPE`, `cause_label/cause_action` ni mapper (`mapping/*.py`) n'a été touché
-  - [ ] Documenter le delta de schéma attendu : ajout de `SensorCapabilities` dans `models/mapping.py`, commentaire vague dans `ha_component_registry.py`, imports mis à jour dans `ha_component_registry.py`
+- [x] Task 4 — Verrouiller la non-régression et la frontière de périmètre (AC: #2, #5, #6)
+  - [x] Exécuter le corpus complet — cible : 0 régression
+  - [x] Vérifier que `test_product_scope_initial_value` passe
+  - [x] Vérifier que `test_all_registry_capabilities_have_reason_mapping` passe avec les nouvelles capabilities
+  - [x] Confirmer qu'aucun fichier `cause_mapping.py`, `PRODUCT_SCOPE`, `cause_label/cause_action` ni mapper (`mapping/*.py`) n'a été touché
+  - [x] Documenter le delta de schéma attendu : ajout de `SensorCapabilities` dans `models/mapping.py`, commentaire vague dans `ha_component_registry.py`, imports mis à jour dans `ha_component_registry.py`
 
 ## Dev Notes
 
@@ -242,10 +242,95 @@ test_non_wave_registry_entries_unchanged()   # snapshot structural des types hor
 
 ### Agent Model Used
 
-claude-sonnet-4-6 — 2026-04-25
+GPT-5 Codex — 2026-04-25
 
 ### Debug Log References
 
+- Préflight Git : worktree dédié `/Users/alexandre/Dev/jeedom/plugins/jeedom2ha-story-pe-7.2`, branche `story/pe-7.2-wave-registry`, working tree clean avant implémentation.
+- RED : `python3 -m pytest resources/daemon/tests/unit/test_story_7_2_wave_registry.py` → échec attendu `ImportError: cannot import name 'SensorCapabilities'`.
+- GREEN ciblé : `python3 -m pytest resources/daemon/tests/unit/test_story_7_2_wave_registry.py` → 13 passed.
+- Non-régression ciblée : `python3 -m pytest resources/daemon/tests/unit/test_ha_component_registry.py resources/daemon/tests/unit/test_step3_validate_projection.py` → 20 passed.
+- Corpus complet : `python3 -m pytest` → 1150 passed, 993 warnings de dépréciation existants.
+- Qualité : `python3 -m flake8 resources/daemon/models/mapping.py resources/daemon/validation/ha_component_registry.py resources/daemon/tests/unit/test_story_7_2_wave_registry.py` → 0.
+
+### Implementation Plan
+
+- Conserver les entrées `sensor` et `binary_sensor` strictement conformes à D3, sans ajout de champ ni changement de `PRODUCT_SCOPE`.
+- Ajouter uniquement `SensorCapabilities(has_state: bool = False)` comme dataclass dédiée à l'état `connu`.
+- Résoudre `has_state` via un chemin typé `isinstance(SensorCapabilities)` tout en conservant le fallback `getattr` pour les doubles et types futurs.
+- Couvrir la vague cible, la frontière hors vague, `PRODUCT_SCOPE`, les cas `validate_projection()` et la non-régression des doubles `_SensorLikeCapabilities`.
+
 ### Completion Notes List
 
+- Entrées `sensor` et `binary_sensor` vérifiées conformes à l'architecture D3 : `required_fields == ["state_topic", "platform", "availability"]`, `required_capabilities == ["has_state"]`.
+- `SensorCapabilities` ajouté dans `models/mapping.py` et inclus dans `MappingCapabilities`.
+- `_resolve_capability("has_state", ...)` utilise désormais explicitement `isinstance(capabilities, SensorCapabilities)` avant le fallback générique.
+- Nouveau fichier de tests story 7.2 couvrant AC1 à AC6, avec snapshots stricts des types hors vague et vérification de `PRODUCT_SCOPE`.
+- Aucun mapper, aucun fichier UX, aucun `cause_mapping.py`, aucun `PRODUCT_SCOPE` et aucun `cause_label/cause_action` modifié.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/7-2-vague-cible-ha-les-types-candidats-sont-modelises-dans-le-registre-comme-connus-avec-contraintes-explicites-et-perimetre-borne.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `resources/daemon/models/mapping.py`
+- `resources/daemon/validation/ha_component_registry.py`
+- `resources/daemon/tests/unit/test_story_7_2_wave_registry.py`
+
+### Change Log
+
+- 2026-04-25 — Implémentation story 7.2 : vague cible `sensor`/`binary_sensor` déclarée comme connue, `SensorCapabilities` ajouté, tests AC1-AC6 ajoutés, non-régression complète verte.
+- 2026-04-27 — Senior Developer Review (BMAD) PASS — verdict `PASS`, 0 finding HIGH/MEDIUM, 1 LOW non bloquante (cf. section ci-dessous). Story laissée en `review`.
+
+## Senior Developer Review (AI) — 2026-04-27
+
+**Reviewer :** Senior Developer + QA BMAD (claude-opus-4-7)
+**Verdict :** ✅ **PASS** — aucune correction requise.
+
+### Préflight Git
+- Branche active : `story/pe-7.2-wave-registry` ✅
+- Worktree dédié : `/Users/alexandre/Dev/jeedom/plugins/jeedom2ha-story-pe-7.2` ✅
+- `main` non modifié (working tree clean dans le worktree principal) ✅
+- File List vs `git status` : 100% concordant (4 modif + 1 nouveau = 5 entrées) ✅
+
+### Fichiers inspectés
+- `resources/daemon/models/mapping.py` (diff +19 / -3) — `SensorCapabilities` ajouté, `MappingCapabilities` Union étendu, type-hint de `MappingResult.capabilities` consolidé en `Optional[MappingCapabilities]`.
+- `resources/daemon/validation/ha_component_registry.py` (diff +11 / -1) — import `SensorCapabilities`, commentaire vague cible, bloc `isinstance(SensorCapabilities)` dans `_resolve_capability("has_state", ...)` avant fallback `getattr`.
+- `resources/daemon/tests/unit/test_story_7_2_wave_registry.py` (nouveau, 13 tests) — couvre AC1-AC6 strictement, snapshot des 4 types hors-vague, `inspect.getsource` pour verrouiller le chemin `isinstance`.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story 7.2 = `review`, last_updated 2026-04-25.
+- `_bmad-output/implementation-artifacts/7-2-...md` — File List, Change Log, Dev Agent Record cohérents.
+
+### Confirmation des guardrails
+| Guardrail | Statut |
+|---|---|
+| Aucun mapper `sensor.py` créé | ✅ |
+| `mapping/light.py`/`cover.py`/`switch.py` non touchés | ✅ |
+| `PRODUCT_SCOPE == ["light","cover","switch"]` inchangé | ✅ |
+| `models/cause_mapping.py` non touché | ✅ |
+| Aucun `cause_label`/`cause_action` modifié | ✅ |
+| Aucune surface FE/UX modifiée | ✅ |
+| Doubles locaux `_SensorLikeCapabilities` conservés et toujours verts | ✅ |
+| Hors-vague `button`/`number`/`select`/`climate` non impactés | ✅ |
+| Fallback `getattr(..., "has_state", False)` conservé | ✅ |
+
+### Validation AC1-AC6
+- **AC1** ✅ PASS — `test_wave_target_types_in_registry` + `test_wave_types_have_exact_d3_constraints`
+- **AC2** ✅ PASS — `test_non_wave_registry_entries_unchanged` + `test_non_wave_types_not_in_product_scope`
+- **AC3** ✅ PASS — `test_sensor_capabilities_dataclass_defaults` + `test_resolve_capability_has_state_sensor` + `test_resolve_capability_uses_sensor_isinstance_path` (verrou source)
+- **AC4** ✅ PASS — 4 cas validate_projection (nominal + échec, sensor + binary_sensor) + non-régression `test_step3_validate_projection.py` 11/11
+- **AC5** ✅ PASS — `test_product_scope_unchanged` (assert exact)
+- **AC6** ✅ PASS — corpus complet 1150 passed (vs 1137 baseline pe-7.1)
+
+### Tests exécutés
+| Commande | Résultat |
+|---|---|
+| `pytest test_story_7_2_wave_registry.py` | **13 passed** |
+| `pytest test_ha_component_registry.py test_step3_validate_projection.py` | **20 passed** |
+| `pytest` (corpus complet, racine worktree) | **1150 passed**, 993 warnings (préexistants) |
+| `flake8` sur les 3 fichiers cibles | **0 erreur** |
+
+### Remarques non bloquantes
+- **LOW (dette préexistante, hors scope 7.2)** : `MappingResult.__post_init__` (`models/mapping.py:140-142`) lève une `ValueError` listant uniquement `« LightCapabilities or CoverCapabilities »` — message déjà obsolète depuis Story 2.4 (Switch) et reste muet sur Sensor. À cleanup dans un futur cycle de dette technique (Epic 4 recadrage UX ou suite pe-epic-7). **Ne pas corriger ici** : la story interdit explicitement les enrichissements opportunistes, et `SensorCapabilities` ne sera pas utilisé comme `MappingResult.capabilities` en production tant que 7.4 + mapper sensor n'existent pas.
+
+### Décision workflow BMAD
+- Statut conservé : `review` (pas de transition automatique vers `done` — décision laissée à l'opérateur BMAD selon le pattern projet : merge PR puis closeout pe-7.2).
+- Aucun push, aucun merge, aucune modification du code applicatif effectués pendant cette review.

@@ -13,7 +13,13 @@ from __future__ import annotations
 
 from typing import List
 
-from models.mapping import LightCapabilities, CoverCapabilities, SwitchCapabilities, ProjectionValidity
+from models.mapping import (
+    CoverCapabilities,
+    LightCapabilities,
+    ProjectionValidity,
+    SensorCapabilities,
+    SwitchCapabilities,
+)
 
 HA_COMPONENT_REGISTRY = {
     "light": {
@@ -28,6 +34,7 @@ HA_COMPONENT_REGISTRY = {
         "required_fields": ["command_topic", "platform", "availability"],
         "required_capabilities": ["has_command"],
     },
+    # Vague cible pe-epic-7 : composants connus, non ouverts dans PRODUCT_SCOPE.
     "sensor": {
         "required_fields": ["state_topic", "platform", "availability"],
         "required_capabilities": ["has_state"],
@@ -101,6 +108,8 @@ def _resolve_capability(abstract: str, capabilities: object) -> bool:
             or getattr(capabilities, "has_command", False)
         )
     if abstract == "has_state":
+        if isinstance(capabilities, SensorCapabilities):
+            return capabilities.has_state
         return bool(getattr(capabilities, "has_state", False))
     if abstract == "has_options":
         return bool(getattr(capabilities, "has_options", False))
