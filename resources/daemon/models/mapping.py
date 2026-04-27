@@ -3,6 +3,7 @@
 Introduced in Story 2.2 for capability-based light mapping.
 Extended in Story 2.3 for cover mapping.
 Extended in Story 2.4 for switch mapping.
+Extended in Story 7.2 PE for sensor/binary_sensor known capabilities.
 """
 from __future__ import annotations
 
@@ -53,7 +54,21 @@ class SwitchCapabilities:
     device_class: Optional[str] = None   # "outlet" if confirmed by eq_type_name, None otherwise
 
 
-MappingCapabilities = Union[LightCapabilities, CoverCapabilities, SwitchCapabilities]
+@dataclass
+class SensorCapabilities:
+    """Sensor capabilities detected for the pe-epic-7 target wave.
+
+    Story 7.2 PE - known constraints only. No sensor mapper is introduced here.
+    """
+    has_state: bool = False
+
+
+MappingCapabilities = Union[
+    LightCapabilities,
+    CoverCapabilities,
+    SensorCapabilities,
+    SwitchCapabilities,
+]
 
 
 @dataclass
@@ -110,7 +125,7 @@ class MappingResult:
     commands: Dict[str, JeedomCmd] = field(default_factory=dict)   # generic_type -> JeedomCmd
     # Sentinel default=None so dataclass field ordering is respected.
     # __post_init__ enforces that callers always provide an explicit value.
-    capabilities: Optional[Union[LightCapabilities, CoverCapabilities, "SwitchCapabilities"]] = None
+    capabilities: Optional[MappingCapabilities] = None
     reason_details: Optional[Dict[str, object]] = None
     projection_validity: Optional[ProjectionValidity] = None
     publication_decision_ref: Optional["PublicationDecision"] = None
