@@ -1,6 +1,6 @@
 # Story 7.2 : Vague cible HA — les types candidats sont modélisés dans le registre comme `connus`, avec contraintes explicites et périmètre borné
 
-Status: review
+Status: done
 
 ## Story
 
@@ -280,6 +280,7 @@ GPT-5 Codex — 2026-04-25
 
 - 2026-04-25 — Implémentation story 7.2 : vague cible `sensor`/`binary_sensor` déclarée comme connue, `SensorCapabilities` ajouté, tests AC1-AC6 ajoutés, non-régression complète verte.
 - 2026-04-27 — Senior Developer Review (BMAD) PASS — verdict `PASS`, 0 finding HIGH/MEDIUM, 1 LOW non bloquante (cf. section ci-dessous). Story laissée en `review`.
+- 2026-04-27 — Closeout : PR #103 mergée dans `main` (merge SHA `065df16`, commit story `7b9a6f9`). CI PASS (Python 3.9 + 3.12). 0 finding HIGH/MEDIUM. 1 LOW non bloquante (`MappingResult.__post_init__` message obsolète) laissée en dette technique — ne pas corriger dans cette story. Branche remote et worktree supprimés. Aucun terrain requis (pas de surface utilisateur modifiée). Story passée en `done`.
 
 ## Senior Developer Review (AI) — 2026-04-27
 
