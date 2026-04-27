@@ -47,7 +47,7 @@
 #             puis actionnabilite produit ouverte de facon gouvernee
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-27'  # story 7.3 done — code review PASS, fixes M2/L1/L2 appliquées, 1164 passed
+last_updated: '2026-04-27'  # story 7.3 done — PR #104 mergée main (5cc7f83), CI PASS, branche nettoyée
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -163,7 +163,7 @@ development_status:
   pe-epic-7: in-progress  # story 7.1 creee ready-for-dev le 2026-04-23 ; epic actif selon le sequencing approuve du 2026-04-22
   7-1-enrichissement-additif-du-contrat-4d-projection-validity-est-expose-de-bout-en-bout-sans-regression-sur-le-schema-canonique: done
   7-2-vague-cible-ha-les-types-candidats-sont-modelises-dans-le-registre-comme-connus-avec-contraintes-explicites-et-perimetre-borne: done  # PR #103 mergée 2026-04-27 (065df16)
-  7-3-validation-de-projection-de-la-vague-cible-cas-nominaux-et-cas-d-echec-representatifs-rendent-les-types-validables: done
+  7-3-validation-de-projection-de-la-vague-cible-cas-nominaux-et-cas-d-echec-representatifs-rendent-les-types-validables: done  # PR #104 mergée 2026-04-27 (5cc7f83)
   7-4-gouvernance-d-ouverture-de-la-vague-cible-product-scope-n-evolue-que-sous-fr40-nfr10-dans-le-meme-increment: backlog
   7-5-exposition-d-actions-utilisateur-uniquement-sur-les-surfaces-reelles-et-supportees: backlog
   pe-epic-7-retrospective: optional

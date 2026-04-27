@@ -320,3 +320,4 @@ _Aucun — implémentation directe, tous les tests verts dès le premier run._
 
 - 2026-04-27 — Story 7.3 implémentée : 14 tests de validation de projection vague cible (sensor/binary_sensor) créés — état `connu → validable` selon AR6 satisfait
 - 2026-04-27 — Code review : corrections M2/L1/L2 appliquées (assertions `missing_*` étendues, non-régression light/cover/switch alignée 4 assertions, `hasattr` redondants retirés) — 14/14 PASS, 1164 passed, status → done
+- 2026-04-27 — Closeout : PR #104 mergée dans `main` (squash SHA `5cc7f83`). CI PASS (Python 3.9 + 3.12 + Lint + PR Policy). 0 code applicatif modifié. Aucun terrain requis (story 100 % test-driven). Branche remote supprimée. Story closeout conforme au pattern pe-epic-7.
