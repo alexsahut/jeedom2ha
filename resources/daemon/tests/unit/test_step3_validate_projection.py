@@ -179,7 +179,7 @@ def test_validate_projection_unknown_component_is_invalid():
 def test_validate_projection_sensor_without_state_returns_ha_missing_state_topic():
     """sensor avec has_state=False → ha_missing_state_topic.
 
-    sensor est connu dans HA_COMPONENT_REGISTRY mais non ouvert dans PRODUCT_SCOPE.
+    sensor est connu dans HA_COMPONENT_REGISTRY et ouvert dans PRODUCT_SCOPE depuis Story 7.4.
     La validation structurelle (étape 3) est distincte de la gouvernance d'ouverture
     (Story 3.3 / étape 4) : on peut valider sans publier.
     """
@@ -204,7 +204,8 @@ def test_validate_projection_sensor_with_state_is_valid():
 def test_validate_projection_select_without_options_returns_ha_missing_required_option():
     """select avec has_options=False → ha_missing_required_option (priorité max).
 
-    select est connu dans HA_COMPONENT_REGISTRY mais non ouvert dans PRODUCT_SCOPE.
+    select est connu dans HA_COMPONENT_REGISTRY mais non ouvert dans PRODUCT_SCOPE
+    (sensor/binary_sensor ouverts en Story 7.4, select hors périmètre cycle courant).
     La priorité du reason_code garantit que ha_missing_required_option est retourné
     même si has_command est aussi manquant.
     """

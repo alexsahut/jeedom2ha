@@ -147,4 +147,5 @@ def test_sensor_like_double_with_state_false_works():
 
 
 def test_product_scope_unchanged():
-    assert PRODUCT_SCOPE == ["light", "cover", "switch"]
+    """Story 7.3 n'a pas ouvert PRODUCT_SCOPE ; sensor/binary_sensor ouverts en Story 7.4."""
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]

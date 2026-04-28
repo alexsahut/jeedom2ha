@@ -184,7 +184,7 @@ def test_i4_step2_wins_over_step4_ambiguous_plus_out_of_scope():
     la cause de l'étape 2 (ambiguous_skipped).
     """
     mapping = _make_mapping(
-        ha_entity_type="sensor",   # hors PRODUCT_SCOPE
+        ha_entity_type="climate",  # hors PRODUCT_SCOPE
         confidence="ambiguous",
     )
     result = decide_publication(mapping, product_scope=list(PRODUCT_SCOPE))
@@ -203,7 +203,7 @@ def test_i4_step3_wins_over_step4_invalid_plus_out_of_scope():
     la cause de l'étape 3 (projection invalide).
     """
     mapping = _make_mapping(
-        ha_entity_type="sensor",   # hors PRODUCT_SCOPE
+        ha_entity_type="climate",  # hors PRODUCT_SCOPE
         confidence="sure",
         projection_validity=_failed_pv("ha_missing_state_topic"),
     )
@@ -232,7 +232,7 @@ def test_i6_reason_never_null_on_all_failure_paths():
         _make_mapping(confidence="sure", projection_validity=_failed_pv("ha_missing_command_topic")),
         _make_mapping(confidence="sure", projection_validity=_failed_pv("ha_component_unknown")),
         # Étape 4a
-        _make_mapping(ha_entity_type="sensor", confidence="sure"),   # hors scope
+        _make_mapping(ha_entity_type="climate", confidence="sure"),  # hors scope
         # Étape 4b
         _make_mapping(ha_entity_type="light", confidence="probable"),
     ]

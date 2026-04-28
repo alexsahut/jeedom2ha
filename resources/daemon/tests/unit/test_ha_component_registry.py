@@ -53,8 +53,8 @@ def test_each_registry_component_has_at_least_one_constraint():
 
 
 def test_product_scope_initial_value():
-    """AC3 - La valeur initiale du scope ouvert herite de V1.x."""
-    assert PRODUCT_SCOPE == ["light", "cover", "switch"]
+    """AC3 - Le scope ouvert apres Story 7.4 inclut la vague cible pe-epic-7."""
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]
 
 
 def test_product_scope_subset_of_registry():

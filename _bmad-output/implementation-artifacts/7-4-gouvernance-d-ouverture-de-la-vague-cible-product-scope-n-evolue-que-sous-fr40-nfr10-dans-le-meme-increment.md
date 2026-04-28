@@ -1,6 +1,6 @@
 # Story 7.4 : Gouvernance d'ouverture de la vague cible — `PRODUCT_SCOPE` n'évolue que sous FR40 / NFR10 dans le même incrément
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -141,42 +141,42 @@ Après cette story :
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Modifier `PRODUCT_SCOPE` dans `ha_component_registry.py` (AC: #1)
-  - [ ] Ligne 64 : `PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor"]`
-  - [ ] Mettre à jour le commentaire de version sur la même ligne
+- [x] Task 1 — Modifier `PRODUCT_SCOPE` dans `ha_component_registry.py` (AC: #1)
+  - [x] Ligne 64 : `PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor"]`
+  - [x] Mettre à jour le commentaire de version sur la même ligne
 
-- [ ] Task 2 — Mettre à jour `test_step3_governance_fr40.py` (AC: #2, #3)
-  - [ ] Ajouter `SensorCapabilities` aux imports depuis `models.mapping`
-  - [ ] Ajouter `"sensor": "test_governance_fr40_proof_sensor"` à `_GOVERNED_SCOPE`
-  - [ ] Ajouter `"binary_sensor": "test_governance_fr40_proof_binary_sensor"` à `_GOVERNED_SCOPE`
-  - [ ] Implémenter `test_governance_fr40_proof_sensor()` : nominal `has_state=True` → `is_valid=True` + échec `has_state=False` → `is_valid=False, reason_code="ha_missing_state_topic"`
-  - [ ] Implémenter `test_governance_fr40_proof_binary_sensor()` : même structure
+- [x] Task 2 — Mettre à jour `test_step3_governance_fr40.py` (AC: #2, #3)
+  - [x] Ajouter `SensorCapabilities` aux imports depuis `models.mapping`
+  - [x] Ajouter `"sensor": "test_governance_fr40_proof_sensor"` à `_GOVERNED_SCOPE`
+  - [x] Ajouter `"binary_sensor": "test_governance_fr40_proof_binary_sensor"` à `_GOVERNED_SCOPE`
+  - [x] Implémenter `test_governance_fr40_proof_sensor()` : nominal `has_state=True` → `is_valid=True` + échec `has_state=False` → `is_valid=False, reason_code="ha_missing_state_topic"`
+  - [x] Implémenter `test_governance_fr40_proof_binary_sensor()` : même structure
 
-- [ ] Task 3 — Corriger les tests I4/I6 impactés (AC: #5)
-  - [ ] `test_step4_decide_publication.py` ligne 187 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
-  - [ ] `test_step4_decide_publication.py` ligne 206 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
-  - [ ] `test_step4_decide_publication.py` ligne 235 : `sensor` → `climate` (commentaire `# hors scope`)
-  - [ ] `test_pipeline_invariants.py` ligne 170 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
-  - [ ] `test_pipeline_invariants.py` ligne 211 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
-  - [ ] `test_pipeline_invariants.py` ligne 280 : `sensor` → `climate` (commentaire `# étape 4a`)
-  - [ ] `test_step3_validate_projection.py` ligne 182 : mettre à jour commentaire ("non ouvert → ouvert depuis Story 7.4")
-  - [ ] `test_step3_validate_projection.py` ligne 207 : même mise à jour commentaire pour `select`
+- [x] Task 3 — Corriger les tests I4/I6 impactés (AC: #5)
+  - [x] `test_step4_decide_publication.py` ligne 187 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
+  - [x] `test_step4_decide_publication.py` ligne 206 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
+  - [x] `test_step4_decide_publication.py` ligne 235 : `sensor` → `climate` (commentaire `# hors scope`)
+  - [x] `test_pipeline_invariants.py` ligne 170 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
+  - [x] `test_pipeline_invariants.py` ligne 211 : `sensor` → `climate` (commentaire `# hors PRODUCT_SCOPE`)
+  - [x] `test_pipeline_invariants.py` ligne 280 : `sensor` → `climate` (commentaire `# étape 4a`)
+  - [x] `test_step3_validate_projection.py` ligne 182 : mettre à jour commentaire ("non ouvert → ouvert depuis Story 7.4")
+  - [x] `test_step3_validate_projection.py` ligne 207 : même mise à jour commentaire pour `select`
 
-- [ ] Task 4 — Créer `test_story_7_4_governance_product_scope.py` (AC: #1, #4, #6)
-  - [ ] `test_product_scope_wave_opening_complete()` — PRODUCT_SCOPE contient les 5 types attendus
-  - [ ] `test_decide_publication_authorizes_sensor_sure()` — sensor + sure + is_valid=True → should_publish=True
-  - [ ] `test_decide_publication_authorizes_binary_sensor_sure()` — binary_sensor + sure + is_valid=True → should_publish=True
-  - [ ] `test_decide_publication_sensor_probable_sure_probable_policy()` — sensor + probable + sure_probable → should_publish=True
-  - [ ] `test_decide_publication_sensor_probable_sure_only_policy()` — sensor + probable + sure_only → should_publish=False, reason="probable_skipped" (le gate politique fonctionne toujours)
-  - [ ] `test_governance_gate_sensor_not_in_scope_when_scope_empty()` — sensor + scope=[] → ha_component_not_in_product_scope (démontre que le mécanisme d'exclusion explicite reste fonctionnel)
-  - [ ] `test_fr40_condition1_sensor_binary_sensor_in_registry()` — les deux types ont required_fields + required_capabilities dans HA_COMPONENT_REGISTRY
-  - [ ] `test_fr40_condition3_nfr10_non_regression_existing_scope()` — light/cover/switch toujours autorisés par decide_publication (4D non-régression)
+- [x] Task 4 — Créer `test_story_7_4_governance_product_scope.py` (AC: #1, #4, #6)
+  - [x] `test_product_scope_wave_opening_complete()` — PRODUCT_SCOPE contient les 5 types attendus
+  - [x] `test_decide_publication_authorizes_sensor_sure()` — sensor + sure + is_valid=True → should_publish=True
+  - [x] `test_decide_publication_authorizes_binary_sensor_sure()` — binary_sensor + sure + is_valid=True → should_publish=True
+  - [x] `test_decide_publication_sensor_probable_sure_probable_policy()` — sensor + probable + sure_probable → should_publish=True
+  - [x] `test_decide_publication_sensor_probable_sure_only_policy()` — sensor + probable + sure_only → should_publish=False, reason="probable_skipped" (le gate politique fonctionne toujours)
+  - [x] `test_governance_gate_sensor_not_in_scope_when_scope_empty()` — sensor + scope=[] → ha_component_not_in_product_scope (démontre que le mécanisme d'exclusion explicite reste fonctionnel)
+  - [x] `test_fr40_condition1_sensor_binary_sensor_in_registry()` — les deux types ont required_fields + required_capabilities dans HA_COMPONENT_REGISTRY
+  - [x] `test_fr40_condition3_nfr10_non_regression_existing_scope()` — light/cover/switch toujours autorisés par decide_publication (4D non-régression)
 
-- [ ] Task 5 — Valider la non-régression corpus complet (AC: #6)
-  - [ ] `python3 -m pytest resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py -v` → tous passent
-  - [ ] `python3 -m pytest resources/daemon/tests/unit/test_step3_governance_fr40.py -v` → 5 types couverts (dont sensor/binary_sensor)
-  - [ ] `python3 -m pytest resources/daemon/tests/unit/test_step4_decide_publication.py resources/daemon/tests/unit/test_pipeline_invariants.py -v` → 0 régression après remplacement sensor→climate
-  - [ ] `python3 -m pytest` (corpus complet depuis `resources/daemon/`) → corpus ≥ 1176 passed, 0 régression
+- [x] Task 5 — Valider la non-régression corpus complet (AC: #6)
+  - [x] `python3 -m pytest resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py -v` → 8/8 PASS
+  - [x] `python3 -m pytest resources/daemon/tests/unit/test_step3_governance_fr40.py -v` → 12/12 PASS (5 types paramétrés dont sensor/binary_sensor)
+  - [x] `python3 -m pytest resources/daemon/tests/unit/test_step4_decide_publication.py resources/daemon/tests/unit/test_pipeline_invariants.py -v` → 29/29 PASS
+  - [x] `python3 -m pytest` (corpus complet depuis racine projet) → 1176 passed, 0 régression
 
 ## Dev Notes
 
@@ -297,10 +297,35 @@ Même structure pour `binary_sensor` — `sensor` et `binary_sensor` partagent `
 
 ### Agent Model Used
 
-claude-sonnet-4-6 — 2026-04-27
+claude-sonnet-4-6 — 2026-04-28
 
 ### Debug Log References
 
+Aucun blocage. 3 tests snapshots (test_ha_component_registry, test_story_7_2, test_story_7_3) non mentionnés dans Dev Notes mais impactés par l'extension de PRODUCT_SCOPE — mis à jour pour refléter le nouvel état post-Story-7.4.
+
 ### Completion Notes List
 
+- PRODUCT_SCOPE étendu à 5 types : light, cover, switch, sensor, binary_sensor (1 ligne modifiée)
+- Verrou CI FR40 mis à jour : _GOVERNED_SCOPE + 2 fonctions de preuve (sensor, binary_sensor) dans test_step3_governance_fr40.py — test paramétré passe maintenant sur 5 types
+- 6 occurrences sensor→climate dans test_step4_decide_publication.py et test_pipeline_invariants.py (invariants I4/I6 couverts avec prémisse exacte)
+- 2 commentaires stales mis à jour dans test_step3_validate_projection.py
+- 3 assertions snapshot PRODUCT_SCOPE mises à jour (test_ha_component_registry, test_story_7_2_wave_registry, test_story_7_3_projection_validation_wave)
+- Nouveau fichier : test_story_7_4_governance_product_scope.py — 8 tests couvrant AC1/AC4/AC5/FR40/NFR10
+- Corpus final : 1176 passed, 0 régression (baseline 7.3 = 1164 ; +12 tests = 1176)
+
 ### File List
+
+resources/daemon/validation/ha_component_registry.py
+resources/daemon/tests/unit/test_step3_governance_fr40.py
+resources/daemon/tests/unit/test_step4_decide_publication.py
+resources/daemon/tests/unit/test_pipeline_invariants.py
+resources/daemon/tests/unit/test_step3_validate_projection.py
+resources/daemon/tests/unit/test_ha_component_registry.py
+resources/daemon/tests/unit/test_story_7_2_wave_registry.py
+resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py
+resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py (nouveau)
+_bmad-output/implementation-artifacts/sprint-status.yaml
+
+## Change Log
+
+- 2026-04-28 — Implémentation Story 7.4 : ouverture PRODUCT_SCOPE à sensor/binary_sensor sous FR40 ; verrou CI mis à jour ; +12 tests ; corpus 1176 passed, 0 régression

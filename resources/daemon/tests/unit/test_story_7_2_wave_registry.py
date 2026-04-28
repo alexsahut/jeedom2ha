@@ -80,9 +80,9 @@ def test_non_wave_types_not_in_product_scope():
 
 
 def test_product_scope_unchanged():
-    """AC5 — aucune ouverture produit dans cette story."""
-    assert PRODUCT_SCOPE == ["light", "cover", "switch"]
-    for component in WAVE_TARGETS:
+    """AC5 — Story 7.2 n'a pas ouvert PRODUCT_SCOPE ; sensor/binary_sensor ouverts en Story 7.4."""
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 
 

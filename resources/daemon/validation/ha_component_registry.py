@@ -61,7 +61,7 @@ HA_COMPONENT_REGISTRY = {
     },
 }
 
-PRODUCT_SCOPE = ["light", "cover", "switch"]  # V1.x - versionne par cycle produit
+PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor"]  # V1.x - pe-epic-7 vague cible ouverte Story 7.4
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,
