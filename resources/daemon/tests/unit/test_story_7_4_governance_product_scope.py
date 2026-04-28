@@ -7,27 +7,59 @@ Tests en isolation totale : aucun daemon, réseau, asyncio.
 
 from typing import Optional
 
-from models.mapping import MappingResult, ProjectionValidity, SensorCapabilities
+from models.mapping import (
+    CoverCapabilities,
+    LightCapabilities,
+    MappingCapabilities,
+    MappingResult,
+    ProjectionValidity,
+    SensorCapabilities,
+    SwitchCapabilities,
+)
 from models.decide_publication import decide_publication
 from validation.ha_component_registry import PRODUCT_SCOPE, HA_COMPONENT_REGISTRY
+
+
+_REASON_CODE_BY_TYPE = {
+    "light": "light_on_off",
+    "cover": "cover_open_close",
+    "switch": "switch_on_off",
+    "sensor": "sensor_state",
+    "binary_sensor": "binary_sensor_state",
+}
+
+
+def _default_capabilities(ha_entity_type: str) -> MappingCapabilities:
+    if ha_entity_type == "light":
+        return LightCapabilities(has_on_off=True)
+    if ha_entity_type == "cover":
+        return CoverCapabilities(has_open_close=True)
+    if ha_entity_type == "switch":
+        return SwitchCapabilities(has_on_off=True)
+    # sensor + binary_sensor partagent SensorCapabilities (cf. Story 7.2)
+    return SensorCapabilities(has_state=True)
 
 
 def _make_mapping(
     ha_entity_type: str = "sensor",
     confidence: str = "sure",
     projection_validity: Optional[ProjectionValidity] = None,
+    capabilities: Optional[MappingCapabilities] = None,
+    reason_code: Optional[str] = None,
 ) -> MappingResult:
     pv = projection_validity if projection_validity is not None else ProjectionValidity(
         is_valid=True, reason_code=None, missing_fields=[], missing_capabilities=[]
     )
+    caps = capabilities if capabilities is not None else _default_capabilities(ha_entity_type)
+    rc = reason_code if reason_code is not None else _REASON_CODE_BY_TYPE.get(ha_entity_type, "sensor_state")
     mr = MappingResult(
         ha_entity_type=ha_entity_type,
         confidence=confidence,
-        reason_code="sensor_state",
+        reason_code=rc,
         jeedom_eq_id=1,
         ha_unique_id="jeedom2ha_eq_1",
-        ha_name="Test sensor",
-        capabilities=SensorCapabilities(has_state=True),
+        ha_name="Test entity",
+        capabilities=caps,
     )
     mr.projection_validity = pv
     return mr
@@ -74,6 +106,14 @@ def test_decide_publication_sensor_probable_sure_probable_policy():
 def test_decide_publication_sensor_probable_sure_only_policy():
     """sensor + probable + sure_only → should_publish=False (gate politique actif)."""
     mapping = _make_mapping(ha_entity_type="sensor", confidence="probable")
+    result = decide_publication(mapping, confidence_policy="sure_only")
+    assert result.should_publish is False
+    assert result.reason == "probable_skipped"
+
+
+def test_decide_publication_binary_sensor_probable_sure_only_policy():
+    """binary_sensor + probable + sure_only → should_publish=False (gate politique actif)."""
+    mapping = _make_mapping(ha_entity_type="binary_sensor", confidence="probable")
     result = decide_publication(mapping, confidence_policy="sure_only")
     assert result.should_publish is False
     assert result.reason == "probable_skipped"

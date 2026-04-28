@@ -1,6 +1,6 @@
 # Story 7.4 : Gouvernance d'ouverture de la vague cible — `PRODUCT_SCOPE` n'évolue que sous FR40 / NFR10 dans le même incrément
 
-Status: review
+Status: done
 
 ## Story
 
@@ -329,3 +329,8 @@ _bmad-output/implementation-artifacts/sprint-status.yaml
 ## Change Log
 
 - 2026-04-28 — Implémentation Story 7.4 : ouverture PRODUCT_SCOPE à sensor/binary_sensor sous FR40 ; verrou CI mis à jour ; +12 tests ; corpus 1176 passed, 0 régression
+- 2026-04-28 — Code review fixes (M1/L1/L2/L3, tests-only) :
+  - M1 : `test_product_scope_unchanged` renommé en `test_product_scope_snapshot_with_wave_open` dans `test_story_7_2_wave_registry.py` et `test_story_7_3_projection_validation_wave.py` (le nom "unchanged" devenait trompeur post-7.4)
+  - L1/L2 : helper `_make_mapping` du fichier 7.4 paramètre désormais `capabilities` et `reason_code` selon `ha_entity_type` via `_default_capabilities()` + `_REASON_CODE_BY_TYPE` (cohérence type/capabilities pour light/cover/switch dans le test NFR10)
+  - L3 : ajout `test_decide_publication_binary_sensor_probable_sure_only_policy` — symétrie de couverture sensor/binary_sensor sur le gate `sure_only`
+  - Corpus final : 1177 passed (+1 vs baseline review), 0 régression — aucun changement produit, périmètre strictement test
