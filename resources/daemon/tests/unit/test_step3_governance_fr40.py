@@ -34,7 +34,7 @@ Helpers locaux uniquement — pas de conftest.py.
 
 import pytest
 
-from models.mapping import LightCapabilities, CoverCapabilities, SwitchCapabilities
+from models.mapping import LightCapabilities, CoverCapabilities, SwitchCapabilities, SensorCapabilities
 from validation.ha_component_registry import (
     PRODUCT_SCOPE,
     HA_COMPONENT_REGISTRY,
@@ -53,6 +53,8 @@ _GOVERNED_SCOPE = {
     "light": "test_governance_fr40_proof_light",
     "cover": "test_governance_fr40_proof_cover",
     "switch": "test_governance_fr40_proof_switch",
+    "sensor": "test_governance_fr40_proof_sensor",
+    "binary_sensor": "test_governance_fr40_proof_binary_sensor",
 }
 # 3 conditions FR40 — mécanismes d'enforcement (AR13) :
 #
@@ -173,6 +175,43 @@ def test_governance_fr40_proof_switch():
     result_fail = validate_projection("switch", SwitchCapabilities(has_on_off=False))
     assert result_fail.is_valid is False
     assert result_fail.reason_code == "ha_missing_command_topic"
+
+
+# ---------------------------------------------------------------------------
+# Preuves de gouvernance FR40 : vague cible pe-epic-7 (Story 7.4)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_sensor():
+    """Preuve de gouvernance FR40 pour le composant 'sensor'.
+
+    Cas nominal : SensorCapabilities avec has_state=True → is_valid=True.
+    Cas d'échec : SensorCapabilities avec has_state=False → is_valid=False,
+                  reason_code="ha_missing_state_topic".
+    """
+    result_nominal = validate_projection("sensor", SensorCapabilities(has_state=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail = validate_projection("sensor", SensorCapabilities(has_state=False))
+    assert result_fail.is_valid is False
+    assert result_fail.reason_code == "ha_missing_state_topic"
+
+
+def test_governance_fr40_proof_binary_sensor():
+    """Preuve de gouvernance FR40 pour le composant 'binary_sensor'.
+
+    sensor et binary_sensor partagent SensorCapabilities (has_state).
+    Cas nominal : SensorCapabilities avec has_state=True → is_valid=True.
+    Cas d'échec : SensorCapabilities avec has_state=False → is_valid=False,
+                  reason_code="ha_missing_state_topic".
+    """
+    result_nominal = validate_projection("binary_sensor", SensorCapabilities(has_state=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail = validate_projection("binary_sensor", SensorCapabilities(has_state=False))
+    assert result_fail.is_valid is False
+    assert result_fail.reason_code == "ha_missing_state_topic"
 
 
 # ---------------------------------------------------------------------------

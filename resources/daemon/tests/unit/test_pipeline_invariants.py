@@ -167,7 +167,7 @@ def test_i4_ambiguous_plus_out_of_scope_keeps_step2_cause():
     assert eligibility.is_eligible is True
 
     mapping = _make_mapping(
-        ha_entity_type="sensor",   # hors PRODUCT_SCOPE
+        ha_entity_type="climate",  # hors PRODUCT_SCOPE
         confidence="ambiguous",    # échec étape 2
         projection_validity=_valid_pv(),
     )
@@ -208,7 +208,7 @@ def test_i4_invalid_projection_plus_out_of_scope_keeps_step3_cause():
     assert eligibility.is_eligible is True
 
     mapping = _make_mapping(
-        ha_entity_type="sensor",   # hors PRODUCT_SCOPE
+        ha_entity_type="climate",  # hors PRODUCT_SCOPE
         confidence="sure",
         projection_validity=_invalid_pv("ha_missing_state_topic"),
     )
@@ -277,7 +277,7 @@ def test_i6_reason_field_never_null_or_empty():
         # étape 3
         _make_mapping(confidence="sure", projection_validity=_invalid_pv("ha_missing_command_topic")),
         # étape 4a
-        _make_mapping(ha_entity_type="sensor", confidence="sure", projection_validity=_valid_pv()),
+        _make_mapping(ha_entity_type="climate", confidence="sure", projection_validity=_valid_pv()),
         # étape 4b
         _make_mapping(ha_entity_type="light", confidence="probable", projection_validity=_valid_pv()),
         # nominal

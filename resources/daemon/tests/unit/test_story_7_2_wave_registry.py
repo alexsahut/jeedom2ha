@@ -79,10 +79,15 @@ def test_non_wave_types_not_in_product_scope():
         assert component not in PRODUCT_SCOPE
 
 
-def test_product_scope_unchanged():
-    """AC5 — aucune ouverture produit dans cette story."""
-    assert PRODUCT_SCOPE == ["light", "cover", "switch"]
-    for component in WAVE_TARGETS:
+def test_product_scope_snapshot_with_wave_open():
+    """Snapshot du PRODUCT_SCOPE après ouverture de la vague cible (Story 7.4).
+
+    Story 7.2 ne touchait pas à PRODUCT_SCOPE ; cette assertion garde la valeur
+    actuelle (5 types) et reste sous le contrôle de AR13 via
+    test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
+    """
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 
 
