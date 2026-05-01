@@ -41,13 +41,16 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-7 (22 stories — pe-epic-1/2/3/4/5/6 done, pe-epic-7 backlog)
+#   Epics: pe-epic-1 à pe-epic-9 (post correct-course 2026-04-30 :
+#          pe-epic-1/2/3/4/5/6/7 done, pe-epic-8/9 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
-#             puis actionnabilite produit ouverte de facon gouvernee
+#             actionnabilite produit gouvernee, refactor dispatch registry-driven,
+#             premiere vague d'extension reelle (sensor / binary_sensor / button)
+#             alimentee par ha-projection-reference.md et degradation elegante §11
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-04-28'  # story 7.4 done apres code review (M1/L1/L2/L3 fixes tests-only)
+last_updated: '2026-04-30'  # correct-course : cloture pe-epic-7, ajout pe-epic-8 + pe-epic-9
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -160,10 +163,37 @@ development_status:
   6-3-traduction-cause-canonique-cause-label-cause-action-stables-action-proposee-uniquement-si-une-remediation-utilisateur-existe: done
   pe-epic-6-retrospective: done  # retro partielle 2026-04-22 ; correct-course approuve ensuite — epic cloture, 6.2 re-homee, regle : aucune action exposee sans surface produit reelle
 
-  pe-epic-7: in-progress  # story 7.1 creee ready-for-dev le 2026-04-23 ; epic actif selon le sequencing approuve du 2026-04-22
+  pe-epic-7: done  # cloture propre apres correct-course 2026-04-30 ; valeur livree = 7.1 + 7.2 + 7.3 + 7.4 (gouvernance d'ouverture + projection_validity) ; 7.5 re-homee vers pe-epic-9 Story 9.5 ; dette structurelle (mappers + publishers + dispatch + degradation §11) re-homee vers pe-epic-8 et pe-epic-9
   7-1-enrichissement-additif-du-contrat-4d-projection-validity-est-expose-de-bout-en-bout-sans-regression-sur-le-schema-canonique: done
   7-2-vague-cible-ha-les-types-candidats-sont-modelises-dans-le-registre-comme-connus-avec-contraintes-explicites-et-perimetre-borne: done  # PR #103 mergée 2026-04-27 (065df16)
   7-3-validation-de-projection-de-la-vague-cible-cas-nominaux-et-cas-d-echec-representatifs-rendent-les-types-validables: done  # PR #104 mergée 2026-04-27 (5cc7f83)
   7-4-gouvernance-d-ouverture-de-la-vague-cible-product-scope-n-evolue-que-sous-fr40-nfr10-dans-le-meme-increment: done  # code review PASS 2026-04-28 — 0 finding HIGH, M1/L1/L2/L3 fixes tests-only, 1177 passed corpus
-  7-5-exposition-d-actions-utilisateur-uniquement-sur-les-surfaces-reelles-et-supportees: backlog
+  # 7-5 re-homee vers pe-epic-9 Story 9.5 le 2026-04-30 (correct-course) — non executable ici, voir bloc pe-epic-9 ci-dessous et SCP 2026-04-30 §5.4
   pe-epic-7-retrospective: optional
+
+  # ==============================================================
+  # pe-epic-8 — Refactor dispatch et registry-driven publishers
+  # Ajoute par correct-course 2026-04-30 — refactor PUR sans nouveau comportement
+  # Gate de cloture epic-level = golden-file 8.4 vert sur 30 equipements de reference
+  # ==============================================================
+  pe-epic-8: backlog
+  8-1-mapper-registry-dispatch-deterministe-et-slot-terminal-reserve: backlog
+  8-2-publisher-registry-dispatch-table-ha-entity-type-vers-methode-publish: backlog
+  8-3-refactor-http-server-run-sync-boucle-dispatch-unique-et-compteurs-generiques: backlog
+  8-4-gate-golden-file-de-non-regression-sur-30-equipements-de-reference: backlog
+  pe-epic-8-retrospective: optional
+
+  # ==============================================================
+  # pe-epic-9 — Vague 1 d'extension reelle : sensor / binary_sensor / button
+  #             + FallbackMapper §11 (degradation elegante terminale)
+  # Ajoute par correct-course 2026-04-30 — pre-requis pe-epic-8 clos
+  # Source de verite : _bmad-output/planning-artifacts/ha-projection-reference.md
+  # Gate terrain de cloture epic-level = comptage nouveaux publies sur box reelle
+  # ==============================================================
+  pe-epic-9: backlog
+  9-1-sensor-mapper-publish-sensor-info-numeric-et-capteurs-simples: backlog
+  9-2-binary-sensor-mapper-publish-binary-sensor-info-binary-presence-ouverture-fuite: backlog
+  9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10: backlog
+  9-4-fallback-mapper-degradation-elegante-terminale-publier-sensor-button-par-defaut-plutot-que-skip-silencieux: backlog
+  9-5-exposition-d-actions-utilisateur-sur-les-surfaces-reellement-ouvertes-par-la-vague-1-re-homee-depuis-7-5: backlog  # pre-requis : 9.1 + 9.2 + 9.3 + 9.4 done + gate terrain PASS
+  pe-epic-9-retrospective: optional
