@@ -1,0 +1,1814 @@
+_meta:
+  artifact_type: ha-projection-reference
+  project: jeedom2ha
+  source_xlsx: ha-projection-reference.xlsx
+  extracted_on: '2026-04-30'
+  status: source-of-truth
+  note: 'Derive ha_component_registry.yaml (consumed by daemon) from this reference. Do not edit by hand: regenerate from ha-projection-reference.xlsx.'
+ha_components:
+  alarm_control_panel:
+    doc_id: alarm_control_panel.mqtt
+    title: MQTT Alarm control panel
+    ha_domain: mqtt
+    ha_category: Alarm
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform, state_topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/alarm_control_panel.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the alarm state.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `alarm_control_panel`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+    - field_path: state_topic
+      field_name: state_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: '"The MQTT topic subscribed to receive state updates. A \"None\" payload resets to an `unknown` state. An empty payload is ignored. Valid state payloads are: `armed_away`, `armed_custom_bypass`,
+        `armed_home`, `armed_night`, `armed_vacation`, `arming`, `disarmed`, `disarming` `pending` and `triggered`."'
+  binary_sensor:
+    doc_id: binary_sensor.mqtt
+    title: MQTT binary sensor
+    ha_domain: mqtt
+    ha_category: Binary sensor
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform, state_topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/binary_sensor.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `binary_sensor`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+    - field_path: state_topic
+      field_name: state_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic subscribed to receive sensor's state. Valid states are `OFF` and `ON`. Custom `OFF` and `ON` values can be set with the `payload_off` and `payload_on` config options.
+  button:
+    doc_id: button.mqtt
+    title: MQTT button
+    ha_domain: mqtt
+    ha_category: Button
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/button.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to trigger the button.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `button`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  camera:
+    doc_id: camera.mqtt
+    title: MQTT Camera
+    ha_domain: mqtt
+    ha_category: Camera
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/camera.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: topic
+      field_name: topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to subscribe to.
+  climate:
+    doc_id: climate.mqtt
+    title: MQTT climate (HVAC)
+    ha_domain: mqtt
+    ha_category: Climate
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/climate.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+  cover:
+    doc_id: cover.mqtt
+    title: MQTT Cover
+    ha_domain: mqtt
+    ha_category: Cover
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/cover.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `cover`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  device_tracker:
+    doc_id: device_tracker.mqtt
+    title: MQTT device tracker
+    ha_domain: mqtt
+    ha_category: Presence detection
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/device_tracker.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `device_tracker`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  device_trigger:
+    doc_id: device_trigger.mqtt
+    title: MQTT Device trigger
+    ha_domain: mqtt
+    ha_category: Device automation
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: automation_type, platform, topic, type, subtype, device
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/device_trigger.mqtt.markdown
+    required_fields:
+    - field_path: automation_type
+      field_name: automation_type
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The type of automation, must be 'trigger'.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `device_automation`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+    - field_path: topic
+      field_name: topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic subscribed to receive trigger events.
+    - field_path: type
+      field_name: type
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: '"The type of the trigger, e.g. `button_short_press`. Entries supported by the frontend: `button_short_press`, `button_short_release`, `button_long_press`, `button_long_release`, `button_double_press`,
+        `button_triple_press`, `button_quadruple_press`, `button_quintuple_press`. If set to an unsupported value, will render as `subtype type`, e.g. `button_1 spammed` with `type` set to `spammed` and
+        `subtype` set to `button_1`"'
+    - field_path: subtype
+      field_name: subtype
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: '"The subtype of the trigger, e.g. `button_1`. Entries supported by the frontend: `turn_on`, `turn_off`, `button_1`, `button_2`, `button_3`, `button_4`, `button_5`, `button_6`. If set
+        to an unsupported value, will render as `subtype type`, e.g. `left_button pressed` with `type` set to `button_short_press` and `subtype` set to `left_button`"'
+    - field_path: device
+      field_name: device
+      parent_path: null
+      required: 'true'
+      type: map
+      default: null
+      description: '"Information about the device this device trigger is a part of to tie it into the [device registry](https://developers.home-assistant.io/docs/en/device_registry_index.html). At least
+        one of identifiers or connections must be present to identify the device."'
+  event:
+    doc_id: event.mqtt
+    title: MQTT Event
+    ha_domain: mqtt
+    ha_category: Event
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, event_types, platform, state_topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/event.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: event_types
+      field_name: event_types
+      parent_path: null
+      required: 'true'
+      type: list
+      default: null
+      description: A list of valid `event_type` strings.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `event`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+    - field_path: state_topic
+      field_name: state_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic subscribed to receive JSON event payloads. The JSON payload should contain the `event_type` element. The event type should be one of the configured `event_types`. Note
+        that replayed retained messages will be discarded.
+  fan:
+    doc_id: fan.mqtt
+    title: MQTT Fan
+    ha_domain: mqtt
+    ha_category: Fan
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/fan.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the fan state.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `fan`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  humidifier:
+    doc_id: humidifier.mqtt
+    title: MQTT Humidifier
+    ha_domain: mqtt
+    ha_category: Humidifier
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, target_humidity_command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/humidifier.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the humidifier state.
+    - field_path: target_humidity_command_topic
+      field_name: target_humidity_command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the humidifier target humidity state based on a percentage.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `humidifier`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  image:
+    doc_id: image.mqtt
+    title: MQTT Image
+    ha_domain: mqtt
+    ha_category: Image
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/image.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+  lawn_mower:
+    doc_id: lawn_mower.mqtt
+    title: MQTT lawn mower
+    ha_domain: mqtt
+    ha_category: Lawn mower
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/lawn_mower.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `lawn_mower`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  light:
+    doc_id: light.mqtt
+    title: MQTT Light
+    ha_domain: mqtt
+    ha_category: Light
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/light.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the switch state.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `light`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  lock:
+    doc_id: lock.mqtt
+    title: MQTT Lock
+    ha_domain: mqtt
+    ha_category: Lock
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/lock.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the lock state.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `lock`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  manual_mqtt:
+    doc_id: manual_mqtt
+    title: Manual MQTT Alarm control panel
+    ha_domain: manual_mqtt
+    ha_category: Alarm
+    discovery_or_setup_doc: null
+    explicit_required_fields_csv: null
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/manual_mqtt.markdown
+    required_fields: []
+  mqtt_json:
+    doc_id: mqtt_json
+    title: MQTT JSON
+    ha_domain: mqtt_json
+    ha_category: Presence detection
+    discovery_or_setup_doc: null
+    explicit_required_fields_csv: devices
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/mqtt_json.markdown
+    required_fields:
+    - field_path: devices
+      field_name: devices
+      parent_path: null
+      required: 'true'
+      type: list
+      default: null
+      description: List of devices with their topic.
+  mqtt_room:
+    doc_id: mqtt_room
+    title: MQTT room presence
+    ha_domain: mqtt_room
+    ha_category: Presence detection
+    discovery_or_setup_doc: null
+    explicit_required_fields_csv: device_id, state_topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/mqtt_room.markdown
+    required_fields:
+    - field_path: device_id
+      field_name: device_id
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The device id to track for this sensor.
+    - field_path: state_topic
+      field_name: state_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The topic that contains all subtopics for the rooms.
+  notify:
+    doc_id: notify.mqtt
+    title: MQTT notify
+    ha_domain: mqtt
+    ha_category: Notifications
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/notify.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+  number:
+    doc_id: number.mqtt
+    title: MQTT Number
+    ha_domain: mqtt
+    ha_category: Number
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/number.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the number.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `number`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  scene:
+    doc_id: scene.mqtt
+    title: MQTT Scene
+    ha_domain: mqtt
+    ha_category: Scene
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/scene.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `scene`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  select:
+    doc_id: select.mqtt
+    title: MQTT Select
+    ha_domain: mqtt
+    ha_category: Select
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, options, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/select.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the selected option.
+    - field_path: options
+      field_name: options
+      parent_path: null
+      required: 'true'
+      type: list
+      default: null
+      description: List of options that can be selected. An empty list or a list with a single item is allowed.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `select`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  sensor:
+    doc_id: sensor.mqtt
+    title: MQTT Sensor
+    ha_domain: mqtt
+    ha_category: Sensor
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform, state_topic
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/sensor.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `sensor`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+    - field_path: state_topic
+      field_name: state_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic subscribed to receive sensor values. If `device_class`, `state_class`, `unit_of_measurement` or `suggested_display_precision` is set, and a numeric value is expected, an
+        empty value `''` will be ignored and will not update the state, a `'None'` value will set the sensor to an `unknown` state. If a `value_template` is used to parse a JSON payload, a `null` value
+        in the JSON [will be rendered as](/docs/configuration/templating/#using-value-templates-with-mqtt) `'None'`. Note that the `device_class` can be `null`.
+  siren:
+    doc_id: siren.mqtt
+    title: MQTT Siren
+    ha_domain: mqtt
+    ha_category: Siren
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/siren.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `siren`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  switch:
+    doc_id: switch.mqtt
+    title: MQTT Switch
+    ha_domain: mqtt
+    ha_category: Switch
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/switch.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish commands to change the switch state.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `switch`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  tag:
+    doc_id: tag.mqtt
+    title: MQTT tag scanner
+    ha_domain: mqtt
+    ha_category: Tag scanner
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: topic, device
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/tag.mqtt.markdown
+    required_fields:
+    - field_path: topic
+      field_name: topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic subscribed to receive tag scanned events.
+    - field_path: device
+      field_name: device
+      parent_path: null
+      required: 'true'
+      type: map
+      default: null
+      description: '"Information about the device this device trigger is a part of to tie it into the [device registry](https://developers.home-assistant.io/docs/en/device_registry_index.html). At least
+        one of identifiers or connections must be present to identify the device."'
+  text:
+    doc_id: text.mqtt
+    title: MQTT Text
+    ha_domain: mqtt
+    ha_category: Text
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, command_topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/text.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: command_topic
+      field_name: command_topic
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: The MQTT topic to publish the text value that is set.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `text`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  update:
+    doc_id: update.mqtt
+    title: MQTT Update
+    ha_domain: mqtt
+    ha_category: Update
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/update.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `update`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  vacuum:
+    doc_id: vacuum.mqtt
+    title: MQTT Vacuum
+    ha_domain: mqtt
+    ha_category: Vacuum
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/vacuum.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `vacuum`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  valve:
+    doc_id: valve.mqtt
+    title: MQTT Valve
+    ha_domain: mqtt
+    ha_category: Valve
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/valve.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `valve`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+  water_heater:
+    doc_id: water_heater.mqtt
+    title: MQTT water heater
+    ha_domain: mqtt
+    ha_category: Water heater
+    discovery_or_setup_doc: 'yes'
+    explicit_required_fields_csv: availability > keys > topic, platform
+    source_url: https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/source/_integrations/water_heater.mqtt.markdown
+    required_fields:
+    - field_path: availability > keys > topic
+      field_name: topic
+      parent_path: availability > keys
+      required: 'true'
+      type: string
+      default: null
+      description: An MQTT topic subscribed to receive availability (online/offline) updates.
+    - field_path: platform
+      field_name: platform
+      parent_path: null
+      required: 'true'
+      type: string
+      default: null
+      description: Must be `water_heater`. Only allowed and required in [MQTT auto discovery device messages](/integrations/mqtt/#device-discovery-payload).
+jeedom_generic_types:
+- family_fr: Autre
+  family_id: Other
+  generic_code: TIMER
+  label_fr: Minuteur Etat
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Autre
+  family_id: Other
+  generic_code: TIMER_STATE
+  label_fr: Minuteur Etat (pause ou non)
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Autre
+  family_id: Other
+  generic_code: SET_TIMER
+  label_fr: Minuteur
+  command_kind: Action
+  subtypes: slider
+- family_fr: Autre
+  family_id: Other
+  generic_code: TIMER_PAUSE
+  label_fr: Minuteur pause
+  command_kind: Action
+  subtypes: other
+- family_fr: Autre
+  family_id: Other
+  generic_code: TIMER_RESUME
+  label_fr: Minuteur reprendre
+  command_kind: Action
+  subtypes: other
+- family_fr: Batterie
+  family_id: Battery
+  generic_code: BATTERY
+  label_fr: Batterie
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Batterie
+  family_id: Battery
+  generic_code: BATTERY_CHARGING
+  label_fr: Batterie en charge
+  command_kind: Info
+  subtypes: binary
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_URL
+  label_fr: URL caméra
+  command_kind: Info
+  subtypes: string
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_RECORD_STATE
+  label_fr: État enregistrement caméra
+  command_kind: Info
+  subtypes: binary
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_UP
+  label_fr: Mouvement caméra vers le haut
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_DOWN
+  label_fr: Mouvement caméra vers le bas
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_LEFT
+  label_fr: Mouvement caméra vers la gauche
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_RIGHT
+  label_fr: Mouvement caméra vers la droite
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_ZOOM
+  label_fr: Zoom caméra vers l’avant
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_DEZOOM
+  label_fr: Zoom caméra vers l’arrière
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_STOP
+  label_fr: Stop caméra
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_PRESET
+  label_fr: Preset caméra
+  command_kind: Action
+  subtypes: other
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_RECORD
+  label_fr: Enregistrement caméra
+  command_kind: Action
+  subtypes: null
+- family_fr: Caméra
+  family_id: Camera
+  generic_code: CAMERA_TAKE
+  label_fr: Snapshot caméra
+  command_kind: Action
+  subtypes: null
+- family_fr: Chauffage
+  family_id: Heating
+  generic_code: HEATING_STATE
+  label_fr: Chauffage fil pilote Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Chauffage
+  family_id: Heating
+  generic_code: HEATING_ON
+  label_fr: Chauffage fil pilote Bouton ON
+  command_kind: Action
+  subtypes: other
+- family_fr: Chauffage
+  family_id: Heating
+  generic_code: HEATING_OFF
+  label_fr: Chauffage fil pilote Bouton OFF
+  command_kind: Action
+  subtypes: other
+- family_fr: Chauffage
+  family_id: Heating
+  generic_code: HEATING_OTHER
+  label_fr: Chauffage fil pilote Bouton
+  command_kind: Action
+  subtypes: other
+- family_fr: Electricité
+  family_id: Electricity
+  generic_code: POWER
+  label_fr: Puissance Electrique
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Electricité
+  family_id: Electricity
+  generic_code: CONSUMPTION
+  label_fr: Consommation Electrique
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Electricité
+  family_id: Electricity
+  generic_code: VOLTAGE
+  label_fr: Tension
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Electricité
+  family_id: Electricity
+  generic_code: REBOOT
+  label_fr: Redémarrage
+  command_kind: Action
+  subtypes: other
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: TEMPERATURE
+  label_fr: Température
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: AIR_QUALITY
+  label_fr: Qualité de l’air
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: BRIGHTNESS
+  label_fr: Luminosité
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: PRESENCE
+  label_fr: Présence
+  command_kind: Info
+  subtypes: binary
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: SMOKE
+  label_fr: Détection de fumée
+  command_kind: Info
+  subtypes: binary
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: HUMIDITY
+  label_fr: Humidité
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: UV
+  label_fr: UV
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: CO2
+  label_fr: CO2 (ppm)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: CO
+  label_fr: CO (ppm)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: NOISE
+  label_fr: Son (dB)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: PRESSURE
+  label_fr: Pression
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: WATER_LEAK
+  label_fr: Fuite d’eau
+  command_kind: Info
+  subtypes: null
+- family_fr: Environnement
+  family_id: Environment
+  generic_code: FILTER_CLEAN_STATE
+  label_fr: Etat du filtre
+  command_kind: Info
+  subtypes: binary
+- family_fr: Generic
+  family_id: Generic
+  generic_code: DEPTH
+  label_fr: Profondeur
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Generic
+  family_id: Generic
+  generic_code: DISTANCE
+  label_fr: Distance
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Generic
+  family_id: Generic
+  generic_code: BUTTON
+  label_fr: Bouton
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Generic
+  family_id: Generic
+  generic_code: GENERIC_INFO
+  label_fr: Générique
+  command_kind: Info
+  subtypes: null
+- family_fr: Generic
+  family_id: Generic
+  generic_code: GENERIC_ACTION
+  label_fr: Générique
+  command_kind: Action
+  subtypes: other
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_STATE
+  label_fr: Lumière Etat
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_BRIGHTNESS
+  label_fr: Lumière Luminosité
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_COLOR
+  label_fr: Lumière Couleur
+  command_kind: Info
+  subtypes: string
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_STATE_BOOL
+  label_fr: Lumière Etat (Binaire)
+  command_kind: Info
+  subtypes: binary
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_COLOR_TEMP
+  label_fr: Lumière Température Couleur
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_TOGGLE
+  label_fr: Lumière Toggle
+  command_kind: Action
+  subtypes: other
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_ON
+  label_fr: Lumière Bouton On
+  command_kind: Action
+  subtypes: other
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_OFF
+  label_fr: Lumière Bouton Off
+  command_kind: Action
+  subtypes: other
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_SLIDER
+  label_fr: Lumière Slider
+  command_kind: Action
+  subtypes: slider
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_SET_COLOR
+  label_fr: Lumière Couleur
+  command_kind: Action
+  subtypes: color
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_MODE
+  label_fr: Lumière Mode
+  command_kind: Action
+  subtypes: other
+- family_fr: Lumière
+  family_id: Light
+  generic_code: LIGHT_SET_COLOR_TEMP
+  label_fr: Lumière Température Couleur
+  command_kind: Action
+  subtypes: null
+- family_fr: Mode
+  family_id: Mode
+  generic_code: MODE_STATE
+  label_fr: Mode Etat
+  command_kind: Info
+  subtypes: string
+- family_fr: Mode
+  family_id: Mode
+  generic_code: MODE_SET_STATE
+  label_fr: Changer Mode
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: VOLUME
+  label_fr: Volume
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_STATUS
+  label_fr: Status
+  command_kind: Info
+  subtypes: string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_ALBUM
+  label_fr: Album
+  command_kind: Info
+  subtypes: string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_ARTIST
+  label_fr: Artiste
+  command_kind: Info
+  subtypes: string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_TITLE
+  label_fr: Titre
+  command_kind: Info
+  subtypes: string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_POWER
+  label_fr: Power
+  command_kind: Info
+  subtypes: string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: CHANNEL
+  label_fr: Chaine
+  command_kind: Info
+  subtypes: numeric, string
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_STATE
+  label_fr: Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: SET_VOLUME
+  label_fr: Volume
+  command_kind: Action
+  subtypes: slider
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: SET_CHANNEL
+  label_fr: Chaine
+  command_kind: Action
+  subtypes: other, slider
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_PAUSE
+  label_fr: Pause
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_RESUME
+  label_fr: Lecture
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_STOP
+  label_fr: Stop
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_NEXT
+  label_fr: Suivant
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_PREVIOUS
+  label_fr: Précedent
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_ON
+  label_fr: 'On'
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_OFF
+  label_fr: 'Off'
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_MUTE
+  label_fr: Muet
+  command_kind: Action
+  subtypes: other
+- family_fr: Multimédia
+  family_id: Multimedia
+  generic_code: MEDIA_UNMUTE
+  label_fr: Non Muet
+  command_kind: Action
+  subtypes: other
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE
+  label_fr: Météo Température
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MAX_2
+  label_fr: Météo condition j+1 max j+2
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WIND_SPEED
+  label_fr: Vent (vitesse)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: RAIN_TOTAL
+  label_fr: Pluie (accumulation)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: RAIN_CURRENT
+  label_fr: Pluie (mm/h)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_ID_4
+  label_fr: Météo condition (id) j+4
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_4
+  label_fr: Météo condition j+4
+  command_kind: Info
+  subtypes: string
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MAX_4
+  label_fr: Météo Température max j+4
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MIN_4
+  label_fr: Météo Température min j+4
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_ID_3
+  label_fr: Météo condition (id) j+3
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_3
+  label_fr: Météo condition j+3
+  command_kind: Info
+  subtypes: string
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MAX_3
+  label_fr: Météo Température max j+3
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MIN_3
+  label_fr: Météo Température min j+3
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_ID_2
+  label_fr: Météo condition (id) j+2
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_2
+  label_fr: Météo condition j+2
+  command_kind: Info
+  subtypes: string
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MIN_2
+  label_fr: Météo Température min j+2
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_HUMIDITY
+  label_fr: Météo Humidité
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_ID_1
+  label_fr: Météo condition (id) j+1
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_1
+  label_fr: Météo condition j+1
+  command_kind: Info
+  subtypes: string
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MAX_1
+  label_fr: Météo Température max j+1
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MIN_1
+  label_fr: Météo Température min j+1
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION_ID
+  label_fr: Météo condition (id)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_CONDITION
+  label_fr: Météo condition
+  command_kind: Info
+  subtypes: string
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MAX
+  label_fr: Météo Température max
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_TEMPERATURE_MIN
+  label_fr: Météo Température min
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_SUNRISE
+  label_fr: Météo coucher de soleil
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_SUNSET
+  label_fr: Météo lever de soleil
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_WIND_DIRECTION
+  label_fr: Météo direction du vent
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_WIND_SPEED
+  label_fr: Météo vitesse du vent
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WEATHER_PRESSURE
+  label_fr: Météo Pression
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Météo
+  family_id: Weather
+  generic_code: WIND_DIRECTION
+  label_fr: Vent (direction)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: LOCK_STATE
+  label_fr: Serrure Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: BARRIER_STATE
+  label_fr: Portail (ouvrant) Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: GARAGE_STATE
+  label_fr: Garage (ouvrant) Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: OPENING
+  label_fr: Porte
+  command_kind: Info
+  subtypes: binary
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: OPENING_WINDOW
+  label_fr: Fenêtre
+  command_kind: Info
+  subtypes: binary
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: LOCK_OPEN
+  label_fr: Serrure Bouton Ouvrir
+  command_kind: Action
+  subtypes: other
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: LOCK_CLOSE
+  label_fr: Serrure Bouton Fermer
+  command_kind: Action
+  subtypes: other
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: GB_OPEN
+  label_fr: Portail ou garage bouton d’ouverture
+  command_kind: Action
+  subtypes: other
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: GB_CLOSE
+  label_fr: Portail ou garage bouton de fermeture
+  command_kind: Action
+  subtypes: other
+- family_fr: Ouvrant
+  family_id: Opening
+  generic_code: GB_TOGGLE
+  label_fr: Portail ou garage bouton toggle
+  command_kind: Action
+  subtypes: other
+- family_fr: Prise
+  family_id: Outlet
+  generic_code: ENERGY_STATE
+  label_fr: Prise Etat
+  command_kind: Info
+  subtypes: numeric, binary
+- family_fr: Prise
+  family_id: Outlet
+  generic_code: ENERGY_ON
+  label_fr: Prise Bouton On
+  command_kind: Action
+  subtypes: other
+- family_fr: Prise
+  family_id: Outlet
+  generic_code: ENERGY_OFF
+  label_fr: Prise Bouton Off
+  command_kind: Action
+  subtypes: other
+- family_fr: Prise
+  family_id: Outlet
+  generic_code: ENERGY_SLIDER
+  label_fr: Prise Slider
+  command_kind: Action
+  subtypes: null
+- family_fr: Robot
+  family_id: Robot
+  generic_code: DOCK_STATE
+  label_fr: Base Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Robot
+  family_id: Robot
+  generic_code: DOCK
+  label_fr: Retour base
+  command_kind: Action
+  subtypes: other
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: SIREN_STATE
+  label_fr: Sirène Etat
+  command_kind: Info
+  subtypes: binary
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_STATE
+  label_fr: Alarme Etat
+  command_kind: Info
+  subtypes: binary, string
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_MODE
+  label_fr: Alarme mode
+  command_kind: Info
+  subtypes: string
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_ENABLE_STATE
+  label_fr: Alarme Etat activée
+  command_kind: Info
+  subtypes: binary
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: FLOOD
+  label_fr: Inondation
+  command_kind: Info
+  subtypes: binary
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: SABOTAGE
+  label_fr: Sabotage
+  command_kind: Info
+  subtypes: binary
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: SHOCK
+  label_fr: Choc
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: SIREN_OFF
+  label_fr: Sirène Bouton Off
+  command_kind: Action
+  subtypes: other
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: SIREN_ON
+  label_fr: Sirène Bouton On
+  command_kind: Action
+  subtypes: other
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_ARMED
+  label_fr: Alarme armée
+  command_kind: Action
+  subtypes: other
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_RELEASED
+  label_fr: Alarme libérée
+  command_kind: Action
+  subtypes: other
+- family_fr: Sécurité
+  family_id: Security
+  generic_code: ALARM_SET_MODE
+  label_fr: Alarme Mode
+  command_kind: Action
+  subtypes: other
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_STATE
+  label_fr: Thermostat Etat (BINAIRE) (pour Plugin Thermostat uniquement)
+  command_kind: Info
+  subtypes: null
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_TEMPERATURE
+  label_fr: Thermostat Température ambiante
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_SETPOINT
+  label_fr: Thermostat consigne
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_MODE
+  label_fr: Thermostat Mode (pour Plugin Thermostat uniquement)
+  command_kind: Info
+  subtypes: string
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_LOCK
+  label_fr: Thermostat Verrouillage (pour Plugin Thermostat uniquement)
+  command_kind: Info
+  subtypes: binary
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_TEMPERATURE_OUTDOOR
+  label_fr: Thermostat Température Exterieur (pour Plugin Thermostat uniquement)
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_STATE_NAME
+  label_fr: Thermostat Etat (HUMAIN) (pour Plugin Thermostat uniquement)
+  command_kind: Info
+  subtypes: string
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_HUMIDITY
+  label_fr: Thermostat humidité ambiante
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: HUMIDITY_SETPOINT
+  label_fr: Humidité consigne
+  command_kind: Info
+  subtypes: slider
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_SET_SETPOINT
+  label_fr: Thermostat consigne
+  command_kind: Action
+  subtypes: slider
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_SET_MODE
+  label_fr: Thermostat Mode (pour Plugin Thermostat uniquement)
+  command_kind: Action
+  subtypes: other
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_SET_LOCK
+  label_fr: Thermostat Verrouillage (pour Plugin Thermostat uniquement)
+  command_kind: Action
+  subtypes: other
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: THERMOSTAT_SET_UNLOCK
+  label_fr: Thermostat Déverrouillage (pour Plugin Thermostat uniquement)
+  command_kind: Action
+  subtypes: other
+- family_fr: Thermostat
+  family_id: Thermostat
+  generic_code: HUMIDITY_SET_SETPOINT
+  label_fr: Humidité consigne
+  command_kind: Action
+  subtypes: slider
+- family_fr: Ventilateur
+  family_id: Fan
+  generic_code: FAN_SPEED_STATE
+  label_fr: Vitesse ventilateur Etat
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Ventilateur
+  family_id: Fan
+  generic_code: ROTATION_STATE
+  label_fr: Rotation Etat
+  command_kind: Info
+  subtypes: numeric
+- family_fr: Ventilateur
+  family_id: Fan
+  generic_code: FAN_SPEED
+  label_fr: Vitesse ventilateur
+  command_kind: Action
+  subtypes: slider
+- family_fr: Ventilateur
+  family_id: Fan
+  generic_code: ROTATION
+  label_fr: Rotation
+  command_kind: Action
+  subtypes: slider
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_STATE
+  label_fr: Volet Etat
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_BSO_STATE
+  label_fr: Volet BSO Etat
+  command_kind: Info
+  subtypes: binary, numeric
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_UP
+  label_fr: Volet Bouton Monter
+  command_kind: Action
+  subtypes: other
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_DOWN
+  label_fr: Volet Bouton Descendre
+  command_kind: Action
+  subtypes: other
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_STOP
+  label_fr: Volet Bouton Stop
+  command_kind: Action
+  subtypes: null
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_SLIDER
+  label_fr: Volet Bouton Slider
+  command_kind: Action
+  subtypes: slider
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_BSO_UP
+  label_fr: Volet BSO Bouton Monter
+  command_kind: Action
+  subtypes: other
+- family_fr: Volet
+  family_id: Shutter
+  generic_code: FLAP_BSO_DOWN
+  label_fr: Volet BSO Bouton Descendre
+  command_kind: Action
+  subtypes: other
