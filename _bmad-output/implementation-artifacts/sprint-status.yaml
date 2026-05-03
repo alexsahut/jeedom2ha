@@ -50,7 +50,7 @@
 #             alimentee par ha-projection-reference.md et degradation elegante §11
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-05-03'  # story 8.3 review ; story 8.2 done via PR #108
+last_updated: '2026-05-04'  # story 8.3 done via PR #109 ; story 8.2 done via PR #108
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -179,7 +179,7 @@ development_status:
   pe-epic-8: in-progress
   8-1-mapper-registry-dispatch-deterministe-et-slot-terminal-reserve: done  # PR #107 mergee 2026-05-03
   8-2-publisher-registry-dispatch-table-ha-entity-type-vers-methode-publish: done  # PR #108 mergee 2026-05-03
-  8-3-refactor-http-server-run-sync-boucle-dispatch-unique-et-compteurs-generiques: review
+  8-3-refactor-http-server-run-sync-boucle-dispatch-unique-et-compteurs-generiques: done  # PR #109 mergee 2026-05-03
   8-4-gate-golden-file-de-non-regression-sur-30-equipements-de-reference: backlog
   pe-epic-8-retrospective: optional
 

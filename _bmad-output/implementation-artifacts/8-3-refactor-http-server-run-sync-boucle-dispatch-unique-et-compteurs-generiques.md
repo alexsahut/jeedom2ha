@@ -1,6 +1,6 @@
 # Story 8.3 : Refactor `http_server._run_sync` — boucle dispatch unique et compteurs generiques
 
-Status: review
+Status: done
 
 ## Story
 
