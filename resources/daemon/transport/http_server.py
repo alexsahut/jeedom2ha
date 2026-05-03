@@ -42,10 +42,9 @@ from models.ui_contract_4d import (
     compute_home_statut,
 )
 from models.actions_ha import build_actions_ha
-from mapping.light import LightMapper
-from mapping.cover import CoverMapper
-from mapping.switch import SwitchMapper
+from mapping.registry import MapperRegistry
 from discovery.publisher import DiscoveryPublisher
+from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
 from validation.ha_component_registry import validate_projection
 
@@ -56,6 +55,8 @@ _DATA_DIR = os.path.normpath(os.path.join(_HTTP_SERVER_DIR, "..", "..", "..", "d
 _LOGGER = logging.getLogger(__name__)
 
 _VERSION = "0.2.0"
+
+_MAPPING_COUNTER_BUCKETS = ("sure", "probable", "ambiguous", "published", "skipped")
 
 
 def _check_secret(request: web.Request, local_secret: str) -> bool:
@@ -171,6 +172,79 @@ def _make_publication_result(
         technical_reason_code=technical_reason_code,
         attempted_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+def _mapping_counter_prefix(ha_entity_type: str) -> str:
+    """Return the legacy-compatible summary prefix for one HA entity type."""
+    if ha_entity_type.endswith(("s", "x", "ch", "sh")):
+        return f"{ha_entity_type}es"
+    return f"{ha_entity_type}s"
+
+
+def _mapping_counter_key(ha_entity_type: str, bucket: str) -> str:
+    return f"{_mapping_counter_prefix(ha_entity_type)}_{bucket}"
+
+
+def _build_mapping_counters_from_publisher_registry(
+    publisher_registry: Optional[PublisherRegistry] = None,
+) -> Dict[str, int]:
+    """Build mapping counters from registered discovery publisher entity types."""
+    registry = publisher_registry or PublisherRegistry(DiscoveryPublisher(None))
+    return {
+        _mapping_counter_key(ha_entity_type, bucket): 0
+        for ha_entity_type in registry.publishers.keys()
+        for bucket in _MAPPING_COUNTER_BUCKETS
+    }
+
+
+def _increment_mapping_counter(
+    counters: Dict[str, int],
+    mapping: MappingResult,
+    bucket: str,
+) -> None:
+    key = _mapping_counter_key(mapping.ha_entity_type, bucket)
+    if key in counters:
+        counters[key] += 1
+
+
+def _mapping_counter_prefixes(counters: Dict[str, int]) -> list[str]:
+    prefixes: list[str] = []
+    for key in counters.keys():
+        for bucket in _MAPPING_COUNTER_BUCKETS:
+            suffix = f"_{bucket}"
+            if key.endswith(suffix):
+                prefix = key[: -len(suffix)]
+                if prefix not in prefixes:
+                    prefixes.append(prefix)
+                break
+    return prefixes
+
+
+def _format_mapping_counter_summary(counters: Dict[str, int]) -> str:
+    groups = []
+    for prefix in _mapping_counter_prefixes(counters):
+        group = " ".join(
+            f"{bucket}={counters.get(f'{prefix}_{bucket}', 0)}"
+            for bucket in _MAPPING_COUNTER_BUCKETS
+        )
+        groups.append(f"{prefix}({group})")
+    return " ".join(groups)
+
+
+def _prepare_publication_bookkeeping(
+    eq_id: int,
+    mapping: MappingResult,
+    decision: PublicationDecision,
+    snapshot: TopologySnapshot,
+    publications: Dict[int, PublicationDecision],
+    nouveaux_eq_ids: set[int],
+) -> None:
+    """Populate common runtime publication bookkeeping before discovery publish."""
+    decision.state_topic = _resolve_state_topic(mapping)
+    decision.active_or_alive = False
+    _apply_availability_metadata(decision, mapping, snapshot)
+    publications[eq_id] = decision
+    nouveaux_eq_ids.add(eq_id)
 
 
 def _resolve_eq_ids_for_portee(
@@ -994,32 +1068,14 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     nouveaux_eq_ids = set()
 
     # 5. Map eligible eqLogics to HA entities (Stories 2.2 + 2.3 + 2.4)
-    light_mapper = LightMapper()
-    cover_mapper = CoverMapper()
-    switch_mapper = SwitchMapper()
+    mapper_registry = MapperRegistry()
     mappings = {}       # Dict[int, MappingResult]
     publications = {}   # Dict[int, PublicationDecision]
-    
-    mapping_counters = {
-        "lights_sure": 0,
-        "lights_probable": 0,
-        "lights_ambiguous": 0,
-        "lights_published": 0,
-        "lights_skipped": 0,
-        "covers_sure": 0,
-        "covers_probable": 0,
-        "covers_ambiguous": 0,
-        "covers_published": 0,
-        "covers_skipped": 0,
-        "switches_sure": 0,
-        "switches_probable": 0,
-        "switches_ambiguous": 0,
-        "switches_published": 0,
-        "switches_skipped": 0,
-    }
-    
+
     mqtt_bridge = request.app.get("mqtt_bridge")
     publisher = DiscoveryPublisher(mqtt_bridge) if mqtt_bridge else None
+    publisher_registry = PublisherRegistry(publisher) if publisher else None
+    mapping_counters = _build_mapping_counters_from_publisher_registry(publisher_registry)
     pending_local_cleanup = request.app["pending_local_availability_cleanup"]
     pending_discovery_unpublish = request.app["pending_discovery_unpublish"]
 
@@ -1036,13 +1092,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
         
-        # Try light first, then cover, then switch (first mapper that returns non-None wins)
-        mapping = light_mapper.map(eq, snapshot)
-        if mapping is None:
-            mapping = cover_mapper.map(eq, snapshot)
-        if mapping is None:
-            mapping = switch_mapper.map(eq, snapshot)
-        
+        mapping = mapper_registry.map(eq, snapshot)
         if mapping is None:
             continue  # Not mapped by any mapper
         
@@ -1069,159 +1119,55 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         mapping.publication_decision_ref = decision
         mapping.pipeline_step_reached = 4
 
-        if mapping.ha_entity_type == "light":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["lights_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["lights_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["lights_ambiguous"] += 1
-            
-            config_published = False
-            decision.state_topic = _resolve_state_topic(mapping)
-            decision.active_or_alive = False
-            _apply_availability_metadata(decision, mapping, snapshot)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-            
-            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
-            if decision.should_publish:
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    config_published = await publisher.publish_light(mapping, snapshot)
-                else:
-                    config_published = False
-                    _LOGGER.warning(
-                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
-                        eq_id,
-                    )
-                if not config_published:
-                    # Préserver le marqueur HA stale si l'entité était précédemment publiée
-                    if _needs_discovery_unpublish(previous_decision):
-                        decision.discovery_published = True
+        if mapping.confidence in ("sure", "probable", "ambiguous"):
+            _increment_mapping_counter(mapping_counters, mapping, mapping.confidence)
+
+        _prepare_publication_bookkeeping(
+            eq_id,
+            mapping,
+            decision,
+            snapshot,
+            publications,
+            nouveaux_eq_ids,
+        )
+
+        config_published = False
+        # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
+        if decision.should_publish:
+            if publisher_registry and mqtt_bridge and mqtt_bridge.is_connected:
+                config_published = await publisher_registry.publish(mapping, snapshot)
+            else:
+                config_published = False
+                _LOGGER.warning(
+                    "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
+                    eq_id,
+                )
+            if not config_published:
+                # Préserver le marqueur HA stale si l'entité était précédemment publiée
+                if _needs_discovery_unpublish(previous_decision):
+                    decision.discovery_published = True
+                if mapping.publication_result is None:
                     mapping.publication_result = _make_publication_result(
                         "failed", "discovery_publish_failed"
                     )
-                else:
-                    decision.discovery_published = True
-                    local_ok = True
-                    if decision.local_availability_supported:
-                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    if local_ok:
-                        decision.active_or_alive = True
-                        mapping.publication_result = _make_publication_result("success")
-                        mapping_counters["lights_published"] += 1
-                    else:
-                        mapping.publication_result = _make_publication_result(
-                            "failed", "local_availability_publish_failed"
-                        )
             else:
-                mapping.publication_result = _make_publication_result("not_attempted")
-            mapping.pipeline_step_reached = 5
-            if not decision.active_or_alive:
-                mapping_counters["lights_skipped"] += 1
-
-        elif mapping.ha_entity_type == "cover":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["covers_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["covers_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["covers_ambiguous"] += 1
-            
-            config_published = False
-            decision.state_topic = _resolve_state_topic(mapping)
-            decision.active_or_alive = False
-            _apply_availability_metadata(decision, mapping, snapshot)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-            
-            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
-            if decision.should_publish:
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    config_published = await publisher.publish_cover(mapping, snapshot)
+                decision.discovery_published = True
+                local_ok = True
+                if decision.local_availability_supported:
+                    local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+                if local_ok:
+                    decision.active_or_alive = True
+                    mapping.publication_result = _make_publication_result("success")
+                    _increment_mapping_counter(mapping_counters, mapping, "published")
                 else:
-                    config_published = False
-                    _LOGGER.warning(
-                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
-                        eq_id,
-                    )
-                if not config_published:
-                    if _needs_discovery_unpublish(previous_decision):
-                        decision.discovery_published = True
                     mapping.publication_result = _make_publication_result(
-                        "failed", "discovery_publish_failed"
+                        "failed", "local_availability_publish_failed"
                     )
-                else:
-                    decision.discovery_published = True
-                    local_ok = True
-                    if decision.local_availability_supported:
-                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    if local_ok:
-                        decision.active_or_alive = True
-                        mapping.publication_result = _make_publication_result("success")
-                        mapping_counters["covers_published"] += 1
-                    else:
-                        mapping.publication_result = _make_publication_result(
-                            "failed", "local_availability_publish_failed"
-                        )
-            else:
-                mapping.publication_result = _make_publication_result("not_attempted")
-            mapping.pipeline_step_reached = 5
-            if not decision.active_or_alive:
-                mapping_counters["covers_skipped"] += 1
-
-        elif mapping.ha_entity_type == "switch":
-            # Count by confidence
-            if mapping.confidence == "sure":
-                mapping_counters["switches_sure"] += 1
-            elif mapping.confidence == "probable":
-                mapping_counters["switches_probable"] += 1
-            elif mapping.confidence == "ambiguous":
-                mapping_counters["switches_ambiguous"] += 1
-
-            config_published = False
-            decision.state_topic = _resolve_state_topic(mapping)
-            decision.active_or_alive = False
-            _apply_availability_metadata(decision, mapping, snapshot)
-            publications[eq_id] = decision
-            nouveaux_eq_ids.add(eq_id)
-
-            # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
-            if decision.should_publish:
-                if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    config_published = await publisher.publish_switch(mapping, snapshot)
-                else:
-                    config_published = False
-                    _LOGGER.warning(
-                        "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
-                        eq_id,
-                    )
-                if not config_published:
-                    if _needs_discovery_unpublish(previous_decision):
-                        decision.discovery_published = True
-                    mapping.publication_result = _make_publication_result(
-                        "failed", "discovery_publish_failed"
-                    )
-                else:
-                    decision.discovery_published = True
-                    local_ok = True
-                    if decision.local_availability_supported:
-                        local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                    if local_ok:
-                        decision.active_or_alive = True
-                        mapping.publication_result = _make_publication_result("success")
-                        mapping_counters["switches_published"] += 1
-                    else:
-                        mapping.publication_result = _make_publication_result(
-                            "failed", "local_availability_publish_failed"
-                        )
-            else:
-                mapping.publication_result = _make_publication_result("not_attempted")
-            mapping.pipeline_step_reached = 5
-            if not decision.active_or_alive:
-                mapping_counters["switches_skipped"] += 1
+        else:
+            mapping.publication_result = _make_publication_result("not_attempted")
+        mapping.pipeline_step_reached = 5
+        if not decision.active_or_alive:
+            _increment_mapping_counter(mapping_counters, mapping, "skipped")
 
         previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
         previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
@@ -1415,26 +1361,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     if boot_sync_event is not None and not boot_sync_event.is_set():
         boot_sync_event.set()
 
-    _LOGGER.info(
-        "[MAPPING] Summary: lights(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
-        "covers(sure=%d probable=%d ambiguous=%d published=%d skipped=%d) "
-        "switches(sure=%d probable=%d ambiguous=%d published=%d skipped=%d)",
-        mapping_counters["lights_sure"],
-        mapping_counters["lights_probable"],
-        mapping_counters["lights_ambiguous"],
-        mapping_counters["lights_published"],
-        mapping_counters["lights_skipped"],
-        mapping_counters["covers_sure"],
-        mapping_counters["covers_probable"],
-        mapping_counters["covers_ambiguous"],
-        mapping_counters["covers_published"],
-        mapping_counters["covers_skipped"],
-        mapping_counters["switches_sure"],
-        mapping_counters["switches_probable"],
-        mapping_counters["switches_ambiguous"],
-        mapping_counters["switches_published"],
-        mapping_counters["switches_skipped"],
-    )
+    _LOGGER.info("[MAPPING] Summary: %s", _format_mapping_counter_summary(mapping_counters))
     
     summary = {
         "total_objects": len(snapshot.objects),
