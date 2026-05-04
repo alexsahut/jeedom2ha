@@ -1,0 +1,933 @@
+{
+  "eq_logics": [
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10001,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 10002,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10003,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10011,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10012,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1001",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 10021,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10022,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1002",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_SLIDER",
+          "id": 10031,
+          "name": "LIGHT_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1003",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10041,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10042,
+          "name": "LIGHT_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1004",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10051,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 10052,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10053,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "LIGHT_BRIGHTNESS",
+          "id": 10054,
+          "name": "LIGHT_BRIGHTNESS",
+          "sub_type": "numeric",
+          "type": "info"
+        },
+        {
+          "generic_type": "LIGHT_SLIDER",
+          "id": 10055,
+          "name": "LIGHT_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1005,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1005",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10061,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 10062,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10063,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1006,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1006",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 10071,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10072,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1007,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1007",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 10081,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10082,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1008,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1008",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_SLIDER",
+          "id": 10091,
+          "name": "LIGHT_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 10092,
+          "name": "LIGHT_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 1009,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Light reference 1009",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 20001,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 20002,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_STATE",
+          "id": 20003,
+          "name": "FLAP_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2000",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 20011,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 20012,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2001",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_SLIDER",
+          "id": 20021,
+          "name": "FLAP_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2002",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 20031,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 20032,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_STATE",
+          "id": 20033,
+          "name": "FLAP_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        },
+        {
+          "generic_type": "FLAP_STOP",
+          "id": 20034,
+          "name": "FLAP_STOP",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2003",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_BSO_UP",
+          "id": 20041,
+          "name": "FLAP_BSO_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_BSO_DOWN",
+          "id": 20042,
+          "name": "FLAP_BSO_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2004",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_BSO_UP",
+          "id": 20051,
+          "name": "FLAP_BSO_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_BSO_DOWN",
+          "id": 20052,
+          "name": "FLAP_BSO_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_BSO_STATE",
+          "id": 20053,
+          "name": "FLAP_BSO_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2005,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2005",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 20061,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 20062,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_STATE",
+          "id": 20063,
+          "name": "FLAP_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        },
+        {
+          "generic_type": "FLAP_SLIDER",
+          "id": 20064,
+          "name": "FLAP_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2006,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2006",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 20071,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 20072,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_SLIDER",
+          "id": 20073,
+          "name": "FLAP_SLIDER",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 2007,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Cover reference 2007",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 30001,
+          "name": "ENERGY_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 30002,
+          "name": "ENERGY_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 30003,
+          "name": "ENERGY_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "prise",
+      "id": 3000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Switch reference 3000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 30011,
+          "name": "ENERGY_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 30012,
+          "name": "ENERGY_OFF",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 3001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Switch reference 3001",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 30021,
+          "name": "ENERGY_ON",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 3002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Switch reference 3002",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 30031,
+          "name": "ENERGY_OFF",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 3003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Switch reference 3003",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 30041,
+          "name": "ENERGY_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 30042,
+          "name": "ENERGY_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "energy_meter",
+      "id": 3004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Switch reference 3004",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 40001,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_UP",
+          "id": 40002,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 4000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Ambiguous light conflict 4000",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_STATE",
+          "id": 40011,
+          "name": "FLAP_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "volet",
+      "id": 4001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Ambiguous cover state orphan 4001",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 40021,
+          "name": "ENERGY_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 40022,
+          "name": "ENERGY_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 40023,
+          "name": "ENERGY_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 4002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Volet conflit switch 4002",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 50001,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 50002,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 5000,
+      "is_enable": false,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Ineligible disabled 5000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLAP_UP",
+          "id": 50011,
+          "name": "FLAP_UP",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "FLAP_DOWN",
+          "id": 50012,
+          "name": "FLAP_DOWN",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "exclusion_source": "eqlogic",
+      "id": 5001,
+      "is_enable": true,
+      "is_excluded": true,
+      "is_visible": true,
+      "name": "Ineligible excluded 5001",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 60001,
+          "name": "LIGHT_STATE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 6000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Blocked ha_missing_command_topic 6000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 60011,
+          "name": "LIGHT_ON",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 60012,
+          "name": "LIGHT_OFF",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 60013,
+          "name": "LIGHT_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 6001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Blocked product_scope climate 6001",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": 1,
+      "name": "Salon"
+    },
+    {
+      "id": 2,
+      "name": "Chambre"
+    },
+    {
+      "id": 3,
+      "name": "Garage"
+    }
+  ],
+  "published_scope": {
+    "equipements": {},
+    "global": {
+      "raw_state": "include",
+      "source": "user"
+    },
+    "pieces": {}
+  },
+  "sync_config": {
+    "confidence_policy": "sure_probable"
+  }
+}
