@@ -507,9 +507,7 @@ else
     _summary=$(echo "${_sync_raw}" | jq -r '
       .payload |
       "total_eq=\(.total_eq_logics) eligible=\(.eligible_count) published=\(
-        (.mapping_summary.lights_published  // 0) +
-        (.mapping_summary.covers_published  // 0) +
-        (.mapping_summary.switches_published // 0)
+        ([ (.mapping_summary // {}) | to_entries[] | select(.key | endswith("_published")) | .value | tonumber? ] | add // 0)
       )"' 2>/dev/null || echo "ok")
     echo "  OK — ${_summary}"
   fi

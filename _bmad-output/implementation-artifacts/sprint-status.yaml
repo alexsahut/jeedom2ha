@@ -42,7 +42,7 @@
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
 #   Epics: pe-epic-1 à pe-epic-9 (post correct-course 2026-04-30 :
-#          pe-epic-1/2/3/4/5/6/7/8 done, pe-epic-9 backlog)
+#          pe-epic-1/2/3/4/5/6/7/8 done, pe-epic-9 in-progress via prefixe 9.0)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -50,7 +50,7 @@
 #             alimentee par ha-projection-reference.md et degradation elegante §11
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-05-05'  # cloture pe-epic-8 apres merge story 8.4
+last_updated: '2026-05-05'  # Story 9.0 done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -190,7 +190,9 @@ development_status:
   # Source de verite : _bmad-output/planning-artifacts/ha-projection-reference.md
   # Gate terrain de cloture epic-level = comptage nouveaux publies sur box reelle
   # ==============================================================
-  pe-epic-9: backlog
+  pe-epic-9: in-progress  # prefixe 9.0 en cours de closeout
+  # 9.0 prefixe obligatoire issu de la retro pe-epic-8 (PE8-AI-01/02)
+  9-0-decouplage-des-consommateurs-externes-de-mapping-summary-ui-jeedom-script-de-deploiement: done  # code review PASS 2026-05-05 — 0 finding, 6/6 tests Node, AC1-AC6 valides, scope strict confirme
   9-1-sensor-mapper-publish-sensor-info-numeric-et-capteurs-simples: backlog
   9-2-binary-sensor-mapper-publish-binary-sensor-info-binary-presence-ouverture-fuite: backlog
   9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10: backlog
