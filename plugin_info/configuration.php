@@ -329,9 +329,13 @@ $(function() {
             }
             var r = scanData.result || {};
             var summary = (r.payload && r.payload.mapping_summary) ? r.payload.mapping_summary : {};
-            var published = (summary.lights_published || 0)
-                          + (summary.covers_published || 0)
-                          + (summary.switches_published || 0);
+            var published = Object.keys(summary).reduce(function(total, key) {
+              if (!key.endsWith('_published')) {
+                return total;
+              }
+              var numericValue = Number(summary[key]);
+              return isFinite(numericValue) ? total + numericValue : total;
+            }, 0);
             $status.addClass('label-success')
                    .text('{{Appliqué & Rescan terminé}} — ' + published + ' {{équipement(s) publié(s)}}');
           },
