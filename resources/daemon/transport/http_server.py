@@ -69,7 +69,7 @@ def _check_secret(request: web.Request, local_secret: str) -> bool:
 
 def _resolve_state_topic(mapping: MappingResult) -> str:
     """Resolve runtime state topic for a published actuator mapping."""
-    if mapping.ha_entity_type in ("light", "cover", "switch"):
+    if mapping.ha_entity_type in ("light", "cover", "switch", "sensor"):
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""
@@ -189,10 +189,13 @@ def _build_mapping_counters_from_publisher_registry(
     publisher_registry: Optional[PublisherRegistry] = None,
 ) -> Dict[str, int]:
     """Build mapping counters from registered discovery publisher entity types."""
-    registry = publisher_registry or PublisherRegistry(DiscoveryPublisher(None))
+    if publisher_registry is not None:
+        ha_entity_types = publisher_registry.publishers.keys()
+    else:
+        ha_entity_types = PublisherRegistry.known_types()
     return {
         _mapping_counter_key(ha_entity_type, bucket): 0
-        for ha_entity_type in registry.publishers.keys()
+        for ha_entity_type in ha_entity_types
         for bucket in _MAPPING_COUNTER_BUCKETS
     }
 

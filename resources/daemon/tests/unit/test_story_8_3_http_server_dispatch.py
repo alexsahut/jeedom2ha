@@ -84,7 +84,7 @@ def _switch_eq(eq_id: int = 301) -> dict:
     )
 
 
-def _unmapped_eq(eq_id: int = 401) -> dict:
+def _sensor_eq(eq_id: int = 401) -> dict:
     return _eq_payload(
         eq_id,
         f"Temperature {eq_id}",
@@ -137,6 +137,7 @@ class _RecordingPublisherRegistry:
             "light": object(),
             "cover": object(),
             "switch": object(),
+            "sensor": object(),
         }
         self.published_types: list[str] = []
         _RecordingPublisherRegistry.instances.append(self)
@@ -164,7 +165,7 @@ async def test_run_sync_uses_mapper_registry_and_preserves_current_mapping_types
     ):
         response = await cli.post(
             "/action/sync",
-            json=_sync_body([_light_eq(), _cover_eq(), _switch_eq(), _unmapped_eq()]),
+            json=_sync_body([_light_eq(), _cover_eq(), _switch_eq(), _sensor_eq()]),
             headers={"X-Local-Secret": SECRET},
         )
 
@@ -173,7 +174,7 @@ async def test_run_sync_uses_mapper_registry_and_preserves_current_mapping_types
     assert app["mappings"][101].ha_entity_type == "light"
     assert app["mappings"][201].ha_entity_type == "cover"
     assert app["mappings"][301].ha_entity_type == "switch"
-    assert 401 not in app["mappings"]
+    assert app["mappings"][401].ha_entity_type == "sensor"
 
 
 async def test_run_sync_publishes_light_cover_and_switch_through_publisher_registry(cli, app):
@@ -241,7 +242,7 @@ async def test_unknown_publisher_reason_is_preserved_without_discovery_failure_o
     ):
         response = await cli.post(
             "/action/sync",
-            json=_sync_body([_unmapped_eq(501)]),
+            json=_sync_body([_sensor_eq(501)]),
             headers={"X-Local-Secret": SECRET},
         )
 
@@ -355,9 +356,12 @@ async def test_mapping_summary_uses_dynamic_counter_keys_and_semantic_values(cli
     assert summary["lights_sure"] == 1
     assert summary["covers_sure"] == 1
     assert summary["switches_sure"] == 1
+    assert summary["sensors_sure"] == 0
     assert summary["lights_published"] == 1
     assert summary["covers_published"] == 1
     assert summary["switches_published"] == 1
+    assert summary["sensors_published"] == 0
     assert summary["lights_skipped"] == 0
     assert summary["covers_skipped"] == 0
     assert summary["switches_skipped"] == 0
+    assert summary["sensors_skipped"] == 0

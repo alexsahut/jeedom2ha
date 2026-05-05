@@ -1,6 +1,7 @@
 # Golden Corpus Story 8.4
 
-Ce corpus fige 30 eqLogics deterministes pour le gate de non-regression Story 8.4.
+Ce corpus fige 35 eqLogics deterministes pour le gate de non-regression Story 8.4
+et l'extension sensor Story 9.1.
 
 ## Repartition normative
 
@@ -10,6 +11,7 @@ Ce corpus fige 30 eqLogics deterministes pour le gate de non-regression Story 8.
 - Ambigus (3): `4000`-`4002`
 - Non-eligibles (2): `5000`-`5001`
 - Valides bloques (2): `6000`-`6001`
+- Sensors (5): `7000`-`7004`
 
 ## Roles equipement par equipement
 
@@ -48,6 +50,12 @@ Ce corpus fige 30 eqLogics deterministes pour le gate de non-regression Story 8.
 
 - `6000`: valide bloque etape 3 (`ha_missing_command_topic`) via light `LIGHT_STATE` numeric seul
 - `6001`: valide bloque etape 4 (`ha_component_not_in_product_scope`) via mapping test-double `climate`
+
+- `7000`: sensor temperature (`TEMPERATURE`) -> `device_class=temperature`, `unit=°C`
+- `7001`: sensor humidite (`HUMIDITY`) -> `device_class=humidity`, `unit=%`
+- `7002`: sensor puissance (`POWER`) -> `device_class=power`, `unit=W`
+- `7003`: sensor qualite air (`CO2`) -> `device_class=carbon_dioxide`, `unit=ppm`
+- `7004`: sensor luminosite (`BRIGHTNESS`) -> `device_class=illuminance`, `unit=lx`
 
 ## Stabilite
 

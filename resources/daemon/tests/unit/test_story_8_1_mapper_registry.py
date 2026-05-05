@@ -9,6 +9,7 @@ from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
 from mapping.registry import MapperRegistry
+from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 
@@ -88,8 +89,16 @@ def _switch_eq() -> JeedomEqLogic:
 def _unknown_eq() -> JeedomEqLogic:
     return _eq(
         40,
+        "Equipement non mappe",
+        [_cmd(401, "GENERIC_INFO", type_="info", sub_type="string")],
+    )
+
+
+def _sensor_eq() -> JeedomEqLogic:
+    return _eq(
+        50,
         "Temperature salon",
-        [_cmd(401, "TEMPERATURE", type_="info", sub_type="numeric")],
+        [_cmd(501, "TEMPERATURE", type_="info", sub_type="numeric")],
     )
 
 
@@ -99,6 +108,8 @@ def _hardcoded_cascade(eq: JeedomEqLogic, snapshot: TopologySnapshot):
         mapping = CoverMapper().map(eq, snapshot)
     if mapping is None:
         mapping = SwitchMapper().map(eq, snapshot)
+    if mapping is None:
+        mapping = SensorMapper().map(eq, snapshot)
     return mapping
 
 
@@ -109,6 +120,7 @@ def test_ac1_mapper_registry_exposes_canonical_order():
         LightMapper,
         CoverMapper,
         SwitchMapper,
+        SensorMapper,
         FallbackMapper,
     ]
 
@@ -166,3 +178,16 @@ def test_ac3_registry_matches_hardcoded_cascade_for_unmapped_equipment():
 
     assert _hardcoded_cascade(eq, snapshot) is None
     assert MapperRegistry().map(eq, snapshot) is None
+
+
+def test_ac3_registry_matches_hardcoded_cascade_for_sensor():
+    snapshot = _make_snapshot()
+    eq = _sensor_eq()
+
+    cascade_result = _hardcoded_cascade(eq, snapshot)
+    registry_result = MapperRegistry().map(eq, snapshot)
+
+    assert cascade_result is not None
+    assert registry_result is not None
+    assert cascade_result.ha_entity_type == "sensor"
+    assert registry_result.ha_entity_type == "sensor"

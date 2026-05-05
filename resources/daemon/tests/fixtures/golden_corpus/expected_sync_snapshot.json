@@ -2868,6 +2868,391 @@
           "unmatched_commands": [],
           "v1_compatibility": false,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7000,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70001,
+              "cmd_name": "TEMPERATURE",
+              "generic_type": "TEMPERATURE"
+            }
+          ],
+          "name": "Sensor temperature salon 7000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "TEMPERATURE",
+                "id": 70001,
+                "name": "TEMPERATURE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70001,
+                "configured_type": "TEMPERATURE",
+                "logical_role": "TEMPERATURE",
+                "used_type": "TEMPERATURE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7001,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70011,
+              "cmd_name": "HUMIDITY",
+              "generic_type": "HUMIDITY"
+            }
+          ],
+          "name": "Sensor humidite sdb 7001",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "HUMIDITY",
+                "id": 70011,
+                "name": "HUMIDITY"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70011,
+                "configured_type": "HUMIDITY",
+                "logical_role": "HUMIDITY",
+                "used_type": "HUMIDITY"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7002,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70021,
+              "cmd_name": "POWER",
+              "generic_type": "POWER"
+            }
+          ],
+          "name": "Compteur puissance elec 7002",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "POWER",
+                "id": 70021,
+                "name": "POWER"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70021,
+                "configured_type": "POWER",
+                "logical_role": "POWER",
+                "used_type": "POWER"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7003,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70031,
+              "cmd_name": "CO2",
+              "generic_type": "CO2"
+            }
+          ],
+          "name": "Sensor qualite air 7003",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "CO2",
+                "id": 70031,
+                "name": "CO2"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70031,
+                "configured_type": "CO2",
+                "logical_role": "CO2",
+                "used_type": "CO2"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7004,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70041,
+              "cmd_name": "BRIGHTNESS",
+              "generic_type": "BRIGHTNESS"
+            }
+          ],
+          "name": "Sensor luminosite 7004",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "BRIGHTNESS",
+                "id": 70041,
+                "name": "BRIGHTNESS"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70041,
+                "configured_type": "BRIGHTNESS",
+                "logical_role": "BRIGHTNESS",
+                "used_type": "BRIGHTNESS"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
         }
       ],
       "in_scope_equipments": [
@@ -5680,6 +6065,391 @@
           "unmatched_commands": [],
           "v1_compatibility": false,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7000,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70001,
+              "cmd_name": "TEMPERATURE",
+              "generic_type": "TEMPERATURE"
+            }
+          ],
+          "name": "Sensor temperature salon 7000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "TEMPERATURE",
+                "id": 70001,
+                "name": "TEMPERATURE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70001,
+                "configured_type": "TEMPERATURE",
+                "logical_role": "TEMPERATURE",
+                "used_type": "TEMPERATURE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7001,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70011,
+              "cmd_name": "HUMIDITY",
+              "generic_type": "HUMIDITY"
+            }
+          ],
+          "name": "Sensor humidite sdb 7001",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "HUMIDITY",
+                "id": 70011,
+                "name": "HUMIDITY"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70011,
+                "configured_type": "HUMIDITY",
+                "logical_role": "HUMIDITY",
+                "used_type": "HUMIDITY"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7002,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70021,
+              "cmd_name": "POWER",
+              "generic_type": "POWER"
+            }
+          ],
+          "name": "Compteur puissance elec 7002",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "POWER",
+                "id": 70021,
+                "name": "POWER"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70021,
+                "configured_type": "POWER",
+                "logical_role": "POWER",
+                "used_type": "POWER"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7003,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70031,
+              "cmd_name": "CO2",
+              "generic_type": "CO2"
+            }
+          ],
+          "name": "Sensor qualite air 7003",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "CO2",
+                "id": 70031,
+                "name": "CO2"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70031,
+                "configured_type": "CO2",
+                "logical_role": "CO2",
+                "used_type": "CO2"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 7004,
+          "eq_type_name": "virtual",
+          "ha_type": "sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 70041,
+              "cmd_name": "BRIGHTNESS",
+              "generic_type": "BRIGHTNESS"
+            }
+          ],
+          "name": "Sensor luminosite 7004",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "BRIGHTNESS",
+                "id": 70041,
+                "name": "BRIGHTNESS"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 70041,
+                "configured_type": "BRIGHTNESS",
+                "logical_role": "BRIGHTNESS",
+                "used_type": "BRIGHTNESS"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
         }
       ],
       "rooms": [
@@ -5687,8 +6457,8 @@
           "compteurs": {
             "ecarts": 2,
             "exclus": 0,
-            "inclus": 8,
-            "total": 8
+            "inclus": 11,
+            "total": 11
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -5698,25 +6468,25 @@
               "disabled_eqlogic": 1,
               "ha_missing_command_topic": 1,
               "probable": 4,
-              "sure": 2
+              "sure": 5
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 2,
-              "published": 6
+              "published": 9
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 8
+            "total_equipments": 11
           }
         },
         {
           "compteurs": {
             "ecarts": 4,
             "exclus": 0,
-            "inclus": 14,
-            "total": 14
+            "inclus": 15,
+            "total": 15
           },
           "home_statut": "Partiellement publiee",
           "object_id": 2,
@@ -5726,25 +6496,25 @@
               "ambiguous_skipped": 3,
               "ha_component_not_in_product_scope": 1,
               "probable": 6,
-              "sure": 4
+              "sure": 5
             },
             "counts_by_status": {
               "ambiguous": 3,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 1,
-              "published": 10
+              "published": 11
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 14
+            "total_equipments": 15
           }
         },
         {
           "compteurs": {
             "ecarts": 0,
             "exclus": 1,
-            "inclus": 7,
-            "total": 8
+            "inclus": 8,
+            "total": 9
           },
           "home_statut": "Publiee",
           "object_id": 3,
@@ -5753,17 +6523,17 @@
             "counts_by_reason": {
               "excluded_eqlogic": 1,
               "probable": 5,
-              "sure": 2
+              "sure": 3
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 1,
               "infra_incident": 0,
               "not_supported": 0,
-              "published": 7
+              "published": 8
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 8
+            "total_equipments": 9
           }
         }
       ],
@@ -5771,8 +6541,8 @@
         "compteurs": {
           "ecarts": 6,
           "exclus": 1,
-          "inclus": 29,
-          "total": 30
+          "inclus": 34,
+          "total": 35
         },
         "counts_by_reason": {
           "ambiguous_skipped": 3,
@@ -5781,18 +6551,18 @@
           "ha_component_not_in_product_scope": 1,
           "ha_missing_command_topic": 1,
           "probable": 15,
-          "sure": 8
+          "sure": 13
         },
         "counts_by_status": {
           "ambiguous": 3,
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 23
+          "published": 28
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 30
+        "total_equipments": 35
       }
     },
     "request_id": "<normalized-request-id>",
@@ -5822,6 +6592,11 @@
       "lights_published": 10,
       "lights_skipped": 2,
       "lights_sure": 3,
+      "sensors_ambiguous": 0,
+      "sensors_probable": 0,
+      "sensors_published": 5,
+      "sensors_skipped": 0,
+      "sensors_sure": 5,
       "switches_ambiguous": 1,
       "switches_probable": 4,
       "switches_published": 5,
@@ -7483,6 +8258,246 @@
         "reason_code": "climate_forced_for_scope_gate",
         "reason_details": null,
         "suggested_area": "Chambre"
+      },
+      "7000": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "TEMPERATURE": {
+            "generic_type": "TEMPERATURE",
+            "id": 70001,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "sensor",
+        "ha_name": "Sensor temperature salon 7000",
+        "ha_unique_id": "jeedom2ha_eq_7000",
+        "jeedom_eq_id": 7000,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/7000/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/7000/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "sensor_temperature",
+        "reason_details": {
+          "device_class": "temperature",
+          "unit_of_measurement": "\u00b0C"
+        },
+        "suggested_area": "Salon"
+      },
+      "7001": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "HUMIDITY": {
+            "generic_type": "HUMIDITY",
+            "id": 70011,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "sensor",
+        "ha_name": "Sensor humidite sdb 7001",
+        "ha_unique_id": "jeedom2ha_eq_7001",
+        "jeedom_eq_id": 7001,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/7001/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/7001/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "sensor_humidity",
+        "reason_details": {
+          "device_class": "humidity",
+          "unit_of_measurement": "%"
+        },
+        "suggested_area": "Chambre"
+      },
+      "7002": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "POWER": {
+            "generic_type": "POWER",
+            "id": 70021,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "sensor",
+        "ha_name": "Compteur puissance elec 7002",
+        "ha_unique_id": "jeedom2ha_eq_7002",
+        "jeedom_eq_id": 7002,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/7002/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/7002/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "sensor_power",
+        "reason_details": {
+          "device_class": "power",
+          "unit_of_measurement": "W"
+        },
+        "suggested_area": "Salon"
+      },
+      "7003": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "CO2": {
+            "generic_type": "CO2",
+            "id": 70031,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "sensor",
+        "ha_name": "Sensor qualite air 7003",
+        "ha_unique_id": "jeedom2ha_eq_7003",
+        "jeedom_eq_id": 7003,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/7003/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/7003/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "sensor_co2",
+        "reason_details": {
+          "device_class": "carbon_dioxide",
+          "unit_of_measurement": "ppm"
+        },
+        "suggested_area": "Garage"
+      },
+      "7004": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "BRIGHTNESS": {
+            "generic_type": "BRIGHTNESS",
+            "id": 70041,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "sensor",
+        "ha_name": "Sensor luminosite 7004",
+        "ha_unique_id": "jeedom2ha_eq_7004",
+        "jeedom_eq_id": 7004,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/7004/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/7004/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "sensor_brightness",
+        "reason_details": {
+          "device_class": "illuminance",
+          "unit_of_measurement": "lx"
+        },
+        "suggested_area": "Salon"
       }
     },
     "publications": {
@@ -7989,13 +9004,103 @@
         "reason": "ha_component_not_in_product_scope",
         "should_publish": false,
         "state_topic": ""
+      },
+      "7000": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/7000/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "sensor",
+          "jeedom_eq_id": 7000,
+          "reason_code": "sensor_temperature"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/7000/state"
+      },
+      "7001": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/7001/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "sensor",
+          "jeedom_eq_id": 7001,
+          "reason_code": "sensor_humidity"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/7001/state"
+      },
+      "7002": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/7002/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "sensor",
+          "jeedom_eq_id": 7002,
+          "reason_code": "sensor_power"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/7002/state"
+      },
+      "7003": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/7003/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "sensor",
+          "jeedom_eq_id": 7003,
+          "reason_code": "sensor_co2"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/7003/state"
+      },
+      "7004": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/7004/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "sensor",
+          "jeedom_eq_id": 7004,
+          "reason_code": "sensor_brightness"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/7004/state"
       }
     }
   },
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 28,
+      "eligible_count": 33,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -8012,6 +9117,11 @@
         "lights_published": 10,
         "lights_skipped": 2,
         "lights_sure": 3,
+        "sensors_ambiguous": 0,
+        "sensors_probable": 0,
+        "sensors_published": 5,
+        "sensors_skipped": 0,
+        "sensors_sure": 5,
         "switches_ambiguous": 1,
         "switches_probable": 4,
         "switches_published": 5,
@@ -8289,14 +9399,59 @@
             "is_exception": false,
             "name": "Blocked product_scope climate 6001",
             "object_id": 2
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 7000,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Sensor temperature salon 7000",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 7001,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Sensor humidite sdb 7001",
+            "object_id": 2
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 7002,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Compteur puissance elec 7002",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 7003,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Sensor qualite air 7003",
+            "object_id": 3
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 7004,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Sensor luminosite 7004",
+            "object_id": 1
           }
         ],
         "global": {
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 29,
-            "total": 30
+            "include": 34,
+            "total": 35
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -8307,8 +9462,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 8,
-              "total": 8
+              "include": 11,
+              "total": 11
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -8319,8 +9474,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 14,
-              "total": 14
+              "include": 15,
+              "total": 15
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -8331,8 +9486,8 @@
             "counts": {
               "exceptions": 1,
               "exclude": 1,
-              "include": 7,
-              "total": 8
+              "include": 8,
+              "total": 9
             },
             "has_pending_home_assistant_changes": false,
             "home_perimetre": "Incluse",
@@ -8341,8 +9496,8 @@
           }
         ]
       },
-      "total_cmds": 69,
-      "total_eq_logics": 30,
+      "total_cmds": 74,
+      "total_eq_logics": 35,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",
