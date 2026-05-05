@@ -3,6 +3,7 @@
 Story 2.2: Publishes light entity discovery payloads to the MQTT broker.
 Story 2.3: Extended for cover entity discovery payloads.
 Story 2.4: Extended for switch entity discovery payloads.
+Story 9.1: Extended for sensor entity discovery payloads.
 Uses single-component discovery (homeassistant/{entity_type}/...).
 """
 import json
@@ -117,6 +118,34 @@ class DiscoveryPublisher:
         if not ok:
             _LOGGER.error(
                 "[DISCOVERY] Failed to publish switch config for eq_id=%d (bridge unavailable)",
+                mapping.jeedom_eq_id,
+            )
+        return ok
+
+    async def publish_sensor(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a sensor discovery config to MQTT.
+
+        Args:
+            mapping: MappingResult with SensorCapabilities and reason_details (device_class, unit_of_measurement).
+            snapshot: TopologySnapshot to extract device info.
+
+        Returns:
+            True if publish succeeded, False otherwise.
+        """
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="sensor")
+        payload = self._build_sensor_payload(mapping, snapshot)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing sensor config: topic=%s eq_id=%d name='%s' confidence=%s",
+            topic, mapping.jeedom_eq_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish sensor config for eq_id=%d (bridge unavailable)",
                 mapping.jeedom_eq_id,
             )
         return ok
@@ -298,5 +327,34 @@ class DiscoveryPublisher:
         # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch"
         if caps.device_class == "outlet":
             payload["device_class"] = "outlet"
+
+        return payload
+
+    def _build_sensor_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build the MQTT Discovery JSON payload for a sensor entity."""
+        eq_id = mapping.jeedom_eq_id
+        device = self._build_device_block(mapping, snapshot)
+        reason_details = mapping.reason_details or {}
+        device_class = reason_details.get("device_class")
+        unit_of_measurement = reason_details.get("unit_of_measurement")
+
+        payload = {
+            "name": mapping.ha_name,
+            "unique_id": mapping.ha_unique_id,
+            "object_id": f"jeedom2ha_{eq_id}",
+            "state_topic": f"jeedom2ha/{eq_id}/state",
+            "platform": "mqtt",
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        payload.update(self._build_availability_fields(mapping, snapshot))
+
+        if device_class is not None:
+            payload["device_class"] = device_class
+        if unit_of_measurement is not None:
+            payload["unit_of_measurement"] = unit_of_measurement
 
         return payload

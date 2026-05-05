@@ -5,6 +5,7 @@ from typing import Iterator, List, Optional
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
+from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import MappingResult
 from models.topology import JeedomEqLogic, TopologySnapshot
@@ -18,6 +19,7 @@ class MapperRegistry:
             LightMapper(),
             CoverMapper(),
             SwitchMapper(),
+            SensorMapper(),
             FallbackMapper(),
         ]
 

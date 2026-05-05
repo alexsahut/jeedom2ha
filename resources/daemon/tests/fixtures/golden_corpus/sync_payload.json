@@ -903,6 +903,111 @@
       "status": {
         "timeout": 0
       }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "TEMPERATURE",
+          "id": 70001,
+          "name": "TEMPERATURE",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 7000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Sensor temperature salon 7000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "HUMIDITY",
+          "id": 70011,
+          "name": "HUMIDITY",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 7001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Sensor humidite sdb 7001",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "POWER",
+          "id": 70021,
+          "name": "POWER",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 7002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Compteur puissance elec 7002",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "CO2",
+          "id": 70031,
+          "name": "CO2",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 7003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Sensor qualite air 7003",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "BRIGHTNESS",
+          "id": 70041,
+          "name": "BRIGHTNESS",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 7004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Sensor luminosite 7004",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

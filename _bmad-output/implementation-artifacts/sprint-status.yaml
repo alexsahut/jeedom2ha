@@ -193,7 +193,7 @@ development_status:
   pe-epic-9: in-progress  # prefixe 9.0 merged/closed
   # 9.0 prefixe obligatoire issu de la retro pe-epic-8 (PE8-AI-01/02)
   9-0-decouplage-des-consommateurs-externes-de-mapping-summary-ui-jeedom-script-de-deploiement: done  # PR #111 mergee 2026-05-05 — AC1-AC6 valides, scope strict confirme
-  9-1-sensor-mapper-publish-sensor-info-numeric-et-capteurs-simples: backlog
+  9-1-sensor-mapper-publish-sensor-info-numeric-et-capteurs-simples: review  # Story 9.1 impl complete 2026-05-05 — 684/684 tests PASS, golden 35 PASS, terrain publish=55 (>30 baseline)
   9-2-binary-sensor-mapper-publish-binary-sensor-info-binary-presence-ouverture-fuite: backlog
   9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10: backlog
   9-4-fallback-mapper-degradation-elegante-terminale-publier-sensor-button-par-defaut-plutot-que-skip-silencieux: backlog

@@ -1,6 +1,6 @@
 # Story 9.1 : SensorMapper + publish_sensor — Info numeric et capteurs simples
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -59,24 +59,24 @@ afin que les capteurs simples deja types correctement dans Jeedom apparaissent a
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
-  - [ ] Dry-run : verifier sans transferer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Selectionner le mode selon l'objectif de la story :
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+  - [x] Dry-run : verifier sans transferer : `./scripts/deploy-to-box.sh --dry-run`
+  - [x] Selectionner le mode selon l'objectif de la story :
     - Verification disparition entites HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Verifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup termine.`
+  - [x] Verifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup termine.`
 
-- [ ] Task 1 — API statique `PublisherRegistry.known_types()` (AC4, PE8-AI-03)
-  - [ ] 1.1 Ajouter `@classmethod known_types()` a `PublisherRegistry` dans `resources/daemon/discovery/registry.py`
-  - [ ] 1.2 La liste retournee doit etre `["light", "cover", "switch"]` avant enregistrement de `sensor` (maintenue en dur + mise a jour quand le constructeur enregistre un nouveau type)
-  - [ ] 1.3 Refactorer `http_server.py:_build_mapping_counters_from_publisher_registry()` pour utiliser `PublisherRegistry.known_types()` au lieu d'instancier `PublisherRegistry(DiscoveryPublisher(None))`
-  - [ ] 1.4 Verifier que les tests Story 8.3 (`test_story_8_3_http_server_dispatch.py`) restent verts apres refactor
-  - [ ] 1.5 Ajouter un test unitaire pour `known_types()` retournant la bonne liste
+- [x] Task 1 — API statique `PublisherRegistry.known_types()` (AC4, PE8-AI-03)
+  - [x] 1.1 Ajouter `@classmethod known_types()` a `PublisherRegistry` dans `resources/daemon/discovery/registry.py`
+  - [x] 1.2 La liste retournee doit etre `["light", "cover", "switch"]` avant enregistrement de `sensor` (maintenue en dur + mise a jour quand le constructeur enregistre un nouveau type)
+  - [x] 1.3 Refactorer `http_server.py:_build_mapping_counters_from_publisher_registry()` pour utiliser `PublisherRegistry.known_types()` au lieu d'instancier `PublisherRegistry(DiscoveryPublisher(None))`
+  - [x] 1.4 Verifier que les tests Story 8.3 (`test_story_8_3_http_server_dispatch.py`) restent verts apres refactor
+  - [x] 1.5 Ajouter un test unitaire pour `known_types()` retournant la bonne liste
 
-- [ ] Task 2 — Table de mapping Jeedom Info numeric → HA device_class (AC1)
-  - [ ] 2.1 Creer `resources/daemon/mapping/sensor.py`
-  - [ ] 2.2 Definir la table `_SENSOR_GENERIC_TYPE_MAP` : dictionnaire `generic_code → (device_class, unit_of_measurement)`
-  - [ ] 2.3 Table derivee de `ha-projection-reference.md` section 3 (types Info, subtype numeric) :
+- [x] Task 2 — Table de mapping Jeedom Info numeric → HA device_class (AC1)
+  - [x] 2.1 Creer `resources/daemon/mapping/sensor.py`
+  - [x] 2.2 Definir la table `_SENSOR_GENERIC_TYPE_MAP` : dictionnaire `generic_code → (device_class, unit_of_measurement)`
+  - [x] 2.3 Table derivee de `ha-projection-reference.md` section 3 (types Info, subtype numeric) :
     - `TEMPERATURE` → `("temperature", "°C")`
     - `HUMIDITY` → `("humidity", "%")`
     - `POWER` → `("power", "W")`
@@ -106,12 +106,12 @@ afin que les capteurs simples deja types correctement dans Jeedom apparaissent a
     - `THERMOSTAT_TEMPERATURE_OUTDOOR` → `("temperature", "°C")`
     - `FAN_SPEED_STATE` → `(None, "rpm")`
     - `ROTATION_STATE` → `(None, "rpm")`
-  - [ ] 2.4 Les types generiques avec `command_kind = Action` sont exclus (Info seulement)
-  - [ ] 2.5 Les types generiques avec `subtypes = binary` sont exclus (reserves a Story 9.2 BinarySensorMapper)
+  - [x] 2.4 Les types generiques avec `command_kind = Action` sont exclus (Info seulement)
+  - [x] 2.5 Les types generiques avec `subtypes = binary` sont exclus (reserves a Story 9.2 BinarySensorMapper)
 
-- [ ] Task 3 — Implementation de `SensorMapper` (AC1, AC6)
-  - [ ] 3.1 Classe `SensorMapper` dans `resources/daemon/mapping/sensor.py` avec methode `map(eq, snapshot) -> Optional[MappingResult]`
-  - [ ] 3.2 Logique de `map()` :
+- [x] Task 3 — Implementation de `SensorMapper` (AC1, AC6)
+  - [x] 3.1 Classe `SensorMapper` dans `resources/daemon/mapping/sensor.py` avec methode `map(eq, snapshot) -> Optional[MappingResult]`
+  - [x] 3.2 Logique de `map()` :
     - Iterer les commandes de l'eqLogic
     - Selectionner la premiere commande Info dont `generic_type` est dans `_SENSOR_GENERIC_TYPE_MAP` et dont le subtype inclut `numeric` (exclure `binary`)
     - Construire `MappingResult` avec :
@@ -123,17 +123,17 @@ afin que les capteurs simples deja types correctement dans Jeedom apparaissent a
       - `ha_unique_id = f"jeedom2ha_eq_{eq.id}"`
       - `ha_name = eq.name`
       - `suggested_area = snapshot.get_suggested_area(eq.id)`
-  - [ ] 3.3 Si aucune commande Info numeric matchant la table → retourner `None`
-  - [ ] 3.4 Stocker `device_class` et `unit_of_measurement` dans `reason_details` pour usage par le publisher
+  - [x] 3.3 Si aucune commande Info numeric matchant la table → retourner `None`
+  - [x] 3.4 Stocker `device_class` et `unit_of_measurement` dans `reason_details` pour usage par le publisher
 
-- [ ] Task 4 — Enregistrement dans `MapperRegistry` (AC6)
-  - [ ] 4.1 Modifier `resources/daemon/mapping/registry.py` : importer `SensorMapper`
-  - [ ] 4.2 Inserer `SensorMapper()` AVANT `FallbackMapper()` dans `self._mappers`
-  - [ ] 4.3 Ordre final : `[LightMapper(), CoverMapper(), SwitchMapper(), SensorMapper(), FallbackMapper()]`
+- [x] Task 4 — Enregistrement dans `MapperRegistry` (AC6)
+  - [x] 4.1 Modifier `resources/daemon/mapping/registry.py` : importer `SensorMapper`
+  - [x] 4.2 Inserer `SensorMapper()` AVANT `FallbackMapper()` dans `self._mappers`
+  - [x] 4.3 Ordre final : `[LightMapper(), CoverMapper(), SwitchMapper(), SensorMapper(), FallbackMapper()]`
 
-- [ ] Task 5 — Implementation de `publish_sensor` (AC3)
-  - [ ] 5.1 Ajouter methode `async publish_sensor(mapping, snapshot) -> bool` dans `DiscoveryPublisher` (`resources/daemon/discovery/publisher.py`)
-  - [ ] 5.2 Builder de payload `_build_sensor_payload(mapping, snapshot)` :
+- [x] Task 5 — Implementation de `publish_sensor` (AC3)
+  - [x] 5.1 Ajouter methode `async publish_sensor(mapping, snapshot) -> bool` dans `DiscoveryPublisher` (`resources/daemon/discovery/publisher.py`)
+  - [x] 5.2 Builder de payload `_build_sensor_payload(mapping, snapshot)` :
     - `name`, `unique_id`, `object_id`
     - `state_topic = f"jeedom2ha/{eq_id}/state"`
     - `device_class` depuis `mapping.reason_details["device_class"]`
@@ -141,45 +141,45 @@ afin que les capteurs simples deja types correctement dans Jeedom apparaissent a
     - `device` bloc via `_build_device_block(mapping, snapshot)`
     - `availability` via `_build_availability_fields(mapping, snapshot)`
     - `platform = "mqtt"`
-  - [ ] 5.3 Topic MQTT Discovery : `homeassistant/sensor/jeedom2ha_{eq_id}/config`
-  - [ ] 5.4 Pattern identique a `publish_light`/`publish_cover`/`publish_switch` : log info, publish QoS 1 retain
+  - [x] 5.3 Topic MQTT Discovery : `homeassistant/sensor/jeedom2ha_{eq_id}/config`
+  - [x] 5.4 Pattern identique a `publish_light`/`publish_cover`/`publish_switch` : log info, publish QoS 1 retain
 
-- [ ] Task 6 — Enregistrement dans `PublisherRegistry` (AC3, AC4)
-  - [ ] 6.1 Modifier `resources/daemon/discovery/registry.py` : ajouter `"sensor": publisher.publish_sensor` dans le dict `_publishers` du constructeur
-  - [ ] 6.2 Mettre a jour `known_types()` pour inclure `"sensor"` dans la liste retournee
+- [x] Task 6 — Enregistrement dans `PublisherRegistry` (AC3, AC4)
+  - [x] 6.1 Modifier `resources/daemon/discovery/registry.py` : ajouter `"sensor": publisher.publish_sensor` dans le dict `_publishers` du constructeur
+  - [x] 6.2 Mettre a jour `known_types()` pour inclure `"sensor"` dans la liste retournee
 
-- [ ] Task 7 — Extension du golden-file (AC5, PE8-AI-04)
-  - [ ] 7.1 Ajouter 5 eqLogics sensor dans `resources/daemon/tests/fixtures/golden_corpus/sync_payload.json` :
+- [x] Task 7 — Extension du golden-file (AC5, PE8-AI-04)
+  - [x] 7.1 Ajouter 5 eqLogics sensor dans `resources/daemon/tests/fixtures/golden_corpus/sync_payload.json` :
     - `7000` : TEMPERATURE (capteur temperature salon) — device_class=temperature, unit=°C
     - `7001` : HUMIDITY (capteur humidite sdb) — device_class=humidity, unit=%
     - `7002` : POWER (compteur puissance elec) — device_class=power, unit=W
     - `7003` : CO2 (capteur qualite air) — device_class=carbon_dioxide, unit=ppm
     - `7004` : BRIGHTNESS (capteur luminosite) — device_class=illuminance, unit=lx
-  - [ ] 7.2 Ajouter les entrees correspondantes dans `expected_sync_snapshot.json` (diagnostics + mapping_summary counters)
-  - [ ] 7.3 Verifier que `test_story_8_4_golden_file.py` passe avec les 35 equipements (30 initiaux + 5 nouveaux)
-  - [ ] 7.4 NE PAS modifier les 30 equipements initiaux (IDs 1000-6001)
-  - [ ] 7.5 Mettre a jour `resources/daemon/tests/fixtures/golden_corpus/README.md` avec la section sensor
+  - [x] 7.2 Ajouter les entrees correspondantes dans `expected_sync_snapshot.json` (diagnostics + mapping_summary counters)
+  - [x] 7.3 Verifier que `test_story_8_4_golden_file.py` passe avec les 35 equipements (30 initiaux + 5 nouveaux)
+  - [x] 7.4 NE PAS modifier les 30 equipements initiaux (IDs 1000-6001)
+  - [x] 7.5 Mettre a jour `resources/daemon/tests/fixtures/golden_corpus/README.md` avec la section sensor
 
-- [ ] Task 8 — Tests unitaires SensorMapper + publish_sensor (AC1, AC2, AC3)
-  - [ ] 8.1 Creer `resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py`
-  - [ ] 8.2 Tests SensorMapper :
+- [x] Task 8 — Tests unitaires SensorMapper + publish_sensor (AC1, AC2, AC3)
+  - [x] 8.1 Creer `resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py`
+  - [x] 8.2 Tests SensorMapper :
     - Test nominal : eqLogic avec TEMPERATURE → MappingResult sensor
     - Test nominal : eqLogic avec HUMIDITY → MappingResult sensor
     - Test nominal : eqLogic avec POWER → MappingResult sensor
     - Test negatif : eqLogic sans commande Info numeric matchante → None
     - Test exclusion : eqLogic avec seulement des commandes binary → None (reserve 9.2)
     - Test validation : MappingResult passe validate_projection() → is_valid=True
-  - [ ] 8.3 Tests publish_sensor :
+  - [x] 8.3 Tests publish_sensor :
     - Test payload structure : tous les champs requis presents
     - Test device_class et unit_of_measurement correctement remontes
     - Test topic format correct
-  - [ ] 8.4 Test known_types() : retourne la bonne liste apres enregistrement sensor
+  - [x] 8.4 Test known_types() : retourne la bonne liste apres enregistrement sensor
 
-- [ ] Task 9 — Validation non-regression + terrain (AC2, AC5, AC7)
-  - [ ] 9.1 Lancer la suite complete : `pytest resources/daemon/tests/` — zero regression
-  - [ ] 9.2 Lancer specifiquement `test_story_8_4_golden_file.py` — PASS avec 35 equipements
-  - [ ] 9.3 Deployer sur box Alexandre et verifier que les nouveaux sensors apparaissent dans HA Discovery
-  - [ ] 9.4 Relever le comptage : baseline 30 → attendu > 30 publies (nouveaux sensors en plus)
+- [x] Task 9 — Validation non-regression + terrain (AC2, AC5, AC7)
+  - [x] 9.1 Lancer la suite complete : `pytest resources/daemon/tests/` — zero regression
+  - [x] 9.2 Lancer specifiquement `test_story_8_4_golden_file.py` — PASS avec 35 equipements
+  - [x] 9.3 Deployer sur box Alexandre et verifier que les nouveaux sensors apparaissent dans HA Discovery
+  - [x] 9.4 Relever le comptage : baseline 30 → attendu > 30 publies (nouveaux sensors en plus)
 
 ## Dev Notes
 
@@ -334,10 +334,51 @@ resources/daemon/
 
 ### Agent Model Used
 
-(a remplir par le dev agent)
+GPT-5 (Codex)
+
 
 ### Debug Log References
 
+- `./scripts/deploy-to-box.sh --dry-run` (pre-flight Task 0)
+- `python3 -m pytest resources/daemon/tests/unit/test_story_8_3_http_server_dispatch.py resources/daemon/tests/unit/test_story_8_2_publisher_registry.py` (validation Task 1)
+- `python3 -m pytest resources/daemon/tests/unit/test_story_8_1_mapper_registry.py resources/daemon/tests/unit/test_story_8_2_publisher_registry.py resources/daemon/tests/unit/test_story_8_3_http_server_dispatch.py resources/daemon/tests/unit/test_story_8_4_golden_file.py resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py`
+- `python3 -m pytest resources/daemon/tests/` (gate complet: 684 PASS)
+- `python3 -m pytest resources/daemon/tests/unit/test_story_8_4_golden_file.py -q` (golden 35 PASS)
+- `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon` (validation terrain Task 9)
+
 ### Completion Notes List
 
+- Task 0 validée: pre-flight terrain (dry-run) + fin de script conforme.
+- Task 1 validée: `PublisherRegistry.known_types()` introduit et consommé dans `http_server` sans instanciation ad hoc.
+- Tasks 2-4 validées: `SensorMapper` ajouté avec table `_SENSOR_GENERIC_TYPE_MAP`, exclusion `Action`/`binary`, et insertion cascade `[Light, Cover, Switch, Sensor, Fallback]`.
+- Tasks 5-6 validées: `publish_sensor` + `_build_sensor_payload` ajoutés; `PublisherRegistry` enregistre désormais `sensor`; `known_types()` expose `['light', 'cover', 'switch', 'sensor']`.
+- Task 7 validée: golden corpus étendu avec 5 équipements `7000..7004` sans altérer les 30 historiques; snapshot attendu régénéré; README mis à jour.
+- Task 8 validée: nouveau fichier de tests Story 9.1 couvrant mapping nominal, exclusions, validation projection, payload discovery et `known_types()`.
+- Task 9 validée: non-régression complète PASS (`684 passed`), golden 35 PASS, terrain box Alexandre validé.
+- Mesure terrain: sync réel `total_eq=278 eligible=81 published=55` (baseline historique: 30), topics `homeassistant/sensor/...` publiés.
+
 ### File List
+
+- `resources/daemon/mapping/sensor.py` (nouveau)
+- `resources/daemon/mapping/registry.py`
+- `resources/daemon/discovery/publisher.py`
+- `resources/daemon/discovery/registry.py`
+- `resources/daemon/transport/http_server.py`
+- `resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py` (nouveau)
+- `resources/daemon/tests/unit/test_story_8_1_mapper_registry.py`
+- `resources/daemon/tests/unit/test_story_8_2_publisher_registry.py`
+- `resources/daemon/tests/unit/test_story_8_3_http_server_dispatch.py`
+- `resources/daemon/tests/unit/test_story_8_4_golden_file.py`
+- `resources/daemon/tests/fixtures/golden_corpus/sync_payload.json`
+- `resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json`
+- `resources/daemon/tests/fixtures/golden_corpus/README.md`
+
+### Change Log
+
+- 2026-05-05: Implémentation complète Story 9.1 (SensorMapper + publisher sensor + extension golden + validations tests/terrain).
+- 2026-05-05: Code review adversariale — findings traités :
+  - G1 vérifié : sensor.py et test_story_9_1_sensor_mapper.py non stagés → inclus dans le commit de review.
+  - M1 corrigé : suppression de la boucle dead code `for ha_entity_type in self._publishers` dans `PublisherRegistry.__init__` ; ajout du test `test_known_types_matches_publishers_dict` dans test_story_8_2.
+  - M2 corrigé : `_unmapped_eq()` renommé en `_sensor_eq()` dans test_story_8_3 (3 call sites) — sémantique alignée sur le comportement réel post-Story 9.1.
+  - L1 corrigé : docstring `publish_sensor` complété avec Args/Returns pour cohérence avec publish_light/cover/switch.
+  - L2, L3 reportés en action items rétro pe-epic-9 : renommage du test "...light_cover_and_switch..." et refactoring de `_resolve_state_topic` vers `known_types()` seront adressés lors de Story 9.2/9.3.

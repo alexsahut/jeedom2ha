@@ -28,12 +28,20 @@ class UnknownPublisherError(KeyError):
 class PublisherRegistry:
     """Fixed dispatch table for existing discovery publishers."""
 
+    _known_types = ["light", "cover", "switch", "sensor"]
+
     def __init__(self, publisher: DiscoveryPublisher) -> None:
         self._publishers: Dict[str, PublishMethod] = {
             "light": publisher.publish_light,
             "cover": publisher.publish_cover,
             "switch": publisher.publish_switch,
+            "sensor": publisher.publish_sensor,
         }
+
+    @classmethod
+    def known_types(cls) -> list[str]:
+        """Return the static list of known publisher types without instantiation."""
+        return list(cls._known_types)
 
     @property
     def publishers(self) -> Dict[str, PublishMethod]:
