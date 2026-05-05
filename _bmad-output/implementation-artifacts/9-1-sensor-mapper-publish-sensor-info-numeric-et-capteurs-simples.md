@@ -1,6 +1,6 @@
 # Story 9.1 : SensorMapper + publish_sensor — Info numeric et capteurs simples
 
-Status: review
+Status: done
 
 ## Story
 
@@ -382,3 +382,8 @@ GPT-5 (Codex)
   - M2 corrigé : `_unmapped_eq()` renommé en `_sensor_eq()` dans test_story_8_3 (3 call sites) — sémantique alignée sur le comportement réel post-Story 9.1.
   - L1 corrigé : docstring `publish_sensor` complété avec Args/Returns pour cohérence avec publish_light/cover/switch.
   - L2, L3 reportés en action items rétro pe-epic-9 : renommage du test "...light_cover_and_switch..." et refactoring de `_resolve_state_topic` vers `known_types()` seront adressés lors de Story 9.2/9.3.
+- 2026-05-05 — PR #114 mergée, smoke test terrain PASS sur box réelle :
+  total_eq=278, eligible=81, published=55 (vs baseline 30)
+  sensors_published=25, ratio publié/éligible=67.9%
+  (baseline pré-9.1 = 37%, mesure baseline pour rétro pe-epic-9 PE8-AI-05)
+  Story done.
