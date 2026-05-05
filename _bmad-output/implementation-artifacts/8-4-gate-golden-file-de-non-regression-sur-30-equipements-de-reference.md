@@ -1,6 +1,6 @@
 # Story 8.4 : Gate golden-file de non-regression sur 30 equipements de reference
 
-Status: review
+Status: done
 
 ## Story
 
@@ -314,3 +314,4 @@ Completion note: Ultimate context engine analysis completed - comprehensive deve
 
 - 2026-05-04 — Creation Story 8.4 ready-for-dev : corpus golden-file 30 equipements, test snapshot CI, garde-fous zero production change, baseline pe-epic-9.
 - 2026-05-04 — Implementation Story 8.4 : corpus golden-file 30 equipements + snapshot expected + test golden-file non-regression, validations pytest completes, statut passe a review.
+- 2026-05-05 — PR #110 mergée, story done, pe-epic-8 cloturé

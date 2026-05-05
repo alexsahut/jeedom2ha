@@ -42,7 +42,7 @@
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
 #   Epics: pe-epic-1 à pe-epic-9 (post correct-course 2026-04-30 :
-#          pe-epic-1/2/3/4/5/6/7 done, pe-epic-8/9 backlog)
+#          pe-epic-1/2/3/4/5/6/7/8 done, pe-epic-9 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -50,7 +50,7 @@
 #             alimentee par ha-projection-reference.md et degradation elegante §11
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-05-04'  # story 8.4 moved to review ; story 8.3 done via PR #109
+last_updated: '2026-05-05'  # cloture pe-epic-8 apres merge story 8.4
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -176,11 +176,11 @@ development_status:
   # Ajoute par correct-course 2026-04-30 — refactor PUR sans nouveau comportement
   # Gate de cloture epic-level = golden-file 8.4 vert sur 30 equipements de reference
   # ==============================================================
-  pe-epic-8: in-progress
+  pe-epic-8: done  # cloture epic apres merge 8.4 — golden-file gate operationnel, baseline regression-control pour pe-epic-9
   8-1-mapper-registry-dispatch-deterministe-et-slot-terminal-reserve: done  # PR #107 mergee 2026-05-03
   8-2-publisher-registry-dispatch-table-ha-entity-type-vers-methode-publish: done  # PR #108 mergee 2026-05-03
   8-3-refactor-http-server-run-sync-boucle-dispatch-unique-et-compteurs-generiques: done  # PR #109 mergee 2026-05-03
-  8-4-gate-golden-file-de-non-regression-sur-30-equipements-de-reference: review
+  8-4-gate-golden-file-de-non-regression-sur-30-equipements-de-reference: done  # PR #110 mergee 2026-05-05
   pe-epic-8-retrospective: optional
 
   # ==============================================================
