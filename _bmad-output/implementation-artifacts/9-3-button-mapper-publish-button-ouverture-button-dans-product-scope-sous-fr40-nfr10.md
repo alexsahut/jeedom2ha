@@ -145,8 +145,8 @@ afin que les actions discrètes Jeedom soient déclenchables depuis Home Assista
 - [x] Task 9 — Validation non-régression + terrain (AC2, AC7)
   - [x] 9.1 Suite complète : X/X PASS — zéro régression
   - [x] 9.2 `test_story_8_4_golden_file.py` : PASS avec 43 équipements
-  - [x] 9.3 Déployer sur box Alexandre et relever la mesure terrain
-  - [x] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
+  - [ ] 9.3 Déployer sur box Alexandre et relever la mesure terrain
+  - [ ] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
 
 ## Dev Notes
 
@@ -458,3 +458,25 @@ claude-sonnet-4-6
 ### Completion Notes List
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10.md` — story file
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — 9.3 marquée ready-for-dev → review
+- `resources/daemon/mapping/button.py` — NEW : ButtonMapper + _is_action_other_command
+- `resources/daemon/mapping/registry.py` — ButtonMapper inséré avant FallbackMapper
+- `resources/daemon/discovery/publisher.py` — publish_button + _build_button_payload
+- `resources/daemon/discovery/registry.py` — "button" dans _known_types + _publishers
+- `resources/daemon/transport/http_server.py` — _TYPES_WITHOUT_STATE_TOPIC + _resolve_state_topic fix
+- `resources/daemon/validation/ha_component_registry.py` — PRODUCT_SCOPE += "button"
+- `resources/daemon/tests/fixtures/golden_corpus/sync_payload.json` — +3 eqLogics button (9000-9002)
+- `resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json` — +3 résultats button + buttons_published=3
+- `resources/daemon/tests/unit/test_story_9_3_button_mapper.py` — NEW : 14 tests ButtonMapper + publish_button
+- `resources/daemon/tests/unit/test_story_8_1_mapper_registry.py` — canonical order + _hardcoded_cascade mis à jour
+- `resources/daemon/tests/unit/test_story_8_2_publisher_registry.py` — "button" dans assertions
+- `resources/daemon/tests/unit/test_story_8_4_golden_file.py` — _assert_corpus_shape → 43 équipements
+- `resources/daemon/tests/unit/test_ha_component_registry.py` — non-régression
+- `resources/daemon/tests/unit/test_step3_governance_fr40.py` — non-régression
+- `resources/daemon/tests/unit/test_story_7_2_wave_registry.py` — non-régression
+- `resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py` — non-régression
+- `resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py` — non-régression PRODUCT_SCOPE
+- `resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py` — non-régression
+- `resources/daemon/tests/unit/test_story_9_2_binary_sensor_mapper.py` — non-régression

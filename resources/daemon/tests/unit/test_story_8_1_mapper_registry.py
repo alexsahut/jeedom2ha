@@ -111,7 +111,11 @@ def _hardcoded_cascade(eq: JeedomEqLogic, snapshot: TopologySnapshot):
     if mapping is None:
         mapping = SwitchMapper().map(eq, snapshot)
     if mapping is None:
+        mapping = BinarySensorMapper().map(eq, snapshot)
+    if mapping is None:
         mapping = SensorMapper().map(eq, snapshot)
+    if mapping is None:
+        mapping = ButtonMapper().map(eq, snapshot)
     return mapping
 
 
