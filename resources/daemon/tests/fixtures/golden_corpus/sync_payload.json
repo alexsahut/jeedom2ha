@@ -1008,6 +1008,111 @@
       "status": {
         "timeout": 0
       }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "PRESENCE",
+          "id": 80001,
+          "name": "PRESENCE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 8000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Detecteur presence salon 8000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "OPENING",
+          "id": 80011,
+          "name": "OPENING",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 8001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Capteur ouverture porte entree 8001",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "SMOKE",
+          "id": 80021,
+          "name": "SMOKE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 8002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Detecteur fumee cuisine 8002",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "FLOOD",
+          "id": 80031,
+          "name": "FLOOD",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 8003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Capteur inondation cave 8003",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LOCK_STATE",
+          "id": 80041,
+          "name": "LOCK_STATE",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 8004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Serrure connectee 8004",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

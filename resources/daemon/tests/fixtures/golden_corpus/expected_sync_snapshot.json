@@ -3253,6 +3253,391 @@
           "unmatched_commands": [],
           "v1_compatibility": true,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8000,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80001,
+              "cmd_name": "PRESENCE",
+              "generic_type": "PRESENCE"
+            }
+          ],
+          "name": "Detecteur presence salon 8000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "PRESENCE",
+                "id": 80001,
+                "name": "PRESENCE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80001,
+                "configured_type": "PRESENCE",
+                "logical_role": "PRESENCE",
+                "used_type": "PRESENCE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8001,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80011,
+              "cmd_name": "OPENING",
+              "generic_type": "OPENING"
+            }
+          ],
+          "name": "Capteur ouverture porte entree 8001",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "OPENING",
+                "id": 80011,
+                "name": "OPENING"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80011,
+                "configured_type": "OPENING",
+                "logical_role": "OPENING",
+                "used_type": "OPENING"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8002,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80021,
+              "cmd_name": "SMOKE",
+              "generic_type": "SMOKE"
+            }
+          ],
+          "name": "Detecteur fumee cuisine 8002",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SMOKE",
+                "id": 80021,
+                "name": "SMOKE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80021,
+                "configured_type": "SMOKE",
+                "logical_role": "SMOKE",
+                "used_type": "SMOKE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8003,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80031,
+              "cmd_name": "FLOOD",
+              "generic_type": "FLOOD"
+            }
+          ],
+          "name": "Capteur inondation cave 8003",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "FLOOD",
+                "id": 80031,
+                "name": "FLOOD"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80031,
+                "configured_type": "FLOOD",
+                "logical_role": "FLOOD",
+                "used_type": "FLOOD"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8004,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80041,
+              "cmd_name": "LOCK_STATE",
+              "generic_type": "LOCK_STATE"
+            }
+          ],
+          "name": "Serrure connectee 8004",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "LOCK_STATE",
+                "id": 80041,
+                "name": "LOCK_STATE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80041,
+                "configured_type": "LOCK_STATE",
+                "logical_role": "LOCK_STATE",
+                "used_type": "LOCK_STATE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
         }
       ],
       "in_scope_equipments": [
@@ -6450,6 +6835,391 @@
           "unmatched_commands": [],
           "v1_compatibility": true,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8000,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80001,
+              "cmd_name": "PRESENCE",
+              "generic_type": "PRESENCE"
+            }
+          ],
+          "name": "Detecteur presence salon 8000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "PRESENCE",
+                "id": 80001,
+                "name": "PRESENCE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80001,
+                "configured_type": "PRESENCE",
+                "logical_role": "PRESENCE",
+                "used_type": "PRESENCE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8001,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80011,
+              "cmd_name": "OPENING",
+              "generic_type": "OPENING"
+            }
+          ],
+          "name": "Capteur ouverture porte entree 8001",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "OPENING",
+                "id": 80011,
+                "name": "OPENING"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80011,
+                "configured_type": "OPENING",
+                "logical_role": "OPENING",
+                "used_type": "OPENING"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8002,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80021,
+              "cmd_name": "SMOKE",
+              "generic_type": "SMOKE"
+            }
+          ],
+          "name": "Detecteur fumee cuisine 8002",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SMOKE",
+                "id": 80021,
+                "name": "SMOKE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80021,
+                "configured_type": "SMOKE",
+                "logical_role": "SMOKE",
+                "used_type": "SMOKE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8003,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80031,
+              "cmd_name": "FLOOD",
+              "generic_type": "FLOOD"
+            }
+          ],
+          "name": "Capteur inondation cave 8003",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "FLOOD",
+                "id": 80031,
+                "name": "FLOOD"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80031,
+                "configured_type": "FLOOD",
+                "logical_role": "FLOOD",
+                "used_type": "FLOOD"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 8004,
+          "eq_type_name": "virtual",
+          "ha_type": "binary_sensor",
+          "matched_commands": [
+            {
+              "cmd_id": 80041,
+              "cmd_name": "LOCK_STATE",
+              "generic_type": "LOCK_STATE"
+            }
+          ],
+          "name": "Serrure connectee 8004",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "binary_sensor",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "LOCK_STATE",
+                "id": 80041,
+                "name": "LOCK_STATE"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 80041,
+                "configured_type": "LOCK_STATE",
+                "logical_role": "LOCK_STATE",
+                "used_type": "LOCK_STATE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
         }
       ],
       "rooms": [
@@ -6457,8 +7227,8 @@
           "compteurs": {
             "ecarts": 2,
             "exclus": 0,
-            "inclus": 11,
-            "total": 11
+            "inclus": 13,
+            "total": 13
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -6468,25 +7238,25 @@
               "disabled_eqlogic": 1,
               "ha_missing_command_topic": 1,
               "probable": 4,
-              "sure": 5
+              "sure": 7
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 2,
-              "published": 9
+              "published": 11
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 11
+            "total_equipments": 13
           }
         },
         {
           "compteurs": {
             "ecarts": 4,
             "exclus": 0,
-            "inclus": 15,
-            "total": 15
+            "inclus": 17,
+            "total": 17
           },
           "home_statut": "Partiellement publiee",
           "object_id": 2,
@@ -6496,25 +7266,25 @@
               "ambiguous_skipped": 3,
               "ha_component_not_in_product_scope": 1,
               "probable": 6,
-              "sure": 5
+              "sure": 7
             },
             "counts_by_status": {
               "ambiguous": 3,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 1,
-              "published": 11
+              "published": 13
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 15
+            "total_equipments": 17
           }
         },
         {
           "compteurs": {
             "ecarts": 0,
             "exclus": 1,
-            "inclus": 8,
-            "total": 9
+            "inclus": 9,
+            "total": 10
           },
           "home_statut": "Publiee",
           "object_id": 3,
@@ -6523,17 +7293,17 @@
             "counts_by_reason": {
               "excluded_eqlogic": 1,
               "probable": 5,
-              "sure": 3
+              "sure": 4
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 1,
               "infra_incident": 0,
               "not_supported": 0,
-              "published": 8
+              "published": 9
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 9
+            "total_equipments": 10
           }
         }
       ],
@@ -6541,8 +7311,8 @@
         "compteurs": {
           "ecarts": 6,
           "exclus": 1,
-          "inclus": 34,
-          "total": 35
+          "inclus": 39,
+          "total": 40
         },
         "counts_by_reason": {
           "ambiguous_skipped": 3,
@@ -6551,18 +7321,18 @@
           "ha_component_not_in_product_scope": 1,
           "ha_missing_command_topic": 1,
           "probable": 15,
-          "sure": 13
+          "sure": 18
         },
         "counts_by_status": {
           "ambiguous": 3,
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 28
+          "published": 33
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 35
+        "total_equipments": 40
       }
     },
     "request_id": "<normalized-request-id>",
@@ -6582,6 +7352,11 @@
   "runtime": {
     "derniere_synchro_terminee": "<normalized-timestamp>",
     "mapping_counters": {
+      "binary_sensors_ambiguous": 0,
+      "binary_sensors_probable": 0,
+      "binary_sensors_published": 5,
+      "binary_sensors_skipped": 0,
+      "binary_sensors_sure": 5,
       "covers_ambiguous": 1,
       "covers_probable": 4,
       "covers_published": 8,
@@ -8498,6 +9273,241 @@
           "unit_of_measurement": "lx"
         },
         "suggested_area": "Salon"
+      },
+      "8000": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "PRESENCE": {
+            "generic_type": "PRESENCE",
+            "id": 80001,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "binary_sensor",
+        "ha_name": "Detecteur presence salon 8000",
+        "ha_unique_id": "jeedom2ha_eq_8000",
+        "jeedom_eq_id": 8000,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/8000/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/8000/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "binary_sensor_presence",
+        "reason_details": {
+          "device_class": "occupancy"
+        },
+        "suggested_area": "Salon"
+      },
+      "8001": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "OPENING": {
+            "generic_type": "OPENING",
+            "id": 80011,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "binary_sensor",
+        "ha_name": "Capteur ouverture porte entree 8001",
+        "ha_unique_id": "jeedom2ha_eq_8001",
+        "jeedom_eq_id": 8001,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/8001/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/8001/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "binary_sensor_opening",
+        "reason_details": {
+          "device_class": "door"
+        },
+        "suggested_area": "Chambre"
+      },
+      "8002": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "SMOKE": {
+            "generic_type": "SMOKE",
+            "id": 80021,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "binary_sensor",
+        "ha_name": "Detecteur fumee cuisine 8002",
+        "ha_unique_id": "jeedom2ha_eq_8002",
+        "jeedom_eq_id": 8002,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/8002/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/8002/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "binary_sensor_smoke",
+        "reason_details": {
+          "device_class": "smoke"
+        },
+        "suggested_area": "Salon"
+      },
+      "8003": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "FLOOD": {
+            "generic_type": "FLOOD",
+            "id": 80031,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "binary_sensor",
+        "ha_name": "Capteur inondation cave 8003",
+        "ha_unique_id": "jeedom2ha_eq_8003",
+        "jeedom_eq_id": 8003,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/8003/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/8003/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "binary_sensor_flood",
+        "reason_details": {
+          "device_class": "moisture"
+        },
+        "suggested_area": "Garage"
+      },
+      "8004": {
+        "capabilities": {
+          "has_state": true
+        },
+        "commands": {
+          "LOCK_STATE": {
+            "generic_type": "LOCK_STATE",
+            "id": 80041,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "binary_sensor",
+        "ha_name": "Serrure connectee 8004",
+        "ha_unique_id": "jeedom2ha_eq_8004",
+        "jeedom_eq_id": 8004,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/8004/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/8004/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "binary_sensor_lock_state",
+        "reason_details": {
+          "device_class": "lock"
+        },
+        "suggested_area": "Chambre"
       }
     },
     "publications": {
@@ -9094,19 +10104,114 @@
         "reason": "sure",
         "should_publish": true,
         "state_topic": "jeedom2ha/7004/state"
+      },
+      "8000": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/8000/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "binary_sensor",
+          "jeedom_eq_id": 8000,
+          "reason_code": "binary_sensor_presence"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/8000/state"
+      },
+      "8001": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/8001/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "binary_sensor",
+          "jeedom_eq_id": 8001,
+          "reason_code": "binary_sensor_opening"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/8001/state"
+      },
+      "8002": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/8002/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "binary_sensor",
+          "jeedom_eq_id": 8002,
+          "reason_code": "binary_sensor_smoke"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/8002/state"
+      },
+      "8003": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/8003/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "binary_sensor",
+          "jeedom_eq_id": 8003,
+          "reason_code": "binary_sensor_flood"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/8003/state"
+      },
+      "8004": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/8004/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "binary_sensor",
+          "jeedom_eq_id": 8004,
+          "reason_code": "binary_sensor_lock_state"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/8004/state"
       }
     }
   },
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 33,
+      "eligible_count": 38,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
       },
       "ineligible_count": 2,
       "mapping_summary": {
+        "binary_sensors_ambiguous": 0,
+        "binary_sensors_probable": 0,
+        "binary_sensors_published": 5,
+        "binary_sensors_skipped": 0,
+        "binary_sensors_sure": 5,
         "covers_ambiguous": 1,
         "covers_probable": 4,
         "covers_published": 8,
@@ -9444,14 +10549,59 @@
             "is_exception": false,
             "name": "Sensor luminosite 7004",
             "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 8000,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Detecteur presence salon 8000",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 8001,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Capteur ouverture porte entree 8001",
+            "object_id": 2
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 8002,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Detecteur fumee cuisine 8002",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 8003,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Capteur inondation cave 8003",
+            "object_id": 3
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 8004,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Serrure connectee 8004",
+            "object_id": 2
           }
         ],
         "global": {
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 34,
-            "total": 35
+            "include": 39,
+            "total": 40
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -9462,8 +10612,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 11,
-              "total": 11
+              "include": 13,
+              "total": 13
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -9474,8 +10624,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 15,
-              "total": 15
+              "include": 17,
+              "total": 17
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -9486,8 +10636,8 @@
             "counts": {
               "exceptions": 1,
               "exclude": 1,
-              "include": 8,
-              "total": 9
+              "include": 9,
+              "total": 10
             },
             "has_pending_home_assistant_changes": false,
             "home_perimetre": "Incluse",
@@ -9496,8 +10646,8 @@
           }
         ]
       },
-      "total_cmds": 74,
-      "total_eq_logics": 35,
+      "total_cmds": 79,
+      "total_eq_logics": 40,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

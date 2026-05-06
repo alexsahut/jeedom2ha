@@ -233,7 +233,7 @@ def _build_canonical_snapshot(sync_response: dict, diagnostics_response: dict, a
 
 def _assert_corpus_shape(sync_payload: dict) -> None:
     eq_ids = {eq["id"] for eq in sync_payload["eq_logics"]}
-    assert len(eq_ids) == 35
+    assert len(eq_ids) == 40
 
     assert len([i for i in eq_ids if 1000 <= i <= 1009]) == 10
     assert len([i for i in eq_ids if 2000 <= i <= 2007]) == 8
@@ -242,6 +242,7 @@ def _assert_corpus_shape(sync_payload: dict) -> None:
     assert len([i for i in eq_ids if 5000 <= i <= 5001]) == 2
     assert len([i for i in eq_ids if 6000 <= i <= 6001]) == 2
     assert len([i for i in eq_ids if 7000 <= i <= 7004]) == 5
+    assert len([i for i in eq_ids if 8000 <= i <= 8004]) == 5
 
 
 async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):

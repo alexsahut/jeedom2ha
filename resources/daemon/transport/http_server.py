@@ -69,7 +69,7 @@ def _check_secret(request: web.Request, local_secret: str) -> bool:
 
 def _resolve_state_topic(mapping: MappingResult) -> str:
     """Resolve runtime state topic for a published actuator mapping."""
-    if mapping.ha_entity_type in ("light", "cover", "switch", "sensor"):
+    if mapping.ha_entity_type in PublisherRegistry.known_types():
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""
