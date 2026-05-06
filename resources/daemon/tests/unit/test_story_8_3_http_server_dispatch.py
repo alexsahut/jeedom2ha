@@ -138,9 +138,14 @@ class _RecordingPublisherRegistry:
             "cover": object(),
             "switch": object(),
             "sensor": object(),
+            "binary_sensor": object(),
         }
         self.published_types: list[str] = []
         _RecordingPublisherRegistry.instances.append(self)
+
+    @classmethod
+    def known_types(cls) -> list:
+        return ["light", "cover", "switch", "sensor", "binary_sensor"]
 
     async def publish(self, mapping, snapshot):
         self.published_types.append(mapping.ha_entity_type)
@@ -177,7 +182,7 @@ async def test_run_sync_uses_mapper_registry_and_preserves_current_mapping_types
     assert app["mappings"][401].ha_entity_type == "sensor"
 
 
-async def test_run_sync_publishes_light_cover_and_switch_through_publisher_registry(cli, app):
+async def test_run_sync_publishes_known_types_through_publisher_registry(cli, app):
     _connected_bridge(app)
     _RecordingPublisherRegistry.instances = []
 
@@ -216,6 +221,10 @@ async def test_unknown_publisher_reason_is_preserved_without_discovery_failure_o
     class _UnknownPublisherRegistry:
         def __init__(self, _publisher):
             self.publishers = {"light": object(), "cover": object(), "switch": object()}
+
+        @classmethod
+        def known_types(cls) -> list:
+            return ["light", "cover", "switch"]
 
         async def publish(self, mapping, snapshot):
             mapping.publication_result = PublicationResult(
@@ -357,11 +366,14 @@ async def test_mapping_summary_uses_dynamic_counter_keys_and_semantic_values(cli
     assert summary["covers_sure"] == 1
     assert summary["switches_sure"] == 1
     assert summary["sensors_sure"] == 0
+    assert summary["binary_sensors_sure"] == 0
     assert summary["lights_published"] == 1
     assert summary["covers_published"] == 1
     assert summary["switches_published"] == 1
     assert summary["sensors_published"] == 0
+    assert summary["binary_sensors_published"] == 0
     assert summary["lights_skipped"] == 0
     assert summary["covers_skipped"] == 0
     assert summary["switches_skipped"] == 0
     assert summary["sensors_skipped"] == 0
+    assert summary["binary_sensors_skipped"] == 0

@@ -5,6 +5,7 @@ Tests en isolation totale : aucune dependance MQTT, daemon ou Jeedom.
 
 from __future__ import annotations
 
+from mapping.binary_sensor import BinarySensorMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
@@ -120,6 +121,7 @@ def test_ac1_mapper_registry_exposes_canonical_order():
         LightMapper,
         CoverMapper,
         SwitchMapper,
+        BinarySensorMapper,
         SensorMapper,
         FallbackMapper,
     ]

@@ -38,11 +38,11 @@ def _make_mapping(ha_entity_type: str, eq_id: int = 10) -> MappingResult:
 def test_ac1_registry_contains_exact_current_publishers():
     registry = PublisherRegistry(_make_publisher())
 
-    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor"}
+    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor"}
 
 
 def test_known_types_classmethod_returns_static_types_without_instance():
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor"]
 
 
 def test_known_types_matches_publishers_dict():
@@ -51,11 +51,10 @@ def test_known_types_matches_publishers_dict():
     assert set(PublisherRegistry.known_types()) == set(registry.publishers.keys())
 
 
-def test_ac1_ac4_registry_excludes_binary_sensor_and_button():
+def test_ac4_registry_excludes_button():
     registry = PublisherRegistry(_make_publisher())
     keys = set(registry.publishers.keys())
 
-    assert "binary_sensor" not in keys
     assert "button" not in keys
 
 
@@ -104,17 +103,17 @@ def test_ac3_resolve_unknown_type_raises_explicit_error_and_logs(caplog):
     caplog.set_level(logging.ERROR)
 
     with pytest.raises(UnknownPublisherError) as exc_info:
-        registry.resolve("binary_sensor")
+        registry.resolve("button")
 
-    assert exc_info.value.ha_entity_type == "binary_sensor"
+    assert exc_info.value.ha_entity_type == "button"
     assert exc_info.value.technical_reason_code == "publisher_not_registered"
-    assert "No publisher registered for ha_entity_type=binary_sensor" in caplog.text
+    assert "No publisher registered for ha_entity_type=button" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_ac3_publish_unknown_type_sets_failed_publication_result():
     registry = PublisherRegistry(_make_publisher())
-    mapping = _make_mapping("binary_sensor", eq_id=42)
+    mapping = _make_mapping("button", eq_id=42)
 
     published = await registry.publish(mapping, _make_snapshot())
 

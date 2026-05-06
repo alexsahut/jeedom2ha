@@ -1,7 +1,7 @@
-# Golden Corpus Story 8.4
+# Golden Corpus Story 8.4 / 9.1 / 9.2
 
-Ce corpus fige 35 eqLogics deterministes pour le gate de non-regression Story 8.4
-et l'extension sensor Story 9.1.
+Ce corpus fige 40 eqLogics deterministes pour le gate de non-regression Story 8.4,
+l'extension sensor Story 9.1, et l'extension binary_sensor Story 9.2.
 
 ## Repartition normative
 
@@ -12,6 +12,7 @@ et l'extension sensor Story 9.1.
 - Non-eligibles (2): `5000`-`5001`
 - Valides bloques (2): `6000`-`6001`
 - Sensors (5): `7000`-`7004`
+- Binary sensors (5): `8000`-`8004`
 
 ## Roles equipement par equipement
 
@@ -56,6 +57,12 @@ et l'extension sensor Story 9.1.
 - `7002`: sensor puissance (`POWER`) -> `device_class=power`, `unit=W`
 - `7003`: sensor qualite air (`CO2`) -> `device_class=carbon_dioxide`, `unit=ppm`
 - `7004`: sensor luminosite (`BRIGHTNESS`) -> `device_class=illuminance`, `unit=lx`
+
+- `8000`: binary_sensor presence (`PRESENCE`) -> `device_class=occupancy`, objet Salon
+- `8001`: binary_sensor ouverture porte (`OPENING`) -> `device_class=door`, objet Chambre
+- `8002`: binary_sensor fumee (`SMOKE`) -> `device_class=smoke`, objet Salon
+- `8003`: binary_sensor inondation (`FLOOD`) -> `device_class=moisture`, objet Garage
+- `8004`: binary_sensor serrure (`LOCK_STATE`) -> `device_class=lock`, objet Chambre
 
 ## Stabilite
 
