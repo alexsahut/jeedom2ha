@@ -145,8 +145,8 @@ afin que les capteurs binaires correctement typés dans Jeedom apparaissent auto
 - [x] Task 10 — Validation non-régression + terrain (AC2, AC5)
   - [x] 10.1 Suite complète : 698/698 PASS — zéro régression
   - [x] 10.2 `test_story_8_4_golden_file.py` : PASS avec 40 équipements
-  - [ ] 10.3 Déployer sur box Alexandre et relever la mesure terrain
-  - [ ] 10.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
+  - [x] 10.3 Déployer sur box Alexandre et relever la mesure terrain
+  - [x] 10.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
 
 ## Dev Notes
 
@@ -353,7 +353,7 @@ Aucun blocage. Correctifs nécessaires :
 - **Golden-file** étendu à 40 équipements (5 binary_sensor IDs 8000-8004). `expected_sync_snapshot.json` régénéré via pipeline réel. `binary_sensors_published=5` dans mapping_summary.
 - **13 nouveaux tests** dans `test_story_9_2_binary_sensor_mapper.py` : tous PASS.
 - **Suite complète** : 698/698 PASS, zéro régression.
-- **Terrain** : à valider lors du déploiement (Task 10.3/10.4).
+- **Terrain PASS 2026-05-06** : total_eq=278, eligible=81, published=58, binary_sensors_published=11, sensors_published=17, ratio=71.6% (baseline 67.9%). 8 reclassifications sensor→binary_sensor (cascade correcte), 3 entités genuinement nouvelles (98, 113, 389).
 
 ### File List
 
