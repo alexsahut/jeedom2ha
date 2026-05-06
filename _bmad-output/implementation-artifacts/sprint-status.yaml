@@ -50,7 +50,7 @@
 #             alimentee par ha-projection-reference.md et degradation elegante §11
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-05-06'  # Story 9.3 in-progress
+last_updated: '2026-05-06'  # Story 9.3 done — gate terrain PASS
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -195,7 +195,7 @@ development_status:
   9-0-decouplage-des-consommateurs-externes-de-mapping-summary-ui-jeedom-script-de-deploiement: done  # PR #111 mergee 2026-05-05 — AC1-AC6 valides, scope strict confirme
   9-1-sensor-mapper-publish-sensor-info-numeric-et-capteurs-simples: done  # PR #114 mergée 2026-05-05, smoke terrain PASS sensors_published=25 ratio=67.9%
   9-2-binary-sensor-mapper-publish-binary-sensor-info-binary-presence-ouverture-fuite: done  # PR #115 mergée 2026-05-06, gate terrain PASS — published=58 binary_sensors=11 ratio=71.6%
-  9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10: review
+  9-3-button-mapper-publish-button-ouverture-button-dans-product-scope-sous-fr40-nfr10: done  # PR #116 mergée 2026-05-06, gate terrain PASS — published=68 buttons_published=10 ratio=83.9%
   9-4-fallback-mapper-degradation-elegante-terminale-publier-sensor-button-par-defaut-plutot-que-skip-silencieux: backlog
   9-5-exposition-d-actions-utilisateur-sur-les-surfaces-reellement-ouvertes-par-la-vague-1-re-homee-depuis-7-5: backlog  # pre-requis : 9.1 + 9.2 + 9.3 + 9.4 done + gate terrain PASS
   pe-epic-9-retrospective: optional

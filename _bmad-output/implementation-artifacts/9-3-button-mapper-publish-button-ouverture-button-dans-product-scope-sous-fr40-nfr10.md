@@ -1,6 +1,6 @@
 # Story 9.3 : ButtonMapper + publish_button + ouverture `button` dans PRODUCT_SCOPE sous FR40 / NFR10
 
-Status: review
+Status: done
 
 ## Story
 
@@ -145,8 +145,8 @@ afin que les actions discrètes Jeedom soient déclenchables depuis Home Assista
 - [x] Task 9 — Validation non-régression + terrain (AC2, AC7)
   - [x] 9.1 Suite complète : X/X PASS — zéro régression
   - [x] 9.2 `test_story_8_4_golden_file.py` : PASS avec 43 équipements
-  - [ ] 9.3 Déployer sur box Alexandre et relever la mesure terrain
-  - [ ] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
+  - [x] 9.3 Déployer sur box Alexandre et relever la mesure terrain
+  - [x] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
 
 ## Dev Notes
 
@@ -456,6 +456,19 @@ claude-sonnet-4-6
 ### Debug Log References
 
 ### Completion Notes List
+
+**Gate terrain pe-epic-9 Story 9.3 — PASS (2026-05-06)**
+
+Déploiement box réelle via `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`.
+
+Mesure post-sync :
+- `total_eq=278, eligible=81, published=68, ratio=83.9%`
+- `lights=13, switches=10, covers=7, sensors=17, binary_sensors=11, buttons=10`
+- Delta vs baseline 9.2 (published=58, ratio=71.6%) : **+10 buttons**
+
+Topics button publiés : jeedom2ha_496, 527, 508, 312, 461, 462, 279, 199, 67, 506
+
+Baseline mise à jour post-9.3 : `published=68, buttons_published=10, ratio=83.9%`
 
 ### File List
 
