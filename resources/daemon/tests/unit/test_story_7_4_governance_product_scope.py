@@ -71,8 +71,8 @@ def _make_mapping(
 
 def test_product_scope_wave_opening_complete():
     """PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]."""
-    assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor"}
-    assert len(PRODUCT_SCOPE) == 5
+    assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button"}
+    assert len(PRODUCT_SCOPE) == 6
 
 
 # ---------------------------------------------------------------------------

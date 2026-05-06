@@ -1113,6 +1113,69 @@
       "status": {
         "timeout": 0
       }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "GENERIC_ACTION",
+          "id": 90001,
+          "name": "Activer",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "scenario",
+      "id": 9000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Scenario alarme securite 9000",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "MEDIA_PAUSE",
+          "id": 90011,
+          "name": "Pause",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 9001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Lecteur salon 9001",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "SIREN_ON",
+          "id": 90021,
+          "name": "Activer sirene",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 9002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Sirene garage 9002",
+      "object_id": 3,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

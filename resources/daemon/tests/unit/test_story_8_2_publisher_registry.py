@@ -38,11 +38,11 @@ def _make_mapping(ha_entity_type: str, eq_id: int = 10) -> MappingResult:
 def test_ac1_registry_contains_exact_current_publishers():
     registry = PublisherRegistry(_make_publisher())
 
-    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor"}
+    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button"}
 
 
 def test_known_types_classmethod_returns_static_types_without_instance():
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
 
 
 def test_known_types_matches_publishers_dict():
@@ -51,11 +51,11 @@ def test_known_types_matches_publishers_dict():
     assert set(PublisherRegistry.known_types()) == set(registry.publishers.keys())
 
 
-def test_ac4_registry_excludes_button():
+def test_ac4_button_is_now_registered(story_9_3_note="button ouvert Story 9.3"):
     registry = PublisherRegistry(_make_publisher())
     keys = set(registry.publishers.keys())
 
-    assert "button" not in keys
+    assert "button" in keys
 
 
 def test_ac2_resolve_light_returns_same_bound_method_as_discovery_publisher():
@@ -103,17 +103,17 @@ def test_ac3_resolve_unknown_type_raises_explicit_error_and_logs(caplog):
     caplog.set_level(logging.ERROR)
 
     with pytest.raises(UnknownPublisherError) as exc_info:
-        registry.resolve("button")
+        registry.resolve("climate")
 
-    assert exc_info.value.ha_entity_type == "button"
+    assert exc_info.value.ha_entity_type == "climate"
     assert exc_info.value.technical_reason_code == "publisher_not_registered"
-    assert "No publisher registered for ha_entity_type=button" in caplog.text
+    assert "No publisher registered for ha_entity_type=climate" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_ac3_publish_unknown_type_sets_failed_publication_result():
     registry = PublisherRegistry(_make_publisher())
-    mapping = _make_mapping("button", eq_id=42)
+    mapping = _make_mapping("climate", eq_id=42)
 
     published = await registry.publish(mapping, _make_snapshot())
 
@@ -122,6 +122,16 @@ async def test_ac3_publish_unknown_type_sets_failed_publication_result():
     assert mapping.publication_result.status == "failed"
     assert mapping.publication_result.technical_reason_code == "publisher_not_registered"
     assert mapping.publication_result.attempted_at is not None
+
+
+def test_ac2_resolve_button_returns_publish_button():
+    publisher = _make_publisher()
+    registry = PublisherRegistry(publisher)
+
+    resolved = registry.resolve("button")
+
+    assert resolved.__self__ is publisher
+    assert resolved.__func__ is DiscoveryPublisher.publish_button
 
 
 @pytest.mark.asyncio

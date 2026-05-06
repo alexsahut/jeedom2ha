@@ -5,6 +5,7 @@ Story 2.3: Extended for cover entity discovery payloads.
 Story 2.4: Extended for switch entity discovery payloads.
 Story 9.1: Extended for sensor entity discovery payloads.
 Story 9.2: Extended for binary_sensor entity discovery payloads.
+Story 9.3: Extended for button entity discovery payloads.
 Uses single-component discovery (homeassistant/{entity_type}/...).
 """
 import json
@@ -175,6 +176,34 @@ class DiscoveryPublisher:
         if not ok:
             _LOGGER.error(
                 "[DISCOVERY] Failed to publish binary_sensor config for eq_id=%d (bridge unavailable)",
+                mapping.jeedom_eq_id,
+            )
+        return ok
+
+    async def publish_button(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a button discovery config to MQTT.
+
+        Args:
+            mapping: MappingResult with SwitchCapabilities and reason_details (command_topic).
+            snapshot: TopologySnapshot to extract device info.
+
+        Returns:
+            True if publish succeeded, False otherwise.
+        """
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="button")
+        payload = self._build_button_payload(mapping, snapshot)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing button config: topic=%s eq_id=%d name='%s' confidence=%s",
+            topic, mapping.jeedom_eq_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish button config for eq_id=%d (bridge unavailable)",
                 mapping.jeedom_eq_id,
             )
         return ok
@@ -411,5 +440,32 @@ class DiscoveryPublisher:
 
         if device_class is not None:
             payload["device_class"] = device_class
+
+        return payload
+
+    def _build_button_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build the MQTT Discovery JSON payload for a button entity.
+
+        No state_topic: button is command-only (no persistent state in HA).
+        command_topic uses /cmd (not /set) to distinguish from switch/light actuators.
+        """
+        eq_id = mapping.jeedom_eq_id
+        device = self._build_device_block(mapping, snapshot)
+        reason_details = mapping.reason_details or {}
+        command_topic = reason_details.get("command_topic", f"jeedom2ha/{eq_id}/cmd")
+
+        payload = {
+            "name": mapping.ha_name,
+            "unique_id": mapping.ha_unique_id,
+            "object_id": f"jeedom2ha_{eq_id}",
+            "command_topic": command_topic,
+            "platform": "mqtt",
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        payload.update(self._build_availability_fields(mapping, snapshot))
 
         return payload

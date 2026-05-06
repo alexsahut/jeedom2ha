@@ -20,13 +20,9 @@ from validation.ha_component_registry import (
 
 
 WAVE_TARGETS = ("sensor", "binary_sensor")
-NON_WAVE_TYPES = ("button", "number", "select", "climate")
+NON_WAVE_TYPES = ("number", "select", "climate")
 
 EXPECTED_NON_WAVE_REGISTRY = {
-    "button": {
-        "required_fields": ["command_topic", "platform", "availability"],
-        "required_capabilities": ["has_command"],
-    },
     "number": {
         "required_fields": ["command_topic", "platform", "availability"],
         "required_capabilities": ["has_command"],
@@ -86,7 +82,7 @@ def test_product_scope_snapshot_with_wave_open():
     actuelle (5 types) et reste sous le contrôle de AR13 via
     test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
     for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 

@@ -160,4 +160,4 @@ async def test_publish_sensor_payload_contains_required_fields_and_topic():
 
 def test_publisher_registry_known_types_includes_sensor():
     assert "sensor" in PublisherRegistry.known_types()
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
