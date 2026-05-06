@@ -247,4 +247,4 @@ async def test_publish_binary_sensor_topic_format():
 # ---------------------------------------------------------------------------
 
 def test_publisher_registry_known_types_includes_binary_sensor():
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]

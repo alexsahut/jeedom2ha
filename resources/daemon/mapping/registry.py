@@ -3,6 +3,7 @@
 from typing import Iterator, List, Optional
 
 from mapping.binary_sensor import BinarySensorMapper
+from mapping.button import ButtonMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
@@ -22,6 +23,7 @@ class MapperRegistry:
             SwitchMapper(),
             BinarySensorMapper(),
             SensorMapper(),
+            ButtonMapper(),
             FallbackMapper(),
         ]
 

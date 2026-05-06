@@ -67,9 +67,15 @@ def _check_secret(request: web.Request, local_secret: str) -> bool:
     return provided == local_secret
 
 
+# Types without state_topic: command-only entities (no persistent state in HA).
+# Extended when new command-only types are added to PublisherRegistry.
+_TYPES_WITHOUT_STATE_TOPIC = {"button"}
+
+
 def _resolve_state_topic(mapping: MappingResult) -> str:
     """Resolve runtime state topic for a published actuator mapping."""
-    if mapping.ha_entity_type in PublisherRegistry.known_types():
+    if (mapping.ha_entity_type in PublisherRegistry.known_types()
+            and mapping.ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC):
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""

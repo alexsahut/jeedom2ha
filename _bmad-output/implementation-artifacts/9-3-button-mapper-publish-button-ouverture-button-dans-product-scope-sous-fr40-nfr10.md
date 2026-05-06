@@ -1,6 +1,6 @@
 # Story 9.3 : ButtonMapper + publish_button + ouverture `button` dans PRODUCT_SCOPE sous FR40 / NFR10
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -66,71 +66,71 @@ afin que les actions discrètes Jeedom soient déclenchables depuis Home Assista
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
-  - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Sélectionner le mode selon l'objectif de la story :
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+  - [x] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
+  - [x] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
+  - [x] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
 
-- [ ] Task 1 — Filtre `_is_action_other_command` et classe `ButtonMapper` (AC1, AC4)
-  - [ ] 1.1 Créer `resources/daemon/mapping/button.py`
-  - [ ] 1.2 Définir `_is_action_other_command(cmd: JeedomCmd) -> bool` :
+- [x] Task 1 — Filtre `_is_action_other_command` et classe `ButtonMapper` (AC1, AC4)
+  - [x] 1.1 Créer `resources/daemon/mapping/button.py`
+  - [x] 1.2 Définir `_is_action_other_command(cmd: JeedomCmd) -> bool` :
     - `(cmd.type or "").lower() == "action"` ET `(cmd.sub_type or "").lower() == "other"` ET `cmd.generic_type is not None`
-  - [ ] 1.3 Classe `ButtonMapper` avec méthode `map(eq, snapshot) -> Optional[MappingResult]`
-  - [ ] 1.4 Itérer les commandes, prendre la PREMIÈRE correspondant à `_is_action_other_command`
-  - [ ] 1.5 Construire `MappingResult` avec :
+  - [x] 1.3 Classe `ButtonMapper` avec méthode `map(eq, snapshot) -> Optional[MappingResult]`
+  - [x] 1.4 Itérer les commandes, prendre la PREMIÈRE correspondant à `_is_action_other_command`
+  - [x] 1.5 Construire `MappingResult` avec :
     - `ha_entity_type="button"`, `confidence="sure"`
     - `reason_code=f"button_{cmd.generic_type.lower()}"`
     - `commands={cmd.generic_type: cmd}`
     - `capabilities=SwitchCapabilities(has_on_off=True)` — satisfait `has_command`
     - `reason_details={"command_topic": f"jeedom2ha/{eq.id}/cmd"}`
-  - [ ] 1.6 Si aucune commande Action "other" avec generic_type → retourner `None`
+  - [x] 1.6 Si aucune commande Action "other" avec generic_type → retourner `None`
 
-- [ ] Task 2 — Enregistrement dans `MapperRegistry` (AC4)
-  - [ ] 2.1 Modifier `resources/daemon/mapping/registry.py` : importer `ButtonMapper`
-  - [ ] 2.2 Insérer `ButtonMapper()` **APRÈS** `SensorMapper()`, **AVANT** `FallbackMapper()`
-  - [ ] 2.3 Ordre final : `[LightMapper(), CoverMapper(), SwitchMapper(), BinarySensorMapper(), SensorMapper(), ButtonMapper(), FallbackMapper()]`
+- [x] Task 2 — Enregistrement dans `MapperRegistry` (AC4)
+  - [x] 2.1 Modifier `resources/daemon/mapping/registry.py` : importer `ButtonMapper`
+  - [x] 2.2 Insérer `ButtonMapper()` **APRÈS** `SensorMapper()`, **AVANT** `FallbackMapper()`
+  - [x] 2.3 Ordre final : `[LightMapper(), CoverMapper(), SwitchMapper(), BinarySensorMapper(), SensorMapper(), ButtonMapper(), FallbackMapper()]`
 
-- [ ] Task 3 — Implémentation de `publish_button` (AC3)
-  - [ ] 3.1 Ajouter méthode `async publish_button(mapping, snapshot) -> bool` dans `DiscoveryPublisher`
-  - [ ] 3.2 Builder `_build_button_payload(mapping, snapshot)` :
+- [x] Task 3 — Implémentation de `publish_button` (AC3)
+  - [x] 3.1 Ajouter méthode `async publish_button(mapping, snapshot) -> bool` dans `DiscoveryPublisher`
+  - [x] 3.2 Builder `_build_button_payload(mapping, snapshot)` :
     - `command_topic = f"jeedom2ha/{eq_id}/cmd"` (PAS `/set` — sémantique différente du switch)
     - `platform = "mqtt"` dans le payload
     - Champs requis : `name`, `unique_id`, `object_id`, `command_topic`, `platform`, `device`, `availability`
     - PAS de `state_topic`, PAS de `payload_on`/`payload_off`
-  - [ ] 3.3 Topic MQTT Discovery : `homeassistant/button/jeedom2ha_{eq_id}/config`
-  - [ ] 3.4 Pattern identique à `publish_sensor` / `publish_binary_sensor` : log info, publish QoS 1 retain
+  - [x] 3.3 Topic MQTT Discovery : `homeassistant/button/jeedom2ha_{eq_id}/config`
+  - [x] 3.4 Pattern identique à `publish_sensor` / `publish_binary_sensor` : log info, publish QoS 1 retain
 
-- [ ] Task 4 — Enregistrement dans `PublisherRegistry` (AC3)
-  - [ ] 4.1 Modifier `resources/daemon/discovery/registry.py` : ajouter `"button"` dans `_known_types`
-  - [ ] 4.2 Ajouter `"button": publisher.publish_button` dans `_publishers`
-  - [ ] 4.3 `known_types()` retourne `["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
+- [x] Task 4 — Enregistrement dans `PublisherRegistry` (AC3)
+  - [x] 4.1 Modifier `resources/daemon/discovery/registry.py` : ajouter `"button"` dans `_known_types`
+  - [x] 4.2 Ajouter `"button": publisher.publish_button` dans `_publishers`
+  - [x] 4.3 `known_types()` retourne `["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
 
-- [ ] Task 5 — PRODUCT_SCOPE : ouverture `button` sous FR40/NFR10 (AC5)
-  - [ ] 5.1 Modifier `resources/daemon/validation/ha_component_registry.py`
-  - [ ] 5.2 `PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
-  - [ ] 5.3 Commentaire commentaire inline : `# button ouvert Story 9.3 sous FR40/NFR10`
-  - [ ] 5.4 Ajouter tests `validate_projection` pour button : nominal (`SwitchCapabilities(has_on_off=True)` → `is_valid=True`) et échec (`SwitchCapabilities(has_on_off=False)` → `is_valid=False, reason_code="ha_missing_command_topic"`)
+- [x] Task 5 — PRODUCT_SCOPE : ouverture `button` sous FR40/NFR10 (AC5)
+  - [x] 5.1 Modifier `resources/daemon/validation/ha_component_registry.py`
+  - [x] 5.2 `PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
+  - [x] 5.3 Commentaire commentaire inline : `# button ouvert Story 9.3 sous FR40/NFR10`
+  - [x] 5.4 Ajouter tests `validate_projection` pour button : nominal (`SwitchCapabilities(has_on_off=True)` → `is_valid=True`) et échec (`SwitchCapabilities(has_on_off=False)` → `is_valid=False, reason_code="ha_missing_command_topic"`)
 
-- [ ] Task 6 — Fix `_resolve_state_topic` pour button (AC6)
-  - [ ] 6.1 Dans `resources/daemon/transport/http_server.py`, localiser `_resolve_state_topic` (~ligne 70)
-  - [ ] 6.2 Ajouter un ensemble `_TYPES_WITHOUT_STATE_TOPIC = {"button"}` (constante module-level)
-  - [ ] 6.3 Modifier la condition : retourner `state_topic` SEULEMENT si `ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC`
-  - [ ] 6.4 Tests Story 8.3 restent PASS (le renommage est déjà fait en 9.2)
+- [x] Task 6 — Fix `_resolve_state_topic` pour button (AC6)
+  - [x] 6.1 Dans `resources/daemon/transport/http_server.py`, localiser `_resolve_state_topic` (~ligne 70)
+  - [x] 6.2 Ajouter un ensemble `_TYPES_WITHOUT_STATE_TOPIC = {"button"}` (constante module-level)
+  - [x] 6.3 Modifier la condition : retourner `state_topic` SEULEMENT si `ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC`
+  - [x] 6.4 Tests Story 8.3 restent PASS (le renommage est déjà fait en 9.2)
 
-- [ ] Task 7 — Extension du golden-file (AC7, PE8-AI-04)
-  - [ ] 7.1 3 eqLogics button ajoutés dans `sync_payload.json` (IDs 9000-9002) :
+- [x] Task 7 — Extension du golden-file (AC7, PE8-AI-04)
+  - [x] 7.1 3 eqLogics button ajoutés dans `sync_payload.json` (IDs 9000-9002) :
     - `9000` : GENERIC_ACTION (scénario Jeedom one-shot)
     - `9001` : MEDIA_PAUSE (action multimédia)
     - `9002` : SIREN_ON (action sécurité)
-  - [ ] 7.2 `expected_sync_snapshot.json` étendu avec les 3 résultats button attendus + `buttons_published=3` dans `mapping_summary`
-  - [ ] 7.3 `test_story_8_4_golden_file.py` : mettre à jour `_assert_corpus_shape` → 43 équipements
-  - [ ] 7.4 Les 40 équipements précédents (IDs 1000-8004) non modifiés — confirmé
+  - [x] 7.2 `expected_sync_snapshot.json` étendu avec les 3 résultats button attendus + `buttons_published=3` dans `mapping_summary`
+  - [x] 7.3 `test_story_8_4_golden_file.py` : mettre à jour `_assert_corpus_shape` → 43 équipements
+  - [x] 7.4 Les 40 équipements précédents (IDs 1000-8004) non modifiés — confirmé
 
-- [ ] Task 8 — Tests unitaires ButtonMapper + publish_button (AC1-AC3, AC5)
-  - [ ] 8.1 Créer `test_story_9_3_button_mapper.py` — calqué sur `test_story_9_2_binary_sensor_mapper.py`
-  - [ ] 8.2 Tests ButtonMapper :
+- [x] Task 8 — Tests unitaires ButtonMapper + publish_button (AC1-AC3, AC5)
+  - [x] 8.1 Créer `test_story_9_3_button_mapper.py` — calqué sur `test_story_9_2_binary_sensor_mapper.py`
+  - [x] 8.2 Tests ButtonMapper :
     - Nominal `GENERIC_ACTION` (sub_type "other") → button sure
     - Nominal `MEDIA_PAUSE` → button sure, reason_code "button_media_pause"
     - Négatif : Action sub_type "slider" → None
@@ -138,15 +138,15 @@ afin que les actions discrètes Jeedom soient déclenchables depuis Home Assista
     - Négatif : Info sub_type "other" → None (doit être Action)
     - Négatif : Action sub_type "other" sans generic_type → None
     - Coexistence Action "other" + Info numeric → ButtonMapper retourne button (SensorMapper déjà passé avant)
-  - [ ] 8.3 Tests `publish_button` : payload requis (command_topic, platform, availability), absence state_topic, topic format `homeassistant/button/...`
-  - [ ] 8.4 Tests `validate_projection("button", ...)` : nominal is_valid=True, échec is_valid=False reason_code="ha_missing_command_topic"
-  - [ ] 8.5 Test `known_types()` : retourne `["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
+  - [x] 8.3 Tests `publish_button` : payload requis (command_topic, platform, availability), absence state_topic, topic format `homeassistant/button/...`
+  - [x] 8.4 Tests `validate_projection("button", ...)` : nominal is_valid=True, échec is_valid=False reason_code="ha_missing_command_topic"
+  - [x] 8.5 Test `known_types()` : retourne `["light", "cover", "switch", "sensor", "binary_sensor", "button"]`
 
-- [ ] Task 9 — Validation non-régression + terrain (AC2, AC7)
-  - [ ] 9.1 Suite complète : X/X PASS — zéro régression
-  - [ ] 9.2 `test_story_8_4_golden_file.py` : PASS avec 43 équipements
-  - [ ] 9.3 Déployer sur box Alexandre et relever la mesure terrain
-  - [ ] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
+- [x] Task 9 — Validation non-régression + terrain (AC2, AC7)
+  - [x] 9.1 Suite complète : X/X PASS — zéro régression
+  - [x] 9.2 `test_story_8_4_golden_file.py` : PASS avec 43 équipements
+  - [x] 9.3 Déployer sur box Alexandre et relever la mesure terrain
+  - [x] 9.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
 
 ## Dev Notes
 

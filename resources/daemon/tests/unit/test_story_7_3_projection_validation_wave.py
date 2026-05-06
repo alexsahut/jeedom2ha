@@ -153,4 +153,4 @@ def test_product_scope_snapshot_with_wave_open():
     fige la valeur actuelle (5 types). AR13 reste appliqué par
     test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]

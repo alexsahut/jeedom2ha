@@ -55,6 +55,7 @@ _GOVERNED_SCOPE = {
     "switch": "test_governance_fr40_proof_switch",
     "sensor": "test_governance_fr40_proof_sensor",
     "binary_sensor": "test_governance_fr40_proof_binary_sensor",
+    "button": "test_governance_fr40_proof_button",
 }
 # 3 conditions FR40 — mécanismes d'enforcement (AR13) :
 #
@@ -250,3 +251,23 @@ def test_governance_gate_blocks_condition2_violation():
     assert result.is_valid is False
     assert result.reason_code == "ha_missing_command_topic"
     assert "has_command" in result.missing_capabilities
+
+
+# ---------------------------------------------------------------------------
+# Preuve de gouvernance FR40 : button (Story 9.3)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_button():
+    """Preuve de gouvernance FR40 pour le composant 'button'.
+
+    Cas nominal : SwitchCapabilities avec has_on_off=True → is_valid=True.
+    Cas d'échec : SwitchCapabilities avec has_on_off=False → is_valid=False,
+                  reason_code="ha_missing_command_topic".
+    """
+    result_nominal = validate_projection("button", SwitchCapabilities(has_on_off=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail = validate_projection("button", SwitchCapabilities(has_on_off=False))
+    assert result_fail.is_valid is False
+    assert result_fail.reason_code == "ha_missing_command_topic"

@@ -3638,6 +3638,237 @@
           "unmatched_commands": [],
           "v1_compatibility": true,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9000,
+          "eq_type_name": "scenario",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90001,
+              "cmd_name": "Activer",
+              "generic_type": "GENERIC_ACTION"
+            }
+          ],
+          "name": "Scenario alarme securite 9000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "GENERIC_ACTION",
+                "id": 90001,
+                "name": "Activer"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90001,
+                "configured_type": "GENERIC_ACTION",
+                "logical_role": "GENERIC_ACTION",
+                "used_type": "GENERIC_ACTION"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9001,
+          "eq_type_name": "virtual",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90011,
+              "cmd_name": "Pause",
+              "generic_type": "MEDIA_PAUSE"
+            }
+          ],
+          "name": "Lecteur salon 9001",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "MEDIA_PAUSE",
+                "id": 90011,
+                "name": "Pause"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90011,
+                "configured_type": "MEDIA_PAUSE",
+                "logical_role": "MEDIA_PAUSE",
+                "used_type": "MEDIA_PAUSE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9002,
+          "eq_type_name": "virtual",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90021,
+              "cmd_name": "Activer sirene",
+              "generic_type": "SIREN_ON"
+            }
+          ],
+          "name": "Sirene garage 9002",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SIREN_ON",
+                "id": 90021,
+                "name": "Activer sirene"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90021,
+                "configured_type": "SIREN_ON",
+                "logical_role": "SIREN_ON",
+                "used_type": "SIREN_ON"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
         }
       ],
       "in_scope_equipments": [
@@ -7220,6 +7451,237 @@
           "unmatched_commands": [],
           "v1_compatibility": true,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9000,
+          "eq_type_name": "scenario",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90001,
+              "cmd_name": "Activer",
+              "generic_type": "GENERIC_ACTION"
+            }
+          ],
+          "name": "Scenario alarme securite 9000",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "GENERIC_ACTION",
+                "id": 90001,
+                "name": "Activer"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90001,
+                "configured_type": "GENERIC_ACTION",
+                "logical_role": "GENERIC_ACTION",
+                "used_type": "GENERIC_ACTION"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9001,
+          "eq_type_name": "virtual",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90011,
+              "cmd_name": "Pause",
+              "generic_type": "MEDIA_PAUSE"
+            }
+          ],
+          "name": "Lecteur salon 9001",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "MEDIA_PAUSE",
+                "id": 90011,
+                "name": "Pause"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90011,
+                "configured_type": "MEDIA_PAUSE",
+                "logical_role": "MEDIA_PAUSE",
+                "used_type": "MEDIA_PAUSE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9002,
+          "eq_type_name": "virtual",
+          "ha_type": "button",
+          "matched_commands": [
+            {
+              "cmd_id": 90021,
+              "cmd_name": "Activer sirene",
+              "generic_type": "SIREN_ON"
+            }
+          ],
+          "name": "Sirene garage 9002",
+          "object_name": "Garage",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "button",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SIREN_ON",
+                "id": 90021,
+                "name": "Activer sirene"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 90021,
+                "configured_type": "SIREN_ON",
+                "logical_role": "SIREN_ON",
+                "used_type": "SIREN_ON"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
         }
       ],
       "rooms": [
@@ -7227,8 +7689,8 @@
           "compteurs": {
             "ecarts": 2,
             "exclus": 0,
-            "inclus": 13,
-            "total": 13
+            "inclus": 15,
+            "total": 15
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -7238,17 +7700,17 @@
               "disabled_eqlogic": 1,
               "ha_missing_command_topic": 1,
               "probable": 4,
-              "sure": 7
+              "sure": 9
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 2,
-              "published": 11
+              "published": 13
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 13
+            "total_equipments": 15
           }
         },
         {
@@ -7283,8 +7745,8 @@
           "compteurs": {
             "ecarts": 0,
             "exclus": 1,
-            "inclus": 9,
-            "total": 10
+            "inclus": 10,
+            "total": 11
           },
           "home_statut": "Publiee",
           "object_id": 3,
@@ -7293,17 +7755,17 @@
             "counts_by_reason": {
               "excluded_eqlogic": 1,
               "probable": 5,
-              "sure": 4
+              "sure": 5
             },
             "counts_by_status": {
               "ambiguous": 0,
               "excluded": 1,
               "infra_incident": 0,
               "not_supported": 0,
-              "published": 9
+              "published": 10
             },
             "primary_aggregated_status": "partially_published",
-            "total_equipments": 10
+            "total_equipments": 11
           }
         }
       ],
@@ -7311,8 +7773,8 @@
         "compteurs": {
           "ecarts": 6,
           "exclus": 1,
-          "inclus": 39,
-          "total": 40
+          "inclus": 42,
+          "total": 43
         },
         "counts_by_reason": {
           "ambiguous_skipped": 3,
@@ -7321,18 +7783,18 @@
           "ha_component_not_in_product_scope": 1,
           "ha_missing_command_topic": 1,
           "probable": 15,
-          "sure": 18
+          "sure": 21
         },
         "counts_by_status": {
           "ambiguous": 3,
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 33
+          "published": 36
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 40
+        "total_equipments": 43
       }
     },
     "request_id": "<normalized-request-id>",
@@ -7357,6 +7819,11 @@
       "binary_sensors_published": 5,
       "binary_sensors_skipped": 0,
       "binary_sensors_sure": 5,
+      "buttons_ambiguous": 0,
+      "buttons_probable": 0,
+      "buttons_published": 3,
+      "buttons_skipped": 0,
+      "buttons_sure": 3,
       "covers_ambiguous": 1,
       "covers_probable": 4,
       "covers_published": 8,
@@ -9508,6 +9975,156 @@
           "device_class": "lock"
         },
         "suggested_area": "Chambre"
+      },
+      "9000": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": false,
+          "on_off_confidence": "unknown"
+        },
+        "commands": {
+          "GENERIC_ACTION": {
+            "generic_type": "GENERIC_ACTION",
+            "id": 90001,
+            "sub_type": "other",
+            "type": "action"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "button",
+        "ha_name": "Scenario alarme securite 9000",
+        "ha_unique_id": "jeedom2ha_eq_9000",
+        "jeedom_eq_id": 9000,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/9000/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": ""
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "button_generic_action",
+        "reason_details": {
+          "command_topic": "jeedom2ha/9000/cmd"
+        },
+        "suggested_area": "Salon"
+      },
+      "9001": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": false,
+          "on_off_confidence": "unknown"
+        },
+        "commands": {
+          "MEDIA_PAUSE": {
+            "generic_type": "MEDIA_PAUSE",
+            "id": 90011,
+            "sub_type": "other",
+            "type": "action"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "button",
+        "ha_name": "Lecteur salon 9001",
+        "ha_unique_id": "jeedom2ha_eq_9001",
+        "jeedom_eq_id": 9001,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/9001/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": ""
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "button_media_pause",
+        "reason_details": {
+          "command_topic": "jeedom2ha/9001/cmd"
+        },
+        "suggested_area": "Salon"
+      },
+      "9002": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": false,
+          "on_off_confidence": "unknown"
+        },
+        "commands": {
+          "SIREN_ON": {
+            "generic_type": "SIREN_ON",
+            "id": 90021,
+            "sub_type": "other",
+            "type": "action"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "button",
+        "ha_name": "Sirene garage 9002",
+        "ha_unique_id": "jeedom2ha_eq_9002",
+        "jeedom_eq_id": 9002,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/9002/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": ""
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "button_siren_on",
+        "reason_details": {
+          "command_topic": "jeedom2ha/9002/cmd"
+        },
+        "suggested_area": "Garage"
       }
     },
     "publications": {
@@ -10194,13 +10811,67 @@
         "reason": "sure",
         "should_publish": true,
         "state_topic": "jeedom2ha/8004/state"
+      },
+      "9000": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/9000/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "button",
+          "jeedom_eq_id": 9000,
+          "reason_code": "button_generic_action"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": ""
+      },
+      "9001": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/9001/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "button",
+          "jeedom_eq_id": 9001,
+          "reason_code": "button_media_pause"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": ""
+      },
+      "9002": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/9002/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "button",
+          "jeedom_eq_id": 9002,
+          "reason_code": "button_siren_on"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": ""
       }
     }
   },
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 38,
+      "eligible_count": 41,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -10212,6 +10883,11 @@
         "binary_sensors_published": 5,
         "binary_sensors_skipped": 0,
         "binary_sensors_sure": 5,
+        "buttons_ambiguous": 0,
+        "buttons_probable": 0,
+        "buttons_published": 3,
+        "buttons_skipped": 0,
+        "buttons_sure": 3,
         "covers_ambiguous": 1,
         "covers_probable": 4,
         "covers_published": 8,
@@ -10594,14 +11270,41 @@
             "is_exception": false,
             "name": "Serrure connectee 8004",
             "object_id": 2
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 9000,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Scenario alarme securite 9000",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 9001,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Lecteur salon 9001",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 9002,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Sirene garage 9002",
+            "object_id": 3
           }
         ],
         "global": {
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 39,
-            "total": 40
+            "include": 42,
+            "total": 43
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -10612,8 +11315,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 13,
-              "total": 13
+              "include": 15,
+              "total": 15
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -10636,8 +11339,8 @@
             "counts": {
               "exceptions": 1,
               "exclude": 1,
-              "include": 9,
-              "total": 10
+              "include": 10,
+              "total": 11
             },
             "has_pending_home_assistant_changes": false,
             "home_perimetre": "Incluse",
@@ -10646,8 +11349,8 @@
           }
         ]
       },
-      "total_cmds": 79,
-      "total_eq_logics": 40,
+      "total_cmds": 82,
+      "total_eq_logics": 43,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",
