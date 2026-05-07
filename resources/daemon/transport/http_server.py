@@ -1485,6 +1485,11 @@ _DIAGNOSTIC_MESSAGES = {
         "Consultez la documentation du plugin pour connaître le périmètre V1 supporté.",
         True,
     ),
+    "no_projection_possible": (
+        "Aucune commande Info ou Action exploitable — projection impossible même en dégradation.",
+        "Vérifiez que l'équipement possède des commandes Info ou Action dans Jeedom.",
+        False,
+    ),
     "discovery_publish_failed": (
         "La publication MQTT de cet équipement a échoué lors du dernier sync.",
         "Vérifiez la connexion au broker MQTT et relancez un diagnostic après résolution.",
@@ -1848,7 +1853,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                                 reason_code = technical_failure_reason
                         status = get_primary_status(reason_code)
                 else:
-                    reason_code = "no_mapping"
+                    reason_code = "no_projection_possible"
                     confidence = "Ignoré"
                     status = get_primary_status(reason_code)
 

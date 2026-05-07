@@ -1176,6 +1176,116 @@
       "status": {
         "timeout": 0
       }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "GENERIC_INFO",
+          "id": 100001,
+          "name": "État",
+          "sub_type": "string",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "generic_type": null,
+      "id": 10000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Capteur generique non type",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "COLOR",
+          "id": 100011,
+          "name": "Couleur",
+          "sub_type": "color",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "generic_type": null,
+      "id": 10001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Couleur ambiante",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "VOLUME_SET",
+          "id": 100021,
+          "name": "Niveau",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "generic_type": null,
+      "id": 10002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Variateur slider",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "SET_TEXT",
+          "id": 100031,
+          "name": "Texte",
+          "sub_type": "string",
+          "type": "action"
+        }
+      ],
+      "eq_type": "virtual",
+      "generic_type": null,
+      "id": 10003,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Saisie texte",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "JEEDOM_CHANNEL",
+          "id": 100041,
+          "name": "Evenement",
+          "sub_type": "other",
+          "type": "event"
+        }
+      ],
+      "eq_type": "virtual",
+      "generic_type": null,
+      "id": 10004,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Commande interne evenement",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

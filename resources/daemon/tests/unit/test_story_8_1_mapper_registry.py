@@ -116,6 +116,8 @@ def _hardcoded_cascade(eq: JeedomEqLogic, snapshot: TopologySnapshot):
         mapping = SensorMapper().map(eq, snapshot)
     if mapping is None:
         mapping = ButtonMapper().map(eq, snapshot)
+    if mapping is None:
+        mapping = FallbackMapper().map(eq, snapshot)
     return mapping
 
 
@@ -133,12 +135,30 @@ def test_ac1_mapper_registry_exposes_canonical_order():
     ]
 
 
-def test_ac2_fallback_mapper_always_returns_none():
-    snapshot = _make_snapshot()
+def test_ac2_fallback_mapper_with_info_returns_sensor():
+    """FallbackMapper produit sensor pour eq avec commande Info (Story 9.4)."""
     fallback = FallbackMapper()
+    eq = _eq(
+        40,
+        "Capteur non mappe",
+        [_cmd(401, "GENERIC_INFO", type_="info", sub_type="string")],
+    )
+    result = fallback.map(eq, _make_snapshot())
+    assert result is not None
+    assert result.ha_entity_type == "sensor"
+    assert result.confidence == "ambiguous"
+    assert result.reason_code == "fallback_sensor_default"
 
-    for eq in (_light_eq(), _cover_eq(), _switch_eq(), _unknown_eq()):
-        assert fallback.map(eq, snapshot) is None
+
+def test_ac2_fallback_mapper_without_info_action_returns_none():
+    """FallbackMapper retourne None si aucune commande Info ni Action (Story 9.4)."""
+    fallback = FallbackMapper()
+    eq = _eq(
+        99,
+        "Commande event",
+        [_cmd(991, "JEEDOM_CHANNEL", type_="event", sub_type="other")],
+    )
+    assert fallback.map(eq, _make_snapshot()) is None
 
 
 def test_ac3_registry_matches_hardcoded_cascade_for_light():
@@ -180,12 +200,20 @@ def test_ac3_registry_matches_hardcoded_cascade_for_switch():
     assert registry_result.ha_entity_type == "switch"
 
 
-def test_ac3_registry_matches_hardcoded_cascade_for_unmapped_equipment():
+def test_ac3_registry_matches_hardcoded_cascade_for_unknown_eq_now_fallback():
+    """_unknown_eq (Info string) is captured by FallbackMapper → sensor ambiguous (Story 9.4)."""
     snapshot = _make_snapshot()
     eq = _unknown_eq()
 
-    assert _hardcoded_cascade(eq, snapshot) is None
-    assert MapperRegistry().map(eq, snapshot) is None
+    cascade_result = _hardcoded_cascade(eq, snapshot)
+    registry_result = MapperRegistry().map(eq, snapshot)
+
+    assert cascade_result is not None
+    assert registry_result is not None
+    assert cascade_result.ha_entity_type == "sensor"
+    assert registry_result.ha_entity_type == "sensor"
+    assert cascade_result.confidence == "ambiguous"
+    assert registry_result.confidence == "ambiguous"
 
 
 def test_ac3_registry_matches_hardcoded_cascade_for_sensor():

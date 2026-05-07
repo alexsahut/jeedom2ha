@@ -1,4 +1,4 @@
-# ARTEFACT FIGÉ — Story 4.1 / Story 4.3 / Story 6.2 (CAUSE_MAPPING + resolve_cause_ux) / Story 6.3 (sémantique honnête). Ne pas modifier sans story dédiée.
+# ARTEFACT FIGÉ — Story 4.1 / Story 4.3 / Story 6.2 (CAUSE_MAPPING + resolve_cause_ux) / Story 6.3 (sémantique honnête) / Story 9.4 (3 codes dégradation élégante §11). Ne pas modifier sans story dédiée.
 """Table de traduction reason_code → (cause_code, cause_label, cause_action).
 
 Module pur, standalone — aucune dépendance sur http_server, aggregation, taxonomy.
@@ -120,6 +120,23 @@ _REASON_CODE_TO_CAUSE: dict = {
     "ha_component_unknown": (
         "ha_component_unknown",
         "Type d'entité HA inconnu du moteur",
+        None,
+    ),
+    # --- 3 codes dégradation élégante Story 9.4 (§11 cadrage) ---
+    # cause_action = None : conformité règle no faux CTA (Story 6.3)
+    "fallback_sensor_default": (
+        "fallback_sensor_default",
+        "Projection en dégradation élégante — capteur par défaut",
+        None,
+    ),
+    "fallback_button_default": (
+        "fallback_button_default",
+        "Projection en dégradation élégante — bouton par défaut",
+        None,
+    ),
+    "no_projection_possible": (
+        "no_projection_possible",
+        "Projection impossible — aucune commande exploitable détectée",
         None,
     ),
     # --- 3 codes published → pas d'écart direction 1 ---
