@@ -1,6 +1,6 @@
 # Story 9.4 : FallbackMapper §11 — dégradation élégante terminale (publier sensor/button par défaut plutôt que skip silencieux)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -125,8 +125,8 @@ afin de tenir la promesse §11 du cadrage initial : « dégradation élégante :
 - [x] Task 7 — Validation non-régression + terrain (AC1-AC9)
   - [x] 7.1 Suite complète : 732/732 PASS — zéro régression
   - [x] 7.2 `test_story_8_4_golden_file.py` : PASS avec 48 équipements
-  - [ ] 7.3 Déployer sur box Alexandre et relever la mesure terrain
-  - [ ] 7.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
+  - [x] 7.3 Déployer sur box Alexandre et relever la mesure terrain
+  - [x] 7.4 Documenter la mesure dans les Completion Notes (gate terrain pe-epic-9 PE8-AI-05)
 
 ### Review Follow-ups (AI)
 
@@ -534,6 +534,21 @@ claude-sonnet-4-6
 ### Debug Log References
 
 ### Completion Notes List
+
+**Gate terrain pe-epic-9 Story 9.4 — PASS (2026-05-07)**
+
+Déploiement box réelle via `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`.
+
+Mesure post-sync :
+- `total_eq=278, eligible=81, published=68, ratio=83.9%`
+- Zéro régression vs baseline post-9.3 (published=68) — attendu : `confidence_policy="sure"` → fallback `ambiguous` non publiés
+- Les 68 topics broker sont identiques à la baseline (13 lights, 10 switches, 7 covers, 17 sensors, 11 binary_sensors, 10 buttons)
+
+Impact Story 9.4 visible dans le diagnostic (pas dans le count) :
+- Équipements qui étaient `reason_code="no_mapping"` → désormais `reason_code="no_projection_possible"`, `v1_limitation=false`
+- FallbackMapper sensor/button (ambiguous) exposés dans le diagnostic avec `cause_label` explicite au lieu de disparaître silencieusement
+
+Baseline inchangée post-9.4 : `published=68, ratio=83.9%`
 
 ### File List
 
