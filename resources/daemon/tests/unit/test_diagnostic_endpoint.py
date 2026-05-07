@@ -339,7 +339,7 @@ async def test_diagnostics_detail_and_remediation_no_commands(aiohttp_client):
 
 
 async def test_diagnostics_detail_and_remediation_no_mapping(aiohttp_client):
-    """no_mapping => hors périmètre V1, v1_limitation=True."""
+    """no_projection_possible (Story 9.4) => aucune commande exploitable, v1_limitation=False."""
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -350,15 +350,15 @@ async def test_diagnostics_detail_and_remediation_no_mapping(aiohttp_client):
     )
     app["topology"] = snapshot
     app["eligibility"] = {401: EligibilityResult(is_eligible=True, reason_code="eligible")}
-    app["mappings"] = {}   # aucun mapping => reason_code "no_mapping" calculé dans le handler
+    app["mappings"] = {}   # aucun mapping => reason_code "no_projection_possible" (Story 9.4)
 
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 401)
 
     assert eq["status"] == "Non supporté"
-    assert eq["reason_code"] == "no_mapping"
-    assert eq["v1_limitation"] is True
+    assert eq["reason_code"] == "no_projection_possible"
+    assert eq["v1_limitation"] is False
     assert eq["detail"] != ""
     assert eq["remediation"] != ""
     assert eq["unmatched_commands"] == []
@@ -918,7 +918,7 @@ async def test_diagnostics_reason_code_normalization_no_generic_type(aiohttp_cli
 
 
 async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
-    """AC2 — decision_trace.reason_code: no_mapping → no_supported_generic_type."""
+    """AC2 — decision_trace.reason_code: no_projection_possible → no_commands (fallback conservateur)."""
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -929,15 +929,15 @@ async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
     )
     app["topology"] = snapshot
     app["eligibility"] = {801: EligibilityResult(is_eligible=True, reason_code="eligible")}
-    app["mappings"] = {}  # no mapping → reason_code="no_mapping"
+    app["mappings"] = {}  # no mapping → reason_code="no_projection_possible" (Story 9.4)
 
     resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
     data = await resp.json()
     eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 801)
 
-    assert eq["reason_code"] == "no_mapping"  # top-level inchangé
+    assert eq["reason_code"] == "no_projection_possible"  # top-level Story 9.4
     dt = eq["traceability"]["decision_trace"]
-    assert dt["reason_code"] == "no_supported_generic_type"  # types configurés hors V1
+    assert dt["reason_code"] == "no_commands"  # fallback conservateur (_build_traceability)
     assert dt["reason_code"] in _CLOSED_REASON_CODES
 
 
