@@ -8,7 +8,7 @@ from transport.http_server import create_app
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd, EligibilityResult
 )
-from models.mapping import MappingResult, PublicationDecision, LightCapabilities
+from models.mapping import MappingResult, PublicationDecision, LightCapabilities, SensorCapabilities
 
 @pytest.fixture
 def app():
@@ -735,6 +735,7 @@ _CLOSED_REASON_CODES = {
     "published", "excluded", "disabled_eqlogic", "no_commands",
     "ambiguous_skipped", "no_generic_type_configured",
     "no_supported_generic_type", "discovery_publish_failed",
+    "no_projection_possible",  # Story 9.5 fix — éligible sans commande exploitable
 }
 
 
@@ -918,7 +919,7 @@ async def test_diagnostics_reason_code_normalization_no_generic_type(aiohttp_cli
 
 
 async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
-    """AC2 — decision_trace.reason_code: no_projection_possible → no_commands (fallback conservateur)."""
+    """AC2 — decision_trace.reason_code: no_projection_possible → no_projection_possible (fix Story 9.5)."""
     app = create_app(local_secret="test_secret")
     cli = await aiohttp_client(app)
 
@@ -937,8 +938,48 @@ async def test_diagnostics_reason_code_normalization_no_mapping(aiohttp_client):
 
     assert eq["reason_code"] == "no_projection_possible"  # top-level Story 9.4
     dt = eq["traceability"]["decision_trace"]
-    assert dt["reason_code"] == "no_commands"  # fallback conservateur (_build_traceability)
+    assert dt["reason_code"] == "no_projection_possible"  # fix Story 9.5 — normalisé depuis _CLOSED_REASON_MAP
     assert dt["reason_code"] in _CLOSED_REASON_CODES
+
+
+async def test_diagnostics_fallback_mapper_cause_action_non_null(aiohttp_client):
+    """AC2 — cause_action non-null pour équipement FallbackMapper (ambiguous_skipped, step_4) après Story 9.5."""
+    app = create_app(local_secret="test_secret")
+    cli = await aiohttp_client(app)
+
+    cmd = JeedomCmd(id=80301, name="État", generic_type="GENERIC_INFO", type="info", sub_type="string")
+    snapshot = TopologySnapshot(
+        timestamp="2026-03-18T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics={803: JeedomEqLogic(id=803, name="Capteur Fallback", object_id=1, is_enable=True, cmds=[cmd])},
+    )
+    mapping_res = MappingResult(
+        ha_entity_type="sensor",
+        confidence="ambiguous",
+        reason_code="fallback_sensor_default",
+        jeedom_eq_id=803,
+        ha_unique_id="sensor_803",
+        ha_name="Capteur Fallback",
+        commands={"GENERIC_INFO": cmd},
+        capabilities=SensorCapabilities(has_state=True),
+    )
+    app["topology"] = snapshot
+    app["eligibility"] = {803: EligibilityResult(is_eligible=True, reason_code="eligible")}
+    app["mappings"] = {803: mapping_res}
+    app["publications"] = {
+        803: PublicationDecision(
+            should_publish=False,
+            reason="ambiguous_skipped",
+            mapping_result=mapping_res,
+            active_or_alive=False,
+        )
+    }
+
+    resp = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
+    data = await resp.json()
+    eq = next(e for e in data["payload"]["equipments"] if e["eq_id"] == 803)
+
+    assert eq["cause_action"] is not None and len(eq["cause_action"]) > 0
 
 
 async def test_diagnostics_traceability_discovery_failed(aiohttp_client):

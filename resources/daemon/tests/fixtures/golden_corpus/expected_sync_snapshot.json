@@ -2395,7 +2395,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -3885,7 +3885,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -3964,7 +3964,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -4043,7 +4043,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -4122,7 +4122,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -4201,9 +4201,9 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Vérifier que l'équipement possède des commandes actives dans Jeedom",
+          "cause_action": null,
           "cause_code": "no_projection_possible",
-          "cause_label": "Équipement sans commandes exploitables",
+          "cause_label": "Projection impossible — aucune commande exploitable détectée",
           "confidence": "Ignoré",
           "detail": "Aucune commande Info ou Action exploitable — projection impossible même en dégradation.",
           "detected_generic_types": [],
@@ -4225,7 +4225,7 @@
             "decision_trace": {
               "confidence": "ignore",
               "ha_entity_type": null,
-              "reason_code": "no_commands"
+              "reason_code": "no_projection_possible"
             },
             "observed_commands": [
               {
@@ -6644,7 +6644,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -8078,7 +8078,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -8157,7 +8157,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -8236,7 +8236,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -8315,7 +8315,7 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": null,
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
           "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
@@ -8394,9 +8394,9 @@
               "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Vérifier que l'équipement possède des commandes actives dans Jeedom",
+          "cause_action": null,
           "cause_code": "no_projection_possible",
-          "cause_label": "Équipement sans commandes exploitables",
+          "cause_label": "Projection impossible — aucune commande exploitable détectée",
           "confidence": "Ignoré",
           "detail": "Aucune commande Info ou Action exploitable — projection impossible même en dégradation.",
           "detected_generic_types": [],
@@ -8418,7 +8418,7 @@
             "decision_trace": {
               "confidence": "ignore",
               "ha_entity_type": null,
-              "reason_code": "no_commands"
+              "reason_code": "no_projection_possible"
             },
             "observed_commands": [
               {
