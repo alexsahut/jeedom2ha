@@ -85,9 +85,10 @@ def test_resolve_cause_ux_ambiguous_step_3():
 
 
 def test_resolve_cause_ux_ambiguous_step_4():
-    # Story 6.3 — faux CTA éliminé : cause_action = None pour step 4
+    # Story 9.5 — cause_action non-null pour step 4 : surface vague 1 réelle (types génériques dans Jeedom)
+    # Story 6.3 règle "no faux CTA" respectée : "Préciser les types génériques" est une action exécutable
     resolved = resolve_cause_ux("ambiguous_skipped", 4)
-    assert resolved["cause_action"] is None
+    assert resolved["cause_action"] is not None and len(resolved["cause_action"]) > 0
     assert "Choisir manuellement" not in (resolved.get("cause_action") or "")
     assert resolved["cause_label"]  # libellé non vide
 
@@ -163,8 +164,8 @@ async def test_step_3_and_step_4_same_reason_code_different_ux(cli, app):
     )
     assert eq_step4["pipeline_step_visible"] == 4
     assert eq_step4["traceability"]["decision_trace"]["reason_code"] == "ambiguous_skipped"
-    # Story 6.3 — faux CTA éliminé : cause_action = None pour step 4
-    assert eq_step4["cause_action"] is None
+    # Story 9.5 — cause_action non-null pour step 4 : surface vague 1 réelle (types génériques dans Jeedom)
+    assert eq_step4["cause_action"] is not None and len(eq_step4["cause_action"]) > 0
     assert "Choisir manuellement" not in (eq_step4.get("cause_action") or "")
     assert eq_step4["cause_label"] != eq_step3["cause_label"]  # AC5 — libellés distincts
 

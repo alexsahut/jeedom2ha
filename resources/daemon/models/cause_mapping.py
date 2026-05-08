@@ -1,4 +1,4 @@
-# ARTEFACT FIGÉ — Story 4.1 / Story 4.3 / Story 6.2 (CAUSE_MAPPING + resolve_cause_ux) / Story 6.3 (sémantique honnête) / Story 9.4 (3 codes dégradation élégante §11). Ne pas modifier sans story dédiée.
+# ARTEFACT FIGÉ — Story 4.1 / Story 4.3 / Story 6.2 (CAUSE_MAPPING + resolve_cause_ux) / Story 6.3 (sémantique honnête) / Story 9.4 (3 codes dégradation élégante §11) / Story 9.5 (cause_action non-null FallbackMapper). Ne pas modifier sans story dédiée.
 """Table de traduction reason_code → (cause_code, cause_label, cause_action).
 
 Module pur, standalone — aucune dépendance sur http_server, aggregation, taxonomy.
@@ -123,16 +123,17 @@ _REASON_CODE_TO_CAUSE: dict = {
         None,
     ),
     # --- 3 codes dégradation élégante Story 9.4 (§11 cadrage) ---
-    # cause_action = None : conformité règle no faux CTA (Story 6.3)
+    # Story 9.5 : fallback_sensor_default / fallback_button_default → cause_action non-null (surface vague 1 réelle)
+    # no_projection_possible → cause_action = None (aucune remédiation directe)
     "fallback_sensor_default": (
         "fallback_sensor_default",
         "Projection en dégradation élégante — capteur par défaut",
-        None,
+        "Configurer les types génériques des commandes Info dans Jeedom pour permettre une projection spécifique",
     ),
     "fallback_button_default": (
         "fallback_button_default",
         "Projection en dégradation élégante — bouton par défaut",
-        None,
+        "Configurer les types génériques des commandes Action dans Jeedom pour permettre une projection spécifique",
     ),
     "no_projection_possible": (
         "no_projection_possible",
@@ -156,7 +157,7 @@ CAUSE_MAPPING: dict = {
         },
         "step_4": {
             "label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
-            "action": None,  # aucune surface dans jeedom2ha pour choisir manuellement le type
+            "action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",  # Story 9.5 : surface vague 1 réelle ouverte
         },
     },
     "ambiguous_skipped": {
@@ -166,7 +167,7 @@ CAUSE_MAPPING: dict = {
         },
         "step_4": {
             "label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
-            "action": None,  # aucune surface dans jeedom2ha pour choisir manuellement le type
+            "action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",  # Story 9.5 : chemin critique FallbackMapper — surface vague 1 réelle
         },
     },
 }

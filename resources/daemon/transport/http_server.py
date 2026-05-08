@@ -1563,7 +1563,7 @@ _STATUS_CODE_MAP: dict = {
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
 # Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
 #                confidence_policy_skipped, no_generic_type_configured,
-#                no_supported_generic_type, discovery_publish_failed
+#                no_supported_generic_type, discovery_publish_failed, no_projection_possible
 _CLOSED_REASON_MAP: dict = {
     # Eligibility — codes normalisés
     "excluded_eqlogic": "excluded",
@@ -1582,6 +1582,7 @@ _CLOSED_REASON_MAP: dict = {
     "probable_skipped": "confidence_policy_skipped",  # Story 4.3 — bloqué par politique de confiance sure_only
     "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
     "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
+    "no_projection_possible": "no_projection_possible",  # Story 9.5 fix — éligible sans commande exploitable
     "discovery_publish_failed": "discovery_publish_failed",
     "local_availability_publish_failed": "discovery_publish_failed",  # famille infra
     # États publiés (garde-fou si status check ne les attrape pas)

@@ -174,18 +174,18 @@ def test_no_commands_returns_none():
 
 # ─── cause_mapping — 3 codes §11 ──────────────────────────────────────────────
 
-def test_cause_fallback_sensor_default_no_action():
+def test_cause_fallback_sensor_default_has_action():
     code, label, action = reason_code_to_cause("fallback_sensor_default")
     assert code == "fallback_sensor_default"
     assert label is not None and "dégradation élégante" in label
-    assert action is None
+    assert action is not None and len(action) > 0
 
 
-def test_cause_fallback_button_default_no_action():
+def test_cause_fallback_button_default_has_action():
     code, label, action = reason_code_to_cause("fallback_button_default")
     assert code == "fallback_button_default"
     assert label is not None
-    assert action is None
+    assert action is not None and len(action) > 0
 
 
 def test_cause_no_projection_possible_no_action():
