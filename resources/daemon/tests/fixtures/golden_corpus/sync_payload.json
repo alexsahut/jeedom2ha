@@ -1286,6 +1286,86 @@
       "status": {
         "timeout": 0
       }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "THERMOSTAT_SET_SETPOINT",
+          "id": 110001,
+          "name": "Consigne",
+          "sub_type": "slider",
+          "type": "action"
+        },
+        {
+          "generic_type": "THERMOSTAT_TEMPERATURE",
+          "id": 110002,
+          "name": "Température",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "thermostat",
+      "generic_type": null,
+      "id": 11000,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Thermostat RDC",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "THERMOSTAT_SET_SETPOINT",
+          "id": 110011,
+          "name": "Consigne",
+          "sub_type": "slider",
+          "type": "action"
+        }
+      ],
+      "eq_type": "thermostat",
+      "generic_type": null,
+      "id": 11001,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Thermostat Galerie",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "THERMOSTAT_SET_SETPOINT",
+          "id": 110021,
+          "name": "Consigne",
+          "sub_type": "slider",
+          "type": "action"
+        },
+        {
+          "generic_type": "THERMOSTAT_TEMPERATURE",
+          "id": 110022,
+          "name": "Température",
+          "sub_type": "numeric",
+          "type": "info"
+        }
+      ],
+      "eq_type": "thermostat",
+      "generic_type": null,
+      "id": 11002,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Thermostat chambre Arthur",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

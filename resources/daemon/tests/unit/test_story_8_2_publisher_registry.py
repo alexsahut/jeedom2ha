@@ -38,11 +38,11 @@ def _make_mapping(ha_entity_type: str, eq_id: int = 10) -> MappingResult:
 def test_ac1_registry_contains_exact_current_publishers():
     registry = PublisherRegistry(_make_publisher())
 
-    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button"}
+    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"}
 
 
 def test_known_types_classmethod_returns_static_types_without_instance():
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"]
 
 
 def test_known_types_matches_publishers_dict():
@@ -103,17 +103,17 @@ def test_ac3_resolve_unknown_type_raises_explicit_error_and_logs(caplog):
     caplog.set_level(logging.ERROR)
 
     with pytest.raises(UnknownPublisherError) as exc_info:
-        registry.resolve("climate")
+        registry.resolve("alarm_control_panel")
 
-    assert exc_info.value.ha_entity_type == "climate"
+    assert exc_info.value.ha_entity_type == "alarm_control_panel"
     assert exc_info.value.technical_reason_code == "publisher_not_registered"
-    assert "No publisher registered for ha_entity_type=climate" in caplog.text
+    assert "No publisher registered for ha_entity_type=alarm_control_panel" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_ac3_publish_unknown_type_sets_failed_publication_result():
     registry = PublisherRegistry(_make_publisher())
-    mapping = _make_mapping("climate", eq_id=42)
+    mapping = _make_mapping("alarm_control_panel", eq_id=42)
 
     published = await registry.publish(mapping, _make_snapshot())
 

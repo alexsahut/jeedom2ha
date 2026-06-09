@@ -53,8 +53,8 @@ def test_each_registry_component_has_at_least_one_constraint():
 
 
 def test_product_scope_initial_value():
-    """AC5 - Le scope ouvert apres Story 9.3 inclut button (vague 1 pe-epic-9)."""
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
+    """AC5 - Le scope ouvert apres Story 10.2 inclut climate (vague Homebridge pe-epic-10)."""
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"]
 
 
 def test_product_scope_subset_of_registry():

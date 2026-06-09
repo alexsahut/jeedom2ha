@@ -210,6 +210,34 @@ class DiscoveryPublisher:
             )
         return ok
 
+    async def publish_climate(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a climate discovery config to MQTT.
+
+        Args:
+            mapping: MappingResult with ClimateCapabilities and reason_details.
+            snapshot: TopologySnapshot to extract device info.
+
+        Returns:
+            True if publish succeeded, False otherwise.
+        """
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="climate")
+        payload = self._build_climate_payload(mapping, snapshot)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing climate config: topic=%s eq_id=%d name='%s' confidence=%s",
+            topic, mapping.jeedom_eq_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish climate config for eq_id=%d (bridge unavailable)",
+                mapping.jeedom_eq_id,
+            )
+        return ok
+
     async def unpublish(self, ha_unique_id: str) -> bool:
         """Remove a discovery config by publishing empty payload with retain.
 
@@ -456,6 +484,42 @@ class DiscoveryPublisher:
 
         if device_class is not None:
             payload["device_class"] = device_class
+
+        return payload
+
+    def _build_climate_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build the MQTT Discovery JSON payload for a climate (thermostat) entity.
+
+        Minimal useful payload: temperature setpoint + current temperature when available.
+        Scope: residential thermostat, no advanced HVAC modes (Story 10.2 guardrail).
+        """
+        eq_id = mapping.jeedom_eq_id
+        device = self._build_device_block(mapping, snapshot)
+        reason_details = mapping.reason_details or {}
+
+        payload = {
+            "name": mapping.ha_name,
+            "unique_id": mapping.ha_unique_id,
+            "object_id": f"jeedom2ha_{eq_id}",
+            "temperature_command_topic": reason_details.get(
+                "temperature_command_topic", f"jeedom2ha/{eq_id}/temperature/set"
+            ),
+            "temperature_state_topic": reason_details.get(
+                "temperature_state_topic", f"jeedom2ha/{eq_id}/temperature/state"
+            ),
+            "modes": ["heat", "off"],
+            "platform": "mqtt",
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        payload.update(self._build_availability_fields(mapping, snapshot))
+
+        current_temperature_topic = reason_details.get("current_temperature_topic")
+        if current_temperature_topic:
+            payload["current_temperature_topic"] = current_temperature_topic
 
         return payload
 

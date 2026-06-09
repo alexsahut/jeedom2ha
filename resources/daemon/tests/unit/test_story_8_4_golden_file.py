@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from mapping.registry import MapperRegistry as RealMapperRegistry
-from models.mapping import LightCapabilities, MappingResult
+from models.mapping import ClimateCapabilities, LightCapabilities, MappingResult
 from transport.http_server import create_app
 
 SECRET = "test-secret-story-8-4-golden"
@@ -55,7 +55,11 @@ class _Story84MapperRegistry:
                 ha_name=eq.name,
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=commands,
-                capabilities=LightCapabilities(has_on_off=True),
+                capabilities=ClimateCapabilities(has_setpoint=True),
+                reason_details={
+                    "temperature_command_topic": f"jeedom2ha/{eq.id}/temperature/set",
+                    "temperature_state_topic": f"jeedom2ha/{eq.id}/temperature/state",
+                },
             )
         return self._real.map(eq, snapshot)
 
@@ -233,7 +237,7 @@ def _build_canonical_snapshot(sync_response: dict, diagnostics_response: dict, a
 
 def _assert_corpus_shape(sync_payload: dict) -> None:
     eq_ids = {eq["id"] for eq in sync_payload["eq_logics"]}
-    assert len(eq_ids) == 48
+    assert len(eq_ids) == 51  # +3 thermostats Story 10.2 (11000, 11001, 11002)
 
     assert len([i for i in eq_ids if 1000 <= i <= 1009]) == 10
     assert len([i for i in eq_ids if 2000 <= i <= 2007]) == 8
@@ -245,6 +249,7 @@ def _assert_corpus_shape(sync_payload: dict) -> None:
     assert len([i for i in eq_ids if 8000 <= i <= 8004]) == 5
     assert len([i for i in eq_ids if 9000 <= i <= 9002]) == 3
     assert len([i for i in eq_ids if 10000 <= i <= 10004]) == 5
+    assert len([i for i in eq_ids if 11000 <= i <= 11002]) == 3  # thermostats Story 10.2
 
 
 async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):
@@ -283,7 +288,8 @@ async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):
         for item in diagnostics_json["payload"]["equipments"]
     }
     assert diagnostics_by_id[6000]["reason_code"] == "ha_missing_command_topic"
-    assert diagnostics_by_id[6001]["reason_code"] == "ha_component_not_in_product_scope"
+    # eq 6001 était bloqué ha_component_not_in_product_scope — climate ouvert Story 10.2 : now published
+    assert diagnostics_by_id[6001]["reason_code"] != "ha_component_not_in_product_scope"
 
     mapping_summary = sync_json["payload"]["mapping_summary"]
     assert "lights_sure" in mapping_summary

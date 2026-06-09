@@ -2779,43 +2779,59 @@
         {
           "actions_ha": {
             "publier": {
-              "disponible": false,
-              "label": "Créer dans Home Assistant",
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
+              "raison_indisponibilite": null
             },
             "supprimer": {
-              "disponible": false,
+              "disponible": true,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
+              "raison_indisponibilite": null
             }
           },
           "cause_action": null,
-          "cause_code": "not_in_product_scope",
-          "cause_label": "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant",
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "Sûr",
-          "detail": "La projection de cet équipement est valide, mais son composant Home Assistant n'est pas ouvert dans le cycle courant.",
+          "detail": "",
           "detected_generic_types": [],
-          "ecart": true,
+          "ecart": false,
           "eq_id": 6001,
           "eq_type_name": "virtual",
           "ha_type": "climate",
-          "matched_commands": [],
+          "matched_commands": [
+            {
+              "cmd_id": 60011,
+              "cmd_name": "LIGHT_ON",
+              "generic_type": "LIGHT_ON"
+            },
+            {
+              "cmd_id": 60012,
+              "cmd_name": "LIGHT_OFF",
+              "generic_type": "LIGHT_OFF"
+            },
+            {
+              "cmd_id": 60013,
+              "cmd_name": "LIGHT_STATE",
+              "generic_type": "LIGHT_STATE"
+            }
+          ],
           "name": "Blocked product_scope climate 6001",
           "object_name": "Chambre",
           "perimetre": "inclus",
-          "pipeline_step_visible": 4,
-          "reason_code": "ha_component_not_in_product_scope",
-          "remediation": "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
-          "status": "Non supporté",
-          "status_code": "not_supported",
-          "statut": "non_publie",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
           "traceability": {
             "decision_trace": {
               "confidence": "sure",
               "ha_entity_type": "climate",
-              "reason_code": "ha_component_not_in_product_scope"
+              "reason_code": "published"
             },
             "observed_commands": [
               {
@@ -2841,7 +2857,7 @@
               "reason_code": null
             },
             "publication_trace": {
-              "last_discovery_publish_result": "not_attempted",
+              "last_discovery_publish_result": "success",
               "last_publish_timestamp": null
             },
             "typing_trace": [
@@ -4245,6 +4261,269 @@
               "last_publish_timestamp": null
             },
             "typing_trace": []
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11000,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110001,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            },
+            {
+              "cmd_id": 110002,
+              "cmd_name": "Température",
+              "generic_type": "THERMOSTAT_TEMPERATURE"
+            }
+          ],
+          "name": "Thermostat RDC",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110001,
+                "name": "Consigne"
+              },
+              {
+                "generic_type": "THERMOSTAT_TEMPERATURE",
+                "id": 110002,
+                "name": "Température"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110001,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              },
+              {
+                "command_id": 110002,
+                "configured_type": "THERMOSTAT_TEMPERATURE",
+                "logical_role": "THERMOSTAT_TEMPERATURE",
+                "used_type": "THERMOSTAT_TEMPERATURE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11001,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110011,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            }
+          ],
+          "name": "Thermostat Galerie",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110011,
+                "name": "Consigne"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110011,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11002,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110021,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            },
+            {
+              "cmd_id": 110022,
+              "cmd_name": "Température",
+              "generic_type": "THERMOSTAT_TEMPERATURE"
+            }
+          ],
+          "name": "Thermostat chambre Arthur",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110021,
+                "name": "Consigne"
+              },
+              {
+                "generic_type": "THERMOSTAT_TEMPERATURE",
+                "id": 110022,
+                "name": "Température"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110021,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              },
+              {
+                "command_id": 110022,
+                "configured_type": "THERMOSTAT_TEMPERATURE",
+                "logical_role": "THERMOSTAT_TEMPERATURE",
+                "used_type": "THERMOSTAT_TEMPERATURE"
+              }
+            ]
           },
           "unmatched_commands": [],
           "v1_compatibility": false,
@@ -6972,43 +7251,59 @@
         {
           "actions_ha": {
             "publier": {
-              "disponible": false,
-              "label": "Créer dans Home Assistant",
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
+              "raison_indisponibilite": null
             },
             "supprimer": {
-              "disponible": false,
+              "disponible": true,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
+              "raison_indisponibilite": null
             }
           },
           "cause_action": null,
-          "cause_code": "not_in_product_scope",
-          "cause_label": "Type d'entité HA reconnu — hors périmètre d'ouverture du cycle courant",
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "Sûr",
-          "detail": "La projection de cet équipement est valide, mais son composant Home Assistant n'est pas ouvert dans le cycle courant.",
+          "detail": "",
           "detected_generic_types": [],
-          "ecart": true,
+          "ecart": false,
           "eq_id": 6001,
           "eq_type_name": "virtual",
           "ha_type": "climate",
-          "matched_commands": [],
+          "matched_commands": [
+            {
+              "cmd_id": 60011,
+              "cmd_name": "LIGHT_ON",
+              "generic_type": "LIGHT_ON"
+            },
+            {
+              "cmd_id": 60012,
+              "cmd_name": "LIGHT_OFF",
+              "generic_type": "LIGHT_OFF"
+            },
+            {
+              "cmd_id": 60013,
+              "cmd_name": "LIGHT_STATE",
+              "generic_type": "LIGHT_STATE"
+            }
+          ],
           "name": "Blocked product_scope climate 6001",
           "object_name": "Chambre",
           "perimetre": "inclus",
-          "pipeline_step_visible": 4,
-          "reason_code": "ha_component_not_in_product_scope",
-          "remediation": "Aucune action côté Jeedom : ce composant n'est pas encore pris en charge dans le cycle courant.",
-          "status": "Non supporté",
-          "status_code": "not_supported",
-          "statut": "non_publie",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
           "traceability": {
             "decision_trace": {
               "confidence": "sure",
               "ha_entity_type": "climate",
-              "reason_code": "ha_component_not_in_product_scope"
+              "reason_code": "published"
             },
             "observed_commands": [
               {
@@ -7034,7 +7329,7 @@
               "reason_code": null
             },
             "publication_trace": {
-              "last_discovery_publish_result": "not_attempted",
+              "last_discovery_publish_result": "success",
               "last_publish_timestamp": null
             },
             "typing_trace": [
@@ -8442,6 +8737,269 @@
           "unmatched_commands": [],
           "v1_compatibility": false,
           "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11000,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110001,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            },
+            {
+              "cmd_id": 110002,
+              "cmd_name": "Température",
+              "generic_type": "THERMOSTAT_TEMPERATURE"
+            }
+          ],
+          "name": "Thermostat RDC",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110001,
+                "name": "Consigne"
+              },
+              {
+                "generic_type": "THERMOSTAT_TEMPERATURE",
+                "id": 110002,
+                "name": "Température"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110001,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              },
+              {
+                "command_id": 110002,
+                "configured_type": "THERMOSTAT_TEMPERATURE",
+                "logical_role": "THERMOSTAT_TEMPERATURE",
+                "used_type": "THERMOSTAT_TEMPERATURE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11001,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110011,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            }
+          ],
+          "name": "Thermostat Galerie",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110011,
+                "name": "Consigne"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110011,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 11002,
+          "eq_type_name": "thermostat",
+          "ha_type": "climate",
+          "matched_commands": [
+            {
+              "cmd_id": 110021,
+              "cmd_name": "Consigne",
+              "generic_type": "THERMOSTAT_SET_SETPOINT"
+            },
+            {
+              "cmd_id": 110022,
+              "cmd_name": "Température",
+              "generic_type": "THERMOSTAT_TEMPERATURE"
+            }
+          ],
+          "name": "Thermostat chambre Arthur",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "climate",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SET_SETPOINT",
+                "id": 110021,
+                "name": "Consigne"
+              },
+              {
+                "generic_type": "THERMOSTAT_TEMPERATURE",
+                "id": 110022,
+                "name": "Température"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 110021,
+                "configured_type": "THERMOSTAT_SET_SETPOINT",
+                "logical_role": "THERMOSTAT_SET_SETPOINT",
+                "used_type": "THERMOSTAT_SET_SETPOINT"
+              },
+              {
+                "command_id": 110022,
+                "configured_type": "THERMOSTAT_TEMPERATURE",
+                "logical_role": "THERMOSTAT_TEMPERATURE",
+                "used_type": "THERMOSTAT_TEMPERATURE"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": false,
+          "v1_limitation": false
         }
       ],
       "rooms": [
@@ -8449,8 +9007,8 @@
           "compteurs": {
             "ecarts": 7,
             "exclus": 0,
-            "inclus": 20,
-            "total": 20
+            "inclus": 22,
+            "total": 22
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -8462,25 +9020,25 @@
               "ha_missing_command_topic": 1,
               "no_projection_possible": 1,
               "probable": 4,
-              "sure": 9
+              "sure": 11
             },
             "counts_by_status": {
               "ambiguous": 4,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 3,
-              "published": 13
+              "published": 15
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 20
+            "total_equipments": 22
           }
         },
         {
           "compteurs": {
-            "ecarts": 4,
+            "ecarts": 3,
             "exclus": 0,
-            "inclus": 17,
-            "total": 17
+            "inclus": 18,
+            "total": 18
           },
           "home_statut": "Partiellement publiee",
           "object_id": 2,
@@ -8488,19 +9046,18 @@
           "summary": {
             "counts_by_reason": {
               "ambiguous_skipped": 3,
-              "ha_component_not_in_product_scope": 1,
               "probable": 6,
-              "sure": 7
+              "sure": 9
             },
             "counts_by_status": {
               "ambiguous": 3,
               "excluded": 0,
               "infra_incident": 0,
-              "not_supported": 1,
-              "published": 13
+              "not_supported": 0,
+              "published": 15
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 17
+            "total_equipments": 18
           }
         },
         {
@@ -8533,31 +9090,30 @@
       ],
       "summary": {
         "compteurs": {
-          "ecarts": 11,
+          "ecarts": 10,
           "exclus": 1,
-          "inclus": 47,
-          "total": 48
+          "inclus": 50,
+          "total": 51
         },
         "counts_by_reason": {
           "ambiguous_skipped": 7,
           "disabled_eqlogic": 1,
           "excluded_eqlogic": 1,
-          "ha_component_not_in_product_scope": 1,
           "ha_missing_command_topic": 1,
           "no_projection_possible": 1,
           "probable": 15,
-          "sure": 21
+          "sure": 25
         },
         "counts_by_status": {
           "ambiguous": 7,
           "excluded": 1,
           "infra_incident": 0,
-          "not_supported": 4,
-          "published": 36
+          "not_supported": 3,
+          "published": 40
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 48
+        "total_equipments": 51
       }
     },
     "request_id": "<normalized-request-id>",
@@ -8587,6 +9143,11 @@
       "buttons_published": 3,
       "buttons_skipped": 2,
       "buttons_sure": 3,
+      "climates_ambiguous": 0,
+      "climates_probable": 0,
+      "climates_published": 4,
+      "climates_skipped": 0,
+      "climates_sure": 4,
       "covers_ambiguous": 1,
       "covers_probable": 4,
       "covers_published": 8,
@@ -9384,6 +9945,167 @@
         "reason_details": {
           "brightness": "slider_without_brightness_info",
           "on_off": "slider_implicit_on_off"
+        },
+        "suggested_area": "Chambre"
+      },
+      "11000": {
+        "capabilities": {
+          "has_current_temperature": true,
+          "has_setpoint": true
+        },
+        "commands": {
+          "THERMOSTAT_SET_SETPOINT": {
+            "generic_type": "THERMOSTAT_SET_SETPOINT",
+            "id": 110001,
+            "sub_type": "slider",
+            "type": "action"
+          },
+          "THERMOSTAT_TEMPERATURE": {
+            "generic_type": "THERMOSTAT_TEMPERATURE",
+            "id": 110002,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "climate",
+        "ha_name": "Thermostat RDC",
+        "ha_unique_id": "jeedom2ha_eq_11000",
+        "jeedom_eq_id": 11000,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/11000/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/11000/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "climate_thermostat_setpoint",
+        "reason_details": {
+          "current_temperature_topic": "jeedom2ha/11000/current_temperature",
+          "temperature_command_topic": "jeedom2ha/11000/temperature/set",
+          "temperature_state_topic": "jeedom2ha/11000/temperature/state"
+        },
+        "suggested_area": "Salon"
+      },
+      "11001": {
+        "capabilities": {
+          "has_current_temperature": false,
+          "has_setpoint": true
+        },
+        "commands": {
+          "THERMOSTAT_SET_SETPOINT": {
+            "generic_type": "THERMOSTAT_SET_SETPOINT",
+            "id": 110011,
+            "sub_type": "slider",
+            "type": "action"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "climate",
+        "ha_name": "Thermostat Galerie",
+        "ha_unique_id": "jeedom2ha_eq_11001",
+        "jeedom_eq_id": 11001,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/11001/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/11001/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "climate_thermostat_setpoint",
+        "reason_details": {
+          "temperature_command_topic": "jeedom2ha/11001/temperature/set",
+          "temperature_state_topic": "jeedom2ha/11001/temperature/state"
+        },
+        "suggested_area": "Salon"
+      },
+      "11002": {
+        "capabilities": {
+          "has_current_temperature": true,
+          "has_setpoint": true
+        },
+        "commands": {
+          "THERMOSTAT_SET_SETPOINT": {
+            "generic_type": "THERMOSTAT_SET_SETPOINT",
+            "id": 110021,
+            "sub_type": "slider",
+            "type": "action"
+          },
+          "THERMOSTAT_TEMPERATURE": {
+            "generic_type": "THERMOSTAT_TEMPERATURE",
+            "id": 110022,
+            "sub_type": "numeric",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "climate",
+        "ha_name": "Thermostat chambre Arthur",
+        "ha_unique_id": "jeedom2ha_eq_11002",
+        "jeedom_eq_id": 11002,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/11002/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/11002/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "climate_thermostat_setpoint",
+        "reason_details": {
+          "current_temperature_topic": "jeedom2ha/11002/current_temperature",
+          "temperature_command_topic": "jeedom2ha/11002/temperature/set",
+          "temperature_state_topic": "jeedom2ha/11002/temperature/state"
         },
         "suggested_area": "Chambre"
       },
@@ -10396,10 +11118,8 @@
       },
       "6001": {
         "capabilities": {
-          "brightness_confidence": "unknown",
-          "has_brightness": false,
-          "has_on_off": true,
-          "on_off_confidence": "unknown"
+          "has_current_temperature": false,
+          "has_setpoint": true
         },
         "commands": {
           "LIGHT_OFF": {
@@ -10434,24 +11154,27 @@
           "reason_code": null
         },
         "publication_decision_ref": {
-          "active_or_alive": false,
+          "active_or_alive": true,
           "availability_reason": "timeout_zero",
           "bridge_availability_topic": "jeedom2ha/bridge/status",
-          "discovery_published": false,
+          "discovery_published": true,
           "eqlogic_availability_topic": "jeedom2ha/6001/availability",
           "local_availability_state": "online",
           "local_availability_supported": true,
-          "reason": "ha_component_not_in_product_scope",
-          "should_publish": false,
-          "state_topic": ""
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/6001/state"
         },
         "publication_result": {
           "attempted_at": "<normalized-timestamp>",
-          "status": "not_attempted",
+          "status": "success",
           "technical_reason_code": null
         },
         "reason_code": "climate_forced_for_scope_gate",
-        "reason_details": null,
+        "reason_details": {
+          "temperature_command_topic": "jeedom2ha/6001/temperature/set",
+          "temperature_state_topic": "jeedom2ha/6001/temperature/state"
+        },
         "suggested_area": "Chambre"
       },
       "7000": {
@@ -11333,6 +12056,60 @@
         "should_publish": true,
         "state_topic": "jeedom2ha/1009/state"
       },
+      "11000": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/11000/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "climate",
+          "jeedom_eq_id": 11000,
+          "reason_code": "climate_thermostat_setpoint"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/11000/state"
+      },
+      "11001": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/11001/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "climate",
+          "jeedom_eq_id": 11001,
+          "reason_code": "climate_thermostat_setpoint"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/11001/state"
+      },
+      "11002": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/11002/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "climate",
+          "jeedom_eq_id": 11002,
+          "reason_code": "climate_thermostat_setpoint"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/11002/state"
+      },
       "2000": {
         "active_or_alive": true,
         "availability_reason": "timeout_zero",
@@ -11640,10 +12417,10 @@
         "state_topic": "jeedom2ha/6000/state"
       },
       "6001": {
-        "active_or_alive": false,
+        "active_or_alive": true,
         "availability_reason": "timeout_zero",
         "bridge_availability_topic": "jeedom2ha/bridge/status",
-        "discovery_published": false,
+        "discovery_published": true,
         "eqlogic_availability_topic": "jeedom2ha/6001/availability",
         "local_availability_state": "online",
         "local_availability_supported": true,
@@ -11653,9 +12430,9 @@
           "jeedom_eq_id": 6001,
           "reason_code": "climate_forced_for_scope_gate"
         },
-        "reason": "ha_component_not_in_product_scope",
-        "should_publish": false,
-        "state_topic": ""
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/6001/state"
       },
       "7000": {
         "active_or_alive": true,
@@ -11896,7 +12673,7 @@
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 46,
+      "eligible_count": 49,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -11913,6 +12690,11 @@
         "buttons_published": 3,
         "buttons_skipped": 2,
         "buttons_sure": 3,
+        "climates_ambiguous": 0,
+        "climates_probable": 0,
+        "climates_published": 4,
+        "climates_skipped": 0,
+        "climates_sure": 4,
         "covers_ambiguous": 1,
         "covers_probable": 4,
         "covers_published": 8,
@@ -12201,7 +12983,7 @@
             "decision_source": "global",
             "effective_state": "include",
             "eq_id": 6001,
-            "has_pending_home_assistant_changes": true,
+            "has_pending_home_assistant_changes": false,
             "is_exception": false,
             "name": "Blocked product_scope climate 6001",
             "object_id": 2
@@ -12367,14 +13149,41 @@
             "is_exception": false,
             "name": "Commande interne evenement",
             "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 11000,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Thermostat RDC",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 11001,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Thermostat Galerie",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 11002,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Thermostat chambre Arthur",
+            "object_id": 2
           }
         ],
         "global": {
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 47,
-            "total": 48
+            "include": 50,
+            "total": 51
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -12385,8 +13194,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 20,
-              "total": 20
+              "include": 22,
+              "total": 22
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -12397,8 +13206,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 17,
-              "total": 17
+              "include": 18,
+              "total": 18
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -12419,8 +13228,8 @@
           }
         ]
       },
-      "total_cmds": 87,
-      "total_eq_logics": 48,
+      "total_cmds": 92,
+      "total_eq_logics": 51,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

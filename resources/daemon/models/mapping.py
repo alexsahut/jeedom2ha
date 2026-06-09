@@ -63,11 +63,23 @@ class SensorCapabilities:
     has_state: bool = False
 
 
+@dataclass
+class ClimateCapabilities:
+    """Climate capabilities for thermostat eqLogics (Story 10.2).
+
+    has_setpoint: THERMOSTAT_SET_SETPOINT action/slider detected.
+    has_current_temperature: THERMOSTAT_TEMPERATURE info/numeric detected.
+    """
+    has_setpoint: bool = False
+    has_current_temperature: bool = False
+
+
 MappingCapabilities = Union[
     LightCapabilities,
     CoverCapabilities,
     SensorCapabilities,
     SwitchCapabilities,
+    ClimateCapabilities,
 ]
 
 
