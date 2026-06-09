@@ -1,6 +1,6 @@
 # Story 9.5 : Exposition d'actions utilisateur sur les surfaces réellement ouvertes par la vague 1 (re-homée depuis Story 7.5)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -50,12 +50,12 @@ afin que le diagnostic reste honnête et utile une fois que la vague 1 est en pr
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
-  - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Sélectionner le mode selon l'objectif de la story :
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+  - [x] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
+  - [x] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
+  - [x] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
 
 - [x] Task 1 — Mettre à jour `cause_mapping.py` — ARTEFACT FIGÉ (AC2, AC3)
   - [x] 1.1 Mettre à jour le commentaire d'en-tête : ajouter `Story 9.5` dans la liste des stories
@@ -95,15 +95,15 @@ afin que le diagnostic reste honnête et utile une fois que la vague 1 est en pr
   - [x] 5.3 Vérifier que les 43 équipements existants (IDs 1000-9002) sont INCHANGÉS — confirmé avant PR (seul ID 4001 ambiguous_skipped step_4 mis à jour : effet de bord intentionnel documenté)
   - [x] 5.4 NE PAS régénérer le snapshot via le pipeline — discipline PE8-AI-04
 
-- [ ] Task 6 — Gate terrain no faux CTA (AC5)
-  - [ ] 6.1 Déployer sur box réelle via `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] 6.2 Appeler `/system/diagnostics` et vérifier les cas de la vague 1 :
+- [x] Task 6 — Gate terrain no faux CTA (AC5)
+  - [x] 6.1 Déployer sur box réelle via `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
+  - [x] 6.2 Appeler `/system/diagnostics` et vérifier les cas de la vague 1 :
     - 5 sensors spécifiques (SensorMapper) publiés → `cause_action = null` ✓
     - 5 binary_sensors spécifiques (BinarySensorMapper) publiés → `cause_action = null` ✓
     - 3+ buttons spécifiques (ButtonMapper) publiés → `cause_action = null` ✓
     - Équipements FallbackMapper (ambiguous_skipped) → `cause_action` non-null ✓
-    - Équipement `no_projection_possible` si présent → `cause_action = null` ✓
-  - [ ] 6.3 Documenter les compteurs post-Story 9.5 (baseline attendue : published=68, ratio=83.9% — inchangé car cette story ne modifie pas les publications)
+    - Équipement `no_projection_possible` si présent → non observé ce soir sur cette box, donc non revalidé en live
+  - [x] 6.3 Documenter les compteurs post-Story 9.5 (baseline attendue : published=68, ratio=83.9% — inchangé car cette story ne modifie pas les publications)
 
 - [x] Task 7 — Validation non-régression suite complète
   - [x] 7.1 `pytest resources/daemon/tests/` — suite complète PASS
@@ -267,6 +267,7 @@ claude-sonnet-4-6
 - Task 3 : 2 tests renommés `*_no_action` → `*_has_action` avec assertions inversées. `test_cause_no_projection_possible_no_action` conservé tel quel.
 - Task 4 : `test_diagnostics_reason_code_normalization_no_mapping` corrigé (`no_commands` → `no_projection_possible`). `"no_projection_possible"` ajouté à `_CLOSED_REASON_CODES`. Nouveau test `test_diagnostics_fallback_mapper_cause_action_non_null` ajouté. Import `SensorCapabilities` ajouté.
 - Task 5 : Golden-file mis à jour — IDs 10000-10003 (`cause_action` null → CTA), ID 10004 (3 champs), ID 4001 (effet de bord intentionnel `ambiguous_skipped` step_4). Deux sections (`equipments` et `in_scope_equipments`) mises à jour. PE8-AI-04 respecté (modification manuelle via script Python, pas de pipeline).
+- Task 6 : Gate terrain PASS le 2026-06-05 sur la box réelle via `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon` après dry-run PASS. Compteurs live observés : `total_eq=282`, `eligible=82`, `published=71`, `discovery topics=71`. Vérifications AC5 : `sensor cause_action=null` confirmé sur 18 cas, `binary_sensor cause_action=null` sur 11 cas, `button cause_action=null` sur 13 cas, `ambiguous_skipped cause_action non-null` sur 11 cas. Aucun cas live `no_projection_possible` observé ce soir ; ce sous-cas reste couvert par les validations automatisées et n'empêche pas le `done` car l'AC est formulé en "si présent".
 - Task 7 : 733/733 PASS. Tests Story 6.2 et 6.3 mis à jour pour refléter le nouveau comportement (cause_action non-null pour `ambiguous_skipped` step_4 est intentionnel — CTA réel, règle no faux CTA respectée).
 
 ### File List

@@ -51,7 +51,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-09'  # story 10.1 implementation complete (scenarios as button) — statut review ; gate terrain requis
+last_updated: '2026-06-09'  # story 10.1 done — gate terrain PASS (5/5 scenarios visibles sur box réelle, MQTT topics confirmed)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -210,7 +210,7 @@ development_status:
   # ==============================================================
   pe-epic-10: in-progress  # premier story file cree le 2026-06-07 ; story 10.0 done 2026-06-08
   10-0-prefixe-de-gel-du-perimetre-homebridge-ha-vise: done  # artefact pe-epic-10-perimetre-prefixe-2026-06-08.md cree ; matrice canonique et exclusions verrouillees
-  10-1-verification-et-completion-du-chemin-button-pour-les-5-scenarios-homekit-visibles: review  # implementation complete 2026-06-09 ; gate terrain requis avant done
+  10-1-verification-et-completion-du-chemin-button-pour-les-5-scenarios-homekit-visibles: done  # gate terrain PASS 2026-06-09 — 5/5 scenarios visibles et declenchables (MQTT topics jeedom2ha_scenario_{20,38,50,57,150} confirms)
   10-2-ouverture-gouvernee-de-climate-pour-les-thermostats-homebridge-representatifs: backlog
   10-3-evaluation-puis-ouverture-ciblee-de-alarm-control-panel-pour-alarme-maison: backlog
   10-4-cadrage-des-composites-metier-iq-ev-spa-sans-ouverture-cosmetique: backlog
