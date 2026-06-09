@@ -190,7 +190,9 @@ class DiscoveryPublisher:
         Returns:
             True if publish succeeded, False otherwise.
         """
-        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="button")
+        reason_details = mapping.reason_details or {}
+        node_id = reason_details.get("node_id") if isinstance(reason_details.get("node_id"), str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="button", node_id=node_id)
         payload = self._build_button_payload(mapping, snapshot)
         payload_json = json.dumps(payload, ensure_ascii=False)
 
@@ -243,9 +245,10 @@ class DiscoveryPublisher:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_topic(self, eq_id: int, entity_type: str = "light") -> str:
+    def _build_topic(self, eq_id: int, entity_type: str = "light", node_id: Optional[str] = None) -> str:
         """Build the MQTT discovery topic for an entity."""
-        return f"{self._topic_prefix}/{entity_type}/jeedom2ha_{eq_id}/config"
+        path_part = node_id if node_id else f"jeedom2ha_{eq_id}"
+        return f"{self._topic_prefix}/{entity_type}/{path_part}/config"
 
     def _build_device_block(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the common device block for discovery payloads."""
@@ -448,16 +451,18 @@ class DiscoveryPublisher:
 
         No state_topic: button is command-only (no persistent state in HA).
         command_topic uses /cmd (not /set) to distinguish from switch/light actuators.
+        Supports node_id override in reason_details for scenario buttons (Story 10.1).
         """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         reason_details = mapping.reason_details or {}
         command_topic = reason_details.get("command_topic", f"jeedom2ha/{eq_id}/cmd")
+        object_id = reason_details.get("node_id") or f"jeedom2ha_{eq_id}"
 
         payload = {
             "name": mapping.ha_name,
             "unique_id": mapping.ha_unique_id,
-            "object_id": f"jeedom2ha_{eq_id}",
+            "object_id": object_id,
             "command_topic": command_topic,
             "platform": "mqtt",
             "device": device,

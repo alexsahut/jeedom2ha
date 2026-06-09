@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from models.mapping import MappingResult, SwitchCapabilities
-from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
+from models.topology import JeedomCmd, JeedomEqLogic, JeedomScenario, TopologySnapshot
 
 
 def _is_action_other_command(cmd: JeedomCmd) -> bool:
@@ -39,3 +39,26 @@ class ButtonMapper:
             )
 
         return None
+
+
+class ScenarioButtonMapper:
+    """Mappe un scénario Jeedom en HA button (Story 10.1 — 5 scénarios HomeKit)."""
+
+    def map(self, scenario: JeedomScenario) -> MappingResult:
+        node_id = f"jeedom2ha_scenario_{scenario.id}"
+        return MappingResult(
+            ha_entity_type="button",
+            confidence="sure",
+            reason_code="scenario_trigger",
+            jeedom_eq_id=scenario.id,
+            ha_unique_id=node_id,
+            ha_name=scenario.name,
+            suggested_area=None,
+            commands={},
+            capabilities=SwitchCapabilities(has_on_off=True),
+            reason_details={
+                "command_topic": f"jeedom2ha/scenario_{scenario.id}/cmd",
+                "node_id": node_id,
+                "source_kind": "scenario",
+            },
+        )

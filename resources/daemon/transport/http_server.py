@@ -43,6 +43,7 @@ from models.ui_contract_4d import (
 )
 from models.actions_ha import build_actions_ha
 from mapping.registry import MapperRegistry
+from mapping.button import ScenarioButtonMapper
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
@@ -1348,6 +1349,32 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         request.app["mappings"].pop(old_eq_id, None)
         request.app["publications"].pop(old_eq_id, None)
     
+    # Story 10.1 — Publish Jeedom scenarios as HA button entities
+    scenario_mapper = ScenarioButtonMapper()
+    scenario_publications: Dict[int, PublicationDecision] = {}
+    for scenario_id, scenario in snapshot.scenarios.items():
+        if not scenario.is_active:
+            continue
+        sc_mapping = scenario_mapper.map(scenario)
+        sc_decision = PublicationDecision(
+            should_publish=True,
+            reason="scenario_button",
+            mapping_result=sc_mapping,
+            active_or_alive=True,
+            discovery_published=False,
+        )
+        sc_mapping.publication_decision_ref = sc_decision
+        scenario_publications[scenario_id] = sc_decision
+        if publisher_registry and mqtt_bridge and mqtt_bridge.is_connected:
+            ok = await publisher_registry.publish(sc_mapping, snapshot)
+            if ok:
+                sc_decision.discovery_published = True
+            else:
+                _LOGGER.warning("[SCENARIO] Failed to publish button for scenario_id=%d", scenario_id)
+    request.app["scenario_publications"].update(scenario_publications)
+    if hasattr(request.app.get("command_synchronizer"), "_app"):
+        request.app["command_synchronizer"]._app = request.app
+
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
     request.app["publications"].update(publications)
@@ -2526,6 +2553,7 @@ def create_app(local_secret: str) -> web.Application:
     app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
+    app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]

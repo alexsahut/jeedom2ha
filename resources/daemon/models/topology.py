@@ -99,6 +99,13 @@ class JeedomEqLogic:
     cmds: List[JeedomCmd] = field(default_factory=list)
 
 @dataclass
+class JeedomScenario:
+    """Jeedom scenario — mapped to HA button (Story 10.1)."""
+    id: int
+    name: str
+    is_active: bool = True
+
+@dataclass
 class EligibilityResult:
     is_eligible: bool
     reason_code: str                # stable code for diagnostic (e.g., "excluded_eqlogic")
@@ -110,6 +117,7 @@ class TopologySnapshot:
     timestamp: str                                          # ISO 8601
     objects: Dict[int, JeedomObject] = field(default_factory=dict)
     eq_logics: Dict[int, JeedomEqLogic] = field(default_factory=dict)
+    scenarios: Dict[int, "JeedomScenario"] = field(default_factory=dict)
 
     @classmethod
     def from_jeedom_payload(cls, payload: Dict[str, Any]) -> "TopologySnapshot":
@@ -181,10 +189,23 @@ class TopologySnapshot:
             except (ValueError, TypeError, KeyError):
                 continue
                 
+        scenarios: Dict[int, JeedomScenario] = {}
+        for sc_raw in payload.get("scenarios", []):
+            try:
+                sc_id = int(sc_raw.get("id"))
+                scenarios[sc_id] = JeedomScenario(
+                    id=sc_id,
+                    name=str(sc_raw.get("name", f"Scenario {sc_id}")),
+                    is_active=_to_bool(sc_raw.get("is_active"), default=True),
+                )
+            except (ValueError, TypeError, KeyError):
+                continue
+
         return cls(
             timestamp=payload.get("timestamp", datetime.now().isoformat()),
             objects=objects,
-            eq_logics=eq_logics
+            eq_logics=eq_logics,
+            scenarios=scenarios,
         )
 
     def get_suggested_area(self, eq_id: int) -> Optional[str]:

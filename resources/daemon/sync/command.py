@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
+_SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,11 @@ class CommandSynchronizer:
 
     async def handle_command_message(self, topic: str, payload: str) -> bool:
         """Handle one MQTT command message."""
+        # Scenario button path (Story 10.1): jeedom2ha/scenario_{id}/cmd
+        match = _SCENARIO_CMD_TOPIC_RE.match(topic)
+        if match:
+            return await self._handle_scenario_command(int(match.group("scenario_id")), topic)
+
         parsed, parse_reason = self._parse_topic(topic)
         if parsed is None:
             self._log_cmd(
@@ -471,6 +477,77 @@ class CommandSynchronizer:
             return False
 
         if isinstance(payload, Mapping) and payload.get("error"):
+            self._last_exec_error_reason = "jeedom_rpc_error"
+            return False
+
+        return True
+
+    async def _handle_scenario_command(self, scenario_id: int, topic: str) -> bool:
+        """Handle a button press for a Jeedom scenario (Story 10.1)."""
+        if not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
+            self._log_cmd(logging.INFO, eq_id=f"scenario_{scenario_id}", topic=topic,
+                          reason_code="mqtt_unavailable", action="reject_scenario_command")
+            return False
+
+        scenario_publications = self._app.get("scenario_publications", {}) if hasattr(self._app, "get") else {}
+        decision = scenario_publications.get(scenario_id)
+        if decision is None or not getattr(decision, "should_publish", False):
+            self._log_cmd(logging.INFO, eq_id=f"scenario_{scenario_id}", topic=topic,
+                          reason_code="unknown_runtime_entity", action="reject_scenario_command")
+            return False
+
+        executed = await self._execute_scenario_start(scenario_id)
+        if not executed:
+            reason = self._last_exec_error_reason or "jeedom_rpc_error"
+            self._log_cmd(logging.WARNING, eq_id=f"scenario_{scenario_id}", topic=topic,
+                          reason_code=reason, action="execute_scenario_command")
+            return False
+
+        self._log_cmd(logging.INFO, eq_id=f"scenario_{scenario_id}", topic=topic,
+                      reason_code="scenario_started", action="execute_scenario_command")
+        return True
+
+    async def _execute_scenario_start(self, scenario_id: int) -> bool:
+        """Call scenario::changeState start on Jeedom for a scenario button (Story 10.1)."""
+        self._last_exec_error_reason = ""
+
+        if not self._jeedom_api_endpoint or not self._jeedom_core_api_key:
+            self._last_exec_error_reason = "jeedom_rpc_error"
+            return False
+
+        if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=self._request_timeout)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+
+        request_payload = {
+            "jsonrpc": "2.0",
+            "id": "jeedom2ha-scenario-start",
+            "method": "scenario::changeState",
+            "params": {
+                "apikey": self._jeedom_core_api_key,
+                "id": scenario_id,
+                "state": "start",
+            },
+        }
+
+        try:
+            assert self._session is not None
+            async with self._session.post(self._jeedom_api_endpoint, json=request_payload) as response:
+                if response.status != 200:
+                    self._last_exec_error_reason = "jeedom_rpc_error"
+                    return False
+                result = await response.json(content_type=None)
+        except asyncio.TimeoutError:
+            self._last_exec_error_reason = "jeedom_rpc_timeout"
+            return False
+        except aiohttp.ClientError:
+            self._last_exec_error_reason = "jeedom_rpc_error"
+            return False
+        except Exception:
+            self._last_exec_error_reason = "jeedom_rpc_error"
+            return False
+
+        if isinstance(result, Mapping) and result.get("error"):
             self._last_exec_error_reason = "jeedom_rpc_error"
             return False
 
