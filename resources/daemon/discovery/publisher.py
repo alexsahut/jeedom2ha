@@ -215,14 +215,21 @@ class DiscoveryPublisher:
 
         Args:
             ha_unique_id: The unique ID to derive the topic from.
-                          Expected format: jeedom2ha_eq_{id}
+                          Formats: jeedom2ha_eq_{id} (eqLogic) or jeedom2ha_scenario_{id} (scenario).
 
         Returns:
             True if unpublish succeeded, False otherwise.
         """
-        # Feature héritée et fragile (Axe 6 de la Code Review).
-        # On extrait eq_id depuis la chaîne. Pour un usage robuste au runtime,
-        # utiliser plutôt unpublish_by_eq_id().
+        # Scenario unique_ids use their full id as node_id (e.g. jeedom2ha_scenario_20).
+        if ha_unique_id.startswith("jeedom2ha_scenario_"):
+            topic = self._build_topic(0, entity_type="button", node_id=ha_unique_id)
+            _LOGGER.info("[DISCOVERY] Unpublishing scenario: topic=%s", topic)
+            ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
+            if not ok:
+                _LOGGER.error("[DISCOVERY] Failed to unpublish scenario %s (bridge unavailable)", ha_unique_id)
+            return ok
+
+        # Legacy eqLogic path: extract integer eq_id from jeedom2ha_eq_{id} or jeedom2ha_{id}.
         try:
             eq_id = int(ha_unique_id.split("_")[-1])
         except (ValueError, IndexError):
@@ -257,8 +264,14 @@ class DiscoveryPublisher:
         eq_type_name = eq.eq_type_name if eq else ""
         manufacturer = f"Jeedom ({eq_type_name})" if eq_type_name else "Jeedom"
 
+        # Scenario buttons use ha_unique_id as device identifier to avoid collision
+        # with eqLogics that may share the same integer id (Story 10.1).
+        reason_details = mapping.reason_details or {}
+        source_kind = reason_details.get("source_kind", "eqlogic")
+        device_id = mapping.ha_unique_id if source_kind == "scenario" else f"jeedom2ha_{eq_id}"
+
         device = {
-            "identifiers": [f"jeedom2ha_{eq_id}"],
+            "identifiers": [device_id],
             "name": mapping.ha_name,
             "manufacturer": manufacturer,
             "model": eq_type_name or "Unknown",

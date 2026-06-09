@@ -1371,9 +1371,12 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 sc_decision.discovery_published = True
             else:
                 _LOGGER.warning("[SCENARIO] Failed to publish button for scenario_id=%d", scenario_id)
+    # Purge scenarios that disappeared or became inactive since last sync (M1 fix).
+    stale_scenario_ids = set(request.app["scenario_publications"]) - set(scenario_publications)
+    for stale_id in stale_scenario_ids:
+        request.app["scenario_publications"].pop(stale_id, None)
+        _LOGGER.info("[SCENARIO] Purged stale scenario_id=%d from scenario_publications", stale_id)
     request.app["scenario_publications"].update(scenario_publications)
-    if hasattr(request.app.get("command_synchronizer"), "_app"):
-        request.app["command_synchronizer"]._app = request.app
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)

@@ -70,8 +70,9 @@ afin que les raccourcis du quotidien reapparaissent dans HA sans attendre l'ouve
 
 - [ ] Task 5 — Cloture BMAD story-level (AC: 1, 2, 3, 4)
   - [x] Statut story → `review`
+  - [x] Code-review execute (2026-06-09) — 1 High + 3 Medium corriges
   - [ ] Synchroniser `sprint-status.yaml` apres validation terrain
-  - [ ] Passer en `done` via code-review
+  - [ ] Passer en `done` apres gate terrain
 
 ## Dev Notes
 
@@ -154,3 +155,4 @@ github-copilot/gpt-5.3-codex
 
 - 2026-06-08 — Story 10.1 creee et contextualisee pour execution dev-story.
 - 2026-06-09 — Implementation complete (dev-story). Statut : review. Gate terrain requis avant done.
+- 2026-06-09 — Code-review execute (workflow officiel bmad-code-review). 1 High + 3 Medium corriges : device identifier collision (H1), scenario_publications non purge (M1), re-patch _app fragile (M2), unpublish legacy casse pour scenarios (M3). 2 Low notes (L1 MQTT check duplique, L2 lifecycle absent — non bloquants). Statut reste review en attente gate terrain.

@@ -216,6 +216,20 @@ class TestPublisherButtonNodeId:
         topic = call_args[0][0]
         assert topic == "homeassistant/button/jeedom2ha_999/config"
 
+    def test_device_identifier_no_collision_with_eqlogic(self):
+        """H1 fix — scenario device identifier must not collide with same-integer eqLogic."""
+        publisher, bridge = self._make_publisher()
+        mapping = self._scenario_mapping(20, "Tout éteindre")
+        snapshot = self._empty_snapshot()
+
+        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+
+        call_args = bridge.publish_message.call_args
+        payload = json.loads(call_args[0][1])
+        device_identifiers = payload["device"]["identifiers"]
+        assert device_identifiers == ["jeedom2ha_scenario_20"]
+        assert "jeedom2ha_20" not in device_identifiers
+
 
 # ---------------------------------------------------------------------------
 # Task 2 — CommandSynchronizer handles scenario command topics
