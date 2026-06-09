@@ -11,7 +11,8 @@ class TestScenarioCommandSubscription:
     """AC1 — Le daemon souscrit au topic de commande des scénarios."""
 
     def test_scenario_cmd_topic_in_subscriptions(self):
-        assert "jeedom2ha/scenario_+/cmd" in COMMAND_SUBSCRIPTION_TOPICS
+        # jeedom2ha/+/cmd covers both scenario_N and eq_N cmd topics
+        assert "jeedom2ha/+/cmd" in COMMAND_SUBSCRIPTION_TOPICS
 
     def test_existing_topics_still_present(self):
         assert "jeedom2ha/+/set" in COMMAND_SUBSCRIPTION_TOPICS
