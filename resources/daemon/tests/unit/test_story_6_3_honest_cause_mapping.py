@@ -148,18 +148,20 @@ def test_ac3_class3_label_expresses_governance():
 # ==============================================================
 
 def test_ac4_faux_cta_eliminated_step4_ambiguous_skipped():
-    """AC4 : 'Choisir manuellement le type d'équipement' est éliminé en step 4."""
+    """AC4 : 'Choisir manuellement...' éliminé ; Story 9.5 — CTA réel non-null (types génériques Jeedom)."""
     result = resolve_cause_ux("ambiguous_skipped", 4)
-    assert result["cause_action"] is None, (
-        f"step 4 ambiguous_skipped → cause_action={result['cause_action']!r}, attendu None (no faux CTA)"
+    # Story 9.5 — cause_action est maintenant non-null : surface vague 1 réelle (types génériques dans Jeedom)
+    assert result["cause_action"] is not None and len(result["cause_action"]) > 0, (
+        f"step 4 ambiguous_skipped → cause_action attendu non-null (CTA réel Story 9.5), got {result['cause_action']!r}"
     )
     assert result["cause_action"] != FAUX_CTA_FORBIDDEN
 
 
 def test_ac4_faux_cta_eliminated_step4_ambiguous():
-    """AC4 : 'Choisir manuellement...' éliminé pour 'ambiguous' step 4 aussi."""
+    """AC4 : 'Choisir manuellement...' éliminé ; Story 9.5 — CTA réel non-null (symétrie legacy)."""
     result = resolve_cause_ux("ambiguous", 4)
-    assert result["cause_action"] is None
+    assert result["cause_action"] is not None and len(result["cause_action"]) > 0
+    assert result["cause_action"] != FAUX_CTA_FORBIDDEN
 
 
 @pytest.mark.parametrize("reason_code", ACTIVE_REASON_CODES)
@@ -333,8 +335,9 @@ def test_contract_ha_component_unknown_still_null_action():
 
 
 def test_contract_ambiguous_skipped_step4_null_action():
+    # Story 9.5 — renommé sémantiquement : cause_action est maintenant non-null (CTA réel vague 1)
     result = resolve_cause_ux("ambiguous_skipped", 4)
-    assert result["cause_action"] is None
+    assert result["cause_action"] is not None and len(result["cause_action"]) > 0
 
 
 def test_contract_ha_component_not_in_product_scope_step4():

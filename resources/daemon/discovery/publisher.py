@@ -190,7 +190,9 @@ class DiscoveryPublisher:
         Returns:
             True if publish succeeded, False otherwise.
         """
-        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="button")
+        reason_details = mapping.reason_details or {}
+        node_id = reason_details.get("node_id") if isinstance(reason_details.get("node_id"), str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="button", node_id=node_id)
         payload = self._build_button_payload(mapping, snapshot)
         payload_json = json.dumps(payload, ensure_ascii=False)
 
@@ -213,14 +215,21 @@ class DiscoveryPublisher:
 
         Args:
             ha_unique_id: The unique ID to derive the topic from.
-                          Expected format: jeedom2ha_eq_{id}
+                          Formats: jeedom2ha_eq_{id} (eqLogic) or jeedom2ha_scenario_{id} (scenario).
 
         Returns:
             True if unpublish succeeded, False otherwise.
         """
-        # Feature héritée et fragile (Axe 6 de la Code Review).
-        # On extrait eq_id depuis la chaîne. Pour un usage robuste au runtime,
-        # utiliser plutôt unpublish_by_eq_id().
+        # Scenario unique_ids use their full id as node_id (e.g. jeedom2ha_scenario_20).
+        if ha_unique_id.startswith("jeedom2ha_scenario_"):
+            topic = self._build_topic(0, entity_type="button", node_id=ha_unique_id)
+            _LOGGER.info("[DISCOVERY] Unpublishing scenario: topic=%s", topic)
+            ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
+            if not ok:
+                _LOGGER.error("[DISCOVERY] Failed to unpublish scenario %s (bridge unavailable)", ha_unique_id)
+            return ok
+
+        # Legacy eqLogic path: extract integer eq_id from jeedom2ha_eq_{id} or jeedom2ha_{id}.
         try:
             eq_id = int(ha_unique_id.split("_")[-1])
         except (ValueError, IndexError):
@@ -243,9 +252,10 @@ class DiscoveryPublisher:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_topic(self, eq_id: int, entity_type: str = "light") -> str:
+    def _build_topic(self, eq_id: int, entity_type: str = "light", node_id: Optional[str] = None) -> str:
         """Build the MQTT discovery topic for an entity."""
-        return f"{self._topic_prefix}/{entity_type}/jeedom2ha_{eq_id}/config"
+        path_part = node_id if node_id else f"jeedom2ha_{eq_id}"
+        return f"{self._topic_prefix}/{entity_type}/{path_part}/config"
 
     def _build_device_block(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the common device block for discovery payloads."""
@@ -254,8 +264,14 @@ class DiscoveryPublisher:
         eq_type_name = eq.eq_type_name if eq else ""
         manufacturer = f"Jeedom ({eq_type_name})" if eq_type_name else "Jeedom"
 
+        # Scenario buttons use ha_unique_id as device identifier to avoid collision
+        # with eqLogics that may share the same integer id (Story 10.1).
+        reason_details = mapping.reason_details or {}
+        source_kind = reason_details.get("source_kind", "eqlogic")
+        device_id = mapping.ha_unique_id if source_kind == "scenario" else f"jeedom2ha_{eq_id}"
+
         device = {
-            "identifiers": [f"jeedom2ha_{eq_id}"],
+            "identifiers": [device_id],
             "name": mapping.ha_name,
             "manufacturer": manufacturer,
             "model": eq_type_name or "Unknown",
@@ -448,16 +464,18 @@ class DiscoveryPublisher:
 
         No state_topic: button is command-only (no persistent state in HA).
         command_topic uses /cmd (not /set) to distinguish from switch/light actuators.
+        Supports node_id override in reason_details for scenario buttons (Story 10.1).
         """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         reason_details = mapping.reason_details or {}
         command_topic = reason_details.get("command_topic", f"jeedom2ha/{eq_id}/cmd")
+        object_id = reason_details.get("node_id") or f"jeedom2ha_{eq_id}"
 
         payload = {
             "name": mapping.ha_name,
             "unique_id": mapping.ha_unique_id,
-            "object_id": f"jeedom2ha_{eq_id}",
+            "object_id": object_id,
             "command_topic": command_topic,
             "platform": "mqtt",
             "device": device,

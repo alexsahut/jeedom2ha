@@ -680,11 +680,27 @@ class jeedom2ha extends eqLogic {
       );
     }
 
+    // 3. Scenarios Jeedom (Story 10.1 — publiés comme HA button)
+    $result['scenarios'] = array();
+    if (class_exists('scenario')) {
+      foreach (scenario::all() as $sc) {
+        try {
+          $result['scenarios'][] = array(
+            'id'        => intval($sc->getId()),
+            'name'      => $sc->getName(),
+            'is_active' => (bool)$sc->getIsActive(),
+          );
+        } catch (Exception $e) {
+          // Scénario non lisible — ignorer
+        }
+      }
+    }
+
     // Ajout de sync_config pour la politique de confiance (Story 4.3)
     $result['sync_config'] = array('confidence_policy' => $confidencePolicy);
     $result['published_scope'] = $publishedScope;
 
-    log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics');
+    log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics, ' . count($result['scenarios']) . ' scénarios');
     return $result;
   }
 

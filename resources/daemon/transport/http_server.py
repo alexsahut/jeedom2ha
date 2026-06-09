@@ -43,6 +43,7 @@ from models.ui_contract_4d import (
 )
 from models.actions_ha import build_actions_ha
 from mapping.registry import MapperRegistry
+from mapping.button import ScenarioButtonMapper
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
@@ -1348,6 +1349,35 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         request.app["mappings"].pop(old_eq_id, None)
         request.app["publications"].pop(old_eq_id, None)
     
+    # Story 10.1 — Publish Jeedom scenarios as HA button entities
+    scenario_mapper = ScenarioButtonMapper()
+    scenario_publications: Dict[int, PublicationDecision] = {}
+    for scenario_id, scenario in snapshot.scenarios.items():
+        if not scenario.is_active:
+            continue
+        sc_mapping = scenario_mapper.map(scenario)
+        sc_decision = PublicationDecision(
+            should_publish=True,
+            reason="scenario_button",
+            mapping_result=sc_mapping,
+            active_or_alive=True,
+            discovery_published=False,
+        )
+        sc_mapping.publication_decision_ref = sc_decision
+        scenario_publications[scenario_id] = sc_decision
+        if publisher_registry and mqtt_bridge and mqtt_bridge.is_connected:
+            ok = await publisher_registry.publish(sc_mapping, snapshot)
+            if ok:
+                sc_decision.discovery_published = True
+            else:
+                _LOGGER.warning("[SCENARIO] Failed to publish button for scenario_id=%d", scenario_id)
+    # Purge scenarios that disappeared or became inactive since last sync (M1 fix).
+    stale_scenario_ids = set(request.app["scenario_publications"]) - set(scenario_publications)
+    for stale_id in stale_scenario_ids:
+        request.app["scenario_publications"].pop(stale_id, None)
+        _LOGGER.info("[SCENARIO] Purged stale scenario_id=%d from scenario_publications", stale_id)
+    request.app["scenario_publications"].update(scenario_publications)
+
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
     request.app["publications"].update(publications)
@@ -1563,7 +1593,7 @@ _STATUS_CODE_MAP: dict = {
 # AC2 — Taxonomie fermée des reason_codes pour traceability.decision_trace
 # Liste fermée : published, excluded, disabled_eqlogic, no_commands, ambiguous_skipped,
 #                confidence_policy_skipped, no_generic_type_configured,
-#                no_supported_generic_type, discovery_publish_failed
+#                no_supported_generic_type, discovery_publish_failed, no_projection_possible
 _CLOSED_REASON_MAP: dict = {
     # Eligibility — codes normalisés
     "excluded_eqlogic": "excluded",
@@ -1582,6 +1612,7 @@ _CLOSED_REASON_MAP: dict = {
     "probable_skipped": "confidence_policy_skipped",  # Story 4.3 — bloqué par politique de confiance sure_only
     "no_mapping": "no_supported_generic_type",  # types configurés hors périmètre V1
     "eligible": "no_supported_generic_type",    # éligible mais aucune décision de publication
+    "no_projection_possible": "no_projection_possible",  # Story 9.5 fix — éligible sans commande exploitable
     "discovery_publish_failed": "discovery_publish_failed",
     "local_availability_publish_failed": "discovery_publish_failed",  # famille infra
     # États publiés (garde-fou si status check ne les attrape pas)
@@ -2525,6 +2556,7 @@ def create_app(local_secret: str) -> web.Application:
     app["eligibility"] = None    # Dict[int, EligibilityResult] | None — populated on first sync
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
+    app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
