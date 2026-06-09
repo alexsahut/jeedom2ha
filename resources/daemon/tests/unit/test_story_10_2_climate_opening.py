@@ -28,7 +28,9 @@ def _thermostat_eq(
     name: str,
     *,
     with_temperature: bool = True,
+    with_state: bool = True,
     object_id: int = 1,
+    setpoint_sub_type: str = "slider",
 ) -> JeedomEqLogic:
     cmds = [
         JeedomCmd(
@@ -36,7 +38,7 @@ def _thermostat_eq(
             name="Consigne",
             generic_type="THERMOSTAT_SET_SETPOINT",
             type="action",
-            sub_type="slider",
+            sub_type=setpoint_sub_type,
         )
     ]
     if with_temperature:
@@ -47,6 +49,16 @@ def _thermostat_eq(
                 generic_type="THERMOSTAT_TEMPERATURE",
                 type="info",
                 sub_type="numeric",
+            )
+        )
+    if with_state:
+        cmds.append(
+            JeedomCmd(
+                id=eq_id * 10 + 3,
+                name="Actif",
+                generic_type="THERMOSTAT_STATE",
+                type="info",
+                sub_type="binary",
             )
         )
     return JeedomEqLogic(
@@ -115,6 +127,17 @@ def test_climate_mapper_nominal_seven_thermostats():
         assert mapping.ha_entity_type == "climate"
 
 
+def test_mapper_registry_prioritizes_climate_over_binary_sensor_for_thermostat_state():
+    from mapping.registry import MapperRegistry
+
+    eq = _thermostat_eq(5209, "Thermostat prioritaire", with_temperature=True, with_state=True)
+
+    mapping = MapperRegistry().map(eq, _snapshot(eq))
+
+    assert mapping is not None
+    assert mapping.ha_entity_type == "climate"
+
+
 # ---------------------------------------------------------------------------
 # ClimateMapper — cas d'échec / non-correspondance (AC2)
 # ---------------------------------------------------------------------------
@@ -140,24 +163,32 @@ def test_climate_mapper_rejects_info_numeric_only():
     assert mapping is None
 
 
-def test_climate_mapper_rejects_setpoint_without_slider():
-    """THERMOSTAT_SET_SETPOINT en sub_type='other' ne déclenche pas le mapper."""
-    eq = JeedomEqLogic(
-        id=5301,
-        name="Commande consigne mal typée",
-        object_id=1,
-        eq_type_name="virtual",
-        cmds=[
-            JeedomCmd(
-                id=53011,
-                name="Consigne",
-                generic_type="THERMOSTAT_SET_SETPOINT",
-                type="action",
-                sub_type="other",
-            )
-        ],
+def test_climate_mapper_accepts_setpoint_with_empty_subtype_from_terrain():
+    """Terrain réel: certains thermostats ont sub_type vide sur THERMOSTAT_SET_SETPOINT."""
+    eq = _thermostat_eq(
+        5301,
+        "Thermostat terrain sub_type vide",
+        with_temperature=True,
+        setpoint_sub_type="",
     )
+
     mapping = ClimateMapper().map(eq, _snapshot(eq))
+
+    assert mapping is not None
+    assert mapping.ha_entity_type == "climate"
+
+
+def test_climate_mapper_rejects_setpoint_with_unsupported_subtype():
+    """On borne l'ouverture: un sub_type explicite non supporté reste rejeté."""
+    eq = _thermostat_eq(
+        5303,
+        "Commande consigne mal typée",
+        with_temperature=False,
+        setpoint_sub_type="other",
+    )
+
+    mapping = ClimateMapper().map(eq, _snapshot(eq))
+
     assert mapping is None
 
 

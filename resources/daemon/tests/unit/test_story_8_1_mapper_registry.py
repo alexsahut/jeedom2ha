@@ -112,6 +112,8 @@ def _hardcoded_cascade(eq: JeedomEqLogic, snapshot: TopologySnapshot):
     if mapping is None:
         mapping = SwitchMapper().map(eq, snapshot)
     if mapping is None:
+        mapping = ClimateMapper().map(eq, snapshot)
+    if mapping is None:
         mapping = BinarySensorMapper().map(eq, snapshot)
     if mapping is None:
         mapping = SensorMapper().map(eq, snapshot)
@@ -129,8 +131,8 @@ def test_ac1_mapper_registry_exposes_canonical_order():
         LightMapper,
         CoverMapper,
         SwitchMapper,
-        BinarySensorMapper,
         ClimateMapper,
+        BinarySensorMapper,
         SensorMapper,
         ButtonMapper,
         FallbackMapper,

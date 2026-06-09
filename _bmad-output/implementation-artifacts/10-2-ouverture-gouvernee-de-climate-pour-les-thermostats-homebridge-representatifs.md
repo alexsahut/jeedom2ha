@@ -1,6 +1,6 @@
 # Story 10.2 : Ouverture gouvernée de `climate` pour les thermostats Homebridge représentatifs
 
-Status: review
+Status: done
 
 ## Story
 
@@ -75,12 +75,12 @@ afin que la compatibilité minimale utile couvre aussi le chauffage et les consi
   - [x] 6.3 Cas d'échec de validation (capabilities manquantes ou structure incomplète)
   - [x] 6.4 Cas `PublisherRegistry.known_types()` incluant `climate`
 
-- [ ] Task 7 — Gate terrain box réelle + clôture BMAD story-level (AC1, AC2, AC3)
-  - [ ] 7.1 Déployer via script officiel `deploy-to-box.sh`
-  - [ ] 7.2 Vérifier présence des entités `climate` cibles dans Home Assistant
-  - [ ] 7.3 Vérifier commandabilité minimale utile (consigne/mode selon capacités réellement exposées)
-  - [ ] 7.4 Documenter preuves terrain dans Completion Notes
-  - [ ] 7.5 Passer `Status` à `done` après gate terrain PASS
+- [x] Task 7 — Gate terrain box réelle + clôture BMAD story-level (AC1, AC2, AC3)
+  - [x] 7.1 Déployer via script officiel `deploy-to-box.sh`
+  - [x] 7.2 Vérifier présence des entités `climate` cibles dans Home Assistant
+  - [x] 7.3 Vérifier commandabilité minimale utile (consigne/mode selon capacités réellement exposées)
+  - [x] 7.4 Documenter preuves terrain dans Completion Notes
+  - [x] 7.5 Passer `Status` à `done` après gate terrain PASS
 
 ## Dev Notes
 
@@ -141,6 +141,14 @@ claude-cli/claude-sonnet-4-6
   - 3 eqLogics thermostats (11000–11002) ajoutés au corpus golden-file (51 total) ; `expected_sync_snapshot.json` régénéré ; test golden-file PASS.
   - 14 tests story-10.2 écrits ; suite complète : 769 PASS, 1 échec préexistant (Story 10.1 — hors scope).
   - Status passé à `review` ; Task 7 (gate terrain) en attente d'Alexandre.
+- 2026-06-09 — Gate terrain PASS après correctif mapping thermostat (gpt-5.3-codex) :
+  - Correctif 1 : `ClimateMapper` accepte `THERMOSTAT_SET_SETPOINT` action avec `subType=""` (en plus de `slider`) ; tests unitaires story 10.2 mis à jour.
+  - Correctif 2 : ordre `MapperRegistry` ajusté pour prioriser `ClimateMapper` avant `BinarySensorMapper` afin d'éviter la capture des thermostats via `THERMOSTAT_STATE`.
+  - Validation locale : `pytest -q resources/daemon/tests/unit/test_story_10_2_climate_opening.py resources/daemon/tests/unit/test_story_8_1_mapper_registry.py` → `24 passed`.
+  - Validation box réelle (sync) : `mapping_summary.climates_published = 7` ; logs daemon : publication `homeassistant/climate/jeedom2ha_{240,242,219,217,128,193,595}/config` + unpublish des `binary_sensor` thermostats.
+  - Validation HA live : 7 entités `climate` visibles (`Thermostat chambre Arthur`, `Thermostat chambre Margaux`, `Thermostat chambre parent`, `Thermostat Galerie`, `Thermostat RDC`, `Thermostat SDB`, `Thermostat SPA`).
+  - Commandabilité minimale utile validée structurellement via payload discovery (`temperature_command_topic`, `temperature_state_topic`, `modes=["heat","off"]`) pour les 7 thermostats.
+- Status passé à `done`.
 
 ### File List
 

@@ -18,7 +18,11 @@ def _is_setpoint_action(cmd: JeedomCmd) -> bool:
         return False
     if (cmd.type or "").lower() != "action":
         return False
-    return (cmd.sub_type or "").lower() == "slider"
+
+    # Terrain: certains thermostats Jeedom exposent THERMOSTAT_SET_SETPOINT avec
+    # sub_type vide (au lieu de "slider"). On accepte explicitement ce cas.
+    sub_type = (cmd.sub_type or "").strip().lower()
+    return sub_type in {"", "slider"}
 
 
 def _is_temperature_info(cmd: JeedomCmd) -> bool:
