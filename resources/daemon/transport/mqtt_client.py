@@ -28,7 +28,7 @@ COMMAND_SUBSCRIPTION_TOPICS = (
     "jeedom2ha/+/set",
     "jeedom2ha/+/brightness/set",
     "jeedom2ha/+/position/set",
-    "jeedom2ha/scenario_+/cmd",  # Story 10.6 — scenario button commands
+    "jeedom2ha/+/cmd",  # Story 10.6 — scenario button commands
 )
 # Story 5.1 — Topic birth message Home Assistant (souscrit pour republication)
 HA_STATUS_TOPIC = "homeassistant/status"
