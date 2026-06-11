@@ -20,7 +20,7 @@ from validation.ha_component_registry import (
 
 
 WAVE_TARGETS = ("sensor", "binary_sensor")
-NON_WAVE_TYPES = ("number", "select", "climate")
+NON_WAVE_TYPES = ("number", "select")  # climate ouvert Story 10.2 — n'est plus hors vague
 
 EXPECTED_NON_WAVE_REGISTRY = {
     "number": {
@@ -30,10 +30,6 @@ EXPECTED_NON_WAVE_REGISTRY = {
     "select": {
         "required_fields": ["command_topic", "options", "platform", "availability"],
         "required_capabilities": ["has_command", "has_options"],
-    },
-    "climate": {
-        "required_fields": ["availability"],
-        "required_capabilities": [],
     },
 }
 
@@ -76,13 +72,13 @@ def test_non_wave_types_not_in_product_scope():
 
 
 def test_product_scope_snapshot_with_wave_open():
-    """Snapshot du PRODUCT_SCOPE après ouverture de la vague cible (Story 7.4).
+    """Snapshot du PRODUCT_SCOPE après ouverture Story 10.3 (alarm_control_panel).
 
-    Story 7.2 ne touchait pas à PRODUCT_SCOPE ; cette assertion garde la valeur
-    actuelle (5 types) et reste sous le contrôle de AR13 via
-    test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
+    Story 7.2 n'avait pas modifié PRODUCT_SCOPE ; climate était hors-vague.
+    Story 10.2 a ouvert climate sous FR40/NFR10.
+    Story 10.3 a ouvert alarm_control_panel sous FR40/NFR10.
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]
     for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 

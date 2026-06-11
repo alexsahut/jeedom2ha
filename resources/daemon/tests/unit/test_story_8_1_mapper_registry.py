@@ -5,8 +5,10 @@ Tests en isolation totale : aucune dependance MQTT, daemon ou Jeedom.
 
 from __future__ import annotations
 
+from mapping.alarm_control_panel import AlarmControlPanelMapper
 from mapping.binary_sensor import BinarySensorMapper
 from mapping.button import ButtonMapper
+from mapping.climate import ClimateMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
@@ -111,6 +113,10 @@ def _hardcoded_cascade(eq: JeedomEqLogic, snapshot: TopologySnapshot):
     if mapping is None:
         mapping = SwitchMapper().map(eq, snapshot)
     if mapping is None:
+        mapping = ClimateMapper().map(eq, snapshot)
+    if mapping is None:
+        mapping = AlarmControlPanelMapper().map(eq, snapshot)
+    if mapping is None:
         mapping = BinarySensorMapper().map(eq, snapshot)
     if mapping is None:
         mapping = SensorMapper().map(eq, snapshot)
@@ -128,6 +134,8 @@ def test_ac1_mapper_registry_exposes_canonical_order():
         LightMapper,
         CoverMapper,
         SwitchMapper,
+        ClimateMapper,
+        AlarmControlPanelMapper,
         BinarySensorMapper,
         SensorMapper,
         ButtonMapper,

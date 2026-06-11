@@ -147,10 +147,10 @@ def test_sensor_like_double_with_state_false_works():
 
 
 def test_product_scope_snapshot_with_wave_open():
-    """Snapshot du PRODUCT_SCOPE après ouverture de la vague cible (Story 7.4).
+    """Snapshot du PRODUCT_SCOPE après ouverture Story 10.3 (alarm_control_panel).
 
-    Story 7.3 ne touchait pas à PRODUCT_SCOPE (validable ≠ ouvert) ; cette assertion
-    fige la valeur actuelle (5 types). AR13 reste appliqué par
-    test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
+    Story 7.3 ne touchait pas à PRODUCT_SCOPE. Story 10.2 a ouvert climate.
+    Story 10.3 a ouvert alarm_control_panel.
+    AR13 reste appliqué par test_product_scope_has_governance_proof (test_step3_governance_fr40.py).
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]

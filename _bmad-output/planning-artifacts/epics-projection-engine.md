@@ -1736,6 +1736,48 @@ afin de ne pas confondre parite technique minimale et promesse produit excessive
 
 ---
 
+### Story 10.7 : PresenceSwitchMapper — publier `switch` pour les equipements presence actionnables
+
+En tant qu'utilisateur,
+je veux retrouver dans Home Assistant les equipements de presence sous forme de switch (etat ON/OFF visible + actionnable),
+afin d'obtenir la meme experience que dans HomeKit plutot qu'un binary_sensor (etat seul) + button (action seule) dissocies.
+
+**Acceptance Criteria :**
+
+**Given** un equipement Jeedom avec une info de type PRESENCE et des actions set-on / set-off
+**When** le moteur execute l'etape de mapping
+**Then** le `PresenceSwitchMapper` produit un `MappingResult` avec `ha_entity_type = "switch"`
+**And** le `state_topic` et le `command_topic` sont correctement configures
+**And** `switch` etant deja dans `PRODUCT_SCOPE`, aucune ouverture de type supplementaire n'est requise
+
+**Given** un equipement Jeedom avec une info PRESENCE mais sans actions set-on / set-off
+**When** le moteur execute l'etape de mapping
+**Then** le fallback sur `binary_sensor` est applique (lecture seule)
+**And** aucune regression sur les equipements PRESENCE deja publies en binary_sensor
+
+**Given** l'ouverture effective de Story 10.7
+**When** la story est revue
+**Then** elle embarque dans le meme increment les preuves FR40 / NFR10 :
+**And** cas nominaux pour PRESENCE + set-on/set-off → switch
+**And** cas nominaux pour PRESENCE seule → binary_sensor (fallback)
+**And** cas d'echec de validation
+**And** golden-file etendu
+**And** non-regression diagnostic
+
+**Given** le deploiement sur box reelle
+**When** le gate terrain est execute
+**Then** les equipements de presence actionnables (ex : iPhone Alex) apparaissent en `switch` dans HA
+**And** l'etat et la commande sont fonctionnels
+
+**Dev notes :**
+- `switch` est deja dans `PRODUCT_SCOPE` — pas de nouvelle ouverture de type HA sous FR40
+- `PresenceSwitchMapper` doit etre prioritaire sur `BinarySensorMapper` pour les equipements PRESENCE + actions ; non prioritaire sur `SwitchMapper` generique
+- conserver la retrocompatibilite : les equipements PRESENCE publies avant cette story (en binary_sensor) doivent soit migrer proprement soit etre documentés comme cas de frontiere
+- cadrage explicite approuve par correct-course 2026-06-10 (`sprint-change-proposal-2026-06-10.md`)
+
+---
+
+
 ### Gates epic-level pe-epic-10
 
 - la story 10.0 est obligatoire et close avant toute ouverture de type nouvelle dans l'epic ;

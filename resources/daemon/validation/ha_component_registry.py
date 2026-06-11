@@ -14,6 +14,8 @@ from __future__ import annotations
 from typing import List
 
 from models.mapping import (
+    AlarmCapabilities,
+    ClimateCapabilities,
     CoverCapabilities,
     LightCapabilities,
     ProjectionValidity,
@@ -57,11 +59,15 @@ HA_COMPONENT_REGISTRY = {
     },
     "climate": {
         "required_fields": ["availability"],
-        "required_capabilities": [],
+        "required_capabilities": ["has_setpoint"],
+    },
+    "alarm_control_panel": {
+        "required_fields": ["state_topic", "command_topic", "platform", "availability"],
+        "required_capabilities": ["has_state", "has_command"],
     },
 }
 
-PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button"]  # button ouvert Story 9.3 sous FR40/NFR10
+PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,
@@ -73,18 +79,20 @@ PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button"
 # ---------------------------------------------------------------------------
 
 # Priorité déterministe pour le reason_code quand plusieurs capabilities manquent.
-# Ordre : ha_missing_required_option > ha_missing_state_topic > ha_missing_command_topic
+# Ordre : ha_missing_required_option > ha_missing_state_topic > ha_missing_command_topic > ha_missing_temperature_command_topic
 _REASON_PRIORITY: List[str] = [
     "ha_missing_required_option",
     "ha_missing_state_topic",
     "ha_missing_command_topic",
+    "ha_missing_temperature_command_topic",
 ]
 
 # Correspondance capability abstraite → (reason_code, missing_fields)
 _CAPABILITY_TO_REASON = {
-    "has_command": ("ha_missing_command_topic", ["command_topic"]),
-    "has_state":   ("ha_missing_state_topic",   ["state_topic"]),
-    "has_options": ("ha_missing_required_option", ["options"]),
+    "has_command":  ("ha_missing_command_topic",             ["command_topic"]),
+    "has_state":    ("ha_missing_state_topic",               ["state_topic"]),
+    "has_options":  ("ha_missing_required_option",           ["options"]),
+    "has_setpoint": ("ha_missing_temperature_command_topic", ["temperature_command_topic"]),
 }
 
 
@@ -113,6 +121,10 @@ def _resolve_capability(abstract: str, capabilities: object) -> bool:
         return bool(getattr(capabilities, "has_state", False))
     if abstract == "has_options":
         return bool(getattr(capabilities, "has_options", False))
+    if abstract == "has_setpoint":
+        if isinstance(capabilities, ClimateCapabilities):
+            return capabilities.has_setpoint
+        return bool(getattr(capabilities, "has_setpoint", False))
     # Capability abstraite inconnue — non satisfaite par précaution
     return False
 

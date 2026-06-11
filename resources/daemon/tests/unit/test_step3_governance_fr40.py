@@ -34,7 +34,7 @@ Helpers locaux uniquement — pas de conftest.py.
 
 import pytest
 
-from models.mapping import LightCapabilities, CoverCapabilities, SwitchCapabilities, SensorCapabilities
+from models.mapping import AlarmCapabilities, ClimateCapabilities, LightCapabilities, CoverCapabilities, SwitchCapabilities, SensorCapabilities
 from validation.ha_component_registry import (
     PRODUCT_SCOPE,
     HA_COMPONENT_REGISTRY,
@@ -56,6 +56,8 @@ _GOVERNED_SCOPE = {
     "sensor": "test_governance_fr40_proof_sensor",
     "binary_sensor": "test_governance_fr40_proof_binary_sensor",
     "button": "test_governance_fr40_proof_button",
+    "climate": "test_governance_fr40_proof_climate",
+    "alarm_control_panel": "test_governance_fr40_proof_alarm_control_panel",
 }
 # 3 conditions FR40 — mécanismes d'enforcement (AR13) :
 #
@@ -271,3 +273,43 @@ def test_governance_fr40_proof_button():
     result_fail = validate_projection("button", SwitchCapabilities(has_on_off=False))
     assert result_fail.is_valid is False
     assert result_fail.reason_code == "ha_missing_command_topic"
+
+
+# ---------------------------------------------------------------------------
+# Preuve de gouvernance FR40 : climate (Story 10.2)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_climate():
+    """Preuve de gouvernance FR40 pour le composant 'climate'.
+
+    Cas nominal : ClimateCapabilities avec has_setpoint=True → is_valid=True.
+    Cas d'échec : ClimateCapabilities avec has_setpoint=False → is_valid=False,
+                  reason_code="ha_missing_temperature_command_topic".
+    """
+    result_nominal = validate_projection("climate", ClimateCapabilities(has_setpoint=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail = validate_projection("climate", ClimateCapabilities(has_setpoint=False))
+    assert result_fail.is_valid is False
+    assert result_fail.reason_code == "ha_missing_temperature_command_topic"
+    assert "has_setpoint" in result_fail.missing_capabilities
+
+
+# ---------------------------------------------------------------------------
+# Preuve de gouvernance FR40 : alarm_control_panel (Story 10.3)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_alarm_control_panel():
+    """Preuve de gouvernance FR40 pour alarm_control_panel (Story 10.3)."""
+    result_nominal = validate_projection("alarm_control_panel", AlarmCapabilities(has_state=True, has_command=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail_state = validate_projection("alarm_control_panel", AlarmCapabilities(has_state=False, has_command=True))
+    assert result_fail_state.is_valid is False
+    assert result_fail_state.reason_code == "ha_missing_state_topic"
+
+    result_fail_cmd = validate_projection("alarm_control_panel", AlarmCapabilities(has_state=True, has_command=False))
+    assert result_fail_cmd.is_valid is False
+    assert result_fail_cmd.reason_code == "ha_missing_command_topic"

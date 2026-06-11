@@ -2,8 +2,10 @@
 
 from typing import Iterator, List, Optional
 
+from mapping.alarm_control_panel import AlarmControlPanelMapper
 from mapping.binary_sensor import BinarySensorMapper
 from mapping.button import ButtonMapper
+from mapping.climate import ClimateMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
@@ -21,6 +23,8 @@ class MapperRegistry:
             LightMapper(),
             CoverMapper(),
             SwitchMapper(),
+            ClimateMapper(),
+            AlarmControlPanelMapper(),
             BinarySensorMapper(),
             SensorMapper(),
             ButtonMapper(),

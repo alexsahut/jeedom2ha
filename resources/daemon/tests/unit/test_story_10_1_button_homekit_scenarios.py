@@ -155,7 +155,7 @@ class TestPublisherButtonNodeId:
         mapping = self._scenario_mapping(20, "Tout éteindre")
         snapshot = self._empty_snapshot()
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         topic = call_args[0][0]
@@ -166,7 +166,7 @@ class TestPublisherButtonNodeId:
         mapping = self._scenario_mapping(38, "ambiance cinema")
         snapshot = self._empty_snapshot()
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         payload = json.loads(call_args[0][1])
@@ -177,7 +177,7 @@ class TestPublisherButtonNodeId:
         mapping = self._scenario_mapping(50, "ambiance coucher")
         snapshot = self._empty_snapshot()
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         payload = json.loads(call_args[0][1])
@@ -188,7 +188,7 @@ class TestPublisherButtonNodeId:
         mapping = self._scenario_mapping(57, "Ambiance lumineuse")
         snapshot = self._empty_snapshot()
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         payload = json.loads(call_args[0][1])
@@ -210,7 +210,7 @@ class TestPublisherButtonNodeId:
         mapping = ButtonMapper().map(eq, snapshot)
         assert mapping is not None
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         topic = call_args[0][0]
@@ -222,7 +222,7 @@ class TestPublisherButtonNodeId:
         mapping = self._scenario_mapping(20, "Tout éteindre")
         snapshot = self._empty_snapshot()
 
-        asyncio.get_event_loop().run_until_complete(publisher.publish_button(mapping, snapshot))
+        asyncio.run(publisher.publish_button(mapping, snapshot))
 
         call_args = bridge.publish_message.call_args
         payload = json.loads(call_args[0][1])
@@ -276,7 +276,7 @@ class TestScenarioCommandHandling:
     @_skip_no_sync
     def test_scenario_command_rejected_when_no_publication(self):
         sync = self._make_synchronizer(scenario_publications={})
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             sync.handle_command_message("jeedom2ha/scenario_20/cmd", "PRESS")
         )
         assert result is False
@@ -294,7 +294,7 @@ class TestScenarioCommandHandling:
         sync = self._make_synchronizer(scenario_publications={20: sc_decision})
 
         with patch.object(sync, "_execute_scenario_start", new_callable=AsyncMock, return_value=True) as mock_start:
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 sync.handle_command_message("jeedom2ha/scenario_20/cmd", "PRESS")
             )
 
@@ -304,27 +304,25 @@ class TestScenarioCommandHandling:
     @_skip_no_sync
     def test_execute_scenario_start_builds_correct_payload(self):
         sync = self._make_synchronizer()
-        captured = {}
 
-        async def mock_post(url, json=None, **kwargs):
-            captured["url"] = url
-            captured["payload"] = json
-            mock_resp = MagicMock()
-            mock_resp.status = 200
-            mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-            mock_resp.__aexit__ = AsyncMock(return_value=False)
-            mock_resp.json = AsyncMock(return_value={"result": "ok"})
-            return mock_resp
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"result": "ok"})
+
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
 
         mock_session = MagicMock()
         mock_session.closed = False
-        mock_session.post = mock_post
+        mock_session.post = MagicMock(return_value=mock_cm)
         sync._session = mock_session
 
-        result = asyncio.get_event_loop().run_until_complete(sync._execute_scenario_start(20))
+        result = asyncio.run(sync._execute_scenario_start(20))
 
         assert result is True
-        assert captured["payload"]["method"] == "scenario::changeState"
-        assert captured["payload"]["params"]["id"] == 20
-        assert captured["payload"]["params"]["state"] == "start"
-        assert captured["payload"]["params"]["apikey"] == "testkey"
+        call_kwargs = mock_session.post.call_args
+        assert call_kwargs[1]["json"]["method"] == "scenario::changeState"
+        assert call_kwargs[1]["json"]["params"]["id"] == 20
+        assert call_kwargs[1]["json"]["params"]["state"] == "run"
+        assert call_kwargs[1]["json"]["params"]["apikey"] == "testkey"

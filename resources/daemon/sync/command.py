@@ -508,7 +508,7 @@ class CommandSynchronizer:
         return True
 
     async def _execute_scenario_start(self, scenario_id: int) -> bool:
-        """Call scenario::changeState start on Jeedom for a scenario button (Story 10.1)."""
+        """Call scenario::changeState run on Jeedom for a scenario button (Story 10.1)."""
         self._last_exec_error_reason = ""
 
         if not self._jeedom_api_endpoint or not self._jeedom_core_api_key:
@@ -526,7 +526,7 @@ class CommandSynchronizer:
             "params": {
                 "apikey": self._jeedom_core_api_key,
                 "id": scenario_id,
-                "state": "start",
+                "state": "run",
             },
         }
 
