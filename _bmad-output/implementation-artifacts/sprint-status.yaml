@@ -51,7 +51,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-10'  # Story 10.6 in-progress: fix souscription MQTT scenario_+/cmd manquante (bug remonté utilisateur)
+last_updated: '2026-06-10'  # Story 10.6 done (gate terrain PASS); Story 10.7 reste backlog (correct-course presence → switch)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -208,14 +208,15 @@ development_status:
   #                    homebridge-homekit-vs-ha-delta-2026-06-07.md pour la priorisation
   # Gate de cloture epic-level = preuve de parite minimale utile sur les familles retenues
   # ==============================================================
-  pe-epic-10: in-progress  # premier story file cree le 2026-06-07 ; story 10.0 done 2026-06-08
+  pe-epic-10: in-progress  # 10.0→10.6 done; 10.7 backlog (presence→switch, correct-course 2026-06-10)
   10-0-prefixe-de-gel-du-perimetre-homebridge-ha-vise: done  # artefact pe-epic-10-perimetre-prefixe-2026-06-08.md cree ; matrice canonique et exclusions verrouillees
   10-1-verification-et-completion-du-chemin-button-pour-les-5-scenarios-homekit-visibles: done  # gate terrain PASS 2026-06-09 — 5/5 scenarios visibles et declenchables (MQTT topics jeedom2ha_scenario_{20,38,50,57,150} confirms)
   10-2-ouverture-gouvernee-de-climate-pour-les-thermostats-homebridge-representatifs: done  # gate terrain PASS 2026-06-09 — climates_published=7, topics climate publiés, HA live context 7/7
   10-3-evaluation-puis-ouverture-ciblee-de-alarm-control-panel-pour-alarme-maison: done  # BMAD create→dev→review rejoue le 2026-06-09; statut final done
   10-5-parite-generics-alarme-armed-released: done  # correct-course+create→dev→review 2026-06-09; 792 PASS (5 new); gate terrain PASS alarm_published=1 (objet Maison activé)
   10-4-cadrage-des-composites-metier-iq-ev-spa-sans-ouverture-cosmetique: done  # BMAD create→dev→review 2026-06-09; SPA couvert par composition, IQ EV actions extension bornée nécessaire (multi-switch eq), eq628 hors pe-epic-10
-  10-6-fix-souscription-mqtt-manquante-scenario-cmd: in-progress  # bug utilisateur 2026-06-10 — COMMAND_SUBSCRIPTION_TOPICS manquait jeedom2ha/scenario_+/cmd; gate terrain requis
+  10-6-fix-souscription-mqtt-manquante-scenario-cmd: done  # bug utilisateur 2026-06-10 — fix souscription MQTT appliqué; gate terrain PASS (preuve daemon + scenario38.log)
+  10-7-presence-switch-mapper-publier-switch-presence: backlog  # correct-course 2026-06-10 — cadrage explicite presence zone sensible; switch deja dans PRODUCT_SCOPE; create-story a lancer en session separee
   pe-epic-10-retrospective: optional
 
   # ==============================================================

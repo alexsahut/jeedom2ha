@@ -70,9 +70,9 @@ def _make_mapping(
 # ---------------------------------------------------------------------------
 
 def test_product_scope_wave_opening_complete():
-    """PRODUCT_SCOPE contient les types ouverts jusqu'à Story 10.2."""
-    assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"}
-    assert len(PRODUCT_SCOPE) == 7
+    """PRODUCT_SCOPE contient les types ouverts jusqu'à Story 10.3."""
+    assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}
+    assert len(PRODUCT_SCOPE) == 8
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import List
 
 from models.mapping import (
+    AlarmCapabilities,
     ClimateCapabilities,
     CoverCapabilities,
     LightCapabilities,
@@ -60,9 +61,13 @@ HA_COMPONENT_REGISTRY = {
         "required_fields": ["availability"],
         "required_capabilities": ["has_setpoint"],
     },
+    "alarm_control_panel": {
+        "required_fields": ["state_topic", "command_topic", "platform", "availability"],
+        "required_capabilities": ["has_state", "has_command"],
+    },
 }
 
-PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"]  # climate ouvert Story 10.2 sous FR40/NFR10
+PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,

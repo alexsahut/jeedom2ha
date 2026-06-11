@@ -252,5 +252,5 @@ async def test_publish_button_topic_format():
 def test_known_types_includes_button():
     assert "button" in PublisherRegistry.known_types()
     assert PublisherRegistry.known_types() == [
-        "light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"
+        "light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"
     ]

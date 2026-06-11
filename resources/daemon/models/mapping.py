@@ -74,12 +74,24 @@ class ClimateCapabilities:
     has_current_temperature: bool = False
 
 
+@dataclass
+class AlarmCapabilities:
+    """Alarm capabilities for alarm_control_panel eqLogics (Story 10.3).
+
+    has_state: ALARM_STATE or ALARM_ENABLE_STATE info/binary detected.
+    has_command: ALARM_ENABLE or ALARM_DISABLE action detected.
+    """
+    has_state: bool = False
+    has_command: bool = False
+
+
 MappingCapabilities = Union[
     LightCapabilities,
     CoverCapabilities,
     SensorCapabilities,
     SwitchCapabilities,
     ClimateCapabilities,
+    AlarmCapabilities,
 ]
 
 

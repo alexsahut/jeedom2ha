@@ -72,12 +72,13 @@ def test_non_wave_types_not_in_product_scope():
 
 
 def test_product_scope_snapshot_with_wave_open():
-    """Snapshot du PRODUCT_SCOPE après ouverture Story 10.2 (climate).
+    """Snapshot du PRODUCT_SCOPE après ouverture Story 10.3 (alarm_control_panel).
 
     Story 7.2 n'avait pas modifié PRODUCT_SCOPE ; climate était hors-vague.
-    Story 10.2 a ouvert climate sous FR40/NFR10 — il est maintenant dans le scope.
+    Story 10.2 a ouvert climate sous FR40/NFR10.
+    Story 10.3 a ouvert alarm_control_panel sous FR40/NFR10.
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]
     for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 
