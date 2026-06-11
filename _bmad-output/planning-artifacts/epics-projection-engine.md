@@ -1777,6 +1777,7 @@ afin d'obtenir la meme experience que dans HomeKit plutot qu'un binary_sensor (e
 
 ---
 
+
 ### Gates epic-level pe-epic-10
 
 - la story 10.0 est obligatoire et close avant toute ouverture de type nouvelle dans l'epic ;
