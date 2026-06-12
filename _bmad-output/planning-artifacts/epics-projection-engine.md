@@ -1786,3 +1786,226 @@ afin d'obtenir la meme experience que dans HomeKit plutot qu'un binary_sensor (e
 - le golden-file de reference herite de `pe-epic-8` reste vert sur le corpus initial et s'etend aux nouveaux cas representatifs de la vague ;
 - gate terrain de cloture epic = preuve de parite minimale utile sur les familles retenues par la matrice 10.0, avec statut explicite pour chaque famille (`couvert`, `couvert via type existant`, `ouvert dans l'epic`, `hors scope`, `reporte`) ;
 - aucune plateforme annexe ou surface Apple derivee d'une plateforme annexe n'est comptabilisee comme gap `jeedom2ha` dans cet epic.
+
+---
+
+### Epic 12 — Le mapping configurable donne la main a l'utilisateur expert sans casser le pipeline explicable
+
+**Valeur utilisateur :** L'utilisateur expert peut corriger ou affiner la projection d'un equipement Jeedom lorsque le moteur automatique est trop prudent ou incomplet, tout en gardant la decision native, la validation HA et le diagnostic explicables.
+
+**Resultat observable :** Une couche d'overrides optionnelle, versionnee et reversible s'ajoute au-dessus du pipeline automatique. Elle permet de forcer un candidat HA, d'exclure un equipement, de mapper des commandes, ou de surcharger certaines metadonnees, sans jamais publier une projection HA structurellement invalide.
+
+**FRs couverts :** FR23, FR24, FR25, FR31, FR40, FR44, FR45
+
+**ARs cles :** AR3, AR6, AR11, AR13, D6/D11 a preciser
+
+**NFRs directement adresses :** NFR4, NFR10, NFR11, NFR12
+
+**Invariants a porter en stories :**
+- un override ne contourne jamais la validation HA obligatoire ;
+- la decision native du moteur reste visible dans le diagnostic ;
+- tout override est reversible et tracable (`override_*`) ;
+- le schema d'override est versionne des la premiere story ;
+- 12a livre un backend testable sans UI riche ;
+- 12b ne demarre qu'apres stabilisation du contrat backend.
+
+### Story 12.0 : Prefixe d'architecture — contrat d'override, points d'injection et limites
+
+En tant que mainteneur,
+je veux formaliser les types d'overrides autorises, leurs points d'injection dans le pipeline et leurs limites,
+afin de garantir que la configuration utilisateur ne casse ni la validation HA ni le diagnostic.
+
+**Acceptance Criteria :**
+
+**Given** le pipeline canonique a 5 etapes
+**When** la story est executee
+**Then** les types d'overrides autorises sont listes et bornes
+**And** la distinction est explicite entre override d'eligibilite, override de candidat mapping, override de decision et override de metadata
+**And** l'interdiction de publier une projection invalide est documentee comme invariant bloquant
+
+**Given** un override de mapping ou de decision
+**When** son point d'injection est decrit
+**Then** le document d'architecture precise l'ordre d'application par rapport au mapping automatique, a `validate_projection()` et a `decide_publication()`
+**And** le format du schema JSON v1 est tranche ou renvoye vers une decision explicite de Story 12.1
+
+**Dev notes :**
+- story prefixe obligatoire avant toute implementation 12a
+- cite `sprint-change-proposal-2026-06-12.md`
+
+---
+
+### Story 12.1 : Persistance backend du schema d'overrides v1
+
+En tant qu'utilisateur expert,
+je veux que mes overrides soient persistants, exportables et associes a des IDs Jeedom stables,
+afin de conserver mes choix lors des resyncs, upgrades et renommages.
+
+**Acceptance Criteria :**
+
+**Given** un override valide
+**When** il est sauvegarde
+**Then** il est stocke selon un schema JSON v1 documente
+**And** les references utilisent les IDs Jeedom stables (`eqLogic` / `cmd`) plutot que les noms affiches
+**And** le stockage ne cree pas de table SQL custom
+
+**Given** un import ou une migration de schema
+**When** le schema est invalide ou trop recent
+**Then** le backend refuse l'application de l'override avec un diagnostic explicite
+**And** aucun publish MQTT n'est declenche par l'import seul
+
+**Dev notes :**
+- 12a backend-first ; l'edition manuelle JSON peut suffire au premier increment si elle est documentee
+- export/import minimal requis avant UI riche
+
+---
+
+### Story 12.2 : Application backend des overrides de mapping candidat
+
+En tant qu'utilisateur expert,
+je veux forcer un candidat HA ou mapper explicitement certaines commandes,
+afin de resoudre un cas que le moteur automatique ne peut pas inferer correctement.
+
+**Acceptance Criteria :**
+
+**Given** un equipement eligible avec override de mapping
+**When** le pipeline execute l'etape de mapping
+**Then** le moteur conserve le candidat natif
+**And** applique le candidat surcharge avant validation HA
+**And** trace la source `override_*` dans le resultat de diagnostic
+
+**Given** un override qui produit un candidat HA invalide
+**When** `validate_projection()` s'execute
+**Then** la validation HA echoue explicitement
+**And** la publication reste interdite
+**And** la cause indique que l'override est invalide sans masquer la decision native
+
+**Dev notes :**
+- golden corpus obligatoire : cas nominal, cas invalide, non-regression sans override
+- aucun bypass de `validate_projection()`
+
+---
+
+### Story 12.3 : Overrides de publication et exclusion explicite
+
+En tant qu'utilisateur expert,
+je veux exclure un equipement ou autoriser une publication dont la projection est valide mais bloquee par une politique produit,
+afin de reprendre la main sans confondre ce choix avec une reussite automatique.
+
+**Acceptance Criteria :**
+
+**Given** un equipement exclu par override utilisateur
+**When** le pipeline evalue l'eligibilite ou la decision
+**Then** l'exclusion est prioritaire, lisible et reversible
+**And** le diagnostic signale l'origine utilisateur de l'exclusion
+
+**Given** un equipement dont la projection HA est valide mais dont la confiance est faible ou la politique produit bloque la publication
+**When** un override autorise la publication
+**Then** `projection_validity.is_valid == true` reste une condition obligatoire
+**And** la decision finale indique explicitement qu'elle vient d'un override
+
+**Dev notes :**
+- "forcer publication" signifie "forcer la decision apres validation HA reussie", jamais publier un payload invalide
+
+---
+
+### Story 12.4 : Diagnostic override-aware
+
+En tant qu'utilisateur,
+je veux voir ce que le moteur aurait fait sans override et ce qui a ete surcharge,
+afin de comprendre et maintenir mes choix.
+
+**Acceptance Criteria :**
+
+**Given** un equipement avec override applique
+**When** l'utilisateur consulte le diagnostic
+**Then** il voit la decision native et la decision surchargee
+**And** le diagnostic conserve une cause principale canonique
+**And** les champs ajoutes sont additifs et compatibles avec le contrat 4D
+
+**Given** un override sans remediation utilisateur directe
+**When** la traduction `cause_label` / `cause_action` est construite
+**Then** la regle Epic 6 "no faux CTA" reste appliquee
+
+**Dev notes :**
+- centraliser les traductions dans `cause_mapping.py`
+- l'UI peut afficher un indicateur "modifie manuellement", mais ne doit pas reinterpreter le diagnostic
+
+---
+
+### Story 12.5 : UI Jeedom minimale de configuration par equipement
+
+En tant qu'utilisateur expert,
+je veux configurer un override depuis une surface Jeedom dediee,
+afin de ne pas modifier le JSON a la main pour les cas courants.
+
+**Acceptance Criteria :**
+
+**Given** la surface de configuration avancee
+**When** l'utilisateur l'ouvre
+**Then** elle utilise l'UI native Jeedom sans framework front externe
+**And** elle presente une arborescence piece / equipement
+**And** elle permet de revenir au mode automatique par equipement
+
+**Given** une modification d'override depuis l'UI
+**When** l'utilisateur sauvegarde
+**Then** le backend valide le schema et la projection avant toute application effective
+**And** les erreurs de validation HA sont visibles
+
+**Dev notes :**
+- 12b ne demarre qu'apres stabilisation du contrat backend 12a
+- definir une strategie de test front minimale avant implementation
+
+---
+
+### Story 12.6 : Preview / dry-run avant application
+
+En tant qu'utilisateur expert,
+je veux previsualiser l'effet d'un override avant de l'appliquer,
+afin d'eviter de polluer Home Assistant avec une configuration approximative.
+
+**Acceptance Criteria :**
+
+**Given** un override en cours d'edition
+**When** l'utilisateur demande une preview
+**Then** le backend retourne le resultat "auto" et le resultat "avec override"
+**And** aucune publication MQTT n'est declenchee pendant le dry-run
+**And** les erreurs de validation HA sont visibles avant sauvegarde
+
+**Given** un export support
+**When** un override est implique
+**Then** l'export inclut les raisons de refus et la trace de preview utile au support
+
+---
+
+### Story 12.7 : Gate terrain et profils partageables
+
+En tant que mainteneur,
+je veux valider les overrides sur un corpus terrain et preparer l'export/import de profils,
+afin de transformer la configurabilite en avantage marketplace durable.
+
+**Acceptance Criteria :**
+
+**Given** la vague 12a/12b implementee
+**When** le gate terrain est execute
+**Then** au moins trois familles d'equipements reelles sont validees avec overrides, retour auto et diagnostic
+**And** le corpus inclut au moins un cas d'override invalide correctement refuse
+
+**Given** un profil exporte
+**When** il est partage ou importe
+**Then** il est anonymisable et ne contient pas de secret
+**And** son format reste compatible avec le schema versionne
+
+**Dev notes :**
+- les profils partageables sont un objectif de croissance ; ne pas bloquer 12a si le partage communautaire est trop large
+- documentation utilisateur FR requise avant closeout epic
+
+---
+
+### Gates epic-level pe-epic-12
+
+- Story 12.0 est obligatoire avant toute implementation d'override.
+- Aucun override ne contourne `validate_projection()`.
+- Le schema d'override est versionne des le premier increment.
+- Le diagnostic conserve la decision native et trace l'override de facon additive.
+- 12a backend testable precede 12b UI Jeedom.
+- Le mode automatique reste le comportement par defaut.

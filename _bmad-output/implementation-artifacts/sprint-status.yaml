@@ -229,4 +229,13 @@ development_status:
   #        Diagnostiquer d'abord switch.jeedom2ha_554 état "unknown" (bug mapping ?)
   # Priorité Alex : P1 MSunPV (cerveau routage), P2 chauffe-eau détail
   # ==============================================================
-  pe-epic-11: backlog
+  pe-epic-11: backlog  # prochain epic execute : energie / routage solaire, P1 MSunPV eq553 puis P2 chauffe-eau eq554
+
+  # ==============================================================
+  # pe-epic-12 — Mapping configurable / overrides utilisateur
+  # Ajoute par correct-course 2026-06-12 — cadrage futur, execution apres pe-epic-11
+  # Decoupage : 12a backend testable (schema JSON, application, diagnostic) ;
+  #             12b UI Jeedom (configuration, preview, retour auto)
+  # Garde-fou : un override ne contourne jamais la validation HA obligatoire
+  # ==============================================================
+  pe-epic-12: backlog
