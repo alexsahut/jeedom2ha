@@ -356,7 +356,7 @@ class CommandSynchronizer:
 
         commands = mapping.commands or {}
         if mapping.ha_entity_type in ("light", "switch"):
-            for key in ("LIGHT_STATE", "ENERGY_STATE"):
+            for key in ("LIGHT_STATE", "ENERGY_STATE", "PRESENCE"):
                 cmd = commands.get(key)
                 if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
                     return True
