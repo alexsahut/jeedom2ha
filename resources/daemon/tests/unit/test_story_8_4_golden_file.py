@@ -237,7 +237,7 @@ def _build_canonical_snapshot(sync_response: dict, diagnostics_response: dict, a
 
 def _assert_corpus_shape(sync_payload: dict) -> None:
     eq_ids = {eq["id"] for eq in sync_payload["eq_logics"]}
-    assert len(eq_ids) == 53  # +3 thermostats Story 10.2 (11000, 11001, 11002) +1 alarm Story 10.3 (12000) +1 alarm natif Story 10.5 (230)
+    assert len(eq_ids) == 54  # +3 thermostats Story 10.2 (11000, 11001, 11002) +1 alarm Story 10.3 (12000) +1 alarm natif Story 10.5 (230) +1 presence_switch Story 10.7 (9700)
 
     assert len([i for i in eq_ids if 1000 <= i <= 1009]) == 10
     assert len([i for i in eq_ids if 2000 <= i <= 2007]) == 8

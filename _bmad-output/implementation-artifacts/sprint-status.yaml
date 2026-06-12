@@ -41,8 +41,8 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-10 (post correct-courses 2026-04-30 puis 2026-06-07 :
-#          pe-epic-1/2/3/4/5/6/7/8/9 done, pe-epic-10 in-progress avec 10.0 ready-for-dev)
+#   Epics: pe-epic-1 à pe-epic-11 (post correct-courses 2026-04-30 puis 2026-06-07 :
+#          pe-epic-1/2/3/4/5/6/7/8/9/10 done, pe-epic-11 backlog)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -51,7 +51,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-10'  # Story 10.6 done (gate terrain PASS); Story 10.7 reste backlog (correct-course presence → switch)
+last_updated: '2026-06-12'  # pe-epic-10 retrospected and closed
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -208,7 +208,7 @@ development_status:
   #                    homebridge-homekit-vs-ha-delta-2026-06-07.md pour la priorisation
   # Gate de cloture epic-level = preuve de parite minimale utile sur les familles retenues
   # ==============================================================
-  pe-epic-10: in-progress  # 10.0→10.6 done; 10.7 backlog (presence→switch, correct-course 2026-06-10)
+  pe-epic-10: done  # cloture 2026-06-12 apres retro pe-epic-10 ; stories 10.0→10.7 done, closeout Homebridge -> HA minimal utile valide
   10-0-prefixe-de-gel-du-perimetre-homebridge-ha-vise: done  # artefact pe-epic-10-perimetre-prefixe-2026-06-08.md cree ; matrice canonique et exclusions verrouillees
   10-1-verification-et-completion-du-chemin-button-pour-les-5-scenarios-homekit-visibles: done  # gate terrain PASS 2026-06-09 — 5/5 scenarios visibles et declenchables (MQTT topics jeedom2ha_scenario_{20,38,50,57,150} confirms)
   10-2-ouverture-gouvernee-de-climate-pour-les-thermostats-homebridge-representatifs: done  # gate terrain PASS 2026-06-09 — climates_published=7, topics climate publiés, HA live context 7/7
@@ -216,8 +216,8 @@ development_status:
   10-5-parite-generics-alarme-armed-released: done  # correct-course+create→dev→review 2026-06-09; 792 PASS (5 new); gate terrain PASS alarm_published=1 (objet Maison activé)
   10-4-cadrage-des-composites-metier-iq-ev-spa-sans-ouverture-cosmetique: done  # BMAD create→dev→review 2026-06-09; SPA couvert par composition, IQ EV actions extension bornée nécessaire (multi-switch eq), eq628 hors pe-epic-10
   10-6-fix-souscription-mqtt-manquante-scenario-cmd: done  # bug utilisateur 2026-06-10 — fix souscription MQTT appliqué; gate terrain PASS (preuve daemon + scenario38.log)
-  10-7-presence-switch-mapper-publier-switch-presence: backlog  # correct-course 2026-06-10 — cadrage explicite presence zone sensible; switch deja dans PRODUCT_SCOPE; create-story a lancer en session separee
-  pe-epic-10-retrospective: optional
+  10-7-presence-switch-mapper-publier-switch-presence: done  # decision explicite SM 2026-06-11 : gate terrain execute (deploy/restart/sync OK), implementation et preuves completes ; AC5 non validable faute de candidat live PRESENCE+SET_ON+SET_OFF dans le scope publie
+  pe-epic-10-retrospective: done  # retro 2026-06-12 — story 10.7 closee avec decision explicite SM ; next step = create-story 11.1 MSunPV / RouteurSolaire
 
   # ==============================================================
   # pe-epic-11 — Énergie / Routage solaire (backlog qualifié)

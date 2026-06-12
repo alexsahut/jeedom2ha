@@ -21,7 +21,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -51,7 +51,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -161,7 +161,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -191,7 +191,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -295,7 +295,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -388,7 +388,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -476,7 +476,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -558,7 +558,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -626,7 +626,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -666,7 +666,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -767,7 +767,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -797,7 +797,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -901,7 +901,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -994,7 +994,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1087,7 +1087,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1155,7 +1155,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -1185,7 +1185,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1289,7 +1289,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1377,7 +1377,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1434,7 +1434,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -1469,7 +1469,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1584,7 +1584,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1652,7 +1652,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -1682,7 +1682,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1761,7 +1761,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -1796,7 +1796,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1916,7 +1916,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -1995,7 +1995,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -2025,7 +2025,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -2129,7 +2129,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -2217,7 +2217,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -2294,7 +2294,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -2376,7 +2376,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -2430,22 +2430,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "LIGHT_ON",
             "FLAP_UP"
@@ -2460,7 +2460,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -2524,22 +2524,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "FLAP_STATE"
           ],
@@ -2553,7 +2553,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -2603,22 +2603,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "ENERGY_ON",
             "ENERGY_OFF",
@@ -2634,7 +2634,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -2720,22 +2720,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Activer l'\u00e9quipement dans sa page de configuration Jeedom",
+          "cause_action": "Activer l'équipement dans sa page de configuration Jeedom",
           "cause_code": "disabled_eqlogic",
-          "cause_label": "\u00c9quipement d\u00e9sactiv\u00e9 dans Jeedom",
-          "confidence": "Ignor\u00e9",
-          "detail": "Cet \u00e9quipement est d\u00e9sactiv\u00e9 dans Jeedom.",
+          "cause_label": "Équipement désactivé dans Jeedom",
+          "confidence": "Ignoré",
+          "detail": "Cet équipement est désactivé dans Jeedom.",
           "detected_generic_types": [],
           "ecart": true,
           "eq_id": 5000,
@@ -2747,8 +2747,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 1,
           "reason_code": "disabled_eqlogic",
-          "remediation": "Activez l'\u00e9quipement dans sa page de configuration Jeedom pour qu'il devienne \u00e9ligible.",
-          "status": "Non support\u00e9",
+          "remediation": "Activez l'équipement dans sa page de configuration Jeedom pour qu'il devienne éligible.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -2790,8 +2790,8 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "Ignor\u00e9",
-          "detail": "Cet \u00e9quipement est exclu manuellement de la publication vers Home Assistant.",
+          "confidence": "Ignoré",
+          "detail": "Cet équipement est exclu manuellement de la publication vers Home Assistant.",
           "detected_generic_types": [],
           "ecart": false,
           "eq_id": 5001,
@@ -2845,20 +2845,20 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
           "cause_action": null,
           "cause_code": "ha_missing_command_topic",
-          "cause_label": "Projection HA incompl\u00e8te \u2014 commande requise absente",
+          "cause_label": "Projection HA incomplète — commande requise absente",
           "confidence": "Probable",
           "detail": "Cause inconnue.",
           "detected_generic_types": [],
@@ -2872,8 +2872,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ha_missing_command_topic",
-          "remediation": "Relancez un sync. Si le probl\u00e8me persiste, consultez les logs du d\u00e9mon.",
-          "status": "Non support\u00e9",
+          "remediation": "Relancez un sync. Si le problème persiste, consultez les logs du démon.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -2934,7 +2934,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -2964,7 +2964,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3043,7 +3043,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3063,7 +3063,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3120,7 +3120,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3140,7 +3140,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3197,7 +3197,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3217,7 +3217,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3274,7 +3274,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3294,7 +3294,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3351,7 +3351,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3371,7 +3371,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3428,7 +3428,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3448,7 +3448,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3505,7 +3505,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3525,7 +3525,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3582,7 +3582,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3602,7 +3602,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3659,7 +3659,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3679,7 +3679,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3736,7 +3736,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3756,7 +3756,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3813,7 +3813,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3833,7 +3833,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3890,7 +3890,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3910,7 +3910,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -3967,7 +3967,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -3987,7 +3987,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4029,23 +4029,132 @@
         {
           "actions_ha": {
             "publier": {
-              "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9700,
+          "eq_type_name": "mobile",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 97001,
+              "cmd_name": "PRESENCE",
+              "generic_type": "PRESENCE"
+            },
+            {
+              "cmd_id": 97002,
+              "cmd_name": "Présent",
+              "generic_type": "SET_ON"
+            },
+            {
+              "cmd_id": 97003,
+              "cmd_name": "Absent",
+              "generic_type": "SET_OFF"
+            }
+          ],
+          "name": "iPhone Alex 9700",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "PRESENCE",
+                "id": 97001,
+                "name": "PRESENCE"
+              },
+              {
+                "generic_type": "SET_ON",
+                "id": 97002,
+                "name": "Présent"
+              },
+              {
+                "generic_type": "SET_OFF",
+                "id": 97003,
+                "name": "Absent"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 97001,
+                "configured_type": "PRESENCE",
+                "logical_role": "PRESENCE",
+                "used_type": "PRESENCE"
+              },
+              {
+                "command_id": 97002,
+                "configured_type": "SET_ON",
+                "logical_role": "SET_ON",
+                "used_type": "SET_ON"
+              },
+              {
+                "command_id": 97003,
+                "configured_type": "SET_OFF",
+                "logical_role": "SET_OFF",
+                "used_type": "SET_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": false,
+              "label": "Créer dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "GENERIC_INFO"
           ],
@@ -4059,7 +4168,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -4073,7 +4182,7 @@
               {
                 "generic_type": "GENERIC_INFO",
                 "id": 100001,
-                "name": "\u00c9tat"
+                "name": "État"
               }
             ],
             "projection_validity": {
@@ -4098,7 +4207,7 @@
           "unmatched_commands": [
             {
               "cmd_id": 100001,
-              "cmd_name": "\u00c9tat",
+              "cmd_name": "État",
               "generic_type": "GENERIC_INFO"
             }
           ],
@@ -4109,22 +4218,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "COLOR"
           ],
@@ -4138,7 +4247,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -4188,22 +4297,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "VOLUME_SET"
           ],
@@ -4217,7 +4326,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -4267,22 +4376,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "SET_TEXT"
           ],
@@ -4296,7 +4405,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -4346,22 +4455,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
           "cause_action": null,
           "cause_code": "no_projection_possible",
-          "cause_label": "Projection impossible \u2014 aucune commande exploitable d\u00e9tect\u00e9e",
-          "confidence": "Ignor\u00e9",
-          "detail": "Aucune commande Info ou Action exploitable \u2014 projection impossible m\u00eame en d\u00e9gradation.",
+          "cause_label": "Projection impossible — aucune commande exploitable détectée",
+          "confidence": "Ignoré",
+          "detail": "Aucune commande Info ou Action exploitable — projection impossible même en dégradation.",
           "detected_generic_types": [],
           "ecart": true,
           "eq_id": 10004,
@@ -4373,8 +4482,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 2,
           "reason_code": "no_projection_possible",
-          "remediation": "V\u00e9rifiez que l'\u00e9quipement poss\u00e8de des commandes Info ou Action dans Jeedom.",
-          "status": "Non support\u00e9",
+          "remediation": "Vérifiez que l'équipement possède des commandes Info ou Action dans Jeedom.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -4424,7 +4533,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4439,7 +4548,7 @@
             },
             {
               "cmd_id": 110002,
-              "cmd_name": "Temp\u00e9rature",
+              "cmd_name": "Température",
               "generic_type": "THERMOSTAT_TEMPERATURE"
             }
           ],
@@ -4449,7 +4558,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4467,7 +4576,7 @@
               {
                 "generic_type": "THERMOSTAT_TEMPERATURE",
                 "id": 110002,
-                "name": "Temp\u00e9rature"
+                "name": "Température"
               }
             ],
             "projection_validity": {
@@ -4517,7 +4626,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4537,7 +4646,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4594,7 +4703,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4609,7 +4718,7 @@
             },
             {
               "cmd_id": 110022,
-              "cmd_name": "Temp\u00e9rature",
+              "cmd_name": "Température",
               "generic_type": "THERMOSTAT_TEMPERATURE"
             }
           ],
@@ -4619,7 +4728,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4637,7 +4746,7 @@
               {
                 "generic_type": "THERMOSTAT_TEMPERATURE",
                 "id": 110022,
-                "name": "Temp\u00e9rature"
+                "name": "Température"
               }
             ],
             "projection_validity": {
@@ -4687,7 +4796,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4717,7 +4826,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4809,7 +4918,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4839,7 +4948,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -4949,7 +5058,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -4979,7 +5088,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5083,7 +5192,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5176,7 +5285,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5264,7 +5373,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5346,7 +5455,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5414,7 +5523,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -5454,7 +5563,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5555,7 +5664,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -5585,7 +5694,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5689,7 +5798,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5782,7 +5891,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5875,7 +5984,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -5943,7 +6052,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -5973,7 +6082,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6077,7 +6186,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6165,7 +6274,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6222,7 +6331,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -6257,7 +6366,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6372,7 +6481,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6440,7 +6549,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -6470,7 +6579,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6549,7 +6658,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -6584,7 +6693,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6704,7 +6813,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6783,7 +6892,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -6813,7 +6922,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -6917,7 +7026,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7005,7 +7114,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7082,7 +7191,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7164,7 +7273,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "probable",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7218,22 +7327,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "LIGHT_ON",
             "FLAP_UP"
@@ -7248,7 +7357,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -7312,22 +7421,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "FLAP_STATE"
           ],
@@ -7341,7 +7450,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -7391,22 +7500,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Projection HA structurellement incomplète — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "ENERGY_ON",
             "ENERGY_OFF",
@@ -7422,7 +7531,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -7508,22 +7617,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Activer l'\u00e9quipement dans sa page de configuration Jeedom",
+          "cause_action": "Activer l'équipement dans sa page de configuration Jeedom",
           "cause_code": "disabled_eqlogic",
-          "cause_label": "\u00c9quipement d\u00e9sactiv\u00e9 dans Jeedom",
-          "confidence": "Ignor\u00e9",
-          "detail": "Cet \u00e9quipement est d\u00e9sactiv\u00e9 dans Jeedom.",
+          "cause_label": "Équipement désactivé dans Jeedom",
+          "confidence": "Ignoré",
+          "detail": "Cet équipement est désactivé dans Jeedom.",
           "detected_generic_types": [],
           "ecart": true,
           "eq_id": 5000,
@@ -7535,8 +7644,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 1,
           "reason_code": "disabled_eqlogic",
-          "remediation": "Activez l'\u00e9quipement dans sa page de configuration Jeedom pour qu'il devienne \u00e9ligible.",
-          "status": "Non support\u00e9",
+          "remediation": "Activez l'équipement dans sa page de configuration Jeedom pour qu'il devienne éligible.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -7577,20 +7686,20 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
           "cause_action": null,
           "cause_code": "ha_missing_command_topic",
-          "cause_label": "Projection HA incompl\u00e8te \u2014 commande requise absente",
+          "cause_label": "Projection HA incomplète — commande requise absente",
           "confidence": "Probable",
           "detail": "Cause inconnue.",
           "detected_generic_types": [],
@@ -7604,8 +7713,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 3,
           "reason_code": "ha_missing_command_topic",
-          "remediation": "Relancez un sync. Si le probl\u00e8me persiste, consultez les logs du d\u00e9mon.",
-          "status": "Non support\u00e9",
+          "remediation": "Relancez un sync. Si le problème persiste, consultez les logs du démon.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -7666,7 +7775,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -7696,7 +7805,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7775,7 +7884,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -7795,7 +7904,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7852,7 +7961,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -7872,7 +7981,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -7929,7 +8038,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -7949,7 +8058,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8006,7 +8115,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8026,7 +8135,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8083,7 +8192,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8103,7 +8212,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8160,7 +8269,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8180,7 +8289,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8237,7 +8346,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8257,7 +8366,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8314,7 +8423,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8334,7 +8443,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8391,7 +8500,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8411,7 +8520,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8468,7 +8577,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8488,7 +8597,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8545,7 +8654,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8565,7 +8674,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8622,7 +8731,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8642,7 +8751,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8699,7 +8808,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -8719,7 +8828,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -8761,23 +8870,132 @@
         {
           "actions_ha": {
             "publier": {
-              "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Sûr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 9700,
+          "eq_type_name": "mobile",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 97001,
+              "cmd_name": "PRESENCE",
+              "generic_type": "PRESENCE"
+            },
+            {
+              "cmd_id": 97002,
+              "cmd_name": "Présent",
+              "generic_type": "SET_ON"
+            },
+            {
+              "cmd_id": 97003,
+              "cmd_name": "Absent",
+              "generic_type": "SET_OFF"
+            }
+          ],
+          "name": "iPhone Alex 9700",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publié",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "PRESENCE",
+                "id": 97001,
+                "name": "PRESENCE"
+              },
+              {
+                "generic_type": "SET_ON",
+                "id": 97002,
+                "name": "Présent"
+              },
+              {
+                "generic_type": "SET_OFF",
+                "id": 97003,
+                "name": "Absent"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 97001,
+                "configured_type": "PRESENCE",
+                "logical_role": "PRESENCE",
+                "used_type": "PRESENCE"
+              },
+              {
+                "command_id": 97002,
+                "configured_type": "SET_ON",
+                "logical_role": "SET_ON",
+                "used_type": "SET_ON"
+              },
+              {
+                "command_id": 97003,
+                "configured_type": "SET_OFF",
+                "logical_role": "SET_OFF",
+                "used_type": "SET_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": false,
+              "label": "Créer dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "GENERIC_INFO"
           ],
@@ -8791,7 +9009,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -8805,7 +9023,7 @@
               {
                 "generic_type": "GENERIC_INFO",
                 "id": 100001,
-                "name": "\u00c9tat"
+                "name": "État"
               }
             ],
             "projection_validity": {
@@ -8830,7 +9048,7 @@
           "unmatched_commands": [
             {
               "cmd_id": 100001,
-              "cmd_name": "\u00c9tat",
+              "cmd_name": "État",
               "generic_type": "GENERIC_INFO"
             }
           ],
@@ -8841,22 +9059,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "COLOR"
           ],
@@ -8870,7 +9088,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -8920,22 +9138,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "VOLUME_SET"
           ],
@@ -8949,7 +9167,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -8999,22 +9217,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
-          "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
+          "cause_action": "Préciser les types génériques sur les commandes dans Jeedom pour lever l'ambiguïté",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique — ambiguïté de mapping non résolue",
           "confidence": "Ambigu",
-          "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
+          "detail": "Plusieurs types d'entités Home Assistant sont possibles pour cet équipement. Le plugin ne publie pas en cas d'ambiguïté.",
           "detected_generic_types": [
             "SET_TEXT"
           ],
@@ -9028,7 +9246,7 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
-          "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
+          "remediation": "Précisez les types génériques sur les commandes pour lever l'ambiguïté et permettre une publication fiable.",
           "status": "Ambigu",
           "status_code": "ambiguous",
           "statut": "non_publie",
@@ -9078,22 +9296,22 @@
           "actions_ha": {
             "publier": {
               "disponible": false,
-              "label": "Cr\u00e9er dans Home Assistant",
+              "label": "Créer dans Home Assistant",
               "niveau_confirmation": "aucune",
-              "raison_indisponibilite": "Cet \u00e9quipement ne peut pas \u00eatre publi\u00e9 dans Home Assistant"
+              "raison_indisponibilite": "Cet équipement ne peut pas être publié dans Home Assistant"
             },
             "supprimer": {
               "disponible": false,
               "label": "Supprimer de Home Assistant",
               "niveau_confirmation": "forte",
-              "raison_indisponibilite": "Aucune entit\u00e9 publi\u00e9e dans Home Assistant"
+              "raison_indisponibilite": "Aucune entité publiée dans Home Assistant"
             }
           },
           "cause_action": null,
           "cause_code": "no_projection_possible",
-          "cause_label": "Projection impossible \u2014 aucune commande exploitable d\u00e9tect\u00e9e",
-          "confidence": "Ignor\u00e9",
-          "detail": "Aucune commande Info ou Action exploitable \u2014 projection impossible m\u00eame en d\u00e9gradation.",
+          "cause_label": "Projection impossible — aucune commande exploitable détectée",
+          "confidence": "Ignoré",
+          "detail": "Aucune commande Info ou Action exploitable — projection impossible même en dégradation.",
           "detected_generic_types": [],
           "ecart": true,
           "eq_id": 10004,
@@ -9105,8 +9323,8 @@
           "perimetre": "inclus",
           "pipeline_step_visible": 2,
           "reason_code": "no_projection_possible",
-          "remediation": "V\u00e9rifiez que l'\u00e9quipement poss\u00e8de des commandes Info ou Action dans Jeedom.",
-          "status": "Non support\u00e9",
+          "remediation": "Vérifiez que l'équipement possède des commandes Info ou Action dans Jeedom.",
+          "status": "Non supporté",
           "status_code": "not_supported",
           "statut": "non_publie",
           "traceability": {
@@ -9156,7 +9374,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -9171,7 +9389,7 @@
             },
             {
               "cmd_id": 110002,
-              "cmd_name": "Temp\u00e9rature",
+              "cmd_name": "Température",
               "generic_type": "THERMOSTAT_TEMPERATURE"
             }
           ],
@@ -9181,7 +9399,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -9199,7 +9417,7 @@
               {
                 "generic_type": "THERMOSTAT_TEMPERATURE",
                 "id": 110002,
-                "name": "Temp\u00e9rature"
+                "name": "Température"
               }
             ],
             "projection_validity": {
@@ -9249,7 +9467,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -9269,7 +9487,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -9326,7 +9544,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -9341,7 +9559,7 @@
             },
             {
               "cmd_id": 110022,
-              "cmd_name": "Temp\u00e9rature",
+              "cmd_name": "Température",
               "generic_type": "THERMOSTAT_TEMPERATURE"
             }
           ],
@@ -9351,7 +9569,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -9369,7 +9587,7 @@
               {
                 "generic_type": "THERMOSTAT_TEMPERATURE",
                 "id": 110022,
-                "name": "Temp\u00e9rature"
+                "name": "Température"
               }
             ],
             "projection_validity": {
@@ -9419,7 +9637,7 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
-          "confidence": "S\u00fbr",
+          "confidence": "Sûr",
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
@@ -9449,7 +9667,7 @@
           "pipeline_step_visible": 5,
           "reason_code": "sure",
           "remediation": "",
-          "status": "Publi\u00e9",
+          "status": "Publié",
           "status_code": "published",
           "statut": "publie",
           "traceability": {
@@ -9527,8 +9745,8 @@
           "compteurs": {
             "ecarts": 7,
             "exclus": 0,
-            "inclus": 24,
-            "total": 24
+            "inclus": 25,
+            "total": 25
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -9540,17 +9758,17 @@
               "ha_missing_command_topic": 1,
               "no_projection_possible": 1,
               "probable": 4,
-              "sure": 13
+              "sure": 14
             },
             "counts_by_status": {
               "ambiguous": 4,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 3,
-              "published": 17
+              "published": 18
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 24
+            "total_equipments": 25
           }
         },
         {
@@ -9612,8 +9830,8 @@
         "compteurs": {
           "ecarts": 10,
           "exclus": 1,
-          "inclus": 52,
-          "total": 53
+          "inclus": 53,
+          "total": 54
         },
         "counts_by_reason": {
           "ambiguous_skipped": 7,
@@ -9622,18 +9840,18 @@
           "ha_missing_command_topic": 1,
           "no_projection_possible": 1,
           "probable": 15,
-          "sure": 27
+          "sure": 28
         },
         "counts_by_status": {
           "ambiguous": 7,
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 42
+          "published": 43
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 53
+        "total_equipments": 54
       }
     },
     "request_id": "<normalized-request-id>",
@@ -9690,9 +9908,9 @@
       "sensors_sure": 5,
       "switches_ambiguous": 1,
       "switches_probable": 4,
-      "switches_published": 5,
+      "switches_published": 6,
       "switches_skipped": 1,
-      "switches_sure": 1
+      "switches_sure": 2
     },
     "mappings": {
       "1000": {
@@ -11868,7 +12086,7 @@
         "reason_code": "sensor_temperature",
         "reason_details": {
           "device_class": "temperature",
-          "unit_of_measurement": "\u00b0C"
+          "unit_of_measurement": "°C"
         },
         "suggested_area": "Salon"
       },
@@ -12448,6 +12666,66 @@
           "command_topic": "jeedom2ha/9002/cmd"
         },
         "suggested_area": "Garage"
+      },
+      "9700": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": true,
+          "on_off_confidence": "sure"
+        },
+        "commands": {
+          "PRESENCE": {
+            "generic_type": "PRESENCE",
+            "id": 97001,
+            "sub_type": "binary",
+            "type": "info"
+          },
+          "SET_OFF": {
+            "generic_type": "SET_OFF",
+            "id": 97003,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "SET_ON": {
+            "generic_type": "SET_ON",
+            "id": 97002,
+            "sub_type": "other",
+            "type": "action"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "switch",
+        "ha_name": "iPhone Alex 9700",
+        "ha_unique_id": "jeedom2ha_eq_9700",
+        "jeedom_eq_id": 9700,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/9700/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/9700/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "presence_switch_set_on_off",
+        "reason_details": {},
+        "suggested_area": "Salon"
       }
     },
     "publications": {
@@ -13350,13 +13628,31 @@
         "reason": "sure",
         "should_publish": true,
         "state_topic": ""
+      },
+      "9700": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/9700/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "switch",
+          "jeedom_eq_id": 9700,
+          "reason_code": "presence_switch_set_on_off"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/9700/state"
       }
     }
   },
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 51,
+      "eligible_count": 52,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -13400,9 +13696,9 @@
         "sensors_sure": 5,
         "switches_ambiguous": 1,
         "switches_probable": 4,
-        "switches_published": 5,
+        "switches_published": 6,
         "switches_skipped": 1,
-        "switches_sure": 1
+        "switches_sure": 2
       },
       "published_scope": {
         "equipements": [
@@ -13805,6 +14101,15 @@
           {
             "decision_source": "global",
             "effective_state": "include",
+            "eq_id": 9700,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "iPhone Alex 9700",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
             "eq_id": 10000,
             "has_pending_home_assistant_changes": true,
             "is_exception": false,
@@ -13888,8 +14193,8 @@
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 52,
-            "total": 53
+            "include": 53,
+            "total": 54
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -13900,8 +14205,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 24,
-              "total": 24
+              "include": 25,
+              "total": 25
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -13934,8 +14239,8 @@
           }
         ]
       },
-      "total_cmds": 102,
-      "total_eq_logics": 53,
+      "total_cmds": 105,
+      "total_eq_logics": 54,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

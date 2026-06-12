@@ -9,6 +9,7 @@ from mapping.climate import ClimateMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
+from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import MappingResult
@@ -25,6 +26,7 @@ class MapperRegistry:
             SwitchMapper(),
             ClimateMapper(),
             AlarmControlPanelMapper(),
+            PresenceSwitchMapper(),
             BinarySensorMapper(),
             SensorMapper(),
             ButtonMapper(),
