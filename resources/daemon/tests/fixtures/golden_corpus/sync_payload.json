@@ -3,6 +3,60 @@
     {
       "cmds": [
         {
+          "generic_type": "ALARM_ENABLE_STATE",
+          "id": 23001,
+          "name": "Etat activation",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "ALARM_STATE",
+          "id": 23002,
+          "name": "Etat alarme",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "ALARM_ARMED",
+          "id": 23003,
+          "name": "Armer",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_RELEASED",
+          "id": 23004,
+          "name": "Desactiver",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_SET_MODE",
+          "id": 23005,
+          "name": "Mode",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_MODE",
+          "id": 23006,
+          "name": "Mode courant",
+          "sub_type": "string",
+          "type": "info"
+        }
+      ],
+      "eq_type": "alarm",
+      "id": 230,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Alarme maison",
+      "object_id": 1,
+      "status": {}
+    },
+    {
+      "cmds": [
+        {
           "generic_type": "LIGHT_ON",
           "id": 10001,
           "name": "LIGHT_ON",
@@ -1180,6 +1234,41 @@
     {
       "cmds": [
         {
+          "generic_type": "PRESENCE",
+          "id": 97001,
+          "name": "PRESENCE",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "SET_ON",
+          "id": 97002,
+          "name": "Présent",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "SET_OFF",
+          "id": 97003,
+          "name": "Absent",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "mobile",
+      "id": 9700,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "iPhone Alex 9700",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
           "generic_type": "GENERIC_INFO",
           "id": 100001,
           "name": "État",
@@ -1404,60 +1493,6 @@
       "is_excluded": false,
       "is_visible": true,
       "name": "Alarme maison 12000",
-      "object_id": 1,
-      "status": {}
-    },
-    {
-      "cmds": [
-        {
-          "generic_type": "ALARM_ENABLE_STATE",
-          "id": 23001,
-          "name": "Etat activation",
-          "sub_type": "binary",
-          "type": "info"
-        },
-        {
-          "generic_type": "ALARM_STATE",
-          "id": 23002,
-          "name": "Etat alarme",
-          "sub_type": "binary",
-          "type": "info"
-        },
-        {
-          "generic_type": "ALARM_ARMED",
-          "id": 23003,
-          "name": "Armer",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_RELEASED",
-          "id": 23004,
-          "name": "Desactiver",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_SET_MODE",
-          "id": 23005,
-          "name": "Mode",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_MODE",
-          "id": 23006,
-          "name": "Mode courant",
-          "sub_type": "string",
-          "type": "info"
-        }
-      ],
-      "eq_type": "alarm",
-      "id": 230,
-      "is_enable": true,
-      "is_excluded": false,
-      "is_visible": true,
-      "name": "Alarme maison",
       "object_id": 1,
       "status": {}
     }

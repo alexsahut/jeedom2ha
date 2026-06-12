@@ -245,9 +245,9 @@ class CommandSynchronizer:
                 if payload_upper not in ("ON", "OFF"):
                     return None, "invalid_command_payload"
                 if payload_upper == "ON":
-                    cmd = commands.get("LIGHT_ON") or commands.get("ENERGY_ON")
+                    cmd = commands.get("LIGHT_ON") or commands.get("ENERGY_ON") or commands.get("SET_ON")
                 else:
-                    cmd = commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF")
+                    cmd = commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF") or commands.get("SET_OFF")
                 if cmd is None:
                     return None, "missing_action_command"
                 try:
@@ -356,7 +356,7 @@ class CommandSynchronizer:
 
         commands = mapping.commands or {}
         if mapping.ha_entity_type in ("light", "switch"):
-            for key in ("LIGHT_STATE", "ENERGY_STATE"):
+            for key in ("LIGHT_STATE", "ENERGY_STATE", "PRESENCE"):
                 cmd = commands.get(key)
                 if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
                     return True
