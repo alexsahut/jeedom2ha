@@ -51,7 +51,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-12'  # pe-epic-10 retrospected and closed
+last_updated: '2026-06-17'  # 11.1 gate terrain PASS + Fix A ; story 11.1.bis créée (correct-course)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -229,4 +229,7 @@ development_status:
   #        Diagnostiquer d'abord switch.jeedom2ha_554 état "unknown" (bug mapping ?)
   # Priorité Alex : P1 MSunPV (cerveau routage), P2 chauffe-eau détail
   # ==============================================================
-  pe-epic-11: backlog
+  pe-epic-11: in-progress  # ouvert par Story 11.1 MSunPV / RouteurSolaire
+  11-1-msunpv-routeursolaire-sensors-lecture-seule: review  # dev-story 2026-06-17 — multi-sensor eq553 ; gate terrain PASS box 192.168.1.21 (65 sensors publiés) ; Fix A éligibilité sans generic_type ; pytest 825 vert
+  11-1-bis-multi-sensor-lifecycle-depublication-secondaires: ready-for-dev  # create-story 2026-06-17 (correct-course) — dépublication exhaustive des sensors secondaires (anti-ghosts HA), Follow-up MEDIUM élevé depuis 11.1 ; numéroté 11.1.bis pour réserver 11.2 au chauffe-eau eq554
+  # 11-2-* RÉSERVÉ : chauffe-eau eq554 (backlog-icebox §3.2, P2 Alex) — pas encore créé
