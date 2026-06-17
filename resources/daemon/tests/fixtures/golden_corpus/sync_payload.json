@@ -57,6 +57,84 @@
     {
       "cmds": [
         {
+          "generic_type": "POWER",
+          "id": 5138,
+          "name": "Puissance panneaux",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": "POWER",
+          "id": 5137,
+          "name": "Puissance reseau",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": null,
+          "id": 5139,
+          "name": "Routage cumulus",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5140,
+          "name": "Routage radiateur",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5177,
+          "name": "Etat sortie 1 (CE %)",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5171,
+          "name": "Production panneaux journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        },
+        {
+          "generic_type": null,
+          "id": 5170,
+          "name": "Production injectee journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        },
+        {
+          "generic_type": null,
+          "id": 5169,
+          "name": "Consommation reseau journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        }
+      ],
+      "eq_type": "msunpv",
+      "id": 553,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "MSunPV / RouteurSolaire",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
           "generic_type": "LIGHT_ON",
           "id": 10001,
           "name": "LIGHT_ON",

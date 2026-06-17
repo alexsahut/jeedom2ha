@@ -181,6 +181,72 @@ def _make_publication_result(
     )
 
 
+async def _publish_additional_sensors(
+    *,
+    primary_mapping: MappingResult,
+    snapshot: TopologySnapshot,
+    confidence_policy,
+    publisher_registry: Optional[PublisherRegistry],
+    mqtt_bridge,
+    mapping_counters: Dict[str, int],
+) -> None:
+    """Publier les sensors secondaires d'un eqLogic multi-sensor (Story 11.1 PE).
+
+    Chaque sensor secondaire suit le pipeline canonique (validation HA → décision →
+    publication) et alimente les compteurs comme une entité publiée à part entière.
+    Honnêteté du diagnostic : si un secondaire devant être publié échoue, le résultat
+    technique du mapping primaire passe à "failed" pour ne pas afficher un faux succès.
+    """
+    bridge_ready = bool(mqtt_bridge and getattr(mqtt_bridge, "is_connected", False))
+    eq_id = primary_mapping.jeedom_eq_id
+
+    for secondary in primary_mapping.additional_mappings:
+        secondary.projection_validity = validate_projection(
+            secondary.ha_entity_type, secondary.capabilities
+        )
+        secondary.pipeline_step_reached = 3
+        sec_decision = decide_publication(secondary, confidence_policy=confidence_policy)
+        sec_decision.mapping_result = secondary
+        secondary.publication_decision_ref = sec_decision
+        secondary.pipeline_step_reached = 4
+
+        if secondary.confidence in ("sure", "probable", "ambiguous"):
+            _increment_mapping_counter(mapping_counters, secondary, secondary.confidence)
+
+        if not sec_decision.should_publish:
+            secondary.publication_result = _make_publication_result("not_attempted")
+            secondary.pipeline_step_reached = 5
+            continue
+
+        published = False
+        if publisher_registry and bridge_ready:
+            published = await publisher_registry.publish(secondary, snapshot)
+        else:
+            _LOGGER.warning(
+                "[MAPPING] Discovery publish unavailable for eq_id=%d sensor cmd=%s (bridge missing/disconnected)",
+                eq_id, (secondary.reason_details or {}).get("cmd_id"),
+            )
+
+        if published:
+            sec_decision.discovery_published = True
+            sec_decision.active_or_alive = True
+            secondary.publication_result = _make_publication_result("success")
+            _increment_mapping_counter(mapping_counters, secondary, "published")
+        else:
+            if secondary.publication_result is None:
+                secondary.publication_result = _make_publication_result(
+                    "failed", "discovery_publish_failed"
+                )
+            # Diagnostic honnête : un secondaire raté invalide le succès global de l'eqLogic.
+            if primary_mapping.publication_result is not None and (
+                primary_mapping.publication_result.status == "success"
+            ):
+                primary_mapping.publication_result = _make_publication_result(
+                    "failed", "multi_sensor_partial_publish_failed"
+                )
+        secondary.pipeline_step_reached = 5
+
+
 def _mapping_counter_prefix(ha_entity_type: str) -> str:
     """Return the legacy-compatible summary prefix for one HA entity type."""
     if ha_entity_type.endswith(("s", "x", "ch", "sh")):
@@ -1178,6 +1244,19 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         mapping.pipeline_step_reached = 5
         if not decision.active_or_alive:
             _increment_mapping_counter(mapping_counters, mapping, "skipped")
+
+        # Story 11.1 PE — publication des sensors secondaires (multi-sensor borné).
+        # Le device HA est commun à l'eqLogic ; chaque sensor a ses propres
+        # identifiants/topic. La décision/bookkeeping primaire reste inchangée.
+        if mapping.additional_mappings:
+            await _publish_additional_sensors(
+                primary_mapping=mapping,
+                snapshot=snapshot,
+                confidence_policy=confidence_policy,
+                publisher_registry=publisher_registry,
+                mqtt_bridge=mqtt_bridge,
+                mapping_counters=mapping_counters,
+            )
 
         previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
         previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)

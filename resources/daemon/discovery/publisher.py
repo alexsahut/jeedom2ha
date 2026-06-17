@@ -134,7 +134,9 @@ class DiscoveryPublisher:
         Returns:
             True if publish succeeded, False otherwise.
         """
-        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="sensor")
+        reason_details = mapping.reason_details or {}
+        node_id = reason_details.get("node_id") if isinstance(reason_details.get("node_id"), str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="sensor", node_id=node_id)
         payload = self._build_sensor_payload(mapping, snapshot)
         payload_json = json.dumps(payload, ensure_ascii=False)
 
@@ -461,18 +463,25 @@ class DiscoveryPublisher:
         return payload
 
     def _build_sensor_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
-        """Build the MQTT Discovery JSON payload for a sensor entity."""
+        """Build the MQTT Discovery JSON payload for a sensor entity.
+
+        Story 11.1 — supporte un object_id/state_topic distincts par commande
+        (multi-sensor) via reason_details. À défaut, comportement mono-sensor
+        historique au niveau eqLogic.
+        """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         reason_details = mapping.reason_details or {}
         device_class = reason_details.get("device_class")
         unit_of_measurement = reason_details.get("unit_of_measurement")
+        object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
+        state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
             "name": mapping.ha_name,
             "unique_id": mapping.ha_unique_id,
-            "object_id": f"jeedom2ha_{eq_id}",
-            "state_topic": f"jeedom2ha/{eq_id}/state",
+            "object_id": object_id,
+            "state_topic": state_topic,
             "platform": "mqtt",
             "device": device,
             "origin": {

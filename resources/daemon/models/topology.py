@@ -221,6 +221,24 @@ _EXCLUSION_SOURCE_TO_REASON = {
     "object":  "excluded_object",
 }
 
+# Story 11.1 — eq_type_name (plugin source) dont les sensors sont dérivés par
+# commande (mapping multi-sensor borné). Source de vérité unique partagée avec
+# le SensorMapper. Restreint volontairement aux routeurs solaires MSunPV.
+MULTI_SENSOR_EQ_TYPES = frozenset({"msunpv"})
+
+
+def _has_numeric_info_command(eq: JeedomEqLogic) -> bool:
+    """Vrai si l'eqLogic porte au moins une commande info numérique."""
+    for cmd in eq.cmds:
+        if (cmd.type or "").lower() != "info":
+            continue
+        sub_type = (cmd.sub_type or "").lower()
+        if "binary" in sub_type:
+            continue
+        if "numeric" in sub_type:
+            return True
+    return False
+
 
 def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
     """
@@ -242,6 +260,12 @@ def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
     # Vérifie si au moins une commande possède un type générique
     has_generic_type = any(cmd.generic_type is not None for cmd in eq.cmds)
     if not has_generic_type:
+        # Story 11.1 — les eqTypes multi-sensor (ex. msunpv) dérivent leurs sensors
+        # par commande avec inférence honnête du device_class par unité : ils sont
+        # éligibles sans generic_type tant qu'ils portent au moins une commande info
+        # numérique. Aucun autre eqType ne bénéficie de ce contournement (AC#4).
+        if (eq.eq_type_name or "").lower() in MULTI_SENSOR_EQ_TYPES and _has_numeric_info_command(eq):
+            return EligibilityResult(is_eligible=True, reason_code="eligible", confidence="unknown")
         return EligibilityResult(is_eligible=False, reason_code="no_supported_generic_type", confidence="sure")
 
     return EligibilityResult(is_eligible=True, reason_code="eligible", confidence="unknown")
