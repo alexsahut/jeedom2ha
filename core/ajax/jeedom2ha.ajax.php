@@ -422,6 +422,12 @@ try {
         log::add('jeedom2ha', 'error', '[TOPOLOGY] Le démon n\'a pas répondu au scan de topologie (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }
+      // Story 12.1 — réaligne les listeners de streaming d'état sur le périmètre publié.
+      try {
+        jeedom2ha::syncStateListeners();
+      } catch (\Throwable $e) {
+        log::add('jeedom2ha', 'warning', '[STATE-LISTENER] Réenregistrement post-scan échoué : ' . $e->getMessage());
+      }
       ajax::success($result);
     }
     else if ($action == 'getDiagnostics') {

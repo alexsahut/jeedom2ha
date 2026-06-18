@@ -139,7 +139,7 @@ def _publisher_mock(*, unpublish_results: dict[int, bool] | None = None) -> Magi
     publisher = MagicMock()
     unpublish_results = unpublish_results or {}
 
-    async def unpublish_by_eq_id(eq_id: int, entity_type: str = "light") -> bool:  # noqa: ARG001
+    async def unpublish_by_eq_id(eq_id: int, entity_type: str = "light", node_ids=None) -> bool:  # noqa: ARG001
         return unpublish_results.get(eq_id, True)
 
     publisher.unpublish_by_eq_id = AsyncMock(side_effect=unpublish_by_eq_id)
@@ -222,7 +222,7 @@ async def test_supprimer_equipement_publie_success(cli, app):
     assert payload["scope_reel"]["supprimer_errors"] == 0
     assert payload["scope_reel"]["skips"] == 0
     assert payload["perimetre_impacte"]["nom"] == "Lampe Salon"
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(10, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(10, entity_type="light", node_ids=[])
     assert app["publications"][10].active_or_alive is False
     assert app["publications"][10].discovery_published is False
 

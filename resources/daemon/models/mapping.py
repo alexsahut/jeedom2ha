@@ -157,6 +157,10 @@ class MappingResult:
     # 2 = mapping atteint ; 3 = validation HA exécutée ; 4 = décision publication ;
     # 5 = résultat technique de publication enregistré. None = champ non câblé (avant PE Epic 5).
     publication_result: Optional["PublicationResult"] = None
+    # Story 11.1 PE — mappings secondaires rattachés au même eqLogic (multi-sensor borné).
+    # Vide pour le cas mono-entité historique. Chaque élément est un MappingResult sensor
+    # complet avec ses propres identifiants/topic (reason_details: object_id, state_topic…).
+    additional_mappings: List["MappingResult"] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.capabilities is None:

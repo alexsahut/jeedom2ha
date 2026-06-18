@@ -41,8 +41,10 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-11 (post correct-courses 2026-04-30 puis 2026-06-07 :
-#          pe-epic-1/2/3/4/5/6/7/8/9/10 done, pe-epic-11 backlog)
+#   Epics: pe-epic-1 à pe-epic-12 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18 :
+#          pe-epic-1..10 done, pe-epic-11 in-progress, pe-epic-12 backlog)
+#          pe-epic-11 formalisé dans epics-projection-engine.md le 2026-06-18 (était suivi ici sans définition d'epic)
+#          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vague 1 sensor+binary_sensor
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -51,7 +53,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-12'  # pe-epic-10 retrospected and closed
+last_updated: '2026-06-18'  # correct-course 2026-06-18 (pe-11.3) : Story 11.3 inscrite (backlog, IQ EV/pilotage) + Story 12.2 réservée (vague 2 switch/button) ; dépendances inter-epic explicitées
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -229,4 +231,21 @@ development_status:
   #        Diagnostiquer d'abord switch.jeedom2ha_554 état "unknown" (bug mapping ?)
   # Priorité Alex : P1 MSunPV (cerveau routage), P2 chauffe-eau détail
   # ==============================================================
-  pe-epic-11: backlog
+  pe-epic-11: in-progress  # ouvert par Story 11.1 MSunPV / RouteurSolaire
+  11-1-msunpv-routeursolaire-sensors-lecture-seule: review  # dev-story 2026-06-17 — multi-sensor eq553 ; gate terrain PASS box 192.168.1.21 (65 sensors publiés) ; Fix A éligibilité sans generic_type ; pytest 825 vert
+  11-1-bis-multi-sensor-lifecycle-depublication-secondaires: review  # dev-story terminée 2026-06-17 — dépublication exhaustive des sensors secondaires (anti-ghosts HA), suite verte 835 passed ; gate terrain AC6 (mosquitto_sub) restant avant release Market
+  # 11-2-* RÉSERVÉ : chauffe-eau eq554 (backlog-icebox §3.2, P2 Alex) — pas encore créé ; partie switch.554 dépend de pe-epic-12 / 12.2 (vague 2)
+  11-3-iq-ev-pilotage-priorisation-solaire: backlog  # inscrit par correct-course 2026-06-18 (pe-11.3) — IQ EV eq583 + pilotage priorisation eq628 (backlog-icebox §4) ; types mixtes : sensor/binary ⟸ 12.1, switch/button ⟸ 12.2 ; create-story différé jusqu'à 12.2 ; carte workboard 9039c60c préexistante
+
+  # ==============================================================
+  # pe-epic-12 — Restitution d'état runtime Jeedom → Home Assistant
+  # Ajouté par correct-course 2026-06-18 — comble la régression systémique
+  # « entités publiées mais en état unknown » (chemin de valeur Jeedom → HA absent)
+  # Reprend l'intention legacy FR16/FR17 dans le formalisme du cycle courant
+  # PRD : Feature 9 / FR46-FR50 / NFR13
+  # Vague 1 bornée : sensor + binary_sensor (domaines actionnables = vagues ultérieures)
+  # Gate terrain de clôture = capteurs eq553 « tension réseau » non plus en état unknown
+  # ==============================================================
+  pe-epic-12: in-progress  # ouvert par Story 12.1 (restitution d'état runtime Jeedom → HA) — pré-requis pe-epic-11
+  12-1-streaming-valeur-sensor-binary-sensor-vague-1: ready-for-dev  # create-story 2026-06-18 — StateSynchronizer (sync/state.py) miroir de CommandSynchronizer ; double state_topic mono+multi-sensor eq553 ; canal inbound Jeedom→daemon à trancher Task 1 ; gate terrain eq553 non-unknown
+  # 12-2-* RÉSERVÉ : streaming valeur switch/button (vague 2) — étend sync/state.py aux plateformes actionnables ; débloque switch.554 (11.2) et parties actionnables d'IQ EV/pilotage (11.3) — pas encore créé

@@ -75,7 +75,7 @@ async def test_deleted_equipment_is_unpublished_and_removed_from_diagnostics(aio
 
     assert first_response.status == 200
     assert delete_response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     bridge.publish_message.assert_any_call(build_local_availability_topic(355), "", qos=1, retain=True)
 
     diagnostics = await cli.get("/system/diagnostics", headers={"X-Local-Secret": "test_secret"})
@@ -106,7 +106,7 @@ async def test_first_sync_reconciles_boot_cache_and_cleans_availability(aiohttp_
         )
 
     assert response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     bridge.publish_message.assert_any_call(build_local_availability_topic(355), "", qos=1, retain=True)
     assert "[CLEANUP] eq_id=355" in caplog.text
     assert "boot_cache" in caplog.text
@@ -150,7 +150,7 @@ async def test_disabled_equipment_is_unpublished_then_republished_after_reactiva
     assert publish_response.status == 200
     assert disable_response.status == 200
     assert reactivate_response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     assert publisher.publish_light.await_count == 2
 
     eq = next(item for item in diagnostics_payload["payload"]["equipments"] if item["eq_id"] == 355)

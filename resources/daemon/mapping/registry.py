@@ -44,8 +44,40 @@ class MapperRegistry:
         return len(self._mappers)
 
     def map(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
+        """Mapping principal (back-compat) : premier MappingResult ou None.
+
+        Story 11.1 — les mappings secondaires éventuels (multi-sensor) sont rattachés
+        au mapping principal via ``additional_mappings`` pour que les consommateurs
+        mono-mapping par eqLogic restent inchangés.
+        """
+        results = self.map_all(eq, snapshot)
+        if not results:
+            return None
+        primary = results[0]
+        if len(results) > 1:
+            primary.additional_mappings = results[1:]
+        return primary
+
+    def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        """API additive Story 11.1 : retourne tous les mappings du premier mapper
+        qui reconnaît l'eqLogic.
+
+        Un mapper peut exposer ``map_all`` (multi-entité) ; sinon on retombe sur son
+        ``map`` historique (mono-entité). L'ordre du registry est préservé : on
+        s'arrête au premier mapper qui produit au moins un résultat.
+        """
         for mapper in self._mappers:
-            result = mapper.map(eq, snapshot)
-            if result is not None:
-                return result
-        return None
+            results = self._invoke_mapper(mapper, eq, snapshot)
+            if results:
+                return results
+        return []
+
+    @staticmethod
+    def _invoke_mapper(
+        mapper: object, eq: JeedomEqLogic, snapshot: TopologySnapshot
+    ) -> List[MappingResult]:
+        map_all = getattr(mapper, "map_all", None)
+        if callable(map_all):
+            return list(map_all(eq, snapshot))
+        result = mapper.map(eq, snapshot)  # type: ignore[attr-defined]
+        return [result] if result is not None else []
