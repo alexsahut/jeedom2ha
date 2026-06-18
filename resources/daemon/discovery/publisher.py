@@ -296,15 +296,35 @@ class DiscoveryPublisher:
 
         return await self.unpublish_by_eq_id(eq_id)
 
-    async def unpublish_by_eq_id(self, eq_id: int, entity_type: str = "light") -> bool:
-        """Remove a discovery config by eq_id (robust method, avoids parsing string ID)."""
-        topic = self._build_topic(eq_id, entity_type=entity_type)
-        _LOGGER.info("[DISCOVERY] Unpublishing: topic=%s", topic)
+    async def unpublish_by_eq_id(
+        self,
+        eq_id: int,
+        entity_type: str = "light",
+        node_ids: Optional[list] = None,
+    ) -> bool:
+        """Remove discovery config(s) for an eqLogic (robust, avoids parsing string ID).
 
-        ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
-        if not ok:
-            _LOGGER.error("[DISCOVERY] Failed to unpublish %s (bridge unavailable)", topic)
-        return ok
+        Story 11.1.bis — dépublication exhaustive multi-sensor : si ``node_ids`` est
+        fourni (non vide), efface un topic node-scoped par node_id
+        (``homeassistant/<type>/<node_id>/config``) — primaire + secondaires. Sinon,
+        comportement mono-entité historique inchangé (un seul topic eq-level effacé).
+
+        Honnêteté : tous les topics sont tentés ; un seul échec fait renvoyer False
+        (pas de faux succès, pas d'arrêt prématuré qui laisserait des fantômes).
+        """
+        if node_ids:
+            topics = [self._build_topic(eq_id, entity_type=entity_type, node_id=nid) for nid in node_ids]
+        else:
+            topics = [self._build_topic(eq_id, entity_type=entity_type)]
+
+        all_ok = True
+        for topic in topics:
+            _LOGGER.info("[DISCOVERY] Unpublishing: topic=%s", topic)
+            ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
+            if not ok:
+                all_ok = False
+                _LOGGER.error("[DISCOVERY] Failed to unpublish %s (bridge unavailable)", topic)
+        return all_ok
 
     # ------------------------------------------------------------------
     # Private helpers

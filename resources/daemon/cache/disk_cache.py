@@ -27,6 +27,31 @@ _LOGGER = logging.getLogger(__name__)
 _CACHE_FILENAME = "jeedom2ha_cache.json"
 
 
+def _extract_node_ids(mapping_result) -> list:
+    """Collect node-scoped topic identifiers (multi-sensor) from a mapping result.
+
+    Returns the node_id of the primary (if node-scoped) plus each secondary's node_id.
+    Empty for mono-entity eqLogics (no node_id in reason_details).
+    """
+    if mapping_result is None:
+        return []
+
+    def _nid(m) -> "str | None":
+        rd = getattr(m, "reason_details", None) or {}
+        nid = rd.get("node_id")
+        return nid if isinstance(nid, str) and nid else None
+
+    node_ids: list = []
+    primary_nid = _nid(mapping_result)
+    if primary_nid:
+        node_ids.append(primary_nid)
+    for secondary in getattr(mapping_result, "additional_mappings", None) or []:
+        sec_nid = _nid(secondary)
+        if sec_nid:
+            node_ids.append(sec_nid)
+    return node_ids
+
+
 def save_publications_cache(publications: dict, data_dir: str) -> None:
     """Persist the current publications dict to disk.
 
@@ -50,6 +75,9 @@ def save_publications_cache(publications: dict, data_dir: str) -> None:
             "published": published,
             "ha_name": ha_name,
             "suggested_area": suggested_area,
+            # Story 11.1.bis — node_ids node-scoped (multi-sensor) pour une dépublication
+            # exhaustive au boot sans re-parser la topologie. Vide pour le cas mono-entité.
+            "node_ids": _extract_node_ids(mapping_result),
         }
 
     if not os.path.isdir(data_dir):
@@ -94,11 +122,14 @@ def load_publications_cache(data_dir: str) -> Dict[int, dict]:
                 eq_id = int(key)
                 if not isinstance(value, dict):
                     continue
+                raw_node_ids = value.get("node_ids", None)   # BC: absent before 11.1.bis
+                node_ids = [str(n) for n in raw_node_ids if isinstance(n, str) and n] if isinstance(raw_node_ids, list) else []
                 result[eq_id] = {
                     "entity_type": str(value.get("entity_type", "") or ""),
                     "published": bool(value.get("published", False)),
                     "ha_name": str(value.get("ha_name", "") or ""),        # BC: absent in 5.1
                     "suggested_area": value.get("suggested_area", None),   # BC: absent in 5.1
+                    "node_ids": node_ids,
                 }
             except (ValueError, TypeError):
                 continue

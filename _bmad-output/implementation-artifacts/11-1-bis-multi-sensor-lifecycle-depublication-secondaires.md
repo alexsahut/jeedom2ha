@@ -1,6 +1,6 @@
 # Story 11.1.bis: Multi-sensor lifecycle — dépublication exhaustive des sensors secondaires (anti-ghosts HA)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -22,33 +22,33 @@ afin de ne pas laisser d'entités fantômes (ghosts) qui polluent le dashboard s
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) — NON EXÉCUTÉ (pas d'accès box dans cet environnement)
   - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
 
-- [ ] Task 1 — Tracer les secondaires multi-sensor par eq_id (AC: 1)
-  - [ ] Stocker les mappings/publications secondaires aux côtés du primaire (structure indexée par `eq_id`) lors de `_publish_additional_sensors`.
-  - [ ] Conserver assez d'information (au minimum `node_id`/`object_id` ou `cmd_id`) pour reconstruire les topics secondaires sans re-parser la topologie.
-  - [ ] Ajouter un test rouge décrivant qu'après sync, eq553 expose la liste de ses secondaires.
+- [x] Task 1 — Tracer les secondaires multi-sensor par eq_id (AC: 1)
+  - [x] Stocker les mappings/publications secondaires aux côtés du primaire (structure indexée par `eq_id`) lors de `_publish_additional_sensors`. → Les secondaires sont déjà portés par `mapping_result.additional_mappings` dans `app["publications"][eq_id]` ; pas de structure parallèle nécessaire.
+  - [x] Conserver assez d'information (`node_id` dérivé de `cmd_id`) pour reconstruire les topics secondaires sans re-parser la topologie. → Helper `_collect_unpublish_node_ids` + persistance `node_ids` dans le cache disque (`_extract_node_ids`).
+  - [x] Ajouter un test rouge décrivant qu'après sync, eq553 expose la liste de ses secondaires. → `test_collect_node_ids_multi_sensor_returns_all_per_command_topics`, `test_disk_cache_persists_and_reloads_secondary_node_ids`.
 
-- [ ] Task 2 — Dépublication exhaustive (AC: 2, 4, 5)
-  - [ ] Étendre `unpublish_by_eq_id` (ou ajouter une voie multi-sensor) pour effacer le primaire **et** tous les secondaires connus de l'eq_id.
-  - [ ] Réutiliser `_build_topic(eq_id, entity_type, node_id=...)` pour chaque secondaire (le paramètre `node_id` existe déjà).
-  - [ ] Garde-fou mono-entité : un eqLogic sans secondaires efface exactement un topic (comportement inchangé).
-  - [ ] Honnêteté : agréger les échecs de dépublication, ne pas masquer un secondaire non effacé.
+- [x] Task 2 — Dépublication exhaustive (AC: 2, 4, 5)
+  - [x] Étendre `unpublish_by_eq_id` pour effacer le primaire **et** tous les secondaires connus de l'eq_id (param `node_ids`).
+  - [x] Réutiliser `_build_topic(eq_id, entity_type, node_id=...)` pour chaque secondaire.
+  - [x] Garde-fou mono-entité : `node_ids=[]` → exactement un topic effacé (comportement inchangé).
+  - [x] Honnêteté : agrégation `all_ok` (pas d'arrêt au premier échec), un secondaire non effacé renvoie `False`.
 
-- [ ] Task 3 — Couvrir tous les déclencheurs de cycle de vie (AC: 3)
-  - [ ] Vérifier/adapter chaque appel à `unpublish_by_eq_id` : supprimer, exclure, désactiver, retype, cleanup bootstrap.
-  - [ ] S'assurer que les chemins retype (ancien `eq_id`/type) nettoient aussi les secondaires de l'ancien état.
+- [x] Task 3 — Couvrir tous les déclencheurs de cycle de vie (AC: 3)
+  - [x] Chaque appel à `unpublish_by_eq_id` calcule `node_ids` (runtime via `_collect_unpublish_node_ids`, boot via `cache["node_ids"]`) : retype runtime/boot, changement de politique, purge boot/standard, action supprimer, action publier-exclus.
+  - [x] Chemins retype : nettoient aussi les secondaires de l'ancien état. Replay différé (`pending_discovery_unpublish`) transporte désormais `{entity_type, node_ids}`.
 
-- [ ] Task 4 — Tests + golden + gate terrain (AC: 6, 7)
-  - [ ] Tests unitaires : dépublication multi-sensor efface N+1 topics ; mono-entité efface 1 topic ; échec partiel honnête.
-  - [ ] Ajouter au golden corpus un cas de dépublication multi-sensor (delta borné de `expected_sync_snapshot.json` si nécessaire).
-  - [ ] Lancer la suite pytest complète.
-  - [ ] Gate terrain : publier eq553, puis supprimer/exclure, et vérifier via `mosquitto_sub` qu'aucun `jeedom2ha_553_<cmd>/config` retained ne subsiste.
+- [x] Task 4 — Tests + golden + gate terrain (AC: 6, 7)
+  - [x] Tests unitaires : dépublication multi-sensor efface N topics ; mono-entité efface 1 topic ; échec partiel honnête. → `test_story_11_1_bis_multi_sensor_unpublish.py`.
+  - [x] Cas de dépublication multi-sensor : couvert par le test end-to-end `test_action_supprimer_erases_all_multi_sensor_topics` (le golden `expected_sync_snapshot.json` est un snapshot de **sync**, pas de dépublication → un test dédié est plus fidèle qu'un delta de snapshot).
+  - [x] Suite pytest complète verte : **835 passed**.
+  - [ ] Gate terrain (AC 6) : `mosquitto_sub` sur box réelle — NON EXÉCUTÉ (pas d'accès box dans cet environnement). À valider avant release Market.
 
 ## Dev Notes
 
@@ -118,5 +118,33 @@ Claude Opus 4.8 (create-story via correct-course handoff)
 ### Completion Notes List
 
 - Create-story : story 11.1.bis matérialisée à partir du Follow-up MEDIUM de 11.1, élevé via Sprint Change Proposal 2026-06-17. Numéro `11.1.bis` (et non 11.2) pour préserver le slot 11.2 = chauffe-eau eq554. Scope = robustesse cycle de vie multi-sensor (dépublication exhaustive anti-ghosts). Task 0 terrain injectée (story daemon/MQTT/discovery).
+- Dev-story (Opus 4.8) :
+  - **Constat aggravant** : le primaire multi-sensor est lui aussi node-scoped (`jeedom2ha_<eq>_<cmd>`), donc l'ancienne dépublication mono-topic `jeedom2ha_<eq>/config` n'effaçait **aucun** des topics réels → 65 ghosts pour eq553, pas 64. La collecte des `node_ids` inclut donc le primaire ET les secondaires.
+  - `publisher.unpublish_by_eq_id` accepte `node_ids: Optional[list]=None`. Si fourni : un topic effacé par node_id (primaire + secondaires) ; sinon : topic eq-level historique (mono-entité). Agrégation `all_ok` sans court-circuit → AC 5 (honnêteté échec partiel). Signature rétro-compatible (AC 4).
+  - `cache/disk_cache.py` : helper `_extract_node_ids`, champ `node_ids` persisté + relecture rétro-compatible (caches 5.1/5.2 sans `node_ids` → `[]`).
+  - `transport/http_server.py` : helper `_collect_unpublish_node_ids(mapping_result)` (primaire + `additional_mappings`, `[]` si mono). Les 7 sites d'appel `unpublish_by_eq_id` calculent et passent `node_ids` (runtime via le helper, boot via `cache["node_ids"]`). Le replay différé `pending_discovery_unpublish` stocke désormais `{entity_type, node_ids}` (helpers `_defer_discovery_unpublish` / `_pending_unpublish_parts`) au lieu d'une string.
+  - **Régressions corrigées** : le passage de `unpublish_by_eq_id(...)` avec `node_ids=[]` (mono) + le changement de format de `pending_discovery_unpublish` ont cassé 19 tests existants (assertions de signature exacte + format de la valeur différée + un mock side_effect à signature figée). Tous mis à jour vers la nouvelle signature (`node_ids=[]` pour mono) ; le comportement de production mono-entité est **strictement inchangé** (un seul topic).
+  - **Non vérifiable ici** : Task 0 (deploy-to-box) et AC 6 (gate terrain `mosquitto_sub`) nécessitent la box Jeedom physique — à exécuter avant release Market.
 
 ### File List
+
+**Production :**
+- `resources/daemon/discovery/publisher.py` — `unpublish_by_eq_id` étendu (param `node_ids`, dépublication exhaustive, agrégation honnête).
+- `resources/daemon/cache/disk_cache.py` — `_extract_node_ids` + persistance/relecture rétro-compatible du champ `node_ids`.
+- `resources/daemon/transport/http_server.py` — `_collect_unpublish_node_ids`, format dict `pending_discovery_unpublish` (`_defer_discovery_unpublish` / `_pending_unpublish_parts` / replay), 7 sites unpublish câblés.
+
+**Tests :**
+- `resources/daemon/tests/unit/test_story_11_1_bis_multi_sensor_unpublish.py` — NOUVEAU (collecte node_ids, dépublication exhaustive, échec partiel, BC, cache, end-to-end supprimer).
+- `resources/daemon/tests/unit/test_story_5_3_execute_supprimer.py` — mock + assertion signature `node_ids`.
+- `resources/daemon/tests/unit/test_cleanup.py` — assertions signature `node_ids` + format dict `pending_discovery_unpublish`.
+- `resources/daemon/tests/unit/test_exclusion_filtering.py` — assertion signature `node_ids`.
+- `resources/daemon/tests/unit/test_story_5_2_execute_publier.py` — assertion signature `node_ids`.
+- `resources/daemon/tests/unit/test_story_5_2_integration.py` — assertion signature `node_ids`.
+- `resources/daemon/tests/integration/test_boot_reconciliation.py` — assertions signature `node_ids` (×3).
+
+### Change Log
+
+| Date | Version | Description | Auteur |
+|------|---------|-------------|--------|
+| 2026-06-17 | 0.1 | Création story (correct-course handoff) | Opus 4.8 |
+| 2026-06-17 | 1.0 | Implémentation dev-story : dépublication exhaustive multi-sensor (node_ids), persistance cache, 7 sites de cycle de vie câblés, replay différé en dict, 19 régressions corrigées. Suite verte 835 passed. Status → review. | Opus 4.8 |

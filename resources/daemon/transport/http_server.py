@@ -580,6 +580,36 @@ def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
     return bool(getattr(decision, "should_publish", False))
 
 
+def _collect_unpublish_node_ids(mapping_result) -> list:
+    """Collect node-scoped topic identifiers to unpublish for one eqLogic (Story 11.1.bis).
+
+    Multi-sensor eqLogics publish every entity (primary AND secondaries) under a
+    node-scoped topic ``homeassistant/<type>/<node_id>/config``. To depublish
+    exhaustively (anti-ghosts), gather the primary node_id plus each secondary node_id
+    from the stored mapping result — no topology re-parsing required.
+
+    Returns an empty list for mono-entity eqLogics (no node_id), so the caller falls
+    back to the historical single eq-level unpublish (no over-deletion).
+    """
+    if mapping_result is None:
+        return []
+
+    def _nid(m):
+        rd = getattr(m, "reason_details", None) or {}
+        nid = rd.get("node_id")
+        return nid if isinstance(nid, str) and nid else None
+
+    node_ids: list = []
+    primary_nid = _nid(mapping_result)
+    if primary_nid:
+        node_ids.append(primary_nid)
+    for secondary in getattr(mapping_result, "additional_mappings", None) or []:
+        sec_nid = _nid(secondary)
+        if sec_nid:
+            node_ids.append(sec_nid)
+    return node_ids
+
+
 def _defer_local_availability_cleanup(
     pending_cleanup: Dict[int, str],
     eq_id: int,
@@ -608,31 +638,55 @@ def _replay_deferred_local_availability_cleanup(
             pending_cleanup.pop(pending_eq_id, None)
 
 
+def _pending_unpublish_parts(value) -> tuple:
+    """Normalize a pending-unpublish entry to (entity_type, node_ids).
+
+    Backward-compatible: legacy entries stored a bare entity_type string; Story 11.1.bis
+    entries store a dict {"entity_type": str, "node_ids": [...]} to carry multi-sensor
+    secondaries across a deferred replay.
+    """
+    if isinstance(value, dict):
+        entity_type = str(value.get("entity_type") or "light")
+        node_ids = value.get("node_ids") or []
+        return entity_type, list(node_ids)
+    return str(value or "light"), []
+
+
 def _defer_discovery_unpublish(
-    pending_unpublish: Dict[int, str],
+    pending_unpublish: Dict[int, object],
     eq_id: int,
     entity_type: str,
+    node_ids: Optional[list] = None,
 ) -> None:
-    """Track one discovery unpublish to replay later when broker is connected."""
+    """Track one discovery unpublish to replay later when broker is connected.
+
+    Story 11.1.bis — preserve multi-sensor node_ids so the deferred replay erases the
+    primary AND every secondary topic (no residual ghost after a reconnect).
+    """
     normalized_entity_type = str(entity_type or "light")
-    pending_unpublish[int(eq_id)] = normalized_entity_type
+    pending_unpublish[int(eq_id)] = {
+        "entity_type": normalized_entity_type,
+        "node_ids": list(node_ids or []),
+    }
     _LOGGER.info(
-        "[DISCOVERY] Deferred unpublish eq_id=%d entity_type=%s",
+        "[DISCOVERY] Deferred unpublish eq_id=%d entity_type=%s node_ids=%d",
         eq_id,
         normalized_entity_type,
+        len(node_ids or []),
     )
 
 
 async def _replay_deferred_discovery_unpublish(
     publisher: DiscoveryPublisher,
-    pending_unpublish: Dict[int, str],
+    pending_unpublish: Dict[int, object],
 ) -> None:
     """Replay deferred discovery unpublish messages when broker is connected."""
     if not pending_unpublish:
         return
 
-    for pending_eq_id, pending_entity_type in list(pending_unpublish.items()):
-        if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=pending_entity_type):
+    for pending_eq_id, pending_value in list(pending_unpublish.items()):
+        entity_type, node_ids = _pending_unpublish_parts(pending_value)
+        if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=entity_type, node_ids=node_ids):
             pending_unpublish.pop(pending_eq_id, None)
 
 
@@ -664,12 +718,17 @@ async def _detect_lifecycle_changes(
                 "[LIFECYCLE] eq_id=%d: retypage détecté (%s → %s) → unpublish ancien topic",
                 eq_id, prev_mr.ha_entity_type, mapping.ha_entity_type,
             )
+            prev_node_ids = _collect_unpublish_node_ids(prev_mr)
             if publisher is not None:
-                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=prev_mr.ha_entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(
+                    eq_id, entity_type=prev_mr.ha_entity_type, node_ids=prev_node_ids
+                )
             else:
                 unpublish_ok = False
             if not unpublish_ok:
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, prev_mr.ha_entity_type)
+                _defer_discovery_unpublish(
+                    pending_discovery_unpublish, eq_id, prev_mr.ha_entity_type, node_ids=prev_node_ids
+                )
         # Rename / area change logs (publication already handled by handler with fresh data)
         if prev_mr.ha_name != mapping.ha_name:
             _LOGGER.info(
@@ -694,12 +753,17 @@ async def _detect_lifecycle_changes(
                     "[LIFECYCLE] eq_id=%d: retypage au boot (%s → %s) → unpublish ancien topic",
                     eq_id, boot_type, mapping.ha_entity_type,
                 )
+                boot_node_ids = boot_entry.get("node_ids", []) or []
                 if publisher is not None:
-                    unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=boot_type)
+                    unpublish_ok = await publisher.unpublish_by_eq_id(
+                        eq_id, entity_type=boot_type, node_ids=boot_node_ids
+                    )
                 else:
                     unpublish_ok = False
                 if not unpublish_ok:
-                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, boot_type)
+                    _defer_discovery_unpublish(
+                        pending_discovery_unpublish, eq_id, boot_type, node_ids=boot_node_ids
+                    )
             # Rename au boot
             if boot_name and boot_name != mapping.ha_name:
                 _LOGGER.info(
@@ -1290,12 +1354,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 and current_decision is not None
                 and not current_decision.should_publish):
             entity_type = previous_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
             _LOGGER.info(
                 "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
                 eq_id, previous_decision.reason, current_decision.reason,
             )
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
                 if unpublish_ok:
                     pending_discovery_unpublish.pop(eq_id, None)
                 else:
@@ -1303,13 +1368,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                         "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
                         eq_id,
                     )
-                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             else:
                 _LOGGER.warning(
                     "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
                     eq_id,
                 )
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             # Nettoyer la disponibilité locale si elle était présente
             if bool(getattr(previous_decision, "local_availability_supported", False)):
                 prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
@@ -1345,18 +1410,25 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             boot_entry = boot_cache.get(old_eq_id)
             if boot_entry and boot_entry.get("published"):
                 boot_entity_type = boot_entry.get("entity_type") or "light"
+                boot_node_ids = boot_entry.get("node_ids", []) or []
                 boot_cleanup_reason = "supprimé depuis downtime daemon" if elig_entry is None else cleanup_reason
                 discovery_action = "discovery unpublish effectif"
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=boot_entity_type)
+                    unpublish_ok = await publisher.unpublish_by_eq_id(
+                        old_eq_id, entity_type=boot_entity_type, node_ids=boot_node_ids
+                    )
                     if unpublish_ok:
                         pending_discovery_unpublish.pop(old_eq_id, None)
                     else:
                         discovery_action = "discovery unpublish deferred"
-                        _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+                        _defer_discovery_unpublish(
+                            pending_discovery_unpublish, old_eq_id, boot_entity_type, node_ids=boot_node_ids
+                        )
                 else:
                     discovery_action = "discovery unpublish deferred"
-                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+                    _defer_discovery_unpublish(
+                        pending_discovery_unpublish, old_eq_id, boot_entity_type, node_ids=boot_node_ids
+                    )
                 avail_topic = build_local_availability_topic(old_eq_id)
                 availability_action = "availability cleanup"
                 if mqtt_bridge and mqtt_bridge.is_connected:
@@ -1381,17 +1453,18 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
         if _needs_discovery_unpublish(old_decision):
             entity_type = old_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(old_decision.mapping_result)
             discovery_action = "discovery unpublish effectif"
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type, node_ids=node_ids)
                 if unpublish_ok:
                     pending_discovery_unpublish.pop(old_eq_id, None)
                 else:
                     discovery_action = "discovery unpublish deferred"
-                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type, node_ids=node_ids)
             else:
                 discovery_action = "discovery unpublish deferred"
-                _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type, node_ids=node_ids)
             avail_topic = build_local_availability_topic(old_eq_id)
             availability_action = "availability cleanup"
             if mqtt_bridge and mqtt_bridge.is_connected:
@@ -2311,15 +2384,18 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
             if previous_decision and previous_decision.mapping_result is not None:
                 entity_type = previous_decision.mapping_result.ha_entity_type
+                node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
             elif mappings.get(eq_id) is not None:
                 entity_type = mappings[eq_id].ha_entity_type
+                node_ids = _collect_unpublish_node_ids(mappings[eq_id])
             else:
                 entity_type = "light"
+                node_ids = []
 
-            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
             await asyncio.sleep(_action_delay)
             if not unpublish_ok:
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
                 supprimer_errors += 1
                 continue
 
@@ -2512,15 +2588,18 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
         if previous_decision and previous_decision.mapping_result is not None:
             entity_type = previous_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
         elif mapping is not None:
             entity_type = mapping.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(mapping)
         else:
             entity_type = "light"
+            node_ids = []
 
-        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
         await asyncio.sleep(_action_delay)
         if not unpublish_ok:
-            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             continue
 
         pending_discovery_unpublish.pop(eq_id, None)
