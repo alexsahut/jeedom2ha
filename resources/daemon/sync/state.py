@@ -36,8 +36,12 @@ _STREAMED_TYPES = _VAGUE1_TYPES + _VAGUE2_ACTIONABLE
 
 # Readback (info) command keys per actionable type — used to pick the state
 # command, NOT the action commands (e.g. switch ENERGY_ON/ENERGY_OFF).
+# switch carries two readback shapes: ENERGY_STATE (energy switch) and PRESENCE
+# (Story 10.7 presence switch). Both must stream, and the set must stay in sync
+# with CommandSynchronizer._has_reliable_state, otherwise a presence switch has
+# its optimistic publish suppressed while no real state is ever streamed.
 _READBACK_KEYS = {
-    "switch": ("ENERGY_STATE",),
+    "switch": ("ENERGY_STATE", "PRESENCE"),
     "light": ("LIGHT_STATE",),
     "cover": ("FLAP_STATE", "FLAP_BSO_STATE"),
 }

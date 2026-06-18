@@ -94,6 +94,41 @@ def _switch_no_readback_decision(eq_id=560, published=True):
     return decision
 
 
+def _presence_switch_decision(eq_id=620, state_cmd_id=6203, current_value="1", published=True):
+    """Story 10.7 presence switch: SET_ON/SET_OFF actions + PRESENCE info readback.
+
+    Its real state is the PRESENCE info command, NOT ENERGY_STATE. It must stream
+    just like an energy switch, otherwise CommandSynchronizer suppresses the
+    optimistic publish (PRESENCE is a reliable readback there) while no real state
+    is ever produced -> the switch stays unknown."""
+    commands = {
+        "SET_ON": JeedomCmd(id=6201, name="On", generic_type="SET_ON",
+                            type="action", sub_type="other"),
+        "SET_OFF": JeedomCmd(id=6202, name="Off", generic_type="SET_OFF",
+                             type="action", sub_type="other"),
+        "PRESENCE": JeedomCmd(id=state_cmd_id, name="Presence",
+                              generic_type="PRESENCE", type="info",
+                              sub_type="binary", current_value=current_value),
+    }
+    mapping = MappingResult(
+        ha_entity_type="switch",
+        confidence="sure",
+        reason_code="presence_switch_set_on_off",
+        jeedom_eq_id=eq_id,
+        ha_unique_id=f"jeedom2ha_eq_{eq_id}",
+        ha_name=f"Presence {eq_id}",
+        commands=commands,
+        capabilities=SwitchCapabilities(has_on_off=True, has_state=True,
+                                        on_off_confidence="sure"),
+    )
+    decision = PublicationDecision(
+        should_publish=published, reason="sure", mapping_result=mapping,
+        state_topic=f"jeedom2ha/{eq_id}/state", discovery_published=published,
+    )
+    mapping.publication_decision_ref = decision
+    return decision
+
+
 def _button_decision(eq_id=700, cmd_id=7001):
     """Button: action-only, stateless (no state_topic) — must never stream state."""
     cmd = JeedomCmd(id=cmd_id, name="Trigger", generic_type="ACTION",
@@ -276,6 +311,57 @@ async def test_switch_without_readback_streams_nothing():
     assert await sync.handle_state_message(eq_id=560, cmd_id=5601, value="1") is False
     assert await sync.publish_initial_states(decision) == 0
     assert bridge.published == []
+
+
+# --- presence switch (Story 10.7) streams via PRESENCE readback (regression) ---
+
+@pytest.mark.asyncio
+async def test_presence_switch_streams_state_via_presence_readback():
+    """A presence switch's real state is its PRESENCE info command. It must stream
+    ON/OFF on the eq-level state_topic, exactly like an ENERGY_STATE switch."""
+    decision = _presence_switch_decision(eq_id=620, state_cmd_id=6203)
+    bridge = _FakeBridge()
+    sync = _sync({620: decision}, bridge)
+
+    ok = await sync.handle_state_message(eq_id=620, cmd_id=6203, value="1")
+
+    assert ok is True
+    assert bridge.published == [("jeedom2ha/620/state", "ON", 1, True)]
+
+
+def test_presence_switch_is_a_state_target():
+    sync = _sync({620: _presence_switch_decision(eq_id=620, state_cmd_id=6203)},
+                 _FakeBridge())
+
+    assert sync.list_state_targets() == [
+        {"eq_id": 620, "cmd_id": 6203, "ha_type": "switch",
+         "state_topic": "jeedom2ha/620/state"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_presence_switch_initial_snapshot_publishes_current_state():
+    decision = _presence_switch_decision(eq_id=620, state_cmd_id=6203, current_value="0")
+    bridge = _FakeBridge()
+    sync = _sync({620: decision}, bridge)
+
+    count = await sync.publish_initial_states(decision)
+
+    assert count == 1
+    assert bridge.published == [("jeedom2ha/620/state", "OFF", 1, True)]
+
+
+def test_presence_switch_command_and_state_paths_agree():
+    """The reliable-state gate (command path) and the streamed-target set (state
+    path) must agree for a presence switch: both must recognize PRESENCE, else the
+    optimistic publish is suppressed while no real state is ever streamed."""
+    decision = _presence_switch_decision(eq_id=620, state_cmd_id=6203)
+    state_sync = _sync({620: decision}, _FakeBridge())
+    cmd_sync = _cmd_sync()
+    cmd_sync._app = {"state_synchronizer": state_sync}
+
+    assert cmd_sync._has_reliable_state(decision.mapping_result, decision) is True
+    assert [t["cmd_id"] for t in state_sync.list_state_targets()] == [6203]
 
 
 # --- state ⊆ discovery (AC#5) ---
