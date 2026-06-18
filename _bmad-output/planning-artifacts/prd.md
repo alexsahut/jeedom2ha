@@ -389,6 +389,14 @@ Une évolution n'est acceptable que si elle garde ces surfaces alignées. Un cha
 - FR44: Le système peut exposer un contrat de diagnostic dont les champs canoniques (`reason_code`, `cause_code`, `cause_label`, `cause_action`, étape de pipeline, statut`) restent stables d'une version à l'autre, hors ajouts additifs documentés, pour permettre des tests de non-régression.
 - FR45: Le mainteneur peut vérifier qu'une évolution du registre, du mapping ou de la validation ne dégrade pas le contrat 4D ni la hiérarchie des causes.
 
+### Feature 9 — Restitution d'état runtime Jeedom → Home Assistant
+
+- FR46: Le système peut publier vers Home Assistant la valeur d'état runtime de chaque commande info d'un équipement publié, sur le `state_topic` déclaré lors de la publication discovery (étape 5).
+- FR47: Le système peut alimenter l'état d'une entité HA à sa publication (état initial) puis à chaque changement de valeur côté Jeedom (event-driven), sans dépendre d'un resync complet.
+- FR48: L'utilisateur peut distinguer une entité « publiée mais sans valeur » (discovery présente, état `unknown`) d'une entité « publiée et alimentée » dans le diagnostic.
+- FR49: Le système peut restituer en priorité l'état des types `sensor` et `binary_sensor` (vague 1) ; les autres domaines (`switch`, `climate`, …) sont ajoutés par vagues ultérieures gouvernées.
+- FR50: Le système ne publie une valeur d'état que pour des entités effectivement publiées en discovery (cohérence state ⊆ discovery), sans créer de topic d'état orphelin.
+
 ### Dépendances entre features
 
 - **Feature 0** est la fondation de toutes les autres features ; sans ordre canonique, il n'existe ni cause principale stable ni diagnostic fiable.
@@ -399,6 +407,7 @@ Une évolution n'est acceptable que si elle garde ces surfaces alignées. Un cha
 - **Feature 4** conditionne **Feature 5** ; aucune publication ne peut contourner la décision produit.
 - **Feature 6** dépend des Features **0 à 5** ; le diagnostic restitue l'état réel du pipeline et du résultat de publication.
 - **Feature 8** est transverse ; elle gouverne la capacité à faire évoluer les Features **1 à 7** sans régression.
+- **Feature 9** dépend des Features **0 à 5** ; la restitution d'état n'alimente que des `state_topic` déjà déclarés par la publication discovery. Elle est parallèle au pipeline de projection (ne réordonne ni ne revalide les 5 étapes).
 
 ## Exigences non fonctionnelles
 
@@ -422,3 +431,7 @@ Une évolution n'est acceptable que si elle garde ces surfaces alignées. Un cha
 - NFR10: 100% des ouvertures de nouveaux composants HA doivent être accompagnées, dans le même incrément, d'au moins un cas nominal, un cas d'échec de validation et un test de non-régression diagnostic, vérifié en revue de livraison.
 - NFR11: 0 évolution du registre, du mapping ou de la validation ne doit être acceptée si le corpus de non-régression du diagnostic canonique présente une régression, vérifié par passage complet des tests de non-régression avant acceptation.
 - NFR12: Les artefacts de décision utilisés par les vérifications automatiques doivent conserver un schéma canonique stable sur 100% des tests de cohérence, hors ajouts additifs documentés, vérifié par contrôles de schéma et tests de cohérence.
+
+### Restitution d'état runtime
+
+- NFR13: La restitution d'état doit être event-driven et n'introduire aucune source de vérité métier concurrente à Jeedom (cohérent NFR6) ; 100% des valeurs publiées proviennent d'une commande info Jeedom d'une entité déjà publiée en discovery.
