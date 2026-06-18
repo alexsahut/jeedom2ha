@@ -53,7 +53,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-18'  # correct-course 2026-06-18 (pe-11.3) : Story 11.3 inscrite (backlog, IQ EV/pilotage) + Story 12.2 réservée (vague 2 switch/button) ; dépendances inter-epic explicitées
+last_updated: '2026-06-18'  # gate terrain 12.2 PASS sur box 192.168.1.21 (switch on/off réel, eq554=OFF ; non-régression eq553+light/cover ; 1 follow-up LOW bruit discovery). Story 12.2 entièrement validée (AC 1-11). Antérieur — code-review 12.2 (1 HIGH corrigé, 893 tests verts) ; dev-story 12.2 ; create-story 12.2 ; correct-course (pe-11.3)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -248,4 +248,4 @@ development_status:
   # ==============================================================
   pe-epic-12: in-progress  # ouvert par Story 12.1 (restitution d'état runtime Jeedom → HA) — pré-requis pe-epic-11
   12-1-streaming-valeur-sensor-binary-sensor-vague-1: ready-for-dev  # create-story 2026-06-18 — StateSynchronizer (sync/state.py) miroir de CommandSynchronizer ; double state_topic mono+multi-sensor eq553 ; canal inbound Jeedom→daemon à trancher Task 1 ; gate terrain eq553 non-unknown
-  # 12-2-* RÉSERVÉ : streaming valeur switch/button (vague 2) — étend sync/state.py aux plateformes actionnables ; débloque switch.554 (11.2) et parties actionnables d'IQ EV/pilotage (11.3) — pas encore créé
+  12-2-streaming-valeur-switch-button-vague-2: done  # gate terrain PASS 2026-06-18 (box 192.168.1.21 : switch on/off réel, eq554=OFF, state_listeners switch enregistrés, non-régression eq553+light/cover ; 1 follow-up LOW bruit discovery). AC 1-11 validés. Antérieur — code-review : switch streamé (ENERGY_STATE→ON/OFF), button no-op, is_active scope-aware ; 1 HIGH corrigé ; 893 tests verts ; débloque switch.554 (11.2) + actionnables IQ EV/pilotage (11.3)
