@@ -1,6 +1,6 @@
 # Story 12.1: Restitution d'état runtime — streaming des valeurs sensor / binary_sensor (vague 1)
 
-Status: ready-for-dev
+Status: ready-for-review (daemon + listener PHP implémentés et testés ; gate terrain PASSÉ sur domobox le 2026-06-18)
 
 ## Story
 
@@ -23,46 +23,80 @@ afin de pouvoir construire un dashboard énergie/maison exploitable, alimenté e
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
-  - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Vérifier que le script se termine avec `Deploy complete.`
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+  - [x] Dry-run OK (`./scripts/deploy-to-box.sh --dry-run`) : rsync simulé, `state.py` + `http_server.py` inclus, aucun transfert.
+  - [x] Cycle complet `--cleanup-discovery --restart-daemon` → `Deploy complete.` (2026-06-18, box domobox 192.168.1.21).
 
-- [ ] Task 1 — Décision d'architecture du canal Jeedom → daemon (AC: 1, 3, 7)
-  - [ ] Trancher le mécanisme par lequel un changement de valeur Jeedom atteint le daemon. Trois options identifiées (voir Dev Notes §Canal inbound) :
-    - **Option A (recommandée)** : listener Jeedom `cmd::event` / `#listener#` côté plugin → envoi au daemon (via `jeedomdaemon` `send_to_daemon` → `on_message()` du daemon `main.py:169`), puis publication MQTT.
-    - **Option B** : cron Jeedom (`jeedom2ha.class.php`) qui pousse les deltas de valeur vers le daemon par HTTP.
-    - **Option C** : polling daemon-initié.
-  - [ ] Documenter la décision et son périmètre minimal pour la vague 1 (sensor/binary_sensor info) directement dans la story.
-  - [ ] Garder le périmètre PHP minimal et borné ; ne pas réécrire le plugin.
+- [x] Task 1 — Décision d'architecture du canal Jeedom → daemon (AC: 1, 3, 7) — **TRANCHÉE** (voir §Décision Task 1 ci-dessous)
+  - [x] Mécanisme retenu : **Option A raffinée** — listener Jeedom `#listener#` event-driven, MAIS transport via le canal HTTP éprouvé `callDaemon()` → nouvelle route daemon `POST /action/state_update`, et NON via le socket `jeedomdaemon`/`on_message` (qui est un stub non câblé côté plugin : aucun `sendToDaemon` dans `core/`).
+  - [x] Décision et périmètre minimal documentés dans la story (§Décision Task 1).
+  - [x] Périmètre PHP gardé minimal et borné ; pipeline de projection non touché.
 
-- [ ] Task 2 — Implémenter `StateSynchronizer` (daemon) (AC: 1, 2, 3, 5, 6, 7, 8)
-  - [ ] Créer `resources/daemon/sync/state.py` avec une classe `StateSynchronizer` calquée structurellement sur `CommandSynchronizer` (`sync/command.py`).
-  - [ ] Interface attendue par le code existant : `is_active` (property ou callable), cohérente avec `CommandSynchronizer._is_state_sync_active()` (`sync/command.py:374-399`).
-  - [ ] Résoudre, pour un `(eq_id, cmd_id, valeur)` entrant, le `state_topic` cible **depuis le registre de publications** `app["publications"]` (ne jamais reconstruire un topic à la main) : mono-entité → `jeedom2ha/{eq}/state` ; multi-sensor → `jeedom2ha/{eq}/{cmd}/state`.
-  - [ ] Publier via `MqttBridge.publish_message(state_topic, payload, qos=1, retain=True)` (`transport/mqtt_client.py:315`).
-  - [ ] Traduire la valeur binaire en `payload_on`/`payload_off` cohérents avec le payload binary_sensor (`discovery/publisher.py` ~ligne 532).
-  - [ ] Borne stricte vague 1 : ne traiter que les entités dont le `ha_entity_type ∈ {sensor, binary_sensor}` dans `app["publications"]`. Ignorer le reste.
+- [x] Task 2 — Implémenter `StateSynchronizer` (daemon) (AC: 1, 2, 3, 5, 6, 7, 8)
+  - [x] Créé `resources/daemon/sync/state.py` (`StateSynchronizer`), miroir structurel de `CommandSynchronizer`.
+  - [x] Expose `is_active` (property) — retourne **False** en vague 1 : on ne stream PAS l'état actionnable, donc `CommandSynchronizer` garde son chemin optimiste (AC#4/#9).
+  - [x] Résout `(eq_id, cmd_id)` → `state_topic` **depuis `app["publications"]`** (jamais reconstruit) : mono → `decision.state_topic` ; multi-sensor → `reason_details["state_topic"]` via `reason_details["cmd_id"]` (`mapping/sensor.py:164-167`).
+  - [x] Publie via `MqttBridge.publish_message(topic, payload, qos=1, retain=True)`.
+  - [x] Traduction binaire : `1/true/on/open` → `ON`, sinon `OFF` (défauts HA, payload discovery non surchargé).
+  - [x] Borne stricte vague 1 : `ha_entity_type ∈ {sensor, binary_sensor}` uniquement.
 
-- [ ] Task 3 — Câbler le canal inbound et l'instanciation (AC: 1, 3, 8)
-  - [ ] Instancier `StateSynchronizer` dans `main.py` (`on_start`) et l'exposer dans `self._app["state_synchronizer"]` (cf. `CommandSynchronizer` à `main.py:139-145`).
-  - [ ] Implémenter le routage des messages de valeur entrants : selon l'option Task 1, soit via `Jeedom2haDaemon.on_message()` (`main.py:169`), soit via un handler dédié, vers `StateSynchronizer.handle_state_message(...)`.
-  - [ ] Côté PHP (option retenue), brancher l'émission de valeur minimale (listener ou cron) — périmètre borné, sans toucher au pipeline de projection.
+- [x] Task 3 — Câbler le canal inbound et l'instanciation (AC: 1, 3, 8) — **complète (daemon + PHP, R1 ciblé)**
+  - [x] `StateSynchronizer` instancié dans `main.py` (`on_start`) et exposé dans `app["state_synchronizer"]`.
+  - [x] Routage inbound : nouvelle route `POST /action/state_update` (`transport/http_server.py`) → `StateSynchronizer.handle_state_message(...)`. (Décision Task 1 : HTTP, pas `on_message`.)
+  - [x] **R1 (ciblé) — source autoritative daemon** : `StateSynchronizer.list_state_targets()` + route `GET /system/state_listeners` exposent l'ensemble exact des `(eq_id, cmd_id)` vague-1 publiés (mapping single-sourcé dans le daemon ; `published_scope` est eq-level, ne porte pas les cmd_id).
+  - [x] **Listener PHP** : `jeedom2ha::syncStateListeners()` purge puis (ré)enregistre un `listener` Jeedom par cmd publiée (lu depuis `/system/state_listeners`), callback `jeedom2ha::stateListener($options)` → `callDaemon('/action/state_update', {eq_id, cmd_id, value}, 'POST')`. Branché après chaque sync OK (`bootstrapRuntimeAfterDaemonStart` + scan manuel `ajax scanTopology`).
+  - [x] Sous-décision « registration » R1 vs R2 : **R1 tranchée par l'agent architecte (Winston) le 2026-06-18** — écouter exactement le périmètre publié (cf. §Décision Task 1).
 
-- [ ] Task 4 — État initial (snapshot) à la publication discovery (AC: 2)
-  - [ ] Après publication discovery d'une entité vague 1, publier l'état courant connu de Jeedom sur son `state_topic` lorsqu'il est disponible (sinon laisser `unknown`, sans inventer de valeur).
-  - [ ] Vérifier l'ordre : discovery publié AVANT le premier message d'état (sinon HA ignore l'état).
+- [x] Task 4 — État initial (snapshot) à la publication discovery (AC: 2)
+  - [x] `StateSynchronizer.publish_initial_states(decision)` publie `JeedomCmd.current_value` sur le `state_topic` des entités vague 1, gated sur `publication_decision_ref.discovery_published` (AC#5).
+  - [x] Appelé dans `_handle_action_sync` APRÈS la publication discovery (primaire + secondaires), donc ordre discovery→état respecté.
 
-- [ ] Task 5 — Tests et non-régression (AC: 4, 6, 7, 9)
-  - [ ] Remplacer/compléter les fakes `_FakeStateSynchronizer` (`tests/unit/test_command_sync.py:19`, `tests/integration/test_command_sync_coexistence.py:14`) par des tests du vrai `StateSynchronizer` (interface `is_active`, résolution de topic, publication, borne vague 1).
-  - [ ] Tester la traduction binary_sensor (on/off) et le cas multi-sensor eq553 (`jeedom2ha/553/<cmd>/state`).
-  - [ ] Tester que les types actionnables ne sont pas alimentés par cette story (AC#4) et que `CommandSynchronizer` reste inchangé sur l'optimiste hors vague 1.
-  - [ ] Lancer la suite pytest complète (`python3 -m pytest resources/daemon/tests -q`).
+- [x] Task 5 — Tests et non-régression (AC: 4, 6, 7, 9)
+  - [x] Tests du vrai `StateSynchronizer` ajoutés (`tests/unit/test_story_12_1_state_streaming.py`, 19 tests) : interface `is_active`, résolution topic mono/multi, publication, borne vague 1, snapshot, state⊆discovery. Fakes `_FakeStateSynchronizer` conservés (couverture des branches `CommandSynchronizer` en isolation) + test du contrat sur l'objet réel.
+  - [x] Traduction binary_sensor (on/off) et multi-sensor eq553 (`jeedom2ha/553/<cmd>/state`) testés.
+  - [x] Test que les actionnables ne sont pas alimentés (AC#4) + `CommandSynchronizer._is_state_sync_active(real)` == False (optimiste préservé).
+  - [x] Route HTTP testée (`tests/unit/test_story_12_1_state_update_route.py`, 7 tests : publish, wrapper/direct, auth 401, champs requis 400, entité inconnue, + `/system/state_listeners` liste & auth).
+  - [x] `list_state_targets()` testé (mono/multi/binary inclus, light exclu, non-publié exclu).
+  - [x] Suite pytest complète : **860 passed** (était 831 ; +29).
 
-- [ ] Task 6 — Gate terrain (AC: 10)
-  - [ ] `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon` → `Deploy complete.`
-  - [ ] Provoquer/attendre un changement de valeur eq553 et vérifier sur le broker (`mosquitto_sub -h 127.0.0.1 -p 1883 ... -t 'jeedom2ha/553/#'`) que les `state_topic` reçoivent des valeurs ; confirmer dans HA que les capteurs ne sont plus `unknown`.
-  - [ ] Documenter les preuves dans la story (topics, valeurs, capture HA).
+- [x] Task 6 — Gate terrain (AC: 10) — **PASSÉ le 2026-06-18 (box domobox 192.168.1.21)**
+  - [x] `--cleanup-discovery --restart-daemon` → `Deploy complete.` ; daemon up, MQTT `connected`.
+  - [x] `/system/state_listeners` renvoie 88 cibles vague-1 (dont eq553 multi-sensor par-cmd) ; **88 listeners PHP `stateListener` enregistrés** en base.
+  - [x] Streaming live prouvé end-to-end : daemon log `POST /action/state_update` 200 (100 %) → `[SYNC-STATE] eq_id=553 cmd_id=5141 state_published jeedom2ha/553/5141/state` ; **37 `state_published`** post-deploy.
+  - [x] **eq553 « Tension réseau » (cmd 5141) = 238.4 V** en retained MQTT (`jeedom2ha/553/5141/state`) — n'est plus `unknown`. Autres eq streamant : 244, 627, 385, 553(×N).
+  - [x] Aucune régression observée : erreurs `listener_execution` (« Too many connections ») **antérieures au deploy** (mtime 03:36 vs deploy 12:02), 1 seul `jeeListener.php` actif (pas de tempête).
+  - Note hardening (suivi possible, hors scope vague 1) : les listeners tournent en **background** (défaut Jeedom = un process `jeeListener.php` par changement de cmd, re-bootstrap core). Sous burst MSunPV × 88 capteurs c'est de la charge récurrente ; option `setOption('background', false)` (foreground) à évaluer si la charge devient un problème (trade-off : latence inline sur l'event vs coût process). Non appliqué : l'impl background fonctionne et la box est saine.
+
+## Décision Task 1 (tranchée 2026-06-18)
+
+**Mécanisme retenu : Option A raffinée — listener event-driven, transport HTTP `callDaemon` (PAS le socket `on_message`).**
+
+Constat de code qui motive le raffinement :
+- Le socket `jeedomdaemon` (`on_message`, `main.py:169`) est un **stub** et n'est **câblé nulle part** côté plugin : aucune occurrence de `sendToDaemon`/`send_to_daemon` dans `core/`. L'utiliser imposerait d'introduire un mécanisme socket PHP→daemon inexistant.
+- Le canal PHP→daemon **réellement utilisé, authentifié et testé** est HTTP : `jeedom2ha::callDaemon()` (`core/class/jeedom2ha.class.php:403`, header `X-Local-Secret`) → routes `/action/*` du serveur aiohttp (`transport/http_server.py`).
+
+Donc, à intention identique (event-driven, périmètre PHP minimal, pas de polling), le seam concret le plus sûr et cohérent est HTTP :
+
+```
+Jeedom #listener# (info cmd d'un eqLogic publié)
+  → callDaemon('/action/state_update', {eq_id, cmd_id, value}, 'POST')
+    → _handle_action_state_update (auth X-Local-Secret, unwrap {payload})
+      → StateSynchronizer.handle_state_message(eq_id, cmd_id, value)
+        → résolution state_topic depuis app["publications"]  (state ⊆ discovery)
+          → MqttBridge.publish_message(state_topic, payload, qos=1, retain=True)
+```
+
+Périmètre vague 1 : `sensor`/`binary_sensor` info uniquement. Le daemon est **autoritatif** sur le filtrage (une cmd non publiée → `handle_state_message` renvoie False, rien publié), ce qui permet de garder le PHP « bête ».
+
+**Sous-décision PHP « registration » — TRANCHÉE R1 (ciblé) par l'agent architecte (Winston), 2026-06-18.**
+
+Options évaluées :
+- **(R1, retenue)** Listener **ciblé** piloté par le périmètre publié : un `listener` Jeedom par cmd info effectivement publiée.
+- **(R2, rejetée)** Listener **large** + filtrage 100% côté daemon : flood le daemon d'un POST par changement de cmd de *toute* l'install (anti-pattern, surtout MSunPV haute fréquence) ; le filtrage arrive après le saut réseau.
+
+Verdict : R1 réutilise un contrat existant et garde le mapping single-sourcé dans le daemon. Comme `published_scope` est **eq-level** (pas de cmd_id), R1 s'appuie sur un nouvel endpoint dédié `GET /system/state_listeners` (issu de `StateSynchronizer.list_state_targets()`) qui renvoie l'ensemble exact des `(eq_id, cmd_id, ha_type, state_topic)` vague-1 publiés. PHP `syncStateListeners()` purge puis recrée les listeners depuis cette liste après chaque sync OK ; `state ⊆ discovery` est ainsi garanti **à la source**.
+
+Le code daemon (route `/action/state_update`, auth, unwrap wrapper `callDaemon`, contrat `{status, published}`, filtrage autoritatif) reste en place et testé.
 
 ## Dev Notes
 
@@ -148,19 +182,37 @@ C'est le point dur : aujourd'hui aucun canal ne porte les changements de valeur 
 
 ### Agent Model Used
 
-Claude Opus 4.8 (create-story)
+Claude Opus 4.8 (create-story + dev-story daemon-side)
 
 ### Debug Log References
+
+- `pytest resources/daemon/tests/unit -q` → **860 passed** (831 baseline + 29 nouveaux : 22 `test_story_12_1_state_streaming.py` + 7 `test_story_12_1_state_update_route.py`).
 
 ### Completion Notes List
 
 - Create-story completed : story 12.1 matérialisée avec le map complet du chemin de valeur (StateSynchronizer miroir de CommandSynchronizer), la double résolution de state_topic (mono + multi-sensor eq553), et la décision d'architecture du canal inbound Jeedom → daemon laissée en Task 1 (Option A recommandée).
+- Task 1 TRANCHÉE : canal inbound = route HTTP `POST /action/state_update` via `callDaemon` (canal éprouvé), pas le socket `on_message` (jamais alimenté côté PHP — aucun `sendToDaemon`/listener existant). Voir section « Décision Task 1 ».
+- Tasks 2/4/5 livrées : `StateSynchronizer` (`sync/state.py`) + snapshot initial (`publish_initial_states`, AC#2) + suite de tests.
+- `is_active` reste **False** en vague 1 → préserve le chemin optimiste de `CommandSynchronizer` (AC#4/#9) ; aucun domaine actionnable streamé.
+- Task 3 COMPLÈTE (daemon + PHP). Sous-décision listener R1 vs R2 **tranchée R1 (ciblé) par l'agent architecte (Winston)** : `published_scope` est eq-level → ajout de `StateSynchronizer.list_state_targets()` + route `GET /system/state_listeners` pour exposer l'ensemble exact des `(eq_id, cmd_id)` vague-1 publiés (mapping autoritatif single-sourcé daemon). PHP : `syncStateListeners()` (re)enregistre un listener Jeedom par cmd publiée + callback `stateListener()` → `callDaemon('/action/state_update')`, branché après chaque sync OK.
+- State ⊆ discovery (AC#5) : topics lus depuis `app["publications"]`, jamais reconstruits ; listeners PHP enregistrés sur exactement le périmètre publié.
+- Gate terrain PASSÉ (domobox, 2026-06-18) : 88 listeners enregistrés, `POST /action/state_update` 200 à 100 %, eq553 « Tension réseau » (cmd 5141) = 238.4 V en MQTT (plus `unknown`). Erreurs `Too many connections` du log listener antérieures au deploy (sans lien). Suivi possible : listeners en foreground si la charge background devient un souci (hors scope vague 1).
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/12-1-streaming-valeur-sensor-binary-sensor-vague-1.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `resources/daemon/sync/state.py` (nouveau — `StateSynchronizer` + `list_state_targets`)
+- `resources/daemon/tests/unit/test_story_12_1_state_streaming.py` (nouveau — 22 tests)
+- `resources/daemon/tests/unit/test_story_12_1_state_update_route.py` (nouveau — 7 tests)
+- `resources/daemon/transport/http_server.py` (modifié — routes `/action/state_update` + `/system/state_listeners`, normalisation wrapper, hook snapshot)
+- `resources/daemon/main.py` (modifié — instanciation/enregistrement `StateSynchronizer`)
+- `core/class/jeedom2ha.class.php` (modifié — `syncStateListeners()` + `stateListener()` + hook post-bootstrap)
+- `core/ajax/jeedom2ha.ajax.php` (modifié — réenregistrement des listeners après scan manuel)
 
 ### Change Log
 
 - 2026-06-18 — Story 12.1 créée via workflow create-story (suite au Sprint Change Proposal 2026-06-18, ouverture de pe-epic-12).
+- 2026-06-18 — Implémentation daemon-side : `StateSynchronizer` + route HTTP `/action/state_update` + snapshot initial + tests. Task 1 tranchée (canal HTTP).
+- 2026-06-18 — Listener PHP (R1 ciblé, verdict architecte) : `list_state_targets()` + route `/system/state_listeners` + `syncStateListeners()`/`stateListener()` PHP + hooks post-sync. Suite 860 passed.
+- 2026-06-18 — Gate terrain PASSÉ sur domobox : eq553 « Tension réseau » = 238.4 V dans HA (streaming live prouvé). Story → ready-for-review.

@@ -1322,6 +1322,12 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 mapping_counters=mapping_counters,
             )
 
+        # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
+        # sur le state_topic des entités vague 1 APRÈS la discovery (sinon HA l'ignore).
+        state_sync = request.app.get("state_synchronizer")
+        if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
+            await state_sync.publish_initial_states(decision)
+
         previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
         previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
         current_local_supported = bool(getattr(decision, "local_availability_supported", False))
@@ -2220,6 +2226,31 @@ async def _handle_system_published_scope(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_state_listeners(request: web.Request) -> web.Response:
+    """Handle GET /system/state_listeners — published vague-1 (eq_id, cmd_id) targets.
+
+    Story 12.1 (R1): authoritative list the PHP plugin uses to register a Jeedom
+    listener on exactly the published sensor/binary_sensor info commands. Mapping
+    authority stays single-sourced in the daemon (state ⊆ discovery, AC#5).
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    state_sync = request.app.get("state_synchronizer")
+    listeners = state_sync.list_state_targets() if state_sync is not None else []
+    return web.json_response({
+        "action": "system.state_listeners",
+        "status": "ok",
+        "listeners": listeners,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 
 # ---------------------------------------------------------------------------
 # Story 5.1 — Façade backend unique d'opérations HA
@@ -2702,6 +2733,55 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     return _build_action_execute_response(payload=payload)
 
 
+def _normalize_state_update_body(body: Any) -> Dict[str, Any]:
+    """Accept direct JSON calls and the PHP relay wrapper `{payload: {...}}`."""
+    if not isinstance(body, dict):
+        return {}
+    wrapped = body.get("payload")
+    if isinstance(wrapped, dict) and ("eq_id" in wrapped or "cmd_id" in wrapped):
+        return wrapped
+    return body
+
+
+async def _handle_action_state_update(request: web.Request) -> web.Response:
+    """Story 12.1 — inbound Jeedom info value → MQTT state_topic (vague 1).
+
+    Event-driven channel: a Jeedom ``#listener#`` on the info commands of published
+    sensor/binary_sensor eqLogics relays (eq_id, cmd_id, value) here via
+    ``callDaemon()``. The daemon resolves the discovery-declared state_topic from
+    the publication registry and publishes, so HA entities leave ``unknown``.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    try:
+        raw_body = await request.json()
+    except Exception:
+        return web.json_response(
+            {"status": "error", "message": "Corps de requête JSON invalide."}, status=400
+        )
+
+    body = _normalize_state_update_body(raw_body)
+    eq_id = body.get("eq_id")
+    cmd_id = body.get("cmd_id")
+    value = body.get("value")
+    if eq_id is None or cmd_id is None:
+        return web.json_response(
+            {"status": "error", "message": "Champs 'eq_id' et 'cmd_id' obligatoires."},
+            status=400,
+        )
+
+    state_sync = request.app.get("state_synchronizer")
+    if state_sync is None:
+        return web.json_response(
+            {"status": "error", "message": "State synchronizer indisponible."}, status=503
+        )
+
+    published = await state_sync.handle_state_message(eq_id, cmd_id, value)
+    return web.json_response({"status": "ok", "published": bool(published)})
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application()
@@ -2734,6 +2814,9 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
+    # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)
+    app.router.add_post("/action/state_update", _handle_action_state_update)
+    app.router.add_get("/system/state_listeners", _handle_system_state_listeners)
     return app
 
 
