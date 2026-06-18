@@ -210,7 +210,7 @@ class TestRetypageRuntime:
 
         await _call_helper(eq_id=10, mapping=mapping, previous_decision=prev, publisher=publisher)
 
-        publisher.unpublish_by_eq_id.assert_called_once_with(10, entity_type="light")
+        publisher.unpublish_by_eq_id.assert_called_once_with(10, entity_type="light", node_ids=[])
 
     async def test_retypage_runtime_logs_retypage_message(self, caplog):
         """Retypage → log INFO [LIFECYCLE].*retypage détecté."""
@@ -250,7 +250,7 @@ class TestRetypageRuntime:
         await _call_helper(eq_id=10, mapping=mapping, previous_decision=prev,
                            publisher=publisher, pending=pending)
 
-        assert pending.get(10) == "light"
+        assert pending.get(10) == {"entity_type": "light", "node_ids": []}
 
     async def test_retypage_runtime_no_publisher_defers(self):
         """AC #8 — publisher=None → deferred into pending, no crash."""
@@ -261,7 +261,7 @@ class TestRetypageRuntime:
         await _call_helper(eq_id=10, mapping=mapping, previous_decision=prev,
                            publisher=None, pending=pending)
 
-        assert pending.get(10) == "light"
+        assert pending.get(10) == {"entity_type": "light", "node_ids": []}
 
     async def test_no_retypage_if_not_published(self):
         """Retypage not triggered if entity was never published (discovery_published=False)."""
@@ -360,7 +360,7 @@ class TestRetypageBootUnit:
         await _call_helper(eq_id=7, mapping=mapping, previous_decision=None,
                            boot_cache=boot_cache, is_first_sync=True, publisher=publisher)
 
-        publisher.unpublish_by_eq_id.assert_called_once_with(7, entity_type="light")
+        publisher.unpublish_by_eq_id.assert_called_once_with(7, entity_type="light", node_ids=[])
 
     async def test_retypage_boot_unpublish_fail_defers(self):
         """AC #8 — boot retypage unpublish fails → pending populated."""
@@ -373,7 +373,7 @@ class TestRetypageBootUnit:
                            boot_cache=boot_cache, is_first_sync=True,
                            publisher=publisher, pending=pending)
 
-        assert pending.get(7) == "light"
+        assert pending.get(7) == {"entity_type": "light", "node_ids": []}
 
     async def test_no_retypage_boot_when_not_first_sync(self):
         """is_first_sync=False → boot retypage path skipped."""
@@ -434,7 +434,7 @@ class TestRenameAndRetypageCombined:
         await _call_helper(eq_id=20, mapping=mapping, previous_decision=prev,
                            publisher=publisher)
 
-        publisher.unpublish_by_eq_id.assert_called_once_with(20, entity_type="light")
+        publisher.unpublish_by_eq_id.assert_called_once_with(20, entity_type="light", node_ids=[])
 
     async def test_rename_and_retypage_combined_unique_id_invariant(self):
         """AC #11 — unique_id inchangé même lors d'un rename + retypage simultanés."""

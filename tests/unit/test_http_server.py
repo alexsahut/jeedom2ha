@@ -577,7 +577,7 @@ class TestSyncAction:
             json={"payload": payload_removed},
         )
         assert resp_second.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
         assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
 
         mock_mqtt.publish_message.reset_mock()
@@ -639,7 +639,7 @@ class TestSyncAction:
             json={"payload": payload_removed},
         )
         assert resp_second.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
         assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
 
         mock_mqtt.publish_message.reset_mock()
@@ -727,7 +727,7 @@ class TestSyncAction:
             json={"payload": payload_ineligible},
         )
         assert resp_second.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True
@@ -798,7 +798,7 @@ class TestSyncAction:
             json={"payload": payload_removed},
         )
         assert resp_third.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True
@@ -868,7 +868,7 @@ class TestSyncAction:
             json={"payload": payload_removed},
         )
         assert resp_third.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
         assert http_app["pending_local_availability_cleanup"] == {2: "jeedom2ha/2/availability"}
 
         mock_mqtt.publish_message.reset_mock()
@@ -965,7 +965,7 @@ class TestSyncAction:
             json={"payload": payload_ineligible},
         )
         assert resp_third.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True
@@ -1037,7 +1037,7 @@ class TestSyncAction:
             json={"payload": payload_removed},
         )
         assert resp_second.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True
@@ -1128,7 +1128,7 @@ class TestSyncAction:
             json={"payload": payload_ineligible},
         )
         assert resp_second.status == 200
-        assert http_app["pending_discovery_unpublish"] == {2: "switch"}
+        assert http_app["pending_discovery_unpublish"] == {2: {"entity_type": "switch", "node_ids": []}}
 
         mock_mqtt.publish_message.reset_mock()
         mock_mqtt.is_connected = True

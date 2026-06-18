@@ -49,9 +49,9 @@ class TestSavePublicationsCache:
         with open(cache_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["123"] == {"entity_type": "light", "published": True, "ha_name": "", "suggested_area": None}
-        assert data["456"] == {"entity_type": "cover", "published": True, "ha_name": "", "suggested_area": None}
-        assert data["789"] == {"entity_type": "switch", "published": False, "ha_name": "", "suggested_area": None}
+        assert data["123"] == {"entity_type": "light", "published": True, "ha_name": "", "suggested_area": None, "node_ids": []}
+        assert data["456"] == {"entity_type": "cover", "published": True, "ha_name": "", "suggested_area": None, "node_ids": []}
+        assert data["789"] == {"entity_type": "switch", "published": False, "ha_name": "", "suggested_area": None, "node_ids": []}
 
     def test_save_keys_are_strings(self, tmp_path):
         """JSON keys must be strings (JSON limitation)."""
@@ -93,7 +93,7 @@ class TestSavePublicationsCache:
 
         with open(tmp_path / "jeedom2ha_cache.json", encoding="utf-8") as f:
             data = json.load(f)
-        assert data["55"] == {"entity_type": "", "published": False, "ha_name": "", "suggested_area": None}
+        assert data["55"] == {"entity_type": "", "published": False, "ha_name": "", "suggested_area": None, "node_ids": []}
 
     def test_save_includes_ha_name_and_suggested_area(self, tmp_path):
         """AC #9 — save persists ha_name and suggested_area from mapping_result."""
@@ -109,9 +109,9 @@ class TestSavePublicationsCache:
         with open(tmp_path / "jeedom2ha_cache.json", encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["10"] == {"entity_type": "light", "published": True, "ha_name": "Lampe Salon", "suggested_area": "Salon"}
-        assert data["20"] == {"entity_type": "cover", "published": True, "ha_name": "Volet Chambre", "suggested_area": "Chambre"}
-        assert data["30"] == {"entity_type": "switch", "published": False, "ha_name": "Prise Bureau", "suggested_area": None}
+        assert data["10"] == {"entity_type": "light", "published": True, "ha_name": "Lampe Salon", "suggested_area": "Salon", "node_ids": []}
+        assert data["20"] == {"entity_type": "cover", "published": True, "ha_name": "Volet Chambre", "suggested_area": "Chambre", "node_ids": []}
+        assert data["30"] == {"entity_type": "switch", "published": False, "ha_name": "Prise Bureau", "suggested_area": None, "node_ids": []}
 
 
 class TestLoadPublicationsCache:
@@ -132,8 +132,8 @@ class TestLoadPublicationsCache:
 
         # 5.1 cache: ha_name and suggested_area default to "" and None respectively
         assert result == {
-            123: {"entity_type": "light", "published": True, "ha_name": "", "suggested_area": None},
-            456: {"entity_type": "cover", "published": False, "ha_name": "", "suggested_area": None},
+            123: {"entity_type": "light", "published": True, "ha_name": "", "suggested_area": None, "node_ids": []},
+            456: {"entity_type": "cover", "published": False, "ha_name": "", "suggested_area": None, "node_ids": []},
         }
 
     def test_load_51_cache_without_ha_name_returns_defaults(self, tmp_path, caplog):
@@ -171,8 +171,8 @@ class TestLoadPublicationsCache:
 
         result = load_publications_cache(str(tmp_path))
 
-        assert result[10] == {"entity_type": "light", "published": True, "ha_name": "Lampe Salon", "suggested_area": "Salon"}
-        assert result[20] == {"entity_type": "switch", "published": False, "ha_name": "Prise Bureau", "suggested_area": None}
+        assert result[10] == {"entity_type": "light", "published": True, "ha_name": "Lampe Salon", "suggested_area": "Salon", "node_ids": []}
+        assert result[20] == {"entity_type": "switch", "published": False, "ha_name": "Prise Bureau", "suggested_area": None, "node_ids": []}
 
     def test_load_converts_keys_to_int(self, tmp_path):
         """Keys must be converted from str to int on load."""
