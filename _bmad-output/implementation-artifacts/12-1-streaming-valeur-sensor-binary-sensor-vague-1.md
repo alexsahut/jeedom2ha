@@ -1,6 +1,6 @@
 # Story 12.1: Restitution d'état runtime — streaming des valeurs sensor / binary_sensor (vague 1)
 
-Status: ready-for-review (daemon + listener PHP implémentés et testés ; gate terrain PASSÉ sur domobox le 2026-06-18)
+Status: done (daemon + listener PHP implémentés et testés ; gate terrain PASSÉ sur domobox le 2026-06-18 — eq553 « Tension réseau » = 238.4 V live, plus unknown ; 860 tests verts ; mergée main via PR #123. Réaligné done par correct-course 2026-06-19.)
 
 ## Story
 

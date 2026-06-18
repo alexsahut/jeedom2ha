@@ -53,7 +53,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-18'  # gate terrain 12.2 PASS sur box 192.168.1.21 (switch on/off réel, eq554=OFF ; non-régression eq553+light/cover ; 1 follow-up LOW bruit discovery). Story 12.2 entièrement validée (AC 1-11). Antérieur — code-review 12.2 (1 HIGH corrigé, 893 tests verts) ; dev-story 12.2 ; create-story 12.2 ; correct-course (pe-11.3)
+last_updated: '2026-06-19'  # correct-course réalignement tracking : 11.1, 11.1-bis, 12.1 étaient done dans main (PR #123) mais jamais flippés (gate terrain manuel hors BMAD = flip oublié). 11.1-bis gate terrain AC6 PASS box 192.168.1.21 le 2026-06-19 (supprimer eq553 65→0, zéro ghost, restauré). pe-epic-12 clôturé (gate eq553 non-unknown atteint). SCP : sprint-change-proposal-2026-06-19-realign-tracking.md. Antérieur — gate terrain 12.2 PASS (AC 1-11) ; code-review/dev-story/create-story 12.2 ; correct-course (pe-11.3)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -231,9 +231,9 @@ development_status:
   #        Diagnostiquer d'abord switch.jeedom2ha_554 état "unknown" (bug mapping ?)
   # Priorité Alex : P1 MSunPV (cerveau routage), P2 chauffe-eau détail
   # ==============================================================
-  pe-epic-11: in-progress  # ouvert par Story 11.1 MSunPV / RouteurSolaire
-  11-1-msunpv-routeursolaire-sensors-lecture-seule: review  # dev-story 2026-06-17 — multi-sensor eq553 ; gate terrain PASS box 192.168.1.21 (65 sensors publiés) ; Fix A éligibilité sans generic_type ; pytest 825 vert
-  11-1-bis-multi-sensor-lifecycle-depublication-secondaires: review  # dev-story terminée 2026-06-17 — dépublication exhaustive des sensors secondaires (anti-ghosts HA), suite verte 835 passed ; gate terrain AC6 (mosquitto_sub) restant avant release Market
+  pe-epic-11: in-progress  # 11.1 + 11.1-bis done ; reste 11.2 (chauffe-eau eq554, non créée) + 11.3 (IQ EV, backlog) — epic non clôturable
+  11-1-msunpv-routeursolaire-sensors-lecture-seule: done  # gate terrain PASS box 192.168.1.21 (65 sensors eq553 publiés) ; Fix A éligibilité sans generic_type ; pytest 825 vert ; mergée main via PR #123. Réaligné done par correct-course 2026-06-19 (flip oublié au commit close ce2b5b7).
+  11-1-bis-multi-sensor-lifecycle-depublication-secondaires: done  # dépublication exhaustive multi-sensor (anti-ghosts HA), 835 tests verts, mergée main via PR #123. Gate terrain AC6 PASS box 192.168.1.21 le 2026-06-19 (supprimer eq553 : 65→0 topics config retained, zéro ghost ; eq553 restauré à 65 via sync PHP). Réaligné done par correct-course 2026-06-19.
   # 11-2-* RÉSERVÉ : chauffe-eau eq554 (backlog-icebox §3.2, P2 Alex) — pas encore créé ; partie switch.554 dépend de pe-epic-12 / 12.2 (vague 2)
   11-3-iq-ev-pilotage-priorisation-solaire: backlog  # inscrit par correct-course 2026-06-18 (pe-11.3) — IQ EV eq583 + pilotage priorisation eq628 (backlog-icebox §4) ; types mixtes : sensor/binary ⟸ 12.1, switch/button ⟸ 12.2 ; create-story différé jusqu'à 12.2 ; carte workboard 9039c60c préexistante
 
@@ -246,6 +246,6 @@ development_status:
   # Vague 1 bornée : sensor + binary_sensor (domaines actionnables = vagues ultérieures)
   # Gate terrain de clôture = capteurs eq553 « tension réseau » non plus en état unknown
   # ==============================================================
-  pe-epic-12: in-progress  # ouvert par Story 12.1 (restitution d'état runtime Jeedom → HA) — pré-requis pe-epic-11
-  12-1-streaming-valeur-sensor-binary-sensor-vague-1: ready-for-dev  # create-story 2026-06-18 — StateSynchronizer (sync/state.py) miroir de CommandSynchronizer ; double state_topic mono+multi-sensor eq553 ; canal inbound Jeedom→daemon à trancher Task 1 ; gate terrain eq553 non-unknown
+  pe-epic-12: done  # clôture 2026-06-19 par correct-course — gate epic-level atteint (capteurs eq553 « tension réseau » non plus en unknown, 238.4 V live le 2026-06-18 via 12.1). Vague 1 (12.1) + vague 2 actionnable bonus (12.2) done. Vagues actionnables ultérieures (light/cover/climate streaming) = futures stories/correct-course si besoin.
+  12-1-streaming-valeur-sensor-binary-sensor-vague-1: done  # dev-story + listener PHP livrés ; gate terrain PASS box 192.168.1.21 le 2026-06-18 (eq553 « Tension réseau » cmd 5141 = 238.4 V live, plus unknown ; 88 listeners ; POST /action/state_update 200) ; 860 tests verts ; mergée main via PR #123. Réaligné done par correct-course 2026-06-19 (code-review jamais rejoué + flip jamais fait → resté ready-for-dev à tort).
   12-2-streaming-valeur-switch-button-vague-2: done  # gate terrain PASS 2026-06-18 (box 192.168.1.21 : switch on/off réel, eq554=OFF, state_listeners switch enregistrés, non-régression eq553+light/cover ; 1 follow-up LOW bruit discovery). AC 1-11 validés. Antérieur — code-review : switch streamé (ENERGY_STATE→ON/OFF), button no-op, is_active scope-aware ; 1 HIGH corrigé ; 893 tests verts ; débloque switch.554 (11.2) + actionnables IQ EV/pilotage (11.3)

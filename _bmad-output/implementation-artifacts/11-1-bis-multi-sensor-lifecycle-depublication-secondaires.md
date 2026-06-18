@@ -1,6 +1,6 @@
 # Story 11.1.bis: Multi-sensor lifecycle — dépublication exhaustive des sensors secondaires (anti-ghosts HA)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,7 +48,7 @@ afin de ne pas laisser d'entités fantômes (ghosts) qui polluent le dashboard s
   - [x] Tests unitaires : dépublication multi-sensor efface N topics ; mono-entité efface 1 topic ; échec partiel honnête. → `test_story_11_1_bis_multi_sensor_unpublish.py`.
   - [x] Cas de dépublication multi-sensor : couvert par le test end-to-end `test_action_supprimer_erases_all_multi_sensor_topics` (le golden `expected_sync_snapshot.json` est un snapshot de **sync**, pas de dépublication → un test dédié est plus fidèle qu'un delta de snapshot).
   - [x] Suite pytest complète verte : **835 passed**.
-  - [ ] Gate terrain (AC 6) : `mosquitto_sub` sur box réelle — NON EXÉCUTÉ (pas d'accès box dans cet environnement). À valider avant release Market.
+  - [x] Gate terrain (AC 6) : **PASS** box 192.168.1.21 le 2026-06-19. `POST /action/execute {intention:"supprimer", portee:"equipement", selection:[553]}` → réponse `succes` (1 équipement supprimé). `mosquitto_sub -t 'homeassistant/+/+/config'` (auth mqtt2) : eq553 passe de **65 → 0** topics `config` retained (`jeedom2ha_553_<cmd>/config`), zéro ghost. Restauration : `getFullTopology()` + `callDaemon('/action/sync')` (284 eq_logics) → eq553 revenu à **65**. Note : `/action/sync` est push-based (la topologie est poussée par le PHP) — un POST avec payload vide renvoie `total_eq_logics:0` sans republier ; le restore doit passer par `getFullTopology()`.
 
 ## Dev Notes
 
