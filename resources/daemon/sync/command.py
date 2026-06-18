@@ -354,6 +354,12 @@ class CommandSynchronizer:
         if not self._is_state_sync_active(state_sync):
             return False
 
+        # Scope-aware (Story 12.2): a type the synchronizer does NOT stream must not
+        # be treated as reliable, else its optimistic publish is suppressed while no
+        # real state ever arrives (regression). vague 2 streams switch only.
+        if not self._state_sync_streams_type(state_sync, mapping.ha_entity_type):
+            return False
+
         commands = mapping.commands or {}
         if mapping.ha_entity_type in ("light", "switch"):
             for key in ("LIGHT_STATE", "ENERGY_STATE", "PRESENCE"):
@@ -370,6 +376,23 @@ class CommandSynchronizer:
             return False
 
         return False
+
+    @staticmethod
+    def _state_sync_streams_type(state_sync: Any, ha_type: Any) -> bool:
+        """Whether the state sync actually streams reliable state for ``ha_type``.
+
+        Backward-compatible: a synchronizer without ``streams_actionable_type``
+        (older or fake services) keeps the prior behavior (an active sync is treated
+        as reliable for the type). The real ``StateSynchronizer`` (Story 12.2)
+        returns True for ``switch`` only, so light/cover keep their optimistic path.
+        """
+        checker = getattr(state_sync, "streams_actionable_type", None)
+        if not callable(checker):
+            return True
+        try:
+            return bool(checker(ha_type))
+        except Exception:
+            return False
 
     def _is_state_sync_active(self, state_sync: Any) -> bool:
         """Return True only when a state sync service is really active and usable."""

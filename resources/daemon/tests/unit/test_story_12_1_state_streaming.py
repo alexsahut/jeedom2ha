@@ -320,19 +320,22 @@ async def test_initial_snapshot_skips_when_no_current_value():
 
 
 # --- is_active contract / non-regression with CommandSynchronizer (AC#8, AC#9) ---
+# NOTE: Story 12.2 (vague 2) opens switch streaming, so is_active is now True. The
+# preservation of the optimistic path for non-streamed types (light/cover) moved to
+# the type-scoped streams_actionable_type gate — see test_story_12_2_*.
 
-def test_real_state_sync_is_inactive_in_vague1():
+def test_real_state_sync_is_active_from_vague2():
     sync = _sync({}, _FakeBridge())
-    assert sync.is_active is False
+    assert sync.is_active is True
 
 
-def test_command_sync_sees_real_state_sync_as_inactive():
-    """Real StateSynchronizer must satisfy CommandSynchronizer's is_active contract
-    and keep it on the optimistic path (vague 1 does not stream actionable state)."""
+def test_command_sync_sees_real_state_sync_as_active():
+    """Since vague 2 streams switch, CommandSynchronizer sees an active state sync;
+    the optimistic path for light/cover is preserved by streams_actionable_type."""
     state_sync = _sync({}, _FakeBridge())
     cmd_sync = CommandSynchronizer(app={}, mqtt_bridge=_FakeBridge(),
                                    jeedom_api_endpoint="http://x/api")
-    assert cmd_sync._is_state_sync_active(state_sync) is False
+    assert cmd_sync._is_state_sync_active(state_sync) is True
 
 
 # --- list_state_targets: authoritative PHP listener registration (R1, AC#5) ---
