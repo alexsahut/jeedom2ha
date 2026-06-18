@@ -212,7 +212,10 @@ class StateSynchronizer:
             for candidate in self._iter_vague1_candidates(mapping):
                 if self._candidate_cmd_id(candidate) != cmd_id:
                     continue
-                state_topic = self._candidate_state_topic(candidate, decision, eq_id)
+                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                if not getattr(cand_decision, "discovery_published", False):
+                    return None
+                state_topic = self._candidate_state_topic(candidate, cand_decision, eq_id)
                 if not state_topic or not str(state_topic).startswith("jeedom2ha/"):
                     return None
                 return candidate, str(state_topic)

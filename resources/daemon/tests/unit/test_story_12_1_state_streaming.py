@@ -229,6 +229,22 @@ async def test_unpublished_entity_is_never_fed():
 
 
 @pytest.mark.asyncio
+async def test_secondary_with_failed_discovery_is_never_fed():
+    """A multi-sensor secondary whose own discovery failed must not stream state,
+    even if the parent decision is should_publish (state ⊆ discovery, per-candidate)."""
+    decision = _multi_sensor_decision(eq_id=553, cmd_ids=(5301, 5302))
+    secondary = decision.mapping_result.additional_mappings[0]
+    secondary.publication_decision_ref.discovery_published = False
+    bridge = _FakeBridge()
+    sync = _sync({553: decision}, bridge)
+
+    # Secondary (discovery failed) is rejected; primary keeps streaming.
+    assert await sync.handle_state_message(eq_id=553, cmd_id=5302, value="13.1") is False
+    assert await sync.handle_state_message(eq_id=553, cmd_id=5301, value="232") is True
+    assert bridge.published == [("jeedom2ha/553/5301/state", "232", 1, True)]
+
+
+@pytest.mark.asyncio
 async def test_unknown_eq_or_cmd_is_rejected():
     decision = _mono_sensor_decision(eq_id=100, cmd_id=4001)
     bridge = _FakeBridge()
