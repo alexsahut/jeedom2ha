@@ -1,6 +1,6 @@
 # Story 11.1: MSunPV / RouteurSolaire — publier les valeurs de routage solaire en sensors lecture seule
 
-Status: review
+Status: done
 
 ## Story
 
