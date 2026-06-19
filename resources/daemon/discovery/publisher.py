@@ -164,7 +164,10 @@ class DiscoveryPublisher:
         Returns:
             True if publish succeeded, False otherwise.
         """
-        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="binary_sensor")
+        reason_details = mapping.reason_details or {}
+        _nid = reason_details.get("node_id")
+        node_id = _nid if isinstance(_nid, str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="binary_sensor", node_id=node_id)
         payload = self._build_binary_sensor_payload(mapping, snapshot)
         payload_json = json.dumps(payload, ensure_ascii=False)
 
@@ -311,9 +314,22 @@ class DiscoveryPublisher:
 
         Honnêteté : tous les topics sont tentés ; un seul échec fait renvoyer False
         (pas de faux succès, pas d'arrêt prématuré qui laisserait des fantômes).
+
+        Story 11.2 — un élément de ``node_ids`` peut être un tuple/liste
+        ``(entity_type, node_id)`` (cas multi-domaine hétérogène) ; il porte alors son
+        propre domaine et ignore l'``entity_type`` global de l'appel. Les éléments
+        chaîne conservent le comportement homogène historique.
         """
         if node_ids:
-            topics = [self._build_topic(eq_id, entity_type=entity_type, node_id=nid) for nid in node_ids]
+            topics = []
+            for entry in node_ids:
+                if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                    entry_type, entry_nid = entry
+                    topics.append(
+                        self._build_topic(eq_id, entity_type=str(entry_type), node_id=str(entry_nid))
+                    )
+                else:
+                    topics.append(self._build_topic(eq_id, entity_type=entity_type, node_id=entry))
         else:
             topics = [self._build_topic(eq_id, entity_type=entity_type)]
 
@@ -519,17 +535,24 @@ class DiscoveryPublisher:
         return payload
 
     def _build_binary_sensor_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
-        """Build the MQTT Discovery JSON payload for a binary_sensor entity."""
+        """Build the MQTT Discovery JSON payload for a binary_sensor entity.
+
+        Story 11.2 — supporte un object_id/state_topic distincts par commande
+        (multi-domaine) via reason_details. À défaut, comportement mono-binaire
+        historique au niveau eqLogic.
+        """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         reason_details = mapping.reason_details or {}
         device_class = reason_details.get("device_class")
+        object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
+        state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
             "name": mapping.ha_name,
             "unique_id": mapping.ha_unique_id,
-            "object_id": f"jeedom2ha_{eq_id}",
-            "state_topic": f"jeedom2ha/{eq_id}/state",
+            "object_id": object_id,
+            "state_topic": state_topic,
             "platform": "mqtt",
             "device": device,
             "origin": {

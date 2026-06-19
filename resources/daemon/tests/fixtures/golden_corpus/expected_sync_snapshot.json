@@ -283,6 +283,221 @@
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
+          "eq_id": 554,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5490,
+              "cmd_name": "Manu",
+              "generic_type": "ENERGY_ON"
+            },
+            {
+              "cmd_id": 5491,
+              "cmd_name": "auto",
+              "generic_type": "ENERGY_OFF"
+            },
+            {
+              "cmd_id": 5708,
+              "cmd_name": "active",
+              "generic_type": "ENERGY_STATE"
+            }
+          ],
+          "name": "Chauffe-eau",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": null,
+                "id": 5205,
+                "name": "Routage"
+              },
+              {
+                "generic_type": "ENERGY_STATE",
+                "id": 5530,
+                "name": "Routage reel"
+              },
+              {
+                "generic_type": "ENERGY_ON",
+                "id": 5706,
+                "name": "On_5701"
+              },
+              {
+                "generic_type": "ENERGY_OFF",
+                "id": 5707,
+                "name": "Off_5702"
+              },
+              {
+                "generic_type": null,
+                "id": 5204,
+                "name": "Rafraichir"
+              },
+              {
+                "generic_type": null,
+                "id": 5206,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": null,
+                "id": 5489,
+                "name": "etat"
+              },
+              {
+                "generic_type": null,
+                "id": 5372,
+                "name": "Absence"
+              },
+              {
+                "generic_type": "ENERGY_ON",
+                "id": 5490,
+                "name": "Manu"
+              },
+              {
+                "generic_type": "ENERGY_OFF",
+                "id": 5491,
+                "name": "auto"
+              },
+              {
+                "generic_type": null,
+                "id": 5510,
+                "name": "chauffe complete dans la journee"
+              },
+              {
+                "generic_type": null,
+                "id": 5531,
+                "name": "Routage chauffe complete"
+              },
+              {
+                "generic_type": null,
+                "id": 5535,
+                "name": "CE Kwh chauffe complete"
+              },
+              {
+                "generic_type": null,
+                "id": 5532,
+                "name": "Routage 24H jusqua 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5533,
+                "name": "Routage aujourdhui"
+              },
+              {
+                "generic_type": null,
+                "id": 5534,
+                "name": "CE kWh 24H jusqua 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5527,
+                "name": "CE kWh depuis 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5542,
+                "name": "eq H de chauffe hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5538,
+                "name": "eq H de chauffe aujourdhui"
+              },
+              {
+                "generic_type": null,
+                "id": 5543,
+                "name": "mediane chauffe complete sur 7 jours"
+              },
+              {
+                "generic_type": "ENERGY_STATE",
+                "id": 5708,
+                "name": "active"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5708,
+                "configured_type": "ENERGY_STATE",
+                "logical_role": "ENERGY_STATE",
+                "used_type": "ENERGY_STATE"
+              },
+              {
+                "command_id": 5490,
+                "configured_type": "ENERGY_ON",
+                "logical_role": "ENERGY_ON",
+                "used_type": "ENERGY_ON"
+              },
+              {
+                "command_id": 5491,
+                "configured_type": "ENERGY_OFF",
+                "logical_role": "ENERGY_OFF",
+                "used_type": "ENERGY_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5530,
+              "cmd_name": "Routage reel",
+              "generic_type": "ENERGY_STATE"
+            },
+            {
+              "cmd_id": 5706,
+              "cmd_name": "On_5701",
+              "generic_type": "ENERGY_ON"
+            },
+            {
+              "cmd_id": 5707,
+              "cmd_name": "Off_5702",
+              "generic_type": "ENERGY_OFF"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
           "eq_id": 1000,
           "eq_type_name": "virtual",
           "ha_type": "light",
@@ -5298,6 +5513,221 @@
           "detail": "",
           "detected_generic_types": [],
           "ecart": false,
+          "eq_id": 554,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5490,
+              "cmd_name": "Manu",
+              "generic_type": "ENERGY_ON"
+            },
+            {
+              "cmd_id": 5491,
+              "cmd_name": "auto",
+              "generic_type": "ENERGY_OFF"
+            },
+            {
+              "cmd_id": 5708,
+              "cmd_name": "active",
+              "generic_type": "ENERGY_STATE"
+            }
+          ],
+          "name": "Chauffe-eau",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "sure",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "sure",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": null,
+                "id": 5205,
+                "name": "Routage"
+              },
+              {
+                "generic_type": "ENERGY_STATE",
+                "id": 5530,
+                "name": "Routage reel"
+              },
+              {
+                "generic_type": "ENERGY_ON",
+                "id": 5706,
+                "name": "On_5701"
+              },
+              {
+                "generic_type": "ENERGY_OFF",
+                "id": 5707,
+                "name": "Off_5702"
+              },
+              {
+                "generic_type": null,
+                "id": 5204,
+                "name": "Rafraichir"
+              },
+              {
+                "generic_type": null,
+                "id": 5206,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": null,
+                "id": 5489,
+                "name": "etat"
+              },
+              {
+                "generic_type": null,
+                "id": 5372,
+                "name": "Absence"
+              },
+              {
+                "generic_type": "ENERGY_ON",
+                "id": 5490,
+                "name": "Manu"
+              },
+              {
+                "generic_type": "ENERGY_OFF",
+                "id": 5491,
+                "name": "auto"
+              },
+              {
+                "generic_type": null,
+                "id": 5510,
+                "name": "chauffe complete dans la journee"
+              },
+              {
+                "generic_type": null,
+                "id": 5531,
+                "name": "Routage chauffe complete"
+              },
+              {
+                "generic_type": null,
+                "id": 5535,
+                "name": "CE Kwh chauffe complete"
+              },
+              {
+                "generic_type": null,
+                "id": 5532,
+                "name": "Routage 24H jusqua 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5533,
+                "name": "Routage aujourdhui"
+              },
+              {
+                "generic_type": null,
+                "id": 5534,
+                "name": "CE kWh 24H jusqua 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5527,
+                "name": "CE kWh depuis 22H36 hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5542,
+                "name": "eq H de chauffe hier"
+              },
+              {
+                "generic_type": null,
+                "id": 5538,
+                "name": "eq H de chauffe aujourdhui"
+              },
+              {
+                "generic_type": null,
+                "id": 5543,
+                "name": "mediane chauffe complete sur 7 jours"
+              },
+              {
+                "generic_type": "ENERGY_STATE",
+                "id": 5708,
+                "name": "active"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5708,
+                "configured_type": "ENERGY_STATE",
+                "logical_role": "ENERGY_STATE",
+                "used_type": "ENERGY_STATE"
+              },
+              {
+                "command_id": 5490,
+                "configured_type": "ENERGY_ON",
+                "logical_role": "ENERGY_ON",
+                "used_type": "ENERGY_ON"
+              },
+              {
+                "command_id": 5491,
+                "configured_type": "ENERGY_OFF",
+                "logical_role": "ENERGY_OFF",
+                "used_type": "ENERGY_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5530,
+              "cmd_name": "Routage reel",
+              "generic_type": "ENERGY_STATE"
+            },
+            {
+              "cmd_id": 5706,
+              "cmd_name": "On_5701",
+              "generic_type": "ENERGY_ON"
+            },
+            {
+              "cmd_id": 5707,
+              "cmd_name": "Off_5702",
+              "generic_type": "ENERGY_OFF"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "S\u00fbr",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
           "eq_id": 1000,
           "eq_type_name": "virtual",
           "ha_type": "light",
@@ -9981,8 +10411,8 @@
           "compteurs": {
             "ecarts": 7,
             "exclus": 0,
-            "inclus": 26,
-            "total": 26
+            "inclus": 27,
+            "total": 27
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -9994,17 +10424,17 @@
               "ha_missing_command_topic": 1,
               "no_projection_possible": 1,
               "probable": 4,
-              "sure": 15
+              "sure": 16
             },
             "counts_by_status": {
               "ambiguous": 4,
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 3,
-              "published": 19
+              "published": 20
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 26
+            "total_equipments": 27
           }
         },
         {
@@ -10066,8 +10496,8 @@
         "compteurs": {
           "ecarts": 10,
           "exclus": 1,
-          "inclus": 54,
-          "total": 55
+          "inclus": 55,
+          "total": 56
         },
         "counts_by_reason": {
           "ambiguous_skipped": 7,
@@ -10076,18 +10506,18 @@
           "ha_missing_command_topic": 1,
           "no_projection_possible": 1,
           "probable": 15,
-          "sure": 29
+          "sure": 30
         },
         "counts_by_status": {
           "ambiguous": 7,
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 44
+          "published": 45
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 55
+        "total_equipments": 56
       }
     },
     "request_id": "<normalized-request-id>",
@@ -10114,9 +10544,9 @@
       "alarm_control_panels_sure": 2,
       "binary_sensors_ambiguous": 0,
       "binary_sensors_probable": 0,
-      "binary_sensors_published": 5,
+      "binary_sensors_published": 6,
       "binary_sensors_skipped": 0,
-      "binary_sensors_sure": 5,
+      "binary_sensors_sure": 6,
       "buttons_ambiguous": 2,
       "buttons_probable": 0,
       "buttons_published": 3,
@@ -10139,14 +10569,14 @@
       "lights_sure": 3,
       "sensors_ambiguous": 2,
       "sensors_probable": 0,
-      "sensors_published": 13,
+      "sensors_published": 25,
       "sensors_skipped": 2,
-      "sensors_sure": 13,
+      "sensors_sure": 25,
       "switches_ambiguous": 1,
       "switches_probable": 4,
-      "switches_published": 6,
+      "switches_published": 7,
       "switches_skipped": 1,
-      "switches_sure": 2
+      "switches_sure": 3
     },
     "mappings": {
       "1000": {
@@ -12215,6 +12645,68 @@
         },
         "suggested_area": "Salon"
       },
+      "554": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": true,
+          "on_off_confidence": "sure"
+        },
+        "commands": {
+          "ENERGY_OFF": {
+            "generic_type": "ENERGY_OFF",
+            "id": 5491,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "ENERGY_ON": {
+            "generic_type": "ENERGY_ON",
+            "id": 5490,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "ENERGY_STATE": {
+            "generic_type": "ENERGY_STATE",
+            "id": 5708,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "sure",
+        "ha_entity_type": "switch",
+        "ha_name": "Chauffe-eau",
+        "ha_unique_id": "jeedom2ha_eq_554",
+        "jeedom_eq_id": 554,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/554/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "sure",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/554/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "switch_on_off_state",
+        "reason_details": {
+          "device_class_source": "virtual"
+        },
+        "suggested_area": "Salon"
+      },
       "6000": {
         "capabilities": {
           "brightness_confidence": "probable",
@@ -13665,6 +14157,24 @@
         "should_publish": true,
         "state_topic": "jeedom2ha/553/state"
       },
+      "554": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/554/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "sure",
+          "ha_entity_type": "switch",
+          "jeedom_eq_id": 554,
+          "reason_code": "switch_on_off_state"
+        },
+        "reason": "sure",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/554/state"
+      },
       "6000": {
         "active_or_alive": false,
         "availability_reason": "timeout_zero",
@@ -13958,7 +14468,7 @@
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 53,
+      "eligible_count": 54,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -13972,9 +14482,9 @@
         "alarm_control_panels_sure": 2,
         "binary_sensors_ambiguous": 0,
         "binary_sensors_probable": 0,
-        "binary_sensors_published": 5,
+        "binary_sensors_published": 6,
         "binary_sensors_skipped": 0,
-        "binary_sensors_sure": 5,
+        "binary_sensors_sure": 6,
         "buttons_ambiguous": 2,
         "buttons_probable": 0,
         "buttons_published": 3,
@@ -13997,14 +14507,14 @@
         "lights_sure": 3,
         "sensors_ambiguous": 2,
         "sensors_probable": 0,
-        "sensors_published": 13,
+        "sensors_published": 25,
         "sensors_skipped": 2,
-        "sensors_sure": 13,
+        "sensors_sure": 25,
         "switches_ambiguous": 1,
         "switches_probable": 4,
-        "switches_published": 6,
+        "switches_published": 7,
         "switches_skipped": 1,
-        "switches_sure": 2
+        "switches_sure": 3
       },
       "published_scope": {
         "equipements": [
@@ -14024,6 +14534,15 @@
             "has_pending_home_assistant_changes": false,
             "is_exception": false,
             "name": "MSunPV / RouteurSolaire",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 554,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Chauffe-eau",
             "object_id": 1
           },
           {
@@ -14508,8 +15027,8 @@
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 54,
-            "total": 55
+            "include": 55,
+            "total": 56
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -14520,8 +15039,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 26,
-              "total": 26
+              "include": 27,
+              "total": 27
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -14554,8 +15073,8 @@
           }
         ]
       },
-      "total_cmds": 113,
-      "total_eq_logics": 55,
+      "total_cmds": 134,
+      "total_eq_logics": 56,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

@@ -13,7 +13,7 @@ from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import MappingResult
-from models.topology import JeedomEqLogic, TopologySnapshot
+from models.topology import MULTI_DOMAIN_EQ_IDS, JeedomEqLogic, TopologySnapshot
 
 
 class MapperRegistry:
@@ -65,12 +65,34 @@ class MapperRegistry:
         Un mapper peut exposer ``map_all`` (multi-entité) ; sinon on retombe sur son
         ``map`` historique (mono-entité). L'ordre du registry est préservé : on
         s'arrête au premier mapper qui produit au moins un résultat.
+
+        Story 11.2 — exception bornée : pour un eqLogic de l'allowlist multi-domaine,
+        on AGRÈGE plusieurs domaines (switch + sensor + binary_sensor) au lieu de
+        s'arrêter au premier mapper. Le switch reste primaire (back-compat).
         """
+        if eq.id in MULTI_DOMAIN_EQ_IDS:
+            return self._map_multi_domain(eq, snapshot)
+
         for mapper in self._mappers:
             results = self._invoke_mapper(mapper, eq, snapshot)
             if results:
                 return results
         return []
+
+    def _map_multi_domain(
+        self, eq: JeedomEqLogic, snapshot: TopologySnapshot
+    ) -> List[MappingResult]:
+        """Agrège les domaines d'un eqLogic multi-domaine (allowlist Story 11.2).
+
+        Ordre : switch primaire (identité eqLogic historique préservée), puis
+        sensors par commande, puis binary_sensors par commande. Tous rattachés au
+        même device Jeedom. Aucun débordement : seuls les IDs de l'allowlist passent ici.
+        """
+        results: List[MappingResult] = []
+        for mapper in self._mappers:
+            if isinstance(mapper, (SwitchMapper, SensorMapper, BinarySensorMapper)):
+                results.extend(self._invoke_mapper(mapper, eq, snapshot))
+        return results
 
     @staticmethod
     def _invoke_mapper(

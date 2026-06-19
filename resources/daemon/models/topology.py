@@ -226,6 +226,13 @@ _EXCLUSION_SOURCE_TO_REASON = {
 # le SensorMapper. Restreint volontairement aux routeurs solaires MSunPV.
 MULTI_SENSOR_EQ_TYPES = frozenset({"msunpv"})
 
+# Story 11.2 — eqLogics projetés en MULTI-DOMAINE (switch + sensor + binary_sensor
+# sous un device commun). Gating par allowlist d'IDs (Option A) et non par eq_type :
+# eq554 « Chauffe-eau » est de type `virtual`, mutualisé par 64 eqLogics ; gater
+# sur eq_type emporterait à tort tous les autres virtuals. Source de vérité unique
+# partagée par le SensorMapper, le BinarySensorMapper et le MapperRegistry.
+MULTI_DOMAIN_EQ_IDS = frozenset({554})
+
 
 def _has_numeric_info_command(eq: JeedomEqLogic) -> bool:
     """Vrai si l'eqLogic porte au moins une commande info numérique."""
