@@ -438,11 +438,44 @@ async def _publish_mapping_for_action(
     topology: TopologySnapshot,
 ) -> bool:
     if mapping.ha_entity_type == "light":
+        primary_ok = await publisher.publish_light(mapping, topology)
+    elif mapping.ha_entity_type == "cover":
+        primary_ok = await publisher.publish_cover(mapping, topology)
+    elif mapping.ha_entity_type == "switch":
+        primary_ok = await publisher.publish_switch(mapping, topology)
+    else:
+        return False
+
+    if not primary_ok:
+        return False
+
+    # Story 11.2 — un eqLogic multi-domaine (eq554) porte ses sensors/binary_sensors
+    # secondaires dans additional_mappings. Le chemin action « publier » doit les
+    # publier comme le fait le chemin sync (_publish_additional_sensors), sinon une
+    # re-inclusion sans sync complet recrée le switch primaire en laissant les 12
+    # sensors + 1 binary_sensor non publiés (entités manquantes côté HA).
+    all_ok = True
+    for secondary in mapping.additional_mappings or []:
+        if not await _publish_secondary_for_action(publisher, secondary, topology):
+            all_ok = False
+    return all_ok
+
+
+async def _publish_secondary_for_action(
+    publisher: DiscoveryPublisher,
+    mapping: MappingResult,
+    topology: TopologySnapshot,
+) -> bool:
+    if mapping.ha_entity_type == "sensor":
+        return await publisher.publish_sensor(mapping, topology)
+    if mapping.ha_entity_type == "binary_sensor":
+        return await publisher.publish_binary_sensor(mapping, topology)
+    if mapping.ha_entity_type == "switch":
+        return await publisher.publish_switch(mapping, topology)
+    if mapping.ha_entity_type == "light":
         return await publisher.publish_light(mapping, topology)
     if mapping.ha_entity_type == "cover":
         return await publisher.publish_cover(mapping, topology)
-    if mapping.ha_entity_type == "switch":
-        return await publisher.publish_switch(mapping, topology)
     return False
 
 

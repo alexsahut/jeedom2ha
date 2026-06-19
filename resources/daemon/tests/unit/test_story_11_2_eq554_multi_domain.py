@@ -35,7 +35,11 @@ from models.topology import (
     JeedomObject,
     TopologySnapshot,
 )
-from transport.http_server import _collect_unpublish_node_ids, create_app
+from transport.http_server import (
+    _collect_unpublish_node_ids,
+    _publish_mapping_for_action,
+    create_app,
+)
 
 _SECRET = "test-secret-story-11-2"
 
@@ -320,6 +324,39 @@ async def test_publish_binary_sensor_mono_backward_compatible_topic():
     assert payload["unique_id"] == "jeedom2ha_eq_7100"
     assert payload["object_id"] == "jeedom2ha_7100"
     assert payload["state_topic"] == "jeedom2ha/7100/state"
+
+
+async def test_action_publier_path_publishes_switch_and_all_secondaries():
+    # Régression PR #127 (review codex P2) : le chemin action « publier »
+    # (_publish_mapping_for_action) ne publiait que le switch primaire ; les 12 sensors
+    # + 1 binary_sensor (additional_mappings) restaient non publiés lors d'une
+    # re-inclusion sans sync complet → entités manquantes côté HA.
+    mqtt_bridge = MagicMock()
+    mqtt_bridge.publish_message.return_value = True
+    publisher = DiscoveryPublisher(mqtt_bridge)
+
+    eq = _eq554()
+    snapshot = _snapshot(eq)
+    primary = MapperRegistry().map(eq, snapshot)
+    assert primary.ha_entity_type == "switch"
+    assert len(primary.additional_mappings) == 13
+
+    ok = await _publish_mapping_for_action(publisher, primary, snapshot)
+    assert ok is True
+
+    config_topics = {
+        call.args[0]
+        for call in mqtt_bridge.publish_message.call_args_list
+        if call.args and call.args[0].endswith("/config")
+    }
+    expected = {"homeassistant/switch/jeedom2ha_554/config",
+                "homeassistant/binary_sensor/jeedom2ha_554_5510/config"}
+    expected |= {
+        f"homeassistant/sensor/jeedom2ha_554_{cmd}/config"
+        for cmd in (5205, 5530, 5206, 5531, 5535, 5532, 5533, 5534, 5527, 5542, 5538, 5543)
+    }
+    assert config_topics == expected
+    assert len(config_topics) == 14
 
 
 # ---------------------------------------------------------------------------
