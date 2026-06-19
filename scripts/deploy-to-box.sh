@@ -435,6 +435,34 @@ fi
 if [[ "${RESTART_DAEMON}" == "true" ]]; then
   echo "--- [3/5] Restart daemon (jeedom2ha::deamon_start + boucle readiness MQTT)..."
 
+  # 3a. Stop défensif AVANT start. deamon_start() échoue sur « address already in use »
+  # si un daemon orphelin subsiste — PID file vidé (Jeedom le croit arrêté) mais process
+  # toujours vivant tenant les ports API/socket. Cas observé 2026-06-19 : 1er restart
+  # KO, entités discovery wipées et non republiées. On stoppe d'abord proprement via le
+  # contrat plugin (PID file), puis on force-libère tout main.py résiduel (port-agnostic,
+  # ne suppose pas la relation apiport/socketport). || true partout : best-effort, ne doit
+  # jamais faire échouer le deploy si rien à tuer.
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
+sudo env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
+jeedom2ha::deamon_stop();
+' || true
+_orphans=\$(pgrep -f 'plugins/jeedom2ha/.*resources/daemon/main.py' 2>/dev/null || true)
+if [[ -n "\${_orphans}" ]]; then
+  echo "  Daemon orphelin résiduel (PID \${_orphans}) → SIGTERM"
+  sudo kill \${_orphans} 2>/dev/null || true
+  sleep 2
+  _orphans=\$(pgrep -f 'plugins/jeedom2ha/.*resources/daemon/main.py' 2>/dev/null || true)
+  if [[ -n "\${_orphans}" ]]; then
+    echo "  Orphelin persistant → SIGKILL \${_orphans}"
+    sudo kill -9 \${_orphans} 2>/dev/null || true
+    sleep 1
+  fi
+fi
+echo "  Stop défensif OK (ports daemon libérés)."
+REMOTE
+
   # deamon_start() génère localSecret si absent — lire le secret APRÈS l'appel
   # set -e : fail-fast si deamon_start() retourne false ou si PHP fatal
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
