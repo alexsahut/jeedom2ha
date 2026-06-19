@@ -1573,6 +1573,179 @@
       "name": "Alarme maison 12000",
       "object_id": 1,
       "status": {}
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": null,
+          "id": 5205,
+          "name": "Routage",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 5530,
+          "name": "Routage reel",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 5706,
+          "name": "On_5701",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 5707,
+          "name": "Off_5702",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5204,
+          "name": "Rafraichir",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5206,
+          "name": "Puissance",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": null,
+          "id": 5489,
+          "name": "etat",
+          "sub_type": "string",
+          "type": "info"
+        },
+        {
+          "generic_type": null,
+          "id": 5372,
+          "name": "Absence",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 5490,
+          "name": "Manu",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 5491,
+          "name": "auto",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5510,
+          "name": "chauffe complete dans la journee",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": null,
+          "id": 5531,
+          "name": "Routage chauffe complete",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5535,
+          "name": "CE Kwh chauffe complete",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5532,
+          "name": "Routage 24H jusqua 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5533,
+          "name": "Routage aujourdhui",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5534,
+          "name": "CE kWh 24H jusqua 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5527,
+          "name": "CE kWh depuis 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5542,
+          "name": "eq H de chauffe hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "H"
+        },
+        {
+          "generic_type": null,
+          "id": 5538,
+          "name": "eq H de chauffe aujourdhui",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "H"
+        },
+        {
+          "generic_type": null,
+          "id": 5543,
+          "name": "mediane chauffe complete sur 7 jours",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 5708,
+          "name": "active",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 554,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Chauffe-eau",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

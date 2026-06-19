@@ -590,6 +590,13 @@ def _collect_unpublish_node_ids(mapping_result) -> list:
 
     Returns an empty list for mono-entity eqLogics (no node_id), so the caller falls
     back to the historical single eq-level unpublish (no over-deletion).
+
+    Story 11.2 — cas MULTI-DOMAINE (switch + sensor + binary_sensor sous un même
+    eqLogic) : les entités s'étalent sur plusieurs domaines HA, donc un node_id seul
+    (+ un entity_type unique côté appelant) ne suffit plus. On renvoie alors une liste
+    de tuples ``(entity_type, node_id)`` couvrant TOUTES les entités, y compris le
+    switch primaire au topic eq-level (node_id pseudo ``jeedom2ha_<eq_id>``). Le cas
+    homogène (mono / multi-sensor) conserve strictement le contrat list[str] historique.
     """
     if mapping_result is None:
         return []
@@ -599,11 +606,29 @@ def _collect_unpublish_node_ids(mapping_result) -> list:
         nid = rd.get("node_id")
         return nid if isinstance(nid, str) and nid else None
 
+    def _etype(m) -> str:
+        return str(getattr(m, "ha_entity_type", "") or "")
+
+    secondaries = list(getattr(mapping_result, "additional_mappings", None) or [])
+    all_types = {_etype(mapping_result)} | {_etype(s) for s in secondaries}
+
+    # Multi-domaine hétérogène : porter le type par entité (anti-fantôme cross-domaine).
+    if len(all_types) > 1:
+        eq_id = getattr(mapping_result, "jeedom_eq_id", None)
+        entries: list = []
+        primary_nid = _nid(mapping_result) or f"jeedom2ha_{eq_id}"
+        entries.append((_etype(mapping_result), primary_nid))
+        for secondary in secondaries:
+            sec_nid = _nid(secondary) or f"jeedom2ha_{getattr(secondary, 'jeedom_eq_id', eq_id)}"
+            entries.append((_etype(secondary), sec_nid))
+        return entries
+
+    # Homogène (mono / multi-sensor) : contrat list[str] historique (Story 11.1.bis).
     node_ids: list = []
     primary_nid = _nid(mapping_result)
     if primary_nid:
         node_ids.append(primary_nid)
-    for secondary in getattr(mapping_result, "additional_mappings", None) or []:
+    for secondary in secondaries:
         sec_nid = _nid(secondary)
         if sec_nid:
             node_ids.append(sec_nid)

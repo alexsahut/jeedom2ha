@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from models.mapping import MappingResult, SensorCapabilities
 from models.topology import (
+    MULTI_DOMAIN_EQ_IDS,
     MULTI_SENSOR_EQ_TYPES,
     JeedomCmd,
     JeedomEqLogic,
@@ -81,6 +82,10 @@ def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
 
 
 def _is_multi_sensor_eq(eq: JeedomEqLogic) -> bool:
+    # Story 11.2 — les eqLogics multi-domaine (allowlist) dérivent eux aussi leurs
+    # sensors par commande, sous le même device que leur switch/binary_sensor.
+    if eq.id in MULTI_DOMAIN_EQ_IDS:
+        return True
     return (eq.eq_type_name or "").lower() in _MULTI_SENSOR_EQ_TYPES
 
 

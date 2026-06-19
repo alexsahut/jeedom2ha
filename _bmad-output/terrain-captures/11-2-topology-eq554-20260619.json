@@ -1,0 +1,180 @@
+{
+  "id": 554,
+  "name": "Chauffe-eau",
+  "eq_type": "virtual",
+  "generic_type": null,
+  "object_id": 25,
+  "is_enable": true,
+  "is_visible": true,
+  "is_excluded": false,
+  "cmds": [
+    {
+      "id": 5205,
+      "name": "Routage",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "%"
+    },
+    {
+      "id": 5530,
+      "name": "Routage réel",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": "ENERGY_STATE",
+      "unit": "%"
+    },
+    {
+      "id": 5706,
+      "name": "On_5701",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": "ENERGY_ON",
+      "unit": null
+    },
+    {
+      "id": 5707,
+      "name": "Off_5702",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": "ENERGY_OFF",
+      "unit": null
+    },
+    {
+      "id": 5204,
+      "name": "Rafraichir",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": null,
+      "unit": null
+    },
+    {
+      "id": 5206,
+      "name": "Puissance",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "W"
+    },
+    {
+      "id": 5489,
+      "name": "etat",
+      "type": "info",
+      "sub_type": "string",
+      "generic_type": null,
+      "unit": null
+    },
+    {
+      "id": 5372,
+      "name": "Absence",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": null,
+      "unit": null
+    },
+    {
+      "id": 5490,
+      "name": "Manu",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": "ENERGY_ON",
+      "unit": null
+    },
+    {
+      "id": 5491,
+      "name": "auto",
+      "type": "action",
+      "sub_type": "other",
+      "generic_type": "ENERGY_OFF",
+      "unit": null
+    },
+    {
+      "id": 5510,
+      "name": "chauffe complète dans la journée",
+      "type": "info",
+      "sub_type": "binary",
+      "generic_type": null,
+      "unit": null
+    },
+    {
+      "id": 5531,
+      "name": "Routage chauffe complete",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "%"
+    },
+    {
+      "id": 5535,
+      "name": "CE Kwh chauffe complete",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "kWh"
+    },
+    {
+      "id": 5532,
+      "name": "Routage 24H jusquà 22H36 hier",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "%"
+    },
+    {
+      "id": 5533,
+      "name": "Routage aujourdhui (depuis 22H36 hier)",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "%"
+    },
+    {
+      "id": 5534,
+      "name": "CE kWh 24H jusquà 22H36 hier",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "kWh"
+    },
+    {
+      "id": 5527,
+      "name": "CEnbsp;kWhnbsp;depuis 22H36 hier",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "kWh"
+    },
+    {
+      "id": 5542,
+      "name": "eq H de chauffe hier",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "H"
+    },
+    {
+      "id": 5538,
+      "name": "eq H de chauffe aujourdhui",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "H"
+    },
+    {
+      "id": 5543,
+      "name": "mediane chauffe complete sur 7 jours",
+      "type": "info",
+      "sub_type": "numeric",
+      "generic_type": null,
+      "unit": "%"
+    },
+    {
+      "id": 5708,
+      "name": "activé",
+      "type": "info",
+      "sub_type": "binary",
+      "generic_type": "ENERGY_STATE",
+      "unit": null
+    }
+  ]
+}
