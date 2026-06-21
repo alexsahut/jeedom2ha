@@ -13,7 +13,7 @@ from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import MappingResult
-from models.topology import MULTI_DOMAIN_EQ_IDS, JeedomEqLogic, TopologySnapshot
+from models.topology import JeedomEqLogic, TopologySnapshot
 
 
 class MapperRegistry:
@@ -66,12 +66,13 @@ class MapperRegistry:
         ``map`` historique (mono-entité). L'ordre du registry est préservé : on
         s'arrête au premier mapper qui produit au moins un résultat.
 
-        Story 11.2 — exception bornée : pour un eqLogic de l'allowlist multi-domaine,
-        on AGRÈGE plusieurs domaines (switch + sensor + binary_sensor) au lieu de
-        s'arrêter au premier mapper. Le switch reste primaire (back-compat).
+        Story 11.3 — exception structurelle : quand les mappers dédiés produisent
+        plusieurs entités pour le même eqLogic (multi-switch et/ou multi-domaine),
+        on agrège ces résultats au lieu d'utiliser une allowlist d'IDs.
         """
-        if eq.id in MULTI_DOMAIN_EQ_IDS:
-            return self._map_multi_domain(eq, snapshot)
+        structural_results = self._map_structural_multi_entity(eq, snapshot)
+        if len(structural_results) > 1:
+            return structural_results
 
         for mapper in self._mappers:
             results = self._invoke_mapper(mapper, eq, snapshot)
@@ -79,20 +80,30 @@ class MapperRegistry:
                 return results
         return []
 
-    def _map_multi_domain(
+    def _map_structural_multi_entity(
         self, eq: JeedomEqLogic, snapshot: TopologySnapshot
     ) -> List[MappingResult]:
-        """Agrège les domaines d'un eqLogic multi-domaine (allowlist Story 11.2).
+        """Agrège les résultats structurellement multi-entités.
 
-        Ordre : switch primaire (identité eqLogic historique préservée), puis
-        sensors par commande, puis binary_sensors par commande. Tous rattachés au
-        même device Jeedom. Aucun débordement : seuls les IDs de l'allowlist passent ici.
+        Ordre : switch(es), puis sensors, puis binary_sensors. Les mappers concernés
+        garantissent eux-mêmes qu'ils ne passent en mode multi que sur une structure
+        riche (pas un simple switch ENERGY_* + une mesure annexe).
         """
-        results: List[MappingResult] = []
-        for mapper in self._mappers:
-            if isinstance(mapper, (SwitchMapper, SensorMapper, BinarySensorMapper)):
-                results.extend(self._invoke_mapper(mapper, eq, snapshot))
-        return results
+        switch_mapper = next(m for m in self._mappers if isinstance(m, SwitchMapper))
+        sensor_mapper = next(m for m in self._mappers if isinstance(m, SensorMapper))
+        binary_mapper = next(m for m in self._mappers if isinstance(m, BinarySensorMapper))
+
+        switch_results = self._invoke_mapper(switch_mapper, eq, snapshot)
+        if not switch_results:
+            return []
+
+        sensor_results = self._invoke_mapper(sensor_mapper, eq, snapshot)
+        binary_results = self._invoke_mapper(binary_mapper, eq, snapshot)
+        secondary_count = len(sensor_results) + len(binary_results)
+
+        if len(switch_results) > 1 or secondary_count > 1:
+            return [*switch_results, *sensor_results, *binary_results]
+        return []
 
     @staticmethod
     def _invoke_mapper(

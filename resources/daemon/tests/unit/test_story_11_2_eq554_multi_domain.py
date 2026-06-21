@@ -8,9 +8,9 @@ projeter PLUSIEURS domaines HA rattachés au même device `jeedom2ha_554` :
 - 1 ``binary_sensor`` (#5510 « chauffe complète ») ; la binaire ENERGY_STATE
   (#5708 « activé ») est EXCLUE car déjà portée par le switch (anti-doublon).
 
-Gating volontairement borné à un allowlist d'IDs eqLogic (`MULTI_DOMAIN_EQ_IDS`,
-Option A) : `virtual` est mutualisé, on ne peut pas gater sur eq_type sans
-emporter 63 autres équipements. Aucun autre eqLogic ne devient multi-domaine.
+Gating structurel : le registry agrège l'eqLogic quand les mappers produisent
+plusieurs entités (switch + sensors + binary_sensor), sans allowlist d'IDs.
+Aucun autre eqLogic mono-switch ne devient multi-domaine.
 
 Fixture fidèle au terrain (box 192.168.1.21, capture 2026-06-19).
 """
@@ -29,7 +29,6 @@ from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import SwitchCapabilities
 from models.topology import (
-    MULTI_DOMAIN_EQ_IDS,
     JeedomCmd,
     JeedomEqLogic,
     JeedomObject,
@@ -105,12 +104,16 @@ def _snapshot(eq: JeedomEqLogic) -> TopologySnapshot:
 
 
 # ---------------------------------------------------------------------------
-# Gating — allowlist borné (Option A)
+# Gating — prédicat structurel
 # ---------------------------------------------------------------------------
 
 
-def test_eq554_is_in_multi_domain_allowlist():
-    assert 554 in MULTI_DOMAIN_EQ_IDS
+def test_eq554_is_multi_domain_by_structure_without_id_allowlist():
+    eq = _eq554()
+    results = MapperRegistry().map_all(eq, _snapshot(eq))
+
+    assert len(results) > 1
+    assert {r.ha_entity_type for r in results} == {"switch", "sensor", "binary_sensor"}
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +221,7 @@ def test_binary_sensor_identity_is_per_command():
 
 
 # ---------------------------------------------------------------------------
-# Non-régression — aucun débordement de l'allowlist (AC 4)
+# Non-régression — aucun débordement du prédicat structurel (AC 4)
 # ---------------------------------------------------------------------------
 
 

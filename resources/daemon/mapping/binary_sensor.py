@@ -1,10 +1,10 @@
 """binary_sensor.py — Mapper Jeedom Info binary vers Home Assistant binary_sensor.
 
-Story 11.2 PE — support multi-domaine borné : un eqLogic de l'allowlist
-``MULTI_DOMAIN_EQ_IDS`` (ex. chauffe-eau eq554) expose ses commandes info binaires
+Story 11.2 PE — support multi-domaine : un eqLogic structurellement multi-entité
+expose ses commandes info binaires
 comme autant de `binary_sensor` HA distincts rattachés au même device, sans
 régression sur le comportement mono-binaire historique des autres équipements.
-Les commandes binaires portant un generic_type ENERGY_* sont exclues : elles sont
+Les commandes binaires portant un generic_type de readback switch sont exclues : elles sont
 déjà projetées par le `switch` (anti-doublon).
 """
 
@@ -13,11 +13,14 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from models.mapping import MappingResult, SensorCapabilities
-from models.topology import MULTI_DOMAIN_EQ_IDS, JeedomCmd, JeedomEqLogic, TopologySnapshot
+from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 
 # Story 11.2 — generic_types portés par le switch ; leurs commandes binaires ne
 # doivent jamais être dupliquées en binary_sensor.
-_SWITCH_OWNED_GENERIC_TYPES = frozenset({"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF"})
+_SWITCH_OWNED_GENERIC_TYPES = frozenset({
+    "ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF",
+    "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF",
+})
 
 _BINARY_SENSOR_GENERIC_TYPE_MAP: Dict[str, Optional[str]] = {
     "BATTERY_CHARGING": "battery_charging",
@@ -43,6 +46,7 @@ _BINARY_SENSOR_GENERIC_TYPE_MAP: Dict[str, Optional[str]] = {
     "THERMOSTAT_STATE": None,
     "MEDIA_STATE": "running",
     "TIMER_STATE": "running",
+    "SWITCH_STATE": None,
 }
 
 
@@ -56,7 +60,20 @@ def _is_binary_info_command(cmd: JeedomCmd) -> bool:
 
 
 def _is_multi_domain_eq(eq: JeedomEqLogic) -> bool:
-    return eq.id in MULTI_DOMAIN_EQ_IDS
+    switch_types = {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}
+    has_switch_shape = any(cmd.generic_type in switch_types for cmd in eq.cmds)
+    binary_candidates = [
+        cmd for cmd in eq.cmds
+        if _is_binary_info_command(cmd) and cmd.generic_type not in _SWITCH_OWNED_GENERIC_TYPES
+    ]
+    numeric_count = sum(
+        1 for cmd in eq.cmds
+        if (cmd.type or "").lower() == "info"
+        and "numeric" in (cmd.sub_type or "").lower()
+        and "binary" not in (cmd.sub_type or "").lower()
+    )
+    switch_state_count = sum(1 for cmd in eq.cmds if cmd.generic_type in {"SWITCH_STATE", "ENERGY_STATE"})
+    return has_switch_shape and (bool(binary_candidates) or numeric_count >= 2 or switch_state_count >= 2)
 
 
 class BinarySensorMapper:
@@ -67,7 +84,7 @@ class BinarySensorMapper:
 
         - Cas standard : au plus un mapping (premier generic_type connu), strictement
           identique au comportement mono-binaire historique.
-        - Cas multi-domaine borné (allowlist) : un mapping par commande info binaire,
+        - Cas multi-domaine structurel : un mapping par commande info binaire,
           chacun avec identité distincte dérivée de l'ID cmd Jeedom. Les commandes
           ENERGY_* (portées par le switch) sont exclues.
         """
@@ -84,7 +101,7 @@ class BinarySensorMapper:
         for cmd in eq.cmds:
             if not _is_binary_info_command(cmd):
                 continue
-            if cmd.generic_type in _SWITCH_OWNED_GENERIC_TYPES:
+            if cmd.id in _switch_readback_cmd_ids(eq):
                 continue  # déjà projeté par le switch — pas de doublon
 
             device_class = _BINARY_SENSOR_GENERIC_TYPE_MAP.get(cmd.generic_type)
@@ -135,3 +152,42 @@ class BinarySensorMapper:
             )
 
         return None
+
+
+def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
+    """Return state cmd ids consumed by complete ENERGY_*/SWITCH_* switch trios."""
+    consumed: set[int] = set()
+    energy_state = None
+    has_energy_on = False
+    has_energy_off = False
+    switch_groups: Dict[str, Dict[str, JeedomCmd]] = {}
+
+    for cmd in eq.cmds:
+        if cmd.generic_type == "ENERGY_STATE":
+            energy_state = cmd
+        elif cmd.generic_type == "ENERGY_ON":
+            has_energy_on = True
+        elif cmd.generic_type == "ENERGY_OFF":
+            has_energy_off = True
+        elif cmd.generic_type in {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}:
+            key = _switch_group_key(cmd.name)
+            switch_groups.setdefault(key, {})[cmd.generic_type] = cmd
+
+    if energy_state is not None and has_energy_on and has_energy_off:
+        consumed.add(int(energy_state.id))
+
+    for group in switch_groups.values():
+        if {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}.issubset(group):
+            consumed.add(int(group["SWITCH_STATE"].id))
+
+    return consumed
+
+
+def _switch_group_key(name: str) -> str:
+    import re
+
+    normalized = (name or "").strip().lower()
+    normalized = re.sub(r"\s+(on|off)$", "", normalized)
+    normalized = re.sub(r"[_\-\s]+(on|off)$", "", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
