@@ -1,0 +1,68 @@
+# Story 10.3 : Évaluation puis ouverture ciblée de `alarm_control_panel` pour `Alarme maison`
+
+Status: done
+
+## Story
+
+En tant qu'utilisateur,
+je veux retrouver dans Home Assistant l'alarme maison déjà exposée via Homebridge,
+afin que la compatibilité minimale utile couvre aussi l'état armé/désarmé et les commandes armer/désarmer.
+
+## Évaluation (pré-décidée OUVRABLE)
+
+Les generic types Jeedom disponibles mappent proprement sur `alarm_control_panel.mqtt` :
+- `ALARM_STATE` (info/binary) → signal d'état de l'alarme
+- `ALARM_ENABLE_STATE` (info/binary) → signal d'état secondaire (activation alarme)
+- `ALARM_ENABLE` (action) → commande armer
+- `ALARM_DISABLE` (action) → commande désarmer
+
+## Acceptance Criteria
+
+**AC1 — Mapper `alarm_control_panel` nominal**
+**Given** un eqLogic Jeedom alarme avec ALARM_STATE + ALARM_ENABLE + ALARM_DISABLE
+**When** le mapper `alarm_control_panel` est invoqué
+**Then** il produit un `MappingResult` `ha_entity_type = "alarm_control_panel"` structurellement valide
+
+**AC2 — Publication MQTT disponible**
+**Given** le mapper produit un MappingResult alarm_control_panel
+**When** la publication est déclenchée
+**Then** `PublisherRegistry` résout `alarm_control_panel` → `publish_alarm_control_panel`
+
+**AC3 — Ouverture `PRODUCT_SCOPE` sous FR40 / NFR10**
+**Given** l'ouverture de `alarm_control_panel` dans `PRODUCT_SCOPE`
+**When** la story est revue
+**Then** elle embarque dans le même incrément les preuves FR40 / NFR10 :
+- cas nominal : `AlarmCapabilities(has_state=True, has_command=True)` → is_valid=True
+- cas d'échec état : `AlarmCapabilities(has_state=False, has_command=True)` → `ha_missing_state_topic`
+- cas d'échec commande : `AlarmCapabilities(has_state=True, has_command=False)` → `ha_missing_command_topic`
+- golden-file étendu avec eq_id=12000
+
+## Implémentation
+
+### Fichiers créés
+- `resources/daemon/mapping/alarm_control_panel.py` — `AlarmControlPanelMapper`
+- `resources/daemon/tests/unit/test_story_10_3_alarm_control_panel.py` — 9 tests unitaires
+
+### Fichiers modifiés
+- `resources/daemon/models/mapping.py` — `AlarmCapabilities` dataclass + union `MappingCapabilities`
+- `resources/daemon/mapping/registry.py` — `AlarmControlPanelMapper` avant `BinarySensorMapper`
+- `resources/daemon/discovery/publisher.py` — `publish_alarm_control_panel` + `_build_alarm_control_panel_payload`
+- `resources/daemon/discovery/registry.py` — `alarm_control_panel` dans `_known_types` et `_publishers`
+- `resources/daemon/validation/ha_component_registry.py` — `alarm_control_panel` dans registre + `PRODUCT_SCOPE`
+- `resources/daemon/tests/fixtures/golden_corpus/sync_payload.json` — eq_id=12000 ajouté
+- `resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json` — régénéré
+- `resources/daemon/tests/unit/test_step3_governance_fr40.py` — preuve FR40 alarm_control_panel
+- `resources/daemon/tests/unit/test_ha_component_registry.py` — PRODUCT_SCOPE snapshot 8 types
+- `resources/daemon/tests/unit/test_story_7_2_wave_registry.py` — snapshot PRODUCT_SCOPE
+- `resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py` — snapshot PRODUCT_SCOPE
+- `resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py` — len==8
+- `resources/daemon/tests/unit/test_story_8_1_mapper_registry.py` — ordre AlarmControlPanelMapper
+- `resources/daemon/tests/unit/test_story_8_2_publisher_registry.py` — alarm_control_panel registré
+- `resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py` — known_types snapshot
+- `resources/daemon/tests/unit/test_story_9_2_binary_sensor_mapper.py` — known_types snapshot
+- `resources/daemon/tests/unit/test_story_9_3_button_mapper.py` — known_types snapshot
+- `resources/daemon/tests/unit/test_story_8_4_golden_file.py` — corpus shape 52 eq_logics
+
+## Résultat CI
+
+787 passed, 1 pre-existing failure (test_story_10_1, non lié à cette story)
