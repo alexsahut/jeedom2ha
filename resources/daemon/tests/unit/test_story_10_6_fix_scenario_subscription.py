@@ -16,9 +16,10 @@ class TestScenarioCommandSubscription:
 
     def test_existing_topics_still_present(self):
         assert "jeedom2ha/+/set" in COMMAND_SUBSCRIPTION_TOPICS
+        assert "jeedom2ha/+/+/set" in COMMAND_SUBSCRIPTION_TOPICS
         assert "jeedom2ha/+/brightness/set" in COMMAND_SUBSCRIPTION_TOPICS
         assert "jeedom2ha/+/position/set" in COMMAND_SUBSCRIPTION_TOPICS
 
     def test_subscription_count(self):
-        # 3 topics existants + 1 ajouté par Story 10.6
-        assert len(COMMAND_SUBSCRIPTION_TOPICS) == 4
+        # 3 topics existants + Story 10.6 cmd + Story 11.3 node-scoped set
+        assert len(COMMAND_SUBSCRIPTION_TOPICS) == 5

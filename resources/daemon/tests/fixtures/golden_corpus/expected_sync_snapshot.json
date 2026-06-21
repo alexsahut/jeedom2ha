@@ -494,6 +494,491 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 583,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5987,
+              "cmd_name": "Charge",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5997,
+              "cmd_name": "Charge On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5998,
+              "cmd_name": "Charge Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "name": "IQ EV Charger",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5986,
+                "name": "Branche"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5988,
+                "name": "Connecte"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5987,
+                "name": "Charge"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5997,
+                "name": "Charge On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5998,
+                "name": "Charge Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6009,
+                "name": "Charge solaire"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5999,
+                "name": "Charge solaire On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6001,
+                "name": "Charge solaire Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6010,
+                "name": "Charge manuelle"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 6000,
+                "name": "Charge manuelle On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6021,
+                "name": "Charge manuelle Off"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5991,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5992,
+                "name": "Energie session"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5993,
+                "name": "Energie jour"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5989,
+                "name": "Etat connecteur"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5990,
+                "name": "Mode de charge"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5994,
+                "name": "Derniere MAJ"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5995,
+                "name": "Source"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5996,
+                "name": "Diagnostic"
+              },
+              {
+                "generic_type": null,
+                "id": 6003,
+                "name": "action_ev"
+              },
+              {
+                "generic_type": null,
+                "id": 6002,
+                "name": "Rafraichir"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5987,
+                "configured_type": "SWITCH_STATE",
+                "logical_role": "SWITCH_STATE",
+                "used_type": "SWITCH_STATE"
+              },
+              {
+                "command_id": 5997,
+                "configured_type": "SWITCH_ON",
+                "logical_role": "SWITCH_ON",
+                "used_type": "SWITCH_ON"
+              },
+              {
+                "command_id": 5998,
+                "configured_type": "SWITCH_OFF",
+                "logical_role": "SWITCH_OFF",
+                "used_type": "SWITCH_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5986,
+              "cmd_name": "Branche",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5988,
+              "cmd_name": "Connecte",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6009,
+              "cmd_name": "Charge solaire",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5999,
+              "cmd_name": "Charge solaire On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6001,
+              "cmd_name": "Charge solaire Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 6010,
+              "cmd_name": "Charge manuelle",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6000,
+              "cmd_name": "Charge manuelle On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6021,
+              "cmd_name": "Charge manuelle Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 5991,
+              "cmd_name": "Puissance",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5992,
+              "cmd_name": "Energie session",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5993,
+              "cmd_name": "Energie jour",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5989,
+              "cmd_name": "Etat connecteur",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5990,
+              "cmd_name": "Mode de charge",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5994,
+              "cmd_name": "Derniere MAJ",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5995,
+              "cmd_name": "Source",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5996,
+              "cmd_name": "Diagnostic",
+              "generic_type": "GENERIC_INFO"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 628,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5977,
+              "cmd_name": "Filtration piscine",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5978,
+              "cmd_name": "Filtration piscine On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5979,
+              "cmd_name": "Filtration piscine Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "name": "Pilotage priorisation solaire",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5977,
+                "name": "Filtration piscine"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5978,
+                "name": "Filtration piscine On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5979,
+                "name": "Filtration piscine Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5980,
+                "name": "Chauffage piscine"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5981,
+                "name": "Chauffage piscine On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5982,
+                "name": "Chauffage piscine Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5983,
+                "name": "Chauffage SPA"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5984,
+                "name": "Chauffage SPA On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5985,
+                "name": "Chauffage SPA Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6004,
+                "name": "Charge voiture"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 6005,
+                "name": "Charge voiture On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6006,
+                "name": "Charge voiture Off"
+              },
+              {
+                "generic_type": null,
+                "id": 5976,
+                "name": "Rafraichir"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5977,
+                "configured_type": "SWITCH_STATE",
+                "logical_role": "SWITCH_STATE",
+                "used_type": "SWITCH_STATE"
+              },
+              {
+                "command_id": 5978,
+                "configured_type": "SWITCH_ON",
+                "logical_role": "SWITCH_ON",
+                "used_type": "SWITCH_ON"
+              },
+              {
+                "command_id": 5979,
+                "configured_type": "SWITCH_OFF",
+                "logical_role": "SWITCH_OFF",
+                "used_type": "SWITCH_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5980,
+              "cmd_name": "Chauffage piscine",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5981,
+              "cmd_name": "Chauffage piscine On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5982,
+              "cmd_name": "Chauffage piscine Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 5983,
+              "cmd_name": "Chauffage SPA",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5984,
+              "cmd_name": "Chauffage SPA On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5985,
+              "cmd_name": "Chauffage SPA Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 6004,
+              "cmd_name": "Charge voiture",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6005,
+              "cmd_name": "Charge voiture On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6006,
+              "cmd_name": "Charge voiture Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "S\u00fbr",
           "detail": "",
           "detected_generic_types": [],
@@ -5724,6 +6209,491 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 583,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5987,
+              "cmd_name": "Charge",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5997,
+              "cmd_name": "Charge On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5998,
+              "cmd_name": "Charge Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "name": "IQ EV Charger",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5986,
+                "name": "Branche"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5988,
+                "name": "Connecte"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5987,
+                "name": "Charge"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5997,
+                "name": "Charge On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5998,
+                "name": "Charge Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6009,
+                "name": "Charge solaire"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5999,
+                "name": "Charge solaire On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6001,
+                "name": "Charge solaire Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6010,
+                "name": "Charge manuelle"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 6000,
+                "name": "Charge manuelle On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6021,
+                "name": "Charge manuelle Off"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5991,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5992,
+                "name": "Energie session"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5993,
+                "name": "Energie jour"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5989,
+                "name": "Etat connecteur"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5990,
+                "name": "Mode de charge"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5994,
+                "name": "Derniere MAJ"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5995,
+                "name": "Source"
+              },
+              {
+                "generic_type": "GENERIC_INFO",
+                "id": 5996,
+                "name": "Diagnostic"
+              },
+              {
+                "generic_type": null,
+                "id": 6003,
+                "name": "action_ev"
+              },
+              {
+                "generic_type": null,
+                "id": 6002,
+                "name": "Rafraichir"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5987,
+                "configured_type": "SWITCH_STATE",
+                "logical_role": "SWITCH_STATE",
+                "used_type": "SWITCH_STATE"
+              },
+              {
+                "command_id": 5997,
+                "configured_type": "SWITCH_ON",
+                "logical_role": "SWITCH_ON",
+                "used_type": "SWITCH_ON"
+              },
+              {
+                "command_id": 5998,
+                "configured_type": "SWITCH_OFF",
+                "logical_role": "SWITCH_OFF",
+                "used_type": "SWITCH_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5986,
+              "cmd_name": "Branche",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5988,
+              "cmd_name": "Connecte",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6009,
+              "cmd_name": "Charge solaire",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5999,
+              "cmd_name": "Charge solaire On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6001,
+              "cmd_name": "Charge solaire Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 6010,
+              "cmd_name": "Charge manuelle",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6000,
+              "cmd_name": "Charge manuelle On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6021,
+              "cmd_name": "Charge manuelle Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 5991,
+              "cmd_name": "Puissance",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5992,
+              "cmd_name": "Energie session",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5993,
+              "cmd_name": "Energie jour",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5989,
+              "cmd_name": "Etat connecteur",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5990,
+              "cmd_name": "Mode de charge",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5994,
+              "cmd_name": "Derniere MAJ",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5995,
+              "cmd_name": "Source",
+              "generic_type": "GENERIC_INFO"
+            },
+            {
+              "cmd_id": 5996,
+              "cmd_name": "Diagnostic",
+              "generic_type": "GENERIC_INFO"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 628,
+          "eq_type_name": "virtual",
+          "ha_type": "switch",
+          "matched_commands": [
+            {
+              "cmd_id": 5977,
+              "cmd_name": "Filtration piscine",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5978,
+              "cmd_name": "Filtration piscine On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5979,
+              "cmd_name": "Filtration piscine Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "name": "Pilotage priorisation solaire",
+          "object_name": "Salon",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "switch",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5977,
+                "name": "Filtration piscine"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5978,
+                "name": "Filtration piscine On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5979,
+                "name": "Filtration piscine Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5980,
+                "name": "Chauffage piscine"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5981,
+                "name": "Chauffage piscine On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5982,
+                "name": "Chauffage piscine Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 5983,
+                "name": "Chauffage SPA"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 5984,
+                "name": "Chauffage SPA On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 5985,
+                "name": "Chauffage SPA Off"
+              },
+              {
+                "generic_type": "SWITCH_STATE",
+                "id": 6004,
+                "name": "Charge voiture"
+              },
+              {
+                "generic_type": "SWITCH_ON",
+                "id": 6005,
+                "name": "Charge voiture On"
+              },
+              {
+                "generic_type": "SWITCH_OFF",
+                "id": 6006,
+                "name": "Charge voiture Off"
+              },
+              {
+                "generic_type": null,
+                "id": 5976,
+                "name": "Rafraichir"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 5977,
+                "configured_type": "SWITCH_STATE",
+                "logical_role": "SWITCH_STATE",
+                "used_type": "SWITCH_STATE"
+              },
+              {
+                "command_id": 5978,
+                "configured_type": "SWITCH_ON",
+                "logical_role": "SWITCH_ON",
+                "used_type": "SWITCH_ON"
+              },
+              {
+                "command_id": 5979,
+                "configured_type": "SWITCH_OFF",
+                "logical_role": "SWITCH_OFF",
+                "used_type": "SWITCH_OFF"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "cmd_id": 5980,
+              "cmd_name": "Chauffage piscine",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5981,
+              "cmd_name": "Chauffage piscine On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5982,
+              "cmd_name": "Chauffage piscine Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 5983,
+              "cmd_name": "Chauffage SPA",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 5984,
+              "cmd_name": "Chauffage SPA On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 5985,
+              "cmd_name": "Chauffage SPA Off",
+              "generic_type": "SWITCH_OFF"
+            },
+            {
+              "cmd_id": 6004,
+              "cmd_name": "Charge voiture",
+              "generic_type": "SWITCH_STATE"
+            },
+            {
+              "cmd_id": 6005,
+              "cmd_name": "Charge voiture On",
+              "generic_type": "SWITCH_ON"
+            },
+            {
+              "cmd_id": 6006,
+              "cmd_name": "Charge voiture Off",
+              "generic_type": "SWITCH_OFF"
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "S\u00fbr",
           "detail": "",
           "detected_generic_types": [],
@@ -10411,8 +11381,8 @@
           "compteurs": {
             "ecarts": 7,
             "exclus": 0,
-            "inclus": 27,
-            "total": 27
+            "inclus": 29,
+            "total": 29
           },
           "home_statut": "Partiellement publiee",
           "object_id": 1,
@@ -10423,7 +11393,7 @@
               "disabled_eqlogic": 1,
               "ha_missing_command_topic": 1,
               "no_projection_possible": 1,
-              "probable": 4,
+              "probable": 6,
               "sure": 16
             },
             "counts_by_status": {
@@ -10431,10 +11401,10 @@
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 3,
-              "published": 20
+              "published": 22
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 27
+            "total_equipments": 29
           }
         },
         {
@@ -10496,8 +11466,8 @@
         "compteurs": {
           "ecarts": 10,
           "exclus": 1,
-          "inclus": 55,
-          "total": 56
+          "inclus": 57,
+          "total": 58
         },
         "counts_by_reason": {
           "ambiguous_skipped": 7,
@@ -10505,7 +11475,7 @@
           "excluded_eqlogic": 1,
           "ha_missing_command_topic": 1,
           "no_projection_possible": 1,
-          "probable": 15,
+          "probable": 17,
           "sure": 30
         },
         "counts_by_status": {
@@ -10513,11 +11483,11 @@
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 45
+          "published": 47
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
-        "total_equipments": 56
+        "total_equipments": 58
       }
     },
     "request_id": "<normalized-request-id>",
@@ -10544,9 +11514,9 @@
       "alarm_control_panels_sure": 2,
       "binary_sensors_ambiguous": 0,
       "binary_sensors_probable": 0,
-      "binary_sensors_published": 6,
+      "binary_sensors_published": 8,
       "binary_sensors_skipped": 0,
-      "binary_sensors_sure": 6,
+      "binary_sensors_sure": 8,
       "buttons_ambiguous": 2,
       "buttons_probable": 0,
       "buttons_published": 3,
@@ -10569,12 +11539,12 @@
       "lights_sure": 3,
       "sensors_ambiguous": 2,
       "sensors_probable": 0,
-      "sensors_published": 25,
+      "sensors_published": 28,
       "sensors_skipped": 2,
-      "sensors_sure": 25,
+      "sensors_sure": 28,
       "switches_ambiguous": 1,
-      "switches_probable": 4,
-      "switches_published": 7,
+      "switches_probable": 11,
+      "switches_published": 14,
       "switches_skipped": 1,
       "switches_sure": 3
     },
@@ -12707,6 +13677,74 @@
         },
         "suggested_area": "Salon"
       },
+      "583": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": true,
+          "on_off_confidence": "probable"
+        },
+        "commands": {
+          "SWITCH_OFF": {
+            "generic_type": "SWITCH_OFF",
+            "id": 5998,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "SWITCH_ON": {
+            "generic_type": "SWITCH_ON",
+            "id": 5997,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "SWITCH_STATE": {
+            "generic_type": "SWITCH_STATE",
+            "id": 5987,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "probable",
+        "ha_entity_type": "switch",
+        "ha_name": "Charge",
+        "ha_unique_id": "jeedom2ha_eq_583_cmd_5987",
+        "jeedom_eq_id": 583,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/583/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "probable",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/583/5987/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "switch_switch_on_off_state",
+        "reason_details": {
+          "cmd_id": 5987,
+          "command_topic": "jeedom2ha/583/5987/set",
+          "device_class_source": "virtual",
+          "grouping_key": "charge",
+          "node_id": "jeedom2ha_583_5987",
+          "object_id": "jeedom2ha_583_5987",
+          "state_topic": "jeedom2ha/583/5987/state"
+        },
+        "suggested_area": "Salon"
+      },
       "6000": {
         "capabilities": {
           "brightness_confidence": "probable",
@@ -12821,6 +13859,74 @@
           "temperature_state_topic": "jeedom2ha/6001/temperature/state"
         },
         "suggested_area": "Chambre"
+      },
+      "628": {
+        "capabilities": {
+          "device_class": null,
+          "has_on_off": true,
+          "has_state": true,
+          "on_off_confidence": "probable"
+        },
+        "commands": {
+          "SWITCH_OFF": {
+            "generic_type": "SWITCH_OFF",
+            "id": 5979,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "SWITCH_ON": {
+            "generic_type": "SWITCH_ON",
+            "id": 5978,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "SWITCH_STATE": {
+            "generic_type": "SWITCH_STATE",
+            "id": 5977,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "probable",
+        "ha_entity_type": "switch",
+        "ha_name": "Filtration piscine",
+        "ha_unique_id": "jeedom2ha_eq_628_cmd_5977",
+        "jeedom_eq_id": 628,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/628/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "probable",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/628/5977/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "switch_switch_on_off_state",
+        "reason_details": {
+          "cmd_id": 5977,
+          "command_topic": "jeedom2ha/628/5977/set",
+          "device_class_source": "virtual",
+          "grouping_key": "filtration piscine",
+          "node_id": "jeedom2ha_628_5977",
+          "object_id": "jeedom2ha_628_5977",
+          "state_topic": "jeedom2ha/628/5977/state"
+        },
+        "suggested_area": "Salon"
       },
       "7000": {
         "capabilities": {
@@ -14175,6 +15281,24 @@
         "should_publish": true,
         "state_topic": "jeedom2ha/554/state"
       },
+      "583": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/583/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "probable",
+          "ha_entity_type": "switch",
+          "jeedom_eq_id": 583,
+          "reason_code": "switch_switch_on_off_state"
+        },
+        "reason": "probable",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/583/5987/state"
+      },
       "6000": {
         "active_or_alive": false,
         "availability_reason": "timeout_zero",
@@ -14210,6 +15334,24 @@
         "reason": "sure",
         "should_publish": true,
         "state_topic": "jeedom2ha/6001/state"
+      },
+      "628": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/628/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "probable",
+          "ha_entity_type": "switch",
+          "jeedom_eq_id": 628,
+          "reason_code": "switch_switch_on_off_state"
+        },
+        "reason": "probable",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/628/5977/state"
       },
       "7000": {
         "active_or_alive": true,
@@ -14468,7 +15610,7 @@
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 54,
+      "eligible_count": 56,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -14482,9 +15624,9 @@
         "alarm_control_panels_sure": 2,
         "binary_sensors_ambiguous": 0,
         "binary_sensors_probable": 0,
-        "binary_sensors_published": 6,
+        "binary_sensors_published": 8,
         "binary_sensors_skipped": 0,
-        "binary_sensors_sure": 6,
+        "binary_sensors_sure": 8,
         "buttons_ambiguous": 2,
         "buttons_probable": 0,
         "buttons_published": 3,
@@ -14507,12 +15649,12 @@
         "lights_sure": 3,
         "sensors_ambiguous": 2,
         "sensors_probable": 0,
-        "sensors_published": 25,
+        "sensors_published": 28,
         "sensors_skipped": 2,
-        "sensors_sure": 25,
+        "sensors_sure": 28,
         "switches_ambiguous": 1,
-        "switches_probable": 4,
-        "switches_published": 7,
+        "switches_probable": 11,
+        "switches_published": 14,
         "switches_skipped": 1,
         "switches_sure": 3
       },
@@ -14543,6 +15685,24 @@
             "has_pending_home_assistant_changes": false,
             "is_exception": false,
             "name": "Chauffe-eau",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 583,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "IQ EV Charger",
+            "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 628,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Pilotage priorisation solaire",
             "object_id": 1
           },
           {
@@ -15027,8 +16187,8 @@
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 55,
-            "total": 56
+            "include": 57,
+            "total": 58
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -15039,8 +16199,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 27,
-              "total": 27
+              "include": 29,
+              "total": 29
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -15073,8 +16233,8 @@
           }
         ]
       },
-      "total_cmds": 134,
-      "total_eq_logics": 56,
+      "total_cmds": 168,
+      "total_eq_logics": 58,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

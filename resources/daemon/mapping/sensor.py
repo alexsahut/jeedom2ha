@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple
 
 from models.mapping import MappingResult, SensorCapabilities
 from models.topology import (
-    MULTI_DOMAIN_EQ_IDS,
     MULTI_SENSOR_EQ_TYPES,
     JeedomCmd,
     JeedomEqLogic,
@@ -82,11 +81,16 @@ def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
 
 
 def _is_multi_sensor_eq(eq: JeedomEqLogic) -> bool:
-    # Story 11.2 — les eqLogics multi-domaine (allowlist) dérivent eux aussi leurs
-    # sensors par commande, sous le même device que leur switch/binary_sensor.
-    if eq.id in MULTI_DOMAIN_EQ_IDS:
+    if _has_structural_multi_entity_sensor_shape(eq):
         return True
     return (eq.eq_type_name or "").lower() in _MULTI_SENSOR_EQ_TYPES
+
+
+def _has_structural_multi_entity_sensor_shape(eq: JeedomEqLogic) -> bool:
+    switch_types = {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}
+    has_switch_shape = any(cmd.generic_type in switch_types for cmd in eq.cmds)
+    numeric_count = sum(1 for cmd in eq.cmds if _is_numeric_info_command(cmd))
+    return has_switch_shape and numeric_count >= 2
 
 
 class SensorMapper:
