@@ -20,5 +20,5 @@ class TestScenarioCommandSubscription:
         assert "jeedom2ha/+/position/set" in COMMAND_SUBSCRIPTION_TOPICS
 
     def test_subscription_count(self):
-        # 3 topics existants + 1 ajouté par Story 10.6
-        assert len(COMMAND_SUBSCRIPTION_TOPICS) == 4
+        # 3 topics historiques + multi-switch 11.3 + scenario ajouté par Story 10.6
+        assert len(COMMAND_SUBSCRIPTION_TOPICS) == 5

@@ -75,6 +75,11 @@ _TYPES_WITHOUT_STATE_TOPIC = {"button"}
 
 def _resolve_state_topic(mapping: MappingResult) -> str:
     """Resolve runtime state topic for a published actuator mapping."""
+    reason_details = getattr(mapping, "reason_details", None) or {}
+    state_topic = reason_details.get("state_topic")
+    if mapping.ha_entity_type == "switch" and isinstance(state_topic, str) and state_topic:
+        return state_topic
+
     if (mapping.ha_entity_type in PublisherRegistry.known_types()
             and mapping.ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC):
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"

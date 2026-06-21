@@ -106,7 +106,9 @@ class DiscoveryPublisher:
         Returns:
             True if publish succeeded, False otherwise.
         """
-        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="switch")
+        reason_details = mapping.reason_details or {}
+        node_id = reason_details.get("node_id") if isinstance(reason_details.get("node_id"), str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="switch", node_id=node_id)
         payload = self._build_switch_payload(mapping, snapshot)
         payload_json = json.dumps(payload, ensure_ascii=False)
 
@@ -457,15 +459,19 @@ class DiscoveryPublisher:
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         caps = mapping.capabilities
+        reason_details = mapping.reason_details or {}
+        object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
+        command_topic = reason_details.get("command_topic") or f"jeedom2ha/{eq_id}/set"
+        state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
             "name": mapping.ha_name,
             "unique_id": mapping.ha_unique_id,
-            "object_id": f"jeedom2ha_{eq_id}",
-            "command_topic": f"jeedom2ha/{eq_id}/set",
+            "object_id": object_id,
+            "command_topic": command_topic,
             "payload_on": "ON",
             "payload_off": "OFF",
-            "state_topic": f"jeedom2ha/{eq_id}/state",
+            "state_topic": state_topic,
             "state_on": "ON",
             "state_off": "OFF",
             "device": device,

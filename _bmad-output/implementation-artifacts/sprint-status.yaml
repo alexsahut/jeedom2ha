@@ -42,9 +42,9 @@
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
 #   Epics: pe-epic-1 à pe-epic-12 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18 :
-#          pe-epic-1..10 done, pe-epic-11 in-progress, pe-epic-12 backlog)
+#          pe-epic-1..10 done, pe-epic-11 in-progress, pe-epic-12 done)
 #          pe-epic-11 formalisé dans epics-projection-engine.md le 2026-06-18 (était suivi ici sans définition d'epic)
-#          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vague 1 sensor+binary_sensor
+#          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vagues 1+2 done
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -53,7 +53,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-19'  # correct-course réalignement tracking : 11.1, 11.1-bis, 12.1 étaient done dans main (PR #123) mais jamais flippés (gate terrain manuel hors BMAD = flip oublié). 11.1-bis gate terrain AC6 PASS box 192.168.1.21 le 2026-06-19 (supprimer eq553 65→0, zéro ghost, restauré). pe-epic-12 clôturé (gate eq553 non-unknown atteint). SCP : sprint-change-proposal-2026-06-19-realign-tracking.md. Antérieur — gate terrain 12.2 PASS (AC 1-11) ; code-review/dev-story/create-story 12.2 ; correct-course (pe-11.3)
+last_updated: '2026-06-21'  # dev-story closeout 11.3 : IQ EV eq583 + pilotage priorisation eq628 passés en review après tests locaux (6 ciblés, 903 daemon). Gate terrain eq583/eq628 + code-review restent bloquants avant done. SCP : sprint-change-proposal-2026-06-21-realign-11-3.md. Antérieur — create-story 11.3 après déblocage par 12.2 done ; correct-course 2026-06-19 réalignement 11.1/11.1-bis/12.1/pe-epic-12.
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -231,11 +231,11 @@ development_status:
   #        Diagnostiquer d'abord switch.jeedom2ha_554 état "unknown" (bug mapping ?)
   # Priorité Alex : P1 MSunPV (cerveau routage), P2 chauffe-eau détail
   # ==============================================================
-  pe-epic-11: in-progress  # 11.1 + 11.1-bis done ; reste 11.2 (chauffe-eau eq554, non créée) + 11.3 (IQ EV, backlog) — epic non clôturable
+  pe-epic-11: in-progress  # 11.1 + 11.1-bis done ; 11.3 en review ; reste 11.2 (chauffe-eau eq554, non créée) + code-review/gate terrain 11.3 — epic non clôturable
   11-1-msunpv-routeursolaire-sensors-lecture-seule: done  # gate terrain PASS box 192.168.1.21 (65 sensors eq553 publiés) ; Fix A éligibilité sans generic_type ; pytest 825 vert ; mergée main via PR #123. Réaligné done par correct-course 2026-06-19 (flip oublié au commit close ce2b5b7).
   11-1-bis-multi-sensor-lifecycle-depublication-secondaires: done  # dépublication exhaustive multi-sensor (anti-ghosts HA), 835 tests verts, mergée main via PR #123. Gate terrain AC6 PASS box 192.168.1.21 le 2026-06-19 (supprimer eq553 : 65→0 topics config retained, zéro ghost ; eq553 restauré à 65 via sync PHP). Réaligné done par correct-course 2026-06-19.
   # 11-2-* RÉSERVÉ : chauffe-eau eq554 (backlog-icebox §3.2, P2 Alex) — pas encore créé ; partie switch.554 dépend de pe-epic-12 / 12.2 (vague 2)
-  11-3-iq-ev-pilotage-priorisation-solaire: backlog  # inscrit par correct-course 2026-06-18 (pe-11.3) — IQ EV eq583 + pilotage priorisation eq628 (backlog-icebox §4) ; types mixtes : sensor/binary ⟸ 12.1, switch/button ⟸ 12.2 ; create-story différé jusqu'à 12.2 ; carte workboard 9039c60c préexistante
+  11-3-iq-ev-pilotage-priorisation-solaire: review  # dev-story closeout 2026-06-21 — IQ EV eq583 + pilotage priorisation eq628 ; multi-switch borné implémenté ; tests 6 ciblés + 903 daemon verts ; gate terrain eq583/eq628 et code-review requis avant done ; dépendance 12.2 levée ; carte workboard 9039c60c préexistante
 
   # ==============================================================
   # pe-epic-12 — Restitution d'état runtime Jeedom → Home Assistant

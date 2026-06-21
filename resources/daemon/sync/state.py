@@ -41,7 +41,7 @@ _STREAMED_TYPES = _VAGUE1_TYPES + _VAGUE2_ACTIONABLE
 # with CommandSynchronizer._has_reliable_state, otherwise a presence switch has
 # its optimistic publish suppressed while no real state is ever streamed.
 _READBACK_KEYS = {
-    "switch": ("ENERGY_STATE", "PRESENCE"),
+    "switch": ("ENERGY_STATE", "SWITCH_STATE", "PRESENCE"),
     "light": ("LIGHT_STATE",),
     "cover": ("FLAP_STATE", "FLAP_BSO_STATE"),
 }

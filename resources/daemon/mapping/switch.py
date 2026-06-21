@@ -7,7 +7,8 @@ eq.generic_type exclusion).
 """
 import logging
 import re
-from typing import Dict, Optional, Set
+import unicodedata
+from typing import Dict, List, Optional, Set
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import SwitchCapabilities, MappingResult, PublicationDecision
@@ -33,6 +34,18 @@ _SWITCH_GENERIC_TYPES = {
     "ENERGY_STATE",
     "ENERGY_ON",
     "ENERGY_OFF",
+    "SWITCH_STATE",
+    "SWITCH_ON",
+    "SWITCH_OFF",
+}
+
+_SWITCH_GENERIC_ALIASES = {
+    "ENERGY_STATE": "ENERGY_STATE",
+    "ENERGY_ON": "ENERGY_ON",
+    "ENERGY_OFF": "ENERGY_OFF",
+    "SWITCH_STATE": "ENERGY_STATE",
+    "SWITCH_ON": "ENERGY_ON",
+    "SWITCH_OFF": "ENERGY_OFF",
 }
 
 # Generic types that strongly imply the equipment is NOT a switch
@@ -89,18 +102,32 @@ class SwitchMapper:
 
         Returns None if the equipment contains no ENERGY_* commands (ENERGY_ON/OFF/STATE).
         """
+        results = self.map_all(eq, snapshot)
+        return results[0] if results else None
+
+    def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        """Map one eqLogic to one or more switch entities.
+
+        Historical switches expose one ENERGY_STATE/ON/OFF trio and still produce a
+        single mapping. Story 11.3 adds a bounded multi-switch shape for virtual
+        energy equipment: several readback info commands, each paired with its own
+        On/Off actions, become distinct HA switches attached to the same device.
+        """
         # Collect ENERGY_* commands and detect ANTI_SWITCH_* commands
         energy_cmds: Dict[str, JeedomCmd] = {}
+        energy_cmds_by_type: Dict[str, List[JeedomCmd]] = {key: [] for key in _SWITCH_GENERIC_TYPES}
         anti_switch_cmds: Set[str] = set()
 
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in _SWITCH_GENERIC_TYPES:
-                energy_cmds[cmd.generic_type] = cmd
+                canonical = _SWITCH_GENERIC_ALIASES[cmd.generic_type]
+                energy_cmds[canonical] = cmd
+                energy_cmds_by_type.setdefault(canonical, []).append(cmd)
             elif cmd.generic_type and cmd.generic_type in _ANTI_SWITCH_GENERIC_TYPES:
                 anti_switch_cmds.add(cmd.generic_type)
 
         if not energy_cmds:
-            return None  # Not a switch
+            return []  # Not a switch
 
         # GUARDRAILS against false positives
 
@@ -110,7 +137,7 @@ class SwitchMapper:
                 "[MAPPING] eq_id=%d name='%s': eq.generic_type is '%s' (not switch) → ignore",
                 eq.id, eq.name, eq.generic_type,
             )
-            return None
+            return []
 
         # 2. Conflicting command generic types (Anti-affinity)
         if anti_switch_cmds:
@@ -119,7 +146,7 @@ class SwitchMapper:
                 eq.id, eq.name, list(anti_switch_cmds),
             )
             capabilities = SwitchCapabilities(device_class=None)
-            return MappingResult(
+            return [MappingResult(
                 ha_entity_type="switch",
                 confidence="ambiguous",
                 reason_code="conflicting_generic_types",
@@ -130,7 +157,7 @@ class SwitchMapper:
                 commands=energy_cmds,
                 capabilities=capabilities,
                 reason_details={"conflicting_types": list(anti_switch_cmds)},
-            )
+            )]
 
         # 3. Name heuristics
         name_lower = eq.name.lower()
@@ -141,7 +168,7 @@ class SwitchMapper:
                 eq.id, eq.name, matched_kw,
             )
             capabilities = SwitchCapabilities(device_class=None)
-            return MappingResult(
+            return [MappingResult(
                 ha_entity_type="switch",
                 confidence="ambiguous",
                 reason_code="name_heuristic_rejection",
@@ -152,7 +179,11 @@ class SwitchMapper:
                 commands=energy_cmds,
                 capabilities=capabilities,
                 reason_details={"matched_keyword": matched_kw},
-            )
+            )]
+
+        multi = self._map_multi_switch(eq, snapshot, energy_cmds_by_type)
+        if multi:
+            return multi
 
         # Phase 1: Detect On/Off capability
         has_on = "ENERGY_ON" in energy_cmds
@@ -200,7 +231,7 @@ class SwitchMapper:
                 on_off_confidence=on_off_confidence,
                 device_class=None,
             )
-            return MappingResult(
+            return [MappingResult(
                 ha_entity_type="switch",
                 confidence="ambiguous",
                 reason_code=f"switch_{reason_code_suffix}",
@@ -211,7 +242,7 @@ class SwitchMapper:
                 commands=energy_cmds,
                 capabilities=capabilities,
                 reason_details={"available_types": list(energy_cmds.keys())},
-            )
+            )]
 
         # Phase 2: device_class — conservative rule based on eq_type_name only
         device_class = self._detect_device_class(eq)
@@ -237,7 +268,7 @@ class SwitchMapper:
             device_class,
         )
 
-        return MappingResult(
+        return [MappingResult(
             ha_entity_type="switch",
             confidence=global_confidence,
             reason_code=reason_code,
@@ -248,7 +279,7 @@ class SwitchMapper:
             commands=energy_cmds,
             capabilities=capabilities,
             reason_details={"device_class_source": eq.eq_type_name or ""},
-        )
+        )]
 
     def decide_publication(self, mapping: MappingResult, confidence_policy: str = "sure_probable") -> PublicationDecision:
         """Apply the bounded publication policy for Story 2.4.
@@ -307,3 +338,97 @@ class SwitchMapper:
                 )
                 return "outlet"
         return None
+
+    def _map_multi_switch(
+        self,
+        eq: JeedomEqLogic,
+        snapshot: TopologySnapshot,
+        energy_cmds_by_type: Dict[str, List[JeedomCmd]],
+    ) -> List[MappingResult]:
+        state_cmds = energy_cmds_by_type.get("ENERGY_STATE", [])
+        on_cmds = energy_cmds_by_type.get("ENERGY_ON", [])
+        off_cmds = energy_cmds_by_type.get("ENERGY_OFF", [])
+        if len(state_cmds) < 2 or len(on_cmds) < 2 or len(off_cmds) < 2:
+            return []
+
+        groups: Dict[str, Dict[str, JeedomCmd]] = {}
+        labels: Dict[str, str] = {}
+        for generic_type, cmds in (
+            ("ENERGY_STATE", state_cmds),
+            ("ENERGY_ON", on_cmds),
+            ("ENERGY_OFF", off_cmds),
+        ):
+            for cmd in cmds:
+                key = self._logical_switch_key(cmd)
+                if not key:
+                    continue
+                groups.setdefault(key, {})[generic_type] = cmd
+                labels.setdefault(key, self._logical_switch_label(cmd))
+
+        complete_keys = [
+            key for key, commands in groups.items()
+            if all(kind in commands for kind in ("ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF"))
+        ]
+        if len(complete_keys) < 2:
+            return []
+
+        suggested_area = snapshot.get_suggested_area(eq.id)
+        device_class = self._detect_device_class(eq)
+        mappings: List[MappingResult] = []
+        for key in complete_keys:
+            commands = groups[key]
+            state_cmd = commands["ENERGY_STATE"]
+            cmd_id = int(state_cmd.id)
+            node_id = f"jeedom2ha_{eq.id}_{cmd_id}"
+            label = labels.get(key) or state_cmd.name
+            mappings.append(
+                MappingResult(
+                    ha_entity_type="switch",
+                    confidence="sure",
+                    reason_code="switch_multi_on_off_state",
+                    jeedom_eq_id=eq.id,
+                    ha_unique_id=f"jeedom2ha_eq_{eq.id}_cmd_{cmd_id}",
+                    ha_name=label,
+                    suggested_area=suggested_area,
+                    commands={
+                        "ENERGY_STATE": state_cmd,
+                        "ENERGY_ON": commands["ENERGY_ON"],
+                        "ENERGY_OFF": commands["ENERGY_OFF"],
+                    },
+                    capabilities=SwitchCapabilities(
+                        has_on_off=True,
+                        has_state=True,
+                        on_off_confidence="sure",
+                        device_class=device_class,
+                    ),
+                    reason_details={
+                        "cmd_id": cmd_id,
+                        "object_id": node_id,
+                        "node_id": node_id,
+                        "state_topic": f"jeedom2ha/{eq.id}/{cmd_id}/state",
+                        "command_topic": f"jeedom2ha/{eq.id}/{cmd_id}/set",
+                        "device_class_source": eq.eq_type_name or "",
+                    },
+                )
+            )
+        return mappings
+
+    @staticmethod
+    def _logical_switch_key(cmd: JeedomCmd) -> str:
+        text = SwitchMapper._normalize_name(cmd.name)
+        text = re.sub(r"\betat\b|\bstate\b|\bon\b|\boff\b", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    @staticmethod
+    def _logical_switch_label(cmd: JeedomCmd) -> str:
+        label = re.sub(r"\([^)]*\)", " ", cmd.name or "")
+        label = re.sub(r"\b(On|Off|Etat|État|State)\b", " ", label, flags=re.IGNORECASE)
+        return re.sub(r"\s+", " ", label).strip() or cmd.name
+
+    @staticmethod
+    def _normalize_name(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value or "")
+        ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+        ascii_text = re.sub(r"[^a-zA-Z0-9]+", " ", ascii_text.lower())
+        return re.sub(r"\s+", " ", ascii_text).strip()

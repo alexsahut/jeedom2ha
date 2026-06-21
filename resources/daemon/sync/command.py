@@ -16,6 +16,7 @@ from models.mapping import MappingResult, PublicationDecision
 _LOGGER = logging.getLogger(__name__)
 
 _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
+_NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<node_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
@@ -27,6 +28,7 @@ class ParsedTopic:
 
     eq_id: int
     channel: str
+    node_id: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,14 @@ class CommandSynchronizer:
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="set"), None
 
+        match = _NODE_SET_TOPIC_RE.match(topic)
+        if match:
+            return ParsedTopic(
+                eq_id=int(match.group("eq_id")),
+                channel="set",
+                node_id=int(match.group("node_id")),
+            ), None
+
         match = _BRIGHTNESS_TOPIC_RE.match(topic)
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="brightness"), None
@@ -195,17 +205,28 @@ class CommandSynchronizer:
                 continue
             found_alive = True
 
-            expected_topics = self._expected_command_topics(mapping)
-            if topic not in expected_topics.values():
+            candidates = [mapping, *(getattr(mapping, "additional_mappings", None) or [])]
+            matched_mapping = None
+            matched_decision = None
+            for candidate in candidates:
+                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                if not getattr(cand_decision, "should_publish", False):
+                    continue
+                expected_topics = self._expected_command_topics(candidate)
+                if topic in expected_topics.values():
+                    matched_mapping = candidate
+                    matched_decision = cand_decision
+                    break
+            if matched_mapping is None or matched_decision is None:
                 continue
 
             if (
-                bool(getattr(decision, "local_availability_supported", False))
-                and str(getattr(decision, "local_availability_state", "")).lower() == AVAILABILITY_OFFLINE
+                bool(getattr(matched_decision, "local_availability_supported", False))
+                and str(getattr(matched_decision, "local_availability_state", "")).lower() == AVAILABILITY_OFFLINE
             ):
                 return None, None, "entity_unavailable"
 
-            return decision, mapping, None
+            return matched_decision, matched_mapping, None
 
         if not found_eq:
             return None, None, "unknown_runtime_entity"
@@ -220,7 +241,9 @@ class CommandSynchronizer:
         topics: Dict[str, str] = {}
 
         if mapping.ha_entity_type in ("light", "switch", "cover"):
-            topics["set"] = f"jeedom2ha/{eq_id}/set"
+            reason_details = getattr(mapping, "reason_details", None) or {}
+            command_topic = reason_details.get("command_topic")
+            topics["set"] = command_topic if isinstance(command_topic, str) and command_topic else f"jeedom2ha/{eq_id}/set"
 
         if mapping.ha_entity_type == "light" and bool(getattr(mapping.capabilities, "has_brightness", False)):
             topics["brightness"] = f"jeedom2ha/{eq_id}/brightness/set"
@@ -245,9 +268,9 @@ class CommandSynchronizer:
                 if payload_upper not in ("ON", "OFF"):
                     return None, "invalid_command_payload"
                 if payload_upper == "ON":
-                    cmd = commands.get("LIGHT_ON") or commands.get("ENERGY_ON") or commands.get("SET_ON")
+                    cmd = commands.get("LIGHT_ON") or commands.get("ENERGY_ON") or commands.get("SWITCH_ON") or commands.get("SET_ON")
                 else:
-                    cmd = commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF") or commands.get("SET_OFF")
+                    cmd = commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF") or commands.get("SWITCH_OFF") or commands.get("SET_OFF")
                 if cmd is None:
                     return None, "missing_action_command"
                 try:
@@ -362,7 +385,7 @@ class CommandSynchronizer:
 
         commands = mapping.commands or {}
         if mapping.ha_entity_type in ("light", "switch"):
-            for key in ("LIGHT_STATE", "ENERGY_STATE", "PRESENCE"):
+            for key in ("LIGHT_STATE", "ENERGY_STATE", "SWITCH_STATE", "PRESENCE"):
                 cmd = commands.get(key)
                 if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
                     return True

@@ -26,6 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 BRIDGE_STATUS_TOPIC = BRIDGE_AVAILABILITY_TOPIC
 COMMAND_SUBSCRIPTION_TOPICS = (
     "jeedom2ha/+/set",
+    "jeedom2ha/+/+/set",
     "jeedom2ha/+/brightness/set",
     "jeedom2ha/+/position/set",
     "jeedom2ha/+/cmd",  # Story 10.6 — scenario button commands
