@@ -1837,14 +1837,11 @@ L'utilisateur dispose dans HA des équipements énergie/routage solaire de Jeedo
 ### Story 11.1.bis — Multi-sensor lifecycle : dépublication exhaustive des sensors secondaires
 (livrée — anti-ghosts HA, nettoyage des topics secondaires à la dépublication ; voir SCP 2026-06-17)
 
-### Story 11.2 (réservée) — Chauffe-eau eq554 : détail routage
-Réservée (P2). Inventaire `backlog-icebox.md §3.2`. Inclut le diagnostic du `switch.jeedom2ha_554` en état `unknown` — à traiter en lien avec pe-epic-12 (valeur runtime), pas comme une ouverture de type. La partie `switch.554` dépend de la vague 2 (pe-epic-12 / 12.2).
+### Story 11.2 — Chauffe-eau eq554 : détail routage
+Livrée via PR #127 (`5e3d39b`). Projection multi-domaine de l'equipement eq554 : un `switch`, douze `sensor` et un `binary_sensor` sous un device commun, avec depublication domain-aware et persistance cross-reboot. Revue PASS (11/11 AC), 916 tests verts et gate terrain PASS le 2026-06-19 : quatorze entites publiees et `switch.jeedom2ha_554` non `unknown`.
 
-### Story 11.3 (backlog) — IQ EV Charger (eq583) + Pilotage priorisation solaire (eq628)
-Planifiée au tableau de travail le 2026-06-12 (3ᵉ sujet énergie, reporté après pe-epic-11 par la retro pe-epic-10). Inventaire `backlog-icebox.md §4`.
-- **IQ EV (eq583)** : `binary_sensor` (#5986, #5987, #6009, #6010) + `sensor` (#5991, #5992, #5993) + `switch`/`button` On/Off dissociés (#5999/#6001/#6000/#6021) — pas d'ouverture cosmétique.
-- **Pilotage priorisation (eq628)** : `switch` triple-commande info+on+off (#5977→#6006, 4 charges) — vérifier le support du pattern triple-commande dans le `MapperRegistry` avant ouverture.
-- **Dépendance streaming** : parties `sensor`/`binary_sensor` ⟸ pe-epic-12 / 12.1 (vague 1) ; états actionnables `switch`/`button` ⟸ pe-epic-12 / 12.2 (vague 2). create-story 11.3 différé jusqu'à disponibilité de 12.2.
+### Story 11.3 — IQ EV Charger (eq583) + Pilotage priorisation solaire (eq628)
+Livrée via PR #128 (`3546f22`). Le support generique `SWITCH_*`, le multi-switch structurel et le streaming `SWITCH_STATE` couvrent eq583 et eq628 sans allowlist d'identifiants. Gate terrain PASS le 2026-06-21 : eq583 publie trois `sensor`, deux `binary_sensor` et trois `switch`; eq628 publie quatre `switch`; tous les etats actionnables observes sont non `unknown`. Le controle de onze autres commandes `SWITCH_*` n'a revele aucune ouverture inattendue.
 
 ### Gates epic-level pe-epic-11
 - aucune ouverture de type nouveau dans `PRODUCT_SCOPE` (les 4 types nécessaires sont déjà ouverts) ; toute exception passe FR40/NFR10 dans le même incrément ;
@@ -1859,13 +1856,23 @@ Planifiée au tableau de travail le 2026-06-12 (3ᵉ sujet énergie, reporté ap
 Capacité produit comblant la régression systémique révélée le 2026-06-18 (entités publiées en discovery mais en état `unknown` faute de chemin de valeur Jeedom → HA). Reprend l'intention des anciennes FR16 « Retour d'état » / FR17 « Synchro temps réel » (legacy `epics.md`), abandonnées entre cycles, dans le formalisme courant. Vague 1 bornée : `sensor` + `binary_sensor`.
 
 ### Story 12.1 — Streaming de valeur sensor / binary_sensor (vague 1)
-À créer (create-story). Brief de scope : établir le chemin de valeur Jeedom → HA (callback PHP réel + `resources/daemon/sync/state.py` + publication sur les `state_topic` déjà émis par la discovery), publier l'état initial à la publication puis les changements event-driven, pour les types `sensor` et `binary_sensor` uniquement. Gate terrain : les capteurs eq553 (« tension réseau ») affichent une valeur réelle dans HA (plus aucun `unknown` pour les commandes info alimentées).
+Livrée via PR #123 (`d5b86ce`, correctifs `6abfcf5` et `0a79966`). Le callback PHP, le resolver `resources/daemon/sync/state.py` et la publication MQTT fournissent l'etat initial puis les changements event-driven pour `sensor` et `binary_sensor`, uniquement quand l'entite est effectivement publiee en discovery. Gate terrain PASS le 2026-06-18 : 88 listeners actifs et le capteur eq553 « Tension reseau » expose 238.4 V au lieu de `unknown`; 860 tests verts.
 
-### Story 12.2 (réservée) — Streaming de valeur switch / button (vague 2)
-Réservée. Étend le chemin de valeur de 12.1 (`resources/daemon/sync/state.py`) aux plateformes actionnables `switch` et `button`, pour restituer l'état readback de ces entités (sortie du `unknown`). Débloque : le `switch.jeedom2ha_554` de Story 11.2, et les parties actionnables de Story 11.3 (IQ EV On/Off, pilotage priorisation eq628). Borne : vague 2 = `switch` + `button` uniquement ; `climate` et autres domaines = vagues ultérieures gouvernées (FR49).
+### Story 12.2 — Streaming de valeur switch / button (vague 2)
+Livrée via PR #125 (`6e24693`). Le chemin de valeur de 12.1 est etendu aux `switch`; les `button` restent volontairement sans etat readback. Gate terrain PASS le 2026-06-18 : commande switch reelle on/off, eq554 non `unknown`, listeners actifs et non-regression eq553/light/cover. Revue terminee apres correction d'un finding HIGH; 893 tests verts.
+
+### Story 12.3 — Réalignement documentaire post pe-epic-11 / pe-epic-12
+Story de maintenance documentaire ajoutée par `sprint-change-proposal-2026-06-22-doc-realignment.md`. Elle ne change aucun comportement produit. Elle réaligne les artefacts BMAD actifs après les merges #127/#128 et la clôture effective des epics 11 et 12 : `active-cycle-manifest.md`, `epics-projection-engine.md`, `sprint-status.yaml`, et les rétrospectives `pe-epic-11` / `pe-epic-12`.
+
+**Acceptance criteria :**
+
+- `active-cycle-manifest.md` indique l'état courant : `pe-epic-10`, `pe-epic-11`, `pe-epic-12` livrés ; dernier SCP = 2026-06-22 ; prochain axe configurable mapping à renuméroter/rebaser avant usage.
+- `epics-projection-engine.md` ne décrit plus `11.2`, `11.3`, `12.1`, `12.2` comme réservées, backlog ou à créer.
+- Les rétrospectives `pe-epic-11-retro-2026-06-22.md` et `pe-epic-12-retro-2026-06-22.md` existent et citent les preuves terrain/Git principales.
+- `sprint-status.yaml` suit la story 12.3 jusqu'à `done`, puis `pe-epic-12` revient à `done`.
 
 ### Gates epic-level pe-epic-12
 - cohérence state ⊆ discovery : 0 `state_topic` publié pour une entité non publiée en discovery ;
 - event-driven, aucune source de vérité concurrente à Jeedom (NFR6/NFR13) ;
-- vagues bornées et séquencées : vague 1 (12.1) = `sensor` + `binary_sensor` ; vague 2 (12.2, réservée) = `switch` + `button` ; domaines suivants (`climate`, …) = vagues ultérieures gouvernées (FR49) ; aucune vague n'ouvre un domaine hors `PRODUCT_SCOPE` ;
+- vagues bornées et séquencées : vague 1 (12.1) = `sensor` + `binary_sensor` ; vague 2 (12.2) = `switch` + `button` ; domaines suivants (`climate`, …) = vagues ultérieures gouvernées (FR49) ; aucune vague n'ouvre un domaine hors `PRODUCT_SCOPE` ;
 - gate terrain de clôture epic = sur la box réelle, les capteurs eq553 ne sont plus en état `unknown` ; non-régression de la discovery existante.

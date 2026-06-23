@@ -53,7 +53,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-06-21'  # 11.3 gate terrain live PASS ; pe-epic-11 clôturable
+last_updated: '2026-06-24'  # Story 12.3 code-review PASS ; epics 11/12 et artefacts actifs réalignés
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -246,6 +246,9 @@ development_status:
   # Vague 1 bornée : sensor + binary_sensor (domaines actionnables = vagues ultérieures)
   # Gate terrain de clôture = capteurs eq553 « tension réseau » non plus en état unknown
   # ==============================================================
-  pe-epic-12: done  # clôture 2026-06-19 par correct-course — gate epic-level atteint (capteurs eq553 « tension réseau » non plus en unknown, 238.4 V live le 2026-06-18 via 12.1). Vague 1 (12.1) + vague 2 actionnable bonus (12.2) done. Vagues actionnables ultérieures (light/cover/climate streaming) = futures stories/correct-course si besoin.
+  pe-epic-12: done  # Story 12.3 code-review PASS 2026-06-24 ; runtime state streaming livré et closeout documentaire aligné
   12-1-streaming-valeur-sensor-binary-sensor-vague-1: done  # dev-story + listener PHP livrés ; gate terrain PASS box 192.168.1.21 le 2026-06-18 (eq553 « Tension réseau » cmd 5141 = 238.4 V live, plus unknown ; 88 listeners ; POST /action/state_update 200) ; 860 tests verts ; mergée main via PR #123. Réaligné done par correct-course 2026-06-19 (code-review jamais rejoué + flip jamais fait → resté ready-for-dev à tort).
   12-2-streaming-valeur-switch-button-vague-2: done  # gate terrain PASS 2026-06-18 (box 192.168.1.21 : switch on/off réel, eq554=OFF, state_listeners switch enregistrés, non-régression eq553+light/cover ; 1 follow-up LOW bruit discovery). AC 1-11 validés. Antérieur — code-review : switch streamé (ENERGY_STATE→ON/OFF), button no-op, is_active scope-aware ; 1 HIGH corrigé ; 893 tests verts ; débloque switch.554 (11.2) + actionnables IQ EV/pilotage (11.3)
+  12-3-realignement-documentaire-post-epics-11-12: done  # code-review PASS 2026-06-24 — AC1-AC6 satisfaits, 1 finding LOW mécanique corrigé
+  pe-epic-11-retrospective: done  # rétro 2026-06-22 matérialisée par Story 12.3
+  pe-epic-12-retrospective: done  # rétro 2026-06-22 matérialisée par Story 12.3
