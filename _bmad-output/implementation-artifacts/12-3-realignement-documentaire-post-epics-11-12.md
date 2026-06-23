@@ -1,6 +1,6 @@
 # Story 12.3: Réalignement documentaire post pe-epic-11 / pe-epic-12
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -84,7 +84,7 @@ afin que la prochaine story parte des bonnes sources de vérité, sans reprendre
 
 ### Agent Model Used
 
-GPT-5 Codex (create-story)
+GPT-5 Codex (`create-story`, `dev-story`, `code-review`)
 
 ### Debug Log References
 
@@ -96,6 +96,7 @@ GPT-5 Codex (create-story)
 - 2026-06-22 — `create-story` completed : story 12.3 matérialisée après correct-course approuvé, scope borné au réalignement documentaire actif. Statut résultant : `ready-for-dev`.
 - 2026-06-24 — `dev-story` lancé : réalignement des artefacts actifs et création des rétrospectives pe-epic-11 / pe-epic-12. Statut résultant : `in-progress`.
 - 2026-06-24 — `dev-story` terminé : AC1-AC6 implémentés, validations documentaires ciblées prêtes. Statut résultant : `review`.
+- 2026-06-24 — `code-review` terminé : AC1-AC6 vérifiés, références présentes, formulations obsolètes absentes et unique finding mécanique de fin de fichier corrigé. Statut résultant : `done`.
 
 ### File List
 
@@ -112,3 +113,16 @@ GPT-5 Codex (create-story)
 - 2026-06-22 — Story créée via workflow `create-story`; statut initial `ready-for-dev`.
 - 2026-06-24 — Workflow `dev-story` lancé; statut `in-progress`.
 - 2026-06-24 — Workflow `dev-story` terminé; AC1-AC6 réalisés et statut `review`.
+- 2026-06-24 — Workflow `code-review` terminé; 1 finding LOW corrigé, statut final `done`.
+
+## Senior Developer Review
+
+Date: 2026-06-24
+Verdict: APPROVED
+
+- AC1-AC6 satisfaits.
+- Aucun changement de code produit.
+- `git diff --check` propre après correction d'une ligne vide finale.
+- Les références documentaires attendues existent.
+- Les sections actives 11.2, 11.3, 12.1 et 12.2 ne portent plus les statuts obsolètes.
+- Validation YAML dédiée non exécutée faute de parseur YAML installé; la modification reste limitée à des valeurs scalaires et a été revue dans le diff.

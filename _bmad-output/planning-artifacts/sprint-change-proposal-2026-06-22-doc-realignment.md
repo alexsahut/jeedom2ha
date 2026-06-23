@@ -100,4 +100,3 @@ La story doit modifier uniquement les artefacts documentaires actifs et les rét
 - Le manifeste pointe vers l'état courant et non vers `pe-epic-10`.
 - Les rétrospectives 11/12 existent.
 - `sprint-status.yaml` reflète la story 12.3 et clôture à nouveau `pe-epic-12` après review.
-
