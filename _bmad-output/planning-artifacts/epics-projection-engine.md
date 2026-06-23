@@ -1864,6 +1864,16 @@ Capacité produit comblant la régression systémique révélée le 2026-06-18 (
 ### Story 12.2 (réservée) — Streaming de valeur switch / button (vague 2)
 Réservée. Étend le chemin de valeur de 12.1 (`resources/daemon/sync/state.py`) aux plateformes actionnables `switch` et `button`, pour restituer l'état readback de ces entités (sortie du `unknown`). Débloque : le `switch.jeedom2ha_554` de Story 11.2, et les parties actionnables de Story 11.3 (IQ EV On/Off, pilotage priorisation eq628). Borne : vague 2 = `switch` + `button` uniquement ; `climate` et autres domaines = vagues ultérieures gouvernées (FR49).
 
+### Story 12.3 — Réalignement documentaire post pe-epic-11 / pe-epic-12
+Story de maintenance documentaire ajoutée par `sprint-change-proposal-2026-06-22-doc-realignment.md`. Elle ne change aucun comportement produit. Elle réaligne les artefacts BMAD actifs après les merges #127/#128 et la clôture effective des epics 11 et 12 : `active-cycle-manifest.md`, `epics-projection-engine.md`, `sprint-status.yaml`, et les rétrospectives `pe-epic-11` / `pe-epic-12`.
+
+**Acceptance criteria :**
+
+- `active-cycle-manifest.md` indique l'état courant : `pe-epic-10`, `pe-epic-11`, `pe-epic-12` livrés ; dernier SCP = 2026-06-22 ; prochain axe configurable mapping à renuméroter/rebaser avant usage.
+- `epics-projection-engine.md` ne décrit plus `11.2`, `11.3`, `12.1`, `12.2` comme réservées, backlog ou à créer.
+- Les rétrospectives `pe-epic-11-retro-2026-06-22.md` et `pe-epic-12-retro-2026-06-22.md` existent et citent les preuves terrain/Git principales.
+- `sprint-status.yaml` suit la story 12.3 jusqu'à `done`, puis `pe-epic-12` revient à `done`.
+
 ### Gates epic-level pe-epic-12
 - cohérence state ⊆ discovery : 0 `state_topic` publié pour une entité non publiée en discovery ;
 - event-driven, aucune source de vérité concurrente à Jeedom (NFR6/NFR13) ;
