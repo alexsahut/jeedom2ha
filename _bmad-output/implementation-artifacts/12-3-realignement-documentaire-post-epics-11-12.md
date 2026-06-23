@@ -1,6 +1,6 @@
 # Story 12.3: Réalignement documentaire post pe-epic-11 / pe-epic-12
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -21,25 +21,25 @@ afin que la prochaine story parte des bonnes sources de vérité, sans reprendre
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Réaligner `active-cycle-manifest.md` (AC: 1, 4)
-  - [ ] Mettre à jour la table des sources de vérité, notamment le dernier Sprint Change Proposal.
-  - [ ] Remplacer la section "Prochaine étape BMAD attendue" par un état post-epic-12.
-  - [ ] Ajouter une note explicite sur le cadrage mapping configurable à renuméroter/rebaser.
+- [x] Task 1 — Réaligner `active-cycle-manifest.md` (AC: 1, 4)
+  - [x] Mettre à jour la table des sources de vérité, notamment le dernier Sprint Change Proposal.
+  - [x] Remplacer la section "Prochaine étape BMAD attendue" par un état post-epic-12.
+  - [x] Ajouter une note explicite sur le cadrage mapping configurable à renuméroter/rebaser.
 
-- [ ] Task 2 — Réaligner `epics-projection-engine.md` (AC: 2, 4)
-  - [ ] Mettre à jour le résumé détaillé de `pe-epic-11` : 11.1, 11.1-bis, 11.2 et 11.3 livrées.
-  - [ ] Mettre à jour le résumé détaillé de `pe-epic-12` : 12.1, 12.2 livrées, 12.3 story de closeout documentaire.
-  - [ ] Retirer les formulations obsolètes "réservée", "backlog" ou "à créer" pour les stories déjà livrées.
+- [x] Task 2 — Réaligner `epics-projection-engine.md` (AC: 2, 4)
+  - [x] Mettre à jour le résumé détaillé de `pe-epic-11` : 11.1, 11.1-bis, 11.2 et 11.3 livrées.
+  - [x] Mettre à jour le résumé détaillé de `pe-epic-12` : 12.1, 12.2 livrées, 12.3 story de closeout documentaire.
+  - [x] Retirer les formulations obsolètes "réservée", "backlog" ou "à créer" pour les stories déjà livrées.
 
-- [ ] Task 3 — Ajouter les rétrospectives pe-epic-11 et pe-epic-12 (AC: 3)
-  - [ ] Créer `pe-epic-11-retro-2026-06-22.md`.
-  - [ ] Créer `pe-epic-12-retro-2026-06-22.md`.
-  - [ ] Inclure valeur livrée, preuves principales, risques résiduels et leçons BMAD.
+- [x] Task 3 — Ajouter les rétrospectives pe-epic-11 et pe-epic-12 (AC: 3)
+  - [x] Créer `pe-epic-11-retro-2026-06-22.md`.
+  - [x] Créer `pe-epic-12-retro-2026-06-22.md`.
+  - [x] Inclure valeur livrée, preuves principales, risques résiduels et leçons BMAD.
 
-- [ ] Task 4 — Synchroniser tracking et validations documentaires (AC: 5, 6)
-  - [ ] Garder cette story en `in-progress` pendant l'implémentation, puis `review` à la fin du dev-story.
-  - [ ] Ajouter les lignes rétrospectives au `sprint-status.yaml`.
-  - [ ] Exécuter les vérifications ciblées : `git diff --check` et recherches sur les formulations obsolètes dans les artefacts actifs.
+- [x] Task 4 — Synchroniser tracking et validations documentaires (AC: 5, 6)
+  - [x] Garder cette story en `in-progress` pendant l'implémentation, puis `review` à la fin du dev-story.
+  - [x] Ajouter les lignes rétrospectives au `sprint-status.yaml`.
+  - [x] Exécuter les vérifications ciblées : `git diff --check` et recherches sur les formulations obsolètes dans les artefacts actifs.
 
 ## Dev Notes
 
@@ -94,15 +94,21 @@ GPT-5 Codex (create-story)
 ### Completion Notes List
 
 - 2026-06-22 — `create-story` completed : story 12.3 matérialisée après correct-course approuvé, scope borné au réalignement documentaire actif. Statut résultant : `ready-for-dev`.
+- 2026-06-24 — `dev-story` lancé : réalignement des artefacts actifs et création des rétrospectives pe-epic-11 / pe-epic-12. Statut résultant : `in-progress`.
+- 2026-06-24 — `dev-story` terminé : AC1-AC6 implémentés, validations documentaires ciblées prêtes. Statut résultant : `review`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/12-3-realignement-documentaire-post-epics-11-12.md`
+- `_bmad-output/implementation-artifacts/pe-epic-11-retro-2026-06-22.md`
+- `_bmad-output/implementation-artifacts/pe-epic-12-retro-2026-06-22.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/active-cycle-manifest.md`
 - `_bmad-output/planning-artifacts/epics-projection-engine.md`
 - `_bmad-output/planning-artifacts/sprint-change-proposal-2026-06-22-doc-realignment.md`
 
 ### Change Log
 
 - 2026-06-22 — Story créée via workflow `create-story`; statut initial `ready-for-dev`.
-
+- 2026-06-24 — Workflow `dev-story` lancé; statut `in-progress`.
+- 2026-06-24 — Workflow `dev-story` terminé; AC1-AC6 réalisés et statut `review`.
