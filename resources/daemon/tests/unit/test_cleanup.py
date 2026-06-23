@@ -121,7 +121,7 @@ async def test_standard_cleanup_clears_local_availability_even_when_local_suppor
         )
 
     assert response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     bridge.publish_message.assert_any_call(build_local_availability_topic(355), "", qos=1, retain=True)
     assert app["pending_discovery_unpublish"] == {}
     assert app["pending_local_availability_cleanup"] == {}
@@ -177,7 +177,7 @@ async def test_cleanup_logs_classify_deleted_disabled_excluded_and_ineligible_ca
         )
 
     assert response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     assert "[CLEANUP] eq_id=355" in caplog.text
     assert expected_reason in caplog.text
 
@@ -206,7 +206,7 @@ async def test_deferred_unpublish_and_availability_cleanup_are_replayed_after_br
 
     assert first_response.status == 200
     first_publisher.unpublish_by_eq_id.assert_not_awaited()
-    assert app["pending_discovery_unpublish"] == {355: "light"}
+    assert app["pending_discovery_unpublish"] == {355: {"entity_type": "light", "node_ids": []}}
     assert app["pending_local_availability_cleanup"] == {355: build_local_availability_topic(355)}
 
     bridge.is_connected = True
@@ -224,7 +224,7 @@ async def test_deferred_unpublish_and_availability_cleanup_are_replayed_after_br
         )
 
     assert replay_response.status == 200
-    replay_publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    replay_publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     bridge.publish_message.assert_any_call(build_local_availability_topic(355), "", qos=1, retain=True)
     assert app["pending_discovery_unpublish"] == {}
     assert app["pending_local_availability_cleanup"] == {}
@@ -283,5 +283,5 @@ async def test_disabled_eqlogic_unpublishes_instead_of_publishing_runtime_offlin
         )
 
     assert response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(355, entity_type="light", node_ids=[])
     assert call(build_local_availability_topic(355), AVAILABILITY_OFFLINE, qos=1, retain=True) not in bridge.publish_message.mock_calls

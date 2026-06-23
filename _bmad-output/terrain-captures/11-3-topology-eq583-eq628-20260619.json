@@ -1,0 +1,348 @@
+{
+  "captured_at": "2026-06-19",
+  "box": "192.168.1.21",
+  "source": "jeedom2ha::getFullTopology() read-only",
+  "note": "generic types are SWITCH_* not ENERGY_*; daemon SwitchMapper does NOT recognize SWITCH_*; 13 eqLogics use SWITCH_* (regression surface)",
+  "switch_star_eqlogics": [
+    {
+      "id": 550,
+      "name": "Programme Aspirateur haut"
+    },
+    {
+      "id": 580,
+      "name": "E-208"
+    },
+    {
+      "id": 583,
+      "name": "IQ EV Charger"
+    },
+    {
+      "id": 174,
+      "name": "Absence"
+    },
+    {
+      "id": 628,
+      "name": "pilotage priorisation solaire"
+    },
+    {
+      "id": 235,
+      "name": "Présence"
+    },
+    {
+      "id": 207,
+      "name": "Présence Alex"
+    },
+    {
+      "id": 234,
+      "name": "Présence Arthur"
+    },
+    {
+      "id": 475,
+      "name": "Présence Margaux"
+    },
+    {
+      "id": 206,
+      "name": "Présence Mélanie"
+    },
+    {
+      "id": 632,
+      "name": "SPA - Filtre"
+    },
+    {
+      "id": 631,
+      "name": "SPA - Hivernage"
+    },
+    {
+      "id": 594,
+      "name": "SPA_Intex"
+    }
+  ],
+  "eq583": {
+    "id": 583,
+    "name": "IQ EV Charger",
+    "eq_type": "virtual",
+    "generic_type": null,
+    "cmds": [
+      {
+        "id": 6010,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Charge manuelle"
+      },
+      {
+        "id": 6021,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Charge manuelle Off"
+      },
+      {
+        "id": 6009,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Charge solaire"
+      },
+      {
+        "id": 5986,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Branché"
+      },
+      {
+        "id": 5987,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Charge"
+      },
+      {
+        "id": 5988,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Connecté"
+      },
+      {
+        "id": 5989,
+        "type": "info",
+        "sub_type": "string",
+        "generic_type": "GENERIC_INFO",
+        "unit": null,
+        "name": "État connecteur"
+      },
+      {
+        "id": 5990,
+        "type": "info",
+        "sub_type": "string",
+        "generic_type": "GENERIC_INFO",
+        "unit": null,
+        "name": "Mode de charge"
+      },
+      {
+        "id": 5991,
+        "type": "info",
+        "sub_type": "numeric",
+        "generic_type": "GENERIC_INFO",
+        "unit": "W",
+        "name": "Puissance"
+      },
+      {
+        "id": 5992,
+        "type": "info",
+        "sub_type": "numeric",
+        "generic_type": "GENERIC_INFO",
+        "unit": "Wh",
+        "name": "Énergie session"
+      },
+      {
+        "id": 5993,
+        "type": "info",
+        "sub_type": "numeric",
+        "generic_type": "GENERIC_INFO",
+        "unit": "Wh",
+        "name": "Énergie jour"
+      },
+      {
+        "id": 5994,
+        "type": "info",
+        "sub_type": "string",
+        "generic_type": "GENERIC_INFO",
+        "unit": null,
+        "name": "Dernière MAJ"
+      },
+      {
+        "id": 5995,
+        "type": "info",
+        "sub_type": "string",
+        "generic_type": "GENERIC_INFO",
+        "unit": null,
+        "name": "Source"
+      },
+      {
+        "id": 5996,
+        "type": "info",
+        "sub_type": "string",
+        "generic_type": "GENERIC_INFO",
+        "unit": null,
+        "name": "Diagnostic"
+      },
+      {
+        "id": 6003,
+        "type": "info",
+        "sub_type": "other",
+        "generic_type": null,
+        "unit": null,
+        "name": "action_ev"
+      },
+      {
+        "id": 5997,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Charge On"
+      },
+      {
+        "id": 5998,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Charge Off"
+      },
+      {
+        "id": 5999,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Charge solaire On"
+      },
+      {
+        "id": 6000,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Charge manuelle On"
+      },
+      {
+        "id": 6001,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Charge solaire Off"
+      },
+      {
+        "id": 6002,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": null,
+        "unit": null,
+        "name": "Rafraîchir"
+      }
+    ]
+  },
+  "eq628": {
+    "id": 628,
+    "name": "pilotage priorisation solaire",
+    "eq_type": "virtual",
+    "generic_type": null,
+    "cmds": [
+      {
+        "id": 6004,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Charge voiture"
+      },
+      {
+        "id": 6005,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Charge voiture On"
+      },
+      {
+        "id": 5980,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Chauffage piscine"
+      },
+      {
+        "id": 6006,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Charge voiture Off"
+      },
+      {
+        "id": 5981,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Chauffage piscine On"
+      },
+      {
+        "id": 5982,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Chauffage piscine Off"
+      },
+      {
+        "id": 5983,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Chauffage SPA"
+      },
+      {
+        "id": 5984,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Chauffage SPA On"
+      },
+      {
+        "id": 5985,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Chauffage SPA Off"
+      },
+      {
+        "id": 5978,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_ON",
+        "unit": null,
+        "name": "Filtration piscine On"
+      },
+      {
+        "id": 5979,
+        "type": "action",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_OFF",
+        "unit": null,
+        "name": "Filtration piscine Off"
+      },
+      {
+        "id": 5977,
+        "type": "info",
+        "sub_type": "binary",
+        "generic_type": "SWITCH_STATE",
+        "unit": null,
+        "name": "Filtration piscine"
+      },
+      {
+        "id": 5976,
+        "type": "action",
+        "sub_type": "other",
+        "generic_type": null,
+        "unit": null,
+        "name": "Rafraichir"
+      }
+    ]
+  }
+}

@@ -262,7 +262,7 @@ async def test_publier_piece_scope_enforces_unpublish_for_excluded_equipment(cli
     assert payload["scope_reel"]["equipements_inclus"] == 2
     assert payload["scope_reel"]["equipements_publies_ou_crees"] == 2
     assert payload["scope_reel"]["ecarts_resolus"] == 1
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(12, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(12, entity_type="light", node_ids=[])
     assert app["publications"][12].active_or_alive is False
     assert app["publications"][12].discovery_published is False
     # Lissage : 2 publish + 1 unpublish = 3 appels sleep

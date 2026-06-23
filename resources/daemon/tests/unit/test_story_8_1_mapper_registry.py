@@ -12,6 +12,7 @@ from mapping.climate import ClimateMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
+from mapping.presence_switch import PresenceSwitchMapper
 from mapping.registry import MapperRegistry
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
@@ -136,6 +137,7 @@ def test_ac1_mapper_registry_exposes_canonical_order():
         SwitchMapper,
         ClimateMapper,
         AlarmControlPanelMapper,
+        PresenceSwitchMapper,
         BinarySensorMapper,
         SensorMapper,
         ButtonMapper,

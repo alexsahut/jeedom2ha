@@ -273,7 +273,7 @@ async def test_policy_change_probable_to_sure_only_triggers_unpublish(aiohttp_cl
     assert data["status"] == "ok"
 
     # Vérifier que unpublish_by_eq_id a été appelé pour l'équipement probable
-    mock_publisher.unpublish_by_eq_id.assert_called_once_with(10, entity_type="light")
+    mock_publisher.unpublish_by_eq_id.assert_called_once_with(10, entity_type="light", node_ids=[])
 
 
 # ---------------------------------------------------------------------------

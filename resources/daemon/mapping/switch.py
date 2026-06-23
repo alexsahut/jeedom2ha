@@ -7,7 +7,7 @@ eq.generic_type exclusion).
 """
 import logging
 import re
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import SwitchCapabilities, MappingResult, PublicationDecision
@@ -33,6 +33,9 @@ _SWITCH_GENERIC_TYPES = {
     "ENERGY_STATE",
     "ENERGY_ON",
     "ENERGY_OFF",
+    "SWITCH_STATE",
+    "SWITCH_ON",
+    "SWITCH_OFF",
 }
 
 # Generic types that strongly imply the equipment is NOT a switch
@@ -84,7 +87,28 @@ class SwitchMapper:
     - Phase 3: Global confidence = on_off_confidence
     """
 
+    def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        """Return every switch entity structurally present on an eqLogic.
+
+        ENERGY_* keeps the historical mono-switch behavior. SWITCH_* may carry
+        several logical switches on the same eqLogic; those are grouped by command
+        name prefix and identified by their state command id.
+        """
+        switch_groups = self._group_switch_cmds(eq)
+        if switch_groups:
+            return [
+                self._map_cmd_group(eq, snapshot, group, family="SWITCH")
+                for _, group in switch_groups
+            ]
+
+        primary = self._map_energy_switch(eq, snapshot)
+        return [primary] if primary is not None else []
+
     def map(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
+        mappings = self.map_all(eq, snapshot)
+        return mappings[0] if mappings else None
+
+    def _map_energy_switch(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
         """Map a single eqLogic to a switch MappingResult.
 
         Returns None if the equipment contains no ENERGY_* commands (ENERGY_ON/OFF/STATE).
@@ -94,7 +118,7 @@ class SwitchMapper:
         anti_switch_cmds: Set[str] = set()
 
         for cmd in eq.cmds:
-            if cmd.generic_type and cmd.generic_type in _SWITCH_GENERIC_TYPES:
+            if cmd.generic_type and cmd.generic_type in {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF"}:
                 energy_cmds[cmd.generic_type] = cmd
             elif cmd.generic_type and cmd.generic_type in _ANTI_SWITCH_GENERIC_TYPES:
                 anti_switch_cmds.add(cmd.generic_type)
@@ -249,6 +273,68 @@ class SwitchMapper:
             capabilities=capabilities,
             reason_details={"device_class_source": eq.eq_type_name or ""},
         )
+
+    def _map_cmd_group(
+        self,
+        eq: JeedomEqLogic,
+        snapshot: TopologySnapshot,
+        cmds: Dict[str, JeedomCmd],
+        family: str,
+    ) -> MappingResult:
+        state_key = f"{family}_STATE"
+        on_key = f"{family}_ON"
+        off_key = f"{family}_OFF"
+        state_cmd = cmds[state_key]
+        device_class = self._detect_device_class(eq)
+        capabilities = SwitchCapabilities(
+            has_on_off=True,
+            has_state=True,
+            on_off_confidence="probable",
+            device_class=device_class,
+        )
+        return MappingResult(
+            ha_entity_type="switch",
+            confidence="probable",
+            reason_code=f"switch_{family.lower()}_on_off_state",
+            jeedom_eq_id=eq.id,
+            ha_unique_id=f"jeedom2ha_eq_{eq.id}_cmd_{state_cmd.id}",
+            ha_name=state_cmd.name,
+            suggested_area=snapshot.get_suggested_area(eq.id),
+            commands={state_key: state_cmd, on_key: cmds[on_key], off_key: cmds[off_key]},
+            capabilities=capabilities,
+            reason_details={
+                "device_class_source": eq.eq_type_name or "",
+                "cmd_id": state_cmd.id,
+                "object_id": f"jeedom2ha_{eq.id}_{state_cmd.id}",
+                "node_id": f"jeedom2ha_{eq.id}_{state_cmd.id}",
+                "state_topic": f"jeedom2ha/{eq.id}/{state_cmd.id}/state",
+                "command_topic": f"jeedom2ha/{eq.id}/{state_cmd.id}/set",
+                "grouping_key": self._switch_group_key(state_cmd.name),
+            },
+        )
+
+    def _group_switch_cmds(self, eq: JeedomEqLogic) -> List[Tuple[str, Dict[str, JeedomCmd]]]:
+        by_key: Dict[str, Dict[str, JeedomCmd]] = {}
+        for cmd in eq.cmds:
+            generic_type = cmd.generic_type
+            if generic_type not in {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}:
+                continue
+            key = self._switch_group_key(cmd.name)
+            by_key.setdefault(key, {})[generic_type] = cmd
+
+        groups = []
+        for key, cmds in by_key.items():
+            if {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}.issubset(cmds):
+                groups.append((key, cmds))
+        return groups
+
+    @staticmethod
+    def _switch_group_key(name: str) -> str:
+        normalized = (name or "").strip().lower()
+        normalized = re.sub(r"\s+(on|off)$", "", normalized)
+        normalized = re.sub(r"[_\-\s]+(on|off)$", "", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
 
     def decide_publication(self, mapping: MappingResult, confidence_policy: str = "sure_probable") -> PublicationDecision:
         """Apply the bounded publication policy for Story 2.4.

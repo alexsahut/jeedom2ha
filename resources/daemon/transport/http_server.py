@@ -77,6 +77,10 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
     """Resolve runtime state topic for a published actuator mapping."""
     if (mapping.ha_entity_type in PublisherRegistry.known_types()
             and mapping.ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC):
+        reason_details = mapping.reason_details or {}
+        state_topic = reason_details.get("state_topic")
+        if mapping.ha_entity_type == "switch" and isinstance(state_topic, str) and state_topic:
+            return state_topic
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""
@@ -179,6 +183,72 @@ def _make_publication_result(
         technical_reason_code=technical_reason_code,
         attempted_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+async def _publish_additional_sensors(
+    *,
+    primary_mapping: MappingResult,
+    snapshot: TopologySnapshot,
+    confidence_policy,
+    publisher_registry: Optional[PublisherRegistry],
+    mqtt_bridge,
+    mapping_counters: Dict[str, int],
+) -> None:
+    """Publier les sensors secondaires d'un eqLogic multi-sensor (Story 11.1 PE).
+
+    Chaque sensor secondaire suit le pipeline canonique (validation HA → décision →
+    publication) et alimente les compteurs comme une entité publiée à part entière.
+    Honnêteté du diagnostic : si un secondaire devant être publié échoue, le résultat
+    technique du mapping primaire passe à "failed" pour ne pas afficher un faux succès.
+    """
+    bridge_ready = bool(mqtt_bridge and getattr(mqtt_bridge, "is_connected", False))
+    eq_id = primary_mapping.jeedom_eq_id
+
+    for secondary in primary_mapping.additional_mappings:
+        secondary.projection_validity = validate_projection(
+            secondary.ha_entity_type, secondary.capabilities
+        )
+        secondary.pipeline_step_reached = 3
+        sec_decision = decide_publication(secondary, confidence_policy=confidence_policy)
+        sec_decision.mapping_result = secondary
+        secondary.publication_decision_ref = sec_decision
+        secondary.pipeline_step_reached = 4
+
+        if secondary.confidence in ("sure", "probable", "ambiguous"):
+            _increment_mapping_counter(mapping_counters, secondary, secondary.confidence)
+
+        if not sec_decision.should_publish:
+            secondary.publication_result = _make_publication_result("not_attempted")
+            secondary.pipeline_step_reached = 5
+            continue
+
+        published = False
+        if publisher_registry and bridge_ready:
+            published = await publisher_registry.publish(secondary, snapshot)
+        else:
+            _LOGGER.warning(
+                "[MAPPING] Discovery publish unavailable for eq_id=%d sensor cmd=%s (bridge missing/disconnected)",
+                eq_id, (secondary.reason_details or {}).get("cmd_id"),
+            )
+
+        if published:
+            sec_decision.discovery_published = True
+            sec_decision.active_or_alive = True
+            secondary.publication_result = _make_publication_result("success")
+            _increment_mapping_counter(mapping_counters, secondary, "published")
+        else:
+            if secondary.publication_result is None:
+                secondary.publication_result = _make_publication_result(
+                    "failed", "discovery_publish_failed"
+                )
+            # Diagnostic honnête : un secondaire raté invalide le succès global de l'eqLogic.
+            if primary_mapping.publication_result is not None and (
+                primary_mapping.publication_result.status == "success"
+            ):
+                primary_mapping.publication_result = _make_publication_result(
+                    "failed", "multi_sensor_partial_publish_failed"
+                )
+        secondary.pipeline_step_reached = 5
 
 
 def _mapping_counter_prefix(ha_entity_type: str) -> str:
@@ -372,11 +442,44 @@ async def _publish_mapping_for_action(
     topology: TopologySnapshot,
 ) -> bool:
     if mapping.ha_entity_type == "light":
+        primary_ok = await publisher.publish_light(mapping, topology)
+    elif mapping.ha_entity_type == "cover":
+        primary_ok = await publisher.publish_cover(mapping, topology)
+    elif mapping.ha_entity_type == "switch":
+        primary_ok = await publisher.publish_switch(mapping, topology)
+    else:
+        return False
+
+    if not primary_ok:
+        return False
+
+    # Story 11.2 — un eqLogic multi-domaine (eq554) porte ses sensors/binary_sensors
+    # secondaires dans additional_mappings. Le chemin action « publier » doit les
+    # publier comme le fait le chemin sync (_publish_additional_sensors), sinon une
+    # re-inclusion sans sync complet recrée le switch primaire en laissant les 12
+    # sensors + 1 binary_sensor non publiés (entités manquantes côté HA).
+    all_ok = True
+    for secondary in mapping.additional_mappings or []:
+        if not await _publish_secondary_for_action(publisher, secondary, topology):
+            all_ok = False
+    return all_ok
+
+
+async def _publish_secondary_for_action(
+    publisher: DiscoveryPublisher,
+    mapping: MappingResult,
+    topology: TopologySnapshot,
+) -> bool:
+    if mapping.ha_entity_type == "sensor":
+        return await publisher.publish_sensor(mapping, topology)
+    if mapping.ha_entity_type == "binary_sensor":
+        return await publisher.publish_binary_sensor(mapping, topology)
+    if mapping.ha_entity_type == "switch":
+        return await publisher.publish_switch(mapping, topology)
+    if mapping.ha_entity_type == "light":
         return await publisher.publish_light(mapping, topology)
     if mapping.ha_entity_type == "cover":
         return await publisher.publish_cover(mapping, topology)
-    if mapping.ha_entity_type == "switch":
-        return await publisher.publish_switch(mapping, topology)
     return False
 
 
@@ -514,6 +617,61 @@ def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
     return bool(getattr(decision, "should_publish", False))
 
 
+def _collect_unpublish_node_ids(mapping_result) -> list:
+    """Collect node-scoped topic identifiers to unpublish for one eqLogic (Story 11.1.bis).
+
+    Multi-sensor eqLogics publish every entity (primary AND secondaries) under a
+    node-scoped topic ``homeassistant/<type>/<node_id>/config``. To depublish
+    exhaustively (anti-ghosts), gather the primary node_id plus each secondary node_id
+    from the stored mapping result — no topology re-parsing required.
+
+    Returns an empty list for mono-entity eqLogics (no node_id), so the caller falls
+    back to the historical single eq-level unpublish (no over-deletion).
+
+    Story 11.2 — cas MULTI-DOMAINE (switch + sensor + binary_sensor sous un même
+    eqLogic) : les entités s'étalent sur plusieurs domaines HA, donc un node_id seul
+    (+ un entity_type unique côté appelant) ne suffit plus. On renvoie alors une liste
+    de tuples ``(entity_type, node_id)`` couvrant TOUTES les entités, y compris le
+    switch primaire au topic eq-level (node_id pseudo ``jeedom2ha_<eq_id>``). Le cas
+    homogène (mono / multi-sensor) conserve strictement le contrat list[str] historique.
+    """
+    if mapping_result is None:
+        return []
+
+    def _nid(m):
+        rd = getattr(m, "reason_details", None) or {}
+        nid = rd.get("node_id")
+        return nid if isinstance(nid, str) and nid else None
+
+    def _etype(m) -> str:
+        return str(getattr(m, "ha_entity_type", "") or "")
+
+    secondaries = list(getattr(mapping_result, "additional_mappings", None) or [])
+    all_types = {_etype(mapping_result)} | {_etype(s) for s in secondaries}
+
+    # Multi-domaine hétérogène : porter le type par entité (anti-fantôme cross-domaine).
+    if len(all_types) > 1:
+        eq_id = getattr(mapping_result, "jeedom_eq_id", None)
+        entries: list = []
+        primary_nid = _nid(mapping_result) or f"jeedom2ha_{eq_id}"
+        entries.append((_etype(mapping_result), primary_nid))
+        for secondary in secondaries:
+            sec_nid = _nid(secondary) or f"jeedom2ha_{getattr(secondary, 'jeedom_eq_id', eq_id)}"
+            entries.append((_etype(secondary), sec_nid))
+        return entries
+
+    # Homogène (mono / multi-sensor) : contrat list[str] historique (Story 11.1.bis).
+    node_ids: list = []
+    primary_nid = _nid(mapping_result)
+    if primary_nid:
+        node_ids.append(primary_nid)
+    for secondary in secondaries:
+        sec_nid = _nid(secondary)
+        if sec_nid:
+            node_ids.append(sec_nid)
+    return node_ids
+
+
 def _defer_local_availability_cleanup(
     pending_cleanup: Dict[int, str],
     eq_id: int,
@@ -542,31 +700,55 @@ def _replay_deferred_local_availability_cleanup(
             pending_cleanup.pop(pending_eq_id, None)
 
 
+def _pending_unpublish_parts(value) -> tuple:
+    """Normalize a pending-unpublish entry to (entity_type, node_ids).
+
+    Backward-compatible: legacy entries stored a bare entity_type string; Story 11.1.bis
+    entries store a dict {"entity_type": str, "node_ids": [...]} to carry multi-sensor
+    secondaries across a deferred replay.
+    """
+    if isinstance(value, dict):
+        entity_type = str(value.get("entity_type") or "light")
+        node_ids = value.get("node_ids") or []
+        return entity_type, list(node_ids)
+    return str(value or "light"), []
+
+
 def _defer_discovery_unpublish(
-    pending_unpublish: Dict[int, str],
+    pending_unpublish: Dict[int, object],
     eq_id: int,
     entity_type: str,
+    node_ids: Optional[list] = None,
 ) -> None:
-    """Track one discovery unpublish to replay later when broker is connected."""
+    """Track one discovery unpublish to replay later when broker is connected.
+
+    Story 11.1.bis — preserve multi-sensor node_ids so the deferred replay erases the
+    primary AND every secondary topic (no residual ghost after a reconnect).
+    """
     normalized_entity_type = str(entity_type or "light")
-    pending_unpublish[int(eq_id)] = normalized_entity_type
+    pending_unpublish[int(eq_id)] = {
+        "entity_type": normalized_entity_type,
+        "node_ids": list(node_ids or []),
+    }
     _LOGGER.info(
-        "[DISCOVERY] Deferred unpublish eq_id=%d entity_type=%s",
+        "[DISCOVERY] Deferred unpublish eq_id=%d entity_type=%s node_ids=%d",
         eq_id,
         normalized_entity_type,
+        len(node_ids or []),
     )
 
 
 async def _replay_deferred_discovery_unpublish(
     publisher: DiscoveryPublisher,
-    pending_unpublish: Dict[int, str],
+    pending_unpublish: Dict[int, object],
 ) -> None:
     """Replay deferred discovery unpublish messages when broker is connected."""
     if not pending_unpublish:
         return
 
-    for pending_eq_id, pending_entity_type in list(pending_unpublish.items()):
-        if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=pending_entity_type):
+    for pending_eq_id, pending_value in list(pending_unpublish.items()):
+        entity_type, node_ids = _pending_unpublish_parts(pending_value)
+        if await publisher.unpublish_by_eq_id(pending_eq_id, entity_type=entity_type, node_ids=node_ids):
             pending_unpublish.pop(pending_eq_id, None)
 
 
@@ -598,12 +780,17 @@ async def _detect_lifecycle_changes(
                 "[LIFECYCLE] eq_id=%d: retypage détecté (%s → %s) → unpublish ancien topic",
                 eq_id, prev_mr.ha_entity_type, mapping.ha_entity_type,
             )
+            prev_node_ids = _collect_unpublish_node_ids(prev_mr)
             if publisher is not None:
-                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=prev_mr.ha_entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(
+                    eq_id, entity_type=prev_mr.ha_entity_type, node_ids=prev_node_ids
+                )
             else:
                 unpublish_ok = False
             if not unpublish_ok:
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, prev_mr.ha_entity_type)
+                _defer_discovery_unpublish(
+                    pending_discovery_unpublish, eq_id, prev_mr.ha_entity_type, node_ids=prev_node_ids
+                )
         # Rename / area change logs (publication already handled by handler with fresh data)
         if prev_mr.ha_name != mapping.ha_name:
             _LOGGER.info(
@@ -628,12 +815,17 @@ async def _detect_lifecycle_changes(
                     "[LIFECYCLE] eq_id=%d: retypage au boot (%s → %s) → unpublish ancien topic",
                     eq_id, boot_type, mapping.ha_entity_type,
                 )
+                boot_node_ids = boot_entry.get("node_ids", []) or []
                 if publisher is not None:
-                    unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=boot_type)
+                    unpublish_ok = await publisher.unpublish_by_eq_id(
+                        eq_id, entity_type=boot_type, node_ids=boot_node_ids
+                    )
                 else:
                     unpublish_ok = False
                 if not unpublish_ok:
-                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, boot_type)
+                    _defer_discovery_unpublish(
+                        pending_discovery_unpublish, eq_id, boot_type, node_ids=boot_node_ids
+                    )
             # Rename au boot
             if boot_name and boot_name != mapping.ha_name:
                 _LOGGER.info(
@@ -1179,6 +1371,25 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if not decision.active_or_alive:
             _increment_mapping_counter(mapping_counters, mapping, "skipped")
 
+        # Story 11.1 PE — publication des sensors secondaires (multi-sensor borné).
+        # Le device HA est commun à l'eqLogic ; chaque sensor a ses propres
+        # identifiants/topic. La décision/bookkeeping primaire reste inchangée.
+        if mapping.additional_mappings:
+            await _publish_additional_sensors(
+                primary_mapping=mapping,
+                snapshot=snapshot,
+                confidence_policy=confidence_policy,
+                publisher_registry=publisher_registry,
+                mqtt_bridge=mqtt_bridge,
+                mapping_counters=mapping_counters,
+            )
+
+        # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
+        # sur le state_topic des entités vague 1 APRÈS la discovery (sinon HA l'ignore).
+        state_sync = request.app.get("state_synchronizer")
+        if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
+            await state_sync.publish_initial_states(decision)
+
         previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
         previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
         current_local_supported = bool(getattr(decision, "local_availability_supported", False))
@@ -1211,12 +1422,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 and current_decision is not None
                 and not current_decision.should_publish):
             entity_type = previous_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
             _LOGGER.info(
                 "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
                 eq_id, previous_decision.reason, current_decision.reason,
             )
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
                 if unpublish_ok:
                     pending_discovery_unpublish.pop(eq_id, None)
                 else:
@@ -1224,13 +1436,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                         "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
                         eq_id,
                     )
-                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             else:
                 _LOGGER.warning(
                     "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
                     eq_id,
                 )
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             # Nettoyer la disponibilité locale si elle était présente
             if bool(getattr(previous_decision, "local_availability_supported", False)):
                 prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
@@ -1266,18 +1478,25 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             boot_entry = boot_cache.get(old_eq_id)
             if boot_entry and boot_entry.get("published"):
                 boot_entity_type = boot_entry.get("entity_type") or "light"
+                boot_node_ids = boot_entry.get("node_ids", []) or []
                 boot_cleanup_reason = "supprimé depuis downtime daemon" if elig_entry is None else cleanup_reason
                 discovery_action = "discovery unpublish effectif"
                 if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                    unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=boot_entity_type)
+                    unpublish_ok = await publisher.unpublish_by_eq_id(
+                        old_eq_id, entity_type=boot_entity_type, node_ids=boot_node_ids
+                    )
                     if unpublish_ok:
                         pending_discovery_unpublish.pop(old_eq_id, None)
                     else:
                         discovery_action = "discovery unpublish deferred"
-                        _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+                        _defer_discovery_unpublish(
+                            pending_discovery_unpublish, old_eq_id, boot_entity_type, node_ids=boot_node_ids
+                        )
                 else:
                     discovery_action = "discovery unpublish deferred"
-                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, boot_entity_type)
+                    _defer_discovery_unpublish(
+                        pending_discovery_unpublish, old_eq_id, boot_entity_type, node_ids=boot_node_ids
+                    )
                 avail_topic = build_local_availability_topic(old_eq_id)
                 availability_action = "availability cleanup"
                 if mqtt_bridge and mqtt_bridge.is_connected:
@@ -1302,17 +1521,18 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
         if _needs_discovery_unpublish(old_decision):
             entity_type = old_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(old_decision.mapping_result)
             discovery_action = "discovery unpublish effectif"
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type)
+                unpublish_ok = await publisher.unpublish_by_eq_id(old_eq_id, entity_type=entity_type, node_ids=node_ids)
                 if unpublish_ok:
                     pending_discovery_unpublish.pop(old_eq_id, None)
                 else:
                     discovery_action = "discovery unpublish deferred"
-                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+                    _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type, node_ids=node_ids)
             else:
                 discovery_action = "discovery unpublish deferred"
-                _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, old_eq_id, entity_type, node_ids=node_ids)
             avail_topic = build_local_availability_topic(old_eq_id)
             availability_action = "availability cleanup"
             if mqtt_bridge and mqtt_bridge.is_connected:
@@ -2068,6 +2288,31 @@ async def _handle_system_published_scope(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_state_listeners(request: web.Request) -> web.Response:
+    """Handle GET /system/state_listeners — published vague-1 (eq_id, cmd_id) targets.
+
+    Story 12.1 (R1): authoritative list the PHP plugin uses to register a Jeedom
+    listener on exactly the published sensor/binary_sensor info commands. Mapping
+    authority stays single-sourced in the daemon (state ⊆ discovery, AC#5).
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    state_sync = request.app.get("state_synchronizer")
+    listeners = state_sync.list_state_targets() if state_sync is not None else []
+    return web.json_response({
+        "action": "system.state_listeners",
+        "status": "ok",
+        "listeners": listeners,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 
 # ---------------------------------------------------------------------------
 # Story 5.1 — Façade backend unique d'opérations HA
@@ -2232,15 +2477,18 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
             if previous_decision and previous_decision.mapping_result is not None:
                 entity_type = previous_decision.mapping_result.ha_entity_type
+                node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
             elif mappings.get(eq_id) is not None:
                 entity_type = mappings[eq_id].ha_entity_type
+                node_ids = _collect_unpublish_node_ids(mappings[eq_id])
             else:
                 entity_type = "light"
+                node_ids = []
 
-            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
             await asyncio.sleep(_action_delay)
             if not unpublish_ok:
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
                 supprimer_errors += 1
                 continue
 
@@ -2433,15 +2681,18 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
         if previous_decision and previous_decision.mapping_result is not None:
             entity_type = previous_decision.mapping_result.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
         elif mapping is not None:
             entity_type = mapping.ha_entity_type
+            node_ids = _collect_unpublish_node_ids(mapping)
         else:
             entity_type = "light"
+            node_ids = []
 
-        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type)
+        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
         await asyncio.sleep(_action_delay)
         if not unpublish_ok:
-            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type)
+            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             continue
 
         pending_discovery_unpublish.pop(eq_id, None)
@@ -2544,6 +2795,55 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     return _build_action_execute_response(payload=payload)
 
 
+def _normalize_state_update_body(body: Any) -> Dict[str, Any]:
+    """Accept direct JSON calls and the PHP relay wrapper `{payload: {...}}`."""
+    if not isinstance(body, dict):
+        return {}
+    wrapped = body.get("payload")
+    if isinstance(wrapped, dict) and ("eq_id" in wrapped or "cmd_id" in wrapped):
+        return wrapped
+    return body
+
+
+async def _handle_action_state_update(request: web.Request) -> web.Response:
+    """Story 12.1 — inbound Jeedom info value → MQTT state_topic (vague 1).
+
+    Event-driven channel: a Jeedom ``#listener#`` on the info commands of published
+    sensor/binary_sensor eqLogics relays (eq_id, cmd_id, value) here via
+    ``callDaemon()``. The daemon resolves the discovery-declared state_topic from
+    the publication registry and publishes, so HA entities leave ``unknown``.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    try:
+        raw_body = await request.json()
+    except Exception:
+        return web.json_response(
+            {"status": "error", "message": "Corps de requête JSON invalide."}, status=400
+        )
+
+    body = _normalize_state_update_body(raw_body)
+    eq_id = body.get("eq_id")
+    cmd_id = body.get("cmd_id")
+    value = body.get("value")
+    if eq_id is None or cmd_id is None:
+        return web.json_response(
+            {"status": "error", "message": "Champs 'eq_id' et 'cmd_id' obligatoires."},
+            status=400,
+        )
+
+    state_sync = request.app.get("state_synchronizer")
+    if state_sync is None:
+        return web.json_response(
+            {"status": "error", "message": "State synchronizer indisponible."}, status=503
+        )
+
+    published = await state_sync.handle_state_message(eq_id, cmd_id, value)
+    return web.json_response({"status": "ok", "published": bool(published)})
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application()
@@ -2576,6 +2876,9 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
+    # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)
+    app.router.add_post("/action/state_update", _handle_action_state_update)
+    app.router.add_get("/system/state_listeners", _handle_system_state_listeners)
     return app
 
 

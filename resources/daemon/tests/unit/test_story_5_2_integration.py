@@ -202,7 +202,7 @@ async def test_scope_enforcement_resolves_excluded_gap_without_altering_4d_contr
         )
 
     assert response.status == 200
-    publisher.unpublish_by_eq_id.assert_awaited_once_with(12, entity_type="light")
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(12, entity_type="light", node_ids=[])
 
     after = await _get_diagnostics(cli)
     assert after[12]["perimetre"] == "exclu_sur_equipement"

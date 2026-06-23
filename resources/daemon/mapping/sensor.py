@@ -1,11 +1,22 @@
-"""sensor.py — Mapper Jeedom Info numeric vers Home Assistant sensor."""
+"""sensor.py — Mapper Jeedom Info numeric vers Home Assistant sensor.
+
+Story 11.1 PE — support multi-sensor borné : un eqLogic « routeur solaire »
+(MSunPV) expose plusieurs commandes info numériques comme autant de `sensor` HA
+distincts rattachés au même device Jeedom, sans régression sur le comportement
+mono-sensor historique des autres équipements.
+"""
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from models.mapping import MappingResult, SensorCapabilities
-from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
+from models.topology import (
+    MULTI_SENSOR_EQ_TYPES,
+    JeedomCmd,
+    JeedomEqLogic,
+    TopologySnapshot,
+)
 
 _SENSOR_GENERIC_TYPE_MAP: Dict[str, Tuple[Optional[str], Optional[str]]] = {
     "TEMPERATURE": ("temperature", "°C"),
@@ -40,6 +51,25 @@ _SENSOR_GENERIC_TYPE_MAP: Dict[str, Tuple[Optional[str], Optional[str]]] = {
 }
 
 
+# Story 11.1 — eq_type_name (plugin source) éligibles au mapping multi-sensor borné.
+# Source de vérité unique dans models.topology (partagée avec assess_eligibility),
+# pour que l'éligibilité et le mapping restent cohérents. Restreint à MSunPV
+# (garde-fou AC 4 — pas de régression mono-entité).
+_MULTI_SENSOR_EQ_TYPES = MULTI_SENSOR_EQ_TYPES
+
+# Story 11.1 — inférence honnête d'un device_class HA à partir de l'unité Jeedom,
+# pour les commandes info numériques sans generic_type standard. Toute unité non
+# listée ne reçoit AUCUN device_class (publication honnête plutôt que classe fausse).
+_UNIT_DEVICE_CLASS: Dict[str, str] = {
+    "W": "power",
+    "kW": "power",
+    "Wh": "energy",
+    "kWh": "energy",
+    "V": "voltage",
+    "A": "current",
+}
+
+
 def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
     if (cmd.type or "").lower() != "info":
         return False
@@ -50,10 +80,46 @@ def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
     return "numeric" in sub_type
 
 
+def _is_multi_sensor_eq(eq: JeedomEqLogic) -> bool:
+    if _has_structural_multi_entity_sensor_shape(eq):
+        return True
+    return (eq.eq_type_name or "").lower() in _MULTI_SENSOR_EQ_TYPES
+
+
+def _has_structural_multi_entity_sensor_shape(eq: JeedomEqLogic) -> bool:
+    switch_types = {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}
+    has_switch_shape = any(cmd.generic_type in switch_types for cmd in eq.cmds)
+    numeric_count = sum(1 for cmd in eq.cmds if _is_numeric_info_command(cmd))
+    return has_switch_shape and numeric_count >= 2
+
+
 class SensorMapper:
     """Mappe un eqLogic Jeedom en HA sensor via type générique Info numeric."""
 
     def map(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
+        """API historique : retourne le mapping sensor principal (ou None).
+
+        Conserve la compatibilité des consommateurs attendant un mapping unique
+        par eqLogic. Le support multi-sensor passe par ``map_all``.
+        """
+        mappings = self.map_all(eq, snapshot)
+        return mappings[0] if mappings else None
+
+    def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        """API additive Story 11.1 : retourne 0..N mappings sensor pour l'eqLogic.
+
+        - Cas standard : au plus un mapping (premier generic_type connu), strictement
+          identique au comportement mono-sensor historique.
+        - Cas multi-sensor borné (MSunPV) : un mapping par commande info numérique,
+          chacun avec identifiants/topic distincts dérivés de l'ID cmd Jeedom.
+        """
+        if _is_multi_sensor_eq(eq):
+            return self._map_multi_sensor(eq, snapshot)
+
+        primary = self._map_single(eq, snapshot)
+        return [primary] if primary is not None else []
+
+    def _map_single(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
         for cmd in eq.cmds:
             generic_type = cmd.generic_type
             if not generic_type or generic_type not in _SENSOR_GENERIC_TYPE_MAP:
@@ -79,3 +145,52 @@ class SensorMapper:
             )
 
         return None
+
+    def _map_multi_sensor(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        suggested_area = snapshot.get_suggested_area(eq.id)
+        mappings: List[MappingResult] = []
+
+        for cmd in eq.cmds:
+            if not _is_numeric_info_command(cmd):
+                continue
+
+            device_class, unit_of_measurement = self._derive_sensor_metadata(cmd)
+            mappings.append(
+                MappingResult(
+                    ha_entity_type="sensor",
+                    confidence="sure",
+                    reason_code="sensor_multi_routeur_solaire",
+                    jeedom_eq_id=eq.id,
+                    # Identité par commande (IDs Jeedom stables), device commun à l'eqLogic.
+                    ha_unique_id=f"jeedom2ha_eq_{eq.id}_cmd_{cmd.id}",
+                    ha_name=cmd.name,
+                    suggested_area=suggested_area,
+                    commands={str(cmd.id): cmd},
+                    capabilities=SensorCapabilities(has_state=True),
+                    reason_details={
+                        "device_class": device_class,
+                        "unit_of_measurement": unit_of_measurement,
+                        "cmd_id": cmd.id,
+                        "object_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                        "node_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                        "state_topic": f"jeedom2ha/{eq.id}/{cmd.id}/state",
+                    },
+                )
+            )
+
+        return mappings
+
+    @staticmethod
+    def _derive_sensor_metadata(cmd: JeedomCmd) -> Tuple[Optional[str], Optional[str]]:
+        """Déduit (device_class, unit) pour une commande multi-sensor.
+
+        Préfère le mapping generic_type standard ; à défaut, infère le device_class
+        depuis l'unité Jeedom. Aucune classe inventée quand l'unité est inconnue.
+        """
+        generic_type = cmd.generic_type
+        if generic_type and generic_type in _SENSOR_GENERIC_TYPE_MAP:
+            return _SENSOR_GENERIC_TYPE_MAP[generic_type]
+
+        unit = cmd.unit or None
+        device_class = _UNIT_DEVICE_CLASS.get(unit) if unit else None
+        return device_class, unit

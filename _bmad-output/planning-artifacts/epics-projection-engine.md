@@ -189,6 +189,7 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 | FR25 | _(post-MVP — hors cycle)_ | Overrides avancés inter-étapes |
 | FR26-FR30 | Epic 5 | Feature 5 — Publication MQTT orchestrée |
 | FR31-FR35 | Epic 6 | Feature 6 — Diagnostic explicable et actionnable |
+| FR46-FR50 | pe-epic-12 | Feature 9 — Restitution d'état runtime Jeedom → HA |
 
 **NFR coverage :**
 
@@ -420,6 +421,43 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 - toute ouverture de type dans `PRODUCT_SCOPE` passe dans le meme increment avec ses preuves FR40 / NFR10 ;
 - la parite visee se lit en familles d'usage et exemples representatifs, pas en dump exhaustif non gouverne ;
 - aucune equivalence UX metier sensible (`presence`, composites complexes, etc.) n'est ouverte cosmetiquement sans intention produit explicite.
+
+### Epic 11 — L'énergie et le routage solaire deviennent lisibles dans Home Assistant via une restitution discovery gouvernée
+
+**Valeur utilisateur :** L'utilisateur retrouve dans Home Assistant les équipements de pilotage solaire déjà présents dans Jeedom (MSunPV/RouteurSolaire, chauffe-eau), pour un dashboard énergie famille, sans ouvrir de nouveau type HA ni contourner le moteur.
+
+**Résultat observable :** Les commandes info des équipements énergie/routage (eq553, eq554) sont projetées en `sensor` / `binary_sensor` via le pipeline existant. La priorisation suit le besoin réel (P1 MSunPV, P2 chauffe-eau), pas un type arbitraire.
+
+**FRs couverts :** FR7, FR11, FR16, FR26, FR31, FR39, FR40 (réutilisation du pipeline existant — aucun type nouveau)
+
+**ARs clés :** AR4, AR6, AR13
+
+**NFRs directement adressés :** NFR2, NFR5, NFR10
+
+**Invariants à porter en stories :**
+- `sensor`, `binary_sensor`, `button`, `switch` sont déjà dans `PRODUCT_SCOPE` : pe-epic-11 n'ouvre aucun type nouveau ;
+- la restitution est en lecture seule (discovery) ; la valeur runtime relève de pe-epic-12 et n'est pas un défaut de cet epic ;
+- la dépublication d'un équipement multi-sensor doit nettoyer tous les topics secondaires (cf. Story 11.1.bis) ;
+- l'inventaire cible reste borné par `backlog-icebox.md §3` et `§4` (IQ EV eq583 / pilotage priorisation eq628) ; aucune ouverture de l'intégration Enphase native HA (hors scope jeedom2ha) ;
+- Story 11.3 (IQ EV + pilotage priorisation) mêle des types : ses `sensor`/`binary_sensor` sont alimentés par la vague 1 (pe-epic-12 / 12.1), ses états actionnables `switch`/`button` dépendent de la vague 2 (pe-epic-12 / 12.2) — 11.3 n'est créée/lancée qu'une fois 12.2 disponible.
+
+### Epic 12 — Les entités publiées portent leurs valeurs réelles : restitution d'état runtime Jeedom → Home Assistant
+
+**Valeur utilisateur :** L'utilisateur voit dans Home Assistant les valeurs réelles de ses entités (et non « inconnu ») : un capteur publié affiche sa mesure, un binary_sensor son état, mis à jour quand Jeedom change.
+
+**Résultat observable :** Pour les types de la vague 1 (`sensor`, `binary_sensor`), chaque entité publiée en discovery reçoit un état initial puis des mises à jour event-driven sur son `state_topic`. Le diagnostic distingue « publié sans valeur » de « publié et alimenté ».
+
+**FRs couverts :** FR46, FR47, FR48, FR49, FR50
+
+**ARs clés :** à cadrer au démarrage de l'epic (chemin de valeur : callback PHP, `sync/state.py`, route daemon) — additif au contrat des 5 étapes, sans le modifier.
+
+**NFRs directement adressés :** NFR6, NFR13
+
+**Invariants à porter en stories :**
+- la restitution n'alimente que des `state_topic` déjà déclarés par la publication discovery (cohérence state ⊆ discovery) ;
+- event-driven, sans source de vérité concurrente à Jeedom (NFR6/NFR13) ;
+- vague 1 = `sensor` + `binary_sensor` ; les domaines actionnables (`switch`, `climate`, …) sont des vagues ultérieures gouvernées ;
+- gate terrain de clôture = les capteurs eq553 (« tension réseau ») ne sont plus en état `unknown` sur la box réelle.
 
 ---
 
@@ -1786,3 +1824,55 @@ afin d'obtenir la meme experience que dans HomeKit plutot qu'un binary_sensor (e
 - le golden-file de reference herite de `pe-epic-8` reste vert sur le corpus initial et s'etend aux nouveaux cas representatifs de la vague ;
 - gate terrain de cloture epic = preuve de parite minimale utile sur les familles retenues par la matrice 10.0, avec statut explicite pour chaque famille (`couvert`, `couvert via type existant`, `ouvert dans l'epic`, `hors scope`, `reporte`) ;
 - aucune plateforme annexe ou surface Apple derivee d'une plateforme annexe n'est comptabilisee comme gap `jeedom2ha` dans cet epic.
+
+---
+
+## Epic 11 — Énergie / Routage solaire : restitution discovery lecture seule des équipements de pilotage solaire
+
+L'utilisateur dispose dans HA des équipements énergie/routage solaire de Jeedom, projetés en lecture seule via le pipeline existant. Priorité : P1 MSunPV/RouteurSolaire (eq553, le « cerveau » du routage), P2 chauffe-eau (eq554). Aucun type HA nouveau : `sensor`/`binary_sensor`/`button`/`switch` sont déjà ouverts. Source d'inventaire : `backlog-icebox.md §3`.
+
+### Story 11.1 — MSunPV / RouteurSolaire : sensors lecture seule
+(livrée — multi-sensor eq553, 65 capteurs, gate terrain PASS box 192.168.1.21 ; Fix A éligibilité sans generic_type ; voir record `11-1-msunpv-routeursolaire-sensors-lecture-seule.md`)
+
+### Story 11.1.bis — Multi-sensor lifecycle : dépublication exhaustive des sensors secondaires
+(livrée — anti-ghosts HA, nettoyage des topics secondaires à la dépublication ; voir SCP 2026-06-17)
+
+### Story 11.2 — Chauffe-eau eq554 : détail routage
+Livrée via PR #127 (`5e3d39b`). Projection multi-domaine de l'equipement eq554 : un `switch`, douze `sensor` et un `binary_sensor` sous un device commun, avec depublication domain-aware et persistance cross-reboot. Revue PASS (11/11 AC), 916 tests verts et gate terrain PASS le 2026-06-19 : quatorze entites publiees et `switch.jeedom2ha_554` non `unknown`.
+
+### Story 11.3 — IQ EV Charger (eq583) + Pilotage priorisation solaire (eq628)
+Livrée via PR #128 (`3546f22`). Le support generique `SWITCH_*`, le multi-switch structurel et le streaming `SWITCH_STATE` couvrent eq583 et eq628 sans allowlist d'identifiants. Gate terrain PASS le 2026-06-21 : eq583 publie trois `sensor`, deux `binary_sensor` et trois `switch`; eq628 publie quatre `switch`; tous les etats actionnables observes sont non `unknown`. Le controle de onze autres commandes `SWITCH_*` n'a revele aucune ouverture inattendue.
+
+### Gates epic-level pe-epic-11
+- aucune ouverture de type nouveau dans `PRODUCT_SCOPE` (les 4 types nécessaires sont déjà ouverts) ; toute exception passe FR40/NFR10 dans le même incrément ;
+- la dépublication d'un équipement multi-sensor ne laisse aucun topic discovery secondaire orphelin (hérité de Story 11.1.bis) ;
+- gate terrain de clôture epic = comptage des équipements énergie publiés sur la box réelle, périmètre conforme à `backlog-icebox.md §3` ;
+- la restitution de valeur runtime est explicitement hors-scope de cet epic (relève de pe-epic-12).
+
+---
+
+## Epic 12 — Restitution d'état runtime Jeedom → Home Assistant : les entités publiées portent leurs valeurs réelles
+
+Capacité produit comblant la régression systémique révélée le 2026-06-18 (entités publiées en discovery mais en état `unknown` faute de chemin de valeur Jeedom → HA). Reprend l'intention des anciennes FR16 « Retour d'état » / FR17 « Synchro temps réel » (legacy `epics.md`), abandonnées entre cycles, dans le formalisme courant. Vague 1 bornée : `sensor` + `binary_sensor`.
+
+### Story 12.1 — Streaming de valeur sensor / binary_sensor (vague 1)
+Livrée via PR #123 (`d5b86ce`, correctifs `6abfcf5` et `0a79966`). Le callback PHP, le resolver `resources/daemon/sync/state.py` et la publication MQTT fournissent l'etat initial puis les changements event-driven pour `sensor` et `binary_sensor`, uniquement quand l'entite est effectivement publiee en discovery. Gate terrain PASS le 2026-06-18 : 88 listeners actifs et le capteur eq553 « Tension reseau » expose 238.4 V au lieu de `unknown`; 860 tests verts.
+
+### Story 12.2 — Streaming de valeur switch / button (vague 2)
+Livrée via PR #125 (`6e24693`). Le chemin de valeur de 12.1 est etendu aux `switch`; les `button` restent volontairement sans etat readback. Gate terrain PASS le 2026-06-18 : commande switch reelle on/off, eq554 non `unknown`, listeners actifs et non-regression eq553/light/cover. Revue terminee apres correction d'un finding HIGH; 893 tests verts.
+
+### Story 12.3 — Réalignement documentaire post pe-epic-11 / pe-epic-12
+Story de maintenance documentaire ajoutée par `sprint-change-proposal-2026-06-22-doc-realignment.md`. Elle ne change aucun comportement produit. Elle réaligne les artefacts BMAD actifs après les merges #127/#128 et la clôture effective des epics 11 et 12 : `active-cycle-manifest.md`, `epics-projection-engine.md`, `sprint-status.yaml`, et les rétrospectives `pe-epic-11` / `pe-epic-12`.
+
+**Acceptance criteria :**
+
+- `active-cycle-manifest.md` indique l'état courant : `pe-epic-10`, `pe-epic-11`, `pe-epic-12` livrés ; dernier SCP = 2026-06-22 ; prochain axe configurable mapping à renuméroter/rebaser avant usage.
+- `epics-projection-engine.md` ne décrit plus `11.2`, `11.3`, `12.1`, `12.2` comme réservées, backlog ou à créer.
+- Les rétrospectives `pe-epic-11-retro-2026-06-22.md` et `pe-epic-12-retro-2026-06-22.md` existent et citent les preuves terrain/Git principales.
+- `sprint-status.yaml` suit la story 12.3 jusqu'à `done`, puis `pe-epic-12` revient à `done`.
+
+### Gates epic-level pe-epic-12
+- cohérence state ⊆ discovery : 0 `state_topic` publié pour une entité non publiée en discovery ;
+- event-driven, aucune source de vérité concurrente à Jeedom (NFR6/NFR13) ;
+- vagues bornées et séquencées : vague 1 (12.1) = `sensor` + `binary_sensor` ; vague 2 (12.2) = `switch` + `button` ; domaines suivants (`climate`, …) = vagues ultérieures gouvernées (FR49) ; aucune vague n'ouvre un domaine hors `PRODUCT_SCOPE` ;
+- gate terrain de clôture epic = sur la box réelle, les capteurs eq553 ne sont plus en état `unknown` ; non-régression de la discovery existante.

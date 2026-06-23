@@ -96,6 +96,29 @@ def _switch_mapping(eq_id: int = 2, *, with_state_info: bool = True) -> MappingR
     )
 
 
+def _presence_switch_mapping(eq_id: int = 4) -> MappingResult:
+    commands = {
+        "PRESENCE": JeedomCmd(id=4001, name="Présence", generic_type="PRESENCE", type="info", sub_type="binary"),
+        "SET_ON": JeedomCmd(id=4002, name="On", generic_type="SET_ON", type="action", sub_type="other"),
+        "SET_OFF": JeedomCmd(id=4003, name="Off", generic_type="SET_OFF", type="action", sub_type="other"),
+    }
+    return MappingResult(
+        ha_entity_type="switch",
+        confidence="sure",
+        reason_code="presence_switch_set_on_off",
+        jeedom_eq_id=eq_id,
+        ha_unique_id=f"jeedom2ha_eq_{eq_id}",
+        ha_name=f"Presence {eq_id}",
+        commands=commands,
+        capabilities=SwitchCapabilities(
+            has_on_off=True,
+            has_state=True,
+            on_off_confidence="sure",
+            device_class=None,
+        ),
+    )
+
+
 def _cover_mapping(
     eq_id: int = 3,
     *,
@@ -365,6 +388,50 @@ async def test_optimistic_controlled_publishes_state_only_when_allowed():
     assert ok is True
     sync._execute_exec_cmd.assert_awaited_once_with(2001, {})
     bridge.publish_message.assert_called_once_with("jeedom2ha/2/state", "ON", qos=1, retain=False)
+
+
+@pytest.mark.asyncio
+async def test_presence_switch_uses_real_state_confirmation_when_sync_active():
+    mapping = _presence_switch_mapping(eq_id=4)
+    app = {
+        "mappings": {mapping.ha_unique_id: mapping},
+        "publications": {mapping.ha_unique_id: _decision(mapping)},
+        "state_synchronizer": _FakeStateSynchronizer(active=True),
+    }
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message.return_value = True
+
+    sync = _make_sync(app, bridge)
+    sync._execute_exec_cmd = AsyncMock(return_value=True)
+
+    ok = await sync.handle_command_message("jeedom2ha/4/set", "ON")
+
+    assert ok is True
+    sync._execute_exec_cmd.assert_awaited_once_with(4002, {})
+    bridge.publish_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_presence_switch_without_state_sync_is_optimistic():
+    mapping = _presence_switch_mapping(eq_id=4)
+    app = {
+        "mappings": {mapping.ha_unique_id: mapping},
+        "publications": {mapping.ha_unique_id: _decision(mapping)},
+        "state_synchronizer": None,
+    }
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message.return_value = True
+
+    sync = _make_sync(app, bridge)
+    sync._execute_exec_cmd = AsyncMock(return_value=True)
+
+    ok = await sync.handle_command_message("jeedom2ha/4/set", "OFF")
+
+    assert ok is True
+    sync._execute_exec_cmd.assert_awaited_once_with(4003, {})
+    bridge.publish_message.assert_called_once_with("jeedom2ha/4/state", "OFF", qos=1, retain=False)
 
 
 @pytest.mark.asyncio

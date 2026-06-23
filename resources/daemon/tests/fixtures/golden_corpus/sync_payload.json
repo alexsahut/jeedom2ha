@@ -3,6 +3,594 @@
     {
       "cmds": [
         {
+          "generic_type": "ALARM_ENABLE_STATE",
+          "id": 23001,
+          "name": "Etat activation",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "ALARM_STATE",
+          "id": 23002,
+          "name": "Etat alarme",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "ALARM_ARMED",
+          "id": 23003,
+          "name": "Armer",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_RELEASED",
+          "id": 23004,
+          "name": "Desactiver",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_SET_MODE",
+          "id": 23005,
+          "name": "Mode",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ALARM_MODE",
+          "id": 23006,
+          "name": "Mode courant",
+          "sub_type": "string",
+          "type": "info"
+        }
+      ],
+      "eq_type": "alarm",
+      "id": 230,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Alarme maison",
+      "object_id": 1,
+      "status": {}
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "POWER",
+          "id": 5138,
+          "name": "Puissance panneaux",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": "POWER",
+          "id": 5137,
+          "name": "Puissance reseau",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": null,
+          "id": 5139,
+          "name": "Routage cumulus",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5140,
+          "name": "Routage radiateur",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5177,
+          "name": "Etat sortie 1 (CE %)",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5171,
+          "name": "Production panneaux journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        },
+        {
+          "generic_type": null,
+          "id": 5170,
+          "name": "Production injectee journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        },
+        {
+          "generic_type": null,
+          "id": 5169,
+          "name": "Consommation reseau journaliere",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "Wh"
+        }
+      ],
+      "eq_type": "msunpv",
+      "id": 553,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "MSunPV / RouteurSolaire",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": null,
+          "id": 5205,
+          "name": "Routage",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 5530,
+          "name": "Routage reel",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 5706,
+          "name": "On_5701",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 5707,
+          "name": "Off_5702",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5204,
+          "name": "Rafraichir",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5206,
+          "name": "Puissance",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": null,
+          "id": 5489,
+          "name": "etat",
+          "sub_type": "string",
+          "type": "info"
+        },
+        {
+          "generic_type": null,
+          "id": 5372,
+          "name": "Absence",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_ON",
+          "id": 5490,
+          "name": "Manu",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "ENERGY_OFF",
+          "id": 5491,
+          "name": "auto",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": null,
+          "id": 5510,
+          "name": "chauffe complete dans la journee",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": null,
+          "id": 5531,
+          "name": "Routage chauffe complete",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5535,
+          "name": "CE Kwh chauffe complete",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5532,
+          "name": "Routage 24H jusqua 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5533,
+          "name": "Routage aujourdhui",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": null,
+          "id": 5534,
+          "name": "CE kWh 24H jusqua 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5527,
+          "name": "CE kWh depuis 22H36 hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        },
+        {
+          "generic_type": null,
+          "id": 5542,
+          "name": "eq H de chauffe hier",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "H"
+        },
+        {
+          "generic_type": null,
+          "id": 5538,
+          "name": "eq H de chauffe aujourdhui",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "H"
+        },
+        {
+          "generic_type": null,
+          "id": 5543,
+          "name": "mediane chauffe complete sur 7 jours",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "%"
+        },
+        {
+          "generic_type": "ENERGY_STATE",
+          "id": 5708,
+          "name": "active",
+          "sub_type": "binary",
+          "type": "info"
+        }
+      ],
+      "eq_type": "virtual",
+      "id": 554,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Chauffe-eau",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "id": 583,
+      "name": "IQ EV Charger",
+      "object_id": 1,
+      "is_enable": true,
+      "is_visible": true,
+      "is_excluded": false,
+      "eq_type": "virtual",
+      "generic_type": null,
+      "status": {
+        "timeout": 0
+      },
+      "cmds": [
+        {
+          "id": 5986,
+          "name": "Branche",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "1"
+        },
+        {
+          "id": 5988,
+          "name": "Connecte",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "1"
+        },
+        {
+          "id": 5987,
+          "name": "Charge",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "0"
+        },
+        {
+          "id": 5997,
+          "name": "Charge On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 5998,
+          "name": "Charge Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 6009,
+          "name": "Charge solaire",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "1"
+        },
+        {
+          "id": 5999,
+          "name": "Charge solaire On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 6001,
+          "name": "Charge solaire Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 6010,
+          "name": "Charge manuelle",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "0"
+        },
+        {
+          "id": 6000,
+          "name": "Charge manuelle On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 6021,
+          "name": "Charge manuelle Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 5991,
+          "name": "Puissance",
+          "type": "info",
+          "sub_type": "numeric",
+          "generic_type": "GENERIC_INFO",
+          "unit": "W",
+          "current_value": "1200"
+        },
+        {
+          "id": 5992,
+          "name": "Energie session",
+          "type": "info",
+          "sub_type": "numeric",
+          "generic_type": "GENERIC_INFO",
+          "unit": "Wh",
+          "current_value": "42"
+        },
+        {
+          "id": 5993,
+          "name": "Energie jour",
+          "type": "info",
+          "sub_type": "numeric",
+          "generic_type": "GENERIC_INFO",
+          "unit": "Wh",
+          "current_value": "84"
+        },
+        {
+          "id": 5989,
+          "name": "Etat connecteur",
+          "type": "info",
+          "sub_type": "string",
+          "generic_type": "GENERIC_INFO"
+        },
+        {
+          "id": 5990,
+          "name": "Mode de charge",
+          "type": "info",
+          "sub_type": "string",
+          "generic_type": "GENERIC_INFO"
+        },
+        {
+          "id": 5994,
+          "name": "Derniere MAJ",
+          "type": "info",
+          "sub_type": "string",
+          "generic_type": "GENERIC_INFO"
+        },
+        {
+          "id": 5995,
+          "name": "Source",
+          "type": "info",
+          "sub_type": "string",
+          "generic_type": "GENERIC_INFO"
+        },
+        {
+          "id": 5996,
+          "name": "Diagnostic",
+          "type": "info",
+          "sub_type": "string",
+          "generic_type": "GENERIC_INFO"
+        },
+        {
+          "id": 6003,
+          "name": "action_ev",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": null
+        },
+        {
+          "id": 6002,
+          "name": "Rafraichir",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": null
+        }
+      ]
+    },
+    {
+      "id": 628,
+      "name": "Pilotage priorisation solaire",
+      "object_id": 1,
+      "is_enable": true,
+      "is_visible": true,
+      "is_excluded": false,
+      "eq_type": "virtual",
+      "generic_type": null,
+      "status": {
+        "timeout": 0
+      },
+      "cmds": [
+        {
+          "id": 5977,
+          "name": "Filtration piscine",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "1"
+        },
+        {
+          "id": 5978,
+          "name": "Filtration piscine On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 5979,
+          "name": "Filtration piscine Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 5980,
+          "name": "Chauffage piscine",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "0"
+        },
+        {
+          "id": 5981,
+          "name": "Chauffage piscine On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 5982,
+          "name": "Chauffage piscine Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 5983,
+          "name": "Chauffage SPA",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "0"
+        },
+        {
+          "id": 5984,
+          "name": "Chauffage SPA On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 5985,
+          "name": "Chauffage SPA Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 6004,
+          "name": "Charge voiture",
+          "type": "info",
+          "sub_type": "binary",
+          "generic_type": "SWITCH_STATE",
+          "current_value": "1"
+        },
+        {
+          "id": 6005,
+          "name": "Charge voiture On",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_ON"
+        },
+        {
+          "id": 6006,
+          "name": "Charge voiture Off",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": "SWITCH_OFF"
+        },
+        {
+          "id": 5976,
+          "name": "Rafraichir",
+          "type": "action",
+          "sub_type": "other",
+          "generic_type": null
+        }
+      ]
+    },
+    {
+      "cmds": [
+        {
           "generic_type": "LIGHT_ON",
           "id": 10001,
           "name": "LIGHT_ON",
@@ -1180,6 +1768,41 @@
     {
       "cmds": [
         {
+          "generic_type": "PRESENCE",
+          "id": 97001,
+          "name": "PRESENCE",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "SET_ON",
+          "id": 97002,
+          "name": "Présent",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "SET_OFF",
+          "id": 97003,
+          "name": "Absent",
+          "sub_type": "other",
+          "type": "action"
+        }
+      ],
+      "eq_type": "mobile",
+      "id": 9700,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "iPhone Alex 9700",
+      "object_id": 1,
+      "status": {
+        "timeout": 0
+      }
+    },
+    {
+      "cmds": [
+        {
           "generic_type": "GENERIC_INFO",
           "id": 100001,
           "name": "État",
@@ -1404,60 +2027,6 @@
       "is_excluded": false,
       "is_visible": true,
       "name": "Alarme maison 12000",
-      "object_id": 1,
-      "status": {}
-    },
-    {
-      "cmds": [
-        {
-          "generic_type": "ALARM_ENABLE_STATE",
-          "id": 23001,
-          "name": "Etat activation",
-          "sub_type": "binary",
-          "type": "info"
-        },
-        {
-          "generic_type": "ALARM_STATE",
-          "id": 23002,
-          "name": "Etat alarme",
-          "sub_type": "binary",
-          "type": "info"
-        },
-        {
-          "generic_type": "ALARM_ARMED",
-          "id": 23003,
-          "name": "Armer",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_RELEASED",
-          "id": 23004,
-          "name": "Desactiver",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_SET_MODE",
-          "id": 23005,
-          "name": "Mode",
-          "sub_type": "other",
-          "type": "action"
-        },
-        {
-          "generic_type": "ALARM_MODE",
-          "id": 23006,
-          "name": "Mode courant",
-          "sub_type": "string",
-          "type": "info"
-        }
-      ],
-      "eq_type": "alarm",
-      "id": 230,
-      "is_enable": true,
-      "is_excluded": false,
-      "is_visible": true,
-      "name": "Alarme maison",
       "object_id": 1,
       "status": {}
     }

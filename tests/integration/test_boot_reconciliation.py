@@ -383,7 +383,7 @@ class TestBootRetypageReconciliation:
 
         # Pending unpublish must be populated for eq_id
         pending = http_app["pending_discovery_unpublish"]
-        assert pending.get(eq_id) == "light", (
+        assert pending.get(eq_id) == {"entity_type": "light", "node_ids": []}, (
             f"Expected pending unpublish for eq_id={eq_id} with 'light'. Got: {pending}"
         )
 

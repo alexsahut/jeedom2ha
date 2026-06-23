@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -237,7 +238,7 @@ def _build_canonical_snapshot(sync_response: dict, diagnostics_response: dict, a
 
 def _assert_corpus_shape(sync_payload: dict) -> None:
     eq_ids = {eq["id"] for eq in sync_payload["eq_logics"]}
-    assert len(eq_ids) == 53  # +3 thermostats Story 10.2 (11000, 11001, 11002) +1 alarm Story 10.3 (12000) +1 alarm natif Story 10.5 (230)
+    assert len(eq_ids) == 58  # +3 thermostats Story 10.2 (11000, 11001, 11002) +1 alarm Story 10.3 (12000) +1 alarm natif Story 10.5 (230) +1 presence_switch Story 10.7 (9700) +1 MSunPV multi-sensor Story 11.1 (553) +1 chauffe-eau multi-domaine Story 11.2 (554) +2 SWITCH_* multi-switch Story 11.3 (583, 628)
 
     assert len([i for i in eq_ids if 1000 <= i <= 1009]) == 10
     assert len([i for i in eq_ids if 2000 <= i <= 2007]) == 8
@@ -252,6 +253,10 @@ def _assert_corpus_shape(sync_payload: dict) -> None:
     assert len([i for i in eq_ids if 11000 <= i <= 11002]) == 3  # thermostats Story 10.2
     assert len([i for i in eq_ids if 12000 <= i <= 12000]) == 1  # alarm Story 10.3
     assert 230 in eq_ids  # alarm natif Jeedom Story 10.5 (ALARM_ARMED / ALARM_RELEASED)
+    assert 553 in eq_ids  # MSunPV / RouteurSolaire multi-sensor Story 11.1
+    assert 554 in eq_ids  # Chauffe-eau multi-domaine (switch+sensor+binary) Story 11.2
+    assert 583 in eq_ids  # IQ EV Charger multi-domaine + 3 switches Story 11.3
+    assert 628 in eq_ids  # Pilotage priorisation solaire 4 switches Story 11.3
 
 
 async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):
@@ -303,8 +308,14 @@ async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):
 
     current_snapshot = _build_canonical_snapshot(sync_json, diagnostics_json, app)
 
-    expected_text = json.dumps(expected_snapshot, indent=2, sort_keys=True) + "\n"
     current_text = json.dumps(current_snapshot, indent=2, sort_keys=True) + "\n"
+
+    # Régénération volontaire du golden (corpus étendu) — désactivée par défaut.
+    if os.environ.get("GOLDEN_REGEN") == "1":
+        EXPECTED_SNAPSHOT_PATH.write_text(current_text, encoding="utf-8")
+        return
+
+    expected_text = json.dumps(expected_snapshot, indent=2, sort_keys=True) + "\n"
 
     if current_text != expected_text:
         diff = "\n".join(

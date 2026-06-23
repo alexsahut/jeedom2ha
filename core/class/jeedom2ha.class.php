@@ -360,6 +360,12 @@ class jeedom2ha extends eqLogic {
         }
 
         log::add(__CLASS__, 'info', '[SYNC] Runtime bootstrap startup sync succeeded');
+        // Story 12.1 — (ré)enregistre les listeners de streaming d'état sur le périmètre publié.
+        try {
+          self::syncStateListeners();
+        } catch (\Throwable $e) {
+          log::add(__CLASS__, 'warning', '[STATE-LISTENER] Enregistrement post-bootstrap échoué : ' . $e->getMessage());
+        }
         return array('status' => 'success', 'reason' => 'sync_completed');
       }
 
@@ -371,6 +377,95 @@ class jeedom2ha extends eqLogic {
 
       usleep(min($pollMicros, $remainingMicros));
     }
+  }
+
+  /**
+   * Story 12.1 (vague 1, R1) — (ré)enregistre les listeners Jeedom de streaming d'état.
+   *
+   * Source autoritative : le daemon (/system/state_listeners) renvoie l'ensemble exact
+   * des cmds info sensor/binary_sensor publiées en discovery. On écoute UNIQUEMENT
+   * celles-ci (state ⊆ discovery, AC#5) : un listener par cmd, callback stateListener().
+   * Les listeners précédents de cette classe/fonction sont purgés puis recréés à neuf
+   * pour rester alignés sur le périmètre publié courant. À appeler après chaque sync OK.
+   *
+   * @return int nombre de listeners enregistrés
+   */
+  public static function syncStateListeners(?callable $_targetsFetcher = null): int {
+    foreach (listener::byClass(__CLASS__) as $existing) {
+      if ($existing->getFunction() === 'stateListener') {
+        $existing->remove();
+      }
+    }
+
+    $fetcher = $_targetsFetcher ?: function() {
+      return self::callDaemon('/system/state_listeners', null, 'GET', 15);
+    };
+
+    try {
+      $response = $fetcher();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Cibles indisponibles : ' . $e->getMessage());
+      return 0;
+    }
+
+    if (!is_array($response) || ($response['status'] ?? null) !== 'ok' || !isset($response['listeners']) || !is_array($response['listeners'])) {
+      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Contrat state_listeners indisponible — aucun listener enregistré');
+      return 0;
+    }
+
+    $count = 0;
+    foreach ($response['listeners'] as $target) {
+      if (!is_array($target) || !isset($target['cmd_id'])) {
+        continue;
+      }
+      $cmd_id = intval($target['cmd_id']);
+      if ($cmd_id <= 0) {
+        continue;
+      }
+      $listener = new listener();
+      $listener->setClass(__CLASS__);
+      $listener->setFunction('stateListener');
+      $listener->setOption('eq_id', intval($target['eq_id'] ?? 0));
+      $listener->setOption('cmd_id', $cmd_id);
+      $listener->addEvent($cmd_id);
+      $listener->save();
+      $count++;
+    }
+
+    log::add(__CLASS__, 'info', '[STATE-LISTENER] ' . $count . ' listener(s) état (re)enregistré(s)');
+    return $count;
+  }
+
+  /**
+   * Story 12.1 (vague 1) — callback listener : pousse la nouvelle valeur d'une cmd info
+   * publiée vers le daemon (/action/state_update), qui la republie sur le state_topic
+   * déclaré en discovery. Aucune reconstruction de topic ici : le daemon est autoritatif.
+   *
+   * $_options : fourni par le core Jeedom — event_id (= cmd_id), value, plus nos options
+   * custom eq_id/cmd_id posées à l'enregistrement.
+   */
+  public static function stateListener($_options) {
+    $cmd_id = intval($_options['cmd_id'] ?? ($_options['event_id'] ?? 0));
+    if ($cmd_id <= 0) {
+      return;
+    }
+    $eq_id = intval($_options['eq_id'] ?? 0);
+    if ($eq_id <= 0) {
+      $cmd = cmd::byId($cmd_id);
+      if (is_object($cmd)) {
+        $eq_id = intval($cmd->getEqLogic_id());
+      }
+    }
+    if ($eq_id <= 0) {
+      return;
+    }
+    $value = array_key_exists('value', $_options) ? $_options['value'] : null;
+
+    self::callDaemon('/action/state_update', array(
+      'eq_id'  => $eq_id,
+      'cmd_id' => $cmd_id,
+      'value'  => $value,
+    ), 'POST');
   }
 
   public static function deamon_stop() {

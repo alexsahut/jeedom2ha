@@ -21,6 +21,7 @@ from jeedomdaemon.base_config import BaseConfig
 
 from transport.http_server import create_app, start_server, stop_server
 from sync.command import CommandSynchronizer
+from sync.state import StateSynchronizer
 from cache.disk_cache import load_publications_cache
 
 # Résoudre le répertoire data/ relatif au daemon (data/ est un sibling de resources/)
@@ -144,6 +145,13 @@ class Jeedom2haDaemon(BaseDaemon):
             request_timeout=2.0,
         )
         self._app["command_synchronizer"] = self._command_synchronizer
+        # Story 12.1 — streaming d'état Jeedom → HA (vague 1 sensor/binary_sensor).
+        # Le bridge est un objet stable créé dans create_app ; is_connected bascule
+        # à la connexion. CommandSynchronizer consulte app["state_synchronizer"].
+        self._app["state_synchronizer"] = StateSynchronizer(
+            app=self._app,
+            mqtt_bridge=self._app.get("mqtt_bridge"),
+        )
         mqtt_bridge = self._app.get("mqtt_bridge")
         if mqtt_bridge is not None:
             mqtt_bridge.set_command_handler(self._command_synchronizer.handle_command_message)

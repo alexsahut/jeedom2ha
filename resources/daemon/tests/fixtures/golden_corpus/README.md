@@ -1,7 +1,8 @@
-# Golden Corpus Story 8.4 / 9.1 / 9.2
+# Golden Corpus Story 8.4 / 9.1 / 9.2 / 10.7
 
-Ce corpus fige 40 eqLogics deterministes pour le gate de non-regression Story 8.4,
-l'extension sensor Story 9.1, et l'extension binary_sensor Story 9.2.
+Ce corpus fige 54 eqLogics deterministes pour le gate de non-regression Story 8.4,
+l'extension sensor Story 9.1, l'extension binary_sensor Story 9.2,
+et l'extension presence_switch Story 10.7.
 
 ## Repartition normative
 
@@ -63,6 +64,8 @@ l'extension sensor Story 9.1, et l'extension binary_sensor Story 9.2.
 - `8002`: binary_sensor fumee (`SMOKE`) -> `device_class=smoke`, objet Salon
 - `8003`: binary_sensor inondation (`FLOOD`) -> `device_class=moisture`, objet Garage
 - `8004`: binary_sensor serrure (`LOCK_STATE`) -> `device_class=lock`, objet Chambre
+
+- `9700`: presence_switch (`PRESENCE` + `SET_ON` + `SET_OFF`) -> `switch` (Story 10.7), objet Salon
 
 ## Stabilite
 

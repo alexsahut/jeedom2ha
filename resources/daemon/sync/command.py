@@ -16,6 +16,7 @@ from models.mapping import MappingResult, PublicationDecision
 _LOGGER = logging.getLogger(__name__)
 
 _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
+_NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
@@ -27,6 +28,7 @@ class ParsedTopic:
 
     eq_id: int
     channel: str
+    cmd_id: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,14 @@ class CommandSynchronizer:
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="set"), None
 
+        match = _NODE_SET_TOPIC_RE.match(topic)
+        if match:
+            return ParsedTopic(
+                eq_id=int(match.group("eq_id")),
+                channel="set",
+                cmd_id=int(match.group("cmd_id")),
+            ), None
+
         match = _BRIGHTNESS_TOPIC_RE.match(topic)
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="brightness"), None
@@ -195,17 +205,19 @@ class CommandSynchronizer:
                 continue
             found_alive = True
 
-            expected_topics = self._expected_command_topics(mapping)
-            if topic not in expected_topics.values():
-                continue
+            for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
+                candidate_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                expected_topics = self._expected_command_topics(candidate)
+                if topic not in expected_topics.values():
+                    continue
 
-            if (
-                bool(getattr(decision, "local_availability_supported", False))
-                and str(getattr(decision, "local_availability_state", "")).lower() == AVAILABILITY_OFFLINE
-            ):
-                return None, None, "entity_unavailable"
+                if (
+                    bool(getattr(candidate_decision, "local_availability_supported", False))
+                    and str(getattr(candidate_decision, "local_availability_state", "")).lower() == AVAILABILITY_OFFLINE
+                ):
+                    return None, None, "entity_unavailable"
 
-            return decision, mapping, None
+                return candidate_decision, candidate, None
 
         if not found_eq:
             return None, None, "unknown_runtime_entity"
@@ -220,7 +232,13 @@ class CommandSynchronizer:
         topics: Dict[str, str] = {}
 
         if mapping.ha_entity_type in ("light", "switch", "cover"):
-            topics["set"] = f"jeedom2ha/{eq_id}/set"
+            reason_details = mapping.reason_details or {}
+            command_topic = reason_details.get("command_topic")
+            topics["set"] = (
+                command_topic
+                if isinstance(command_topic, str) and command_topic
+                else f"jeedom2ha/{eq_id}/set"
+            )
 
         if mapping.ha_entity_type == "light" and bool(getattr(mapping.capabilities, "has_brightness", False)):
             topics["brightness"] = f"jeedom2ha/{eq_id}/brightness/set"
@@ -245,9 +263,11 @@ class CommandSynchronizer:
                 if payload_upper not in ("ON", "OFF"):
                     return None, "invalid_command_payload"
                 if payload_upper == "ON":
-                    cmd = commands.get("LIGHT_ON") or commands.get("ENERGY_ON")
+                    cmd = (commands.get("LIGHT_ON") or commands.get("ENERGY_ON")
+                           or commands.get("SWITCH_ON") or commands.get("SET_ON"))
                 else:
-                    cmd = commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF")
+                    cmd = (commands.get("LIGHT_OFF") or commands.get("ENERGY_OFF")
+                           or commands.get("SWITCH_OFF") or commands.get("SET_OFF"))
                 if cmd is None:
                     return None, "missing_action_command"
                 try:
@@ -354,9 +374,15 @@ class CommandSynchronizer:
         if not self._is_state_sync_active(state_sync):
             return False
 
+        # Scope-aware (Story 12.2): a type the synchronizer does NOT stream must not
+        # be treated as reliable, else its optimistic publish is suppressed while no
+        # real state ever arrives (regression). vague 2 streams switch only.
+        if not self._state_sync_streams_type(state_sync, mapping.ha_entity_type):
+            return False
+
         commands = mapping.commands or {}
         if mapping.ha_entity_type in ("light", "switch"):
-            for key in ("LIGHT_STATE", "ENERGY_STATE"):
+            for key in ("LIGHT_STATE", "ENERGY_STATE", "SWITCH_STATE", "PRESENCE"):
                 cmd = commands.get(key)
                 if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
                     return True
@@ -370,6 +396,23 @@ class CommandSynchronizer:
             return False
 
         return False
+
+    @staticmethod
+    def _state_sync_streams_type(state_sync: Any, ha_type: Any) -> bool:
+        """Whether the state sync actually streams reliable state for ``ha_type``.
+
+        Backward-compatible: a synchronizer without ``streams_actionable_type``
+        (older or fake services) keeps the prior behavior (an active sync is treated
+        as reliable for the type). The real ``StateSynchronizer`` (Story 12.2)
+        returns True for ``switch`` only, so light/cover keep their optimistic path.
+        """
+        checker = getattr(state_sync, "streams_actionable_type", None)
+        if not callable(checker):
+            return True
+        try:
+            return bool(checker(ha_type))
+        except Exception:
+            return False
 
     def _is_state_sync_active(self, state_sync: Any) -> bool:
         """Return True only when a state sync service is really active and usable."""
