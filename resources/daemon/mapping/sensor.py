@@ -70,6 +70,31 @@ _UNIT_DEVICE_CLASS: Dict[str, str] = {
 }
 
 
+def _derive_state_class(device_class: Optional[str], unit_of_measurement: Optional[str]) -> Optional[str]:
+    if device_class == "power" and unit_of_measurement == "W":
+        return "measurement"
+    if device_class == "energy" and unit_of_measurement in {"Wh", "kWh"}:
+        return "total_increasing"
+    return None
+
+
+def _sensor_reason_details(
+    device_class: Optional[str],
+    unit_of_measurement: Optional[str],
+    extra: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
+    details: Dict[str, object] = {
+        "device_class": device_class,
+        "unit_of_measurement": unit_of_measurement,
+    }
+    state_class = _derive_state_class(device_class, unit_of_measurement)
+    if state_class is not None:
+        details["state_class"] = state_class
+    if extra:
+        details.update(extra)
+    return details
+
+
 def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
     if (cmd.type or "").lower() != "info":
         return False
@@ -138,10 +163,7 @@ class SensorMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands={generic_type: cmd},
                 capabilities=SensorCapabilities(has_state=True),
-                reason_details={
-                    "device_class": device_class,
-                    "unit_of_measurement": unit_of_measurement,
-                },
+                reason_details=_sensor_reason_details(device_class, unit_of_measurement),
             )
 
         return None
@@ -167,14 +189,16 @@ class SensorMapper:
                     suggested_area=suggested_area,
                     commands={str(cmd.id): cmd},
                     capabilities=SensorCapabilities(has_state=True),
-                    reason_details={
-                        "device_class": device_class,
-                        "unit_of_measurement": unit_of_measurement,
-                        "cmd_id": cmd.id,
-                        "object_id": f"jeedom2ha_{eq.id}_{cmd.id}",
-                        "node_id": f"jeedom2ha_{eq.id}_{cmd.id}",
-                        "state_topic": f"jeedom2ha/{eq.id}/{cmd.id}/state",
-                    },
+                    reason_details=_sensor_reason_details(
+                        device_class,
+                        unit_of_measurement,
+                        {
+                            "cmd_id": cmd.id,
+                            "object_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                            "node_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                            "state_topic": f"jeedom2ha/{eq.id}/{cmd.id}/state",
+                        },
+                    ),
                 )
             )
 

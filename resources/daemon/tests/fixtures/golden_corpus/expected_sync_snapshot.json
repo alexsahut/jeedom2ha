@@ -13610,6 +13610,7 @@
           "device_class": "power",
           "node_id": "jeedom2ha_553_5138",
           "object_id": "jeedom2ha_553_5138",
+          "state_class": "measurement",
           "state_topic": "jeedom2ha/553/5138/state",
           "unit_of_measurement": "W"
         },
@@ -14068,6 +14069,7 @@
         "reason_code": "sensor_power",
         "reason_details": {
           "device_class": "power",
+          "state_class": "measurement",
           "unit_of_measurement": "W"
         },
         "suggested_area": "Salon"

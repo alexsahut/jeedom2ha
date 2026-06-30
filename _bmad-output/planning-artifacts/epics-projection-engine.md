@@ -7,6 +7,7 @@ inputDocuments:
   - '_bmad-output/planning-artifacts/epic-5-lifecycle-matrix.md'
   - '_bmad-output/planning-artifacts/sprint-change-proposal-2026-06-07.md'
   - '_bmad-output/planning-artifacts/homebridge-homekit-vs-ha-delta-2026-06-07.md'
+  - '_bmad-output/planning-artifacts/sprint-change-proposal-2026-06-30-energy-dashboard-ha.md'
 workflowType: 'epic_planning'
 workflow: 'create-epics-and-stories'
 project: 'jeedom2ha'
@@ -190,6 +191,7 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 | FR26-FR30 | Epic 5 | Feature 5 — Publication MQTT orchestrée |
 | FR31-FR35 | Epic 6 | Feature 6 — Diagnostic explicable et actionnable |
 | FR46-FR50 | pe-epic-12 | Feature 9 — Restitution d'état runtime Jeedom → HA |
+| Energy HA statistics / W-kWh auto-discovery | pe-epic-13 | SCP 2026-06-30 — Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh |
 
 **NFR coverage :**
 
@@ -458,6 +460,27 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 - event-driven, sans source de vérité concurrente à Jeedom (NFR6/NFR13) ;
 - vague 1 = `sensor` + `binary_sensor` ; les domaines actionnables (`switch`, `climate`, …) sont des vagues ultérieures gouvernées ;
 - gate terrain de clôture = les capteurs eq553 (« tension réseau ») ne sont plus en état `unknown` sur la box réelle.
+
+### Epic 13 — Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh
+
+**Valeur utilisateur :** L'utilisateur peut exploiter dans Home Assistant les puissances et energies deja presentes dans Jeedom pour construire un dashboard Energie utile : suivi des gros consommateurs, integration Riemann cote HA si necessaire, et conservation des entites actionnables existantes.
+
+**Résultat observable :** Les sensors power/energy publies portent les metadonnees statistiques HA attendues (`device_class`, `unit_of_measurement`, `state_class`). Les commandes numeriques W/Wh/kWh fiables peuvent etre publiees meme sans `generic_type`. Les prises mesureuses gardent leur switch primaire historique et exposent leurs mesures W/kWh en sensors secondaires. La documentation et les versions refletent le comportement reel.
+
+**Source de décision :** `sprint-change-proposal-2026-06-30-energy-dashboard-ha.md` approuve le 2026-06-30.
+
+**Stories prévues :**
+
+- Story 13.1 — HA Energy metadata pour sensors power/energy.
+- Story 13.2 — Auto-decouverte par unite W/Wh/kWh hors MSunPV.
+- Story 13.3 — Capteurs secondaires pour prises mesureuses commandables.
+- Story 13.4 — Documentation, versions et handoff produit/terrain.
+
+**Invariants à porter en stories :**
+- pas de conversion W -> kWh dans jeedom2ha ; l'integration temporelle reste cote Home Assistant ;
+- pas de modification Jeedom, pas de creation d'historique retroactif et pas de renommage d'entite primaire existante ;
+- toute augmentation du nombre d'entites publiees doit conserver les `unique_id` historiques des entites primaires ;
+- le futur mapping configurable / overrides manuels reste separe et devra etre renumerote/rebase avant usage.
 
 ---
 
@@ -1876,3 +1899,28 @@ Story de maintenance documentaire ajoutée par `sprint-change-proposal-2026-06-2
 - event-driven, aucune source de vérité concurrente à Jeedom (NFR6/NFR13) ;
 - vagues bornées et séquencées : vague 1 (12.1) = `sensor` + `binary_sensor` ; vague 2 (12.2) = `switch` + `button` ; domaines suivants (`climate`, …) = vagues ultérieures gouvernées (FR49) ; aucune vague n'ouvre un domaine hors `PRODUCT_SCOPE` ;
 - gate terrain de clôture epic = sur la box réelle, les capteurs eq553 ne sont plus en état `unknown` ; non-régression de la discovery existante.
+
+---
+
+## Epic 13 — Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh
+
+Nouvel epic ajoute par `sprint-change-proposal-2026-06-30-energy-dashboard-ha.md` approuve le 2026-06-30. Il transforme les capteurs puissance/energie deja presents dans Jeedom en sources exploitables par Home Assistant Energy, sans reouvrir les epics 9/11/12 et sans attendre le futur mapping configurable.
+
+### Story 13.1 — HA Energy metadata pour sensors power/energy
+Ajouter les metadonnees HA statistiques aux sensors eligibles : `state_class=measurement` pour la puissance instantanee (`power`, W/kW) et `state_class=total_increasing` pour l'energie cumulative fiable (`energy`, Wh/kWh). La valeur et l'unite Jeedom restent brutes ; aucune conversion n'est faite dans le daemon.
+
+### Story 13.2 — Auto-decouverte par unite W/Wh/kWh pour commandes non taguees
+Publier les commandes info numeric non taguees quand leur unite (`W`, `kW`, `Wh`, `kWh`) suffit a etablir une classe HA fiable. Cette story generalise le chemin hors MSunPV sans rendre eligibles les unites ambigues ni contourner les exclusions existantes.
+
+### Story 13.3 — Mesures secondaires sur prises mesureuses commandables
+Conserver le switch primaire historique d'une prise commandable et ajouter ses mesures W/Wh/kWh comme sensors secondaires sous le meme device HA. Une seule mesure W doit suffire a creer un sensor secondaire ; les commandes de readback consommees par le switch ne doivent pas etre dupliquees en sensor.
+
+### Story 13.4 — Documentation, versions et handoff produit/terrain
+Aligner README, versions et handoff terrain avec le comportement livre : sensors power/energy supportes, limite explicite "pas de conversion W -> kWh dans jeedom2ha", usage attendu de l'integration Riemann/dashboard Energy HA, et convention de version coherente.
+
+### Gates epic-level pe-epic-13
+- le workflow BMAD reste strict : `create-story -> dev-story -> code-review` pour chaque story ;
+- aucune story de dev n'est creee par l'application du SCP ; la prochaine action est `create-story` sur 13.1 ;
+- les entites primaires historiques conservent leurs `unique_id` et `entity_id` attendus ;
+- les nouveaux sensors power/energy publies sont utilisables par les statistiques long-terme HA ou par l'integration Riemann ;
+- aucune conversion W -> kWh, aucune modification Jeedom, aucun historique retroactif cree par le daemon.

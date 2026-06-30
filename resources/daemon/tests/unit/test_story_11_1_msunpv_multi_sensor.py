@@ -149,10 +149,13 @@ def test_msunpv_unit_inference_for_commands_without_generic_type():
     # W -> power, Wh -> energy, % -> pas de device_class (honnête, pas de classe HA fiable)
     assert mappings[5138].reason_details["device_class"] == "power"
     assert mappings[5138].reason_details["unit_of_measurement"] == "W"
+    assert mappings[5138].reason_details["state_class"] == "measurement"
     assert mappings[5171].reason_details["device_class"] == "energy"
     assert mappings[5171].reason_details["unit_of_measurement"] == "Wh"
+    assert mappings[5171].reason_details["state_class"] == "total_increasing"
     assert mappings[5139].reason_details["device_class"] is None
     assert mappings[5139].reason_details["unit_of_measurement"] == "%"
+    assert "state_class" not in mappings[5139].reason_details
 
 
 def test_msunpv_only_info_numeric_no_action_command_created():
