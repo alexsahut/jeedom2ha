@@ -517,6 +517,7 @@ class DiscoveryPublisher:
         reason_details = mapping.reason_details or {}
         device_class = reason_details.get("device_class")
         unit_of_measurement = reason_details.get("unit_of_measurement")
+        state_class = reason_details.get("state_class")
         object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
         state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
@@ -538,6 +539,8 @@ class DiscoveryPublisher:
             payload["device_class"] = device_class
         if unit_of_measurement is not None:
             payload["unit_of_measurement"] = unit_of_measurement
+        if state_class is not None:
+            payload["state_class"] = state_class
 
         return payload
 

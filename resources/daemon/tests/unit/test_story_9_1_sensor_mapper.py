@@ -86,6 +86,7 @@ def test_sensor_mapper_power_nominal():
     assert mapping.reason_details == {
         "device_class": "power",
         "unit_of_measurement": "W",
+        "state_class": "measurement",
     }
 
 
