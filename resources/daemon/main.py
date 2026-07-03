@@ -29,7 +29,7 @@ _DAEMON_DATA_DIR = os.path.normpath(os.path.join(_DAEMON_DIR, "..", "..", "data"
 
 _LOGGER = logging.getLogger(__name__)
 
-_VERSION = "0.1.0"
+_VERSION = "0.2.0"
 
 
 async def _boot_watchdog(app: dict, timeout_s: float = 90.0) -> None:

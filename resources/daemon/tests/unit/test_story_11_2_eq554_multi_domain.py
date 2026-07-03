@@ -225,8 +225,8 @@ def test_binary_sensor_identity_is_per_command():
 # ---------------------------------------------------------------------------
 
 
-def test_other_virtual_eq_is_not_multi_domain():
-    """Un autre eqLogic virtual avec ENERGY_* reste un simple switch mono-entité."""
+def test_other_virtual_eq_with_single_power_measure_gets_secondary_sensor():
+    """Story 13.3 : ENERGY_* + une mesure W publie le switch puis le sensor."""
     eq = JeedomEqLogic(
         id=9001,
         name="Prise garage",
@@ -240,8 +240,11 @@ def test_other_virtual_eq_is_not_multi_domain():
         ],
     )
     results = MapperRegistry().map_all(eq, _snapshot(eq))
-    assert len(results) == 1
+    assert len(results) == 2
     assert results[0].ha_entity_type == "switch"
+    assert results[0].ha_unique_id == "jeedom2ha_eq_9001"
+    assert results[1].ha_entity_type == "sensor"
+    assert results[1].ha_unique_id == "jeedom2ha_eq_9001_cmd_90014"
 
 
 def test_non_554_sensor_mapper_stays_mono():

@@ -11,6 +11,7 @@ jeedom2ha est un plugin Jeedom avec démon Python qui expose automatiquement vos
 - **Discovery automatique** : publie vos équipements Jeedom vers Home Assistant via MQTT Discovery (device discovery mode). Home Assistant les intègre sans configuration manuelle.
 - **Synchronisation des états en temps réel** : les changements d'état Jeedom (allumage, position volet, état switch…) remontent dans HA en continu, sur le périmètre publié (lumières, volets, prises).
 - **Pilotage bidirectionnel** : les commandes HA (allumer une lumière, fermer un volet, activer une prise) sont exécutées dans Jeedom avec retour d'état honnête.
+- **Capteurs et énergie HA** : publie les capteurs `sensor` / `binary_sensor`, les mesures de puissance et d'énergie, et les métadonnées Home Assistant utiles aux statistiques (`device_class`, `unit_of_measurement`, `state_class`).
 - **Diagnostic intégré** : l'interface explique pourquoi un équipement est publié, non publié, ou ambigu — avec des pistes de remédiation.
 - **Filtrage et exclusions** : excluez des plugins entiers, des pièces Jeedom, ou des équipements individuels. Politique de confiance configurable (sûr uniquement / sûr + probable).
 - **Auto-détection MQTT Manager** : si le plugin MQTT Manager (mqtt2) est installé, la configuration broker est pré-remplie automatiquement.
@@ -24,9 +25,20 @@ jeedom2ha est un plugin Jeedom avec démon Python qui expose automatiquement vos
 | Lumières couleur RGB | + `LIGHT_COLOR` | `light` (avec color) |
 | Volets / stores | `FLAP_STATE` + commandes | `cover` |
 | Prises / interrupteurs | `ENERGY_STATE` + `ENERGY_ON`/`ENERGY_OFF` | `switch` |
+| Capteurs numériques simples | `TEMPERATURE`, `HUMIDITY`, `POWER`, unités `W`/`Wh`/`kWh`, etc. | `sensor` |
+| Capteurs binaires simples | `DOOR_STATE`, `MOTION_STATE`, états binaires compatibles, etc. | `binary_sensor` |
+| Mesures secondaires de prises | Prise commandable + mesure power/energy fiable | `switch` primaire + `sensor` secondaire |
+
+Les capteurs d'énergie exposent les métadonnées Home Assistant quand elles sont connues : `device_class=power` avec `state_class=measurement` pour une puissance instantanée, et `device_class=energy` avec `state_class=total_increasing` pour une énergie cumulative fiable.
+
+### Limites volontaires
+
+- jeedom2ha conserve les valeurs et unités Jeedom brutes : une mesure `W` reste une puissance instantanée en `W`.
+- jeedom2ha ne convertit pas `W` en `kWh`, ne calcule pas d'intégration temporelle et ne crée pas d'historique rétroactif.
+- Pour obtenir des `kWh` à partir d'une puissance `W`, configurez l'intégration Riemann côté Home Assistant ou utilisez directement un capteur d'énergie cumulatif compatible dans le dashboard Energy HA.
+- jeedom2ha ne modifie pas les équipements, commandes ou scénarios Jeedom pendant la publication.
+
 **Ce que le plugin ne fait pas encore :**
-- Capteurs numériques (`TEMPERATURE`, `HUMIDITY`, `POWER`…) → `sensor` : prévu, non implémenté
-- Capteurs binaires (`DOOR_STATE`, `MOTION_STATE`…) → `binary_sensor` : prévu, non implémenté
 - Thermostats / climate
 - Scénarios Jeedom → HA
 - Équipements sans `generic_type` assigné (non publiés, signalés dans le diagnostic)
@@ -157,7 +169,7 @@ Niveaux utiles :
 | Statut | Beta — fonctionnel sur périmètre V1, en développement actif |
 | Auteur | Alexandre SAHUT |
 
-Le plugin est en développement actif. Le mapping des capteurs (sensor / binary_sensor), l'export de diagnostic et la republication automatique après redémarrage broker sont prévus dans les prochaines versions.
+Le plugin est en développement actif. Le périmètre V1 couvre les entités principales, les capteurs `sensor` / `binary_sensor`, le state streaming et les métadonnées HA Energy pour les mesures power/energy. L'export de diagnostic et la republication automatique après redémarrage broker restent prévus dans les prochaines versions.
 
 > **Note restart** : après un redémarrage du démon jeedom2ha (sans redémarrage de Jeedom), les entités redeviennent pilotables automatiquement. Après un redémarrage du broker MQTT, le comportement dépend de la configuration de persistance du broker : si les messages retained sont conservés, Home Assistant retrouve les entités sans action ; sinon, un rescan manuel depuis la configuration est nécessaire.
 

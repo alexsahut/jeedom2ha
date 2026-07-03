@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+import unicodedata
 
 from models.availability import (
     AVAILABILITY_OFFLINE,
@@ -225,18 +226,75 @@ _EXCLUSION_SOURCE_TO_REASON = {
 # commande (mapping multi-sensor borné). Source de vérité unique partagée avec
 # le SensorMapper. Restreint volontairement aux routeurs solaires MSunPV.
 MULTI_SENSOR_EQ_TYPES = frozenset({"msunpv"})
+RELIABLE_UNIT_POWER_SENSOR_UNITS = frozenset({"W"})
+RELIABLE_UNIT_ENERGY_SENSOR_UNITS = frozenset({"Wh", "kWh"})
+RELIABLE_UNIT_SENSOR_UNITS = RELIABLE_UNIT_POWER_SENSOR_UNITS | RELIABLE_UNIT_ENERGY_SENSOR_UNITS
+_CUMULATIVE_ENERGY_NAME_MARKERS = (
+    "24h",
+    "aujourd",
+    "chauffe complete",
+    "chauffe complète",
+    "compteur",
+    "consommation",
+    "cumul",
+    "depuis",
+    "energie",
+    "energy",
+    "hier",
+    "index",
+    "jour",
+    "production",
+    "session",
+    "total",
+)
 
 def _has_numeric_info_command(eq: JeedomEqLogic) -> bool:
     """Vrai si l'eqLogic porte au moins une commande info numérique."""
     for cmd in eq.cmds:
-        if (cmd.type or "").lower() != "info":
-            continue
-        sub_type = (cmd.sub_type or "").lower()
-        if "binary" in sub_type:
-            continue
-        if "numeric" in sub_type:
+        if _is_numeric_info_command(cmd):
             return True
     return False
+
+
+def _is_numeric_info_command(cmd: JeedomCmd) -> bool:
+    if (cmd.type or "").lower() != "info":
+        return False
+    sub_type = (cmd.sub_type or "").lower()
+    if "binary" in sub_type:
+        return False
+    return "numeric" in sub_type
+
+
+def _has_reliable_unit_numeric_info_command(eq: JeedomEqLogic) -> bool:
+    """Vrai si une commande non taguée porte une unité W/Wh/kWh exploitable."""
+    for cmd in eq.cmds:
+        if cmd.generic_type is not None:
+            continue
+        if not _is_numeric_info_command(cmd):
+            continue
+        if is_reliable_unit_sensor_command(cmd):
+            return True
+    return False
+
+
+def is_reliable_unit_sensor_command(cmd: JeedomCmd) -> bool:
+    """Vrai si l'unité suffit à déduire une sémantique sensor HA fiable."""
+    if cmd.unit in RELIABLE_UNIT_POWER_SENSOR_UNITS:
+        return True
+    if cmd.unit in RELIABLE_UNIT_ENERGY_SENSOR_UNITS:
+        return _has_reliable_cumulative_energy_semantics(cmd)
+    return False
+
+
+def _has_reliable_cumulative_energy_semantics(cmd: JeedomCmd) -> bool:
+    """Heuristique bornée : Wh/kWh n'implique energy que pour une mesure cumulée."""
+    name = _normalize_semantic_text(cmd.name or "")
+    return any(marker in name for marker in _CUMULATIVE_ENERGY_NAME_MARKERS)
+
+
+def _normalize_semantic_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return normalized.lower()
 
 
 def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
@@ -259,6 +317,11 @@ def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
     # Vérifie si au moins une commande possède un type générique
     has_generic_type = any(cmd.generic_type is not None for cmd in eq.cmds)
     if not has_generic_type:
+        # Story 13.2 — les sensors W/Wh/kWh non tagués peuvent être mappés par
+        # unité fiable, sans dépendre de l'allowlist multi-sensor.
+        if _has_reliable_unit_numeric_info_command(eq):
+            return EligibilityResult(is_eligible=True, reason_code="eligible", confidence="unknown")
+
         # Story 11.1 — les eqTypes multi-sensor (ex. msunpv) dérivent leurs sensors
         # par commande avec inférence honnête du device_class par unité : ils sont
         # éligibles sans generic_type tant qu'ils portent au moins une commande info

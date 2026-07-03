@@ -1,7 +1,7 @@
 {
 	"id": "jeedom2ha",
 	"name": "Jeedom2HA",
-	"pluginVersion": "0.1",
+	"pluginVersion": "0.2.0",
 	"specialAttributes": {},
 	"description": {
 		"fr_FR": "Plugin de pont Jeedom vers Home Assistant via MQTT Discovery",
