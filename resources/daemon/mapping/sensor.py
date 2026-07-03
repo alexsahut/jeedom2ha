@@ -16,6 +16,7 @@ from models.topology import (
     JeedomCmd,
     JeedomEqLogic,
     TopologySnapshot,
+    is_reliable_unit_sensor_command,
 )
 
 _SENSOR_GENERIC_TYPE_MAP: Dict[str, Tuple[Optional[str], Optional[str]]] = {
@@ -118,6 +119,31 @@ def _has_structural_multi_entity_sensor_shape(eq: JeedomEqLogic) -> bool:
     return has_switch_shape and numeric_count >= 2
 
 
+def _is_actionable_readback_consumed_by_switch(cmd: JeedomCmd, eq: JeedomEqLogic) -> bool:
+    generic_type = cmd.generic_type
+    if generic_type == "ENERGY_STATE":
+        has_action = any(other.generic_type in {"ENERGY_ON", "ENERGY_OFF"} for other in eq.cmds)
+        state_cmds = [other for other in eq.cmds if other.generic_type == "ENERGY_STATE"]
+        return has_action and bool(state_cmds) and state_cmds[-1].id == cmd.id
+    if generic_type == "SWITCH_STATE":
+        key = _switch_group_key(cmd.name)
+        group_types = {
+            other.generic_type
+            for other in eq.cmds
+            if _switch_group_key(other.name) == key
+        }
+        return {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}.issubset(group_types)
+    return False
+
+
+def _switch_group_key(name: str) -> str:
+    normalized = (name or "").strip().lower()
+    normalized = normalized.removesuffix(" on").removesuffix(" off")
+    normalized = normalized.removesuffix("_on").removesuffix("_off")
+    normalized = normalized.removesuffix("-on").removesuffix("-off")
+    return " ".join(normalized.split())
+
+
 class SensorMapper:
     """Mappe un eqLogic Jeedom en HA sensor via type générique Info numeric."""
 
@@ -166,6 +192,40 @@ class SensorMapper:
                 reason_details=_sensor_reason_details(device_class, unit_of_measurement),
             )
 
+        for cmd in eq.cmds:
+            if cmd.generic_type is not None:
+                continue
+            if not _is_numeric_info_command(cmd):
+                continue
+            if not is_reliable_unit_sensor_command(cmd):
+                continue
+
+            device_class, unit_of_measurement = self._derive_sensor_metadata(cmd)
+            if device_class not in {"power", "energy"}:
+                continue
+            reason_code = "sensor_unit_power" if device_class == "power" else "sensor_unit_energy"
+            return MappingResult(
+                ha_entity_type="sensor",
+                confidence="sure",
+                reason_code=reason_code,
+                jeedom_eq_id=eq.id,
+                ha_unique_id=f"jeedom2ha_eq_{eq.id}_cmd_{cmd.id}",
+                ha_name=eq.name,
+                suggested_area=snapshot.get_suggested_area(eq.id),
+                commands={str(cmd.id): cmd},
+                capabilities=SensorCapabilities(has_state=True),
+                reason_details=_sensor_reason_details(
+                    device_class,
+                    unit_of_measurement,
+                    {
+                        "cmd_id": cmd.id,
+                        "object_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                        "node_id": f"jeedom2ha_{eq.id}_{cmd.id}",
+                        "state_topic": f"jeedom2ha/{eq.id}/{cmd.id}/state",
+                    },
+                ),
+            )
+
         return None
 
     def _map_multi_sensor(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
@@ -174,6 +234,8 @@ class SensorMapper:
 
         for cmd in eq.cmds:
             if not _is_numeric_info_command(cmd):
+                continue
+            if _is_actionable_readback_consumed_by_switch(cmd, eq):
                 continue
 
             device_class, unit_of_measurement = self._derive_sensor_metadata(cmd)
@@ -216,5 +278,5 @@ class SensorMapper:
             return _SENSOR_GENERIC_TYPE_MAP[generic_type]
 
         unit = cmd.unit or None
-        device_class = _UNIT_DEVICE_CLASS.get(unit) if unit else None
+        device_class = _UNIT_DEVICE_CLASS.get(unit) if unit and is_reliable_unit_sensor_command(cmd) else None
         return device_class, unit

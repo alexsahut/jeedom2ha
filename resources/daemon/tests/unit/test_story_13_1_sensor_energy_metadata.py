@@ -27,6 +27,7 @@ def _eq_with_cmd(
     unit: str | None,
     current_value: object = None,
     eq_type_name: str = "virtual",
+    cmd_name: str | None = None,
 ) -> JeedomEqLogic:
     return JeedomEqLogic(
         id=eq_id,
@@ -36,7 +37,7 @@ def _eq_with_cmd(
         cmds=[
             JeedomCmd(
                 id=cmd_id,
-                name=f"Cmd {cmd_id}",
+                name=cmd_name or f"Cmd {cmd_id}",
                 generic_type=generic_type,
                 type="info",
                 sub_type="numeric",
@@ -97,6 +98,7 @@ def test_multi_sensor_wh_energy_gets_total_increasing_state_class():
         unit="Wh",
         current_value=9876,
         eq_type_name="msunpv",
+        cmd_name="Production journaliere",
     )
 
     mappings = SensorMapper().map_all(eq, _snapshot(eq))

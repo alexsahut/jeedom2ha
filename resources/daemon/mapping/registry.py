@@ -101,9 +101,21 @@ class MapperRegistry:
         binary_results = self._invoke_mapper(binary_mapper, eq, snapshot)
         secondary_count = len(sensor_results) + len(binary_results)
 
-        if len(switch_results) > 1 or secondary_count > 1:
+        if (
+            len(switch_results) > 1
+            or secondary_count > 1
+            or self._has_power_or_energy_sensor(sensor_results)
+        ):
             return [*switch_results, *sensor_results, *binary_results]
         return []
+
+    @staticmethod
+    def _has_power_or_energy_sensor(results: List[MappingResult]) -> bool:
+        for result in results:
+            reason_details = result.reason_details or {}
+            if reason_details.get("device_class") in {"power", "energy"}:
+                return True
+        return False
 
     @staticmethod
     def _invoke_mapper(
