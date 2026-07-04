@@ -10,17 +10,24 @@ déjà projetées par le `switch` (anti-doublon).
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from models.mapping import MappingResult, SensorCapabilities
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 
 # Story 11.2 — generic_types portés par le switch ; leurs commandes binaires ne
 # doivent jamais être dupliquées en binary_sensor.
+# Story 14.1 — ajout de la famille FAN_* (ex : eq67 pompe filtration piscine),
+# groupée par SwitchMapper au même titre que SWITCH_*.
 _SWITCH_OWNED_GENERIC_TYPES = frozenset({
     "ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF",
     "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF",
+    "FAN_STATE", "FAN_ON", "FAN_OFF",
 })
+
+# Story 14.1 — familles de commandes on/off/state groupées comme des switches
+# structurels (voir mapping/switch.py::_SWITCH_CMD_FAMILIES).
+_SWITCH_CMD_FAMILIES = ("SWITCH", "FAN")
 
 _BINARY_SENSOR_GENERIC_TYPE_MAP: Dict[str, Optional[str]] = {
     "BATTERY_CHARGING": "battery_charging",
@@ -60,8 +67,7 @@ def _is_binary_info_command(cmd: JeedomCmd) -> bool:
 
 
 def _is_multi_domain_eq(eq: JeedomEqLogic) -> bool:
-    switch_types = {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}
-    has_switch_shape = any(cmd.generic_type in switch_types for cmd in eq.cmds)
+    has_switch_shape = any(cmd.generic_type in _SWITCH_OWNED_GENERIC_TYPES for cmd in eq.cmds)
     binary_candidates = [
         cmd for cmd in eq.cmds
         if _is_binary_info_command(cmd) and cmd.generic_type not in _SWITCH_OWNED_GENERIC_TYPES
@@ -72,7 +78,9 @@ def _is_multi_domain_eq(eq: JeedomEqLogic) -> bool:
         and "numeric" in (cmd.sub_type or "").lower()
         and "binary" not in (cmd.sub_type or "").lower()
     )
-    switch_state_count = sum(1 for cmd in eq.cmds if cmd.generic_type in {"SWITCH_STATE", "ENERGY_STATE"})
+    switch_state_count = sum(
+        1 for cmd in eq.cmds if cmd.generic_type in {"SWITCH_STATE", "ENERGY_STATE", "FAN_STATE"}
+    )
     return has_switch_shape and (bool(binary_candidates) or numeric_count >= 2 or switch_state_count >= 2)
 
 
@@ -155,12 +163,21 @@ class BinarySensorMapper:
 
 
 def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
-    """Return state cmd ids consumed by complete ENERGY_*/SWITCH_* switch trios."""
+    """Return state cmd ids consumed by complete ENERGY_*/SWITCH_*/FAN_* switch trios.
+
+    Story 14.1 gate terrain — must mirror SwitchMapper._group_switch_cmds exactly
+    (including its name-mismatch fallback pass), otherwise a FAN_STATE (or any
+    future family) command whose ON/OFF siblings don't share a name prefix would
+    be published as switch by SwitchMapper AND duplicated as binary_sensor here.
+    """
     consumed: set[int] = set()
     energy_state = None
     has_energy_on = False
     has_energy_off = False
-    switch_groups: Dict[str, Dict[str, JeedomCmd]] = {}
+    # Story 14.1 — keyed by (family, name_key) to support several distinct
+    # groups per family (e.g. multiple SWITCH_* trios) and the FAN_* family.
+    switch_groups: Dict[Tuple[str, str], Dict[str, JeedomCmd]] = {}
+    by_family: Dict[str, Dict[str, List[JeedomCmd]]] = {}
 
     for cmd in eq.cmds:
         if cmd.generic_type == "ENERGY_STATE":
@@ -169,16 +186,34 @@ def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
             has_energy_on = True
         elif cmd.generic_type == "ENERGY_OFF":
             has_energy_off = True
-        elif cmd.generic_type in {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}:
-            key = _switch_group_key(cmd.name)
-            switch_groups.setdefault(key, {})[cmd.generic_type] = cmd
+        else:
+            for family in _SWITCH_CMD_FAMILIES:
+                if cmd.generic_type in {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}:
+                    key = (family, _switch_group_key(cmd.name))
+                    switch_groups.setdefault(key, {})[cmd.generic_type] = cmd
+                    by_family.setdefault(family, {}).setdefault(cmd.generic_type, []).append(cmd)
+                    break
 
     if energy_state is not None and has_energy_on and has_energy_off:
         consumed.add(int(energy_state.id))
 
-    for group in switch_groups.values():
-        if {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}.issubset(group):
-            consumed.add(int(group["SWITCH_STATE"].id))
+    families_with_group: set[str] = set()
+    for (family, _key), group in switch_groups.items():
+        required = {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}
+        if required.issubset(group):
+            consumed.add(int(group[f"{family}_STATE"].id))
+            families_with_group.add(family)
+
+    # Fallback pass — mirrors SwitchMapper._group_switch_cmds's name-mismatch
+    # fallback so the readback exclusion set stays exhaustive.
+    for family, type_map in by_family.items():
+        if family in families_with_group:
+            continue
+        state_cmds = [c for c in type_map.get(f"{family}_STATE", []) if int(c.id) not in consumed]
+        on_cmds = type_map.get(f"{family}_ON", [])
+        off_cmds = type_map.get(f"{family}_OFF", [])
+        if len(state_cmds) == 1 and len(on_cmds) == 1 and len(off_cmds) == 1:
+            consumed.add(int(state_cmds[0].id))
 
     return consumed
 

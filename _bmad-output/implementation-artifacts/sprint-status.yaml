@@ -266,3 +266,14 @@ development_status:
   13-2-auto-detection-des-commandes-w-wh-kwh-sans-generic-type: done
   13-3-publier-les-mesures-secondaires-des-prises-mesureuses-commandables: done
   13-4-documentation-versions-et-handoff-terrain-ha-energy: done
+
+  # ==============================================================
+  # pe-epic-14 — Parite generique FAN_* -> switch (pompe filtration piscine)
+  # Ajoute par correct-course 2026-07-04 — signalement ClawBox : eq67/cmd382
+  # (plugin pool, "Filtration", generic_type=FAN_STATE) jamais exporte vers HA
+  # Scope Minor / Direct Adjustment — SCP : sprint-change-proposal-2026-07-04-fan-switch-parity.md
+  # Composant HA cible deja ouvert dans PRODUCT_SCOPE ("switch") — pas de gouvernance FR40/NFR10 a rejouer
+  # Gate de cloture = eq67/cmd382 publie en switch MQTT HA etat non-unknown, zero regression SWITCH_*/ENERGY_* existants
+  # ==============================================================
+  pe-epic-14: done
+  14-1-fan-state-on-off-generalisation-switch-family: done  # gate terrain PASS sur 192.168.1.21 (2e passage) : eq67/cmd382 publie homeassistant/switch/jeedom2ha_67_382/config, etat ON, zero regression eq583/eq628. Correctif fallback single-trio-per-family requis (1er passage gate terrain avait revele des noms de cmd heterogenes non couverts par le groupement par nom) ; 10/10 tests story PASS, 1456 passed suite complete, 24 echecs pre-existants inchanges.
