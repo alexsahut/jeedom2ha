@@ -172,6 +172,64 @@ def test_fan_state_not_duplicated_as_binary_sensor():
 
 
 # ---------------------------------------------------------------------------
+# Gate terrain (eq67 réel, plugin `pool`) — noms de commandes hétérogènes
+# ("Filtration" / "Actif" / "Auto") ne partageant aucun préfixe commun. La
+# heuristique de groupement par nom (_switch_group_key) ne peut pas les
+# apparier ; le fallback single-trio-per-family doit prendre le relais.
+# ---------------------------------------------------------------------------
+
+def _eq_fan_trio_heterogeneous_names(eq_id: int = 67) -> JeedomEqLogic:
+    """Reproduction exacte de la topologie constatée sur la box réelle :
+    cmd382 "Filtration" (FAN_STATE), cmd388 "Actif" (FAN_ON), cmd389 "Auto" (FAN_OFF).
+    """
+    return JeedomEqLogic(
+        id=eq_id,
+        name="Filtration",
+        object_id=1,
+        eq_type_name="pool",
+        cmds=[
+            _cmd(382, "Filtration", "FAN_STATE", "info", "binary"),
+            _cmd(388, "Actif", "FAN_ON", "action", "other"),
+            _cmd(389, "Auto", "FAN_OFF", "action", "other"),
+        ],
+    )
+
+
+def test_fan_trio_with_heterogeneous_names_still_maps_to_switch():
+    """Régression gate terrain 2026-07-04 : sans le fallback, ce trio (noms non
+    apparentés) n'était jamais groupé et cmd382 restait en binary_senson (bug)."""
+    mapper = SwitchMapper()
+    eq = _eq_fan_trio_heterogeneous_names()
+    results = mapper.map_all(eq, _snapshot(eq))
+
+    assert len(results) == 1
+    mapping = results[0]
+    assert mapping.ha_entity_type == "switch"
+    assert mapping.reason_code == "switch_fan_on_off_state"
+    assert mapping.commands["FAN_STATE"].id == 382
+    assert mapping.commands["FAN_ON"].id == 388
+    assert mapping.commands["FAN_OFF"].id == 389
+
+
+def test_fan_trio_with_heterogeneous_names_not_duplicated_as_binary_sensor():
+    eq = JeedomEqLogic(
+        id=67,
+        name="Filtration",
+        object_id=1,
+        eq_type_name="pool",
+        cmds=[
+            _cmd(382, "Filtration", "FAN_STATE", "info", "binary"),
+            _cmd(388, "Actif", "FAN_ON", "action", "other"),
+            _cmd(389, "Auto", "FAN_OFF", "action", "other"),
+            _cmd(384, "Chauffage", "HEATING_STATE", "info", "binary"),
+        ],
+    )
+    binary_results = BinarySensorMapper().map_all(eq, _snapshot(eq))
+    fan_state_ids = {r.reason_details.get("cmd_id") for r in binary_results}
+    assert 382 not in fan_state_ids
+
+
+# ---------------------------------------------------------------------------
 # AC5 — CommandSynchronizer : FAN_ON / FAN_OFF routés sur channel /{cmd_id}/set
 # ---------------------------------------------------------------------------
 

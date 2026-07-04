@@ -326,8 +326,17 @@ class SwitchMapper:
         trio found. A single eqLogic may expose several distinct switch groups
         (e.g. several SWITCH_* trios) and/or a FAN_* trio (Story 14.1) at the
         same time — each is mapped independently.
+
+        Story 14.1 gate terrain (eq67, plugin `pool`) revealed that some
+        integrations do not name their STATE/ON/OFF commands with a shared
+        prefix (e.g. STATE="Filtration", ON="Actif", OFF="Auto"), so the
+        name-based grouping below never pairs them. As a fallback, if a
+        family has no complete group after name-based grouping AND exactly
+        one ungrouped STATE/ON/OFF command each exists for that family, they
+        are paired unconditionally (single-trio-per-family assumption).
         """
         by_key: Dict[Tuple[str, str], Dict[str, JeedomCmd]] = {}
+        by_family: Dict[str, Dict[str, List[JeedomCmd]]] = {}
         for cmd in eq.cmds:
             generic_type = cmd.generic_type
             if not generic_type:
@@ -336,13 +345,33 @@ class SwitchMapper:
                 if generic_type in {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}:
                     key = (family, self._switch_group_key(cmd.name))
                     by_key.setdefault(key, {})[generic_type] = cmd
+                    by_family.setdefault(family, {}).setdefault(generic_type, []).append(cmd)
                     break
 
         groups: List[Tuple[str, str, Dict[str, JeedomCmd]]] = []
+        grouped_cmd_ids: Set[int] = set()
         for (family, key), cmds in by_key.items():
             required = {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}
             if required.issubset(cmds):
                 groups.append((family, key, cmds))
+                grouped_cmd_ids.update(int(c.id) for c in cmds.values())
+
+        # Fallback pass (Story 14.1) — see docstring above.
+        for family, type_map in by_family.items():
+            if any(g_family == family for g_family, _, _ in groups):
+                continue  # name-based grouping already resolved this family
+            state_cmds = [c for c in type_map.get(f"{family}_STATE", []) if int(c.id) not in grouped_cmd_ids]
+            on_cmds = [c for c in type_map.get(f"{family}_ON", []) if int(c.id) not in grouped_cmd_ids]
+            off_cmds = [c for c in type_map.get(f"{family}_OFF", []) if int(c.id) not in grouped_cmd_ids]
+            if len(state_cmds) == 1 and len(on_cmds) == 1 and len(off_cmds) == 1:
+                state_cmd, on_cmd, off_cmd = state_cmds[0], on_cmds[0], off_cmds[0]
+                fallback_group = {
+                    f"{family}_STATE": state_cmd,
+                    f"{family}_ON": on_cmd,
+                    f"{family}_OFF": off_cmd,
+                }
+                groups.append((family, self._switch_group_key(state_cmd.name), fallback_group))
+
         return groups
 
     @staticmethod

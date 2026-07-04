@@ -1,6 +1,6 @@
 # Story 14.1 : Généralisation `family="FAN"` — trio FAN_STATE/FAN_ON/FAN_OFF publié en `switch`
 
-Status: review
+Status: done
 
 ## Story
 
@@ -46,10 +46,10 @@ afin de pouvoir piloter la pompe de filtration piscine depuis HA au lieu qu'elle
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
-  - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Vérifier que le script se termine avec `Deploy complete.`
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+  - [x] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
+  - [x] Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
+  - [x] Vérifier que le script se termine avec `Deploy complete.`
 
 - [x] Task 1 — Généraliser `_group_switch_cmds` pour accepter `family="FAN"` (AC: 1, 2)
   - [x] Introduire une constante `_SWITCH_CMD_FAMILIES = ("SWITCH", "FAN")` dans `switch.py`
@@ -73,13 +73,43 @@ afin de pouvoir piloter la pompe de filtration piscine depuis HA au lieu qu'elle
     - Cas command routing : `_translate_command` résout `FAN_ON`/`FAN_OFF` (ajouter au test existant équivalent au pattern Story 10.7)
   - [x] Lancer la suite complète `python3 -m pytest tests/ resources/daemon/tests/ -q` — 8/8 nouveaux tests PASS, 1454 passed, 24 échecs pré-existants confirmés hors scope (dépendance externe `jeedomdaemon` absente localement — identiques avant/après le changement, cf. note sprint-status Story 11.3)
 
-- [ ] Task 5 — Gate terrain + clôture BMAD (AC: 6)
-  - [ ] Déployer via `scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
-  - [ ] Confirmer via log daemon / MQTT discovery que eq67/cmd382 apparaît en `switch`, état non-`unknown`
-  - [ ] Confirmer absence de régression sur eq554/eq583/eq628 (switches existants) — topics et états inchangés
-  - [ ] Documenter la preuve terrain dans Dev Agent Record
-  - [ ] Mettre à jour `sprint-status.yaml` : `14-1-...: done` et `pe-epic-14: done` si gate PASS
-  - [ ] Mettre à jour statut story → `done`
+- [x] Task 5 — Gate terrain + clôture BMAD (AC: 6)
+  - [x] Déployer via `scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
+  - [x] Confirmer via log daemon / MQTT discovery que eq67/cmd382 apparaît en `switch`, état non-`unknown`
+  - [x] Confirmer absence de régression sur eq554/eq583/eq628 (switches existants) — topics et états inchangés
+  - [x] Documenter la preuve terrain dans Dev Agent Record
+  - [x] Mettre à jour `sprint-status.yaml` : `14-1-...: done` et `pe-epic-14: done` (gate PASS)
+  - [x] Mettre à jour statut story → `done`
+
+### Gate terrain — résultat (2026-07-04)
+
+**Premier déploiement (échec constaté)** : la première exécution de `deploy-to-box.sh --cleanup-discovery --restart-daemon` a montré que `homeassistant/binary_sensor/jeedom2ha_67_382/config` restait republié en `binary_sensor` — **cmd382 n'était toujours pas publié en switch**, malgré Task 1-4 vertes en tests unitaires.
+
+**Diagnostic terrain** : interrogation directe de la base Jeedom réelle (`SELECT id, name, generic_type FROM cmd WHERE eqLogic_id=67`) a confirmé la topologie réelle d'eq67 :
+- cmd382 `"Filtration"` → `FAN_STATE`
+- cmd388 `"Actif"` → `FAN_ON`
+- cmd389 `"Auto"` → `FAN_OFF`
+
+Le trio est structurellement complet, **mais les noms de commande ne partagent aucun préfixe commun** ("Filtration" / "Actif" / "Auto"), contrairement à tous les cas couverts par les tests unitaires initiaux (`"Filtration piscine"` / `"Filtration piscine On"` / `"Filtration piscine Off"`). `_switch_group_key` (regex de suppression du suffixe `on`/`off`) ne peut pas apparier ces trois commandes sous une même clé de groupement → le trio n'était jamais détecté comme groupe complet.
+
+**Correctif appliqué** : ajout d'un fallback dans `SwitchMapper._group_switch_cmds` et `binary_sensor._switch_readback_cmd_ids` — si le groupement par nom ne trouve aucun groupe complet pour une famille, et qu'il existe exactement une commande `{FAMILY}_STATE`, une `{FAMILY}_ON` et une `{FAMILY}_OFF` non déjà groupées pour cette famille sur l'eqLogic, elles sont appariées sans condition de nom (hypothèse : un seul trio par famille et par eqLogic dans ce cas). Deux tests de régression ajoutés reproduisant exactement la topologie réelle d'eq67 (`test_fan_trio_with_heterogeneous_names_still_maps_to_switch`, `test_fan_trio_with_heterogeneous_names_not_duplicated_as_binary_sensor`).
+
+**Second déploiement (succès)** : après correctif + suite complète re-vérifiée (10/10 tests story 14.1 PASS, 1456 passed / 24 échecs pré-existants identiques sur la suite globale), redéploiement via `deploy-to-box.sh --cleanup-discovery --restart-daemon` → `Deploy complete.`
+
+**Preuve MQTT (box réelle 192.168.1.21)** :
+```
+homeassistant/switch/jeedom2ha_67_382/config {"name": "Filtration", "unique_id": "jeedom2ha_eq_67_cmd_382",
+  "object_id": "jeedom2ha_67_382", "command_topic": "jeedom2ha/67/382/set", "payload_on": "ON", "payload_off": "OFF",
+  "state_topic": "jeedom2ha/67/382/state", "state_on": "ON", "state_off": "OFF",
+  "device": {"identifiers": ["jeedom2ha_67"], "name": "Filtration", "manufacturer": "Jeedom (pool)", "model": "pool", ...}}
+
+jeedom2ha/67/382/state ON
+```
+`homeassistant/binary_sensor/jeedom2ha_67_382/config` n'est plus republié (seuls `_67_384`, `_67_386`, `_67_395` — Chauffage/Traitement/Surpresseur, hors périmètre de cette story — restent en binary_sensor, comportement attendu).
+
+**Non-régression switches existants** : topics `homeassistant/switch/jeedom2ha_583_5987/config`, `_583_6009`, `_583_6010`, `_628_5977`, `_628_5980`, `_628_5983`, `_628_6004` toujours présents et inchangés (groupes SWITCH_* eq583/eq628).
+
+**Verdict AC6 : PASS.**
 
 ## Dev Notes
 
@@ -157,10 +187,11 @@ claude-sonnet-5 (clawcode agent)
 - 2026-07-04 : Task 3 — `sync/command.py::_translate_command` : ajout de `FAN_ON`/`FAN_OFF` dans la résolution de commande on/off (aux côtés de `LIGHT_ON/ENERGY_ON/SWITCH_ON/SET_ON` et symétrique OFF).
 - 2026-07-04 : Task 4 — `test_story_14_1_fan_switch_family.py` créé (8 tests, 8 PASS) : trio FAN nominal, topics dérivés du cmd_id, trio FAN incomplet → aucun switch, non-régression trio SWITCH historique, groupes mixtes SWITCH+FAN sur le même eqLogic → 2 mappings indépendants, anti-doublon binary_sensor (FAN_STATE consommé par le switch non republié), routage commande HA→Jeedom FAN_ON/FAN_OFF. Suite complète : `python3 -m pytest tests/ resources/daemon/tests/ -q` → 1454 passed (+8 nouveaux), 24 échecs pré-existants confirmés identiques avant/après le changement via `git stash` (dépendance externe `jeedomdaemon` absente localement, non liés à cette story).
 - 2026-07-04 : Aucune modification de `mapping/registry.py` ni de `discovery/publisher.py` n'a été nécessaire — le publisher switch existant est générique par `ha_entity_type="switch"` et ne connaît pas la notion de `family`.
+- 2026-07-04 : Gate terrain (Task 0/Task 5) exécuté sur box réelle 192.168.1.21. Premier déploiement : régression détectée — cmd382 restait publié en `binary_sensor` malgré le code Task 1-4. Diagnostic via requête SQL directe sur la table `cmd` de la box (`generic_type` réel de cmd382/388/389) : le trio FAN_STATE/FAN_ON/FAN_OFF est structurellement complet mais ses noms ("Filtration"/"Actif"/"Auto") ne partagent aucun préfixe commun, contrairement à tous les cas des tests unitaires initiaux — `_switch_group_key` ne pouvait donc jamais les regrouper. Correctif : fallback single-trio-per-family ajouté dans `switch.py::_group_switch_cmds` et `binary_sensor.py::_switch_readback_cmd_ids`, appliqué quand le groupement par nom ne trouve aucun groupe complet pour une famille et qu'il existe exactement 1 STATE + 1 ON + 1 OFF non groupés pour cette famille. 2 tests de régression ajoutés reproduisant exactement la topologie réelle (10/10 tests story PASS, 1456 passed sur la suite complète, 24 échecs pré-existants inchangés). Second déploiement : `Deploy complete.`, MQTT confirme `homeassistant/switch/jeedom2ha_67_382/config` avec état `ON`, zéro régression sur eq583/eq628. AC6 : PASS.
 
 ## Dev Story — Statut
 
-Toutes les tasks de développement (1 à 4) sont complètes et vertes. Task 0 (pre-flight terrain) et Task 5 (gate terrain) restent à exécuter après code-review, conformément à la contrainte procédurale du projet.
+Toutes les tasks (0 à 5) sont complètes. Gate terrain PASS après un correctif itératif découvert en conditions réelles (voir section "Gate terrain — résultat" et Change Log). Story clôturée `done`.
 
 ### File List
 
@@ -199,9 +230,12 @@ Toutes les tasks de développement (1 à 4) sont complètes et vertes. Task 0 (p
 
 **Outcome** : **APPROVE** — 0 finding Critical/High. La story peut avancer vers le gate terrain (Task 0/Task 5).
 
+**Note post-gate-terrain** : le gate terrain a révélé un défaut supplémentaire non détectable par les tests unitaires initiaux (noms de commandes réels hétérogènes sur eq67) — voir section "Gate terrain — résultat" ci-dessus et Change Log. Ce correctif (fallback single-trio-per-family) a été ajouté après cette revue ; il ne remet pas en cause l'outcome APPROVE de la revue initiale sur le périmètre alors livré, mais constitue un correctif de suivi direct nécessaire à la clôture de la story.
+
 ## Change Log
 
 - 2026-07-04 — correct-course exécuté intégralement : décision de créer `pe-epic-14` dédié (scope Minor, extension pure de mapper, composant `switch` déjà ouvert). SCP écrit, `sprint-status.yaml` et `active-cycle-manifest.md` mis à jour.
 - 2026-07-04 — Story 14.1 créée (BMAD create-story). Statut `ready-for-dev`.
 - 2026-07-04 — Dev-story : `family="FAN"` généralisé dans `switch.py` (`_group_switch_cmds`/`map_all`), anti-doublon `binary_sensor.py` étendu, routage commande HA→Jeedom `sync/command.py` étendu (`FAN_ON`/`FAN_OFF`). 8 tests unitaires nouveaux PASS, 0 régression sur la suite complète (1454 passed). Statut `review`.
 - 2026-07-04 — Code-review APPROVE (0 finding Critical/High ; 1 finding LOW documenté, hérité et hors scope). Prochaine étape : gate terrain (Task 0/Task 5).
+- 2026-07-04 — Gate terrain (1er passage) : régression détectée sur box réelle — eq67/cmd382 toujours publié en `binary_sensor`, pas en `switch`. Diagnostic SQL direct sur la box : trio FAN_STATE/FAN_ON/FAN_OFF réel avec noms hétérogènes ("Filtration"/"Actif"/"Auto") non appariables par `_switch_group_key`. Correctif : fallback single-trio-per-family ajouté dans `switch.py` et `binary_sensor.py`, 2 tests de régression ajoutés (10/10 PASS story, 1456 passed suite complète, 0 régression). Gate terrain (2e passage) : PASS — `homeassistant/switch/jeedom2ha_67_382/config` publié, état `ON`, zéro régression eq583/eq628. Statut `done`.

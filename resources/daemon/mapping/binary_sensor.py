@@ -163,7 +163,13 @@ class BinarySensorMapper:
 
 
 def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
-    """Return state cmd ids consumed by complete ENERGY_*/SWITCH_*/FAN_* switch trios."""
+    """Return state cmd ids consumed by complete ENERGY_*/SWITCH_*/FAN_* switch trios.
+
+    Story 14.1 gate terrain — must mirror SwitchMapper._group_switch_cmds exactly
+    (including its name-mismatch fallback pass), otherwise a FAN_STATE (or any
+    future family) command whose ON/OFF siblings don't share a name prefix would
+    be published as switch by SwitchMapper AND duplicated as binary_sensor here.
+    """
     consumed: set[int] = set()
     energy_state = None
     has_energy_on = False
@@ -171,6 +177,7 @@ def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
     # Story 14.1 — keyed by (family, name_key) to support several distinct
     # groups per family (e.g. multiple SWITCH_* trios) and the FAN_* family.
     switch_groups: Dict[Tuple[str, str], Dict[str, JeedomCmd]] = {}
+    by_family: Dict[str, Dict[str, List[JeedomCmd]]] = {}
 
     for cmd in eq.cmds:
         if cmd.generic_type == "ENERGY_STATE":
@@ -184,15 +191,29 @@ def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
                 if cmd.generic_type in {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}:
                     key = (family, _switch_group_key(cmd.name))
                     switch_groups.setdefault(key, {})[cmd.generic_type] = cmd
+                    by_family.setdefault(family, {}).setdefault(cmd.generic_type, []).append(cmd)
                     break
 
     if energy_state is not None and has_energy_on and has_energy_off:
         consumed.add(int(energy_state.id))
 
+    families_with_group: set[str] = set()
     for (family, _key), group in switch_groups.items():
         required = {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}
         if required.issubset(group):
             consumed.add(int(group[f"{family}_STATE"].id))
+            families_with_group.add(family)
+
+    # Fallback pass — mirrors SwitchMapper._group_switch_cmds's name-mismatch
+    # fallback so the readback exclusion set stays exhaustive.
+    for family, type_map in by_family.items():
+        if family in families_with_group:
+            continue
+        state_cmds = [c for c in type_map.get(f"{family}_STATE", []) if int(c.id) not in consumed]
+        on_cmds = type_map.get(f"{family}_ON", [])
+        off_cmds = type_map.get(f"{family}_OFF", [])
+        if len(state_cmds) == 1 and len(on_cmds) == 1 and len(off_cmds) == 1:
+            consumed.add(int(state_cmds[0].id))
 
     return consumed
 

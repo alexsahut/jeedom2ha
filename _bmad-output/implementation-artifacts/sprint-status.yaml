@@ -275,5 +275,5 @@ development_status:
   # Composant HA cible deja ouvert dans PRODUCT_SCOPE ("switch") — pas de gouvernance FR40/NFR10 a rejouer
   # Gate de cloture = eq67/cmd382 publie en switch MQTT HA etat non-unknown, zero regression SWITCH_*/ENERGY_* existants
   # ==============================================================
-  pe-epic-14: in-progress
-  14-1-fan-state-on-off-generalisation-switch-family: review  # dev-story complet, 8 tests nouveaux PASS, 0 regression (1454 passed) ; gate terrain restant
+  pe-epic-14: done
+  14-1-fan-state-on-off-generalisation-switch-family: done  # gate terrain PASS sur 192.168.1.21 (2e passage) : eq67/cmd382 publie homeassistant/switch/jeedom2ha_67_382/config, etat ON, zero regression eq583/eq628. Correctif fallback single-trio-per-family requis (1er passage gate terrain avait revele des noms de cmd heterogenes non couverts par le groupement par nom) ; 10/10 tests story PASS, 1456 passed suite complete, 24 echecs pre-existants inchanges.
