@@ -266,3 +266,14 @@ development_status:
   13-2-auto-detection-des-commandes-w-wh-kwh-sans-generic-type: done
   13-3-publier-les-mesures-secondaires-des-prises-mesureuses-commandables: done
   13-4-documentation-versions-et-handoff-terrain-ha-energy: done
+
+  # ==============================================================
+  # pe-epic-14 — Parite generique FAN_* -> switch (pompe filtration piscine)
+  # Ajoute par correct-course 2026-07-04 — signalement ClawBox : eq67/cmd382
+  # (plugin pool, "Filtration", generic_type=FAN_STATE) jamais exporte vers HA
+  # Scope Minor / Direct Adjustment — SCP : sprint-change-proposal-2026-07-04-fan-switch-parity.md
+  # Composant HA cible deja ouvert dans PRODUCT_SCOPE ("switch") — pas de gouvernance FR40/NFR10 a rejouer
+  # Gate de cloture = eq67/cmd382 publie en switch MQTT HA etat non-unknown, zero regression SWITCH_*/ENERGY_* existants
+  # ==============================================================
+  pe-epic-14: in-progress
+  14-1-fan-state-on-off-generalisation-switch-family: review  # dev-story complet, 8 tests nouveaux PASS, 0 regression (1454 passed) ; gate terrain restant

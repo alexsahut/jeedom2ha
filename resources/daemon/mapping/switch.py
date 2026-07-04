@@ -56,6 +56,12 @@ _ANTI_SWITCH_GENERIC_TYPES = {
 # eq.generic_type values that explicitly allow switch mapping
 _ALLOWED_EQ_GENERIC_TYPES = {"", "switch", "energy", "plug", "outlet", "prise"}
 
+# Story 14.1 — generic_type families structurally grouped as on/off/state trios
+# and published as `switch`. "SWITCH" is the historical family (Story 2.4/8.x);
+# "FAN" extends the same pattern to FAN_STATE/FAN_ON/FAN_OFF (e.g. eq67 pompe
+# de filtration piscine, plugin `pool`).
+_SWITCH_CMD_FAMILIES = ("SWITCH", "FAN")
+
 # Keywords in equipment name that strongly imply it is NOT a switch
 _NON_SWITCH_KEYWORDS = {
     "lumière", "lumiere", "light", "lampe", "ampoule",
@@ -97,8 +103,8 @@ class SwitchMapper:
         switch_groups = self._group_switch_cmds(eq)
         if switch_groups:
             return [
-                self._map_cmd_group(eq, snapshot, group, family="SWITCH")
-                for _, group in switch_groups
+                self._map_cmd_group(eq, snapshot, group, family=family)
+                for family, _, group in switch_groups
             ]
 
         primary = self._map_energy_switch(eq, snapshot)
@@ -313,19 +319,30 @@ class SwitchMapper:
             },
         )
 
-    def _group_switch_cmds(self, eq: JeedomEqLogic) -> List[Tuple[str, Dict[str, JeedomCmd]]]:
-        by_key: Dict[str, Dict[str, JeedomCmd]] = {}
+    def _group_switch_cmds(self, eq: JeedomEqLogic) -> List[Tuple[str, str, Dict[str, JeedomCmd]]]:
+        """Group SWITCH_*/FAN_* on/off/state command trios by (family, name key).
+
+        Returns a list of (family, group_key, cmds) tuples, one per complete
+        trio found. A single eqLogic may expose several distinct switch groups
+        (e.g. several SWITCH_* trios) and/or a FAN_* trio (Story 14.1) at the
+        same time — each is mapped independently.
+        """
+        by_key: Dict[Tuple[str, str], Dict[str, JeedomCmd]] = {}
         for cmd in eq.cmds:
             generic_type = cmd.generic_type
-            if generic_type not in {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}:
+            if not generic_type:
                 continue
-            key = self._switch_group_key(cmd.name)
-            by_key.setdefault(key, {})[generic_type] = cmd
+            for family in _SWITCH_CMD_FAMILIES:
+                if generic_type in {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}:
+                    key = (family, self._switch_group_key(cmd.name))
+                    by_key.setdefault(key, {})[generic_type] = cmd
+                    break
 
-        groups = []
-        for key, cmds in by_key.items():
-            if {"SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}.issubset(cmds):
-                groups.append((key, cmds))
+        groups: List[Tuple[str, str, Dict[str, JeedomCmd]]] = []
+        for (family, key), cmds in by_key.items():
+            required = {f"{family}_STATE", f"{family}_ON", f"{family}_OFF"}
+            if required.issubset(cmds):
+                groups.append((family, key, cmds))
         return groups
 
     @staticmethod
