@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-06-06
+# last_updated: 2026-07-05
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,11 +41,12 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-13 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18, 2026-06-30 :
-#          pe-epic-1..12 done, pe-epic-13 in-progress (13.1 done, 13.2 done, 13.3 done))
+#   Epics: pe-epic-1 à pe-epic-14 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18, 2026-06-30, 2026-07-04, 2026-07-05 :
+#          pe-epic-1..14 done, retrospectives pe-epic-13/14 matérialisées le 2026-07-05 après audit de gouvernance)
 #          pe-epic-11 formalisé dans epics-projection-engine.md le 2026-06-18 (était suivi ici sans définition d'epic)
 #          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vague 1 sensor+binary_sensor
-#          pe-epic-13 = Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh (in-progress)
+#          pe-epic-13 = Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh (done, flip epic-level 2026-07-05)
+#          pe-epic-14 = Parité générique FAN_* -> switch (traité en SCP Minor/Direct Adjustment le 2026-07-04, jamais formalisé dans epics-projection-engine.md — action de correct-course en cours)
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -261,11 +262,12 @@ development_status:
   # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-06-30-energy-dashboard-ha.md
   # Story 13.1 code-review PASS le 2026-06-30 ; Story 13.2 code-review PASS le 2026-07-01 ; Story 13.3 code-review PASS le 2026-07-01 ; Story 13.4 creee le 2026-07-02
   # ==============================================================
-  pe-epic-13: in-progress
+  pe-epic-13: done  # Flip epic-level via correct-course 2026-07-05 (4/4 stories done, flip manuel jamais fait au moment de la cloture 13.4)
   13-1-ha-energy-metadata-pour-sensors-power-energy: done
   13-2-auto-detection-des-commandes-w-wh-kwh-sans-generic-type: done
   13-3-publier-les-mesures-secondaires-des-prises-mesureuses-commandables: done
   13-4-documentation-versions-et-handoff-terrain-ha-energy: done
+  pe-epic-13-retrospective: done  # retro 2026-07-05 : angle mort UI/daemon (Energy state_class jamais visible console) + gouvernance flip manquant
 
   # ==============================================================
   # pe-epic-14 — Parite generique FAN_* -> switch (pompe filtration piscine)
@@ -277,3 +279,4 @@ development_status:
   # ==============================================================
   pe-epic-14: done
   14-1-fan-state-on-off-generalisation-switch-family: done  # gate terrain PASS sur 192.168.1.21 (2e passage) : eq67/cmd382 publie homeassistant/switch/jeedom2ha_67_382/config, etat ON, zero regression eq583/eq628. Correctif fallback single-trio-per-family requis (1er passage gate terrain avait revele des noms de cmd heterogenes non couverts par le groupement par nom) ; 10/10 tests story PASS, 1456 passed suite complete, 24 echecs pre-existants inchanges.
+  pe-epic-14-retrospective: done  # retro 2026-07-05 : manquement gouvernance (epic jamais formalise dans epics-projection-engine.md malgre consigne BMAD explicite) + gate terrain a revele un cas non couvert par les tests unitaires
