@@ -47,8 +47,8 @@
 #          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vague 1 sensor+binary_sensor
 #          pe-epic-13 = Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh (done, flip epic-level 2026-07-05)
 #          pe-epic-14 = Parité générique FAN_* -> switch (formalisé dans epics-projection-engine.md le 2026-07-05, done)
-#          pe-epic-15 = Visibilité console des capacités daemon (Energy state_class, streaming, FAN parity) — backlog,
-#                       formalisé par sprint-change-proposal-2026-07-05-epic-visibilite-console.md, story 15.1 pas encore créée
+#          pe-epic-15 = Visibilité console des capacités daemon (Energy state_class, streaming, FAN parity) — done,
+#                       formalisé par sprint-change-proposal-2026-07-05-epic-visibilite-console.md, 3/3 stories done, gate terrain de cloture PASS 2026-07-05
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -57,7 +57,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-05'  # Story 15.3 code-review terminee (Approve), done
+last_updated: '2026-07-05'  # pe-epic-15 flip done (3/3 stories + gate terrain de cloture PASS)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -289,7 +289,7 @@ development_status:
   # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-05-epic-visibilite-console.md
   # Lecture seule cote desktop/php + desktop/js, aucune reouverture des epics 12/13/14
   # ==============================================================
-  pe-epic-15: in-progress  # Story 15.1 creee le 2026-07-05 (create-story)
+  pe-epic-15: done  # 3/3 stories done, gate terrain de cloture d'epic PASS le 2026-07-05 (Energy/Streaming/FAN coexistants sur le meme corpus)
   15-1-visibilite-energy-state-class-console: done  # code-review termine 2026-07-05 (0 High/Medium, 1 Low en follow-up)
   15-2-visibilite-statut-streaming-runtime: done  # code-review approve 2026-07-05, aucun finding
   15-3-visibilite-parite-fan-switch-console: done  # code-review terminee 2026-07-05, Approve
