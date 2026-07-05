@@ -921,6 +921,17 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         html += '</div>';
 
         // --- Section 2 : Typage Jeedom (configured_type vs used_type — AC1) ---
+        // Story 15.1 — index cmd_id -> {state_class, unit_of_measurement} pour affichage additif,
+        // lecture stricte de eq.matched_commands (aucune donnée inventée si absente).
+        var energyByCmdId = {};
+        if (eq.matched_commands) {
+          for (var mc = 0; mc < eq.matched_commands.length; mc++) {
+            var mcEntry = eq.matched_commands[mc];
+            if (mcEntry && mcEntry.state_class) {
+              energyByCmdId[mcEntry.cmd_id] = mcEntry;
+            }
+          }
+        }
         html += '<div style="margin-bottom:10px;"><strong>{{Typage Jeedom}}</strong>';
         if (typingTrace.length > 0) {
           html += '<ul style="margin:4px 0 0 16px;">';
@@ -937,6 +948,12 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
               html += ' \u2192 <span style="color:#888;font-size:0.8em;">{{utilisé}}</span> <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
             } else {
               html += ' \u2014 <span style="background-color:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #c8e6c9;">' + usedType + '</span>';
+            }
+            // Story 15.1 - badge Energy additif (state_class + unite) quand fourni par le daemon.
+            var energyInfo = energyByCmdId[tt.command_id];
+            if (energyInfo) {
+              var energyLabel = 'Energy: ' + energyInfo.state_class + (energyInfo.unit_of_measurement ? ' / ' + energyInfo.unit_of_measurement : '');
+              html += ' <span style="background-color:#e3f2fd;color:#0d47a1;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #bbdefb;">' + energyLabel + '</span>';
             }
             html += '</li>';
           }

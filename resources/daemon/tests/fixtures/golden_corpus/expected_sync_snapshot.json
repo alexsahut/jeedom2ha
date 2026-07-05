@@ -172,7 +172,9 @@
             {
               "cmd_id": 5138,
               "cmd_name": "Puissance panneaux",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "state_class": "measurement",
+              "unit_of_measurement": "W"
             }
           ],
           "name": "MSunPV / RouteurSolaire",
@@ -4026,7 +4028,9 @@
             {
               "cmd_id": 70021,
               "cmd_name": "POWER",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "state_class": "measurement",
+              "unit_of_measurement": "W"
             }
           ],
           "name": "Compteur puissance elec 7002",
@@ -5887,7 +5891,9 @@
             {
               "cmd_id": 5138,
               "cmd_name": "Puissance panneaux",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "state_class": "measurement",
+              "unit_of_measurement": "W"
             }
           ],
           "name": "MSunPV / RouteurSolaire",
@@ -9685,7 +9691,9 @@
             {
               "cmd_id": 70021,
               "cmd_name": "POWER",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "state_class": "measurement",
+              "unit_of_measurement": "W"
             }
           ],
           "name": "Compteur puissance elec 7002",

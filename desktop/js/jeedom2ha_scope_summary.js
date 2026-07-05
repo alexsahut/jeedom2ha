@@ -52,11 +52,22 @@
       if (!cmd || typeof cmd !== 'object') {
         continue;
       }
-      normalized.push({
+      var normalizedCmd = {
         cmd_id: isFiniteNumber(cmd.cmd_id) ? cmd.cmd_id : null,
         cmd_name: readString(cmd.cmd_name, ''),
         generic_type: readString(cmd.generic_type, ''),
-      });
+      };
+      // Story 15.1 — passthrough additif : state_class/unit_of_measurement
+      // uniquement quand fournis par le daemon, jamais de valeur inventee.
+      var stateClass = readString(cmd.state_class, '');
+      if (stateClass !== '') {
+        normalizedCmd.state_class = stateClass;
+        var unitOfMeasurement = readString(cmd.unit_of_measurement, '');
+        if (unitOfMeasurement !== '') {
+          normalizedCmd.unit_of_measurement = unitOfMeasurement;
+        }
+      }
+      normalized.push(normalizedCmd);
     }
     return normalized;
   }

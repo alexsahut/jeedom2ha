@@ -290,6 +290,6 @@ development_status:
   # Lecture seule cote desktop/php + desktop/js, aucune reouverture des epics 12/13/14
   # ==============================================================
   pe-epic-15: in-progress  # Story 15.1 creee le 2026-07-05 (create-story)
-  15-1-visibilite-energy-state-class-console: ready-for-dev  # story creee 2026-07-05 via create-story
+  15-1-visibilite-energy-state-class-console: done  # code-review termine 2026-07-05 (0 High/Medium, 1 Low en follow-up)
   15-2-visibilite-statut-streaming-runtime: backlog
   15-3-visibilite-parite-fan-switch-console: backlog

@@ -144,3 +144,41 @@ test("render: statut pièce hors domaine contractuel => état neutre, sans valeu
   assert.doesNotMatch(salonRow[0], /Surprenant/);
   assert.match(salonRow[0], /&mdash;/);
 });
+
+test("createModel: matched_commands passthrough state_class/unit_of_measurement quand fournis (Story 15.1)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    101: {
+      matched_commands: [
+        { cmd_id: 9001, cmd_name: "Puissance", generic_type: "POWER", state_class: "measurement", unit_of_measurement: "W" },
+      ],
+      unmatched_commands: [],
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 101);
+
+  assert.equal(equip.matched_commands.length, 1);
+  assert.equal(equip.matched_commands[0].state_class, "measurement");
+  assert.equal(equip.matched_commands[0].unit_of_measurement, "W");
+});
+
+test("createModel: matched_commands sans state_class => aucune clé Energy inventée (Story 15.1)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    102: {
+      matched_commands: [
+        { cmd_id: 9002, cmd_name: "Etat prise", generic_type: "ENERGY_STATE" },
+      ],
+      unmatched_commands: [],
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 102);
+
+  assert.equal(equip.matched_commands.length, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(equip.matched_commands[0], "state_class"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(equip.matched_commands[0], "unit_of_measurement"), false);
+});
