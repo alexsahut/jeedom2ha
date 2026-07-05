@@ -182,3 +182,59 @@ test("createModel: matched_commands sans state_class => aucune clé Energy inven
   assert.equal(Object.prototype.hasOwnProperty.call(equip.matched_commands[0], "state_class"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(equip.matched_commands[0], "unit_of_measurement"), false);
 });
+
+test("createModel: matched_commands passthrough streaming quand fourni (Story 15.2)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    101: {
+      matched_commands: [
+        { cmd_id: 9003, cmd_name: "Temperature", generic_type: "TEMP", streaming: true },
+      ],
+      unmatched_commands: [],
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 101);
+
+  assert.equal(equip.matched_commands.length, 1);
+  assert.equal(equip.matched_commands[0].streaming, true);
+});
+
+test("createModel: matched_commands sans streaming => aucune clé inventée (Story 15.2)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    102: {
+      matched_commands: [
+        { cmd_id: 9004, cmd_name: "Etat prise", generic_type: "ENERGY_STATE" },
+      ],
+      unmatched_commands: [],
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 102);
+
+  assert.equal(equip.matched_commands.length, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(equip.matched_commands[0], "streaming"), false);
+});
+
+test("createModel: expose streaming_actif/streaming_cibles_count globaux (Story 15.2)", () => {
+  const response = makeResponse();
+  response.diagnostic_summary = Object.assign({}, response.diagnostic_summary, {
+    streaming_actif: true,
+    streaming_cibles_count: 5,
+  });
+
+  const model = scopeSummary.createModel(response);
+
+  assert.equal(model.global.streaming_actif, true);
+  assert.equal(model.global.streaming_cibles_count, 5);
+});
+
+test("createModel: streaming_actif/streaming_cibles_count par défaut sans state_synchronizer (Story 15.2)", () => {
+  const model = scopeSummary.createModel(makeResponse());
+
+  assert.equal(model.global.streaming_actif, false);
+  assert.equal(model.global.streaming_cibles_count, 0);
+});

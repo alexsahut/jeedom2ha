@@ -57,7 +57,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-05'  # Story 15.1 creee via create-story ; pe-epic-15 in-progress
+last_updated: '2026-07-05'  # Story 15.2 code-review terminee, approve sans finding, status done
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -291,5 +291,5 @@ development_status:
   # ==============================================================
   pe-epic-15: in-progress  # Story 15.1 creee le 2026-07-05 (create-story)
   15-1-visibilite-energy-state-class-console: done  # code-review termine 2026-07-05 (0 High/Medium, 1 Low en follow-up)
-  15-2-visibilite-statut-streaming-runtime: backlog
+  15-2-visibilite-statut-streaming-runtime: done  # code-review approve 2026-07-05, aucun finding
   15-3-visibilite-parite-fan-switch-console: backlog

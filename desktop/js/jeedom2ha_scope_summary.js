@@ -67,6 +67,10 @@
           normalizedCmd.unit_of_measurement = unitOfMeasurement;
         }
       }
+      // Story 15.2 — passthrough additif : streaming (true uniquement quand fourni).
+      if (cmd.streaming === true) {
+        normalizedCmd.streaming = true;
+      }
       normalized.push(normalizedCmd);
     }
     return normalized;
@@ -354,6 +358,10 @@
     var globalCounts = globalCompteurs ? buildCompteurs(globalCompteurs) : buildCompteursFallback(globalSection.counts);
     globalCounts.publies = homeSignals.global.publies;
 
+    // Story 15.2 — passthrough additif : visibilité globale streaming (epic 12).
+    var streamingActif = readBoolean(diagSummary ? diagSummary.streaming_actif : null, false);
+    var streamingCiblesCount = readCount(diagSummary, 'streaming_cibles_count');
+
     return {
       has_contract: true,
       global: {
@@ -362,6 +370,8 @@
         name: 'Parc global',
         status_room: homeSignals.global.statut,
         counts: globalCounts,
+        streaming_actif: streamingActif,
+        streaming_cibles_count: streamingCiblesCount !== null ? streamingCiblesCount : 0,
       },
       pieces: normalizedPieces,
     };
@@ -384,7 +394,7 @@
     return html;
   }
 
-  function renderNameCell(label, level, isToggle, nodeId) {
+  function renderNameCell(label, level, isToggle, nodeId, extraBadgeHtml) {
     var indentPx = 0;
     if (level === 'piece') {
       indentPx = 12;
@@ -402,8 +412,22 @@
     }
 
     html += '<span>' + escapeHtml(label) + '</span>';
+    if (extraBadgeHtml) {
+      html += extraBadgeHtml;
+    }
     html += '</div>';
     return html;
+  }
+
+  // Story 15.2 — badge additif visibilité globale streaming (epic 12), affiché
+  // uniquement sur la ligne Parc global, jamais de valeur inventée si absente.
+  function renderGlobalStreamingBadge(streamingActif, streamingCiblesCount) {
+    if (streamingActif !== true) {
+      return '';
+    }
+    var count = isFiniteNumber(streamingCiblesCount) ? streamingCiblesCount : 0;
+    return ' <span style="margin-left:8px;background-color:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:3px;font-size:0.8em;font-family:monospace;border:1px solid #a5d6a7;">' +
+      '{{Streaming actif}} &mdash; ' + String(count) + ' {{cibles}}</span>';
   }
 
   function renderPerimetreBadge(perimetre, level) {
@@ -582,7 +606,10 @@
     html += '<tbody>';
 
     var globalColumns = [
-      renderNameCell(model.global.name, 'global', true, 'global'),
+      renderNameCell(
+        model.global.name, 'global', true, 'global',
+        renderGlobalStreamingBadge(model.global.streaming_actif, model.global.streaming_cibles_count)
+      ),
       renderMutedBadge('&mdash;'),
       renderMutedBadge('&mdash;'),
       renderPieceEcartBadge(model.global.counts.ecarts),

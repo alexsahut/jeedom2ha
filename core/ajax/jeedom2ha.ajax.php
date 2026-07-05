@@ -18,15 +18,27 @@
 /**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
+ * Story 15.1/15.2 — passthrough additif de state_class/unit_of_measurement et
+ * streaming quand fournis par le daemon (jamais de valeur inventee).
  */
 function _jeedom2ha_extract_commands(array $cmds): array {
     $result = [];
     foreach ($cmds as $cmd) {
-        $result[] = [
+        $entry = [
             'cmd_id'       => (int)($cmd['cmd_id'] ?? 0),
             'cmd_name'     => (string)($cmd['cmd_name'] ?? ''),
             'generic_type' => (string)($cmd['generic_type'] ?? ''),
         ];
+        if (isset($cmd['state_class'])) {
+            $entry['state_class'] = (string)$cmd['state_class'];
+            if (isset($cmd['unit_of_measurement'])) {
+                $entry['unit_of_measurement'] = (string)$cmd['unit_of_measurement'];
+            }
+        }
+        if (isset($cmd['streaming'])) {
+            $entry['streaming'] = (bool)$cmd['streaming'];
+        }
+        $result[] = $entry;
     }
     return $result;
 }

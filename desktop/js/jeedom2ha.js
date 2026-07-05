@@ -923,12 +923,18 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
         // --- Section 2 : Typage Jeedom (configured_type vs used_type — AC1) ---
         // Story 15.1 — index cmd_id -> {state_class, unit_of_measurement} pour affichage additif,
         // lecture stricte de eq.matched_commands (aucune donnée inventée si absente).
+        // Story 15.2 — index cmd_id -> streaming (booléen) pour affichage additif,
+        // lecture stricte de eq.matched_commands (aucune donnée inventée si absente).
         var energyByCmdId = {};
+        var streamingByCmdId = {};
         if (eq.matched_commands) {
           for (var mc = 0; mc < eq.matched_commands.length; mc++) {
             var mcEntry = eq.matched_commands[mc];
             if (mcEntry && mcEntry.state_class) {
               energyByCmdId[mcEntry.cmd_id] = mcEntry;
+            }
+            if (mcEntry && mcEntry.streaming === true) {
+              streamingByCmdId[mcEntry.cmd_id] = true;
             }
           }
         }
@@ -954,6 +960,10 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             if (energyInfo) {
               var energyLabel = 'Energy: ' + energyInfo.state_class + (energyInfo.unit_of_measurement ? ' / ' + energyInfo.unit_of_measurement : '');
               html += ' <span style="background-color:#e3f2fd;color:#0d47a1;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #bbdefb;">' + energyLabel + '</span>';
+            }
+            // Story 15.2 - badge Streaming actif additif quand la commande est dans list_state_targets().
+            if (streamingByCmdId[tt.command_id]) {
+              html += ' <span style="background-color:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #a5d6a7;">{{Streaming actif}}</span>';
             }
             html += '</li>';
           }

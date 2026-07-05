@@ -2027,6 +2027,16 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     # Les vrais signaux sont publications[eq_id].active_or_alive et pending_discovery_unpublish.
     pending_discovery_unpublish = request.app.get("pending_discovery_unpublish") or {}
 
+    # Story 15.2 — Lecture seule de StateSynchronizer.list_state_targets() (Story 12.1/12.2)
+    # pour exposer le statut de streaming runtime déjà résolu, sans réouvrir sync/state.py.
+    state_sync = request.app.get("state_synchronizer")
+    if state_sync is not None:
+        streaming_targets = {
+            (t["eq_id"], t["cmd_id"]) for t in state_sync.list_state_targets()
+        }
+    else:
+        streaming_targets = set()
+
     equipments = []
     rooms_equips: dict = {}  # (object_id, object_name) -> list[dict]
 
@@ -2084,6 +2094,8 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                                 unit_of_measurement = reason_details.get("unit_of_measurement")
                                 if unit_of_measurement:
                                     entry["unit_of_measurement"] = unit_of_measurement
+                            if (eq_id, c.id) in streaming_targets:
+                                entry["streaming"] = True
                             matched_commands.append(entry)
                         if unmapped_cmds:
                             unmatched_commands = [
@@ -2239,6 +2251,9 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     summary = build_summary(equipments)
     summary["compteurs"] = build_ui_counters(equipments)
     summary["home_statut"] = compute_home_statut(equipments)
+    # Story 15.2 — Visibilité globale de la capacité streaming (epic 12), lecture seule.
+    summary["streaming_actif"] = bool(state_sync.is_active) if state_sync is not None else False
+    summary["streaming_cibles_count"] = len(streaming_targets)
     rooms = []
     for (object_id, object_name_val), room_eqs in rooms_equips.items():
         room_summary = build_summary(room_eqs)
