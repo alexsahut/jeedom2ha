@@ -238,3 +238,31 @@ test("createModel: streaming_actif/streaming_cibles_count par défaut sans state
   assert.equal(model.global.streaming_actif, false);
   assert.equal(model.global.streaming_cibles_count, 0);
 });
+
+test("createModel: fan_switch_parity passthrough quand fourni (Story 15.3)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    101: {
+      fan_switch_parity: true,
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 101);
+
+  assert.equal(equip.fan_switch_parity, true);
+});
+
+test("createModel: fan_switch_parity absent => valeur par défaut false, aucune valeur inventée (Story 15.3)", () => {
+  const response = makeResponse();
+  response.diagnostic_equipments = {
+    102: {
+      statut: "publie",
+    },
+  };
+
+  const model = scopeSummary.createModel(response);
+  const equip = model.pieces[0].equipements.find((e) => e.eq_id === 102);
+
+  assert.equal(equip.fan_switch_parity, false);
+});

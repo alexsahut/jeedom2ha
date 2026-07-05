@@ -249,6 +249,8 @@
       unmatched_commands: readCommandCoverage(diag.unmatched_commands),
       // Story 5.1 — signal actions_ha en lecture seule (null si absent ou non inclus)
       actions_ha: readActionsHa(diag.actions_ha),
+      // Story 15.3 — parite FAN -> switch (epic 14), lecture seule
+      fan_switch_parity: readBoolean(diag.fan_switch_parity, false),
       in_scope: isInScope === true,
       counts: {
         total: 1,
@@ -428,6 +430,16 @@
     var count = isFiniteNumber(streamingCiblesCount) ? streamingCiblesCount : 0;
     return ' <span style="margin-left:8px;background-color:#e8f5e9;color:#1b5e20;padding:1px 4px;border-radius:3px;font-size:0.8em;font-family:monospace;border:1px solid #a5d6a7;">' +
       '{{Streaming actif}} &mdash; ' + String(count) + ' {{cibles}}</span>';
+  }
+
+  // Story 15.3 — badge additif parite FAN -> switch (epic 14), affiché uniquement
+  // sur les lignes équipement, jamais de valeur inventée si absente.
+  function renderFanParityBadge(fanSwitchParity) {
+    if (fanSwitchParity !== true) {
+      return '';
+    }
+    return ' <span style="margin-left:8px;background-color:#fff3e0;color:#e65100;padding:1px 4px;border-radius:3px;font-size:0.8em;font-family:monospace;border:1px solid #ffcc80;">' +
+      '{{Parité FAN &rarr; switch}}</span>';
   }
 
   function renderPerimetreBadge(perimetre, level) {
@@ -653,7 +665,7 @@
         var eq = piece.equipements[j];
         var label = eq.name !== '' ? (eq.name + ' (#' + String(eq.eq_id) + ')') : ('#' + String(eq.eq_id));
         var eqColumns = [
-          renderNameCell(label, 'equipement', false, ''),
+          renderNameCell(label, 'equipement', false, '', renderFanParityBadge(eq.fan_switch_parity)),
           renderPerimetreBadge(eq.perimetre, 'equipement'),
           renderEquipmentStatutBadge(eq.statut),
           renderEquipmentEcartBadge(eq),
