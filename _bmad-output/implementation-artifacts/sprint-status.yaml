@@ -41,12 +41,14 @@
 #
 # Cycle Moteur de Projection Explicable — CYCLE COURANT
 #   Source: epics-projection-engine.md | Démarré: 2026-04-10
-#   Epics: pe-epic-1 à pe-epic-14 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18, 2026-06-30, 2026-07-04, 2026-07-05 :
+#   Epics: pe-epic-1 à pe-epic-15 (post correct-courses 2026-04-30, 2026-06-07, 2026-06-18, 2026-06-30, 2026-07-04, 2026-07-05 :
 #          pe-epic-1..14 done, retrospectives pe-epic-13/14 matérialisées le 2026-07-05 après audit de gouvernance)
 #          pe-epic-11 formalisé dans epics-projection-engine.md le 2026-06-18 (était suivi ici sans définition d'epic)
 #          pe-epic-12 = restitution d'état runtime Jeedom → HA (Feature 9 / FR46-FR50), vague 1 sensor+binary_sensor
 #          pe-epic-13 = Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh (done, flip epic-level 2026-07-05)
-#          pe-epic-14 = Parité générique FAN_* -> switch (traité en SCP Minor/Direct Adjustment le 2026-07-04, jamais formalisé dans epics-projection-engine.md — action de correct-course en cours)
+#          pe-epic-14 = Parité générique FAN_* -> switch (formalisé dans epics-projection-engine.md le 2026-07-05, done)
+#          pe-epic-15 = Visibilité console des capacités daemon (Energy state_class, streaming, FAN parity) — backlog,
+#                       formalisé par sprint-change-proposal-2026-07-05-epic-visibilite-console.md, story 15.1 pas encore créée
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
