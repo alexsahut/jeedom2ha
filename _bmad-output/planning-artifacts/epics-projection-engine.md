@@ -1940,3 +1940,24 @@ Généraliser `_group_switch_cmds` (switch.py) et `_switch_readback_cmd_ids` (bi
 - gate de clôture : eq67/cmd382 publié en switch MQTT HA, état non-`unknown`, zéro régression sur les groupes SWITCH_*/ENERGY_* existants (eq583, eq628) ;
 - le gate terrain a révélé un cas non couvert par les tests unitaires initiaux (noms de commande hétérogènes sans préfixe commun) ; correctif "single-trio-per-family" appliqué et re-vérifié avant clôture ;
 - **enseignement de gouvernance retenu** : même un changement scope Minor/Direct Adjustment doit être rattaché à une entrée epic formalisée dans ce document, avec retrospective de clôture — pas de bypass de la structure BMAD quel que soit le niveau de scope.
+
+---
+
+## Epic 15 — Visibilité console des capacités daemon (Energy, streaming, FAN)
+
+Epic ajouté par `sprint-change-proposal-2026-07-05-epic-visibilite-console.md`, suite à l'audit de gouvernance du 2026-07-05 (voir `pe-epic-13-retro-2026-07-05.md` et `pe-epic-14-retro-2026-07-05.md`). La console (`desktop/php`, `desktop/js`) n'expose aucune des capacités ajoutées par les epics 12/13/14 côté daemon. Cet epic ne rouvre pas ces epics : il ajoute de la visibilité lecture seule dans la console sur des métadonnées déjà produites (ou à exposer explicitement) par le daemon.
+
+### Story 15.1 — Visibilité Energy state_class en console
+Afficher, pour chaque sensor power/energy éligible, son `state_class` (measurement / total_increasing) et son unité résolue (W/kW/Wh/kWh) dans le panneau de diagnostic équipement (`jeedom2ha_scope_summary.js`, `buildEquipmentModel`). Lecture seule, aucun changement de mapping.
+
+### Story 15.2 — Visibilité statut du state streaming runtime
+Afficher un indicateur de statut de streaming runtime (publié / en attente / en échec) par équipement ou de manière globale, pour donner une visibilité terrain sur la capacité livrée en epic 12. Lecture seule.
+
+### Story 15.3 — Visibilité parité FAN_* -> switch en console
+Indiquer, dans le diagnostic équipement, quand un équipement a été rattaché à la famille `switch` via le fallback générique FAN (`FAN_STATE`/`FAN_ON`/`FAN_OFF`), pour faciliter le diagnostic terrain de cas similaires à eq67 (découvert uniquement en gate terrain, cf. retro epic 14). Lecture seule.
+
+### Gates epic-level pe-epic-15
+- le workflow BMAD reste strict : `create-story -> dev-story -> code-review` pour chaque story, avec gate terrain sur box réelle (192.168.1.21) avant clôture, cohérent avec la pratique des epics 11-14 ;
+- aucune story de cet epic ne modifie le comportement de mapping, de validation ou de publication existant : lecture seule des métadonnées de diagnostic ;
+- si une story nécessite d'ajouter un champ au payload diagnostic daemon (state_class, statut streaming, famille FAN) avant de pouvoir le consommer côté console, ce point doit être cadré explicitement dans la story correspondante lors de `create-story`, sans réouvrir le mapping des epics 12/13/14 ;
+- principe directeur permanent (issu des rétrospectives 13/14) : toujours réévaluer l'alignement UI/daemon à chaque nouvelle extension de capacité daemon, même hors AC explicite.
