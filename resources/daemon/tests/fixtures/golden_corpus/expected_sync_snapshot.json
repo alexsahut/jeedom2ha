@@ -11495,6 +11495,8 @@
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
+        "streaming_actif": false,
+        "streaming_cibles_count": 0,
         "total_equipments": 58
       }
     },
