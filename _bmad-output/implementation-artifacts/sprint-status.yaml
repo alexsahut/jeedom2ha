@@ -57,7 +57,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-03'  # Story 13.4 code-review APPROVE ; statut done
+last_updated: '2026-07-05'  # Story 15.1 creee via create-story ; pe-epic-15 in-progress
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -282,3 +282,14 @@ development_status:
   pe-epic-14: done
   14-1-fan-state-on-off-generalisation-switch-family: done  # gate terrain PASS sur 192.168.1.21 (2e passage) : eq67/cmd382 publie homeassistant/switch/jeedom2ha_67_382/config, etat ON, zero regression eq583/eq628. Correctif fallback single-trio-per-family requis (1er passage gate terrain avait revele des noms de cmd heterogenes non couverts par le groupement par nom) ; 10/10 tests story PASS, 1456 passed suite complete, 24 echecs pre-existants inchanges.
   pe-epic-14-retrospective: done  # retro 2026-07-05 : manquement gouvernance (epic jamais formalise dans epics-projection-engine.md malgre consigne BMAD explicite) + gate terrain a revele un cas non couvert par les tests unitaires
+
+  # ==============================================================
+  # pe-epic-15 — Visibilite console des capacites daemon (Energy, streaming, FAN)
+  # Ajoute par correct-course 2026-07-05 — SCP approuve
+  # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-05-epic-visibilite-console.md
+  # Lecture seule cote desktop/php + desktop/js, aucune reouverture des epics 12/13/14
+  # ==============================================================
+  pe-epic-15: in-progress  # Story 15.1 creee le 2026-07-05 (create-story)
+  15-1-visibilite-energy-state-class-console: done  # code-review termine 2026-07-05 (0 High/Medium, 1 Low en follow-up)
+  15-2-visibilite-statut-streaming-runtime: backlog
+  15-3-visibilite-parite-fan-switch-console: backlog

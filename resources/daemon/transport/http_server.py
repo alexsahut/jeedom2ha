@@ -2068,14 +2068,23 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                         coverable_cmds = [c for c in eq.cmds if c.generic_type]
                         unmapped_cmds = [c for c in coverable_cmds if c.id not in mapped_cmd_ids]
 
-                        matched_commands = [
-                            {
+                        reason_details = map_result.reason_details or {}
+                        matched_commands = []
+                        for c in eq.cmds:
+                            if c.id not in mapped_cmd_ids:
+                                continue
+                            entry = {
                                 "cmd_id": c.id,
                                 "cmd_name": c.name,
                                 "generic_type": c.generic_type,
                             }
-                            for c in eq.cmds if c.id in mapped_cmd_ids
-                        ]
+                            state_class = reason_details.get("state_class")
+                            if state_class:
+                                entry["state_class"] = state_class
+                                unit_of_measurement = reason_details.get("unit_of_measurement")
+                                if unit_of_measurement:
+                                    entry["unit_of_measurement"] = unit_of_measurement
+                            matched_commands.append(entry)
                         if unmapped_cmds:
                             unmatched_commands = [
                                 {
