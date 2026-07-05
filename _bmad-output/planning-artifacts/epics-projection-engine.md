@@ -192,6 +192,7 @@ _Aucun document UX spécifique au cycle moteur de projection n'a été identifi�
 | FR31-FR35 | Epic 6 | Feature 6 — Diagnostic explicable et actionnable |
 | FR46-FR50 | pe-epic-12 | Feature 9 — Restitution d'état runtime Jeedom → HA |
 | Energy HA statistics / W-kWh auto-discovery | pe-epic-13 | SCP 2026-06-30 — Energie HA exploitable : statistiques, prises mesureuses et auto-decouverte W/kWh |
+| Parité générique FAN_* -> switch (composant `switch` déjà ouvert) | pe-epic-14 | SCP 2026-07-04 — Parité générique FAN_STATE/FAN_ON/FAN_OFF -> switch family (formalisation rétroactive 2026-07-05, cf. retro pe-epic-14) |
 
 **NFR coverage :**
 
@@ -1924,3 +1925,18 @@ Aligner README, versions et handoff terrain avec le comportement livre : sensors
 - les entites primaires historiques conservent leurs `unique_id` et `entity_id` attendus ;
 - les nouveaux sensors power/energy publies sont utilisables par les statistiques long-terme HA ou par l'integration Riemann ;
 - aucune conversion W -> kWh, aucune modification Jeedom, aucun historique retroactif cree par le daemon.
+
+---
+
+## Epic 14 — Parité générique FAN_* -> switch (pompe filtration piscine)
+
+Epic ajouté par `sprint-change-proposal-2026-07-04-fan-switch-parity.md` (correct-course 2026-07-04, signalement ClawBox : eq67/cmd382, plugin pool "Filtration", `generic_type=FAN_STATE`, jamais exporté vers HA). Scope Minor / Direct Adjustment : le composant HA cible (`switch`) est déjà ouvert dans `PRODUCT_SCOPE`, aucune gouvernance FR40/NFR10 supplémentaire à rejouer. Cette section formalise rétroactivement l'epic dans le document de référence (2026-07-05) : l'epic avait été exécuté et clôturé (story 14.1 `done`, gate terrain PASS) sans jamais être formalisé ici, un manquement de process capturé dans la retro `pe-epic-14-retro-2026-07-05.md`.
+
+### Story 14.1 — FAN_STATE on/off : généralisation de la switch family
+Généraliser `_group_switch_cmds` (switch.py) et `_switch_readback_cmd_ids` (binary_sensor.py) pour reconnaître dynamiquement une famille `FAN` (`FAN_STATE`/`FAN_ON`/`FAN_OFF`) en plus de `SWITCH`, sans changement de slot registry ni ouverture de nouveau composant HA. Ajouter `FAN_ON`/`FAN_OFF` à la table de routage commande HA → Jeedom.
+
+### Gates epic-level pe-epic-14
+- le composant HA cible est déjà ouvert dans `PRODUCT_SCOPE` ("switch") — aucune ouverture FR40/NFR10 à instruire ;
+- gate de clôture : eq67/cmd382 publié en switch MQTT HA, état non-`unknown`, zéro régression sur les groupes SWITCH_*/ENERGY_* existants (eq583, eq628) ;
+- le gate terrain a révélé un cas non couvert par les tests unitaires initiaux (noms de commande hétérogènes sans préfixe commun) ; correctif "single-trio-per-family" appliqué et re-vérifié avant clôture ;
+- **enseignement de gouvernance retenu** : même un changement scope Minor/Direct Adjustment doit être rattaché à une entrée epic formalisée dans ce document, avec retrospective de clôture — pas de bypass de la structure BMAD quel que soit le niveau de scope.
