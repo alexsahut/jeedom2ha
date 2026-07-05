@@ -2050,6 +2050,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         unmatched_commands = []
         map_result = None
         pub_decision = None
+        family_reason_code = None
 
         el_result = eligibility.get(eq_id)
         if el_result:
@@ -2063,6 +2064,7 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
 
                 if map_result:
                     reason_code = map_result.reason_code
+                    family_reason_code = map_result.reason_code
                     confidence_map = {
                         "sure": "Sûr",
                         "probable": "Probable",
@@ -2244,6 +2246,9 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
             # Lecture stricte côté frontend — ne jamais recalculer localement.
             "pipeline_step_visible": pipeline_step_visible,
         }
+        # Story 15.3 — Visibilité parité FAN -> switch (epic 14), lecture seule.
+        if family_reason_code == "switch_fan_on_off_state":
+            eq_dict["fan_switch_parity"] = True
         equipments.append(eq_dict)
         room_key = (eq.object_id, object_name)
         rooms_equips.setdefault(room_key, []).append(eq_dict)

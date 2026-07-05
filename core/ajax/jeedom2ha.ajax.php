@@ -487,6 +487,8 @@ try {
                 'unmatched_commands' => _jeedom2ha_extract_commands($eq['unmatched_commands'] ?? []),
                 // Story 5.1 — signal actions_ha en passthrough strict (aucun calcul local)
                 'actions_ha'         => $eq['actions_ha'] ?? null,
+                // Story 15.3 — passthrough additif de fan_switch_parity (jamais de valeur inventee)
+                'fan_switch_parity'  => array_key_exists('fan_switch_parity', $eq) ? (bool)$eq['fan_switch_parity'] : null,
               ];
             }
           }

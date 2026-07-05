@@ -1128,6 +1128,11 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
           for (var eqIdx = 0; eqIdx < eqs.length; eqIdx++) {
             var eq = eqs[eqIdx];
             var reasonDescription = getDiagnosticReasonLabel(eq);
+            // Story 15.3 - badge Parité FAN → switch additif quand fourni par le daemon (jamais de placeholder si absent/faux).
+            var fanParityBadgeHtml = '';
+            if (eq.fan_switch_parity === true) {
+              fanParityBadgeHtml = ' <span style="background-color:#fff3e0;color:#e65100;padding:1px 4px;border-radius:3px;font-size:0.85em;font-family:monospace;border:1px solid #ffcc80;">{{Parité FAN &rarr; switch}}</span>';
+            }
             // Accordéon disponible pour TOUS les équipements in-scope (y compris Publié)
             var chevron = '<i class="fas fa-chevron-right diag-chevron" style="margin-right:6px;font-size:0.8em;color:#aaa;transition:transform 0.15s;"></i>';
 
@@ -1151,7 +1156,7 @@ $('.eqLogicAction[data-action=diagnostic]').on('click', function() {
             // Story 4.6 — AC 6 : data-eq-id sur chaque ligne pour le ciblage depuis la home.
             html += '<tr class="diag-expandable" style="cursor:pointer;" data-eq-id="' + eq.eq_id + '" data-detail=\'' + detailData.replace(/'/g, '&#39;') + '\'>';
             html += '<td style="vertical-align:middle;"><strong>' + objName + '</strong></td>';
-            html += '<td style="white-space:nowrap;">' + chevron + eq.name + '</td>';
+            html += '<td style="white-space:nowrap;">' + chevron + eq.name + fanParityBadgeHtml + '</td>';
             // Story 4.6 — AC 2 : colonne Écart (nouvelle, avant Statut).
             html += '<td>' + getEcartBadge(eq.ecart) + '</td>';
             var partialSuffix = '';
