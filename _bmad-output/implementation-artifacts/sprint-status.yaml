@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-07-05
+# last_updated: 2026-07-06
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -305,4 +305,5 @@ development_status:
   # Absorbe backlog-icebox.md §1 (drill-down commande par commande) dans Story 16.4
   # Aucun override HA ne modifie le generic_type Jeedom natif (non-regression Homebridge)
   # ==============================================================
-  pe-epic-16: backlog  # mapping configurable / overrides utilisateur, double granularite Jeedom/HA ; cadre par SCP 2026-07-06 ; absorbe backlog-icebox §1 ; prochain epic execute (1-15 tous done)
+  pe-epic-16: in-progress  # mapping configurable / overrides utilisateur, double granularite Jeedom/HA ; cadre par SCP 2026-07-06 ; absorbe backlog-icebox §1 ; Story 16.0 (prefixe architecture) demarree 2026-07-06
+  16-0-prefixe-architecture-contrat-override: done  # code-review OK 2026-07-06 (0 High ; issues Medium/Low corrigees) ; 970 tests passed
