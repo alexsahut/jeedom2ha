@@ -373,3 +373,19 @@ jeedom2ha/
 
 **4. Mapping Engine (`mapping/engine.py`)**
 - Centralise TOUTE la logique de traduction des "Generic Types" Jeedom vers les entités HA. Les autres composants, en particulier ceux situés dans `sync/`, ne doivent faire aucune supposition sémantique. Ils se contentent de router les états traduits par ce mapping central.nv`) isolé géré par Jeedom. Installation et résolution de dépendances limitées à `apt` pour les lib système, `pip` applicatif minimisé strict (`paho-mqtt`, `jeedomdaemon`).
+
+## Overrides — Contrat de Référence (Epic 16)
+
+Le mapping configurable (overrides utilisateur, double granularité Jeedom/HA) est cadré par deux documents d'architecture delta, tous deux `status: complete` et faisant foi pour toutes les stories 16.0-16.7 :
+
+- **`architecture-delta-pe-epic-16-mapping-configurable.md`** (backend) — points d'injection dans le pipeline canonique (D6-D8), schéma de persistance `data/ha_overrides.json` v1 (D9), non-mutation du `generic_type` Jeedom natif (D10), ordre de préséance en cas de conflit (D11), stratégie de test (D12).
+- **`architecture-delta-pe-epic-16b-mapping-configurable-endpoint.md`** (endpoint HTTP) — routes `GET /system/mapping_overrides/{jeedom_eq_id}` et `POST /action/mapping_dry_run` (D13), fonction d'écriture `save_override()` découplée du pipeline de sync (D14), absence de garde serveur assumée (D15).
+
+**Invariants non négociables (gates epic-level pe-epic-16, cf. `epics-projection-engine.md`) :**
+- Aucun override ne contourne `validate_projection()`.
+- Aucun override HA ne modifie le `generic_type` Jeedom natif.
+- Le schéma d'override est versionné dès le premier incrément (`schema_version: 1`).
+- Le diagnostic conserve la décision native et trace l'override de façon additive (`reason_details.override_applied`/`override_source`).
+- Le mode automatique reste le comportement par défaut.
+
+Toute story de l'epic 16 doit se référer à ces deux documents comme source de vérité plutôt que de redécouvrir ou rouvrir ces décisions.

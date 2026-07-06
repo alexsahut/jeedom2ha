@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-07-05
+# last_updated: 2026-07-06
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -49,6 +49,9 @@
 #          pe-epic-14 = Parité générique FAN_* -> switch (formalisé dans epics-projection-engine.md le 2026-07-05, done)
 #          pe-epic-15 = Visibilité console des capacités daemon (Energy state_class, streaming, FAN parity) — done,
 #                       formalisé par sprint-change-proposal-2026-07-05-epic-visibilite-console.md, 3/3 stories done, gate terrain de cloture PASS 2026-07-05
+#          pe-epic-16 = mapping configurable commande par commande (renumerotation de pe-epic-12,
+#                       cadre par sprint-change-proposal-2026-07-06-mapping-configurable.md),
+#                       absorbe backlog-icebox.md §1 (drill-down commande), backlog, prochain epic execute
 #   Objectif: Pipeline canonique à 5 étapes, moteur de projection explicable,
 #             registre HA gouverné à 3 états, diagnostic explicable et actionnable,
 #             actionnabilite produit gouvernee, refactor dispatch registry-driven,
@@ -57,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-05'  # pe-epic-15 flip done (3/3 stories + gate terrain de cloture PASS)
+last_updated: '2026-07-06'  # pe-epic-16 cadre (correct-course, renumerotation de pe-epic-12) et ajoute en backlog
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -293,3 +296,14 @@ development_status:
   15-1-visibilite-energy-state-class-console: done  # code-review termine 2026-07-05 (0 High/Medium, 1 Low en follow-up)
   15-2-visibilite-statut-streaming-runtime: done  # code-review approve 2026-07-05, aucun finding
   15-3-visibilite-parite-fan-switch-console: done  # code-review terminee 2026-07-05, Approve
+
+  # ==============================================================
+  # pe-epic-16 — Mapping configurable commande par commande (renumerotation de pe-epic-12)
+  # Ajoute par correct-course 2026-07-06 — SCP approuve
+  # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-06-mapping-configurable.md
+  # Renumerote le cadrage historique pe-epic-12 (jamais execute, numero recycle par le runtime state streaming)
+  # Absorbe backlog-icebox.md §1 (drill-down commande par commande) dans Story 16.4
+  # Aucun override HA ne modifie le generic_type Jeedom natif (non-regression Homebridge)
+  # ==============================================================
+  pe-epic-16: in-progress  # mapping configurable / overrides utilisateur, double granularite Jeedom/HA ; cadre par SCP 2026-07-06 ; absorbe backlog-icebox §1 ; Story 16.0 (prefixe architecture) demarree 2026-07-06
+  16-0-prefixe-architecture-contrat-override: done  # code-review OK 2026-07-06 (0 High ; issues Medium/Low corrigees) ; 970 tests passed

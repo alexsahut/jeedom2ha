@@ -1961,3 +1961,248 @@ Indiquer, dans le diagnostic équipement, quand un équipement a été rattaché
 - aucune story de cet epic ne modifie le comportement de mapping, de validation ou de publication existant : lecture seule des métadonnées de diagnostic ;
 - si une story nécessite d'ajouter un champ au payload diagnostic daemon (state_class, statut streaming, famille FAN) avant de pouvoir le consommer côté console, ce point doit être cadré explicitement dans la story correspondante lors de `create-story`, sans réouvrir le mapping des epics 12/13/14 ;
 - principe directeur permanent (issu des rétrospectives 13/14) : toujours réévaluer l'alignement UI/daemon à chaque nouvelle extension de capacité daemon, même hors AC explicite.
+```md
+---
+
+### Epic 16 — Le mapping configurable donne la main à l'utilisateur expert sans casser le pipeline explicable ni la config Homebridge existante
+
+**Valeur utilisateur :** L'utilisateur expert peut corriger ou affiner la projection HA d'une commande Jeedom lorsque le moteur automatique est trop prudent ou incomplet, voir explicitement ce que Home Assistant attend pour que l'entité fonctionne, et appliquer une surcharge HA locale sans jamais modifier le `generic_type` Jeedom natif (pour préserver une configuration Homebridge fonctionnelle en parallèle).
+
+**Résultat observable :** Une couche d'overrides optionnelle, versionnée et réversible s'ajoute au-dessus du pipeline automatique, avec une hiérarchie de configuration pièce -> équipement -> commande inspirée de Homebridge. Pour chaque commande, l'utilisateur voit le `generic_type` Jeedom actuel, l'attendu Home Assistant pour le composant visé, et une proposition automatique si aucun `generic_type` n'est configuré. Aucun override ne publie une projection HA structurellement invalide, et aucun override HA ne réécrit le `generic_type` Jeedom natif.
+
+**FRs couverts :** FR23, FR24, FR25, FR31, FR40, FR44, FR45
+
+**ARs clés :** AR3, AR6, AR11, AR13, D6/D11 à préciser
+
+**NFRs directement adressés :** NFR4, NFR10, NFR11, NFR12
+
+**Absorbe :** `backlog-icebox.md` §1 (drill-down commande par commande) — même hiérarchie niveau 4, traité en lecture seule dans Story 16.4 avant capacité d'édition.
+
+**Invariants à porter en stories :**
+- un override ne contourne jamais la validation HA obligatoire ;
+- un override HA ne réécrit jamais le `generic_type` Jeedom natif — la surcharge vit au niveau du pipeline jeedom2ha uniquement ;
+- la décision native du moteur reste visible dans le diagnostic, avec l'attendu HA affiché par commande ;
+- tout override est réversible et traçable (`override_*`) ;
+- le schéma d'override est versionné dès la première story ;
+- 16a livre un backend testable sans UI riche ;
+- 16b ne démarre qu'après stabilisation du contrat backend, et absorbe le drill-down commande en lecture seule avant l'édition.
+
+### Story 16.0 : Préfixe d'architecture — contrat d'override double granularité, points d'injection et limites
+
+En tant que mainteneur,
+je veux formaliser les types d'overrides autorisés (dont la distinction override Jeedom vs override HA local), leurs points d'injection dans le pipeline et leurs limites,
+afin de garantir que la configuration utilisateur ne casse ni la validation HA, ni le diagnostic, ni une configuration Homebridge existante.
+
+**Acceptance Criteria :**
+
+**Given** le pipeline canonique à 5 étapes
+**When** la story est exécutée
+**Then** les types d'overrides autorisés sont listés et bornés (éligibilité, candidat mapping, décision, métadata)
+**And** un override HA local est explicitement distingué d'une modification du `generic_type` Jeedom natif — cette dernière reste hors scope et interdite
+**And** l'interdiction de publier une projection invalide est documentée comme invariant bloquant
+
+**Given** un override de mapping ou de décision
+**When** son point d'injection est décrit
+**Then** le document d'architecture précise l'ordre d'application par rapport au mapping automatique, à `validate_projection()` et à `decide_publication()`
+**And** le format du schéma JSON v1 est tranché ou renvoyé vers une décision explicite de Story 16.1
+
+**Dev notes :**
+- story préfixe obligatoire avant toute implémentation 16a
+- cite `sprint-change-proposal-2026-07-06-mapping-configurable.md`
+
+---
+
+### Story 16.1 : Persistance backend du schéma d'overrides v1
+
+En tant qu'utilisateur expert,
+je veux que mes overrides soient persistants, exportables et associés à des IDs Jeedom stables,
+afin de conserver mes choix lors des resyncs, upgrades et renommages.
+
+**Acceptance Criteria :**
+
+**Given** un override valide
+**When** il est sauvegardé
+**Then** il est stocké selon un schéma JSON v1 documenté, référencé par `eqLogic.id`/`cmd.id`
+**And** le schéma ne modifie jamais le `generic_type` Jeedom natif — l'override HA vit dans une structure séparée
+**And** le stockage ne crée pas de table SQL custom
+
+**Given** un import ou une migration de schéma
+**When** le schéma est invalide ou trop récent
+**Then** le backend refuse l'application de l'override avec un diagnostic explicite
+**And** aucun publish MQTT n'est déclenché par l'import seul
+
+**Dev notes :**
+- 16a backend-first ; l'édition manuelle JSON peut suffire au premier incrément si documentée
+- export/import minimal requis avant UI riche
+
+---
+
+### Story 16.2 : Table "attendu Home Assistant par commande" et application backend des overrides de mapping candidat
+
+En tant qu'utilisateur expert,
+je veux voir ce que Home Assistant attend pour chaque commande et pouvoir forcer un candidat HA ou mapper explicitement certaines commandes,
+afin de résoudre un cas que le moteur automatique ne peut pas inférer correctement, et de comprendre pourquoi.
+
+**Acceptance Criteria :**
+
+**Given** une commande Jeedom, mappée ou non
+**When** le backend résout son "attendu HA"
+**Then** il expose, en lecture, le(s) composant(s) HA et `generic_type` compatibles pour cette commande, dérivés de `ha-projection-reference.yaml`
+**And** si la commande n'a aucun `generic_type` configuré, une proposition automatique est calculée à partir du moteur de mapping existant
+
+**Given** un équipement éligible avec override de mapping
+**When** le pipeline exécute l'étape de mapping
+**Then** le moteur conserve le candidat natif
+**And** applique le candidat surchargé avant validation HA
+**And** trace la source `override_*` dans le résultat de diagnostic, sans jamais réécrire le `generic_type` Jeedom natif
+
+**Given** un override qui produit un candidat HA invalide
+**When** `validate_projection()` s'exécute
+**Then** la validation HA échoue explicitement
+**And** la publication reste interdite
+**And** la cause indique que l'override est invalide sans masquer la décision native
+
+**Dev notes :**
+- golden corpus obligatoire : cas nominal, cas invalide, cas "proposition auto", non-régression sans override
+- aucun bypass de `validate_projection()`
+- source de vérité pour l'attendu HA = `ha-projection-reference.md`/`.yaml`, jamais une table dupliquée en dur
+
+---
+
+### Story 16.3 : Overrides de publication et exclusion explicite
+
+En tant qu'utilisateur expert,
+je veux exclure un équipement ou une commande, ou autoriser une publication dont la projection est valide mais bloquée par une politique produit,
+afin de reprendre la main sans confondre ce choix avec une réussite automatique.
+
+**Acceptance Criteria :**
+
+**Given** un équipement ou une commande exclu par override utilisateur
+**When** le pipeline évalue l'éligibilité ou la décision
+**Then** l'exclusion est prioritaire, lisible et réversible
+**And** le diagnostic signale l'origine utilisateur de l'exclusion
+
+**Given** un équipement dont la projection HA est valide mais dont la confiance est faible ou la politique produit bloque la publication
+**When** un override autorise la publication
+**Then** `projection_validity.is_valid == true` reste une condition obligatoire
+**And** la décision finale indique explicitement qu'elle vient d'un override
+
+**Dev notes :**
+- "forcer publication" signifie "forcer la décision après validation HA réussie", jamais publier un payload invalide
+
+---
+
+### Story 16.4 : Diagnostic override-aware avec drill-down commande par commande (absorbe backlog-icebox §1)
+
+En tant qu'utilisateur,
+je veux déplier un équipement pour voir, commande par commande, le `generic_type` Jeedom actuel, l'attendu Home Assistant, la décision native et l'éventuelle surcharge,
+afin de comprendre et maintenir mes choix avec la granularité fine demandée par `backlog-icebox.md` §1.
+
+**Acceptance Criteria :**
+
+**Given** un équipement publié
+**When** l'utilisateur déplie le drill-down commande
+**Then** il voit, pour chaque commande retenue ou rejetée : le `generic_type` Jeedom, l'attendu HA, et la décision de mapping — en lecture seule pour les commandes non surchargées
+**And** ce niveau 4 (`pièce -> équipement -> commande`) ne pollue pas l'Epic 2 (santé du pont) ni ne modifie les statuts Epic 3 (niveau équipement), conformément aux garde-fous `backlog-icebox.md` §1
+
+**Given** un équipement avec override appliqué
+**When** l'utilisateur consulte le diagnostic
+**Then** il voit la décision native et la décision surchargée
+**And** le diagnostic conserve une cause principale canonique
+**And** les champs ajoutés sont additifs et compatibles avec le contrat 4D
+
+**Given** un override sans remédiation utilisateur directe
+**When** la traduction `cause_label` / `cause_action` est construite
+**Then** la règle Epic 6 "no faux CTA" reste appliquée
+
+**Dev notes :**
+- centraliser les traductions dans `cause_mapping.py`
+- le drill-down reste lecture seule tant que 16b (édition) n'est pas livré
+- garde-fous `backlog-icebox.md` §1 à reporter explicitement dans cette story lors de `create-story`
+
+---
+
+### Story 16.5 : UI Jeedom de configuration par équipement, inspirée Homebridge
+
+En tant qu'utilisateur expert,
+je veux configurer un override depuis une surface Jeedom dédiée organisée par pièce comme Homebridge, avec l'attendu HA visible par commande,
+afin de ne pas modifier le JSON à la main et de savoir quel `generic_type` choisir pour que l'entité fonctionne — ce que Homebridge lui-même ne montre pas.
+
+**Acceptance Criteria :**
+
+**Given** la surface de configuration avancée
+**When** l'utilisateur l'ouvre
+**Then** elle utilise l'UI native Jeedom sans framework front externe
+**And** elle présente une arborescence pièce -> équipement -> commande (reprenant le classement par pièce de Homebridge)
+**And** pour chaque commande, elle affiche côte à côte le `generic_type` Jeedom actuel et l'attendu Home Assistant pour le composant visé
+**And** pour une commande sans `generic_type`, elle affiche la proposition automatique calculée en Story 16.2
+**And** elle permet de revenir au mode automatique par équipement ou par commande
+
+**Given** une modification d'override HA local depuis l'UI
+**When** l'utilisateur sauvegarde
+**Then** le backend valide le schéma et la projection avant toute application effective
+**And** le `generic_type` Jeedom natif n'est jamais modifié par cette action
+**And** les erreurs de validation HA sont visibles
+
+**Dev notes :**
+- 16b ne démarre qu'après stabilisation du contrat backend 16a
+- définir une stratégie de test front minimale avant implémentation
+- inspiration Homebridge pour le classement par pièce uniquement — corriger explicitement son défaut identifié (absence de visibilité sur l'attendu HomeKit/HA)
+
+---
+
+### Story 16.6 : Preview / dry-run avant application
+
+En tant qu'utilisateur expert,
+je veux prévisualiser l'effet d'un override avant de l'appliquer,
+afin d'éviter de polluer Home Assistant avec une configuration approximative.
+
+**Acceptance Criteria :**
+
+**Given** un override en cours d'édition
+**When** l'utilisateur demande une preview
+**Then** le backend retourne le résultat "auto" et le résultat "avec override"
+**And** aucune publication MQTT n'est déclenchée pendant le dry-run
+**And** les erreurs de validation HA sont visibles avant sauvegarde
+
+**Given** un export support
+**When** un override est impliqué
+**Then** l'export inclut les raisons de refus et la trace de preview utile au support
+
+---
+
+### Story 16.7 : Gate terrain et profils partageables
+
+En tant que mainteneur,
+je veux valider les overrides sur un corpus terrain et préparer l'export/import de profils,
+afin de transformer la configurabilité en avantage marketplace durable, en cohérence avec le classement par pièce hérité de Homebridge.
+
+**Acceptance Criteria :**
+
+**Given** la vague 16a/16b implémentée
+**When** le gate terrain est exécuté
+**Then** au moins trois familles d'équipements réelles sont validées avec overrides HA locaux, retour auto et diagnostic drill-down commande
+**And** le corpus inclut au moins un cas d'override invalide correctement refusé
+**And** au moins un cas démontre qu'un override HA n'a pas modifié le `generic_type` Jeedom natif (non-régression Homebridge)
+
+**Given** un profil exporté
+**When** il est partagé ou importé
+**Then** il est anonymisable et ne contient pas de secret
+**And** son format reste compatible avec le schéma versionné
+
+**Dev notes :**
+- les profils partageables sont un objectif de croissance ; ne pas bloquer 16a si le partage communautaire est trop large
+- documentation utilisateur FR requise avant closeout epic
+
+---
+
+### Gates epic-level pe-epic-16
+
+- Story 16.0 est obligatoire avant toute implémentation d'override.
+- Aucun override ne contourne `validate_projection()`.
+- Aucun override HA ne modifie le `generic_type` Jeedom natif (non-régression Homebridge garantie).
+- Le schéma d'override est versionné dès le premier incrément.
+- Le diagnostic conserve la décision native, trace l'override de façon additive, et affiche l'attendu HA par commande.
+- 16a backend testable précède 16b UI Jeedom.
+- Le mode automatique reste le comportement par défaut.
+- Le drill-down commande par commande (`backlog-icebox.md` §1) est livré en lecture seule dans Story 16.4 avant toute capacité d'édition en 16b.

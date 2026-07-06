@@ -11,6 +11,8 @@ Ce document trace les sujets qualifiés par le PM qui sont explicitement HORS SC
 
 ## 1. Transparence et observabilité du mapping (Niveau Commande)
 
+**Statut :** Absorbé par `pe-epic-16` (Story 16.4) depuis le correct-course du 2026-07-06 — voir `sprint-change-proposal-2026-07-06-mapping-configurable.md`. Cet item n'est plus icebox, il est cadré et planifié.
+
 * **Intitulé :** Drill-down commande par commande
 * **Résumé produit :** Permettre à l'utilisateur de déplier un équipement publié pour consulter, en lecture seule, les commandes sous-jacentes retenues et rejetées par le modèle de mapping, afin de fiabiliser le diagnostic local. Révèle la composition fine de l'équipement HA.
 * **Horizon recommandé :** Post-V1.1 (Maturité produit avancée - Frontière C du PRD)
