@@ -44,6 +44,7 @@ from models.ui_contract_4d import (
 from models.actions_ha import build_actions_ha
 from mapping.registry import MapperRegistry
 from mapping.button import ScenarioButtonMapper
+from mapping.overrides import apply_type_override, list_overrides
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
@@ -193,6 +194,7 @@ async def _publish_additional_sensors(
     publisher_registry: Optional[PublisherRegistry],
     mqtt_bridge,
     mapping_counters: Dict[str, int],
+    overrides_cache: Optional[Dict[str, dict]] = None,
 ) -> None:
     """Publier les sensors secondaires d'un eqLogic multi-sensor (Story 11.1 PE).
 
@@ -200,11 +202,20 @@ async def _publish_additional_sensors(
     publication) et alimente les compteurs comme une entité publiée à part entière.
     Honnêteté du diagnostic : si un secondaire devant être publié échoue, le résultat
     technique du mapping primaire passe à "failed" pour ne pas afficher un faux succès.
+
+    `overrides_cache` (Story 16.2 code-review) : dict `list_overrides(_DATA_DIR)` déjà
+    chargé par l'appelant pour tout le cycle de sync, évite une relecture disque du
+    fichier d'overrides par capteur secondaire.
     """
     bridge_ready = bool(mqtt_bridge and getattr(mqtt_bridge, "is_connected", False))
     eq_id = primary_mapping.jeedom_eq_id
 
-    for secondary in primary_mapping.additional_mappings:
+    for index, secondary in enumerate(primary_mapping.additional_mappings):
+        # Story 16.2 — même injection override que le chemin primaire, avant validation HA.
+        # Le secondaire porte son propre cmd_id dans reason_details → matching par commande.
+        secondary = apply_type_override(secondary, _DATA_DIR, overrides=overrides_cache)
+        primary_mapping.additional_mappings[index] = secondary
+
         secondary.projection_validity = validate_projection(
             secondary.ha_entity_type, secondary.capabilities
         )
@@ -770,6 +781,11 @@ async def _detect_lifecycle_changes(
     - Area change (runtime): logs INFO [LIFECYCLE].
     - Retyping (runtime or boot): unpublishes old topic BEFORE new publish.
       If unpublish fails: defers into pending_discovery_unpublish and continues.
+
+    Story 16.2 (code-review) : `mapping` is received here AFTER `apply_type_override()` has
+    already run. This is intentional — the first sync cycle after a user applies (or removes)
+    an HA-type override legitimately IS a retyping event and must unpublish the stale topic
+    the same way a native mapper retype would (see test_override_qui_change_ha_entity_type_declenche_le_retypage_lifecycle).
     """
     # --- Runtime detection (previous_decision from app["publications"]) ---
     if previous_decision is not None and getattr(previous_decision, "mapping_result", None) is not None:
@@ -1285,19 +1301,28 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         await _replay_deferred_discovery_unpublish(publisher, pending_discovery_unpublish)
     if mqtt_bridge and mqtt_bridge.is_connected:
         _replay_deferred_local_availability_cleanup(mqtt_bridge, pending_local_cleanup)
-    
+
+    # Story 16.2 code-review — charger les overrides UNE SEULE FOIS pour tout le cycle
+    # de sync (au lieu d'une relecture disque par équipement/capteur secondaire).
+    overrides_cache = list_overrides(_DATA_DIR)
+
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
             continue
-        
+
         eq = snapshot.eq_logics.get(eq_id)
         if not eq:
             continue
-        
+
         mapping = mapper_registry.map(eq, snapshot)
         if mapping is None:
             continue  # Not mapped by any mapper
-        
+
+        # Story 16.2 — override de type utilisateur, injecté ENTRE étape 2 (map) et étape 3
+        # (validate_projection) : patch d'une copie, generic_type natif intact (D10),
+        # validation HA jugera le type surchargé (D11, aucun bypass).
+        mapping = apply_type_override(mapping, _DATA_DIR, overrides=overrides_cache)
+
         mappings[eq_id] = mapping
         previous_decision = request.app["publications"].get(eq_id)
 
@@ -1382,6 +1407,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 publisher_registry=publisher_registry,
                 mqtt_bridge=mqtt_bridge,
                 mapping_counters=mapping_counters,
+                overrides_cache=overrides_cache,
             )
 
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
