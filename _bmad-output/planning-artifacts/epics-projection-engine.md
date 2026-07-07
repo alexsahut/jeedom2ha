@@ -1961,7 +1961,7 @@ Indiquer, dans le diagnostic équipement, quand un équipement a été rattaché
 - aucune story de cet epic ne modifie le comportement de mapping, de validation ou de publication existant : lecture seule des métadonnées de diagnostic ;
 - si une story nécessite d'ajouter un champ au payload diagnostic daemon (state_class, statut streaming, famille FAN) avant de pouvoir le consommer côté console, ce point doit être cadré explicitement dans la story correspondante lors de `create-story`, sans réouvrir le mapping des epics 12/13/14 ;
 - principe directeur permanent (issu des rétrospectives 13/14) : toujours réévaluer l'alignement UI/daemon à chaque nouvelle extension de capacité daemon, même hors AC explicite.
-```md
+
 ---
 
 ### Epic 16 — Le mapping configurable donne la main à l'utilisateur expert sans casser le pipeline explicable ni la config Homebridge existante
@@ -2119,6 +2119,7 @@ afin de comprendre et maintenir mes choix avec la granularité fine demandée pa
 - centraliser les traductions dans `cause_mapping.py`
 - le drill-down reste lecture seule tant que 16b (édition) n'est pas livré
 - garde-fous `backlog-icebox.md` §1 à reporter explicitement dans cette story lors de `create-story`
+- **Rappel SCP 2026-07-07 (Story 16.3)** : le diagnostic override-aware doit consommer exactement les reason_codes actés en 16.3 — `publication_excluded_eqlogic` / `publication_excluded_command` / `publication_forced` (`reason_details.publication_override_applied`/`override_source`/`underlying_confidence`) — sans en introduire de nouveaux qui recouvriraient la même sémantique. Réf. `_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-07-16-3-overrides-schema.md`.
 
 ---
 
@@ -2206,3 +2207,109 @@ afin de transformer la configurabilité en avantage marketplace durable, en coh�
 - 16a backend testable précède 16b UI Jeedom.
 - Le mode automatique reste le comportement par défaut.
 - Le drill-down commande par commande (`backlog-icebox.md` §1) est livré en lecture seule dans Story 16.4 avant toute capacité d'édition en 16b.
+
+---
+
+### Epic 17 — Cadrage de l'ouverture gouvernée de `number` et `select` (consigne / mode) sans ouverture cosmétique
+
+**Valeur utilisateur :** décider explicitement, preuve à l'appui, si les deux derniers composants HA connus et validables mais non gouvernés (`number`, `select`) doivent être ouverts dans `PRODUCT_SCOPE`, plutôt que les ouvrir « parce qu'ils sont registrés ». Cet epic protège la promesse de gouvernance FR40/NFR10 : un composant ne s'ouvre que si un besoin réel de consigne (`number`) ou de mode distinct (`select`) est prouvé par un `generic_type` de la **taxonomie Jeedom universelle** (`resources/daemon/mapping/registry.py`) non déjà couvert par les types ouverts — **indépendamment du corpus de la box du mainteneur** : jeedom2ha est distribué sur le Jeedom Market, donc « réel » = « présent dans le catalogue `generic_type` », pas « présent sur ma box ».
+
+**Résultat observable :** deux stories de cadrage classent chaque cas candidat (`déjà couvert par composition de types existants` / `justifie une ouverture gouvernée` / `pas de besoin réel prouvé → report`) et, lorsqu'une ouverture est justifiée, produisent un handoff précis (équipement cible, `generic_type`, cas nominal + cas d'échec `validate_projection()` à écrire, test de non-régression 4D) vers une future story d'ouverture ou un correct-course. Aucune de ces stories ne modifie `PRODUCT_SCOPE`, le mapping, la validation ou la publication.
+
+**FRs couverts :** FR40 (gouvernance d'ouverture)
+
+**ARs clés :** AR6 (registre 3 états), AR13 (ouverture sous 3 conditions dans le même incrément)
+
+**NFRs directement adressés :** NFR10
+
+**Origine :** demande Alexandre 2026-07-07 après audit des composants HA non gouvernés (`number`, `select` présents dans `HA_COMPONENT_REGISTRY`, absents de `PRODUCT_SCOPE`). Reprend le garde-fou explicite de la Story 10.4 (`number`/`select` ne s'introduisent que si un besoin réel de consigne/mode est prouvé). Voir `sprint-change-proposal-2026-07-07-cadrage-number-select.md`.
+
+**Invariants à porter en stories :**
+- stories de cadrage uniquement — aucune ouverture effective de `PRODUCT_SCOPE`, aucune modification de mapping/validation/publication ;
+- **driver de classement = taxonomie `generic_type` Jeedom (universelle, `resources/daemon/mapping/registry.py`)**, jamais le corpus d'une box particulière ; le garde-fou 10.4 interdit l'ouverture *cosmétique* (aucun `generic_type` réel), pas l'ouverture *anticipée* d'un `generic_type` réel absent de la box du mainteneur ;
+- toute ouverture effective décidée par une story reste un incrément séparé portant, dans le même incrément, les 3 preuves FR40/NFR10 (entrée `HA_COMPONENT_REGISTRY` déjà présente + cas nominal et cas d'échec `validate_projection()` + non-régression du contrat 4D), **écrites sur fixtures synthétiques — box réelle non requise** ;
+- aucun `generic_type` Jeedom natif n'est modifié ;
+- `ha-projection-reference.md`/`.yaml` reste la source-of-truth des contraintes HA.
+
+### Story 17.1 : Cadrage de l'ouverture de `number` (consigne) sans ouverture effective
+
+En tant que mainteneur,
+je veux déterminer si un besoin réel de consigne isolée justifie l'ouverture gouvernée de `number`, en identifiant les équipements Jeedom et `generic_type` candidats et en précisant les preuves FR40/NFR10 nécessaires,
+afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité technique et promesse produit.
+
+**Acceptance Criteria :**
+
+**Given** le registre HA (où `number` est déjà `connu` et `validable` : `required_fields = command_topic, platform, availability` ; `required_capabilities = has_command`) mais absent de `PRODUCT_SCOPE`
+**When** la story est exécutée
+**Then** chaque cas candidat « consigne » identifié est classé dans l'une des catégories : `déjà suffisamment couvert par composition de types existants` ; `justifie une ouverture gouvernée number` ; `pas de besoin réel prouvé → report`
+
+**Given** un cas classé `déjà suffisamment couvert`
+**When** la story est close
+**Then** la justification cite les entités HA déjà suffisantes (ex. `climate` pour une consigne de thermostat, `sensor` pour une valeur en lecture seule, `switch`)
+**And** aucune nouvelle promesse UX n'est ajoutée
+**And** `PRODUCT_SCOPE` n'est pas modifié
+
+**Given** un cas classé `justifie une ouverture gouvernée number`
+**When** la story est close
+**Then** elle ne force pas cette ouverture dans `pe-epic-17`
+**And** elle produit un handoff clair vers une future story d'ouverture ou un correct-course, précisant : le `generic_type` Jeedom cible (taxonomie universelle), le cas nominal + le cas d'échec `validate_projection()` à écrire (sur fixtures synthétiques, box réelle non requise), et le test de non-régression du contrat 4D — les 3 conditions AR13/FR40/NFR10 à livrer dans le même incrément
+
+**Given** un cas classé `pas de besoin réel prouvé`
+**When** la story est close
+**Then** la justification cite l'absence de `generic_type` Jeedom (catalogue universel) portant une consigne isolée (température de consigne autonome, niveau, volume, position numérique) non déjà couverte par un type ouvert — et non l'absence sur une box particulière
+
+**Dev notes :**
+- story de cadrage, pas d'ouverture automatique (modèle Story 10.4)
+- `number` est déjà présent dans `HA_COMPONENT_REGISTRY` — l'ouverture éventuelle ne rejoue que les preuves FR40/NFR10, pas la définition du composant
+- garde-fou `epics-projection-engine.md` (Dev notes Story 10.4) : le besoin réel de consigne doit être prouvé
+- source des contraintes HA : `ha-projection-reference.md` / `.yaml`, jamais une table dupliquée
+- aucune modification du `generic_type` Jeedom natif ; aucune ouverture cosmétique
+- cite `sprint-change-proposal-2026-07-07-cadrage-number-select.md`
+
+---
+
+### Story 17.2 : Cadrage de l'ouverture de `select` (mode) sans ouverture effective
+
+En tant que mainteneur,
+je veux déterminer si un besoin réel de mode distinct (liste d'options) justifie l'ouverture gouvernée de `select`, en identifiant les équipements Jeedom et `generic_type` candidats et en précisant les preuves FR40/NFR10 nécessaires,
+afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité technique et promesse produit.
+
+**Acceptance Criteria :**
+
+**Given** le registre HA (où `select` est déjà `connu` et `validable` : `required_fields = command_topic, options, platform, availability` ; `required_capabilities = has_command, has_options`) mais absent de `PRODUCT_SCOPE`
+**When** la story est exécutée
+**Then** chaque cas candidat « mode » identifié est classé dans l'une des catégories : `déjà suffisamment couvert par composition de types existants` ; `justifie une ouverture gouvernée select` ; `pas de besoin réel prouvé → report`
+
+**Given** un cas classé `déjà suffisamment couvert`
+**When** la story est close
+**Then** la justification cite les entités HA déjà suffisantes (ex. le mode HVAC porté par `climate`, un `switch` par état, un `sensor` de mode en lecture seule)
+**And** aucune nouvelle promesse UX n'est ajoutée
+**And** `PRODUCT_SCOPE` n'est pas modifié
+
+**Given** un cas classé `justifie une ouverture gouvernée select`
+**When** la story est close
+**Then** elle ne force pas cette ouverture dans `pe-epic-17`
+**And** elle produit un handoff clair vers une future story d'ouverture ou un correct-course, précisant : le `generic_type` Jeedom cible (taxonomie universelle), la source des `options` du `select`, le cas nominal + le cas d'échec `validate_projection()` (notamment l'absence de `has_options`) à écrire (sur fixtures synthétiques, box réelle non requise), et le test de non-régression du contrat 4D — les 3 conditions AR13/FR40/NFR10 à livrer dans le même incrément
+
+**Given** un cas classé `pas de besoin réel prouvé`
+**When** la story est close
+**Then** la justification cite l'absence de `generic_type` Jeedom (catalogue universel) portant une liste de modes discrets non déjà couverte par un type ouvert (ex. modes déjà exposés via `climate`, ou états déjà couverts par `switch`/`sensor`)
+
+**Dev notes :**
+- story de cadrage, pas d'ouverture automatique (modèle Story 10.4)
+- `select` est déjà présent dans `HA_COMPONENT_REGISTRY` — l'ouverture éventuelle ne rejoue que les preuves FR40/NFR10 ; la capability `has_options` est spécifique et doit avoir une source d'options claire (liste de modes Jeedom)
+- garde-fou `epics-projection-engine.md` (Dev notes Story 10.4) : le besoin réel de mode distinct doit être prouvé
+- source des contraintes HA : `ha-projection-reference.md` / `.yaml`, jamais une table dupliquée
+- aucune modification du `generic_type` Jeedom natif ; aucune ouverture cosmétique
+- cite `sprint-change-proposal-2026-07-07-cadrage-number-select.md`
+
+---
+
+### Gates epic-level pe-epic-17
+
+- stories de cadrage uniquement — aucune modification de `PRODUCT_SCOPE`, de mapping, de validation ou de publication ;
+- workflow BMAD strict `create-story -> dev-story -> code-review` pour chaque story ;
+- aucune ouverture effective de `number` ou `select` n'est autorisée dans cet epic : toute ouverture décidée fait l'objet d'un incrément séparé portant les 3 preuves FR40/NFR10 dans le même incrément (entrée registre déjà présente + cas nominal/échec `validate_projection()` + non-régression 4D) ;
+- `ha-projection-reference.md` reste citée ligne de preuve par ligne de preuve pour toute contrainte HA ;
+- pas de gate terrain disruptif requis (cadrage documentaire) ; toute inspection du corpus réel reste en lecture seule ;
+- chaque story se conclut par un statut explicite de classement par cas (`couvert via type existant`, `justifie ouverture`, `pas de besoin prouvé / report`).

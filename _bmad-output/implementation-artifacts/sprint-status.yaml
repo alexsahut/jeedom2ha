@@ -60,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-07'  # Story 16.2 : create-story -> correct-course (SCP Option 1) -> dev-story -> code-review -> done (998 unit passed, 0 regression)
+last_updated: '2026-07-07'  # create-story 17-1 + 17-2 (cadrage number/select) -> ready-for-dev ; pe-epic-17 in-progress (SCP 2026-07-07)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -309,3 +309,14 @@ development_status:
   16-0-prefixe-architecture-contrat-override: done  # code-review OK 2026-07-06 (0 High ; issues Medium/Low corrigees) ; 970 tests passed
   16-1-persistance-backend-schema-overrides-v1: done  # code-review OK 2026-07-06 (0 High, 1 Medium corrige, 3 Low acceptes) ; overrides.py (save_/list_/remove_), data/ha_overrides.json schema_version:1 ; 989 tests passed (0 regression)
   16-2-attendu-ha-application-overrides-mapping-candidat: done  # code-review OK 2026-07-07 (0 High, 3 Medium + 1 Low corriges) ; docstring overrides.py, cache overrides_cache (N+1 evite), test lifecycle retypage override, naming _publish_additional_sensors ; 998 unit passed (0 regression) + golden non-regression
+  16-3-overrides-publication-exclusion-explicite: done  # code-review PASS 2026-07-07 (0 Critical/High/Medium, AC1/AC2 valides) ; schema v2, resolve_publication_override, decide_publication niveaux 2b/4, PublicationDecision.reason_details ; 26 tests + 2 fixes collateraux ; 1024 passed (0 regression) ; note gouvernance : force_publish ne bypass jamais PRODUCT_SCOPE ; reste : commit/PR (action Alexandre) + cycle disruptif terrain differe (Task 0)
+  # ==============================================================
+  # pe-epic-17 — Cadrage de l'ouverture gouvernee de number et select (consigne / mode)
+  # Ajoute par correct-course 2026-07-07 — SCP approuve
+  # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-07-cadrage-number-select.md
+  # Stories de cadrage seulement (modele Story 10.4) ; AUCUNE ouverture PRODUCT_SCOPE dans cet epic
+  # Toute ouverture effective reste un increment separe sous FR40/NFR10 (registry + nominal/echec validate_projection + non-regression 4D)
+  # ==============================================================
+  pe-epic-17: in-progress  # cadrage ouverture number/select (composants HA connus/validables non gouvernes) ; cadre par SCP 2026-07-07 ; stories de cadrage seulement, aucune ouverture PRODUCT_SCOPE ; demarre 2026-07-07 (create-story 17-1)
+  17-1-cadrage-ouverture-number-consigne: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code
+  17-2-cadrage-ouverture-select-mode: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code

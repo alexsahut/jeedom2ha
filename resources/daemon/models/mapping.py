@@ -177,6 +177,12 @@ class PublicationDecision:
     should_publish: bool
     reason: str                               # e.g. "sure", "probable_bounded", "ambiguous_skipped"
     mapping_result: MappingResult = field(default=None)  # type: ignore[assignment]
+    # Story 16.3 : diagnostic dédié à la décision de publication (distinct de
+    # MappingResult.reason_details, qui décrit le mapping/la projection, étapes 2-3).
+    # Porte la paire indissociable publication_override_applied/override_source quand
+    # un override utilisateur (exclusion ou forçage) a été appliqué à l'étape 4, ainsi
+    # que underlying_confidence pour ne jamais perdre la confiance native sous "publication_forced".
+    reason_details: Optional[Dict[str, object]] = None
     state_topic: Optional[str] = None
     active_or_alive: bool = True
     discovery_published: bool = False

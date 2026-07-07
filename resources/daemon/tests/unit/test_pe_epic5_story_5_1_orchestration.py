@@ -89,12 +89,15 @@ async def test_sync_executes_5_steps_in_order_and_publishes_valid_light(cli, app
         call_order.append("validation")
         return _real_validate_projection(entity_type, capabilities)
 
-    def _decide_spy(mapping, confidence_policy="sure_probable", product_scope=None):
+    def _decide_spy(
+        mapping, confidence_policy="sure_probable", product_scope=None, publication_override=None
+    ):
         call_order.append("decision")
         return _real_decide_publication(
             mapping,
             confidence_policy=confidence_policy,
             product_scope=product_scope,
+            publication_override=publication_override,
         )
 
     async def _publish_light_spy(mapping, snapshot):
@@ -153,12 +156,15 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
             missing_capabilities=["has_command"],
         )
 
-    def _decide_spy(mapping, confidence_policy="sure_probable", product_scope=None):
+    def _decide_spy(
+        mapping, confidence_policy="sure_probable", product_scope=None, publication_override=None
+    ):
         calls.append("decision")
         return _real_decide_publication(
             mapping,
             confidence_policy=confidence_policy,
             product_scope=product_scope,
+            publication_override=publication_override,
         )
 
     _set_connected_bridge(app)

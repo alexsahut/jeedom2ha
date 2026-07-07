@@ -104,14 +104,19 @@ def test_save_override_puis_list_overrides_round_trip(tmp_path):
     assert list_overrides(data_dir) == {"553:5138": {"ha_entity_type": "switch", "source": "user"}}
 
 
-def test_save_override_persiste_schema_version_1_sur_disque(tmp_path):
-    """AC1/AC3 : persistance fichier JSON avec schema_version: 1, pas de table SQL."""
+def test_save_override_persiste_schema_version_2_sur_disque(tmp_path):
+    """AC1/AC3 : persistance fichier JSON avec schema_version, pas de table SQL.
+
+    Story 16.3 (SCP 2026-07-07) : `_SCHEMA_VERSION` est passé à 2 — tout `save_override`
+    (même sur un fichier absent) écrit désormais `schema_version: 2` (migration
+    transparente, bump au premier write).
+    """
     data_dir = str(tmp_path)
 
     save_override(553, 5138, {"ha_entity_type": "switch"}, data_dir)
 
     on_disk = _read_overrides_file(data_dir)
-    assert on_disk["schema_version"] == 1
+    assert on_disk["schema_version"] == 2
     assert on_disk["overrides"]["553:5138"]["source"] == "user"
 
 
@@ -165,11 +170,15 @@ def test_list_overrides_retourne_vide_si_fichier_absent(tmp_path):
 
 
 def test_list_overrides_refuse_schema_version_trop_recente_avec_diagnostic(tmp_path, caplog):
-    """AC4 : schema_version inconnue/trop récente -> refus explicite, pas de cold-start silencieux."""
+    """AC4 : schema_version inconnue/trop récente -> refus explicite, pas de cold-start silencieux.
+
+    Story 16.3 a étendu les versions supportées à {1, 2} — ce test utilise donc désormais
+    une version au-delà de cet ensemble (3) pour continuer à couvrir le refus explicite.
+    """
     data_dir = str(tmp_path)
     path = os.path.join(data_dir, "ha_overrides.json")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"schema_version": 2, "overrides": {"553:5138": {"source": "user"}}}, f)
+        json.dump({"schema_version": 3, "overrides": {"553:5138": {"source": "user"}}}, f)
 
     with caplog.at_level(logging.ERROR):
         result = list_overrides(data_dir)
