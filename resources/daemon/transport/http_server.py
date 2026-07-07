@@ -44,7 +44,13 @@ from models.ui_contract_4d import (
 from models.actions_ha import build_actions_ha
 from mapping.registry import MapperRegistry
 from mapping.button import ScenarioButtonMapper
-from mapping.overrides import apply_type_override, list_overrides
+from mapping.overrides import (
+    apply_type_override,
+    list_equipment_overrides,
+    list_overrides,
+    mapping_cmd_ids,
+    resolve_publication_override,
+)
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
@@ -186,6 +192,29 @@ def _make_publication_result(
     )
 
 
+def _resolve_publication_override_for_mapping(
+    mapping: MappingResult,
+    overrides_cache: Dict[str, dict],
+    equipment_overrides_cache: Dict[str, dict],
+) -> Optional[str]:
+    """Resolve `publication_override` for a mapping (Story 16.3, AC1/AC2).
+
+    Thin wrapper around `resolve_publication_override(eq_id, cmd_id, ...)` : the equipment-level
+    rules (exclusion veto, force_publish default) don't depend on `cmd_id`, but the low-level
+    function still expects one — so this loops `mapping_cmd_ids(mapping)` (same deterministic
+    first-match order as `apply_type_override`) and falls back to a sentinel `-1` (never a real
+    Jeedom cmd_id) when a mapping carries none, so equipment-level checks still run.
+    """
+    eq_id = mapping.jeedom_eq_id
+    for cmd_id in mapping_cmd_ids(mapping) or [-1]:
+        override = resolve_publication_override(
+            eq_id, cmd_id, overrides_cache, equipment_overrides_cache
+        )
+        if override is not None:
+            return override
+    return None
+
+
 async def _publish_additional_sensors(
     *,
     primary_mapping: MappingResult,
@@ -195,6 +224,7 @@ async def _publish_additional_sensors(
     mqtt_bridge,
     mapping_counters: Dict[str, int],
     overrides_cache: Optional[Dict[str, dict]] = None,
+    equipment_overrides_cache: Optional[Dict[str, dict]] = None,
 ) -> None:
     """Publier les sensors secondaires d'un eqLogic multi-sensor (Story 11.1 PE).
 
@@ -206,6 +236,9 @@ async def _publish_additional_sensors(
     `overrides_cache` (Story 16.2 code-review) : dict `list_overrides(_DATA_DIR)` déjà
     chargé par l'appelant pour tout le cycle de sync, évite une relecture disque du
     fichier d'overrides par capteur secondaire.
+
+    `equipment_overrides_cache` (Story 16.3) : dict `list_equipment_overrides(_DATA_DIR)`,
+    même contrat — chargé une seule fois par cycle de sync par l'appelant.
     """
     bridge_ready = bool(mqtt_bridge and getattr(mqtt_bridge, "is_connected", False))
     eq_id = primary_mapping.jeedom_eq_id
@@ -220,7 +253,14 @@ async def _publish_additional_sensors(
             secondary.ha_entity_type, secondary.capabilities
         )
         secondary.pipeline_step_reached = 3
-        sec_decision = decide_publication(secondary, confidence_policy=confidence_policy)
+        sec_publication_override = _resolve_publication_override_for_mapping(
+            secondary, overrides_cache or {}, equipment_overrides_cache or {}
+        )
+        sec_decision = decide_publication(
+            secondary,
+            confidence_policy=confidence_policy,
+            publication_override=sec_publication_override,
+        )
         sec_decision.mapping_result = secondary
         secondary.publication_decision_ref = sec_decision
         secondary.pipeline_step_reached = 4
@@ -1305,6 +1345,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     # Story 16.2 code-review — charger les overrides UNE SEULE FOIS pour tout le cycle
     # de sync (au lieu d'une relecture disque par équipement/capteur secondaire).
     overrides_cache = list_overrides(_DATA_DIR)
+    # Story 16.3 — même principe pour les overrides de politique de publication (équipement).
+    equipment_overrides_cache = list_equipment_overrides(_DATA_DIR)
 
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
@@ -1341,7 +1383,14 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         projection_validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
         mapping.projection_validity = projection_validity
         mapping.pipeline_step_reached = 3
-        decision = decide_publication(mapping, confidence_policy=confidence_policy)
+        publication_override = _resolve_publication_override_for_mapping(
+            mapping, overrides_cache, equipment_overrides_cache
+        )
+        decision = decide_publication(
+            mapping,
+            confidence_policy=confidence_policy,
+            publication_override=publication_override,
+        )
         decision.mapping_result = mapping
         mapping.publication_decision_ref = decision
         mapping.pipeline_step_reached = 4
@@ -1408,6 +1457,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 mqtt_bridge=mqtt_bridge,
                 mapping_counters=mapping_counters,
                 overrides_cache=overrides_cache,
+                equipment_overrides_cache=equipment_overrides_cache,
             )
 
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
