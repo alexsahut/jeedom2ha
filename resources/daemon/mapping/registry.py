@@ -1,6 +1,6 @@
 """registry.py - Ordered registry for Jeedom -> Home Assistant mappers."""
 
-from typing import Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from mapping.alarm_control_panel import AlarmControlPanelMapper
 from mapping.binary_sensor import BinarySensorMapper
@@ -13,7 +13,8 @@ from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from models.mapping import MappingResult
-from models.topology import JeedomEqLogic, TopologySnapshot
+from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
+from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
 
 
 class MapperRegistry:
@@ -126,3 +127,62 @@ class MapperRegistry:
             return list(map_all(eq, snapshot))
         result = mapper.map(eq, snapshot)  # type: ignore[attr-defined]
         return [result] if result is not None else []
+
+
+def resolve_expected_ha(
+    eq: JeedomEqLogic,
+    snapshot: TopologySnapshot,
+    cmd: Optional[JeedomCmd] = None,
+    *,
+    registry: Optional["MapperRegistry"] = None,
+) -> Dict[str, Any]:
+    """Résout, en LECTURE seule, "l'attendu Home Assistant" pour une commande (AC1, Story 16.2).
+
+    Source de vérité runtime = moteur de mapping (`MapperRegistry`) + registre HA
+    (`HA_COMPONENT_REGISTRY` via `validate_projection`) — **PAS** le YAML de planning
+    `ha-projection-reference.yaml` (tranché SCP 2026-07-07, Option 1). Aucune table
+    dupliquée en dur : les composants compatibles sont dérivés des capabilities réellement
+    détectées par le moteur, confrontées au registre HA.
+
+    Retour (structure ouverte à enrichissement 16b — champs label `None` en 16a) :
+        {
+          "eq_id", "cmd_id", "generic_type",
+          "proposed_ha_entity_type": <candidat moteur | None>,   # proposition auto (AC1)
+          "compatible_ha_components": [<types PRODUCT_SCOPE validables>],
+          "secondary_ha_entity_types": [<types des mappings multi-entités>],
+          "label_fr": None, "family_fr": None, "subtype": None,   # remplis en 16b
+        }
+
+    - Couvre `FallbackMapper` (le moteur retourne alors son candidat) et le multi-entités
+      (`additional_mappings` → `secondary_ha_entity_types`) : l'attendu n'est pas toujours
+      1 commande → 1 composant.
+    - Si `cmd` n'a pas de `generic_type`, la proposition auto reste calculée au niveau
+      eqLogic par le moteur existant (`map()`), conforme à AC1.
+    """
+    registry = registry or MapperRegistry()
+    mapping = registry.map(eq, snapshot)
+
+    if mapping is None:
+        proposed: Optional[str] = None
+        compatible: List[str] = []
+        secondary: List[str] = []
+    else:
+        proposed = mapping.ha_entity_type
+        compatible = [
+            ha_type
+            for ha_type in PRODUCT_SCOPE
+            if validate_projection(ha_type, mapping.capabilities).is_valid
+        ]
+        secondary = [m.ha_entity_type for m in (mapping.additional_mappings or [])]
+
+    return {
+        "eq_id": eq.id,
+        "cmd_id": getattr(cmd, "id", None),
+        "generic_type": getattr(cmd, "generic_type", None),
+        "proposed_ha_entity_type": proposed,
+        "compatible_ha_components": compatible,
+        "secondary_ha_entity_types": secondary,
+        "label_fr": None,
+        "family_fr": None,
+        "subtype": None,
+    }

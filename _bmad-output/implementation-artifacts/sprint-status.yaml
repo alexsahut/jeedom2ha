@@ -60,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-06'  # pe-epic-16 cadre (correct-course, renumerotation de pe-epic-12) et ajoute en backlog
+last_updated: '2026-07-07'  # Story 16.2 : create-story -> correct-course (SCP Option 1) -> dev-story -> code-review -> done (998 unit passed, 0 regression)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -308,3 +308,4 @@ development_status:
   pe-epic-16: in-progress  # mapping configurable / overrides utilisateur, double granularite Jeedom/HA ; cadre par SCP 2026-07-06 ; absorbe backlog-icebox §1 ; Story 16.0 (prefixe architecture) demarree 2026-07-06
   16-0-prefixe-architecture-contrat-override: done  # code-review OK 2026-07-06 (0 High ; issues Medium/Low corrigees) ; 970 tests passed
   16-1-persistance-backend-schema-overrides-v1: done  # code-review OK 2026-07-06 (0 High, 1 Medium corrige, 3 Low acceptes) ; overrides.py (save_/list_/remove_), data/ha_overrides.json schema_version:1 ; 989 tests passed (0 regression)
+  16-2-attendu-ha-application-overrides-mapping-candidat: done  # code-review OK 2026-07-07 (0 High, 3 Medium + 1 Low corriges) ; docstring overrides.py, cache overrides_cache (N+1 evite), test lifecycle retypage override, naming _publish_additional_sensors ; 998 unit passed (0 regression) + golden non-regression
