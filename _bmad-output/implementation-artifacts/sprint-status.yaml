@@ -60,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-17'  # pe-epic-18 (couverture domaines HA manquants) ajoute en backlog via SCP 2026-07-17 (fan/lock/siren/valve/event ; media_player reporte)
+last_updated: '2026-07-17'  # pe-epic-17 clos (cadrage number/select : aucune ouverture PRODUCT_SCOPE) ; pe-epic-18 (couverture domaines HA manquants) en backlog via SCP 2026-07-17 (fan/lock/siren/valve/event ; media_player reporte)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -317,9 +317,9 @@ development_status:
   # Stories de cadrage seulement (modele Story 10.4) ; AUCUNE ouverture PRODUCT_SCOPE dans cet epic
   # Toute ouverture effective reste un increment separe sous FR40/NFR10 (registry + nominal/echec validate_projection + non-regression 4D)
   # ==============================================================
-  pe-epic-17: in-progress  # cadrage ouverture number/select (composants HA connus/validables non gouvernes) ; cadre par SCP 2026-07-07 ; stories de cadrage seulement, aucune ouverture PRODUCT_SCOPE ; demarre 2026-07-07 (create-story 17-1)
-  17-1-cadrage-ouverture-number-consigne: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code
-  17-2-cadrage-ouverture-select-mode: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code
+  pe-epic-17: done  # cadrage ouverture number/select clos 2026-07-17 ; conclusion : aucune ouverture PRODUCT_SCOPE justifiee (number et select restes connus/validables non ouverts) ; toute ouverture future = increment separe sous FR40/NFR10
+  17-1-cadrage-ouverture-number-consigne: done  # code-review PASS 2026-07-17 (0 finding) ; classement par cas AC5 : aucun cas ne justifie l'ouverture de number, PRODUCT_SCOPE inchange ; aucun code
+  17-2-cadrage-ouverture-select-mode: done  # code-review PASS 2026-07-17 (0 finding) ; classement par cas AC5 : aucun cas ne justifie l'ouverture de select (mode HVAC deja porte par climate ; presets fan -> pe-epic-18), PRODUCT_SCOPE inchange ; aucun code
 
   # ==============================================================
   # pe-epic-18 — Couverture generique des domaines HA manquants

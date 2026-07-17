@@ -1,6 +1,6 @@
 # Story 17.2: Cadrage de l'ouverture de `select` (mode) sans ouverture effective
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,20 +24,20 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Recenser les cas candidats « mode » (AC: #1)
-  - [ ] Inventorier, en lecture seule, le **catalogue `generic_type` Jeedom** (`resources/daemon/mapping/registry.py`, universel — pas seulement les types présents sur une box) pouvant porter une liste de modes discrets (sélecteur de mode, choix d'options)
-  - [ ] Pour chaque `generic_type`, noter comment il est aujourd'hui projeté (type HA actuel via le mapping existant) et où se trouve la liste d'options côté Jeedom
-- [ ] Task 2 — Classer chaque cas dans les 3 catégories (AC: #1, #2, #3, #4)
-  - [ ] `déjà suffisamment couvert` : citer les entités HA existantes suffisantes (`climate` mode HVAC, `switch` par état, `sensor` de mode)
-  - [ ] `justifie une ouverture gouvernée select` : marquer sans ouvrir
-  - [ ] `pas de besoin réel prouvé → report` : justifier l'absence d'équipement réel
-- [ ] Task 3 — Produire le handoff FR40/NFR10 pour tout cas justifiant une ouverture (AC: #3)
-  - [ ] Équipement Jeedom cible + `generic_type` source + **source des `options`** (liste de modes Jeedom)
-  - [ ] Cas nominal + cas d'échec `validate_projection()` — notamment le cas d'**absence de `has_options`** (référence : `resources/daemon/validation/ha_component_registry.py`)
-  - [ ] Test de non-régression du contrat 4D à écrire
-  - [ ] Rappeler que les 3 preuves sont livrées dans le **même incrément** séparé (AR13)
-- [ ] Task 4 — Conclure par le tableau de classement par cas (AC: #5)
-  - [ ] Vérifier qu'aucune modification de `PRODUCT_SCOPE`/mapping/validation/publication/`generic_type` n'a été faite
+- [x] Task 1 — Recenser les cas candidats « mode » (AC: #1)
+  - [x] Inventorier, en lecture seule, le **catalogue `generic_type` Jeedom** (`resources/daemon/mapping/registry.py`, universel — pas seulement les types présents sur une box) pouvant porter une liste de modes discrets (sélecteur de mode, choix d'options)
+  - [x] Pour chaque `generic_type`, noter comment il est aujourd'hui projeté (type HA actuel via le mapping existant) et où se trouve la liste d'options côté Jeedom
+- [x] Task 2 — Classer chaque cas dans les 3 catégories (AC: #1, #2, #3, #4)
+  - [x] `déjà suffisamment couvert` : citer les entités HA existantes suffisantes (`climate` mode HVAC, `switch` par état, `sensor` de mode)
+  - [x] `justifie une ouverture gouvernée select` : marquer sans ouvrir → **aucun cas** dans cette catégorie (voir tableau AC5)
+  - [x] `pas de besoin réel prouvé → report` : justifier l'absence d'équipement réel
+- [x] Task 3 — Produire le handoff FR40/NFR10 pour tout cas justifiant une ouverture (AC: #3)
+  - [x] Équipement Jeedom cible + `generic_type` source + **source des `options`** → **sans objet** : aucun cas classé « justifie ouverture select »
+  - [x] Cas nominal + cas d'échec `validate_projection()` (dont **absence de `has_options`**) → sans objet (aucune ouverture)
+  - [x] Test de non-régression du contrat 4D à écrire → sans objet (aucune ouverture)
+  - [x] Rappeler que les 3 preuves sont livrées dans le **même incrément** séparé (AR13) → rappel consigné pour toute ouverture future
+- [x] Task 4 — Conclure par le tableau de classement par cas (AC: #5)
+  - [x] Vérifier qu'aucune modification de `PRODUCT_SCOPE`/mapping/validation/publication/`generic_type` n'a été faite
 
 ## Dev Notes
 
@@ -76,4 +76,47 @@ claude-cli/claude-opus-4-8
 
 ### Completion Notes List
 
+**dev-story lancé 2026-07-17 — statut résultant : `review`.** Story de cadrage documentaire (modèle Story 10.4), aucun code touché.
+
+#### Classement par cas (livrable AC5)
+
+Inventaire, en lecture seule, des `generic_type` du catalogue Jeedom (universel) pouvant porter une **liste de modes discrets** (`has_options`), avec projection HA actuelle et classement :
+
+| `generic_type` candidat | Nature Jeedom | Projeté aujourd'hui | Catégorie | Justification / handoff |
+|---|---|---|---|---|
+| `THERMOSTAT_MODE` | mode HVAC (liste de modes) | attribut du thermostat → domaine `climate` ; présent dans les anti-listes `light.py:44`, `switch.py:50`, `cover.py:39` (pas capté comme switch/light/cover) | **déjà suffisamment couvert** | Le mode HVAC est un attribut natif du domaine `climate` (`hvac_modes`/`preset_modes`, déjà ouvert). Un `select` séparé fragmenterait le thermostat et dupliquerait la sémantique. |
+| `THERMOSTAT_STATE` | état thermostat | `binary_sensor` (device_class `None`) — `binary_sensor.py:53` / anti-listes | **déjà suffisamment couvert** | État en lecture seule, pas une liste de modes réglable. Couvert par `binary_sensor`/`climate`. |
+| Presets / modes de ventilateur | (n'existe pas comme `generic_type` mode dédié ; `fan` = STATE/ON/OFF + `FAN_SPEED_STATE`) | `switch`/`binary_sensor` (on/off) + `sensor` rpm | **report** (autre domaine) | Les `preset_modes` d'un ventilateur relèvent du domaine `fan` (pe-epic-18, story 18-1), pas de `select`. |
+| États discrets `SWITCH_*` / `ALARM_*` | états/armement | `switch` / `alarm_control_panel` | **déjà suffisamment couvert** | États binaires ou armement déjà couverts par des domaines dédiés ouverts ; pas une liste de modes libres nécessitant `has_options`. |
+
+**Synthèse :** aucun `generic_type` du catalogue Jeedom ne porte une **liste de modes discrets réglable** avec une **source d'options (`has_options`) claire** qui ne soit pas déjà absorbée par un domaine HA plus riche **déjà ouvert** (`climate` pour le mode HVAC), ou qui n'appartienne à un domaine ouvert **séparément** (`fan` → pe-epic-18). Le seul « sélecteur de mode » réel du catalogue (`THERMOSTAT_MODE`) est structurellement rattaché à `climate`.
+
+**Décision de cadrage :** **aucun cas ne justifie l'ouverture de `select` aujourd'hui** (garde-fou Story 10.4 respecté : pas de besoin réel de mode distinct prouvé hors `climate`). `PRODUCT_SCOPE` reste inchangé (8 composants). Toute ouverture future de `select` resterait un incrément séparé sous AR13/FR40/NFR10 (registry `select` déjà présent lignes 56-59 + **source d'options claire** + cas nominal/échec `validate_projection()` dont **absence de `has_options`** + non-régression contrat 4D, sur fixtures synthétiques).
+
+**Vérification AC5 :** aucune modification de `PRODUCT_SCOPE`, du mapping, de la validation, de la publication, ni d'aucun `generic_type` Jeedom natif.
+
 ### File List
+
+_Aucun fichier de code modifié._ Story de cadrage documentaire ; seul cet artefact (`17-2-cadrage-ouverture-select-mode.md`) est rempli. `sprint-status.yaml` mis à jour hors story (statut).
+
+### Change Log
+
+- 2026-07-17 — dev-story : inventaire du catalogue `generic_type` (mode/liste d'options), classement par cas (AC5), décision de non-ouverture de `select`. Status `ready-for-dev` → `review`. Aucun code touché.
+- 2026-07-17 — code-review : PASS, aucun finding. Status `review` → `done`.
+
+## Senior Developer Review (AI)
+
+- **Reviewer :** clawcode (claude-opus-4-8)
+- **Date :** 2026-07-17
+- **Outcome :** **Approve** (0 High / 0 Medium / 0 Low)
+
+### Vérifications
+
+- **AC1–AC5 satisfaits** : chaque `generic_type` porteur de « mode » est recensé, sa projection HA actuelle citée, et classé dans l'une des 3 catégories. Le tableau de classement par cas est présent (AC5). Le point spécifique `has_options` (source d'options) est traité.
+- **Invariant de cadrage respecté** : `git diff` confirme qu'aucun fichier de code n'est touché (seuls `17-2-*.md` et `sprint-status.yaml` modifiés). `PRODUCT_SCOPE`, mapping, validation, publication et `generic_type` natifs inchangés.
+- **Garde-fou Story 10.4 respecté** : décision de non-ouverture justifiée — le seul sélecteur de mode réel (`THERMOSTAT_MODE`) est structurellement rattaché à `climate` ; les presets de ventilateur relèvent de `fan` (pe-epic-18).
+- **Handoff AR13/FR40/NFR10** correctement décrit comme condition d'un incrément futur séparé, avec l'exigence propre à `select` d'une **source d'options claire** et du cas d'échec `absence de has_options`.
+
+### Action Items
+
+_Aucun._

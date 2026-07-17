@@ -1,6 +1,6 @@
 # Story 17.1: Cadrage de l'ouverture de `number` (consigne) sans ouverture effective
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,20 +24,20 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Recenser les cas candidats « consigne » (AC: #1)
-  - [ ] Inventorier, en lecture seule, le **catalogue `generic_type` Jeedom** (`resources/daemon/mapping/registry.py`, universel — pas seulement les types présents sur une box) pouvant porter une consigne numérique isolée (température de consigne, niveau, volume, position numérique)
-  - [ ] Pour chaque `generic_type`, noter comment il est aujourd'hui projeté (type HA actuel via le mapping existant)
-- [ ] Task 2 — Classer chaque cas dans les 3 catégories (AC: #1, #2, #3, #4)
-  - [ ] `déjà suffisamment couvert` : citer les entités HA existantes suffisantes (`climate`, `sensor`, `switch`)
-  - [ ] `justifie une ouverture gouvernée number` : marquer sans ouvrir
-  - [ ] `pas de besoin réel prouvé → report` : justifier l'absence d'équipement réel
-- [ ] Task 3 — Produire le handoff FR40/NFR10 pour tout cas justifiant une ouverture (AC: #3)
-  - [ ] Équipement Jeedom cible + `generic_type` source
-  - [ ] Cas nominal + cas d'échec `validate_projection()` à écrire (référence : `resources/daemon/validation/ha_component_registry.py`)
-  - [ ] Test de non-régression du contrat 4D à écrire
-  - [ ] Rappeler que les 3 preuves sont livrées dans le **même incrément** séparé (AR13)
-- [ ] Task 4 — Conclure par le tableau de classement par cas (AC: #5)
-  - [ ] Vérifier qu'aucune modification de `PRODUCT_SCOPE`/mapping/validation/publication/`generic_type` n'a été faite
+- [x] Task 1 — Recenser les cas candidats « consigne » (AC: #1)
+  - [x] Inventorier, en lecture seule, le **catalogue `generic_type` Jeedom** (`resources/daemon/mapping/registry.py`, universel — pas seulement les types présents sur une box) pouvant porter une consigne numérique isolée (température de consigne, niveau, volume, position numérique)
+  - [x] Pour chaque `generic_type`, noter comment il est aujourd'hui projeté (type HA actuel via le mapping existant)
+- [x] Task 2 — Classer chaque cas dans les 3 catégories (AC: #1, #2, #3, #4)
+  - [x] `déjà suffisamment couvert` : citer les entités HA existantes suffisantes (`climate`, `sensor`, `switch`)
+  - [x] `justifie une ouverture gouvernée number` : marquer sans ouvrir → **aucun cas** dans cette catégorie (voir tableau AC5)
+  - [x] `pas de besoin réel prouvé → report` : justifier l'absence d'équipement réel
+- [x] Task 3 — Produire le handoff FR40/NFR10 pour tout cas justifiant une ouverture (AC: #3)
+  - [x] Équipement Jeedom cible + `generic_type` source → **sans objet** : aucun cas classé « justifie ouverture number »
+  - [x] Cas nominal + cas d'échec `validate_projection()` à écrire → sans objet (aucune ouverture)
+  - [x] Test de non-régression du contrat 4D à écrire → sans objet (aucune ouverture)
+  - [x] Rappeler que les 3 preuves sont livrées dans le **même incrément** séparé (AR13) → rappel consigné pour toute ouverture future
+- [x] Task 4 — Conclure par le tableau de classement par cas (AC: #5)
+  - [x] Vérifier qu'aucune modification de `PRODUCT_SCOPE`/mapping/validation/publication/`generic_type` n'a été faite
 
 ## Dev Notes
 
@@ -76,4 +76,50 @@ claude-cli/claude-opus-4-8
 
 ### Completion Notes List
 
+**dev-story lancé 2026-07-17 — statut résultant : `review`.** Story de cadrage documentaire (modèle Story 10.4), aucun code touché.
+
+#### Classement par cas (livrable AC5)
+
+Inventaire, en lecture seule, des `generic_type` du catalogue Jeedom (universel) pouvant porter une **consigne numérique isolée**, avec projection HA actuelle et classement :
+
+| `generic_type` candidat | Nature Jeedom | Projeté aujourd'hui | Catégorie | Justification / handoff |
+|---|---|---|---|---|
+| `THERMOSTAT_SET_SETPOINT` | action/slider (consigne °C) | `climate` (target_temperature) — `climate.py` | **déjà suffisamment couvert** | La consigne EST la cible du domaine `climate` (déjà ouvert). Un `number` isolé perdrait la sémantique thermostat (modes, temp courante). |
+| `THERMOSTAT_SETPOINT` | info numérique | `sensor` temperature °C — `sensor.py:47` | **déjà suffisamment couvert** | Valeur en lecture seule → `sensor`. Pas une consigne réglable. |
+| `LIGHT_SLIDER` / `LIGHT_BRIGHTNESS` | action/info (luminosité) | `light` (brightness) — `light.py:36,367` | **déjà suffisamment couvert** | La luminosité est un attribut natif du domaine `light` (déjà ouvert). |
+| `FLAP_SLIDER` | action (position volet) | `cover` (position) — `cover.py:345` | **déjà suffisamment couvert** | La position est un attribut natif du domaine `cover` (déjà ouvert). |
+| `FAN_SPEED_STATE` | info (rpm, lecture seule) | `sensor` rpm — `sensor.py:50` | **report** (autre domaine) | Vitesse en lecture seule → `sensor`. Une *consigne* de vitesse relève du domaine `fan` (percentage), traité en **pe-epic-18 (18-1)**, pas de `number`. |
+| `ROTATION_STATE` | info (rpm, lecture seule) | `sensor` rpm — `sensor.py:51` | **report** (lecture seule) | Info rpm → `sensor`. Aucune consigne réglable. |
+| `VOLUME` | info | `sensor` (sans device_class) — `sensor.py:38` | **report** (autre domaine) | Un *réglage* de volume relève de `media_player` (reporté hors pe-epic-18 par SCP 2026-07-17), pas de `number`. |
+
+**Synthèse :** aucun `generic_type` du catalogue Jeedom ne porte une **consigne numérique isolée** qui ne soit pas déjà absorbée par un domaine HA plus riche et sémantique **déjà ouvert** (`climate`, `light`, `cover`), ou qui n'appartienne à un domaine ouvert **séparément** (`fan` → pe-epic-18 ; `media_player` → reporté).
+
+**Décision de cadrage :** **aucun cas ne justifie l'ouverture de `number` aujourd'hui** (garde-fou Story 10.4 respecté : pas de besoin réel de consigne isolée prouvé). `PRODUCT_SCOPE` reste inchangé (8 composants). Toute ouverture future de `number` resterait un incrément séparé sous AR13/FR40/NFR10 (registry `number` déjà présent lignes 52-55 + cas nominal/échec `validate_projection()` + non-régression contrat 4D, sur fixtures synthétiques).
+
+**Vérification AC5 :** aucune modification de `PRODUCT_SCOPE`, du mapping, de la validation, de la publication, ni d'aucun `generic_type` Jeedom natif.
+
 ### File List
+
+_Aucun fichier de code modifié._ Story de cadrage documentaire ; seul cet artefact (`17-1-cadrage-ouverture-number-consigne.md`) est rempli. `sprint-status.yaml` mis à jour hors story (statut).
+
+### Change Log
+
+- 2026-07-17 — dev-story : inventaire du catalogue `generic_type` (consigne numérique), classement par cas (AC5), décision de non-ouverture de `number`. Status `ready-for-dev` → `review`. Aucun code touché.
+- 2026-07-17 — code-review : PASS, aucun finding. Status `review` → `done`.
+
+## Senior Developer Review (AI)
+
+- **Reviewer :** clawcode (claude-opus-4-8)
+- **Date :** 2026-07-17
+- **Outcome :** **Approve** (0 High / 0 Medium / 0 Low)
+
+### Vérifications
+
+- **AC1–AC5 satisfaits** : chaque `generic_type` porteur de consigne numérique est recensé, sa projection HA actuelle citée (références de lignes), et classé dans l'une des 3 catégories. Le tableau de classement par cas est présent (AC5).
+- **Invariant de cadrage respecté** : `git diff` confirme qu'aucun fichier de code n'est touché (seuls `17-1-*.md` et `sprint-status.yaml` modifiés). `PRODUCT_SCOPE`, mapping, validation, publication et `generic_type` natifs inchangés.
+- **Garde-fou Story 10.4 respecté** : décision de non-ouverture justifiée par l'absence de consigne numérique isolée non déjà absorbée par un domaine plus riche déjà ouvert (`climate`/`light`/`cover`) ou ouvert séparément (`fan`/`media_player`).
+- **Handoff AR13/FR40/NFR10** correctement décrit comme condition d'un incrément futur séparé (registry déjà présent + nominal/échec `validate_projection()` + non-régression 4D sur fixtures).
+
+### Action Items
+
+_Aucun._
