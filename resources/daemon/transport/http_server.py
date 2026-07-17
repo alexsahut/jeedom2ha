@@ -49,7 +49,10 @@ from mapping.overrides import (
     list_equipment_overrides,
     list_overrides,
     mapping_cmd_ids,
+    remove_equipment_override,
+    remove_override,
     resolve_publication_override,
+    save_override,
 )
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
@@ -2301,6 +2304,231 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
     })
 
 
+def _resolve_data_dir(request: web.Request) -> str:
+    """Résout le data_dir des overrides : override applicatif (tests) sinon _DATA_DIR.
+
+    Seul point d'injection du répertoire de persistance pour les routes 16.5 (câblage de
+    `save_override`/`remove_override`). Le pipeline de sync continue d'utiliser `_DATA_DIR`.
+    """
+    return request.app.get("data_dir") or _DATA_DIR
+
+
+def _build_mapping_override_tree(eq, snapshot, data_dir):
+    """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
+
+    Pour chaque commande de l'équipement (ordre natif Jeedom), expose le `generic_type`
+    natif (jamais muté, D10), l'attendu HA calculé par le moteur, le type effectif après
+    override persisté, l'état d'override, et le diagnostic effectif (projection + publication).
+    N'écrit rien : consomme `list_overrides`/`apply_type_override`/`_preview_mapping_view`.
+    """
+    overrides_cache = list_overrides(data_dir)
+    proposed_eq = resolve_expected_ha(eq, snapshot).get("proposed_ha_entity_type")
+
+    auto_mapping = MapperRegistry().map(eq, snapshot)
+    mapped = auto_mapping is not None
+    covered_ids = set(mapping_cmd_ids(auto_mapping)) if mapped else set()
+    native_type = auto_mapping.ha_entity_type if mapped else None
+
+    effective_diag = None
+    if mapped:
+        over_mapping = apply_type_override(auto_mapping, data_dir, overrides=overrides_cache)
+        effective_type = over_mapping.ha_entity_type
+        effective_diag = _preview_mapping_view(
+            over_mapping, "sure_probable", publication_override=None
+        )
+    else:
+        effective_type = None
+
+    commands = []
+    for cmd in eq.cmds:
+        key = f"{eq.id}:{cmd.id}"
+        entry = overrides_cache.get(key) or {}
+        override_type = entry.get("ha_entity_type")
+        override_applied = bool(override_type)
+        is_covered = cmd.id in covered_ids
+        attendu_ha = native_type if is_covered else proposed_eq
+        if override_applied:
+            row_effective = effective_type if is_covered else override_type
+        else:
+            row_effective = attendu_ha
+        row = {
+            "jeedom_cmd_id": cmd.id,
+            "cmd_name": cmd.name,
+            "generic_type": cmd.generic_type,
+            "coverable": bool(cmd.generic_type),
+            "attendu_ha": attendu_ha,
+            "effective_ha": row_effective,
+            "override_applied": override_applied,
+        }
+        if override_applied:
+            row["override_source"] = entry.get("source", "user")
+        if is_covered and effective_diag is not None:
+            row["diagnostic"] = dict(effective_diag)
+        else:
+            row["diagnostic"] = None
+        commands.append(row)
+
+    return {
+        "jeedom_eq_id": eq.id,
+        "eq_name": eq.name,
+        "mapped": mapped,
+        "commands": commands,
+    }
+
+
+async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
+    """GET /system/mapping_overrides/{eq_id} — Story 16.5 (AC4/5) : arbre par commande.
+
+    Lecture seule : statuts + `generic_type` natif + attendu HA + effectif + diagnostic
+    par commande, pour peupler le triptyque à l'ouverture de l'onglet. Aucune écriture.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    raw_eq_id = request.match_info.get("eq_id", "")
+    try:
+        eq_id = int(raw_eq_id)
+    except (TypeError, ValueError):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+
+    data_dir = _resolve_data_dir(request)
+    payload = _build_mapping_override_tree(eq, snapshot, data_dir)
+    return web.json_response({"status": "ok", "payload": payload})
+
+
+async def _handle_mapping_override_save(request: web.Request) -> web.Response:
+    """POST /action/mapping_override — Story 16.5 (AC9) : persiste un override de type.
+
+    Appelle `overrides.save_override(...)` (câblage HTTP du gap identifié). Valide
+    `jeedom_eq_id`/`jeedom_cmd_id` contre le référentiel équipement (404 si inconnu).
+    Ne touche JAMAIS le `generic_type` natif (D10). Jamais appelé par le pipeline de sync.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Invalid JSON"}, status=400)
+    payload = data.get("payload", {}) if isinstance(data, dict) else {}
+
+    eq_id = payload.get("jeedom_eq_id")
+    cmd_id = payload.get("jeedom_cmd_id")
+    ha_entity_type = payload.get("ha_entity_type")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    if not isinstance(cmd_id, int) or isinstance(cmd_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_cmd_id (int) requis"}, status=400
+        )
+    if not isinstance(ha_entity_type, str) or not ha_entity_type:
+        return web.json_response(
+            {"status": "error", "message": "ha_entity_type doit être une chaîne non vide"},
+            status=400,
+        )
+
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+    if not any(c.id == cmd_id for c in eq.cmds):
+        return web.json_response(
+            {"status": "error", "message": f"Commande {cmd_id} introuvable pour l'équipement {eq_id}"},
+            status=404,
+        )
+
+    data_dir = _resolve_data_dir(request)
+    try:
+        save_override(eq_id, cmd_id, {"ha_entity_type": ha_entity_type}, data_dir)
+    except ValueError as exc:
+        return web.json_response(
+            {"status": "error", "message": str(exc)}, status=500
+        )
+
+    _LOGGER.info(
+        "[OVERRIDES] Override HA sauvegardé via UI eq_id=%d cmd_id=%d type=%s",
+        eq_id, cmd_id, ha_entity_type,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "jeedom_cmd_id": cmd_id,
+            "ha_entity_type": ha_entity_type,
+            "override_applied": True,
+        },
+    })
+
+
+async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
+    """POST /action/mapping_override_revert — Story 16.5 (AC10) : retour au mode auto.
+
+    Supprime l'override de commande (`remove_override`) ou d'équipement
+    (`remove_equipment_override`) selon la présence de `jeedom_cmd_id`. Ne touche
+    jamais le `generic_type` natif (D10).
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Invalid JSON"}, status=400)
+    payload = data.get("payload", {}) if isinstance(data, dict) else {}
+
+    eq_id = payload.get("jeedom_eq_id")
+    cmd_id = payload.get("jeedom_cmd_id")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    if cmd_id is not None and (not isinstance(cmd_id, int) or isinstance(cmd_id, bool)):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_cmd_id doit être un int ou absent"},
+            status=400,
+        )
+
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+
+    data_dir = _resolve_data_dir(request)
+    if isinstance(cmd_id, int):
+        removed = remove_override(eq_id, cmd_id, data_dir)
+        scope = "command"
+    else:
+        removed = remove_equipment_override(eq_id, data_dir)
+        scope = "equipment"
+
+    _LOGGER.info(
+        "[OVERRIDES] Retour mode auto via UI eq_id=%d scope=%s removed=%s",
+        eq_id, scope, removed,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {"jeedom_eq_id": eq_id, "scope": scope, "removed": removed},
+    })
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -3211,6 +3439,11 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/sync", _handle_action_sync)
     app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
     app.router.add_post("/system/overrides/preview", _handle_overrides_preview)
+    # Story 16.5 — UI de configuration par équipement : arbre par commande (GET),
+    # persistance override (POST) et retour au mode auto (POST).
+    app.router.add_get("/system/mapping_overrides/{eq_id}", _handle_mapping_overrides_get)
+    app.router.add_post("/action/mapping_override", _handle_mapping_override_save)
+    app.router.add_post("/action/mapping_override_revert", _handle_mapping_override_revert)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
