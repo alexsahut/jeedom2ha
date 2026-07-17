@@ -42,7 +42,7 @@ from models.ui_contract_4d import (
     compute_home_statut,
 )
 from models.actions_ha import build_actions_ha
-from mapping.registry import MapperRegistry
+from mapping.registry import MapperRegistry, resolve_expected_ha
 from mapping.button import ScenarioButtonMapper
 from mapping.overrides import (
     apply_type_override,
@@ -2077,6 +2077,64 @@ def _compute_pipeline_step_visible(el_result, map_result, pub_decision) -> int:
     return 5
 
 
+def _enrich_command_drilldown(eq, snapshot, map_result, matched_commands, unmatched_commands):
+    """Story 16.4 — enrichit, en LECTURE SEULE, chaque entrée du drill-down commande.
+
+    Additif sur les entrées déjà produites (`matched_commands` / `unmatched_commands`) :
+    ajoute `attendu_ha` (type HA natif projeté par le moteur), `mapping_decision`
+    (décision effective) et `retained` (retenue vs rejetée). Quand un override de TYPE
+    (Story 16.2) a été appliqué, ajoute `type_override` avec la décision native ET la
+    décision surchargée (AC2). N'altère aucun champ 4D eq-level.
+    """
+    reason_details = (map_result.reason_details or {}) if map_result else {}
+    override_applied = bool(reason_details.get("override_applied"))
+    effective_type = map_result.ha_entity_type if map_result else None
+
+    if override_applied:
+        # Décision native = moteur brut (registry.map n'applique PAS les overrides).
+        native_type = resolve_expected_ha(eq, snapshot).get("proposed_ha_entity_type")
+        override_source = reason_details.get("override_source")
+    else:
+        native_type = effective_type
+        override_source = None
+
+    for entry in matched_commands:
+        entry["retained"] = True
+        entry["attendu_ha"] = native_type
+        entry["mapping_decision"] = effective_type
+        if override_applied:
+            entry["type_override"] = {
+                "source": override_source,
+                "native": native_type,
+                "effective": effective_type,
+            }
+
+    for entry in unmatched_commands:
+        entry["retained"] = False
+        entry["attendu_ha"] = None
+        entry["mapping_decision"] = None
+
+
+def _build_publication_override_diag(reason_code, pub_decision):
+    """Story 16.4 (AC4) — expose l'état d'override de PUBLICATION (Story 16.3) sans
+    introduire de nouveau reason_code.
+
+    Consomme EXACTEMENT les reason_codes 16.3 (`publication_excluded_eqlogic` /
+    `publication_excluded_command` / `publication_forced`) portés par `reason_code`,
+    et les `reason_details` 16.3 (`publication_override_applied`, `override_source`,
+    `underlying_confidence`) portés par `pub_decision`. Retourne None si aucun override
+    de publication n'a été appliqué (pas de clé nulle).
+    """
+    pub_reason_details = (pub_decision.reason_details or {}) if pub_decision else {}
+    if not pub_reason_details.get("publication_override_applied"):
+        return None
+    return {
+        "reason_code": reason_code,
+        "override_source": pub_reason_details.get("override_source"),
+        "underlying_confidence": pub_reason_details.get("underlying_confidence"),
+    }
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -2230,6 +2288,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
                     "generic_type": c.generic_type,
                 })
 
+        # Story 16.4 — drill-down commande override-aware (lecture seule, additif).
+        _enrich_command_drilldown(eq, topology, map_result, matched_commands, unmatched_commands)
+        publication_override = _build_publication_override_diag(reason_code, pub_decision)
+
         # AC5 — v1_compatibility: True si ha_entity_type dans le périmètre V1
         v1_compatibility = (
             map_result is not None
@@ -2325,6 +2387,10 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         # Story 15.3 — Visibilité parité FAN -> switch (epic 14), lecture seule.
         if family_reason_code == "switch_fan_on_off_state":
             eq_dict["fan_switch_parity"] = True
+        # Story 16.4 (AC4) — override de publication (Story 16.3) exposé additivement,
+        # uniquement s'il a été appliqué (aucune clé nulle sinon).
+        if publication_override is not None:
+            eq_dict["publication_override"] = publication_override
         equipments.append(eq_dict)
         room_key = (eq.object_id, object_name)
         rooms_equips.setdefault(room_key, []).append(eq_dict)
