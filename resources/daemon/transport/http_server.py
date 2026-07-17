@@ -2135,6 +2135,172 @@ def _build_publication_override_diag(reason_code, pub_decision):
     }
 
 
+def _preview_mapping_view(mapping, confidence_policy, *, publication_override):
+    """Story 16.6 — vue JSON-safe d'un mapping pour la preview (lecture seule).
+
+    Fait passer le mapping par `validate_projection` (step 3, même moteur que le
+    pipeline de sync, aucun bypass) puis `decide_publication` (step 4) avec l'override
+    de publication éventuel. Aucune publication MQTT, aucune écriture disque.
+    """
+    validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
+    mapping.projection_validity = validity
+    decision = decide_publication(
+        mapping,
+        confidence_policy=confidence_policy,
+        publication_override=publication_override,
+    )
+    return {
+        "ha_entity_type": mapping.ha_entity_type,
+        "confidence": mapping.confidence,
+        "reason_code": mapping.reason_code,
+        "projection_validity": {
+            "is_valid": validity.is_valid,
+            "reason_code": validity.reason_code,
+            "missing_capabilities": list(validity.missing_capabilities),
+            "missing_fields": list(validity.missing_fields),
+        },
+        "should_publish": decision.should_publish,
+        "publication_reason": decision.reason,
+    }
+
+
+async def _handle_overrides_preview(request: web.Request) -> web.Response:
+    """POST /system/overrides/preview — Story 16.6 : dry-run d'un override (lecture seule).
+
+    Calcule le mapping AUTO (moteur brut, sans override) et le mapping AVEC l'override
+    PROPOSÉ (appliqué EN MÉMOIRE, jamais persisté), fait passer le résultat surchargé par
+    `validate_projection` AVANT toute sauvegarde, et ne déclenche AUCUNE publication MQTT.
+    Zéro effet de bord : ni `save_override`, ni écriture `data_dir`, ni `publish*`.
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Invalid JSON"}, status=400)
+    payload = data.get("payload", {}) if isinstance(data, dict) else {}
+
+    eq_id = payload.get("jeedom_eq_id")
+    if not isinstance(eq_id, int):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+
+    proposed_type = payload.get("ha_entity_type")
+    proposed_cmd_id = payload.get("jeedom_cmd_id")
+    proposed_policy = payload.get("publication_policy")
+    if proposed_type is None and proposed_policy is None:
+        return web.json_response(
+            {"status": "error", "message": "ha_entity_type ou publication_policy requis"},
+            status=400,
+        )
+    if proposed_type is not None and (not isinstance(proposed_type, str) or not proposed_type):
+        return web.json_response(
+            {"status": "error", "message": "ha_entity_type doit être une chaîne non vide"},
+            status=400,
+        )
+    if proposed_policy is not None and proposed_policy not in ("exclude", "force_publish"):
+        return web.json_response(
+            {"status": "error", "message": "publication_policy invalide (exclude|force_publish)"},
+            status=400,
+        )
+
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+
+    confidence_policy = payload.get("confidence_policy", "sure_probable")
+    if confidence_policy not in ("sure_only", "sure_probable"):
+        confidence_policy = "sure_probable"
+
+    native_generic_types = {str(c.id): c.generic_type for c in eq.cmds}
+
+    # 1. AUTO — moteur brut, aucun override.
+    registry = MapperRegistry()
+    auto_mapping = registry.map(eq, snapshot)
+    if auto_mapping is None:
+        return web.json_response({
+            "status": "ok",
+            "payload": {
+                "jeedom_eq_id": eq_id,
+                "mapped": False,
+                "auto": None,
+                "overridden": None,
+                "native_generic_types": native_generic_types,
+            },
+        })
+
+    # 2. Overrides PROPOSÉS, construits depuis le corps de requête, EN MÉMOIRE uniquement.
+    proposed_type_overrides: Dict[str, dict] = {}
+    if proposed_type is not None:
+        cmd_ids = mapping_cmd_ids(auto_mapping)
+        key_cmd = proposed_cmd_id if isinstance(proposed_cmd_id, int) else (cmd_ids[0] if cmd_ids else None)
+        if key_cmd is not None:
+            proposed_type_overrides[f"{eq_id}:{key_cmd}"] = {
+                "ha_entity_type": proposed_type,
+                "source": "preview",
+            }
+    proposed_cmd_overrides: Dict[str, dict] = {}
+    proposed_equipment_overrides: Dict[str, dict] = {}
+    if proposed_policy is not None:
+        if isinstance(proposed_cmd_id, int):
+            proposed_cmd_overrides[f"{eq_id}:{proposed_cmd_id}"] = {"publication_override": proposed_policy}
+        else:
+            proposed_equipment_overrides[str(eq_id)] = {"publication_override": proposed_policy}
+
+    # 3. Résultat AVEC override : copie patchée (generic_type natif intact, D10).
+    over_mapping = apply_type_override(auto_mapping, _DATA_DIR, overrides=proposed_type_overrides)
+    pub_override = _resolve_publication_override_for_mapping(
+        over_mapping, proposed_cmd_overrides, proposed_equipment_overrides
+    )
+
+    auto_view = _preview_mapping_view(auto_mapping, confidence_policy, publication_override=None)
+    over_view = _preview_mapping_view(over_mapping, confidence_policy, publication_override=pub_override)
+
+    over_reason_details = over_mapping.reason_details or {}
+    if over_reason_details.get("override_applied"):
+        over_view["type_override"] = {
+            "source": over_reason_details.get("override_source"),
+            "native": auto_mapping.ha_entity_type,
+            "effective": over_mapping.ha_entity_type,
+        }
+    if pub_override is not None:
+        over_view["publication_override"] = pub_override
+
+    # 4. Export support (AC4) : trace de preview + raisons de refus (aucun nouveau reason_code).
+    refusal_reasons = []
+    if not over_view["projection_validity"]["is_valid"] and over_view["projection_validity"]["reason_code"]:
+        refusal_reasons.append(over_view["projection_validity"]["reason_code"])
+    if not over_view["should_publish"] and over_view["publication_reason"]:
+        if over_view["publication_reason"] not in refusal_reasons:
+            refusal_reasons.append(over_view["publication_reason"])
+    support_export = {
+        "preview_trace": {
+            "native": auto_mapping.ha_entity_type,
+            "effective": over_mapping.ha_entity_type,
+            "publication_override": pub_override,
+        },
+        "refusal_reasons": refusal_reasons,
+    }
+
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "mapped": True,
+            "auto": auto_view,
+            "overridden": over_view,
+            "native_generic_types": native_generic_types,
+            "support_export": support_export,
+        },
+    })
+
+
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     """Handle GET /system/diagnostics — return coverage diagnostics."""
     local_secret = request.app["local_secret"]
@@ -3044,6 +3210,7 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
     app.router.add_post("/action/sync", _handle_action_sync)
     app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
+    app.router.add_post("/system/overrides/preview", _handle_overrides_preview)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
