@@ -69,3 +69,74 @@
 .j2ha-diag-target-highlight > td {
   background-color: #fff9c4 !important;
 }
+
+/* Story 16.5 — Accordéon commande : en-tête cliquable clavier + souris. */
+.mo-accordion-toggle {
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+}
+.mo-accordion-toggle:hover,
+.mo-accordion-toggle:focus {
+  text-decoration: none;
+}
+
+/* Story 16.5 — Triptyque override HA par commande (natif / override / diagnostic). */
+.mapping-override-triptyque {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 15px;
+}
+.mapping-override-triptyque .mo-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.mapping-override-triptyque .mo-col-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 4px;
+}
+/* Colonne native : traitement « champ désactivé », séparation permanente (AC6). */
+.mo-col-native {
+  background-color: #f5f5f5;
+  border-radius: 3px;
+  padding: 6px 8px;
+  border-left: 3px solid #ccc;
+}
+.mo-native-value {
+  font-family: monospace;
+  color: #555;
+  font-weight: 600;
+}
+.mo-col-override .mo-empty-state {
+  font-size: 12px;
+  font-style: italic;
+  margin-top: 4px;
+}
+.mo-col-override .mo-spinner {
+  margin-left: 6px;
+  color: #337ab7;
+}
+.mo-col-override .mo-revert-cmd {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #337ab7;
+  cursor: pointer;
+}
+/* Diagnostic : information jamais codée uniquement par la couleur (message textuel primaire). */
+.mo-diag-cell {
+  font-size: 13px;
+}
+.mo-diag-cell.j2ha-diag-ready {
+  color: #3c763d;
+}
+/* Bloquant : ton neutre/factuel, jamais rouge alarmant (AC8). */
+.mo-diag-cell.j2ha-diag-blocking {
+  color: #8a6d3b;
+}
+.mo-diag-cell.j2ha-diag-unknown {
+  color: #999;
+}

@@ -621,6 +621,62 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'getMappingOverrides') {
+      // Story 16.5 — arbre de mapping par équipement (lecture seule) pour le triptyque.
+      $eqId = init('eqId', '');
+      if ($eqId === '' || !ctype_digit((string)$eqId)) {
+        throw new Exception(__('eqId invalide', __FILE__));
+      }
+      $result = jeedom2ha::callDaemon('/system/mapping_overrides/' . (int)$eqId, null, 'GET', 15);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[MAPPING-OVERRIDE] Le démon n\'a pas répondu (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'previewMappingOverride') {
+      // Story 16.5 — dry-run instantané (lecture seule, aucune persistance) via 16.6.
+      $params = array(
+        'payload' => array(
+          'jeedom_eq_id'   => (int)init('eqId', 0),
+          'jeedom_cmd_id'  => (int)init('cmdId', 0),
+          'ha_entity_type' => init('haEntityType', ''),
+        ),
+      );
+      $result = jeedom2ha::callDaemon('/system/overrides/preview', $params, 'POST', 15);
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'saveMappingOverride') {
+      // Story 16.5 — persistance de l'override sur succès du dry-run (auto-validation).
+      $params = array(
+        'payload' => array(
+          'jeedom_eq_id'   => (int)init('eqId', 0),
+          'jeedom_cmd_id'  => (int)init('cmdId', 0),
+          'ha_entity_type' => init('haEntityType', ''),
+        ),
+      );
+      $result = jeedom2ha::callDaemon('/action/mapping_override', $params, 'POST', 15);
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'revertMappingOverride') {
+      // Story 16.5 — retour au mode auto (par commande si cmdId fourni, sinon équipement).
+      $payload = array('jeedom_eq_id' => (int)init('eqId', 0));
+      $cmdId = init('cmdId', '');
+      if ($cmdId !== '' && ctype_digit((string)$cmdId)) {
+        $payload['jeedom_cmd_id'] = (int)$cmdId;
+      }
+      $result = jeedom2ha::callDaemon('/action/mapping_override_revert', array('payload' => $payload), 'POST', 15);
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
     else {
       throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
     }

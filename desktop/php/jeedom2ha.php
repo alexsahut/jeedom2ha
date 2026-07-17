@@ -158,6 +158,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<li role="presentation"><a href="#" class="eqLogicAction" aria-controls="home" role="tab" data-toggle="tab" data-action="returnToThumbnailDisplay"><i class="fas fa-arrow-circle-left"></i></a></li>
 			<li role="presentation" class="active"><a href="#eqlogictab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-tachometer-alt"></i> {{Equipement}}</a></li>
 			<li role="presentation"><a href="#commandtab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-list"></i> {{Commandes}}</a></li>
+			<li role="presentation"><a href="#mappingOverrideTab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-house-signal"></i> {{HA / jeedom2ha}}</a></li>
 		</ul>
 		<div class="tab-content">
 			<!-- Onglet de configuration de l'équipement -->
@@ -283,6 +284,21 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				</div>
 			</div><!-- /.tabpanel #commandtab-->
 
+			<!-- Story 16.5 — Onglet override mapping HA par commande (triptyque natif/override/diagnostic) -->
+			<div role="tabpanel" class="tab-pane" id="mappingOverrideTab">
+				<div class="alert alert-info" style="margin:10px 5px;">
+					<i class="fas fa-info-circle"></i>
+					{{Choisissez le type Home Assistant utilisé pour chaque commande. Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
+				</div>
+				<div id="mappingOverride_reassurance" class="alert alert-warning" role="status" aria-live="polite" style="display:none; margin:10px 5px;">
+					<i class="fas fa-shield-alt"></i>
+					{{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}
+				</div>
+				<div id="mappingOverride_status" class="text-muted" style="margin:10px 5px;"></div>
+				<div id="mappingOverride_eqActions" style="margin:10px 5px;"></div>
+				<div id="mappingOverride_list" class="panel-group" role="tablist" aria-multiselectable="true" style="margin:10px 5px;"></div>
+			</div><!-- /.tabpanel #mappingOverrideTab-->
+
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
 </div><!-- /.row row-overflow -->
@@ -292,6 +308,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_diagnostic_helpers', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_mapping_override', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>

@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-07-06
+# last_updated: 2026-07-17
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -60,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-17'  # Story 16.4 done (code-review) ; Story 16.6 done (code-review) preview/dry-run backend ; pe-epic-18 en backlog via SCP 2026-07-17
+last_updated: '2026-07-17'  # Story 16.4 done (code-review) ; Story 16.6 done (code-review) preview/dry-run backend ; Story 16.5 dev-story -> review (UI triptyque + persistance HTTP) ; pe-epic-18 en backlog via SCP 2026-07-17
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -312,7 +312,7 @@ development_status:
   16-3-overrides-publication-exclusion-explicite: done  # code-review PASS 2026-07-07 (0 Critical/High/Medium, AC1/AC2 valides) ; schema v2, resolve_publication_override, decide_publication niveaux 2b/4, PublicationDecision.reason_details ; 26 tests + 2 fixes collateraux ; 1024 passed (0 regression) ; note gouvernance : force_publish ne bypass jamais PRODUCT_SCOPE ; reste : commit/PR (action Alexandre) + cycle disruptif terrain differe (Task 0)
   # --- Phase 16b (diagnostic + UI + preview + terrain) ; deja definies dans epics-projection-engine.md, enregistrees 2026-07-17 pour cloture complete de pe-epic-16 ---
   16-4-diagnostic-override-aware-drill-down: done  # code-review 2026-07-17 : diff strictement additif, 5 AC couverts, 0 nouveau reason_code, 4D eq-level intact, generic_type natif jamais mute ; 1028 tests passed ; golden realigne
-  16-5-ui-jeedom-configuration-par-equipement: backlog  # UI Jeedom (PHP) de configuration par equipement inspiree Homebridge ; demande implication Alexandre (choix UI)
+  16-5-ui-jeedom-configuration-par-equipement: done  # code-review 2026-07-17 : 2 findings HIGH corriges (subtask 3.4 accordeons collapsibles + auto-open bloquantes plafonne 4 ; subtask 4.1 revert scope equipement) ; triptyque natif/override/diagnostic + dry-run + auto-validation + reassurance ; node 247/247, non-reg daemon 1050 passed (0 regression) ; terrain differe a 16.7
   16-6-preview-dry-run-avant-application: done  # code-review 2026-07-17 : endpoint POST /system/overrides/preview strictement additif lecture seule (aucun publisher construit), 5 AC couverts, validate_projection consomme sans bypass, 0 nouveau reason_code, generic_type natif jamais mute, input validation 400/401/404 solide ; 1035 tests passed ; golden inchange
   16-7-gate-terrain-et-profils-partageables: backlog  # gate terrain (box 192.168.1.21) + profils partageables ; demande implication Alexandre (terrain)
   # ==============================================================
