@@ -2313,3 +2313,44 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - `ha-projection-reference.md` reste citée ligne de preuve par ligne de preuve pour toute contrainte HA ;
 - pas de gate terrain disruptif requis (cadrage documentaire) ; toute inspection du corpus réel reste en lecture seule ;
 - chaque story se conclut par un statut explicite de classement par cas (`couvert via type existant`, `justifie ouverture`, `pas de besoin prouvé / report`).
+
+---
+
+### Epic 18 — Couverture générique des domaines HA manquants (fan, lock, siren, valve, event)
+
+**Statut :** `backlog` — ajouté par correct-course 2026-07-17 (`sprint-change-proposal-2026-07-17-couverture-domaines-ha.md`).
+
+**Objectif :** projeter vers Home Assistant tous les domaines d'entités porteurs d'une intention utilisateur claire mais aujourd'hui non couverts — `fan`, `lock`, `siren`, `valve`, `event` — pour que le plugin soit **générique** : le mapping le plus large et le plus logique possible, indépendamment de toute installation particulière.
+
+**Référentiel autoritaire :** le catalogue fermé des `generic_type` = **Jeedom core ∪ plugin Homebridge** (`NebzHB/homebridge-jeedom`). Le core (`core/config/jeedom.config.php`) ne définit ni `FAN_STATE/ON/OFF`, ni `SWITCH_STATE/ON/OFF`, ni `VALVE_*` ; ces familles proviennent du plugin Homebridge, qui étend le référentiel pour coller aux types d'accessoires HomeKit.
+
+**Invariants transverses (règle « les 2 plugins coexistent ») :**
+- jeedom2ha **consomme** le `generic_type` posé (y compris par Homebridge) comme signal d'intention et **ne le modifie jamais** — une configuration faite pour Homebridge n'est jamais cassée ;
+- la couche d'override `pe-epic-16` (`data/ha_overrides.json`) reste le **point de contrôle final** de l'utilisateur (ex. forcer un `FAN_*` en `switch` dans HA tout en le gardant `fan` pour HomeKit) ;
+- toute ouverture de domaine respecte AR13/FR40/NFR10 : entrée `HA_COMPONENT_REGISTRY` + cas nominal + cas d'échec `validate_projection()` + non-régression du contrat 4D, **dans le même incrément** ;
+- source des contraintes HA : `ha-projection-reference.md` / `.yaml`, jamais une table dupliquée.
+
+**Stories :**
+
+- **Story 18.0 — Préfixe : gel du référentiel dual-source et matrice de couverture.** Documentaire (modèle Story 10.0). Fige la matrice canonique `generic_type (core ∪ Homebridge) → domaine HA → contraintes HA` pour les 5 domaines de l'epic, et verrouille le périmètre + les exclusions. Aucune modification de code, de mapping ou de scope.
+- **Story 18.1 — Ouverture gouvernée `fan`.** `FAN_STATE/ON/OFF` (Homebridge) + `FAN_SPEED*`/`ROTATION*` (core, vitesse variable → `percentage_command_topic`). **Étend `pe-epic-14`** : `FAN_*` est projeté par défaut en `fan` (plus en `switch`) ; l'override `pe-epic-16` permet de forcer `switch` dans HA ; non-régression stricte de `SWITCH_*`/`ENERGY_*`. Première de la séquence d'ouvertures.
+- **Story 18.2 — Ouverture gouvernée `lock`.** `LOCK_STATE/OPEN/CLOSE` (core Security). Retrait de l'exclusion `_ANTI_SWITCH` correspondante au profit du nouveau mapper dédié.
+- **Story 18.3 — Ouverture gouvernée `siren`.** `SIREN_STATE/ON/OFF`. Idem : sortie du `_ANTI_SWITCH`/`fallback` vers un mapper `siren`.
+- **Story 18.4 — Ouverture gouvernée `valve`.** `VALVE_*`, `FAUCET_*`, `IRRIG_*` (Homebridge) → domaine HA `valve`.
+- **Story 18.5 — Ouverture gouvernée `event`.** `SWITCH_STATELESS_SINGLE/DOUBLE/LONG/ALLINONE` (Homebridge, impulsions sans état) → domaine HA `event`.
+
+**Hors périmètre (décision Alexandre 2026-07-17) :** `media_player` (`VOLUME`, `SPEAKER_MUTE_*`, `MEDIA_*`) est **reporté** vers un epic futur dédié — capabilities riches (volume, sources, transport) qui justifient un cadrage séparé. `number`/`select` restent traités par `pe-epic-17`.
+
+**Dev notes :**
+- chaque domaine partage la même mécanique : nouveau mapper on/off/state + builder discovery + entrée `HA_COMPONENT_REGISTRY` + règle `validate_projection` (nominal + échec) + retrait éventuel de `_ANTI_SWITCH`/`_SWITCH_CMD_FAMILIES` ;
+- le dispatch registry-driven (`pe-epic-8`) absorbe les nouveaux mappers/publishers sans refonte d'architecture ;
+- ordre d'exécution : `18-0` (préfixe) → `18-1 fan` → `lock`/`siren`/`valve`/`event` ;
+- workflow BMAD strict `create-story -> dev-story -> code-review` par story.
+
+### Gates epic-level pe-epic-18
+
+- pour chaque domaine ouvert : entrée registre + mapper + cas nominal/échec `validate_projection()` + non-régression 4D **et** `SWITCH_*`/`ENERGY_*` livrés dans le même incrément ;
+- au moins un cas représentatif par domaine publié en MQTT HA, état non-unknown, prouvé par gate terrain ;
+- aucune modification des `generic_type` Jeedom natifs ni de la config Homebridge (lecture seule vérifiée) ;
+- compatibilité de chaque nouveau domaine avec la couche d'override `pe-epic-16` (le domaine reste redirigeable) ;
+- `ha-projection-reference.md` citée ligne de preuve par ligne de preuve pour toute contrainte HA.

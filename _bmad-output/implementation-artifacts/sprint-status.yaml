@@ -60,7 +60,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-07-07'  # create-story 17-1 + 17-2 (cadrage number/select) -> ready-for-dev ; pe-epic-17 in-progress (SCP 2026-07-07)
+last_updated: '2026-07-17'  # pe-epic-17 clos (cadrage number/select : aucune ouverture PRODUCT_SCOPE) ; pe-epic-18 (couverture domaines HA manquants) en backlog via SCP 2026-07-17 (fan/lock/siren/valve/event ; media_player reporte)
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -317,6 +317,24 @@ development_status:
   # Stories de cadrage seulement (modele Story 10.4) ; AUCUNE ouverture PRODUCT_SCOPE dans cet epic
   # Toute ouverture effective reste un increment separe sous FR40/NFR10 (registry + nominal/echec validate_projection + non-regression 4D)
   # ==============================================================
-  pe-epic-17: in-progress  # cadrage ouverture number/select (composants HA connus/validables non gouvernes) ; cadre par SCP 2026-07-07 ; stories de cadrage seulement, aucune ouverture PRODUCT_SCOPE ; demarre 2026-07-07 (create-story 17-1)
-  17-1-cadrage-ouverture-number-consigne: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code
-  17-2-cadrage-ouverture-select-mode: ready-for-dev  # create-story 2026-07-07 ; cadrage documentaire (modele Story 10.4), aucun code
+  pe-epic-17: done  # cadrage ouverture number/select clos 2026-07-17 ; conclusion : aucune ouverture PRODUCT_SCOPE justifiee (number et select restes connus/validables non ouverts) ; toute ouverture future = increment separe sous FR40/NFR10
+  17-1-cadrage-ouverture-number-consigne: done  # code-review PASS 2026-07-17 (0 finding) ; classement par cas AC5 : aucun cas ne justifie l'ouverture de number, PRODUCT_SCOPE inchange ; aucun code
+  17-2-cadrage-ouverture-select-mode: done  # code-review PASS 2026-07-17 (0 finding) ; classement par cas AC5 : aucun cas ne justifie l'ouverture de select (mode HVAC deja porte par climate ; presets fan -> pe-epic-18), PRODUCT_SCOPE inchange ; aucun code
+
+  # ==============================================================
+  # pe-epic-18 — Couverture generique des domaines HA manquants
+  # Ajoute par correct-course 2026-07-17 — SCP approuve
+  # Source : _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17-couverture-domaines-ha.md
+  # Referentiel autoritaire : Jeedom core ∪ plugin Homebridge (consommer l'intention Homebridge, ne jamais la casser)
+  # Une ouverture gouvernee FR40/NFR10 par domaine (registry + validate_projection nominal/echec + non-regression 4D + gate terrain)
+  # Overrides pe-epic-16 preserves comme controle final utilisateur
+  # media_player reporte hors epic (decision Alexandre 2026-07-17) — candidat futur epic dedie
+  # Sequencement : 18-0 prefixe -> 18-1 fan (lien pe-epic-14) -> lock/siren/valve/event
+  # ==============================================================
+  pe-epic-18: backlog  # couverture generique domaines HA manquants (fan/lock/siren/valve/event) ; cadre par SCP 2026-07-17 ; referentiel core ∪ Homebridge ; overrides pe-epic-16 preserves ; media_player reporte hors epic
+  18-0-prefixe-referentiel-dual-source-et-matrice-domaines: backlog
+  18-1-ouverture-gouvernee-fan: backlog  # etend pe-epic-14 : FAN_* par defaut -> fan, override switch preserve, non-regression SWITCH_*/ENERGY_*
+  18-2-ouverture-gouvernee-lock: backlog
+  18-3-ouverture-gouvernee-siren: backlog
+  18-4-ouverture-gouvernee-valve: backlog
+  18-5-ouverture-gouvernee-event: backlog
