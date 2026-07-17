@@ -30,19 +30,28 @@
           "ha_type": "alarm_control_panel",
           "matched_commands": [
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23001,
               "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE"
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23003,
               "cmd_name": "Armer",
-              "generic_type": "ALARM_ARMED"
+              "generic_type": "ALARM_ARMED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23004,
               "cmd_name": "Desactiver",
-              "generic_type": "ALARM_RELEASED"
+              "generic_type": "ALARM_RELEASED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             }
           ],
           "name": "Alarme maison",
@@ -125,19 +134,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 23002,
               "cmd_name": "Etat alarme",
-              "generic_type": "ALARM_STATE"
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 23005,
               "cmd_name": "Mode",
-              "generic_type": "ALARM_SET_MODE"
+              "generic_type": "ALARM_SET_MODE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 23006,
               "cmd_name": "Mode courant",
-              "generic_type": "ALARM_MODE"
+              "generic_type": "ALARM_MODE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -170,9 +188,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 5138,
               "cmd_name": "Puissance panneaux",
               "generic_type": "POWER",
+              "mapping_decision": "sensor",
+              "retained": true,
               "state_class": "measurement",
               "unit_of_measurement": "W"
             }
@@ -255,9 +276,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5137,
               "cmd_name": "Puissance reseau",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -290,19 +314,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5490,
               "cmd_name": "Manu",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5491,
               "cmd_name": "auto",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5708,
               "cmd_name": "active",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Chauffe-eau",
@@ -460,19 +493,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5530,
               "cmd_name": "Routage reel",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5706,
               "cmd_name": "On_5701",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5707,
               "cmd_name": "Off_5702",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -505,19 +547,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5987,
               "cmd_name": "Charge",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5997,
               "cmd_name": "Charge On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5998,
               "cmd_name": "Charge Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "IQ EV Charger",
@@ -675,84 +726,132 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5986,
               "cmd_name": "Branche",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5988,
               "cmd_name": "Connecte",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6009,
               "cmd_name": "Charge solaire",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5999,
               "cmd_name": "Charge solaire On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6001,
               "cmd_name": "Charge solaire Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6010,
               "cmd_name": "Charge manuelle",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6000,
               "cmd_name": "Charge manuelle On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6021,
               "cmd_name": "Charge manuelle Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5991,
               "cmd_name": "Puissance",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5992,
               "cmd_name": "Energie session",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5993,
               "cmd_name": "Energie jour",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5989,
               "cmd_name": "Etat connecteur",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5990,
               "cmd_name": "Mode de charge",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5994,
               "cmd_name": "Derniere MAJ",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5995,
               "cmd_name": "Source",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5996,
               "cmd_name": "Diagnostic",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -785,19 +884,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5977,
               "cmd_name": "Filtration piscine",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5978,
               "cmd_name": "Filtration piscine On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5979,
               "cmd_name": "Filtration piscine Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Pilotage priorisation solaire",
@@ -915,49 +1023,76 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5980,
               "cmd_name": "Chauffage piscine",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5981,
               "cmd_name": "Chauffage piscine On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5982,
               "cmd_name": "Chauffage piscine Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5983,
               "cmd_name": "Chauffage SPA",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5984,
               "cmd_name": "Chauffage SPA On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5985,
               "cmd_name": "Chauffage SPA Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6004,
               "cmd_name": "Charge voiture",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6005,
               "cmd_name": "Charge voiture On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6006,
               "cmd_name": "Charge voiture Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -990,19 +1125,28 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10001,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10002,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10003,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1000",
@@ -1099,14 +1243,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10011,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10012,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1001",
@@ -1192,14 +1342,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10021,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10022,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1002",
@@ -1285,9 +1441,12 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10031,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1003",
@@ -1362,14 +1521,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10041,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10042,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1004",
@@ -1455,29 +1620,44 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10051,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10052,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10053,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10054,
               "cmd_name": "LIGHT_BRIGHTNESS",
-              "generic_type": "LIGHT_BRIGHTNESS"
+              "generic_type": "LIGHT_BRIGHTNESS",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10055,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1005",
@@ -1596,19 +1776,28 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10061,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10062,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10063,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1006",
@@ -1705,14 +1894,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10071,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10072,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1007",
@@ -1798,14 +1993,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10081,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10082,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1008",
@@ -1891,14 +2092,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10091,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10092,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1009",
@@ -1984,19 +2191,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20001,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20002,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20003,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2000",
@@ -2093,14 +2309,20 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20011,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20012,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2001",
@@ -2186,9 +2408,12 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20021,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2002",
@@ -2263,24 +2488,36 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20031,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20032,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20033,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20034,
               "cmd_name": "FLAP_STOP",
-              "generic_type": "FLAP_STOP"
+              "generic_type": "FLAP_STOP",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2003",
@@ -2388,14 +2625,20 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20041,
               "cmd_name": "FLAP_BSO_UP",
-              "generic_type": "FLAP_BSO_UP"
+              "generic_type": "FLAP_BSO_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20042,
               "cmd_name": "FLAP_BSO_DOWN",
-              "generic_type": "FLAP_BSO_DOWN"
+              "generic_type": "FLAP_BSO_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2004",
@@ -2481,19 +2724,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20051,
               "cmd_name": "FLAP_BSO_UP",
-              "generic_type": "FLAP_BSO_UP"
+              "generic_type": "FLAP_BSO_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20052,
               "cmd_name": "FLAP_BSO_DOWN",
-              "generic_type": "FLAP_BSO_DOWN"
+              "generic_type": "FLAP_BSO_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20053,
               "cmd_name": "FLAP_BSO_STATE",
-              "generic_type": "FLAP_BSO_STATE"
+              "generic_type": "FLAP_BSO_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2005",
@@ -2590,24 +2842,36 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20061,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20062,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20063,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20064,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2006",
@@ -2715,19 +2979,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20071,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20072,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20073,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2007",
@@ -2824,19 +3097,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30001,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30002,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30003,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3000",
@@ -2933,14 +3215,20 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30011,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30012,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3001",
@@ -3026,9 +3314,12 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30021,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3002",
@@ -3103,9 +3394,12 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30031,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3003",
@@ -3180,14 +3474,20 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30041,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30042,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3004",
@@ -3327,14 +3627,20 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40001,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40002,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -3411,9 +3717,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40011,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -3518,19 +3827,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40021,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40022,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40023,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -3763,19 +4081,28 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 60011,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 60012,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 60013,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Blocked product_scope climate 6001",
@@ -3872,9 +4199,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70001,
               "cmd_name": "TEMPERATURE",
-              "generic_type": "TEMPERATURE"
+              "generic_type": "TEMPERATURE",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor temperature salon 7000",
@@ -3949,9 +4279,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70011,
               "cmd_name": "HUMIDITY",
-              "generic_type": "HUMIDITY"
+              "generic_type": "HUMIDITY",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor humidite sdb 7001",
@@ -4026,9 +4359,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70021,
               "cmd_name": "POWER",
               "generic_type": "POWER",
+              "mapping_decision": "sensor",
+              "retained": true,
               "state_class": "measurement",
               "unit_of_measurement": "W"
             }
@@ -4105,9 +4441,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70031,
               "cmd_name": "CO2",
-              "generic_type": "CO2"
+              "generic_type": "CO2",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor qualite air 7003",
@@ -4182,9 +4521,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70041,
               "cmd_name": "BRIGHTNESS",
-              "generic_type": "BRIGHTNESS"
+              "generic_type": "BRIGHTNESS",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor luminosite 7004",
@@ -4259,9 +4601,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80001,
               "cmd_name": "PRESENCE",
-              "generic_type": "PRESENCE"
+              "generic_type": "PRESENCE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Detecteur presence salon 8000",
@@ -4336,9 +4681,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80011,
               "cmd_name": "OPENING",
-              "generic_type": "OPENING"
+              "generic_type": "OPENING",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Capteur ouverture porte entree 8001",
@@ -4413,9 +4761,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80021,
               "cmd_name": "SMOKE",
-              "generic_type": "SMOKE"
+              "generic_type": "SMOKE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Detecteur fumee cuisine 8002",
@@ -4490,9 +4841,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80031,
               "cmd_name": "FLOOD",
-              "generic_type": "FLOOD"
+              "generic_type": "FLOOD",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Capteur inondation cave 8003",
@@ -4567,9 +4921,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80041,
               "cmd_name": "LOCK_STATE",
-              "generic_type": "LOCK_STATE"
+              "generic_type": "LOCK_STATE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Serrure connectee 8004",
@@ -4644,9 +5001,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90001,
               "cmd_name": "Activer",
-              "generic_type": "GENERIC_ACTION"
+              "generic_type": "GENERIC_ACTION",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Scenario alarme securite 9000",
@@ -4721,9 +5081,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90011,
               "cmd_name": "Pause",
-              "generic_type": "MEDIA_PAUSE"
+              "generic_type": "MEDIA_PAUSE",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Lecteur salon 9001",
@@ -4798,9 +5161,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90021,
               "cmd_name": "Activer sirene",
-              "generic_type": "SIREN_ON"
+              "generic_type": "SIREN_ON",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Sirene garage 9002",
@@ -4875,19 +5241,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 97001,
               "cmd_name": "PRESENCE",
-              "generic_type": "PRESENCE"
+              "generic_type": "PRESENCE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 97002,
               "cmd_name": "Pr\u00e9sent",
-              "generic_type": "SET_ON"
+              "generic_type": "SET_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 97003,
               "cmd_name": "Absent",
-              "generic_type": "SET_OFF"
+              "generic_type": "SET_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "iPhone Alex 9700",
@@ -5028,9 +5403,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100001,
               "cmd_name": "\u00c9tat",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -5107,9 +5485,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100011,
               "cmd_name": "Couleur",
-              "generic_type": "COLOR"
+              "generic_type": "COLOR",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -5186,9 +5567,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100021,
               "cmd_name": "Niveau",
-              "generic_type": "VOLUME_SET"
+              "generic_type": "VOLUME_SET",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -5265,9 +5649,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100031,
               "cmd_name": "Texte",
-              "generic_type": "SET_TEXT"
+              "generic_type": "SET_TEXT",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -5364,14 +5751,20 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110001,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 110002,
               "cmd_name": "Temp\u00e9rature",
-              "generic_type": "THERMOSTAT_TEMPERATURE"
+              "generic_type": "THERMOSTAT_TEMPERATURE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat RDC",
@@ -5457,9 +5850,12 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110011,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat Galerie",
@@ -5534,14 +5930,20 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110021,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 110022,
               "cmd_name": "Temp\u00e9rature",
-              "generic_type": "THERMOSTAT_TEMPERATURE"
+              "generic_type": "THERMOSTAT_TEMPERATURE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat chambre Arthur",
@@ -5627,19 +6029,28 @@
           "ha_type": "alarm_control_panel",
           "matched_commands": [
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12001,
               "cmd_name": "Etat",
-              "generic_type": "ALARM_STATE"
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12003,
               "cmd_name": "Activer",
-              "generic_type": "ALARM_ENABLE"
+              "generic_type": "ALARM_ENABLE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12004,
               "cmd_name": "Desactiver",
-              "generic_type": "ALARM_DISABLE"
+              "generic_type": "ALARM_DISABLE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             }
           ],
           "name": "Alarme maison 12000",
@@ -5712,9 +6123,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 12002,
               "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE"
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -5749,19 +6163,28 @@
           "ha_type": "alarm_control_panel",
           "matched_commands": [
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23001,
               "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE"
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23003,
               "cmd_name": "Armer",
-              "generic_type": "ALARM_ARMED"
+              "generic_type": "ALARM_ARMED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23004,
               "cmd_name": "Desactiver",
-              "generic_type": "ALARM_RELEASED"
+              "generic_type": "ALARM_RELEASED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             }
           ],
           "name": "Alarme maison",
@@ -5844,19 +6267,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 23002,
               "cmd_name": "Etat alarme",
-              "generic_type": "ALARM_STATE"
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 23005,
               "cmd_name": "Mode",
-              "generic_type": "ALARM_SET_MODE"
+              "generic_type": "ALARM_SET_MODE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 23006,
               "cmd_name": "Mode courant",
-              "generic_type": "ALARM_MODE"
+              "generic_type": "ALARM_MODE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -5889,9 +6321,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 5138,
               "cmd_name": "Puissance panneaux",
               "generic_type": "POWER",
+              "mapping_decision": "sensor",
+              "retained": true,
               "state_class": "measurement",
               "unit_of_measurement": "W"
             }
@@ -5974,9 +6409,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5137,
               "cmd_name": "Puissance reseau",
-              "generic_type": "POWER"
+              "generic_type": "POWER",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -6009,19 +6447,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5490,
               "cmd_name": "Manu",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5491,
               "cmd_name": "auto",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5708,
               "cmd_name": "active",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Chauffe-eau",
@@ -6179,19 +6626,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5530,
               "cmd_name": "Routage reel",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5706,
               "cmd_name": "On_5701",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5707,
               "cmd_name": "Off_5702",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -6224,19 +6680,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5987,
               "cmd_name": "Charge",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5997,
               "cmd_name": "Charge On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5998,
               "cmd_name": "Charge Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "IQ EV Charger",
@@ -6394,84 +6859,132 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5986,
               "cmd_name": "Branche",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5988,
               "cmd_name": "Connecte",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6009,
               "cmd_name": "Charge solaire",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5999,
               "cmd_name": "Charge solaire On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6001,
               "cmd_name": "Charge solaire Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6010,
               "cmd_name": "Charge manuelle",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6000,
               "cmd_name": "Charge manuelle On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6021,
               "cmd_name": "Charge manuelle Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5991,
               "cmd_name": "Puissance",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5992,
               "cmd_name": "Energie session",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5993,
               "cmd_name": "Energie jour",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5989,
               "cmd_name": "Etat connecteur",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5990,
               "cmd_name": "Mode de charge",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5994,
               "cmd_name": "Derniere MAJ",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5995,
               "cmd_name": "Source",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5996,
               "cmd_name": "Diagnostic",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -6504,19 +7017,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 5977,
               "cmd_name": "Filtration piscine",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5978,
               "cmd_name": "Filtration piscine On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 5979,
               "cmd_name": "Filtration piscine Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Pilotage priorisation solaire",
@@ -6634,49 +7156,76 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 5980,
               "cmd_name": "Chauffage piscine",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5981,
               "cmd_name": "Chauffage piscine On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5982,
               "cmd_name": "Chauffage piscine Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5983,
               "cmd_name": "Chauffage SPA",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5984,
               "cmd_name": "Chauffage SPA On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 5985,
               "cmd_name": "Chauffage SPA Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6004,
               "cmd_name": "Charge voiture",
-              "generic_type": "SWITCH_STATE"
+              "generic_type": "SWITCH_STATE",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6005,
               "cmd_name": "Charge voiture On",
-              "generic_type": "SWITCH_ON"
+              "generic_type": "SWITCH_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 6006,
               "cmd_name": "Charge voiture Off",
-              "generic_type": "SWITCH_OFF"
+              "generic_type": "SWITCH_OFF",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -6709,19 +7258,28 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10001,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10002,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10003,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1000",
@@ -6818,14 +7376,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10011,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10012,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1001",
@@ -6911,14 +7475,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10021,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10022,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1002",
@@ -7004,9 +7574,12 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10031,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1003",
@@ -7081,14 +7654,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10041,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10042,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1004",
@@ -7174,29 +7753,44 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10051,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10052,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10053,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10054,
               "cmd_name": "LIGHT_BRIGHTNESS",
-              "generic_type": "LIGHT_BRIGHTNESS"
+              "generic_type": "LIGHT_BRIGHTNESS",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10055,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1005",
@@ -7315,19 +7909,28 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10061,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10062,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10063,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1006",
@@ -7424,14 +8027,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10071,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10072,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1007",
@@ -7517,14 +8126,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10081,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10082,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1008",
@@ -7610,14 +8225,20 @@
           "ha_type": "light",
           "matched_commands": [
             {
+              "attendu_ha": "light",
               "cmd_id": 10091,
               "cmd_name": "LIGHT_SLIDER",
-              "generic_type": "LIGHT_SLIDER"
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
             },
             {
+              "attendu_ha": "light",
               "cmd_id": 10092,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
             }
           ],
           "name": "Light reference 1009",
@@ -7703,19 +8324,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20001,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20002,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20003,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2000",
@@ -7812,14 +8442,20 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20011,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20012,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2001",
@@ -7905,9 +8541,12 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20021,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2002",
@@ -7982,24 +8621,36 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20031,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20032,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20033,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20034,
               "cmd_name": "FLAP_STOP",
-              "generic_type": "FLAP_STOP"
+              "generic_type": "FLAP_STOP",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2003",
@@ -8107,14 +8758,20 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20041,
               "cmd_name": "FLAP_BSO_UP",
-              "generic_type": "FLAP_BSO_UP"
+              "generic_type": "FLAP_BSO_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20042,
               "cmd_name": "FLAP_BSO_DOWN",
-              "generic_type": "FLAP_BSO_DOWN"
+              "generic_type": "FLAP_BSO_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2004",
@@ -8200,19 +8857,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20051,
               "cmd_name": "FLAP_BSO_UP",
-              "generic_type": "FLAP_BSO_UP"
+              "generic_type": "FLAP_BSO_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20052,
               "cmd_name": "FLAP_BSO_DOWN",
-              "generic_type": "FLAP_BSO_DOWN"
+              "generic_type": "FLAP_BSO_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20053,
               "cmd_name": "FLAP_BSO_STATE",
-              "generic_type": "FLAP_BSO_STATE"
+              "generic_type": "FLAP_BSO_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2005",
@@ -8309,24 +8975,36 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20061,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20062,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20063,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20064,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2006",
@@ -8434,19 +9112,28 @@
           "ha_type": "cover",
           "matched_commands": [
             {
+              "attendu_ha": "cover",
               "cmd_id": 20071,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20072,
               "cmd_name": "FLAP_DOWN",
-              "generic_type": "FLAP_DOWN"
+              "generic_type": "FLAP_DOWN",
+              "mapping_decision": "cover",
+              "retained": true
             },
             {
+              "attendu_ha": "cover",
               "cmd_id": 20073,
               "cmd_name": "FLAP_SLIDER",
-              "generic_type": "FLAP_SLIDER"
+              "generic_type": "FLAP_SLIDER",
+              "mapping_decision": "cover",
+              "retained": true
             }
           ],
           "name": "Cover reference 2007",
@@ -8543,19 +9230,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30001,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30002,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30003,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3000",
@@ -8652,14 +9348,20 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30011,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30012,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3001",
@@ -8745,9 +9447,12 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30021,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3002",
@@ -8822,9 +9527,12 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30031,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3003",
@@ -8899,14 +9607,20 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 30041,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 30042,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "Switch reference 3004",
@@ -9046,14 +9760,20 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40001,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40002,
               "cmd_name": "FLAP_UP",
-              "generic_type": "FLAP_UP"
+              "generic_type": "FLAP_UP",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -9130,9 +9850,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40011,
               "cmd_name": "FLAP_STATE",
-              "generic_type": "FLAP_STATE"
+              "generic_type": "FLAP_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -9237,19 +9960,28 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 40021,
               "cmd_name": "ENERGY_ON",
-              "generic_type": "ENERGY_ON"
+              "generic_type": "ENERGY_ON",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40022,
               "cmd_name": "ENERGY_OFF",
-              "generic_type": "ENERGY_OFF"
+              "generic_type": "ENERGY_OFF",
+              "mapping_decision": null,
+              "retained": false
             },
             {
+              "attendu_ha": null,
               "cmd_id": 40023,
               "cmd_name": "ENERGY_STATE",
-              "generic_type": "ENERGY_STATE"
+              "generic_type": "ENERGY_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -9426,19 +10158,28 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 60011,
               "cmd_name": "LIGHT_ON",
-              "generic_type": "LIGHT_ON"
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 60012,
               "cmd_name": "LIGHT_OFF",
-              "generic_type": "LIGHT_OFF"
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 60013,
               "cmd_name": "LIGHT_STATE",
-              "generic_type": "LIGHT_STATE"
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Blocked product_scope climate 6001",
@@ -9535,9 +10276,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70001,
               "cmd_name": "TEMPERATURE",
-              "generic_type": "TEMPERATURE"
+              "generic_type": "TEMPERATURE",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor temperature salon 7000",
@@ -9612,9 +10356,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70011,
               "cmd_name": "HUMIDITY",
-              "generic_type": "HUMIDITY"
+              "generic_type": "HUMIDITY",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor humidite sdb 7001",
@@ -9689,9 +10436,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70021,
               "cmd_name": "POWER",
               "generic_type": "POWER",
+              "mapping_decision": "sensor",
+              "retained": true,
               "state_class": "measurement",
               "unit_of_measurement": "W"
             }
@@ -9768,9 +10518,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70031,
               "cmd_name": "CO2",
-              "generic_type": "CO2"
+              "generic_type": "CO2",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor qualite air 7003",
@@ -9845,9 +10598,12 @@
           "ha_type": "sensor",
           "matched_commands": [
             {
+              "attendu_ha": "sensor",
               "cmd_id": 70041,
               "cmd_name": "BRIGHTNESS",
-              "generic_type": "BRIGHTNESS"
+              "generic_type": "BRIGHTNESS",
+              "mapping_decision": "sensor",
+              "retained": true
             }
           ],
           "name": "Sensor luminosite 7004",
@@ -9922,9 +10678,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80001,
               "cmd_name": "PRESENCE",
-              "generic_type": "PRESENCE"
+              "generic_type": "PRESENCE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Detecteur presence salon 8000",
@@ -9999,9 +10758,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80011,
               "cmd_name": "OPENING",
-              "generic_type": "OPENING"
+              "generic_type": "OPENING",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Capteur ouverture porte entree 8001",
@@ -10076,9 +10838,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80021,
               "cmd_name": "SMOKE",
-              "generic_type": "SMOKE"
+              "generic_type": "SMOKE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Detecteur fumee cuisine 8002",
@@ -10153,9 +10918,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80031,
               "cmd_name": "FLOOD",
-              "generic_type": "FLOOD"
+              "generic_type": "FLOOD",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Capteur inondation cave 8003",
@@ -10230,9 +10998,12 @@
           "ha_type": "binary_sensor",
           "matched_commands": [
             {
+              "attendu_ha": "binary_sensor",
               "cmd_id": 80041,
               "cmd_name": "LOCK_STATE",
-              "generic_type": "LOCK_STATE"
+              "generic_type": "LOCK_STATE",
+              "mapping_decision": "binary_sensor",
+              "retained": true
             }
           ],
           "name": "Serrure connectee 8004",
@@ -10307,9 +11078,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90001,
               "cmd_name": "Activer",
-              "generic_type": "GENERIC_ACTION"
+              "generic_type": "GENERIC_ACTION",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Scenario alarme securite 9000",
@@ -10384,9 +11158,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90011,
               "cmd_name": "Pause",
-              "generic_type": "MEDIA_PAUSE"
+              "generic_type": "MEDIA_PAUSE",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Lecteur salon 9001",
@@ -10461,9 +11238,12 @@
           "ha_type": "button",
           "matched_commands": [
             {
+              "attendu_ha": "button",
               "cmd_id": 90021,
               "cmd_name": "Activer sirene",
-              "generic_type": "SIREN_ON"
+              "generic_type": "SIREN_ON",
+              "mapping_decision": "button",
+              "retained": true
             }
           ],
           "name": "Sirene garage 9002",
@@ -10538,19 +11318,28 @@
           "ha_type": "switch",
           "matched_commands": [
             {
+              "attendu_ha": "switch",
               "cmd_id": 97001,
               "cmd_name": "PRESENCE",
-              "generic_type": "PRESENCE"
+              "generic_type": "PRESENCE",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 97002,
               "cmd_name": "Pr\u00e9sent",
-              "generic_type": "SET_ON"
+              "generic_type": "SET_ON",
+              "mapping_decision": "switch",
+              "retained": true
             },
             {
+              "attendu_ha": "switch",
               "cmd_id": 97003,
               "cmd_name": "Absent",
-              "generic_type": "SET_OFF"
+              "generic_type": "SET_OFF",
+              "mapping_decision": "switch",
+              "retained": true
             }
           ],
           "name": "iPhone Alex 9700",
@@ -10691,9 +11480,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100001,
               "cmd_name": "\u00c9tat",
-              "generic_type": "GENERIC_INFO"
+              "generic_type": "GENERIC_INFO",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -10770,9 +11562,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100011,
               "cmd_name": "Couleur",
-              "generic_type": "COLOR"
+              "generic_type": "COLOR",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": true,
@@ -10849,9 +11644,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100021,
               "cmd_name": "Niveau",
-              "generic_type": "VOLUME_SET"
+              "generic_type": "VOLUME_SET",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -10928,9 +11726,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 100031,
               "cmd_name": "Texte",
-              "generic_type": "SET_TEXT"
+              "generic_type": "SET_TEXT",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
@@ -11027,14 +11828,20 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110001,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 110002,
               "cmd_name": "Temp\u00e9rature",
-              "generic_type": "THERMOSTAT_TEMPERATURE"
+              "generic_type": "THERMOSTAT_TEMPERATURE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat RDC",
@@ -11120,9 +11927,12 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110011,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat Galerie",
@@ -11197,14 +12007,20 @@
           "ha_type": "climate",
           "matched_commands": [
             {
+              "attendu_ha": "climate",
               "cmd_id": 110021,
               "cmd_name": "Consigne",
-              "generic_type": "THERMOSTAT_SET_SETPOINT"
+              "generic_type": "THERMOSTAT_SET_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
             },
             {
+              "attendu_ha": "climate",
               "cmd_id": 110022,
               "cmd_name": "Temp\u00e9rature",
-              "generic_type": "THERMOSTAT_TEMPERATURE"
+              "generic_type": "THERMOSTAT_TEMPERATURE",
+              "mapping_decision": "climate",
+              "retained": true
             }
           ],
           "name": "Thermostat chambre Arthur",
@@ -11290,19 +12106,28 @@
           "ha_type": "alarm_control_panel",
           "matched_commands": [
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12001,
               "cmd_name": "Etat",
-              "generic_type": "ALARM_STATE"
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12003,
               "cmd_name": "Activer",
-              "generic_type": "ALARM_ENABLE"
+              "generic_type": "ALARM_ENABLE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             },
             {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12004,
               "cmd_name": "Desactiver",
-              "generic_type": "ALARM_DISABLE"
+              "generic_type": "ALARM_DISABLE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
             }
           ],
           "name": "Alarme maison 12000",
@@ -11375,9 +12200,12 @@
           },
           "unmatched_commands": [
             {
+              "attendu_ha": null,
               "cmd_id": 12002,
               "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE"
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": null,
+              "retained": false
             }
           ],
           "v1_compatibility": false,
