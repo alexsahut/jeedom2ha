@@ -103,6 +103,24 @@ def test_energy_power_maps_to_power_without_relying_on_unit():
     assert unit == "W"
 
 
+# --- Anti-fantôme : eq.generic_type non-light → reste mono eq-scoped ----------
+
+def test_non_light_eq_generic_type_stays_mono_eq_scoped_sensor():
+    # LIGHT_* + POWER/CONSUMPTION mais eq.generic_type="switch" : LightMapper renvoie
+    # None (garde eq.generic_type), donc le light n'est jamais publié. Le compagnon de
+    # mesure doit rester un sensor mono eq-scoped `jeedom2ha_eq_<id>` — surtout PAS
+    # basculer en command-scoped, sinon le changement de node_id à type sensor constant
+    # laisse un topic fantôme retenu (le lifecycle n'unpublish qu'au retypage).
+    eq = _dimmer_with_metering(459)
+    eq.generic_type = "switch"
+
+    results = SensorMapper().map_all(eq, _snapshot(eq))
+
+    assert len(results) == 1
+    assert results[0].ha_entity_type == "sensor"
+    assert results[0].ha_unique_id == "jeedom2ha_eq_459"
+
+
 # --- AC3 : light + ENERGY_STATE reste ambiguous (prise) ----------------------
 
 def test_light_with_energy_state_stays_ambiguous_plug():

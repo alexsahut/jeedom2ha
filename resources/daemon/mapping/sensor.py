@@ -126,13 +126,28 @@ def _has_structural_multi_entity_sensor_shape(eq: JeedomEqLogic) -> bool:
     # forme prise ENERGY_*/SWITCH_*) : les compagnons deviennent des sensors HA
     # command-scoped rattachés au device commun, pour éviter la collision d'unique_id
     # avec le light primaire (jeedom2ha_eq_<id>).
-    if not has_switch_shape and _has_actionable_light_shape(eq) and _has_power_or_energy_companion(eq):
+    if (
+        not has_switch_shape
+        and _has_actionable_light_shape(eq)
+        and _has_power_or_energy_companion(eq)
+        and _eq_generic_type_allows_light(eq)
+    ):
         return True
     return False
 
 
 def _has_actionable_light_shape(eq: JeedomEqLogic) -> bool:
     return any(cmd.generic_type in _ACTIONABLE_LIGHT_GENERIC_TYPES for cmd in eq.cmds)
+
+
+def _eq_generic_type_allows_light(eq: JeedomEqLogic) -> bool:
+    # Miroir du garde LightMapper (light.py) : un eq.generic_type non-light fait
+    # renvoyer None au LightMapper, donc le light n'est jamais publié. Dans ce cas le
+    # compagnon power/energy doit rester un sensor mono eq-scoped (jeedom2ha_eq_<id>)
+    # plutôt que basculer en command-scoped — sinon le changement de node_id à type
+    # sensor constant laisse un topic fantôme retenu (aucun unpublish de retypage).
+    generic_type = (eq.generic_type or "").lower()
+    return generic_type in ("", "light")
 
 
 def _has_power_or_energy_companion(eq: JeedomEqLogic) -> bool:
