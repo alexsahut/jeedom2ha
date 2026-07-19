@@ -38,13 +38,17 @@ _LIGHT_GENERIC_TYPES = {
 }
 
 # Generic types that strongly imply the equipment is NOT primarily a light
-# (Heaters, Covers, Plugs, Sensors, Sirens)
+# (Heaters, Covers, Plugs, Sensors, Sirens).
+# Story 11.4 — POWER/CONSUMPTION/ENERGY_POWER retirés : ce sont des compagnons de
+# mesure, pas des conflits de domaine. Le light mapper les ignore (ni light_cmds ni
+# anti_light_cmds), les laissant au SensorMapper → light + sensor sous device commun.
+# ENERGY_STATE/ON/OFF restent des conflits durs (relais de prise, décision 2026-07-19).
 _ANTI_LIGHT_GENERIC_TYPES = {
     "HEATING_STATE", "HEATING_ON", "HEATING_OFF", "HEATING_OTHER",
     "THERMOSTAT_STATE", "THERMOSTAT_MODE", "THERMOSTAT_SETPOINT",
     "WATER_HEATER_STATE", "WATER_HEATER_ON", "WATER_HEATER_OFF",
     "FLAP_STATE", "FLAP_UP", "FLAP_DOWN", "FLAP_STOP", "FLAP_SLIDER",
-    "ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "ENERGY_POWER", "POWER", "CONSUMPTION",
+    "ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF",
     "SMOKE", "MOTION", "PRESENCE", "OPENING", "OPENING_WINDOW", "OPENING_DOOR",
     "SIREN_STATE", "SIREN_ON", "SIREN_OFF",
     "ALARM_STATE", "ALARM_ENABLE", "ALARM_DISABLE",
