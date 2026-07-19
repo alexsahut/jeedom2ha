@@ -253,6 +253,37 @@ class TestFalsePositivesGuardrails:
         assert result.reason_code == "conflicting_generic_types"
         assert "HEATING_STATE" in result.reason_details["conflicting_types"]
 
+    def test_power_consumption_companions_not_ambiguous(self, mapper, snapshot):
+        """Story 11.4 — LIGHT_* + POWER/CONSUMPTION → lumière projetée (non-ambiguous) ;
+        les compagnons de mesure sont ignorés par le light mapper."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("POWER", id=103, type="info", sub_type="numeric"),
+            _cmd("CONSUMPTION", id=104, type="info", sub_type="numeric"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence in ("sure", "probable")
+        assert result.reason_code != "conflicting_generic_types"
+        assert "POWER" not in result.commands
+        assert "CONSUMPTION" not in result.commands
+
+    def test_energy_state_companion_still_ambiguous(self, mapper, snapshot):
+        """Story 11.4 — LIGHT_* + ENERGY_STATE reste ambiguous (comportement prise)."""
+        eq = _make_eq(cmds=[
+            _cmd("LIGHT_STATE", id=100, type="info", sub_type="binary"),
+            _cmd("LIGHT_ON", id=101, type="action", sub_type="other"),
+            _cmd("LIGHT_OFF", id=102, type="action", sub_type="other"),
+            _cmd("ENERGY_STATE", id=103, type="info", sub_type="binary"),
+        ])
+        result = mapper.map(eq, snapshot)
+        assert result is not None
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "conflicting_generic_types"
+        assert "ENERGY_STATE" in result.reason_details["conflicting_types"]
+
     def test_name_heuristic_rejection(self, mapper, snapshot):
         """Nom contenant 'prise' ou 'chauffage' avec des commandes lumière → ambiguous."""
         eq = _make_eq(id=99, name="Prise TV Salon", cmds=[

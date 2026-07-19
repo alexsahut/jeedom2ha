@@ -59,6 +59,46 @@ def test_ambiguous_conflicting_light_and_flap_commands():
     assert decision.reason == "ambiguous_skipped"
 
 
+def test_power_consumption_companions_are_not_a_conflict():
+    """Story 11.4 — LIGHT_* + POWER/CONSUMPTION ne déclenche PLUS
+    conflicting_generic_types : les compagnons de mesure sont ignorés par le light
+    mapper (laissés au SensorMapper) et la lumière est projetée normalement."""
+    cmds = [
+        _cmd(1, "On", "LIGHT_ON", type_="action", sub_type="other"),
+        _cmd(2, "Off", "LIGHT_OFF", type_="action", sub_type="other"),
+        _cmd(3, "Etat", "LIGHT_STATE", type_="info", sub_type="binary"),
+        _cmd(4, "Puissance", "POWER", type_="info", sub_type="numeric"),
+        _cmd(5, "Conso", "CONSUMPTION", type_="info", sub_type="numeric"),
+    ]
+    eq = _make_eq(11, "Variateur chambre", cmds)
+    result = LightMapper().map(eq, _make_snapshot())
+
+    assert result is not None
+    assert result.ha_entity_type == "light"
+    assert result.confidence in ("sure", "probable")
+    assert result.reason_code != "conflicting_generic_types"
+
+    decision = LightMapper().decide_publication(result)
+    assert decision.should_publish is True
+
+
+def test_energy_state_companion_stays_a_conflict():
+    """Story 11.4 — LIGHT_* + ENERGY_STATE reste un conflit dur (prise) :
+    ENERGY_STATE/ON/OFF conservés dans _ANTI_LIGHT_GENERIC_TYPES."""
+    cmds = [
+        _cmd(1, "On", "LIGHT_ON", type_="action", sub_type="other"),
+        _cmd(2, "Off", "LIGHT_OFF", type_="action", sub_type="other"),
+        _cmd(3, "Etat prise", "ENERGY_STATE", type_="info", sub_type="binary"),
+    ]
+    eq = _make_eq(12, "Prise lampe", cmds)
+    result = LightMapper().map(eq, _make_snapshot())
+
+    assert result is not None
+    assert result.confidence == "ambiguous"
+    assert result.reason_code == "conflicting_generic_types"
+    assert "ENERGY_STATE" in result.reason_details["conflicting_types"]
+
+
 # ---------------------------------------------------------------------------
 # Task 1.3 — Test AC1 — duplicate generic_types même sub_type (AC #1, #3)
 # ---------------------------------------------------------------------------

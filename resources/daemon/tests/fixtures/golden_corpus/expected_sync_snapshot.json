@@ -179,6 +179,170 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 457,
+          "eq_type_name": "zwave",
+          "ha_type": "light",
+          "matched_commands": [
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45701,
+              "cmd_name": "On",
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45702,
+              "cmd_name": "Off",
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45703,
+              "cmd_name": "Etat",
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45704,
+              "cmd_name": "Variateur",
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
+            }
+          ],
+          "name": "Chambre parents",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "light",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "LIGHT_ON",
+                "id": 45701,
+                "name": "On"
+              },
+              {
+                "generic_type": "LIGHT_OFF",
+                "id": 45702,
+                "name": "Off"
+              },
+              {
+                "generic_type": "LIGHT_STATE",
+                "id": 45703,
+                "name": "Etat"
+              },
+              {
+                "generic_type": "LIGHT_SLIDER",
+                "id": 45704,
+                "name": "Variateur"
+              },
+              {
+                "generic_type": "POWER",
+                "id": 45705,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": "CONSUMPTION",
+                "id": 45706,
+                "name": "Consommation"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 45701,
+                "configured_type": "LIGHT_ON",
+                "logical_role": "LIGHT_ON",
+                "used_type": "LIGHT_ON"
+              },
+              {
+                "command_id": 45702,
+                "configured_type": "LIGHT_OFF",
+                "logical_role": "LIGHT_OFF",
+                "used_type": "LIGHT_OFF"
+              },
+              {
+                "command_id": 45703,
+                "configured_type": "LIGHT_STATE",
+                "logical_role": "LIGHT_STATE",
+                "used_type": "LIGHT_STATE"
+              },
+              {
+                "command_id": 45704,
+                "configured_type": "LIGHT_SLIDER",
+                "logical_role": "LIGHT_SLIDER",
+                "used_type": "LIGHT_SLIDER"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "attendu_ha": null,
+              "cmd_id": 45705,
+              "cmd_name": "Puissance",
+              "generic_type": "POWER",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 45706,
+              "cmd_name": "Consommation",
+              "generic_type": "CONSUMPTION",
+              "mapping_decision": null,
+              "retained": false
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "S\u00fbr",
           "detail": "",
           "detected_generic_types": [],
@@ -6312,6 +6476,170 @@
           "cause_action": null,
           "cause_code": null,
           "cause_label": null,
+          "confidence": "Probable",
+          "detail": "",
+          "detected_generic_types": [],
+          "ecart": false,
+          "eq_id": 457,
+          "eq_type_name": "zwave",
+          "ha_type": "light",
+          "matched_commands": [
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45701,
+              "cmd_name": "On",
+              "generic_type": "LIGHT_ON",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45702,
+              "cmd_name": "Off",
+              "generic_type": "LIGHT_OFF",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45703,
+              "cmd_name": "Etat",
+              "generic_type": "LIGHT_STATE",
+              "mapping_decision": "light",
+              "retained": true
+            },
+            {
+              "attendu_ha": "light",
+              "cmd_id": 45704,
+              "cmd_name": "Variateur",
+              "generic_type": "LIGHT_SLIDER",
+              "mapping_decision": "light",
+              "retained": true
+            }
+          ],
+          "name": "Chambre parents",
+          "object_name": "Chambre",
+          "perimetre": "inclus",
+          "pipeline_step_visible": 5,
+          "reason_code": "probable",
+          "remediation": "",
+          "status": "Publi\u00e9",
+          "status_code": "published",
+          "statut": "publie",
+          "traceability": {
+            "decision_trace": {
+              "confidence": "probable",
+              "ha_entity_type": "light",
+              "reason_code": "published"
+            },
+            "observed_commands": [
+              {
+                "generic_type": "LIGHT_ON",
+                "id": 45701,
+                "name": "On"
+              },
+              {
+                "generic_type": "LIGHT_OFF",
+                "id": 45702,
+                "name": "Off"
+              },
+              {
+                "generic_type": "LIGHT_STATE",
+                "id": 45703,
+                "name": "Etat"
+              },
+              {
+                "generic_type": "LIGHT_SLIDER",
+                "id": 45704,
+                "name": "Variateur"
+              },
+              {
+                "generic_type": "POWER",
+                "id": 45705,
+                "name": "Puissance"
+              },
+              {
+                "generic_type": "CONSUMPTION",
+                "id": 45706,
+                "name": "Consommation"
+              }
+            ],
+            "projection_validity": {
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
+            },
+            "publication_trace": {
+              "last_discovery_publish_result": "success",
+              "last_publish_timestamp": null
+            },
+            "typing_trace": [
+              {
+                "command_id": 45701,
+                "configured_type": "LIGHT_ON",
+                "logical_role": "LIGHT_ON",
+                "used_type": "LIGHT_ON"
+              },
+              {
+                "command_id": 45702,
+                "configured_type": "LIGHT_OFF",
+                "logical_role": "LIGHT_OFF",
+                "used_type": "LIGHT_OFF"
+              },
+              {
+                "command_id": 45703,
+                "configured_type": "LIGHT_STATE",
+                "logical_role": "LIGHT_STATE",
+                "used_type": "LIGHT_STATE"
+              },
+              {
+                "command_id": 45704,
+                "configured_type": "LIGHT_SLIDER",
+                "logical_role": "LIGHT_SLIDER",
+                "used_type": "LIGHT_SLIDER"
+              }
+            ]
+          },
+          "unmatched_commands": [
+            {
+              "attendu_ha": null,
+              "cmd_id": 45705,
+              "cmd_name": "Puissance",
+              "generic_type": "POWER",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 45706,
+              "cmd_name": "Consommation",
+              "generic_type": "CONSUMPTION",
+              "mapping_decision": null,
+              "retained": false
+            }
+          ],
+          "v1_compatibility": true,
+          "v1_limitation": false
+        },
+        {
+          "actions_ha": {
+            "publier": {
+              "disponible": true,
+              "label": "Republier dans Home Assistant",
+              "niveau_confirmation": "aucune",
+              "raison_indisponibilite": null
+            },
+            "supprimer": {
+              "disponible": true,
+              "label": "Supprimer de Home Assistant",
+              "niveau_confirmation": "forte",
+              "raison_indisponibilite": null
+            }
+          },
+          "cause_action": null,
+          "cause_code": null,
+          "cause_label": null,
           "confidence": "S\u00fbr",
           "detail": "",
           "detected_generic_types": [],
@@ -12247,8 +12575,8 @@
           "compteurs": {
             "ecarts": 3,
             "exclus": 0,
-            "inclus": 18,
-            "total": 18
+            "inclus": 19,
+            "total": 19
           },
           "home_statut": "Partiellement publiee",
           "object_id": 2,
@@ -12256,7 +12584,7 @@
           "summary": {
             "counts_by_reason": {
               "ambiguous_skipped": 3,
-              "probable": 6,
+              "probable": 7,
               "sure": 9
             },
             "counts_by_status": {
@@ -12264,10 +12592,10 @@
               "excluded": 0,
               "infra_incident": 0,
               "not_supported": 0,
-              "published": 15
+              "published": 16
             },
             "primary_aggregated_status": "ambiguous",
-            "total_equipments": 18
+            "total_equipments": 19
           }
         },
         {
@@ -12302,8 +12630,8 @@
         "compteurs": {
           "ecarts": 10,
           "exclus": 1,
-          "inclus": 57,
-          "total": 58
+          "inclus": 58,
+          "total": 59
         },
         "counts_by_reason": {
           "ambiguous_skipped": 7,
@@ -12311,7 +12639,7 @@
           "excluded_eqlogic": 1,
           "ha_missing_command_topic": 1,
           "no_projection_possible": 1,
-          "probable": 17,
+          "probable": 18,
           "sure": 30
         },
         "counts_by_status": {
@@ -12319,13 +12647,13 @@
           "excluded": 1,
           "infra_incident": 0,
           "not_supported": 3,
-          "published": 47
+          "published": 48
         },
         "home_statut": "Partiellement publiee",
         "primary_aggregated_status": "ambiguous",
         "streaming_actif": false,
         "streaming_cibles_count": 0,
-        "total_equipments": 58
+        "total_equipments": 59
       }
     },
     "request_id": "<normalized-request-id>",
@@ -12371,15 +12699,15 @@
       "covers_skipped": 1,
       "covers_sure": 4,
       "lights_ambiguous": 1,
-      "lights_probable": 8,
-      "lights_published": 10,
+      "lights_probable": 9,
+      "lights_published": 11,
       "lights_skipped": 2,
       "lights_sure": 3,
       "sensors_ambiguous": 2,
       "sensors_probable": 0,
-      "sensors_published": 28,
+      "sensors_published": 30,
       "sensors_skipped": 2,
-      "sensors_sure": 28,
+      "sensors_sure": 30,
       "switches_ambiguous": 1,
       "switches_probable": 11,
       "switches_published": 14,
@@ -14401,6 +14729,75 @@
         },
         "suggested_area": "Chambre"
       },
+      "457": {
+        "capabilities": {
+          "brightness_confidence": "probable",
+          "has_brightness": true,
+          "has_on_off": true,
+          "on_off_confidence": "sure"
+        },
+        "commands": {
+          "LIGHT_OFF": {
+            "generic_type": "LIGHT_OFF",
+            "id": 45702,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "LIGHT_ON": {
+            "generic_type": "LIGHT_ON",
+            "id": 45701,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "LIGHT_SLIDER": {
+            "generic_type": "LIGHT_SLIDER",
+            "id": 45704,
+            "sub_type": "slider",
+            "type": "action"
+          },
+          "LIGHT_STATE": {
+            "generic_type": "LIGHT_STATE",
+            "id": 45703,
+            "sub_type": "binary",
+            "type": "info"
+          }
+        },
+        "confidence": "probable",
+        "ha_entity_type": "light",
+        "ha_name": "Chambre parents",
+        "ha_unique_id": "jeedom2ha_eq_457",
+        "jeedom_eq_id": 457,
+        "pipeline_step_reached": 5,
+        "projection_validity": {
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
+        },
+        "publication_decision_ref": {
+          "active_or_alive": true,
+          "availability_reason": "timeout_zero",
+          "bridge_availability_topic": "jeedom2ha/bridge/status",
+          "discovery_published": true,
+          "eqlogic_availability_topic": "jeedom2ha/457/availability",
+          "local_availability_state": "online",
+          "local_availability_supported": true,
+          "reason": "probable",
+          "should_publish": true,
+          "state_topic": "jeedom2ha/457/state"
+        },
+        "publication_result": {
+          "attempted_at": "<normalized-timestamp>",
+          "status": "success",
+          "technical_reason_code": null
+        },
+        "reason_code": "light_on_off_brightness",
+        "reason_details": {
+          "brightness": "slider_without_brightness_info",
+          "on_off": "state+on+off"
+        },
+        "suggested_area": "Chambre"
+      },
       "553": {
         "capabilities": {
           "has_state": true
@@ -16085,6 +16482,24 @@
         "should_publish": false,
         "state_topic": "jeedom2ha/4002/state"
       },
+      "457": {
+        "active_or_alive": true,
+        "availability_reason": "timeout_zero",
+        "bridge_availability_topic": "jeedom2ha/bridge/status",
+        "discovery_published": true,
+        "eqlogic_availability_topic": "jeedom2ha/457/availability",
+        "local_availability_state": "online",
+        "local_availability_supported": true,
+        "mapping_ref": {
+          "confidence": "probable",
+          "ha_entity_type": "light",
+          "jeedom_eq_id": 457,
+          "reason_code": "light_on_off_brightness"
+        },
+        "reason": "probable",
+        "should_publish": true,
+        "state_topic": "jeedom2ha/457/state"
+      },
       "553": {
         "active_or_alive": true,
         "availability_reason": "timeout_zero",
@@ -16450,7 +16865,7 @@
   "sync": {
     "action": "sync",
     "payload": {
-      "eligible_count": 56,
+      "eligible_count": 57,
       "ineligible_breakdown": {
         "disabled_eqlogic": 1,
         "excluded_eqlogic": 1
@@ -16483,15 +16898,15 @@
         "covers_skipped": 1,
         "covers_sure": 4,
         "lights_ambiguous": 1,
-        "lights_probable": 8,
-        "lights_published": 10,
+        "lights_probable": 9,
+        "lights_published": 11,
         "lights_skipped": 2,
         "lights_sure": 3,
         "sensors_ambiguous": 2,
         "sensors_probable": 0,
-        "sensors_published": 28,
+        "sensors_published": 30,
         "sensors_skipped": 2,
-        "sensors_sure": 28,
+        "sensors_sure": 30,
         "switches_ambiguous": 1,
         "switches_probable": 11,
         "switches_published": 14,
@@ -16508,6 +16923,15 @@
             "is_exception": false,
             "name": "Alarme maison",
             "object_id": 1
+          },
+          {
+            "decision_source": "global",
+            "effective_state": "include",
+            "eq_id": 457,
+            "has_pending_home_assistant_changes": false,
+            "is_exception": false,
+            "name": "Chambre parents",
+            "object_id": 2
           },
           {
             "decision_source": "global",
@@ -17027,8 +17451,8 @@
           "counts": {
             "exceptions": 1,
             "exclude": 1,
-            "include": 57,
-            "total": 58
+            "include": 58,
+            "total": 59
           },
           "effective_state": "include",
           "has_pending_home_assistant_changes": true,
@@ -17051,8 +17475,8 @@
             "counts": {
               "exceptions": 0,
               "exclude": 0,
-              "include": 18,
-              "total": 18
+              "include": 19,
+              "total": 19
             },
             "has_pending_home_assistant_changes": true,
             "home_perimetre": "Incluse",
@@ -17073,8 +17497,8 @@
           }
         ]
       },
-      "total_cmds": 168,
-      "total_eq_logics": 58,
+      "total_cmds": 174,
+      "total_eq_logics": 59,
       "total_objects": 3
     },
     "request_id": "<normalized-request-id>",

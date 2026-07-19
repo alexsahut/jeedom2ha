@@ -2029,6 +2029,64 @@
       "name": "Alarme maison 12000",
       "object_id": 1,
       "status": {}
+    },
+    {
+      "cmds": [
+        {
+          "generic_type": "LIGHT_ON",
+          "id": 45701,
+          "name": "On",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_OFF",
+          "id": 45702,
+          "name": "Off",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "LIGHT_STATE",
+          "id": 45703,
+          "name": "Etat",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "LIGHT_SLIDER",
+          "id": 45704,
+          "name": "Variateur",
+          "sub_type": "slider",
+          "type": "action"
+        },
+        {
+          "generic_type": "POWER",
+          "id": 45705,
+          "name": "Puissance",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "W"
+        },
+        {
+          "generic_type": "CONSUMPTION",
+          "id": 45706,
+          "name": "Consommation",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "kWh"
+        }
+      ],
+      "eq_type": "zwave",
+      "id": 457,
+      "is_enable": true,
+      "is_excluded": false,
+      "is_visible": true,
+      "name": "Chambre parents",
+      "object_id": 2,
+      "status": {
+        "timeout": 0
+      }
     }
   ],
   "objects": [

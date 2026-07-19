@@ -86,29 +86,59 @@ class MapperRegistry:
     ) -> List[MappingResult]:
         """Agrège les résultats structurellement multi-entités.
 
-        Ordre : switch(es), puis sensors, puis binary_sensors. Les mappers concernés
-        garantissent eux-mêmes qu'ils ne passent en mode multi que sur une structure
-        riche (pas un simple switch ENERGY_* + une mesure annexe).
+        Primaire = light (publiable) OU switch(es), puis sensors, puis binary_sensors.
+        Story 11.4 — un light actionnable portant des compagnons de mesure
+        power/energy est agrégé à l'identique du switch : light primaire + sensors
+        power/energy sous device commun. Les mappers concernés garantissent eux-mêmes
+        qu'ils ne passent en mode multi que sur une structure riche (pas un simple
+        switch ENERGY_* + une mesure annexe).
         """
+        light_mapper = next(m for m in self._mappers if isinstance(m, LightMapper))
         switch_mapper = next(m for m in self._mappers if isinstance(m, SwitchMapper))
         sensor_mapper = next(m for m in self._mappers if isinstance(m, SensorMapper))
         binary_mapper = next(m for m in self._mappers if isinstance(m, BinarySensorMapper))
 
         switch_results = self._invoke_mapper(switch_mapper, eq, snapshot)
-        if not switch_results:
-            return []
-
         sensor_results = self._invoke_mapper(sensor_mapper, eq, snapshot)
         binary_results = self._invoke_mapper(binary_mapper, eq, snapshot)
+
+        # Primaire switch inchangé ; sinon, un light publiable portant des compagnons
+        # de mesure power/energy devient primaire (Story 11.4). Le light mapper n'est
+        # invoqué que dans ce cas pour éviter tout appel superflu sur les lights simples.
+        if switch_results:
+            primary_results = switch_results
+        elif self._has_power_or_energy_sensor(sensor_results):
+            primary_results = self._publishable_light_primary(light_mapper, eq, snapshot)
+        else:
+            primary_results = []
+
+        if not primary_results:
+            return []
+
         secondary_count = len(sensor_results) + len(binary_results)
 
         if (
-            len(switch_results) > 1
+            len(primary_results) > 1
             or secondary_count > 1
             or self._has_power_or_energy_sensor(sensor_results)
         ):
-            return [*switch_results, *sensor_results, *binary_results]
+            return [*primary_results, *sensor_results, *binary_results]
         return []
+
+    def _publishable_light_primary(
+        self, light_mapper: object, eq: JeedomEqLogic, snapshot: TopologySnapshot
+    ) -> List[MappingResult]:
+        """Résultats light éligibles comme primaire multi-entité.
+
+        Seuls les lights publiables (confidence sure/probable) sont promus : un light
+        ambiguous (ex. conflit prise ENERGY_STATE, name-heuristic, color-only) n'est
+        jamais primaire → on retombe sur le switch, comportement inchangé (AC3/AC4).
+        """
+        return [
+            result
+            for result in self._invoke_mapper(light_mapper, eq, snapshot)
+            if result.confidence in ("sure", "probable")
+        ]
 
     @staticmethod
     def _has_power_or_energy_sensor(results: List[MappingResult]) -> bool:

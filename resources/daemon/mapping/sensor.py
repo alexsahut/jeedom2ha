@@ -23,6 +23,7 @@ _SENSOR_GENERIC_TYPE_MAP: Dict[str, Tuple[Optional[str], Optional[str]]] = {
     "TEMPERATURE": ("temperature", "°C"),
     "HUMIDITY": ("humidity", "%"),
     "POWER": ("power", "W"),
+    "ENERGY_POWER": ("power", "W"),
     "CONSUMPTION": ("energy", "kWh"),
     "VOLTAGE": ("voltage", "V"),
     "AIR_QUALITY": ("aqi", None),
@@ -112,11 +113,35 @@ def _is_multi_sensor_eq(eq: JeedomEqLogic) -> bool:
     return (eq.eq_type_name or "").lower() in _MULTI_SENSOR_EQ_TYPES
 
 
+_ACTIONABLE_LIGHT_GENERIC_TYPES = {"LIGHT_ON", "LIGHT_OFF", "LIGHT_SLIDER", "LIGHT_BRIGHTNESS"}
+
+
 def _has_structural_multi_entity_sensor_shape(eq: JeedomEqLogic) -> bool:
     switch_types = {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF", "SWITCH_STATE", "SWITCH_ON", "SWITCH_OFF"}
     has_switch_shape = any(cmd.generic_type in switch_types for cmd in eq.cmds)
     numeric_count = sum(1 for cmd in eq.cmds if _is_numeric_info_command(cmd))
-    return has_switch_shape and numeric_count >= 2
+    if has_switch_shape and numeric_count >= 2:
+        return True
+    # Story 11.4 — lumière actionnable + compagnon(s) de mesure power/energy (sans
+    # forme prise ENERGY_*/SWITCH_*) : les compagnons deviennent des sensors HA
+    # command-scoped rattachés au device commun, pour éviter la collision d'unique_id
+    # avec le light primaire (jeedom2ha_eq_<id>).
+    if not has_switch_shape and _has_actionable_light_shape(eq) and _has_power_or_energy_companion(eq):
+        return True
+    return False
+
+
+def _has_actionable_light_shape(eq: JeedomEqLogic) -> bool:
+    return any(cmd.generic_type in _ACTIONABLE_LIGHT_GENERIC_TYPES for cmd in eq.cmds)
+
+
+def _has_power_or_energy_companion(eq: JeedomEqLogic) -> bool:
+    for cmd in eq.cmds:
+        if not _is_numeric_info_command(cmd):
+            continue
+        if SensorMapper._derive_sensor_metadata(cmd)[0] in {"power", "energy"}:
+            return True
+    return False
 
 
 def _is_actionable_readback_consumed_by_switch(cmd: JeedomCmd, eq: JeedomEqLogic) -> bool:
