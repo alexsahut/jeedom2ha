@@ -184,6 +184,106 @@ def test_import_profile_cle_composite_invalide_refusee(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# Codex P2 — whitelist de VALEUR (pas seulement de nom de champ)
+# --------------------------------------------------------------------------- #
+
+def test_export_profile_strippe_valeur_source_hors_whitelist(tmp_path):
+    """Un secret logé dans le champ whitelisté `source` est droppé à l'export (valeur ∉ {user})."""
+    data_dir = str(tmp_path)
+    polluted = {
+        "schema_version": 2,
+        "overrides": {
+            "553:5138": {"source": "s3cr3t-token", "ha_entity_type": "switch"}
+        },
+        "equipment_overrides": {},
+    }
+    with open(os.path.join(data_dir, "ha_overrides.json"), "w", encoding="utf-8") as f:
+        json.dump(polluted, f)
+
+    profile = export_profile(data_dir)
+    assert "s3cr3t-token" not in json.dumps(profile)
+    # Le champ source à valeur hors whitelist est droppé, la sémantique de type survit.
+    assert profile["overrides"]["553:5138"] == {"ha_entity_type": "switch"}
+
+
+def test_export_profile_strippe_ha_entity_type_hors_referentiel(tmp_path):
+    """Un ha_entity_type arbitraire (hors référentiel HA connu) est droppé à l'export."""
+    data_dir = str(tmp_path)
+    polluted = {
+        "schema_version": 2,
+        "overrides": {"553:5138": {"source": "user", "ha_entity_type": "arbitrary_injection"}},
+        "equipment_overrides": {},
+    }
+    with open(os.path.join(data_dir, "ha_overrides.json"), "w", encoding="utf-8") as f:
+        json.dump(polluted, f)
+
+    profile = export_profile(data_dir)
+    assert "arbitrary_injection" not in json.dumps(profile)
+    assert profile["overrides"]["553:5138"] == {"source": "user"}
+
+
+def test_import_profile_strippe_valeur_hors_whitelist(tmp_path):
+    """Un profil malveillant ne peut pas injecter une valeur hors whitelist dans le fichier local."""
+    data_dir = str(tmp_path)
+    profile = {
+        "schema_version": 2,
+        "overrides": {"553:5138": {"source": "evil", "ha_entity_type": "switch"}},
+        "equipment_overrides": {},
+    }
+    import_profile(profile, data_dir)
+
+    stored = list_overrides(data_dir)["553:5138"]
+    # `source: evil` droppé à l'assainissement ; save_override réinjecte le défaut `user`.
+    assert stored["source"] == "user"
+    assert stored["ha_entity_type"] == "switch"
+
+
+# --------------------------------------------------------------------------- #
+# Codex P2 — atomicité de l'import + détection d'échec d'écriture
+# --------------------------------------------------------------------------- #
+
+def test_import_profile_atomique_aucune_ecriture_partielle(tmp_path):
+    """Une clé invalide en fin de profil abort AVANT toute écriture (pas de fichier partiel)."""
+    data_dir = str(tmp_path)
+    profile = {
+        "schema_version": 2,
+        "overrides": {
+            "553:5138": {"ha_entity_type": "switch"},  # valide, traité en premier
+            "clef_invalide": {"ha_entity_type": "sensor"},  # invalide → abort
+        },
+        "equipment_overrides": {},
+    }
+    with pytest.raises(ValueError):
+        import_profile(profile, data_dir)
+
+    # Aucune écriture partielle : le fichier d'overrides ne doit pas exister.
+    assert not os.path.exists(os.path.join(data_dir, "ha_overrides.json"))
+
+
+def test_import_profile_echec_persistance_leve_runtimeerror(tmp_path):
+    """Un data_dir inexistant fait échouer la persistance (save renvoie False) → RuntimeError."""
+    missing_dir = str(tmp_path / "nexiste_pas")
+    profile = {
+        "schema_version": 2,
+        "overrides": {"553:5138": {"ha_entity_type": "switch"}},
+        "equipment_overrides": {},
+    }
+    with pytest.raises(RuntimeError):
+        import_profile(profile, missing_dir)
+
+
+def test_save_override_renvoie_bool(tmp_path):
+    """save_override / save_equipment_override renvoient True si persisté, False sinon (Codex P2)."""
+    ok_dir = str(tmp_path)
+    assert save_override(553, 5138, {"ha_entity_type": "switch"}, ok_dir) is True
+    assert save_equipment_override(67, {"publication_override": "exclude"}, ok_dir) is True
+
+    missing_dir = str(tmp_path / "nexiste_pas")
+    assert save_override(553, 5138, {"ha_entity_type": "switch"}, missing_dir) is False
+    assert save_equipment_override(67, {"publication_override": "exclude"}, missing_dir) is False
+
+
+# --------------------------------------------------------------------------- #
 # Invariant structurel — aucun couplage sync/transport/MQTT (D8)
 # --------------------------------------------------------------------------- #
 

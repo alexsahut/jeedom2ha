@@ -129,6 +129,25 @@ def _resolve_capability(abstract: str, capabilities: object) -> bool:
     return False
 
 
+def _cross_family_action_mismatch(ha_entity_type: str, capabilities: object) -> bool:
+    """Détecte un override cross-type dont la famille de commande est non routable (Story 16.7, Codex P1).
+
+    `has_command` se résout à True à travers les familles (un cover via `has_open_close`, un
+    light/switch via `has_on_off`), si bien qu'un override cross-type peut passer la
+    vérification générique de capability tout en étant impilotable : `_translate_command`
+    (`sync/command.py`) ne route un light/switch que via des commandes ON/OFF
+    (`LIGHT_ON/OFF`, `SWITCH_ON/OFF`, ...) et un cover que via `FLAP_UP/DOWN/STOP`. Quand la
+    famille de commande du type forcé diffère de la famille native des capabilities source,
+    la commande d'action requise est absente → la projection doit être refusée plutôt que
+    publiée comme entité non-actionnable (D11, pas de bypass).
+    """
+    if ha_entity_type in ("light", "switch"):
+        return isinstance(capabilities, CoverCapabilities)
+    if ha_entity_type == "cover":
+        return isinstance(capabilities, (LightCapabilities, SwitchCapabilities))
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Fonction pure d'étape 3 (Story 3.2)
 # ---------------------------------------------------------------------------
@@ -152,6 +171,16 @@ def validate_projection(
             reason_code="ha_component_unknown",
             missing_fields=[],
             missing_capabilities=[],
+        )
+
+    # Story 16.7 (Codex P1) — refuse un override cross-type dont la famille de commande
+    # (ON/OFF vs OPEN/CLOSE) ne peut être routée : la commande d'action requise est absente.
+    if _cross_family_action_mismatch(ha_entity_type, capabilities):
+        return ProjectionValidity(
+            is_valid=False,
+            reason_code="ha_missing_command_topic",
+            missing_fields=["command_topic"],
+            missing_capabilities=["has_command"],
         )
 
     spec = HA_COMPONENT_REGISTRY[ha_entity_type]

@@ -22,6 +22,7 @@ from models.mapping import (
     SwitchCapabilities,
 )
 from models.topology import TopologySnapshot
+from validation.ha_component_registry import validate_projection
 
 
 def _make_publisher() -> DiscoveryPublisher:
@@ -85,3 +86,47 @@ def test_outlet_switch_still_emits_device_class():
     mapping = _make_mapping("switch", SwitchCapabilities(has_on_off=True, device_class="outlet"))
     payload = publisher._build_switch_payload(mapping, _make_snapshot())
     assert payload["device_class"] == "outlet"
+
+
+# ---------------------------------------------------------------------------
+# Story 16.7 (Codex P1) — validate_projection refuse un override cross-type dont la
+# famille de commande (ON/OFF vs OPEN/CLOSE) n'est pas routable par _translate_command.
+# has_command se résout à True à travers les familles, donc la garde doit refuser AVANT
+# que la validation générique ne laisse passer une entité non-actionnable (D11, pas de bypass).
+# ---------------------------------------------------------------------------
+
+
+def test_cover_forced_to_switch_projection_rejected():
+    validity = validate_projection("switch", CoverCapabilities(has_open_close=True))
+    assert validity.is_valid is False
+    assert validity.reason_code == "ha_missing_command_topic"
+    assert "command_topic" in validity.missing_fields
+
+
+def test_cover_forced_to_light_projection_rejected():
+    validity = validate_projection("light", CoverCapabilities(has_open_close=True))
+    assert validity.is_valid is False
+    assert validity.reason_code == "ha_missing_command_topic"
+
+
+def test_switch_forced_to_cover_projection_rejected():
+    validity = validate_projection("cover", SwitchCapabilities(has_on_off=True))
+    assert validity.is_valid is False
+    assert validity.reason_code == "ha_missing_command_topic"
+
+
+def test_light_forced_to_cover_projection_rejected():
+    validity = validate_projection("cover", LightCapabilities(has_on_off=True))
+    assert validity.is_valid is False
+    assert validity.reason_code == "ha_missing_command_topic"
+
+
+def test_light_forced_to_switch_projection_still_valid():
+    # Même famille de commande (ON/OFF) → routable → la projection reste valide.
+    validity = validate_projection("switch", LightCapabilities(has_on_off=True))
+    assert validity.is_valid is True
+
+
+def test_switch_forced_to_light_projection_still_valid():
+    validity = validate_projection("light", SwitchCapabilities(has_on_off=True))
+    assert validity.is_valid is True

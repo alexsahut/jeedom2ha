@@ -130,6 +130,13 @@ claude-opus-4-8 (clawcode)
 
 - **code-review** — 2026-07-20 — Revue adversariale (workflow BMAD `code-review`). Résultat : **0 Critical, 0 High, 1 Medium (corrigé), 1 Low (follow-up)**. 7/7 ACs implémentés/validés ; suite daemon complète **1086 passed, 0 régression**. MEDIUM corrigé : `resources/daemon/discovery/publisher.py` (fix D11) ajouté à la File List (était omis). LOW consigné (non bloquant) : `import_profile` n'est pas atomique — une clé composite invalide en milieu de profil lève `ValueError` après persistance des entrées précédentes (import partiel possible) ; acceptable pour le périmètre « simple et sûr », à durcir si un partage communautaire élargi est un jour livré. Statut résultant : `done`.
 
+- **codex-review (PR #152)** — 2026-07-20 — Revue automatique Codex sur la PR : **1 P1 + 3 P2**, tous corrigés sur la branche puis re-poussés :
+  - **P1 (validation cross-type impilotable)** — `validate_projection()` refuse désormais un override cross-type dont la **famille de commande** (ON/OFF vs OPEN/CLOSE) n'est pas routable par `_translate_command` : `has_command` se résolvant à `True` à travers les familles (cover via `has_open_close`, light/switch via `has_on_off`), un `cover → switch` passait la validation générique tout en étant impilotable. Nouvelle garde `_cross_family_action_mismatch` dans `validation/ha_component_registry.py` → `is_valid=false`, `reason_code=ha_missing_command_topic` (**0 nouveau reason_code**, `cause_mapping.py` figé intouché). Sens de commande identique (light↔switch) reste valide.
+  - **P2 (whitelist de valeur)** — `_sanitize_profile_entry` valide maintenant la **valeur** en plus du nom de champ : `source ∈ {user}`, `publication_override ∈ {exclude, force_publish}`, `ha_entity_type ∈` référentiel HA connu. Un secret logé dans un champ whitelisté (`"source": "<token>"`) ou un type arbitraire est droppé à l'export ET à l'import.
+  - **P2 (atomicité import)** — `import_profile` refactoré en **deux passes** : parse/valide/assainit TOUTES les entrées avant toute écriture ; une clé invalide en milieu de profil abort (`ValueError`) sans laisser de fichier partiel.
+  - **P2 (échec d'écriture avalé)** — `save_override`/`save_equipment_override` renvoient désormais `bool` (True persisté, False sur dossier absent/OSError avalé) ; `import_profile` lève `RuntimeError` si une entrée validée n'a pas pu être persistée.
+  - Tests ajoutés : 6 rejets/validations cross-family (`validate_projection`) + 6 whitelist-valeur/atomicité/échec-écriture/bool. Suite daemon complète **1098 passed, 0 régression**.
+
 ### Gate terrain — Preuves (2026-07-18, box `192.168.1.21`)
 
 **AC1 — 3 familles réelles distinctes validées de bout en bout** (override appliqué+persisté / revert commande / revert équipement / diagnostic drill-down) :
@@ -158,10 +165,11 @@ claude-opus-4-8 (clawcode)
 
 ### File List
 
-- `resources/daemon/mapping/overrides.py` (modifié — ajout `export_profile`, `import_profile`, helpers `_sanitize_profile_entry`, `_parse_override_key`, `_parse_equipment_key` + constantes whitelist)
-- `resources/daemon/tests/unit/test_story_16_7_profiles_export_import.py` (nouveau — 16 tests)
+- `resources/daemon/mapping/overrides.py` (modifié — ajout `export_profile`, `import_profile`, helpers `_sanitize_profile_entry`, `_parse_override_key`, `_parse_equipment_key` + constantes whitelist ; Codex P2 : whitelist de valeur `_is_allowed_profile_value`, import deux passes atomique, `save_override*` renvoient `bool`)
+- `resources/daemon/validation/ha_component_registry.py` (modifié — Codex P1 : garde `_cross_family_action_mismatch` dans `validate_projection` refusant un override cross-type dont la famille de commande n'est pas routable)
+- `resources/daemon/tests/unit/test_story_16_7_profiles_export_import.py` (nouveau — 16 tests + 6 Codex P2 : whitelist-valeur, atomicité, échec-écriture, bool)
 - `docs/fr_FR/index.md` (modifié — section overrides + TOC)
 - `resources/daemon/discovery/publisher.py` (modifié — fix D11 : `getattr` sur `capabilities` dans `_build_switch/cover/light_payload` pour tolérer un override cross-type sans crash `AttributeError`)
-- `resources/daemon/tests/unit/test_story_16_7_cross_type_override_discovery.py` (nouveau — 5 tests non-régression cross-type override discovery, bug D11 `LightCapabilities.device_class`)
+- `resources/daemon/tests/unit/test_story_16_7_cross_type_override_discovery.py` (nouveau — 5 tests non-régression cross-type override discovery + 6 Codex P1 : rejets/validations cross-family `validate_projection`)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié — 16.7 → `review` après gate terrain 2026-07-18)
 - `_bmad-output/implementation-artifacts/16-7-gate-terrain-et-profils-partageables.md` (modifié — checkboxes Tasks 1/2/3/5 + Task 0/4 avec preuves terrain consignées, Dev Agent Record)

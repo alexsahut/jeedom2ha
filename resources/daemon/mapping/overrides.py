@@ -67,17 +67,63 @@ def _override_key(jeedom_eq_id: int, jeedom_cmd_id: int) -> str:
 _PROFILE_COMMAND_FIELDS = ("source", "ha_entity_type", "publication_override")
 _PROFILE_EQUIPMENT_FIELDS = ("source", "publication_override")
 
+# Story 16.7 (Codex P2) — le nom du champ ne suffit pas : la VALEUR doit aussi appartenir à
+# un ensemble fermé et connu. Sinon un profil édité à la main peut faire fuiter un secret dans
+# un champ whitelisté (`"source": "<token>"`) ou injecter un type HA arbitraire non modélisé.
+_PROFILE_ALLOWED_SOURCES = ("user",)
+_PROFILE_ALLOWED_PUBLICATION = ("exclude", "force_publish")
+# Types HA connus (miroir de HA_COMPONENT_REGISTRY, gardé local pour préserver le sens unique
+# D8 : overrides.py n'importe pas depuis validation/). Un override cross-type reste jugé par
+# validate_projection() en aval ; ici on ne filtre que les valeurs hors référentiel connu.
+_PROFILE_ALLOWED_ENTITY_TYPES = frozenset(
+    {
+        "light",
+        "cover",
+        "switch",
+        "sensor",
+        "binary_sensor",
+        "button",
+        "number",
+        "select",
+        "climate",
+        "alarm_control_panel",
+    }
+)
+
+
+def _is_allowed_profile_value(field: str, value: object) -> bool:
+    """Return True if `value` is an accepted value for the whitelisted profile `field`.
+
+    Value-level whitelist (Codex P2) complementing the field-name whitelist : keeps the
+    closed sets of `source` / `publication_override` / `ha_entity_type` so no secret or
+    unmodelled type can ride inside an otherwise-known field.
+    """
+    if field == "source":
+        return value in _PROFILE_ALLOWED_SOURCES
+    if field == "publication_override":
+        return value in _PROFILE_ALLOWED_PUBLICATION
+    if field == "ha_entity_type":
+        return isinstance(value, str) and value in _PROFILE_ALLOWED_ENTITY_TYPES
+    return False
+
 
 def _sanitize_profile_entry(entry: dict, allowed_fields) -> dict:
-    """Keep only the whitelisted mapping-semantic fields of an override entry (Story 16.7).
+    """Keep only the whitelisted mapping-semantic fields AND values of an override entry.
+
+    Two-level whitelist (Story 16.7, hardened by Codex P2) :
+    - field NAME must be in `allowed_fields` ;
+    - field VALUE must be in the closed set for that field (`_is_allowed_profile_value`).
 
     `None` values are dropped : a portable profile carries no null noise, and an absent
-    `publication_override` is semantically identical to `None` (no override).
+    `publication_override` is semantically identical to `None` (no override). Any field
+    carrying an out-of-set value is dropped rather than exported/imported verbatim.
     """
     return {
         field: entry[field]
         for field in allowed_fields
-        if field in entry and entry[field] is not None
+        if field in entry
+        and entry[field] is not None
+        and _is_allowed_profile_value(field, entry[field])
     }
 
 
@@ -180,10 +226,15 @@ def list_equipment_overrides(data_dir: str) -> Dict[str, dict]:
     return dict(raw["equipment_overrides"])
 
 
-def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_dir: str) -> None:
+def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_dir: str) -> bool:
     """Persist a single override, merging with any existing entries.
 
     Adds `"source": "user"` if not already present in `override`.
+
+    Returns:
+        bool: True if the entry was persisted to disk, False if persistence was swallowed
+        (data_dir missing, or OSError on write) — Codex P2 : the caller (e.g. `import_profile`)
+        must be able to tell a silent write failure from a success instead of assuming it.
 
     Raises:
         ValueError: if the existing file has an invalid/unsupported `schema_version` —
@@ -203,7 +254,7 @@ def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_di
 
     if not os.path.isdir(data_dir):
         _LOGGER.warning("[OVERRIDES] data_dir introuvable : %s — override non sauvegardé", data_dir)
-        return
+        return False
 
     path = _overrides_path(data_dir)
     try:
@@ -213,15 +264,21 @@ def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_di
             "[OVERRIDES] Override sauvegardé : %s dans %s",
             _override_key(jeedom_eq_id, jeedom_cmd_id), path,
         )
+        return True
     except OSError as exc:
         _LOGGER.error("[OVERRIDES] Échec sauvegarde override : %s", exc)
+        return False
 
 
-def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) -> None:
+def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) -> bool:
     """Persist a single equipment-level override, merging with any existing entries (Story 16.3).
 
     Adds `"source": "user"` if not already present in `override`. Separate section from
     `save_override` (SCP 2026-07-07 — key is `eq_id` alone, no `cmd_id`).
+
+    Returns:
+        bool: True if the entry was persisted to disk, False if persistence was swallowed
+        (data_dir missing, or OSError on write) — Codex P2, same contract as `save_override`.
 
     Raises:
         ValueError: if the existing file has an invalid/unsupported `schema_version` —
@@ -241,7 +298,7 @@ def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) ->
 
     if not os.path.isdir(data_dir):
         _LOGGER.warning("[OVERRIDES] data_dir introuvable : %s — override non sauvegardé", data_dir)
-        return
+        return False
 
     path = _overrides_path(data_dir)
     try:
@@ -250,8 +307,10 @@ def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) ->
         _LOGGER.info(
             "[OVERRIDES] Override équipement sauvegardé : %s dans %s", jeedom_eq_id, path,
         )
+        return True
     except OSError as exc:
         _LOGGER.error("[OVERRIDES] Échec sauvegarde override équipement : %s", exc)
+        return False
 
 
 def mapping_cmd_ids(mapping: "MappingResult") -> List[int]:
@@ -497,8 +556,14 @@ def import_profile(profile: dict, data_dir: str) -> None:
     MQTT call (import only reads the profile and writes the file, D8). Imported entries are
     re-whitelisted so a malicious/hand-edited profile cannot inject secret keys locally.
 
+    Two-pass (Codex P2 — atomicity) : EVERY entry is parsed, validated and sanitized first ;
+    only once the whole profile is proven well-formed does any write happen. A malformed key
+    mid-profile therefore aborts with `ValueError` before leaving a half-imported file on disk.
+
     Raises:
         ValueError: on an invalid/unsupported `schema_version`, or a malformed profile body.
+        RuntimeError: if a validated entry could not be persisted (data_dir missing / write
+            error) — Codex P2 : a swallowed write no longer passes for a successful import.
     """
     if not isinstance(profile, dict):
         raise ValueError("[OVERRIDES] Profil d'import invalide (racine non-objet)")
@@ -521,14 +586,34 @@ def import_profile(profile: dict, data_dir: str) -> None:
             "[OVERRIDES] Profil d'import invalide (sections 'overrides'/'equipment_overrides')"
         )
 
+    # Passe 1 — tout parser / valider / assainir AVANT toute écriture (atomicité).
+    command_writes: List[tuple] = []
     for key, entry in overrides.items():
         if not isinstance(entry, dict):
             raise ValueError(f"[OVERRIDES] Entrée d'override de profil invalide : {key!r}")
         eq_id, cmd_id = _parse_override_key(key)
-        save_override(eq_id, cmd_id, _sanitize_profile_entry(entry, _PROFILE_COMMAND_FIELDS), data_dir)
+        command_writes.append(
+            (eq_id, cmd_id, _sanitize_profile_entry(entry, _PROFILE_COMMAND_FIELDS))
+        )
 
+    equipment_writes: List[tuple] = []
     for key, entry in equipment_overrides.items():
         if not isinstance(entry, dict):
             raise ValueError(f"[OVERRIDES] Entrée d'override équipement de profil invalide : {key!r}")
         eq_id = _parse_equipment_key(key)
-        save_equipment_override(eq_id, _sanitize_profile_entry(entry, _PROFILE_EQUIPMENT_FIELDS), data_dir)
+        equipment_writes.append(
+            (eq_id, _sanitize_profile_entry(entry, _PROFILE_EQUIPMENT_FIELDS))
+        )
+
+    # Passe 2 — persistance ; une écriture avalée (dossier absent / OSError) devient une erreur.
+    for eq_id, cmd_id, sanitized in command_writes:
+        if not save_override(eq_id, cmd_id, sanitized, data_dir):
+            raise RuntimeError(
+                f"[OVERRIDES] Échec de persistance de l'override importé {eq_id}:{cmd_id}"
+            )
+
+    for eq_id, sanitized in equipment_writes:
+        if not save_equipment_override(eq_id, sanitized, data_dir):
+            raise RuntimeError(
+                f"[OVERRIDES] Échec de persistance de l'override équipement importé {eq_id}"
+            )
