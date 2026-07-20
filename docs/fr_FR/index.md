@@ -16,6 +16,7 @@ Ce plugin expose automatiquement vos équipements Jeedom comme des entités nati
 - [Diagnostic](#diagnostic)
 - [Comportement des pièces (suggested_area)](#comportement-des-pièces-suggested_area)
 - [Nommage des équipements](#nommage-des-équipements)
+- [Configuration du mapping par équipement (overrides)](#configuration-du-mapping-par-équipement-overrides)
 - [Troubleshooting](#troubleshooting)
 - [Changelog](changelog.md)
 
@@ -214,6 +215,44 @@ Exemples de noms problématiques :
 - Vérifiez le diagnostic après chaque rescan pour repérer les équipements marqués **ambiguous**.
 - Évitez les noms contenant involontairement un mot-clé listé ci-dessus.
 - En cas d'ambiguïté, renommez l'équipement dans Jeedom puis relancez un rescan.
+
+---
+
+## Configuration du mapping par équipement (overrides)
+
+Par défaut, jeedom2ha choisit le type d'entité Home Assistant automatiquement, à partir du `generic_type` des commandes Jeedom. Dans la plupart des cas, ce choix automatique est le bon et vous n'avez rien à faire.
+
+Quand vous voulez reprendre la main sur un équipement précis, ouvrez sa fiche dans Jeedom : un onglet **HA / jeedom2ha** y présente le mapping commande par commande.
+
+### L'onglet HA / jeedom2ha
+
+Chaque commande est affichée sous forme d'un panneau dépliable, avec trois colonnes :
+
+- **Natif** (lecture seule) : ce que jeedom2ha déduit automatiquement du `generic_type` Jeedom. Cette colonne ne modifie jamais votre configuration Jeedom ni votre configuration Homebridge — elle ne fait que la lire.
+- **Override** (modifiable) : le type d'entité HA que vous voulez forcer pour cette commande, ou le choix d'exclure/forcer sa publication. C'est la seule colonne que vous éditez.
+- **Diagnostic** : le verdict de faisabilité. Si un override n'est pas compatible avec les capacités réelles de la commande, il est refusé ici, avec la raison — l'override incompatible n'est jamais publié.
+
+La validation est **instantanée** : dès que vous modifiez un override, le résultat est recalculé et affiché sans bouton « Enregistrer » à cliquer. Un override compatible est accepté ; un override incompatible reste bloqué avec son diagnostic.
+
+> **Non-régression Homebridge.** Poser un override HA ne touche jamais au `generic_type` Jeedom natif. Si vous utilisez aussi le plugin Homebridge, votre configuration HomeKit reste intacte : jeedom2ha consomme l'intention du `generic_type` sans la réécrire.
+
+### Revenir au mode automatique
+
+Deux niveaux de retour arrière :
+
+- **Par commande** : chaque commande overridée propose de revenir à son mapping automatique.
+- **Par équipement** : un bouton « Revenir au mode automatique » rétablit d'un coup le comportement automatique de tout l'équipement.
+
+Le mode automatique reste toujours le défaut : un override est un choix délibéré, jamais imposé.
+
+### Export / import de profils d'overrides
+
+Vos overrides peuvent être exportés dans un **profil partageable** :
+
+- Le profil ne contient que la **sémantique de mapping** (type HA cible, publication forcée ou exclue), indexée par les identifiants Jeedom des équipements et commandes.
+- Il est **anonymisable** : aucun secret, aucun jeton, aucune adresse de box, aucun chemin de fichier ni donnée personnelle n'y figure. Vous pouvez le partager sans risque.
+
+À l'import, le profil est accepté seulement s'il respecte le **schéma versionné** du plugin. Un profil sans version ou avec une version non supportée est **refusé explicitement**, avec un message clair — jamais appliqué silencieusement. L'import ne fait qu'écrire vos overrides : il ne déclenche aucune publication vers Home Assistant par lui-même (la prochaine synchronisation s'en charge).
 
 ---
 

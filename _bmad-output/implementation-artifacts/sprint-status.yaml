@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-07-17
+# last_updated: 2026-07-20
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -315,7 +315,7 @@ development_status:
   16-4-diagnostic-override-aware-drill-down: done  # code-review 2026-07-17 : diff strictement additif, 5 AC couverts, 0 nouveau reason_code, 4D eq-level intact, generic_type natif jamais mute ; 1028 tests passed ; golden realigne
   16-5-ui-jeedom-configuration-par-equipement: done  # code-review 2026-07-17 : 2 findings HIGH corriges (subtask 3.4 accordeons collapsibles + auto-open bloquantes plafonne 4 ; subtask 4.1 revert scope equipement) ; triptyque natif/override/diagnostic + dry-run + auto-validation + reassurance ; node 247/247, non-reg daemon 1050 passed (0 regression) ; terrain differe a 16.7
   16-6-preview-dry-run-avant-application: done  # code-review 2026-07-17 : endpoint POST /system/overrides/preview strictement additif lecture seule (aucun publisher construit), 5 AC couverts, validate_projection consomme sans bypass, 0 nouveau reason_code, generic_type natif jamais mute, input validation 400/401/404 solide ; 1035 tests passed ; golden inchange
-  16-7-gate-terrain-et-profils-partageables: backlog  # gate terrain (box 192.168.1.21) + profils partageables ; demande implication Alexandre (terrain)
+  16-7-gate-terrain-et-profils-partageables: done  # code-review 2026-07-20 : 0 Critical/High, 1 Medium corrige (publisher.py fix D11 ajoute a la File List), 1 Low follow-up (import_profile non atomique) ; 7/7 ACs ; suite daemon 1086 passed 0 regression ; gate terrain AC1->AC4 PASS 2026-07-18 (box 192.168.1.21, published=246=baseline)
   # ==============================================================
   # pe-epic-17 — Cadrage de l'ouverture gouvernee de number et select (consigne / mode)
   # Ajoute par correct-course 2026-07-07 — SCP approuve
