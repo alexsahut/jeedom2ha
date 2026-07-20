@@ -636,12 +636,12 @@ try {
     }
     else if ($action == 'previewMappingOverride') {
       // Story 16.5 — dry-run instantané (lecture seule, aucune persistance) via 16.6.
+      // callDaemon enveloppe déjà le payload dans une clé 'payload' : on passe donc
+      // les champs à plat (ne jamais pré-wrapper, sinon double imbrication côté daemon).
       $params = array(
-        'payload' => array(
-          'jeedom_eq_id'   => (int)init('eqId', 0),
-          'jeedom_cmd_id'  => (int)init('cmdId', 0),
-          'ha_entity_type' => init('haEntityType', ''),
-        ),
+        'jeedom_eq_id'   => (int)init('eqId', 0),
+        'jeedom_cmd_id'  => (int)init('cmdId', 0),
+        'ha_entity_type' => init('haEntityType', ''),
       );
       $result = jeedom2ha::callDaemon('/system/overrides/preview', $params, 'POST', 15);
       if ($result === null) {
@@ -651,12 +651,11 @@ try {
     }
     else if ($action == 'saveMappingOverride') {
       // Story 16.5 — persistance de l'override sur succès du dry-run (auto-validation).
+      // Payload à plat : callDaemon ajoute lui-même la clé 'payload' (cf. previewMappingOverride).
       $params = array(
-        'payload' => array(
-          'jeedom_eq_id'   => (int)init('eqId', 0),
-          'jeedom_cmd_id'  => (int)init('cmdId', 0),
-          'ha_entity_type' => init('haEntityType', ''),
-        ),
+        'jeedom_eq_id'   => (int)init('eqId', 0),
+        'jeedom_cmd_id'  => (int)init('cmdId', 0),
+        'ha_entity_type' => init('haEntityType', ''),
       );
       $result = jeedom2ha::callDaemon('/action/mapping_override', $params, 'POST', 15);
       if ($result === null) {
@@ -671,7 +670,8 @@ try {
       if ($cmdId !== '' && ctype_digit((string)$cmdId)) {
         $payload['jeedom_cmd_id'] = (int)$cmdId;
       }
-      $result = jeedom2ha::callDaemon('/action/mapping_override_revert', array('payload' => $payload), 'POST', 15);
+      // Payload à plat : callDaemon ajoute lui-même la clé 'payload' (cf. previewMappingOverride).
+      $result = jeedom2ha::callDaemon('/action/mapping_override_revert', $payload, 'POST', 15);
       if ($result === null) {
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }

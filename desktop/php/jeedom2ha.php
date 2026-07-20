@@ -6,6 +6,34 @@ if (!isConnect('admin')) {
 $plugin = plugin::byId('jeedom2ha');
 sendVarToJS('eqType', $plugin->getId());
 $eqLogics = eqLogic::byType($plugin->getId());
+
+// Story 16.8 — Arbre pièce -> équipement pour la surface de mapping HA (modèle Homebridge).
+// Consommé côté front (data Jeedom, aucune route daemon ajoutée). Les eqLogics de type
+// jeedom2ha sont exclus : ce sont des templates du bridge, pas des cibles de mapping.
+$j2haRoomsTree = array();
+foreach ((jeeObject::buildTree(null, false)) as $object) {
+	$roomEqList = array();
+	foreach (eqLogic::byObjectId($object->getId()) as $roomEq) {
+		if ($roomEq->getEqType_name() === 'jeedom2ha') {
+			continue;
+		}
+		$roomEqList[] = array(
+			'eq_id'   => (int) $roomEq->getId(),
+			'eq_name' => $roomEq->getName(),
+			'enabled' => ($roomEq->getIsEnable() == 1),
+		);
+	}
+	if (count($roomEqList) === 0) {
+		continue;
+	}
+	$j2haRoomsTree[] = array(
+		'object_id'     => (int) $object->getId(),
+		'object_name'   => $object->getName(),
+		'parent_number' => (int) $object->getConfiguration('parentNumber'),
+		'equipments'    => $roomEqList,
+	);
+}
+sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 ?>
 
 <div class="row row-overflow">
@@ -91,6 +119,30 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			</div>
 		</div>
 
+		<!-- Story 16.8 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
+		     Point d'entrée dédié, supersède l'onglet inatteignable de la 16.5. -->
+		<legend><i class="fas fa-house-signal"></i> {{Configuration mapping Home Assistant par pièce}}</legend>
+		<div class="alert alert-info" style="margin:10px 5px;">
+			<i class="fas fa-info-circle"></i>
+			{{Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle répond aux prérequis Home Assistant (prêt / bloquant + pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
+		</div>
+		<?php
+		if (count($j2haRoomsTree) == 0) {
+			echo '<div class="text-center" style="font-size:1.1em; margin:10px 5px;">{{Aucune pièce avec équipement trouvée.}}</div>';
+		} else {
+			echo '<div class="objectListContainer" id="j2ha_roomCards">';
+			foreach ($j2haRoomsTree as $room) {
+				echo '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $room['object_id'] . '" onclick="j2haOpenRoom(' . $room['object_id'] . ')">';
+				echo '<i class="fas fa-door-open" style="font-size:3em; margin-top:10px;"></i>';
+				echo '<br>';
+				echo '<span class="name">' . $room['object_name'] . '</span>';
+				echo '<span class="text-muted"> (' . count($room['equipments']) . ')</span>';
+				echo '</div>';
+			}
+			echo '</div>';
+		}
+		?>
+
 		<!-- Boutons de gestion du plugin -->
 		<div class="eqLogicThumbnailContainer">
 			<div class="cursor eqLogicAction logoPrimary" data-action="add">
@@ -158,7 +210,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			<li role="presentation"><a href="#" class="eqLogicAction" aria-controls="home" role="tab" data-toggle="tab" data-action="returnToThumbnailDisplay"><i class="fas fa-arrow-circle-left"></i></a></li>
 			<li role="presentation" class="active"><a href="#eqlogictab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-tachometer-alt"></i> {{Equipement}}</a></li>
 			<li role="presentation"><a href="#commandtab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-list"></i> {{Commandes}}</a></li>
-			<li role="presentation"><a href="#mappingOverrideTab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-house-signal"></i> {{HA / jeedom2ha}}</a></li>
 		</ul>
 		<div class="tab-content">
 			<!-- Onglet de configuration de l'équipement -->
@@ -284,20 +335,9 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				</div>
 			</div><!-- /.tabpanel #commandtab-->
 
-			<!-- Story 16.5 — Onglet override mapping HA par commande (triptyque natif/override/diagnostic) -->
-			<div role="tabpanel" class="tab-pane" id="mappingOverrideTab">
-				<div class="alert alert-info" style="margin:10px 5px;">
-					<i class="fas fa-info-circle"></i>
-					{{Choisissez le type Home Assistant utilisé pour chaque commande. Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
-				</div>
-				<div id="mappingOverride_reassurance" class="alert alert-warning" role="status" aria-live="polite" style="display:none; margin:10px 5px;">
-					<i class="fas fa-shield-alt"></i>
-					{{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}
-				</div>
-				<div id="mappingOverride_status" class="text-muted" style="margin:10px 5px;"></div>
-				<div id="mappingOverride_eqActions" style="margin:10px 5px;"></div>
-				<div id="mappingOverride_list" class="panel-group" role="tablist" aria-multiselectable="true" style="margin:10px 5px;"></div>
-			</div><!-- /.tabpanel #mappingOverrideTab-->
+			<!-- Story 16.8 — L'onglet override par commande (16.5) est retiré : point d'entrée
+			     inatteignable (0 eqLogic jeedom2ha). Le triptyque + diagnostic vivent désormais
+			     dans la surface « Configuration mapping HA par pièce » (modale par pièce). -->
 
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
@@ -309,6 +349,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 <?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_diagnostic_helpers', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_mapping_override', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_mapping_surface', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>

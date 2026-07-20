@@ -70,59 +70,46 @@
   background-color: #fff9c4 !important;
 }
 
-/* Story 16.5 — Accordéon commande : en-tête cliquable clavier + souris. */
-.mo-accordion-toggle {
-  cursor: pointer;
-  display: block;
-  text-decoration: none;
+/* Story 16.8 — Tableau des commandes (Commande | generic_type | Override HA | Diagnostic). */
+.j2ha-cmd-table {
+  margin-bottom: 0;
+  table-layout: auto;
 }
-.mo-accordion-toggle:hover,
-.mo-accordion-toggle:focus {
-  text-decoration: none;
-}
-
-/* Story 16.5 — Triptyque override HA par commande (natif / override / diagnostic). */
-.mapping-override-triptyque {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  gap: 15px;
-}
-.mapping-override-triptyque .mo-col {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.mapping-override-triptyque .mo-col-label {
+.j2ha-cmd-table > thead > tr > th {
   font-size: 11px;
   text-transform: uppercase;
   color: #888;
-  margin-bottom: 4px;
+  border-bottom: 2px solid #ddd;
+  white-space: nowrap;
 }
-/* Colonne native : traitement « champ désactivé », séparation permanente (AC6). */
-.mo-col-native {
-  background-color: #f5f5f5;
-  border-radius: 3px;
-  padding: 6px 8px;
-  border-left: 3px solid #ccc;
+.j2ha-cmd-table > tbody > tr > td {
+  vertical-align: middle;
+}
+.j2ha-cmd-table .mo-td-name {
+  font-weight: 600;
+}
+.j2ha-cmd-table .mo-td-override {
+  white-space: nowrap;
+  min-width: 200px;
+}
+.j2ha-cmd-table .mo-td-override .mapping-override-select {
+  display: inline-block;
+  width: auto;
+  max-width: 160px;
+  vertical-align: middle;
 }
 .mo-native-value {
   font-family: monospace;
   color: #555;
   font-weight: 600;
 }
-.mo-col-override .mo-empty-state {
-  font-size: 12px;
-  font-style: italic;
-  margin-top: 4px;
-}
-.mo-col-override .mo-spinner {
+.mo-spinner {
   margin-left: 6px;
   color: #337ab7;
 }
-.mo-col-override .mo-revert-cmd {
+.mo-revert-cmd {
   display: inline-block;
-  margin-top: 6px;
-  font-size: 12px;
+  margin-left: 8px;
   color: #337ab7;
   cursor: pointer;
 }
@@ -139,4 +126,57 @@
 }
 .mo-diag-cell.j2ha-diag-unknown {
   color: #999;
+}
+
+/* Story 16.8 — Surface par pièce (cartes pièces + accordéon équipements + synthèse publication). */
+.j2ha-room-card i.fa-door-open {
+  color: #5b9bd5;
+}
+.j2ha-eq-accordion .j2ha-eq-panel.j2ha-eq-disabled {
+  opacity: 0.6;
+}
+.j2ha-eq-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  text-decoration: none;
+}
+.j2ha-eq-toggle:focus {
+  text-decoration: none;
+}
+.j2ha-eq-name {
+  font-weight: 600;
+}
+/* Badge de synthèse : message textuel primaire, la couleur reste secondaire (a11y). */
+.j2ha-eq-publish-badge {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: normal;
+  text-align: left;
+}
+.j2ha-eq-publish-badge.j2ha-publish-ok {
+  background-color: #dff0d8;
+  color: #3c763d;
+}
+.j2ha-eq-publish-badge.j2ha-publish-partial {
+  background-color: #fcf8e3;
+  color: #8a6d3b;
+}
+.j2ha-eq-publish-badge.j2ha-publish-blocked {
+  background-color: #f2dede;
+  color: #8a6d3b;
+}
+.j2ha-eq-publish-badge.j2ha-publish-empty {
+  background-color: #eee;
+  color: #777;
+}
+.j2ha-goto-blocking {
+  color: #337ab7;
+  cursor: pointer;
+  font-size: 12px;
+}
+.j2ha-diag-target-highlight {
+  outline: 2px solid #f0ad4e;
+  transition: outline 0.3s ease;
 }
