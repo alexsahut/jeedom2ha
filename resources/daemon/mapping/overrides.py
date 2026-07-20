@@ -60,6 +60,44 @@ def _override_key(jeedom_eq_id: int, jeedom_cmd_id: int) -> str:
     return f"{jeedom_eq_id}:{jeedom_cmd_id}"
 
 
+# Story 16.7 (AC5/AC6) — champs sémantiques de mapping autorisés dans un profil partageable.
+# Whitelist (jamais blacklist) : un champ inconnu ajouté par une édition manuelle de
+# `ha_overrides.json` (identifiant machine, chemin, hostname, token/localSecret, donnée
+# personnelle) ne peut pas fuiter dans un profil exporté ni s'injecter à l'import.
+_PROFILE_COMMAND_FIELDS = ("source", "ha_entity_type", "publication_override")
+_PROFILE_EQUIPMENT_FIELDS = ("source", "publication_override")
+
+
+def _sanitize_profile_entry(entry: dict, allowed_fields) -> dict:
+    """Keep only the whitelisted mapping-semantic fields of an override entry (Story 16.7).
+
+    `None` values are dropped : a portable profile carries no null noise, and an absent
+    `publication_override` is semantically identical to `None` (no override).
+    """
+    return {
+        field: entry[field]
+        for field in allowed_fields
+        if field in entry and entry[field] is not None
+    }
+
+
+def _parse_override_key(key: str) -> tuple:
+    """Parse a composite command key 'eq_id:cmd_id' back to (int, int) (Story 16.7 import)."""
+    try:
+        eq_str, cmd_str = str(key).split(":", 1)
+        return int(eq_str), int(cmd_str)
+    except (ValueError, AttributeError):
+        raise ValueError(f"[OVERRIDES] Clé d'override composite invalide : {key!r}")
+
+
+def _parse_equipment_key(key: str) -> int:
+    """Parse an equipment key 'eq_id' back to int (Story 16.7 import)."""
+    try:
+        return int(key)
+    except (ValueError, TypeError):
+        raise ValueError(f"[OVERRIDES] Clé d'override équipement invalide : {key!r}")
+
+
 def _load_raw(data_dir: str) -> Optional[Dict]:
     """Load and validate the overrides file.
 
@@ -412,3 +450,85 @@ def resolve_publication_override(
         return "force_publish"
 
     return None
+
+
+def export_profile(data_dir: str) -> dict:
+    """Export the persisted overrides as an anonymisable, shareable profile (Story 16.7 / AC5).
+
+    Pure read path : reuses `_load_raw` (no write, no `sync`/`transport`/MQTT). Returns a
+    profile dict `{"schema_version", "overrides", "equipment_overrides"}` carrying ONLY the
+    mapping semantics, indexed by the composite keys `eq_id:cmd_id` (commands) / `eq_id`
+    (equipment). Each entry is whitelisted to the known mapping fields (`_PROFILE_*_FIELDS`)
+    so no secret / hostname / absolute path / machine id can leak into the profile — even if
+    `ha_overrides.json` was hand-edited with extra keys.
+
+    Never mutates the Jeedom topology nor the `generic_type` native (D10) : the profile only
+    carries the jeedom2ha override layer, indexed by Jeedom IDs. Returns a well-formed empty
+    profile if the overrides file is absent, invalid or carries an unsupported schema_version
+    (diagnostic already logged by `_load_raw`).
+    """
+    raw = _load_raw(data_dir)
+    if raw is None:
+        return {"schema_version": _SCHEMA_VERSION, "overrides": {}, "equipment_overrides": {}}
+
+    return {
+        "schema_version": raw["schema_version"],
+        "overrides": {
+            key: _sanitize_profile_entry(entry, _PROFILE_COMMAND_FIELDS)
+            for key, entry in raw["overrides"].items()
+            if isinstance(entry, dict)
+        },
+        "equipment_overrides": {
+            key: _sanitize_profile_entry(entry, _PROFILE_EQUIPMENT_FIELDS)
+            for key, entry in raw["equipment_overrides"].items()
+            if isinstance(entry, dict)
+        },
+    }
+
+
+def import_profile(profile: dict, data_dir: str) -> None:
+    """Import a shared overrides profile, reusing the versioned-schema refusal contract (AC6).
+
+    Validates `profile["schema_version"]` against `_SUPPORTED_SCHEMA_VERSIONS` : an absent,
+    non-integer or unsupported version is refused explicitly (`ValueError`), never a silent
+    cold-start (same contract as `_load_raw` — no `disk_cache`-style fallback). Writes
+    exclusively through the existing persistence primitives (`save_override` /
+    `save_equipment_override`) — no parallel write path — and performs no `sync`/`transport`/
+    MQTT call (import only reads the profile and writes the file, D8). Imported entries are
+    re-whitelisted so a malicious/hand-edited profile cannot inject secret keys locally.
+
+    Raises:
+        ValueError: on an invalid/unsupported `schema_version`, or a malformed profile body.
+    """
+    if not isinstance(profile, dict):
+        raise ValueError("[OVERRIDES] Profil d'import invalide (racine non-objet)")
+
+    schema_version = profile.get("schema_version")
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or schema_version not in _SUPPORTED_SCHEMA_VERSIONS
+    ):
+        raise ValueError(
+            f"[OVERRIDES] schema_version de profil invalide ou non supportée "
+            f"({schema_version!r}) — import refusé"
+        )
+
+    overrides = profile.get("overrides", {})
+    equipment_overrides = profile.get("equipment_overrides", {})
+    if not isinstance(overrides, dict) or not isinstance(equipment_overrides, dict):
+        raise ValueError(
+            "[OVERRIDES] Profil d'import invalide (sections 'overrides'/'equipment_overrides')"
+        )
+
+    for key, entry in overrides.items():
+        if not isinstance(entry, dict):
+            raise ValueError(f"[OVERRIDES] Entrée d'override de profil invalide : {key!r}")
+        eq_id, cmd_id = _parse_override_key(key)
+        save_override(eq_id, cmd_id, _sanitize_profile_entry(entry, _PROFILE_COMMAND_FIELDS), data_dir)
+
+    for key, entry in equipment_overrides.items():
+        if not isinstance(entry, dict):
+            raise ValueError(f"[OVERRIDES] Entrée d'override équipement de profil invalide : {key!r}")
+        eq_id = _parse_equipment_key(key)
+        save_equipment_override(eq_id, _sanitize_profile_entry(entry, _PROFILE_EQUIPMENT_FIELDS), data_dir)

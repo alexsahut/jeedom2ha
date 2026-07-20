@@ -409,8 +409,9 @@ class DiscoveryPublisher:
         }
         payload.update(self._build_availability_fields(mapping, snapshot))
 
-        # Add brightness fields if capability detected
-        if mapping.capabilities.has_brightness:
+        # Add brightness fields if capability detected.
+        # getattr: a type override (D11) may keep non-Light detected capabilities.
+        if getattr(mapping.capabilities, "has_brightness", False):
             payload["brightness_state_topic"] = f"jeedom2ha/{eq_id}/brightness"
             payload["brightness_command_topic"] = f"jeedom2ha/{eq_id}/brightness/set"
             payload["brightness_scale"] = 100
@@ -431,8 +432,9 @@ class DiscoveryPublisher:
         device = self._build_device_block(mapping, snapshot)
         caps = mapping.capabilities
 
-        # Default device_class: shutter (volet roulant) or blind (BSO)
-        device_class = "blind" if caps.is_bso else "shutter"
+        # Default device_class: shutter (volet roulant) or blind (BSO).
+        # getattr: a type override (D11) may keep non-Cover detected capabilities.
+        device_class = "blind" if getattr(caps, "is_bso", False) else "shutter"
 
         payload = {
             "name": mapping.ha_name,
@@ -454,11 +456,11 @@ class DiscoveryPublisher:
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Conditional: Stop
-        if caps.has_stop:
+        if getattr(caps, "has_stop", False):
             payload["payload_stop"] = "STOP"
 
         # Conditional: Position
-        if caps.has_position:
+        if getattr(caps, "has_position", False):
             payload["position_topic"] = f"jeedom2ha/{eq_id}/position"
             payload["set_position_topic"] = f"jeedom2ha/{eq_id}/position/set"
             payload["position_open"] = 100
@@ -499,8 +501,9 @@ class DiscoveryPublisher:
         }
         payload.update(self._build_availability_fields(mapping, snapshot))
 
-        # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch"
-        if caps.device_class == "outlet":
+        # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch".
+        # getattr: a type override (D11) may keep non-Switch detected capabilities.
+        if getattr(caps, "device_class", None) == "outlet":
             payload["device_class"] = "outlet"
 
         return payload
