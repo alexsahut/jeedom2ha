@@ -234,3 +234,27 @@ describe('16.8 / tableau — buildBlockingReason', () => {
     assert.match(M.buildBlockingReason(view), /non pilotable/i);
   });
 });
+
+describe('16.8 / AC12 « jamais vide » — commande non couverte', () => {
+  it('readPreviewCovered → false quand le backend renvoie covered:false', () => {
+    assert.strictEqual(M.readPreviewCovered({ payload: { covered: false, overridden: null } }), false);
+  });
+
+  it('readPreviewCovered → true quand covered:true', () => {
+    assert.strictEqual(M.readPreviewCovered({ payload: { covered: true } }), true);
+  });
+
+  it('readPreviewCovered → true par défaut (rétro-compat backend sans le champ)', () => {
+    assert.strictEqual(M.readPreviewCovered({ payload: { overridden: {} } }), true);
+    assert.strictEqual(M.readPreviewCovered(null), true);
+  });
+
+  it('accepte aussi un payload déjà déballé', () => {
+    assert.strictEqual(M.readPreviewCovered({ covered: false }), false);
+  });
+
+  it('buildUncoveredLabel → message factuel « non couverte »', () => {
+    assert.match(M.buildUncoveredLabel(), /non couverte/i);
+    assert.match(M.buildUncoveredLabel(), /ne sera pas publié/i);
+  });
+});

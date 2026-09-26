@@ -52,10 +52,17 @@
     return $sel;
   }
 
-  function renderDiagnosticCell($cell, view) {
+  function renderDiagnosticCell($cell, view, covered) {
+    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered');
+    // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
+    // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
+    if (covered === false) {
+      $cell.addClass('j2ha-diag-uncovered').html('<i class="fas fa-ban"></i> ');
+      $cell.append($('<span></span>').text(M.buildUncoveredLabel()));
+      return;
+    }
     var state = M.diagnosticState(view);
     var msg = M.buildPublishCellLabel(view);
-    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown');
     if (state === 'ready') {
       $cell.addClass('j2ha-diag-ready').html('<i class="fas fa-check-circle"></i> ');
     } else if (state === 'blocking') {
@@ -97,7 +104,7 @@
 
     // Colonne 4 : diagnostic — « ce qui sera publié » / « ne sera pas publié + raison ».
     var $diagCell = $('<td class="mo-td-diag mo-diag-cell"></td>');
-    renderDiagnosticCell($diagCell, row.diagnostic);
+    renderDiagnosticCell($diagCell, row.diagnostic, row.covered);
     $tr.append($diagCell);
 
     // Débounce dry-run instantané + auto-validation (logique 16.5 inchangée).
@@ -133,8 +140,17 @@
       data: { action: 'previewMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type },
       dataType: 'json',
       success: function (data) {
-        var view = M.readPreviewOverridden(data && data.result ? data.result : data);
-        renderDiagnosticCell($diagCell, view);
+        var result = data && data.result ? data.result : data;
+        var covered = M.readPreviewCovered(result);
+        // Commande non couverte : aucun mapping à projeter. On affiche l'état factuel et on
+        // NE persiste PAS (un override sur une commande non couverte est un no-op qui, après
+        // reload, laisse la cellule vide — la cause exacte du #871).
+        if (!covered) {
+          renderDiagnosticCell($diagCell, null, false);
+          return;
+        }
+        var view = M.readPreviewOverridden(result);
+        renderDiagnosticCell($diagCell, view, true);
         maybeShowReassurance(M.isBlockingDiagnostic(view));
         if (M.shouldAutoValidate(view)) {
           saveOverride(eqId, cmdId, type);

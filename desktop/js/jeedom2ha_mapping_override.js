@@ -90,13 +90,36 @@
     };
   }
 
-  // Extrait la vue overridée d'une réponse de preview (dry-run).
+  // Extrait la vue overridée BRUTE d'une réponse de preview (dry-run).
+  // Renvoie l'objet `overridden` tel quel (mêmes clés que le contrat backend / que
+  // `row.diagnostic` du GET arbre), directement consommable par diagnosticState /
+  // buildPublishCellLabel / shouldAutoValidate — qui appliquent readDiagnosticView
+  // eux-mêmes. Ne JAMAIS pré-aplatir ici : un double readDiagnosticView perdrait
+  // `projection_validity` (→ is_valid=false → toujours « ne sera pas publié », #869).
   function readPreviewOverridden(payload) {
     var p = (payload && payload.payload) ? payload.payload : payload;
-    if (!p || typeof p !== 'object') {
+    if (!p || typeof p !== 'object' || !p.overridden || typeof p.overridden !== 'object') {
       return null;
     }
-    return readDiagnosticView(p.overridden);
+    return p.overridden;
+  }
+
+  // Story 16.8 — couverture d'une commande : le backend répond `covered:false` quand la
+  // commande ciblée n'est couverte NI par le mapping primaire NI par un capteur secondaire.
+  // Défaut `true` (rétro-compat : un backend antérieur sans le champ signifie « couvert »).
+  function readPreviewCovered(payload) {
+    var p = (payload && payload.payload) ? payload.payload : payload;
+    if (!p || typeof p !== 'object') {
+      return true;
+    }
+    return p.covered !== false;
+  }
+
+  // Story 16.8 (AC12 « jamais vide ») — libellé de la cellule diagnostic pour une commande
+  // non couverte : elle n'a aucun mapping à projeter, donc rien ne sera publié. Message
+  // factuel (jamais vide, jamais un flash vert trompeur, jamais un code HTTP).
+  function buildUncoveredLabel() {
+    return 'Ne sera pas publié — commande non couverte par un mapping';
   }
 
   // État diagnostic : 'ready' (vert franc), 'blocking' (neutre actionnable), 'unknown'.
@@ -368,6 +391,8 @@
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,
+    readPreviewCovered: readPreviewCovered,
+    buildUncoveredLabel: buildUncoveredLabel,
     diagnosticState: diagnosticState,
     isReadyDiagnostic: isReadyDiagnostic,
     isBlockingDiagnostic: isBlockingDiagnostic,

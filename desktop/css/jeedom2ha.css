@@ -127,6 +127,11 @@
 .mo-diag-cell.j2ha-diag-unknown {
   color: #999;
 }
+/* Non couvert : commande sans mapping — ton neutre grisé, factuel (AC12 « jamais vide »). */
+.mo-diag-cell.j2ha-diag-uncovered {
+  color: #777;
+  font-style: italic;
+}
 
 /* Story 16.8 — Surface par pièce (cartes pièces + accordéon équipements + synthèse publication). */
 .j2ha-room-card i.fa-door-open {
