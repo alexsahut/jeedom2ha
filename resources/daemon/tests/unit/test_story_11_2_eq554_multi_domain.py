@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 
 from cache.disk_cache import load_publications_cache, save_publications_cache
 from discovery.publisher import DiscoveryPublisher
+from discovery.registry import PublisherRegistry
 from models.mapping import PublicationDecision
 from mapping.binary_sensor import BinarySensorMapper
 from mapping.registry import MapperRegistry
@@ -339,7 +340,7 @@ async def test_action_publier_path_publishes_switch_and_all_secondaries():
     # re-inclusion sans sync complet → entités manquantes côté HA.
     mqtt_bridge = MagicMock()
     mqtt_bridge.publish_message.return_value = True
-    publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(DiscoveryPublisher(mqtt_bridge))
 
     eq = _eq554()
     snapshot = _snapshot(eq)
@@ -347,7 +348,7 @@ async def test_action_publier_path_publishes_switch_and_all_secondaries():
     assert primary.ha_entity_type == "switch"
     assert len(primary.additional_mappings) == 13
 
-    ok = await _publish_mapping_for_action(publisher, primary, snapshot)
+    ok = await _publish_mapping_for_action(publisher_registry, primary, snapshot)
     assert ok is True
 
     config_topics = {

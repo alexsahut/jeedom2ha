@@ -491,19 +491,17 @@ def _should_attempt_publish(
 
 
 async def _publish_mapping_for_action(
-    publisher: DiscoveryPublisher,
+    publisher_registry: PublisherRegistry,
     mapping: MappingResult,
     topology: TopologySnapshot,
 ) -> bool:
-    if mapping.ha_entity_type == "light":
-        primary_ok = await publisher.publish_light(mapping, topology)
-    elif mapping.ha_entity_type == "cover":
-        primary_ok = await publisher.publish_cover(mapping, topology)
-    elif mapping.ha_entity_type == "switch":
-        primary_ok = await publisher.publish_switch(mapping, topology)
-    else:
-        return False
+    """Publie un mapping (action « publier ») via le registre unique (CC-08).
 
+    Un type non enregistré dans PublisherRegistry échoue explicitement : publish()
+    consigne une erreur et positionne mapping.publication_result à "failed" au lieu
+    de retourner un False silencieux qui masquerait le problème.
+    """
+    primary_ok = await publisher_registry.publish(mapping, topology)
     if not primary_ok:
         return False
 
@@ -514,27 +512,9 @@ async def _publish_mapping_for_action(
     # sensors + 1 binary_sensor non publiés (entités manquantes côté HA).
     all_ok = True
     for secondary in mapping.additional_mappings or []:
-        if not await _publish_secondary_for_action(publisher, secondary, topology):
+        if not await publisher_registry.publish(secondary, topology):
             all_ok = False
     return all_ok
-
-
-async def _publish_secondary_for_action(
-    publisher: DiscoveryPublisher,
-    mapping: MappingResult,
-    topology: TopologySnapshot,
-) -> bool:
-    if mapping.ha_entity_type == "sensor":
-        return await publisher.publish_sensor(mapping, topology)
-    if mapping.ha_entity_type == "binary_sensor":
-        return await publisher.publish_binary_sensor(mapping, topology)
-    if mapping.ha_entity_type == "switch":
-        return await publisher.publish_switch(mapping, topology)
-    if mapping.ha_entity_type == "light":
-        return await publisher.publish_light(mapping, topology)
-    if mapping.ha_entity_type == "cover":
-        return await publisher.publish_cover(mapping, topology)
-    return False
 
 
 def _build_action_perimetre_impacte(
@@ -929,6 +909,7 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
         return
 
     publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(publisher)
 
     # AC #11: rejouer les pending_discovery_unpublish AVANT la republication (reconnect uniquement)
     if reason == "broker_reconnect":
@@ -950,14 +931,7 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
             continue
         entity_type = getattr(mapping, "ha_entity_type", "") or ""
         try:
-            if entity_type == "light":
-                ok = await publisher.publish_light(mapping, topology)
-            elif entity_type == "cover":
-                ok = await publisher.publish_cover(mapping, topology)
-            elif entity_type == "switch":
-                ok = await publisher.publish_switch(mapping, topology)
-            else:
-                ok = False
+            ok = await publisher_registry.publish(mapping, topology)
             if not ok:
                 _LOGGER.error(
                     "[DISCOVERY] eq_id=%d entity_type=%s : échec publish — bridge indisponible",
@@ -969,6 +943,25 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
                 eq_id, entity_type, exc,
             )
         await asyncio.sleep(delay)
+
+        # CC-08 — un eqLogic multi-domaine (switch/lumière + sensors/binary_sensors)
+        # porte ses entités secondaires dans additional_mappings ; sans republication
+        # dédiée, un reconnect/birth HA laisse ces entités absentes de HA.
+        for secondary in getattr(mapping, "additional_mappings", None) or []:
+            secondary_type = getattr(secondary, "ha_entity_type", "") or ""
+            try:
+                sec_ok = await publisher_registry.publish(secondary, topology)
+                if not sec_ok:
+                    _LOGGER.error(
+                        "[DISCOVERY] eq_id=%d entity_type=%s (secondaire) : échec publish — bridge indisponible",
+                        eq_id, secondary_type,
+                    )
+            except Exception as exc:
+                _LOGGER.error(
+                    "[DISCOVERY] eq_id=%d entity_type=%s (secondaire) : échec publish — %s",
+                    eq_id, secondary_type, exc,
+                )
+            await asyncio.sleep(delay)
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -3166,6 +3159,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         for entry in published_scope.get("equipements", [])
     }
     publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(publisher)
 
     equipements_inclus = 0
     equipements_publies_ou_crees = 0
@@ -3189,7 +3183,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 skips += 1
                 continue
 
-            publish_ok = await _publish_mapping_for_action(publisher, mapping, topology)
+            publish_ok = await _publish_mapping_for_action(publisher_registry, mapping, topology)
             await asyncio.sleep(_action_delay)
             if not publish_ok:
                 failed_decision = PublicationDecision(
