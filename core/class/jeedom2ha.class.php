@@ -196,11 +196,16 @@ class jeedom2ha extends eqLogic {
     // argv (visible via ps aux / /proc/<pid>/cmdline). Ils sont écrits dans un fichier 0600,
     // hors de l'arborescence versionnée/packagée du plugin (jeedom::getTmpFolder, même
     // convention que deamon.pid), et seul son chemin (non sensible) est passé en argv.
+    // umask(0077) le temps de l'écriture évite la fenêtre où le fichier existe avec les
+    // droits par défaut (potentiellement lisibles) avant le chmod ; le chmod 0600 reste en
+    // ceinture pour les cas où umask n'est pas honoré (ex. filesystem particulier).
     $secretsFile = jeedom::getTmpFolder(__CLASS__) . '/daemon.secrets';
     $secretsContent = 'apikey=' . $apiKey . "\n"
       . 'localsecret=' . $localSecret . "\n"
       . 'jeedomcoreapikey=' . (string) $jeedomCoreApiKey . "\n";
+    $previousUmask = umask(0077);
     file_put_contents($secretsFile, $secretsContent);
+    umask($previousUmask);
     chmod($secretsFile, 0600);
 
     $cmd = $pythonPath . ' ' . $daemonDir . '/main.py';

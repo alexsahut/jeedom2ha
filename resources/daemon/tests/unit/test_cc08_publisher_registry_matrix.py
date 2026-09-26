@@ -19,6 +19,7 @@ sans diagnostic) sur les trois chemins.
 """
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -184,6 +185,14 @@ class TestActionPublierPathMatrix:
 
 class TestRepublicationPathMatrix:
     """Republication (_republish_all_from_cache) : primaire + additional_mappings."""
+
+    @pytest.fixture(autouse=True)
+    def _no_real_throttle_delay(self, monkeypatch):
+        """_republish_all_from_cache espace ses publications d'un vrai asyncio.sleep
+        (10s / nb_entites, throttle MQTT réel — ne pas y toucher). On neutralise
+        uniquement le sleep ici pour que la matrice ne coûte pas plusieurs minutes
+        de CI par cellule ; le code de production n'est pas modifié."""
+        monkeypatch.setattr(asyncio, "sleep", AsyncMock())
 
     def _app(self, decision, registry: PublisherRegistry | None = None):
         mqtt_bridge = MagicMock()
