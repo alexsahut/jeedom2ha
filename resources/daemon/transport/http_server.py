@@ -2138,6 +2138,24 @@ def _build_publication_override_diag(reason_code, pub_decision):
     }
 
 
+def _secondary_mapping_by_cmd(primary_mapping):
+    """Index {cmd_id: MappingResult} des capteurs secondaires (Story 11.1 multi-sensor).
+
+    Chaque secondaire d'`additional_mappings` porte son propre cmd_id Jeedom dans
+    `reason_details["cmd_id"]`. Ces capteurs sont publiés au sync mais absents du mapping
+    primaire — cet index permet à l'arbre/preview d'exposer leur diagnostic réel par
+    commande. Premier gagnant si collision (setdefault), ordre natif préservé.
+    """
+    index: Dict[int, object] = {}
+    if primary_mapping is None:
+        return index
+    for secondary in (primary_mapping.additional_mappings or []):
+        cmd_id = (secondary.reason_details or {}).get("cmd_id")
+        if isinstance(cmd_id, int) and not isinstance(cmd_id, bool):
+            index.setdefault(cmd_id, secondary)
+    return index
+
+
 def _preview_mapping_view(mapping, confidence_policy, *, publication_override):
     """Story 16.6 — vue JSON-safe d'un mapping pour la preview (lecture seule).
 
@@ -2238,10 +2256,44 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             },
         })
 
+    # 1b. Si la commande ciblée est un capteur secondaire (Story 11.1 multi-sensor), c'est CE
+    # mapping qu'il faut évaluer : le primaire ne le couvre pas, donc évaluer le primaire
+    # afficherait le type primaire (« Sera publié : binary_sensor ») au lieu du type réel du
+    # secondaire (« sensor »). On bascule la cible sans jamais toucher le primaire.
+    target_mapping = auto_mapping
+    is_secondary_target = False
+    if isinstance(proposed_cmd_id, int):
+        secondary = _secondary_mapping_by_cmd(auto_mapping).get(proposed_cmd_id)
+        if secondary is not None:
+            target_mapping = secondary
+            is_secondary_target = True
+
+    # AC12 « jamais vide » : une commande ciblée qui n'est couverte NI par le primaire NI par un
+    # capteur secondaire n'a pas de mapping à évaluer. Évaluer le primaire à sa place afficherait
+    # un « Sera publié : <type primaire> » trompeur (flash vert puis cellule vide au reload).
+    # On répond honnêtement `covered:false` / `overridden:null` : l'UI montre « non couvert ».
+    covered = True
+    if isinstance(proposed_cmd_id, int) and not is_secondary_target:
+        covered = proposed_cmd_id in set(mapping_cmd_ids(auto_mapping))
+    if not covered:
+        return web.json_response({
+            "status": "ok",
+            "payload": {
+                "jeedom_eq_id": eq_id,
+                "mapped": True,
+                "covered": False,
+                "auto": _preview_mapping_view(
+                    auto_mapping, confidence_policy, publication_override=None
+                ),
+                "overridden": None,
+                "native_generic_types": native_generic_types,
+            },
+        })
+
     # 2. Overrides PROPOSÉS, construits depuis le corps de requête, EN MÉMOIRE uniquement.
     proposed_type_overrides: Dict[str, dict] = {}
     if proposed_type is not None:
-        cmd_ids = mapping_cmd_ids(auto_mapping)
+        cmd_ids = mapping_cmd_ids(target_mapping)
         key_cmd = proposed_cmd_id if isinstance(proposed_cmd_id, int) else (cmd_ids[0] if cmd_ids else None)
         if key_cmd is not None:
             proposed_type_overrides[f"{eq_id}:{key_cmd}"] = {
@@ -2257,19 +2309,19 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             proposed_equipment_overrides[str(eq_id)] = {"publication_override": proposed_policy}
 
     # 3. Résultat AVEC override : copie patchée (generic_type natif intact, D10).
-    over_mapping = apply_type_override(auto_mapping, _DATA_DIR, overrides=proposed_type_overrides)
+    over_mapping = apply_type_override(target_mapping, _DATA_DIR, overrides=proposed_type_overrides)
     pub_override = _resolve_publication_override_for_mapping(
         over_mapping, proposed_cmd_overrides, proposed_equipment_overrides
     )
 
-    auto_view = _preview_mapping_view(auto_mapping, confidence_policy, publication_override=None)
+    auto_view = _preview_mapping_view(target_mapping, confidence_policy, publication_override=None)
     over_view = _preview_mapping_view(over_mapping, confidence_policy, publication_override=pub_override)
 
     over_reason_details = over_mapping.reason_details or {}
     if over_reason_details.get("override_applied"):
         over_view["type_override"] = {
             "source": over_reason_details.get("override_source"),
-            "native": auto_mapping.ha_entity_type,
+            "native": target_mapping.ha_entity_type,
             "effective": over_mapping.ha_entity_type,
         }
     if pub_override is not None:
@@ -2284,7 +2336,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             refusal_reasons.append(over_view["publication_reason"])
     support_export = {
         "preview_trace": {
-            "native": auto_mapping.ha_entity_type,
+            "native": target_mapping.ha_entity_type,
             "effective": over_mapping.ha_entity_type,
             "publication_override": pub_override,
         },
@@ -2296,6 +2348,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
         "payload": {
             "jeedom_eq_id": eq_id,
             "mapped": True,
+            "covered": True,
             "auto": auto_view,
             "overridden": over_view,
             "native_generic_types": native_generic_types,
@@ -2328,6 +2381,7 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
     mapped = auto_mapping is not None
     covered_ids = set(mapping_cmd_ids(auto_mapping)) if mapped else set()
     native_type = auto_mapping.ha_entity_type if mapped else None
+    secondary_by_cmd = _secondary_mapping_by_cmd(auto_mapping) if mapped else {}
 
     effective_diag = None
     if mapped:
@@ -2346,9 +2400,37 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
         override_type = entry.get("ha_entity_type")
         override_applied = bool(override_type)
         is_covered = cmd.id in covered_ids
-        attendu_ha = native_type if is_covered else proposed_eq
+        secondary = secondary_by_cmd.get(cmd.id)
+        is_secondary = secondary is not None and not is_covered
+
+        # Capteur secondaire (Story 11.1) : le mapping primaire ne le couvre pas, mais il EST
+        # publié au sync. On calcule son diagnostic réel (type override honoré, publication
+        # override non appliqué ici — symétrique du chemin primaire de l'arbre).
+        secondary_diag = None
+        secondary_native = None
+        secondary_effective = None
+        if is_secondary:
+            secondary_native = secondary.ha_entity_type
+            secondary_over = apply_type_override(secondary, data_dir, overrides=overrides_cache)
+            secondary_effective = secondary_over.ha_entity_type
+            secondary_diag = _preview_mapping_view(
+                secondary_over, "sure_probable", publication_override=None
+            )
+
+        if is_covered:
+            attendu_ha = native_type
+        elif is_secondary:
+            attendu_ha = secondary_native
+        else:
+            attendu_ha = proposed_eq
+
         if override_applied:
-            row_effective = effective_type if is_covered else override_type
+            if is_covered:
+                row_effective = effective_type
+            elif is_secondary:
+                row_effective = secondary_effective
+            else:
+                row_effective = override_type
         else:
             row_effective = attendu_ha
         row = {
@@ -2356,6 +2438,7 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
             "cmd_name": cmd.name,
             "generic_type": cmd.generic_type,
             "coverable": bool(cmd.generic_type),
+            "covered": bool(is_covered or is_secondary),
             "attendu_ha": attendu_ha,
             "effective_ha": row_effective,
             "override_applied": override_applied,
@@ -2364,6 +2447,8 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
             row["override_source"] = entry.get("source", "user")
         if is_covered and effective_diag is not None:
             row["diagnostic"] = dict(effective_diag)
+        elif is_secondary and secondary_diag is not None:
+            row["diagnostic"] = dict(secondary_diag)
         else:
             row["diagnostic"] = None
         commands.append(row)
