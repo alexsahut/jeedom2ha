@@ -192,21 +192,27 @@ class jeedom2ha extends eqLogic {
     $socketPort = config::byKey('socketport', __CLASS__, '55081');
     $logLevel = log::convertLogLevel(log::getLogLevel(__CLASS__));
 
+    // CC-08 hygiène des clés : apikey/localsecret/jeedomcoreapikey ne sont jamais passés en
+    // argv (visible via ps aux / /proc/<pid>/cmdline). Ils sont écrits dans un fichier 0600,
+    // hors de l'arborescence versionnée/packagée du plugin (jeedom::getTmpFolder, même
+    // convention que deamon.pid), et seul son chemin (non sensible) est passé en argv.
+    $secretsFile = jeedom::getTmpFolder(__CLASS__) . '/daemon.secrets';
+    $secretsContent = 'apikey=' . $apiKey . "\n"
+      . 'localsecret=' . $localSecret . "\n"
+      . 'jeedomcoreapikey=' . (string) $jeedomCoreApiKey . "\n";
+    file_put_contents($secretsFile, $secretsContent);
+    chmod($secretsFile, 0600);
+
     $cmd = $pythonPath . ' ' . $daemonDir . '/main.py';
     $cmd .= ' --loglevel ' . $logLevel;
     $cmd .= ' --sockethost 127.0.0.1';
     $cmd .= ' --socketport ' . $socketPort;
     $cmd .= ' --callback ' . $callbackUrl;
-    $cmd .= ' --apikey ' . $apiKey;
-    $cmd .= ' --jeedomcoreapikey ' . escapeshellarg((string) $jeedomCoreApiKey);
+    $cmd .= ' --secretsfile ' . escapeshellarg($secretsFile);
     $cmd .= ' --pid ' . $pidFile;
     $cmd .= ' --apiport ' . $apiPort;
-    $cmd .= ' --localsecret ' . $localSecret;
 
-    $cmdLog = preg_replace('/--localsecret\s+\S+/', '--localsecret ***', $cmd);
-    $cmdLog = preg_replace('/--apikey\s+\S+/', '--apikey ***', $cmdLog);
-    $cmdLog = preg_replace('/--jeedomcoreapikey\s+\S+/', '--jeedomcoreapikey ***', $cmdLog);
-    log::add(__CLASS__, 'info', '[DAEMON] Launching: ' . $cmdLog);
+    log::add(__CLASS__, 'info', '[DAEMON] Launching: ' . $cmd);
     $result = exec($cmd . ' >> ' . log::getPathToLog(__CLASS__ . '_daemon') . ' 2>&1 &');
     // Use wall-clock deadline: callDaemon has a 3s timeout per attempt (2 attempts for GET),
     // so each deamon_info() call can take up to ~7s. The deadline enforces a real 20s limit.
