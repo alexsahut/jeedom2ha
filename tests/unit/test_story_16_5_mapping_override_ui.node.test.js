@@ -136,11 +136,32 @@ describe('16.5 / AC8-AC9 — état diagnostic', () => {
     assert.strictEqual(M.isBlockingDiagnostic(null), false);
   });
 
-  it('readPreviewOverridden extrait la vue overridée de la réponse preview', () => {
+  it('readPreviewOverridden extrait la vue overridée BRUTE de la réponse preview', () => {
     const resp = { status: 'ok', payload: { jeedom_eq_id: 200, mapped: true, auto: readyView(), overridden: blockingView() } };
     const v = M.readPreviewOverridden(resp);
-    assert.strictEqual(v.is_valid, false);
-    assert.strictEqual(M.diagnosticState(resp.payload.overridden), 'blocking');
+    // Vue BRUTE (mêmes clés que le contrat backend), pas une vue déjà aplatie :
+    // directement réutilisable par diagnosticState (comme row.diagnostic du GET arbre).
+    assert.deepStrictEqual(v, resp.payload.overridden);
+    assert.strictEqual(M.diagnosticState(v), 'blocking');
+  });
+
+  it('readPreviewOverridden absente / mal formée → null (unknown, jamais bloquant)', () => {
+    assert.strictEqual(M.readPreviewOverridden({ status: 'ok', payload: { mapped: false } }), null);
+    assert.strictEqual(M.readPreviewOverridden(null), null);
+    assert.strictEqual(M.diagnosticState(M.readPreviewOverridden({ payload: {} })), 'unknown');
+  });
+
+  // Régression #869 : une preview publiable (should_publish=true) doit rester « ready »
+  // après passage par readPreviewOverridden. Le bug historique aplatissait deux fois la
+  // vue (readPreviewOverridden PUIS diagnosticState), perdant projection_validity et
+  // forçant is_valid=false → « ne sera pas publié » quel que soit l'override.
+  it('readPreviewOverridden(ready) reste ready et « Sera publié » (régression #869)', () => {
+    const resp = { status: 'ok', payload: { jeedom_eq_id: 543, mapped: true, auto: readyView('binary_sensor'), overridden: readyView('binary_sensor') } };
+    const v = M.readPreviewOverridden(resp);
+    assert.strictEqual(M.diagnosticState(v), 'ready');
+    assert.strictEqual(M.isReadyDiagnostic(v), true);
+    assert.match(M.buildPublishCellLabel(v), /Sera publié/);
+    assert.strictEqual(M.shouldAutoValidate(v), true);
   });
 });
 
