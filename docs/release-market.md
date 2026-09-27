@@ -122,12 +122,21 @@ $ curl -s https://api.github.com/repos/mips2648/jeedom-worxLandroidS/contents/.g
 ```
 
 Conclusions tirées de cette preuve terrain, pas d'une supposition :
-1. **`.github/`, les dotfiles (`.gitignore`, `.markdownlint.json`) et les
-   dossiers `doc`/`docs` ne sont PAS livrés sur la box réelle**, alors qu'ils
-   sont bien présents sur la branche GitHub effectivement servie par le
-   Market pour ces deux plugins (la suppression de `doc`/`docs` recoupe
-   d'ailleurs exactement le `rm -rf` explicite lu dans `doUpdate()`, voir
-   1.6 — confirmation croisée code + terrain).
+1. **`.github/` et les dotfiles (`.gitignore`, `.markdownlint.json`) ne sont
+   PAS livrés sur la box réelle**, alors qu'ils sont bien présents sur la
+   branche GitHub effectivement servie par le Market pour ces deux plugins.
+   **Le sort de `doc`/`docs` n'est en revanche PAS uniforme** :
+   `worxLandroidS` a bien un dossier `docs/` livré sur la box (confirmé
+   ci-dessus, `ls -a` réel), alors que `tahoma` n'a **pas** de `doc/` sur la
+   box bien que son dépôt GitHub en contienne un — pour une raison non
+   élucidée par cette preuve. **Attention à un raccourci qui contredirait ce
+   constat** : le core Jeedom exécute bien un `rm -rf` explicite sur `doc/`
+   et `docs/` avant chaque mise à jour (`doUpdate()`, voir 1.6), mais ce
+   `rm -rf` a lieu **avant** le `rmove()` qui réinstalle le contenu du
+   nouveau zip — un `docs/` présent dans le zip Market est donc réinstallé
+   juste après avoir été supprimé, ce qui est cohérent avec sa présence
+   effective chez `worxLandroidS` et **ne permet pas** de conclure que
+   `doc`/`docs` seraient filtrés comme `.github`/les dotfiles.
 2. **Aucun des deux dépôts n'a de `.gitattributes`** (404 confirmé sur les
    deux) : le filtrage constaté n'est donc **pas** un `export-ignore` Git.
    Le mécanisme réel (filtrage côté serveur Market avant livraison à la box,
@@ -171,8 +180,9 @@ du zip, dont le nom de fichier zip == ID du plugin :
 récupération du contenu (checkout complet de la branche vs archive filtrée
 par le serveur Market) n'a pas été confirmé par une preuve directe de son
 fonctionnement interne — voir la preuve empirique ci-dessus (1.3, comparaison
-`tahoma`/`worxLandroidS`) qui prouve le **résultat** (`.github`/dotfiles/
-`doc`/`docs` non livrés) sans prouver le **mécanisme**.
+`tahoma`/`worxLandroidS`) qui prouve le **résultat** (`.github`/dotfiles non
+livrés ; `doc`/`docs` à sort non uniforme, voir point 1 ci-dessus) sans
+prouver le **mécanisme**.
 
 Pour `jeedom2ha` spécifiquement, cette preuve terrain reste à faire une fois
 la première version beta réellement publiée (une fois le compte dev validé) :
@@ -184,7 +194,11 @@ dotfiles (`.gitignore` notamment), la preuve empirique de 1.3 permet
 désormais de considérer, par analogie avec deux plugins tiers réels, qu'ils
 ne seront **probablement pas** livrés — mais « probablement » n'est pas
 « prouvé pour `jeedom2ha` », d'où le maintien de la gate sur l'ensemble du
-point tant qu'aucune inspection directe post-publication n'a été faite.
+point tant qu'aucune inspection directe post-publication n'a été faite. Pour
+`docs/` en particulier, le sort non uniforme constaté (livré chez
+`worxLandroidS`, absent chez `tahoma` sans explication) interdit même une
+extrapolation « probable » : ce point reste entièrement ouvert pour
+`jeedom2ha`.
 
 ### 1.4 Champs `info.json` qui comptent pour la version — PROUVÉ
 
@@ -448,7 +462,8 @@ mécanisme qui relance un démon détecté `nok`), pas d'un appel synchrone au
 sein de la mise à jour elle-même. **Conséquence opérationnelle** : après une
 mise à jour Market, il peut donc y avoir un délai (durée du cycle de
 surveillance `deamonAutoMode`, non chiffrée par cette relecture) avant que le
-démon de synchronisation HomeKit (`resources/daemon/main.py`) ne redémarre
+démon de synchronisation Home Assistant / MQTT Discovery
+(`resources/daemon/main.py`) ne redémarre
 réellement — pas une réaction instantanée garantie.
 
 **PROUVÉ — compatibilité `require` vérifiée avant installation, pas après** :
@@ -564,8 +579,13 @@ $ gh api repos/alexsahut/jeedom2ha/branches/main/protection --jq '.required_stat
 ```
 
 - Le commit candidat doit déjà avoir été **déployé et validé sur la box**
-  réelle, matérialisé par un tag `deploy-<sha>-<horodatage>` existant sur ce
-  SHA (convention déjà en usage, voir section 2).
+  réelle. La preuve de « déployé » n'est **pas** le tag `deploy-<sha>-
+  <horodatage>` (ce tag peut être en retard sur un rollback — incident réel
+  constaté le 2026-09-27 15:35, voir section 6, point 3 de l'historique des
+  défauts corrigés) : c'est le fichier `VERSION` lu **directement** sur la
+  box via SSH en lecture seule, en utilisant
+  `scripts/verify-release-candidate.sh` (section 6), qui compare le SHA
+  candidat au SHA réellement en place sur la box.
 - Si l'écran/l'UI du plugin a été modifié depuis la dernière promotion :
   preuve UX (capture ou description du test manuel) attachée à la PR de
   promotion.
@@ -638,6 +658,42 @@ déclenche jamais. Procédure :
 gh pr create --base beta --head main \
   --title "Promote main to beta: vX.Y.Z" \
   --body "Promotion vX.Y.Z (voir docs/release-market.md §3)"
+```
+
+**Invariant obligatoire AVANT de fusionner — « ARBRE à publier = arbre du
+tag déployé »** : contrôler l'arbre **avant** `gh pr merge`, sur le commit
+de fusion de test que GitHub génère lui-même pour toute PR ouverte
+(`refs/pull/<N>/merge`), pas après. Faire ce contrôle après la fusion
+seulement laisserait la branche `beta` déjà publiée — et potentiellement
+déjà resynchronisée par le Market — le temps de constater une non-conformité :
+
+```
+git fetch origin pull/<N>/merge
+git diff --quiet vX.Y.Z FETCH_HEAD   # DOIT être silencieux (exit 0)
+```
+
+Mécanisme réellement vérifié dans ce repo (PR #165, `pull/165/merge` est le
+commit de fusion de test GitHub combinant `main` et la branche de la PR — le
+même mécanisme s'applique à une PR de promotion `main → beta`) :
+
+```
+$ git fetch origin pull/165/merge
+ * branch            refs/pull/165/merge -> FETCH_HEAD
+$ git rev-parse FETCH_HEAD
+2e5c8181e4adebf6d5c2665f333c4dac515539cf
+$ git log -1 --format='%H %P' FETCH_HEAD
+2e5c8181e4adebf6d5c2665f333c4dac515539cf dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e 58e95dc9ca61757bb83aec0feef0231bcd958248
+```
+
+(`%P` confirme que ce commit a bien deux parents : la base `main`
+`dd304f1...` et la tête de la PR `58e95dc...` — c'est un vrai commit de
+fusion de test, pas une supposition.)
+
+Si `git diff --quiet vX.Y.Z FETCH_HEAD` échoue (exit non nul) **avant**
+`gh pr merge`, la promotion **ne doit pas être fusionnée** — investiguer
+avant de continuer. Si le contrôle passe, fusionner :
+
+```
 # revue par Alex, CI verte (PR Routing Policy incluse), puis :
 gh pr merge --merge   # stratégie "Create a merge commit" — jamais Squash ni Rebase
 ```
@@ -646,22 +702,20 @@ gh pr merge --merge   # stratégie "Create a merge commit" — jamais Squash ni 
 exige un commit de merge de promotion explicite — pas de squash, pas de
 fast-forward.)
 
-**Invariant obligatoire après la fusion — « ARBRE publié = arbre du tag
-déployé »** : une fois la PR de promotion fusionnée, vérifier que le
-contenu de `beta` est strictement identique à celui du tag `vX.Y.Z` (les
-SHA diffèrent forcément, un commit de merge étant créé, mais l'arbre de
-fichiers doit être byte-identique) :
+**Confirmation a posteriori (filet de sécurité, pas le seul contrôle)** :
+une fois la PR fusionnée, rejouer la même vérification sur `origin/beta`
+pour confirmer que la fusion réelle a produit le même arbre que le commit de
+fusion de test contrôlé avant fusion (les SHA diffèrent forcément d'un
+commit de merge à l'autre, mais l'arbre de fichiers doit être
+byte-identique) :
 
 ```
 git fetch origin beta
 git diff --quiet vX.Y.Z origin/beta   # DOIT être silencieux (exit 0)
 ```
 
-Si cette commande échoue (exit non nul), la promotion **n'est pas
-conforme** et ne doit pas être considérée terminée — investiguer avant de
-passer à l'étape suivante. Précédent réel vérifié pour la dernière
-promotion connue (PR #73, tag `v1.1.0` = `166cb7b`, HEAD beta post-merge =
-`1a149ca`) :
+Précédent réel vérifié pour la dernière promotion connue (PR #73, tag
+`v1.1.0` = `166cb7b`, HEAD beta post-merge = `1a149ca`) :
 
 ```
 $ git diff --quiet 166cb7b 1a149ca && echo "IDENTIQUE (exit 0)"
@@ -685,11 +739,24 @@ elif base == "stable":
 gh pr create --base stable --head beta \
   --title "Promote beta to stable: vX.Y.Z" \
   --body "Promotion vX.Y.Z (voir docs/release-market.md §3)"
+```
+
+Même invariant, dans le même ordre — **avant** de fusionner, sur le commit
+de fusion de test GitHub de cette PR :
+
+```
+git fetch origin pull/<N>/merge
+git diff --quiet vX.Y.Z FETCH_HEAD   # DOIT être silencieux (exit 0)
+```
+
+Si ce contrôle échoue, ne pas fusionner. S'il passe :
+
+```
 # revue par Alex, CI verte, puis :
 gh pr merge --merge
 ```
 
-Puis la même vérification obligatoire de l'invariant :
+Puis la même confirmation a posteriori (filet de sécurité) :
 
 ```
 git fetch origin stable
@@ -858,12 +925,26 @@ réelle sur la box de référence.
 
 ## 6. Vérification à blanc (lecture seule, ne pousse rien)
 
-**Point E — script corrigé.** La version précédente de ce script avait
-quatre défauts identifiés et corrigés ici :
+**Point E — script versionné, pas seulement collé ici.** La logique de
+vérification vit dans `scripts/verify-release-candidate.sh` (+ la
+bibliothèque testée `scripts/verify-release-candidate-lib.sh`), pas dans un
+bloc de code séparé dans ce document qui pourrait diverger du script réel.
+Cible SSH configurable par variable d'environnement (même mécanisme que
+`scripts/deploy-to-box.sh`) : `JEEDOM_BOX_HOST` (obligatoire),
+`JEEDOM_BOX_USER` (défaut `asahut`), `JEEDOM_BOX_PORT` (défaut `22`),
+`JEEDOM_BOX_PATH` (défaut `/var/www/html/plugins/jeedom2ha`) — jamais
+`asahut@192.168.1.21` en dur dans le script versionné. Testé sans aucun vrai
+appel SSH (lecture de la box simulée par fixture) dans
+`tests/unit/test_verify_release_candidate.py`.
+
+Historique des défauts déjà corrigés dans ce script (par rapport à une
+première version jetable collée directement dans ce document lors d'une
+relecture antérieure) :
 1. `git diff --stat ... || true` ne faisait jamais échouer le script même en
    cas de divergence (le `|| true` avale systématiquement le code de sortie)
-   — remplacé par `git diff --quiet`, qui fait échouer le script
-   (`set -euo pipefail` + `exit 1` explicite) en cas de différence réelle.
+   — remplacé par une comparaison stricte de SHA qui fait échouer le script
+   (`set -euo pipefail` + `return 1`/`exit 1` explicites) en cas de
+   différence réelle.
 2. Le contrôle « candidat ancêtre ou égal » (`--is-ancestor`) était trop
    laxiste pour le cas de la 1ère publication stable (section 4), qui exige
    une **égalité stricte** avec le SHA en prod, pas seulement une ascendance
@@ -879,81 +960,33 @@ quatre défauts identifiés et corrigés ici :
    explicite obligatoire (`${1:?candidat requis}`), avec vérification
    croisée que `pluginVersion` (`info.json`) correspond au tag `vX.Y.Z` visé
    s'il existe déjà.
+5. **`git rev-parse vX.Y.Z` rend l'objet TAG (annoté), pas le commit
+   pointé** — bug constaté en preuve terrain : `git rev-parse v1.1.0` rend
+   `e1325f05df16e70bf53f717a7c843f809521b3f5`, alors que le commit réellement
+   pointé (et celui affiché en section 2) est `166cb7b...`. Avec la
+   procédure de tag de la section 3 (`git tag -a`, tag annoté), ce défaut
+   faisait échouer **systématiquement** le contrôle « le tag pointe sur le
+   candidat », y compris dans un cas parfaitement conforme — corrigé en
+   déréférençant systématiquement en commit avec `^{commit}`, aussi bien
+   pour le candidat que pour le tag attendu
+   (`jeedom2ha_tag_commit_sha` dans la bibliothèque).
 
-Script reproductible, **réexécuté réellement dans ce worktree** au moment de
-la rédaction de cette révision (sortie collée telle quelle ci-dessous, et
-également collée dans le corps de la PR) :
-
-```bash
-#!/usr/bin/env bash
-# Lecture seule stricte : ne crée aucun tag, ne pousse aucune branche,
-# ne touche ni au Market ni à la box (une seule commande SSH en lecture,
-# `cat` du fichier VERSION, aucune écriture).
-set -euo pipefail
-
-CANDIDATE_REF="${1:?candidat requis : SHA ou ref à vérifier, ex. \$(git rev-parse HEAD)}"
-CANDIDATE_SHA="$(git rev-parse "${CANDIDATE_REF}")"
-echo "SHA candidat : ${CANDIDATE_SHA}"
-
-# 1. pluginVersion du candidat cohérent avec un éventuel tag vX.Y.Z existant.
-PLUGIN_VERSION="$(git show "${CANDIDATE_SHA}:plugin_info/info.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["pluginVersion"])')"
-echo "pluginVersion du candidat : ${PLUGIN_VERSION}"
-EXPECTED_TAG="v${PLUGIN_VERSION}"
-if git rev-parse "${EXPECTED_TAG}" >/dev/null 2>&1; then
-  TAG_SHA="$(git rev-parse "${EXPECTED_TAG}")"
-  if [ "${TAG_SHA}" = "${CANDIDATE_SHA}" ]; then
-    echo "[OK] le tag ${EXPECTED_TAG} existe déjà et pointe exactement sur le candidat"
-  else
-    echo "[ECHEC] le tag ${EXPECTED_TAG} existe mais pointe sur ${TAG_SHA} (candidat = ${CANDIDATE_SHA})"
-    exit 1
-  fi
-else
-  echo "[INFO] le tag ${EXPECTED_TAG} n'existe pas encore (attendu avant la 1ère publication de cette version)"
-fi
-
-# 2. SHA réellement en place sur la box, lu DIRECTEMENT (source de vérité) :
-#    jamais déduit du dernier tag deploy-, qui peut être en retard sur un
-#    rollback (incident constaté le 2026-09-27 15:35 : dernier tag deploy-
-#    pointait sur d7db48a alors que la box tournait déjà en 0.2.0 après
-#    --rollback).
-BOX_VERSION_RAW="$(ssh -o BatchMode=yes -o ConnectTimeout=5 asahut@192.168.1.21 'cat /var/www/html/plugins/jeedom2ha/VERSION' 2>/dev/null || true)"
-if [ -z "${BOX_VERSION_RAW}" ]; then
-  echo "[ECHEC] impossible de lire VERSION sur la box (SSH ou fichier absent)"
-  exit 1
-fi
-echo "--- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---"
-echo "${BOX_VERSION_RAW}"
-BOX_SHA="$(echo "${BOX_VERSION_RAW}" | sed -n 's/^sha=//p')"
-echo "SHA réellement déployé sur la box (source de vérité) : ${BOX_SHA}"
-
-# 3. Egalité STRICTE candidat <-> box, exigée pour la 1ère publication
-#    (section 4 : le premier `stable` publié DOIT être exactement le code
-#    en prod, pas un ancêtre — "ancêtre ou égal" est trop laxiste ici).
-if [ "${CANDIDATE_SHA}" = "${BOX_SHA}" ]; then
-  echo "[OK] candidat strictement identique au SHA déployé sur la box"
-else
-  echo "[ECHEC] candidat (${CANDIDATE_SHA}) différent du SHA déployé sur la box (${BOX_SHA})"
-  echo "--- git diff --quiet candidat vs SHA déployé (diagnostic) ---"
-  if git diff --quiet "${CANDIDATE_SHA}" "${BOX_SHA}" 2>/dev/null; then
-    echo "[INFO] même contenu malgré des SHA différents — à investiguer avant de continuer"
-  else
-    echo "[ECHEC] contenu également différent"
-  fi
-  exit 1
-fi
-
-echo "Vérification à blanc terminée : candidat conforme, strictement identique à la box."
-```
+> Le script réel n'est pas dupliqué ici pour éviter toute divergence entre ce
+> document et le script versionné : voir `scripts/verify-release-candidate.sh`
+> et `scripts/verify-release-candidate-lib.sh` dans ce repo pour le contenu
+> exact.
 
 ### Sortie réelle obtenue — cas conforme (réexécuté le 2026-09-27, candidat = `origin/main`)
 
 ```
+$ export JEEDOM_BOX_HOST=192.168.1.21 JEEDOM_BOX_USER=asahut
 $ git fetch origin --quiet
-$ bash verify-release-candidate.sh origin/main
+$ bash scripts/verify-release-candidate.sh origin/main
 SHA candidat : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
 pluginVersion du candidat : 0.3.0
 [INFO] le tag v0.3.0 n'existe pas encore (attendu avant la 1ère publication de cette version)
---- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---
+--- Lecture VERSION sur la box (asahut@192.168.1.21, lecture seule) ---
+--- VERSION lu sur la box ---
 version=0.3.0
 sha=dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
 deployed_at=2026-09-27T13:36:40Z
@@ -968,19 +1001,18 @@ EXIT_CODE=0
 ### Sortie réelle obtenue — cas d'échec volontaire (réexécuté le 2026-09-27, candidat = `v1.1.0`, ancien SHA)
 
 ```
-$ bash verify-release-candidate.sh v1.1.0
-SHA candidat : e1325f05df16e70bf53f717a7c843f809521b3f5
+$ bash scripts/verify-release-candidate.sh v1.1.0
+SHA candidat : 166cb7beda25777021dce6ca97081c721b5dbdc0
 pluginVersion du candidat : 0.1
 [INFO] le tag v0.1 n'existe pas encore (attendu avant la 1ère publication de cette version)
---- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---
+--- Lecture VERSION sur la box (asahut@192.168.1.21, lecture seule) ---
+--- VERSION lu sur la box ---
 version=0.3.0
 sha=dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
 deployed_at=2026-09-27T13:36:40Z
 git_status=clean
 SHA réellement déployé sur la box (source de vérité) : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
-[ECHEC] candidat (e1325f05df16e70bf53f717a7c843f809521b3f5) différent du SHA déployé sur la box (dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e)
---- git diff --quiet candidat vs SHA déployé (diagnostic) ---
-[ECHEC] contenu également différent
+[ECHEC] candidat (166cb7beda25777021dce6ca97081c721b5dbdc0) différent du SHA déployé sur la box (dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e)
 $ echo "EXIT_CODE=$?"
 EXIT_CODE=1
 ```
@@ -988,8 +1020,12 @@ EXIT_CODE=1
 Interprétation : le premier cas confirme que le SHA candidat (`origin/main`,
 `dd304f1...`) est exactement le SHA déjà déployé et validé sur la box —
 c'est le cas attendu pour une première publication stable conforme à la
-section 4. Le second cas confirme que le script **échoue bien avec un code
-de sortie non nul** dès que le candidat diffère réellement de la box — le
-défaut n°1 ci-dessus (`|| true` qui masquait les échecs) est corrigé.
-Aucune commande de ce script n'écrit quoi que ce soit : ni tag, ni branche,
-ni Market, ni box (une seule commande SSH, en lecture seule).
+section 4. Le second cas confirme deux choses à la fois : (a) le SHA
+candidat affiché pour `v1.1.0` est désormais bien `166cb7b...` — le commit
+réellement pointé par ce tag annoté, identique à celui de la section 2 —
+et non plus `e1325f0...` (l'objet tag brut, obtenu sans `^{commit}`) ; (b)
+le script **échoue bien avec un code de sortie non nul**, et ce pour la
+BONNE raison (SHA candidat différent du SHA déployé sur la box), pas à
+cause du bug d'objet tag corrigé au point 5 ci-dessus. Aucune commande de ce
+script n'écrit quoi que ce soit : ni tag, ni branche, ni Market, ni box (une
+seule commande SSH, en lecture seule).
