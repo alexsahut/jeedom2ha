@@ -67,7 +67,7 @@ Aucune preuve terrain requise — fonction pure, aucun branchement dans le pipel
 
 ## Invariants concernés
 
-I2, I3, I4, I5, I6, I7 (vérifiés par tests dédiés sur la sortie de `evaluate_equipment()`, AC5). I1 reste vérifié en amont (étape d'éligibilité, hors périmètre de cette fonction pure — non dupliqué ici). I11 non concerné par cette story (relève de Story 19.2, `state.py`/`command.py`).
+I1, I2, I3, I4, I5, I6, I7 : vérifiés par des tests dédiés sur la sortie de `evaluate_equipment()` (AC5). I11 : non concerné (story 19.2).
 
 ## Points fermés
 
