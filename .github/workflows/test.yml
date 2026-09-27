@@ -7,7 +7,7 @@ name: Test Pipeline
 
 on:
   push:
-    branches: [main, beta, stable]
+    branches: ['**']
   pull_request:
     branches: [main, beta, stable]
     types: [opened, synchronize, reopened, labeled]
@@ -86,6 +86,94 @@ jobs:
           name: coverage-report-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 30
+
+  # Node stage - frontend unit tests (node --test, no build step)
+  node:
+    name: Node unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run node unit tests
+        run: |
+          set -euo pipefail
+          node --test tests/unit/*.node.test.js
+
+  # PHP stage - syntax lint on every tracked PHP file, then execute the
+  # test files that are self-contained (they stub the Jeedom AJAX layer via
+  # JEEDOM2HA_AJAX_FUNCTIONS_ONLY and don't need a real Jeedom install).
+  # A few php test files require a real Jeedom core bootstrap
+  # (core/php/core.inc.php) that only exists inside an actual Jeedom
+  # installation; those are skipped with an explicit message instead of
+  # failing, matching this project's existing convention of validating them
+  # manually on a real box (see docs/dev-deploy.md).
+  php:
+    name: PHP lint & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Lint PHP sources
+        run: |
+          set -euo pipefail
+          git ls-files '*.php' | xargs -n1 php -l
+
+      - name: Run PHP test files
+        run: |
+          set -euo pipefail
+          passed=0
+          skipped=0
+          failed=0
+          for f in tests/test_php_*.php tests/test_runtime_bootstrap_startup.php; do
+            [ -f "$f" ] || continue
+            echo "--- $f ---"
+            if out=$(php "$f" 2>&1); then
+              echo "$out"
+              passed=$((passed + 1))
+            else
+              echo "$out"
+              if echo "$out" | grep -qi -E 'core\.inc\.php|jeedom core bootstrap'; then
+                echo "SKIP: $f requires a real Jeedom install (core.inc.php not available in CI)."
+                skipped=$((skipped + 1))
+              else
+                echo "FAIL: $f"
+                failed=$((failed + 1))
+              fi
+            fi
+          done
+          echo "php tests: $passed passed, $skipped skipped, $failed failed"
+          [ "$failed" -eq 0 ]
+
+  # Shell stage - syntax check every script (never executes them)
+  shell-syntax:
+    name: Shell syntax (bash -n)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: bash -n on scripts/*.sh
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh; do
+            echo "Checking $f"
+            bash -n "$f"
+          done
 
   # Burn-in stage - Flaky test detection
   burn-in:
