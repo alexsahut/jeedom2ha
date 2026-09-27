@@ -73,7 +73,7 @@ Le mapping repose sur les `generic_type` Jeedom. Un équipement sans `generic_ty
 ## Prérequis
 
 - **Jeedom Core v4.4.9+** (PHP 8.x)
-- **Debian 12+** ou Raspberry Pi OS récent
+- **Debian 11 et 12** ou Raspberry Pi OS récent
 - **Python 3.9+** (installé avec le plugin)
 - **Broker MQTT** : MQTT Manager (plugin mqtt2, recommandé) ou broker externe (Mosquitto, etc.)
 - **Home Assistant** avec l'intégration MQTT activée et le device discovery activé
