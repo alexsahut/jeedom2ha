@@ -75,14 +75,51 @@ def _derive_jeedom_api_endpoint(callback_url: str) -> str:
     )
 
 
+def _load_secrets_file(path: str) -> dict[str, str]:
+    """Read a ``KEY=VALUE`` secrets file (one entry per line) into a dict.
+
+    Blank lines and lines without ``=`` are ignored. Values are not stripped
+    of surrounding whitespace beyond the trailing newline, to tolerate secrets
+    containing leading/trailing significant characters.
+    """
+    secrets: dict[str, str] = {}
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.rstrip("\n")
+            if not line or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            secrets[key.strip()] = value
+    return secrets
+
+
 class Jeedom2haConfig(BaseConfig):
-    """Custom configuration adding --apiport and --localsecret for the local HTTP API."""
+    """Custom configuration adding --apiport and --localsecret for the local HTTP API.
+
+    CC-08 hygiène des clés : ``apikey``/``localsecret``/``jeedomcoreapikey`` ne
+    sont plus nécessairement fournis en argv (visibles via ``ps aux``). Quand
+    ``--secretsfile`` est fourni, ces trois valeurs sont relues depuis ce
+    fichier (permissions 0600, hors arborescence versionnée du plugin) et
+    injectées dans les args parsées, en mémoire uniquement — jamais visible
+    dans la ligne de commande du process.
+    """
 
     def __init__(self):
         super().__init__()
         self.add_argument("--apiport", type=int, default=55080)
         self.add_argument("--localsecret", type=str, default="")
         self.add_argument("--jeedomcoreapikey", type=str, default="")
+        self.add_argument("--secretsfile", type=str, default="")
+
+    def parse(self, args=None):
+        super().parse(args)
+        secretsfile = getattr(self._args, "secretsfile", "") or ""
+        if not secretsfile:
+            return
+        secrets = _load_secrets_file(secretsfile)
+        for key in ("apikey", "localsecret", "jeedomcoreapikey"):
+            if key in secrets:
+                setattr(self._args, key, secrets[key])
 
 
 class Jeedom2haDaemon(BaseDaemon):

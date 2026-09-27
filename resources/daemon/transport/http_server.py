@@ -490,20 +490,30 @@ def _should_attempt_publish(
     )
 
 
+def _secondary_publishable(secondary: MappingResult) -> bool:
+    """Return True when the secondary's last-sync decision (Story 16.2/CC-08 review)
+    allows publication. `publication_decision_ref` is populated by
+    `_publish_additional_sensors` on the previous sync; in its absence (never synced,
+    or a decision that already refused publication), the secondary must not be
+    (re)published outside of a full sync — an unknown decision is treated as refused,
+    never as an implicit allow.
+    """
+    decision_ref = getattr(secondary, "publication_decision_ref", None)
+    return bool(decision_ref is not None and getattr(decision_ref, "should_publish", False))
+
+
 async def _publish_mapping_for_action(
-    publisher: DiscoveryPublisher,
+    publisher_registry: PublisherRegistry,
     mapping: MappingResult,
     topology: TopologySnapshot,
 ) -> bool:
-    if mapping.ha_entity_type == "light":
-        primary_ok = await publisher.publish_light(mapping, topology)
-    elif mapping.ha_entity_type == "cover":
-        primary_ok = await publisher.publish_cover(mapping, topology)
-    elif mapping.ha_entity_type == "switch":
-        primary_ok = await publisher.publish_switch(mapping, topology)
-    else:
-        return False
+    """Publie un mapping (action « publier ») via le registre unique (CC-08).
 
+    Un type non enregistré dans PublisherRegistry échoue explicitement : publish()
+    consigne une erreur et positionne mapping.publication_result à "failed" au lieu
+    de retourner un False silencieux qui masquerait le problème.
+    """
+    primary_ok = await publisher_registry.publish(mapping, topology)
     if not primary_ok:
         return False
 
@@ -512,29 +522,24 @@ async def _publish_mapping_for_action(
     # publier comme le fait le chemin sync (_publish_additional_sensors), sinon une
     # re-inclusion sans sync complet recrée le switch primaire en laissant les 12
     # sensors + 1 binary_sensor non publiés (entités manquantes côté HA).
+    #
+    # Revue Codex (P1) : un secondaire ne doit être (re)publié ici que si sa décision
+    # du dernier sync l'y autorise (cf. _secondary_publishable) — sinon on republierait
+    # un secondaire explicitement refusé par decide_publication().
     all_ok = True
     for secondary in mapping.additional_mappings or []:
-        if not await _publish_secondary_for_action(publisher, secondary, topology):
+        if not _secondary_publishable(secondary):
+            _LOGGER.info(
+                "[MAPPING] Action publier ignore le secondaire eq_id=%d cmd=%s "
+                "(entity_type=%s) — dernière décision de sync inconnue ou refusée",
+                mapping.jeedom_eq_id,
+                (secondary.reason_details or {}).get("cmd_id"),
+                secondary.ha_entity_type,
+            )
+            continue
+        if not await publisher_registry.publish(secondary, topology):
             all_ok = False
     return all_ok
-
-
-async def _publish_secondary_for_action(
-    publisher: DiscoveryPublisher,
-    mapping: MappingResult,
-    topology: TopologySnapshot,
-) -> bool:
-    if mapping.ha_entity_type == "sensor":
-        return await publisher.publish_sensor(mapping, topology)
-    if mapping.ha_entity_type == "binary_sensor":
-        return await publisher.publish_binary_sensor(mapping, topology)
-    if mapping.ha_entity_type == "switch":
-        return await publisher.publish_switch(mapping, topology)
-    if mapping.ha_entity_type == "light":
-        return await publisher.publish_light(mapping, topology)
-    if mapping.ha_entity_type == "cover":
-        return await publisher.publish_cover(mapping, topology)
-    return False
 
 
 def _build_action_perimetre_impacte(
@@ -929,6 +934,7 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
         return
 
     publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(publisher)
 
     # AC #11: rejouer les pending_discovery_unpublish AVANT la republication (reconnect uniquement)
     if reason == "broker_reconnect":
@@ -936,7 +942,21 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
         await _replay_deferred_discovery_unpublish(publisher, pending_unpublish)
 
     topology = app.get("topology")
+
+    # Revue Codex (P2) : le lissage doit espacer TOUTES les publications MQTT
+    # effectivement émises dans ce batch — primaires + secondaires publiables (cf.
+    # _secondary_publishable) — pas seulement les primaires, sinon un eqLogic
+    # multi-sensor republie ses N secondaires sans aucun délai entre eux.
     nb_entites = len(published_entries)
+    for _eq_id, decision in published_entries:
+        mapping = getattr(decision, "mapping_result", None)
+        if mapping is None:
+            continue
+        nb_entites += sum(
+            1
+            for secondary in getattr(mapping, "additional_mappings", None) or []
+            if _secondary_publishable(secondary)
+        )
     delay = max(0.1, 10.0 / nb_entites)
 
     _LOGGER.info(
@@ -950,14 +970,7 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
             continue
         entity_type = getattr(mapping, "ha_entity_type", "") or ""
         try:
-            if entity_type == "light":
-                ok = await publisher.publish_light(mapping, topology)
-            elif entity_type == "cover":
-                ok = await publisher.publish_cover(mapping, topology)
-            elif entity_type == "switch":
-                ok = await publisher.publish_switch(mapping, topology)
-            else:
-                ok = False
+            ok = await publisher_registry.publish(mapping, topology)
             if not ok:
                 _LOGGER.error(
                     "[DISCOVERY] eq_id=%d entity_type=%s : échec publish — bridge indisponible",
@@ -969,6 +982,36 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
                 eq_id, entity_type, exc,
             )
         await asyncio.sleep(delay)
+
+        # CC-08 — un eqLogic multi-domaine (switch/lumière + sensors/binary_sensors)
+        # porte ses entités secondaires dans additional_mappings ; sans republication
+        # dédiée, un reconnect/birth HA laisse ces entités absentes de HA.
+        #
+        # Revue Codex (P1) : ne republier un secondaire que si sa décision du dernier
+        # sync l'y autorise (cf. _secondary_publishable) — sinon on republierait un
+        # secondaire explicitement refusé par decide_publication().
+        for secondary in getattr(mapping, "additional_mappings", None) or []:
+            secondary_type = getattr(secondary, "ha_entity_type", "") or ""
+            if not _secondary_publishable(secondary):
+                _LOGGER.info(
+                    "[DISCOVERY] eq_id=%d entity_type=%s (secondaire) : republication ignorée "
+                    "— dernière décision de sync inconnue ou refusée",
+                    eq_id, secondary_type,
+                )
+                continue
+            try:
+                sec_ok = await publisher_registry.publish(secondary, topology)
+                if not sec_ok:
+                    _LOGGER.error(
+                        "[DISCOVERY] eq_id=%d entity_type=%s (secondaire) : échec publish — bridge indisponible",
+                        eq_id, secondary_type,
+                    )
+            except Exception as exc:
+                _LOGGER.error(
+                    "[DISCOVERY] eq_id=%d entity_type=%s (secondaire) : échec publish — %s",
+                    eq_id, secondary_type, exc,
+                )
+            await asyncio.sleep(delay)
 
 
 async def _handle_system_status(request: web.Request) -> web.Response:
@@ -3251,6 +3294,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         for entry in published_scope.get("equipements", [])
     }
     publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(publisher)
 
     equipements_inclus = 0
     equipements_publies_ou_crees = 0
@@ -3274,7 +3318,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 skips += 1
                 continue
 
-            publish_ok = await _publish_mapping_for_action(publisher, mapping, topology)
+            publish_ok = await _publish_mapping_for_action(publisher_registry, mapping, topology)
             await asyncio.sleep(_action_delay)
             if not publish_ok:
                 failed_decision = PublicationDecision(
