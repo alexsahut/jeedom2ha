@@ -1,6 +1,6 @@
 # Story 19.1: Sync migré vers `evaluate_equipment()`, sans changement de comportement
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
