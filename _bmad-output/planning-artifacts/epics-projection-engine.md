@@ -2354,3 +2354,50 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - aucune modification des `generic_type` Jeedom natifs ni de la config Homebridge (lecture seule vérifiée) ;
 - compatibilité de chaque nouveau domaine avec la couche d'override `pe-epic-16` (le domaine reste redirigeable) ;
 - `ha-projection-reference.md` citée ligne de preuve par ligne de preuve pour toute contrainte HA.
+
+### Epic 19 — Étape 3 : contrat de décision unifié (`CommandDecision` / `evaluate_equipment`)
+
+**Statut :** `in-progress` — cadrage documentaire 2026-09-27, à la demande directe du mainteneur (pas de sprint-change-proposal dédié : contenu purement architectural/documentaire, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR).
+
+**Origine :** le pipeline compte aujourd'hui **4 points d'appel indépendants** qui recalculent chacun une décision de publication de façon divergente : le sync (`_do_handle_action_sync` → `decide_publication` dans `resources/daemon/models/decide_publication.py`), la surface de navigation par pièce (`_build_mapping_override_tree`, Story 16.8), l'aperçu à blanc (`_handle_overrides_preview`), et le bouton "Publier" (`_should_attempt_publish`). Ces divergences produisent des bugs constatés en production :
+- **CC-03** : la surface par pièce affiche "sera publié" pour des équipements en réalité exclus, car elle ne revérifie pas l'éligibilité déjà calculée par le sync.
+- **CC-18** : le bouton "Publier" refuse la confiance `sure_mapping` que le sync accepte, et à l'inverse tente de publier des équipements exclus par override utilisateur.
+- **CC-19** : le bouton "revenir au mode automatique" n'efface que l'override de TYPE, jamais l'override de publication/exclusion.
+- **CC-04**, **CC-14** (P1) : contexte plus large du même chantier de divergence — chacun est explicitement statué (fermé ou laissé ouvert) par la story qui le couvre, ci-dessous.
+
+**Valeur utilisateur :** un équipement a **une seule vérité de publication**, quel que soit l'écran ou le point d'entrée consulté (sync, navigation par pièce, aperçu, bouton "Publier") — fini les affichages contradictoires entre la console de diagnostic et l'état réel publié.
+
+**Résultat observable :** une fonction pure `evaluate_equipment()`, alimentée par un résultat d'éligibilité déjà calculé (jamais recalculé en interne), une politique de confiance, les overrides persistés (+ overrides proposés en option, fusion unique) et un registre de mappeurs injectable, produit une décision principale, des décisions secondaires, et une `CommandDecision` par `cmd_id` (y compris les commandes non couvertes, avec leur raison) — sans jamais muter les objets d'entrée. Les 4 points d'appel du pipeline consomment cette même fonction.
+
+**Invariants concernés (I1-I8) :**
+- **I1-I7** : invariants déjà en usage dans `decide_publication()` (cf. Story 16.3) — I2 (projection invalide ⇒ jamais publié, même avec override), I4 (le premier échec dans l'ordre des étapes 1→2→3→4 est la cause retenue, jamais écrasée par une étape aval), I6 (`reason` toujours non-null), I7 (`decide_publication`/`evaluate_equipment` ne contiennent aucune logique MQTT/broker/cache).
+- **I8 (nouveau, découvert dans ce chantier)** : publié ⇒ état streamé ET commandes routées. Aujourd'hui violé : `resources/daemon/sync/state.py` (~l.151-154) et `resources/daemon/sync/command.py` (~l.199-205) filtrent le state-streaming et le routage de commandes sur la décision du **principal** uniquement (`if not decision.should_publish: continue`) — un secondaire publié sous un principal refusé devient une entité HA sans état ni commande. Décision actée : **découplage** (chaque candidat/secondaire a sa propre décision ; `state.py`/`command.py` itèrent sur la décision par candidat, jamais sur celle du principal) — pas de couplage forcé, pour ne pas régresser le pattern "metering plug" (secondaires indépendants du type du principal, cf. `test_story_13_3_metering_plug_secondary_sensors.py`).
+
+**Règle de scope actée :** `published_scope` (résolu par `resolve_published_scope`, appliqué après coup par `_apply_pending_scope_flags` dans `http_server.py`) reste un **filtre après décision**, jamais un critère d'entrée de `evaluate_equipment()`. Il doit être appliqué par une seule fonction de filtre partagée, appelée à la fois par le sync et par "Publier" (aucune interface n'écrit aujourd'hui d'état de scope explicite — invariant à établir pour l'avenir, pas un bug corrigé aujourd'hui).
+
+**Règle "Publier" actée :** mini-sync — réévalue avec les entrées courantes (overrides persistés à cet instant, politique stockée), écrit la nouvelle décision dans `app["publications"]`, et **dépublie explicitement** ce qui passe de publié à refusé (symétrique au nettoyage déjà fait au sync pour les équipements disparus) — jamais un simple ajout.
+
+**Ordre de dépendance (obligatoire) :** `19.0 (A)` → `19.1 (B1)` → `19.2 (B2)` → `19.3 (C)` → `19.4 (D)`. B1 doit être prouvé **avant** B2 : le refactoring sans changement de comportement (sync migré vers le contrat) doit être validé séparément du changement de comportement I8 (découplage state/command) — ne jamais mélanger les deux preuves dans une même story.
+
+**Stories :**
+
+- **Story 19.0 (A) — Contrat pur `CommandDecision` / `evaluate_equipment()`.** Fonction pure uniquement, aucun branchement dans le pipeline. Pas de preuve terrain (rien n'est encore appelé en production) — tests unitaires + harnais de parité seuls.
+- **Story 19.1 (B1) — Sync migré vers `evaluate_equipment()`, sans changement de comportement.** Le sync (`decide_publication` actuel) est remplacé par un appel à `evaluate_equipment()` à comportement strictement identique. Preuve terrain par outil de parité en lecture seule (à écrire dans cette story).
+- **Story 19.2 (B2) — Découplage I8 dans `state.py`/`command.py`.** Chaque candidat/secondaire publié reçoit son état MQTT et voit ses commandes routées, indépendamment de la décision du principal.
+- **Story 19.3 (C) — Surface pièce / aperçu branchés sur le contrat (CC-03, CC-19).** La navigation par pièce et l'aperçu à blanc consomment `evaluate_equipment()` au lieu de recalculer leur propre logique ; le bouton "revenir au mode automatique" efface aussi l'override de publication/exclusion. Passe par le statut `ready-for-UX-validation` (preuve par clic réel dans l'UI Jeedom).
+- **Story 19.4 (D) — "Publier" en mini-sync (CC-18).** Le bouton "Publier" réévalue via `evaluate_equipment()` avec le même filtre de scope que le sync, et dépublie explicitement ce qui devient refusé.
+
+**Points fermés par cet epic :** CC-03 (Story 19.3), CC-18 (Story 19.4), CC-19 (Story 19.3). CC-04 et CC-14 sont statués individuellement par chaque story concernée (fermés si couverts par la convergence, sinon explicitement laissés ouverts avec justification) — voir la section "Points fermés" de chaque story.
+
+**Dev notes :**
+- source technique de cet epic : directive du mainteneur (session documentation 2026-09-27), reprenant l'analyse des 4 points d'appel divergents et des invariants I1-I8 ; aucune donnée de cette section n'est inventée au-delà de ce qui a été fourni.
+- workflow BMAD complet (pas de fast-track) : chaque story passe par `create-story -> dev-story -> code-review`, et la Story 19.3 (UI) passe en plus par `ready-for-UX-validation` avant `done` (cf. `docs/bmad-parcours-rapide-complet.md`, précédent commit `2b2c49b`).
+- `published_scope` / `resolve_published_scope` : ne jamais devenir un paramètre d'entrée de `evaluate_equipment()` — appliqué en aval par une fonction de filtre partagée unique (sync + "Publier").
+
+### Gates epic-level pe-epic-19
+
+- une seule fonction pure `evaluate_equipment()` fait foi pour la décision de publication ; les 4 points d'appel (sync, navigation par pièce, aperçu, "Publier") la consomment tous à l'issue de l'epic.
+- aucune régression du golden file / de l'inventaire MQTT retained tant que Story 19.1 (B1) n'a pas prouvé une parité stricte avant tout changement de comportement (Story 19.2).
+- I8 est corrigé par découplage explicite (jamais par couplage forcé du secondaire sur le principal) — non-régression du pattern "metering plug" obligatoire.
+- CC-03/CC-18/CC-19 fermés et prouvés (parité, clic UI réel, cas de confiance/exclusion réels ou repli documenté) ; CC-04/CC-14 statués explicitement (fermés ou ouverts, avec justification) avant clôture d'epic.
+- aucun outil créé dans cet epic (Story 19.1) n'expose `local_secret`, en ligne de commande, en journal ou en sortie — vérifié comme critère d'acceptation testable.

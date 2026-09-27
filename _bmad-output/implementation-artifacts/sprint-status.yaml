@@ -347,3 +347,19 @@ development_status:
   18-3-ouverture-gouvernee-siren: backlog
   18-4-ouverture-gouvernee-valve: backlog
   18-5-ouverture-gouvernee-event: backlog
+
+  # ==============================================================
+  # pe-epic-19 — Étape 3 : contrat de décision unifié (CommandDecision / evaluate_equipment)
+  # Ajouté 2026-09-27 — cadrage documentaire à la demande directe du mainteneur (pas de SCP dédié,
+  # aucune ouverture PRODUCT_SCOPE, aucun nouveau FR/NFR)
+  # Corrige la divergence des 4 points d'appel de décision de publication (sync, navigation par
+  # piece, apercu, bouton Publier) : CC-03, CC-18, CC-19 fermes par cet epic ; CC-04/CC-14 (P1)
+  # statues explicitement story par story (fermes si couverts, sinon laisses ouverts avec justification)
+  # Ordre de dependance obligatoire : 19.0 (A) -> 19.1 (B1) -> 19.2 (B2) -> 19.3 (C) -> 19.4 (D)
+  # ==============================================================
+  pe-epic-19: in-progress  # contrat de decision unifie evaluate_equipment()/CommandDecision ; 5 stories creees 2026-09-27, toutes ready-for-dev
+  19-0-contrat-pur-command-decision-evaluate-equipment: ready-for-dev  # fonction pure, aucun branchement, pas de preuve terrain (tests unitaires + harnais de parite seuls)
+  19-1-sync-migre-contrat-decision-sans-changement-comportement: ready-for-dev  # sync migre vers evaluate_equipment() sans changement de comportement ; preuve terrain = outil de parite lecture seule (golden file inchange, inventaire MQTT retained identique, secret local jamais expose)
+  19-2-decouplage-etat-commandes-invariant-i8: ready-for-dev  # decouplage I8 dans sync/state.py et sync/command.py (etat/commandes par decision de candidat, jamais celle du principal) ; non-regression pattern metering plug (13.3)
+  19-3-surface-piece-apercu-contrat-decision-cc03-cc19: ready-for-dev  # ferme CC-03 (statut reel affiche) et CC-19 (retour mode auto efface aussi l'override de publication) ; UI Impact oui ; passe par ready-for-UX-validation avant done
+  19-4-publier-mini-sync-contrat-decision-cc18: ready-for-dev  # ferme CC-18 (bouton Publier aligne sur le sync, meme filtre de scope, depublication explicite, mini-sync jamais simple ajout)
