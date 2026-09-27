@@ -1,6 +1,7 @@
 """Guardrails and rollback wiring for deploy-to-box.sh, without a Jeedom box."""
 import os
 import subprocess
+import tarfile
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +10,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "deploy-to-box.sh"
+ROLLBACK_LIB = REPO_ROOT / "scripts" / "deploy-rollback-lib.sh"
 
 
 def _write_mock_tools(tmp_path: Path) -> Path:
@@ -251,3 +253,130 @@ def test_after_inventory_is_captured_only_after_successful_sync():
     after_inventory = code.index('jeedom2ha_inventory_discovery "after"')
     sync_success = code.index('echo "  OK — ${_summary}"')
     assert after_inventory > sync_success
+
+
+def _extract_rollback_extraction_snippet() -> str:
+    """Slice the exact remote extraction block — from the ARCHIVE/PLUGIN_PATH
+    positional args through the 'jeedom2ha/ absente' guard — verbatim out of
+    jeedom2ha_rollback_archive() in deploy-to-box.sh. This is the real code
+    under test (not a hand-copied reimplementation), so a regression in the
+    shipped script is caught even if the surrounding code moves around."""
+    text = SCRIPT.read_text()
+    start_marker = 'ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"; BACKUP_DIR="$4"; BOX_USER="$5"'
+    end_marker = (
+        'sudo test -d "${_work}/jeedom2ha" || '
+        '{ echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }'
+    )
+    start = text.index(start_marker)
+    end = text.index(end_marker, start) + len(end_marker)
+    return text[start:end]
+
+
+# `sudo` here is not a plain passthrough (as in test_deploy_rollback_lib.py):
+# it faithfully models the real permission wall a `sudo mktemp -d`/`sudo tar
+# -xzf` pair creates on the box (a root-owned, non-traversable work dir).
+# `sudo mktemp -d` locks its freshly created directory to mode 000 right
+# away; any *other* `sudo ...` call touching a locked directory temporarily
+# restores access (like real root bypassing permission checks) before
+# re-locking it. A bare, unprefixed command touching that same directory —
+# the exact shape of the regression this test guards against — hits the
+# mode-000 wall and fails, exactly as it would against a real root-owned
+# directory on the box.
+_PRIVILEGE_WALL_SUDO_STUB = '''
+LOCKED_DIRS_FILE="$(mktemp)"
+sudo() {
+  if [ "$1" = "mktemp" ]; then
+    shift
+    local d
+    d=$(command mktemp "$@")
+    chmod 000 "$d"
+    printf '%s\\n' "$d" >> "$LOCKED_DIRS_FILE"
+    printf '%s\\n' "$d"
+    return 0
+  fi
+  if [ -s "$LOCKED_DIRS_FILE" ]; then
+    while IFS= read -r d; do chmod 700 "$d" 2>/dev/null || true; done < "$LOCKED_DIRS_FILE"
+  fi
+  "$@"
+  local rc=$?
+  if [ -s "$LOCKED_DIRS_FILE" ]; then
+    while IFS= read -r d; do chmod 000 "$d" 2>/dev/null || true; done < "$LOCKED_DIRS_FILE"
+  fi
+  return $rc
+}
+'''
+
+
+def _make_rollback_archive(tmp_path: Path) -> Path:
+    archive = tmp_path / "rollback-src.tar.gz"
+    staging = tmp_path / "_staging"
+    (staging / "jeedom2ha" / "core" / "class").mkdir(parents=True)
+    (staging / "jeedom2ha" / "core" / "class" / "jeedom2ha.class.php").write_text("<?php")
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(staging / "jeedom2ha", arcname="jeedom2ha")
+    return archive
+
+
+def _run_rollback_extraction(tmp_path: Path, snippet: str) -> subprocess.CompletedProcess:
+    archive = _make_rollback_archive(tmp_path)
+    plugin_path = tmp_path / "plugins" / "jeedom2ha"
+    plugin_path.parent.mkdir(parents=True, exist_ok=True)  # e.g. /var/www/html/plugins on the box
+    script = f'''
+set -euo pipefail
+{_PRIVILEGE_WALL_SUDO_STUB}
+source "{ROLLBACK_LIB}"
+{snippet}
+echo "EXTRACTION_OK"
+'''
+    return subprocess.run(
+        ["bash", "-c", script, "bash", str(archive), str(plugin_path), "x", "x", "x"],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_rollback_extraction_check_survives_a_root_owned_non_traversable_work_dir():
+    # Regression: `sudo mktemp -d` / `sudo tar -xzf` create and populate the
+    # extraction work dir as root, which real terrain exposed as a
+    # non-traversable directory for the unprivileged SSH user. The presence
+    # check right after extraction must itself run under `sudo`, or it fails
+    # even though the archive extracted successfully (observed on the box:
+    # "ERROR: jeedom2ha/ absente après extraction." against an intact
+    # archive, confirmed valid by a separate read-only `tar -tzf`).
+    with_tmp = Path(__import__("tempfile").mkdtemp())
+    try:
+        snippet = _extract_rollback_extraction_snippet()
+        result = _run_rollback_extraction(with_tmp, snippet)
+        assert result.returncode == 0, result.stderr
+        assert "EXTRACTION_OK" in result.stdout
+        assert "jeedom2ha/ absente" not in result.stderr
+    finally:
+        subprocess.run(["chmod", "-R", "u+rwx", str(with_tmp)])
+        subprocess.run(["rm", "-rf", str(with_tmp)])
+
+
+def test_rollback_extraction_check_would_have_caught_the_old_unprivileged_bug():
+    # Proof the harness above actually exercises the permission wall: the
+    # pre-fix `[[ -d "${_work}/jeedom2ha" ]]` (no sudo) run against the same
+    # locked-down work dir must fail exactly like the real terrain incident.
+    with_tmp = Path(__import__("tempfile").mkdtemp())
+    try:
+        buggy_snippet = (
+            'ARCHIVE="$1"; PLUGIN_PATH="$2"\n'
+            'set -euo pipefail\n'
+            '[[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }\n'
+            'jeedom2ha_validate_rollback_archive "${ARCHIVE}"\n'
+            '_parent=$(dirname "${PLUGIN_PATH}")\n'
+            '_work=$(sudo mktemp -d "${_parent}/.jeedom2ha-rollback.XXXXXX")\n'
+            'cleanup() { sudo rm -rf "${_work}"; }\n'
+            'trap cleanup EXIT\n'
+            'sudo tar -xzf "${ARCHIVE}" -C "${_work}"\n'
+            '[[ -d "${_work}/jeedom2ha" ]] || '
+            '{ echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }\n'
+        )
+        result = _run_rollback_extraction(with_tmp, buggy_snippet)
+        assert result.returncode != 0
+        assert "jeedom2ha/ absente après extraction" in result.stderr
+    finally:
+        subprocess.run(["chmod", "-R", "u+rwx", str(with_tmp)])
+        subprocess.run(["rm", "-rf", str(with_tmp)])
