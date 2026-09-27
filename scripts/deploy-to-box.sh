@@ -18,11 +18,26 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 FILTER_FILE="${REPO_ROOT}/.rsync-plugin-deploy.filter"
 ENV_FILE="${REPO_ROOT}/.env"
 VERSION_FILE_LIB="${SCRIPT_DIR}/deploy-version-file.sh"
+ROLLBACK_LIB="${SCRIPT_DIR}/deploy-rollback-lib.sh"
+INVENTORY_DIFF_LIB="${SCRIPT_DIR}/deploy-inventory-diff.sh"
 
 # jeedom2ha_render_version_content / jeedom2ha_write_version_file_atomic —
 # testées sans ssh dans tests/unit/test_deploy_version_file.py.
+# jeedom2ha_diff_topic_lists (diff d'inventaire MQTT, point 8) — testée sans
+# ssh dans tests/unit/test_deploy_inventory_diff.py ; exécutée en LOCAL ici
+# (le contenu avant/après est rapatrié par ssh+cat, mais le diff lui-même ne
+# touche à aucune box).
 # shellcheck disable=SC1090
 source "${VERSION_FILE_LIB}"
+# shellcheck disable=SC1090
+source "${INVENTORY_DIFF_LIB}"
+
+# ROLLBACK_LIB (jeedom2ha_validate_rollback_archive / jeedom2ha_backup_plugin_dir /
+# jeedom2ha_stop_daemon_with_pid_fallback — points 5, 6, 7) n'est PAS sourcée
+# ici : ses fonctions ne s'exécutent que sur la box, via
+# jeedom2ha_rollback_archive qui concatène ce fichier devant le script
+# distant (même convention que VERSION_FILE_LIB plus bas pour l'écriture du
+# fichier VERSION). Testée sans ssh dans tests/unit/test_deploy_rollback_lib.py.
 
 # Load .env if present
 if [[ -f "${ENV_FILE}" ]]; then
@@ -55,6 +70,15 @@ DAEMON_API="http://127.0.0.1:55080"
 
 # MQTT credentials pour cleanup — initialisés par la section cleanup
 _mqtt_host=""; _mqtt_port="1883"; _mqtt_user=""; _mqtt_pass=""
+
+# Chemins des fichiers d'inventaire MQTT avant/après — initialisés par
+# jeedom2ha_inventory_discovery (point 8, diff affiché en fin de déploiement).
+INVENTORY_BEFORE_FILE=""
+INVENTORY_AFTER_FILE=""
+
+# Archive de sauvegarde créée par --rollback avant d'écraser le plugin en
+# place (point 7, rollback réversible) — initialisée par jeedom2ha_rollback_archive.
+PRE_ROLLBACK_BACKUP_ARCHIVE=""
 
 DRY_RUN=false
 RESTART_DAEMON=false
@@ -110,11 +134,41 @@ jeedom2ha_verify_deploy_source() {
     || _fail "Impossible de lire les check-runs GitHub pour ${_deploy_sha}."
   _check_lines=$(printf '%s' "${_check_runs}" | jq -r '.check_runs[]? | [.status, .conclusion] | @tsv')
   [[ -n "${_check_lines}" ]] || _fail "Refus de déployer ${_deploy_sha} : aucun check-run GitHub trouvé."
+  # Un check-run encore en cours (in_progress/queued) doit être un refus, pas
+  # un succès implicite — on ne l'accepte donc que si status="completed".
+  # Une fois "completed", seules success/skipped/neutral sont des conclusions
+  # valides (ex: Burn-In "skipped" hors planning burn-in) ; tout le reste
+  # (failure, cancelled, timed_out, action_required, stale, ...) est refusé.
   while IFS=$'\t' read -r _check_status _check_conclusion; do
-    [[ "${_check_status}" == "completed" && "${_check_conclusion}" == "success" ]] \
-      || _fail "Refus de déployer ${_deploy_sha} : CI non verte (${_check_status}/${_check_conclusion})."
+    [[ "${_check_status}" == "completed" ]] \
+      || _fail "Refus de déployer ${_deploy_sha} : check-run non terminé (${_check_status}/${_check_conclusion})."
+    case "${_check_conclusion}" in
+      success|skipped|neutral) ;;
+      *) _fail "Refus de déployer ${_deploy_sha} : CI non verte (${_check_status}/${_check_conclusion})." ;;
+    esac
   done <<< "${_check_lines}"
   echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts)."
+}
+
+# Point 9 — un tag resté local ne sert à rien pour la traçabilité partagée :
+# on le pousse vers origin après l'avoir créé en local. Non bloquant : le
+# déploiement a déjà réussi à ce stade (fichiers en place, healthcheck OK) ;
+# un souci réseau ponctuel sur le push ne doit pas faire échouer le script
+# après coup — juste avertir, le tag local reste disponible pour un push
+# manuel ultérieur. Extraite en fonction (pure git, aucun ssh) pour être
+# testable unitairement sans dérouler tout le flux de déploiement.
+jeedom2ha_create_and_push_deploy_tag() {
+  local _sha="$1" _ts="$2"
+  local _tag="deploy-${_sha}-$(date -u +%Y%m%dT%H%M%SZ)"
+  GIT_COMMITTER_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    git -C "${REPO_ROOT}" tag -a "${_tag}" "${_sha}" \
+      -m "DEV/TEST box deploy ${_sha} (${_ts})"
+  echo "  Tag annoté créé : ${_tag}"
+  if git -C "${REPO_ROOT}" push origin "${_tag}"; then
+    echo "  Tag poussé vers origin : ${_tag}"
+  else
+    echo "WARNING: push du tag ${_tag} vers origin a échoué (tag local conservé)." >&2
+  fi
 }
 
 # --stop-daemon-cleanup est un mode dédié, incompatible avec les autres options opérationnelles.
@@ -295,34 +349,67 @@ TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 
 printf '%s\n' "${TOPICS}" | grep '/jeedom2ha_' | sort -u | sudo tee "${_file}" >/dev/null || true
 sudo chmod 600 "${_file}"
 sudo chown "$(id -un):$(id -gn)" "${_file}"
+echo "__JEEDOM2HA_INVENTORY_FILE__=${_file}"
 echo "  Inventaire ${PHASE}: ${_file}"
 REMOTE
+}
+
+# jeedom2ha_fetch_inventory_content <remote_file>
+# Rapatrie localement le contenu d'un fichier d'inventaire écrit par
+# jeedom2ha_inventory_discovery, pour que jeedom2ha_diff_topic_lists
+# (bibliothèque pure bash, point 8) puisse calculer le diff. Chaîne vide si
+# <remote_file> est vide ou introuvable — jeedom2ha_diff_topic_lists gère
+# ce cas sans erreur.
+jeedom2ha_fetch_inventory_content() {
+  local _remote_file="$1"
+  [[ -n "${_remote_file}" ]] || { echo ""; return 0; }
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sudo cat '${_remote_file}'" 2>/dev/null || echo ""
 }
 
 jeedom2ha_rollback_archive() {
   local _archive="$1"
   echo "--- Rollback archive → ${JEEDOM_BOX_PATH}/"
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" <<'REMOTE'
+  local _remote_output
+  _remote_output=$(
+    { cat "${ROLLBACK_LIB}"
+      cat <<'REMOTE'
+ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"; BACKUP_DIR="$4"; BOX_USER="$5"
 set -euo pipefail
-ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"
 [[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }
-tar -tzf "${ARCHIVE}" | grep -Eq '^jeedom2ha(/|$)' || {
-  echo "ERROR: archive incompatible (racine jeedom2ha/ absente): ${ARCHIVE}" >&2; exit 1;
-}
-if tar -tzf "${ARCHIVE}" | grep -Ev '^jeedom2ha(/|$)' >/dev/null; then
-  echo "ERROR: archive incompatible (contenu hors jeedom2ha/): ${ARCHIVE}" >&2; exit 1
-fi
+
+# Point 5 — validation sans pipe direct tar|grep sous pipefail (voir
+# jeedom2ha_validate_rollback_archive, ROLLBACK_LIB ci-dessus).
+jeedom2ha_validate_rollback_archive "${ARCHIVE}"
+
 _parent=$(dirname "${PLUGIN_PATH}")
 _work=$(sudo mktemp -d "${_parent}/.jeedom2ha-rollback.XXXXXX")
 cleanup() { sudo rm -rf "${_work}"; }
 trap cleanup EXIT
 sudo tar -xzf "${ARCHIVE}" -C "${_work}"
 [[ -d "${_work}/jeedom2ha" ]] || { echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }
-sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+
+# Point 7 — rollback réversible : archive l'état COURANT du plugin en place
+# (code + data/, aucune exclusion) AVANT de l'écraser, même format 700/600
+# que les archives de pré-déploiement, sous un préfixe distinct pour ne
+# jamais les confondre. Non bloquant si aucun plugin n'est en place (rien à
+# perdre) : le rollback doit pouvoir s'appliquer même sur une box vierge.
+jeedom2ha_backup_plugin_dir "${PLUGIN_PATH}" "${BACKUP_DIR}" "${BOX_USER}:${BOX_USER}" \
+  "jeedom2ha-pre-rollback" "false"
+
+# Point 6 — le plugin en place peut être cassé (c'est le scénario même du
+# rollback) : jeedom2ha::deamon_stop() peut donc échouer. On tente d'abord
+# la voie normale (classe PHP du plugin), puis on replie sur un arrêt direct
+# via le PID file si besoin — la restauration ci-dessous doit avoir lieu
+# dans tous les cas, que l'arrêt ait réussi ou non.
+jeedom2ha_stop_via_plugin_class() {
+  sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
 jeedom2ha::deamon_stop();
 '
+}
+jeedom2ha_stop_daemon_with_pid_fallback "/tmp/jeedom/jeedom2ha/deamon.pid"
+
 sudo rm -rf "${PLUGIN_PATH}"
 sudo mv "${_work}/jeedom2ha" "${PLUGIN_PATH}"
 sudo chown -R www-data:www-data "${PLUGIN_PATH}"
@@ -333,6 +420,16 @@ if (!jeedom2ha::deamon_start()) { fwrite(STDERR, "deamon_start() returned false\
 '
 echo "  Rollback restauré et daemon redémarré sous www-data."
 REMOTE
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
+        "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" "${JEEDOM_BACKUP_DIR}" "${JEEDOM_BOX_USER}"
+  )
+  echo "${_remote_output}"
+  PRE_ROLLBACK_BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_remote_output}")
+  if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
+    echo ""
+    echo "  Ce rollback est lui-même réversible :"
+    printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
+  fi
 }
 
 # =============================================================================
@@ -485,7 +582,9 @@ fi
 
 echo "--- Inventaire MQTT avant déploiement..."
 jeedom2ha_refresh_mqtt_credentials
-jeedom2ha_inventory_discovery "before"
+_inv_before_output=$(jeedom2ha_inventory_discovery "before")
+echo "${_inv_before_output}"
+INVENTORY_BEFORE_FILE=$(sed -n 's/^__JEEDOM2HA_INVENTORY_FILE__=//p' <<< "${_inv_before_output}")
 echo ""
 
 echo "--- [1/5] Deploy (staging + sudo promotion)..."
@@ -715,7 +814,15 @@ REMOTE
   echo ""
 
   echo "--- Inventaire MQTT après redémarrage..."
-  jeedom2ha_inventory_discovery "after"
+  _inv_after_output=$(jeedom2ha_inventory_discovery "after")
+  echo "${_inv_after_output}"
+  INVENTORY_AFTER_FILE=$(sed -n 's/^__JEEDOM2HA_INVENTORY_FILE__=//p' <<< "${_inv_after_output}")
+  echo ""
+
+  echo "--- Diff inventaire MQTT (avant/après)..."
+  jeedom2ha_diff_topic_lists \
+    "$(jeedom2ha_fetch_inventory_content "${INVENTORY_BEFORE_FILE}")" \
+    "$(jeedom2ha_fetch_inventory_content "${INVENTORY_AFTER_FILE}")"
   echo ""
 fi
 
@@ -794,11 +901,7 @@ fi
 if [[ "${SKIP_POST_DEPLOY}" == "true" ]]; then
   echo "WARNING: aucun tag de déploiement créé : --skip-post-deploy ne confirme pas le healthcheck." >&2
 else
-  _deploy_tag="deploy-${_deploy_sha}-$(date -u +%Y%m%dT%H%M%SZ)"
-  GIT_COMMITTER_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    git -C "${REPO_ROOT}" tag -a "${_deploy_tag}" "${_deploy_sha}" \
-      -m "DEV/TEST box deploy ${_deploy_sha} (${_deploy_ts})"
-  echo "  Tag annoté créé : ${_deploy_tag}"
+  jeedom2ha_create_and_push_deploy_tag "${_deploy_sha}" "${_deploy_ts}"
 fi
 echo ""
 echo "  Commande de rollback prête :"
