@@ -274,14 +274,23 @@ def _extract_rollback_extraction_snippet() -> str:
 
 # `sudo` here is not a plain passthrough (as in test_deploy_rollback_lib.py):
 # it faithfully models the real permission wall a `sudo mktemp -d`/`sudo tar
-# -xzf` pair creates on the box (a root-owned, non-traversable work dir).
-# `sudo mktemp -d` locks its freshly created directory to mode 000 right
-# away; any *other* `sudo ...` call touching a locked directory temporarily
-# restores access (like real root bypassing permission checks) before
-# re-locking it. A bare, unprefixed command touching that same directory —
-# the exact shape of the regression this test guards against — hits the
-# mode-000 wall and fails, exactly as it would against a real root-owned
-# directory on the box.
+# -xzf` pair creates on the box (a root-owned, non-traversable work dir) —
+# without relying on Unix permission bits, which a root-run test process
+# (common in CI containers) would simply bypass, making the wall a no-op and
+# letting the pre-fix, unprivileged `[[ -d ... ]]` pass through undetected
+# (caught in review: reproduced locally with `sudo pytest -k
+# rollback_extraction_check`, where the "would have caught the old bug" test
+# failed under root with the mode-000 version of this stub). Renaming the
+# work dir out of the way is a real filesystem-existence barrier instead: it
+# blocks root exactly as it blocks anyone else, since a path that has been
+# renamed away simply is not there to look up, privilege or not.
+# `sudo mktemp -d` renames its freshly created directory to `<path>.locked`
+# right away; any *other* `sudo ...` call temporarily renames all tracked
+# work dirs back to their real path (like real root bypassing permission
+# checks) before renaming them away again. A bare, unprefixed command
+# touching that same directory — the exact shape of the regression this test
+# guards against — finds nothing at that path and fails, exactly as it would
+# against a real root-owned, non-traversable directory on the box.
 _PRIVILEGE_WALL_SUDO_STUB = '''
 LOCKED_DIRS_FILE="$(mktemp)"
 sudo() {
@@ -289,19 +298,25 @@ sudo() {
     shift
     local d
     d=$(command mktemp "$@")
-    chmod 000 "$d"
+    mv "$d" "$d.locked"
     printf '%s\\n' "$d" >> "$LOCKED_DIRS_FILE"
     printf '%s\\n' "$d"
     return 0
   fi
+  local -a _unlocked=()
   if [ -s "$LOCKED_DIRS_FILE" ]; then
-    while IFS= read -r d; do chmod 700 "$d" 2>/dev/null || true; done < "$LOCKED_DIRS_FILE"
+    while IFS= read -r d; do
+      if [ -e "$d.locked" ]; then
+        mv "$d.locked" "$d"
+        _unlocked+=("$d")
+      fi
+    done < "$LOCKED_DIRS_FILE"
   fi
   "$@"
   local rc=$?
-  if [ -s "$LOCKED_DIRS_FILE" ]; then
-    while IFS= read -r d; do chmod 000 "$d" 2>/dev/null || true; done < "$LOCKED_DIRS_FILE"
-  fi
+  for d in "${_unlocked[@]}"; do
+    [ -e "$d" ] && mv "$d" "$d.locked" 2>/dev/null
+  done
   return $rc
 }
 '''
