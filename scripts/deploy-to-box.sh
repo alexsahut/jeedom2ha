@@ -278,11 +278,51 @@ echo "  sync-body: \$(wc -c < /tmp/jeedom2ha-sync-body.json) bytes → /tmp/jeed
 REMOTE
 }
 
+# Exécute un appel curl vers l'API daemon locale (127.0.0.1) sur la box, en
+# transmettant X-Local-Secret via un fichier de config curl (-K) chmod 600
+# écrit et supprimé côté distant (trap EXIT) — le secret ne transite jamais
+# par l'argv de ssh ou de curl, ni localement ni sur la box (CC-20).
+# LOCAL_SECRET est restitué octet pour octet côté distant via printf %q
+# (source bash valide, transmise en stdin — jamais en argument de commande),
+# puis échappé au format attendu par curl -K (\\ puis " → voir curl.se,
+# section "-K, --config" : une valeur entre guillemets échappe \\ et \").
+# Args: $1=url, $2=max-time, $3=méthode (GET|POST, défaut GET),
+#       $4=fichier --data-binary distant (optionnel).
+jeedom2ha_curl_with_secret() {
+  local _url="$1" _max_time="$2" _method="${3:-GET}" _data_file="${4:-}"
+  local _secret_src
+  printf -v _secret_src '%q' "${LOCAL_SECRET}"
+  { printf 'LOCAL_SECRET=%s\n' "${_secret_src}"
+    cat <<'REMOTE'
+set -euo pipefail
+URL="$1"; MAX_TIME="$2"; METHOD="$3"; DATA_FILE="$4"
+_secret_esc=${LOCAL_SECRET//\\/\\\\}
+_secret_esc=${_secret_esc//\"/\\\"}
+_cfg=$(mktemp)
+chmod 600 "${_cfg}"
+trap 'rm -f "${_cfg}"' EXIT
+{
+  echo 'silent'
+  echo 'show-error'
+  printf 'max-time = %s\n' "${MAX_TIME}"
+  printf 'header = "X-Local-Secret: %s"\n' "${_secret_esc}"
+  if [[ "${METHOD}" == "POST" ]]; then
+    echo 'request = POST'
+    echo 'header = "Content-Type: application/json"'
+  fi
+  [[ -n "${DATA_FILE}" ]] && printf 'data-binary = @%s\n' "${DATA_FILE}"
+  printf 'url = "%s"\n' "${URL}"
+} > "${_cfg}"
+curl -K "${_cfg}"
+REMOTE
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
+        "${_url}" "${_max_time}" "${_method}" "${_data_file}"
+}
+
 # GET /system/status sur la box (daemon 127.0.0.1 seulement, X-Local-Secret).
 # Pattern terrain doc section 1.
 jeedom2ha_status() {
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "curl -sS --max-time 5 -H 'X-Local-Secret: ${LOCAL_SECRET}' ${DAEMON_API}/system/status"
+  jeedom2ha_curl_with_secret "${DAEMON_API}/system/status" 5 GET
 }
 
 # Arrête le daemon via jeedom2ha::deamon_stop() (SIGTERM + SIGKILL fallback après 10s).
@@ -301,12 +341,7 @@ REMOTE
 # POST /action/sync en utilisant /tmp/jeedom2ha-sync-body.json sur la box.
 # Pattern terrain doc section 2.
 jeedom2ha_sync() {
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "curl -sS -X POST --max-time 20 \
-     -H 'X-Local-Secret: ${LOCAL_SECRET}' \
-     -H 'Content-Type: application/json' \
-     ${DAEMON_API}/action/sync \
-     --data-binary @/tmp/jeedom2ha-sync-body.json"
+  jeedom2ha_curl_with_secret "${DAEMON_API}/action/sync" 20 POST /tmp/jeedom2ha-sync-body.json
 }
 
 # Source unique des credentials MQTT, également utilisée par --cleanup-discovery.
@@ -331,28 +366,95 @@ REMOTE
   _mqtt_pass=$(echo "${_mqtt_json}" | jq -r '.pass // empty')
 }
 
+# Génère (stdout) du bash source qui reconstruit MQTT_USER/MQTT_PASS et
+# écrit, dans un dossier temporaire chmod 700 supprimé immédiatement après
+# usage (trap EXIT), les fichiers de config par défaut de mosquitto_sub et
+# mosquitto_pub (chmod 600) — les credentials MQTT ne transitent jamais par
+# l'argv de ssh ni de mosquitto_sub/mosquitto_pub, ni localement ni sur la
+# box (CC-20).
+#
+# IMPORTANT : la box cible réelle tourne mosquitto-clients
+# 2.0.11-1+deb11u2, qui N'A PAS l'option -o (celle-ci n'existe que depuis
+# mosquitto 2.1 — voir mosquitto_sub(1)/mosquitto_pub(1) : "-o config-file
+# ... Available from version 2.1", et client/client_shared.c au tag
+# eclipse/mosquitto v2.0.11 où -o est absent de client_config_line_proc).
+# Sur 2.0.11, le seul mécanisme sans argv est le *fichier de config par
+# défaut* : client_config_load() (client/client_shared.c) cherche
+# $XDG_CONFIG_HOME/mosquitto_sub ou .../mosquitto_pub (à défaut
+# $HOME/.config/mosquitto_sub|mosquitto_pub) et parse chaque ligne via
+# strtok(line, " ") pour l'option puis strtok(NULL, "") pour le reste de la
+# ligne pris tel quel comme valeur (pas de guillemets ni d'échappement) —
+# donc un mot de passe contenant des espaces est transmis correctement,
+# tant qu'il ne contient pas de retour à la ligne.
+#
+# jeedom2ha_mqtt_run() ci-dessous positionne XDG_CONFIG_HOME uniquement le
+# temps de l'appel à mosquitto_sub/mosquitto_pub (pas d'export global).
+#
+# Prévu pour être concaténé en préfixe d'un heredoc distant quoté
+# (<<'REMOTE') via :
+#   { echo 'set -euo pipefail'; jeedom2ha_mqtt_auth_snippet; cat <<'REMOTE' ... REMOTE; } \
+#     | ssh ... bash -s -- <args non secrets>
+# printf %q restitue MQTT_USER/MQTT_PASS octet pour octet quels que soient
+# les caractères spéciaux qu'ils contiennent (hors retour à la ligne, non
+# supporté par le format ligne-par-ligne de mosquitto : on échoue
+# explicitement dans ce cas plutôt que de retomber sur l'argv).
+jeedom2ha_mqtt_auth_snippet() {
+  local _u _pw
+  printf -v _u '%q' "${_mqtt_user}"
+  printf -v _pw '%q' "${_mqtt_pass}"
+  cat <<SNIPPET
+MQTT_USER=${_u}
+MQTT_PASS=${_pw}
+if [[ -n "\${MQTT_USER}" ]]; then
+  if [[ "\${MQTT_USER}" == *\$'\n'* || "\${MQTT_PASS}" == *\$'\n'* ]]; then
+    echo "ERROR: identifiants MQTT contenant un retour à la ligne — incompatible avec le fichier de config mosquitto (format ligne par ligne, sans échappement). Voir CC-20." >&2
+    exit 1
+  fi
+  _mqtt_auth_dir=\$(mktemp -d)
+  chmod 700 "\${_mqtt_auth_dir}"
+  trap 'rm -rf "\${_mqtt_auth_dir}"' EXIT
+  printf -- '-u %s\n-P %s\n' "\${MQTT_USER}" "\${MQTT_PASS}" > "\${_mqtt_auth_dir}/mosquitto_sub"
+  cp "\${_mqtt_auth_dir}/mosquitto_sub" "\${_mqtt_auth_dir}/mosquitto_pub"
+  chmod 600 "\${_mqtt_auth_dir}/mosquitto_sub" "\${_mqtt_auth_dir}/mosquitto_pub"
+fi
+# jeedom2ha_mqtt_run <mosquitto_sub|mosquitto_pub> [args...]
+# N'exporte XDG_CONFIG_HOME que pour cette seule invocation (mosquitto
+# 2.0.x default config file mechanism — pas d'option -o, absente avant
+# mosquitto 2.1).
+jeedom2ha_mqtt_run() {
+  local _bin="\$1"; shift
+  if [[ -n "\${_mqtt_auth_dir:-}" ]]; then
+    XDG_CONFIG_HOME="\${_mqtt_auth_dir}" "\${_bin}" "\$@"
+  else
+    "\${_bin}" "\$@"
+  fi
+  }
+SNIPPET
+}
+
 # Snapshot retained topics on the box next to deploy backups for manual diffs.
 jeedom2ha_inventory_discovery() {
   local _phase="$1"
   [[ -n "${_mqtt_host}" ]] || { echo "WARNING: mqtt2 host introuvable — inventaire ${_phase} ignoré." >&2; return 0; }
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-    "${_mqtt_host}" "${_mqtt_port}" "${_mqtt_user}" "${_mqtt_pass}" "${JEEDOM_BACKUP_DIR}" "${_phase}" <<'REMOTE'
-set -euo pipefail
-MQTT_HOST="$1"; MQTT_PORT="$2"; MQTT_USER="$3"; MQTT_PASS="$4"; BACKUP_DIR="$5"; PHASE="$6"
+  { echo 'set -euo pipefail'
+    jeedom2ha_mqtt_auth_snippet
+    cat <<'REMOTE'
+MQTT_HOST="$1"; MQTT_PORT="$2"; BACKUP_DIR="$3"; PHASE="$4"
 command -v mosquitto_sub &>/dev/null || { echo "WARNING: mosquitto_sub absent — inventaire ignoré." >&2; exit 0; }
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
 sudo mkdir -p "${BACKUP_DIR}/inventory"
 sudo chmod 700 "${BACKUP_DIR}/inventory"
 sudo chown "$(id -un):$(id -gn)" "${BACKUP_DIR}/inventory"
 _file="${BACKUP_DIR}/inventory/jeedom2ha-discovery-${PHASE}-$(date -u +%Y%m%dT%H%M%SZ).txt"
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
 printf '%s\n' "${TOPICS}" | grep '/jeedom2ha_' | sort -u | sudo tee "${_file}" >/dev/null || true
 sudo chmod 600 "${_file}"
 sudo chown "$(id -un):$(id -gn)" "${_file}"
 echo "__JEEDOM2HA_INVENTORY_FILE__=${_file}"
 echo "  Inventaire ${PHASE}: ${_file}"
 REMOTE
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
+        "${_mqtt_host}" "${_mqtt_port}" "${JEEDOM_BACKUP_DIR}" "${_phase}"
 }
 
 # jeedom2ha_fetch_inventory_content <remote_file>
@@ -566,17 +668,16 @@ REMOTE
     echo "--- [stop-2/2] Cleanup retained jeedom2ha discovery topics..."
     echo "    Scope: homeassistant/{light,cover,switch}/jeedom2ha_*/config"
     echo "    Broker: ${_mqtt_host}:${_mqtt_port}"
-    ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-      "${_mqtt_host}" "${_mqtt_port}" "${_mqtt_user}" "${_mqtt_pass}" <<'REMOTE'
-set -euo pipefail
-MQTT_HOST="$1"; MQTT_PORT="$2"; MQTT_USER="$3"; MQTT_PASS="$4"
+    { echo 'set -euo pipefail'
+      jeedom2ha_mqtt_auth_snippet
+      cat <<'REMOTE'
+MQTT_HOST="$1"; MQTT_PORT="$2"
 command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || {
   echo "  ERROR: mosquitto_sub/pub introuvables. apt-get install mosquitto-clients" >&2; exit 1
 }
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
 echo "  Énumération des topics retained (fenêtre 2s)..."
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 \
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
@@ -584,11 +685,12 @@ TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
 _n=0
 while IFS= read -r _t; do
   [[ -z "${_t}" ]] && continue
-  mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
+  jeedom2ha_mqtt_run mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
   echo "  Cleared: ${_t}"; _n=$((_n + 1))
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
 REMOTE
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
   fi
   echo ""
   echo "======================================================================="
@@ -728,21 +830,21 @@ REMOTE
     echo "         Vérifiez que MQTT Manager (mqtt2) est installé et configuré."
   else
     echo "  Broker: ${_mqtt_host}:${_mqtt_port}"
-    # Credentials passés en args positionnels pour éviter l'injection dans le heredoc
-    ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-      "${_mqtt_host}" "${_mqtt_port}" "${_mqtt_user}" "${_mqtt_pass}" <<'REMOTE'
-set -euo pipefail
-MQTT_HOST="$1"; MQTT_PORT="$2"; MQTT_USER="$3"; MQTT_PASS="$4"
+    # Credentials MQTT jamais en argv : transmis via stdin (jeedom2ha_mqtt_auth_snippet),
+    # reconstruits et écrits dans un fichier d'options mosquitto (-o) chmod 600 côté distant (CC-20).
+    { echo 'set -euo pipefail'
+      jeedom2ha_mqtt_auth_snippet
+      cat <<'REMOTE'
+MQTT_HOST="$1"; MQTT_PORT="$2"
 
 command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || {
   echo "  ERROR: mosquitto_sub/pub introuvables. apt-get install mosquitto-clients" >&2; exit 1
 }
 
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
 
 echo "  Énumération des topics retained (fenêtre 2s)..."
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 \
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
@@ -752,11 +854,12 @@ TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
 _n=0
 while IFS= read -r _t; do
   [[ -z "${_t}" ]] && continue
-  mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
+  jeedom2ha_mqtt_run mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
   echo "  Cleared: ${_t}"; _n=$((_n + 1))
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
 REMOTE
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
   fi
   echo ""
 fi
@@ -818,10 +921,7 @@ REMOTE
 
   echo "  Attente readiness daemon + MQTT (condition identique au protocole terrain 3.2b-A)..."
   _wait=0; _max=60
-  until ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-      "curl -sS --max-time 3 \
-       -H 'X-Local-Secret: ${LOCAL_SECRET}' \
-       ${DAEMON_API}/system/status" \
+  until jeedom2ha_curl_with_secret "${DAEMON_API}/system/status" 3 GET \
     2>/dev/null \
     | jq -e '.status == "ok" and .payload.mqtt.connected == true and .payload.mqtt.state == "connected"' \
     >/dev/null 2>&1; do
@@ -902,14 +1002,13 @@ fi
 if [[ "${CLEANUP_DISCOVERY}" == "true" && "${SKIP_POST_DEPLOY}" == "false" \
       && -n "${_mqtt_host}" ]]; then
   echo "--- [5/5] Vérification topics discovery post-sync..."
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-    "${_mqtt_host}" "${_mqtt_port}" "${_mqtt_user}" "${_mqtt_pass}" <<'REMOTE'
-set -euo pipefail
-MQTT_HOST="$1"; MQTT_PORT="$2"; MQTT_USER="$3"; MQTT_PASS="$4"
+  { echo 'set -euo pipefail'
+    jeedom2ha_mqtt_auth_snippet
+    cat <<'REMOTE'
+MQTT_HOST="$1"; MQTT_PORT="$2"
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
 command -v mosquitto_sub &>/dev/null || { echo "  mosquitto_sub absent — skip."; exit 0; }
-FOUND=$(mosquitto_sub "${_auth[@]}" -W 2 \
+FOUND=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 FOUND=$(echo "${FOUND}" | grep '/jeedom2ha_' || true)
@@ -917,6 +1016,7 @@ _n=$(echo "${FOUND}" | grep -c 'jeedom2ha_' 2>/dev/null || echo 0)
 echo "  ${_n} topic(s) présent(s) sur le broker après sync."
 echo "${FOUND}" | while IFS= read -r _t; do [[ -n "${_t}" ]] && echo "    + ${_t}"; done
 REMOTE
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
   echo ""
 fi
 
