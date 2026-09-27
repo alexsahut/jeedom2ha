@@ -21,6 +21,7 @@
 #   - ready-for-dev: Story file created in stories folder
 #   - in-progress: Developer actively working on implementation
 #   - review: Ready for code review (via Dev's code-review workflow)
+#   - ready-for-UX-validation: Story dont l'implémentation est terminée et déployée en environnement de test, en attente de preuve d'usage réel de l'UI avant de passer 'done'
 #   - done: Story completed
 #
 # Retrospective Status:
@@ -33,6 +34,7 @@
 # - Stories can be worked in parallel if team capacity allows
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Story touchant l'UI : review -> ready-for-UX-validation -> done (voir docs/bmad-parcours-rapide-complet.md)
 
 # CYCLES:
 # =======

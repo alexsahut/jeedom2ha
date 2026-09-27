@@ -8,3 +8,4 @@
 6. Ouvrir les PR de développement uniquement vers `main`.
 7. Pour tout test terrain sur la box Jeedom réelle, utiliser **exclusivement** `scripts/deploy-to-box.sh` (DEV/TEST ONLY — ce n’est pas la procédure de release Market).
 8. Ne jamais improviser de rsync, copie SSH manuelle ou procédure de déploiement ad hoc vers la box. Voir `_bmad-output/implementation-artifacts/jeedom2ha-test-context-jeedom-reel.md` pour les modes disponibles et le template Task 0 Pre-flight terrain.
+9. Avant de choisir un parcours (rapide ou complet), lire `docs/bmad-parcours-rapide-complet.md`.
