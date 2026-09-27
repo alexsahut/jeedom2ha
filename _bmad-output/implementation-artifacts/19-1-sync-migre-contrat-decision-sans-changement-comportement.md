@@ -158,5 +158,13 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 ### Completion Notes List
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle non exposée cette session).
+- **dev-story** — 2026-09-27 — statut résultant : `in-progress`. Task 1 (migration `/action/sync` vers `evaluate_equipment()`), Task 4 (garde-fous unitaires de la migration) et Task 3 (outil de parité `tools/parity_snapshot.py`, AC3/AC4/AC5, testé en local/mocké uniquement — preuve terrain hors scope de cette passe) implémentées et committées (`8bbe147`, `df2fca9`, `1e02e1a`). Suite complète verte (1248 tests, flake8 clean). PR **#169** ouverte contre `main`, CI verte sur le SHA poussé. Revue automatisée (bot Codex) : 3 remarques P2 sur `tools/parity_snapshot.py` — toutes confirmées légitimes par inspection du code et corrigées (`cc0dc05`) avec tests de régression dédiés, fils de revue résolus. CI reconfirmée verte sur `cc0dc05`. **PR non fusionnée** — en attente de revue Alexandre (fusion hors scope de cette passe).
 
 ### File List
+
+- `resources/daemon/transport/http_server.py` (modifié)
+- `resources/daemon/tests/unit/test_pe_epic5_story_5_1_orchestration.py` (modifié)
+- `resources/daemon/tests/unit/test_story_19_1_sync_migration_parity.py` (nouveau)
+- `resources/daemon/tools/__init__.py` (nouveau)
+- `resources/daemon/tools/parity_snapshot.py` (nouveau)
+- `resources/daemon/tests/unit/test_story_19_1_parity_tool_readonly.py` (nouveau)
