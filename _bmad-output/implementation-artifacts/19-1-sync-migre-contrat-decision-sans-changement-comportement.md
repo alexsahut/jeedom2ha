@@ -81,13 +81,13 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 
 - [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (vérifier SSH/sudo OK, box 192.168.1.21 joignable)
-  - [ ] Sélectionner le mode de déploiement adapté à un cycle de mesure avant/après (à documenter en dev-story, cohérent avec le mode utilisé en Story 16.3/16.7)
+  - [ ] Déployer en standard : `./scripts/deploy-to-box.sh --restart-daemon`, sans option de nettoyage.
   - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant le cycle de mesure avant/après de cette story — ces deux flags republient des messages MQTT retained **vides** sur les topics discovery (`homeassistant/{light,cover,switch}/jeedom2ha_*/config`), effaçant l'état publié entre les deux relevés et rendant la comparaison "avant/après" invalide par construction (les entités disparaîtraient, ce qui n'a rien à voir avec un changement de décision). Utiliser exclusivement un déploiement standard (sans ces flags).
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou équivalent
 
 - [ ] Task 1 — Migrer le sync vers `evaluate_equipment()` (AC1, AC2)
-  - [ ] Remplacer l'appel direct à `decide_publication()` dans `_do_handle_action_sync` (chemin primaire) et dans `_publish_additional_sensors()` (chemin secondaire) par un appel à `evaluate_equipment()` (Story 19.0), à comportement strictement identique
-  - [ ] Vérifier que la résolution de l'éligibilité reste faite exactement comme aujourd'hui (une seule fois, en amont), et passée telle quelle à `evaluate_equipment()` (AC2 de Story 19.0)
+  - [ ] Passer l'instance `MapperRegistry` créée à `http_server.py:1375` à `evaluate_equipment()` (golden patch `transport.http_server.MapperRegistry`, `test_story_8_4_golden_file.py:272`) ; conserver les gardes `http_server.py:1397-1399` (inéligible) et `1405-1407` (mapping `None`).
+  - [ ] Stocker des copies renvoyées par `evaluate_equipment()` dans `app["mappings"]` / `app["publications"]`, avec `projection_validity`, `publication_decision_ref`, `pipeline_step_reached` et `mapping_result` renseignés.
 
 - [ ] Task 2 — Non-régression golden file + suite complète (AC1, AC2)
   - [ ] Exécuter `test_story_8_4_golden_file.py` sans modification de fixture
@@ -132,9 +132,10 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 
 ### Points constatés en dev-story (dispersion actuelle, à ne pas régresser silencieusement)
 
-- **`confidence_policy` est dispersé, pas centralisé :** aujourd'hui lu indépendamment depuis la charge utile de la requête à `http_server.py:1322` (`sync_config.get("confidence_policy", "sure_probable")`) et à nouveau à `http_server.py:2281-2283` pour l'endpoint d'aperçu, puis re-dupliqué avec son propre défaut `"sure_probable"` dans chaque mapper de domaine (`mapping/cover.py:303`, `mapping/switch.py:385`, `mapping/light.py:329`). Cette story ne doit **pas** corriger cette dispersion (hors périmètre), mais `evaluate_equipment()` doit recevoir ce paramètre déjà résolu une seule fois par l'appelant migré (le sync), sans en introduire une résolution supplémentaire en interne.
-- **`data_dir` : deux chemins de résolution parallèles, pas d'injection unique.** Côté HTTP, `_resolve_data_dir()` (`http_server.py:2403-2409`) retombe sur `app.get("data_dir") or _DATA_DIR` (`_DATA_DIR` codé en dur à `http_server.py:64`) ; côté tests, l'injection se fait directement via `app["data_dir"] = str(tmp_path)`, en contournant ce résolveur. `mapping/overrides.py` et `cache/disk_cache.py` prennent `data_dir` en paramètre positionnel simple, sans résolveur partagé. Cette story n'unifie pas ce point (hors périmètre) — l'outil de parité doit utiliser le même mécanisme de résolution que le sync réel (`_resolve_data_dir`), jamais un chemin codé en dur séparé, pour éviter de lire un état différent de celui réellement utilisé en production.
+- **Politique de confiance :** stocker `request.app["confidence_policy"]` au sync, après `http_server.py:1325`.
+- **Point d'injection unique :** `_resolve_data_dir(request)` remplace `_DATA_DIR` aux lignes `http_server.py:252,1393,1395,1412,1733,2355,3454`. Sans effet production ; prouvé par golden.
 - **`app["mappings"]` reste le cache vivant consommé par le sync.** Ce dict `Dict[int, MappingResult]` (initialisé `http_server.py:3551`, mis à jour aux lignes 1691/1724, lu aux lignes 1361/1371/3142) continue d'être alimenté et lu exactement comme aujourd'hui après migration — `evaluate_equipment()` ne change pas ce mécanisme de cache, il ne fait que remplacer l'appel `decide_publication()` en aval de ce cache.
+- **Le sync :** `evaluate_equipment()` remplace les étapes 2-4 ; `app["mappings"]` et `app["publications"]` stockent les copies renvoyées.
 - **Scénarios (`app["scenario_publications"]`, `ScenarioButtonMapper`) et `is_visible` (topologie) restent hors périmètre.** Ces deux mécanismes ne passent pas par `decide_publication`/`evaluate_equipment()` aujourd'hui et cette story ne les y fait pas entrer — confirmé par lecture directe (`http_server.py:1694-1721`, `sync/command.py:530-573` pour les scénarios ; `models/topology.py:82,91,161,179` pour `is_visible`, sujet de parsing topologique sans rapport avec la décision de publication).
 
 ### Project Structure Notes
