@@ -367,19 +367,37 @@ REMOTE
 }
 
 # Génère (stdout) du bash source qui reconstruit MQTT_USER/MQTT_PASS et
-# écrit un fichier d'options mosquitto (-o) chmod 600, supprimé
-# immédiatement après usage (trap EXIT) — les credentials MQTT ne
-# transitent jamais par l'argv de ssh ou de mosquitto_sub/mosquitto_pub, ni
-# localement ni sur la box (CC-20). Format du fichier -o : "-u <valeur>" /
-# "-P <valeur>" sur des lignes séparées, valeur brute jusqu'à fin de ligne —
-# mosquitto découpe chaque ligne via strtok(" ") puis prend le reste tel
-# quel, sans guillemets ni échappement (voir client_shared.c, disponible
-# depuis mosquitto 2.1). Prévu pour être concaténé en préfixe d'un heredoc
-# distant quoté (<<'REMOTE') via :
+# écrit, dans un dossier temporaire chmod 700 supprimé immédiatement après
+# usage (trap EXIT), les fichiers de config par défaut de mosquitto_sub et
+# mosquitto_pub (chmod 600) — les credentials MQTT ne transitent jamais par
+# l'argv de ssh ni de mosquitto_sub/mosquitto_pub, ni localement ni sur la
+# box (CC-20).
+#
+# IMPORTANT : la box cible réelle tourne mosquitto-clients
+# 2.0.11-1+deb11u2, qui N'A PAS l'option -o (celle-ci n'existe que depuis
+# mosquitto 2.1 — voir mosquitto_sub(1)/mosquitto_pub(1) : "-o config-file
+# ... Available from version 2.1", et client/client_shared.c au tag
+# eclipse/mosquitto v2.0.11 où -o est absent de client_config_line_proc).
+# Sur 2.0.11, le seul mécanisme sans argv est le *fichier de config par
+# défaut* : client_config_load() (client/client_shared.c) cherche
+# $XDG_CONFIG_HOME/mosquitto_sub ou .../mosquitto_pub (à défaut
+# $HOME/.config/mosquitto_sub|mosquitto_pub) et parse chaque ligne via
+# strtok(line, " ") pour l'option puis strtok(NULL, "") pour le reste de la
+# ligne pris tel quel comme valeur (pas de guillemets ni d'échappement) —
+# donc un mot de passe contenant des espaces est transmis correctement,
+# tant qu'il ne contient pas de retour à la ligne.
+#
+# jeedom2ha_mqtt_run() ci-dessous positionne XDG_CONFIG_HOME uniquement le
+# temps de l'appel à mosquitto_sub/mosquitto_pub (pas d'export global).
+#
+# Prévu pour être concaténé en préfixe d'un heredoc distant quoté
+# (<<'REMOTE') via :
 #   { echo 'set -euo pipefail'; jeedom2ha_mqtt_auth_snippet; cat <<'REMOTE' ... REMOTE; } \
 #     | ssh ... bash -s -- <args non secrets>
 # printf %q restitue MQTT_USER/MQTT_PASS octet pour octet quels que soient
-# les caractères spéciaux qu'ils contiennent.
+# les caractères spéciaux qu'ils contiennent (hors retour à la ligne, non
+# supporté par le format ligne-par-ligne de mosquitto : on échoue
+# explicitement dans ce cas plutôt que de retomber sur l'argv).
 jeedom2ha_mqtt_auth_snippet() {
   local _u _pw
   printf -v _u '%q' "${_mqtt_user}"
@@ -388,11 +406,29 @@ jeedom2ha_mqtt_auth_snippet() {
 MQTT_USER=${_u}
 MQTT_PASS=${_pw}
 if [[ -n "\${MQTT_USER}" ]]; then
-  _mqtt_auth_file=\$(mktemp)
-  chmod 600 "\${_mqtt_auth_file}"
-  trap 'rm -f "\${_mqtt_auth_file}"' EXIT
-  printf -- '-u %s\n-P %s\n' "\${MQTT_USER}" "\${MQTT_PASS}" > "\${_mqtt_auth_file}"
+  if [[ "\${MQTT_USER}" == *\$'\n'* || "\${MQTT_PASS}" == *\$'\n'* ]]; then
+    echo "ERROR: identifiants MQTT contenant un retour à la ligne — incompatible avec le fichier de config mosquitto (format ligne par ligne, sans échappement). Voir CC-20." >&2
+    exit 1
+  fi
+  _mqtt_auth_dir=\$(mktemp -d)
+  chmod 700 "\${_mqtt_auth_dir}"
+  trap 'rm -rf "\${_mqtt_auth_dir}"' EXIT
+  printf -- '-u %s\n-P %s\n' "\${MQTT_USER}" "\${MQTT_PASS}" > "\${_mqtt_auth_dir}/mosquitto_sub"
+  cp "\${_mqtt_auth_dir}/mosquitto_sub" "\${_mqtt_auth_dir}/mosquitto_pub"
+  chmod 600 "\${_mqtt_auth_dir}/mosquitto_sub" "\${_mqtt_auth_dir}/mosquitto_pub"
 fi
+# jeedom2ha_mqtt_run <mosquitto_sub|mosquitto_pub> [args...]
+# N'exporte XDG_CONFIG_HOME que pour cette seule invocation (mosquitto
+# 2.0.x default config file mechanism — pas d'option -o, absente avant
+# mosquitto 2.1).
+jeedom2ha_mqtt_run() {
+  local _bin="\$1"; shift
+  if [[ -n "\${_mqtt_auth_dir:-}" ]]; then
+    XDG_CONFIG_HOME="\${_mqtt_auth_dir}" "\${_bin}" "\$@"
+  else
+    "\${_bin}" "\$@"
+  fi
+  }
 SNIPPET
 }
 
@@ -406,12 +442,11 @@ jeedom2ha_inventory_discovery() {
 MQTT_HOST="$1"; MQTT_PORT="$2"; BACKUP_DIR="$3"; PHASE="$4"
 command -v mosquitto_sub &>/dev/null || { echo "WARNING: mosquitto_sub absent — inventaire ignoré." >&2; exit 0; }
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${_mqtt_auth_file:-}" ]] && _auth+=(-o "${_mqtt_auth_file}")
 sudo mkdir -p "${BACKUP_DIR}/inventory"
 sudo chmod 700 "${BACKUP_DIR}/inventory"
 sudo chown "$(id -un):$(id -gn)" "${BACKUP_DIR}/inventory"
 _file="${BACKUP_DIR}/inventory/jeedom2ha-discovery-${PHASE}-$(date -u +%Y%m%dT%H%M%SZ).txt"
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
 printf '%s\n' "${TOPICS}" | grep '/jeedom2ha_' | sort -u | sudo tee "${_file}" >/dev/null || true
 sudo chmod 600 "${_file}"
 sudo chown "$(id -un):$(id -gn)" "${_file}"
@@ -641,9 +676,8 @@ command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || 
   echo "  ERROR: mosquitto_sub/pub introuvables. apt-get install mosquitto-clients" >&2; exit 1
 }
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${_mqtt_auth_file:-}" ]] && _auth+=(-o "${_mqtt_auth_file}")
 echo "  Énumération des topics retained (fenêtre 2s)..."
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 \
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
@@ -651,7 +685,7 @@ TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
 _n=0
 while IFS= read -r _t; do
   [[ -z "${_t}" ]] && continue
-  mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
+  jeedom2ha_mqtt_run mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
   echo "  Cleared: ${_t}"; _n=$((_n + 1))
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
@@ -808,10 +842,9 @@ command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || 
 }
 
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${_mqtt_auth_file:-}" ]] && _auth+=(-o "${_mqtt_auth_file}")
 
 echo "  Énumération des topics retained (fenêtre 2s)..."
-TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 \
+TOPICS=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
@@ -821,7 +854,7 @@ TOPICS=$(echo "${TOPICS}" | grep '/jeedom2ha_' || true)
 _n=0
 while IFS= read -r _t; do
   [[ -z "${_t}" ]] && continue
-  mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
+  jeedom2ha_mqtt_run mosquitto_pub "${_auth[@]}" -t "${_t}" -r -n
   echo "  Cleared: ${_t}"; _n=$((_n + 1))
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
@@ -974,9 +1007,8 @@ if [[ "${CLEANUP_DISCOVERY}" == "true" && "${SKIP_POST_DEPLOY}" == "false" \
     cat <<'REMOTE'
 MQTT_HOST="$1"; MQTT_PORT="$2"
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
-[[ -n "${_mqtt_auth_file:-}" ]] && _auth+=(-o "${_mqtt_auth_file}")
 command -v mosquitto_sub &>/dev/null || { echo "  mosquitto_sub absent — skip."; exit 0; }
-FOUND=$(mosquitto_sub "${_auth[@]}" -W 2 \
+FOUND=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
   -t 'homeassistant/+/+/config' \
   -F '%t' 2>/dev/null || true)
 FOUND=$(echo "${FOUND}" | grep '/jeedom2ha_' || true)

@@ -491,15 +491,116 @@ printf '{"status":"ok"}\\n'
     assert f'header = "X-Local-Secret: {escaped}"' in curl_config_log.read_text()
 
 
+# --- CC-20 follow-up: mosquitto-clients 2.0.11-1+deb11u2 (the version on the
+# real target box) has no `-o config-file` option at all — that option was
+# only added in mosquitto 2.1 (see the official mosquitto_sub(1)/
+# mosquitto_pub(1) man pages: "-o config-file ... Available from version
+# 2.1."; confirmed by reading client/client_shared.c at the eclipse/
+# mosquitto v2.0.11 tag, where `-o` is entirely absent from
+# client_config_line_proc). On 2.0.11, the *only* way to load options
+# without putting them on the argv is the **default config file**
+# mechanism: client_config_load() in client/client_shared.c looks up
+# `$XDG_CONFIG_HOME/mosquitto_sub` (or `mosquitto_pub`), falling back to
+# `$HOME/.config/mosquitto_sub`/`mosquitto_pub`, and parses it line by line
+# with `strtok(line, " ")` for the option then `strtok(NULL, "")` for the
+# (raw, unescaped) rest of the line as its value — so values may contain
+# spaces safely, but not newlines.
+#
+# The mock below refuses any option that is not part of the real
+# mosquitto-clients 2.0.11-1+deb11u2 option set (per binary — mosquitto_pub
+# and mosquitto_sub don't take the exact same options), which makes it fail
+# against the pre-fix script's `-o` usage instead of silently accepting it.
+# It also checks that credentials are supplied through the
+# `$XDG_CONFIG_HOME/<prog>` default config file rather than via argv.
+
+# mosquitto-clients 2.0.11-1+deb11u2 short options actually understood by
+# each binary (mosquitto_sub(1)/mosquitto_pub(1) man pages, "Available from
+# version 2.1" entries excluded: -o, --message-rate, --no-tls,
+# --retain-handling, --tls-keylog, -w/--watch).
+_MOSQUITTO_SUB_ALLOWED_OPTS = {
+    "-h", "-p", "-u", "-P", "-t", "-L", "-c", "-k", "-q", "-x", "-C", "-E",
+    "-R", "-T", "-U", "-F", "-W", "-A", "-i", "-I", "-d", "-N", "-v", "-V",
+    "-D",
+}
+_MOSQUITTO_PUB_ALLOWED_OPTS = {
+    "-h", "-p", "-u", "-P", "-t", "-L", "-c", "-k", "-q", "-x", "-A", "-i",
+    "-I", "-d", "-D", "-f", "-m", "-n", "-r", "-s", "-S", "-V",
+}
+
+
+def _write_strict_mosquitto_mocks(bin_dir: Path) -> None:
+    # One shared script body, parameterised on argv[0] basename so it can be
+    # installed both as mosquitto_sub and mosquitto_pub with each binary's
+    # own real option set (2.0.11-1+deb11u2).
+    body = """#!/bin/bash
+set -euo pipefail
+prog=$(basename "$0")
+printf 'ARGS: %s\\n' "$*" >> "$MOCK_MOSQUITTO_ARGV_LOG"
+
+if [ "$prog" = "mosquitto_sub" ]; then
+  allowed="-h -p -u -P -t -L -c -k -q -x -C -E -R -T -U -F -W -A -i -I -d -N -v -V -D"
+else
+  allowed="-h -p -u -P -t -L -c -k -q -x -A -i -I -d -D -f -m -n -r -s -S -V"
+fi
+
+skip_value=0
+for a in "$@"; do
+  if [ "$skip_value" = 1 ]; then
+    skip_value=0
+    continue
+  fi
+  case "$a" in
+    -*)
+      match=0
+      for opt in $allowed; do
+        [ "$a" = "$opt" ] && match=1 && break
+      done
+      if [ "$match" -eq 0 ]; then
+        echo "ERROR ($prog): option '$a' does not exist in mosquitto-clients 2.0.11-1+deb11u2 (CC-20 regression guard)" >&2
+        exit 2
+      fi
+      # Options below this mock cares about all take one value; flags like
+      # -N/-E/-v/-R/-r/-n/-c/-d take none, so only skip a value for the
+      # ones actually used with an argument in this script (-h/-p/-t/-F/-W).
+      case "$a" in
+        -h|-p|-t|-F|-W) skip_value=1 ;;
+      esac
+      ;;
+  esac
+done
+
+# CC-20: credentials must arrive via the mosquitto 2.0.x default config
+# file mechanism ($XDG_CONFIG_HOME/<prog>), never via argv.
+if [ -n "${XDG_CONFIG_HOME:-}" ] && [ -r "${XDG_CONFIG_HOME}/${prog}" ]; then
+  cat "${XDG_CONFIG_HOME}/${prog}" >> "$MOCK_MOSQUITTO_OPTS_LOG"
+fi
+
+if [ "$prog" = "mosquitto_sub" ]; then
+  printf 'homeassistant/switch/jeedom2ha_pool/config\\n'
+fi
+"""
+    (bin_dir / "mosquitto_sub").write_text(body)
+    (bin_dir / "mosquitto_sub").chmod(0o755)
+    (bin_dir / "mosquitto_pub").write_text(body)
+    (bin_dir / "mosquitto_pub").chmod(0o755)
+
+
 def test_mqtt_credentials_never_in_ssh_argv(tmp_path):
     # CC-20: MQTT credentials must never appear in ssh's or mosquitto_sub's
-    # argv. They travel over stdin (printf %q, same mechanism as the curl
-    # helper above) and land in a chmod-600 mosquitto -o options file on the
-    # remote side, written in mosquitto's own raw `-u <value>` / `-P
-    # <value>` format (mosquitto does no shell-style unescaping of that
-    # file — see client_shared.c). This fails against the pre-fix script,
-    # which passed MQTT_USER/MQTT_PASS as positional args to
-    # `ssh ... bash -s --`.
+    # argv, and the mosquitto invocation itself must only use options that
+    # actually exist in mosquitto-clients 2.0.11-1+deb11u2 (the version on
+    # the real target box — no `-o`, added only in mosquitto 2.1). Creds
+    # travel over stdin (printf %q, same mechanism as the curl helper
+    # above) and land in a chmod-600 default config file
+    # ($XDG_CONFIG_HOME/mosquitto_sub) on the remote side, written in
+    # mosquitto's own raw `-u <value>` / `-P <value>` format (mosquitto
+    # does no shell-style unescaping of that file — see
+    # client_config_load()/client_config_line_proc() in client_shared.c).
+    # This fails against the pre-fix script, which passed MQTT_USER/
+    # MQTT_PASS as positional args to `ssh ... bash -s --`, and would also
+    # fail (via the strict mock above) against a script using `-o`, since
+    # that option does not exist on the box's actual mosquitto-clients
+    # version.
     func_src = "\n".join(
         [
             _extract_function("jeedom2ha_mqtt_auth_snippet"),
@@ -511,26 +612,14 @@ def test_mqtt_credentials_never_in_ssh_argv(tmp_path):
     _write_remote_exec_ssh_mock(bin_dir)
 
     # Quotes, spaces and backslashes: adversarial values a real password
-    # could contain, and exactly what raw (unescaped) mosquitto -o lines
-    # must still carry unchanged.
+    # could contain, and exactly what raw (unescaped) mosquitto default
+    # config file lines must still carry unchanged.
     mqtt_user = 'mqtt"user\\with\\backslash'
     mqtt_pass = "p@ss word's \\back \"quoted\""
 
     mosquitto_argv_log = tmp_path / "mosquitto.argv.log"
     mosquitto_opts_log = tmp_path / "mosquitto.opts.log"
-    (bin_dir / "mosquitto_sub").write_text(
-        """#!/bin/bash
-printf 'ARGS: %s\\n' "$*" >> "$MOCK_MOSQUITTO_ARGV_LOG"
-for ((i=1; i<=$#; i++)); do
-  if [ "${!i}" = "-o" ]; then
-    j=$((i + 1))
-    cat "${!j}" >> "$MOCK_MOSQUITTO_OPTS_LOG"
-  fi
-done
-printf 'homeassistant/switch/jeedom2ha_pool/config\\n'
-"""
-    )
-    (bin_dir / "mosquitto_sub").chmod(0o755)
+    _write_strict_mosquitto_mocks(bin_dir)
     (bin_dir / "sudo").write_text("#!/bin/sh\nexec \"$@\"\n")
     (bin_dir / "sudo").chmod(0o755)
 
@@ -569,6 +658,18 @@ printf 'homeassistant/switch/jeedom2ha_pool/config\\n'
     assert mqtt_user not in mosquitto_argv
     assert mqtt_pass not in mosquitto_argv
     assert "MQTT_USER=" in ssh_stdin.read_text()
+    # CC-20 regression guard: `-o` does not exist in mosquitto-clients
+    # 2.0.11-1+deb11u2 (added in mosquitto 2.1). If the script still uses
+    # it, the strict mock above rejects it and never writes the opts log.
+    assert " -o " not in f" {mosquitto_argv} ", (
+        "script passed '-o' to mosquitto_sub/mosquitto_pub, which does not "
+        f"exist in mosquitto-clients 2.0.11-1+deb11u2 (CC-20): {mosquitto_argv!r}"
+    )
+    assert mosquitto_opts_log.exists(), (
+        "mosquitto mock never received credentials via "
+        "$XDG_CONFIG_HOME/<prog> (default config file mechanism) — "
+        f"argv was: {mosquitto_argv!r}"
+    )
     opts_content = mosquitto_opts_log.read_text()
     assert f"-u {mqtt_user}\n" in opts_content
     assert f"-P {mqtt_pass}\n" in opts_content
