@@ -21,8 +21,8 @@
 #   - ready-for-dev: Story file created in stories folder
 #   - in-progress: Developer actively working on implementation
 #   - review: Ready for code review (via Dev's code-review workflow)
-#   - ready-for-UX-validation: Story dont l'implémentation est terminée et déployée en environnement de test, en attente de preuve d'usage réel de l'UI avant de passer 'done'
-#   - done: Story completed
+#   - ready-for-UX-validation: Story dont l'implémentation est terminée et la CI verte, en attente de la preuve d'usage réel de l'interface avant de passer `done`.
+#   - done: Story completed. Si le changement touche la publication vers Home Assistant, preuve terrain après déploiement par le gate obligatoire (inventaire des entités avant/après, 0 erreur) avant de passer 'done'
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
