@@ -640,3 +640,65 @@ def test_secondary_mapping_gets_its_own_command_decision():
     secondary_cd = next(cd for cd in result.command_decisions if cd.cmd_id == 201)
     assert secondary_cd.reason == result.secondary_decisions[0].reason
     assert secondary_cd.should_publish == result.secondary_decisions[0].should_publish
+
+
+# ---------------------------------------------------------------------------
+# Revue bot Codex (PR #167) — corrections ciblées, non couvertes ailleurs
+# ---------------------------------------------------------------------------
+
+def test_ac3_merge_is_field_level_not_full_entry_replacement():
+    """Thread 1 (revue bot) : un override `proposed` PARTIEL (une seule clé de champ) sur une
+    clé déjà couverte par un override `persisted` ne doit jamais faire disparaître les champs
+    persistés non recouverts (schéma v2, `mapping/overrides.py` : une entrée porte à la fois
+    `ha_entity_type` et `publication_override`). Ici, `persisted` fixe `ha_entity_type="cover"`
+    sur 7:101 ; `proposed` ne fixe QUE `publication_override` sur la même clé — les deux champs
+    doivent survivre fusionnés, pas seulement le dernier écrit."""
+    eq = _make_eq()
+    mapping = _make_mapping(jeedom_eq_id=7, commands={"LIGHT_ON": _cmd(101, "LIGHT_ON")})
+    persisted = {"7:101": {"source": "user", "ha_entity_type": "cover"}}
+    proposed = {"7:101": {"source": "user", "publication_override": "force_publish"}}
+
+    from models.evaluate_equipment import _merge_override_layer
+
+    merged = _merge_override_layer(persisted, proposed)
+
+    assert merged["7:101"]["ha_entity_type"] == "cover"
+    assert merged["7:101"]["publication_override"] == "force_publish"
+
+    # Effet de bord observable via evaluate_equipment() : l'override de type persisté (cover)
+    # doit toujours s'appliquer alors que le forçage de publication vient du calque proposé.
+    result = _evaluate(
+        eq,
+        _eligible(),
+        mapping,
+        persisted_overrides=persisted,
+        proposed_overrides=proposed,
+        validate_projection_fn=lambda t, c: _valid_pv(),
+    )
+    assert result.mapping.ha_entity_type == "cover"
+    assert result.equipment_decision.reason == "publication_forced"
+
+
+def test_thread1_equipment_decision_mapping_result_reflects_final_mapping():
+    """Thread 1 (revue bot) : `equipment_decision.mapping_result` doit refléter le mapping FINAL
+    (étape 4, secondaires déjà finalisées) — jamais la version intermédiaire de l'étape 3, qui
+    ne porterait pas encore les décisions secondaires ni `pipeline_step_reached=4`."""
+    eq = _make_eq(cmds=[_cmd(101, "LIGHT_ON"), _cmd(201, "POWER", type_="info")])
+    secondary = _make_mapping(jeedom_eq_id=1, ha_entity_type="sensor", confidence="sure", commands={})
+    mapping = _make_mapping(
+        commands={"LIGHT_ON": _cmd(101, "LIGHT_ON")}, additional_mappings=[secondary]
+    )
+
+    result = _evaluate(
+        eq, _eligible(), mapping, validate_projection_fn=lambda t, c: _valid_pv()
+    )
+
+    mapping_result = result.equipment_decision.mapping_result
+    assert mapping_result.pipeline_step_reached == 4
+    assert len(mapping_result.additional_mappings) == 1
+    assert mapping_result.additional_mappings[0].pipeline_step_reached == 4
+    assert mapping_result.additional_mappings[0].publication_decision_ref is not None
+
+    # Cohérent avec le mapping final exposé par ailleurs sur l'évaluation.
+    assert mapping_result.additional_mappings[0].ha_entity_type == result.mapping.additional_mappings[0].ha_entity_type
+    assert result.secondary_decisions[0].mapping_result.pipeline_step_reached == 4

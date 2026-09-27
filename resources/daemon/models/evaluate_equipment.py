@@ -37,8 +37,12 @@ Registre de mappeurs et fonctions du pipeline injectables (Dev Notes) :
 
 Fusion des overrides (AC3) :
     Point unique de fusion overrides persistés + overrides proposés (aperçu, non sauvegardés) :
-    `_merge_override_layer`. Fournir uniquement des overrides persistés (aucun `proposed_*`)
-    produit un résultat identique à l'appel actuel de `decide_publication()` sur le même cas.
+    `_merge_override_layer`. La fusion est CHAMP PAR CHAMP à une même clé (schéma v2,
+    `mapping/overrides.py` : une entrée peut porter à la fois `ha_entity_type` et
+    `publication_override`) — un `proposed` partiel ne fait jamais disparaître un champ
+    persisté non recouvert (correction revue bot, PR #167). Fournir uniquement des overrides
+    persistés (aucun `proposed_*`) produit un résultat identique à l'appel actuel de
+    `decide_publication()` sur le même cas.
 """
 from __future__ import annotations
 
@@ -117,13 +121,18 @@ def _merge_override_layer(
 ) -> Dict[str, dict]:
     """Point unique de fusion overrides persistés + overrides proposés (AC3).
 
-    Le calque `proposed` (aperçu, non encore sauvegardé) est prioritaire clé par clé sur
-    `persisted` ; les clés persistées non recouvertes par `proposed` restent inchangées.
+    Le calque `proposed` (aperçu, non encore sauvegardé) est prioritaire CHAMP PAR CHAMP sur
+    `persisted` à une même clé (schéma v2, `mapping/overrides.py` : une entrée peut porter à la
+    fois `ha_entity_type` et `publication_override`) — un `proposed` partiel (ex. seulement
+    `publication_override`) ne doit jamais faire disparaître un champ persisté non recouvert
+    (ex. `ha_entity_type`). Les clés persistées non recouvertes par `proposed` restent inchangées.
     Ne mute jamais `persisted` ni `proposed` — retourne toujours de nouveaux dicts (deepcopy).
     """
     merged: Dict[str, dict] = deepcopy(dict(persisted or {}))
     for key, entry in (proposed or {}).items():
-        merged[key] = deepcopy(dict(entry))
+        base = dict(merged.get(key) or {})
+        base.update(deepcopy(dict(entry)))
+        merged[key] = base
     return merged
 
 
@@ -166,11 +175,20 @@ def _decide_for_mapping(
     validate_projection_fn: Callable[[str, object], ProjectionValidity],
     decide_publication_fn: Callable[..., PublicationDecision],
 ) -> "tuple[MappingResult, PublicationDecision]":
-    """Étapes 3 puis 4 du pipeline pour un seul `MappingResult` (primaire ou secondaire).
+    """Étape 3 (validation projection) puis 4 (décision) pour un seul `MappingResult`
+    (primaire ou secondaire) — sans finaliser encore `additional_mappings` (fait par
+    l'appelant une fois les secondaires eux-mêmes décidés, cf. `evaluate_equipment`).
 
     Jamais de mutation en place : `projection_validity`/`publication_decision_ref` sont
     posés via `dataclasses.replace`, jamais par assignation d'attribut (contrairement à
     `_preview_mapping_view`, AC4).
+
+    Retourne le mapping à l'étape 3 (`validated_mapping`, `pipeline_step_reached=3`) — c'est
+    à l'appelant de le finaliser (`pipeline_step_reached=4`, `additional_mappings` mis à jour)
+    puis de reposer `decision.mapping_result` sur cette version finale via
+    `_finalize_decision_mapping_result` (Story 19.0, correction revue bot — la version
+    précédente laissait `decision.mapping_result` figé à l'étape 3, sans les secondaires
+    finalisées ni `pipeline_step_reached=4`).
     """
     validity = validate_projection_fn(mapping.ha_entity_type, mapping.capabilities)
     validated_mapping = replace(mapping, projection_validity=validity, pipeline_step_reached=3)
@@ -183,10 +201,36 @@ def _decide_for_mapping(
         confidence_policy=confidence_policy,
         publication_override=publication_override,
     )
-    decision = replace(decision, mapping_result=validated_mapping)
-    final_mapping = replace(
-        validated_mapping, publication_decision_ref=decision, pipeline_step_reached=4
+    return validated_mapping, decision
+
+
+def _finalize_decision_mapping_result(
+    validated_mapping: MappingResult,
+    decision: PublicationDecision,
+    *,
+    additional_mappings: Optional[List[MappingResult]] = None,
+) -> "tuple[MappingResult, PublicationDecision]":
+    """Finalise le couple (mapping, décision) à l'étape 4 (Story 19.0, correction revue bot).
+
+    `decision.mapping_result` doit refléter le mapping final (étape 4, `additional_mappings`
+    déjà finalisées pour le primaire), jamais la version intermédiaire de l'étape 3 — sinon
+    `EquipmentEvaluation.equipment_decision.mapping_result` peut présenter un état obsolète
+    par rapport à `EquipmentEvaluation.mapping` (secondaires non finalisées notamment).
+
+    Limite structurelle assumée : `final_mapping.publication_decision_ref` référence `decision`,
+    mais `decision.mapping_result` référence `final_mapping` SANS `publication_decision_ref`
+    posé sur lui-même (`final_mapping_without_self_ref`) — une vraie boucle auto-référente
+    n'est pas représentable avec des dataclasses immuables (`dataclasses.replace`), contrairement
+    au pipeline classique qui mute les deux objets en place. `pipeline_step_reached=4` et
+    `additional_mappings` finalisées sont en revanche garantis cohérents des deux côtés.
+    """
+    final_mapping_without_self_ref = replace(
+        validated_mapping,
+        additional_mappings=additional_mappings if additional_mappings is not None else [],
+        pipeline_step_reached=4,
     )
+    decision = replace(decision, mapping_result=final_mapping_without_self_ref)
+    final_mapping = replace(final_mapping_without_self_ref, publication_decision_ref=decision)
     return final_mapping, decision
 
 
@@ -302,12 +346,13 @@ def evaluate_equipment(
         validate_projection_fn=validate_projection_fn,
         decide_publication_fn=decide_publication_fn,
     )
+    original_secondaries = mapping.additional_mappings or []
 
     secondary_decisions: List[PublicationDecision] = []
     updated_secondaries: List[MappingResult] = []
-    for secondary in mapping.additional_mappings or []:
+    for secondary in original_secondaries:
         secondary = apply_type_override(secondary, "", overrides=merged_overrides)
-        secondary, secondary_decision = _decide_for_mapping(
+        validated_secondary, secondary_decision = _decide_for_mapping(
             secondary,
             confidence_policy=confidence_policy,
             overrides=merged_overrides,
@@ -315,9 +360,20 @@ def evaluate_equipment(
             validate_projection_fn=validate_projection_fn,
             decide_publication_fn=decide_publication_fn,
         )
+        final_secondary, secondary_decision = _finalize_decision_mapping_result(
+            validated_secondary,
+            secondary_decision,
+            additional_mappings=validated_secondary.additional_mappings,
+        )
         secondary_decisions.append(secondary_decision)
-        updated_secondaries.append(secondary)
-    mapping = replace(mapping, additional_mappings=updated_secondaries)
+        updated_secondaries.append(final_secondary)
+
+    # Finalisation étape 4 du primaire une fois les secondaires eux-mêmes finalisées, pour que
+    # `primary_decision.mapping_result.additional_mappings` reflète les décisions secondaires
+    # réelles (correction revue bot — cf. `_finalize_decision_mapping_result`).
+    mapping, primary_decision = _finalize_decision_mapping_result(
+        mapping, primary_decision, additional_mappings=updated_secondaries
+    )
 
     # AC1 — une CommandDecision par cmd_id connu de l'équipement, y compris non couvertes.
     covered: Dict[int, "tuple[PublicationDecision, str]"] = {}
