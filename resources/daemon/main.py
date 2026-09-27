@@ -4,6 +4,7 @@
 # and publishes entities to Home Assistant via MQTT Discovery.
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -27,9 +28,56 @@ from cache.disk_cache import load_publications_cache
 # Résoudre le répertoire data/ relatif au daemon (data/ est un sibling de resources/)
 _DAEMON_DATA_DIR = os.path.normpath(os.path.join(_DAEMON_DIR, "..", "..", "data"))
 
+# plugin_info/info.json et VERSION sont à la racine du plugin, relatifs au daemon
+# (même pattern que _DAEMON_DATA_DIR ci-dessus).
+_PLUGIN_INFO_PATH = os.path.normpath(os.path.join(_DAEMON_DIR, "..", "..", "plugin_info", "info.json"))
+_VERSION_FILE_PATH = os.path.normpath(os.path.join(_DAEMON_DIR, "..", "..", "VERSION"))
+
+_UNKNOWN_VERSION = "inconnu"
+
 _LOGGER = logging.getLogger(__name__)
 
-_VERSION = "0.2.0"
+
+def _read_plugin_version(info_json_path: str = _PLUGIN_INFO_PATH) -> str:
+    """Read ``pluginVersion`` from plugin_info/info.json.
+
+    Falls back to ``_UNKNOWN_VERSION`` if the file is absent, unreadable, not
+    valid JSON, or valid JSON whose root is not an object (e.g. a list or a
+    string) — the daemon must never crash on a missing/corrupt file.
+    """
+    try:
+        with open(info_json_path, "r", encoding="utf-8") as fh:
+            info = json.load(fh)
+        if not isinstance(info, dict):
+            return _UNKNOWN_VERSION
+        return str(info.get("pluginVersion", _UNKNOWN_VERSION))
+    except (OSError, ValueError):
+        return _UNKNOWN_VERSION
+
+
+def _read_deploy_sha(version_file_path: str = _VERSION_FILE_PATH) -> str:
+    """Read the deployed commit SHA from the optional VERSION file at the
+    plugin root, written by scripts/deploy-to-box.sh on deploy as
+    ``key=value`` lines (``version=``, ``sha=``, ``deployed_at=``,
+    ``git_status=`` — see jeedom2ha_render_version_content).
+
+    Falls back to ``_UNKNOWN_VERSION`` if the file is absent, unreadable, or
+    has no ``sha=`` line.
+    """
+    try:
+        with open(version_file_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line.startswith("sha="):
+                    sha = line[len("sha="):].strip()
+                    return sha or _UNKNOWN_VERSION
+        return _UNKNOWN_VERSION
+    except OSError:
+        return _UNKNOWN_VERSION
+
+
+_VERSION = _read_plugin_version()
+_DEPLOY_SHA = _read_deploy_sha()
 
 
 async def _boot_watchdog(app: dict, timeout_s: float = 90.0) -> None:
@@ -151,7 +199,7 @@ class Jeedom2haDaemon(BaseDaemon):
           3. Start boot watchdog (90s)
           4. Start HTTP server
         """
-        _LOGGER.info("[DAEMON] jeedom2ha daemon v%s starting", _VERSION)
+        _LOGGER.info("[DAEMON] jeedom2ha daemon v%s (sha %s) starting", _VERSION, _DEPLOY_SHA)
 
         local_secret = self._config.localsecret
         if not local_secret:
