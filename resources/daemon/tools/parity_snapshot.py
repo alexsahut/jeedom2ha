@@ -10,6 +10,10 @@ Hors chemin de production : jamais importé par `transport/http_server.py` ni
 par `main.py`, jamais exécuté automatiquement (invocation manuelle uniquement,
 `python3 -m tools.parity_snapshot ...` depuis la VM de dev).
 
+Entrée VM recommandée : `scripts/parity-snapshot.sh capture|diff`. Le wrapper
+collecte MQTT sur la box par SSH et fournit --mqtt-inventory-file ; aucun
+mosquitto_sub local ni sudo sur la VM requis.
+
 Garanties de conception (guardrails Story 19.1) :
   - Lecture seule stricte : uniquement des requêtes HTTP GET
     (`/system/diagnostics`, `/system/published_scope`) et `mosquitto_sub`
@@ -263,6 +267,8 @@ def fetch_mqtt_retained_inventory(
         if auth_dir:
             shutil.rmtree(auth_dir, ignore_errors=True)
 
+    if result.returncode not in (0, 27):
+        raise ParitySnapshotError(f"mosquitto_sub a échoué (code {result.returncode}).")
     topics = sorted({
         line.strip() for line in result.stdout.splitlines()
         if discovery_substring in line and line.strip()
@@ -384,6 +390,7 @@ def capture_snapshot(
     mqtt_timeout: float = 2.0,
     http_timeout: float = 10.0,
     mqtt_runner=subprocess.run,
+    mqtt_inventory_file: Optional[str] = None,
 ) -> ParitySnapshot:
     """Relève un snapshot complet (décisions + inventaire MQTT + I11/scope
     explicite). Échoue explicitement (ParitySnapshotError) si le relevé de
@@ -398,11 +405,20 @@ def capture_snapshot(
             "le plugin Jeedom AVANT ce relevé ; cet outil ne déclenche jamais de sync lui-même)."
         )
 
-    mqtt_topics = fetch_mqtt_retained_inventory(
-        mqtt_host, mqtt_port,
-        user=mqtt_user, password=mqtt_password,
-        timeout=mqtt_timeout, runner=mqtt_runner,
-    )
+    if mqtt_inventory_file is not None:
+        # Inventory collected on the box by scripts/parity-snapshot.sh over SSH.
+        # The VM needs only Python's standard library, not mosquitto-clients.
+        with open(mqtt_inventory_file, encoding="utf-8") as inventory:
+            mqtt_topics = sorted({
+                line.strip() for line in inventory
+                if "/" + _MQTT_DISCOVERY_SUBSTRING in line and line.strip()
+            })
+    else:
+        mqtt_topics = fetch_mqtt_retained_inventory(
+            mqtt_host, mqtt_port,
+            user=mqtt_user, password=mqtt_password,
+            timeout=mqtt_timeout, runner=mqtt_runner,
+        )
     if not mqtt_topics:
         raise ParitySnapshotError(
             f"Relevé '{label}' : ÉCHEC — inventaire MQTT retained vide pour "
@@ -465,7 +481,9 @@ def diff_snapshots(before: dict, after: dict) -> dict:
 
 
 def _write_snapshot(snapshot: ParitySnapshot, output_path: str) -> None:
-    with open(output_path, "w", encoding="utf-8") as fh:
+    # Exclusive creation: do not truncate an existing proof or follow a symlink.
+    fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(snapshot.to_dict(), fh, indent=2, sort_keys=True, ensure_ascii=False)
         fh.write("\n")
 
@@ -483,6 +501,7 @@ def _cmd_capture(args: argparse.Namespace) -> int:
         mqtt_user=mqtt_user,
         mqtt_password=mqtt_password,
         mqtt_timeout=args.mqtt_timeout,
+        mqtt_inventory_file=args.mqtt_inventory_file,
     )
     _write_snapshot(snapshot, args.output)
     print(f"Relevé '{args.label}' écrit : {args.output}")
@@ -535,6 +554,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "capture", help="Relève un snapshot (décisions + MQTT retained)."
     )
     capture_parser.add_argument("--base-url", required=True, help="ex. http://192.168.1.21:PORT")
+    capture_parser.add_argument("--mqtt-inventory-file", help="Inventaire SSH du wrapper VM (aucun client MQTT local requis).")
     capture_parser.add_argument("--mqtt-host", required=True)
     capture_parser.add_argument("--mqtt-port", type=int, default=1883)
     capture_parser.add_argument("--mqtt-timeout", type=float, default=2.0)
@@ -555,7 +575,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except ParitySnapshotError as exc:
+    except (ParitySnapshotError, OSError) as exc:
         print(f"ERREUR : {exc}", file=sys.stderr)
         return 2
 

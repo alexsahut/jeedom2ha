@@ -1,65 +1,70 @@
 # Relevé de parité Story 19.1
 
-`resources/daemon/tools/parity_snapshot.py` compare l'état de publication du
-démon avant et après un changement de sync. Il est **strictement en lecture
-seule** : GET `/system/diagnostics`, GET `/system/published_scope` et
-`mosquitto_sub` uniquement. Il ne déclenche ni `/action/sync`, ni publication
-MQTT, ni écriture dans `data/`.
+Depuis la VM, `scripts/parity-snapshot.sh` relève l’état du démon avec uniquement
+GET `/system/diagnostics`, GET `/system/published_scope` et une souscription MQTT.
+Aucun `/action/*`, publication, redémarrage ou déploiement. La topologie doit déjà
+être disponible dans le démon ; un relevé vide échoue sans déclencher de sync.
 
-## Préconditions
+## Capture depuis la VM
 
-1. Faire exécuter le sync normal par le plugin Jeedom ; ne pas utiliser cet
-   outil pour le déclencher.
-2. Depuis la VM de développement, ouvrir un tunnel SSH local vers les services
-   locaux de la box (adapter le port du démon) :
-
-   ```bash
-   ssh -N -L 155080:127.0.0.1:<daemon-port> -L 11883:127.0.0.1:1883 jeedom-deploy
-   ```
-
-   Le tunnel évite d'exposer le démon ou MQTT sur le LAN. Garder cette session
-   ouverte uniquement le temps du relevé.
-3. Fournir le secret local et, si le broker l'exige, les identifiants MQTT par
-   le mécanisme d'environnement masqué de l'hôte (`JEEDOM2HA_LOCAL_SECRET` ou
-   `JEEDOM2HA_LOCAL_SECRET_FILE`, `JEEDOM2HA_MQTT_USER`,
-   `JEEDOM2HA_MQTT_PASS`). Ne jamais les placer dans une commande, un argument,
-   un URL, un fichier versionné ou un journal.
-
-## Procédure terrain (read-only)
-
-Dans `resources/daemon`, capturer l'état **avant** :
+Prérequis VM : Bash, SSH, jq et Python 3 (bibliothèque standard uniquement).
+Pas de `mosquitto_sub` ni de sudo nécessaires sur la VM. L’alias SSH réel est
+`jeedom-deploy` (`asahut@192.168.1.21`), avec accès PHP CLI via sudo sur la box.
 
 ```bash
-python3 -m tools.parity_snapshot capture \
-  --base-url http://127.0.0.1:155080 \
-  --mqtt-host 127.0.0.1 --mqtt-port 11883 \
-  --label before --output /tmp/jeedom2ha-parity-before.json
+scripts/parity-snapshot.sh capture
 ```
 
-Après le changement autorisé et le sync normal du plugin, capturer **après** :
+Le chemin par défaut est `/tmp/jeedom2ha-parity-probe-<UTC>.json` (mode **600**,
+création exclusive : une preuve existante ne sera pas écrasée). Pour choisir
+le libellé et le chemin :
 
 ```bash
-python3 -m tools.parity_snapshot capture \
-  --base-url http://127.0.0.1:155080 \
-  --mqtt-host 127.0.0.1 --mqtt-port 11883 \
-  --label after --output /tmp/jeedom2ha-parity-after.json
+scripts/parity-snapshot.sh capture --label before --output /tmp/jeedom2ha-parity-before.json
+scripts/parity-snapshot.sh capture --label after --output /tmp/jeedom2ha-parity-after.json
+scripts/parity-snapshot.sh diff --before /tmp/jeedom2ha-parity-before.json --after /tmp/jeedom2ha-parity-after.json
 ```
 
-Comparer ensuite les deux fichiers :
+Les deux captures encadrent un changement autorisé séparément ; ce wrapper ne
+réalise jamais ce changement. Pour vérifier seulement la chaîne de capture,
+comparer le fichier obtenu à lui-même avec `diff`.
+
+## Transport et secrets
+
+Le wrapper réutilise `jeedom2ha_refresh_secret`,
+`jeedom2ha_refresh_mqtt_credentials` et `jeedom2ha_mqtt_auth_snippet`, primitives
+partagées avec `deploy-to-box.sh` dans `scripts/box-readonly-lib.sh`.
+Il lit `localSecret`, `daemonApiPort` et la configuration MQTT par PHP CLI sur
+la box. Ne jamais copier le secret manuellement : il reste en mémoire, puis
+passe à Python uniquement par l’environnement `JEEDOM2HA_LOCAL_SECRET`.
+Les identifiants MQTT transitent dans stdin SSH, jamais dans argv ou les logs.
+
+Le tunnel HTTP local est ouvert puis fermé automatiquement (trap EXIT), avec
+un socket de contrôle dédié. Il correspond, pour le port habituel 55080, à :
 
 ```bash
-python3 -m tools.parity_snapshot diff \
-  --before /tmp/jeedom2ha-parity-before.json \
-  --after /tmp/jeedom2ha-parity-after.json
+ssh -N -L 127.0.0.1:15508:127.0.0.1:55080 jeedom-deploy
 ```
 
-Le code de retour vaut `0` seulement si décisions et topics MQTT sont
-identiques. Un relevé vide (décisions **ou** topics), une erreur HTTP/MQTT ou
-un diff non vide est un échec explicite (`2` pour capture/donnée invalide, `1`
-pour un diff) : ne pas le consigner comme une parité validée. Les champs
-`i11_candidates`, `explicit_scope_entries` et `published_scope_exceptions`
-restent des observations ; l'outil ne les corrige jamais.
+Ne pas ouvrir ce tunnel manuellement avant le wrapper. Celui-ci obtient le port
+réel depuis Jeedom. `JEEDOM2HA_PARITY_LOCAL_PORT` permet de remplacer 15508 s’il
+est occupé ; `JEEDOM2HA_PARITY_SSH_TARGET` permet de sélectionner un autre alias.
 
-Fermer le tunnel dès que les captures sont terminées et conserver les JSON
-comme preuve de la passe, hors du dépôt si elles contiennent des données de
-l'installation.
+MQTT est inventorié **sur la box**, sans tunnel MQTT, par `mosquitto_sub -W 2`
+avec exactement le mécanisme d’authentification de l’inventaire de déploiement :
+répertoire temporaire mode 700, configuration `mosquitto_sub` mode 600,
+`XDG_CONFIG_HOME` limité à l’appel, nettoyage par trap EXIT, sans option `-o`.
+Seuls ces fichiers temporaires sont écrits sur la box puis supprimés ; aucun
+inventaire ni backup n’y est conservé. Le flux de topics est transmis au tool
+par un fichier temporaire protégé sur la VM, également supprimé à la sortie.
+
+## Résultats
+
+Une capture réussie retourne `0` et affiche les nombres de décisions et topics.
+Une erreur SSH/MQTT est propagée ; un inventaire ou un ensemble de décisions vide
+échoue explicitement. Le timeout normal de `mosquitto_sub` (code 27) est accepté,
+mais son résultat doit être non vide. Le tool retourne `2` pour une capture ou
+donnée invalide ; `diff` retourne `0` pour une parité stricte, `1` pour un écart.
+Les champs `i11_candidates`, `explicit_scope_entries` et
+`published_scope_exceptions` restent des observations sans correction.
+Conserver les captures hors du dépôt : elles décrivent l’installation réelle.

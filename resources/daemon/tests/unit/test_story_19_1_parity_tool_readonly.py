@@ -474,3 +474,36 @@ def test_module_never_calls_mosquitto_pub_or_action_endpoints():
     assert "mosquitto_pub" not in code_only
     assert "/action/" not in code_only
     assert "ha_overrides.json" not in code_only
+
+
+def test_ssh_inventory_capture_needs_no_local_mosquitto(monkeypatch, tmp_path):
+    monkeypatch.setattr(pt, "fetch_diagnostics", lambda *a, **kw: _diagnostics_payload([_eq(1)]))
+    monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **kw: {"payload": {}})
+    def unexpected(*a, **kw):
+        pytest.fail("SSH inventory must not launch a local MQTT client")
+    inventory = tmp_path / "topics"
+    inventory.write_text("homeassistant/light/jeedom2ha_1/config\n" * 2 + "homeassistant/light/other/config\n")
+    snap = pt.capture_snapshot(
+        base_url="http://localhost", local_secret=SECRET, mqtt_host="box", mqtt_port=1883,
+        label="before", mqtt_inventory_file=str(inventory), mqtt_runner=unexpected,
+    )
+    assert snap.mqtt_topics == ["homeassistant/light/jeedom2ha_1/config"]
+    output = tmp_path / "capture.json"
+    pt._write_snapshot(snap, str(output))
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert pt.main(["diff", "--before", str(output), "--after", str(output)]) == 0
+    with pytest.raises(FileExistsError):
+        pt._write_snapshot(snap, str(output))
+    inventory.write_text("")
+    with pytest.raises(pt.ParitySnapshotError, match="vide"):
+        pt.capture_snapshot(
+            base_url="http://localhost", local_secret=SECRET, mqtt_host="box", mqtt_port=1883,
+            label="before", mqtt_inventory_file=str(inventory), mqtt_runner=unexpected,
+        )
+
+
+def test_mqtt_error_with_partial_topics_is_not_a_success():
+    with pytest.raises(pt.ParitySnapshotError, match="code 5"):
+        pt.fetch_mqtt_retained_inventory(
+            "box", 1883, runner=_fake_runner("homeassistant/light/jeedom2ha_1/config", 5)
+        )
