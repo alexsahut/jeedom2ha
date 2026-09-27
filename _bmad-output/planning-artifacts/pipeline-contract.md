@@ -94,6 +94,7 @@
 | I8 | `PRODUCT_SCOPE` est un sous-ensemble strict de `HA_COMPONENT_REGISTRY.keys()` | `assert set(PRODUCT_SCOPE) <= set(HA_COMPONENT_REGISTRY.keys())` |
 | I9 | Les `reason_code` sont uniques et sans collision de préfixe | Vérifier unicité dans le catalogue complet |
 | I10 | Déterminisme : mêmes entrées → même cause décisionnelle, même `should_publish` | Exécuter le pipeline 2x sur un corpus fixe → résultats identiques |
+| I11 | Publié ⇒ état streamé ET commandes routées, décision prise par candidat (jamais héritée du principal) | Pour un secondaire `should_publish=True` sous un principal refusé : `assert` état MQTT streamé et commande routée pour le secondaire, indépendamment de la décision du principal |
 
 ---
 
