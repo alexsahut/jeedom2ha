@@ -61,20 +61,29 @@ RESTART_DAEMON=false
 CLEANUP_DISCOVERY=false
 SKIP_POST_DEPLOY=false
 STOP_DAEMON_CLEANUP=false
+ROLLBACK_ARCHIVE=""
 
 # --- Parse args ---
-for arg in "$@"; do
-  case "$arg" in
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
     --dry-run)            DRY_RUN=true ;;
     --restart-daemon)     RESTART_DAEMON=true ;;
     --cleanup-discovery)  CLEANUP_DISCOVERY=true ;;
     --skip-post-deploy)    SKIP_POST_DEPLOY=true ;;
     --stop-daemon-cleanup) STOP_DAEMON_CLEANUP=true ;;
-    *) echo "ERROR: Unknown argument: $arg" >&2
+    --rollback)
+       [[ "$#" -ge 2 && -n "$2" && "${2:0:2}" != "--" ]] || {
+         echo "ERROR: --rollback requires a remote .tar.gz archive path." >&2; exit 1;
+       }
+       ROLLBACK_ARCHIVE="$2"
+       shift ;;
+    *) echo "ERROR: Unknown argument: $1" >&2
        echo "Usage: $0 [--dry-run] [--restart-daemon] [--cleanup-discovery] [--skip-post-deploy]" >&2
+       echo "       $0 --rollback <remote-archive.tar.gz>" >&2
        echo "       $0 --stop-daemon-cleanup  (mode dédié — incompatible avec les autres options)" >&2
        exit 1 ;;
   esac
+  shift
 done
 
 # =============================================================================
@@ -82,6 +91,31 @@ done
 # =============================================================================
 
 _fail() { echo "ERROR: $*" >&2; exit 1; }
+
+# Normal deploys must be reproducible from a committed, CI-validated SHA.  We
+# query the GitHub check-runs endpoint directly rather than `gh pr checks`:
+# a commit can be deployable even when it has no open PR, and this endpoint is
+# explicitly scoped to the exact SHA that is copied by rsync below.
+jeedom2ha_verify_deploy_source() {
+  _deploy_sha=$(git -C "${REPO_ROOT}" rev-parse HEAD)
+  [[ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ]] \
+    || _fail "Refus de déployer : l'arbre Git local est sale (fichiers non suivis inclus)."
+
+  _origin_url=$(git -C "${REPO_ROOT}" config --get remote.origin.url 2>/dev/null || true)
+  _github_repo=$(sed -E -n 's#^(git@github\.com:|https://github\.com/)([^/]+/[^/.]+)(\.git)?$#\2#p' <<< "${_origin_url}")
+  [[ -n "${_github_repo}" ]] || _fail "Impossible de déterminer le dépôt GitHub depuis origin (${_origin_url:-absent})."
+
+  _check_runs=$(gh api --paginate -H "Accept: application/vnd.github+json" \
+    "repos/${_github_repo}/commits/${_deploy_sha}/check-runs?per_page=100") \
+    || _fail "Impossible de lire les check-runs GitHub pour ${_deploy_sha}."
+  _check_lines=$(printf '%s' "${_check_runs}" | jq -r '.check_runs[]? | [.status, .conclusion] | @tsv')
+  [[ -n "${_check_lines}" ]] || _fail "Refus de déployer ${_deploy_sha} : aucun check-run GitHub trouvé."
+  while IFS=$'\t' read -r _check_status _check_conclusion; do
+    [[ "${_check_status}" == "completed" && "${_check_conclusion}" == "success" ]] \
+      || _fail "Refus de déployer ${_deploy_sha} : CI non verte (${_check_status}/${_check_conclusion})."
+  done <<< "${_check_lines}"
+  echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts)."
+}
 
 # --stop-daemon-cleanup est un mode dédié, incompatible avec les autres options opérationnelles.
 if [[ "${STOP_DAEMON_CLEANUP}" == "true" ]]; then
@@ -97,6 +131,15 @@ if [[ "${STOP_DAEMON_CLEANUP}" == "true" ]]; then
   fi
 fi
 
+if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
+  [[ "${DRY_RUN}" == "false" && "${RESTART_DAEMON}" == "false" \
+     && "${CLEANUP_DISCOVERY}" == "false" && "${SKIP_POST_DEPLOY}" == "false" \
+     && "${STOP_DAEMON_CLEANUP}" == "false" ]] \
+    || _fail "--rollback est un mode dédié et ne peut pas être combiné avec d'autres options."
+  [[ "${ROLLBACK_ARCHIVE}" == /* && "${ROLLBACK_ARCHIVE}" == *.tar.gz ]] \
+    || _fail "--rollback attend un chemin absolu vers une archive .tar.gz distante."
+fi
+
 [[ -z "${JEEDOM_BOX_HOST}" ]]                         && _fail "JEEDOM_BOX_HOST is not set."
 [[ -z "${JEEDOM_BOX_PATH}" ]]                         && _fail "JEEDOM_BOX_PATH is empty."
 [[ "${JEEDOM_BOX_PATH:0:1}" != "/" ]]                 && _fail "JEEDOM_BOX_PATH must be absolute."
@@ -108,6 +151,14 @@ _depth=$(awk -F'/' '{print NF-1}' <<< "${JEEDOM_BOX_PATH}")
 # jq requis localement pour le parsing JSON.
 # Le script ne l'utilise pas sur la box distante.
 command -v jq &>/dev/null || _fail "jq is required locally. Install: brew install jq"
+
+# This is deliberately before the first ssh/rsync invocation.  A rejected
+# source must leave the test box entirely untouched.
+if [[ -z "${ROLLBACK_ARCHIVE}" && "${STOP_DAEMON_CLEANUP}" == "false" ]]; then
+  echo "--- Garde-fous source..."
+  jeedom2ha_verify_deploy_source
+  echo ""
+fi
 
 SSH_TARGET="${JEEDOM_BOX_USER}@${JEEDOM_BOX_HOST}"
 SSH_OPTS=(-p "${JEEDOM_BOX_PORT}" -o "BatchMode=yes" -o "StrictHostKeyChecking=accept-new")
@@ -204,6 +255,86 @@ jeedom2ha_sync() {
      --data-binary @/tmp/jeedom2ha-sync-body.json"
 }
 
+# Source unique des credentials MQTT, également utilisée par --cleanup-discovery.
+jeedom2ha_refresh_mqtt_credentials() {
+  local _mqtt_json
+  _mqtt_json=$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
+sudo env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+\$mode = config::byKey("mode", "mqtt2", "local");
+\$host = (\$mode === "remote") ? config::byKey("remote::ip", "mqtt2", "") : "127.0.0.1";
+\$port = (\$mode === "remote") ? intval(config::byKey("remote::port", "mqtt2", 1883)) : 1883;
+\$raw = config::byKey("mqtt::password", "mqtt2", "");
+\$line = explode("\\n", \$raw)[0]; \$user = ""; \$pass = "";
+if (strpos(\$line, ":") !== false) { list(\$user, \$pass) = explode(":", \$line, 2); }
+echo json_encode(["host"=>\$host, "port"=>\$port, "user"=>\$user, "pass"=>\$pass]);
+'
+REMOTE
+  )
+  _mqtt_host=$(echo "${_mqtt_json}" | jq -r '.host // empty')
+  _mqtt_port=$(echo "${_mqtt_json}" | jq -r '.port // "1883"')
+  _mqtt_user=$(echo "${_mqtt_json}" | jq -r '.user // empty')
+  _mqtt_pass=$(echo "${_mqtt_json}" | jq -r '.pass // empty')
+}
+
+# Snapshot retained topics on the box next to deploy backups for manual diffs.
+jeedom2ha_inventory_discovery() {
+  local _phase="$1"
+  [[ -n "${_mqtt_host}" ]] || { echo "WARNING: mqtt2 host introuvable — inventaire ${_phase} ignoré." >&2; return 0; }
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
+    "${_mqtt_host}" "${_mqtt_port}" "${_mqtt_user}" "${_mqtt_pass}" "${JEEDOM_BACKUP_DIR}" "${_phase}" <<'REMOTE'
+set -euo pipefail
+MQTT_HOST="$1"; MQTT_PORT="$2"; MQTT_USER="$3"; MQTT_PASS="$4"; BACKUP_DIR="$5"; PHASE="$6"
+command -v mosquitto_sub &>/dev/null || { echo "WARNING: mosquitto_sub absent — inventaire ignoré." >&2; exit 0; }
+_auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
+[[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
+sudo mkdir -p "${BACKUP_DIR}/inventory"
+sudo chmod 700 "${BACKUP_DIR}/inventory"
+_file="${BACKUP_DIR}/inventory/jeedom2ha-discovery-${PHASE}-$(date -u +%Y%m%dT%H%M%SZ).txt"
+TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
+printf '%s\n' "${TOPICS}" | grep '/jeedom2ha_' | sort -u | sudo tee "${_file}" >/dev/null || true
+sudo chmod 600 "${_file}"
+sudo chown "$(id -un):$(id -gn)" "${_file}"
+echo "  Inventaire ${PHASE}: ${_file}"
+REMOTE
+}
+
+jeedom2ha_rollback_archive() {
+  local _archive="$1"
+  echo "--- Rollback archive → ${JEEDOM_BOX_PATH}/"
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" <<'REMOTE'
+set -euo pipefail
+ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"
+[[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }
+tar -tzf "${ARCHIVE}" | grep -Eq '^jeedom2ha(/|$)' || {
+  echo "ERROR: archive incompatible (racine jeedom2ha/ absente): ${ARCHIVE}" >&2; exit 1;
+}
+if tar -tzf "${ARCHIVE}" | grep -Ev '^jeedom2ha(/|$)' >/dev/null; then
+  echo "ERROR: archive incompatible (contenu hors jeedom2ha/): ${ARCHIVE}" >&2; exit 1
+fi
+_parent=$(dirname "${PLUGIN_PATH}")
+_work=$(sudo mktemp -d "${_parent}/.jeedom2ha-rollback.XXXXXX")
+cleanup() { sudo rm -rf "${_work}"; }
+trap cleanup EXIT
+sudo tar -xzf "${ARCHIVE}" -C "${_work}"
+[[ -d "${_work}/jeedom2ha" ]] || { echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
+jeedom2ha::deamon_stop();
+'
+sudo rm -rf "${PLUGIN_PATH}"
+sudo mv "${_work}/jeedom2ha" "${PLUGIN_PATH}"
+sudo chown -R www-data:www-data "${PLUGIN_PATH}"
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
+if (!jeedom2ha::deamon_start()) { fwrite(STDERR, "deamon_start() returned false\\n"); exit(1); }
+'
+echo "  Rollback restauré et daemon redémarré sous www-data."
+REMOTE
+}
+
 # =============================================================================
 echo "======================================================================="
 echo "  DEV/TEST DEPLOY — jeedom2ha"
@@ -214,6 +345,18 @@ echo "  Staging : ${JEEDOM_STAGING_DIR}/"
 echo "  Target  : ${JEEDOM_BOX_PATH}/ (via sudo)"
 [[ "${DRY_RUN}" == "true" ]] && echo "  Mode    : DRY-RUN"
 echo ""
+
+if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
+  jeedom2ha_rollback_archive "${ROLLBACK_ARCHIVE}"
+  jeedom2ha_refresh_secret || _fail "Rollback effectué mais localSecret indisponible après redémarrage."
+  _rollback_status=$(jeedom2ha_status 2>&1) || _fail "Daemon injoignable après rollback."
+  [[ "$(echo "${_rollback_status}" | jq -r '.status // empty')" == "ok" ]] \
+    || _fail "Healthcheck échoué après rollback: ${_rollback_status}"
+  echo "======================================================================="
+  echo "  Rollback complete."
+  echo "======================================================================="
+  exit 0
+fi
 
 # =============================================================================
 # STEP 1 — déploiement (user SSH non-root + sudo)
@@ -340,6 +483,11 @@ REMOTE
   exit 0
 fi
 
+echo "--- Inventaire MQTT avant déploiement..."
+jeedom2ha_refresh_mqtt_credentials
+jeedom2ha_inventory_discovery "before"
+echo ""
+
 echo "--- [1/5] Deploy (staging + sudo promotion)..."
 
 # 1a — rsync vers staging (pas de sudo requis)
@@ -352,7 +500,7 @@ rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${JEEDOM_STAGING_DIR}/"
 # d'archives (700) et, si un plugin est déjà déployé, une nouvelle archive
 # horodatée (600) avant que le rsync --delete de l'étape 1b ne l'écrase.
 echo "  1a-bis. Backup ${JEEDOM_BOX_PATH}/ → ${JEEDOM_BACKUP_DIR}/ (si plugin déjà déployé)"
-ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
+_backup_output=$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
 set -e
 sudo mkdir -p "${JEEDOM_BACKUP_DIR}"
 sudo chmod 700 "${JEEDOM_BACKUP_DIR}"
@@ -366,11 +514,17 @@ if [[ -d "${JEEDOM_BOX_PATH}" ]]; then
   sudo tar -czf "\${_archive}" -C "$(dirname "${JEEDOM_BOX_PATH}")" "$(basename "${JEEDOM_BOX_PATH}")"
   sudo chmod 600 "\${_archive}"
   sudo chown "${JEEDOM_BOX_USER}:${JEEDOM_BOX_USER}" "\${_archive}"
+  echo "__JEEDOM2HA_BACKUP_ARCHIVE__=\${_archive}"
   echo "  Backup créé: \${_archive} (600, ${JEEDOM_BOX_USER}) — dossier ${JEEDOM_BACKUP_DIR} (700, ${JEEDOM_BOX_USER})."
 else
-  echo "  Aucun plugin existant à ${JEEDOM_BOX_PATH} — pas de backup (premier déploiement)."
+  echo "ERROR: plugin absent à ${JEEDOM_BOX_PATH}; aucun rollback sûr ne peut être garanti." >&2
+  exit 1
 fi
 REMOTE
+)
+echo "${_backup_output}"
+BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_backup_output}")
+[[ -n "${BACKUP_ARCHIVE}" ]] || _fail "Backup absent : le déploiement est annulé pour préserver un rollback sûr."
 echo ""
 
 # 1b — promotion staging → plugin dir + permissions (sudo requis)
@@ -393,13 +547,8 @@ echo ""
 # la même fonction est testée sans ssh dans tests/unit/test_deploy_version_file.py.
 echo "  1c. VERSION → ${JEEDOM_BOX_PATH}/VERSION"
 _plugin_version=$(jq -r '.pluginVersion' "${REPO_ROOT}/plugin_info/info.json")
-_deploy_sha=$(git -C "${REPO_ROOT}" rev-parse HEAD)
 _deploy_ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-if [[ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
-  _deploy_git_status="clean"
-else
-  _deploy_git_status="dirty"
-fi
+_deploy_git_status="clean"
 _version_content=$(jeedom2ha_render_version_content \
   "${_plugin_version}" "${_deploy_sha}" "${_deploy_ts}" "${_deploy_git_status}")
 
@@ -564,6 +713,10 @@ REMOTE
   done
   echo "  Daemon prêt, MQTT connecté (${_wait}s)."
   echo ""
+
+  echo "--- Inventaire MQTT après redémarrage..."
+  jeedom2ha_inventory_discovery "after"
+  echo ""
 fi
 
 # =============================================================================
@@ -638,6 +791,18 @@ REMOTE
   echo ""
 fi
 
+if [[ "${SKIP_POST_DEPLOY}" == "true" ]]; then
+  echo "WARNING: aucun tag de déploiement créé : --skip-post-deploy ne confirme pas le healthcheck." >&2
+else
+  _deploy_tag="deploy-${_deploy_sha}-$(date -u +%Y%m%dT%H%M%SZ)"
+  GIT_COMMITTER_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    git -C "${REPO_ROOT}" tag -a "${_deploy_tag}" "${_deploy_sha}" \
+      -m "DEV/TEST box deploy ${_deploy_sha} (${_deploy_ts})"
+  echo "  Tag annoté créé : ${_deploy_tag}"
+fi
+echo ""
+echo "  Commande de rollback prête :"
+printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${BACKUP_ARCHIVE}"
 echo "======================================================================="
 echo "  Deploy complete."
 echo "======================================================================="
