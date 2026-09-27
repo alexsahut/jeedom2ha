@@ -1,4 +1,4 @@
-# Story 19.2: Découplage I8 — état streamé et commandes routées par décision de candidat
+# Story 19.2: Découplage I11 — état streamé et commandes routées par décision de candidat
 
 Status: ready-for-dev
 
@@ -10,20 +10,22 @@ As un mainteneur,
 I want que `resources/daemon/sync/state.py` et `resources/daemon/sync/command.py` filtrent le state-streaming et le routage de commandes sur la décision **du candidat/secondaire lui-même**, jamais sur celle du principal,
 so that un secondaire publié sous un principal refusé (ex. pattern "metering plug") reçoive bien son état MQTT et voie ses commandes routées, au lieu de devenir une entité HA fantôme sans état ni commande.
 
+**Parcours : complet.**
+
 ## Acceptance Criteria
 
-**AC1 — State streaming découplé (I8)**
+**AC1 — State streaming découplé (I11)**
 
 **Given** un équipement dont le principal est refusé (`should_publish=False`) mais dont un secondaire est publié (`should_publish=True`)
-**When** `resources/daemon/sync/state.py` (~l.151-154) décide de streamer l'état d'une entité
+**When** `resources/daemon/sync/state.py` décide de streamer l'état d'une entité — deux points de filtrage précis à corriger : `list_state_targets` (filtre sur `decision.should_publish` du principal, l.154, **avant** même d'itérer les candidats à la recherche de leur propre `cand_decision`, l.164-165) et `_resolve_state_target` (même filtre sur le principal, l.263-264, **avant** la recherche du candidat ciblé par `eq_id`/`cmd_id`)
 **Then** la décision de streaming est prise sur la `CommandDecision`/décision **du candidat concerné**, jamais sur celle du principal
 **And** le secondaire publié reçoit son état MQTT streamé
 **And** un test explicite reproduit ce cas et vérifie que l'état du secondaire est bien streamé malgré le refus du principal.
 
-**AC2 — Routage de commandes découplé (I8)**
+**AC2 — Routage de commandes découplé (I11)**
 
 **Given** le même scénario (principal refusé, secondaire publié)
-**When** `resources/daemon/sync/command.py` (~l.199-205) décide de router une commande entrante
+**When** `resources/daemon/sync/command.py::_resolve_runtime_target` décide de router une commande entrante — filtre sur `decision.should_publish` du principal en l.201, puis sur `decision.active_or_alive` (toujours le principal) en l.204, **avant** d'itérer les candidats (`candidate_decision`, l.209) pour trouver celui qui correspond réellement au topic
 **Then** la décision de routage est prise sur la décision **du candidat concerné**, jamais sur celle du principal
 **And** les commandes destinées au secondaire publié sont bien routées
 **And** un test explicite reproduit ce cas et vérifie le routage effectif de la commande du secondaire.
@@ -31,13 +33,13 @@ so that un secondaire publié sous un principal refusé (ex. pattern "metering p
 **AC3 — Non-régression du pattern "metering plug"**
 
 **Given** le corpus de test `test_story_13_3_metering_plug_secondary_sensors.py` (secondaires indépendants du type du principal)
-**When** le découplage I8 est implémenté
+**When** le découplage I11 est implémenté
 **Then** ce test reste vert sans modification de son intention (des ajustements de mécanique interne sont acceptables si la sémantique du test n'est pas affaiblie)
 **And** aucune autre suite existante liée aux secondaires/multi-sensor n'est régressée.
 
-**AC4 — Pas de couplage forcé (I8 correctement interprété)**
+**AC4 — Pas de couplage forcé (I11 correctement interprété)**
 
-**Given** l'invariant I8 tel que formulé ("publié ⇒ état streamé ET commandes routées")
+**Given** l'invariant I11 tel que formulé ("publié ⇒ état streamé ET commandes routées")
 **When** l'implémentation est revue
 **Then** la correction ne force **jamais** un secondaire à hériter de la décision du principal (ni dans un sens ni dans l'autre) — chaque candidat garde sa décision propre, indépendante
 **And** un test explicite vérifie qu'un principal publié avec un secondaire refusé ne fait PAS streamer/router le secondaire refusé (le découplage n'est pas un "tout publier", c'est un "chacun sa décision").
@@ -48,19 +50,21 @@ so that un secondaire publié sous un principal refusé (ex. pattern "metering p
 
 ## Impact sur la production et retour arrière
 
-Changement de comportement réel et volontaire : des entités HA aujourd'hui "fantômes" (publiées en discovery mais sans état/commande car secondaires d'un principal refusé) recevront désormais leur état et leurs commandes. C'est une correction de bug (I8), pas une régression attendue. Retour arrière : revert de la story/PR — `state.py`/`command.py` reviennent au filtrage sur la décision du principal ; aucune migration de données requise, aucun changement de schéma de persistance.
+Changement de comportement réel et volontaire : des entités HA aujourd'hui "fantômes" (publiées en discovery mais sans état/commande car secondaires d'un principal refusé) recevront désormais leur état et leurs commandes. C'est une correction de bug (I11), pas une régression attendue. Retour arrière : revert de la story/PR — `state.py`/`command.py` reviennent au filtrage sur la décision du principal ; aucune migration de données requise, aucun changement de schéma de persistance.
 
 ## Preuve terrain
 
-Preuve terrain = chaque entité effectivement publiée (principal ou secondaire) reçoit bien son état MQTT et voit ses commandes routées, vérifié sur la box réelle (192.168.1.21), en utilisant si possible un cas réel identifié par l'outil de parité de Story 19.1 (mesure I8 déjà violé). **À défaut** d'un cas réel trouvé sur la box, repli explicite sur un test d'intégration dédié reproduisant le scénario "principal refusé / secondaire publié" — ce repli doit être mentionné explicitement dans les Completion Notes de cette story, jamais passé sous silence.
+Preuve terrain = chaque entité effectivement publiée (principal ou secondaire) reçoit bien son état MQTT et voit ses commandes routées, vérifié sur la box réelle (192.168.1.21), en utilisant si possible un cas réel identifié par l'outil de parité de Story 19.1 (mesure I11 déjà violé). **À défaut** d'un cas réel trouvé sur la box, repli explicite sur un test d'intégration dédié reproduisant le scénario "principal refusé / secondaire publié" — ce repli doit être mentionné explicitement dans les Completion Notes de cette story, jamais passé sous silence.
+
+**Gate d'inventaire obligatoire (convention repo, `sprint-status.yaml`) :** cette story touche la publication vers Home Assistant (état MQTT streamé + routage de commandes pour des entités déjà publiées) — elle ne peut donc passer à `done` qu'après le gate obligatoire d'inventaire des entités avant/après déploiement (0 erreur), au même titre que toute story de ce type. Ce gate est distinct de l'outil de parité de Story 19.1 (qui mesure la décision de publication) : il porte spécifiquement sur l'inventaire des entités HA effectivement présentes après déploiement de cette correction.
 
 ## Invariants concernés
 
-I8 (objet principal de cette story — correction par découplage explicite, jamais par couplage forcé). I1-I7 non modifiés, à ne pas régresser (vérifié par la suite complète).
+I11 (objet principal de cette story — correction par découplage explicite, jamais par couplage forcé). I1-I7 non modifiés, à ne pas régresser (vérifié par la suite complète).
 
 ## Points fermés
 
-Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directement à I8 (I8 est une découverte de ce chantier, pas un ticket CC-xx préexistant). Cette story ne ferme donc pas de CC-xx numéroté ; elle corrige l'invariant I8 découvert pendant l'analyse. CC-04/CC-14 non concernés par cette story spécifique.
+Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directement à I11 (I11 est une découverte de ce chantier, pas un ticket CC-xx préexistant). Cette story ne ferme donc pas de CC-xx numéroté ; elle corrige l'invariant I11 découvert pendant l'analyse. CC-04/CC-14 non concernés par cette story spécifique.
 
 ## Tasks / Subtasks
 
@@ -68,14 +72,15 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
 - [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Identifier, via le rapport de l'outil de parité (Story 19.1, AC4), un cas réel de violation I8 sur la box si disponible
+  - [ ] Identifier, via le rapport de l'outil de parité (Story 19.1, AC4), un cas réel de violation I11 sur la box si disponible
+  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant la vérification terrain de cette story — ces flags republient des messages MQTT retained **vides** sur les topics discovery, ce qui effacerait les entités déjà publiées (principal et secondaires) et rendrait impossible de constater si un secondaire reçoit bien son état/ses commandes après correction. Déploiement standard uniquement.
 
 - [ ] Task 1 — Découpler le state streaming (AC1)
-  - [ ] Modifier `resources/daemon/sync/state.py` (~l.151-154) pour filtrer sur la décision du candidat concerné (`CommandDecision`/décision par candidat issue de `evaluate_equipment()`, Story 19.0/19.1) au lieu de `decision.should_publish` du principal
+  - [ ] Modifier `resources/daemon/sync/state.py` aux **deux** points de filtrage identifiés — `list_state_targets` (l.154) et `_resolve_state_target` (l.263-264) — pour filtrer sur la décision du candidat concerné (`CommandDecision`/décision par candidat issue de `evaluate_equipment()`, Story 19.0/19.1) au lieu de `decision.should_publish` du principal
   - [ ] Vérifier qu'aucun autre filtre implicite ne réintroduit une dépendance au principal
 
 - [ ] Task 2 — Découpler le routage de commandes (AC2)
-  - [ ] Modifier `resources/daemon/sync/command.py` (~l.199-205) selon le même principe
+  - [ ] Modifier `resources/daemon/sync/command.py::_resolve_runtime_target` aux **deux** filtres identifiés (l.201 `should_publish`, l.204 `active_or_alive`) selon le même principe — décision prise sur le `candidate_decision` (l.209) du candidat effectivement ciblé par le topic, jamais sur celle du principal
 
 - [ ] Task 3 — Garde-fou anti-couplage-forcé (AC4)
   - [ ] Test explicite garantissant qu'un secondaire refusé reste refusé (pas de "tout publier" accidentel)
@@ -114,11 +119,13 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics-projection-engine.md#Epic-19] — invariant I8, règle de découplage actée (pas de couplage forcé).
-- [Source: resources/daemon/sync/state.py#L151-L154] — filtrage actuel sur la décision du principal (à corriger).
-- [Source: resources/daemon/sync/command.py#L199-L205] — filtrage actuel sur la décision du principal (à corriger).
+- [Source: _bmad-output/planning-artifacts/epics-projection-engine.md#Epic-19] — invariant I11, règle de découplage actée (pas de couplage forcé).
+- [Source: resources/daemon/sync/state.py#L154] — `list_state_targets`, filtrage actuel sur `decision.should_publish` du principal (à corriger).
+- [Source: resources/daemon/sync/state.py#L263-L264] — `_resolve_state_target`, même filtrage sur le principal (à corriger).
+- [Source: resources/daemon/sync/command.py#L201] — `_resolve_runtime_target`, filtrage sur `decision.should_publish` du principal (à corriger).
+- [Source: resources/daemon/sync/command.py#L204] — `_resolve_runtime_target`, filtrage sur `decision.active_or_alive` du principal (à corriger).
 - [Source: resources/daemon/tests/unit/test_story_13_3_metering_plug_secondary_sensors.py] — non-régression du pattern secondaires indépendants.
-- [Source: _bmad-output/implementation-artifacts/19-1-sync-migre-contrat-decision-sans-changement-comportement.md] — outil de parité, mesure préalable des violations I8.
+- [Source: _bmad-output/implementation-artifacts/19-1-sync-migre-contrat-decision-sans-changement-comportement.md] — outil de parité, mesure préalable des violations I11.
 
 ## Dev Agent Record
 
