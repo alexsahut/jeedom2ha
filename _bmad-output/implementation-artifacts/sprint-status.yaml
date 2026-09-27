@@ -21,7 +21,8 @@
 #   - ready-for-dev: Story file created in stories folder
 #   - in-progress: Developer actively working on implementation
 #   - review: Ready for code review (via Dev's code-review workflow)
-#   - done: Story completed
+#   - ready-for-UX-validation: Story dont l'implémentation est terminée et la CI verte, en attente de la preuve d'usage réel de l'interface avant de passer `done`.
+#   - done: Story completed. Si le changement touche la publication vers Home Assistant, preuve terrain après déploiement par le gate obligatoire (inventaire des entités avant/après, 0 erreur) avant de passer 'done'
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
@@ -33,6 +34,7 @@
 # - Stories can be worked in parallel if team capacity allows
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Story touchant l'UI : review -> ready-for-UX-validation -> done (voir docs/bmad-parcours-rapide-complet.md)
 
 # CYCLES:
 # =======

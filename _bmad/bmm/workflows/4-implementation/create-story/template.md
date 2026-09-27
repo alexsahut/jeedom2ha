@@ -14,6 +14,10 @@ so that {{benefit}}.
 
 1. [Add acceptance criteria from epics/PRD]
 
+## UI Impact
+
+- **UI Impact:** {{ui_impact}} <!-- Oui / Non — coche "Oui" si cette story modifie l'interface utilisateur (desktop/, core/ajax/, templates, CSS/JS front) ou tout comportement visible par l'utilisateur final. code-review l'utilise pour décider si la story doit passer par le statut "ready-for-UX-validation" avant "done". -->
+
 ## Tasks / Subtasks
 
 <!-- Story terrain (daemon / MQTT / discovery HA / runtime / bootstrap / restart daemon /
