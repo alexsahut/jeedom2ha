@@ -19,7 +19,7 @@ so that les 4 points d'appel du pipeline (sync, navigation par pièce, aperçu, 
 **Given** un équipement dont certaines commandes sont mappées, éligibles ou explicitement overridées, et d'autres non couvertes par le mapping
 **When** `evaluate_equipment()` est appelé
 **Then** la sortie contient une `CommandDecision` pour **chaque** `cmd_id` de l'équipement, y compris les commandes non couvertes
-**And** chaque `CommandDecision` porte un `reason` non-null (I6), y compris pour les commandes non couvertes (ex. `reason="cmd_not_mapped"` ou équivalent explicite)
+**And** chaque `CommandDecision` porte un `reason` non-null (I6), y compris pour les commandes non couvertes (raison explicite « commande non couverte »)
 **And** un test unitaire vérifie que le nombre de `CommandDecision` produites est strictement égal au nombre de `cmd_id` connus de l'équipement en entrée.
 
 **AC2 — Éligibilité jamais recalculée en interne (racine de CC-03)**
@@ -49,8 +49,8 @@ so that les 4 points d'appel du pipeline (sync, navigation par pièce, aperçu, 
 **When** `evaluate_equipment()` est implémenté
 **Then** I2 (projection invalide ⇒ jamais publié, même avec override), I4 (premier échec dans l'ordre 1→2→3→4 fait foi, jamais écrasé en aval), I6 (`reason` non-null) et I7 (aucune logique MQTT/broker/cache dans la fonction) sont vérifiés par des tests dédiés, portés de `test_step4_decide_publication.py`
 **And** I3 (un `cmd_id`/candidat avec `should_publish=True` a passé les 4 premières étapes positivement) est vérifié par un test dédié sur la sortie de `evaluate_equipment()` (confidence `sure`/`probable`/`sure_mapping` + `is_valid=True` + `ha_entity_type` dans `PRODUCT_SCOPE` ⇒ `should_publish=True`, et réciproquement)
-**And** I5 (tout candidat éligible produit ses 3 sous-blocs) est vérifié par un test dédié : pour tout candidat dont `mapping` et `projection_validity` sont fournis en entrée (déjà calculés en amont), `evaluate_equipment()` produit toujours une `CommandDecision`/décision de publication — jamais `None`, jamais une décision omise
-**And** I1 (un eq inéligible ne produit aucun sous-bloc) reste hors du périmètre testable de cette fonction : `evaluate_equipment()` ne reçoit que des candidats déjà filtrés comme éligibles par l'étape 1 (en amont, hors de cette fonction) ; I1 continue d'être vérifié par les tests existants de l'étape d'éligibilité, sans duplication ici
+**And** I5 (tout équipement éligible produit ses 3 sous-blocs) est vérifié par un test dédié : `evaluate_equipment()` calcule le mapping avec le registre injecté, fusionne les overrides, valide puis décide — sans mapping ni projection fournis en entrée — et produit toujours une `CommandDecision`/décision de publication, jamais `None`, jamais une décision omise
+**And** I1 (équipement inéligible) produit une décision refusée de niveau 1 avec un code de raison d'éligibilité, sans mapping ni projection, et une `CommandDecision` refusée par `cmd_id` ; un test dédié le vérifie.
 **And** `evaluate_equipment()` ne prend **aucun** paramètre `published_scope` — un test explicite vérifie que la signature de la fonction ne contient pas ce paramètre (le filtre de scope reste hors périmètre de cette story, appliqué en aval par une fonction de filtre partagée définie ultérieurement).
 
 ## UI Impact
@@ -71,19 +71,19 @@ I2, I3, I4, I5, I6, I7 (vérifiés par tests dédiés sur la sortie de `evaluate
 
 ## Points fermés
 
-Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC-03 et CC-19 sont fermés par Story 19.3, CC-18 par Story 19.4 (cf. `epics-projection-engine.md#Epic-19`). CC-04 et CC-14 (P1) restent **ouverts** dans tout l'epic : aucun contenu définissant ces deux points n'a été retrouvé dans le dépôt (grep + historique git exhaustifs) ; ils ne sont attribués à aucune story de cet epic, faute de définition source.
+Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC-03 et CC-19 sont fermés par Story 19.3, CC-18 par Story 19.4 (cf. `epics-projection-engine.md#Epic-19`). CC-04 — partiellement fermé. Volet contrat : décision canonique par commande (19-0 AC1) et deux temporalités (19-3 AC6). Volet UI (jargon, gabarit, surface unique) : étape 4. CC-14 P1 (parité simulation/sync + pas de silence) — fermé par 19-0 AC1 + 19-3 AC7 + 19-4 AC7 ; P0 fait à l'étape 1 ; P2 hors périmètre.
 
 ## Tasks / Subtasks
 
 - [ ] Task 1 — Définir `CommandDecision` (AC1, AC4)
-  - [ ] Nouveau type de données `CommandDecision` (dataclass ou équivalent), un par `cmd_id`, portant au minimum `cmd_id`, `should_publish`, `reason`, `reason_details` (cohérent avec `PublicationDecision.reason_details` existant, Story 16.3)
+  - [ ] Nouveau type de données `CommandDecision` (dataclass ou équivalent), un par `cmd_id`, portant au minimum `cmd_id`, `should_publish`, `reason`, `reason_details`, `step` (1|2|2b|3|4, niveau I4 du premier échec), avec la taxonomie `publication_forced`, `publication_excluded_eqlogic`, `publication_excluded_command`, `sure_mapping`; alias `no_supported_generic_type` → `no_generic_type_configured` (`http_server.py:1949`), et raison explicite pour commande non couverte.
   - [ ] S'assurer qu'aucune commande connue de l'équipement n'est omise, y compris les commandes non mappées
 
 - [ ] Task 2 — Implémenter `evaluate_equipment()` (AC1-AC5)
-  - [ ] Signature : équipement/snapshot topologie, résultat d'éligibilité déjà calculé (paramètre obligatoire, jamais recalculé en interne), politique de confiance, overrides persistés, overrides proposés (paramètre optionnel), registre de mappeurs injectable
+  - [ ] Signature : équipement/snapshot topologie, résultat d'éligibilité déjà calculé (paramètre obligatoire, jamais recalculé en interne), politique de confiance, overrides persistés, overrides proposés (paramètre optionnel), registre de mappeurs injectable ; pour un équipement éligible, calculer mapping → fusion overrides → validation → décision, sans mapping ni projection en entrée.
   - [ ] Sortie : décision principale + décisions secondaires + liste de `CommandDecision` (une par `cmd_id`)
   - [ ] Point unique de fusion overrides persistés + overrides proposés
-  - [ ] Aucune mutation des objets d'entrée (deepcopy défensif si nécessaire, jamais de mutation en place façon `_preview_mapping_view` actuel)
+  - [ ] Aucune mutation des objets d'entrée (deepcopy défensif si nécessaire, jamais de mutation en place façon `_preview_mapping_view` actuel) : `apply_type_override` retourne le même objet sans override (`overrides.py:366-369,399`), alors que le sync modifie aujourd'hui `additional_mappings[index]` (`http_server.py:253`), `projection_validity` / `publication_decision_ref` (`http_server.py:1430/1441`).
   - [ ] Aucun paramètre `published_scope`
 
 - [ ] Task 3 — Réutiliser la logique existante de `decide_publication()` sans duplication de règles (AC5)
