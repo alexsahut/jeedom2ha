@@ -151,7 +151,7 @@ jobs:
           passed=0
           skipped=0
           failed=0
-          for f in tests/test_php_*.php tests/test_runtime_bootstrap_startup.php; do
+          while IFS= read -r f; do
             [ -f "$f" ] || continue
             skip=0
             for needs_core in "${NEEDS_JEEDOM_CORE[@]}"; do
@@ -175,7 +175,7 @@ jobs:
               echo "FAIL: $f"
               failed=$((failed + 1))
             fi
-          done
+          done < <(find tests -type f -name '*.php' | sort)
           echo "php tests: $passed passed, $skipped skipped, $failed failed"
           [ "$failed" -eq 0 ]
 

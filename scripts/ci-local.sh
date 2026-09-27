@@ -180,7 +180,7 @@ else
             PHP_FAIL=$((PHP_FAIL + 1))
             echo "FAIL: $f"
         fi
-    done < <(printf '%s\n' tests/test_php_*.php tests/test_runtime_bootstrap_startup.php)
+    done < <(find tests -type f -name '*.php' | sort)
 
     if [[ "$PHP_FAIL" -eq 0 ]]; then
         record "php tests ($PHP_PASS passed, $PHP_SKIP skipped, needs real Jeedom core)" "PASS"
