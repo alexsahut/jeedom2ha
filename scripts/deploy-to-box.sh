@@ -357,7 +357,11 @@ set -e
 sudo mkdir -p "${JEEDOM_BACKUP_DIR}"
 sudo chmod 700 "${JEEDOM_BACKUP_DIR}"
 if [[ -d "${JEEDOM_BOX_PATH}" ]]; then
-  _archive="${JEEDOM_BACKUP_DIR}/jeedom2ha-\$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+  # mktemp réserve le nom de fichier de façon atomique avant que tar n'y
+  # écrive : deux déploiements dans la même seconde ne peuvent donc jamais
+  # calculer/écraser le même chemin d'archive (contrairement à un nom
+  # construit uniquement à partir de la date).
+  _archive=\$(sudo mktemp "${JEEDOM_BACKUP_DIR}/jeedom2ha-\$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX.tar.gz")
   sudo tar -czf "\${_archive}" -C "$(dirname "${JEEDOM_BOX_PATH}")" "$(basename "${JEEDOM_BOX_PATH}")"
   sudo chmod 600 "\${_archive}"
   echo "  Backup créé: \${_archive} (600) — dossier ${JEEDOM_BACKUP_DIR} (700)."
