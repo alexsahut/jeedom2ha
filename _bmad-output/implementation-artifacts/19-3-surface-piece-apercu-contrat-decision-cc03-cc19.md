@@ -20,7 +20,7 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **When** la surface de navigation par pièce (`_build_mapping_override_tree`) affiche son statut
 **Then** elle consomme `evaluate_equipment()` (Story 19.0/19.1) au lieu de recalculer sa propre logique d'affichage
 **And** elle affiche le statut réel "exclu" au lieu de "sera publié"
-**And** un test explicite reproduit le cas CC-03 (équipement exclu par éligibilité amont) et vérifie que la surface affiche désormais le statut correct.
+**And** un test explicite reproduit le cas CC-03 (équipement exclu par éligibilité amont), un override de publication (aujourd'hui `None` dans cette surface) et la politique `sure_only`, et vérifie que la surface affiche désormais le statut correct.
 
 **AC2 — CC-03 : l'aperçu à blanc reflète la même vérité**
 
