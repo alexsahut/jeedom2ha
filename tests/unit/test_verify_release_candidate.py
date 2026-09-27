@@ -140,6 +140,30 @@ class TestCheckBoxShaMatchesCandidate:
         assert result.returncode == 1
         assert "impossible de lire VERSION" in result.stderr
 
+    def test_dirty_git_status_fails_even_with_matching_sha(self):
+        """Un déploiement fait depuis un arbre de travail sale peut committer
+        le bon SHA dans VERSION tout en ayant déployé un contenu différent de
+        ce commit (fichiers modifiés non commités déployés par-dessus) : doit
+        échouer même si le SHA correspond exactement."""
+        content = "version=0.3.0\nsha=deadbeef\ndeployed_at=2026-09-27T00:00:00Z\ngit_status=dirty\n"
+
+        result = _run_bash(f"jeedom2ha_check_box_sha_matches_candidate deadbeef '{content}'")
+
+        assert result.returncode == 1
+        assert "[ECHEC]" in result.stderr
+        assert "git_status=dirty" in result.stderr
+
+    def test_missing_git_status_field_fails(self):
+        """VERSION sans champ git_status (format inattendu ou ancien) : ne
+        doit jamais être traité silencieusement comme propre."""
+        content = "version=0.3.0\nsha=deadbeef\ndeployed_at=2026-09-27T00:00:00Z\n"
+
+        result = _run_bash(f"jeedom2ha_check_box_sha_matches_candidate deadbeef '{content}'")
+
+        assert result.returncode == 1
+        assert "[ECHEC]" in result.stderr
+        assert "git_status" in result.stderr
+
 
 def test_library_never_references_ssh_or_scp():
     """Host-agnostic par construction : c'est ce qui rend les tests ci-dessus
