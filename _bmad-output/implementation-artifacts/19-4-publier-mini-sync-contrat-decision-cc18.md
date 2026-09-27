@@ -76,7 +76,7 @@ Changement de comportement réel et volontaire : des équipements `sure_mapping`
 
 ## Preuve terrain
 
-Preuve terrain obligatoire : (ii) exclusion UI équipement sans risque, cliquer « Publier » sur une pièce, constater la non-publication, puis le retour auto. Pour (i)/(iii), aucun mapper `sure_mapping` n'existe dans `main` (`decide_publication.py:57` est la seule référence) : fallback par test assumé et documenté.
+Preuve terrain obligatoire : (ii) exclusion UI équipement sans risque, cliquer « Publier » sur une pièce, constater la non-publication, puis le retour auto. Pour (i)/(iii), aucun mapper `sure_mapping` n'existe dans `main` : fallback par test assumé et documenté. **Écart vérifié avec `origin/main` :** `decide_publication.py:57` n'est pas l'unique référence globale à `sure_mapping` (on en trouve aussi dans `cause_mapping.py`, `http_server.py` et des tests), mais c'est la référence de politique de publication pertinente ici.
 
 **Gate d'inventaire obligatoire (convention repo, `sprint-status.yaml`) :** cette story modifie un comportement de publication/dépublication réelle vers Home Assistant — elle ne peut passer à `done` qu'après le gate obligatoire d'inventaire des entités avant/après déploiement (0 erreur), en plus de la preuve par clic réel (UI Impact `Oui`, ci-dessus) et des preuves (i)/(ii)/(iii).
 
