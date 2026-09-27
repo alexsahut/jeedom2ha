@@ -295,3 +295,36 @@ async def test_mapping_none_still_skipped_after_migration(cli, app, mock_publish
     assert resp.status == 200
     assert 302 not in app["mappings"]
     assert 302 not in app["publications"]
+
+
+@pytest.mark.parametrize("intention", ["publier", "supprimer"])
+async def test_action_execute_uses_app_data_dir_for_publication_cache(
+    cli, app, mock_publisher, monkeypatch, tmp_path, intention
+):
+    """Both action branches persist to the same app directory as sync."""
+    import transport.http_server as hs
+
+    calls = []
+    app["data_dir"] = str(tmp_path)
+    monkeypatch.setattr(
+        hs, "save_publications_cache", lambda publications, path: calls.append((publications, path))
+    )
+    _set_connected_bridge(app)
+    with patch("transport.http_server.DiscoveryPublisher", return_value=mock_publisher):
+        response = await cli.post(
+            "/action/sync", json=_sync_body([_light_eq_payload(206, _VALID_LIGHT_CMDS)]),
+            headers={"X-Local-Secret": SECRET},
+        )
+        assert response.status == 200
+        calls.clear()
+        with patch("transport.http_server.asyncio.sleep", new_callable=AsyncMock):
+            response = await cli.post(
+                "/action/execute",
+                json={"intention": intention, "portee": "equipement", "selection": [206]},
+                headers={"X-Local-Secret": SECRET},
+            )
+    assert response.status == 200
+    assert (await response.json())["payload"]["resultat"] == "succes"
+    assert len(calls) == 1
+    assert calls[0][0] is app["publications"]
+    assert calls[0][1] == str(tmp_path)

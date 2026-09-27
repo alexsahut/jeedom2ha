@@ -2395,10 +2395,9 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
 
 
 def _resolve_data_dir(request: web.Request) -> str:
-    """Résout le data_dir des overrides : override applicatif (tests) sinon _DATA_DIR.
+    """Point unique de résolution de la persistance (overrides et cache de publication).
 
-    Seul point d'injection du répertoire de persistance pour les routes 16.5 (câblage de
-    `save_override`/`remove_override`). Le pipeline de sync continue d'utiliser `_DATA_DIR`.
+    Le sync et les routes HTTP utilisent le data_dir applicatif, sinon _DATA_DIR.
     """
     return request.app.get("data_dir") or _DATA_DIR
 
@@ -3250,7 +3249,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             publications,
             pending_discovery_unpublish,
         )
-        save_publications_cache(publications, _DATA_DIR)
+        save_publications_cache(publications, _resolve_data_dir(request))
         _supprimer_msg = _build_supprimer_message(
             resultat=resultat,
             equipements_supprimes=equipements_supprimes,
@@ -3445,7 +3444,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         publications,
         pending_discovery_unpublish,
     )
-    save_publications_cache(publications, _DATA_DIR)
+    save_publications_cache(publications, _resolve_data_dir(request))
     _publier_msg = _build_publier_message(
         resultat=resultat,
         equipements_publies_ou_crees=equipements_publies_ou_crees,
