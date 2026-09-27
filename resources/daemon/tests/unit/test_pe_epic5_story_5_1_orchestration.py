@@ -146,6 +146,7 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
     calls: list[str] = []
 
     def _validate_invalid(_entity_type, _capabilities):
+        calls.append("validation")
         return ProjectionValidity(
             is_valid=False,
             reason_code="ha_missing_command_topic",
@@ -160,7 +161,6 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
     def _evaluate_spy(*args, **kwargs):
         # Mutation temporaire du contrat injecté : seul ce sync voit une validation
         # invalide. Le vrai decide_publication reste espionné et doit encore être appelé.
-        calls.append("validation")
         kwargs["validate_projection_fn"] = _validate_invalid
         kwargs["decide_publication_fn"] = _decide_spy
         return _real_evaluate_equipment(*args, **kwargs)
