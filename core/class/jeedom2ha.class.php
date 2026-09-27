@@ -203,6 +203,9 @@ class jeedom2ha extends eqLogic {
     $secretsContent = 'apikey=' . $apiKey . "\n"
       . 'localsecret=' . $localSecret . "\n"
       . 'jeedomcoreapikey=' . (string) $jeedomCoreApiKey . "\n";
+    // Supprime un éventuel fichier laissé par un autre utilisateur (ex. root) : sinon
+    // file_put_contents() échoue à le réécrire (droits du propriétaire existant).
+    @unlink($secretsFile);
     $previousUmask = umask(0077);
     file_put_contents($secretsFile, $secretsContent);
     umask($previousUmask);
