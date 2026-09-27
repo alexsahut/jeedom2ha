@@ -115,7 +115,10 @@ def test_accepts_completed_check_run_with_valid_conclusion(tmp_path, conclusion)
     # past jeedom2ha_verify_deploy_source to the SSH pre-checks: the gate
     # error messages must never appear, and ssh.log (written by the very
     # first ssh pre-check call) must exist.
-    result = _run(tmp_path, MOCK_CI_CONCLUSION=conclusion, timeout=3)
+    # The test must reach the first SSH pre-check, but the mocked run then
+    # intentionally blocks at rsync.  A generous timeout avoids CI-host
+    # scheduling jitter being mistaken for a rejected valid conclusion.
+    result = _run(tmp_path, MOCK_CI_CONCLUSION=conclusion, timeout=10)
 
     assert "CI non verte" not in result.stderr
     assert "check-run non terminé" not in result.stderr
