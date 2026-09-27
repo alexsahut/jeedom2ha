@@ -7,7 +7,7 @@ name: Test Pipeline
 
 on:
   push:
-    branches: [main, beta, stable]
+    branches: ['**']
   pull_request:
     branches: [main, beta, stable]
     types: [opened, synchronize, reopened, labeled]
@@ -87,6 +87,115 @@ jobs:
           path: coverage.xml
           retention-days: 30
 
+  # Node stage - frontend unit tests (node --test, no build step)
+  node:
+    name: Node unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run node unit tests
+        run: |
+          set -euo pipefail
+          node --test tests/unit/*.node.test.js
+
+  # PHP stage - syntax lint on every tracked PHP file (matrix: PHP 7.4, the
+  # version running on the production box, and 8.2), then execute the test
+  # files that are self-contained (they stub the Jeedom AJAX layer via
+  # JEEDOM2HA_AJAX_FUNCTIONS_ONLY and don't need a real Jeedom install).
+  # A fixed, explicit list of test files requires a real Jeedom core
+  # bootstrap (core/php/core.inc.php) that only exists inside an actual
+  # Jeedom installation; those are skipped with an explicit message instead
+  # of failing, matching this project's existing convention of validating
+  # them manually on a real box (see docs/dev-deploy.md). Any other test
+  # failure fails the job.
+  php:
+    name: PHP lint & tests (PHP ${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.2']
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+
+      - name: Lint PHP sources
+        run: |
+          set -euo pipefail
+          git ls-files '*.php' | xargs -n1 php -l
+
+      - name: Run PHP test files
+        run: |
+          set -euo pipefail
+          # Test files that require a real Jeedom core bootstrap
+          # (core/php/core.inc.php); not available in CI, skipped explicitly.
+          NEEDS_JEEDOM_CORE=(
+            "tests/test_php_published_scope_relay.php"
+            "tests/test_php_topology_extraction.php"
+            "tests/test_runtime_bootstrap_startup.php"
+          )
+          passed=0
+          skipped=0
+          failed=0
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            skip=0
+            for needs_core in "${NEEDS_JEEDOM_CORE[@]}"; do
+              if [ "$f" = "$needs_core" ]; then
+                skip=1
+                break
+              fi
+            done
+            if [ "$skip" -eq 1 ]; then
+              echo "--- $f ---"
+              echo "SKIP: $f requires a real Jeedom install (core.inc.php not available in CI)."
+              skipped=$((skipped + 1))
+              continue
+            fi
+            echo "--- $f ---"
+            if out=$(php "$f" 2>&1); then
+              echo "$out"
+              passed=$((passed + 1))
+            else
+              echo "$out"
+              echo "FAIL: $f"
+              failed=$((failed + 1))
+            fi
+          done < <(find tests -type f -name '*.php' | sort)
+          echo "php tests: $passed passed, $skipped skipped, $failed failed"
+          [ "$failed" -eq 0 ]
+
+  # Shell stage - syntax check every script (never executes them)
+  shell-syntax:
+    name: Shell syntax (bash -n)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: bash -n on scripts/*.sh
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh; do
+            echo "Checking $f"
+            bash -n "$f"
+          done
+
   # Burn-in stage - Flaky test detection
   burn-in:
     name: Burn-In (Python 3.9)
@@ -130,7 +239,7 @@ jobs:
   report:
     name: Test Report
     runs-on: ubuntu-latest
-    needs: [lint, test, burn-in]
+    needs: [lint, test, burn-in, node, php, shell-syntax]
     if: always()
 
     steps:
@@ -142,6 +251,9 @@ jobs:
           echo "- **Status (Lint)**: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status (Tests)**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Burn-in**: ${{ needs.burn-in.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status (Node)**: ${{ needs.node.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status (PHP)**: ${{ needs.php.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status (Shell syntax)**: ${{ needs.shell-syntax.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.burn-in.result }}" == "failure" ]; then

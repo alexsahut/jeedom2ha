@@ -15,3 +15,8 @@ docs/.sass-cache/
 __pycache__/
 *.pyc
 .env
+.venv/
+*.egg-info/
+.coverage
+coverage.xml
+.pytest_cache/

@@ -1,4 +1,5 @@
 - .git/
+- .git
 - .DS_Store
 - .env
 - .env.*
@@ -17,7 +18,10 @@
 - _bmad-output/
 - .vscode/
 - .venv/
+- *.egg-info/
 - __pycache__/
+- .coverage
+- coverage.xml
 - pyproject.toml
 - Makefile
 - README.md
