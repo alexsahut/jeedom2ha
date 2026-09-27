@@ -44,7 +44,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# test job (mirrors: pytest --cov matrix, Python 3.9 and 3.12)
+# test job (mirrors: pytest --cov matrix, Python 3.9, 3.11, and 3.12)
 # ---------------------------------------------------------------------------
 PYTEST_ARGS=(-m pytest --cov=resources/daemon --cov-report=xml --cov-report=term-missing)
 PYTEST_LOG=$(mktemp)
@@ -64,6 +64,14 @@ if "$VENV_PY" "${PYTEST_ARGS[@]}" 2>&1 | tee "$PYTEST_LOG"; then
     record "test (pytest 3.9): $(summarize_pytest)" "PASS"
 else
     record "test (pytest 3.9): $(summarize_pytest)" "FAIL"
+fi
+
+step "test — pytest + coverage (Python 3.11)"
+: > "$PYTEST_LOG"
+if uv run --python 3.11 --with-editable ".[test]" --isolated -- python "${PYTEST_ARGS[@]}" 2>&1 | tee "$PYTEST_LOG"; then
+    record "test (pytest 3.11): $(summarize_pytest)" "PASS"
+else
+    record "test (pytest 3.11): $(summarize_pytest)" "FAIL"
 fi
 
 step "test — pytest + coverage (Python 3.12)"
