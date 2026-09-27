@@ -1,6 +1,6 @@
 # Story 19.0: Contrat pur `CommandDecision` / `evaluate_equipment()`
 
-Status: ready-for-dev
+Status: ready-for-review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -75,28 +75,28 @@ Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Définir `CommandDecision` (AC1, AC4)
-  - [ ] Nouveau type de données `CommandDecision` (dataclass ou équivalent), un par `cmd_id`, portant au minimum `cmd_id`, `should_publish`, `reason`, `reason_details`, `step` (1|2|2b|3|4, niveau I4 du premier échec), avec la taxonomie `publication_forced`, `publication_excluded_eqlogic`, `publication_excluded_command`, `sure_mapping`; alias `no_supported_generic_type` → `no_generic_type_configured` (`http_server.py:1949`), et raison explicite pour commande non couverte.
-  - [ ] S'assurer qu'aucune commande connue de l'équipement n'est omise, y compris les commandes non mappées
+- [x] Task 1 — Définir `CommandDecision` (AC1, AC4)
+  - [x] Nouveau type de données `CommandDecision` (dataclass ou équivalent), un par `cmd_id`, portant au minimum `cmd_id`, `should_publish`, `reason`, `reason_details`, `step` (1|2|2b|3|4, niveau I4 du premier échec), avec la taxonomie `publication_forced`, `publication_excluded_eqlogic`, `publication_excluded_command`, `sure_mapping`; alias `no_supported_generic_type` → `no_generic_type_configured` (`http_server.py:1949`), et raison explicite pour commande non couverte.
+  - [x] S'assurer qu'aucune commande connue de l'équipement n'est omise, y compris les commandes non mappées
 
-- [ ] Task 2 — Implémenter `evaluate_equipment()` (AC1-AC5)
-  - [ ] Signature : équipement/snapshot topologie, résultat d'éligibilité déjà calculé (paramètre obligatoire, jamais recalculé en interne), politique de confiance, overrides persistés, overrides proposés (paramètre optionnel), registre de mappeurs injectable ; pour un équipement éligible, calculer mapping → fusion overrides → validation → décision, sans mapping ni projection en entrée.
-  - [ ] Sortie : décision principale + décisions secondaires + liste de `CommandDecision` (une par `cmd_id`)
-  - [ ] Point unique de fusion overrides persistés + overrides proposés
-  - [ ] Aucune mutation des objets d'entrée (deepcopy défensif si nécessaire, jamais de mutation en place façon `_preview_mapping_view` actuel) : `apply_type_override` retourne le même objet sans override (`overrides.py:366-369,399`), alors que le sync modifie aujourd'hui `additional_mappings[index]` (`http_server.py:253`), `projection_validity` / `publication_decision_ref` (`http_server.py:1430/1441`).
-  - [ ] Aucun paramètre `published_scope`
+- [x] Task 2 — Implémenter `evaluate_equipment()` (AC1-AC5)
+  - [x] Signature : équipement/snapshot topologie, résultat d'éligibilité déjà calculé (paramètre obligatoire, jamais recalculé en interne), politique de confiance, overrides persistés, overrides proposés (paramètre optionnel), registre de mappeurs injectable ; pour un équipement éligible, calculer mapping → fusion overrides → validation → décision, sans mapping ni projection en entrée.
+  - [x] Sortie : décision principale + décisions secondaires + liste de `CommandDecision` (une par `cmd_id`)
+  - [x] Point unique de fusion overrides persistés + overrides proposés
+  - [x] Aucune mutation des objets d'entrée (deepcopy défensif si nécessaire, jamais de mutation en place façon `_preview_mapping_view` actuel) : `apply_type_override` retourne le même objet sans override (`overrides.py:366-369,399`), alors que le sync modifie aujourd'hui `additional_mappings[index]` (`http_server.py:253`), `projection_validity` / `publication_decision_ref` (`http_server.py:1430/1441`).
+  - [x] Aucun paramètre `published_scope`
 
-- [ ] Task 3 — Réutiliser la logique existante de `decide_publication()` sans duplication de règles (AC5)
-  - [ ] `evaluate_equipment()` s'appuie sur (ou encapsule) `decide_publication()` existant pour la décision principale/secondaire, sans dupliquer les niveaux 1-4 déjà actés (I1-I7)
-  - [ ] Aucune logique MQTT/broker/cache introduite (I7)
+- [x] Task 3 — Réutiliser la logique existante de `decide_publication()` sans duplication de règles (AC5)
+  - [x] `evaluate_equipment()` s'appuie sur (ou encapsule) `decide_publication()` existant pour la décision principale/secondaire, sans dupliquer les niveaux 1-4 déjà actés (I1-I7)
+  - [x] Aucune logique MQTT/broker/cache introduite (I7)
 
-- [ ] Task 4 — Harnais de parité (préparatoire à Story 19.1)
-  - [ ] Script/outil de test (non exposé en production) qui exécute `evaluate_equipment()` et `decide_publication()` sur le même corpus (`tests/fixtures/golden_corpus/`) et rapporte tout écart
-  - [ ] Documenter dans cette story les écarts constatés (attendus : aucun, sinon les lister explicitement)
+- [x] Task 4 — Harnais de parité (préparatoire à Story 19.1)
+  - [x] Script/outil de test (non exposé en production) qui exécute `evaluate_equipment()` et `decide_publication()` sur le même corpus (`tests/fixtures/golden_corpus/`) et rapporte tout écart — `resources/daemon/tests/tools/parity_harness_19_0.py` (`compute_parity_report()`), consommé par `resources/daemon/tests/unit/test_story_19_0_parity_golden_corpus.py`.
+  - [x] Documenter dans cette story les écarts constatés (attendus : aucun, sinon les lister explicitement) — **aucun écart constaté** : `compute_parity_report()` exécuté sur `tests/fixtures/golden_corpus/sync_payload.json` (59 eqLogics, 57 éligibles / 2 inéligibles) retourne une liste vide (`test_ac3_parity_harness_golden_corpus_no_discrepancy`).
 
-- [ ] Task 5 — Tests (AC1-AC5)
-  - [ ] `test_story_19_0_evaluate_equipment_contract.py` (préfixe `test_story_19_0_*`) : couverture AC1-AC5, y compris les tests de non-mutation (deepcopy) et le test de signature (absence de `published_scope`)
-  - [ ] Suite complète `pytest tests/unit -q` : 0 régression vs. baseline actuelle
+- [x] Task 5 — Tests (AC1-AC5)
+  - [x] `test_story_19_0_evaluate_equipment_contract.py` (préfixe `test_story_19_0_*`) : couverture AC1-AC5, y compris les tests de non-mutation (deepcopy) et le test de signature (absence de `published_scope`)
+  - [x] Suite complète `pytest tests/unit -q` : 0 régression vs. baseline actuelle
 
 ## Dev Notes
 
@@ -130,10 +130,31 @@ Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC
 
 ### Agent Model Used
 
+clawcode (Claude, agent de code jeedom2ha) — session autonome en arrière-plan, worktree dédié `story/19-0-contrat-pur-command-decision`.
+
 ### Debug Log References
+
+- TDD strict : `test_i7_no_mqtt_broker_or_disk_io_in_module_source` a d'abord échoué (faux positif — recherche naïve de sous-chaîne `"mqtt"` matchant le docstring du module, pas du code exécutable). Corrigé par une inspection AST (`ast.parse`/`ast.walk`, nœuds `Import`/`ImportFrom`/`Call`/`Attribute`/`Name` uniquement) qui ignore docstrings/commentaires.
+- Aucun autre échec de test bloquant — TDD mené test par test, incrément par incrément.
 
 ### Completion Notes List
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle `bmad-create-story` non exposée dans cette session — cf. journal `/tmp/jeedom2ha-etape3-stories.log`), en répliquant fidèlement `template.md` et les conventions de `16-3-overrides-publication-exclusion-explicite.md`.
+- **dev-story** — 2026-09-27 — statut résultant : `ready-for-review`. Skill officielle `bmad-dev-story` non exposée dans cette session d'exécution autonome (outillage identique à la limitation déjà notée pour `create-story` ci-dessus) ; le workflow dev-story (TDD strict test-par-test, mise à jour Tasks/Subtasks + Dev Agent Record, aucune modification des points d'appel existants) a été suivi manuellement en répliquant sa discipline, conformément à la convention déjà établie sur cette story pour `create-story`.
+- `CommandDecision` + `evaluate_equipment()` implémentés dans un nouveau module pur (`resources/daemon/models/evaluate_equipment.py`), sans aucune instanciation interne de `MapperRegistry` (injecté), sans I/O (I7), avec `decide_publication()`/`validate_projection()` réutilisés tels quels (injectables, valeur par défaut = implémentations réelles) — aucune duplication des règles I1-I7.
+- Non-mutation (AC4) : `eq`, `snapshot`, `eligibility` deep-copiés en entrée ; toute mise à jour de `MappingResult`/`PublicationDecision` passe par `dataclasses.replace()`, jamais par affectation d'attribut en place — vérifié par un test de régression dédié ciblant explicitement le bug `_preview_mapping_view` (`http_server.py:2210`).
+- Fusion overrides (AC3) : un unique point de fusion (`_merge_override_layer`), overrides proposés prioritaires sur les persistés, dicts d'entrée jamais mutés. Fusion **champ par champ** à une même clé (schéma v2 : une entrée peut porter à la fois `ha_entity_type` et `publication_override`) — corrigé suite à la revue bot Codex, cf. note ci-dessous.
+- Harnais de parité (Task 4) : `resources/daemon/tests/tools/parity_harness_19_0.py` (`compute_parity_report()`) exécute le pipeline classique (`decide_publication()` appelé directement, réplique fidèle de `_do_handle_action_sync` hors MQTT/publisher) et `evaluate_equipment()` (overrides persistés seuls) sur le corpus doré `tests/fixtures/golden_corpus/sync_payload.json` — **aucun écart constaté** sur les 57 équipements éligibles (2 inéligibles, 59 au total).
+- 35 tests unitaires dédiés (`test_story_19_0_evaluate_equipment_contract.py`) + 2 tests de parité golden-corpus (`test_story_19_0_parity_golden_corpus.py`) — tous verts. Suite complète (voir File List / commit final pour le décompte exact `pytest`/Node/PHP/`bash -n`).
+- Aucun fichier de point d'appel modifié — `http_server.py`, `state.py`, `command.py` strictement intacts (vérifié par `git diff --stat`, cf. commit final).
+- **Revue bot Codex (PR #167, commit `7e43533`)** — 2 remarques P2 (`COMMENTED`, non bloquantes), les deux confirmées réelles et corrigées :
+  1. `_merge_override_layer` remplaçait l'entrée entière d'une clé `proposed` plutôt que fusionner ses champs avec l'entrée `persisted` correspondante ; un override "proposé" partiel (ex. seulement `publication_override`) pouvait donc faire disparaître silencieusement un champ persisté non recouvert (ex. `ha_entity_type`) au lieu de le fusionner (schéma v2, `mapping/overrides.py`). Corrigé par une fusion champ par champ (`base.update(entry)` par clé) ; couvert par `test_ac3_merge_is_field_level_not_full_entry_replacement`.
+  2. `decision.mapping_result` (dans `_decide_for_mapping`) restait figé sur le mapping intermédiaire de l'étape 3 (`pipeline_step_reached=3`, secondaires non finalisées), au lieu du mapping final de l'étape 4 — `EquipmentEvaluation.equipment_decision.mapping_result` pouvait donc présenter un état obsolète par rapport à `EquipmentEvaluation.mapping`. Corrigé en introduisant `_finalize_decision_mapping_result` (posée après finalisation des secondaires) ; couvert par `test_thread1_equipment_decision_mapping_result_reflects_final_mapping`. Limite structurelle assumée et documentée dans le code : une boucle auto-référente `mapping.publication_decision_ref.mapping_result is mapping` n'est pas représentable avec des dataclasses immuables (`dataclasses.replace`), contrairement au pipeline classique qui mute les deux objets en place ; `pipeline_step_reached=4` et `additional_mappings` finalisées restent en revanche garantis cohérents des deux côtés.
 
 ### File List
+
+- `resources/daemon/models/evaluate_equipment.py` — NOUVEAU — `CommandDecision`, `EquipmentEvaluation`, `evaluate_equipment()`.
+- `resources/daemon/tests/unit/test_story_19_0_evaluate_equipment_contract.py` — NOUVEAU — 35 tests (AC1-AC5, I1-I7, signature, non-mutation, 2 tests dédiés à la revue bot Codex).
+- `resources/daemon/tests/tools/__init__.py` — NOUVEAU — package vide (convention `tests/unit`, `tests/integration`).
+- `resources/daemon/tests/tools/parity_harness_19_0.py` — NOUVEAU — harnais de parité (Task 4).
+- `resources/daemon/tests/unit/test_story_19_0_parity_golden_corpus.py` — NOUVEAU — 2 tests de parité sur corpus doré (AC3).
