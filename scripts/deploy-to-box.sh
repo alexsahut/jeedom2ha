@@ -175,7 +175,7 @@ jeedom2ha_status() {
 # Pattern aligné avec le contrat plugin — arrêt par PID file, pas via jeeApi.php.
 jeedom2ha_stop_daemon() {
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
-sudo env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
 jeedom2ha::deamon_stop();
@@ -443,7 +443,7 @@ if [[ "${RESTART_DAEMON}" == "true" ]]; then
   # ne suppose pas la relation apiport/socketport). || true partout : best-effort, ne doit
   # jamais faire échouer le deploy si rien à tuer.
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
-sudo env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
 jeedom2ha::deamon_stop();
@@ -467,7 +467,7 @@ REMOTE
   # set -e : fail-fast si deamon_start() retourne false ou si PHP fatal
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
 set -e
-sudo env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
 \$ok = jeedom2ha::deamon_start();
