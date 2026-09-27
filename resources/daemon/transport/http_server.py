@@ -27,6 +27,7 @@ from models.availability import (
 from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
 from models.decide_publication import decide_publication
+from models.evaluate_equipment import evaluate_equipment
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
@@ -1402,14 +1403,22 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
 
-        mapping = mapper_registry.map(eq, snapshot)
+        # Story 19.1 — étapes 2 à 4 (mapping, override de type, validation projection,
+        # décision de publication) déléguées à evaluate_equipment() (Story 19.0). Le
+        # MapperRegistry reste injecté (une seule instance par sync, cf. plus haut),
+        # jamais recréé à l'intérieur de la fonction pure.
+        evaluation = evaluate_equipment(
+            eq,
+            snapshot,
+            result,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=overrides_cache,
+            persisted_equipment_overrides=equipment_overrides_cache,
+        )
+        mapping = evaluation.mapping
         if mapping is None:
             continue  # Not mapped by any mapper
-
-        # Story 16.2 — override de type utilisateur, injecté ENTRE étape 2 (map) et étape 3
-        # (validate_projection) : patch d'une copie, generic_type natif intact (D10),
-        # validation HA jugera le type surchargé (D11, aucun bypass).
-        mapping = apply_type_override(mapping, _DATA_DIR, overrides=overrides_cache)
 
         mappings[eq_id] = mapping
         previous_decision = request.app["publications"].get(eq_id)
@@ -1423,23 +1432,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publisher=publisher,
             pending_discovery_unpublish=pending_discovery_unpublish,
         )
-        # Pipeline canonique Story 5.1 :
-        # étape 3 (validate_projection) puis étape 4 (decide_publication),
-        # sans court-circuit pour les équipements éligibles mappés.
-        projection_validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
-        mapping.projection_validity = projection_validity
-        mapping.pipeline_step_reached = 3
-        publication_override = _resolve_publication_override_for_mapping(
-            mapping, overrides_cache, equipment_overrides_cache
-        )
-        decision = decide_publication(
-            mapping,
-            confidence_policy=confidence_policy,
-            publication_override=publication_override,
-        )
-        decision.mapping_result = mapping
-        mapping.publication_decision_ref = decision
-        mapping.pipeline_step_reached = 4
+        decision = evaluation.equipment_decision
 
         if mapping.confidence in ("sure", "probable", "ambiguous"):
             _increment_mapping_counter(mapping_counters, mapping, mapping.confidence)
