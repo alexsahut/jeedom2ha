@@ -85,12 +85,13 @@ if ! command -v node >/dev/null 2>&1; then
 else
     NODE_LOG=$(mktemp)
     if node --test tests/unit/*.node.test.js 2>&1 | tee "$NODE_LOG"; then
-        NODE_SUMMARY=$(grep -E '^ℹ (tests|pass|fail) ' "$NODE_LOG" | sed 's/^ℹ //' | join_lines)
-        record "node (node --test): $NODE_SUMMARY" "PASS"
+        NODE_STATUS="PASS"
     else
-        NODE_SUMMARY=$(grep -E '^ℹ (tests|pass|fail) ' "$NODE_LOG" | sed 's/^ℹ //' | join_lines)
-        record "node (node --test): $NODE_SUMMARY" "FAIL"
+        NODE_STATUS="FAIL"
     fi
+    # Node 24 prints summary lines as "ℹ tests 12", Node 20/22 print "# tests 12".
+    NODE_SUMMARY=$(grep -E '^(ℹ|#) (tests|pass|fail) ' "$NODE_LOG" | sed -E 's/^(ℹ|#) //' | join_lines)
+    record "node (node --test): $NODE_SUMMARY" "$NODE_STATUS"
     rm -f "$NODE_LOG"
 fi
 
@@ -117,18 +118,19 @@ fi
 
 # ---------------------------------------------------------------------------
 # php job (mirrors: setup-php + php -l + php test execution)
-# Some php test files under tests/ require a real Jeedom core bootstrap
-# (core/php/core.inc.php) that only exists inside an actual Jeedom
-# installation. They are skipped with a clear message instead of failing,
-# matching the project's long-standing convention (see docs/dev-deploy.md
-# and the story implementation artifacts) of validating those specific
-# tests manually on a real box rather than in a sandboxed checkout.
+# A fixed, explicit list of test files under tests/ requires a real Jeedom
+# core bootstrap (core/php/core.inc.php) that only exists inside an actual
+# Jeedom installation. They are skipped with a clear message instead of
+# failing, matching the project's long-standing convention (see
+# docs/dev-deploy.md and the story implementation artifacts) of validating
+# those specific tests manually on a real box rather than in a sandboxed
+# checkout. Any other test failure fails this job.
 # ---------------------------------------------------------------------------
 step "php — php -l and php test execution"
 if ! command -v php >/dev/null 2>&1; then
     record "php tests" "SKIPPED (php not installed locally)"
     echo "ci-local: 'php' is not installed — skipping php -l and php test execution."
-    echo "          (php is provided on GitHub Actions runners via shivammathur/setup-php)"
+    echo "          (php is provided on GitHub Actions runners via shivammathur/setup-php, matrix 7.4 and 8.2)"
 else
     PHP_LINT_FAIL=0
     PHP_LINT_TOTAL=0
@@ -145,19 +147,35 @@ else
         record "php -l ($((PHP_LINT_TOTAL - PHP_LINT_FAIL))/$PHP_LINT_TOTAL files OK)" "FAIL"
     fi
 
+    NEEDS_JEEDOM_CORE=(
+        "tests/test_php_published_scope_relay.php"
+        "tests/test_php_topology_extraction.php"
+        "tests/test_runtime_bootstrap_startup.php"
+    )
+
     PHP_PASS=0
     PHP_SKIP=0
     PHP_FAIL=0
     while IFS= read -r f; do
         [[ -f "$f" ]] || continue
+        skip=0
+        for needs_core in "${NEEDS_JEEDOM_CORE[@]}"; do
+            if [[ "$f" == "$needs_core" ]]; then
+                skip=1
+                break
+            fi
+        done
+        if [[ "$skip" -eq 1 ]]; then
+            echo "--- $f ---"
+            echo "SKIP: $f requires a real Jeedom install (core.inc.php not available in this sandbox)."
+            PHP_SKIP=$((PHP_SKIP + 1))
+            continue
+        fi
         echo "--- $f ---"
         PHP_OUT=$(php "$f" 2>&1) && PHP_CODE=0 || PHP_CODE=$?
         echo "$PHP_OUT"
         if [[ "$PHP_CODE" -eq 0 ]]; then
             PHP_PASS=$((PHP_PASS + 1))
-        elif echo "$PHP_OUT" | grep -qi -E 'core\.inc\.php|jeedom core bootstrap'; then
-            PHP_SKIP=$((PHP_SKIP + 1))
-            echo "SKIP: $f requires a real Jeedom install (core.inc.php not available in this sandbox)."
         else
             PHP_FAIL=$((PHP_FAIL + 1))
             echo "FAIL: $f"
