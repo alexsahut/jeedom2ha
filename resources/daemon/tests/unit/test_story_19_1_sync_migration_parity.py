@@ -114,6 +114,39 @@ async def test_sync_delegates_primary_pipeline_to_evaluate_equipment(cli, app, m
     assert resp.status == 200
     assert len(calls) == 1, "evaluate_equipment() doit être appelée une fois pour l'unique équipement éligible mappé"
     assert calls[0]["confidence_policy"] == "sure_probable"
+    assert app["confidence_policy"] == "sure_probable"
+
+
+async def test_sync_uses_app_data_dir_for_overrides_and_publication_cache(
+    cli, app, mock_publisher, monkeypatch, tmp_path
+):
+    """Le resolver app data_dir alimente le sync, sans retomber sur le data/ global."""
+    import transport.http_server as hs
+
+    calls = []
+    monkeypatch.setattr(hs, "list_overrides", lambda path: calls.append(("overrides", path)) or {})
+    monkeypatch.setattr(
+        hs, "list_equipment_overrides", lambda path: calls.append(("equipment", path)) or {}
+    )
+    monkeypatch.setattr(
+        hs, "save_publications_cache", lambda _publications, path: calls.append(("cache", path))
+    )
+    app["data_dir"] = str(tmp_path)
+    _set_connected_bridge(app)
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=mock_publisher):
+        resp = await cli.post(
+            "/action/sync",
+            json=_sync_body([_light_eq_payload(206, _VALID_LIGHT_CMDS)]),
+            headers={"X-Local-Secret": SECRET},
+        )
+
+    assert resp.status == 200
+    assert calls == [
+        ("overrides", str(tmp_path)),
+        ("equipment", str(tmp_path)),
+        ("cache", str(tmp_path)),
+    ]
 
 
 async def test_mapper_registry_instantiated_once_and_injected_not_recreated(cli, app, mock_publisher):

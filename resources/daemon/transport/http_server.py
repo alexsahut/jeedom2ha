@@ -1310,6 +1310,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         confidence_policy = "sure_probable"
 
     _LOGGER.info("[TOPOLOGY] Received sync request (confidence_policy=%s)", confidence_policy)
+    request.app["confidence_policy"] = confidence_policy
     data_dir = _resolve_data_dir(request)
 
     # 1. Normalize and store snapshot
@@ -1706,7 +1707,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     )
 
     # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
-    save_publications_cache(request.app["publications"], _DATA_DIR)
+    save_publications_cache(request.app["publications"], data_dir)
 
     # Story 5.1 — Task 7.3: purger boot_cache après le premier sync (rôle accompli)
     if is_first_sync and request.app.get("boot_cache"):
