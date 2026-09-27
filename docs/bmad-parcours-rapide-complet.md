@@ -22,3 +22,11 @@
   - la **commande exacte** pour les rejouer ;
   - tout changement touchant la publication vers Home Assistant exige une preuve terrain après déploiement par le gate (inventaire des entités avant/après, 0 erreur) avant de passer `done`.
 - **Story touchant l'interface** : statut `ready-for-UX-validation` obligatoire avant `done`, puis preuve d'usage réel de l'interface. Le gate UX outillé n'existe pas encore : en attendant, une validation manuelle est acceptée mais doit être **nommément identifiée** — qui a validé, quand, sur quel SHA/environnement.
+
+## Personnalisations BMAD à préserver
+
+BMAD est un framework tiers installé sous `_bmad/`. Une mise à jour future de BMAD peut écraser ces fichiers ; si cela arrive, les 3 changements ci-dessous doivent être réappliqués manuellement :
+
+- `_bmad/bmm/workflows/4-implementation/sprint-status/workflow.md` : le statut `ready-for-UX-validation` a été ajouté partout où les statuts de story sont listés, comptés, validés ou affichés (statuts valides, compteurs, résumé, mode data, mode validate), ainsi qu'une action suggérée dédiée.
+- `_bmad/bmm/workflows/4-implementation/code-review/workflow.md` : l'étape 5 détecte désormais un impact UI (champ `UI Impact` de la story, ou fichiers modifiés sous `desktop/`/`core/ajax/`) et route vers le statut `ready-for-UX-validation` au lieu de `done` directement, avec synchronisation correspondante dans `sprint-status.yaml`.
+- `_bmad/bmm/workflows/4-implementation/create-story/template.md` : ajout du champ `UI Impact` au gabarit de story, utilisé par `code-review` pour la détection d'impact UI ci-dessus.

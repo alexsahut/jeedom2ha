@@ -79,14 +79,14 @@ Run `/bmad:bmm:workflows:sprint-planning` to generate it, then rerun sprint-stat
   - Retrospectives: keys ending with "-retrospective"
   - Stories: everything else (e.g., 1-2-login-form)
   <action>Map legacy story status "drafted" → "ready-for-dev"</action>
-  <action>Count story statuses: backlog, ready-for-dev, in-progress, review, done</action>
+  <action>Count story statuses: backlog, ready-for-dev, in-progress, review, ready-for-UX-validation, done</action>
   <action>Map legacy epic status "contexted" → "in-progress"</action>
   <action>Count epic statuses: backlog, in-progress, done</action>
   <action>Count retrospective statuses: optional, done</action>
 
 <action>Validate all statuses against known values:</action>
 
-- Valid story statuses: backlog, ready-for-dev, in-progress, review, done, drafted (legacy)
+- Valid story statuses: backlog, ready-for-dev, in-progress, review, ready-for-UX-validation, done, drafted (legacy)
 - Valid epic statuses: backlog, in-progress, done, contexted (legacy)
 - Valid retrospective statuses: optional, done
 
@@ -100,7 +100,7 @@ Run `/bmad:bmm:workflows:sprint-planning` to generate it, then rerun sprint-stat
 
 **Valid statuses:**
 
-- Stories: backlog, ready-for-dev, in-progress, review, done
+- Stories: backlog, ready-for-dev, in-progress, review, ready-for-UX-validation, done
 - Epics: backlog, in-progress, done
 - Retrospectives: optional, done
   </output>
@@ -119,6 +119,7 @@ Enter corrections (e.g., "1=in-progress, 2=backlog") or "skip" to continue witho
 <action>Detect risks:</action>
 
 - IF any story has status "review": suggest `/bmad:bmm:workflows:code-review`
+- IF any story has status "ready-for-UX-validation": suggest manual UX validation then rerun sprint-status to mark done
 - IF any story has status "in-progress" AND no stories have status "ready-for-dev": recommend staying focused on active story
 - IF all epics have status "backlog" AND no stories have status "ready-for-dev": prompt `/bmad:bmm:workflows:create-story`
 - IF `last_updated` timestamp is more than 7 days old (or `last_updated` is missing, fall back to `generated`): warn "sprint-status.yaml may be stale"
@@ -146,7 +147,7 @@ Enter corrections (e.g., "1=in-progress, 2=backlog") or "skip" to continue witho
 - Tracking: {{tracking_system}}
 - Status file: {sprint_status_file}
 
-**Stories:** backlog {{count_backlog}}, ready-for-dev {{count_ready}}, in-progress {{count_in_progress}}, review {{count_review}}, done {{count_done}}
+**Stories:** backlog {{count_backlog}}, ready-for-dev {{count_ready}}, in-progress {{count_in_progress}}, review {{count_review}}, ready-for-UX-validation {{count_ready_for_ux_validation}}, done {{count_done}}
 
 **Epics:** backlog {{epic_backlog}}, in-progress {{epic_in_progress}}, done {{epic_done}}
 
@@ -181,6 +182,7 @@ If the command targets a story, set `story_key={{next_story_id}}` when prompted.
 ### Stories by Status
 - In Progress: {{stories_in_progress}}
 - Review: {{stories_in_review}}
+- Ready for UX Validation: {{stories_ready_for_ux_validation}}
 - Ready for Dev: {{stories_ready_for_dev}}
 - Backlog: {{stories_backlog}}
 - Done: {{stories_done}}
@@ -209,6 +211,7 @@ If the command targets a story, set `story_key={{next_story_id}}` when prompted.
   <template-output>count_ready = {{count_ready}}</template-output>
   <template-output>count_in_progress = {{count_in_progress}}</template-output>
   <template-output>count_review = {{count_review}}</template-output>
+  <template-output>count_ready_for_ux_validation = {{count_ready_for_ux_validation}}</template-output>
   <template-output>count_done = {{count_done}}</template-output>
   <template-output>epic_backlog = {{epic_backlog}}</template-output>
   <template-output>epic_in_progress = {{epic_in_progress}}</template-output>
@@ -250,7 +253,7 @@ If the command targets a story, set `story_key={{next_story_id}}` when prompted.
 
 <action>Validate all status values against known valid statuses:</action>
 
-- Stories: backlog, ready-for-dev, in-progress, review, done (legacy: drafted)
+- Stories: backlog, ready-for-dev, in-progress, review, ready-for-UX-validation, done (legacy: drafted)
 - Epics: backlog, in-progress, done (legacy: contexted)
 - Retrospectives: optional, done
   <check if="any invalid status found">

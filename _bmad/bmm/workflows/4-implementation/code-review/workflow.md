@@ -83,6 +83,10 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 
   <action>Read fully and follow `{installed_path}/discover-inputs.md` to load all input files</action>
   <action>Load {project_context} for coding standards (if exists)</action>
+
+  <!-- UI impact detection, used in Step 5 to decide between "done" and "ready-for-UX-validation" -->
+  <action>Read the story's "UI Impact" field (see create-story template) if present</action>
+  <action>Set {{ui_impact}} = true if the "UI Impact" field says "Oui", OR if any file from the comprehensive changed-files list (story File List + git changes) is under `desktop/` or `core/ajax/`; otherwise {{ui_impact}} = false</action>
 </step>
 
 <step n="2" goal="Build review attack plan">
@@ -209,7 +213,11 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 
 <step n="5" goal="Update story status and sync sprint tracking">
   <!-- Determine new status based on review outcome -->
-  <check if="all HIGH and MEDIUM issues fixed AND all ACs implemented">
+  <check if="all HIGH and MEDIUM issues fixed AND all ACs implemented AND {{ui_impact}} == true">
+    <action>Set {{new_status}} = "ready-for-UX-validation"</action>
+    <action>Update story Status field to "ready-for-UX-validation"</action>
+  </check>
+  <check if="all HIGH and MEDIUM issues fixed AND all ACs implemented AND {{ui_impact}} == false">
     <action>Set {{new_status}} = "done"</action>
     <action>Update story Status field to "done"</action>
   </check>
@@ -239,6 +247,13 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
       <output>✅ Sprint status synced: {{story_key}} → done</output>
     </check>
 
+    <check if="{{new_status}} == 'ready-for-UX-validation'">
+      <action>Update development_status[{{story_key}}] = "ready-for-UX-validation"</action>
+      <action>Update last_updated field to current date</action>
+      <action>Save file, preserving ALL comments and structure</action>
+      <output>🎨 Sprint status synced: {{story_key}} → ready-for-UX-validation (validation manuelle requise avant "done")</output>
+    </check>
+
     <check if="{{new_status}} == 'in-progress'">
       <action>Update development_status[{{story_key}}] = "in-progress"</action>
       <action>Update last_updated field to current date</action>
@@ -261,7 +276,7 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
     **Issues Fixed:** {{fixed_count}}
     **Action Items Created:** {{action_count}}
 
-    {{#if new_status == "done"}}Code review complete!{{else}}Address the action items and continue development.{{/if}}
+    {{#if new_status == "done"}}Code review complete!{{/if}}{{#if new_status == "ready-for-UX-validation"}}Code review complete, but this story has UI impact — validation UX manuelle requise avant de marquer la story "done" (voir /bmad:bmm:workflows:sprint-status).{{/if}}{{#if new_status == "in-progress"}}Address the action items and continue development.{{/if}}
   </output>
 </step>
 
