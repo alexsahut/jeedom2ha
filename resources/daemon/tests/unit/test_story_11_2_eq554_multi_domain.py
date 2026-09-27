@@ -348,6 +348,13 @@ async def test_action_publier_path_publishes_switch_and_all_secondaries():
     assert primary.ha_entity_type == "switch"
     assert len(primary.additional_mappings) == 13
 
+    # L'action « publier » suit toujours un sync (revue Codex P1) : chaque secondaire
+    # doit porter la décision de ce dernier sync pour être (re)publié ici.
+    for secondary in primary.additional_mappings:
+        secondary.publication_decision_ref = PublicationDecision(
+            should_publish=True, reason="sure"
+        )
+
     ok = await _publish_mapping_for_action(publisher_registry, primary, snapshot)
     assert ok is True
 

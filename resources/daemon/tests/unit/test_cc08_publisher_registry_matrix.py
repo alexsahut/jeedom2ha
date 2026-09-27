@@ -20,6 +20,7 @@ sans diagnostic) sur les trois chemins.
 from __future__ import annotations
 
 import asyncio
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -33,8 +34,24 @@ from transport.http_server import _publish_mapping_for_action, _republish_all_fr
 KNOWN_TYPES = PublisherRegistry.known_types()
 
 
-def _mapping(entity_type: str, eq_id: int, *, additional=None) -> MappingResult:
-    return MappingResult(
+def _publication_decision(should_publish: bool):
+    """Lightweight stand-in for a secondary's `publication_decision_ref` (last-sync
+    decision), sufficient for the `should_publish` gate checked by both republication
+    paths (revue Codex P1)."""
+    return type("PublicationDecision", (), {"should_publish": should_publish})()
+
+
+def _mapping(
+    entity_type: str,
+    eq_id: int,
+    *,
+    additional=None,
+    should_publish: Optional[bool] = None,
+) -> MappingResult:
+    """`should_publish` sets `publication_decision_ref` to simulate the last-sync
+    decision for a secondary (cf. `_secondary_publishable` in http_server.py).
+    Left `None` (default) to simulate a secondary never synced (no known decision)."""
+    mapping = MappingResult(
         ha_entity_type=entity_type,
         confidence="sure",
         reason_code=f"{entity_type}_test",
@@ -44,6 +61,9 @@ def _mapping(entity_type: str, eq_id: int, *, additional=None) -> MappingResult:
         capabilities=SensorCapabilities(),
         additional_mappings=additional or [],
     )
+    if should_publish is not None:
+        mapping.publication_decision_ref = _publication_decision(should_publish)
+    return mapping
 
 
 def _snapshot() -> TopologySnapshot:
@@ -135,7 +155,7 @@ class TestActionPublierPathMatrix:
     async def test_publier_publishes_secondary(self, entity_type):
         registry, publisher = _registry_with_patched_publishers()
         primary_type = _distinct_primary_type(entity_type)
-        secondary = _mapping(entity_type, eq_id=2)
+        secondary = _mapping(entity_type, eq_id=2, should_publish=True)
         primary = _mapping(primary_type, eq_id=1, additional=[secondary])
         snapshot = _snapshot()
 
@@ -158,7 +178,7 @@ class TestActionPublierPathMatrix:
 
     async def test_publier_unregistered_secondary_fails_explicitly_without_masking(self):
         registry, publisher = _registry_with_patched_publishers()
-        secondary = _mapping("unknown_type", eq_id=2)
+        secondary = _mapping("unknown_type", eq_id=2, should_publish=True)
         primary = _mapping("switch", eq_id=1, additional=[secondary])
         snapshot = _snapshot()
 
@@ -172,8 +192,8 @@ class TestActionPublierPathMatrix:
     async def test_publier_secondary_failure_does_not_short_circuit_remaining_secondaries(self):
         """Un secondaire en échec ne doit pas empêcher la publication des suivants."""
         registry, publisher = _registry_with_patched_publishers()
-        failing = _mapping("unknown_type", eq_id=2)
-        ok_secondary = _mapping("sensor", eq_id=3)
+        failing = _mapping("unknown_type", eq_id=2, should_publish=True)
+        ok_secondary = _mapping("sensor", eq_id=3, should_publish=True)
         primary = _mapping("switch", eq_id=1, additional=[failing, ok_secondary])
         snapshot = _snapshot()
 
@@ -181,6 +201,36 @@ class TestActionPublierPathMatrix:
 
         assert ok is False
         publisher.publish_sensor.assert_awaited_once_with(ok_secondary, snapshot)
+
+    async def test_publier_secondary_refused_at_last_sync_is_not_republished(self):
+        """Revue Codex (P1) : un secondaire dont la décision du dernier sync refuse
+        la publication (should_publish=False) ne doit pas être republié par l'action
+        « publier », même si le primaire l'est."""
+        registry, publisher = _registry_with_patched_publishers()
+        refused = _mapping("sensor", eq_id=2, should_publish=False)
+        primary = _mapping("switch", eq_id=1, additional=[refused])
+        snapshot = _snapshot()
+
+        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+
+        assert ok is True
+        publisher.publish_sensor.assert_not_awaited()
+        publisher.publish_switch.assert_awaited_once_with(primary, snapshot)
+
+    async def test_publier_secondary_without_known_decision_is_not_republished(self):
+        """Revue Codex (P1) : un secondaire jamais synchronisé (publication_decision_ref
+        absent) ne doit pas être publié par l'action « publier » — une décision inconnue
+        n'est jamais traitée comme une autorisation implicite."""
+        registry, publisher = _registry_with_patched_publishers()
+        never_synced = _mapping("sensor", eq_id=2)  # should_publish=None (pas de décision)
+        primary = _mapping("switch", eq_id=1, additional=[never_synced])
+        snapshot = _snapshot()
+
+        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+
+        assert ok is True
+        publisher.publish_sensor.assert_not_awaited()
+        publisher.publish_switch.assert_awaited_once_with(primary, snapshot)
 
 
 class TestRepublicationPathMatrix:
@@ -239,7 +289,7 @@ class TestRepublicationPathMatrix:
             "transport.http_server.DiscoveryPublisher", lambda _bridge: publisher
         )
         primary_type = _distinct_primary_type(entity_type)
-        secondary = _mapping(entity_type, eq_id=2)
+        secondary = _mapping(entity_type, eq_id=2, should_publish=True)
         primary = _mapping(primary_type, eq_id=1, additional=[secondary])
         app = self._app(self._decision(primary))
 
@@ -284,7 +334,7 @@ class TestRepublicationPathMatrix:
         monkeypatch.setattr(
             "transport.http_server.DiscoveryPublisher", lambda _bridge: publisher
         )
-        secondary = _mapping("unknown_type", eq_id=2)
+        secondary = _mapping("unknown_type", eq_id=2, should_publish=True)
         primary = _mapping("switch", eq_id=1, additional=[secondary])
         app = self._app(self._decision(primary))
 
@@ -293,3 +343,78 @@ class TestRepublicationPathMatrix:
         assert secondary.publication_result.status == "failed"
         assert secondary.publication_result.technical_reason_code == "publisher_not_registered"
         publisher.publish_switch.assert_awaited_once_with(primary, app["topology"])
+
+    async def test_republication_secondary_refused_at_last_sync_is_not_republished(
+        self, monkeypatch
+    ):
+        """Revue Codex (P1) : un secondaire dont la décision du dernier sync refuse
+        la publication (should_publish=False) ne doit pas être republié, même si le
+        primaire l'est."""
+        registry, publisher = _registry_with_patched_publishers()
+        monkeypatch.setattr(
+            "transport.http_server.PublisherRegistry", lambda _publisher: registry
+        )
+        monkeypatch.setattr(
+            "transport.http_server.DiscoveryPublisher", lambda _bridge: publisher
+        )
+        refused = _mapping("sensor", eq_id=2, should_publish=False)
+        primary = _mapping("switch", eq_id=1, additional=[refused])
+        app = self._app(self._decision(primary))
+
+        await _republish_all_from_cache(app, "ha_birth")
+
+        publisher.publish_sensor.assert_not_awaited()
+        publisher.publish_switch.assert_awaited_once_with(primary, app["topology"])
+
+    async def test_republication_secondary_without_known_decision_is_not_republished(
+        self, monkeypatch
+    ):
+        """Revue Codex (P1) : un secondaire jamais synchronisé (publication_decision_ref
+        absent) ne doit pas être republié — une décision inconnue n'est jamais traitée
+        comme une autorisation implicite."""
+        registry, publisher = _registry_with_patched_publishers()
+        monkeypatch.setattr(
+            "transport.http_server.PublisherRegistry", lambda _publisher: registry
+        )
+        monkeypatch.setattr(
+            "transport.http_server.DiscoveryPublisher", lambda _bridge: publisher
+        )
+        never_synced = _mapping("sensor", eq_id=2)  # should_publish=None (pas de décision)
+        primary = _mapping("switch", eq_id=1, additional=[never_synced])
+        app = self._app(self._decision(primary))
+
+        await _republish_all_from_cache(app, "ha_birth")
+
+        publisher.publish_sensor.assert_not_awaited()
+        publisher.publish_switch.assert_awaited_once_with(primary, app["topology"])
+
+    async def test_republication_delay_counts_primary_and_publishable_secondaries_only(
+        self, monkeypatch
+    ):
+        """Revue Codex (P2) : le délai de lissage doit compter primaires + secondaires
+        publiables — un secondaire refusé (ignoré, non publié) ne doit pas gonfler le
+        compte utilisé pour calculer le délai."""
+        registry, publisher = _registry_with_patched_publishers()
+        monkeypatch.setattr(
+            "transport.http_server.PublisherRegistry", lambda _publisher: registry
+        )
+        monkeypatch.setattr(
+            "transport.http_server.DiscoveryPublisher", lambda _bridge: publisher
+        )
+        sleep_calls: list[float] = []
+
+        async def _fake_sleep(delay):
+            sleep_calls.append(delay)
+
+        monkeypatch.setattr(asyncio, "sleep", _fake_sleep)
+
+        publishable = _mapping("sensor", eq_id=2, should_publish=True)
+        refused = _mapping("binary_sensor", eq_id=3, should_publish=False)
+        primary = _mapping("switch", eq_id=1, additional=[publishable, refused])
+        app = self._app(self._decision(primary))
+
+        await _republish_all_from_cache(app, "ha_birth")
+
+        # 1 primaire + 1 secondaire publiable = 2 entités → delay = 10.0 / 2 = 5.0.
+        # Le secondaire refusé est ignoré, donc pas de sleep additionnel pour lui.
+        assert sleep_calls == [pytest.approx(5.0), pytest.approx(5.0)]
