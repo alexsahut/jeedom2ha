@@ -17,6 +17,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 FILTER_FILE="${REPO_ROOT}/.rsync-plugin-deploy.filter"
 ENV_FILE="${REPO_ROOT}/.env"
+VERSION_FILE_LIB="${SCRIPT_DIR}/deploy-version-file.sh"
+
+# jeedom2ha_render_version_content / jeedom2ha_write_version_file_atomic —
+# testées sans ssh dans tests/unit/test_deploy_version_file.py.
+# shellcheck disable=SC1090
+source "${VERSION_FILE_LIB}"
 
 # Load .env if present
 if [[ -f "${ENV_FILE}" ]]; then
@@ -36,6 +42,9 @@ JEEDOM_BOX_PATH="${JEEDOM_BOX_PATH:-/var/www/html/plugins/jeedom2ha}"
 # Répertoire de staging sur la box (accessible en écriture par JEEDOM_BOX_USER).
 # Le déploiement est en 2 étapes : rsync → staging, puis sudo → plugin dir.
 JEEDOM_STAGING_DIR="${JEEDOM_STAGING_DIR:-/home/${JEEDOM_BOX_USER}/jeedom2ha-staging}"
+# Répertoire d'archives (backup du plugin existant avant écrasement).
+# Dossier en 700, chaque archive tar.gz en 600 (point 4b — hygiène des permissions).
+JEEDOM_BACKUP_DIR="${JEEDOM_BACKUP_DIR:-/home/${JEEDOM_BOX_USER}/jeedom2ha-backups}"
 # JEEDOM_ROOT est utilisé par PHP via getenv("JEEDOM_ROOT") sur la box
 JEEDOM_ROOT="${JEEDOM_ROOT:-/var/www/html}"
 
@@ -207,10 +216,12 @@ echo "  Target  : ${JEEDOM_BOX_PATH}/ (via sudo)"
 echo ""
 
 # =============================================================================
-# STEP 1 — déploiement en 2 étapes (user SSH non-root + sudo)
+# STEP 1 — déploiement (user SSH non-root + sudo)
 #
-# Étape 1a : rsync local → staging (accessible en écriture par JEEDOM_BOX_USER)
-# Étape 1b : sudo promotion staging → plugin dir + permissions www-data
+# Étape 1a      : rsync local → staging (accessible en écriture par JEEDOM_BOX_USER)
+# Étape 1a-bis  : backup archive (700/600) du plugin existant, avant écrasement
+# Étape 1b      : sudo promotion staging → plugin dir + permissions www-data
+# Étape 1c      : écriture atomique du fichier VERSION (version + sha + date)
 #
 # Pattern terrain doc "Sur la box Jeedom de test" adapté pour user non-root.
 # Toutes les opérations sur /var/www/html passent par sudo.
@@ -336,6 +347,26 @@ echo "  1a. rsync → ${JEEDOM_STAGING_DIR}/"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p '${JEEDOM_STAGING_DIR}'"
 rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${JEEDOM_STAGING_DIR}/"
 
+# 1a-bis — sauvegarde du plugin existant avant écrasement (point 4b).
+# Ne touche à aucune archive déjà existante — crée uniquement le dossier
+# d'archives (700) et, si un plugin est déjà déployé, une nouvelle archive
+# horodatée (600) avant que le rsync --delete de l'étape 1b ne l'écrase.
+echo "  1a-bis. Backup ${JEEDOM_BOX_PATH}/ → ${JEEDOM_BACKUP_DIR}/ (si plugin déjà déployé)"
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
+set -e
+sudo mkdir -p "${JEEDOM_BACKUP_DIR}"
+sudo chmod 700 "${JEEDOM_BACKUP_DIR}"
+if [[ -d "${JEEDOM_BOX_PATH}" ]]; then
+  _archive="${JEEDOM_BACKUP_DIR}/jeedom2ha-\$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+  sudo tar -czf "\${_archive}" -C "$(dirname "${JEEDOM_BOX_PATH}")" "$(basename "${JEEDOM_BOX_PATH}")"
+  sudo chmod 600 "\${_archive}"
+  echo "  Backup créé: \${_archive} (600) — dossier ${JEEDOM_BACKUP_DIR} (700)."
+else
+  echo "  Aucun plugin existant à ${JEEDOM_BOX_PATH} — pas de backup (premier déploiement)."
+fi
+REMOTE
+echo ""
+
 # 1b — promotion staging → plugin dir + permissions (sudo requis)
 echo "  1b. sudo promote → ${JEEDOM_BOX_PATH}/"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
@@ -348,6 +379,40 @@ sudo find "${JEEDOM_BOX_PATH}" -type f -exec chmod 644 {} \;
 sudo chmod +x "${JEEDOM_BOX_PATH}/resources/daemon/main.py"
 echo "  Permissions OK (www-data, 755/644, main.py +x)."
 REMOTE
+echo ""
+
+# 1c — écrire un fichier VERSION à la racine du plugin (hors data/), APRÈS le
+# rsync --delete ci-dessus pour ne pas en être la victime. Écriture atomique
+# + relecture immédiate via scripts/deploy-version-file.sh (point 1c) —
+# la même fonction est testée sans ssh dans tests/unit/test_deploy_version_file.py.
+echo "  1c. VERSION → ${JEEDOM_BOX_PATH}/VERSION"
+_plugin_version=$(jq -r '.pluginVersion' "${REPO_ROOT}/plugin_info/info.json")
+_deploy_sha=$(git -C "${REPO_ROOT}" rev-parse HEAD)
+_deploy_ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+if [[ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
+  _deploy_git_status="clean"
+else
+  _deploy_git_status="dirty"
+fi
+_version_content=$(jeedom2ha_render_version_content \
+  "${_plugin_version}" "${_deploy_sha}" "${_deploy_ts}" "${_deploy_git_status}")
+
+_remote_version_readback=$(
+  { cat "${VERSION_FILE_LIB}"
+    printf 'jeedom2ha_write_version_file_atomic %q %q\n' "${JEEDOM_BOX_PATH}" "${_version_content}"
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sudo bash -s"
+)
+
+if [[ "${_remote_version_readback}" == "${_version_content}" ]]; then
+  echo "  VERSION vérifié après écriture (relecture identique au contenu attendu) :"
+  echo "${_version_content}" | sed 's/^/    /'
+else
+  _fail "VERSION mismatch après écriture sur la box ${JEEDOM_BOX_PATH}/VERSION.
+Attendu:
+${_version_content}
+Obtenu:
+${_remote_version_readback}"
+fi
 echo ""
 
 # =============================================================================
