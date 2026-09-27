@@ -50,6 +50,7 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **When** un testeur exécute le scénario de clic suivant : (1) ouvrir la surface de navigation par pièce ; (2) localiser un équipement précédemment affiché à tort "sera publié" alors qu'il est en réalité exclu ; (3) constater qu'il affiche désormais son vrai statut "exclu" ; (4) sur un équipement avec override TYPE + override publication actifs, cliquer sur "revenir au mode automatique" ; (5) constater que les deux overrides ont disparu de l'affichage
 **Then** le scénario est documenté avec captures ou description précise du résultat observé sur la box réelle
 **And** cette story reste au statut `ready-for-UX-validation` tant que ce scénario de clic réel n'a pas été exécuté et documenté.
+**And** la validation est nommément identifiée : validateur, date, SHA déployé, environnement (box 192.168.1.21).
 
 **AC6 — Deux temporalités explicites**
 
@@ -62,7 +63,7 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **Given** chaque commande de l'équipement
 **When** la surface ou l'aperçu expose son diagnostic
 **Then** chaque commande a une `CommandDecision`, une raison et un libellé français, y compris `publication_excluded_eqlogic`, `publication_excluded_command`, `publication_forced`, `sure_mapping`, `ha_component_not_in_product_scope`, `no_mapping`, `skipped_no_mapping_candidate` et la commande non couverte
-**And** le diagnostic ne vaut plus `None` (`http_server.py:2496`) ni « — » côté JS (`jeedom2ha_mapping_surface.js:249`) ; golden 59 contient zéro commande sans raison.
+**And** le diagnostic ne vaut plus `None` (`http_server.py:2496`) ni « — » côté JS (`jeedom2ha_mapping_override.js:249`) ; golden 59 contient zéro commande sans raison.
 
 ## UI Impact
 
@@ -97,7 +98,7 @@ I2, I4, I6 (cohérence de la décision affichée avec celle réellement appliqu�
   - [ ] Utiliser le paramètre "overrides proposés" de `evaluate_equipment()` (Story 19.0, AC3) pour le calcul "avec override" de l'aperçu
   - [ ] Vérifier la cohérence stricte entre le résultat de l'aperçu et celui de la surface par pièce pour un même override
 
-- [ ] Task 3 — Corriger "revenir au mode automatique" pour effacer aussi l'override de publication (AC3)
+- [ ] Task 3 — Corriger CC-19 : « revenir au mode automatique » laisse les overrides TYPE par commande (AC3)
   - [ ] Effacer `remove_override` pour chaque clé `eq_id:cmd_id`, puis `remove_equipment_override` (persistance `data/ha_overrides.json`, cf. Story 16.3).
 
 - [ ] Task 4 — Étendre `REASON_LABELS` (AC4)
@@ -129,7 +130,7 @@ I2, I4, I6 (cohérence de la décision affichée avec celle réellement appliqu�
 
 ### Project Structure Notes
 
-- Fichiers à toucher (probable) : `resources/daemon/transport/http_server.py` [MODIFIÉ — `_build_mapping_override_tree`, `_handle_overrides_preview`], `desktop/js/jeedom2ha_mapping_override.js` [MODIFIÉ — `REASON_LABELS`, logique "revenir au mode automatique"], tests backend + front associés [NOUVEAU/MODIFIÉ].
+- Fichiers à toucher (probable) : `resources/daemon/transport/http_server.py` [MODIFIÉ — `_build_mapping_override_tree`, `_handle_overrides_preview`], `desktop/js/jeedom2ha_mapping_override.js` [MODIFIÉ — `REASON_LABELS`, CC-19 : « revenir au mode automatique » laisse les overrides TYPE par commande], tests backend + front associés [NOUVEAU/MODIFIÉ].
 
 ### References
 
