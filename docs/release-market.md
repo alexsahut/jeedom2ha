@@ -24,7 +24,10 @@ Jeedom.
 Cette page n'est accessible qu'au travers du rendu JS du site
 `doc.jeedom.com` (un fetch HTTP direct renvoie 404, y compris sur la racine
 `/fr_FR/dev`) ; la citation ci-dessus provient de l'indexation du moteur de
-recherche sur cette URL exacte, pas d'une supposition.
+recherche sur cette URL exacte, pas d'une supposition. **Étiquette : extrait
+indexé, page non récupérable directement** — la page complète n'a pas pu être
+lue (fetch échoué/tronqué), seul un extrait indexé par le moteur de recherche
+a pu être confirmé.
 
 **Délai de validation du compte dev : HYPOTHÈSE.** Aucun délai chiffré n'a
 été trouvé sur une page officielle lors de cette recherche. À prouver en
@@ -61,7 +64,10 @@ dans ce repo (voir `docs/git-strategy.md`), sans changement nécessaire.
 bouton "Synchronize Market" vs webhook GitHub) n'est pas confirmée avec un
 chiffre précis. Élément partiel PROUVÉ :
 
-> Source : https://doc.jeedom.com/en_US/core/4.1/update
+> Source : https://doc.jeedom.com/en_US/core/4.1/update (**extrait indexé,
+> page non récupérable directement** — fetch direct confirmé en 404 lors de
+> cette relecture, seul un extrait indexé par le moteur de recherche a pu
+> être confirmé)
 > Extrait indexé : « Jeedom periodically connects to the Market to see if
 > updates are available. The date of the last check is indicated at the top
 > left of the page. »
@@ -74,7 +80,7 @@ consultant `Configuration → Mise à jour / Market → onglet Market` sur une
 instance Jeedom réelle (paramètre "Vérifier automatiquement s'il y a des
 mises à jour").
 
-### 1.3 Contenu empaqueté — PROUVÉ (absence de mécanisme d'exclusion Git)
+### 1.3 Contenu empaqueté — PROUVÉ (empiriquement, sur deux plugins tiers réels) + GATE BLOQUANTE résiduelle sur `tests/`
 
 Recherche d'un mécanisme d'exclusion `export-ignore` dans ce repo :
 
@@ -84,36 +90,101 @@ $ find . -iname ".gitattributes"
 ```
 
 Aucun fichier `.gitattributes` n'existe dans `jeedom2ha`. Il n'y a donc
-**aucune règle `export-ignore`** définie pour ce repo — un `git archive`
-(ou tout mécanisme Market s'appuyant dessus) sur une branche donnée
-empaquetterait tout le contenu versionné de cette branche, y compris
-`tests/`, `_bmad/`, `.github/`, `scripts/`, `docs/`, etc.
+**aucune règle `export-ignore`** définie pour ce repo.
+
+**PROUVÉ (preuve empirique terrain, pas seulement documentaire)** : deux
+plugins tiers réellement installés depuis le Market sur la box de référence
+(`asahut@192.168.1.21`, lecture seule) ont été comparés à leur dépôt GitHub
+public, sur la branche effectivement servie (déduite du champ `changelog`/
+`documentation` de leur `info.json`) :
+
+```
+$ ssh asahut@192.168.1.21 'ls -a /var/www/html/plugins/tahoma/'
+. .. 3rdparty compress.sh core desktop plugin_info README.md
+
+$ curl -s https://api.github.com/repos/redbug26/jeedom-tahoma/contents/?ref=master | jq -r '.[].name'
+.gitignore 3rdparty README.md compress.sh core desktop doc plugin_info
+
+$ curl -s https://api.github.com/repos/redbug26/jeedom-tahoma/contents/.gitattributes?ref=master
+{"message":"Not Found", ...}
+```
+
+```
+$ ssh asahut@192.168.1.21 'ls -a /var/www/html/plugins/worxLandroidS/'
+. .. composer.json composer.lock core desktop docs LICENSE plugin_info README.md resources vendor
+
+$ curl -s https://api.github.com/repos/mips2648/jeedom-worxLandroidS/contents/?ref=beta | jq -r '.[].name'
+.github .gitignore .markdownlint.json LICENSE README.md composer.json composer.lock core desktop docs plugin_info resources
+# (branche master : liste identique)
+
+$ curl -s https://api.github.com/repos/mips2648/jeedom-worxLandroidS/contents/.gitattributes?ref=beta
+{"message":"Not Found", ...}
+```
+
+Conclusions tirées de cette preuve terrain, pas d'une supposition :
+1. **`.github/`, les dotfiles (`.gitignore`, `.markdownlint.json`) et les
+   dossiers `doc`/`docs` ne sont PAS livrés sur la box réelle**, alors qu'ils
+   sont bien présents sur la branche GitHub effectivement servie par le
+   Market pour ces deux plugins (la suppression de `doc`/`docs` recoupe
+   d'ailleurs exactement le `rm -rf` explicite lu dans `doUpdate()`, voir
+   1.6 — confirmation croisée code + terrain).
+2. **Aucun des deux dépôts n'a de `.gitattributes`** (404 confirmé sur les
+   deux) : le filtrage constaté n'est donc **pas** un `export-ignore` Git.
+   Le mécanisme réel (filtrage côté serveur Market avant livraison à la box,
+   ou traitement spécifique d'une archive GitHub qui exclurait déjà ces
+   éléments) reste **HYPOTHÈSE** — non confirmé par une preuve directe de son
+   fonctionnement interne, seul le résultat observé est prouvé.
+3. **`tests/` reste non tranché** : ni `tahoma` ni `worxLandroidS` n'ont de
+   dossier `tests/` (ou équivalent `_bmad/`, `.claude/`, `.agent`, `scripts/`)
+   à leur racine GitHub, donc cette preuve ne dit rien sur le sort réservé à
+   ce type de dossier.
+
+**Fix de parité proposé, revu à la lumière de cette preuve** : ajouter un
+`.gitattributes export-ignore` serait **inutile** au vu du point 2
+ci-dessus — le mécanisme observé n'en dépend pas pour `.github`/dotfiles chez
+ces deux plugins, rien ne garantit qu'il en tiendrait compte pour `jeedom2ha`
+non plus. La seule option fiable est de **ne pas présumer** que `tests/`,
+`_bmad/`, `.claude/`, `.agent`, `scripts/` seront filtrés comme `.github` l'a
+été, et de traiter ce point comme une **GATE BLOQUANTE explicite avant la
+première publication** (pas un « à vérifier » facultatif) : inspecter
+réellement le contenu du plugin sur la box **après** la première publication
+beta (`ls -la` du répertoire du plugin), avant toute promotion vers
+`stable`. Si `tests/`/`_bmad/`/`.claude/`/`.agent`/`scripts/` s'avèrent
+livrés aux utilisateurs, il faudra alors soit les retirer physiquement de
+`beta`/`stable` (branches dédiées sans ces dossiers), soit contacter le
+support Market pour confirmer si un `.gitattributes export-ignore` serait
+pris en compte malgré l'absence de précédent observé.
 
 **PROUVÉ (mécanisme de l'ancienne installation par ZIP)** : le mécanisme
 générique "installer depuis un fichier" attend un `plugin_info/` à la racine
 du zip, dont le nom de fichier zip == ID du plugin :
 
-> Source : https://doc.jeedom.com/en_US/core/4.2/plugin
+> Source : https://doc.jeedom.com/en_US/core/4.2/plugin (**extrait indexé,
+> page non récupérable directement** — fetch direct confirmé en 404 lors de
+> cette relecture)
 > Extrait : « Attention, in the case of adding by a zip file, the name of
 > the zip must be the same as the ID of the plugin and upon opening the ZIP
 > a plugin_info folder must be present. »
 
-**HYPOTHÈSE** : pour une installation **depuis GitHub** (le cas retenu par
-`jeedom2ha`), le mécanisme réel de récupération du contenu (checkout complet
-de la branche vs archive filtrée par le serveur Market) n'a pas été confirmé
-par une preuve directe. À prouver concrètement en :
-1. publiant une version beta réelle (une fois le compte dev validé),
-2. installant cette version beta sur une box de test,
-3. inspectant le contenu réellement présent sous le répertoire du plugin sur
-   cette box (`ls -la /path/plugin/jeedom2ha`) pour vérifier si `tests/`,
-   `_bmad/`, `.github/` etc. sont présents ou non.
+**HYPOTHÈSE (mécanisme exact de récupération)** : pour une installation
+**depuis GitHub** (le cas retenu par `jeedom2ha`), le mécanisme précis de
+récupération du contenu (checkout complet de la branche vs archive filtrée
+par le serveur Market) n'a pas été confirmé par une preuve directe de son
+fonctionnement interne — voir la preuve empirique ci-dessus (1.3, comparaison
+`tahoma`/`worxLandroidS`) qui prouve le **résultat** (`.github`/dotfiles/
+`doc`/`docs` non livrés) sans prouver le **mécanisme**.
 
-Tant que cette preuve terrain n'est pas faite, il faut supposer par défaut
-que **tout ce qui est versionné sur `beta`/`stable` sera livré aux
-utilisateurs finaux**, y compris les répertoires de développement — à la
-différence du déploiement `rsync` interne qui, lui, filtre explicitement via
-`.rsync-plugin-deploy.filter` (voir 1.6). C'est un écart de mécanisme
-important entre déploiement interne et publication Market.
+Pour `jeedom2ha` spécifiquement, cette preuve terrain reste à faire une fois
+la première version beta réellement publiée (une fois le compte dev validé) :
+inspecter le contenu réel du répertoire du plugin (`ls -la` sur la box, en
+lecture seule) après installation, pour vérifier si `tests/`, `_bmad/`,
+`.claude/`, `.agent`, `scripts/` sont présents ou non — voir 1.3 pour le
+statut de gate bloquante de ce point précis. Pour `.github/` et les
+dotfiles (`.gitignore` notamment), la preuve empirique de 1.3 permet
+désormais de considérer, par analogie avec deux plugins tiers réels, qu'ils
+ne seront **probablement pas** livrés — mais « probablement » n'est pas
+« prouvé pour `jeedom2ha` », d'où le maintien de la gate sur l'ensemble du
+point tant qu'aucune inspection directe post-publication n'a été faite.
 
 ### 1.4 Champs `info.json` qui comptent pour la version — PROUVÉ
 
@@ -153,9 +224,19 @@ souvent différemment des autres branches), soit les faire pointer sur
 `blob/stable/...` / `blob/beta/...` selon le canal — ce choix reste à trancher
 par Alex, ce n'est pas un fait Market mais une décision produit.
 
+**Recommandation (Point F, à valider par Alex, pas un fait imposé)** : pour
+la **première publication**, faire pointer `changelog`/`documentation` sur
+`blob/stable/...` plutôt que sur `blob/beta/...` ou `main` — un lien
+`stable` reste correct quel que soit le canal effectivement installé par
+l'utilisateur final (`stable` est un sous-ensemble figé de `beta`, voir
+section 2 : contenu strictement identique aujourd'hui), alors qu'un lien
+`beta` afficherait par erreur une documentation non encore stabilisée à un
+utilisateur du canal stable.
+
 ### 1.5 Changelog et doc exigés par le Market — PROUVÉ (mécanisme d'affichage) + fait local
 
-> Source : https://doc.jeedom.com/en_US/core/4.1/update
+> Source : https://doc.jeedom.com/en_US/core/4.1/update (**extrait indexé,
+> page non récupérable directement** — fetch direct confirmé en 404)
 > Extrait : « Pre-update : Allows you to update the update script […] If the
 > changelog is empty but you still have an update, it means that the
 > documentation has been updated. […] it is often an update of the
@@ -189,11 +270,21 @@ $ head -8 docs/fr_FR/changelog_beta.md
 changelog beta avant toute première publication, sans quoi les utilisateurs
 du canal beta verraient le texte de template Jeedom générique.
 
-### 1.6 Comportement d'une box market/stable lors d'une mise à jour — PROUVÉ (partiel) + HYPOTHÈSE (partiel)
+### 1.6 Comportement d'une box market/stable lors d'une mise à jour — PROUVÉ (quasi-totalité, relecture directe du cœur Jeedom)
+
+Cette section a été revérifiée par **lecture directe, en lecture seule via
+SSH (`asahut@192.168.1.21`), du code source PHP du cœur Jeedom réellement
+installé sur la box de référence** — pas par déduction ni par de la
+documentation tierce. Fichiers lus : `core/class/update.class.php`,
+`core/php/utils.inc.php`, `core/class/plugin.class.php`. Aucune commande
+d'écriture n'a été exécutée sur la box pendant cette relecture (uniquement
+`sed`/`grep` sur des fichiers existants).
 
 **PROUVÉ (mécanisme de sauvegarde générale, pas spécifique au plugin)** :
 
-> Source : https://doc.jeedom.com/en_US/core/4.1/update
+> Source : https://doc.jeedom.com/en_US/core/4.1/update (**extrait indexé,
+> page non récupérable directement** — fetch direct confirmé en 404 lors de
+> cette relecture)
 > Extrait : « Save before : Back up Jeedom before updating. The backup is
 > performed locally only (neither Market nor Samba). »
 
@@ -201,25 +292,185 @@ C'est une sauvegarde **de l'instance Jeedom entière**, optionnelle/à la
 discrétion de l'utilisateur au moment de la mise à jour — pas une garantie
 automatique de rollback plugin par plugin.
 
-**HYPOTHÈSE (préservation de `data/` par le remplacement Market)** : aucune
-preuve officielle directe trouvée confirmant que le mécanisme de mise à jour
-Market exclut spécifiquement un répertoire `data/` du plugin lors du
-remplacement de fichiers. Ce comportement existe et est **prouvé** dans notre
-propre script (`scripts/deploy-to-box.sh`, voir 1.3bis / section 4), mais
-c'est un mécanisme **que nous avons écrit nous-mêmes**, pas une garantie du
-Market. À prouver concrètement par un test terrain : installer une version
-beta réelle sur une box de test contenant des données dans le répertoire
-`data/` du plugin, déclencher une mise à jour Market vers une version
-supérieure, puis vérifier que `data/` est toujours présent et inchangé après
-la mise à jour.
+**PROUVÉ — suppression de `doc`/`docs`, puis fusion additive (pas une
+synchronisation miroir) du contenu du plugin** :
 
-**HYPOTHÈSE (redémarrage du démon)** : aucune preuve officielle directe que
-Jeedom relance automatiquement le démon `hasOwnDeamon: true` après une mise à
-jour Market du plugin. Le fichier `info.json` déclare bien
-`"hasOwnDeamon": true` (fait PROUVÉ par lecture), ce qui indique à Jeedom que
-le plugin a un démon à gérer, mais le comportement exact post-update
-(redémarrage automatique vs redémarrage manuel requis par l'utilisateur)
-reste à vérifier sur box de test.
+> `core/class/update.class.php`, méthode `doUpdate()` (ligne 282), lignes
+> 345-354 :
+> ```php
+> if (file_exists(__DIR__ . '/../../plugins/' . $this->getLogicalId() . '/doc')) {
+>     shell_exec('sudo rm -rf ' . __DIR__ . '/../../plugins/' . $this->getLogicalId() . '/doc');
+> }
+> if (file_exists(__DIR__ . '/../../plugins/' . $this->getLogicalId() . '/docs')) {
+>     shell_exec('sudo rm -rf ' . __DIR__ . '/../../plugins/' . $this->getLogicalId() . '/docs');
+> }
+> shell_exec('find ' . $cibDir . '/ -exec touch {} +');
+> rmove($cibDir . '/', __DIR__ . '/../../plugins/' . $this->getLogicalId(), false, array(), true);
+> ```
+
+Avant chaque mise à jour Market, Jeedom **supprime explicitement** `doc/` et
+`docs/` du plugin déjà installé (`sudo rm -rf`), `touch` tous les fichiers du
+zip téléchargé, puis appelle `rmove()` avec son 3ᵉ paramètre (`$_emptyDest`)
+à `false`.
+
+> `core/php/utils.inc.php`, fonction `rmove()` (ligne 569) :
+> ```php
+> function rmove($src, $dst, $_emptyDest = true, $_exclude = array(), $_noError = false, $_params = array()) {
+>     if (!file_exists($src)) { return true; }
+>     if ($_emptyDest) {
+>         rrmdir($dst);
+>     }
+>     ...
+> ```
+
+`$_emptyDest` contrôle si `$dst` est vidé (`rrmdir($dst)`) avant la copie ;
+appelé à `false`, ce `rrmdir($dst)` n'est **jamais** exécuté. La mise à jour
+Market est donc une **fusion additive/écrasante**, jamais un miroir strict :
+elle ajoute/écrase les fichiers du nouveau zip mais ne supprime pas les
+fichiers déjà présents sur la box absents du nouveau zip — sauf `doc`/`docs`
+(supprimés explicitement juste avant) et sauf le nettoyage ciblé ci-dessous.
+
+**Conséquence directe pour `data/` — PROUVÉ (préservation, corollaire du
+même code)** : `data/` n'étant jamais vidé (fusion additive) ni dans la liste
+de nettoyage ciblé (voir plus bas), son contenu **est bien préservé** par une
+mise à jour Market, comme le fait notre propre `deploy-to-box.sh` — mais pour
+une raison différente (fusion additive générique côté Jeedom, pas une
+exclusion `data/` spécifique comme dans notre script).
+
+**Conséquence directe pour `resources/` — PROUVÉ (risque de fichiers
+orphelins, corollaire du même code)** : le nettoyage ciblé post-install (voir
+plus bas) ne couvre qu'une liste fermée de dossiers qui **n'inclut pas
+`resources/`**. Si un fichier du démon Python sous `resources/daemon/`
+(actuel point d'entrée : `resources/daemon/main.py`) est retiré d'une future
+version de `jeedom2ha`, une mise à jour Market **ne le supprimera jamais** de
+la box : fusion additive + `resources/` hors périmètre du nettoyage 7 jours
+= fichier orphelin permanent. **Garde-fou concret proposé** :
+`plugin_info/install.php` expose déjà une fonction `jeedom2ha_update()`
+(appelée par `callInstallFunction('update')`, voir plus bas), aujourd'hui
+limitée à créer `data/` si absent :
+> ```php
+> function jeedom2ha_update() {
+>     $dataDir = __DIR__ . '/../data';
+>     if (!is_dir($dataDir)) {
+>         if (!mkdir($dataDir, 0775, true)) { ... } else { ... }
+>     }
+> }
+> ```
+C'est le point d'accroche naturel pour y ajouter, avant la première
+publication si l'on veut se prémunir de ce risque, un nettoyage explicite de
+`resources/daemon/` (comparer le contenu réel sur la box à une liste de
+fichiers attendus embarquée dans le zip, supprimer le surplus) — à écrire,
+pas seulement à documenter.
+
+**PROUVÉ — permissions réinitialisées à `775` (pas `755`) après une mise à
+jour Market** :
+
+> `core/class/update.class.php`, `postInstallUpdate()` (ligne 439), lignes
+> 453-455 :
+> ```php
+> $cmd = system::getCmdSudo() . 'chown -R ' . system::get('www-uid') . ':' . system::get('www-gid') . ' ' . $cibDir . ';';
+> $cmd .= system::getCmdSudo() . 'chmod 775 -R ' . $cibDir . ';';
+> $cmd .= system::getCmdSudo() . 'chmod 775 -R ' . $cibDir . '/.*;';
+> exec($cmd);
+> ```
+
+Le Market impose `chown www-data:www-data` puis `chmod 775` récursif
+(fichiers, dossiers **et** fichiers cachés) après chaque mise à jour. Ce que
+l'on observe aujourd'hui sur la box, en `755` (répertoires, ligne 654) /
+`644` (fichiers, ligne 655), **n'est pas un comportement Market — c'est un
+artefact de notre propre `scripts/deploy-to-box.sh`** :
+
+> `scripts/deploy-to-box.sh`, lignes 654-655 (`chmod` dirs → `755`, `chmod`
+> fichiers → `644`).
+
+Une fois la box basculée sur une vraie mise à jour Market, les permissions
+passeront donc à `775` partout — ce n'est pas une régression à corriger, mais
+un écart attendu entre les deux mécanismes, à ne pas confondre avec un
+problème de sécurité si on l'observe après une vraie mise à jour Market.
+
+**PROUVÉ — nettoyage ciblé des fichiers de plus de 7 jours, liste fermée de
+dossiers, coquille `3rparty` déjà présente dans le cœur Jeedom lui-même** :
+
+> `core/class/update.class.php`, ligne 459 :
+> ```php
+> foreach (array('3rdparty', '3rparty', 'desktop', 'mobile', 'core', 'docs', 'install', 'script', 'plugin_info') as $folder) {
+>     if (!file_exists($cibDir . '/' . $folder)) { continue; }
+>     shell_exec('find ' . $cibDir . '/' . $folder . '/* -mtime +7 -type f ! -iname "custom.*" ! -iname "common.config.php" ! -path "./vendor/*"  -delete 2>/dev/null');
+> }
+> ```
+
+Liste exacte et complète, telle qu'écrite dans le cœur Jeedom : `3rdparty`,
+`3rparty` (sic — doublon avec coquille, présent tel quel dans le code source
+Jeedom, pas une erreur de cette relecture), `desktop`, `mobile`, `core`,
+`docs`, `install`, `script`, `plugin_info`. **`resources/` n'y figure pas** —
+confirme le risque de fichiers orphelins documenté ci-dessus.
+
+**PROUVÉ — `setIsEnable(1)` arrête le démon mais ne le relance jamais
+directement** :
+
+> `core/class/update.class.php`, ligne 471, dans `postInstallUpdate()` :
+> `if (is_object($plugin) && $plugin->isActive()) { $plugin->setIsEnable(1); }`
+> (appelé seulement si le plugin était déjà actif avant la mise à jour)
+
+> `core/class/plugin.class.php`, `setIsEnable()` (ligne 939), extraits
+> (lignes 954-1032) :
+> ```php
+> $deamonAutoState = config::byKey('deamonAutoMode', $this->getId(), 1);
+> config::save('deamonAutoMode', 0, $this->getId());
+> ...
+> if ($_state == 1) {
+>     $this->deamon_stop();
+>     $deamon_info = $this->deamon_info();
+>     sleep(1);
+>     if ($deamon_info['state'] == 'ok') {
+>         $this->deamon_stop();
+>     }
+>     if ($alreadyActive == 1) {
+>         $out = $this->callInstallFunction('update');
+>     } else { $out = $this->callInstallFunction('install'); }
+>     ...
+> }
+> ...
+> if ($deamonAutoState) {
+>     config::save('deamonAutoMode', 1, $this->getId());
+> }
+> ```
+
+`setIsEnable(1)` désactive temporairement `deamonAutoMode`, appelle
+`deamon_stop()` (jusqu'à deux fois si besoin), déclenche
+`callInstallFunction('update')` (notre `jeedom2ha_update()` ci-dessus), **puis
+restaure `deamonAutoMode` à sa valeur précédente — sans jamais appeler
+`deamon_start()`**. Le fichier `info.json` déclare bien `"hasOwnDeamon": true`
+(fait PROUVÉ par lecture, inchangé), mais cela ne déclenche aucun redémarrage
+direct dans ce chemin de code : le redémarrage effectif dépend entièrement de
+la surveillance périodique `deamonAutoMode` déjà existante côté Jeedom (le
+mécanisme qui relance un démon détecté `nok`), pas d'un appel synchrone au
+sein de la mise à jour elle-même. **Conséquence opérationnelle** : après une
+mise à jour Market, il peut donc y avoir un délai (durée du cycle de
+surveillance `deamonAutoMode`, non chiffrée par cette relecture) avant que le
+démon de synchronisation HomeKit (`resources/daemon/main.py`) ne redémarre
+réellement — pas une réaction instantanée garantie.
+
+**PROUVÉ — compatibilité `require` vérifiée avant installation, pas après** :
+
+> `core/class/update.class.php`, `doUpdate()`, lignes 330-332 :
+> ```php
+> if (is_file($cibDir . '/plugin_info/info.json') && is_array($data = json_decode(file_get_contents($cibDir . '/plugin_info/info.json'), true)) && isset($data['require'])) {
+>     $vJeedom = jeedom::version();
+>     if (version_compare($data['require'], $vJeedom, '>')) {
+>         // rrmdir($cibDir) ; installation annulée avant remplacement
+>     }
+> }
+> ```
+
+Le champ `require` de `plugin_info/info.json` (`"4.4"` pour `jeedom2ha`, voir
+1.4) est comparé à la version du cœur Jeedom **avant** que le contenu
+téléchargé ne remplace quoi que ce soit sur la box : en cas d'incompatibilité,
+l'installation est annulée (`rrmdir($cibDir)`) avant tout remplacement. Un
+second contrôle équivalent existe côté activation du plugin
+(`plugin.class.php::setIsEnable()`, ligne 940 :
+`version_compare(jeedom::version(), $this->getRequire()) == -1`), qui bloque
+l'activation (pas seulement la mise à jour) si le cœur est trop ancien.
 
 ## 2. État actuel — beta / stable / main
 
@@ -322,6 +573,35 @@ $ gh api repos/alexsahut/jeedom2ha/branches/main/protection --jq '.required_stat
   à jour pour couvrir tous les changements depuis la dernière promotion.
 - `plugin_info/info.json` → `pluginVersion` cohérent avec le tag `vX.Y.Z`
   visé (semver, voir section 1.4).
+- **Gate PROUVÉ (Point C) — validation Jeedom sur instance vierge, délai non
+  garanti.** Source directe, contenu réel récupéré via l'API JSON Discourse
+  (le rendu HTML de la page est en JS, non lisible par un simple fetch) :
+
+  > Source : https://community.jeedom.com/t/comment-faire-passer-un-pluggin-en-stable/105451
+  > (fil réel, contenu récupéré via `community.jeedom.com/.../105451.json`)
+  >
+  > Mips (2023-04-13) : « tu dois t'assurer que ton plugin s'installe et
+  > démarre correctement sur une installation de jeedom vierge »
+  >
+  > Sekiro, membre de l'équipe de validation (2023-04-14) : « Nous validons
+  > les plugins quand notre emploi du temps nous le permet »
+
+  Deux conséquences directes pour `jeedom2ha`, avant toute demande de
+  passage en `stable` :
+  1. Le plugin doit être testé installation + démarrage du démon sur une
+     **instance Jeedom fraîche** ("vierge") — pas seulement sur la box de
+     référence, déjà configurée avec des dépendances potentiellement
+     masquantes (précédent réel dans le même fil : un module Python manquant
+     dans les dépendances déclarées n'a été détecté que sur une VM neuve,
+     `pip install` ayant réussi ailleurs à cause d'un module déjà présent
+     pour un autre plugin).
+  2. `jeedom2ha` déclare `"os": {"min": 11, "max": 12.99}` (voir 1.4) : ce
+     test d'installation vierge doit donc être fait sur **Debian 11 ET
+     Debian 12** (les deux bornes de compatibilité annoncées), pas une seule.
+  3. Le délai de validation par l'équipe Jeedom **n'est pas garanti** ("quand
+     notre emploi du temps nous le permet") — à budgéter comme un délai
+     inconnu et non négociable dans la planification d'une première
+     publication stable, pas comme un SLA.
 
 ### Étape 1 — Tag de release sur le commit déployé et validé
 
@@ -335,39 +615,118 @@ Condition : `<sha-deploye-et-valide>` doit déjà porter un tag `deploy-...`
 
 ### Étape 2 — Promotion `main` → `beta` (décision Alex)
 
-Suit le précédent réel (PR #73) et `docs/git-strategy.md` : une pull request
-de promotion dédiée `main → beta`, fusionnée par un **merge commit explicite**
-(pas de squash, pas de fast-forward silencieux) :
+**PROUVÉ (mécanisme obligatoire, pas une convention optionnelle)** : la
+promotion **doit** passer par une vraie pull request GitHub `main → beta`,
+pas par un `git merge` local suivi d'un `git push origin beta`. Preuve
+directe, lecture de `.github/workflows/pr-governance.yml` (job
+`routing-policy`, déclenché sur `pull_request_target`) :
+
+```python
+elif base == "beta":
+    if head != "main":
+        fail(f"Promotion invalide: une PR vers beta doit venir de main, pas de '{head}'.")
+    print("Promotion valide detectee: main -> beta")
+```
+
+Ce contrôle (`PR Routing Policy`) est un **required status check** sur la
+branche `beta` (confirmé section « Protection de branche » ci-dessous) : il
+ne s'exécute que sur un évènement `pull_request_target`, donc seule une PR
+GitHub réelle `main → beta` peut le satisfaire — un `git push` direct ne le
+déclenche jamais. Procédure :
 
 ```
-git checkout beta
-git pull origin beta
-git merge --no-ff vX.Y.Z -m "Promote main to beta: vX.Y.Z"
-# revue par Alex puis :
-git push origin beta
+gh pr create --base beta --head main \
+  --title "Promote main to beta: vX.Y.Z" \
+  --body "Promotion vX.Y.Z (voir docs/release-market.md §3)"
+# revue par Alex, CI verte (PR Routing Policy incluse), puis :
+gh pr merge --merge   # stratégie "Create a merge commit" — jamais Squash ni Rebase
 ```
 
-(Alternative outillée équivalente : ouvrir la PR `main → beta` sur GitHub et
-la fusionner avec la stratégie "Create a merge commit", jamais "Squash" ni
-"Rebase", pour préserver un commit de promotion traçable — cohérent avec
-l'historique constaté de PR #73/#74.)
+(Cohérent avec le précédent réel PR #73/#74 et `docs/git-strategy.md`, qui
+exige un commit de merge de promotion explicite — pas de squash, pas de
+fast-forward.)
+
+**Invariant obligatoire après la fusion — « ARBRE publié = arbre du tag
+déployé »** : une fois la PR de promotion fusionnée, vérifier que le
+contenu de `beta` est strictement identique à celui du tag `vX.Y.Z` (les
+SHA diffèrent forcément, un commit de merge étant créé, mais l'arbre de
+fichiers doit être byte-identique) :
+
+```
+git fetch origin beta
+git diff --quiet vX.Y.Z origin/beta   # DOIT être silencieux (exit 0)
+```
+
+Si cette commande échoue (exit non nul), la promotion **n'est pas
+conforme** et ne doit pas être considérée terminée — investiguer avant de
+passer à l'étape suivante. Précédent réel vérifié pour la dernière
+promotion connue (PR #73, tag `v1.1.0` = `166cb7b`, HEAD beta post-merge =
+`1a149ca`) :
+
+```
+$ git diff --quiet 166cb7b 1a149ca && echo "IDENTIQUE (exit 0)"
+IDENTIQUE (exit 0)
+```
 
 ### Étape 3 — Promotion `beta` → `stable` (décision Alex, après validation beta)
 
-Même mécanique, une fois `beta` validée (retours utilisateurs canal beta,
-délai de validation à la discrétion d'Alex) :
+Même mécanique obligatoire (PR réelle, pas de push direct), une fois `beta`
+validée (retours utilisateurs canal beta, délai de validation à la
+discrétion d'Alex). Preuve directe, même fichier :
+
+```python
+elif base == "stable":
+    if head != "beta":
+        fail(f"Promotion invalide: une PR vers stable doit venir de beta, pas de '{head}'.")
+    print("Promotion valide detectee: beta -> stable")
+```
 
 ```
-git checkout stable
-git pull origin stable
-git merge --no-ff beta -m "Promote beta to stable: vX.Y.Z"
-# revue par Alex puis :
-git push origin stable
+gh pr create --base stable --head beta \
+  --title "Promote beta to stable: vX.Y.Z" \
+  --body "Promotion vX.Y.Z (voir docs/release-market.md §3)"
+# revue par Alex, CI verte, puis :
+gh pr merge --merge
 ```
+
+Puis la même vérification obligatoire de l'invariant :
+
+```
+git fetch origin stable
+git diff --quiet vX.Y.Z origin/stable   # DOIT être silencieux (exit 0)
+```
+
+### Protection de branche `beta`/`stable` — PROUVÉ (lecture directe, lecture seule)
+
+```
+$ gh api repos/alexsahut/jeedom2ha/branches/beta/protection
+$ gh api repos/alexsahut/jeedom2ha/branches/stable/protection
+```
+
+Résultat réel (identique pour `beta` et `stable`) :
+- `required_status_checks.contexts` inclut `"PR Routing Policy"`,
+  `"PR Metadata Policy"`, tests Python/Node — **la PR de promotion doit
+  passer cette CI** pour pouvoir être fusionnée dans l'UI GitHub standard.
+- `required_pull_request_reviews.required_approving_review_count: 0` — une
+  review formelle **n'est pas obligatoire** (0 approbation exigée), mais la
+  présence même de cette règle empêche un `git push` direct non-admin sur
+  ces branches : le changement doit transiter par une PR.
+- `enforce_admins.enabled: false` — **nuance importante, à ne pas ignorer** :
+  ces règles (y compris `PR Routing Policy`) ne s'appliquent **pas** à un
+  compte administrateur du repo. Un push direct ou une fusion sans review
+  reste donc techniquement possible pour Alex (admin), même s'il contredit
+  la procédure documentée ici. Ce document décrit la procédure **à suivre**,
+  pas une garantie technique absolue contre un contournement volontaire par
+  un administrateur.
+- `allow_force_pushes.enabled: false`, `allow_deletions.enabled: false` :
+  ces deux protections-là s'appliquent bien à tous, y compris aux
+  administrateurs (elles ne dépendent pas de `enforce_admins`).
 
 **Écart avec la commande brute demandée initialement** : une publication par
 « fast-forward » brut (`git push origin <sha>:refs/heads/beta`) déplacerait
-le pointeur de branche sans laisser de trace de commit de promotion. Ce
+le pointeur de branche sans laisser de trace de commit de promotion, **et
+serait de toute façon rejetée par la protection de branche pour un compte
+non-admin** (voir ci-dessus). Ce
 document s'écarte volontairement de cette formulation littérale pour suivre
 la règle déjà écrite et déjà appliquée dans ce repo
 (`docs/git-strategy.md`, précédent PR #73/#74) : un commit de merge de
@@ -392,7 +751,7 @@ ne doit pas avoir lieu tant que le SHA candidat n'est pas exactement celui
 qui tourne sur la box (ou un descendant explicitement re-déployé et
 re-validé avant publication).
 
-### Cohabitation `deploy-to-box.sh` (rsync) vs mise à jour Market — PROUVÉ (mécanisme local) + HYPOTHÈSE (mécanisme Market)
+### Cohabitation `deploy-to-box.sh` (rsync) vs mise à jour Market — PROUVÉ (les deux mécanismes)
 
 **PROUVÉ (mécanisme local, lecture de `scripts/deploy-to-box.sh`)** :
 
@@ -409,10 +768,17 @@ $ grep -n "rsync\|--delete\|data/\|VERSION" scripts/deploy-to-box.sh | sed -n '1
 box, puis écrit un fichier `VERSION` (version + SHA + date) à la racine du
 plugin, **après** ce rsync pour ne pas en être victime.
 
-**HYPOTHÈSE (mécanisme Market)** : rien ne prouve que le remplacement de
-fichiers déclenché par une mise à jour Market applique la même exclusion de
-`data/` — voir 1.6. Tant que ce n'est pas vérifié sur box de test, il faut
-considérer `data/` comme **non garanti préservé** par une mise à jour Market.
+**PROUVÉ (mécanisme Market, relecture directe du cœur Jeedom — voir 1.6)** :
+la mise à jour Market **préserve également** `data/`, mais par un mécanisme
+différent du nôtre : ce n'est pas une exclusion ciblée (`--exclude 'data/'`),
+c'est une conséquence de la fusion additive de `rmove(..., false)` (jamais de
+`rrmdir($dst)`) combinée au fait que `data/` n'apparaît pas dans la liste
+fermée de nettoyage 7 jours (`3rdparty`, `3rparty`, `desktop`, `mobile`,
+`core`, `docs`, `install`, `script`, `plugin_info` — voir 1.6). Les deux
+mécanismes aboutissent donc au même résultat pratique (`data/` préservé) par
+des chemins de code totalement différents — ce n'est plus une hypothèse à
+vérifier sur le terrain, c'est prouvé par lecture croisée des deux codes
+sources.
 
 **Risque d'alternance des deux mécanismes (PROUVÉ par lecture de code, pas
 de test terrain nécessaire)** : le fichier `VERSION` écrit par
@@ -462,9 +828,22 @@ pages officielles consultées (`doc.jeedom.com/en_US/core/4.1/update`,
 `doc.jeedom.com/en_US/core/4.2/plugin`) décrivent la proposition de mise à
 jour et son application, mais aucune fonction explicite de "downgrade" vers
 une version Market antérieure choisie par l'utilisateur. À prouver
-concrètement : chercher, sur une box de test avec un plugin ayant plusieurs
-versions stables publiées, si l'UI Market propose un choix de version ou
-uniquement "installer la dernière".
+concrètement, avec un plugin tiers ayant déjà plusieurs versions stables
+publiées (il n'existe pas de box de test dédiée pour ce projet — voir note
+ci-dessous — cette vérification se ferait donc sur une box Jeedom
+quelconque, y compris potentiellement la box de référence de la maison, une
+fois son canal Market basculé sur un plugin tiers de test) : vérifier si
+l'UI Market propose un choix de version ou uniquement "installer la
+dernière".
+
+**Note (Point F, pas de box de test dédiée)** : ce projet n'a pas de box de
+test Jeedom distincte de la box de référence de la maison — c'est un choix
+explicite d'Alex. Toute vérification « terrain » mentionnée dans ce document
+(comportement Market réel, préservation de fichiers, redémarrage du démon,
+contenu livré) se ferait donc, le cas échéant, sur la **box de production
+réelle de la maison**, après bascule explicite de son canal Market vers
+`beta` — et uniquement sur décision explicite d'Alex, jamais une action
+unilatérale de `clawcode`/ClaudeBox.
 
 **Fait établi (hors recherche Market, déjà validé sur ce projet)** : le
 véritable filet de sécurité de rollback reste `scripts/deploy-to-box.sh
@@ -479,63 +858,138 @@ réelle sur la box de référence.
 
 ## 6. Vérification à blanc (lecture seule, ne pousse rien)
 
-Bloc de commandes reproductible, **exécuté réellement dans ce worktree** au
-moment de la rédaction de ce document (sortie collée telle quelle
-ci-dessous, et également collée dans le corps de la PR) :
+**Point E — script corrigé.** La version précédente de ce script avait
+quatre défauts identifiés et corrigés ici :
+1. `git diff --stat ... || true` ne faisait jamais échouer le script même en
+   cas de divergence (le `|| true` avale systématiquement le code de sortie)
+   — remplacé par `git diff --quiet`, qui fait échouer le script
+   (`set -euo pipefail` + `exit 1` explicite) en cas de différence réelle.
+2. Le contrôle « candidat ancêtre ou égal » (`--is-ancestor`) était trop
+   laxiste pour le cas de la 1ère publication stable (section 4), qui exige
+   une **égalité stricte** avec le SHA en prod, pas seulement une ascendance
+   — remplacé par une comparaison stricte de SHA.
+3. Le script se fiait au dernier tag `deploy-*` comme source de vérité, or
+   ce tag peut être en retard sur un rollback : **incident réel constaté le
+   2026-09-27 à 15:35**, où le dernier tag `deploy-*` pointait sur `d7db48a`
+   alors que la box avait déjà été rollback-ée en `0.2.0` par
+   `deploy-to-box.sh --rollback` sans nouveau tag `deploy-*` associé au
+   rollback lui-même — remplacé par une lecture **directe** du fichier
+   `VERSION` sur la box via SSH en lecture seule (`cat`, aucune écriture).
+4. Le candidat était implicitement `HEAD` — remplacé par un paramètre
+   explicite obligatoire (`${1:?candidat requis}`), avec vérification
+   croisée que `pluginVersion` (`info.json`) correspond au tag `vX.Y.Z` visé
+   s'il existe déjà.
+
+Script reproductible, **réexécuté réellement dans ce worktree** au moment de
+la rédaction de cette révision (sortie collée telle quelle ci-dessous, et
+également collée dans le corps de la PR) :
 
 ```bash
 #!/usr/bin/env bash
 # Lecture seule stricte : ne crée aucun tag, ne pousse aucune branche,
-# ne touche ni au Market ni à la box.
+# ne touche ni au Market ni à la box (une seule commande SSH en lecture,
+# `cat` du fichier VERSION, aucune écriture).
 set -euo pipefail
 
-CANDIDATE_SHA="$(git rev-parse HEAD)"
+CANDIDATE_REF="${1:?candidat requis : SHA ou ref à vérifier, ex. \$(git rev-parse HEAD)}"
+CANDIDATE_SHA="$(git rev-parse "${CANDIDATE_REF}")"
 echo "SHA candidat : ${CANDIDATE_SHA}"
 
-LATEST_DEPLOY_TAG="$(git tag -l 'deploy-*' --sort=-creatordate | head -1)"
-echo "Tag deploy- le plus récent : ${LATEST_DEPLOY_TAG}"
-
-DEPLOY_SHA_FROM_NAME="$(echo "${LATEST_DEPLOY_TAG}" | sed -E 's/^deploy-([0-9a-f]+)-.*$/\1/')"
-echo "SHA extrait du nom du tag : ${DEPLOY_SHA_FROM_NAME}"
-
-# 1. Correspondance exacte tag <-> SHA effectivement déployé (comparaison de
-#    chaînes entre le SHA porté par le nom du tag et le SHA réel du commit
-#    pointé par le tag).
-TAG_COMMIT_SHA="$(git rev-list -n1 "${LATEST_DEPLOY_TAG}")"
-if [ "${TAG_COMMIT_SHA}" = "${DEPLOY_SHA_FROM_NAME}" ]; then
-  echo "[OK] correspondance exacte nom-de-tag <-> commit pointé"
+# 1. pluginVersion du candidat cohérent avec un éventuel tag vX.Y.Z existant.
+PLUGIN_VERSION="$(git show "${CANDIDATE_SHA}:plugin_info/info.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["pluginVersion"])')"
+echo "pluginVersion du candidat : ${PLUGIN_VERSION}"
+EXPECTED_TAG="v${PLUGIN_VERSION}"
+if git rev-parse "${EXPECTED_TAG}" >/dev/null 2>&1; then
+  TAG_SHA="$(git rev-parse "${EXPECTED_TAG}")"
+  if [ "${TAG_SHA}" = "${CANDIDATE_SHA}" ]; then
+    echo "[OK] le tag ${EXPECTED_TAG} existe déjà et pointe exactement sur le candidat"
+  else
+    echo "[ECHEC] le tag ${EXPECTED_TAG} existe mais pointe sur ${TAG_SHA} (candidat = ${CANDIDATE_SHA})"
+    exit 1
+  fi
 else
-  echo "[ECHEC] divergence nom-de-tag vs commit pointé"
+  echo "[INFO] le tag ${EXPECTED_TAG} n'existe pas encore (attendu avant la 1ère publication de cette version)"
 fi
 
-# 2. Le candidat est-il ancêtre (ou égal) du SHA deploy- le plus récent ?
-if git merge-base --is-ancestor "${CANDIDATE_SHA}" "${DEPLOY_SHA_FROM_NAME}"; then
-  echo "[OK] candidat ancêtre ou égal au SHA déployé"
+# 2. SHA réellement en place sur la box, lu DIRECTEMENT (source de vérité) :
+#    jamais déduit du dernier tag deploy-, qui peut être en retard sur un
+#    rollback (incident constaté le 2026-09-27 15:35 : dernier tag deploy-
+#    pointait sur d7db48a alors que la box tournait déjà en 0.2.0 après
+#    --rollback).
+BOX_VERSION_RAW="$(ssh -o BatchMode=yes -o ConnectTimeout=5 asahut@192.168.1.21 'cat /var/www/html/plugins/jeedom2ha/VERSION' 2>/dev/null || true)"
+if [ -z "${BOX_VERSION_RAW}" ]; then
+  echo "[ECHEC] impossible de lire VERSION sur la box (SSH ou fichier absent)"
+  exit 1
+fi
+echo "--- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---"
+echo "${BOX_VERSION_RAW}"
+BOX_SHA="$(echo "${BOX_VERSION_RAW}" | sed -n 's/^sha=//p')"
+echo "SHA réellement déployé sur la box (source de vérité) : ${BOX_SHA}"
+
+# 3. Egalité STRICTE candidat <-> box, exigée pour la 1ère publication
+#    (section 4 : le premier `stable` publié DOIT être exactement le code
+#    en prod, pas un ancêtre — "ancêtre ou égal" est trop laxiste ici).
+if [ "${CANDIDATE_SHA}" = "${BOX_SHA}" ]; then
+  echo "[OK] candidat strictement identique au SHA déployé sur la box"
 else
-  echo "[ECHEC] candidat NON ancêtre du SHA déployé"
+  echo "[ECHEC] candidat (${CANDIDATE_SHA}) différent du SHA déployé sur la box (${BOX_SHA})"
+  echo "--- git diff --quiet candidat vs SHA déployé (diagnostic) ---"
+  if git diff --quiet "${CANDIDATE_SHA}" "${BOX_SHA}" 2>/dev/null; then
+    echo "[INFO] même contenu malgré des SHA différents — à investiguer avant de continuer"
+  else
+    echo "[ECHEC] contenu également différent"
+  fi
+  exit 1
 fi
 
-# 3. Diff de contenu entre le candidat et le tag deploy- existant le plus
-#    proche : doit être vide si c'est exactement le même commit.
-echo "--- git diff --stat candidat vs tag deploy ---"
-git diff --stat "${CANDIDATE_SHA}" "${DEPLOY_SHA_FROM_NAME}" || true
-echo "(vide ci-dessus = même contenu)"
+echo "Vérification à blanc terminée : candidat conforme, strictement identique à la box."
 ```
 
-### Sortie réelle obtenue (exécutée le 2026-09-27, HEAD du worktree = `dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e`)
+### Sortie réelle obtenue — cas conforme (réexécuté le 2026-09-27, candidat = `origin/main`)
 
 ```
+$ git fetch origin --quiet
+$ bash verify-release-candidate.sh origin/main
 SHA candidat : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
-Tag deploy- le plus récent : deploy-dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e-20260927T133649Z
-SHA extrait du nom du tag : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
-[OK] correspondance exacte nom-de-tag <-> commit pointé
-[OK] candidat ancêtre ou égal au SHA déployé
---- git diff --stat candidat vs tag deploy ---
-(vide ci-dessus = même contenu)
+pluginVersion du candidat : 0.3.0
+[INFO] le tag v0.3.0 n'existe pas encore (attendu avant la 1ère publication de cette version)
+--- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---
+version=0.3.0
+sha=dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
+deployed_at=2026-09-27T13:36:40Z
+git_status=clean
+SHA réellement déployé sur la box (source de vérité) : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
+[OK] candidat strictement identique au SHA déployé sur la box
+Vérification à blanc terminée : candidat conforme, strictement identique à la box.
+$ echo "EXIT_CODE=$?"
+EXIT_CODE=0
 ```
 
-Interprétation : dans cet exemple, le SHA candidat est exactement le SHA
-déjà déployé et validé sur la box (`dd304f1...`) — c'est le cas attendu pour
-une première publication stable conforme à la section 4. Aucune commande de
-ce bloc ne crée de tag, ne pousse de branche, ni n'agit sur le Market ou la
-box.
+### Sortie réelle obtenue — cas d'échec volontaire (réexécuté le 2026-09-27, candidat = `v1.1.0`, ancien SHA)
+
+```
+$ bash verify-release-candidate.sh v1.1.0
+SHA candidat : e1325f05df16e70bf53f717a7c843f809521b3f5
+pluginVersion du candidat : 0.1
+[INFO] le tag v0.1 n'existe pas encore (attendu avant la 1ère publication de cette version)
+--- VERSION lu sur la box (asahut@192.168.1.21, lecture seule) ---
+version=0.3.0
+sha=dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
+deployed_at=2026-09-27T13:36:40Z
+git_status=clean
+SHA réellement déployé sur la box (source de vérité) : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
+[ECHEC] candidat (e1325f05df16e70bf53f717a7c843f809521b3f5) différent du SHA déployé sur la box (dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e)
+--- git diff --quiet candidat vs SHA déployé (diagnostic) ---
+[ECHEC] contenu également différent
+$ echo "EXIT_CODE=$?"
+EXIT_CODE=1
+```
+
+Interprétation : le premier cas confirme que le SHA candidat (`origin/main`,
+`dd304f1...`) est exactement le SHA déjà déployé et validé sur la box —
+c'est le cas attendu pour une première publication stable conforme à la
+section 4. Le second cas confirme que le script **échoue bien avec un code
+de sortie non nul** dès que le candidat diffère réellement de la box — le
+défaut n°1 ci-dessus (`|| true` qui masquait les échecs) est corrigé.
+Aucune commande de ce script n'écrit quoi que ce soit : ni tag, ni branche,
+ni Market, ni box (une seule commande SSH, en lecture seule).
