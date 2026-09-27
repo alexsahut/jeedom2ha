@@ -344,6 +344,7 @@ _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
 [[ -n "${MQTT_USER}" ]] && _auth+=(-u "${MQTT_USER}" -P "${MQTT_PASS}")
 sudo mkdir -p "${BACKUP_DIR}/inventory"
 sudo chmod 700 "${BACKUP_DIR}/inventory"
+sudo chown "$(id -un):$(id -gn)" "${BACKUP_DIR}/inventory"
 _file="${BACKUP_DIR}/inventory/jeedom2ha-discovery-${PHASE}-$(date -u +%Y%m%dT%H%M%SZ).txt"
 TOPICS=$(mosquitto_sub "${_auth[@]}" -W 2 -t 'homeassistant/+/+/config' -F '%t' 2>/dev/null || true)
 printf '%s\n' "${TOPICS}" | grep '/jeedom2ha_' | sort -u | sudo tee "${_file}" >/dev/null || true
@@ -387,7 +388,7 @@ _work=$(sudo mktemp -d "${_parent}/.jeedom2ha-rollback.XXXXXX")
 cleanup() { sudo rm -rf "${_work}"; }
 trap cleanup EXIT
 sudo tar -xzf "${ARCHIVE}" -C "${_work}"
-[[ -d "${_work}/jeedom2ha" ]] || { echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }
+sudo test -d "${_work}/jeedom2ha" || { echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }
 
 # Point 7 — rollback réversible : archive l'état COURANT du plugin en place
 # (code + data/, aucune exclusion) AVANT de l'écraser, même format 700/600
