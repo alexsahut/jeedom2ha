@@ -65,7 +65,14 @@ echo "Ensuring managed Python 3.9 toolchain is installed via uv..."
 uv python install 3.9
 
 if [[ -x "$VENV_DIR/bin/python" ]]; then
-    echo "Reusing existing virtualenv '$VENV_DIR'."
+    VENV_PY_VERSION=$("$VENV_DIR/bin/python" --version 2>&1 | awk '{print $2}')
+    if [[ "$VENV_PY_VERSION" == 3.9.* ]]; then
+        echo "Reusing existing virtualenv '$VENV_DIR'."
+    else
+        echo "Existing virtualenv '$VENV_DIR' uses Python $VENV_PY_VERSION, not 3.9. Recreating..."
+        rm -rf "$VENV_DIR"
+        uv venv --python 3.9 "$VENV_DIR"
+    fi
 else
     echo "Creating virtualenv '$VENV_DIR' with Python 3.9..."
     uv venv --python 3.9 "$VENV_DIR"
