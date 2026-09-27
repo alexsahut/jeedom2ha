@@ -79,7 +79,7 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 
 <!-- Story terrain : daemon / pipeline decide_publication / sync / box réelle → Task 0 Pre-flight terrain injectée. -->
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
+- [ ] Préalable bloquant : la PR `fix/` de CC-20 est fusionnée. `deploy-to-box.sh` ne passe plus `local_secret` ni les identifiants MQTT en argument de `ssh`, `curl` ou `mosquitto_sub`. Sans cela, pas de preuve terrain.
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (vérifier SSH/sudo OK, box 192.168.1.21 joignable)
   - [ ] Déployer en standard : `./scripts/deploy-to-box.sh --restart-daemon`, sans option de nettoyage.
   - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant le cycle de mesure avant/après de cette story — ces deux flags republient des messages MQTT retained **vides** sur les topics discovery (`homeassistant/{light,cover,switch}/jeedom2ha_*/config`), effaçant l'état publié entre les deux relevés et rendant la comparaison "avant/après" invalide par construction (les entités disparaîtraient, ce qui n'a rien à voir avec un changement de décision). Utiliser exclusivement un déploiement standard (sans ces flags).
@@ -134,7 +134,7 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 
 - **Politique de confiance :** stocker `request.app["confidence_policy"]` au sync, après `http_server.py:1325`.
 - **Point d'injection unique :** `_resolve_data_dir(request)` remplace `_DATA_DIR` aux lignes `http_server.py:252,1393,1395,1412,1733,2355,3454`. Sans effet production ; prouvé par golden.
-- **`app["mappings"]` reste le cache vivant consommé par le sync.** Ce dict `Dict[int, MappingResult]` (initialisé `http_server.py:3551`, mis à jour aux lignes 1691/1724, lu aux lignes 1361/1371/3142) continue d'être alimenté et lu exactement comme aujourd'hui après migration — `evaluate_equipment()` ne change pas ce mécanisme de cache, il ne fait que remplacer l'appel `decide_publication()` en aval de ce cache.
+- **`app["mappings"]` reste le cache vivant consommé par le sync.** Ce dict `Dict[int, MappingResult]` (initialisé `http_server.py:3551`, mis à jour aux lignes 1691/1724, lu aux lignes 1361/1371/3142) continue d'être alimenté et lu exactement comme aujourd'hui après migration — `evaluate_equipment()` remplace les étapes 2 à 4 ; le cache stocke les copies renvoyées.
 - **Le sync :** `evaluate_equipment()` remplace les étapes 2-4 ; `app["mappings"]` et `app["publications"]` stockent les copies renvoyées.
 - **Scénarios (`app["scenario_publications"]`, `ScenarioButtonMapper`) et `is_visible` (topologie) restent hors périmètre.** Ces deux mécanismes ne passent pas par `decide_publication`/`evaluate_equipment()` aujourd'hui et cette story ne les y fait pas entrer — confirmé par lecture directe (`http_server.py:1694-1721`, `sync/command.py:530-573` pour les scénarios ; `models/topology.py:82,91,161,179` pour `is_visible`, sujet de parsing topologique sans rapport avec la décision de publication).
 
