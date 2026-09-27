@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from transport.http_server import create_app
+from mapping.overrides import save_equipment_override
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd,
 )
@@ -142,6 +143,25 @@ async def test_preview_publication_override_exclude(cli, app):
     assert payload["overridden"]["ha_entity_type"] == "light"
     assert payload["overridden"]["should_publish"] is False
     assert payload["overridden"]["publication_reason"] == "publication_excluded_command"
+
+
+async def test_preview_uses_app_data_dir_and_requested_confidence_policy(cli, app, tmp_path):
+    """Preview et sync partagent le resolver data_dir ; la policy reçue est conservée."""
+    snapshot, _ = _light_snapshot()
+    app["topology"] = snapshot
+    app["data_dir"] = str(tmp_path)
+    save_equipment_override(200, {"publication_override": "exclude"}, str(tmp_path))
+
+    resp = await _preview(cli, {
+        "jeedom_eq_id": 200,
+        "jeedom_cmd_id": 2001,
+        "ha_entity_type": "light",
+        "confidence_policy": "sure_only",
+    })
+    assert resp.status == 200
+    payload = (await resp.json())["payload"]
+    assert payload["overridden"]["should_publish"] is False
+    assert payload["overridden"]["publication_reason"] == "publication_excluded_eqlogic"
 
 
 async def test_preview_unknown_equipment_returns_404(cli, app):

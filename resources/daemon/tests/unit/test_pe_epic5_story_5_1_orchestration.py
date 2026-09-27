@@ -9,6 +9,8 @@ import pytest
 from models.evaluate_equipment import evaluate_equipment as _real_evaluate_equipment
 from models.mapping import ProjectionValidity
 from models.topology import assess_all as _real_assess_all
+from models.decide_publication import decide_publication as _real_decide_publication
+from validation.ha_component_registry import validate_projection as _real_validate_projection
 from transport.http_server import create_app
 
 
@@ -84,22 +86,20 @@ async def test_sync_executes_5_steps_in_order_and_publishes_valid_light(cli, app
         call_order.append("mapping")
         return real_map(self, eq, snapshot)
 
-    def _evaluate_spy(*args, **kwargs):
-        # Story 19.1 — validate_projection() et decide_publication() sont désormais appelées
-        # à l'intérieur d'evaluate_equipment() avec ses propres références importées
-        # directement (models.decide_publication / validation.ha_component_registry) : un
-        # patch sur transport.http_server.validate_projection/decide_publication n'intercepte
-        # plus rien. On espionne donc evaluate_equipment() lui-même, qui délègue à l'implé-
-        # mentation réelle (comportement inchangé), en conservant les deux entrées de
-        # call_order pour ne pas changer l'assertion de séquence existante. Les deux marqueurs
-        # sont ajoutés APRÈS l'appel réel : le mapping (mapper_registry.map(), espionné via
-        # LightMapper.map ci-dessus) se produit à L'INTÉRIEUR de cet appel, avant la
-        # validation/décision internes — l'ordre observé doit donc rester
-        # eligibility -> mapping -> validation -> decision -> publication.
-        result = _real_evaluate_equipment(*args, **kwargs)
+    def _validate_spy(*args, **kwargs):
         call_order.append("validation")
+        return _real_validate_projection(*args, **kwargs)
+
+    def _decide_spy(*args, **kwargs):
         call_order.append("decision")
-        return result
+        return _real_decide_publication(*args, **kwargs)
+
+    def _evaluate_spy(*args, **kwargs):
+        # Les deux vraies fonctions du contrat sont injectées et espionnées :
+        # l'ordre ne repose plus sur des marqueurs ajoutés après coup.
+        kwargs["validate_projection_fn"] = _validate_spy
+        kwargs["decide_publication_fn"] = _decide_spy
+        return _real_evaluate_equipment(*args, **kwargs)
 
     async def _publish_light_spy(mapping, snapshot):
         call_order.append("publication")
@@ -153,20 +153,17 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
             missing_capabilities=["has_command"],
         )
 
+    def _decide_spy(*args, **kwargs):
+        calls.append("decision")
+        return _real_decide_publication(*args, **kwargs)
+
     def _evaluate_spy(*args, **kwargs):
-        # Story 19.1 — même gotcha que le test précédent : evaluate_equipment() n'utilise
-        # plus transport.http_server.validate_projection/decide_publication (références
-        # importées directement dans models/evaluate_equipment.py). Pour forcer une
-        # projection invalide tout en appelant le VRAI decide_publication() (le but du test :
-        # vérifier qu'il est appelé même en cas de projection invalide, jamais court-circuité),
-        # on injecte validate_projection_fn dans l'appel réel via le point d'extension prévu
-        # par evaluate_equipment() (Dev Notes Story 19.0) plutôt que de patcher une référence
-        # de module devenue inerte.
+        # Mutation temporaire du contrat injecté : seul ce sync voit une validation
+        # invalide. Le vrai decide_publication reste espionné et doit encore être appelé.
         calls.append("validation")
         kwargs["validate_projection_fn"] = _validate_invalid
-        result = _real_evaluate_equipment(*args, **kwargs)
-        calls.append("decision")
-        return result
+        kwargs["decide_publication_fn"] = _decide_spy
+        return _real_evaluate_equipment(*args, **kwargs)
 
     _set_connected_bridge(app)
     payload = _sync_body(

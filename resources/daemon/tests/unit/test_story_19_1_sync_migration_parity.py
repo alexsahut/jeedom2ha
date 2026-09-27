@@ -174,6 +174,51 @@ async def test_publication_mapping_identity_link_preserved_in_app_state(cli, app
     assert mapping.publication_decision_ref is decision
 
 
+async def test_sync_consumes_evaluation_secondary_decisions_without_redeciding(
+    cli, app, mock_publisher
+):
+    """Un secondaire refusé par le contrat ne doit pas être recalculé puis publié par le sync.
+
+    La mutation est volontairement limitée à l'objet `EquipmentEvaluation` créé pour ce
+    test : elle simule une décision du contrat qui diffère du calcul historique et prouve
+    que l'orchestrateur consomme bien `secondary_decisions`.
+    """
+    mock_publisher.publish_sensor = AsyncMock(return_value=True)
+    _set_connected_bridge(app)
+    payload = _sync_body([
+        {
+            "id": 205, "name": "Prise avec conso", "object_id": 1,
+            "is_enable": True, "is_visible": True, "eq_type": "prise",
+            "is_excluded": False, "status": {"timeout": 0},
+            "cmds": [
+                {"id": 2051, "name": "On", "generic_type": "ENERGY_ON", "type": "action", "sub_type": "other"},
+                {"id": 2052, "name": "Off", "generic_type": "ENERGY_OFF", "type": "action", "sub_type": "other"},
+                {"id": 2053, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info", "sub_type": "binary"},
+                {"id": 2054, "name": "Conso", "generic_type": None, "type": "info", "sub_type": "numeric", "unit": "W"},
+            ],
+        }
+    ])
+
+    def _evaluate_with_temporarily_refused_secondary(*args, **kwargs):
+        evaluation = _real_evaluate_equipment(*args, **kwargs)
+        assert evaluation.secondary_decisions
+        secondary = evaluation.secondary_decisions[0]
+        secondary.should_publish = False
+        secondary.reason = "test_contract_secondary_refused"
+        return evaluation
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=mock_publisher), patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=_evaluate_with_temporarily_refused_secondary,
+    ):
+        resp = await cli.post("/action/sync", json=payload, headers={"X-Local-Secret": SECRET})
+
+    assert resp.status == 200
+    mock_publisher.publish_sensor.assert_not_awaited()
+    secondary = app["mappings"][205].additional_mappings[0]
+    assert secondary.publication_decision_ref.reason == "test_contract_secondary_refused"
+
+
 async def test_ineligible_equipment_still_skipped_after_migration(cli, app, mock_publisher):
     """Garde-fou préexistant : un équipement inéligible n'apparaît ni dans `app["mappings"]`
     ni dans `app["publications"]`, à l'identique du pipeline classique (pas de régression)."""
