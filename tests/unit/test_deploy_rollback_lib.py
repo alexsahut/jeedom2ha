@@ -207,43 +207,73 @@ class TestStopDaemonWithPidFallback:
 
     def test_falls_back_gracefully_when_pid_process_is_already_gone(self, tmp_path):
         pid_file = tmp_path / "deamon.pid"
-        # PID 1 belongs to init and is never killable by this test user;
-        # a very high, virtually-guaranteed-unused PID stands in for "the
-        # process this PID once named is gone".
         pid_file.write_text("999999")
+        signal_log = tmp_path / "signals.log"
 
         result = _run_bash(
             f'jeedom2ha_stop_daemon_with_pid_fallback "{pid_file}"',
-            extra_prelude='jeedom2ha_stop_via_plugin_class() { return 1; }; ',
+            extra_prelude=(
+                f'JEEDOM2HA_PROC_ROOT="{tmp_path}/missing-proc"; SIGNAL_LOG="{signal_log}"; '
+                'jeedom2ha_stop_via_plugin_class() { return 1; }; '
+                'sudo() { if [ "$1" = -u ]; then shift 2; fi; '
+                'if [ "$1" = kill ]; then echo "$*" >> "$SIGNAL_LOG"; return 0; fi; "$@"; }; '
+            ),
         )
 
         assert result.returncode == 0, result.stderr
-        assert "processus introuvable" in result.stdout
+        assert "/proc/999999 est absent" in result.stdout
+        assert not signal_log.exists()
 
-    def test_kills_a_real_live_process_via_pid_file_fallback(self, tmp_path):
+    def test_refuses_pid_owned_by_another_user_without_signalling(self, tmp_path):
         pid_file = tmp_path / "deamon.pid"
+        proc_root = tmp_path / "proc"
+        pid = "4242"
+        proc = proc_root / pid
+        proc.mkdir(parents=True)
+        (proc / "status").write_text("Name:\tother\nUid:\t0\t0\t0\t0\n")
+        (proc / "cmdline").write_bytes(b"python\0/var/www/html/plugins/jeedom2ha/resources/daemon/main.py\0")
+        pid_file.write_text(pid)
+        signal_log = tmp_path / "signals.log"
 
-        proc = subprocess.Popen(["/bin/sleep", "100"])
-        try:
-            pid_file.write_text(str(proc.pid))
+        result = _run_bash(
+            f'jeedom2ha_stop_daemon_with_pid_fallback "{pid_file}"',
+            extra_prelude=(
+                f'JEEDOM2HA_PROC_ROOT="{proc_root}"; SIGNAL_LOG="{signal_log}"; '
+                'jeedom2ha_stop_via_plugin_class() { return 1; }; '
+                'sudo() { if [ "$1" = -u ]; then shift 2; fi; '
+                'if [ "$1" = kill ]; then echo "$*" >> "$SIGNAL_LOG"; return 0; fi; "$@"; }; '
+            ),
+        )
 
-            result = _run_bash(
-                f'jeedom2ha_stop_daemon_with_pid_fallback "{pid_file}"',
-                # `sleep` overridden as a no-op so the SIGTERM/SIGKILL grace
-                # delay inside the library doesn't slow this test down; the
-                # spawned target process itself is /bin/sleep (full path),
-                # bypassing this shell-function override entirely.
-                extra_prelude='jeedom2ha_stop_via_plugin_class() { return 1; }; sleep() { :; }; ',
-            )
+        assert result.returncode == 0, result.stderr
+        assert "propriétaire différent" in result.stdout
+        assert not signal_log.exists()
 
-            assert result.returncode == 0, result.stderr
-            assert "SIGTERM" in result.stdout
-            proc.wait(timeout=5)
-            assert proc.returncode is not None
-        finally:
-            if proc.poll() is None:
-                proc.kill()
-                proc.wait()
+    def test_refuses_pid_with_unrelated_cmdline_without_signalling(self, tmp_path):
+        pid_file = tmp_path / "deamon.pid"
+        proc_root = tmp_path / "proc"
+        pid = "4243"
+        proc = proc_root / pid
+        proc.mkdir(parents=True)
+        www_data_uid = subprocess.check_output(["id", "-u", "www-data"], text=True).strip()
+        (proc / "status").write_text(f"Name:\tzigbee\nUid:\t{www_data_uid}\t{www_data_uid}\t{www_data_uid}\t{www_data_uid}\n")
+        (proc / "cmdline").write_bytes(b"python\0/opt/zigbee/daemon.py\0")
+        pid_file.write_text(pid)
+        signal_log = tmp_path / "signals.log"
+
+        result = _run_bash(
+            f'jeedom2ha_stop_daemon_with_pid_fallback "{pid_file}"',
+            extra_prelude=(
+                f'JEEDOM2HA_PROC_ROOT="{proc_root}"; SIGNAL_LOG="{signal_log}"; '
+                'jeedom2ha_stop_via_plugin_class() { return 1; }; '
+                'sudo() { if [ "$1" = -u ]; then shift 2; fi; '
+                'if [ "$1" = kill ]; then echo "$*" >> "$SIGNAL_LOG"; return 0; fi; "$@"; }; '
+            ),
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "cmdline ne correspond pas" in result.stdout
+        assert not signal_log.exists()
 
 
 def test_library_never_references_ssh_or_scp():

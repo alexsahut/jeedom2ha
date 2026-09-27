@@ -91,6 +91,9 @@ jeedom2ha_backup_plugin_dir() {
 # de l'archive) doit continuer dans tous les cas.
 jeedom2ha_stop_daemon_with_pid_fallback() {
   local pid_file="$1"
+  # JEEDOM2HA_PROC_ROOT is solely for unit tests with a synthetic procfs;
+  # production defaults to the kernel procfs.
+  local proc_root="${JEEDOM2HA_PROC_ROOT:-/proc}"
 
   if jeedom2ha_stop_via_plugin_class; then
     echo "  Daemon arrêté via jeedom2ha::deamon_stop()."
@@ -110,17 +113,40 @@ jeedom2ha_stop_daemon_with_pid_fallback() {
     return 0
   fi
 
-  if ! sudo kill -0 "${pid}" 2>/dev/null; then
-    echo "  PID file présent (PID ${pid}) mais processus introuvable — rien à tuer."
+  if ! sudo test -d "${proc_root}/${pid}"; then
+    echo "  PID file présent (PID ${pid}) mais /proc/${pid} est absent — rien à tuer."
     return 0
   fi
 
-  echo "  Arrêt via PID file (www-data, PID ${pid}) → SIGTERM"
-  sudo kill "${pid}" 2>/dev/null || true
+  local process_uid process_cmdline www_data_uid
+  www_data_uid=$(id -u www-data)
+  process_uid=$(sudo awk '/^Uid:/ { print $2; exit }' "${proc_root}/${pid}/status" 2>/dev/null || true)
+  if [[ -z "${process_uid}" ]] || [[ "${process_uid}" != "${www_data_uid}" ]]; then
+    echo "  PID ${pid} refusé : propriétaire différent de www-data — aucun signal envoyé."
+    return 0
+  fi
+  process_cmdline=$(sudo tr '\0' ' ' < "${proc_root}/${pid}/cmdline" 2>/dev/null || true)
+  if [[ "${process_cmdline}" != *"/plugins/jeedom2ha/"* ]] || \
+     [[ "${process_cmdline}" != *"resources/daemon/main.py"* ]]; then
+    echo "  PID ${pid} refusé : cmdline ne correspond pas au daemon jeedom2ha — aucun signal envoyé."
+    return 0
+  fi
+
+  echo "  Arrêt via PID file vérifié (www-data, daemon jeedom2ha, PID ${pid}) → SIGTERM"
+  sudo -u www-data kill -TERM "${pid}" 2>/dev/null || true
   sleep 2
-  if sudo kill -0 "${pid}" 2>/dev/null; then
-    echo "  Processus persistant → SIGKILL (PID ${pid})"
-    sudo kill -9 "${pid}" 2>/dev/null || true
+  # Check again before SIGKILL: a PID can be recycled during the delay.
+  if sudo test -d "${proc_root}/${pid}"; then
+    process_uid=$(sudo awk '/^Uid:/ { print $2; exit }' "${proc_root}/${pid}/status" 2>/dev/null || true)
+    process_cmdline=$(sudo tr '\0' ' ' < "${proc_root}/${pid}/cmdline" 2>/dev/null || true)
+    if [[ "${process_uid}" == "${www_data_uid}" ]] && \
+       [[ "${process_cmdline}" == *"/plugins/jeedom2ha/"* ]] && \
+       [[ "${process_cmdline}" == *"resources/daemon/main.py"* ]]; then
+      echo "  Processus persistant vérifié → SIGKILL (PID ${pid})"
+      sudo -u www-data kill -KILL "${pid}" 2>/dev/null || true
+    else
+      echo "  PID ${pid} refusé avant SIGKILL : identité ou cmdline modifiée — aucun signal envoyé."
+    fi
   fi
   return 0
 }

@@ -370,7 +370,8 @@ jeedom2ha_rollback_archive() {
   local _archive="$1"
   echo "--- Rollback archive → ${JEEDOM_BOX_PATH}/"
   local _remote_output
-  _remote_output=$(
+  local _remote_status=0
+  if _remote_output=$(
     { cat "${ROLLBACK_LIB}"
       cat <<'REMOTE'
 ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"; BACKUP_DIR="$4"; BOX_USER="$5"
@@ -421,14 +422,25 @@ if (!jeedom2ha::deamon_start()) { fwrite(STDERR, "deamon_start() returned false\
 echo "  Rollback restauré et daemon redémarré sous www-data."
 REMOTE
     } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-        "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" "${JEEDOM_BACKUP_DIR}" "${JEEDOM_BOX_USER}"
-  )
+        "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" "${JEEDOM_BACKUP_DIR}" "${JEEDOM_BOX_USER}" 2>&1
+  ); then
+    _remote_status=0
+  else
+    _remote_status=$?
+  fi
   echo "${_remote_output}"
   PRE_ROLLBACK_BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_remote_output}")
   if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
     echo ""
     echo "  Ce rollback est lui-même réversible :"
     printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
+  fi
+  if [[ "${_remote_status}" -ne 0 ]]; then
+    echo "ERROR: rollback distant échoué (code ${_remote_status})." >&2
+    if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
+      echo "       Archive de sauvegarde pré-rollback : ${PRE_ROLLBACK_BACKUP_ARCHIVE}" >&2
+    fi
+    return "${_remote_status}"
   fi
 }
 
@@ -444,7 +456,12 @@ echo "  Target  : ${JEEDOM_BOX_PATH}/ (via sudo)"
 echo ""
 
 if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
-  jeedom2ha_rollback_archive "${ROLLBACK_ARCHIVE}"
+  if jeedom2ha_rollback_archive "${ROLLBACK_ARCHIVE}"; then
+    :
+  else
+    _rollback_exit=$?
+    exit "${_rollback_exit}"
+  fi
   jeedom2ha_refresh_secret || _fail "Rollback effectué mais localSecret indisponible après redémarrage."
   _rollback_status=$(jeedom2ha_status 2>&1) || _fail "Daemon injoignable après rollback."
   [[ "$(echo "${_rollback_status}" | jq -r '.status // empty')" == "ok" ]] \
@@ -813,17 +830,6 @@ REMOTE
   echo "  Daemon prêt, MQTT connecté (${_wait}s)."
   echo ""
 
-  echo "--- Inventaire MQTT après redémarrage..."
-  _inv_after_output=$(jeedom2ha_inventory_discovery "after")
-  echo "${_inv_after_output}"
-  INVENTORY_AFTER_FILE=$(sed -n 's/^__JEEDOM2HA_INVENTORY_FILE__=//p' <<< "${_inv_after_output}")
-  echo ""
-
-  echo "--- Diff inventaire MQTT (avant/après)..."
-  jeedom2ha_diff_topic_lists \
-    "$(jeedom2ha_fetch_inventory_content "${INVENTORY_BEFORE_FILE}")" \
-    "$(jeedom2ha_fetch_inventory_content "${INVENTORY_AFTER_FILE}")"
-  echo ""
 fi
 
 # =============================================================================
@@ -869,6 +875,21 @@ else
         ([ (.mapping_summary // {}) | to_entries[] | select(.key | endswith("_published")) | .value | tonumber? ] | add // 0)
       )"' 2>/dev/null || echo "ok")
     echo "  OK — ${_summary}"
+    # Sync republie les entités retained : l'inventaire « après » ne doit
+    # être pris qu'une fois cet appel confirmé, sinon le diff est trompeur.
+    if [[ "${RESTART_DAEMON}" == "true" ]]; then
+      echo ""
+      echo "--- Inventaire MQTT après sync confirmé..."
+      _inv_after_output=$(jeedom2ha_inventory_discovery "after")
+      echo "${_inv_after_output}"
+      INVENTORY_AFTER_FILE=$(sed -n 's/^__JEEDOM2HA_INVENTORY_FILE__=//p' <<< "${_inv_after_output}")
+      echo ""
+      echo "--- Diff inventaire MQTT (avant/après)..."
+      jeedom2ha_diff_topic_lists \
+        "$(jeedom2ha_fetch_inventory_content "${INVENTORY_BEFORE_FILE}")" \
+        "$(jeedom2ha_fetch_inventory_content "${INVENTORY_AFTER_FILE}")"
+      echo ""
+    fi
   fi
   echo ""
 fi

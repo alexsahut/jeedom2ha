@@ -41,6 +41,11 @@ esac
 printf 'ARGS: %s\n' "$*" >> "$MOCK_SSH_LOG"
 stdin=$(cat)
 printf '%s\n' "$stdin" >> "$MOCK_SSH_STDIN"
+case "$*" in *"bash -s"*) _is_remote_program=true ;; *) _is_remote_program=false ;; esac
+if [ -n "$MOCK_SSH_OUTPUT" ] && [ "$_is_remote_program" = true ]; then
+  printf '%s\n' "$MOCK_SSH_OUTPUT"
+  exit "${MOCK_SSH_EXIT:-0}"
+fi
 case "$*" in
   *localSecret*) printf '{"local_secret":"test","daemon_port":"55080"}\n' ;;
   *curl*) printf '{"status":"ok"}\n' ;;
@@ -220,3 +225,26 @@ def test_rollback_parses_archive_and_builds_safe_remote_restart(tmp_path):
     assert "jeedom2ha::deamon_stop();" in remote_program
     assert "jeedom2ha::deamon_start()" in remote_program
     assert "sudo -u www-data" in remote_program
+
+
+def test_rollback_failure_after_backup_prints_remote_output_and_backup_path(tmp_path):
+    archive = "/home/test/jeedom2ha-backups/previous.tar.gz"
+    pre_rollback = "/home/test/jeedom2ha-backups/jeedom2ha-pre-rollback-safe.tar.gz"
+    result = _run(
+        tmp_path,
+        "--rollback",
+        archive,
+        MOCK_SSH_OUTPUT=f"__JEEDOM2HA_BACKUP_ARCHIVE__={pre_rollback}\nremote restore failed",
+        MOCK_SSH_EXIT="17",
+    )
+
+    assert result.returncode == 17
+    assert "remote restore failed" in result.stdout
+    assert pre_rollback in result.stderr
+
+
+def test_after_inventory_is_captured_only_after_successful_sync():
+    code = SCRIPT.read_text()
+    after_inventory = code.index('jeedom2ha_inventory_discovery "after"')
+    sync_success = code.index('echo "  OK — ${_summary}"')
+    assert after_inventory > sync_success
