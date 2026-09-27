@@ -53,6 +53,15 @@ def _diagnostics_payload(equipments):
     }
 
 
+def _cmd(entry):
+    """Une commande peut être un simple cmd_id (str) ou un dict complet
+    `{"cmd_id": ..., "mapping_decision": ...}` pour les tests qui vérifient la
+    préservation de `mapping_decision` (Finding 2, revue Codex PR #169)."""
+    if isinstance(entry, dict):
+        return entry
+    return {"cmd_id": entry}
+
+
 def _eq(eq_id, *, reason_code="sure", statut="publie", matched=None, unmatched=None,
         publication_override=None):
     entry = {
@@ -62,8 +71,8 @@ def _eq(eq_id, *, reason_code="sure", statut="publie", matched=None, unmatched=N
         "reason_code": reason_code,
         "perimetre": "inclus",
         "statut": statut,
-        "matched_commands": [{"cmd_id": c} for c in (matched or [])],
-        "unmatched_commands": [{"cmd_id": c} for c in (unmatched or [])],
+        "matched_commands": [_cmd(c) for c in (matched or [])],
+        "unmatched_commands": [_cmd(c) for c in (unmatched or [])],
     }
     if publication_override is not None:
         entry["publication_override"] = publication_override
@@ -315,6 +324,135 @@ def test_no_explicit_scope_on_plain_decision():
     decisions = [_eq(9, reason_code="sure", statut="publie")]
     records = pt._decision_records(_diagnostics_payload(decisions))
     assert pt._detect_explicit_scope(records) == []
+
+
+# ---------------------------------------------------------------------------
+# Régressions — revue bot Codex sur PR #169 (3 remarques)
+# ---------------------------------------------------------------------------
+
+def test_decision_records_preserves_mapping_decision_per_command():
+    """Finding 2 : `_decision_records` réduisait `matched_commands`/
+    `unmatched_commands` aux seuls `cmd_id`, perdant `mapping_decision` — un
+    changement de décision sur une commande (ex. `sure` -> `publication_forced`)
+    sans changement de l'ensemble des cmd_id produisait alors à tort un diff
+    vide."""
+    before = _eq(1, matched=[{"cmd_id": "sure", "mapping_decision": "sure"}])
+    after = _eq(1, matched=[{"cmd_id": "sure", "mapping_decision": "publication_forced"}])
+    before_records = pt._decision_records(_diagnostics_payload([before]))
+    after_records = pt._decision_records(_diagnostics_payload([after]))
+
+    assert before_records[0]["matched_commands"] == [
+        {"cmd_id": "sure", "mapping_decision": "sure"}
+    ]
+    assert after_records[0]["matched_commands"] == [
+        {"cmd_id": "sure", "mapping_decision": "publication_forced"}
+    ]
+
+    topics = ["homeassistant/light/jeedom2ha_1/config"]
+    result = pt.diff_snapshots(
+        {"decisions": before_records, "mqtt_topics": topics},
+        {"decisions": after_records, "mqtt_topics": topics},
+    )
+    assert result["is_empty_diff"] is False
+    assert result["changed_decisions"][0]["eq_id"] == 1
+
+
+def test_no_i11_candidate_when_only_stale_primary_topic_matches():
+    """Finding 3 : un topic retained égal EXACTEMENT au node_id primaire
+    (`jeedom2ha_<eq_id>`, sans suffixe `_<cmd_id>`) est le résidu/topic obsolète
+    du primaire lui-même, jamais la preuve qu'un secondaire est publié — ne
+    doit jamais produire de faux candidat I11."""
+    decisions = [_eq(42, reason_code="no_mapping", statut="non_publie")]
+    records = pt._decision_records(_diagnostics_payload(decisions))
+    topics = ["homeassistant/light/jeedom2ha_42/config"]
+    assert pt._detect_i11_candidates(records, topics) == []
+
+
+def test_detect_published_scope_exceptions_via_equipment_decision_source():
+    """Finding 1 : `_detect_explicit_scope` ne couvrait que les overrides de
+    politique de publication (Story 16.3, `decide_publication`), pas le
+    périmètre canonique global -> pièce -> équipement exposé par
+    `/system/published_scope` (`models/published_scope.py`) — une exception au
+    niveau équipement y passait inaperçue."""
+    payload = {
+        "status": "ok",
+        "payload": {
+            "equipements": [
+                {
+                    "eq_id": 5, "effective_state": "exclu",
+                    "decision_source": "equipement", "is_exception": True,
+                },
+                {
+                    "eq_id": 3, "effective_state": "inclus",
+                    "decision_source": "piece", "is_exception": False,
+                },
+            ]
+        },
+    }
+    found = pt._detect_published_scope_exceptions(payload)
+    assert found == [
+        {"eq_id": 5, "effective_state": "exclu", "decision_source": "equipement", "is_exception": True},
+    ]
+
+
+def test_detect_published_scope_exceptions_via_exception_equipement_source():
+    payload = {
+        "status": "ok",
+        "payload": {
+            "equipements": [
+                {
+                    "eq_id": 9, "effective_state": "inclus",
+                    "decision_source": "exception_equipement", "is_exception": True,
+                },
+            ]
+        },
+    }
+    found = pt._detect_published_scope_exceptions(payload)
+    assert found and found[0]["eq_id"] == 9
+
+
+def test_no_published_scope_exception_when_inherited_from_global():
+    payload = {
+        "status": "ok",
+        "payload": {
+            "equipements": [
+                {
+                    "eq_id": 3, "effective_state": "inclus",
+                    "decision_source": "global", "is_exception": False,
+                },
+            ]
+        },
+    }
+    assert pt._detect_published_scope_exceptions(payload) == []
+
+
+def test_capture_snapshot_includes_published_scope_exceptions(monkeypatch):
+    """Vérifie le câblage bout-en-bout (pas seulement la fonction pure) :
+    `capture_snapshot` appelle bien `fetch_published_scope` et propage le
+    résultat de `_detect_published_scope_exceptions` dans le snapshot."""
+    monkeypatch.setattr(pt, "fetch_diagnostics", lambda *a, **k: _diagnostics_payload([_eq(1)]))
+    monkeypatch.setattr(
+        pt, "fetch_published_scope",
+        lambda *a, **k: {
+            "status": "ok",
+            "payload": {
+                "equipements": [
+                    {
+                        "eq_id": 1, "effective_state": "exclu",
+                        "decision_source": "equipement", "is_exception": True,
+                    },
+                ]
+            },
+        },
+    )
+    snapshot = pt.capture_snapshot(
+        base_url="http://x", local_secret=SECRET,
+        mqtt_host="x", mqtt_port=1883, label="before",
+        mqtt_runner=_fake_runner(stdout="homeassistant/light/jeedom2ha_1/config\n"),
+    )
+    assert snapshot.published_scope_exceptions == [
+        {"eq_id": 1, "effective_state": "exclu", "decision_source": "equipement", "is_exception": True},
+    ]
 
 
 # ---------------------------------------------------------------------------

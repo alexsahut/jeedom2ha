@@ -12,9 +12,10 @@ par `main.py`, jamais exécuté automatiquement (invocation manuelle uniquement,
 
 Garanties de conception (guardrails Story 19.1) :
   - Lecture seule stricte : uniquement des requêtes HTTP GET
-    (`/system/diagnostics`) et `mosquitto_sub` (jamais `mosquitto_pub`, jamais
-    `/action/sync`, jamais d'écriture sur `data/ha_overrides.json`, aucun
-    redémarrage daemon déclenché par l'outil lui-même).
+    (`/system/diagnostics`, `/system/published_scope`) et `mosquitto_sub`
+    (jamais `mosquitto_pub`, jamais `/action/sync`, jamais d'écriture sur
+    `data/ha_overrides.json`, aucun redémarrage daemon déclenché par l'outil
+    lui-même).
   - Un relevé (décisions OU inventaire MQTT) VIDE est un ÉCHEC EXPLICITE (exit
     non-zéro, message clair), jamais un succès déguisé. C'est le piège déjà
     présent dans `jeedom2ha_diff_topic_lists`
@@ -134,9 +135,47 @@ def fetch_diagnostics(base_url: str, local_secret: str, *, timeout: float = 10.0
     return payload
 
 
+def _command_records(commands: List[dict]) -> List[dict]:
+    """Normalise une liste `matched_commands`/`unmatched_commands` (tri par
+    cmd_id) en conservant `mapping_decision` : deux relevés avec les mêmes
+    cmd_id mais une décision de mapping différente pour une commande (ex.
+    `sure` -> `publication_forced`) ne doivent JAMAIS produire un diff vide
+    (une comparaison réduite aux seuls cmd_id masquerait ce changement)."""
+    return sorted(
+        (
+            {"cmd_id": c["cmd_id"], "mapping_decision": c.get("mapping_decision")}
+            for c in commands
+        ),
+        key=lambda c: c["cmd_id"],
+    )
+
+
+def fetch_published_scope(base_url: str, local_secret: str, *, timeout: float = 10.0) -> dict:
+    """GET /system/published_scope — contrat canonique du périmètre de
+    publication (global -> pièce -> équipement), lecture seule stricte, mêmes
+    garanties que `fetch_diagnostics` (secret uniquement via en-tête HTTP,
+    jamais dans l'URL)."""
+    url = base_url.rstrip("/") + "/system/published_scope"
+    request = urllib.request.Request(
+        url, headers={"X-Local-Secret": local_secret}, method="GET"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise ParitySnapshotError(f"Échec de connexion à {url} : {exc}") from exc
+    if payload.get("status") != "ok":
+        raise ParitySnapshotError(
+            f"/system/published_scope a répondu status={payload.get('status')!r} : "
+            f"{payload.get('message', '(aucun message)')}"
+        )
+    return payload
+
+
 def _decision_records(diagnostics_payload: dict) -> List[dict]:
     """Normalise `payload.equipments` en relevé déterministe (tri par eq_id),
-    une entrée par équipement avec la liste des cmd_id couverts/non couverts."""
+    une entrée par équipement avec la liste des commandes couvertes/non
+    couvertes et leur décision de mapping respective."""
     equipments = diagnostics_payload.get("payload", {}).get("equipments", [])
     records = []
     for eq in equipments:
@@ -148,8 +187,8 @@ def _decision_records(diagnostics_payload: dict) -> List[dict]:
             "perimetre": eq.get("perimetre"),
             "statut": eq.get("statut"),
             "publication_override": eq.get("publication_override"),
-            "matched_cmd_ids": sorted(c["cmd_id"] for c in eq.get("matched_commands", [])),
-            "unmatched_cmd_ids": sorted(c["cmd_id"] for c in eq.get("unmatched_commands", [])),
+            "matched_commands": _command_records(eq.get("matched_commands", [])),
+            "unmatched_commands": _command_records(eq.get("unmatched_commands", [])),
         })
     records.sort(key=lambda r: r["eq_id"])
     return records
@@ -248,24 +287,59 @@ def _detect_explicit_scope(decisions: List[dict]) -> List[dict]:
     return found
 
 
+def _detect_published_scope_exceptions(published_scope_payload: dict) -> List[dict]:
+    """AC4 — relève, SANS corriger, les équipements dont l'état de périmètre
+    (`/system/published_scope`, contrat canonique global -> pièce ->
+    équipement) est explicitement défini au niveau ÉQUIPEMENT
+    (`decision_source` == `equipement`/`exception_equipement`) plutôt
+    qu'hérité de la pièce ou du global.
+
+    Couche INDÉPENDANTE de `_detect_explicit_scope` : cette dernière ne
+    couvre que les overrides de POLITIQUE de publication (Story 16.3,
+    `decide_publication`), pas le périmètre d'inclusion/exclusion résolu par
+    `models/published_scope.py`. Les deux sont pertinentes pour Story 19.2 et
+    doivent être relevées séparément (provenance distincte dans le rapport).
+
+    Limite connue : `/system/published_scope` n'expose pas de drapeau "état
+    pièce explicite" indépendant de son état effectif — seul le niveau
+    équipement est détectable ici."""
+    equipements = published_scope_payload.get("payload", {}).get("equipements", [])
+    found = [
+        {
+            "eq_id": entry["eq_id"],
+            "effective_state": entry.get("effective_state"),
+            "decision_source": entry.get("decision_source"),
+            "is_exception": entry.get("is_exception"),
+        }
+        for entry in equipements
+        if entry.get("decision_source") in ("equipement", "exception_equipement")
+    ]
+    found.sort(key=lambda e: e["eq_id"])
+    return found
+
+
 def _detect_i11_candidates(decisions: List[dict], mqtt_topics: List[str]) -> List[dict]:
     """AC4 — heuristique I11 (primaire refusé, secondaire publié) — voir la
     limite documentée en tête de module : `/system/diagnostics` n'expose pas
     de décision par secondaire, donc la détection se fait par corrélation avec
-    l'inventaire MQTT retained (un topic `jeedom2ha_<eq_id>[...]` présent alors
-    que le primaire n'est pas publié)."""
+    l'inventaire MQTT retained (un topic secondaire `jeedom2ha_<eq_id>_<cmd_id>`
+    présent alors que le primaire n'est pas publié).
+
+    Le node_id primaire lui-même (`jeedom2ha_<eq_id>`, SANS suffixe `_<cmd_id>`,
+    cf. `discovery/publisher.py`) est délibérément exclu de la correspondance :
+    un topic retained portant exactement ce segment n'est que le résidu/topic
+    obsolète du primaire, jamais la preuve qu'un secondaire est publié — le
+    confondre produirait un faux candidat I11."""
     candidates = []
     for record in decisions:
         if record["statut"] == "publie":
             continue  # primaire déjà publié : pas un cas I11
         eq_id = record["eq_id"]
         node_prefix = f"jeedom2ha_{eq_id}"
+        secondary_prefix = node_prefix + "_"
         matching_topics = sorted(
             topic for topic in mqtt_topics
-            if any(
-                segment == node_prefix or segment.startswith(node_prefix + "_")
-                for segment in topic.split("/")
-            )
+            if any(segment.startswith(secondary_prefix) for segment in topic.split("/"))
         )
         if matching_topics:
             candidates.append({
@@ -284,6 +358,7 @@ class ParitySnapshot:
     mqtt_topics: List[str]
     i11_candidates: List[dict] = field(default_factory=list)
     explicit_scope_entries: List[dict] = field(default_factory=list)
+    published_scope_exceptions: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -293,6 +368,7 @@ class ParitySnapshot:
             "mqtt_topics": self.mqtt_topics,
             "i11_candidates": self.i11_candidates,
             "explicit_scope_entries": self.explicit_scope_entries,
+            "published_scope_exceptions": self.published_scope_exceptions,
         }
 
 
@@ -336,6 +412,8 @@ def capture_snapshot(
             "informatif. Vérifiez la connectivité MQTT avant de relancer."
         )
 
+    published_scope_payload = fetch_published_scope(base_url, local_secret, timeout=http_timeout)
+
     return ParitySnapshot(
         captured_at=datetime.now(timezone.utc).isoformat(),
         label=label,
@@ -343,6 +421,7 @@ def capture_snapshot(
         mqtt_topics=mqtt_topics,
         i11_candidates=_detect_i11_candidates(decisions, mqtt_topics),
         explicit_scope_entries=_detect_explicit_scope(decisions),
+        published_scope_exceptions=_detect_published_scope_exceptions(published_scope_payload),
     )
 
 
@@ -416,8 +495,13 @@ def _cmd_capture(args: argparse.Namespace) -> int:
         )
     if snapshot.explicit_scope_entries:
         print(
-            "  Scope explicite détecté (relevé seul, aucune correction) : "
-            f"{len(snapshot.explicit_scope_entries)}"
+            "  Scope explicite détecté — override de politique de publication (relevé seul, "
+            f"aucune correction) : {len(snapshot.explicit_scope_entries)}"
+        )
+    if snapshot.published_scope_exceptions:
+        print(
+            "  Scope explicite détecté — périmètre équipement /system/published_scope (relevé "
+            f"seul, aucune correction) : {len(snapshot.published_scope_exceptions)}"
         )
     return 0
 
