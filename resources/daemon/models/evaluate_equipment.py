@@ -21,12 +21,30 @@ Invariants I1-I7 (portés de `decide_publication()`, Story 16.3) :
     I6 : `reason` toujours non-null et non-vide sur tous les chemins de retour.
     I7 : aucune logique MQTT/broker/cache dans ce module — aucune I/O disque, aucun réseau.
 
-Non-mutation stricte (AC4) :
-    Aucun objet d'entrée (`eq`, `snapshot`, `eligibility`, dicts d'overrides) n'est muté.
-    Défense par `deepcopy` sur les entrées ; toute dérivation interne d'un `MappingResult`
-    ou d'un `PublicationDecision` passe par `dataclasses.replace` (jamais d'assignation en
-    place façon `_preview_mapping_view` — cf. `transport/http_server.py:2210`, comportement
-    que cette fonction ne reproduit jamais).
+Non-mutation stricte (AC4) — révisée revue Alexandre PR #167 :
+    Aucun objet d'ENTRÉE (`eq`, `snapshot`, `eligibility`, dicts d'overrides, mapping
+    retourné par `mapper_registry.map()`, secondaires portés par ce mapping) n'est muté.
+    Cette garantie est portée par les tests avant/après (AC4) — plus de `deepcopy` défensif
+    systémique du snapshot complet : le coût est linéaire au nombre d'équipements du snapshot
+    même quand on n'en évalue qu'un seul, ce qui rend le total d'un sync quadratique.
+    La non-mutation est maintenant assurée par construction : `apply_type_override` renvoie
+    une copie via `dataclasses.replace` en cas de match (sinon l'objet inchangé), et notre
+    propre `replace(mapping, projection_validity=..., pipeline_step_reached=3)` produit un
+    NOUVEAU mapping "working copy" que la fonction possède — celui-ci peut être muté
+    directement pour créer le lien croisé bidirectionnel décision ↔ mapping (voir plus bas).
+
+Liens croisés bidirectionnels (correction revue Alexandre PR #167) :
+    Le mapping working et la décision produits par la fonction lui APPARTIENNENT — la
+    contrainte de non-mutation ne porte que sur les entrées, pas sur les objets qu'elle vient
+    de créer. On établit donc directement les deux références par assignation d'attribut sur
+    ces objets nouvellement créés (comme le fait le pipeline classique de `http_server.py`,
+    lignes 1440-1441) :
+        - `decision.mapping_result is final_mapping`               → True
+        - `final_mapping.publication_decision_ref is decision`     → True
+        - idem pour CHAQUE décision/mapping secondaire.
+    Ces liens sont réels (identité `is`, pas juste égalité `==`), ce qui permet au consumer
+    (Story 19.1+) de naviguer d'une décision vers son mapping et réciproquement sans
+    reconstruire d'index externe.
 
 Registre de mappeurs et fonctions du pipeline injectables (Dev Notes) :
     `mapper_registry` est un paramètre obligatoire (jamais instancié en interne). Les deux
@@ -179,59 +197,54 @@ def _decide_for_mapping(
     (primaire ou secondaire) — sans finaliser encore `additional_mappings` (fait par
     l'appelant une fois les secondaires eux-mêmes décidés, cf. `evaluate_equipment`).
 
-    Jamais de mutation en place : `projection_validity`/`publication_decision_ref` sont
-    posés via `dataclasses.replace`, jamais par assignation d'attribut (contrairement à
-    `_preview_mapping_view`, AC4).
-
-    Retourne le mapping à l'étape 3 (`validated_mapping`, `pipeline_step_reached=3`) — c'est
-    à l'appelant de le finaliser (`pipeline_step_reached=4`, `additional_mappings` mis à jour)
-    puis de reposer `decision.mapping_result` sur cette version finale via
-    `_finalize_decision_mapping_result` (Story 19.0, correction revue bot — la version
-    précédente laissait `decision.mapping_result` figé à l'étape 3, sans les secondaires
-    finalisées ni `pipeline_step_reached=4`).
+    Retourne un "working mapping" NEUF (via `dataclasses.replace`) que l'appelant possède
+    et peut muter librement pour poser `publication_decision_ref` (finalisation, étape 4).
+    Le mapping d'entrée reste intact (source retournée par le registre / patchée par
+    `apply_type_override`).
     """
     validity = validate_projection_fn(mapping.ha_entity_type, mapping.capabilities)
-    validated_mapping = replace(mapping, projection_validity=validity, pipeline_step_reached=3)
+    working_mapping = replace(
+        mapping, projection_validity=validity, pipeline_step_reached=3
+    )
 
     publication_override = _resolve_publication_override_for_mapping(
-        validated_mapping, overrides, equipment_overrides
+        working_mapping, overrides, equipment_overrides
     )
     decision = decide_publication_fn(
-        validated_mapping,
+        working_mapping,
         confidence_policy=confidence_policy,
         publication_override=publication_override,
     )
-    return validated_mapping, decision
+    return working_mapping, decision
 
 
-def _finalize_decision_mapping_result(
-    validated_mapping: MappingResult,
+def _finalize_cross_reference(
+    working_mapping: MappingResult,
     decision: PublicationDecision,
     *,
     additional_mappings: Optional[List[MappingResult]] = None,
-) -> "tuple[MappingResult, PublicationDecision]":
-    """Finalise le couple (mapping, décision) à l'étape 4 (Story 19.0, correction revue bot).
+) -> None:
+    """Établit le lien croisé bidirectionnel décision ↔ mapping — Story 19.0 (revue Alexandre).
 
-    `decision.mapping_result` doit refléter le mapping final (étape 4, `additional_mappings`
-    déjà finalisées pour le primaire), jamais la version intermédiaire de l'étape 3 — sinon
-    `EquipmentEvaluation.equipment_decision.mapping_result` peut présenter un état obsolète
-    par rapport à `EquipmentEvaluation.mapping` (secondaires non finalisées notamment).
+    Le `working_mapping` et la `decision` sont des objets NOUVELLEMENT CRÉÉS par la fonction
+    (via `replace()` et `decide_publication_fn()`) — la contrainte de non-mutation ne s'applique
+    pas à eux (elle ne porte que sur les entrées d'`evaluate_equipment`). On peut donc leur
+    assigner directement leurs références croisées comme le fait `http_server.py:1440-1441` :
 
-    Limite structurelle assumée : `final_mapping.publication_decision_ref` référence `decision`,
-    mais `decision.mapping_result` référence `final_mapping` SANS `publication_decision_ref`
-    posé sur lui-même (`final_mapping_without_self_ref`) — une vraie boucle auto-référente
-    n'est pas représentable avec des dataclasses immuables (`dataclasses.replace`), contrairement
-    au pipeline classique qui mute les deux objets en place. `pipeline_step_reached=4` et
-    `additional_mappings` finalisées sont en revanche garantis cohérents des deux côtés.
+        decision.mapping_result = working_mapping
+        working_mapping.publication_decision_ref = decision
+
+    Cela produit un lien réel `is`-identifiable dans les deux sens, ce qui n'était pas possible
+    tant qu'on repassait par `replace` (chaque `replace` casse l'identité côté opposé).
+
+    L'appelant fait circuler `additional_mappings` finalisées côté primaire uniquement (une
+    fois les secondaires eux-mêmes finalisées).
     """
-    final_mapping_without_self_ref = replace(
-        validated_mapping,
-        additional_mappings=additional_mappings if additional_mappings is not None else [],
-        pipeline_step_reached=4,
-    )
-    decision = replace(decision, mapping_result=final_mapping_without_self_ref)
-    final_mapping = replace(final_mapping_without_self_ref, publication_decision_ref=decision)
-    return final_mapping, decision
+    if additional_mappings is not None:
+        working_mapping.additional_mappings = additional_mappings
+    working_mapping.pipeline_step_reached = 4
+    decision.mapping_result = working_mapping
+    working_mapping.publication_decision_ref = decision
 
 
 def evaluate_equipment(
@@ -251,10 +264,15 @@ def evaluate_equipment(
     """Évalue un équipement et produit une `CommandDecision` par `cmd_id` (Story 19.0).
 
     Args:
-        eq: équipement Jeedom (snapshot topologie) — jamais muté (AC4).
-        snapshot: instantané topologie complet — jamais muté (AC4), transmis au registre.
+        eq: équipement Jeedom (snapshot topologie) — jamais muté (AC4, vérifié par test
+            avant/après ; plus de `deepcopy` défensif systémique).
+        snapshot: instantané topologie complet — jamais muté (AC4, vérifié par test avant/
+            après). Transmis tel quel au registre : le coût d'une copie linéaire du snapshot
+            à chaque appel devient quadratique sur un sync complet (revue Alexandre PR #167 —
+            292 équipements × ~13 ms/copie ≈ 3.7 s de surcoût par sync sur le matériel de la
+            box).
         eligibility: résultat d'éligibilité déjà calculé en amont — jamais recalculé ici
-            (AC2, racine de CC-03) ; consommé tel quel.
+            (AC2, racine de CC-03) ; consommé tel quel, jamais muté (AC4).
         mapper_registry: registre de mappeurs (ex. `mapping.registry.MapperRegistry()`)
             injecté par l'appelant — jamais instancié en interne (Dev Notes).
         confidence_policy: transmis tel quel à `decide_publication`.
@@ -271,28 +289,25 @@ def evaluate_equipment(
     Returns:
         EquipmentEvaluation : décision principale, décisions secondaires (multi-sensor),
         et une CommandDecision par cmd_id connu de `eq` — jamais vide si `eq.cmds` est non
-        vide, jamais `None` (I5).
+        vide, jamais `None` (I5). La décision principale et son mapping partagent des
+        références croisées bidirectionnelles `is`-identifiables (idem pour chaque secondaire).
     """
-    eq_copy = deepcopy(eq)
-    snapshot_copy = deepcopy(snapshot)
-    eligibility_copy = deepcopy(eligibility)
-
     merged_overrides = _merge_override_layer(persisted_overrides, proposed_overrides)
     merged_equipment_overrides = _merge_override_layer(
         persisted_equipment_overrides, proposed_equipment_overrides
     )
 
-    known_cmd_ids: List[int] = list(dict.fromkeys(cmd.id for cmd in eq_copy.cmds))
+    known_cmd_ids: List[int] = list(dict.fromkeys(cmd.id for cmd in eq.cmds))
 
     # I1 — équipement inéligible : décision refusée de niveau 1, sans mapping ni projection.
-    if not eligibility_copy.is_eligible:
+    if not eligibility.is_eligible:
         aliased_reason = _ELIGIBILITY_REASON_ALIAS.get(
-            eligibility_copy.reason_code, eligibility_copy.reason_code
+            eligibility.reason_code, eligibility.reason_code
         )
         equipment_decision = PublicationDecision(
             should_publish=False,
             reason=aliased_reason,
-            reason_details={"eligibility_reason_code": eligibility_copy.reason_code},
+            reason_details={"eligibility_reason_code": eligibility.reason_code},
         )
         command_decisions = [
             CommandDecision(
@@ -300,7 +315,7 @@ def evaluate_equipment(
                 should_publish=False,
                 reason=aliased_reason,
                 step="1",
-                reason_details={"eligibility_reason_code": eligibility_copy.reason_code},
+                reason_details={"eligibility_reason_code": eligibility.reason_code},
             )
             for cmd_id in known_cmd_ids
         ]
@@ -313,9 +328,9 @@ def evaluate_equipment(
 
     # I5 — équipement éligible : mapping (registre injecté) → fusion overrides → validation
     # → décision, sans mapping ni projection fournis en entrée. Jamais None, jamais omise.
-    mapping = mapper_registry.map(eq_copy, snapshot_copy)
+    raw_mapping = mapper_registry.map(eq, snapshot)
 
-    if mapping is None:
+    if raw_mapping is None:
         equipment_decision = PublicationDecision(should_publish=False, reason="no_mapping")
         command_decisions = [
             CommandDecision(
@@ -335,49 +350,56 @@ def evaluate_equipment(
         )
 
     # Story 16.2 — override de type utilisateur, injecté ENTRE étape 2 (map) et étape 3
-    # (validate_projection), même point d'insertion que le sync (D10/D11 préservés).
-    mapping = apply_type_override(mapping, "", overrides=merged_overrides)
+    # (validate_projection), même point d'insertion que le sync (D10/D11 préservés). Le
+    # `raw_mapping` retourné par le registre reste intact : `apply_type_override` renvoie
+    # une copie via `replace` si un override matche, sinon l'objet inchangé.
+    patched_primary = apply_type_override(raw_mapping, "", overrides=merged_overrides)
 
-    mapping, primary_decision = _decide_for_mapping(
-        mapping,
+    primary_mapping, primary_decision = _decide_for_mapping(
+        patched_primary,
         confidence_policy=confidence_policy,
         overrides=merged_overrides,
         equipment_overrides=merged_equipment_overrides,
         validate_projection_fn=validate_projection_fn,
         decide_publication_fn=decide_publication_fn,
     )
-    original_secondaries = mapping.additional_mappings or []
+    original_secondaries = raw_mapping.additional_mappings or []
 
     secondary_decisions: List[PublicationDecision] = []
     updated_secondaries: List[MappingResult] = []
-    for secondary in original_secondaries:
-        secondary = apply_type_override(secondary, "", overrides=merged_overrides)
-        validated_secondary, secondary_decision = _decide_for_mapping(
-            secondary,
+    for raw_secondary in original_secondaries:
+        patched_secondary = apply_type_override(
+            raw_secondary, "", overrides=merged_overrides
+        )
+        working_secondary, secondary_decision = _decide_for_mapping(
+            patched_secondary,
             confidence_policy=confidence_policy,
             overrides=merged_overrides,
             equipment_overrides=merged_equipment_overrides,
             validate_projection_fn=validate_projection_fn,
             decide_publication_fn=decide_publication_fn,
         )
-        final_secondary, secondary_decision = _finalize_decision_mapping_result(
-            validated_secondary,
+        # Chaque secondaire est un objet NOUVEAU (créé par `replace` dans `_decide_for_mapping`),
+        # on peut donc y assigner directement le lien croisé bidirectionnel.
+        _finalize_cross_reference(
+            working_secondary,
             secondary_decision,
-            additional_mappings=validated_secondary.additional_mappings,
+            additional_mappings=working_secondary.additional_mappings,
         )
         secondary_decisions.append(secondary_decision)
-        updated_secondaries.append(final_secondary)
+        updated_secondaries.append(working_secondary)
 
-    # Finalisation étape 4 du primaire une fois les secondaires eux-mêmes finalisées, pour que
-    # `primary_decision.mapping_result.additional_mappings` reflète les décisions secondaires
-    # réelles (correction revue bot — cf. `_finalize_decision_mapping_result`).
-    mapping, primary_decision = _finalize_decision_mapping_result(
-        mapping, primary_decision, additional_mappings=updated_secondaries
+    # Finalisation étape 4 du primaire une fois les secondaires eux-mêmes finalisées, pour
+    # que `primary_decision.mapping_result.additional_mappings` reflète les décisions
+    # secondaires réelles (revue Codex, PR #167). Assignation directe : `primary_mapping`
+    # a été créé par `replace()` dans `_decide_for_mapping`, il nous appartient.
+    _finalize_cross_reference(
+        primary_mapping, primary_decision, additional_mappings=updated_secondaries
     )
 
     # AC1 — une CommandDecision par cmd_id connu de l'équipement, y compris non couvertes.
     covered: Dict[int, "tuple[PublicationDecision, str]"] = {}
-    for cmd_id in mapping_cmd_ids(mapping):
+    for cmd_id in mapping_cmd_ids(primary_mapping):
         covered.setdefault(cmd_id, (primary_decision, _step_for_decision(primary_decision)))
     for secondary, secondary_decision in zip(updated_secondaries, secondary_decisions):
         for cmd_id in mapping_cmd_ids(secondary):
@@ -411,5 +433,5 @@ def evaluate_equipment(
         equipment_decision=primary_decision,
         secondary_decisions=secondary_decisions,
         command_decisions=command_decisions,
-        mapping=mapping,
+        mapping=primary_mapping,
     )

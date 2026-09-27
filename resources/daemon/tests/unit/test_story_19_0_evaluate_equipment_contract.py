@@ -702,3 +702,214 @@ def test_thread1_equipment_decision_mapping_result_reflects_final_mapping():
     # Cohérent avec le mapping final exposé par ailleurs sur l'évaluation.
     assert mapping_result.additional_mappings[0].ha_entity_type == result.mapping.additional_mappings[0].ha_entity_type
     assert result.secondary_decisions[0].mapping_result.pipeline_step_reached == 4
+
+
+# ---------------------------------------------------------------------------
+# Revue Alexandre (PR #167) — liens croisés bidirectionnels réels (identité `is`)
+# ---------------------------------------------------------------------------
+
+def test_bidirectional_link_primary_is_identity():
+    """Revue Alexandre : `decision.mapping_result is result.mapping` ET
+    `result.mapping.publication_decision_ref is decision` — un vrai lien croisé, pas juste
+    l'égalité `==`. Les objets créés par la fonction lui appartiennent, elle peut donc les
+    lier par assignation directe (contrainte de non-mutation = uniquement sur les ENTRÉES)."""
+    eq = _make_eq()
+    mapping = _make_mapping()
+
+    result = _evaluate(eq, _eligible(), mapping, validate_projection_fn=lambda t, c: _valid_pv())
+
+    decision = result.equipment_decision
+    final_mapping = result.mapping
+
+    assert decision.mapping_result is final_mapping, (
+        "decision.mapping_result devrait référencer (is) le mapping final exposé par l'évaluation"
+    )
+    assert final_mapping.publication_decision_ref is decision, (
+        "final_mapping.publication_decision_ref devrait référencer (is) la décision principale"
+    )
+
+
+def test_bidirectional_link_secondary_is_identity():
+    """Revue Alexandre : chaque décision secondaire porte le lien bidirectionnel avec son
+    mapping secondaire final. `secondary_decision.mapping_result is secondary_mapping` ET
+    `secondary_mapping.publication_decision_ref is secondary_decision`, pour CHAQUE secondaire."""
+    eq = _make_eq(cmds=[_cmd(101, "LIGHT_ON"), _cmd(201, "POWER", type_="info"),
+                        _cmd(202, "CONSO", type_="info")])
+    secondary_a = _make_mapping(jeedom_eq_id=1, ha_entity_type="sensor", confidence="sure", commands={})
+    secondary_a.reason_details = {"cmd_id": 201}
+    secondary_b = _make_mapping(jeedom_eq_id=1, ha_entity_type="sensor", confidence="sure", commands={})
+    secondary_b.reason_details = {"cmd_id": 202}
+    mapping = _make_mapping(
+        commands={"LIGHT_ON": _cmd(101, "LIGHT_ON")},
+        additional_mappings=[secondary_a, secondary_b],
+    )
+
+    result = _evaluate(eq, _eligible(), mapping, validate_projection_fn=lambda t, c: _valid_pv())
+
+    assert len(result.secondary_decisions) == 2
+    assert len(result.mapping.additional_mappings) == 2
+
+    for i, sec_decision in enumerate(result.secondary_decisions):
+        sec_mapping = result.mapping.additional_mappings[i]
+        assert sec_decision.mapping_result is sec_mapping, (
+            f"secondaire #{i} — decision.mapping_result devrait référencer (is) le mapping secondaire final"
+        )
+        assert sec_mapping.publication_decision_ref is sec_decision, (
+            f"secondaire #{i} — mapping.publication_decision_ref devrait référencer (is) la décision secondaire"
+        )
+
+
+def test_bidirectional_link_primary_additional_mappings_reference_secondaries():
+    """Revue Alexandre : `result.mapping.additional_mappings[i] is result.secondary_decisions[i].mapping_result`.
+    Une seule liste de secondaires finalisés circule — pas de doublon divergent."""
+    eq = _make_eq(cmds=[_cmd(101, "LIGHT_ON"), _cmd(201, "POWER", type_="info")])
+    secondary = _make_mapping(jeedom_eq_id=1, ha_entity_type="sensor", confidence="sure", commands={})
+    secondary.reason_details = {"cmd_id": 201}
+    mapping = _make_mapping(
+        commands={"LIGHT_ON": _cmd(101, "LIGHT_ON")}, additional_mappings=[secondary]
+    )
+
+    result = _evaluate(eq, _eligible(), mapping, validate_projection_fn=lambda t, c: _valid_pv())
+
+    assert result.mapping.additional_mappings[0] is result.secondary_decisions[0].mapping_result, (
+        "primary_mapping.additional_mappings[0] doit être LE MÊME objet que secondary_decisions[0].mapping_result"
+    )
+    # Et le mapping résultat exposé à `equipment_decision.mapping_result` doit être le même primaire.
+    assert result.equipment_decision.mapping_result is result.mapping
+
+
+# ---------------------------------------------------------------------------
+# Revue Alexandre (PR #167) — non-mutation stricte des entrées (avant/après)
+# ---------------------------------------------------------------------------
+
+def test_alexandre_inputs_not_mutated_avant_apres_deep_compare():
+    """Revue Alexandre : preuve avant/après que la fonction ne mute AUCUNE de ses entrées,
+    de manière strictement structurelle (deepcopy + comparaison). Ce test remplace la garantie
+    précédente portée par un `deepcopy(snapshot)` défensif systémique (retiré pour raison de perf,
+    revue Alexandre — cf. `test_perf_no_snapshot_deepcopy_regression`)."""
+    eq = _make_eq(cmds=[_cmd(101, "LIGHT_ON"), _cmd(201, "POWER", type_="info")])
+    snapshot = _make_snapshot(eq)
+    eligibility = _eligible()
+    secondary = _make_mapping(jeedom_eq_id=1, ha_entity_type="sensor", confidence="sure", commands={})
+    secondary.reason_details = {"cmd_id": 201}
+    mapping = _make_mapping(
+        commands={"LIGHT_ON": _cmd(101, "LIGHT_ON")}, additional_mappings=[secondary]
+    )
+    persisted_overrides = {"1:101": {"source": "user", "publication_override": "force_publish"}}
+    persisted_eq_overrides = {"1": {"source": "user", "publication_override": "force_publish"}}
+    proposed_overrides = {"1:201": {"source": "user", "ha_entity_type": "sensor"}}
+    proposed_eq_overrides = {"1": {"source": "user"}}
+
+    # Snapshots avant appel — deepcopy structurel.
+    eq_before = deepcopy(eq)
+    snapshot_before = deepcopy(snapshot)
+    eligibility_before = deepcopy(eligibility)
+    mapping_before = deepcopy(mapping)
+    secondary_before = deepcopy(secondary)
+    persisted_overrides_before = deepcopy(persisted_overrides)
+    persisted_eq_overrides_before = deepcopy(persisted_eq_overrides)
+    proposed_overrides_before = deepcopy(proposed_overrides)
+    proposed_eq_overrides_before = deepcopy(proposed_eq_overrides)
+
+    evaluate_equipment(
+        eq, snapshot, eligibility,
+        mapper_registry=_StubRegistry(mapping),
+        persisted_overrides=persisted_overrides,
+        persisted_equipment_overrides=persisted_eq_overrides,
+        proposed_overrides=proposed_overrides,
+        proposed_equipment_overrides=proposed_eq_overrides,
+        validate_projection_fn=lambda t, c: _valid_pv(),
+    )
+
+    # Après appel — chaque entrée est structurellement égale à sa version d'avant.
+    assert eq == eq_before, "eq muté par evaluate_equipment"
+    assert snapshot == snapshot_before, "snapshot muté par evaluate_equipment"
+    assert eligibility == eligibility_before, "eligibility muté par evaluate_equipment"
+    assert persisted_overrides == persisted_overrides_before, "persisted_overrides muté"
+    assert persisted_eq_overrides == persisted_eq_overrides_before, "persisted_equipment_overrides muté"
+    assert proposed_overrides == proposed_overrides_before, "proposed_overrides muté"
+    assert proposed_eq_overrides == proposed_eq_overrides_before, "proposed_equipment_overrides muté"
+
+    # Le mapping retourné par le registre ET ses secondaires ne sont jamais mutés en place.
+    # (Renforce `test_ac4_mapping_object_returned_by_registry_not_mutated_in_place` + secondaire.)
+    assert mapping == mapping_before, "mapping retourné par le registre muté en place"
+    assert secondary == secondary_before, "secondary retourné par le registre muté en place"
+
+
+# ---------------------------------------------------------------------------
+# Revue Alexandre (PR #167) — non-régression perf (plus de deepcopy(snapshot))
+# ---------------------------------------------------------------------------
+
+def test_perf_no_snapshot_deepcopy_regression():
+    """Revue Alexandre : `evaluate_equipment()` ne doit plus faire de `deepcopy(snapshot)` à
+    chaque appel — sinon un sync complet paie O(N²) sur la copie (mesure : ~2.6 ms/copie pour
+    59 équipements → extrapolé à 292 équipements ~13 ms × 292 ≈ 3.7 s de surcoût par sync,
+    davantage sur le matériel de la box).
+
+    Ce test simule ce cas : un snapshot synthétique de taille "box" (292 équipements, forme
+    simplifiée mais représentative) et 292 appels successifs. Le seuil est volontairement
+    généreux (< 2.0 s au total) pour tolérer les variations CI, mais reste bien en-dessous du
+    surcoût `deepcopy(snapshot)` extrapolé (~3.7 s). Un mapper_registry stub isole le coût
+    d'`evaluate_equipment()` du mapping lui-même : on mesure ce que la fonction ajoute.
+    """
+    import time
+
+    BOX_EQ_COUNT = 292
+    # Snapshot volontairement lourd : chaque eq a plusieurs commandes + attributs texte,
+    # pour rendre le coût d'un deepcopy() proportionnel à celui du corpus réel.
+    eqs = {
+        eq_id: JeedomEqLogic(
+            id=eq_id,
+            name=f"Equipement box #{eq_id} synthétique",
+            is_enable=True,
+            is_excluded=False,
+            exclusion_source=None,
+            cmds=[
+                _cmd(eq_id * 10 + 1, "LIGHT_ON"),
+                _cmd(eq_id * 10 + 2, "LIGHT_STATE", type_="info"),
+                _cmd(eq_id * 10 + 3, "POWER", type_="info"),
+                _cmd(eq_id * 10 + 4, "ENERGY", type_="info"),
+            ],
+        )
+        for eq_id in range(1, BOX_EQ_COUNT + 1)
+    }
+    snapshot = TopologySnapshot(timestamp="2026-09-27T00:00:00Z", eq_logics=eqs)
+
+    def _mapping_for(eq: JeedomEqLogic) -> MappingResult:
+        return MappingResult(
+            ha_entity_type="light",
+            confidence="sure",
+            reason_code="light_on_off",
+            jeedom_eq_id=eq.id,
+            ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+            ha_name=eq.name,
+            capabilities=LightCapabilities(has_on_off=True),
+            commands={"LIGHT_ON": eq.cmds[0], "LIGHT_STATE": eq.cmds[1]},
+            additional_mappings=[],
+        )
+
+    class _PerfRegistry:
+        def map(self, eq, snap):
+            return _mapping_for(eq)
+
+    registry = _PerfRegistry()
+    eligibility = _eligible()
+
+    start = time.perf_counter()
+    for eq in eqs.values():
+        evaluate_equipment(
+            eq, snapshot, eligibility,
+            mapper_registry=registry,
+            validate_projection_fn=lambda t, c: _valid_pv(),
+        )
+    elapsed = time.perf_counter() - start
+
+    # Seuil : < 2.0 s pour 292 appels sur snapshot de 292 équipements.
+    # Avec `deepcopy(snapshot)` par appel : ≈ 3.7 s minimum sur ce corpus (~13 ms × 292).
+    # Sans deepcopy : quelques ms/appel, total bien sous la seconde en local.
+    # 2.0 s laisse une marge x2 pour CI tout en détectant un retour du deepcopy.
+    assert elapsed < 2.0, (
+        f"Régression perf : 292 appels evaluate_equipment sur snapshot 292-eq ont pris "
+        f"{elapsed:.3f}s (seuil 2.0s). Un `deepcopy(snapshot)` par appel a probablement été "
+        f"réintroduit — le coût redevient quadratique sur un sync complet."
+    )
