@@ -7,8 +7,10 @@ Status: ready-for-dev
 ## Story
 
 As un utilisateur,
-I want que la surface de navigation par pièce (`_build_mapping_override_tree`, Story 16.8) et l'aperçu à blanc (`_handle_overrides_preview`) affichent le vrai statut de publication d'un équipement, et que "revenir au mode automatique" efface aussi l'override de publication/exclusion,
-so that je ne vois plus "sera publié" pour un équipement en réalité exclu (CC-03), et que revenir au mode automatique me rende bien un état totalement automatique, sans override de publication résiduel invisible (CC-19).
+I want que la surface de navigation par pièce (`_build_mapping_override_tree`, Story 16.8) et l'aperçu à blanc (`_handle_overrides_preview`) affichent le vrai statut de publication d'un équipement, et que "revenir au mode automatique (tout l'équipement)" efface bien tous les overrides de cet équipement (TYPE par commande ET publication/exclusion),
+so that je ne vois plus "sera publié" pour un équipement en réalité exclu (CC-03), et que revenir au mode automatique me rende bien un état totalement automatique, sans override résiduel invisible d'aucune sorte (CC-19).
+
+**Parcours : complet.**
 
 ## Acceptance Criteria
 
@@ -27,13 +29,12 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **Then** il consomme également `evaluate_equipment()` avec les overrides proposés (mode preview de Story 19.0, AC3)
 **And** le résultat affiché par l'aperçu est cohérent avec celui affiché par la surface par pièce pour le même équipement/override (même contrat, même réponse).
 
-**AC3 — CC-19 : "revenir au mode automatique" efface aussi l'override de publication**
+**AC3 — CC-19 : "revenir au mode automatique (tout l'équipement)" efface réellement tout l'équipement**
 
-**Given** un équipement avec un override de TYPE et un override de publication/exclusion actifs simultanément
-**When** l'utilisateur clique sur "revenir au mode automatique"
-**Then** l'override de TYPE est effacé (comportement déjà existant)
-**And** l'override de publication/exclusion est **également** effacé (correction CC-19)
-**And** un test explicite vérifie que les deux overrides sont bien supprimés en un seul clic, et qu'aucun des deux ne subsiste après l'action.
+**Given** un équipement avec un override de TYPE sur au moins une commande (`overrides[eq_id:cmd_id]`, ce qui affiche le bouton "revenir au mode automatique (tout l'équipement)" via `hasOverride`/`override_applied`, `desktop/js/jeedom2ha_mapping_surface.js` l.264-278) et, séparément, un override de publication/exclusion au niveau équipement (`equipment_overrides[eq_id]`)
+**When** l'utilisateur clique sur ce bouton — qui aujourd'hui envoie uniquement `eqId` (`revertEquipment`, l.190-200), ce qui fait que `_handle_mapping_override_revert` (`resources/daemon/transport/http_server.py` l.2606-2657) n'appelle que `remove_equipment_override` et **laisse intacts** les overrides de TYPE par commande — c'est le bug réel (constaté par lecture directe du code), à l'inverse de la formulation historique de CC-19 qui supposait que seul le TYPE était effacé
+**Then** l'action doit désormais effacer **à la fois** l'override de publication/exclusion au niveau équipement **et** tous les overrides par commande de cet équipement (réutilisation de `remove_equipment_override` **et** `remove_override` pour chaque `cmd_id` concerné, Story 16.1/16.3 — jamais une réécriture manuelle du fichier JSON)
+**And** un test explicite vérifie qu'après un seul clic, plus aucun override (TYPE ou publication, à quelque granularité que ce soit) ne subsiste pour cet équipement.
 
 **AC4 — Libellés français des nouvelles raisons exposées**
 
