@@ -10,6 +10,8 @@ As un mainteneur,
 I want que le sync (`_do_handle_action_sync`) appelle `evaluate_equipment()` (Story 19.0) au lieu de recalculer sa propre décision via `decide_publication()` en direct, à comportement strictement identique,
 so that le sync devienne le premier point d'appel unifié sur le contrat de décision, sans risquer de régression de publication en production.
 
+**Parcours : complet.**
+
 ## Acceptance Criteria
 
 **AC1 — Golden file inchangé**
@@ -24,7 +26,8 @@ so that le sync devienne le premier point d'appel unifié sur le contrat de déc
 **Given** la suite `pytest tests/unit -q` actuelle (baseline)
 **When** le sync est migré vers `evaluate_equipment()`
 **Then** la suite complète passe avec un nombre de tests verts au moins égal à la baseline, 0 régression
-**And** aucun test existant n'est modifié pour "faire passer" la migration (un test qui échouerait à cause d'un changement de comportement réel doit bloquer la story, pas être ajusté).
+**And** un test existant peut être **mécaniquement** ajusté **uniquement** s'il vérifiait un détail d'implémentation devenu obsolète par construction (ex. un mock/spy qui assertait un appel direct à `decide_publication()` et doit désormais asserter un appel à `evaluate_equipment()` à la place) — cet ajustement doit être listé explicitement dans les Completion Notes de cette story, avec justification
+**And** aucun test n'est modifié pour changer une assertion **comportementale** (valeur de `should_publish`, `reason`/`reason_code`, contenu publié) : un test qui échouerait à cause d'un changement de comportement réel doit bloquer la story, jamais être ajusté pour "faire passer" la migration.
 
 **AC3 — Outil de parité en lecture seule sur la box**
 
@@ -34,11 +37,11 @@ so that le sync devienne le premier point d'appel unifié sur le contrat de déc
 **And** l'inventaire des topics MQTT retained est identique avant/après (ex. 353 → 353, valeur exacte relevée sur la box au moment du test)
 **And** l'outil est en lecture seule strict : aucune écriture MQTT, aucune modification de `data/ha_overrides.json`, aucun redémarrage daemon déclenché par l'outil lui-même.
 
-**AC4 — Mesure en lecture seule de l'état actuel d'I8 et du scope explicite**
+**AC4 — Mesure en lecture seule de l'état actuel d'I11 et du scope explicite**
 
 **Given** le même outil de parité
 **When** il s'exécute sur la box
-**Then** il relève et rapporte, en lecture seule, tous les cas où I8 est déjà violé aujourd'hui (principal refusé mais secondaire publié) — sans les corriger (correction hors périmètre, Story 19.2)
+**Then** il relève et rapporte, en lecture seule, tous les cas où I11 est déjà violé aujourd'hui (principal refusé mais secondaire publié) — sans les corriger (correction hors périmètre, Story 19.2)
 **And** il relève et rapporte tout état de scope explicite déjà présent sur la box (aucune UI n'en écrit aujourd'hui, donc résultat probable = zéro — à constater par la mesure, jamais supposé a priori)
 **And** ces deux mesures sont documentées dans le rapport de sortie de l'outil (fichier ou log dédié), pour alimenter respectivement Story 19.2 et l'epic (règle de scope).
 
@@ -61,12 +64,12 @@ Changement de comportement attendu : **aucun** — c'est l'objet même de cette 
 
 - (a) golden file inchangé (AC1).
 - (b) outil en lecture seule (créé dans **cette** story, pas avant) qui relève toutes les décisions de publication avant/après déploiement sur la box, différence **vide**, inventaire des topics MQTT retained identique (ex. 353 → 353).
-- (c) le même outil mesure et rapporte, en lecture seule : les cas où I8 est déjà violé aujourd'hui, et les éventuels états de scope explicites déjà présents sur la box (probablement zéro — à constater, pas supposer).
+- (c) le même outil mesure et rapporte, en lecture seule : les cas où I11 est déjà violé aujourd'hui, et les éventuels états de scope explicites déjà présents sur la box (probablement zéro — à constater, pas supposer).
 - (d) exigence de sécurité non négociable : l'outil ne doit jamais exposer `local_secret` (ligne de commande, journal, sortie) — critère d'acceptation testable (AC5).
 
 ## Invariants concernés
 
-I1-I7 (parité stricte de comportement — aucune régression sur ces invariants déjà en vigueur). I8 n'est **pas corrigé** par cette story : il est seulement **mesuré et rapporté** en lecture seule (AC4), sa correction est le sujet exclusif de Story 19.2. Ne pas mélanger les deux preuves (cf. règle de dépendance de l'epic).
+I1-I7 (parité stricte de comportement — aucune régression sur ces invariants déjà en vigueur). I11 n'est **pas corrigé** par cette story : il est seulement **mesuré et rapporté** en lecture seule (AC4), sa correction est le sujet exclusif de Story 19.2. Ne pas mélanger les deux preuves (cf. règle de dépendance de l'epic).
 
 ## Points fermés
 
@@ -79,6 +82,7 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (vérifier SSH/sudo OK, box 192.168.1.21 joignable)
   - [ ] Sélectionner le mode de déploiement adapté à un cycle de mesure avant/après (à documenter en dev-story, cohérent avec le mode utilisé en Story 16.3/16.7)
+  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant le cycle de mesure avant/après de cette story — ces deux flags republient des messages MQTT retained **vides** sur les topics discovery (`homeassistant/{light,cover,switch}/jeedom2ha_*/config`), effaçant l'état publié entre les deux relevés et rendant la comparaison "avant/après" invalide par construction (les entités disparaîtraient, ce qui n'a rien à voir avec un changement de décision). Utiliser exclusivement un déploiement standard (sans ces flags).
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou équivalent
 
 - [ ] Task 1 — Migrer le sync vers `evaluate_equipment()` (AC1, AC2)
@@ -92,7 +96,7 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - [ ] Task 3 — Outil de parité en lecture seule (AC3, AC4, AC5)
   - [ ] Créer un outil (script dédié, hors chemin de production, jamais exécuté automatiquement) qui relève, pour chaque équipement/commande, la décision de publication actuelle sur la box, sans écriture ni effet de bord
   - [ ] Exécuter l'outil avant déploiement du sync migré, puis après, comparer les deux relevés
-  - [ ] Relever et journaliser (sans corriger) les cas de violation I8 (principal refusé, secondaire publié)
+  - [ ] Relever et journaliser (sans corriger) les cas de violation I11 (principal refusé, secondaire publié)
   - [ ] Relever et journaliser tout état de scope explicite présent sur la box
   - [ ] Vérifier explicitement (test + revue manuelle du code de l'outil) qu'aucune trace de `local_secret` n'apparaît en sortie, log ou argument de ligne de commande
 
@@ -105,7 +109,7 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 ### Contexte pipeline
 
 - Cette story est la première à **brancher** `evaluate_equipment()` (Story 19.0) dans un point d'appel réel — le sync. Elle ne change **aucune** règle métier, uniquement l'implémentation interne.
-- L'outil de parité créé ici sert de preuve terrain pour cette story, et fournit en prime les mesures de référence (I8, scope explicite) qui alimenteront Story 19.2 et la règle de scope de l'epic — mais ne corrige rien lui-même.
+- L'outil de parité créé ici sert de preuve terrain pour cette story, et fournit en prime les mesures de référence (I11, scope explicite) qui alimenteront Story 19.2 et la règle de scope de l'epic — mais ne corrige rien lui-même.
 
 ### Guardrail — Déploiement terrain (DEV/TEST ONLY)
 
@@ -118,6 +122,20 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - Aucune modification de règle métier dans cette story — toute divergence constatée entre `decide_publication()` direct et `evaluate_equipment()` est un bug bloquant à corriger dans `evaluate_equipment()` (Story 19.0), jamais un "changement accepté" ici.
 - L'outil de parité ne doit jamais écrire (MQTT, `data/ha_overrides.json`, redémarrage daemon) — lecture seule stricte.
 - Ne jamais journaliser, afficher ou transmettre `local_secret` en clair, sous quelque forme que ce soit.
+
+### Contraintes techniques de l'outil de parité (AC3-AC5)
+
+- **Exécution depuis la VM de dev, pas depuis la box :** l'outil s'exécute sur la machine de développement (VM), qui se connecte à la box réelle à distance (SSH/HTTP/MQTT selon le besoin) — jamais un script déployé et exécuté directement sur la box elle-même.
+- **Aucune installation de paquet système :** l'outil ne doit dépendre que de ce qui est déjà disponible (bibliothèque standard Python, dépendances déjà présentes dans `requirements`/`venv` du daemon) — pas de `apt-get install` ni équivalent, ni sur la VM ni (a fortiori) sur la box.
+- **Ordre stable et déterministe :** la sortie de l'outil (relevé de décisions, inventaire MQTT retained) doit être triée de façon déterministe (ex. par `eq_id` puis `cmd_id`) — un ordre non stable entre deux exécutions produirait un diff "avant/après" non vide même sans aucun changement réel, invalidant la preuve de parité (AC3).
+- **Jamais de secret en argument de ligne de commande :** cohérent avec le point CC-20 documenté dans l'epic (`scripts/deploy-to-box.sh` expose déjà `local_secret`/identifiants MQTT en clair via `ps` par ce pattern) — l'outil de parité de cette story ne doit **jamais** reproduire ce pattern. Les secrets (identifiants MQTT, `local_secret`) doivent être transmis via variable d'environnement, fichier lu par l'outil, ou entrée standard (stdin) — jamais en argument positionnel ou en option `--xxx=secret` visible dans la liste des processus.
+
+### Points constatés en dev-story (dispersion actuelle, à ne pas régresser silencieusement)
+
+- **`confidence_policy` est dispersé, pas centralisé :** aujourd'hui lu indépendamment depuis la charge utile de la requête à `http_server.py:1322` (`sync_config.get("confidence_policy", "sure_probable")`) et à nouveau à `http_server.py:2281-2283` pour l'endpoint d'aperçu, puis re-dupliqué avec son propre défaut `"sure_probable"` dans chaque mapper de domaine (`mapping/cover.py:303`, `mapping/switch.py:385`, `mapping/light.py:329`). Cette story ne doit **pas** corriger cette dispersion (hors périmètre), mais `evaluate_equipment()` doit recevoir ce paramètre déjà résolu une seule fois par l'appelant migré (le sync), sans en introduire une résolution supplémentaire en interne.
+- **`data_dir` : deux chemins de résolution parallèles, pas d'injection unique.** Côté HTTP, `_resolve_data_dir()` (`http_server.py:2403-2409`) retombe sur `app.get("data_dir") or _DATA_DIR` (`_DATA_DIR` codé en dur à `http_server.py:64`) ; côté tests, l'injection se fait directement via `app["data_dir"] = str(tmp_path)`, en contournant ce résolveur. `mapping/overrides.py` et `cache/disk_cache.py` prennent `data_dir` en paramètre positionnel simple, sans résolveur partagé. Cette story n'unifie pas ce point (hors périmètre) — l'outil de parité doit utiliser le même mécanisme de résolution que le sync réel (`_resolve_data_dir`), jamais un chemin codé en dur séparé, pour éviter de lire un état différent de celui réellement utilisé en production.
+- **`app["mappings"]` reste le cache vivant consommé par le sync.** Ce dict `Dict[int, MappingResult]` (initialisé `http_server.py:3551`, mis à jour aux lignes 1691/1724, lu aux lignes 1361/1371/3142) continue d'être alimenté et lu exactement comme aujourd'hui après migration — `evaluate_equipment()` ne change pas ce mécanisme de cache, il ne fait que remplacer l'appel `decide_publication()` en aval de ce cache.
+- **Scénarios (`app["scenario_publications"]`, `ScenarioButtonMapper`) et `is_visible` (topologie) restent hors périmètre.** Ces deux mécanismes ne passent pas par `decide_publication`/`evaluate_equipment()` aujourd'hui et cette story ne les y fait pas entrer — confirmé par lecture directe (`http_server.py:1694-1721`, `sync/command.py:530-573` pour les scénarios ; `models/topology.py:82,91,161,179` pour `is_visible`, sujet de parsing topologique sans rapport avec la décision de publication).
 
 ### Project Structure Notes
 
