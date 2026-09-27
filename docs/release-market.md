@@ -970,6 +970,19 @@ relecture antérieure) :
    déréférençant systématiquement en commit avec `^{commit}`, aussi bien
    pour le candidat que pour le tag attendu
    (`jeedom2ha_tag_commit_sha` dans la bibliothèque).
+6. **Le SHA candidat identique au SHA committé dans `VERSION` ne suffit pas**
+   — un déploiement fait depuis un arbre de travail sale
+   (`deploy-to-box.sh` lancé alors que le dépôt local avait des fichiers
+   modifiés non commités) committe malgré tout le bon SHA dans `VERSION`,
+   mais peut déployer un contenu différent de ce que ce commit désigne
+   réellement (les modifications locales non commitées sont déployées
+   par-dessus). La comparaison stricte de SHA ne détecte pas ce cas, car
+   elle ne compare que la valeur `sha=`, jamais le contenu réel des fichiers
+   déployés — corrigé en exigeant en plus `git_status=clean` dans le
+   contenu de `VERSION` (champ déjà écrit par `deploy-version-file.sh` /
+   `deploy-to-box.sh`, jusqu'ici jamais vérifié par ce script), avec un
+   message d'échec distinct de celui du SHA
+   (`jeedom2ha_check_box_sha_matches_candidate` dans la bibliothèque).
 
 > Le script réel n'est pas dupliqué ici pour éviter toute divergence entre ce
 > document et le script versionné : voir `scripts/verify-release-candidate.sh`
@@ -993,12 +1006,13 @@ deployed_at=2026-09-27T13:36:40Z
 git_status=clean
 SHA réellement déployé sur la box (source de vérité) : dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e
 [OK] candidat strictement identique au SHA déployé sur la box
+[OK] git_status=clean confirmé : le contenu déployé correspond exactement au commit dd304f17fc3d1b9069ba9c14770a9b07a67d6d0e, sans modification locale non commitée
 Vérification à blanc terminée : candidat conforme, strictement identique à la box.
 $ echo "EXIT_CODE=$?"
 EXIT_CODE=0
 ```
 
-### Sortie réelle obtenue — cas d'échec volontaire (réexécuté le 2026-09-27, candidat = `v1.1.0`, ancien SHA)
+### Sortie réelle obtenue — cas d'échec volontaire, SHA divergent (réexécuté le 2026-09-27, candidat = `v1.1.0`, ancien SHA)
 
 ```
 $ bash scripts/verify-release-candidate.sh v1.1.0
@@ -1017,15 +1031,51 @@ $ echo "EXIT_CODE=$?"
 EXIT_CODE=1
 ```
 
+### Sortie obtenue — cas d'échec volontaire, arbre de travail sale (SSH simulé, 2026-09-27)
+
+Ce cas ne peut pas être reproduit contre la box réelle sans y déployer un
+état sale, ce qui violerait la contrainte « box en lecture seule » de cette
+procédure. Il est donc reproduit ici avec un binaire `ssh` mocké placé en
+tête de `PATH` (même technique que
+`tests/unit/test_verify_release_candidate.py::TestFullScriptWiringWithMockedSsh`)
+qui renvoie un contenu `VERSION` avec le SHA `HEAD` correct mais
+`git_status=dirty` — sortie réelle du script sur ce contenu simulé, pas un
+résultat supposé :
+
+```
+$ PATH="<bin-mocke-avec-ssh-stub>:${PATH}" JEEDOM_BOX_HOST=mock-box bash scripts/verify-release-candidate.sh HEAD
+SHA candidat : 7f9d2a91a2ee9e7390c143999d9b614b772cbb34
+pluginVersion du candidat : 0.3.0
+[INFO] le tag v0.3.0 n'existe pas encore (attendu avant la 1ère publication de cette version)
+--- Lecture VERSION sur la box (asahut@mock-box, lecture seule) ---
+--- VERSION lu sur la box ---
+version=0.3.0
+sha=7f9d2a91a2ee9e7390c143999d9b614b772cbb34
+deployed_at=2026-09-27T13:36:40Z
+git_status=dirty
+SHA réellement déployé sur la box (source de vérité) : 7f9d2a91a2ee9e7390c143999d9b614b772cbb34
+[OK] candidat strictement identique au SHA déployé sur la box
+[ECHEC] arbre de travail sale au moment du déploiement (git_status=dirty, attendu clean) : le SHA committé peut ne pas refléter le contenu réellement déployé sur la box (fichiers modifiés non commités déployés par-dessus)
+$ echo "EXIT_CODE=$?"
+EXIT_CODE=1
+```
+
 Interprétation : le premier cas confirme que le SHA candidat (`origin/main`,
-`dd304f1...`) est exactement le SHA déjà déployé et validé sur la box —
-c'est le cas attendu pour une première publication stable conforme à la
-section 4. Le second cas confirme deux choses à la fois : (a) le SHA
-candidat affiché pour `v1.1.0` est désormais bien `166cb7b...` — le commit
-réellement pointé par ce tag annoté, identique à celui de la section 2 —
-et non plus `e1325f0...` (l'objet tag brut, obtenu sans `^{commit}`) ; (b)
-le script **échoue bien avec un code de sortie non nul**, et ce pour la
-BONNE raison (SHA candidat différent du SHA déployé sur la box), pas à
-cause du bug d'objet tag corrigé au point 5 ci-dessus. Aucune commande de ce
-script n'écrit quoi que ce soit : ni tag, ni branche, ni Market, ni box (une
-seule commande SSH, en lecture seule).
+`dd304f1...`) est exactement le SHA déjà déployé et validé sur la box, ET
+que la box a été déployée depuis un arbre de travail propre — c'est le cas
+attendu pour une première publication stable conforme à la section 4. Le
+second cas confirme deux choses à la fois : (a) le SHA candidat affiché pour
+`v1.1.0` est désormais bien `166cb7b...` — le commit réellement pointé par
+ce tag annoté, identique à celui de la section 2 — et non plus `e1325f0...`
+(l'objet tag brut, obtenu sans `^{commit}`) ; (b) le script **échoue bien
+avec un code de sortie non nul**, et ce pour la BONNE raison (SHA candidat
+différent du SHA déployé sur la box), pas à cause du bug d'objet tag corrigé
+au point 5 ci-dessus. Le troisième cas prouve le point 6 : même quand le SHA
+correspond exactement, un `git_status=dirty` sur la box fait échouer le
+script avec un message distinct de celui du SHA, car un SHA committé
+identique ne garantit pas que le contenu réellement déployé correspond à ce
+commit lorsque l'arbre de travail source était sale au moment du
+déploiement. Aucune commande de ce script n'écrit quoi que ce soit : ni tag,
+ni branche, ni Market, ni box (une seule commande SSH, en lecture seule, et
+un binaire `ssh` mocké — jamais de connexion réelle — pour le troisième
+cas).
