@@ -50,6 +50,15 @@ class TestReadPluginVersion:
 
         assert _read_plugin_version(str(info_json)) == _UNKNOWN_VERSION
 
+    def test_falls_back_to_unknown_when_json_root_is_not_an_object(self, tmp_path):
+        """Given syntactically valid JSON whose root is not an object
+        (e.g. a list), When read, Then the fallback value is returned
+        instead of raising AttributeError from calling .get() on a list."""
+        info_json = tmp_path / "info.json"
+        info_json.write_text(json.dumps([1, 2, 3]))
+
+        assert _read_plugin_version(str(info_json)) == _UNKNOWN_VERSION
+
 
 class TestReadDeploySha:
     """AC: the deployed commit SHA is read from an optional VERSION file."""

@@ -41,12 +41,15 @@ _LOGGER = logging.getLogger(__name__)
 def _read_plugin_version(info_json_path: str = _PLUGIN_INFO_PATH) -> str:
     """Read ``pluginVersion`` from plugin_info/info.json.
 
-    Falls back to ``_UNKNOWN_VERSION`` if the file is absent, unreadable, or
-    not valid JSON — the daemon must never crash on a missing/corrupt file.
+    Falls back to ``_UNKNOWN_VERSION`` if the file is absent, unreadable, not
+    valid JSON, or valid JSON whose root is not an object (e.g. a list or a
+    string) — the daemon must never crash on a missing/corrupt file.
     """
     try:
         with open(info_json_path, "r", encoding="utf-8") as fh:
             info = json.load(fh)
+        if not isinstance(info, dict):
+            return _UNKNOWN_VERSION
         return str(info.get("pluginVersion", _UNKNOWN_VERSION))
     except (OSError, ValueError):
         return _UNKNOWN_VERSION
