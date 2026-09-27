@@ -10,6 +10,8 @@ As un mainteneur,
 I want une fonction pure `evaluate_equipment()` et un type `CommandDecision` (une décision par `cmd_id`) qui formalisent une décision de publication unique et partageable,
 so that les 4 points d'appel du pipeline (sync, navigation par pièce, aperçu, bouton "Publier") pourront à terme consommer exactement la même logique de décision au lieu de la recalculer chacun différemment.
 
+**Parcours : complet.**
+
 ## Acceptance Criteria
 
 **AC1 — `CommandDecision` par `cmd_id`, y compris les commandes non couvertes**
@@ -46,6 +48,9 @@ so that les 4 points d'appel du pipeline (sync, navigation par pièce, aperçu, 
 **Given** les invariants I1-I7 déjà en vigueur dans `decide_publication()` (Story 16.3)
 **When** `evaluate_equipment()` est implémenté
 **Then** I2 (projection invalide ⇒ jamais publié, même avec override), I4 (premier échec dans l'ordre 1→2→3→4 fait foi, jamais écrasé en aval), I6 (`reason` non-null) et I7 (aucune logique MQTT/broker/cache dans la fonction) sont vérifiés par des tests dédiés, portés de `test_step4_decide_publication.py`
+**And** I3 (un `cmd_id`/candidat avec `should_publish=True` a passé les 4 premières étapes positivement) est vérifié par un test dédié sur la sortie de `evaluate_equipment()` (confidence `sure`/`probable`/`sure_mapping` + `is_valid=True` + `ha_entity_type` dans `PRODUCT_SCOPE` ⇒ `should_publish=True`, et réciproquement)
+**And** I5 (tout candidat éligible produit ses 3 sous-blocs) est vérifié par un test dédié : pour tout candidat dont `mapping` et `projection_validity` sont fournis en entrée (déjà calculés en amont), `evaluate_equipment()` produit toujours une `CommandDecision`/décision de publication — jamais `None`, jamais une décision omise
+**And** I1 (un eq inéligible ne produit aucun sous-bloc) reste hors du périmètre testable de cette fonction : `evaluate_equipment()` ne reçoit que des candidats déjà filtrés comme éligibles par l'étape 1 (en amont, hors de cette fonction) ; I1 continue d'être vérifié par les tests existants de l'étape d'éligibilité, sans duplication ici
 **And** `evaluate_equipment()` ne prend **aucun** paramètre `published_scope` — un test explicite vérifie que la signature de la fonction ne contient pas ce paramètre (le filtre de scope reste hors périmètre de cette story, appliqué en aval par une fonction de filtre partagée définie ultérieurement).
 
 ## UI Impact
@@ -58,15 +63,15 @@ Aucun changement de comportement en production : `evaluate_equipment()` est une 
 
 ## Preuve terrain
 
-Aucune preuve terrain requise — fonction pure, aucun branchement dans le pipeline exécuté en production. Preuve exclusivement par tests unitaires (AC1-AC5) et par un harnais de parité (comparaison programmatique `evaluate_equipment()` vs `decide_publication()` actuel sur un corpus de cas synthétiques et sur `tests/fixtures/golden_corpus/`), sans aucun déploiement sur la box.
+Aucune preuve terrain requise — fonction pure, aucun branchement dans le pipeline exécuté en production. Preuve exclusivement par tests unitaires (AC1-AC5) et par un harnais de parité (comparaison programmatique `evaluate_equipment()` vs `decide_publication()` actuel sur un corpus de cas synthétiques et sur `tests/fixtures/golden_corpus/`), sans aucun déploiement sur la box. Précision : il n'existe aujourd'hui **aucun** outil dédié d'export en lecture seule de la topologie Jeedom (aucun CLI/fonction de dump) — le seul précédent comparable est un test golden-file (`resources/daemon/tests/unit/test_story_8_4_golden_file.py`, fixtures `tests/fixtures/golden_corpus/sync_payload.json`/`expected_sync_snapshot.json`) qui construit son instantané via les réponses HTTP `/sync`/`/diagnostics`, pas via un export dédié. Le harnais de parité de cette story doit donc s'appuyer sur ces mêmes fixtures existantes, jamais sur un accès direct à la box.
 
 ## Invariants concernés
 
-I1, I2, I4, I6, I7 (vérifiés par tests dédiés). I3, I5, I8 non concernés par cette story (I8 relève de Story 19.2 ; I3/I5 hors du périmètre de cette fonction, à ne pas régresser ailleurs).
+I2, I3, I4, I5, I6, I7 (vérifiés par tests dédiés sur la sortie de `evaluate_equipment()`, AC5). I1 reste vérifié en amont (étape d'éligibilité, hors périmètre de cette fonction pure — non dupliqué ici). I11 non concerné par cette story (relève de Story 19.2, `state.py`/`command.py`).
 
 ## Points fermés
 
-Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC-03, CC-18, CC-19, CC-04, CC-14 restent tous ouverts et sont traités par les stories 19.1 à 19.4.
+Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC-03 et CC-19 sont fermés par Story 19.3, CC-18 par Story 19.4 (cf. `epics-projection-engine.md#Epic-19`). CC-04 et CC-14 (P1) restent **ouverts** dans tout l'epic : aucun contenu définissant ces deux points n'a été retrouvé dans le dépôt (grep + historique git exhaustifs) ; ils ne sont attribués à aucune story de cet epic, faute de définition source.
 
 ## Tasks / Subtasks
 
@@ -97,9 +102,11 @@ Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC
 
 ### Contexte pipeline
 
-- Pipeline canonique 5 étapes (D1/D7) : `assess_all (éligibilité) → map (2) → validate_projection (3) → decide_publication (4) → publish (5)`. `evaluate_equipment()` se substitue à terme à l'étape 4 pour les 4 points d'appel, mais cette story ne fait que la définir — aucun branchement.
+- Pipeline canonique 5 étapes (D1/D7) : `assess_all (éligibilité) → map (2) → validate_projection (3) → decide_publication (4) → publish (5)`. **Précision (corrige une formulation antérieure imprécise) :** `evaluate_equipment()` n'est **pas** un simple remplacement de l'étape 4 — elle **encapsule** `decide_publication()` (Task 3) pour la décision principale/secondaire, **et ajoute** une granularité nouvelle qui n'existait pas avant cette story : une `CommandDecision` par `cmd_id` (AC1), y compris pour les commandes non couvertes. Cette story ne fait que définir cette fonction élargie — aucun branchement dans un point d'appel réel (celui-ci arrive en Story 19.1+).
 - 4 points d'appel actuels destinés à converger (hors périmètre de cette story, cf. 19.1-19.4) : sync (`_do_handle_action_sync` → `decide_publication`, `resources/daemon/models/decide_publication.py`), navigation par pièce (`_build_mapping_override_tree`, Story 16.8), aperçu (`_handle_overrides_preview`), bouton "Publier" (`_should_attempt_publish`).
-- `_preview_mapping_view` mute aujourd'hui `mapping.projection_validity` en place — comportement à ne **jamais** reproduire dans `evaluate_equipment()` (AC4).
+- **Non-mutation (AC4) — pointeur exact :** `_preview_mapping_view` (`resources/daemon/transport/http_server.py:2202`) mute aujourd'hui `mapping.projection_validity` en place à la ligne `resources/daemon/transport/http_server.py:2210` (juste après le calcul de `validate_projection(...)` en l.2209, avant l'appel à `decide_publication` en l.2211) — c'est précisément ce comportement que `evaluate_equipment()` ne doit **jamais** reproduire ; le test de régression dédié (AC4) doit cibler cette ligne comme cas de référence.
+- **Registre de mappeurs injectable (Task 2) — état actuel :** `MapperRegistry` (`resources/daemon/mapping/registry.py:20`) a aujourd'hui un constructeur sans paramètre (`__init__(self) -> None`, l.23-35) qui code en dur une liste ordonnée de 10 mappeurs ; les appelants instancient directement `MapperRegistry()`. `evaluate_equipment()` doit accepter cette instance en **paramètre injectable** (jamais l'instancier elle-même en interne), pour permettre un registre de test/mock dans le harnais de parité (Task 4) sans dépendre d'une instanciation globale.
+- **`decide_publication()`/`validate_projection()` injectables (coordination avec Story 19.1) :** signatures actuelles — `decide_publication(mapping, confidence_policy="sure_probable", product_scope=None, publication_override=None)` (`resources/daemon/models/decide_publication.py:60`) et `validate_projection(ha_entity_type, capabilities)` (`resources/daemon/validation/ha_component_registry.py:155`). `evaluate_equipment()` doit accepter ces deux fonctions en paramètres injectables optionnels (valeur par défaut = les fonctions réelles ci-dessus), afin que Story 19.1 puisse substituer des doublures instrumentées dans son harnais de parité sans modifier `evaluate_equipment()` elle-même.
 
 ### Dev Agent Guardrails
 
@@ -114,7 +121,7 @@ Aucun CC-xx fermé par cette story : c'est une fondation pure, non branchée. CC
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics-projection-engine.md#Epic-19] — epic canonique, contexte CC-03/CC-18/CC-19/CC-04/CC-14, invariants I1-I8.
+- [Source: _bmad-output/planning-artifacts/epics-projection-engine.md#Epic-19] — epic canonique, contexte CC-03/CC-18/CC-19/CC-04/CC-14, invariants I1-I7 + I11.
 - [Source: resources/daemon/models/decide_publication.py] — `decide_publication()`, invariants I1-I7 existants.
 - [Source: resources/daemon/models/mapping.py] — `PublicationDecision`, `reason_details` (Story 16.3).
 - [Source: _bmad-output/implementation-artifacts/16-3-overrides-publication-exclusion-explicite.md] — précédent direct pour I2/I4/I6/I7 et le style `reason_details`.
