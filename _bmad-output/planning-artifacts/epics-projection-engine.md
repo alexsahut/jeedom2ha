@@ -2390,7 +2390,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Points fermés par cet epic :** CC-03 (Story 19.3), CC-18 (Story 19.4), CC-19 (Story 19.3) et CC-14 P1 (19-0 AC1 + 19-3 AC7 + 19-4 AC7 ; P0 fait à l'étape 1 ; P2 hors périmètre). CC-04 est partiellement fermé : le volet contrat (décision canonique par commande, deux temporalités) est couvert par 19-0 AC1 / 19-3 AC6 ; le volet UI (jargon, gabarit, surface unique) relève de l'étape 4.
 
-**CC-20 :** corrigé par une PR `fix/` dédiée, préalable obligatoire à la preuve terrain de 19-1, suivie dans `sprint-status`.
+**CC-20 :** `scripts/deploy-to-box.sh` expose `local_secret` dans les arguments de `ssh`/`curl` (l.285, l.306) et les identifiants MQTT dans les arguments de `ssh`/`mosquitto_sub` (l.338-349). Une PR `fix/` dédiée est un préalable obligatoire à la preuve terrain de 19-1, suivie dans `sprint-status`.
 
 **Dev notes :**
 - source technique de cet epic : directive du mainteneur (session documentation 2026-09-27), reprenant l'analyse des 4 points d'appel divergents et des invariants I1-I7 + I11 ; aucune donnée de cette section n'est inventée au-delà de ce qui a été fourni.
