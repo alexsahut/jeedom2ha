@@ -28,7 +28,7 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **When** l'aperçu calcule le résultat "avec override"
 **Then** il consomme également `evaluate_equipment()` avec les overrides proposés (mode preview de Story 19.0, AC3)
 **And** le résultat affiché par l'aperçu est cohérent avec celui affiché par la surface par pièce pour le même équipement/override (même contrat, même réponse).
-**And** il utilise la politique applicative `app["confidence_policy"]` (sans `sure_probable` codé en dur aux lignes `http_server.py:2434/2460` ni issu du payload `:2281`) et fusionne les overrides persistés/proposés (`:2337-2358`).
+**And** il utilise la politique applicative `app["confidence_policy"]` (sans `sure_probable` codé en dur aux lignes `http_server.py:2434/2460` ni issu du payload `:2281`) et passe les propositions via `proposed_overrides` / `proposed_equipment_overrides` du contrat.
 
 **AC3 — CC-19 : "revenir au mode automatique (tout l'équipement)" efface réellement tout l'équipement**
 
@@ -121,6 +121,20 @@ I2, I4, I6 (cohérence de la décision affichée avec celle réellement appliqu�
 
 - Cette story dépend de Story 19.1 (sync migré) pour disposer d'un `evaluate_equipment()` déjà validé en parité stricte avant de le brancher sur des surfaces supplémentaires.
 - CC-03 et CC-19 sont deux bugs distincts corrigés dans la même story car ils touchent la même surface (navigation par pièce / overrides) et partagent le même point de branchement (`evaluate_equipment()` + effacement d'overrides).
+
+### Report explicite de la revue PR #169 (Story 19.1)
+
+La Story 19.1 conserve le calcul historique de l’aperçu : proposition seule,
+avec uniquement la substitution `_DATA_DIR` → `data_dir`. La fusion des overrides
+persistés et proposés ainsi que la politique applicative sont différées à cette story.
+Utiliser `evaluate_equipment(..., proposed_overrides=..., proposed_equipment_overrides=...)`.
+
+Ajouter un test de conflit : un override TYPE persisté sur une **autre commande de
+la même entité** est rencontré avant celui demandé par `apply_type_override` et
+peut gagner malgré une fusion par clé. Vérifier que le type **demandé** est celui
+réellement évalué (validation HA et décision), sans mutation des overrides persistés.
+Le simple passage de `proposed_overrides` ne prouve pas cette priorité inter-commandes :
+le test doit couvrir ce conflit dans le contrat puis dans l’aperçu.
 
 ### Dev Agent Guardrails
 

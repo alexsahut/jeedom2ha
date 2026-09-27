@@ -2262,8 +2262,6 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
     native_generic_types = {str(c.id): c.generic_type for c in eq.cmds}
 
     data_dir = _resolve_data_dir(request)
-    persisted_overrides = list_overrides(data_dir)
-    persisted_equipment_overrides = list_equipment_overrides(data_dir)
 
     # 1. AUTO — moteur brut, aucun override.
     registry = MapperRegistry()
@@ -2333,22 +2331,9 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             proposed_equipment_overrides[str(eq_id)] = {"publication_override": proposed_policy}
 
     # 3. Résultat AVEC override : copie patchée (generic_type natif intact, D10).
-    # Fusion explicite : l'aperçu doit démarrer des overrides persistés du même
-    # data_dir que le sync, puis appliquer uniquement la proposition en mémoire.
-    effective_type_overrides = dict(persisted_overrides)
-    for key, value in proposed_type_overrides.items():
-        effective_type_overrides[key] = {**effective_type_overrides.get(key, {}), **value}
-    effective_cmd_overrides = dict(persisted_overrides)
-    for key, value in proposed_cmd_overrides.items():
-        effective_cmd_overrides[key] = {**effective_cmd_overrides.get(key, {}), **value}
-    effective_equipment_overrides = dict(persisted_equipment_overrides)
-    for key, value in proposed_equipment_overrides.items():
-        effective_equipment_overrides[key] = {
-            **effective_equipment_overrides.get(key, {}), **value
-        }
-    over_mapping = apply_type_override(target_mapping, data_dir, overrides=effective_type_overrides)
+    over_mapping = apply_type_override(target_mapping, data_dir, overrides=proposed_type_overrides)
     pub_override = _resolve_publication_override_for_mapping(
-        over_mapping, effective_cmd_overrides, effective_equipment_overrides
+        over_mapping, proposed_cmd_overrides, proposed_equipment_overrides
     )
 
     auto_view = _preview_mapping_view(target_mapping, confidence_policy, publication_override=None)
