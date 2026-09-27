@@ -19,5 +19,6 @@
   - un SHA précis ;
   - CI verte sur ce SHA ;
   - tests ciblés **nommés explicitement** (pas "les tests passent") ;
-  - la **commande exacte** pour les rejouer.
+  - la **commande exacte** pour les rejouer ;
+  - tout changement touchant la publication vers Home Assistant exige une preuve terrain après déploiement par le gate (inventaire des entités avant/après, 0 erreur) avant de passer `done`.
 - **Story touchant l'interface** : statut `ready-for-UX-validation` obligatoire avant `done`, puis preuve d'usage réel de l'interface. Le gate UX outillé n'existe pas encore : en attendant, une validation manuelle est acceptée mais doit être **nommément identifiée** — qui a validé, quand, sur quel SHA/environnement.
