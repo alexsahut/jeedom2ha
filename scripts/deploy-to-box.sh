@@ -399,7 +399,7 @@ _version_content=$(jeedom2ha_render_version_content \
 
 _remote_version_readback=$(
   { cat "${VERSION_FILE_LIB}"
-    printf 'jeedom2ha_write_version_file_atomic %q %q\n' "${JEEDOM_BOX_PATH}" "${_version_content}"
+    printf 'jeedom2ha_write_version_file_atomic %q %q %q\n' "${JEEDOM_BOX_PATH}" "${_version_content}" "www-data:www-data"
   } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sudo bash -s"
 )
 

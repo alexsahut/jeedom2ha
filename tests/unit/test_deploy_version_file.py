@@ -12,6 +12,7 @@ d'exécution change, jamais la fonction testée.
 Rejouer :
     pytest tests/unit/test_deploy_version_file.py -v
 """
+import stat
 import subprocess
 from pathlib import Path
 
@@ -81,6 +82,57 @@ class TestWriteVersionFileAtomic:
 
         assert result.stdout == "fresh-content"
         assert (tmp_path / "VERSION").read_text() == "fresh-content"
+
+    def test_chmod_644_applied_after_move(self, tmp_path):
+        """After the atomic write, VERSION must stay readable by other
+        users (e.g. www-data) even under a restrictive umask (0077 on the
+        box, per project decision) — chmod 644 must always run after the
+        mv, regardless of whether an owner argument is given."""
+        result = _run_bash(f'umask 0077; jeedom2ha_write_version_file_atomic "{tmp_path}" "content"')
+
+        assert result.returncode == 0, result.stderr
+        mode = stat.S_IMODE((tmp_path / "VERSION").stat().st_mode)
+        assert oct(mode) == "0o644"
+
+    def test_no_chown_attempted_when_owner_omitted(self, tmp_path):
+        """Given no owner argument (the local test / no-sudo path, where
+        no www-data account exists), When writing VERSION, Then chown is
+        never invoked — chown is stubbed to fail loudly if called at all,
+        proving the omitted-owner branch skips it entirely."""
+        snippet = (
+            f'chown() {{ echo "UNEXPECTED CHOWN CALL: $*" >&2; exit 1; }}; '
+            f"source '{LIB}'; "
+            f'jeedom2ha_write_version_file_atomic "{tmp_path}" "content"'
+        )
+        result = subprocess.run(
+            ["bash", "-c", f"set -euo pipefail; {snippet}"],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "UNEXPECTED CHOWN CALL" not in result.stderr
+
+    def test_chown_invoked_with_given_owner(self, tmp_path):
+        """Given an owner argument (the box path, run under `sudo bash -s`
+        where www-data exists), When writing VERSION, Then chown is
+        invoked with exactly that owner and the VERSION path — chown is
+        stubbed here so this never requires root or a real www-data
+        account to run locally."""
+        log_file = tmp_path / "chown.log"
+        snippet = (
+            f'chown() {{ printf "%s\\n" "$*" >> \'{log_file}\'; }}; '
+            f"source '{LIB}'; "
+            f'jeedom2ha_write_version_file_atomic "{tmp_path}" "content" "www-data:www-data"'
+        )
+        result = subprocess.run(
+            ["bash", "-c", f"set -euo pipefail; {snippet}"],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert log_file.read_text().strip() == f"www-data:www-data {tmp_path}/VERSION"
 
     def test_library_never_references_ssh_or_scp(self):
         """The library must be host-agnostic (no ssh/scp call inside it) —
