@@ -8,7 +8,7 @@
 
 # 2026-09-27 — v0.3.0
 
-- CC-17 : support OS resserré à Debian 11 et 12 (`os.min` 10 → 11) ; matrice CI Python alignée sur Python 3.9 / 3.11
+- CC-17 : support OS resserré à Debian 11 et 12 (`os.min` 10 → 11) ; matrice CI Python 3.9 / 3.11 avec Python 3.12 ré-ajouté comme test de compatibilité future ; `Test Report` devient un gate global qui échoue si un job attendu échoue ou est annulé (burn-in limité à `success`/`skipped`)
 - Version lisible : `pluginVersion` passé en semver (0.3.0), le démon journalise désormais sa version et le SHA du commit déployé au démarrage (`[DAEMON] jeedom2ha daemon v<version> (sha <sha>) starting`)
 - `deploy-to-box.sh` écrit un fichier `VERSION` (version + sha + date + statut git) à la racine du plugin sur la box après chaque déploiement, hors de portée du rsync `--delete`
 - Hygiène déploiement : sauvegarde automatique (archive tar.gz, permissions 700/600) du plugin existant avant écrasement ; renforcement du filtre rsync (`node_modules/`) et test CI garantissant qu'aucun chemin de développement (`.git`, `tests/`, `_bmad*`, `.venv`, `docs/`, `.github/`, `scripts/`, etc.) ne peut fuiter vers la box
