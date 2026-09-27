@@ -1,6 +1,6 @@
 # Story 19.2: Découplage I11 — état streamé et commandes routées par décision de candidat
 
-Status: ready-for-dev
+Status: backlog
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -54,7 +54,7 @@ Changement de comportement réel et volontaire : des entités HA aujourd'hui "fa
 
 ## Preuve terrain
 
-Preuve terrain = chaque entité effectivement publiée (principal ou secondaire) reçoit bien son état MQTT et voit ses commandes routées, vérifié sur la box réelle (192.168.1.21), en utilisant si possible un cas réel identifié par l'outil de parité de Story 19.1 (mesure I11 déjà violé). **À défaut** d'un cas réel trouvé sur la box, repli explicite sur un test d'intégration dédié reproduisant le scénario "principal refusé / secondaire publié" — ce repli doit être mentionné explicitement dans les Completion Notes de cette story, jamais passé sous silence.
+Preuve terrain = sur la box, pour toutes les entités : `discovery state_topic ==` topics d'état retenus non vides ; à défaut d'un cas réel, repli par test seulement pour I11, reproduisant « principal refusé / secondaire publié », et explicitement documenté dans les Completion Notes.
 
 **Gate d'inventaire obligatoire (convention repo, `sprint-status.yaml`) :** cette story touche la publication vers Home Assistant (état MQTT streamé + routage de commandes pour des entités déjà publiées) — elle ne peut donc passer à `done` qu'après le gate obligatoire d'inventaire des entités avant/après déploiement (0 erreur), au même titre que toute story de ce type. Ce gate est distinct de l'outil de parité de Story 19.1 (qui mesure la décision de publication) : il porte spécifiquement sur l'inventaire des entités HA effectivement présentes après déploiement de cette correction.
 
@@ -93,7 +93,7 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
   - [ ] Si aucun cas réel trouvé, écrire le test d'intégration de repli et le documenter explicitement comme tel
 
 - [ ] Task 6 — Tests (AC1-AC4)
-  - [ ] `test_story_19_2_decouplage_state_command_i8.py` (préfixe `test_story_19_2_*`)
+  - [ ] `test_story_19_2_decouplage_state_command_i11.py` (préfixe `test_story_19_2_*`)
   - [ ] Suite complète `pytest tests/unit -q` : 0 régression
 
 ## Dev Notes
