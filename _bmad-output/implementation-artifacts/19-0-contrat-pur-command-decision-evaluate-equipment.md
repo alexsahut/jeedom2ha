@@ -1,6 +1,6 @@
 # Story 19.0: Contrat pur `CommandDecision` / `evaluate_equipment()`
 
-Status: ready-for-review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -141,6 +141,7 @@ clawcode (Claude, agent de code jeedom2ha) — session autonome en arrière-plan
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle `bmad-create-story` non exposée dans cette session — cf. journal `/tmp/jeedom2ha-etape3-stories.log`), en répliquant fidèlement `template.md` et les conventions de `16-3-overrides-publication-exclusion-explicite.md`.
 - **dev-story** — 2026-09-27 — statut résultant : `ready-for-review`. Skill officielle `bmad-dev-story` non exposée dans cette session d'exécution autonome (outillage identique à la limitation déjà notée pour `create-story` ci-dessus) ; le workflow dev-story (TDD strict test-par-test, mise à jour Tasks/Subtasks + Dev Agent Record, aucune modification des points d'appel existants) a été suivi manuellement en répliquant sa discipline, conformément à la convention déjà établie sur cette story pour `create-story`.
+- **alignement de statut** — 2026-09-28 — statut résultant : `done`. PR #167 fusionnée (`8f19575`), relue par ClaudeBox ; pas de preuve terrain requise par la story (voir section « Preuve terrain » ci-dessus).
 - `CommandDecision` + `evaluate_equipment()` implémentés dans un nouveau module pur (`resources/daemon/models/evaluate_equipment.py`), sans aucune instanciation interne de `MapperRegistry` (injecté), sans I/O (I7), avec `decide_publication()`/`validate_projection()` réutilisés tels quels (injectables, valeur par défaut = implémentations réelles) — aucune duplication des règles I1-I7.
 - Non-mutation (AC4) : `eq`, `snapshot`, `eligibility` deep-copiés en entrée ; toute mise à jour de `MappingResult`/`PublicationDecision` passe par `dataclasses.replace()`, jamais par affectation d'attribut en place — vérifié par un test de régression dédié ciblant explicitement le bug `_preview_mapping_view` (`http_server.py:2210`).
 - Fusion overrides (AC3) : un unique point de fusion (`_merge_override_layer`), overrides proposés prioritaires sur les persistés, dicts d'entrée jamais mutés. Fusion **champ par champ** à une même clé (schéma v2 : une entrée peut porter à la fois `ha_entity_type` et `publication_override`) — corrigé suite à la revue bot Codex, cf. note ci-dessous.
