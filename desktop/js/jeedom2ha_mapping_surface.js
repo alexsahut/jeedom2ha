@@ -56,7 +56,11 @@
     $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered');
     // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
     // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
-    if (covered === false) {
+    // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
+    // systématiquement « aucun mapping ne couvre cette commande » — une exclusion/inéligibilité
+    // amont (I1/I4) porte aussi `covered:false` avec un VRAI diagnostic à afficher. Le libellé
+    // générique ne sort que si `shouldShowUncoveredLabel` confirme l'absence de cause réelle.
+    if (covered === false && M.shouldShowUncoveredLabel(view)) {
       $cell.addClass('j2ha-diag-uncovered').html('<i class="fas fa-ban"></i> ');
       $cell.append($('<span></span>').text(M.buildUncoveredLabel()));
       return;
@@ -145,8 +149,11 @@
         // Commande non couverte : aucun mapping à projeter. On affiche l'état factuel et on
         // NE persiste PAS (un override sur une commande non couverte est un no-op qui, après
         // reload, laisse la cellule vide — la cause exacte du #871).
+        // Story 19.3 (P1) : on transmet la vue `auto` (raison réelle éventuelle — exclusion,
+        // inéligibilité amont) plutôt que `null`, pour que `renderDiagnosticCell` puisse
+        // distinguer « vraiment non couverte » d'une cause amont à afficher (I4).
         if (!covered) {
-          renderDiagnosticCell($diagCell, null, false);
+          renderDiagnosticCell($diagCell, M.readPreviewAuto(result), false);
           return;
         }
         var view = M.readPreviewOverridden(result);

@@ -143,6 +143,35 @@
     return 'Ne sera pas publié — commande non couverte par un mapping';
   }
 
+  // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) — décide si `covered:false` doit
+  // afficher le libellé générique « non couverte » (buildUncoveredLabel) ou le VRAI
+  // diagnostic (buildPublishCellLabel). Avant ce correctif, `covered:false` masquait
+  // systématiquement la cause réelle : une commande exclue/désactivée en amont (I1/I4)
+  // affichait « non couverte par un mapping », un mensonge sur la vraie raison. Le seul
+  // cas où le générique reste correct est l'absence de diagnostic (`view === null`) ou
+  // `publication_reason === 'command_not_covered'` — un `CommandDecision` explicite
+  // signalant qu'AUCUN mapping (primaire ni secondaire) ne couvre cette commande.
+  function shouldShowUncoveredLabel(view) {
+    var d = readDiagnosticView(view);
+    if (d === null) {
+      return true;
+    }
+    return d.publication_reason === 'command_not_covered';
+  }
+
+  // Story 19.3 (P1) — extrait la vue `auto` BRUTE d'une réponse de preview (dry-run), miroir
+  // de `readPreviewOverridden` pour la branche `!covered` (Story 19.3, correction relecture
+  // ClaudeBox PR #176 tour 2) : avant ce correctif, l'appelant ignorait `payload.auto` sur
+  // une commande non couverte et rendait la cellule avec `view=null`, perdant tout
+  // diagnostic réel (raison d'inéligibilité amont) au profit du libellé générique.
+  function readPreviewAuto(payload) {
+    var p = (payload && payload.payload) ? payload.payload : payload;
+    if (!p || typeof p !== 'object' || !p.auto || typeof p.auto !== 'object') {
+      return null;
+    }
+    return p.auto;
+  }
+
   // État diagnostic : 'ready' (vert franc), 'blocking' (neutre actionnable), 'unknown'.
   function diagnosticState(view) {
     var d = readDiagnosticView(view);
@@ -428,8 +457,10 @@
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,
+    readPreviewAuto: readPreviewAuto,
     readPreviewCovered: readPreviewCovered,
     buildUncoveredLabel: buildUncoveredLabel,
+    shouldShowUncoveredLabel: shouldShowUncoveredLabel,
     diagnosticState: diagnosticState,
     isReadyDiagnostic: isReadyDiagnostic,
     isBlockingDiagnostic: isBlockingDiagnostic,
