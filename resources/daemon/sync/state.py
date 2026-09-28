@@ -151,7 +151,7 @@ class StateSynchronizer:
         seen: set = set()
         for decision in publications.values():
             mapping = getattr(decision, "mapping_result", None)
-            if mapping is None or not getattr(decision, "should_publish", False):
+            if mapping is None:
                 continue
             eq_id = getattr(mapping, "jeedom_eq_id", None)
             if eq_id is None:
@@ -161,7 +161,21 @@ class StateSynchronizer:
             except (TypeError, ValueError):
                 continue
             for candidate in self._iter_streamed_candidates(mapping):
-                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                # I11: filtered on the candidate's OWN decision, never on the
+                # principal's. A secondary published under a refused principal
+                # must still stream (and a refused secondary under a published
+                # principal must never inherit the principal's publication).
+                # P1-bis fix (ClaudeBox review round 2, PR #174): the principal's
+                # own decision comes straight from `decision`, never from a
+                # possibly-stale mapping.publication_decision_ref (actions no
+                # longer repoint it on the "publier" success path).
+                cand_decision = (
+                    decision
+                    if candidate is mapping
+                    else (getattr(candidate, "publication_decision_ref", None) or decision)
+                )
+                if not getattr(cand_decision, "should_publish", False):
+                    continue
                 if not getattr(cand_decision, "discovery_published", False):
                     continue
                 cmd_id = self._candidate_cmd_id(candidate)
@@ -200,7 +214,12 @@ class StateSynchronizer:
         eq_id = getattr(mapping, "jeedom_eq_id", None)
         count = 0
         for candidate in self._iter_streamed_candidates(mapping):
-            cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+            # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
+            cand_decision = (
+                decision
+                if candidate is mapping
+                else (getattr(candidate, "publication_decision_ref", None) or decision)
+            )
             if not getattr(cand_decision, "discovery_published", False):
                 continue
             state_topic = self._candidate_state_topic(candidate, cand_decision, eq_id)
@@ -260,13 +279,22 @@ class StateSynchronizer:
             mapping = getattr(decision, "mapping_result", None)
             if mapping is None or getattr(mapping, "jeedom_eq_id", None) != eq_id:
                 continue
-            if not getattr(decision, "should_publish", False):
-                continue
 
             for candidate in self._iter_streamed_candidates(mapping):
                 if self._candidate_cmd_id(candidate) != cmd_id:
                     continue
-                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                # I11: the candidate targeted by cmd_id carries its own decision —
+                # filter on it, never on the principal's should_publish (l.263-264
+                # in the pre-fix version evaluated the principal before even
+                # locating the candidate).
+                # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
+                cand_decision = (
+                    decision
+                    if candidate is mapping
+                    else (getattr(candidate, "publication_decision_ref", None) or decision)
+                )
+                if not getattr(cand_decision, "should_publish", False):
+                    return None
                 if not getattr(cand_decision, "discovery_published", False):
                     return None
                 state_topic = self._candidate_state_topic(candidate, cand_decision, eq_id)
