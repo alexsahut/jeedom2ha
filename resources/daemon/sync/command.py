@@ -198,21 +198,27 @@ class CommandSynchronizer:
                 continue
 
             found_eq = True
-            # Diagnostics only (reason codes below) — reflects the principal's
-            # decision so pre-existing "entity_not_published"/"entity_not_alive"
-            # reporting is preserved when no candidate topic matches at all.
-            # The actual routing gate below is per-candidate (I11): it never
-            # skips the loop based on the principal's should_publish/alive.
-            if getattr(decision, "should_publish", False):
-                found_publishable = True
-                if bool(getattr(decision, "active_or_alive", False)):
-                    found_alive = True
+
+            # P3 fix (ClaudeBox review, 3a408db) — the reason codes below must
+            # reflect the CANDIDATE that actually exposes the requested topic,
+            # never unconditionally the principal: a refused principal with a
+            # published-but-not-alive targeted secondary must report
+            # "entity_not_alive", not "entity_not_published". We only fall
+            # back to the principal's own decision when no candidate at all
+            # exposes this topic (matched_topic stays False below).
+            matched_topic = False
 
             for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
                 candidate_decision = getattr(candidate, "publication_decision_ref", None) or decision
                 expected_topics = self._expected_command_topics(candidate)
                 if topic not in expected_topics.values():
                     continue
+
+                matched_topic = True
+                if getattr(candidate_decision, "should_publish", False):
+                    found_publishable = True
+                    if bool(getattr(candidate_decision, "active_or_alive", False)):
+                        found_alive = True
 
                 # I11: routing is decided on the candidate's OWN decision, never
                 # on the principal's — a secondary published under a refused
@@ -230,6 +236,11 @@ class CommandSynchronizer:
                     return None, None, "entity_unavailable"
 
                 return candidate_decision, candidate, None
+
+            if not matched_topic and getattr(decision, "should_publish", False):
+                found_publishable = True
+                if bool(getattr(decision, "active_or_alive", False)):
+                    found_alive = True
 
         if not found_eq:
             return None, None, "unknown_runtime_entity"
