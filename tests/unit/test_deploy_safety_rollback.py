@@ -1,6 +1,7 @@
 """Guardrails and rollback wiring for deploy-to-box.sh, without a Jeedom box."""
 import os
 import shlex
+import signal
 import subprocess
 import tarfile
 from pathlib import Path
@@ -41,6 +42,17 @@ esac
     )
     (bin_dir / "ssh").write_text(
         """#!/bin/sh
+# The mocked ssh binary cannot speak the rsync wire protocol. A run that
+# gets past the guardrails invokes a real rsync over this ssh mock, which
+# execs us as `ssh ... rsync --server ...`; falling through to the generic
+# `stdin=$(cat)` below would then block forever reading a rsync handshake
+# that will never arrive, leaking an orphaned process once the parent
+# deploy-to-box.sh is killed on timeout (subprocess.run/Popen only kills
+# the direct child, not this grandchild). Exit immediately instead: the
+# goal here is only to never hang, not to simulate a real rsync transfer.
+case "$*" in
+  *"rsync --server"*) exit 1 ;;
+esac
 printf 'ARGS: %s\n' "$*" >> "$MOCK_SSH_LOG"
 stdin=$(cat)
 printf '%s\n' "$stdin" >> "$MOCK_SSH_STDIN"
@@ -73,19 +85,30 @@ def _run(
         "MOCK_SSH_LOG": str(tmp_path / "ssh.log"),
         "MOCK_SSH_STDIN": str(tmp_path / "ssh.stdin"),
     } | env_overrides
+    cmd = [str(SCRIPT), *args]
+    # Popen + start_new_session=True puts deploy-to-box.sh in its own
+    # process group, so that on a timeout the *whole* group (including any
+    # grandchildren such as rsync's ssh transport) can be killed via
+    # os.killpg. subprocess.run's own timeout handling only kills the
+    # direct child, which used to leak orphaned mocked-ssh processes
+    # blocked in the rsync-wire-protocol hang described above.
+    proc = subprocess.Popen(
+        cmd, cwd=REPO_ROOT, env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
     try:
-        return subprocess.run(
-            [str(SCRIPT), *args], cwd=REPO_ROOT, env=env, text=True, capture_output=True, timeout=timeout
-        )
-    except subprocess.TimeoutExpired as exc:
-        # The mocked ssh binary cannot speak the rsync wire protocol: once a
-        # run gets past the guardrails it will eventually hang on the real
-        # rsync-over-ssh transfer. Tests that only care about guardrail
-        # behaviour pass a short timeout and inspect this partial result
-        # instead of waiting for (or working around) that unrelated hang.
-        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        return subprocess.CompletedProcess(exc.cmd, returncode=None, stdout=stdout, stderr=stderr)
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        # Tests that only care about guardrail behaviour pass a short
+        # timeout and inspect this partial result instead of waiting for
+        # (or working around) the unrelated rsync-over-ssh hang.
+        os.killpg(proc.pid, signal.SIGKILL)
+        # Reap the whole group and collect whatever partial output had
+        # already been captured, so no zombie/orphan process is left behind.
+        stdout, stderr = proc.communicate()
+        return subprocess.CompletedProcess(cmd, returncode=None, stdout=stdout, stderr=stderr)
 
 
 def test_refuses_dirty_tree_before_any_ssh(tmp_path):
