@@ -81,28 +81,28 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 
 - [ ] Préalable bloquant : la PR `fix/` de CC-20 est fusionnée. `deploy-to-box.sh` ne passe plus `local_secret` ni les identifiants MQTT en argument de `ssh`, `curl` ou `mosquitto_sub`. Sans cela, pas de preuve terrain.
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (vérifier SSH/sudo OK, box 192.168.1.21 joignable)
-  - [ ] Déployer en standard : `./scripts/deploy-to-box.sh --restart-daemon`, sans option de nettoyage.
-  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant le cycle de mesure avant/après de cette story — ces deux flags republient des messages MQTT retained **vides** sur les topics discovery (`homeassistant/{light,cover,switch}/jeedom2ha_*/config`), effaçant l'état publié entre les deux relevés et rendant la comparaison "avant/après" invalide par construction (les entités disparaîtraient, ce qui n'a rien à voir avec un changement de décision). Utiliser exclusivement un déploiement standard (sans ces flags).
+  - [x] Déployer en standard : `./scripts/deploy-to-box.sh --restart-daemon`, sans option de nettoyage.
+  - [x] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant le cycle de mesure avant/après de cette story — ces deux flags republient des messages MQTT retained **vides** sur les topics discovery (`homeassistant/{light,cover,switch}/jeedom2ha_*/config`), effaçant l'état publié entre les deux relevés et rendant la comparaison "avant/après" invalide par construction (les entités disparaîtraient, ce qui n'a rien à voir avec un changement de décision). Utiliser exclusivement un déploiement standard (sans ces flags).
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou équivalent
 
-- [ ] Task 1 — Migrer le sync vers `evaluate_equipment()` (AC1, AC2)
-  - [ ] Passer l'instance `MapperRegistry` créée à `http_server.py:1375` à `evaluate_equipment()` (golden patch `transport.http_server.MapperRegistry`, `test_story_8_4_golden_file.py:272`) ; conserver les gardes `http_server.py:1397-1399` (inéligible) et `1405-1407` (mapping `None`).
-  - [ ] Stocker des copies renvoyées par `evaluate_equipment()` dans `app["mappings"]` / `app["publications"]`, avec `projection_validity`, `publication_decision_ref`, `pipeline_step_reached` et `mapping_result` renseignés.
+- [x] Task 1 — Migrer le sync vers `evaluate_equipment()` (AC1, AC2)
+  - [x] Passer l'instance `MapperRegistry` créée à `http_server.py:1375` à `evaluate_equipment()` (golden patch `transport.http_server.MapperRegistry`, `test_story_8_4_golden_file.py:272`) ; conserver les gardes `http_server.py:1397-1399` (inéligible) et `1405-1407` (mapping `None`).
+  - [x] Stocker des copies renvoyées par `evaluate_equipment()` dans `app["mappings"]` / `app["publications"]`, avec `projection_validity`, `publication_decision_ref`, `pipeline_step_reached` et `mapping_result` renseignés.
 
-- [ ] Task 2 — Non-régression golden file + suite complète (AC1, AC2)
-  - [ ] Exécuter `test_story_8_4_golden_file.py` sans modification de fixture
-  - [ ] Exécuter `pytest tests/unit -q` intégralement, comparer au nombre de tests verts de la baseline actuelle
+- [x] Task 2 — Non-régression golden file + suite complète (AC1, AC2)
+  - [x] Exécuter `test_story_8_4_golden_file.py` sans modification de fixture
+  - [x] Exécuter `pytest tests/unit -q` intégralement, comparer au nombre de tests verts de la baseline actuelle
 
-- [ ] Task 3 — Outil de parité en lecture seule (AC3, AC4, AC5)
-  - [ ] Créer un outil (script dédié, hors chemin de production, jamais exécuté automatiquement) qui relève, pour chaque équipement/commande, la décision de publication actuelle sur la box, sans écriture ni effet de bord
-  - [ ] Exécuter l'outil avant déploiement du sync migré, puis après, comparer les deux relevés
-  - [ ] Relever et journaliser (sans corriger) les cas de violation I11 (principal refusé, secondaire publié)
-  - [ ] Relever et journaliser tout état de scope explicite présent sur la box
-  - [ ] Vérifier explicitement (test + revue manuelle du code de l'outil) qu'aucune trace de `local_secret` n'apparaît en sortie, log ou argument de ligne de commande
+- [x] Task 3 — Outil de parité en lecture seule (AC3, AC4, AC5)
+  - [x] Créer un outil (script dédié, hors chemin de production, jamais exécuté automatiquement) qui relève, pour chaque équipement/commande, la décision de publication actuelle sur la box, sans écriture ni effet de bord
+  - [x] Exécuter l'outil avant déploiement du sync migré, puis après, comparer les deux relevés
+  - [x] Relever et journaliser (sans corriger) les cas de violation I11 (principal refusé, secondaire publié)
+  - [x] Relever et journaliser tout état de scope explicite présent sur la box
+  - [x] Vérifier explicitement (test + revue manuelle du code de l'outil) qu'aucune trace de `local_secret` n'apparaît en sortie, log ou argument de ligne de commande
 
-- [ ] Task 4 — Tests (AC1-AC5)
-  - [ ] `test_story_19_1_sync_migration_parity.py` (préfixe `test_story_19_1_*`)
-  - [ ] Test dédié de non-exposition du secret local pour l'outil de parité (AC5)
+- [x] Task 4 — Tests (AC1-AC5)
+  - [x] `test_story_19_1_sync_migration_parity.py` (préfixe `test_story_19_1_*`)
+  - [x] Test dédié de non-exposition du secret local pour l'outil de parité (AC5)
 
 ## Dev Notes
 
@@ -161,6 +161,8 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - **dev-story** — 2026-09-27 — statut résultant : `in-progress`. Task 1 (migration `/action/sync` vers `evaluate_equipment()`), Task 4 (garde-fous unitaires de la migration) et Task 3 (outil de parité `tools/parity_snapshot.py`, AC3/AC4/AC5, testé en local/mocké uniquement — preuve terrain hors scope de cette passe) implémentées et committées (`8bbe147`, `df2fca9`, `1e02e1a`). Suite complète verte (1248 tests, flake8 clean). PR **#169** ouverte contre `main`, CI verte sur le SHA poussé. Revue automatisée (bot Codex) : 3 remarques P2 sur `tools/parity_snapshot.py` — toutes confirmées légitimes par inspection du code et corrigées (`cc0dc05`) avec tests de régression dédiés, fils de revue résolus. CI reconfirmée verte sur `cc0dc05`. **PR non fusionnée** — en attente de revue Alexandre (fusion hors scope de cette passe).
 - **dev-story (complément revue #169)** — 2026-09-28 — statut conservé : `in-progress` (preuve terrain explicitement non exécutée). Les tests Story 5.1 espionnent maintenant les fonctions réelles injectées dans `evaluate_equipment()` ; le sync consomme `secondary_decisions` sans recalcul ; le golden verrouille 553/554/583/628/457 ; `confidence_policy` et le `data_dir` applicatif sont propagés au sync/preview. Le runbook `docs/operations/parity-snapshot-19-1.md` documente tunnel HTTP+MQTT et échec obligatoire des snapshots vides. Commit `0a14ad5`; suite locale complète : 1853 pytest, flake8, 276 Node, PHP et bash -n verts. PR non fusionnée.
 - **dev-story (4 corrections revue PR #169, capture terrain réelle)** — 2026-09-28 — statut conservé : `in-progress` (preuve terrain capturée, mais insuffisante à elle seule pour clore la story). Quatre corrections distinctes committées séparément : **A** — extraction de `jeedom2ha_refresh_secret`/`jeedom2ha_refresh_mqtt_credentials`/`jeedom2ha_mqtt_auth_snippet` hors de `deploy-to-box.sh` vers `scripts/box-readonly-lib.sh`, partagée par le nouveau wrapper VM `scripts/parity-snapshot.sh` (capture/diff, inventaire MQTT relevé sur la box par SSH sans `mosquitto_sub` local), `--mqtt-inventory-file` et écriture exclusive (O_EXCL) ajoutés à `tools/parity_snapshot.py` (`13d66c7`) ; **B** — `save_publications_cache()` utilisait `_DATA_DIR` en dur dans les deux branches de `/action/execute`, divergeant du `data_dir` résolu par `_resolve_data_dir()` pour `/action/sync` et les overrides — corrigé et testé (`3888d57`) ; **C** — `_handle_overrides_preview` fusionnait à tort les overrides persistés avec la proposition en mémoire, hors périmètre 19.1 — revient au calcul proposition-seule, report explicite de la fusion à la Story 19.3 documenté dans son artefact (`d44e829`) ; **D** — correction de l'ordre d'espionnage de la validation dans le test Story 5.1, l'espion capturait la mutation du contrat plutôt que l'appel réel (`d99d7d0`). Preuve terrain réelle capturée via `scripts/parity-snapshot.sh capture` sur la box réelle (192.168.1.21) : `/tmp/jeedom2ha-parity-probe-20260927T224725Z.json`, 292 décisions, 353 topics MQTT retained, code de sortie 0 — **aucune écriture, sync ni redémarrage déclenché sur la box** (lecture seule stricte, conforme aux guardrails Story 19.1). Suite complète locale reconfirmée verte après les 4 commits : 585 tests racine + 1256 tests démon (1841 au total). PR #169 non fusionnée, aucune fusion ni déploiement effectué dans cette passe.
+- **code-review + preuve terrain** — 2026-09-28 — statut conservé : `in-progress` (préflight incomplet, cf. entrée suivante). PR #169 fusionnée par merge normal dans `main` (`7f6bcf90b9cd9c27badab37243a6b9ab16f7441c`), CI main verte. Déploiement standard `scripts/deploy-to-box.sh --restart-daemon` exécuté sans flags de nettoyage. Le script de déploiement est sorti en échec à l'attente de disponibilité (« Timeout readiness 60 s ») alors que le démon était sain (connecté MQTT à 09:07:17, sync de démarrage réussi à 09:07:19). Cause : défaut CC-22 introduit par #168 (les appels GET au démon meurent avant curl, 4e argument vide perdu par ssh puis `set -u`), sans lien avec la story. Le contrôle de santé et l'inventaire APRÈS du déploiement n'ont donc pas tourné ; la parité a été prouvée par l'outil de parité (diff vide). VERSION box au SHA fusionné, `git_status=clean`, démon canonique `www-data` présent, 0 ERROR dans les journaux plugin/daemon depuis le déploiement. Snapshots réels avant/après : 292 décisions et 353 topics MQTT retained, diff strictement vide (I11 : 2 candidats et scope explicite : 102, mesures inchangées et non corrigées). Rapport assaini et versionné : [`19-1-field-proof-2026-09-28.md`](19-1-field-proof-2026-09-28.md) (remplace le rapport local non durable `/tmp/jeedom2ha-19-1-field-proof.md`) ; aucun rollback, aucun autre plugin/cœur/dongle touché.
+- **revue Codex #171 (préflight + artefact durable)** — 2026-09-28 — statut confirmé : `in-progress`. La case parente du préalable bloquant (ligne Task 0) est décochée : le dry-run et la vérification explicite de `Deploy complete.` n'ont pas été exécutés lors de la passe du 28/09 (le déploiement est sorti en échec avant, sur le défaut CC-22). Le rapport de preuve terrain est désormais un artefact versionné (voir ci-dessus) au lieu d'un fichier `/tmp`. parité prouvée le 28/09 (diff vide) ; clôture à la preuve terrain CC-22 (redéploiement jusqu'à "Deploy complete.").
 
 ### File List
 
@@ -168,8 +170,8 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - `resources/daemon/tests/unit/test_pe_epic5_story_5_1_orchestration.py` (modifié)
 - `resources/daemon/tests/unit/test_story_19_1_sync_migration_parity.py` (nouveau)
 - `resources/daemon/tools/__init__.py` (nouveau)
-- `resources/daemon/tools/parity_snapshot.py` (modifié)
-- `resources/daemon/tests/unit/test_story_19_1_parity_tool_readonly.py` (modifié)
+- `resources/daemon/tools/parity_snapshot.py` (nouveau)
+- `resources/daemon/tests/unit/test_story_19_1_parity_tool_readonly.py` (nouveau)
 - `resources/daemon/tests/unit/test_story_16_6_preview_dry_run.py` (modifié)
 - `scripts/box-readonly-lib.sh` (nouveau)
 - `scripts/parity-snapshot.sh` (nouveau)
@@ -178,3 +180,4 @@ Aucun CC-xx fermé par cette story (refactoring interne, pas de correction de bu
 - `tests/unit/test_deploy_safety_rollback.py` (modifié)
 - `docs/operations/parity-snapshot-19-1.md` (modifié)
 - `_bmad-output/implementation-artifacts/19-3-surface-piece-apercu-contrat-decision-cc03-cc19.md` (modifié)
+- `_bmad-output/implementation-artifacts/19-1-field-proof-2026-09-28.md` (nouveau)
