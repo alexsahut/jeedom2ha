@@ -76,7 +76,7 @@ REMOTE
 # Prévu pour être concaténé en préfixe d'un heredoc distant quoté
 # (<<'REMOTE') via :
 #   { echo 'set -euo pipefail'; jeedom2ha_mqtt_auth_snippet; cat <<'REMOTE' ... REMOTE; } \
-#     | ssh ... bash -s -- <args non secrets>
+#     | ssh ... bash -s
 # printf %q restitue MQTT_USER/MQTT_PASS octet pour octet quels que soient
 # les caractères spéciaux qu'ils contiennent (hors retour à la ligne, non
 # supporté par le format ligne-par-ligne de mosquitto : on échoue
