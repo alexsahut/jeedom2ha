@@ -27,7 +27,11 @@ from models.availability import (
 )
 from models.topology import TopologySnapshot, assess_all, assess_eligibility
 from models.published_scope import resolve_published_scope
-from models.decide_publication import decide_publication
+from models.decide_publication import (
+    DEFAULT_CONFIDENCE_POLICY,
+    VALID_CONFIDENCE_POLICIES,
+    decide_publication,
+)
 from models.evaluate_equipment import evaluate_equipment, merge_override_layer
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
@@ -72,12 +76,14 @@ _VERSION = "0.2.0"
 
 _MAPPING_COUNTER_BUCKETS = ("sure", "probable", "ambiguous", "published", "skipped")
 
-# Story 19.3 (P3, relecture ClaudeBox PR #176) — source unique de la politique de confiance
-# par défaut, partagée par l'ingestion de sync (`_handle_sync`) et l'aperçu (`_handle_overrides_
-# preview`) : les deux tombaient auparavant sur le même littéral `"sure_probable"` dupliqué à
-# deux endroits, un risque de divergence silencieuse si l'un des deux changeait sans l'autre.
-_DEFAULT_CONFIDENCE_POLICY = "sure_probable"
-_VALID_CONFIDENCE_POLICIES = ("sure_only", "sure_probable")
+# Story 19.3 (P3, relecture ClaudeBox PR #176 tour 2) — alias local vers la source unique
+# (`models/decide_publication.py`), pour ne pas réécrire tous les appelants internes de ce
+# module. Avant ce correctif, `_DEFAULT_CONFIDENCE_POLICY` était défini ICI en dur alors que
+# `evaluate_equipment()` et `decide_publication()` gardaient encore le même littéral
+# `"sure_probable"` dupliqué chacun de leur côté — un risque de divergence silencieuse si
+# l'un changeait sans les autres.
+_DEFAULT_CONFIDENCE_POLICY = DEFAULT_CONFIDENCE_POLICY
+_VALID_CONFIDENCE_POLICIES = VALID_CONFIDENCE_POLICIES
 
 
 def _check_secret(request: web.Request, local_secret: str) -> bool:
@@ -2297,7 +2303,7 @@ def _secondary_mapping_by_cmd(primary_mapping):
     (même extraction que le primaire, `mapping/overrides.py`) pour ne PAS dupliquer une
     seconde définition de « quelles commandes appartiennent à ce mapping » (Story 19.3,
     correction relecture ClaudeBox PR #176, P1-b) : c'est la même fonction que celle utilisée
-    par `covered`, le diagnostic de l'arbre et la cible de l'aperçu (`_target_mapping_for_cmd`).
+    par `covered`, le diagnostic de l'arbre et la cible de l'aperçu (`_resolve_command_mapping`).
     Premier gagnant si collision (setdefault), ordre natif préservé.
     """
     index: Dict[int, object] = {}
@@ -2309,21 +2315,30 @@ def _secondary_mapping_by_cmd(primary_mapping):
     return index
 
 
-def _target_mapping_for_cmd(evaluation, cmd_id):
-    """Retrouve le `MappingResult` (primaire ou secondaire) qui couvre `cmd_id` au sein
+def _resolve_command_mapping(evaluation, cmd_id):
+    """Retrouve LE `MappingResult` (primaire ou secondaire) qui couvre `cmd_id` au sein
     d'une `EquipmentEvaluation` déjà décidée — `None` si l'équipement n'a pas de mapping
-    (inéligible ou `no_mapping`) ou si `cmd_id` n'est couvert par AUCUN des deux (Story 19.3).
+    (inéligible ou `no_mapping`) ou si `cmd_id` n'est couvert par AUCUN des deux.
+
+    Priorité EXACTEMENT celle du contrat (`evaluate_equipment()`, AC1, `covered.setdefault`
+    primaire PUIS secondaires dans l'ordre) : le primaire gagne toujours sur un secondaire
+    pour une commande partagée. Source UNIQUE utilisée par l'arbre (`covered`, `diag_mapping`,
+    `attendu_ha`, `effective_ha`) ET par l'aperçu — Story 19.3, correction relecture ClaudeBox
+    PR #176 tour 2 (P2). Avant ce correctif, l'aperçu (`_target_mapping_for_cmd`) résolvait
+    SECONDAIRE d'abord, à l'inverse du contrat et de l'arbre (qui, eux, dupliquaient chacun
+    leur propre logique primaire-d'abord) : un piège pour toute commande partagée entre le
+    primaire et un secondaire, latent depuis que l'index des secondaires couvre TOUTES leurs
+    commandes (P1-b). Sans effet sur le corpus doré (aucune commande partagée).
+
     `cmd_id=None` cible toujours le mapping primaire (vue équipement).
     """
     primary_mapping = evaluation.mapping
     if primary_mapping is None:
         return None
     if isinstance(cmd_id, int):
-        secondary = _secondary_mapping_by_cmd(primary_mapping).get(cmd_id)
-        if secondary is not None:
-            return secondary
-        if cmd_id not in set(mapping_cmd_ids(primary_mapping)):
-            return None
+        if cmd_id in set(mapping_cmd_ids(primary_mapping)):
+            return primary_mapping
+        return _secondary_mapping_by_cmd(primary_mapping).get(cmd_id)
     return primary_mapping
 
 
@@ -2371,7 +2386,7 @@ def _view_from_evaluation(evaluation, cmd_id):
     """Vue JSON-safe (contrat `_decision_view`) pour `cmd_id` au sein d'une évaluation —
     `None` si non couvert (le caller décide alors du `covered: False`), jamais un mapping
     ré-évalué (Story 19.3, AC1/AC2)."""
-    target_mapping = _target_mapping_for_cmd(evaluation, cmd_id)
+    target_mapping = _resolve_command_mapping(evaluation, cmd_id)
     if target_mapping is None:
         return None
     decision = target_mapping.publication_decision_ref or evaluation.equipment_decision
@@ -2513,7 +2528,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
     # équipements : eq 230/554/583). `_view_for_ineligible_or_unmapped` fait exactement cette
     # résolution par `cmd_id` dans `command_decisions`, `mapping=None` — même contrat que la
     # branche `diag_mapping=None` de `_build_mapping_override_tree`.
-    auto_target = _target_mapping_for_cmd(auto_evaluation, proposed_cmd_id)
+    auto_target = _resolve_command_mapping(auto_evaluation, proposed_cmd_id)
     if auto_target is None:
         return web.json_response({
             "status": "ok",
@@ -2557,7 +2572,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
         proposed_overrides=proposed_overrides,
         proposed_equipment_overrides=proposed_equipment_overrides,
     )
-    over_target = _target_mapping_for_cmd(over_evaluation, proposed_cmd_id)
+    over_target = _resolve_command_mapping(over_evaluation, proposed_cmd_id)
 
     auto_view = _view_from_evaluation(auto_evaluation, proposed_cmd_id)
     over_view = _view_from_evaluation(over_evaluation, proposed_cmd_id)
@@ -2647,6 +2662,12 @@ def _build_mapping_override_tree(
       l'appelant depuis `app["publications"]`) à la décision COURANTE (avec overrides
       persistés actuels) — `override_pending=True` signale un override sauvegardé mais pas
       encore appliqué par un sync (badge « pas encore appliqué »).
+
+    Story 19.3 (P2, relecture ClaudeBox PR #176 tour 2) : la résolution primaire/secondaire
+    par commande passe désormais par `_resolve_command_mapping()`, la même fonction que
+    l'aperçu — plus de logique `is_covered`/`is_secondary` dupliquée ici (qui coïncidait déjà
+    avec la priorité primaire-d'abord du contrat, mais était une SECONDE implémentation à
+    maintenir en cohérence avec l'aperçu).
     """
     overrides_cache = list_overrides(data_dir)
     equipment_overrides_cache = list_equipment_overrides(data_dir)
@@ -2660,11 +2681,7 @@ def _build_mapping_override_tree(
         persisted_overrides=overrides_cache,
         persisted_equipment_overrides=equipment_overrides_cache,
     )
-    primary_mapping = evaluation.mapping
-    mapped = primary_mapping is not None
-    covered_ids = set(mapping_cmd_ids(primary_mapping)) if mapped else set()
-    native_type = primary_mapping.ha_entity_type if mapped else None
-    secondary_by_cmd = _secondary_mapping_by_cmd(primary_mapping) if mapped else {}
+    mapped = evaluation.mapping is not None
     command_decision_by_cmd = {d.cmd_id: d for d in evaluation.command_decisions}
 
     commands = []
@@ -2673,21 +2690,14 @@ def _build_mapping_override_tree(
         entry = overrides_cache.get(key) or {}
         override_type = entry.get("ha_entity_type")
         override_applied = bool(override_type)
-        is_covered = cmd.id in covered_ids
-        secondary = secondary_by_cmd.get(cmd.id)
-        is_secondary = secondary is not None and not is_covered
+        diag_mapping = _resolve_command_mapping(evaluation, cmd.id)
+        is_covered = diag_mapping is not None
 
         if is_covered:
-            attendu_ha = native_type
-            diag_mapping = primary_mapping
-            row_effective = primary_mapping.ha_entity_type
-        elif is_secondary:
-            attendu_ha = secondary.ha_entity_type
-            diag_mapping = secondary
-            row_effective = secondary.ha_entity_type
+            attendu_ha = diag_mapping.ha_entity_type
+            row_effective = diag_mapping.ha_entity_type
         else:
             attendu_ha = proposed_eq
-            diag_mapping = None
             row_effective = override_type if override_applied else attendu_ha
 
         row = {
@@ -2695,7 +2705,7 @@ def _build_mapping_override_tree(
             "cmd_name": cmd.name,
             "generic_type": cmd.generic_type,
             "coverable": bool(cmd.generic_type),
-            "covered": bool(is_covered or is_secondary),
+            "covered": is_covered,
             "attendu_ha": attendu_ha,
             "effective_ha": row_effective,
             "override_applied": override_applied,
