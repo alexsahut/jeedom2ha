@@ -1,5 +1,6 @@
 #!/bin/bash
-# VM -> box, read-only: two HTTP GETs and one MQTT subscription. No deployment.
+# VM -> box, read-only: two HTTP GETs and two MQTT subscriptions (discovery +
+# retained state, Story 19.2 I11 field-proof). No deployment.
 set +x
 set -euo pipefail
 umask 077
@@ -60,8 +61,26 @@ jeedom2ha_mqtt_run mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" \
 [[ "$rc" == 0 || "$rc" == 27 ]] || exit "$rc"
 REMOTE
 } | ssh "${SSH_OPTS[@]}" -S "$control_socket" "$SSH_TARGET" bash -s > "$work_dir/topics"
+# Story 19.2 — second read-only subscription, retained STATE topics this time
+# (jeedom2ha/<eq_id>/<cmd_id>/state), used only as I11 field-proof evidence
+# (parity_snapshot.py correlates it with the discovery-based I11 candidates).
+# Same auth/cleanup mechanism as the discovery capture above; never mosquitto_pub.
+{
+  echo 'set +x; set -euo pipefail; umask 077'
+  jeedom2ha_mqtt_auth_snippet
+  printf 'MQTT_HOST=%q\nMQTT_PORT=%q\n' "$_mqtt_host" "$_mqtt_port"
+  cat <<'REMOTE'
+rc=0
+jeedom2ha_mqtt_run mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" \
+  -W 2 -t 'jeedom2ha/+/+/state' -F '%t' || rc=$?
+# mosquitto_sub 2.0.x returns 27 when the bounded subscription ends.
+[[ "$rc" == 0 || "$rc" == 27 ]] || exit "$rc"
+REMOTE
+} | ssh "${SSH_OPTS[@]}" -S "$control_socket" "$SSH_TARGET" bash -s > "$work_dir/state_topics"
 export JEEDOM2HA_LOCAL_SECRET="$LOCAL_SECRET"
 unset JEEDOM2HA_LOCAL_SECRET_FILE
 "${PYTHON}" "${TOOL}" capture --base-url "http://127.0.0.1:${LOCAL_PORT}" \
   --mqtt-host "$_mqtt_host" --mqtt-port "$_mqtt_port" \
-  --mqtt-inventory-file "$work_dir/topics" --label "$label" --output "$output"
+  --mqtt-inventory-file "$work_dir/topics" \
+  --mqtt-state-inventory-file "$work_dir/state_topics" \
+  --label "$label" --output "$output"

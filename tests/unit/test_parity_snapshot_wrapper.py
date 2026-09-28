@@ -48,7 +48,12 @@ elif role == "mosquitto_sub":
     assert stat.S_IMODE(config.stat().st_mode) == 0o600
     assert config.read_text() == "-u test mqtt user\n-P test ' mqtt password \\\"\n"
     (root / "auth_dir").write_text(str(directory))
-    print("homeassistant/light/jeedom2ha_1/config")
+    # Story 19.2 — second read-only subscription (retained state topics),
+    # distinguished from the discovery one by its -t filter.
+    if args[args.index("-t") + 1] == "jeedom2ha/+/+/state":
+        print("jeedom2ha/1/1/state")
+    else:
+        print("homeassistant/light/jeedom2ha_1/config")
     sys.exit(int(os.environ["PROBE_MQTT_RC"]))
 elif role == "probe-python":
     assert os.environ["JEEDOM2HA_LOCAL_SECRET"] == "test-local-secret"
@@ -56,6 +61,9 @@ elif role == "probe-python":
     inventory = pathlib.Path(args[args.index("--mqtt-inventory-file") + 1])
     assert stat.S_IMODE(inventory.stat().st_mode) == 0o600
     assert inventory.read_text() == "homeassistant/light/jeedom2ha_1/config\n"
+    state_inventory = pathlib.Path(args[args.index("--mqtt-state-inventory-file") + 1])
+    assert stat.S_IMODE(state_inventory.stat().st_mode) == 0o600
+    assert state_inventory.read_text() == "jeedom2ha/1/1/state\n"
     (root / "python_called").touch()
     sys.exit(int(os.environ["PROBE_PYTHON_RC"]))
 ''')
@@ -80,4 +88,7 @@ elif role == "probe-python":
     for secret in ("test-local-secret", "test mqtt user", "mqtt password"):
         assert secret not in exposed
     calls = [json.loads(line) for line in (tmp_path / "argv.jsonl").read_text().splitlines()]
-    assert [role for role, _ in calls].count("mosquitto_sub") == 1
+    # Story 19.2 adds a second (state-topic) subscription after the discovery
+    # one; a failing first subscription (mqtt_rc=5) aborts before it runs.
+    expected_mosquitto_calls = 2 if mqtt_rc == 27 else 1
+    assert [role for role, _ in calls].count("mosquitto_sub") == expected_mosquitto_calls

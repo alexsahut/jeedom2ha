@@ -46,13 +46,17 @@ Ce que l'outil NE FAIT PAS :
     contente de les relever et de les journaliser dans le rapport (AC4) — la
     correction de I11 est le sujet exclusif de Story 19.2.
 
-Limite connue (I11) : `/system/diagnostics` n'expose pas de décision par
-sous-capteur secondaire — la détection I11 ci-dessous est donc une heuristique
-basée sur l'inventaire MQTT retained (un topic `jeedom2ha_<eq_id>[...]` publié
-alors que l'équipement primaire n'est pas publié), pas une lecture directe du
-`CommandDecision` du secondaire. Documenté ici pour Story 19.2, qui possède la
-correction et pourra affiner cette mesure avec un accès direct à
-`evaluate_equipment()`.
+Limite connue (I11), affinée par Story 19.2 : `/system/diagnostics` n'expose
+toujours pas de décision par sous-capteur secondaire, donc la DÉTECTION des
+candidats I11 reste une heuristique basée sur l'inventaire MQTT discovery
+retained (un topic `jeedom2ha_<eq_id>_<cmd_id>` publié alors que l'équipement
+primaire n'est pas publié). Story 19.2 ajoute cependant une preuve terrain
+complémentaire, en lecture seule : la VÉRIFICATION que le topic d'état
+retenu correspondant (`jeedom2ha/<eq_id>/<cmd_id>/state`) est bien présent
+pour chaque candidat détecté — c'est exactement ce que la correction I11
+(`sync/state.py`/`sync/command.py`) est censée garantir. Cette vérification
+est optionnelle (`--mqtt-state-inventory-file`) : sans elle, le comportement
+et le format du rapport restent strictement identiques à Story 19.1.
 """
 
 from __future__ import annotations
@@ -60,6 +64,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -78,6 +83,17 @@ _MQTT_PASS_ENV = "JEEDOM2HA_MQTT_PASS"
 
 # Même convention de filtrage que scripts/deploy-to-box.sh (grep '/jeedom2ha_').
 _MQTT_DISCOVERY_SUBSTRING = "jeedom2ha_"
+
+# Story 19.2 — topics d'état retenus (jamais discovery), même convention de
+# nommage que discovery/publisher.py::_build_topic pour les secondaires
+# (`jeedom2ha/<eq_id>/<cmd_id>/state`).
+_STATE_TOPIC_FILTER = "jeedom2ha/+/+/state"
+_STATE_TOPIC_SUBSTRING = "/state"
+
+# Extrait (eq_id, cmd_id) d'un node_id discovery de secondaire
+# (`jeedom2ha_<eq_id>_<cmd_id>`, cf. mapping/switch.py) pour corréler avec
+# l'inventaire des topics d'état retenus.
+_SECONDARY_NODE_ID_RE = re.compile(r"jeedom2ha_(\d+)_(\d+)")
 
 # Reasons de niveau 2b/4 (models/evaluate_equipment.py, Story 19.0) portant un
 # scope explicite (exclusion ou forçage) déjà décidé par un override persisté.
@@ -356,6 +372,39 @@ def _detect_i11_candidates(decisions: List[dict], mqtt_topics: List[str]) -> Lis
     return candidates
 
 
+def _detect_i11_state_coverage(i11_candidates: List[dict], state_topics: List[str]) -> List[dict]:
+    """Story 19.2 — preuve terrain complémentaire, mesure seule : pour chaque
+    candidat I11 déjà détecté par `_detect_i11_candidates` (corrélation
+    discovery), vérifie si le topic d'état retenu correspondant
+    (`jeedom2ha/<eq_id>/<cmd_id>/state`) est bien présent dans l'inventaire
+    MQTT retained. Ne corrige rien, ne republie rien, ne fait aucune requête
+    supplémentaire — corrèle uniquement deux inventaires déjà relevés.
+
+    Le cmd_id de chaque secondaire est extrait du node_id du topic discovery
+    déjà corrélé (`jeedom2ha_<eq_id>_<cmd_id>`), jamais reconstruit
+    autrement : un candidat sans node_id `_<cmd_id>` exploitable (résidu du
+    primaire, cf. Finding 3 PR #169) n'ajoute aucun cmd_id."""
+    state_topic_set = set(state_topics)
+    augmented = []
+    for candidate in i11_candidates:
+        eq_id = candidate["eq_id"]
+        cmd_ids = sorted({
+            int(cmd_id)
+            for topic in candidate["matching_topics"]
+            for found_eq, cmd_id in _SECONDARY_NODE_ID_RE.findall(topic)
+            if int(found_eq) == eq_id
+        })
+        present = [cmd_id for cmd_id in cmd_ids if f"jeedom2ha/{eq_id}/{cmd_id}/state" in state_topic_set]
+        missing = [cmd_id for cmd_id in cmd_ids if cmd_id not in present]
+        augmented.append({
+            **candidate,
+            "secondary_cmd_ids": cmd_ids,
+            "state_topics_present": present,
+            "state_topics_missing": missing,
+        })
+    return augmented
+
+
 @dataclass
 class ParitySnapshot:
     captured_at: str
@@ -365,6 +414,7 @@ class ParitySnapshot:
     i11_candidates: List[dict] = field(default_factory=list)
     explicit_scope_entries: List[dict] = field(default_factory=list)
     published_scope_exceptions: List[dict] = field(default_factory=list)
+    state_topics: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -375,6 +425,7 @@ class ParitySnapshot:
             "i11_candidates": self.i11_candidates,
             "explicit_scope_entries": self.explicit_scope_entries,
             "published_scope_exceptions": self.published_scope_exceptions,
+            "state_topics": self.state_topics,
         }
 
 
@@ -391,10 +442,15 @@ def capture_snapshot(
     http_timeout: float = 10.0,
     mqtt_runner=subprocess.run,
     mqtt_inventory_file: Optional[str] = None,
+    mqtt_state_inventory_file: Optional[str] = None,
 ) -> ParitySnapshot:
     """Relève un snapshot complet (décisions + inventaire MQTT + I11/scope
     explicite). Échoue explicitement (ParitySnapshotError) si le relevé de
-    décisions OU l'inventaire MQTT est vide — jamais un succès déguisé (AC3)."""
+    décisions OU l'inventaire MQTT est vide — jamais un succès déguisé (AC3).
+
+    `mqtt_state_inventory_file` (Story 19.2) est optionnel et n'affecte le
+    format du rapport que s'il est fourni : sans lui, `state_topics` reste
+    vide et `i11_candidates` garde exactement la forme Story 19.1."""
     diagnostics_payload = fetch_diagnostics(base_url, local_secret, timeout=http_timeout)
     decisions = _decision_records(diagnostics_payload)
     if not decisions:
@@ -430,14 +486,32 @@ def capture_snapshot(
 
     published_scope_payload = fetch_published_scope(base_url, local_secret, timeout=http_timeout)
 
+    i11_candidates = _detect_i11_candidates(decisions, mqtt_topics)
+
+    # Strictement opt-in (Story 19.2) : seul un inventaire d'état explicitement
+    # fourni (mode box SSH, scripts/parity-snapshot.sh) déclenche la preuve
+    # terrain complémentaire. Sans lui, i11_candidates garde EXACTEMENT la
+    # forme Story 19.1, y compris en mode connexion directe (mqtt_runner).
+    state_topics: List[str] = []
+    if mqtt_state_inventory_file is not None:
+        # Même mécanisme que mqtt_inventory_file : inventaire déjà collecté sur
+        # la box par scripts/parity-snapshot.sh (SSH), aucun mosquitto_sub local.
+        with open(mqtt_state_inventory_file, encoding="utf-8") as inventory:
+            state_topics = sorted({
+                line.strip() for line in inventory
+                if _STATE_TOPIC_SUBSTRING in line and line.strip()
+            })
+        i11_candidates = _detect_i11_state_coverage(i11_candidates, state_topics)
+
     return ParitySnapshot(
         captured_at=datetime.now(timezone.utc).isoformat(),
         label=label,
         decisions=decisions,
         mqtt_topics=mqtt_topics,
-        i11_candidates=_detect_i11_candidates(decisions, mqtt_topics),
+        i11_candidates=i11_candidates,
         explicit_scope_entries=_detect_explicit_scope(decisions),
         published_scope_exceptions=_detect_published_scope_exceptions(published_scope_payload),
+        state_topics=state_topics,
     )
 
 
@@ -502,16 +576,29 @@ def _cmd_capture(args: argparse.Namespace) -> int:
         mqtt_password=mqtt_password,
         mqtt_timeout=args.mqtt_timeout,
         mqtt_inventory_file=args.mqtt_inventory_file,
+        mqtt_state_inventory_file=args.mqtt_state_inventory_file,
     )
     _write_snapshot(snapshot, args.output)
     print(f"Relevé '{args.label}' écrit : {args.output}")
     print(f"  Décisions : {len(snapshot.decisions)} équipement(s)")
     print(f"  Topics MQTT retained ({_MQTT_DISCOVERY_SUBSTRING}*) : {len(snapshot.mqtt_topics)}")
+    if snapshot.state_topics:
+        print(f"  Topics d'état retenus ({_STATE_TOPIC_FILTER}) : {len(snapshot.state_topics)}")
     if snapshot.i11_candidates:
         print(
             "  ATTENTION — candidats I11 détectés (relevé seul, correction Story 19.2) : "
             f"{len(snapshot.i11_candidates)}"
         )
+        missing = [
+            (c["eq_id"], c["state_topics_missing"])
+            for c in snapshot.i11_candidates
+            if c.get("state_topics_missing")
+        ]
+        if missing:
+            print(
+                "  ATTENTION — candidats I11 SANS topic d'état retenu correspondant "
+                f"(preuve terrain I11 incomplète) : {missing}"
+            )
     if snapshot.explicit_scope_entries:
         print(
             "  Scope explicite détecté — override de politique de publication (relevé seul, "
@@ -555,6 +642,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     capture_parser.add_argument("--base-url", required=True, help="ex. http://192.168.1.21:PORT")
     capture_parser.add_argument("--mqtt-inventory-file", help="Inventaire SSH du wrapper VM (aucun client MQTT local requis).")
+    capture_parser.add_argument(
+        "--mqtt-state-inventory-file",
+        help=(
+            "Story 19.2, optionnel — inventaire SSH des topics d'état retenus "
+            f"({_STATE_TOPIC_FILTER}), même mécanisme que --mqtt-inventory-file. "
+            "Sans lui, le rapport reste au format Story 19.1."
+        ),
+    )
     capture_parser.add_argument("--mqtt-host", required=True)
     capture_parser.add_argument("--mqtt-port", type=int, default=1883)
     capture_parser.add_argument("--mqtt-timeout", type=float, default=2.0)
