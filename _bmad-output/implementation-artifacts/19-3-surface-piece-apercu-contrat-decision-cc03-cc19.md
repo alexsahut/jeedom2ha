@@ -1,6 +1,6 @@
 # Story 19.3: Surface pièce / aperçu branchés sur le contrat de décision (CC-03, CC-19)
 
-Status: backlog
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -90,30 +90,30 @@ I2, I4, I6 (cohérence de la décision affichée avec celle réellement appliqu�
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Brancher `_build_mapping_override_tree` sur `evaluate_equipment()` (AC1)
-  - [ ] Remplacer la logique de calcul de statut propre à la surface par pièce par un appel à `evaluate_equipment()` (Story 19.0/19.1)
-  - [ ] Vérifier que le statut affiché correspond exactement à la décision réelle (y compris pour les équipements exclus par éligibilité amont)
+- [x] Task 1 — Brancher `_build_mapping_override_tree` sur `evaluate_equipment()` (AC1)
+  - [x] Remplacer la logique de calcul de statut propre à la surface par pièce par un appel à `evaluate_equipment()` (Story 19.0/19.1)
+  - [x] Vérifier que le statut affiché correspond exactement à la décision réelle (y compris pour les équipements exclus par éligibilité amont)
 
-- [ ] Task 2 — Brancher `_handle_overrides_preview` sur `evaluate_equipment()` en mode preview (AC2)
-  - [ ] Utiliser le paramètre "overrides proposés" de `evaluate_equipment()` (Story 19.0, AC3) pour le calcul "avec override" de l'aperçu
-  - [ ] Vérifier la cohérence stricte entre le résultat de l'aperçu et celui de la surface par pièce pour un même override
+- [x] Task 2 — Brancher `_handle_overrides_preview` sur `evaluate_equipment()` en mode preview (AC2)
+  - [x] Utiliser le paramètre "overrides proposés" de `evaluate_equipment()` (Story 19.0, AC3) pour le calcul "avec override" de l'aperçu
+  - [x] Vérifier la cohérence stricte entre le résultat de l'aperçu et celui de la surface par pièce pour un même override
 
-- [ ] Task 3 — Corriger CC-19 : « revenir au mode automatique » laisse les overrides TYPE par commande (AC3)
-  - [ ] Effacer `remove_override` pour chaque clé `eq_id:cmd_id`, puis `remove_equipment_override` (persistance `data/ha_overrides.json`, cf. Story 16.3).
+- [x] Task 3 — Corriger CC-19 : « revenir au mode automatique » laisse les overrides TYPE par commande (AC3)
+  - [x] Effacer `remove_override` pour chaque clé `eq_id:cmd_id`, puis `remove_equipment_override` (persistance `data/ha_overrides.json`, cf. Story 16.3).
 
-- [ ] Task 4 — Étendre `REASON_LABELS` (AC4)
-  - [ ] Ajouter dans `desktop/js/jeedom2ha_mapping_override.js` (l.199-211) un libellé français pour chaque nouvelle raison exposée par le branchement sur `evaluate_equipment()`.
-  - [ ] Citer le bouton/handler réellement concernés : `desktop/js/jeedom2ha_mapping_surface.js:190-200,264-278` et `_handle_mapping_override_revert` (`http_server.py:2642-2648`).
+- [x] Task 4 — Étendre `REASON_LABELS` (AC4)
+  - [x] Ajouter dans `desktop/js/jeedom2ha_mapping_override.js` (l.199-211) un libellé français pour chaque nouvelle raison exposée par le branchement sur `evaluate_equipment()`.
+  - [x] Citer le bouton/handler réellement concernés : `desktop/js/jeedom2ha_mapping_surface.js:190-200,264-278` et `_handle_mapping_override_revert` (`http_server.py:2642-2648`).
 
 - [ ] Task 5 — Preuve par clic réel (AC5)
   - [ ] Exécuter le scénario de clic décrit en AC5 sur la box réelle, documenter le résultat
   - [ ] Statut `ready-for-UX-validation` jusqu'à documentation de la preuve, puis passage à `done`
 
-- [ ] Task 6 — Tests (AC1-AC4, AC6-AC7)
-  - [ ] `test_story_19_3_surface_piece_apercu_contrat.py` (préfixe `test_story_19_3_*`) côté backend
-  - [ ] Tests front (node) pour `REASON_LABELS` étendu et le comportement "revenir au mode automatique"
-  - [ ] Golden 59 et tests backend/front : 0 commande sans raison, jamais diagnostic `None`/« — ».
-  - [ ] Suite complète backend + front : 0 régression
+- [x] Task 6 — Tests (AC1-AC4, AC6-AC7)
+  - [x] `test_story_19_3_ac{1,2,3,6,7}_*.py` (préfixe `test_story_19_3_*`) côté backend, plus le garde-fou de parité JSON `test_story_19_3_guardrail_no_override_json_parity.py`
+  - [x] Tests front (node) pour `REASON_LABELS` étendu et `shouldShowOverridePendingBadge` (AC4/AC6)
+  - [x] Golden 59 et tests backend/front : 0 commande sans raison, jamais diagnostic `None`/« — ».
+  - [x] Suite complète backend + front : 0 régression (1310 tests Python + 291 tests node, tous verts)
 
 ## Dev Notes
 
@@ -164,4 +164,80 @@ le test doit couvrir ce conflit dans le contrat puis dans l’aperçu.
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle non exposée cette session).
 
+- **dev-story (Reprise 1)** — 2026-09-27/28 — production (`http_server.py`, `evaluate_equipment.py`, `overrides.py`, `jeedom2ha_mapping_override.js`, `jeedom2ha_mapping_surface.js`) branchée sur `evaluate_equipment()` pour AC1/AC2/AC3/AC4, `REASON_LABELS` étendu (commit `2bc7c43`). Ce tour s'est arrêté après avoir committé un premier lot de tests (`test_story_19_3_surface_apercu.py`) qui s'est révélé **fabriqué** : il appelait des signatures de fonctions inexistantes dans le code réel (jamais exécuté avec succès), ce qui a interrompu la reprise avant la validation complète. Sauvegarde de l'état non committé en `1b9906f`.
+
+- **dev-story (Reprise 2)** — 2026-09-28 — reprise après le rapport `/tmp/jeedom2ha-19-3-resume-report.md`. Production déjà en place revue et jugée de bonne qualité : **aucun changement de production dans cette reprise**. Travail réalisé :
+  - Suppression du fichier de test fabriqué (`1ce301d`) et remplacement complet par des tests réels, calqués sur le patron `test_story_16_8_secondary_sensor_diagnostic.py` (vrai client aiohttp contre les vrais endpoints HTTP) :
+    - `test_story_19_3_ac1_cc03_surface_status.py` — la surface par pièce affiche le vrai statut (exclusion amont, override de publication, politique `sure_only`).
+    - `test_story_19_3_ac2_preview_surface_parity.py` — cohérence aperçu/surface, `confidence_policy` exclusivement issue de `app["confidence_policy"]` (jamais du payload, écart PR #169), conflit inter-commandes (override persisté sur une commande sœur ne doit pas l'emporter sur l'override proposé).
+    - `test_story_19_3_ac3_revert_equipment.py` — CC-19 : le retour au mode automatique purge tous les overrides (TYPE par commande + publication/exclusion équipement) en un seul clic.
+    - `test_story_19_3_ac6_sync_status.py` — les deux temporalités (`synced_should_publish`/`current_should_publish`/`override_pending`).
+    - `test_story_19_3_ac7_no_silent_diagnostic.py` — zéro commande sans diagnostic/raison sur le corpus doré (59 équipements), libellé français systématique pour toute raison de blocage, cas explicite `command_not_covered`.
+    - `test_story_19_3_ac4_ac6_reason_labels_sync_badge.node.test.js` (front, node) — libellé français concret pour les 10 nouveaux codes de blocage + `publication_forced`, comportement de `shouldShowOverridePendingBadge` (normalisation stricte d'un `sync_status` absent/malformé).
+    - `test_story_19_3_guardrail_no_override_json_parity.py` — garde-fou : pour un équipement sans override, diff champ à champ de la réponse JSON complète (surface + aperçu) entre `49dc70b` et la branche via une sonde manuelle (`git worktree`, script jetable non committé) ; résultat : **un seul champ diffère**, `sync_status` (nouveau, AC6) — tout le reste est strictement identique bit à bit, ce qui valide l'invariant AR9 (aucune duplication/altération de la logique de décision existante) sur le chemin heureux.
+  - **Mutation testing** : les 5 fichiers de production ont été temporairement reramenés à leur état `49dc70b` (working tree non committé, jamais poussé) et la suite des 16 tests Story 19.3 rejouée. 13/16 ont échoué comme attendu (mutation tuée). 3 sont passés sur l'ancien code — chacun justifié, aucun n'a nécessité de renforcement :
+    - `test_guardrail_preview_response_identical_to_pre_story` — passage **attendu et correct par construction** : ce test encode justement le résultat confirmé de la sonde (l'aperçu, pour un équipement sans override, est déjà identique avant/après la story) ; c'est un test de parité, pas un tueur de mutation.
+    - `test_ac2_preview_auto_view_matches_tree_diagnostic` — passe sur `49dc70b` car l'ancien code faisait déjà transiter la vue "auto" de l'aperçu et le diagnostic de l'arbre par le même moteur (`validate_projection`/`decide_publication` dans `_preview_mapping_view`, confirmé par lecture directe de `49dc70b:resources/daemon/transport/http_server.py:2297`) pour ce cas dégénéré sans override. Le vrai correctif AC2 (source de la `confidence_policy`) est bien capturé par le test voisin `test_ac2_confidence_policy_ignores_payload_uses_app_state`, qui échoue correctement sur `49dc70b`.
+    - `test_ac2_proposed_override_wins_over_sibling_persisted_override` — passe sur `49dc70b` car l'ancien code clé déjà les overrides proposés par `f"{eq_id}:{cmd_id}"` (confirmé `49dc70b:resources/daemon/transport/http_server.py:2447`) : l'isolation entre commandes sœurs préexistait à la story. Ce test reste une garde de non-régression légitime pour cet invariant de structure de données, pas un tueur de mutation Story 19.3.
+  - Les 5 fichiers de production ont été restaurés à l'état `HEAD` de la branche immédiatement après la campagne de mutation (aucune trace de la mutation dans l'historique git).
+  - **Suite complète, zéro régression** : `python3 -m pytest -q` depuis `resources/daemon` → 1310 passed ; `node --test tests/unit/*.node.test.js` → 291 pass, 0 fail.
+  - **Écart hors périmètre constaté (non corrigé dans cette reprise)** : sur le corpus doré, certaines commandes secondaires (eq 583 "IQ EV Charger", cmds 5999/6000/6001/6021 ; eq 628 "Pilotage priorisation solaire", cmds 5981/5982/5984/5985/6005/6006) affichent simultanément `covered=False` (champ `row["covered"]` de l'arbre, basé sur `_secondary_mapping_by_cmd`/`reason_details["cmd_id"]`) et `should_publish=True`/`ha_entity_type` renseigné dans leur diagnostic (basé sur `evaluation.command_decisions`, source de vérité). Les deux détections de couverture peuvent diverger pour certaines commandes secondaires. Aucun impact utilisateur constaté (le diagnostic affiché reste correct, seul le badge `coverable`/`covered` de l'arbre serait potentiellement trompeur) — documenté ici pour un futur ticket, volontairement non corrigé (hors périmètre AC1-AC7 de cette reprise, aurait nécessité une modification de production non demandée).
+  - AC5 (preuve par clic réel sur la box 192.168.1.21) reste **non exécutée** dans cette reprise — hors périmètre (aucun accès box/déploiement autorisé pour ce tour). La story reste donc à `in-progress`, pas `ready-for-UX-validation`.
+
+- **dev-story (Reprise 3 — relecture ClaudeBox PR #176)** — 2026-09-28 — correction de trois défauts trouvés par ClaudeBox (P1-a, P1-b bloquants ; P3 mineur), tous visibles uniquement à l'échelle du corpus doré complet (59 équipements), jamais sur un équipement synthétique isolé :
+  - **P1-a (AC2/AC7)** — `POST /system/overrides/preview` était muet (`auto:None`, `overridden:None`, `covered` absent) pour un équipement inéligible (disabled/excluded) ou sans mapping — branche `auto_evaluation.mapping is None` de `_handle_overrides_preview`. Fix : nouvelle fonction `_view_for_ineligible_or_unmapped(evaluation, cmd_id)` — expose la même vue que le `diagnostic` de l'arbre pour cette commande (raison d'éligibilité, `should_publish:false`) ; `auto` et `overridden` partagent la même vue puisqu'aucun override ne peut changer une décision déjà tranchée au niveau 1/2 (I4). `covered:false` ajouté (était absent).
+  - **P1-b** — les commandes d'action (On/Off) des interrupteurs secondaires (eq 583 cmds 5999/6000/6001/6021 ; eq 628 cmds 5981/5982/5984/5985/6005/6006) étaient `covered:false` avec un diagnostic incohérent (`should_publish:true`, `ha_entity_type:null`) — c'est exactement l'écart hors périmètre documenté en Reprise 2 ci-dessus, maintenant corrigé. Cause racine : `_secondary_mapping_by_cmd` n'indexait que `reason_details["cmd_id"]` (commande d'état) de chaque secondaire, jamais ses commandes d'action présentes dans `secondary.commands`. Fix : indexation via `mapping_cmd_ids(secondary)`, la même extraction que le primaire (`mapping/overrides.py`) — une seule fonction reste la source, partagée par `covered` (arbre), le diagnostic (arbre) et la cible de l'aperçu (`_target_mapping_for_cmd`).
+  - **P3 (mineur)** — le littéral `"sure_probable"` était dupliqué 4 fois (`_handle_sync`, `_handle_overrides_preview`, signature par défaut et point d'appel de `_build_mapping_override_tree`). Fix : constantes module-level `_DEFAULT_CONFIDENCE_POLICY = "sure_probable"` et `_VALID_CONFIDENCE_POLICIES = ("sure_only", "sure_probable")`.
+  - **3ᵉ défaut découvert par le nouveau test golden-corpus (non listé par ClaudeBox)** : dans la branche `auto_target is None` de `_handle_overrides_preview` (commande ciblée non couverte ni par le primaire ni par un secondaire), `auto` était construit via `_view_from_evaluation(auto_evaluation, None)` — `cmd_id=None` cible TOUJOURS le mapping PRIMAIRE dans `_target_mapping_for_cmd`, donc l'aperçu affichait la décision de l'ÉQUIPEMENT (ex. `alarm_control_panel`, `should_publish:true` pour eq 230) au lieu de la décision `command_not_covered` propre à la commande — 18 écarts sur eq 230/554/583 du corpus doré. Fix : réemploi de `_view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id)` (déjà introduite pour P1-a), qui résout déjà la décision par `cmd_id` dans `evaluation.command_decisions`, `mapping=None` — même contrat que la branche `diag_mapping=None` de l'arbre.
+  - **Tests ajoutés** : `test_story_19_3_fix1_claudebox_review.py` — Test 1 (parité aperçu/arbre par commande sur les 59 équipements et leurs commandes), Test 2 (invariants golden : aucun `covered:false` publié, aucun `should_publish:true` avec type `null`, chaque raison de blocage a un libellé `REASON_LABELS`), 3 tests unitaires (eq 5000 désactivé, eq 5001 exclu, eq 628 secondaire commande On).
+  - **Mutation testing** : sur `c59a87e` (avant tout fix), les 5 tests échouent. Sur `efa9d9c` (P1-a/P1-b/P3 seuls, sans le 3ᵉ fix), Test 1 échoue encore (18 écarts) tandis que Test 2 et les 3 unitaires passent déjà — preuve que le 3ᵉ défaut est réel et distinct, révélé uniquement par le test à l'échelle du corpus complet.
+  - **Suite complète, zéro régression** : `python3 -m pytest -q` depuis la racine du repo → **1919 passed** ; `node --test tests/unit/*.node.test.js` → **291 pass, 0 fail**.
+  - AC5 reste **non exécutée** dans cette reprise également (même hors-périmètre qu'en Reprise 2). Statut inchangé : `in-progress`.
+
+- **dev-story (Reprise 4 — relecture ClaudeBox PR #176, 2ᵉ tour)** — 2026-09-29 — correction de trois nouveaux défauts trouvés par ClaudeBox sur `9f4be56` (P1 bloquant ; P2 bloquant ; P3 mineur) :
+  - **P1 (bloquant, AC7)** — `renderDiagnosticCell` affichait TOUJOURS le libellé générique « non couverte par un mapping » dès que `covered:false`, y compris pour une commande exclue/inéligible en amont (I1/I4) qui porte pourtant une VRAIE cause (`disabled_eqlogic`, `excluded_eqlogic`, etc.) — le diagnostic réel était disponible mais jamais consulté. Fix, purement front (`desktop/js/jeedom2ha_mapping_override.js`, deux fonctions pures nouvelles) : `shouldShowUncoveredLabel(view)` n'autorise le libellé générique que si `view===null` ou `publication_reason==="command_not_covered"` ; `readPreviewAuto(payload)`, miroir de `readPreviewOverridden`, permet à `runDryRun` de transmettre la vue `auto` de la preview (au lieu de `null`) sur la branche `!covered`. `jeedom2ha_mapping_surface.js` consomme les deux dans `renderDiagnosticCell`/`runDryRun`. Aucun changement backend.
+  - **P2 (bloquant)** — trois logiques divergentes résolvaient « quel mapping couvre cette commande ? » : le contrat (`evaluate_equipment()`, primaire d'abord via `covered.setdefault`), l'arbre (sa propre paire `is_covered`/`is_secondary`, déjà primaire-d'abord par coïncidence mais dupliquée), et l'aperçu (`_target_mapping_for_cmd`, SECONDAIRE d'abord — l'inverse du contrat). Sur le corpus doré, aucune commande n'est jamais partagée entre un primaire et un secondaire, donc la divergence de l'aperçu restait invisible en pratique. Fix : fonction unique `_resolve_command_mapping(evaluation, cmd_id)` (primaire d'abord, comme le contrat) dans `transport/http_server.py`, remplace `_target_mapping_for_cmd` (3 sites d'appel) ET la logique dupliquée de l'arbre (`_build_mapping_override_tree` simplifiée, comportement inchangé sauf pour une commande partagée).
+  - **P3 (mineur)** — `_DEFAULT_CONFIDENCE_POLICY`/`_VALID_CONFIDENCE_POLICIES` restaient dupliqués en dur dans `http_server.py` malgré la centralisation Reprise 3 : `evaluate_equipment.py` et `decide_publication()` portaient chacun encore le même littéral `"sure_probable"` de leur côté. Fix : source unique `DEFAULT_CONFIDENCE_POLICY`/`VALID_CONFIDENCE_POLICIES` dans `models/decide_publication.py`, importée par `evaluate_equipment.py`, `http_server.py` (alias locaux conservés pour ne pas réécrire tous les appelants internes) et les mappers `light.py`/`switch.py`/`cover.py` (leur méthode `decide_publication()` legacy, utilisée uniquement par d'anciens tests, pas par le pipeline de production). Aucun cycle d'import introduit (vérifié par import direct des 4 modules).
+  - **Tests ajoutés** : `test_story_19_3_p2_shared_command_priority.py` (commande partagée primaire/secondaire injectée via monkeypatch post-évaluation de `evaluate_equipment`, fixture prise-conso de la Story 16.8 — arbre ET aperçu doivent résoudre le primaire) ; `test_story_19_3_p1_uncovered_diagnostic.node.test.js` (14 assertions : 6 raisons d'éligibilité + `command_not_covered` + `null`/`undefined` pour `shouldShowUncoveredLabel`, 5 cas pour `readPreviewAuto`) ; `test_story_19_3_p1_covered_false_reason_contract.py` (contrat golden-corpus : toute ligne `covered:false` porte une raison parmi les 7 connues).
+  - **Mutation testing** : sur `9f4be56`, `test_preview_resolves_shared_command_to_primary` échoue bien (`sensor` reçu au lieu de `switch`) — `test_tree_resolves_shared_command_to_primary` passe déjà (l'arbre était accidentellement déjà correct), attendu et documenté. Les 5 assertions `readPreviewAuto` échouent bien (`TypeError: M.readPreviewAuto is not a function`). Le test de contrat Python P1 passe déjà sur `9f4be56` (exception assumée et documentée : P1 n'a aucun changement backend, ce test valide un invariant backend préexistant, pas une régression de ce tour).
+  - **Garde-fou libellés** (59 équipements/174 commandes du corpus doré, script Python aiohttp + script Node rejouant ancienne/nouvelle logique de libellé) : **4 lignes changent exactement** — les 2 commandes de eq 5000 (`disabled_eqlogic`) et les 2 commandes de eq 5001 (`excluded_eqlogic`) passent de « Ne sera pas publié — commande non couverte par un mapping » à leur vraie raison (« équipement désactivé dans Jeedom » / « exclu de Jeedom2HA… »). Les 170 autres lignes sont inchangées.
+  - **Suite complète, zéro régression** : `python3 -m pytest -q` depuis `resources/daemon` → **1318 passed** ; `node --test tests/unit/*.node.test.js` depuis la racine → **305 passed**, 0 fail.
+  - AC5 reste **non exécutée** (hors périmètre, aucun accès box/déploiement autorisé pour ce tour). Statut inchangé : `in-progress`.
+
 ### File List
+
+**Production (Reprise 1, `2bc7c43` + travail antérieur en `1b9906f`) :**
+- `resources/daemon/transport/http_server.py` [MODIFIÉ] — `_build_mapping_override_tree`, `_handle_overrides_preview`, `_handle_mapping_override_revert` branchés sur `evaluate_equipment()`
+- `resources/daemon/models/evaluate_equipment.py` [MODIFIÉ]
+- `resources/daemon/mapping/overrides.py` [MODIFIÉ]
+- `desktop/js/jeedom2ha_mapping_override.js` [MODIFIÉ] — `REASON_LABELS` étendu, `shouldShowOverridePendingBadge`
+- `desktop/js/jeedom2ha_mapping_surface.js` [MODIFIÉ]
+
+**Tests (Reprise 2) :**
+- `resources/daemon/tests/unit/test_story_19_3_ac1_cc03_surface_status.py` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_19_3_ac2_preview_surface_parity.py` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_19_3_ac3_revert_equipment.py` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_19_3_ac6_sync_status.py` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_19_3_ac7_no_silent_diagnostic.py` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_19_3_guardrail_no_override_json_parity.py` [NOUVEAU]
+- `tests/unit/test_story_19_3_ac4_ac6_reason_labels_sync_badge.node.test.js` [NOUVEAU]
+- `resources/daemon/tests/unit/test_story_16_8_secondary_sensor_diagnostic.py` [MODIFIÉ — adapté aux nouvelles signatures]
+- `resources/daemon/tests/unit/test_story_19_0_evaluate_equipment_contract.py` [MODIFIÉ — adapté aux nouvelles signatures]
+- `resources/daemon/tests/unit/test_story_19_3_surface_apercu.py` [SUPPRIMÉ — fichier fabriqué de la Reprise 1, signatures inexistantes]
+
+**Production + tests (Reprise 3, relecture ClaudeBox PR #176, commits `efa9d9c` + `7814de9`) :**
+- `resources/daemon/transport/http_server.py` [MODIFIÉ] — `_secondary_mapping_by_cmd` (P1-b), nouvelle `_view_for_ineligible_or_unmapped` + branchement `_handle_overrides_preview` (P1-a et 3ᵉ défaut, branche `auto_target is None`), constantes `_DEFAULT_CONFIDENCE_POLICY`/`_VALID_CONFIDENCE_POLICIES` (P3)
+- `resources/daemon/tests/unit/test_story_19_3_fix1_claudebox_review.py` [NOUVEAU]
+
+**Production + tests (Reprise 4, relecture ClaudeBox PR #176 tour 2, commits `fa51160` + `ec0c50f` + `e29ff2b`) :**
+- `resources/daemon/models/decide_publication.py` [MODIFIÉ] — `DEFAULT_CONFIDENCE_POLICY`/`VALID_CONFIDENCE_POLICIES` (P3, source unique)
+- `resources/daemon/models/evaluate_equipment.py` [MODIFIÉ] — importe la source unique P3
+- `resources/daemon/mapping/light.py` [MODIFIÉ] — méthode legacy `decide_publication()` importe la source unique P3
+- `resources/daemon/mapping/switch.py` [MODIFIÉ] — idem
+- `resources/daemon/mapping/cover.py` [MODIFIÉ] — idem
+- `resources/daemon/transport/http_server.py` [MODIFIÉ] — alias P3 vers la source unique ; `_resolve_command_mapping` (ex-`_target_mapping_for_cmd`, primaire d'abord, P2) remplace 3 sites d'appel + la logique dupliquée de `_build_mapping_override_tree`
+- `desktop/js/jeedom2ha_mapping_override.js` [MODIFIÉ] — `shouldShowUncoveredLabel`, `readPreviewAuto` (P1)
+- `desktop/js/jeedom2ha_mapping_surface.js` [MODIFIÉ] — `renderDiagnosticCell`/`runDryRun` consomment les deux nouvelles fonctions (P1)
+- `resources/daemon/tests/unit/test_story_19_3_p2_shared_command_priority.py` [NOUVEAU] — P2
+- `tests/unit/test_story_19_3_p1_uncovered_diagnostic.node.test.js` [NOUVEAU] — P1
+- `resources/daemon/tests/unit/test_story_19_3_p1_covered_false_reason_contract.py` [NOUVEAU] — P1 (contrat golden-corpus)

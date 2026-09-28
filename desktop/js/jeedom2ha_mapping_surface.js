@@ -56,7 +56,11 @@
     $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered');
     // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
     // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
-    if (covered === false) {
+    // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
+    // systématiquement « aucun mapping ne couvre cette commande » — une exclusion/inéligibilité
+    // amont (I1/I4) porte aussi `covered:false` avec un VRAI diagnostic à afficher. Le libellé
+    // générique ne sort que si `shouldShowUncoveredLabel` confirme l'absence de cause réelle.
+    if (covered === false && M.shouldShowUncoveredLabel(view)) {
       $cell.addClass('j2ha-diag-uncovered').html('<i class="fas fa-ban"></i> ');
       $cell.append($('<span></span>').text(M.buildUncoveredLabel()));
       return;
@@ -145,8 +149,11 @@
         // Commande non couverte : aucun mapping à projeter. On affiche l'état factuel et on
         // NE persiste PAS (un override sur une commande non couverte est un no-op qui, après
         // reload, laisse la cellule vide — la cause exacte du #871).
+        // Story 19.3 (P1) : on transmet la vue `auto` (raison réelle éventuelle — exclusion,
+        // inéligibilité amont) plutôt que `null`, pour que `renderDiagnosticCell` puisse
+        // distinguer « vraiment non couverte » d'une cause amont à afficher (I4).
         if (!covered) {
-          renderDiagnosticCell($diagCell, null, false);
+          renderDiagnosticCell($diagCell, M.readPreviewAuto(result), false);
           return;
         }
         var view = M.readPreviewOverridden(result);
@@ -246,6 +253,19 @@
     }
   }
 
+  // Story 19.3 (AC6) — badge « override en attente » : signale que la dernière
+  // publication synchronisée (MQTT) ne reflète pas encore l'état courant des overrides
+  // (l'utilisateur doit resynchroniser). Purement informatif, ne bloque aucune action.
+  function renderSyncBadge($panel, tree) {
+    var $badge = $panel.find('.j2ha-eq-sync-badge').first().empty();
+    if (!M.shouldShowOverridePendingBadge(tree)) {
+      return;
+    }
+    $badge.append($('<span class="label label-warning"></span>')
+      .append($('<i class="fas fa-clock"></i> '))
+      .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
+  }
+
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
 
   function renderEquipmentTree($panel, tree) {
@@ -253,6 +273,8 @@
     var eqId = normalized.jeedom_eq_id;
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
+
+    renderSyncBadge($panel, normalized);
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -359,6 +381,7 @@
         .attr('aria-labelledby', headId);
       var $body = $('<div class="panel-body"></div>');
       $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
+      $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-cmdlist panel-group" role="tablist" aria-multiselectable="true" style="max-height:calc(100vh - 320px); overflow-y:auto;"></div>'));

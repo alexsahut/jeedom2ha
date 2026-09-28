@@ -127,8 +127,13 @@ def _sanitize_profile_entry(entry: dict, allowed_fields) -> dict:
     }
 
 
-def _parse_override_key(key: str) -> tuple:
-    """Parse a composite command key 'eq_id:cmd_id' back to (int, int) (Story 16.7 import)."""
+def parse_override_key(key: str) -> tuple:
+    """Parse a composite command key 'eq_id:cmd_id' back to (int, int) (Story 16.7 import).
+
+    Public depuis Story 19.3 (était `_parse_override_key`) : réutilisé par
+    `transport/http_server.py` pour énumérer, sans reparsing manuel, les clés d'override
+    de commande appartenant à un équipement donné (CC-19, `_handle_mapping_override_revert`).
+    """
     try:
         eq_str, cmd_str = str(key).split(":", 1)
         return int(eq_str), int(cmd_str)
@@ -591,7 +596,7 @@ def import_profile(profile: dict, data_dir: str) -> None:
     for key, entry in overrides.items():
         if not isinstance(entry, dict):
             raise ValueError(f"[OVERRIDES] Entrée d'override de profil invalide : {key!r}")
-        eq_id, cmd_id = _parse_override_key(key)
+        eq_id, cmd_id = parse_override_key(key)
         command_writes.append(
             (eq_id, cmd_id, _sanitize_profile_entry(entry, _PROFILE_COMMAND_FIELDS))
         )

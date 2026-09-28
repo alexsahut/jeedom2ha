@@ -186,8 +186,11 @@ async def test_covered_flag_true_on_primary_and_secondary(cli, app, tmp_path):
     assert _row(payload, 133004)["covered"] is True  # secondaire sensor
 
 
-async def test_tree_uncovered_command_flagged_and_no_diagnostic(cli, app, tmp_path):
-    """La température d'un DAAF (non couverte) porte covered=false et diagnostic=null."""
+async def test_tree_uncovered_command_flagged_with_command_not_covered_diagnostic(cli, app, tmp_path):
+    """La température d'un DAAF (non couverte) porte covered=false ET un diagnostic non-null
+    (Story 19.3, AC7 — chaque commande a une CommandDecision, jamais de diagnostic `None`).
+    Avant Story 19.3, ce diagnostic était `None` : `evaluate_equipment()` produit désormais
+    une `CommandDecision(reason="command_not_covered")` pour toute commande non couverte."""
     snapshot, _ = _smoke_detector()
     app["topology"] = snapshot
     app["data_dir"] = str(tmp_path)
@@ -202,7 +205,9 @@ async def test_tree_uncovered_command_flagged_and_no_diagnostic(cli, app, tmp_pa
 
     temperature = _row(payload, 543006)
     assert temperature["covered"] is False
-    assert temperature["diagnostic"] is None
+    assert temperature["diagnostic"] is not None
+    assert temperature["diagnostic"]["should_publish"] is False
+    assert temperature["diagnostic"]["publication_reason"] == "command_not_covered"
 
 
 async def test_preview_uncovered_command_is_honest(cli, app):

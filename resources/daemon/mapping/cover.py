@@ -10,6 +10,7 @@ from typing import Dict, Optional, Set
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import CoverCapabilities, MappingResult, PublicationDecision
+from models.decide_publication import DEFAULT_CONFIDENCE_POLICY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -300,7 +301,7 @@ class CoverMapper:
             reason_details=reason_details if reason_details else None,
         )
 
-    def decide_publication(self, mapping: MappingResult, confidence_policy: str = "sure_probable") -> PublicationDecision:
+    def decide_publication(self, mapping: MappingResult, confidence_policy: str = DEFAULT_CONFIDENCE_POLICY) -> PublicationDecision:
         """Apply the bounded publication policy for Story 2.3.
 
         confidence_policy: "sure_probable" (default) publie sure+probable.

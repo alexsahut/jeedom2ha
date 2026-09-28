@@ -56,10 +56,18 @@ from validation.ha_component_registry import PRODUCT_SCOPE
 # Confidences qui résultent d'un mapping réussi (étape 2 aboutie)
 _PUBLISHABLE_CONFIDENCES = frozenset({"sure", "probable", "sure_mapping"})
 
+# Story 19.3 (P3, relecture ClaudeBox PR #176 tour 2) — source unique de la politique de
+# confiance par défaut : `evaluate_equipment()` et `decide_publication()` portaient chacun
+# le même littéral "sure_probable" dupliqué. Racine de la chaîne d'imports (models/), donc
+# importable sans cycle par `evaluate_equipment.py`, `transport/http_server.py`, et les
+# mappers (`mapping/light.py`, `switch.py`, `cover.py`).
+DEFAULT_CONFIDENCE_POLICY = "sure_probable"
+VALID_CONFIDENCE_POLICIES = ("sure_only", "sure_probable")
+
 
 def decide_publication(
     mapping: MappingResult,
-    confidence_policy: str = "sure_probable",
+    confidence_policy: str = DEFAULT_CONFIDENCE_POLICY,
     product_scope: Optional[List[str]] = None,
     publication_override: Optional[str] = None,
 ) -> PublicationDecision:

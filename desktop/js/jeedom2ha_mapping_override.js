@@ -49,6 +49,20 @@
     };
   }
 
+  // Story 19.3 (AC6) — état sync vs override courant : distingue la dernière décision
+  // synchronisée (`app["publications"]`, MQTT) de l'état courant recalculé avec les
+  // overrides actifs. `override_pending` signale un override qui n'a pas encore été
+  // republié (l'utilisateur doit resynchroniser pour que Home Assistant reflète le
+  // changement).
+  function normalizeSyncStatus(raw) {
+    var s = raw || {};
+    return {
+      synced_should_publish: typeof s.synced_should_publish === 'boolean' ? s.synced_should_publish : null,
+      current_should_publish: typeof s.current_should_publish === 'boolean' ? s.current_should_publish : null,
+      override_pending: s.override_pending === true,
+    };
+  }
+
   function normalizeTree(payload) {
     var p = payload || {};
     var commands = Array.isArray(p.commands) ? p.commands : [];
@@ -58,7 +72,14 @@
       mapped: p.mapped === true,
       // Ordre natif préservé strictement (AC3 : pas de tri/regroupement front).
       commands: commands.map(normalizeCommandRow),
+      sync_status: normalizeSyncStatus(p.sync_status),
     };
+  }
+
+  // Story 19.3 (AC6) — l'accordéon pièce doit afficher un badge quand l'état courant
+  // (overrides actifs) diverge de la dernière décision synchronisée vers Home Assistant.
+  function shouldShowOverridePendingBadge(tree) {
+    return normalizeTree(tree).sync_status.override_pending === true;
   }
 
   // AC5 — état vide explicite : jamais un champ vide silencieux.
@@ -120,6 +141,35 @@
   // factuel (jamais vide, jamais un flash vert trompeur, jamais un code HTTP).
   function buildUncoveredLabel() {
     return 'Ne sera pas publié — commande non couverte par un mapping';
+  }
+
+  // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) — décide si `covered:false` doit
+  // afficher le libellé générique « non couverte » (buildUncoveredLabel) ou le VRAI
+  // diagnostic (buildPublishCellLabel). Avant ce correctif, `covered:false` masquait
+  // systématiquement la cause réelle : une commande exclue/désactivée en amont (I1/I4)
+  // affichait « non couverte par un mapping », un mensonge sur la vraie raison. Le seul
+  // cas où le générique reste correct est l'absence de diagnostic (`view === null`) ou
+  // `publication_reason === 'command_not_covered'` — un `CommandDecision` explicite
+  // signalant qu'AUCUN mapping (primaire ni secondaire) ne couvre cette commande.
+  function shouldShowUncoveredLabel(view) {
+    var d = readDiagnosticView(view);
+    if (d === null) {
+      return true;
+    }
+    return d.publication_reason === 'command_not_covered';
+  }
+
+  // Story 19.3 (P1) — extrait la vue `auto` BRUTE d'une réponse de preview (dry-run), miroir
+  // de `readPreviewOverridden` pour la branche `!covered` (Story 19.3, correction relecture
+  // ClaudeBox PR #176 tour 2) : avant ce correctif, l'appelant ignorait `payload.auto` sur
+  // une commande non couverte et rendait la cellule avec `view=null`, perdant tout
+  // diagnostic réel (raison d'inéligibilité amont) au profit du libellé générique.
+  function readPreviewAuto(payload) {
+    var p = (payload && payload.payload) ? payload.payload : payload;
+    if (!p || typeof p !== 'object' || !p.auto || typeof p.auto !== 'object') {
+      return null;
+    }
+    return p.auto;
   }
 
   // État diagnostic : 'ready' (vert franc), 'blocking' (neutre actionnable), 'unknown'.
@@ -208,6 +258,22 @@
     ha_missing_state_topic: 'pas de retour d’état exploitable',
     discovery_publish_failed: 'échec de publication MQTT au dernier sync',
     low_confidence: 'confiance insuffisante pour la politique active',
+    // Story 19.3 (AC4) — raisons exposées par le branchement sur evaluate_equipment().
+    no_mapping: 'aucun mapping trouvé pour cette commande',
+    skipped_no_mapping_candidate: 'aucun candidat de mapping à valider',
+    ha_component_not_in_product_scope: 'type HA non ouvert par ce plugin',
+    sure_mapping: 'mapping direct — publication normale',
+    publication_excluded_eqlogic: 'exclu manuellement (équipement)',
+    publication_excluded_command: 'exclu manuellement (commande)',
+    publication_forced: 'publication forcée manuellement',
+    // Story 19.3 (AC1/AC7) — le branchement sur evaluate_equipment() fait aussi remonter
+    // les raisons d'inéligibilité amont (Story 4.3) jusqu'au diagnostic par commande,
+    // là où la surface ignorait jusqu'ici ces cas (CC-03).
+    command_not_covered: 'commande non couverte par ce mapping',
+    excluded_eqlogic: 'exclu de Jeedom2HA (équipement dans la liste d’exclusions)',
+    excluded_plugin: 'exclu de Jeedom2HA (plugin source dans la liste d’exclusions)',
+    excluded_object: 'exclu de Jeedom2HA (pièce dans la liste d’exclusions)',
+    no_commands: 'aucune commande configurée dans Jeedom',
   };
 
   // Story 16.8 — raison de blocage concise pour la cellule diagnostic du tableau.
@@ -391,8 +457,10 @@
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,
+    readPreviewAuto: readPreviewAuto,
     readPreviewCovered: readPreviewCovered,
     buildUncoveredLabel: buildUncoveredLabel,
+    shouldShowUncoveredLabel: shouldShowUncoveredLabel,
     diagnosticState: diagnosticState,
     isReadyDiagnostic: isReadyDiagnostic,
     isBlockingDiagnostic: isBlockingDiagnostic,
@@ -409,6 +477,7 @@
     summarizePublication: summarizePublication,
     buildPublicationSummaryLabel: buildPublicationSummaryLabel,
     publicationSummaryState: publicationSummaryState,
+    shouldShowOverridePendingBadge: shouldShowOverridePendingBadge,
   };
 
   return api;

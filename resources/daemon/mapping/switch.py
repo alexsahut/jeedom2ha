@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import SwitchCapabilities, MappingResult, PublicationDecision
+from models.decide_publication import DEFAULT_CONFIDENCE_POLICY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -382,7 +383,7 @@ class SwitchMapper:
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
-    def decide_publication(self, mapping: MappingResult, confidence_policy: str = "sure_probable") -> PublicationDecision:
+    def decide_publication(self, mapping: MappingResult, confidence_policy: str = DEFAULT_CONFIDENCE_POLICY) -> PublicationDecision:
         """Apply the bounded publication policy for Story 2.4.
 
         confidence_policy: "sure_probable" (default) publie sure+probable.
