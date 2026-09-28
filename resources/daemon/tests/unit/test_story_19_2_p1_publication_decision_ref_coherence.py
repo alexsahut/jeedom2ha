@@ -51,6 +51,51 @@ _MSUNPV_CMDS = [
     (5170, "Production injectee journaliere", None, "Wh"),
     (5169, "Consommation reseau journaliere", None, "Wh"),
 ]
+_MSUNPV_CMD_IDS = [c[0] for c in _MSUNPV_CMDS]
+
+# Capture terrain eq554 (Story 11.2, multi-domaine) — (id, name, type, sub_type,
+# generic_type, unit). Dupliquée localement (plutôt qu'importée depuis
+# test_story_11_2_eq554_multi_domain) pour garder ce fichier P1-bis autonome.
+_EQ554_CMDS = [
+    (5205, "Routage", "info", "numeric", None, "%"),
+    (5530, "Routage réel", "info", "numeric", "ENERGY_STATE", "%"),
+    (5706, "On_5701", "action", "other", "ENERGY_ON", None),
+    (5707, "Off_5702", "action", "other", "ENERGY_OFF", None),
+    (5204, "Rafraichir", "action", "other", None, None),
+    (5206, "Puissance", "info", "numeric", None, "W"),
+    (5489, "etat", "info", "string", None, None),
+    (5372, "Absence", "action", "other", None, None),
+    (5490, "Manu", "action", "other", "ENERGY_ON", None),
+    (5491, "auto", "action", "other", "ENERGY_OFF", None),
+    (5510, "chauffe complète dans la journée", "info", "binary", None, None),
+    (5531, "Routage chauffe complete", "info", "numeric", None, "%"),
+    (5535, "CE Kwh chauffe complete", "info", "numeric", None, "kWh"),
+    (5532, "Routage 24H jusqua 22H36 hier", "info", "numeric", None, "%"),
+    (5533, "Routage aujourdhui", "info", "numeric", None, "%"),
+    (5534, "CE kWh 24H jusqua 22H36 hier", "info", "numeric", None, "kWh"),
+    (5527, "CE kWh depuis 22H36 hier", "info", "numeric", None, "kWh"),
+    (5542, "eq H de chauffe hier", "info", "numeric", None, "H"),
+    (5538, "eq H de chauffe aujourdhui", "info", "numeric", None, "H"),
+    (5543, "mediane chauffe complete sur 7 jours", "info", "numeric", None, "%"),
+    (5708, "activé", "info", "binary", "ENERGY_STATE", None),
+]
+
+
+def _eq554_eq_payload(eq_id: int = 554) -> dict:
+    return {
+        "id": eq_id,
+        "name": "Chauffe-eau",
+        "object_id": 1,
+        "is_enable": True,
+        "is_visible": True,
+        "eq_type": "virtual",
+        "is_excluded": False,
+        "status": {"timeout": 0},
+        "cmds": [
+            {"id": c, "name": n, "generic_type": g, "type": t, "sub_type": st, "unit": u}
+            for c, n, t, st, g, u in _EQ554_CMDS
+        ],
+    }
 
 _EQ628_CMDS = [
     (5977, "Filtration piscine", "info", "binary", "SWITCH_STATE"),
@@ -299,8 +344,10 @@ async def test_publier_out_of_scope_ecart_stops_state_streaming_and_command_rout
 
 # ---------------------------------------------------------------------------
 # Test 3 — "publier" réussi après un échec de publication précédent : le
-# principal redevient routable (le fix P1 rafraîchit mapping.publication_decision_ref
-# aussi sur le chemin de succès, pas seulement sur les chemins d'échec).
+# principal redevient routable. Depuis le fix P1-bis, les lecteurs I11 (state.py,
+# command.py) résolvent le principal directement depuis app["publications"][eq_id]
+# — plus jamais via mapping.publication_decision_ref, qui n'est plus repointée sur
+# le chemin de succès "publier" (seule la decision runtime canonique change).
 # ---------------------------------------------------------------------------
 
 
@@ -385,10 +432,13 @@ async def test_publier_success_after_prior_failure_restores_principal_command_ro
     body = (await resp.json())["payload"]
     assert body["scope_reel"]["equipements_publies_ou_crees"] == 1
 
-    # La ref du principal a bien été rafraîchie (pas seulement publications[eq_id]).
-    assert mapping.publication_decision_ref is app["publications"][628]
-    assert mapping.publication_decision_ref.should_publish is True
-    assert mapping.publication_decision_ref.active_or_alive is True
+    # P1-bis (revue ClaudeBox round 2) : les lecteurs I11 résolvent désormais le
+    # principal directement depuis app["publications"][eq_id] (la decision "runtime"),
+    # jamais depuis mapping.publication_decision_ref — le fix ne repointe plus cette
+    # ref sur le chemin de succès "publier". On vérifie donc le comportement
+    # (app["publications"][628] vivante et routable), pas l'identité de la ref.
+    assert app["publications"][628].should_publish is True
+    assert app["publications"][628].active_or_alive is True
 
     cmd_sync = CommandSynchronizer(
         app=app,
@@ -456,3 +506,173 @@ async def test_p2_secondary_discovery_publish_failure_blocks_command_routing(bri
     other_topic = f"jeedom2ha/628/{other_secondary.reason_details['cmd_id']}/set"
     ok_other = await cmd_sync.handle_command_message(other_topic, "ON")
     assert ok_other is True
+
+
+# ---------------------------------------------------------------------------
+# P1-bis (revue ClaudeBox round 2, PR #174) — régression bloquante : un
+# "supprimer" puis "publier" au même périmètre ne republiait, avant ce fix,
+# que le PRINCIPAL. `_sync_publication_decision_refs` remettait le
+# ``should_publish`` de chaque SECONDAIRE à False lors du "supprimer" ; comme
+# `_secondary_publishable` lit ce même flag pour autoriser la republication,
+# les secondaires restaient refusés indéfiniment — régression vs Story 11.2
+# (PR #127, revue Codex P2 : "re-inclusion without full sync → entities
+# missing on HA side"). Ces 3 tests pilotent le flux HTTP réel
+# (/action/sync -> /action/execute) pour prouver le comportement de bout en
+# bout, sans mocker DiscoveryPublisher (le bridge MagicMock suffit).
+# ---------------------------------------------------------------------------
+
+
+async def test_supprimer_puis_publier_eq553_republie_tous_les_secondaires(aiohttp_client, bridge):
+    """Multi-capteur sans commande (eq553, 8 entités sensor) : "publier" après
+    "supprimer" doit republier les 8 topics discovery (principal + 7
+    secondaires) et les 8 cibles d'état doivent redevenir streamables.
+    """
+    app = create_app(local_secret=_SECRET)
+    app["mqtt_bridge"] = bridge
+    client = await aiohttp_client(app)
+
+    with patch("transport.http_server.save_publications_cache"):
+        resp = await client.post(
+            "/action/sync",
+            json=_sync_body([_msunpv_eq_payload()]),
+            headers={"X-Local-Secret": _SECRET},
+        )
+        assert resp.status == 200
+
+        supprimer_body = {
+            "action": "execute",
+            "payload": {"intention": "supprimer", "portee": "equipement", "selection": [553]},
+            "request_id": "supprimer-553-r2",
+            "timestamp": "2026-09-28T00:04:00Z",
+        }
+        resp_del = await client.post("/action/execute", json=supprimer_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_del.status == 200
+
+        bridge.publish_message.reset_mock()
+
+        publier_body = {
+            "action": "execute",
+            "payload": {"intention": "publier", "portee": "equipement", "selection": [553]},
+            "request_id": "publier-553-r2",
+            "timestamp": "2026-09-28T00:05:00Z",
+        }
+        resp_pub = await client.post("/action/execute", json=publier_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_pub.status == 200
+
+    republished = {
+        call.args[0]
+        for call in bridge.publish_message.call_args_list
+        if call.args[0].startswith("homeassistant/sensor/jeedom2ha_553_")
+        and call.args[0].endswith("/config")
+        and call.args[1]
+    }
+    expected = {f"homeassistant/sensor/jeedom2ha_553_{cmd_id}/config" for cmd_id in _MSUNPV_CMD_IDS}
+    assert republished == expected, "les 8 topics discovery (principal + 7 secondaires) doivent être republiés"
+
+    state_sync = StateSynchronizer(app, bridge)
+    targets = state_sync.list_state_targets()
+    assert len(targets) == 8, "les 8 cibles d'état (principal + 7 secondaires) doivent redevenir streamables"
+
+
+async def test_supprimer_puis_publier_eq554_republie_switch_sensors_et_binary(aiohttp_client, bridge):
+    """Multi-domaine (eq554, 1 switch + 12 sensors + 1 binary_sensor = 14
+    entités) : "publier" après "supprimer" doit republier les 14 entités, pas
+    seulement le switch principal.
+    """
+    app = create_app(local_secret=_SECRET)
+    app["mqtt_bridge"] = bridge
+    client = await aiohttp_client(app)
+
+    with patch("transport.http_server.save_publications_cache"):
+        resp = await client.post(
+            "/action/sync",
+            json=_sync_body([_eq554_eq_payload()]),
+            headers={"X-Local-Secret": _SECRET},
+        )
+        assert resp.status == 200
+
+        supprimer_body = {
+            "action": "execute",
+            "payload": {"intention": "supprimer", "portee": "equipement", "selection": [554]},
+            "request_id": "supprimer-554-r2",
+            "timestamp": "2026-09-28T00:06:00Z",
+        }
+        resp_del = await client.post("/action/execute", json=supprimer_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_del.status == 200
+
+        bridge.publish_message.reset_mock()
+
+        publier_body = {
+            "action": "execute",
+            "payload": {"intention": "publier", "portee": "equipement", "selection": [554]},
+            "request_id": "publier-554-r2",
+            "timestamp": "2026-09-28T00:07:00Z",
+        }
+        resp_pub = await client.post("/action/execute", json=publier_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_pub.status == 200
+
+    def _republished_topics(prefix: str) -> set[str]:
+        return {
+            call.args[0]
+            for call in bridge.publish_message.call_args_list
+            if call.args[0].startswith(prefix) and call.args[0].endswith("/config") and call.args[1]
+        }
+
+    sensor_topics = _republished_topics("homeassistant/sensor/jeedom2ha_554_")
+    binary_topics = _republished_topics("homeassistant/binary_sensor/jeedom2ha_554_")
+    switch_topics = _republished_topics("homeassistant/switch/jeedom2ha_554")
+
+    assert len(sensor_topics) == 12, "les 12 sensors secondaires doivent être republiés"
+    assert binary_topics == {"homeassistant/binary_sensor/jeedom2ha_554_5510/config"}
+    assert switch_topics == {"homeassistant/switch/jeedom2ha_554/config"}
+
+
+async def test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_main(aiohttp_client, bridge):
+    """Garde-fou (non-régression, pas un cas visé par le fix) : le diagnostic
+    d'un échec de publication (bridge en panne) pour eq553 après "supprimer"
+    reste identique au comportement de main. Le fix P1-bis ne touche que
+    l'état runtime des SECONDAIRES ; la construction de la décision d'échec
+    du PRINCIPAL (reason="discovery_publish_failed" -> status_code=
+    "infra_incident", statut="non_publie") emprunte le même chemin de code
+    qu'avant, inchangé par ce fix.
+    """
+    app = create_app(local_secret=_SECRET)
+    app["mqtt_bridge"] = bridge
+    client = await aiohttp_client(app)
+
+    with patch("transport.http_server.save_publications_cache"):
+        resp = await client.post(
+            "/action/sync",
+            json=_sync_body([_msunpv_eq_payload()]),
+            headers={"X-Local-Secret": _SECRET},
+        )
+        assert resp.status == 200
+
+        supprimer_body = {
+            "action": "execute",
+            "payload": {"intention": "supprimer", "portee": "equipement", "selection": [553]},
+            "request_id": "supprimer-553-diag",
+            "timestamp": "2026-09-28T00:08:00Z",
+        }
+        resp_del = await client.post("/action/execute", json=supprimer_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_del.status == 200
+
+        bridge.publish_message.return_value = False  # panne bridge simulée
+
+        publier_body = {
+            "action": "execute",
+            "payload": {"intention": "publier", "portee": "equipement", "selection": [553]},
+            "request_id": "publier-553-diag",
+            "timestamp": "2026-09-28T00:09:00Z",
+        }
+        resp_pub = await client.post("/action/execute", json=publier_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_pub.status == 200
+
+    resp_diag = await client.get("/system/diagnostics", headers={"X-Local-Secret": _SECRET})
+    assert resp_diag.status == 200
+    diag_body = await resp_diag.json()
+    eq553_diag = next(eq for eq in diag_body["payload"]["equipments"] if eq["eq_id"] == 553)
+
+    assert eq553_diag["reason_code"] == "discovery_publish_failed"
+    assert eq553_diag["status_code"] == "infra_incident"
+    assert eq553_diag["statut"] == "non_publie"

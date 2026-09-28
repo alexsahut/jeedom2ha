@@ -58,6 +58,19 @@ Preuve terrain = sur la box, pour toutes les entités : `discovery state_topic =
 
 **Gate d'inventaire obligatoire (convention repo, `sprint-status.yaml`) :** cette story touche la publication vers Home Assistant (état MQTT streamé + routage de commandes pour des entités déjà publiées) — elle ne peut donc passer à `done` qu'après le gate obligatoire d'inventaire des entités avant/après déploiement (0 erreur), au même titre que toute story de ce type. Ce gate est distinct de l'outil de parité de Story 19.1 (qui mesure la décision de publication) : il porte spécifiquement sur l'inventaire des entités HA effectivement présentes après déploiement de cette correction.
 
+**Critères de preuve terrain (Task 5) — à vérifier lors du prochain déploiement box avec accès terrain :**
+
+- Parité outil `tools/parity_snapshot.py` : **292 décisions / 353 topics** inchangés (aucune divergence de publication introduite par les correctifs P1-bis) ; `i11_candidates` = **2** inchangé.
+- Via `GET /system/state_listeners` (source exacte des écouteurs enregistrés par le plugin PHP), exactement ces **12 écouteurs** passent d'absents (avant) à présents (après) — et aucun autre écouteur ne doit changer :
+  - eq 579 → cmd_ids 5369, 5493, 5494, 5689, 5695
+  - eq 585 → cmd_ids 5497, 5504, 5505, 5536, 5537, 5546, 5631
+- Au moins une entrée `state_published` dans le journal du daemon portant sur une de ces commandes (preuve qu'un état a réellement été streamé, pas seulement listé comme cible).
+- **0 ERROR** dans le journal du daemon sur la fenêtre de déploiement.
+- Les **21 daemons** de la box restent inchangés (aucun démarrage/arrêt/crash inattendu imputable au déploiement).
+- `VERSION` (endpoint diagnostics ou fichier version du daemon) égale le SHA effectivement déployé.
+
+Ces critères restent à vérifier terrain — non exécutés ce tour (round 2, aucun accès box, cf. Completion Notes).
+
 ## Invariants concernés
 
 I11 (objet principal de cette story — correction par découplage explicite, jamais par couplage forcé). I1-I7 non modifiés, à ne pas régresser (vérifié par la suite complète).
@@ -110,6 +123,14 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
 - Ne jamais coupler la décision d'un secondaire à celle du principal, dans aucun sens.
 - `state.py`/`command.py` restent des consommateurs de décisions déjà calculées — aucune logique de décision (I1-I7) ne doit être dupliquée ou réimplémentée dans ces modules.
+
+### Principe de conception — verdict step-4 vs état runtime (P1-bis, ClaudeBox review round 2, PR #174)
+
+- `should_publish` et `reason` sur une `PublicationDecision` sont le **verdict de l'étape 4** (`evaluate_equipment`, produit UNIQUEMENT lors d'une synchro complète). Aucune action (`publier`/`supprimer`/résolution d'écart) ne doit plus jamais écrire ces deux champs.
+- L'**état runtime** est porté par `discovery_published` et `active_or_alive` uniquement. C'est le SEUL terrain qu'une action a le droit de modifier : pour le principal, directement dans `publications[eq_id]` ; pour un secondaire, via une copie fraîche (`dataclasses.replace(ref, ...)`) qui repointe `publication_decision_ref` du secondaire — jamais de mutation en place, d'autres lecteurs pouvant encore référencer l'ancien objet.
+- Raison : une action "supprimer" qui écrivait `should_publish=False` sur un secondaire empoisonnait durablement `_secondary_publishable` — une "publier" ultérieure refusait alors de le republier, alors que le verdict step-4 (calculé à la dernière synchro complète) restait en réalité favorable. Seul l'état runtime doit refléter l'action ; le verdict ne bouge qu'à la prochaine synchro complète.
+- **Lecteurs I11** (`sync/state.py`, `sync/command.py`) : pour le **principal**, utiliser la variable runtime `decision` de la boucle de synchro (jamais `mapping.publication_decision_ref`, potentiellement obsolète) ; pour un **secondaire**, utiliser son propre `publication_decision_ref`, avec repli sur `decision` si absent. Forme exacte : `cand_decision = decision if candidate is mapping else (getattr(candidate, "publication_decision_ref", None) or decision)`.
+- Corollaire : le principal n'a plus de repoint de `mapping.publication_decision_ref` sur le chemin de succès "publier" — inutile, puisque les lecteurs I11 résolvent déjà le principal directement depuis `decision`/`app["publications"][eq_id]`.
 
 ### Guardrail — Déploiement terrain (DEV/TEST ONLY)
 
@@ -177,19 +198,39 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
   **Suite complète et non-régression.** `python3 -m pytest -q` depuis la racine du worktree → **1895 passed, 0 failed** (1882 avant ce tour + 5 tests P1/P2/P3 + 8 tests state_listeners, moins les 2 fichiers de tests existants modifiés en place sans ajout net de cas). `test_story_19_2_decouplage_state_command_i11.py` (6 tests I11 déjà existants) et `test_story_13_3_metering_plug_secondary_sensors.py` (non-régression pattern "metering plug", AC3) exécutés explicitement en isolation en plus de la suite complète — verts sans modification.
 
+- **code-review (ClaudeBox) round 2 + corrections (autonome)** — 2026-09-28 — revue du commit `751a6d5` (PR #174). Confirmé conforme : correctif P1 original, P2 `active_or_alive`, P3 reason codes, outil `state_listeners`, tests preuve par mutation, suite complète (1895 passed), CI verte, 0 thread Codex. Un point bloquant restant (P1-bis) et statut résultant : `in-progress` (inchangé — gate d'inventaire terrain toujours le seul écart bloquant `done`).
+
+  **P1-bis (bloquant) — "supprimer" puis "publier" (portée équipement) ne republiait que le PRINCIPAL, jamais les secondaires.** Régression vs Story 11.1.bis/11.2 : sur un multi-sensor (eq 553, 8 entités), seule 1/8 entité et 1/8 écouteur d'état se republiaient après un cycle supprimer→publier, contre 8/8 sur `main` et sur `3a408db`. Cause racine : `_sync_publication_decision_refs` (introduit par le fix P1 du tour précédent) forçait `should_publish=False` sur CHAQUE secondaire via `_refuse_secondary_decision`, y compris lors d'un "supprimer" — `_secondary_publishable` lit ce champ et refusait donc de republier les secondaires lors du "publier" suivant, alors que leur verdict step-4 (calculé à la dernière synchro complète) restait en réalité favorable.
+
+  **Correctif — séparation verdict step-4 / état runtime** (principe détaillé en Dev Notes ci-dessus) :
+  - `_refuse_secondary_decision` renommé `_reset_secondary_runtime_state` : ne touche plus jamais `should_publish`/`reason`, uniquement `discovery_published`/`active_or_alive`, via `dataclasses.replace(previous, ...)` (préserve tout le reste de la décision précédente, y compris le verdict step-4).
+  - `_sync_publication_decision_refs` : nouveau paramètre `secondary_discovery_published: Optional[bool]` — `None` court-circuite la boucle secondaires entièrement (utilisé sur le chemin `discovery_publish_failed`, où chaque secondaire a déjà son propre résultat réel enregistré par `_publish_mapping_for_action`, qu'un reset générique aurait écrasé — fix P3 additionnel de ce tour).
+  - Retrait de `mapping.publication_decision_ref = decision` sur le chemin de succès "publier" (principal) — devenu inutile et potentiellement trompeur, puisque les lecteurs I11 résolvent désormais le principal directement depuis la variable runtime `decision`, jamais depuis cette ref.
+  - `sync/state.py` (`list_state_targets`, `_candidate_state_topic`/état, `_resolve_state_target`) et `sync/command.py` (`_resolve_runtime_target`) : la résolution `cand_decision`/`candidate_decision` distingue désormais explicitement principal (`decision`, la variable runtime de la boucle de synchro) et secondaire (`candidate.publication_decision_ref`, avec repli sur `decision`) — forme exacte documentée en Dev Notes.
+
+  **Tests nouveaux (dans `test_story_19_2_p1_publication_decision_ref_coherence.py`), chacun avec preuve par mutation** (`git stash push --keep-index -- <fichiers de production>`, ré-exécution — doit échouer sur le baseline `751a6d5` sauf mention contraire "garde-fou", `git stash pop`, ré-exécution — doit passer) :
+  - `test_supprimer_puis_publier_eq553_republie_tous_les_secondaires` — cycle réel via `/action/sync` puis 2× `/action/execute` (supprimer, publier) sur eq 553 (multi-sensor MSunPV, 8 commandes) ; vérifie 8/8 topics discovery republiés et 8/8 cibles retournées par `StateSynchronizer.list_state_targets()`. **Échoue sur le baseline** (seul le topic principal était republié) ; **passe avec le fix restauré**.
+  - `test_supprimer_puis_publier_eq554_republie_switch_sensors_et_binary` — même cycle sur eq 554 (multi-domaine : 1 switch + 12 sensors + 1 binary_sensor, Story 11.2) ; vérifie les 12 topics sensor + le topic binary_sensor + le topic switch republiés. **Échoue sur le baseline, passe avec le fix.**
+  - `test_publier_success_after_prior_failure_restores_principal_command_routing` — adapté (comportement, pas identité) : l'assertion sur l'identité de `mapping.publication_decision_ref` (devenue obsolète, ce repoint étant retiré) remplacée par une vérification comportementale (`app["publications"][628].should_publish is True` et `.active_or_alive is True`, la decision runtime effectivement vivante et routable). Passe sur baseline ET avec le fix (aucune régression fonctionnelle sur ce chemin, seul un détail d'implémentation changeait) — attendu, pas un défaut de couverture.
+  - `test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_main` — **garde-fou** : cycle sync → supprimer → publier (échouée, `bridge.publish_message` renvoie `False`) sur eq 553, puis `GET /system/diagnostics` ; vérifie `reason_code="discovery_publish_failed"`, `status_code="infra_incident"`, `statut="non_publie"` — champs produits par un chemin de code non touché par ce correctif (construction de la décision d'échec du principal, dérivation de la taxonomie diagnostics), donc identiques à `main` par construction ; passe sur baseline ET avec le fix, confirmé intentionnellement (non-régression explicite de ce chemin).
+
+  **Suite complète et non-régression.** `python3 -m pytest -q` depuis la racine du worktree → **1898 passed, 0 failed** (1895 avant ce tour, +3 tests nets : 2 nouveaux tests republication + 1 test identité adapté en place). `test_story_19_2_decouplage_state_command_i11.py`, `test_story_13_3_metering_plug_secondary_sensors.py` et l'ensemble des tests `test_story_19_2_p1_*`/`test_story_19_2_p3_*`/`test_story_19_2_parity_state_listeners.py` exécutés en isolation en plus de la suite complète — verts sans modification de leur intention.
+
+  **Écart documenté — Task 5 toujours non close.** Comme au tour précédent : aucun déploiement/accès box dans cette fenêtre (round 2 également autonome, sans accès terrain). Le gate d'inventaire obligatoire et la vérification réelle des critères de preuve terrain (section dédiée ci-dessus) restent à faire lors d'un prochain tour avec accès box. Statut de la story laissé à `in-progress`.
+
 ### File List
 
-- `resources/daemon/sync/state.py` [MODIFIÉ] — AC1, découplage I11 (`list_state_targets`, `_resolve_state_target`)
-- `resources/daemon/sync/command.py` [MODIFIÉ] — AC2, découplage I11 (`_resolve_runtime_target`) ; revue ClaudeBox P3 — reason codes dérivés du candidat effectivement ciblé, plus du principal
+- `resources/daemon/sync/state.py` [MODIFIÉ] — AC1, découplage I11 (`list_state_targets`, `_resolve_state_target`) ; round 2 (P1-bis) — résolution explicite principal (`decision`) vs secondaire (`candidate.publication_decision_ref`)
+- `resources/daemon/sync/command.py` [MODIFIÉ] — AC2, découplage I11 (`_resolve_runtime_target`) ; revue ClaudeBox P3 — reason codes dérivés du candidat effectivement ciblé, plus du principal ; round 2 (P1-bis) — même résolution explicite principal/secondaire que `state.py`
 - `resources/daemon/tests/unit/test_story_19_2_decouplage_state_command_i11.py` [NOUVEAU] — AC1-AC4, 6 tests
 - `resources/daemon/tools/parity_snapshot.py` [MODIFIÉ] — Task 5, extension lecture seule opt-in (topics d'état retenus, corrélation I11) ; revue ClaudeBox P2 — `fetch_state_listeners`/champ `state_listeners`/diff `listeners_added`+`listeners_removed`, relevé systématique via `/system/state_listeners` ; P3 — reformulation docstring module
 - `resources/daemon/tests/unit/test_story_19_2_parity_state_topics.py` [MODIFIÉ] — Task 5, 12 tests (extension outil de parité) ; revue ClaudeBox — mock `fetch_state_listeners` ajouté (appel désormais systématique)
 - `scripts/parity-snapshot.sh` [MODIFIÉ] — Task 5, seconde souscription MQTT (topics d'état) en lecture seule
 - `tests/unit/test_parity_snapshot_wrapper.py` [MODIFIÉ] — mise à jour du test wrapper existant (2 souscriptions MQTT au lieu d'1)
-- `resources/daemon/transport/http_server.py` [MODIFIÉ] — revue ClaudeBox P1/P2 — helpers `_sync_publication_decision_refs`/`_refuse_secondary_decision`, câblage aux 6 sites de remplacement de décision ("supprimer" ×2, "publier" échecs ×2, `ecarts_resolus` ×2), resynchro du principal au succès "publier", reset `active_or_alive=False` avant tentative secondaire (`_publish_additional_sensors`), bascule `discovery_published`/`active_or_alive` du secondaire effectivement republié
-- `resources/daemon/tests/unit/test_story_19_2_p1_publication_decision_ref_coherence.py` [NOUVEAU] — revue ClaudeBox P1/P2, 4 tests (preuve par mutation)
+- `resources/daemon/transport/http_server.py` [MODIFIÉ] — revue ClaudeBox P1/P2 — helpers `_sync_publication_decision_refs`/`_refuse_secondary_decision`, câblage aux 6 sites de remplacement de décision ("supprimer" ×2, "publier" échecs ×2, `ecarts_resolus` ×2), resynchro du principal au succès "publier", reset `active_or_alive=False` avant tentative secondaire (`_publish_additional_sensors`), bascule `discovery_published`/`active_or_alive` du secondaire effectivement republié ; round 2 (P1-bis) — `_refuse_secondary_decision` renommé `_reset_secondary_runtime_state` (préserve `should_publish`/`reason` via `dataclasses.replace`), `_sync_publication_decision_refs` accepte `secondary_discovery_published=None` (skip secondaires), retrait du repoint `mapping.publication_decision_ref = decision` sur le succès "publier", préservation par-secondaire de `discovery_published` réel sur l'échec local-availability
+- `resources/daemon/tests/unit/test_story_19_2_p1_publication_decision_ref_coherence.py` [MODIFIÉ] — revue ClaudeBox P1/P2, 4 tests (preuve par mutation) ; round 2 (P1-bis) — identité test adapté en comportement, +2 tests republication eq553/eq554, +1 test garde-fou diagnostics (7 tests au total)
 - `resources/daemon/tests/unit/test_story_19_2_p3_command_reason_code_candidate.py` [NOUVEAU] — revue ClaudeBox P3, 1 test (gap détecté pendant la mutation testing — aucun test existant n'exerçait ce chemin ; preuve par mutation)
 - `resources/daemon/tests/unit/test_story_19_2_parity_state_listeners.py` [NOUVEAU] — revue ClaudeBox P2 (tooling), 8 tests (preuve par mutation)
 - `resources/daemon/tests/unit/test_story_19_1_parity_tool_readonly.py` [MODIFIÉ] — revue ClaudeBox — mock `fetch_state_listeners` ajouté (appel désormais systématique)
-- `_bmad-output/implementation-artifacts/19-2-decouplage-etat-commandes-invariant-i8.md` [MODIFIÉ] — statut, tasks, Completion Notes, File List
+- `_bmad-output/implementation-artifacts/19-2-decouplage-etat-commandes-invariant-i8.md` [MODIFIÉ] — statut, tasks, Completion Notes, File List, Dev Notes (principe step-4/runtime), Preuve terrain (critères Task 5)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ] — statut `19-2-decouplage-etat-commandes-invariant-i8: in-progress`

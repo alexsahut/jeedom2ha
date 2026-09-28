@@ -165,7 +165,15 @@ class StateSynchronizer:
                 # principal's. A secondary published under a refused principal
                 # must still stream (and a refused secondary under a published
                 # principal must never inherit the principal's publication).
-                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                # P1-bis fix (ClaudeBox review round 2, PR #174): the principal's
+                # own decision comes straight from `decision`, never from a
+                # possibly-stale mapping.publication_decision_ref (actions no
+                # longer repoint it on the "publier" success path).
+                cand_decision = (
+                    decision
+                    if candidate is mapping
+                    else (getattr(candidate, "publication_decision_ref", None) or decision)
+                )
                 if not getattr(cand_decision, "should_publish", False):
                     continue
                 if not getattr(cand_decision, "discovery_published", False):
@@ -206,7 +214,12 @@ class StateSynchronizer:
         eq_id = getattr(mapping, "jeedom_eq_id", None)
         count = 0
         for candidate in self._iter_streamed_candidates(mapping):
-            cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+            # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
+            cand_decision = (
+                decision
+                if candidate is mapping
+                else (getattr(candidate, "publication_decision_ref", None) or decision)
+            )
             if not getattr(cand_decision, "discovery_published", False):
                 continue
             state_topic = self._candidate_state_topic(candidate, cand_decision, eq_id)
@@ -274,7 +287,12 @@ class StateSynchronizer:
                 # filter on it, never on the principal's should_publish (l.263-264
                 # in the pre-fix version evaluated the principal before even
                 # locating the candidate).
-                cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
+                cand_decision = (
+                    decision
+                    if candidate is mapping
+                    else (getattr(candidate, "publication_decision_ref", None) or decision)
+                )
                 if not getattr(cand_decision, "should_publish", False):
                     return None
                 if not getattr(cand_decision, "discovery_published", False):

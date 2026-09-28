@@ -209,7 +209,16 @@ class CommandSynchronizer:
             matched_topic = False
 
             for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
-                candidate_decision = getattr(candidate, "publication_decision_ref", None) or decision
+                # P1-bis fix (ClaudeBox review round 2, PR #174) — the principal's
+                # own decision comes straight from `decision` (app["publications"]),
+                # never from mapping.publication_decision_ref: actions no longer
+                # repoint the principal's ref on the "publier" success path, so a
+                # stale ref there must not shadow the fresh runtime decision.
+                candidate_decision = (
+                    decision
+                    if candidate is mapping
+                    else (getattr(candidate, "publication_decision_ref", None) or decision)
+                )
                 expected_topics = self._expected_command_topics(candidate)
                 if topic not in expected_topics.values():
                     continue

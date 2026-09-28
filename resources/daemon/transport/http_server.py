@@ -4,6 +4,7 @@ Listens on 127.0.0.1 only, protected by a local_secret shared with the PHP plugi
 """
 
 import asyncio
+import dataclasses
 import logging
 import os
 import socket
@@ -483,46 +484,64 @@ def _should_attempt_publish(
 
 
 def _secondary_publishable(secondary: MappingResult) -> bool:
-    """Return True when the secondary's last-sync decision (Story 16.2/CC-08 review)
-    allows publication. `publication_decision_ref` is populated by
-    `_publish_additional_sensors` on the previous sync; in its absence (never synced,
-    or a decision that already refused publication), the secondary must not be
-    (re)published outside of a full sync — an unknown decision is treated as refused,
-    never as an implicit allow.
+    """Return True when the secondary's step-4 verdict (``evaluate_equipment``,
+    last full sync) allows publication.
+
+    P1-bis fix (ClaudeBox review round 2, PR #174) — ``should_publish``/``reason``
+    are the step-4 verdict and are never written by an action anymore (see
+    ``_reset_secondary_runtime_state``), so this keeps reading the true verdict
+    from the last full sync even after a "supprimer" action has turned the
+    secondary's runtime state (``discovery_published``/``active_or_alive``) off.
+    In the absence of any decision (never synced), the secondary must not be
+    (re)published outside of a full sync — an unknown decision is treated as
+    refused, never as an implicit allow.
     """
     decision_ref = getattr(secondary, "publication_decision_ref", None)
     return bool(decision_ref is not None and getattr(decision_ref, "should_publish", False))
 
 
-def _refuse_secondary_decision(
+def _reset_secondary_runtime_state(
     secondary: MappingResult,
     *,
-    reason: str,
-    preserve_discovery_published: bool = False,
+    discovery_published: bool,
+    active_or_alive: bool = False,
 ) -> PublicationDecision:
-    """Build a FRESH refused ``PublicationDecision`` for one secondary mapping and
-    repoint its ``publication_decision_ref`` to it (never mutates the previous
-    decision object in place — other consumers may still hold a reference to it).
+    """Update ONLY the runtime state (``discovery_published``/``active_or_alive``)
+    of one secondary mapping's ``publication_decision_ref``, via a fresh
+    ``dataclasses.replace()`` copy (never mutates the previous decision object in
+    place — other consumers may still hold a reference to it), then repoints the
+    secondary's ref to that copy.
 
-    ``preserve_discovery_published`` keeps the secondary's prior
-    ``discovery_published`` flag instead of forcing it to False: used for the
-    local-availability-publish-failed path, where the secondary's discovery
-    message really was published successfully earlier in the same call — only
-    ``should_publish``/``active_or_alive`` must reflect the refusal, exactly
-    like ``_mark_local_availability_publish_failed`` already does for the
-    principal.
+    P1-bis fix (ClaudeBox review round 2, PR #174) — ``should_publish`` and
+    ``reason`` are the step-4 verdict (``evaluate_equipment``, full sync only)
+    and must NEVER be touched by an action: an earlier version of this helper
+    forced ``should_publish=False`` on every secondary during "supprimer", which
+    made ``_secondary_publishable`` refuse to republish them on a later
+    "publier" — only the principal came back, the secondaries stayed missing
+    from HA until the next full sync. Reusing the previous decision via
+    ``dataclasses.replace`` preserves the step-4 verdict untouched.
+
+    When the secondary was never synced (no previous decision to preserve), a
+    conservative refused decision is built instead — nothing to preserve, and an
+    unknown verdict must never be treated as an implicit allow.
     """
     previous = getattr(secondary, "publication_decision_ref", None)
-    decision = PublicationDecision(
-        should_publish=False,
-        reason=reason,
-        mapping_result=secondary,
-        state_topic=getattr(previous, "state_topic", None) or _resolve_state_topic(secondary),
-        active_or_alive=False,
-        discovery_published=(
-            bool(getattr(previous, "discovery_published", False)) if preserve_discovery_published else False
-        ),
-    )
+    if previous is None:
+        decision = PublicationDecision(
+            should_publish=False,
+            reason="no_sync_decision",
+            mapping_result=secondary,
+            state_topic=_resolve_state_topic(secondary),
+            active_or_alive=active_or_alive,
+            discovery_published=discovery_published,
+        )
+    else:
+        decision = dataclasses.replace(
+            previous,
+            mapping_result=secondary,
+            discovery_published=discovery_published,
+            active_or_alive=active_or_alive,
+        )
     secondary.publication_decision_ref = decision
     return decision
 
@@ -531,29 +550,41 @@ def _sync_publication_decision_refs(
     mapping: MappingResult,
     decision: PublicationDecision,
     *,
-    reason_for_secondaries: str,
-    preserve_secondary_discovery_published: bool = False,
+    secondary_discovery_published: Optional[bool] = False,
+    secondary_active_or_alive: bool = False,
 ) -> None:
     """P1 fix (ClaudeBox review, commit 3a408db) — single helper called by every
     action path in this module that replaces ``publications[eq_id]`` with a
     refused/failed ``decision`` for the principal ``mapping``.
 
     Before this fix, only ``publications[eq_id]`` was updated: ``mapping.
-    publication_decision_ref`` (principal AND secondaries) kept pointing at the
-    stale published decision until the next full sync, which is exactly what
-    the I11-decoupled readers (``sync/state.py``, ``sync/command.py``,
-    ``_secondary_publishable``) consult — so a deleted/excluded equipment kept
-    streaming state and routing commands. This helper keeps both consistent in
-    one place: the principal's ref is repointed to ``decision`` (already built
-    by the caller with the correct availability metadata), and every secondary
-    is refused via ``_refuse_secondary_decision``.
+    publication_decision_ref`` — consulted by the I11-decoupled readers
+    (``sync/state.py``, ``sync/command.py``) — kept pointing at the stale
+    published decision until the next full sync, so a deleted/excluded
+    equipment kept streaming state and routing commands. This helper keeps
+    ``publications[eq_id]`` and ``mapping.publication_decision_ref`` consistent
+    in one place for the principal.
+
+    P1-bis fix (ClaudeBox review round 2, PR #174) — the principal's ref is
+    repointed unconditionally (the principal has no separate "step-4 verdict"
+    storage distinct from ``publications[eq_id]``), but secondaries only get
+    their RUNTIME state touched, via ``_reset_secondary_runtime_state``
+    (``should_publish``/``reason`` are preserved).
+
+    ``secondary_discovery_published=None`` skips the secondary loop entirely
+    (P3 fix): used when the caller (``_publish_mapping_for_action``) already
+    recorded each secondary's real per-candidate outcome and a blanket reset
+    here would clobber the secondaries that were actually republished before a
+    later secondary or the local-availability step failed.
     """
     mapping.publication_decision_ref = decision
+    if secondary_discovery_published is None:
+        return
     for secondary in mapping.additional_mappings or []:
-        _refuse_secondary_decision(
+        _reset_secondary_runtime_state(
             secondary,
-            reason=reason_for_secondaries,
-            preserve_discovery_published=preserve_secondary_discovery_published,
+            discovery_published=secondary_discovery_published,
+            active_or_alive=secondary_active_or_alive,
         )
 
 
@@ -3280,9 +3311,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                     availability_reason=previous_decision.availability_reason,
                 )
                 publications[eq_id] = new_decision
-                _sync_publication_decision_refs(
-                    previous_decision.mapping_result, new_decision, reason_for_secondaries="excluded"
-                )
+                _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
             elif mappings.get(eq_id) is not None:
                 mapping = mappings[eq_id]
                 resolved_decision = PublicationDecision(
@@ -3295,7 +3324,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 )
                 _apply_availability_metadata(resolved_decision, mapping, topology)
                 publications[eq_id] = resolved_decision
-                _sync_publication_decision_refs(mapping, resolved_decision, reason_for_secondaries="excluded")
+                _sync_publication_decision_refs(mapping, resolved_decision)
 
             equipements_supprimes += 1
 
@@ -3394,8 +3423,16 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 )
                 _apply_availability_metadata(failed_decision, mapping, topology)
                 publications[eq_id] = failed_decision
+                # P3 fix (ClaudeBox review round 2, PR #174) — publish_ok is False when
+                # EITHER the primary or any secondary failed inside
+                # _publish_mapping_for_action; secondaries that DID succeed there
+                # already have discovery_published/active_or_alive=True on their own
+                # decision_ref. secondary_discovery_published=None skips the blanket
+                # reset so those real per-candidate outcomes are preserved instead of
+                # being clobbered back to "not published" (main has the same limitation
+                # for secondaries left untouched by a failed publish attempt).
                 _sync_publication_decision_refs(
-                    mapping, failed_decision, reason_for_secondaries="discovery_publish_failed"
+                    mapping, failed_decision, secondary_discovery_published=None
                 )
                 publish_errors += 1
                 continue
@@ -3429,23 +3466,35 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             if not local_ok:
                 local_failed_decision = _mark_local_availability_publish_failed(decision, mapping)
                 publications[eq_id] = local_failed_decision
+                mapping.publication_decision_ref = local_failed_decision
                 # Secondaries were already (re)published above (_publish_mapping_for_action) —
-                # preserve their discovery_published flag, on the same model as the
-                # principal's own decision (_mark_local_availability_publish_failed keeps
-                # decision.discovery_published as-is); only should_publish/active_or_alive
-                # reflect the local-availability refusal.
-                _sync_publication_decision_refs(
-                    mapping,
-                    local_failed_decision,
-                    reason_for_secondaries="local_availability_publish_failed",
-                    preserve_secondary_discovery_published=True,
-                )
+                # preserve each secondary's OWN discovery_published flag, on the same
+                # model as the principal's own decision
+                # (_mark_local_availability_publish_failed keeps decision.discovery_published
+                # as-is); only active_or_alive reflects the local-availability refusal.
+                # should_publish/reason are never touched by an action (P1-bis fix,
+                # ClaudeBox review round 2, PR #174) — _reset_secondary_runtime_state
+                # preserves them via dataclasses.replace().
+                for secondary in mapping.additional_mappings or []:
+                    prior_discovery_published = bool(
+                        getattr(getattr(secondary, "publication_decision_ref", None), "discovery_published", False)
+                    )
+                    _reset_secondary_runtime_state(
+                        secondary,
+                        discovery_published=prior_discovery_published,
+                        active_or_alive=False,
+                    )
                 publish_errors += 1
                 continue
 
             decision.active_or_alive = True
             publications[eq_id] = decision
-            mapping.publication_decision_ref = decision
+            # P1-bis fix (ClaudeBox review round 2, PR #174) — the principal's ref is no
+            # longer repointed to an action's runtime decision on the success path. I11
+            # readers (sync/state.py, sync/command.py) now resolve the principal's
+            # decision straight from app["publications"][eq_id] (the `decision` local
+            # variable in their loop), never from mapping.publication_decision_ref, so
+            # routing/streaming still picks up this fresh `decision` without the repoint.
             equipements_publies_ou_crees += 1
             continue
 
@@ -3505,9 +3554,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 availability_reason=previous_decision.availability_reason,
             )
             publications[eq_id] = new_decision
-            _sync_publication_decision_refs(
-                previous_decision.mapping_result, new_decision, reason_for_secondaries="excluded"
-            )
+            _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
         elif mapping is not None:
             resolved_decision = PublicationDecision(
                 should_publish=False,
@@ -3519,7 +3566,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             )
             _apply_availability_metadata(resolved_decision, mapping, topology)
             publications[eq_id] = resolved_decision
-            _sync_publication_decision_refs(mapping, resolved_decision, reason_for_secondaries="excluded")
+            _sync_publication_decision_refs(mapping, resolved_decision)
 
         ecarts_resolus += 1
 
