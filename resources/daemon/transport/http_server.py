@@ -72,6 +72,13 @@ _VERSION = "0.2.0"
 
 _MAPPING_COUNTER_BUCKETS = ("sure", "probable", "ambiguous", "published", "skipped")
 
+# Story 19.3 (P3, relecture ClaudeBox PR #176) — source unique de la politique de confiance
+# par défaut, partagée par l'ingestion de sync (`_handle_sync`) et l'aperçu (`_handle_overrides_
+# preview`) : les deux tombaient auparavant sur le même littéral `"sure_probable"` dupliqué à
+# deux endroits, un risque de divergence silencieuse si l'un des deux changeait sans l'autre.
+_DEFAULT_CONFIDENCE_POLICY = "sure_probable"
+_VALID_CONFIDENCE_POLICIES = ("sure_only", "sure_probable")
+
 
 def _check_secret(request: web.Request, local_secret: str) -> bool:
     """Validate the local_secret from request header."""
@@ -1423,10 +1430,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
     # Story 4.3 — Extraire et valider confidence_policy avant de traiter la topologie
     sync_config = payload.get("sync_config", {})
-    confidence_policy = sync_config.get("confidence_policy", "sure_probable")
-    if confidence_policy not in ("sure_only", "sure_probable"):
-        _LOGGER.warning("[SYNC] confidence_policy invalide '%s' → fallback sure_probable", confidence_policy)
-        confidence_policy = "sure_probable"
+    confidence_policy = sync_config.get("confidence_policy", _DEFAULT_CONFIDENCE_POLICY)
+    if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
+        _LOGGER.warning(
+            "[SYNC] confidence_policy invalide '%s' → fallback %s",
+            confidence_policy, _DEFAULT_CONFIDENCE_POLICY,
+        )
+        confidence_policy = _DEFAULT_CONFIDENCE_POLICY
 
     _LOGGER.info("[TOPOLOGY] Received sync request (confidence_policy=%s)", confidence_policy)
     request.app["confidence_policy"] = confidence_policy
@@ -2278,19 +2288,23 @@ def _build_publication_override_diag(reason_code, pub_decision):
 
 
 def _secondary_mapping_by_cmd(primary_mapping):
-    """Index {cmd_id: MappingResult} des capteurs secondaires (Story 11.1 multi-sensor).
+    """Index {cmd_id: MappingResult} des capteurs/interrupteurs secondaires (Story 11.1
+    multi-sensor), TOUTES les commandes qu'ils couvrent confondues.
 
-    Chaque secondaire d'`additional_mappings` porte son propre cmd_id Jeedom dans
-    `reason_details["cmd_id"]`. Ces capteurs sont publiés au sync mais absents du mapping
-    primaire — cet index permet à l'arbre/preview d'exposer leur diagnostic réel par
-    commande. Premier gagnant si collision (setdefault), ordre natif préservé.
+    Un secondaire couvre non seulement sa commande d'état (`reason_details["cmd_id"]`) mais
+    aussi, pour un interrupteur secondaire, ses commandes d'action (On/Off) présentes dans
+    `secondary.commands` — routées et prouvées par la Story 19.2. Utilise `mapping_cmd_ids()`
+    (même extraction que le primaire, `mapping/overrides.py`) pour ne PAS dupliquer une
+    seconde définition de « quelles commandes appartiennent à ce mapping » (Story 19.3,
+    correction relecture ClaudeBox PR #176, P1-b) : c'est la même fonction que celle utilisée
+    par `covered`, le diagnostic de l'arbre et la cible de l'aperçu (`_target_mapping_for_cmd`).
+    Premier gagnant si collision (setdefault), ordre natif préservé.
     """
     index: Dict[int, object] = {}
     if primary_mapping is None:
         return index
     for secondary in (primary_mapping.additional_mappings or []):
-        cmd_id = (secondary.reason_details or {}).get("cmd_id")
-        if isinstance(cmd_id, int) and not isinstance(cmd_id, bool):
+        for cmd_id in mapping_cmd_ids(secondary):
             index.setdefault(cmd_id, secondary)
     return index
 
@@ -2364,6 +2378,23 @@ def _view_from_evaluation(evaluation, cmd_id):
     return _decision_view(decision, target_mapping)
 
 
+def _view_for_ineligible_or_unmapped(evaluation, cmd_id):
+    """Vue JSON-safe pour un équipement dont `evaluation.mapping is None` (inéligible, I1,
+    ou `no_mapping`, étape 2) — Story 19.3, correction relecture ClaudeBox PR #176 (P1-a).
+
+    Ni `evaluate_equipment()` ni `decide_publication()` ne consultent jamais un override
+    (TYPE ou politique) avant ce point de sortie précoce (I4 : le premier échec 1→2 fait foi,
+    jamais réévalué en aval) : la décision exposée ici est donc IDENTIQUE pour la vue AUTO et
+    la vue AVEC override proposé — un seul appel suffit, jamais de second `evaluate_equipment`
+    à rejouer pour ce cas. `mapping=None` : mêmes champs que le diagnostic de l'arbre
+    (`_build_mapping_override_tree`, branche `diag_mapping=None`), jamais `None` (AC7)."""
+    if isinstance(cmd_id, int):
+        for command_decision in evaluation.command_decisions:
+            if command_decision.cmd_id == cmd_id:
+                return _decision_view(command_decision, None)
+    return _decision_view(evaluation.equipment_decision, None)
+
+
 async def _handle_overrides_preview(request: web.Request) -> web.Response:
     """POST /system/overrides/preview — Story 16.6 : dry-run d'un override (lecture seule).
 
@@ -2424,9 +2455,9 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
 
     # AC2 (Story 19.3) : politique de confiance = celle de l'état applicatif (dernier sync),
     # jamais celle du payload (écart relevé PR #169).
-    confidence_policy = request.app.get("confidence_policy") or "sure_probable"
-    if confidence_policy not in ("sure_only", "sure_probable"):
-        confidence_policy = "sure_probable"
+    confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
+    if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
+        confidence_policy = _DEFAULT_CONFIDENCE_POLICY
 
     native_generic_types = {str(c.id): c.generic_type for c in eq.cmds}
     data_dir = _resolve_data_dir(request)
@@ -2446,13 +2477,20 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
         persisted_equipment_overrides=persisted_equipment_overrides,
     )
     if auto_evaluation.mapping is None:
+        # P1-a (relecture ClaudeBox PR #176) : jamais muet — expose la VRAIE décision du
+        # contrat (raison d'éligibilité ou `no_mapping`, `should_publish:false`), la même vue
+        # que le `diagnostic` de l'arbre pour cette commande (AC2/AC7). `auto` et `overridden`
+        # partagent la même vue : aucun override ne peut changer une décision déjà tranchée au
+        # niveau 1/2 (I4), voir `_view_for_ineligible_or_unmapped`. `covered` toujours présent.
+        no_mapping_view = _view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id)
         return web.json_response({
             "status": "ok",
             "payload": {
                 "jeedom_eq_id": eq_id,
                 "mapped": False,
-                "auto": None,
-                "overridden": None,
+                "covered": False,
+                "auto": no_mapping_view,
+                "overridden": no_mapping_view,
                 "native_generic_types": native_generic_types,
             },
         })
@@ -2573,7 +2611,9 @@ def _resolve_data_dir(request: web.Request) -> str:
     return request.app.get("data_dir") or _DATA_DIR
 
 
-def _build_mapping_override_tree(eq, snapshot, data_dir, confidence_policy="sure_probable", synced_decision=None):
+def _build_mapping_override_tree(
+    eq, snapshot, data_dir, confidence_policy=_DEFAULT_CONFIDENCE_POLICY, synced_decision=None
+):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
     Pour chaque commande de l'équipement (ordre natif Jeedom), expose le `generic_type`
@@ -2693,7 +2733,7 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
         )
 
     data_dir = _resolve_data_dir(request)
-    confidence_policy = request.app.get("confidence_policy") or "sure_probable"
+    confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
     synced_decision = (request.app.get("publications") or {}).get(eq_id)
     payload = _build_mapping_override_tree(
         eq, snapshot, data_dir, confidence_policy, synced_decision
