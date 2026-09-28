@@ -2379,15 +2379,24 @@ def _view_from_evaluation(evaluation, cmd_id):
 
 
 def _view_for_ineligible_or_unmapped(evaluation, cmd_id):
-    """Vue JSON-safe pour un équipement dont `evaluation.mapping is None` (inéligible, I1,
-    ou `no_mapping`, étape 2) — Story 19.3, correction relecture ClaudeBox PR #176 (P1-a).
+    """Vue JSON-safe résolue via `command_decisions` (jamais un mapping ré-évalué) — Story
+    19.3, correction relecture ClaudeBox PR #176. Deux appelants :
 
-    Ni `evaluate_equipment()` ni `decide_publication()` ne consultent jamais un override
-    (TYPE ou politique) avant ce point de sortie précoce (I4 : le premier échec 1→2 fait foi,
-    jamais réévalué en aval) : la décision exposée ici est donc IDENTIQUE pour la vue AUTO et
-    la vue AVEC override proposé — un seul appel suffit, jamais de second `evaluate_equipment`
-    à rejouer pour ce cas. `mapping=None` : mêmes champs que le diagnostic de l'arbre
-    (`_build_mapping_override_tree`, branche `diag_mapping=None`), jamais `None` (AC7)."""
+    P1-a : équipement dont `evaluation.mapping is None` (inéligible, I1, ou `no_mapping`,
+    étape 2). Ni `evaluate_equipment()` ni `decide_publication()` ne consultent jamais un
+    override (TYPE ou politique) avant ce point de sortie précoce (I4 : le premier échec 1→2
+    fait foi, jamais réévalué en aval) : la décision exposée ici est donc IDENTIQUE pour la vue
+    AUTO et la vue AVEC override proposé — un seul appel suffit, jamais de second
+    `evaluate_equipment` à rejouer pour ce cas.
+
+    Écart corpus doré (`auto_target is None`, `_handle_overrides_preview`) : équipement mappé
+    mais `cmd_id` non couvert NI par le primaire NI par un secondaire (`command_not_covered`).
+    Sans ce helper, l'aperçu retombait sur la vue du mapping PRIMAIRE (équipement) au lieu de
+    la décision propre à cette commande, divergeant du diagnostic de l'arbre pour la même
+    commande (eq 230/554/583 du corpus doré 59 équipements).
+
+    Dans les deux cas : mêmes champs que le diagnostic de l'arbre (`_build_mapping_override_
+    tree`, branche `diag_mapping=None`), jamais `None` (AC7)."""
     if isinstance(cmd_id, int):
         for command_decision in evaluation.command_decisions:
             if command_decision.cmd_id == cmd_id:
@@ -2497,7 +2506,13 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
 
     # AC12 « jamais vide » : une commande ciblée qui n'est couverte NI par le primaire NI par
     # un capteur secondaire n'a pas de mapping à évaluer. On répond honnêtement
-    # `covered:false` / `overridden:null` : l'UI montre « non couvert ».
+    # `covered:false` / `overridden:null` : l'UI montre « non couvert ». `auto` doit exposer
+    # la décision PROPRE à cette commande (`command_not_covered`, via `command_decisions`),
+    # pas la vue du mapping primaire — sinon l'aperçu divergerait du diagnostic de l'arbre pour
+    # cette même commande (relecture ClaudeBox PR #176, écart découvert sur le corpus doré 59
+    # équipements : eq 230/554/583). `_view_for_ineligible_or_unmapped` fait exactement cette
+    # résolution par `cmd_id` dans `command_decisions`, `mapping=None` — même contrat que la
+    # branche `diag_mapping=None` de `_build_mapping_override_tree`.
     auto_target = _target_mapping_for_cmd(auto_evaluation, proposed_cmd_id)
     if auto_target is None:
         return web.json_response({
@@ -2506,7 +2521,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
                 "jeedom_eq_id": eq_id,
                 "mapped": True,
                 "covered": False,
-                "auto": _view_from_evaluation(auto_evaluation, None),
+                "auto": _view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id),
                 "overridden": None,
                 "native_generic_types": native_generic_types,
             },
