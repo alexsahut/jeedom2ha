@@ -445,6 +445,7 @@ def test_capture_snapshot_includes_published_scope_exceptions(monkeypatch):
             },
         },
     )
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
     snapshot = pt.capture_snapshot(
         base_url="http://x", local_secret=SECRET,
         mqtt_host="x", mqtt_port=1883, label="before",
@@ -479,6 +480,7 @@ def test_module_never_calls_mosquitto_pub_or_action_endpoints():
 def test_ssh_inventory_capture_needs_no_local_mosquitto(monkeypatch, tmp_path):
     monkeypatch.setattr(pt, "fetch_diagnostics", lambda *a, **kw: _diagnostics_payload([_eq(1)]))
     monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **kw: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **kw: {"status": "ok", "listeners": []})
     def unexpected(*a, **kw):
         pytest.fail("SSH inventory must not launch a local MQTT client")
     inventory = tmp_path / "topics"

@@ -151,6 +151,7 @@ def test_capture_snapshot_without_state_file_keeps_story_19_1_shape(monkeypatch)
         lambda *a, **k: _diagnostics_payload([_eq(42, reason_code="no_mapping", statut="non_publie")]),
     )
     monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **k: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
 
     snapshot = pt.capture_snapshot(
         base_url="http://x", local_secret=SECRET,
@@ -174,6 +175,7 @@ def test_capture_snapshot_with_state_inventory_file_augments_i11_candidates(monk
         lambda *a, **k: _diagnostics_payload([_eq(579, reason_code="no_mapping", statut="non_publie")]),
     )
     monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **k: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
 
     discovery_file = tmp_path / "topics"
     discovery_file.write_text("homeassistant/sensor/jeedom2ha_579_5369/config\n")
@@ -205,6 +207,7 @@ def test_capture_snapshot_with_state_inventory_file_reports_missing_state(monkey
         lambda *a, **k: _diagnostics_payload([_eq(42, reason_code="no_mapping", statut="non_publie")]),
     )
     monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **k: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
 
     discovery_file = tmp_path / "topics"
     discovery_file.write_text("homeassistant/sensor/jeedom2ha_42_3/config\n")
@@ -231,6 +234,7 @@ def test_state_inventory_file_does_not_raise_when_empty(monkeypatch, tmp_path):
         pt, "fetch_diagnostics", lambda *a, **k: _diagnostics_payload([_eq(1)]),
     )
     monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **k: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
 
     discovery_file = tmp_path / "topics"
     discovery_file.write_text("homeassistant/light/jeedom2ha_1/config\n")
