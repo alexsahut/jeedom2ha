@@ -10,7 +10,7 @@
 #     avec `sudo` stubbé en simple passthrough (aucun vrai compte www-data
 #     requis) et des fixtures tar.gz / répertoires temporaires locaux,
 #   - qu'à distance par deploy-to-box.sh, qui envoie ce fichier sur l'entrée
-#     standard d'une commande `ssh ... bash -s -- <args>` (même convention
+#     standard d'une commande `ssh ... bash -s` (même convention
 #     que VERSION_FILE_LIB), avant le script principal qui appelle ces
 #     fonctions avec les vrais chemins de la box.
 # Les appels sudo restent explicites par commande (pas de `sudo bash -s`

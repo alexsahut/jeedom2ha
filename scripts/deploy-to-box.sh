@@ -267,12 +267,16 @@ REMOTE
 #       $4=fichier --data-binary distant (optionnel).
 jeedom2ha_curl_with_secret() {
   local _url="$1" _max_time="$2" _method="${3:-GET}" _data_file="${4:-}"
-  local _secret_src
+  local _secret_src _url_src _max_time_src _method_src _data_file_src
   printf -v _secret_src '%q' "${LOCAL_SECRET}"
-  { printf 'LOCAL_SECRET=%s\n' "${_secret_src}"
+  printf -v _url_src '%q' "${_url}"
+  printf -v _max_time_src '%q' "${_max_time}"
+  printf -v _method_src '%q' "${_method}"
+  printf -v _data_file_src '%q' "${_data_file}"
+  { printf 'LOCAL_SECRET=%s\nURL=%s\nMAX_TIME=%s\nMETHOD=%s\nDATA_FILE=%s\n' \
+      "${_secret_src}" "${_url_src}" "${_max_time_src}" "${_method_src}" "${_data_file_src}"
     cat <<'REMOTE'
 set -euo pipefail
-URL="$1"; MAX_TIME="$2"; METHOD="$3"; DATA_FILE="$4"
 _secret_esc=${LOCAL_SECRET//\\/\\\\}
 _secret_esc=${_secret_esc//\"/\\\"}
 _cfg=$(mktemp)
@@ -292,8 +296,7 @@ trap 'rm -f "${_cfg}"' EXIT
 } > "${_cfg}"
 curl -K "${_cfg}"
 REMOTE
-  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-        "${_url}" "${_max_time}" "${_method}" "${_data_file}"
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
 }
 
 # GET /system/status sur la box (daemon 127.0.0.1 seulement, X-Local-Secret).
@@ -324,11 +327,16 @@ jeedom2ha_sync() {
 # Snapshot retained topics on the box next to deploy backups for manual diffs.
 jeedom2ha_inventory_discovery() {
   local _phase="$1"
+  local _mqtt_host_src _mqtt_port_src _backup_dir_src _phase_src
   [[ -n "${_mqtt_host}" ]] || { echo "WARNING: mqtt2 host introuvable — inventaire ${_phase} ignoré." >&2; return 0; }
-  { echo 'set -euo pipefail'
+  printf -v _mqtt_host_src '%q' "${_mqtt_host}"
+  printf -v _mqtt_port_src '%q' "${_mqtt_port}"
+  printf -v _backup_dir_src '%q' "${JEEDOM_BACKUP_DIR}"
+  printf -v _phase_src '%q' "${_phase}"
+  { printf 'MQTT_HOST=%s\nMQTT_PORT=%s\nBACKUP_DIR=%s\nPHASE=%s\nset -euo pipefail\n' \
+      "${_mqtt_host_src}" "${_mqtt_port_src}" "${_backup_dir_src}" "${_phase_src}"
     jeedom2ha_mqtt_auth_snippet
     cat <<'REMOTE'
-MQTT_HOST="$1"; MQTT_PORT="$2"; BACKUP_DIR="$3"; PHASE="$4"
 command -v mosquitto_sub &>/dev/null || { echo "WARNING: mosquitto_sub absent — inventaire ignoré." >&2; exit 0; }
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
 sudo mkdir -p "${BACKUP_DIR}/inventory"
@@ -342,8 +350,7 @@ sudo chown "$(id -un):$(id -gn)" "${_file}"
 echo "__JEEDOM2HA_INVENTORY_FILE__=${_file}"
 echo "  Inventaire ${PHASE}: ${_file}"
 REMOTE
-  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-        "${_mqtt_host}" "${_mqtt_port}" "${JEEDOM_BACKUP_DIR}" "${_phase}"
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
 }
 
 # jeedom2ha_fetch_inventory_content <remote_file>
@@ -360,13 +367,20 @@ jeedom2ha_fetch_inventory_content() {
 
 jeedom2ha_rollback_archive() {
   local _archive="$1"
+  local _archive_src _plugin_path_src _jeedom_root_src _backup_dir_src _box_user_src
   echo "--- Rollback archive → ${JEEDOM_BOX_PATH}/"
+  printf -v _archive_src '%q' "${_archive}"
+  printf -v _plugin_path_src '%q' "${JEEDOM_BOX_PATH}"
+  printf -v _jeedom_root_src '%q' "${JEEDOM_ROOT}"
+  printf -v _backup_dir_src '%q' "${JEEDOM_BACKUP_DIR}"
+  printf -v _box_user_src '%q' "${JEEDOM_BOX_USER}"
   local _remote_output
   local _remote_status=0
   if _remote_output=$(
-    { cat "${ROLLBACK_LIB}"
+    { printf 'ARCHIVE=%s\nPLUGIN_PATH=%s\nJEEDOM_ROOT=%s\nBACKUP_DIR=%s\nBOX_USER=%s\n' \
+        "${_archive_src}" "${_plugin_path_src}" "${_jeedom_root_src}" "${_backup_dir_src}" "${_box_user_src}"
+      cat "${ROLLBACK_LIB}"
       cat <<'REMOTE'
-ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"; BACKUP_DIR="$4"; BOX_USER="$5"
 set -euo pipefail
 [[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }
 
@@ -413,8 +427,7 @@ if (!jeedom2ha::deamon_start()) { fwrite(STDERR, "deamon_start() returned false\
 '
 echo "  Rollback restauré et daemon redémarré sous www-data."
 REMOTE
-    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- \
-        "${_archive}" "${JEEDOM_BOX_PATH}" "${JEEDOM_ROOT}" "${JEEDOM_BACKUP_DIR}" "${JEEDOM_BOX_USER}" 2>&1
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
   ); then
     _remote_status=0
   else
@@ -455,7 +468,9 @@ if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
     exit "${_rollback_exit}"
   fi
   jeedom2ha_refresh_secret || _fail "Rollback effectué mais localSecret indisponible après redémarrage."
-  _rollback_status=$(jeedom2ha_status 2>&1) || _fail "Daemon injoignable après rollback."
+  if ! _rollback_status=$(jeedom2ha_status 2>&1); then
+    _fail "Daemon injoignable après rollback: ${_rollback_status:-aucune sortie}"
+  fi
   [[ "$(echo "${_rollback_status}" | jq -r '.status // empty')" == "ok" ]] \
     || _fail "Healthcheck échoué après rollback: ${_rollback_status}"
   echo "======================================================================="
@@ -557,10 +572,9 @@ REMOTE
     echo "--- [stop-2/2] Cleanup retained jeedom2ha discovery topics..."
     echo "    Scope: homeassistant/{light,cover,switch}/jeedom2ha_*/config"
     echo "    Broker: ${_mqtt_host}:${_mqtt_port}"
-    { echo 'set -euo pipefail'
+    { printf 'MQTT_HOST=%q\nMQTT_PORT=%q\nset -euo pipefail\n' "${_mqtt_host}" "${_mqtt_port}"
       jeedom2ha_mqtt_auth_snippet
       cat <<'REMOTE'
-MQTT_HOST="$1"; MQTT_PORT="$2"
 command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || {
   echo "  ERROR: mosquitto_sub/pub introuvables. apt-get install mosquitto-clients" >&2; exit 1
 }
@@ -579,7 +593,7 @@ while IFS= read -r _t; do
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
 REMOTE
-    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
   fi
   echo ""
   echo "======================================================================="
@@ -720,12 +734,11 @@ REMOTE
   else
     echo "  Broker: ${_mqtt_host}:${_mqtt_port}"
     # Credentials MQTT jamais en argv : transmis via stdin (jeedom2ha_mqtt_auth_snippet),
-    # reconstruits et écrits dans un fichier d'options mosquitto (-o) chmod 600 côté distant (CC-20).
-    { echo 'set -euo pipefail'
+    # reconstruits et écrits dans le fichier de config par défaut mosquitto_sub/pub
+    # (XDG_CONFIG_HOME) chmod 600 côté distant (CC-20).
+    { printf 'MQTT_HOST=%q\nMQTT_PORT=%q\nset -euo pipefail\n' "${_mqtt_host}" "${_mqtt_port}"
       jeedom2ha_mqtt_auth_snippet
       cat <<'REMOTE'
-MQTT_HOST="$1"; MQTT_PORT="$2"
-
 command -v mosquitto_sub &>/dev/null && command -v mosquitto_pub &>/dev/null || {
   echo "  ERROR: mosquitto_sub/pub introuvables. apt-get install mosquitto-clients" >&2; exit 1
 }
@@ -748,7 +761,7 @@ while IFS= read -r _t; do
 done <<< "${TOPICS}"
 echo "  ${_n} topic(s) nettoyé(s)."
 REMOTE
-    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
   fi
   echo ""
 fi
@@ -810,12 +823,20 @@ REMOTE
 
   echo "  Attente readiness daemon + MQTT (condition identique au protocole terrain 3.2b-A)..."
   _wait=0; _max=60
-  until jeedom2ha_curl_with_secret "${DAEMON_API}/system/status" 3 GET \
-    2>/dev/null \
-    | jq -e '.status == "ok" and .payload.mqtt.connected == true and .payload.mqtt.state == "connected"' \
-    >/dev/null 2>&1; do
+  _last_readiness_error=""
+  while true; do
+    if _readiness_raw=$(jeedom2ha_curl_with_secret "${DAEMON_API}/system/status" 3 GET 2>&1) \
+      && printf '%s' "${_readiness_raw}" | jq -e \
+        '.status == "ok" and .payload.mqtt.connected == true and .payload.mqtt.state == "connected"' \
+        >/dev/null 2>&1; then
+      break
+    fi
+    _last_readiness_error="${_readiness_raw:-aucune sortie du contrôle daemon}"
     sleep 1; _wait=$((_wait + 1))
-    [[ "${_wait}" -ge "${_max}" ]] && _fail "Timeout readiness (${_max}s). Consultez les logs Jeedom."
+    if [[ "${_wait}" -ge "${_max}" ]]; then
+      printf '  Dernière erreur readiness: %s\n' "${_last_readiness_error}" >&2
+      _fail "Timeout readiness (${_max}s). Consultez les logs Jeedom."
+    fi
   done
   echo "  Daemon prêt, MQTT connecté (${_wait}s)."
   echo ""
@@ -842,7 +863,9 @@ else
   echo ""
 
   echo "--- [4a/5] Healthcheck (jeedom2ha_status)..."
-  _status_raw=$(jeedom2ha_status 2>&1) || _fail "Daemon injoignable sur ${DAEMON_API}."
+  if ! _status_raw=$(jeedom2ha_status 2>&1); then
+    _fail "Daemon injoignable sur ${DAEMON_API}: ${_status_raw:-aucune sortie}"
+  fi
   _status_ok=$(echo "${_status_raw}" | jq -r '.status // empty' 2>/dev/null || echo "")
   [[ "${_status_ok}" != "ok" ]] && _fail "status != ok : ${_status_raw}"
   _mqtt_state=$(echo "${_status_raw}" | jq -r '.payload.mqtt.state // "unknown"')
@@ -854,7 +877,9 @@ else
   echo ""
 
   echo "--- [4c/5] Sync (jeedom2ha_sync)..."
-  _sync_raw=$(jeedom2ha_sync 2>&1) || _fail "Appel /action/sync échoué."
+  if ! _sync_raw=$(jeedom2ha_sync 2>&1); then
+    _fail "Appel /action/sync échoué: ${_sync_raw:-aucune sortie}"
+  fi
   _sync_ok=$(echo "${_sync_raw}" | jq -r '.status // empty' 2>/dev/null || echo "")
   if [[ "${_sync_ok}" != "ok" ]]; then
     echo "WARNING: sync status != ok : ${_sync_raw}" >&2
@@ -891,10 +916,9 @@ fi
 if [[ "${CLEANUP_DISCOVERY}" == "true" && "${SKIP_POST_DEPLOY}" == "false" \
       && -n "${_mqtt_host}" ]]; then
   echo "--- [5/5] Vérification topics discovery post-sync..."
-  { echo 'set -euo pipefail'
+  { printf 'MQTT_HOST=%q\nMQTT_PORT=%q\nset -euo pipefail\n' "${_mqtt_host}" "${_mqtt_port}"
     jeedom2ha_mqtt_auth_snippet
     cat <<'REMOTE'
-MQTT_HOST="$1"; MQTT_PORT="$2"
 _auth=(-h "${MQTT_HOST}" -p "${MQTT_PORT}")
 command -v mosquitto_sub &>/dev/null || { echo "  mosquitto_sub absent — skip."; exit 0; }
 FOUND=$(jeedom2ha_mqtt_run mosquitto_sub "${_auth[@]}" -W 2 \
@@ -905,7 +929,7 @@ _n=$(echo "${FOUND}" | grep -c 'jeedom2ha_' 2>/dev/null || echo 0)
 echo "  ${_n} topic(s) présent(s) sur le broker après sync."
 echo "${FOUND}" | while IFS= read -r _t; do [[ -n "${_t}" ]] && echo "    + ${_t}"; done
 REMOTE
-  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s -- "${_mqtt_host}" "${_mqtt_port}"
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
   echo ""
 fi
 
