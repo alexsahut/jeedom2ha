@@ -1,6 +1,6 @@
 # Story 19.2: Découplage I11 — état streamé et commandes routées par décision de candidat
 
-Status: backlog
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -74,27 +74,29 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Identifier, via le rapport de l'outil de parité (Story 19.1, AC4), un cas réel de violation I11 sur la box si disponible
   - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant la vérification terrain de cette story — ces flags republient des messages MQTT retained **vides** sur les topics discovery, ce qui effacerait les entités déjà publiées (principal et secondaires) et rendrait impossible de constater si un secondaire reçoit bien son état/ses commandes après correction. Déploiement standard uniquement.
+  - Non exécutée ce tour : aucun déploiement/dry-run réel effectué (voir Completion Notes — reporté au tour terrain).
 
-- [ ] Task 1 — Découpler le state streaming (AC1)
-  - [ ] Modifier `resources/daemon/sync/state.py` aux **deux** points de filtrage identifiés — `list_state_targets` (l.154) et `_resolve_state_target` (l.263-264) — pour filtrer sur la décision du candidat concerné (`CommandDecision`/décision par candidat issue de `evaluate_equipment()`, Story 19.0/19.1) au lieu de `decision.should_publish` du principal
-  - [ ] Vérifier qu'aucun autre filtre implicite ne réintroduit une dépendance au principal
+- [x] Task 1 — Découpler le state streaming (AC1)
+  - [x] Modifier `resources/daemon/sync/state.py` aux **deux** points de filtrage identifiés — `list_state_targets` (l.154) et `_resolve_state_target` (l.263-264) — pour filtrer sur la décision du candidat concerné (`CommandDecision`/décision par candidat issue de `evaluate_equipment()`, Story 19.0/19.1) au lieu de `decision.should_publish` du principal
+  - [x] Vérifier qu'aucun autre filtre implicite ne réintroduit une dépendance au principal
 
-- [ ] Task 2 — Découpler le routage de commandes (AC2)
-  - [ ] Modifier `resources/daemon/sync/command.py::_resolve_runtime_target` aux **deux** filtres identifiés (l.201 `should_publish`, l.204 `active_or_alive`) selon le même principe — décision prise sur le `candidate_decision` (l.209) du candidat effectivement ciblé par le topic, jamais sur celle du principal
+- [x] Task 2 — Découpler le routage de commandes (AC2)
+  - [x] Modifier `resources/daemon/sync/command.py::_resolve_runtime_target` aux **deux** filtres identifiés (l.201 `should_publish`, l.204 `active_or_alive`) selon le même principe — décision prise sur le `candidate_decision` (l.209) du candidat effectivement ciblé par le topic, jamais sur celle du principal
 
-- [ ] Task 3 — Garde-fou anti-couplage-forcé (AC4)
-  - [ ] Test explicite garantissant qu'un secondaire refusé reste refusé (pas de "tout publier" accidentel)
+- [x] Task 3 — Garde-fou anti-couplage-forcé (AC4)
+  - [x] Test explicite garantissant qu'un secondaire refusé reste refusé (pas de "tout publier" accidentel)
 
-- [ ] Task 4 — Non-régression (AC3)
-  - [ ] Exécuter `test_story_13_3_metering_plug_secondary_sensors.py` et la suite complète
+- [x] Task 4 — Non-régression (AC3)
+  - [x] Exécuter `test_story_13_3_metering_plug_secondary_sensors.py` et la suite complète
 
-- [ ] Task 5 — Preuve terrain (voir section dédiée)
-  - [ ] Chercher un cas réel sur la box (via rapport Story 19.1) ; si trouvé, vérifier l'état/routage effectif après correction
-  - [ ] Si aucun cas réel trouvé, écrire le test d'intégration de repli et le documenter explicitement comme tel
+- [~] Task 5 — Preuve terrain (voir section dédiée)
+  - [~] Chercher un cas réel sur la box (via rapport Story 19.1) ; si trouvé, vérifier l'état/routage effectif après correction — 2 candidats I11 déjà identifiés (`19-1-field-proof-2026-09-28.md`, eq 579/585), mais pas encore vérifiés en conditions réelles ce tour (aucun déploiement effectué)
+  - [x] Outillage de préparation : `tools/parity_snapshot.py`/`scripts/parity-snapshot.sh` étendus en lecture seule pour relever les topics d'état retenus (`jeedom2ha/+/+/state`) et les corréler aux candidats I11 — code + tests unitaires seulement, jamais exécuté contre la box réelle (voir Completion Notes)
+  - [ ] Si aucun cas réel trouvé, écrire le test d'intégration de repli et le documenter explicitement comme tel — sans objet : le test d'intégration de repli existe déjà (`test_story_19_2_decouplage_state_command_i11.py`)
 
-- [ ] Task 6 — Tests (AC1-AC4)
-  - [ ] `test_story_19_2_decouplage_state_command_i11.py` (préfixe `test_story_19_2_*`)
-  - [ ] Suite complète `pytest tests/unit -q` : 0 régression
+- [x] Task 6 — Tests (AC1-AC4)
+  - [x] `test_story_19_2_decouplage_state_command_i11.py` (préfixe `test_story_19_2_*`)
+  - [x] Suite complète — voir Completion Notes pour la commande exacte utilisée (`pytest tests/unit -q` ne couvre pas l'arbre `resources/daemon/tests/unit`) : `pytest -q` depuis la racine → 1882 passed, 0 régression
 
 ## Dev Notes
 
@@ -131,10 +133,41 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
 ### Agent Model Used
 
+- clawcode (autonome), 2026-09-28
+
 ### Debug Log References
 
 ### Completion Notes List
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle non exposée cette session).
+- **dev-story (autonome)** — 2026-09-28 — statut résultant : `in-progress` (pas `done` : gate d'inventaire terrain obligatoire non satisfait ce tour, voir ci-dessous). Branche `story/19-2-decouplage-i11`, worktree dédié.
+
+  **Task 0 (pre-flight terrain) — non exécutée ce tour, volontairement.** Cette story a été traitée en mode autonome sans accès interactif à la box réelle dans cette fenêtre de travail ; aucun `./scripts/deploy-to-box.sh --dry-run` ni déploiement n'a été lancé. Conformément à l'exigence explicite de la story ("Gate d'inventaire obligatoire… cette story… ne peut donc passer à `done` qu'après le gate obligatoire d'inventaire"), le statut reste `in-progress` et non `done`. Le gate terrain (dry-run, déploiement, inventaire avant/après 0 erreur) reste à faire dans un tour ultérieur avec accès box.
+
+  **AC1/AC2 — correction I11 (Task 1/Task 2).** `resources/daemon/sync/state.py` : les deux points de filtrage identifiés (`list_state_targets` l.154, `_resolve_state_target` l.263-264) filtraient sur `decision.should_publish` du **principal** avant même de localiser le candidat concerné. Corrigé en déplaçant le filtre `should_publish` **après** résolution de `cand_decision` (décision propre du candidat/secondaire, via `candidate.publication_decision_ref`, avec repli sur `decision` — le principal — uniquement si le candidat n'a pas de décision propre, cas structurellement impossible pour un secondaire mappé). `resources/daemon/sync/command.py::_resolve_runtime_target` : même principe pour les deux filtres identifiés (`should_publish` l.201, `active_or_alive` l.204). Différence de conception notable avec `state.py` : ces deux filtres constituaient aussi la source des codes `reason` de diagnostic pré-existants (`entity_not_published`/`entity_not_alive`, variables `found_publishable`/`found_alive`) lorsqu'aucun candidat ne correspond au topic. Plutôt que de supprimer ce diagnostic, les variables sont désormais dérivées de la décision du **principal** en lecture seule (`if decision.should_publish: found_publishable = True; ...`) sans jamais `continue`/interrompre la boucle — la boucle sur les candidats n'est plus jamais court-circuitée par le principal. Le vrai filtrage de routage (gate binaire qui autorise ou non l'exécution de la commande) est déplacé **dans** la boucle candidats, sur `candidate_decision` du candidat effectivement ciblé par le topic (ligne où `topic not in expected_topics.values()` a déjà réduit à UN candidat). Ceci préserve 100% de la sémantique des codes `reason` pré-existants pour le cas "aucun candidat ne matche" tout en corrigeant le cas "un candidat matche mais c'était le principal qui bloquait".
+
+  **AC4 — garde-fou anti-couplage-forcé (Task 3).** Le découplage n'introduit aucun "tout publier" : chaque candidat garde son propre gate `should_publish`/`active_or_alive`, y compris quand le principal EST publié. Vérifié par 3 tests dédiés (`test_ac4_*`) : un secondaire refusé (`refused_cmd_ids`) sous un principal publié n'est ni streamé (`list_state_targets` ET `handle_state_message`) ni routé (`handle_command_message`), tandis que le principal et les autres secondaires publiés restent fonctionnels (pas d'effet de bord "tout ou rien").
+
+  **Preuve par mutation (méthodologie, avant PR).** `git stash push -- resources/daemon/sync/state.py resources/daemon/sync/command.py` (fichier de test neuf non suivi, donc non stashé) puis exécution de `test_story_19_2_decouplage_state_command_i11.py` sur le code PRÉ-correction : **4 des 6 tests échouent** (`test_ac1_secondary_listed_as_state_target_despite_refused_principal`, `test_ac1_secondary_state_streamed_despite_refused_principal`, `test_ac2_secondary_command_routed_despite_refused_principal`, `test_ac4_refused_secondary_never_routed_command`). Les 2 tests restants (`test_ac4_refused_secondary_never_streamed_state*`) passent déjà sur l'ancien code — explication : `state.py` pré-correction avait déjà un filtre par-candidat sur `discovery_published` (mais pas sur `should_publish`), qui suffisait par coïncidence à couvrir CE cas précis (secondaire refusé avec `discovery_published=False` implicite dans le test) ; `command.py` pré-correction n'avait AUCUN filtre par-candidat équivalent — `test_ac4_refused_secondary_never_routed_command` révèle donc un vrai bug de sur-permissivité du routage jusqu'ici non détecté (un secondaire refusé pouvait être routé si le principal était publié). `git stash pop` puis re-exécution : **6/6 passent** sur le code corrigé. Ce bug (routage AC4 sans le correctif) est documenté ici car il constitue une preuve indépendante que Task 2/AC2 corrige un problème réel, pas seulement théorique.
+
+  **Découverte — deux arbres de tests, une seule commande couvre les deux.** Le repo a deux arbres `tests/unit` : racine (`tests/unit`, 58 fichiers, général/infra) et `resources/daemon/tests/unit` (85 fichiers dont ce nouveau, sync/mapping/command). La commande littéralement citée par la story (`pytest tests/unit -q`) exécutée depuis la racine ne couvre QUE l'arbre racine — elle ne joue jamais les tests touchant `sync/state.py`/`sync/command.py`. Vérification de non-régression réelle : `python3 -m pytest -q` (sans argument de chemin, laissant `testpaths` s'appliquer aux deux arbres) depuis la racine → **1882 passed, 0 failed** (1870 avant cette story + 12 nouveaux tests story 19.2 dont 6 sur I11 et 6 sur l'extension outil de parité). `test_story_13_3_metering_plug_secondary_sensors.py` (AC3, non-régression pattern "metering plug") inclus et vert sans modification de son intention.
+
+  **Task 5 — préparation de la preuve terrain, extension lecture seule de `tools/parity_snapshot.py`.** L'outil (Story 19.1) détectait déjà des "candidats I11" par heuristique (corrélation topics discovery retained / décision refusée du principal), mais n'inventoriait pas les topics d'ÉTAT retenus (`jeedom2ha/<eq_id>/<cmd_id>/state`) — donc ne pouvait pas vérifier la preuve terrain demandée par la story ("discovery state_topic == topics d'état retenus non vides"). Ajout strictement opt-in et lecture seule :
+    - `tools/parity_snapshot.py` : nouvelle fonction `_detect_i11_state_coverage()` qui corrèle, pour chaque candidat I11 déjà détecté, son/ses `cmd_id` (extraits du node_id discovery `jeedom2ha_<eq_id>_<cmd_id>`) avec un second inventaire MQTT (topics d'état retenus). Nouveau champ `ParitySnapshot.state_topics` et nouveau paramètre optionnel `capture_snapshot(mqtt_state_inventory_file=...)` : sans lui, format et comportement restent STRICTEMENT identiques à Story 19.1 (vérifié par test dédié `test_capture_snapshot_without_state_file_keeps_story_19_1_shape`). Nouveau flag CLI `--mqtt-state-inventory-file`, optionnel.
+    - `scripts/parity-snapshot.sh` : ajout d'une deuxième souscription `mosquitto_sub -t 'jeedom2ha/+/+/state'` sur la box (même mécanisme d'authentification CC-20/trap EXIT que la première), écrite dans un second fichier temporaire transmis au tool via `--mqtt-state-inventory-file`. Jamais `mosquitto_pub`, jamais exécuté contre la box réelle dans ce tour (code + tests unitaires seulement, conformément à la consigne).
+    - Régression de test existant corrigée : `tests/unit/test_parity_snapshot_wrapper.py` asserait exactement 1 appel `mosquitto_sub` par capture — mis à jour pour attendre 2 appels en cas de succès (0 si la première souscription échoue, le script s'arrêtant avant la seconde grâce à `pipefail`).
+    - Portée des candidats I11 réels connus (mesure seule, `19-1-field-proof-2026-09-28.md`) : eq 579 (cmd_ids 5369/5493/5494/5689/5695), eq 585 (cmd_ids 5497/5504/5505/5536/5537/5546/5631) — 2 candidats, cohérent avec la mesure `i11_candidates: 2` déjà relevée sur la box lors de la Story 19.1. Ces identifiants n'ont pas été revérifiés contre la box dans ce tour (aucune connexion établie) ; ils sont repris tels quels depuis l'artefact de preuve terrain 19.1 pour cadrer un futur relevé `--mqtt-state-inventory-file`.
+
+  **Écart documenté — Task 5 non close.** Le gate d'inventaire obligatoire (préambule de la story) et la preuve terrain proprement dite (vérification RÉELLE sur la box que les 2 candidats I11 connus ont désormais leurs topics d'état) restent à faire. Ce tour livre : la correction, sa preuve unitaire + mutation, et l'outillage prêt à l'emploi pour cette vérification terrain — mais pas la vérification elle-même. Statut de la story laissé à `in-progress` pour cette raison, jamais forcé à `done`.
 
 ### File List
+
+- `resources/daemon/sync/state.py` [MODIFIÉ] — AC1, découplage I11 (`list_state_targets`, `_resolve_state_target`)
+- `resources/daemon/sync/command.py` [MODIFIÉ] — AC2, découplage I11 (`_resolve_runtime_target`)
+- `resources/daemon/tests/unit/test_story_19_2_decouplage_state_command_i11.py` [NOUVEAU] — AC1-AC4, 6 tests
+- `resources/daemon/tools/parity_snapshot.py` [MODIFIÉ] — Task 5, extension lecture seule opt-in (topics d'état retenus, corrélation I11)
+- `resources/daemon/tests/unit/test_story_19_2_parity_state_topics.py` [NOUVEAU] — Task 5, 12 tests (extension outil de parité)
+- `scripts/parity-snapshot.sh` [MODIFIÉ] — Task 5, seconde souscription MQTT (topics d'état) en lecture seule
+- `tests/unit/test_parity_snapshot_wrapper.py` [MODIFIÉ] — mise à jour du test wrapper existant (2 souscriptions MQTT au lieu d'1)
+- `_bmad-output/implementation-artifacts/19-2-decouplage-etat-commandes-invariant-i8.md` [MODIFIÉ] — statut, tasks, Completion Notes, File List
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ] — statut `19-2-decouplage-etat-commandes-invariant-i8: in-progress`
