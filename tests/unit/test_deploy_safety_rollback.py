@@ -155,7 +155,7 @@ def _extract_function(name: str) -> str:
     cannot be sourced wholesale just to reach one function further down —
     slicing lets point 9's tag/push logic be exercised on its own, with a
     mocked git binary, without a full (real-rsync-requiring) deploy run."""
-    text = SCRIPT.read_text()
+    text = SCRIPT.read_text() + "\n" + (REPO_ROOT / "scripts/box-readonly-lib.sh").read_text()
     start = text.index(f"{name}() {{")
     end = text.index("\n}\n", start) + len("\n}\n")
     return text[start:end]
