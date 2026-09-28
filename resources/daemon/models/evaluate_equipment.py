@@ -69,7 +69,10 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, List, Optional
 
 from mapping.overrides import apply_type_override, mapping_cmd_ids, resolve_publication_override
-from models.decide_publication import decide_publication as _default_decide_publication
+from models.decide_publication import (
+    DEFAULT_CONFIDENCE_POLICY,
+    decide_publication as _default_decide_publication,
+)
 from models.mapping import MappingResult, ProjectionValidity, PublicationDecision
 from models.topology import EligibilityResult, JeedomEqLogic, TopologySnapshot
 from validation.ha_component_registry import validate_projection as _default_validate_projection
@@ -291,7 +294,7 @@ def evaluate_equipment(
     eligibility: EligibilityResult,
     *,
     mapper_registry: object,
-    confidence_policy: str = "sure_probable",
+    confidence_policy: str = DEFAULT_CONFIDENCE_POLICY,
     persisted_overrides: Optional[Dict[str, dict]] = None,
     persisted_equipment_overrides: Optional[Dict[str, dict]] = None,
     proposed_overrides: Optional[Dict[str, dict]] = None,
