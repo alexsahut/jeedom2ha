@@ -1,6 +1,6 @@
 # Story 19.2: Découplage I11 — état streamé et commandes routées par décision de candidat
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -69,7 +69,10 @@ Preuve terrain = sur la box, pour toutes les entités : `discovery state_topic =
 - Les **21 daemons** de la box restent inchangés (aucun démarrage/arrêt/crash inattendu imputable au déploiement).
 - `VERSION` (endpoint diagnostics ou fichier version du daemon) égale le SHA effectivement déployé.
 
-Ces critères restent à vérifier terrain — non exécutés ce tour (round 2, aucun accès box, cf. Completion Notes).
+Vérifiés terrain le 2026-09-28 après fusion de la PR #174 (SHA `eee358a`) —
+9/9 critères verts après arbitrage de l'écart `is_empty_diff` (topic scénario
+Jeedom sans rapport avec la story, cf. Completion Notes et
+`_bmad-output/implementation-artifacts/19-2-field-proof-2026-09-28.md`).
 
 ## Invariants concernés
 
@@ -83,11 +86,11 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
 <!-- Story terrain : daemon / MQTT / state streaming / routage commande / box réelle → Task 0 Pre-flight terrain injectée. -->
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
-  - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Identifier, via le rapport de l'outil de parité (Story 19.1, AC4), un cas réel de violation I11 sur la box si disponible
-  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant la vérification terrain de cette story — ces flags republient des messages MQTT retained **vides** sur les topics discovery, ce qui effacerait les entités déjà publiées (principal et secondaires) et rendrait impossible de constater si un secondaire reçoit bien son état/ses commandes après correction. Déploiement standard uniquement.
-  - Non exécutée ce tour : aucun déploiement/dry-run réel effectué (voir Completion Notes — reporté au tour terrain).
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
+  - [x] Dry-run/CI : `gh pr checks 174` 12/12 verts sur le SHA de fusion avant déploiement (voir Completion Notes — préflight par CI, pas de `--dry-run` local ce tour)
+  - [x] Cas réel de violation I11 identifié via le rapport de parité Story 19.1 (`19-1-field-proof-2026-09-28.md`) : eq 579/585, confirmé par les 12 écouteurs republiés en preuve terrain
+  - [x] **Interdiction explicite (DANGER) respectée :** déploiement standard uniquement (`--restart-daemon`), ni `--cleanup-discovery` ni `--stop-daemon-cleanup` invoqués
+  - Exécutée le 2026-09-28 : preuve terrain complète après fusion PR #174, voir `19-2-field-proof-2026-09-28.md` et Completion Notes.
 
 - [x] Task 1 — Découpler le state streaming (AC1)
   - [x] Modifier `resources/daemon/sync/state.py` aux **deux** points de filtrage identifiés — `list_state_targets` (l.154) et `_resolve_state_target` (l.263-264) — pour filtrer sur la décision du candidat concerné (`CommandDecision`/décision par candidat issue de `evaluate_equipment()`, Story 19.0/19.1) au lieu de `decision.should_publish` du principal
@@ -102,8 +105,8 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 - [x] Task 4 — Non-régression (AC3)
   - [x] Exécuter `test_story_13_3_metering_plug_secondary_sensors.py` et la suite complète
 
-- [~] Task 5 — Preuve terrain (voir section dédiée)
-  - [~] Chercher un cas réel sur la box (via rapport Story 19.1) ; si trouvé, vérifier l'état/routage effectif après correction — 2 candidats I11 déjà identifiés (`19-1-field-proof-2026-09-28.md`, eq 579/585), mais pas encore vérifiés en conditions réelles ce tour (aucun déploiement effectué)
+- [x] Task 5 — Preuve terrain (voir section dédiée)
+  - [x] Cas réel trouvé sur la box (via rapport Story 19.1) et état/routage effectif vérifié après correction — 2 candidats I11 (`19-1-field-proof-2026-09-28.md`, eq 579/585) : les 12 écouteurs d'état attendus sont passés d'absents à présents (`GET /system/state_listeners`), 385 `state_published` observés depuis le déploiement, 0 `state_target_not_found` — voir `19-2-field-proof-2026-09-28.md`
   - [x] Outillage de préparation : `tools/parity_snapshot.py`/`scripts/parity-snapshot.sh` étendus en lecture seule pour relever les topics d'état retenus (`jeedom2ha/+/+/state`) et les corréler aux candidats I11 — code + tests unitaires seulement, jamais exécuté contre la box réelle (voir Completion Notes)
   - [x] **Revue ClaudeBox (commit `3a408db`), P2 — protocole de preuve corrigé.** `state_topics`/`publish_initial_states` (mécanisme ci-dessus) ne distinguent PAS l'avant de l'après un déploiement : sur `main`, l'état des secondaires I11 est déjà publié en retained à chaque sync complète, sans filtre sur le principal — cette mesure seule ne peut donc jamais servir de preuve terrain. `GET /system/state_listeners` (source exacte utilisée par le plugin PHP pour enregistrer ses écouteurs Jeedom, `StateSynchronizer.list_state_targets`) est la seule preuve qui distingue réellement les deux états. `tools/parity_snapshot.py` relève désormais ce champ systématiquement (`state_listeners`, jamais optionnel, même mécanisme que `/system/diagnostics`) et le diff expose `listeners_added`/`listeners_removed` sans jamais influencer `is_empty_diff` (qui reste la parité Story 19.1) — code + 8 tests unitaires (`test_story_19_2_parity_state_listeners.py`), toujours jamais exécuté contre la box réelle.
   - [ ] Si aucun cas réel trouvé, écrire le test d'intégration de repli et le documenter explicitement comme tel — sans objet : le test d'intégration de repli existe déjà (`test_story_19_2_decouplage_state_command_i11.py`)
@@ -230,6 +233,18 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 
   **Écart documenté — Task 5 toujours non close.** Tour autonome, sans accès box (correction courte ciblée sur le point de revue, hors périmètre déploiement/SSH/`scripts/deploy-to-box.sh`). Le gate d'inventaire obligatoire et la vérification terrain réelle restent à faire lors d'un prochain tour avec accès box. Statut de la story laissé à `in-progress`.
 
+- **preuve terrain 28/09** — 2026-09-28 — statut résultant : `done`. Fusion de la PR #174 sur `main` (SHA `eee358ad0d60f363d263b388db61a16425d60658`), puis gate d'inventaire obligatoire (Task 0/Task 5) exécuté en conditions réelles. Deux lancements : le 1er est mort en « CLI run aborted » à 18:28 (conflit de session concurrente), sans fusion ni déploiement ni aucune autre écriture ; le 2e, seul retenu, est la preuve terrain ci-dessous. Détail complet, y compris l'écart documenté et son arbitrage : `_bmad-output/implementation-artifacts/19-2-field-proof-2026-09-28.md`.
+
+  **Déroulé.** `gh pr checks 174` 12/12 verts, fusion simple (`mergedAt=2026-09-28T16:57:32Z`), relevé `parity-snapshot` *before* (292 décisions, 353 topics, `i11_candidates`=2, `state_listeners`=215 sans les 12 cmd_ids cibles), CI confirmée verte sur le SHA de fusion, déploiement standard (`--restart-daemon`, sans `--cleanup-discovery`/`--stop-daemon-cleanup`) → `Deploy complete.`, relevé *after* (292 décisions, 354 topics, `i11_candidates`=2), diff `parity-snapshot`.
+
+  **9 critères de preuve terrain — tous verts après arbitrage.** `i11_candidates`=2 avant/après ; `listeners_added` = exactement les 12 couples attendus (eq 579 : 5369/5493/5494/5689/5695 ; eq 585 : 5497/5504/5505/5536/5537/5546/5631), `listeners_removed` vide ; VERSION box = SHA de fusion, `git_status=clean` ; démon actif (nouveau PID `www-data`) ; 0 `ERROR` dans les journaux (`jeedom2ha`/`jeedom2ha_daemon`) depuis le déploiement ; les 21 démons tiers strictement inchangés ; 385 `state_published` observés sur eq 579/585 depuis le déploiement, 0 `state_target_not_found`. Le 9e critère (`is_empty_diff` vrai) n'était pas strictement atteint (353→354 topics) ; arbitré ci-dessous comme non bloquant.
+
+  **Écart arbitré — topic scénario Jeedom (accepté, non bloquant).** Le topic `homeassistant/button/jeedom2ha_scenario_33/config` est apparu entre les relevés *before* et *after* (353→354 topics). Preuves qu'il est sans rapport avec la story/PR #174 : la synchronisation précédente (13:04) avait publié 85 scénarios sans le scénario 33, celle du déploiement (19:03) en a publié 86 dont le 33 ; la publication d'un scénario ne dépend que de `scenario.is_active` (`http_server.py`, section Story 10.1), chemin non touché par le diff `87fc354..eee358a` ; le journal Jeedom du scénario 33 montre des exécutions programmées toutes les 5 minutes à partir de `17:35:02` le jour du déploiement : il a donc été activé côté Jeedom entre la synchronisation de 13:04 (où il était inactif) et sa première exécution programmée de 17:35:02 ; aucune synchronisation n'ayant eu lieu entre-temps, son bouton n'a été publié que par la synchronisation du déploiement (19:03), le relevé *before* (18:58) reflétant l'état discovery de la synchronisation de 13:04. Décisions (292) et candidats I11 (2) strictement inchangés des deux côtés ; aucune entité perdue (354 ≥ 353). Décision : écart accepté, les 9 critères considérés verts, gate d'inventaire satisfait.
+
+  **Retour arrière.** Aucun rollback nécessaire (déploiement réussi, démon sain, pas de panne). Archive de sauvegarde pré-déploiement disponible si besoin futur : `/home/asahut/jeedom2ha-backups/jeedom2ha-20260928T170300Z-w3NgSQ.tar.gz` (600, dossier d'archives en 700), non utilisée.
+
+  **Observation hors périmètre, transmise pour tri — un scénario désactivé n'est jamais dépublié.** Constatée en documentant l'écart ci-dessus : la purge des scénarios de la synchronisation (commentaire « M1 fix », `transport/http_server.py`, section Story 10.1) retire le scénario de `app["scenario_publications"]` mais n'appelle pas `DiscoveryPublisher.unpublish()` (aucun appelant hors tests). Le bouton HA d'un scénario qui repasse inactif (`scenario.is_active` devient faux) reste donc publié en discovery retained — un fantôme. Ce comportement est préexistant (Story 10.1, logique `scenario.is_active` documentée ci-dessus) et n'est pas traité par cette story ; signalé ici pour triage ultérieur, hors scope 19.2, suivi côté ClaudeBox sous le nom CC-24.
+
 ### File List
 
 - `resources/daemon/sync/state.py` [MODIFIÉ] — AC1, découplage I11 (`list_state_targets`, `_resolve_state_target`) ; round 2 (P1-bis) — résolution explicite principal (`decision`) vs secondaire (`candidate.publication_decision_ref`)
@@ -244,5 +259,6 @@ Aucun CC-xx explicitement listé dans le contexte fourni ne correspond directeme
 - `resources/daemon/tests/unit/test_story_19_2_p3_command_reason_code_candidate.py` [NOUVEAU] — revue ClaudeBox P3, 1 test (gap détecté pendant la mutation testing — aucun test existant n'exerçait ce chemin ; preuve par mutation)
 - `resources/daemon/tests/unit/test_story_19_2_parity_state_listeners.py` [NOUVEAU] — revue ClaudeBox P2 (tooling), 8 tests (preuve par mutation)
 - `resources/daemon/tests/unit/test_story_19_1_parity_tool_readonly.py` [MODIFIÉ] — revue ClaudeBox — mock `fetch_state_listeners` ajouté (appel désormais systématique)
-- `_bmad-output/implementation-artifacts/19-2-decouplage-etat-commandes-invariant-i8.md` [MODIFIÉ] — statut, tasks, Completion Notes, File List, Dev Notes (principe step-4/runtime), Preuve terrain (critères Task 5)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ] — statut `19-2-decouplage-etat-commandes-invariant-i8: in-progress`
+- `_bmad-output/implementation-artifacts/19-2-decouplage-etat-commandes-invariant-i8.md` [MODIFIÉ] — statut `done`, Task 0/Task 5 cochées, Completion Notes (preuve terrain 28/09), File List, Dev Notes (principe step-4/runtime), Preuve terrain (critères Task 5 vérifiés)
+- `_bmad-output/implementation-artifacts/19-2-field-proof-2026-09-28.md` [NOUVEAU] — artefact durable de preuve terrain (identifiants seulement), gate d'inventaire obligatoire
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ] — statut `19-2-decouplage-etat-commandes-invariant-i8: done`
