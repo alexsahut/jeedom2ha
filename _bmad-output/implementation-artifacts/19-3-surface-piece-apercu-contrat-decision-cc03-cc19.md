@@ -1,6 +1,6 @@
 # Story 19.3: Surface pièce / aperçu branchés sur le contrat de décision (CC-03, CC-19)
 
-Status: in-progress
+Status: ready-for-UX-validation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -203,6 +203,8 @@ le test doit couvrir ce conflit dans le contrat puis dans l’aperçu.
   - **Garde-fou libellés** (59 équipements/174 commandes du corpus doré, script Python aiohttp + script Node rejouant ancienne/nouvelle logique de libellé) : **4 lignes changent exactement** — les 2 commandes de eq 5000 (`disabled_eqlogic`) et les 2 commandes de eq 5001 (`excluded_eqlogic`) passent de « Ne sera pas publié — commande non couverte par un mapping » à leur vraie raison (« équipement désactivé dans Jeedom » / « exclu de Jeedom2HA… »). Les 170 autres lignes sont inchangées.
   - **Suite complète, zéro régression** : `python3 -m pytest -q` depuis `resources/daemon` → **1318 passed** ; `node --test tests/unit/*.node.test.js` depuis la racine → **305 passed**, 0 fail.
   - AC5 reste **non exécutée** (hors périmètre, aucun accès box/déploiement autorisé pour ce tour). Statut inchangé : `in-progress`.
+
+- **preuve terrain (dev-story, gate box)** — 2026-09-29 — fusion de la PR #176 (SHA `5b1424399786c8e0c8dd1e1a6a203591919c3f42`) puis déploiement standard sur la box réelle (192.168.1.21) via `scripts/deploy-to-box.sh --restart-daemon` (sans `--cleanup-discovery` ni `--stop-daemon-cleanup`). Mesures avant/après complètes : `parity-snapshot` strictement vide (`is_empty_diff:true`, 292 décisions, 354 topics MQTT discovery, 184 topics d'état, tous identiques) ; arbres `/system/mapping_overrides/{eq}` vérifiés sur 5 équipements exclus/désactivés réels (547 `excluded_plugin`, 12 et 540 `excluded_object`, 315 et 279 `disabled_eqlogic` — 100/100 commandes passées de l'état bug CC-03 à `covered:false` + vraie raison) et sur les commandes secondaires de eq 628/583 (10/10 passées à `covered:true, ha_entity_type:"switch"`) ; démon jeedom2ha sain (nouveau PID, 0 ERROR) ; 10 démons tiers persistants inchangés (PID/lstart identiques). Aucun rollback nécessaire. Détail complet : `_bmad-output/implementation-artifacts/19-3-field-proof-2026-09-29.md`. **AC5 (scénario de clic réel dans l'UI Jeedom) reste non exécuté** — cette preuve couvre la mesure automatisée avant/après, pas le clic UI. Statut résultant : `ready-for-UX-validation` (pas `done`), conformément à AC5.
 
 ### File List
 
