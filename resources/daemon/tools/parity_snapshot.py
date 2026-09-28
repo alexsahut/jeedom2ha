@@ -55,8 +55,24 @@ complémentaire, en lecture seule : la VÉRIFICATION que le topic d'état
 retenu correspondant (`jeedom2ha/<eq_id>/<cmd_id>/state`) est bien présent
 pour chaque candidat détecté — c'est exactement ce que la correction I11
 (`sync/state.py`/`sync/command.py`) est censée garantir. Cette vérification
-est optionnelle (`--mqtt-state-inventory-file`) : sans elle, le comportement
-et le format du rapport restent strictement identiques à Story 19.1.
+est optionnelle (`--mqtt-state-inventory-file`) : sans elle, `state_topics`
+et l'augmentation de `i11_candidates` restent vides, comme en Story 19.1.
+
+P2 (revue ClaudeBox, commit 3a408db) : `state_topics`/`publish_initial_states`
+ne distinguent PAS l'avant de l'après un déploiement — sur `main`, l'état des
+secondaires I11 est déjà publié en retained à chaque sync complète, sans
+filtre sur le principal. La preuve qui distingue réellement avant et après
+est `GET /system/state_listeners` (liste que le plugin PHP utilise pour
+enregistrer ses écouteurs Jeedom, source `StateSynchronizer.list_state_targets`) :
+`capture` la relève systématiquement (même mécanisme que
+`/system/diagnostics`, jamais optionnelle) dans le champ `state_listeners`
+(couples `(eq_id, cmd_id)` triés) ; `diff` ajoute `listeners_added`/
+`listeners_removed` sans changer la sémantique de `is_empty_diff` (qui reste
+calculée sur les décisions et les topics discovery uniquement, parité
+Story 19.1). `to_dict()` contient désormais toujours la clé `state_topics`
+(et `state_listeners`) : il n'existe plus de "format strictement identique
+à Story 19.1" au sens littéral — seul le CONTENU de `state_topics`/
+`i11_candidates` reste vide/non augmenté sans `--mqtt-state-inventory-file`.
 """
 
 from __future__ import annotations
@@ -153,6 +169,49 @@ def fetch_diagnostics(base_url: str, local_secret: str, *, timeout: float = 10.0
             f"{payload.get('message', '(aucun message)')}"
         )
     return payload
+
+
+def fetch_state_listeners(base_url: str, local_secret: str, *, timeout: float = 10.0) -> dict:
+    """GET /system/state_listeners — lecture seule stricte, mêmes garanties que
+    `fetch_diagnostics` (secret uniquement via en-tête HTTP, jamais dans
+    l'URL). Story 19.2, P2 (revue ClaudeBox, 3a408db) : c'est la seule preuve
+    qui distingue réellement l'avant de l'après un déploiement I11 — source
+    exacte utilisée par le plugin PHP pour enregistrer ses écouteurs Jeedom
+    (`StateSynchronizer.list_state_targets`), contrairement à `state_topics`/
+    `publish_initial_states` qui ne filtrent pas sur le principal et publient
+    déjà l'état des secondaires I11 en retained sur `main`.
+    """
+    url = base_url.rstrip("/") + "/system/state_listeners"
+    request = urllib.request.Request(
+        url, headers={"X-Local-Secret": local_secret}, method="GET"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise ParitySnapshotError(f"Échec de connexion à {url} : {exc}") from exc
+    if payload.get("status") != "ok":
+        raise ParitySnapshotError(
+            f"/system/state_listeners a répondu status={payload.get('status')!r} : "
+            f"{payload.get('message', '(aucun message)')}"
+        )
+    return payload
+
+
+def _state_listener_records(state_listeners_payload: dict) -> List[dict]:
+    """Normalise `payload.listeners` en couples `(eq_id, cmd_id)` triés — même
+    convention déterministe que `_decision_records`. Un relevé sans écouteur
+    (vague 1 pas encore publiée) est un résultat légitime, jamais un échec :
+    contrairement aux décisions/topics discovery (AC3), une liste vide ici
+    n'indique rien d'anormal."""
+    listeners = state_listeners_payload.get("listeners", []) or []
+    return sorted(
+        (
+            {"eq_id": int(entry["eq_id"]), "cmd_id": int(entry["cmd_id"])}
+            for entry in listeners
+        ),
+        key=lambda e: (e["eq_id"], e["cmd_id"]),
+    )
 
 
 def _command_records(commands: List[dict]) -> List[dict]:
@@ -415,6 +474,7 @@ class ParitySnapshot:
     explicit_scope_entries: List[dict] = field(default_factory=list)
     published_scope_exceptions: List[dict] = field(default_factory=list)
     state_topics: List[str] = field(default_factory=list)
+    state_listeners: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -426,6 +486,7 @@ class ParitySnapshot:
             "explicit_scope_entries": self.explicit_scope_entries,
             "published_scope_exceptions": self.published_scope_exceptions,
             "state_topics": self.state_topics,
+            "state_listeners": self.state_listeners,
         }
 
 
@@ -448,9 +509,11 @@ def capture_snapshot(
     explicite). Échoue explicitement (ParitySnapshotError) si le relevé de
     décisions OU l'inventaire MQTT est vide — jamais un succès déguisé (AC3).
 
-    `mqtt_state_inventory_file` (Story 19.2) est optionnel et n'affecte le
-    format du rapport que s'il est fourni : sans lui, `state_topics` reste
-    vide et `i11_candidates` garde exactement la forme Story 19.1."""
+    `mqtt_state_inventory_file` (Story 19.2) est optionnel : sans lui,
+    `state_topics` reste vide et `i11_candidates` garde exactement la forme
+    Story 19.1. `state_listeners` (Story 19.2, P2) est en revanche relevé
+    systématiquement via `/system/state_listeners`, comme les décisions et
+    le périmètre publié."""
     diagnostics_payload = fetch_diagnostics(base_url, local_secret, timeout=http_timeout)
     decisions = _decision_records(diagnostics_payload)
     if not decisions:
@@ -486,6 +549,12 @@ def capture_snapshot(
 
     published_scope_payload = fetch_published_scope(base_url, local_secret, timeout=http_timeout)
 
+    # P2 (revue ClaudeBox, 3a408db) — relevé systématique, jamais optionnel,
+    # même mécanisme que /system/diagnostics : c'est la seule preuve qui
+    # distingue réellement l'avant de l'après (voir docstring du module).
+    state_listeners_payload = fetch_state_listeners(base_url, local_secret, timeout=http_timeout)
+    state_listeners = _state_listener_records(state_listeners_payload)
+
     i11_candidates = _detect_i11_candidates(decisions, mqtt_topics)
 
     # Strictement opt-in (Story 19.2) : seul un inventaire d'état explicitement
@@ -512,6 +581,7 @@ def capture_snapshot(
         explicit_scope_entries=_detect_explicit_scope(decisions),
         published_scope_exceptions=_detect_published_scope_exceptions(published_scope_payload),
         state_topics=state_topics,
+        state_listeners=state_listeners,
     )
 
 
@@ -544,12 +614,34 @@ def diff_snapshots(before: dict, after: dict) -> dict:
 
     before_topics = set(before["mqtt_topics"])
     after_topics = set(after["mqtt_topics"])
+
+    # P2 (revue ClaudeBox, 3a408db) — un relevé capturé AVANT ce champ
+    # (Story 19.1/19.2 pré-P2) reste comparable : absence de la clé traitée
+    # comme une liste vide, jamais une erreur. N'influence jamais
+    # `is_empty_diff`, qui reste calculé uniquement sur les décisions et les
+    # topics discovery (parité Story 19.1) — les écouteurs sont une preuve
+    # terrain complémentaire, pas un critère de parité.
+    before_listeners = {
+        (entry["eq_id"], entry["cmd_id"]) for entry in (before.get("state_listeners") or [])
+    }
+    after_listeners = {
+        (entry["eq_id"], entry["cmd_id"]) for entry in (after.get("state_listeners") or [])
+    }
+    listeners_added = [
+        {"eq_id": eq_id, "cmd_id": cmd_id} for eq_id, cmd_id in sorted(after_listeners - before_listeners)
+    ]
+    listeners_removed = [
+        {"eq_id": eq_id, "cmd_id": cmd_id} for eq_id, cmd_id in sorted(before_listeners - after_listeners)
+    ]
+
     return {
         "changed_decisions": changed_decisions,
         "topics_added": sorted(after_topics - before_topics),
         "topics_removed": sorted(before_topics - after_topics),
         "topic_count_before": len(before_topics),
         "topic_count_after": len(after_topics),
+        "listeners_added": listeners_added,
+        "listeners_removed": listeners_removed,
         "is_empty_diff": not changed_decisions and before_topics == after_topics,
     }
 
