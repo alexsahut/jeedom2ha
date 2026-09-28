@@ -198,17 +198,29 @@ class CommandSynchronizer:
                 continue
 
             found_eq = True
-            if not getattr(decision, "should_publish", False):
-                continue
-            found_publishable = True
-            if not bool(getattr(decision, "active_or_alive", False)):
-                continue
-            found_alive = True
+            # Diagnostics only (reason codes below) — reflects the principal's
+            # decision so pre-existing "entity_not_published"/"entity_not_alive"
+            # reporting is preserved when no candidate topic matches at all.
+            # The actual routing gate below is per-candidate (I11): it never
+            # skips the loop based on the principal's should_publish/alive.
+            if getattr(decision, "should_publish", False):
+                found_publishable = True
+                if bool(getattr(decision, "active_or_alive", False)):
+                    found_alive = True
 
             for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
                 candidate_decision = getattr(candidate, "publication_decision_ref", None) or decision
                 expected_topics = self._expected_command_topics(candidate)
                 if topic not in expected_topics.values():
+                    continue
+
+                # I11: routing is decided on the candidate's OWN decision, never
+                # on the principal's — a secondary published under a refused
+                # principal must still be routed, and a refused secondary under a
+                # published principal must never inherit the principal's routing.
+                if not getattr(candidate_decision, "should_publish", False):
+                    continue
+                if not bool(getattr(candidate_decision, "active_or_alive", False)):
                     continue
 
                 if (
