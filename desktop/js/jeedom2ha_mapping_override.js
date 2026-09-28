@@ -237,6 +237,14 @@
     publication_excluded_eqlogic: 'exclu manuellement (équipement)',
     publication_excluded_command: 'exclu manuellement (commande)',
     publication_forced: 'publication forcée manuellement',
+    // Story 19.3 (AC1/AC7) — le branchement sur evaluate_equipment() fait aussi remonter
+    // les raisons d'inéligibilité amont (Story 4.3) jusqu'au diagnostic par commande,
+    // là où la surface ignorait jusqu'ici ces cas (CC-03).
+    command_not_covered: 'commande non couverte par ce mapping',
+    excluded_eqlogic: 'exclu de Jeedom2HA (équipement dans la liste d’exclusions)',
+    excluded_plugin: 'exclu de Jeedom2HA (plugin source dans la liste d’exclusions)',
+    excluded_object: 'exclu de Jeedom2HA (pièce dans la liste d’exclusions)',
+    no_commands: 'aucune commande configurée dans Jeedom',
   };
 
   // Story 16.8 — raison de blocage concise pour la cellule diagnostic du tableau.
