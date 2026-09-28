@@ -49,6 +49,20 @@
     };
   }
 
+  // Story 19.3 (AC6) — état sync vs override courant : distingue la dernière décision
+  // synchronisée (`app["publications"]`, MQTT) de l'état courant recalculé avec les
+  // overrides actifs. `override_pending` signale un override qui n'a pas encore été
+  // republié (l'utilisateur doit resynchroniser pour que Home Assistant reflète le
+  // changement).
+  function normalizeSyncStatus(raw) {
+    var s = raw || {};
+    return {
+      synced_should_publish: typeof s.synced_should_publish === 'boolean' ? s.synced_should_publish : null,
+      current_should_publish: typeof s.current_should_publish === 'boolean' ? s.current_should_publish : null,
+      override_pending: s.override_pending === true,
+    };
+  }
+
   function normalizeTree(payload) {
     var p = payload || {};
     var commands = Array.isArray(p.commands) ? p.commands : [];
@@ -58,7 +72,14 @@
       mapped: p.mapped === true,
       // Ordre natif préservé strictement (AC3 : pas de tri/regroupement front).
       commands: commands.map(normalizeCommandRow),
+      sync_status: normalizeSyncStatus(p.sync_status),
     };
+  }
+
+  // Story 19.3 (AC6) — l'accordéon pièce doit afficher un badge quand l'état courant
+  // (overrides actifs) diverge de la dernière décision synchronisée vers Home Assistant.
+  function shouldShowOverridePendingBadge(tree) {
+    return normalizeTree(tree).sync_status.override_pending === true;
   }
 
   // AC5 — état vide explicite : jamais un champ vide silencieux.
@@ -208,6 +229,14 @@
     ha_missing_state_topic: 'pas de retour d’état exploitable',
     discovery_publish_failed: 'échec de publication MQTT au dernier sync',
     low_confidence: 'confiance insuffisante pour la politique active',
+    // Story 19.3 (AC4) — raisons exposées par le branchement sur evaluate_equipment().
+    no_mapping: 'aucun mapping trouvé pour cette commande',
+    skipped_no_mapping_candidate: 'aucun candidat de mapping à valider',
+    ha_component_not_in_product_scope: 'type HA non ouvert par ce plugin',
+    sure_mapping: 'mapping direct — publication normale',
+    publication_excluded_eqlogic: 'exclu manuellement (équipement)',
+    publication_excluded_command: 'exclu manuellement (commande)',
+    publication_forced: 'publication forcée manuellement',
   };
 
   // Story 16.8 — raison de blocage concise pour la cellule diagnostic du tableau.
@@ -409,6 +438,7 @@
     summarizePublication: summarizePublication,
     buildPublicationSummaryLabel: buildPublicationSummaryLabel,
     publicationSummaryState: publicationSummaryState,
+    shouldShowOverridePendingBadge: shouldShowOverridePendingBadge,
   };
 
   return api;

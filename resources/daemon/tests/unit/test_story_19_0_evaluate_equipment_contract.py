@@ -658,9 +658,11 @@ def test_ac3_merge_is_field_level_not_full_entry_replacement():
     persisted = {"7:101": {"source": "user", "ha_entity_type": "cover"}}
     proposed = {"7:101": {"source": "user", "publication_override": "force_publish"}}
 
-    from models.evaluate_equipment import _merge_override_layer
+    # Story 19.3 : `_merge_override_layer` promu public `merge_override_layer` (réutilisé par
+    # `transport/http_server.py`).
+    from models.evaluate_equipment import merge_override_layer
 
-    merged = _merge_override_layer(persisted, proposed)
+    merged = merge_override_layer(persisted, proposed)
 
     assert merged["7:101"]["ha_entity_type"] == "cover"
     assert merged["7:101"]["publication_override"] == "force_publish"

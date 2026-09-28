@@ -246,6 +246,19 @@
     }
   }
 
+  // Story 19.3 (AC6) — badge « override en attente » : signale que la dernière
+  // publication synchronisée (MQTT) ne reflète pas encore l'état courant des overrides
+  // (l'utilisateur doit resynchroniser). Purement informatif, ne bloque aucune action.
+  function renderSyncBadge($panel, tree) {
+    var $badge = $panel.find('.j2ha-eq-sync-badge').first().empty();
+    if (!M.shouldShowOverridePendingBadge(tree)) {
+      return;
+    }
+    $badge.append($('<span class="label label-warning"></span>')
+      .append($('<i class="fas fa-clock"></i> '))
+      .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
+  }
+
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
 
   function renderEquipmentTree($panel, tree) {
@@ -253,6 +266,8 @@
     var eqId = normalized.jeedom_eq_id;
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
+
+    renderSyncBadge($panel, normalized);
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -359,6 +374,7 @@
         .attr('aria-labelledby', headId);
       var $body = $('<div class="panel-body"></div>');
       $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
+      $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-cmdlist panel-group" role="tablist" aria-multiselectable="true" style="max-height:calc(100vh - 320px); overflow-y:auto;"></div>'));

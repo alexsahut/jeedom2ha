@@ -1,6 +1,6 @@
 # Story 19.3: Surface pièce / aperçu branchés sur le contrat de décision (CC-03, CC-19)
 
-Status: backlog
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -25,10 +25,10 @@ from models.availability import (
     availability_from_snapshot,
     build_local_availability_topic,
 )
-from models.topology import TopologySnapshot, assess_all
+from models.topology import TopologySnapshot, assess_all, assess_eligibility
 from models.published_scope import resolve_published_scope
 from models.decide_publication import decide_publication
-from models.evaluate_equipment import evaluate_equipment
+from models.evaluate_equipment import evaluate_equipment, merge_override_layer
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
@@ -51,6 +51,7 @@ from mapping.overrides import (
     list_equipment_overrides,
     list_overrides,
     mapping_cmd_ids,
+    parse_override_key,
     remove_equipment_override,
     remove_override,
     resolve_publication_override,
@@ -2294,42 +2295,90 @@ def _secondary_mapping_by_cmd(primary_mapping):
     return index
 
 
-def _preview_mapping_view(mapping, confidence_policy, *, publication_override):
-    """Story 16.6 — vue JSON-safe d'un mapping pour la preview (lecture seule).
-
-    Fait passer le mapping par `validate_projection` (step 3, même moteur que le
-    pipeline de sync, aucun bypass) puis `decide_publication` (step 4) avec l'override
-    de publication éventuel. Aucune publication MQTT, aucune écriture disque.
+def _target_mapping_for_cmd(evaluation, cmd_id):
+    """Retrouve le `MappingResult` (primaire ou secondaire) qui couvre `cmd_id` au sein
+    d'une `EquipmentEvaluation` déjà décidée — `None` si l'équipement n'a pas de mapping
+    (inéligible ou `no_mapping`) ou si `cmd_id` n'est couvert par AUCUN des deux (Story 19.3).
+    `cmd_id=None` cible toujours le mapping primaire (vue équipement).
     """
-    validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
-    mapping.projection_validity = validity
-    decision = decide_publication(
-        mapping,
-        confidence_policy=confidence_policy,
-        publication_override=publication_override,
-    )
+    primary_mapping = evaluation.mapping
+    if primary_mapping is None:
+        return None
+    if isinstance(cmd_id, int):
+        secondary = _secondary_mapping_by_cmd(primary_mapping).get(cmd_id)
+        if secondary is not None:
+            return secondary
+        if cmd_id not in set(mapping_cmd_ids(primary_mapping)):
+            return None
+    return primary_mapping
+
+
+def _decision_view(decision, mapping):
+    """Reconstruit la vue JSON-safe historique (contrat `_preview_mapping_view`, Story 16.6)
+    à partir d'une décision + son mapping DÉJÀ résolus par `evaluate_equipment()` — ne relance
+    JAMAIS `validate_projection`/`decide_publication` (Story 19.3, Dev Notes : aucune
+    duplication de la logique de décision, AR9/I4). `mapping=None` couvre le cas d'une
+    commande non couverte ou d'un équipement inéligible : `decision` reste toujours renseignée
+    (AC7 — jamais `None`), seuls les champs dérivés du mapping deviennent `None`/vides.
+    """
+    if decision is None:
+        return None
+    if mapping is None:
+        return {
+            "ha_entity_type": None,
+            "confidence": None,
+            "reason_code": None,
+            "projection_validity": {
+                "is_valid": False,
+                "reason_code": decision.reason,
+                "missing_capabilities": [],
+                "missing_fields": [],
+            },
+            "should_publish": decision.should_publish,
+            "publication_reason": decision.reason,
+        }
+    validity = mapping.projection_validity
     return {
         "ha_entity_type": mapping.ha_entity_type,
         "confidence": mapping.confidence,
         "reason_code": mapping.reason_code,
         "projection_validity": {
-            "is_valid": validity.is_valid,
-            "reason_code": validity.reason_code,
-            "missing_capabilities": list(validity.missing_capabilities),
-            "missing_fields": list(validity.missing_fields),
+            "is_valid": validity.is_valid if validity else False,
+            "reason_code": validity.reason_code if validity else None,
+            "missing_capabilities": list(validity.missing_capabilities) if validity else [],
+            "missing_fields": list(validity.missing_fields) if validity else [],
         },
         "should_publish": decision.should_publish,
         "publication_reason": decision.reason,
     }
 
 
+def _view_from_evaluation(evaluation, cmd_id):
+    """Vue JSON-safe (contrat `_decision_view`) pour `cmd_id` au sein d'une évaluation —
+    `None` si non couvert (le caller décide alors du `covered: False`), jamais un mapping
+    ré-évalué (Story 19.3, AC1/AC2)."""
+    target_mapping = _target_mapping_for_cmd(evaluation, cmd_id)
+    if target_mapping is None:
+        return None
+    decision = target_mapping.publication_decision_ref or evaluation.equipment_decision
+    return _decision_view(decision, target_mapping)
+
+
 async def _handle_overrides_preview(request: web.Request) -> web.Response:
     """POST /system/overrides/preview — Story 16.6 : dry-run d'un override (lecture seule).
 
-    Calcule le mapping AUTO (moteur brut, sans override) et le mapping AVEC l'override
-    PROPOSÉ (appliqué EN MÉMOIRE, jamais persisté), fait passer le résultat surchargé par
-    `validate_projection` AVANT toute sauvegarde, et ne déclenche AUCUNE publication MQTT.
-    Zéro effet de bord : ni `save_override`, ni écriture `data_dir`, ni `publish*`.
+    Calcule la vue AUTO (état effectif ACTUEL — overrides déjà persistés inclus, aucun
+    proposé — donc cohérente avec ce que montre déjà la surface, Story 19.3 AC2) et la vue
+    AVEC l'override PROPOSÉ (fusionné EN MÉMOIRE avec les overrides persistés via
+    `evaluate_equipment()`, jamais sauvegardé). Aucune publication MQTT, aucune écriture
+    disque. Zéro effet de bord : ni `save_override`, ni écriture `data_dir`, ni `publish*`.
+
+    Story 19.3 (AC2) : passe par `evaluate_equipment()` — plus de rejeu direct de
+    `validate_projection`/`decide_publication` dans ce module (parité stricte avec la surface,
+    même code de décision). Une éligibilité amont négative (CC-03) donne ici aussi
+    `mapped: False`, jamais un mapping fantôme. `confidence_policy` vient exclusivement de
+    `app["confidence_policy"]` (politique du dernier sync) — jamais du payload de requête,
+    qui pourrait mentir par rapport à la politique réellement appliquée en publication.
     """
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
@@ -2373,18 +2422,30 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
         )
 
-    confidence_policy = payload.get("confidence_policy", "sure_probable")
+    # AC2 (Story 19.3) : politique de confiance = celle de l'état applicatif (dernier sync),
+    # jamais celle du payload (écart relevé PR #169).
+    confidence_policy = request.app.get("confidence_policy") or "sure_probable"
     if confidence_policy not in ("sure_only", "sure_probable"):
         confidence_policy = "sure_probable"
 
     native_generic_types = {str(c.id): c.generic_type for c in eq.cmds}
-
     data_dir = _resolve_data_dir(request)
+    eligibility = assess_eligibility(eq)
+    mapper_registry = MapperRegistry()
+    persisted_overrides = list_overrides(data_dir)
+    persisted_equipment_overrides = list_equipment_overrides(data_dir)
 
-    # 1. AUTO — moteur brut, aucun override.
-    registry = MapperRegistry()
-    auto_mapping = registry.map(eq, snapshot)
-    if auto_mapping is None:
+    # 1. AUTO — état effectif ACTUEL (overrides déjà persistés inclus, aucun proposé) : ce
+    # qu'affiche déjà la surface pour cet équipement (AC2). Une éligibilité négative (I1) ou
+    # un `no_mapping` (étape 2) se traduisent tous deux par `evaluation.mapping is None`.
+    auto_evaluation = evaluate_equipment(
+        eq, snapshot, eligibility,
+        mapper_registry=mapper_registry,
+        confidence_policy=confidence_policy,
+        persisted_overrides=persisted_overrides,
+        persisted_equipment_overrides=persisted_equipment_overrides,
+    )
+    if auto_evaluation.mapping is None:
         return web.json_response({
             "status": "ok",
             "payload": {
@@ -2396,78 +2457,85 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             },
         })
 
-    # 1b. Si la commande ciblée est un capteur secondaire (Story 11.1 multi-sensor), c'est CE
-    # mapping qu'il faut évaluer : le primaire ne le couvre pas, donc évaluer le primaire
-    # afficherait le type primaire (« Sera publié : binary_sensor ») au lieu du type réel du
-    # secondaire (« sensor »). On bascule la cible sans jamais toucher le primaire.
-    target_mapping = auto_mapping
-    is_secondary_target = False
-    if isinstance(proposed_cmd_id, int):
-        secondary = _secondary_mapping_by_cmd(auto_mapping).get(proposed_cmd_id)
-        if secondary is not None:
-            target_mapping = secondary
-            is_secondary_target = True
-
-    # AC12 « jamais vide » : une commande ciblée qui n'est couverte NI par le primaire NI par un
-    # capteur secondaire n'a pas de mapping à évaluer. Évaluer le primaire à sa place afficherait
-    # un « Sera publié : <type primaire> » trompeur (flash vert puis cellule vide au reload).
-    # On répond honnêtement `covered:false` / `overridden:null` : l'UI montre « non couvert ».
-    covered = True
-    if isinstance(proposed_cmd_id, int) and not is_secondary_target:
-        covered = proposed_cmd_id in set(mapping_cmd_ids(auto_mapping))
-    if not covered:
+    # AC12 « jamais vide » : une commande ciblée qui n'est couverte NI par le primaire NI par
+    # un capteur secondaire n'a pas de mapping à évaluer. On répond honnêtement
+    # `covered:false` / `overridden:null` : l'UI montre « non couvert ».
+    auto_target = _target_mapping_for_cmd(auto_evaluation, proposed_cmd_id)
+    if auto_target is None:
         return web.json_response({
             "status": "ok",
             "payload": {
                 "jeedom_eq_id": eq_id,
                 "mapped": True,
                 "covered": False,
-                "auto": _preview_mapping_view(
-                    auto_mapping, confidence_policy, publication_override=None
-                ),
+                "auto": _view_from_evaluation(auto_evaluation, None),
                 "overridden": None,
                 "native_generic_types": native_generic_types,
             },
         })
 
-    # 2. Overrides PROPOSÉS, construits depuis le corps de requête, EN MÉMOIRE uniquement.
-    proposed_type_overrides: Dict[str, dict] = {}
-    if proposed_type is not None:
-        cmd_ids = mapping_cmd_ids(target_mapping)
-        key_cmd = proposed_cmd_id if isinstance(proposed_cmd_id, int) else (cmd_ids[0] if cmd_ids else None)
-        if key_cmd is not None:
-            proposed_type_overrides[f"{eq_id}:{key_cmd}"] = {
-                "ha_entity_type": proposed_type,
-                "source": "preview",
-            }
-    proposed_cmd_overrides: Dict[str, dict] = {}
+    # 2. Overrides PROPOSÉS, construits depuis le corps de requête — une seule entrée par clé
+    # `eq_id:cmd_id` pouvant porter `ha_entity_type` ET/OU `publication_override` (schéma v2).
+    cmd_ids = mapping_cmd_ids(auto_target)
+    key_cmd = proposed_cmd_id if isinstance(proposed_cmd_id, int) else (cmd_ids[0] if cmd_ids else None)
+    proposed_overrides: Dict[str, dict] = {}
+    if proposed_type is not None and key_cmd is not None:
+        proposed_overrides[f"{eq_id}:{key_cmd}"] = {
+            "ha_entity_type": proposed_type,
+            "source": "preview",
+        }
     proposed_equipment_overrides: Dict[str, dict] = {}
     if proposed_policy is not None:
         if isinstance(proposed_cmd_id, int):
-            proposed_cmd_overrides[f"{eq_id}:{proposed_cmd_id}"] = {"publication_override": proposed_policy}
+            proposed_overrides.setdefault(f"{eq_id}:{proposed_cmd_id}", {})["publication_override"] = proposed_policy
         else:
             proposed_equipment_overrides[str(eq_id)] = {"publication_override": proposed_policy}
 
-    # 3. Résultat AVEC override : copie patchée (generic_type natif intact, D10).
-    over_mapping = apply_type_override(target_mapping, data_dir, overrides=proposed_type_overrides)
-    pub_override = _resolve_publication_override_for_mapping(
-        over_mapping, proposed_cmd_overrides, proposed_equipment_overrides
+    # 3. Résultat AVEC override : fusion persisté+proposé (AC2). Le helper de priorité
+    # (`evaluate_equipment._apply_type_override_with_proposed_priority`) garantit que CE
+    # `cmd_id` proposé gagne même si un `cmd_id` frère du même mapping porte déjà un override
+    # persisté — test « conflit inter-commandes » (Dev Notes, Story 19.3).
+    over_evaluation = evaluate_equipment(
+        eq, snapshot, eligibility,
+        mapper_registry=mapper_registry,
+        confidence_policy=confidence_policy,
+        persisted_overrides=persisted_overrides,
+        persisted_equipment_overrides=persisted_equipment_overrides,
+        proposed_overrides=proposed_overrides,
+        proposed_equipment_overrides=proposed_equipment_overrides,
     )
+    over_target = _target_mapping_for_cmd(over_evaluation, proposed_cmd_id)
 
-    auto_view = _preview_mapping_view(target_mapping, confidence_policy, publication_override=None)
-    over_view = _preview_mapping_view(over_mapping, confidence_policy, publication_override=pub_override)
+    auto_view = _view_from_evaluation(auto_evaluation, proposed_cmd_id)
+    over_view = _view_from_evaluation(over_evaluation, proposed_cmd_id)
 
-    over_reason_details = over_mapping.reason_details or {}
+    # Champ d'affichage `publication_override` (chaîne brute, ex. "exclude_eqlogic") — lecture
+    # SEULE via `resolve_publication_override` (même fusion que `evaluate_equipment`, via
+    # `merge_override_layer`) : n'influence jamais `should_publish`/`publication_reason`
+    # (qui viennent exclusivement de `over_view`, ci-dessus) — sert uniquement à afficher QUEL
+    # override a été résolu (trace UX, Story 16.6 AC4).
+    merged_cmd_overrides = merge_override_layer(persisted_overrides, proposed_overrides)
+    merged_equipment_overrides = merge_override_layer(
+        persisted_equipment_overrides, proposed_equipment_overrides
+    )
+    pub_override = None
+    if over_target is not None:
+        pub_override = _resolve_publication_override_for_mapping(
+            over_target, merged_cmd_overrides, merged_equipment_overrides
+        )
+
+    over_reason_details = (over_target.reason_details if over_target is not None else None) or {}
     if over_reason_details.get("override_applied"):
         over_view["type_override"] = {
             "source": over_reason_details.get("override_source"),
-            "native": target_mapping.ha_entity_type,
-            "effective": over_mapping.ha_entity_type,
+            "native": auto_target.ha_entity_type,
+            "effective": over_target.ha_entity_type,
         }
     if pub_override is not None:
         over_view["publication_override"] = pub_override
 
-    # 4. Export support (AC4) : trace de preview + raisons de refus (aucun nouveau reason_code).
+    # 4. Export support (AC4, Story 16.6) : trace de preview + raisons de refus (aucun nouveau
+    # reason_code — les codes viennent tous d'`evaluate_equipment`/`decide_publication`).
     refusal_reasons = []
     if not over_view["projection_validity"]["is_valid"] and over_view["projection_validity"]["reason_code"]:
         refusal_reasons.append(over_view["projection_validity"]["reason_code"])
@@ -2476,8 +2544,8 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             refusal_reasons.append(over_view["publication_reason"])
     support_export = {
         "preview_trace": {
-            "native": target_mapping.ha_entity_type,
-            "effective": over_mapping.ha_entity_type,
+            "native": auto_target.ha_entity_type,
+            "effective": over_target.ha_entity_type if over_target is not None else auto_target.ha_entity_type,
             "publication_override": pub_override,
         },
         "refusal_reasons": refusal_reasons,
@@ -2505,32 +2573,44 @@ def _resolve_data_dir(request: web.Request) -> str:
     return request.app.get("data_dir") or _DATA_DIR
 
 
-def _build_mapping_override_tree(eq, snapshot, data_dir):
+def _build_mapping_override_tree(eq, snapshot, data_dir, confidence_policy="sure_probable", synced_decision=None):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
     Pour chaque commande de l'équipement (ordre natif Jeedom), expose le `generic_type`
     natif (jamais muté, D10), l'attendu HA calculé par le moteur, le type effectif après
     override persisté, l'état d'override, et le diagnostic effectif (projection + publication).
-    N'écrit rien : consomme `list_overrides`/`apply_type_override`/`_preview_mapping_view`.
+    N'écrit rien.
+
+    Story 19.3 :
+      AC1 (CC-03) : consomme `evaluate_equipment()` au lieu de rejouer sa propre logique
+      d'affichage — une éligibilité amont négative (I1) ou un override d'exclusion (Story
+      16.3) se traduisent ici par `should_publish=False` avec le VRAI reason_code retenu par
+      I4, jamais par un « sera publié » optimiste qui ignore la cause amont.
+      AC7 : chaque commande obtient sa `CommandDecision` (jamais `None`) via
+      `evaluation.command_decisions`, y compris les commandes non couvertes.
+      AC6 : `sync_status` compare la dernière décision SYNCÉE (`synced_decision`, fournie par
+      l'appelant depuis `app["publications"]`) à la décision COURANTE (avec overrides
+      persistés actuels) — `override_pending=True` signale un override sauvegardé mais pas
+      encore appliqué par un sync (badge « pas encore appliqué »).
     """
     overrides_cache = list_overrides(data_dir)
+    equipment_overrides_cache = list_equipment_overrides(data_dir)
     proposed_eq = resolve_expected_ha(eq, snapshot).get("proposed_ha_entity_type")
 
-    auto_mapping = MapperRegistry().map(eq, snapshot)
-    mapped = auto_mapping is not None
-    covered_ids = set(mapping_cmd_ids(auto_mapping)) if mapped else set()
-    native_type = auto_mapping.ha_entity_type if mapped else None
-    secondary_by_cmd = _secondary_mapping_by_cmd(auto_mapping) if mapped else {}
-
-    effective_diag = None
-    if mapped:
-        over_mapping = apply_type_override(auto_mapping, data_dir, overrides=overrides_cache)
-        effective_type = over_mapping.ha_entity_type
-        effective_diag = _preview_mapping_view(
-            over_mapping, "sure_probable", publication_override=None
-        )
-    else:
-        effective_type = None
+    eligibility = assess_eligibility(eq)
+    evaluation = evaluate_equipment(
+        eq, snapshot, eligibility,
+        mapper_registry=MapperRegistry(),
+        confidence_policy=confidence_policy,
+        persisted_overrides=overrides_cache,
+        persisted_equipment_overrides=equipment_overrides_cache,
+    )
+    primary_mapping = evaluation.mapping
+    mapped = primary_mapping is not None
+    covered_ids = set(mapping_cmd_ids(primary_mapping)) if mapped else set()
+    native_type = primary_mapping.ha_entity_type if mapped else None
+    secondary_by_cmd = _secondary_mapping_by_cmd(primary_mapping) if mapped else {}
+    command_decision_by_cmd = {d.cmd_id: d for d in evaluation.command_decisions}
 
     commands = []
     for cmd in eq.cmds:
@@ -2542,36 +2622,19 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
         secondary = secondary_by_cmd.get(cmd.id)
         is_secondary = secondary is not None and not is_covered
 
-        # Capteur secondaire (Story 11.1) : le mapping primaire ne le couvre pas, mais il EST
-        # publié au sync. On calcule son diagnostic réel (type override honoré, publication
-        # override non appliqué ici — symétrique du chemin primaire de l'arbre).
-        secondary_diag = None
-        secondary_native = None
-        secondary_effective = None
-        if is_secondary:
-            secondary_native = secondary.ha_entity_type
-            secondary_over = apply_type_override(secondary, data_dir, overrides=overrides_cache)
-            secondary_effective = secondary_over.ha_entity_type
-            secondary_diag = _preview_mapping_view(
-                secondary_over, "sure_probable", publication_override=None
-            )
-
         if is_covered:
             attendu_ha = native_type
+            diag_mapping = primary_mapping
+            row_effective = primary_mapping.ha_entity_type
         elif is_secondary:
-            attendu_ha = secondary_native
+            attendu_ha = secondary.ha_entity_type
+            diag_mapping = secondary
+            row_effective = secondary.ha_entity_type
         else:
             attendu_ha = proposed_eq
+            diag_mapping = None
+            row_effective = override_type if override_applied else attendu_ha
 
-        if override_applied:
-            if is_covered:
-                row_effective = effective_type
-            elif is_secondary:
-                row_effective = secondary_effective
-            else:
-                row_effective = override_type
-        else:
-            row_effective = attendu_ha
         row = {
             "jeedom_cmd_id": cmd.id,
             "cmd_name": cmd.name,
@@ -2584,18 +2647,22 @@ def _build_mapping_override_tree(eq, snapshot, data_dir):
         }
         if override_applied:
             row["override_source"] = entry.get("source", "user")
-        if is_covered and effective_diag is not None:
-            row["diagnostic"] = dict(effective_diag)
-        elif is_secondary and secondary_diag is not None:
-            row["diagnostic"] = dict(secondary_diag)
-        else:
-            row["diagnostic"] = None
+        row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
         commands.append(row)
+
+    current_should_publish = mapped and evaluation.equipment_decision.should_publish
+    synced_should_publish = synced_decision.should_publish if synced_decision is not None else None
+    override_pending = synced_should_publish is not None and synced_should_publish != current_should_publish
 
     return {
         "jeedom_eq_id": eq.id,
         "eq_name": eq.name,
         "mapped": mapped,
+        "sync_status": {
+            "synced_should_publish": synced_should_publish,
+            "current_should_publish": current_should_publish,
+            "override_pending": override_pending,
+        },
         "commands": commands,
     }
 
@@ -2626,7 +2693,11 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
         )
 
     data_dir = _resolve_data_dir(request)
-    payload = _build_mapping_override_tree(eq, snapshot, data_dir)
+    confidence_policy = request.app.get("confidence_policy") or "sure_probable"
+    synced_decision = (request.app.get("publications") or {}).get(eq_id)
+    payload = _build_mapping_override_tree(
+        eq, snapshot, data_dir, confidence_policy, synced_decision
+    )
     return web.json_response({"status": "ok", "payload": payload})
 
 
@@ -2705,6 +2776,14 @@ async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
     Supprime l'override de commande (`remove_override`) ou d'équipement
     (`remove_equipment_override`) selon la présence de `jeedom_cmd_id`. Ne touche
     jamais le `generic_type` natif (D10).
+
+    Fix CC-19 (Story 19.3, AC3) : le retour « équipement complet » (`jeedom_cmd_id`
+    absent) ne doit pas se limiter à l'override équipement (`equipment_overrides[eq_id]`) —
+    il doit AUSSI purger tout override TYPE par commande (`overrides[eq_id:cmd_id]`)
+    appartenant à cet équipement. Avant ce fix, un override TYPE par commande survivait au
+    « Revenir au mode automatique », laissant l'UI dans un état incohérent. La purge
+    n'utilise que les primitives CRUD existantes (`list_overrides`/`remove_override`/
+    `remove_equipment_override`) — jamais de réécriture manuelle du JSON.
     """
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
@@ -2739,17 +2818,29 @@ async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
     if isinstance(cmd_id, int):
         removed = remove_override(eq_id, cmd_id, data_dir)
         scope = "command"
+        removed_commands = [cmd_id] if removed else []
     else:
+        # CC-19 (Story 19.3, AC3) — purger tous les overrides TYPE par commande de cet
+        # équipement avant de supprimer l'override équipement, sinon ils survivent au retour
+        # au mode automatique (bug historique : seul `equipment_overrides` était nettoyé).
+        parsed_keys = (parse_override_key(key) for key in list_overrides(data_dir))
+        eq_cmd_ids = sorted(cid for eid, cid in parsed_keys if eid == eq_id)
+        removed_commands = [cid for cid in eq_cmd_ids if remove_override(eq_id, cid, data_dir)]
         removed = remove_equipment_override(eq_id, data_dir)
         scope = "equipment"
 
     _LOGGER.info(
-        "[OVERRIDES] Retour mode auto via UI eq_id=%d scope=%s removed=%s",
-        eq_id, scope, removed,
+        "[OVERRIDES] Retour mode auto via UI eq_id=%d scope=%s removed=%s removed_commands=%s",
+        eq_id, scope, removed, removed_commands,
     )
     return web.json_response({
         "status": "ok",
-        "payload": {"jeedom_eq_id": eq_id, "scope": scope, "removed": removed},
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "scope": scope,
+            "removed": removed,
+            "removed_commands": removed_commands,
+        },
     })
 
 

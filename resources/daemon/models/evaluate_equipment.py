@@ -55,7 +55,7 @@ Registre de mappeurs et fonctions du pipeline injectables (Dev Notes) :
 
 Fusion des overrides (AC3) :
     Point unique de fusion overrides persistés + overrides proposés (aperçu, non sauvegardés) :
-    `_merge_override_layer`. La fusion est CHAMP PAR CHAMP à une même clé (schéma v2,
+    `merge_override_layer`. La fusion est CHAMP PAR CHAMP à une même clé (schéma v2,
     `mapping/overrides.py` : une entrée peut porter à la fois `ha_entity_type` et
     `publication_override`) — un `proposed` partiel ne fait jamais disparaître un champ
     persisté non recouvert (correction revue bot, PR #167). Fournir uniquement des overrides
@@ -133,7 +133,7 @@ class EquipmentEvaluation:
     mapping: Optional[MappingResult] = None
 
 
-def _merge_override_layer(
+def merge_override_layer(
     persisted: Optional[Dict[str, dict]],
     proposed: Optional[Dict[str, dict]],
 ) -> Dict[str, dict]:
@@ -145,6 +145,11 @@ def _merge_override_layer(
     `publication_override`) ne doit jamais faire disparaître un champ persisté non recouvert
     (ex. `ha_entity_type`). Les clés persistées non recouvertes par `proposed` restent inchangées.
     Ne mute jamais `persisted` ni `proposed` — retourne toujours de nouveaux dicts (deepcopy).
+
+    Public depuis Story 19.3 (était `_merge_override_layer`) : réutilisé par
+    `transport/http_server.py` pour reconstruire, à l'identique, le calque fusionné qui sert
+    UNIQUEMENT à l'affichage du champ `publication_override` brut de l'aperçu — jamais pour
+    recalculer une décision (celle-ci vient exclusivement d'`evaluate_equipment()`).
     """
     merged: Dict[str, dict] = deepcopy(dict(persisted or {}))
     for key, entry in (proposed or {}).items():
@@ -169,6 +174,39 @@ def _resolve_publication_override_for_mapping(
         if candidate is not None:
             return candidate
     return None
+
+
+def _apply_type_override_with_proposed_priority(
+    mapping: MappingResult,
+    merged_overrides: Dict[str, dict],
+    proposed_overrides: Optional[Dict[str, dict]],
+) -> MappingResult:
+    """Applique l'override TYPE en priorisant le calque `proposed` (Story 19.3, AC2).
+
+    `apply_type_override` retient le PREMIER `cmd_id` (ordre `mapping_cmd_ids`) qui a une
+    entrée dans le dict d'overrides fourni. Une fois `persisted` et `proposed` aplatis en un
+    seul `merged_overrides` (`merge_override_layer`), un override persisté sur un `cmd_id`
+    frère du même mapping peut donc l'emporter sur l'override réellement proposé (aperçu)
+    d'un AUTRE `cmd_id` de ce même mapping, par simple accident d'ordre d'itération — c'est le
+    test « conflit inter-commandes » exigé par les Dev Notes de la story 19.3.
+
+    Fix : si `proposed_overrides` couvre au moins une clé de `merged_overrides`, on tente
+    D'ABORD `apply_type_override` restreint à CES clés proposées uniquement ; si ça matche,
+    c'est ce résultat qui gagne. Sinon (aucune clé proposée ne matche ce mapping), on retombe
+    sur le comportement historique avec le dict fusionné complet.
+
+    No-op garanti pour le sync : le sync n'appelle jamais `evaluate_equipment` avec
+    `proposed_overrides` (toujours `None`), donc `proposed_keys` est vide et cette fonction
+    se réduit strictement à `apply_type_override(mapping, "", overrides=merged_overrides)`.
+    """
+    proposed_keys = set((proposed_overrides or {}).keys())
+    if proposed_keys:
+        priority_overrides = {k: v for k, v in merged_overrides.items() if k in proposed_keys}
+        if priority_overrides:
+            patched = apply_type_override(mapping, "", overrides=priority_overrides)
+            if patched is not mapping:
+                return patched
+    return apply_type_override(mapping, "", overrides=merged_overrides)
 
 
 def _step_for_decision(decision: PublicationDecision) -> str:
@@ -292,8 +330,8 @@ def evaluate_equipment(
         vide, jamais `None` (I5). La décision principale et son mapping partagent des
         références croisées bidirectionnelles `is`-identifiables (idem pour chaque secondaire).
     """
-    merged_overrides = _merge_override_layer(persisted_overrides, proposed_overrides)
-    merged_equipment_overrides = _merge_override_layer(
+    merged_overrides = merge_override_layer(persisted_overrides, proposed_overrides)
+    merged_equipment_overrides = merge_override_layer(
         persisted_equipment_overrides, proposed_equipment_overrides
     )
 
@@ -353,7 +391,9 @@ def evaluate_equipment(
     # (validate_projection), même point d'insertion que le sync (D10/D11 préservés). Le
     # `raw_mapping` retourné par le registre reste intact : `apply_type_override` renvoie
     # une copie via `replace` si un override matche, sinon l'objet inchangé.
-    patched_primary = apply_type_override(raw_mapping, "", overrides=merged_overrides)
+    patched_primary = _apply_type_override_with_proposed_priority(
+        raw_mapping, merged_overrides, proposed_overrides
+    )
 
     primary_mapping, primary_decision = _decide_for_mapping(
         patched_primary,
@@ -368,8 +408,8 @@ def evaluate_equipment(
     secondary_decisions: List[PublicationDecision] = []
     updated_secondaries: List[MappingResult] = []
     for raw_secondary in original_secondaries:
-        patched_secondary = apply_type_override(
-            raw_secondary, "", overrides=merged_overrides
+        patched_secondary = _apply_type_override_with_proposed_priority(
+            raw_secondary, merged_overrides, proposed_overrides
         )
         working_secondary, secondary_decision = _decide_for_mapping(
             patched_secondary,
