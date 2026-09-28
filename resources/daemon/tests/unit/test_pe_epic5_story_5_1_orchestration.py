@@ -6,11 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from models.decide_publication import decide_publication as _real_decide_publication
+from models.evaluate_equipment import evaluate_equipment as _real_evaluate_equipment
 from models.mapping import ProjectionValidity
 from models.topology import assess_all as _real_assess_all
-from transport.http_server import create_app
+from models.decide_publication import decide_publication as _real_decide_publication
 from validation.ha_component_registry import validate_projection as _real_validate_projection
+from transport.http_server import create_app
 
 
 SECRET = "test-secret-pe-5-1-orchestration"
@@ -85,20 +86,20 @@ async def test_sync_executes_5_steps_in_order_and_publishes_valid_light(cli, app
         call_order.append("mapping")
         return real_map(self, eq, snapshot)
 
-    def _validate_spy(entity_type, capabilities):
+    def _validate_spy(*args, **kwargs):
         call_order.append("validation")
-        return _real_validate_projection(entity_type, capabilities)
+        return _real_validate_projection(*args, **kwargs)
 
-    def _decide_spy(
-        mapping, confidence_policy="sure_probable", product_scope=None, publication_override=None
-    ):
+    def _decide_spy(*args, **kwargs):
         call_order.append("decision")
-        return _real_decide_publication(
-            mapping,
-            confidence_policy=confidence_policy,
-            product_scope=product_scope,
-            publication_override=publication_override,
-        )
+        return _real_decide_publication(*args, **kwargs)
+
+    def _evaluate_spy(*args, **kwargs):
+        # Les deux vraies fonctions du contrat sont injectées et espionnées :
+        # l'ordre ne repose plus sur des marqueurs ajoutés après coup.
+        kwargs["validate_projection_fn"] = _validate_spy
+        kwargs["decide_publication_fn"] = _decide_spy
+        return _real_evaluate_equipment(*args, **kwargs)
 
     async def _publish_light_spy(mapping, snapshot):
         call_order.append("publication")
@@ -124,11 +125,8 @@ async def test_sync_executes_5_steps_in_order_and_publishes_valid_light(cli, app
         "transport.http_server.assess_all",
         side_effect=_assess_all_spy,
     ), patch.object(LightMapper, "map", new=_map_spy), patch(
-        "transport.http_server.validate_projection",
-        side_effect=_validate_spy,
-    ), patch(
-        "transport.http_server.decide_publication",
-        side_effect=_decide_spy,
+        "transport.http_server.evaluate_equipment",
+        side_effect=_evaluate_spy,
     ):
         resp = await cli.post("/action/sync", json=payload, headers={"X-Local-Secret": SECRET})
 
@@ -156,16 +154,16 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
             missing_capabilities=["has_command"],
         )
 
-    def _decide_spy(
-        mapping, confidence_policy="sure_probable", product_scope=None, publication_override=None
-    ):
+    def _decide_spy(*args, **kwargs):
         calls.append("decision")
-        return _real_decide_publication(
-            mapping,
-            confidence_policy=confidence_policy,
-            product_scope=product_scope,
-            publication_override=publication_override,
-        )
+        return _real_decide_publication(*args, **kwargs)
+
+    def _evaluate_spy(*args, **kwargs):
+        # Mutation temporaire du contrat injecté : seul ce sync voit une validation
+        # invalide. Le vrai decide_publication reste espionné et doit encore être appelé.
+        kwargs["validate_projection_fn"] = _validate_invalid
+        kwargs["decide_publication_fn"] = _decide_spy
+        return _real_evaluate_equipment(*args, **kwargs)
 
     _set_connected_bridge(app)
     payload = _sync_body(
@@ -182,11 +180,8 @@ async def test_sync_calls_decide_even_when_projection_invalid_and_never_publishe
     )
 
     with patch("transport.http_server.DiscoveryPublisher", return_value=mock_publisher), patch(
-        "transport.http_server.validate_projection",
-        side_effect=_validate_invalid,
-    ), patch(
-        "transport.http_server.decide_publication",
-        side_effect=_decide_spy,
+        "transport.http_server.evaluate_equipment",
+        side_effect=_evaluate_spy,
     ):
         resp = await cli.post("/action/sync", json=payload, headers={"X-Local-Secret": SECRET})
 

@@ -162,3 +162,35 @@ async def test_preview_requires_secret(cli, app):
     app["topology"] = snapshot
     resp = await cli.post("/system/overrides/preview", json={"payload": {"jeedom_eq_id": 200}})
     assert resp.status == 401
+
+
+async def test_preview_evaluates_proposal_despite_type_override_on_another_command(
+    cli, app, tmp_path
+):
+    """Keep proposal-only behavior; merging persisted types can hide the request."""
+    from mapping.registry import MapperRegistry
+    from mapping.overrides import apply_type_override, list_overrides, mapping_cmd_ids, save_override
+
+    snapshot, eq = _light_snapshot()
+    app["topology"] = snapshot
+    app["data_dir"] = str(tmp_path)
+    mapping = MapperRegistry().map(eq, snapshot)
+    persisted_cmd, requested_cmd = mapping_cmd_ids(mapping)[:2]
+    save_override(200, persisted_cmd, {"ha_entity_type": "switch"}, str(tmp_path))
+    persisted = list_overrides(str(tmp_path))
+    proposed = {f"200:{requested_cmd}": {"ha_entity_type": "light", "source": "preview"}}
+    # Reproduce the first-match conflict that Story 19.3 must handle in the contract.
+    assert apply_type_override(
+        mapping, str(tmp_path), overrides={**persisted, **proposed}
+    ).ha_entity_type == "switch"
+
+    response = await _preview(cli, {
+        "jeedom_eq_id": 200, "jeedom_cmd_id": requested_cmd, "ha_entity_type": "light",
+    })
+    assert response.status == 200
+    result = (await response.json())["payload"]["overridden"]
+    assert result["ha_entity_type"] == "light"
+    assert result["type_override"]["source"] == "preview"
+    assert result["projection_validity"]["is_valid"] is True
+    assert result["should_publish"] is True
+    assert list_overrides(str(tmp_path)) == persisted

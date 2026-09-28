@@ -27,6 +27,7 @@ from models.availability import (
 from models.topology import TopologySnapshot, assess_all
 from models.published_scope import resolve_published_scope
 from models.decide_publication import decide_publication
+from models.evaluate_equipment import evaluate_equipment
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
@@ -221,52 +222,36 @@ def _resolve_publication_override_for_mapping(
 async def _publish_additional_sensors(
     *,
     primary_mapping: MappingResult,
+    secondary_decisions: list[PublicationDecision],
     snapshot: TopologySnapshot,
-    confidence_policy,
     publisher_registry: Optional[PublisherRegistry],
     mqtt_bridge,
     mapping_counters: Dict[str, int],
-    overrides_cache: Optional[Dict[str, dict]] = None,
-    equipment_overrides_cache: Optional[Dict[str, dict]] = None,
 ) -> None:
     """Publier les sensors secondaires d'un eqLogic multi-sensor (Story 11.1 PE).
 
-    Chaque sensor secondaire suit le pipeline canonique (validation HA → décision →
-    publication) et alimente les compteurs comme une entité publiée à part entière.
+    Les décisions secondaires sont celles déjà produites par `evaluate_equipment()` :
+    cette étape ne doit surtout pas rejouer validation/override/décision en parallèle.
+    Elle ne fait que la publication technique et alimente les compteurs.
     Honnêteté du diagnostic : si un secondaire devant être publié échoue, le résultat
     technique du mapping primaire passe à "failed" pour ne pas afficher un faux succès.
 
-    `overrides_cache` (Story 16.2 code-review) : dict `list_overrides(_DATA_DIR)` déjà
-    chargé par l'appelant pour tout le cycle de sync, évite une relecture disque du
-    fichier d'overrides par capteur secondaire.
-
-    `equipment_overrides_cache` (Story 16.3) : dict `list_equipment_overrides(_DATA_DIR)`,
-    même contrat — chargé une seule fois par cycle de sync par l'appelant.
     """
     bridge_ready = bool(mqtt_bridge and getattr(mqtt_bridge, "is_connected", False))
     eq_id = primary_mapping.jeedom_eq_id
 
-    for index, secondary in enumerate(primary_mapping.additional_mappings):
-        # Story 16.2 — même injection override que le chemin primaire, avant validation HA.
-        # Le secondaire porte son propre cmd_id dans reason_details → matching par commande.
-        secondary = apply_type_override(secondary, _DATA_DIR, overrides=overrides_cache)
-        primary_mapping.additional_mappings[index] = secondary
+    secondaries = primary_mapping.additional_mappings or []
+    if len(secondaries) != len(secondary_decisions):
+        raise RuntimeError(
+            "Contrat evaluate_equipment invalide : nombre de décisions secondaires différent "
+            "du nombre de mappings secondaires"
+        )
 
-        secondary.projection_validity = validate_projection(
-            secondary.ha_entity_type, secondary.capabilities
-        )
-        secondary.pipeline_step_reached = 3
-        sec_publication_override = _resolve_publication_override_for_mapping(
-            secondary, overrides_cache or {}, equipment_overrides_cache or {}
-        )
-        sec_decision = decide_publication(
-            secondary,
-            confidence_policy=confidence_policy,
-            publication_override=sec_publication_override,
-        )
-        sec_decision.mapping_result = secondary
-        secondary.publication_decision_ref = sec_decision
-        secondary.pipeline_step_reached = 4
+    for secondary, sec_decision in zip(secondaries, secondary_decisions):
+        if sec_decision.mapping_result is not secondary:
+            raise RuntimeError(
+                "Contrat evaluate_equipment invalide : décision secondaire sans mapping identique"
+            )
 
         if secondary.confidence in ("sure", "probable", "ambiguous"):
             _increment_mapping_counter(mapping_counters, secondary, secondary.confidence)
@@ -1325,6 +1310,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         confidence_policy = "sure_probable"
 
     _LOGGER.info("[TOPOLOGY] Received sync request (confidence_policy=%s)", confidence_policy)
+    request.app["confidence_policy"] = confidence_policy
+    data_dir = _resolve_data_dir(request)
 
     # 1. Normalize and store snapshot
     snapshot = TopologySnapshot.from_jeedom_payload(payload)
@@ -1390,9 +1377,9 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
     # Story 16.2 code-review — charger les overrides UNE SEULE FOIS pour tout le cycle
     # de sync (au lieu d'une relecture disque par équipement/capteur secondaire).
-    overrides_cache = list_overrides(_DATA_DIR)
+    overrides_cache = list_overrides(data_dir)
     # Story 16.3 — même principe pour les overrides de politique de publication (équipement).
-    equipment_overrides_cache = list_equipment_overrides(_DATA_DIR)
+    equipment_overrides_cache = list_equipment_overrides(data_dir)
 
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
@@ -1402,14 +1389,22 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if not eq:
             continue
 
-        mapping = mapper_registry.map(eq, snapshot)
+        # Story 19.1 — étapes 2 à 4 (mapping, override de type, validation projection,
+        # décision de publication) déléguées à evaluate_equipment() (Story 19.0). Le
+        # MapperRegistry reste injecté (une seule instance par sync, cf. plus haut),
+        # jamais recréé à l'intérieur de la fonction pure.
+        evaluation = evaluate_equipment(
+            eq,
+            snapshot,
+            result,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=overrides_cache,
+            persisted_equipment_overrides=equipment_overrides_cache,
+        )
+        mapping = evaluation.mapping
         if mapping is None:
             continue  # Not mapped by any mapper
-
-        # Story 16.2 — override de type utilisateur, injecté ENTRE étape 2 (map) et étape 3
-        # (validate_projection) : patch d'une copie, generic_type natif intact (D10),
-        # validation HA jugera le type surchargé (D11, aucun bypass).
-        mapping = apply_type_override(mapping, _DATA_DIR, overrides=overrides_cache)
 
         mappings[eq_id] = mapping
         previous_decision = request.app["publications"].get(eq_id)
@@ -1423,23 +1418,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
             publisher=publisher,
             pending_discovery_unpublish=pending_discovery_unpublish,
         )
-        # Pipeline canonique Story 5.1 :
-        # étape 3 (validate_projection) puis étape 4 (decide_publication),
-        # sans court-circuit pour les équipements éligibles mappés.
-        projection_validity = validate_projection(mapping.ha_entity_type, mapping.capabilities)
-        mapping.projection_validity = projection_validity
-        mapping.pipeline_step_reached = 3
-        publication_override = _resolve_publication_override_for_mapping(
-            mapping, overrides_cache, equipment_overrides_cache
-        )
-        decision = decide_publication(
-            mapping,
-            confidence_policy=confidence_policy,
-            publication_override=publication_override,
-        )
-        decision.mapping_result = mapping
-        mapping.publication_decision_ref = decision
-        mapping.pipeline_step_reached = 4
+        decision = evaluation.equipment_decision
 
         if mapping.confidence in ("sure", "probable", "ambiguous"):
             _increment_mapping_counter(mapping_counters, mapping, mapping.confidence)
@@ -1497,13 +1476,11 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if mapping.additional_mappings:
             await _publish_additional_sensors(
                 primary_mapping=mapping,
+                secondary_decisions=evaluation.secondary_decisions,
                 snapshot=snapshot,
-                confidence_policy=confidence_policy,
                 publisher_registry=publisher_registry,
                 mqtt_bridge=mqtt_bridge,
                 mapping_counters=mapping_counters,
-                overrides_cache=overrides_cache,
-                equipment_overrides_cache=equipment_overrides_cache,
             )
 
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
@@ -1730,7 +1707,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     )
 
     # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
-    save_publications_cache(request.app["publications"], _DATA_DIR)
+    save_publications_cache(request.app["publications"], data_dir)
 
     # Story 5.1 — Task 7.3: purger boot_cache après le premier sync (rôle accompli)
     if is_first_sync and request.app.get("boot_cache"):
@@ -2284,6 +2261,8 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
 
     native_generic_types = {str(c.id): c.generic_type for c in eq.cmds}
 
+    data_dir = _resolve_data_dir(request)
+
     # 1. AUTO — moteur brut, aucun override.
     registry = MapperRegistry()
     auto_mapping = registry.map(eq, snapshot)
@@ -2352,7 +2331,7 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             proposed_equipment_overrides[str(eq_id)] = {"publication_override": proposed_policy}
 
     # 3. Résultat AVEC override : copie patchée (generic_type natif intact, D10).
-    over_mapping = apply_type_override(target_mapping, _DATA_DIR, overrides=proposed_type_overrides)
+    over_mapping = apply_type_override(target_mapping, data_dir, overrides=proposed_type_overrides)
     pub_override = _resolve_publication_override_for_mapping(
         over_mapping, proposed_cmd_overrides, proposed_equipment_overrides
     )
@@ -2401,10 +2380,9 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
 
 
 def _resolve_data_dir(request: web.Request) -> str:
-    """Résout le data_dir des overrides : override applicatif (tests) sinon _DATA_DIR.
+    """Point unique de résolution de la persistance (overrides et cache de publication).
 
-    Seul point d'injection du répertoire de persistance pour les routes 16.5 (câblage de
-    `save_override`/`remove_override`). Le pipeline de sync continue d'utiliser `_DATA_DIR`.
+    Le sync et les routes HTTP utilisent le data_dir applicatif, sinon _DATA_DIR.
     """
     return request.app.get("data_dir") or _DATA_DIR
 
@@ -3256,7 +3234,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             publications,
             pending_discovery_unpublish,
         )
-        save_publications_cache(publications, _DATA_DIR)
+        save_publications_cache(publications, _resolve_data_dir(request))
         _supprimer_msg = _build_supprimer_message(
             resultat=resultat,
             equipements_supprimes=equipements_supprimes,
@@ -3451,7 +3429,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         publications,
         pending_discovery_unpublish,
     )
-    save_publications_cache(publications, _DATA_DIR)
+    save_publications_cache(publications, _resolve_data_dir(request))
     _publier_msg = _build_publier_message(
         resultat=resultat,
         equipements_publies_ou_crees=equipements_publies_ou_crees,

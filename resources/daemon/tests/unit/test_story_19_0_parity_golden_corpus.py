@@ -103,6 +103,34 @@ def test_parity_harness_covers_secondaries():
     )
 
 
+def test_parity_harness_covers_field_multi_entity_regressions():
+    """Le corpus golden protège les équipements terrain multi-entités critiques.
+
+    Une couverture seulement quantitative laisserait disparaître silencieusement une
+    famille entière ; ces cinq eq_ids couvrent MSunPV, chauffe-eau, IQ EV, pilotage
+    solaire et lumière+consommation.
+    """
+    payload = _load_json(SYNC_FIXTURE_PATH)
+    from mapping.registry import MapperRegistry
+    from models.topology import TopologySnapshot, assess_all
+
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+    eligibility = assess_all(snapshot)
+    registry = MapperRegistry()
+    expected = {553, 554, 583, 628, 457}
+    observed = {}
+    for eq_id in expected:
+        assert eligibility[eq_id].is_eligible, f"eq{eq_id} doit rester éligible dans le golden"
+        mapping = registry.map(snapshot.eq_logics[eq_id], snapshot)
+        assert mapping is not None, f"eq{eq_id} doit rester mappé dans le golden"
+        observed[eq_id] = len(mapping.additional_mappings or [])
+
+    assert all(count > 0 for count in observed.values()), (
+        "Chaque équipement terrain critique doit conserver au moins un secondaire : "
+        f"{observed}"
+    )
+
+
 def test_parity_harness_sure_only_policy():
     """Cas (e) — politique `sure_only` (Story 4.3). Les équipements `probable` doivent basculer
     en `probable_skipped` dans les deux chemins ; zéro écart attendu."""
