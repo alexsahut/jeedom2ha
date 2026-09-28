@@ -561,14 +561,22 @@ def _sync_publication_decision_refs(
     publication_decision_ref`` — consulted by the I11-decoupled readers
     (``sync/state.py``, ``sync/command.py``) — kept pointing at the stale
     published decision until the next full sync, so a deleted/excluded
-    equipment kept streaming state and routing commands. This helper keeps
+    equipment kept streaming state and routing commands. This helper kept
     ``publications[eq_id]`` and ``mapping.publication_decision_ref`` consistent
     in one place for the principal.
 
-    P1-bis fix (ClaudeBox review round 2, PR #174) — the principal's ref is
-    repointed unconditionally (the principal has no separate "step-4 verdict"
-    storage distinct from ``publications[eq_id]``), but secondaries only get
-    their RUNTIME state touched, via ``_reset_secondary_runtime_state``
+    P1-ter fix (ClaudeBox review round 3, PR #174) — the principal's ref is
+    NEVER repointed by an action path anymore. ``mapping.publication_decision_ref``
+    is the "step-4 canonical" source read by ``/system/diagnostics``
+    (``_compute_pipeline_step_visible``, ``traceability.decision_trace``); only a
+    full sync (``evaluate_equipment.py``) may set it, otherwise a delete/exclude
+    action leaves it stuck on a stale refused decision and a later successful
+    "publier" action (which already never repoints it, see the comment at its
+    call site) never clears the stale pointer, so diagnostics keep reporting the
+    equipment as blocked at step 4 even once it is actually published again. The
+    I11-decoupled readers already resolve the principal's decision from
+    ``publications[eq_id]``, not from this ref, so this helper only still touches
+    secondaries' RUNTIME state, via ``_reset_secondary_runtime_state``
     (``should_publish``/``reason`` are preserved).
 
     ``secondary_discovery_published=None`` skips the secondary loop entirely
@@ -577,7 +585,6 @@ def _sync_publication_decision_refs(
     here would clobber the secondaries that were actually republished before a
     later secondary or the local-availability step failed.
     """
-    mapping.publication_decision_ref = decision
     if secondary_discovery_published is None:
         return
     for secondary in mapping.additional_mappings or []:
@@ -3466,7 +3473,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             if not local_ok:
                 local_failed_decision = _mark_local_availability_publish_failed(decision, mapping)
                 publications[eq_id] = local_failed_decision
-                mapping.publication_decision_ref = local_failed_decision
+                # P1-ter fix (ClaudeBox review round 3, PR #174) — the principal's ref is
+                # never repointed by an action path (see _sync_publication_decision_refs
+                # docstring); only a full sync may set mapping.publication_decision_ref.
                 # Secondaries were already (re)published above (_publish_mapping_for_action) —
                 # preserve each secondary's OWN discovery_published flag, on the same
                 # model as the principal's own decision

@@ -628,17 +628,41 @@ async def test_supprimer_puis_publier_eq554_republie_switch_sensors_et_binary(ai
 
 
 async def test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_main(aiohttp_client, bridge):
-    """Garde-fou (non-régression, pas un cas visé par le fix) : le diagnostic
-    d'un échec de publication (bridge en panne) pour eq553 après "supprimer"
-    reste identique au comportement de main. Le fix P1-bis ne touche que
-    l'état runtime des SECONDAIRES ; la construction de la décision d'échec
-    du PRINCIPAL (reason="discovery_publish_failed" -> status_code=
-    "infra_incident", statut="non_publie") emprunte le même chemin de code
-    qu'avant, inchangé par ce fix.
+    """P1-ter (revue ClaudeBox round 3, PR #174) : le diagnostic
+    (``pipeline_step_visible``, ``traceability.decision_trace.reason_code``, et
+    le garde-fou historique ``reason_code``/``status_code``/``statut`` pour un
+    échec de publication) pour eq553 ne doit JAMAIS diverger de main à travers
+    la séquence sync -> supprimer -> publier (réussi) -> publier (échoué,
+    bridge en panne).
+
+    Avant ce fix, ``_sync_publication_decision_refs`` (appelée par
+    "supprimer") et le chemin d'échec de disponibilité locale de "publier"
+    repointaient ``mapping.publication_decision_ref`` — source canonique
+    étape 4 lue par ``/system/diagnostics`` via ``_compute_pipeline_step_visible``
+    et ``traceability.decision_trace.reason_code`` — sur la décision runtime de
+    l'action. Résultat : le diagnostic restait bloqué à l'étape 4 après
+    "supprimer", y compris pour un équipement republié avec succès juste après
+    (``pipeline_step_visible`` ne remontait jamais à 5). Sur main comme après ce
+    fix, ``mapping.publication_decision_ref`` n'est écrit QUE par une synchro
+    complète (``evaluate_equipment.py``) — jamais par une action — donc le
+    diagnostic reste à l'étape 5 / ``reason_code="published"`` tout du long
+    (limitation déjà présente sur main, pas introduite par ce fix ; les
+    lecteurs I11 résolvent déjà le principal depuis ``publications[eq_id]``,
+    pas depuis cette ref).
     """
     app = create_app(local_secret=_SECRET)
     app["mqtt_bridge"] = bridge
     client = await aiohttp_client(app)
+
+    async def _diag_eq553() -> dict:
+        resp_diag = await client.get("/system/diagnostics", headers={"X-Local-Secret": _SECRET})
+        assert resp_diag.status == 200
+        diag_body = await resp_diag.json()
+        return next(eq for eq in diag_body["payload"]["equipments"] if eq["eq_id"] == 553)
+
+    def _assert_step5_published(eq_diag: dict) -> None:
+        assert eq_diag["pipeline_step_visible"] == 5
+        assert eq_diag["traceability"]["decision_trace"]["reason_code"] == "published"
 
     with patch("transport.http_server.save_publications_cache"):
         resp = await client.post(
@@ -647,6 +671,7 @@ async def test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_m
             headers={"X-Local-Secret": _SECRET},
         )
         assert resp.status == 200
+        _assert_step5_published(await _diag_eq553())
 
         supprimer_body = {
             "action": "execute",
@@ -656,6 +681,17 @@ async def test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_m
         }
         resp_del = await client.post("/action/execute", json=supprimer_body, headers={"X-Local-Secret": _SECRET})
         assert resp_del.status == 200
+        _assert_step5_published(await _diag_eq553())
+
+        publier_ok_body = {
+            "action": "execute",
+            "payload": {"intention": "publier", "portee": "equipement", "selection": [553]},
+            "request_id": "publier-553-diag-ok",
+            "timestamp": "2026-09-28T00:08:30Z",
+        }
+        resp_pub_ok = await client.post("/action/execute", json=publier_ok_body, headers={"X-Local-Secret": _SECRET})
+        assert resp_pub_ok.status == 200
+        _assert_step5_published(await _diag_eq553())
 
         bridge.publish_message.return_value = False  # panne bridge simulée
 
@@ -668,11 +704,8 @@ async def test_diagnostics_echec_publication_eq553_apres_supprimer_identique_a_m
         resp_pub = await client.post("/action/execute", json=publier_body, headers={"X-Local-Secret": _SECRET})
         assert resp_pub.status == 200
 
-    resp_diag = await client.get("/system/diagnostics", headers={"X-Local-Secret": _SECRET})
-    assert resp_diag.status == 200
-    diag_body = await resp_diag.json()
-    eq553_diag = next(eq for eq in diag_body["payload"]["equipments"] if eq["eq_id"] == 553)
-
+    eq553_diag = await _diag_eq553()
+    _assert_step5_published(eq553_diag)
     assert eq553_diag["reason_code"] == "discovery_publish_failed"
     assert eq553_diag["status_code"] == "infra_incident"
     assert eq553_diag["statut"] == "non_publie"
