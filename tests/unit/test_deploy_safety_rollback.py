@@ -248,8 +248,13 @@ def test_rollback_parses_archive_and_builds_safe_remote_restart(tmp_path):
     result = _run(tmp_path, "--rollback", archive)
 
     assert result.returncode == 0, result.stderr
+    # CC-22: the archive path (and every other rollback parameter) is sent
+    # over ssh's stdin (ARCHIVE=... line ahead of ROLLBACK_LIB), never as an
+    # ssh argv token — so it must be absent from ssh.log and present only in
+    # what was piped to ssh's stdin.
     remote_program = (tmp_path / "ssh.stdin").read_text()
-    assert archive in (tmp_path / "ssh.log").read_text()
+    assert archive not in (tmp_path / "ssh.log").read_text()
+    assert f"ARCHIVE={archive}" in remote_program
     assert 'sudo tar -xzf "$' + '{ARCHIVE}" -C "$' + '{_work}"' in remote_program
     assert "jeedom2ha::deamon_stop();" in remote_program
     assert "jeedom2ha::deamon_start()" in remote_program
@@ -280,13 +285,14 @@ def test_after_inventory_is_captured_only_after_successful_sync():
 
 
 def _extract_rollback_extraction_snippet() -> str:
-    """Slice the exact remote extraction block — from the ARCHIVE/PLUGIN_PATH
-    positional args through the 'jeedom2ha/ absente' guard — verbatim out of
+    """Slice the exact remote extraction block — from the archive-readability
+    guard (CC-22: ARCHIVE/PLUGIN_PATH now arrive as ssh-stdin variables, not
+    positional args) through the 'jeedom2ha/ absente' guard — verbatim out of
     jeedom2ha_rollback_archive() in deploy-to-box.sh. This is the real code
     under test (not a hand-copied reimplementation), so a regression in the
     shipped script is caught even if the surrounding code moves around."""
     text = SCRIPT.read_text()
-    start_marker = 'ARCHIVE="$1"; PLUGIN_PATH="$2"; JEEDOM_ROOT="$3"; BACKUP_DIR="$4"; BOX_USER="$5"'
+    start_marker = '[[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }'
     end_marker = (
         'sudo test -d "${_work}/jeedom2ha" || '
         '{ echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }'
@@ -360,9 +366,15 @@ def _run_rollback_extraction(tmp_path: Path, snippet: str) -> subprocess.Complet
     archive = _make_rollback_archive(tmp_path)
     plugin_path = tmp_path / "plugins" / "jeedom2ha"
     plugin_path.parent.mkdir(parents=True, exist_ok=True)  # e.g. /var/www/html/plugins on the box
+    # CC-22: on the box, ARCHIVE/PLUGIN_PATH are set as plain shell variables
+    # from ssh's stdin (ahead of ROLLBACK_LIB) rather than passed as
+    # positional args — mirror that here so the sliced snippet (which
+    # references "${ARCHIVE}"/"${PLUGIN_PATH}") finds them already set.
     script = f'''
 set -euo pipefail
 {_PRIVILEGE_WALL_SUDO_STUB}
+ARCHIVE="$1"
+PLUGIN_PATH="$2"
 source "{ROLLBACK_LIB}"
 {snippet}
 echo "EXTRACTION_OK"

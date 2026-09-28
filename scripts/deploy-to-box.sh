@@ -734,7 +734,8 @@ REMOTE
   else
     echo "  Broker: ${_mqtt_host}:${_mqtt_port}"
     # Credentials MQTT jamais en argv : transmis via stdin (jeedom2ha_mqtt_auth_snippet),
-    # reconstruits et écrits dans un fichier d'options mosquitto (-o) chmod 600 côté distant (CC-20).
+    # reconstruits et écrits dans le fichier de config par défaut mosquitto_sub/pub
+    # (XDG_CONFIG_HOME) chmod 600 côté distant (CC-20).
     { printf 'MQTT_HOST=%q\nMQTT_PORT=%q\nset -euo pipefail\n' "${_mqtt_host}" "${_mqtt_port}"
       jeedom2ha_mqtt_auth_snippet
       cat <<'REMOTE'
