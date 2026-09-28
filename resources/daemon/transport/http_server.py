@@ -253,6 +253,13 @@ async def _publish_additional_sensors(
                 "Contrat evaluate_equipment invalide : décision secondaire sans mapping identique"
             )
 
+        # P2 fix (ClaudeBox review, 3a408db) : `active_or_alive` vaut True par défaut
+        # (models/mapping.py) et n'était jamais remis à False avant la tentative — un
+        # secondaire dont la discovery a échoué restait donc routé. Même modèle que
+        # `_prepare_publication_bookkeeping` pour le principal : False avant tentative
+        # (y compris pour un secondaire refusé), True seulement en cas de succès.
+        sec_decision.active_or_alive = False
+
         if secondary.confidence in ("sure", "probable", "ambiguous"):
             _increment_mapping_counter(mapping_counters, secondary, secondary.confidence)
 
@@ -487,6 +494,69 @@ def _secondary_publishable(secondary: MappingResult) -> bool:
     return bool(decision_ref is not None and getattr(decision_ref, "should_publish", False))
 
 
+def _refuse_secondary_decision(
+    secondary: MappingResult,
+    *,
+    reason: str,
+    preserve_discovery_published: bool = False,
+) -> PublicationDecision:
+    """Build a FRESH refused ``PublicationDecision`` for one secondary mapping and
+    repoint its ``publication_decision_ref`` to it (never mutates the previous
+    decision object in place — other consumers may still hold a reference to it).
+
+    ``preserve_discovery_published`` keeps the secondary's prior
+    ``discovery_published`` flag instead of forcing it to False: used for the
+    local-availability-publish-failed path, where the secondary's discovery
+    message really was published successfully earlier in the same call — only
+    ``should_publish``/``active_or_alive`` must reflect the refusal, exactly
+    like ``_mark_local_availability_publish_failed`` already does for the
+    principal.
+    """
+    previous = getattr(secondary, "publication_decision_ref", None)
+    decision = PublicationDecision(
+        should_publish=False,
+        reason=reason,
+        mapping_result=secondary,
+        state_topic=getattr(previous, "state_topic", None) or _resolve_state_topic(secondary),
+        active_or_alive=False,
+        discovery_published=(
+            bool(getattr(previous, "discovery_published", False)) if preserve_discovery_published else False
+        ),
+    )
+    secondary.publication_decision_ref = decision
+    return decision
+
+
+def _sync_publication_decision_refs(
+    mapping: MappingResult,
+    decision: PublicationDecision,
+    *,
+    reason_for_secondaries: str,
+    preserve_secondary_discovery_published: bool = False,
+) -> None:
+    """P1 fix (ClaudeBox review, commit 3a408db) — single helper called by every
+    action path in this module that replaces ``publications[eq_id]`` with a
+    refused/failed ``decision`` for the principal ``mapping``.
+
+    Before this fix, only ``publications[eq_id]`` was updated: ``mapping.
+    publication_decision_ref`` (principal AND secondaries) kept pointing at the
+    stale published decision until the next full sync, which is exactly what
+    the I11-decoupled readers (``sync/state.py``, ``sync/command.py``,
+    ``_secondary_publishable``) consult — so a deleted/excluded equipment kept
+    streaming state and routing commands. This helper keeps both consistent in
+    one place: the principal's ref is repointed to ``decision`` (already built
+    by the caller with the correct availability metadata), and every secondary
+    is refused via ``_refuse_secondary_decision``.
+    """
+    mapping.publication_decision_ref = decision
+    for secondary in mapping.additional_mappings or []:
+        _refuse_secondary_decision(
+            secondary,
+            reason=reason_for_secondaries,
+            preserve_discovery_published=preserve_secondary_discovery_published,
+        )
+
+
 async def _publish_mapping_for_action(
     publisher_registry: PublisherRegistry,
     mapping: MappingResult,
@@ -522,7 +592,17 @@ async def _publish_mapping_for_action(
                 secondary.ha_entity_type,
             )
             continue
-        if not await publisher_registry.publish(secondary, topology):
+        if await publisher_registry.publish(secondary, topology):
+            # P1 fix (ClaudeBox review, 3a408db) — a secondary effectively
+            # republished here must have its OWN publication_decision_ref
+            # flipped alive/published, otherwise sync/state.py and
+            # sync/command.py (I11, per-candidate) keep routing it as if the
+            # republish never happened.
+            sec_decision = getattr(secondary, "publication_decision_ref", None)
+            if sec_decision is not None:
+                sec_decision.discovery_published = True
+                sec_decision.active_or_alive = True
+        else:
             all_ok = False
     return all_ok
 
@@ -3186,7 +3266,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 pending_local_cleanup.pop(eq_id, None)
 
             if previous_decision and previous_decision.mapping_result is not None:
-                publications[eq_id] = PublicationDecision(
+                new_decision = PublicationDecision(
                     should_publish=False,
                     reason=getattr(previous_decision, "reason", "excluded"),
                     mapping_result=previous_decision.mapping_result,
@@ -3198,6 +3278,10 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                     local_availability_supported=previous_decision.local_availability_supported,
                     local_availability_state=previous_decision.local_availability_state,
                     availability_reason=previous_decision.availability_reason,
+                )
+                publications[eq_id] = new_decision
+                _sync_publication_decision_refs(
+                    previous_decision.mapping_result, new_decision, reason_for_secondaries="excluded"
                 )
             elif mappings.get(eq_id) is not None:
                 mapping = mappings[eq_id]
@@ -3211,6 +3295,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 )
                 _apply_availability_metadata(resolved_decision, mapping, topology)
                 publications[eq_id] = resolved_decision
+                _sync_publication_decision_refs(mapping, resolved_decision, reason_for_secondaries="excluded")
 
             equipements_supprimes += 1
 
@@ -3309,6 +3394,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 )
                 _apply_availability_metadata(failed_decision, mapping, topology)
                 publications[eq_id] = failed_decision
+                _sync_publication_decision_refs(
+                    mapping, failed_decision, reason_for_secondaries="discovery_publish_failed"
+                )
                 publish_errors += 1
                 continue
 
@@ -3339,12 +3427,25 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
 
             if not local_ok:
-                publications[eq_id] = _mark_local_availability_publish_failed(decision, mapping)
+                local_failed_decision = _mark_local_availability_publish_failed(decision, mapping)
+                publications[eq_id] = local_failed_decision
+                # Secondaries were already (re)published above (_publish_mapping_for_action) —
+                # preserve their discovery_published flag, on the same model as the
+                # principal's own decision (_mark_local_availability_publish_failed keeps
+                # decision.discovery_published as-is); only should_publish/active_or_alive
+                # reflect the local-availability refusal.
+                _sync_publication_decision_refs(
+                    mapping,
+                    local_failed_decision,
+                    reason_for_secondaries="local_availability_publish_failed",
+                    preserve_secondary_discovery_published=True,
+                )
                 publish_errors += 1
                 continue
 
             decision.active_or_alive = True
             publications[eq_id] = decision
+            mapping.publication_decision_ref = decision
             equipements_publies_ou_crees += 1
             continue
 
@@ -3390,7 +3491,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             pending_local_cleanup.pop(eq_id, None)
 
         if previous_decision and previous_decision.mapping_result is not None:
-            publications[eq_id] = PublicationDecision(
+            new_decision = PublicationDecision(
                 should_publish=False,
                 reason=getattr(previous_decision, "reason", "excluded"),
                 mapping_result=previous_decision.mapping_result,
@@ -3403,6 +3504,10 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 local_availability_state=previous_decision.local_availability_state,
                 availability_reason=previous_decision.availability_reason,
             )
+            publications[eq_id] = new_decision
+            _sync_publication_decision_refs(
+                previous_decision.mapping_result, new_decision, reason_for_secondaries="excluded"
+            )
         elif mapping is not None:
             resolved_decision = PublicationDecision(
                 should_publish=False,
@@ -3414,6 +3519,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             )
             _apply_availability_metadata(resolved_decision, mapping, topology)
             publications[eq_id] = resolved_decision
+            _sync_publication_decision_refs(mapping, resolved_decision, reason_for_secondaries="excluded")
 
         ecarts_resolus += 1
 
