@@ -560,36 +560,37 @@ existantes, pas un ajout de périmètre.
 
 | # | Unité (~45 min) | Contenu | AC couverts |
 |---|---|---|---|
-| 1 | Extraction du helper `apply_publication_decision()` | Créer la fonction (signature section 2.2) à partir du corps existant du sync (bookkeeping + publish + dépublication), sans changer le comportement du sync (le sync l'appelle, résultat identique à avant) ; test de non-régression sur le sync seul | Prépare AC1/AC4/AC5 |
-| 2 | Brancher le sync sur le helper | Remplacer le code inline du sync (l.1561-1690) par l'appel au helper ; supprimer la boucle « policy change » désormais redondante (section 2.3) ; suite de tests sync existante doit rester verte à 100% | Non-régression (pré-requis AC1-AC6) |
-| 3 | `_should_attempt_publish`/overrides frais côté « Publier » (AC1, AC2) | Remplacer la lecture de `mappings.get(eq_id)` (cache) par un appel `evaluate_equipment()` frais (overrides relus, `confidence_policy` de l'app) ; supprimer le tuple de confiance codé en dur | AC1, AC2 |
-| 4 | Tests AC1/AC2 | Écrire les deux tests dédiés (fixture `sure_mapping`, fixture override), vérifier qu'ils échouent avant le commit 3 et passent après | AC1, AC2 |
-| 5 | `_secondary_publishable` → décision fraîche (AC6) | Remplacer la lecture `publication_decision_ref.should_publish` par la lecture de `secondary_decisions` fraîches (section 3.3, option (b) recommandée) ; adapter `_reset_secondary_runtime_state` si besoin | AC6 |
-| 6 | Test AC6 | Scénario override ajouté après dernier sync, avant clic Publier | AC6 |
-| 7 | Brancher « Publier » sur le helper (AC4, AC5) | Remplacer `_publish_mapping_for_action` + la branche dépublication scope-exclue (l.3666-3736) par l'appel au helper commun ; supprimer le couplage principal/secondaires (l.623-625) | AC4, AC5 |
-| 8 | Tests AC4/AC5 | Scénario transition publié→refusé (dépublication), scénario idempotence (pas de republish inutile) | AC4, AC5 |
-| 9 | Arbitrage + implémentation AC3 | **Bloqué tant que la décision (a)/(b) de la section 5.4 n'est pas tranchée** — une fois tranchée : appliquer `_scope_entry_is_included` après décision dans « Publier » (et dans le sync si (a)) | AC3 |
-| 10 | Test AC3 (golden) | Golden test égalité des ensembles filtrés, adapté selon (a)/(b) | AC3 |
-| 11 | Test de parité à 4 points d'appel (AC7) | Nouveau test invoquant les 4 handlers réels (section 6), cas `sure_mapping` + cas override | AC7 |
-| 12 | Suppression du code mort | `_sync_publication_decision_refs`, `_secondary_publishable` (si totalement remplacée), vérification `grep` qu'aucun appelant ne reste (section 3.2) | — |
-| 13 | Mutation testing ciblé | Sur les fonctions modifiées (`apply_publication_decision`, `_should_attempt_publish`, filtre scope) — cohérent avec la pratique déjà en place sur ce repo (guardrails mutation mentionnés dans les stories précédentes) | — |
-| 14 | Guardrails + suite complète | `pytest tests/unit -q` (0 régression, convention Task 6 de la story), lint/type-check si applicable | — |
-| 15 | Preuve terrain (ii) + documentation fallback (i)/(iii) | Procédure section 7.3 (`saveFilteringConfig`), documentation des tests de fallback `sure_mapping` (section 6) | Preuve terrain |
-| 16 | Gate d'inventaire + rédaction PR | Gate obligatoire d'inventaire entités avant/après (convention repo, `sprint-status.yaml`), rédaction de la description PR (résumé, risques section 7, lien note de conception) | — |
+| 1 | **Garde-fou du publisher factice (C5, en premier)** | Écrire le test de parité `FakePublisherRegistry` sur le corpus doré 59 (section 6, C5), exécuté sur le sync actuel **avant toute extraction** — capture la séquence d'appels publish/unpublish de référence | Garde-fou (aucun AC direct) |
+| 2 | Extraction du helper `apply_publication_decision()` | Créer la fonction (signature section 2.2, y compris l'étape 0 `_detect_lifecycle_changes`, C2) à partir du corps existant du sync (bookkeeping + publish + dépublication par candidat, C1), sans changer le comportement du sync ; rejouer le garde-fou #1, doit matcher hors écarts déclarés | Prépare AC1/AC4/AC5 |
+| 3 | Brancher le sync sur le helper | Remplacer le code inline du sync (l.1561-1690) par l'appel au helper ; supprimer la boucle « policy change » désormais redondante (section 2.3) ; suite de tests sync existante doit rester verte à 100% | Non-régression (pré-requis AC1-AC6) |
+| 4 | `_should_attempt_publish`/overrides frais côté « Publier » (AC1, AC2) | Remplacer la lecture de `mappings.get(eq_id)` (cache) par un appel `evaluate_equipment()` frais (overrides relus, `confidence_policy` de l'app) ; supprimer le tuple de confiance codé en dur | AC1, AC2 |
+| 5 | Tests AC1/AC2 | Écrire les deux tests dédiés (fixture `sure_mapping`, fixture override), vérifier qu'ils échouent avant le commit 3 et passent après | AC1, AC2 |
+| 6 | `_secondary_publishable` → décision fraîche (AC6) | Remplacer la lecture `publication_decision_ref.should_publish` par la lecture de `secondary_decisions` fraîches (section 3.3, option (b) recommandée) ; adapter `_reset_secondary_runtime_state` si besoin | AC6 |
+| 7 | Test AC6 | Scénario override ajouté après dernier sync, avant clic Publier | AC6 |
+| 8 | Brancher « Publier » sur le helper (AC4, AC5) | Remplacer `_publish_mapping_for_action` + la branche dépublication scope-exclue (l.3666-3736) par l'appel au helper commun ; supprimer le couplage principal/secondaires (l.623-625) | AC4, AC5 |
+| 9 | Tests AC4/AC5 | Scénario transition publié→refusé (dépublication), scénario idempotence (pas de republish inutile) | AC4, AC5 |
+| 10 | Implémentation AC3 (option (a) tranchée, section 5.4) | Appliquer `_scope_entry_is_included` après décision, dans « Publier » **et dans le sync** ; rejouer le harnais de parité (section 7.1) juste avant merge pour confirmer A=0 toujours vrai sur un export récent | AC3 |
+| 11 | Test AC3 (golden) | Golden test égalité des ensembles filtrés sync vs « Publier », plus un cas de fixture scope=exclude (section 6, aucun cas réel disponible sur le corpus actuel) | AC3 |
+| 12 | Test de parité à 4 points d'appel (AC7) | Nouveau test invoquant les 4 handlers réels (section 6), cas `sure_mapping` + cas override | AC7 |
+| 13 | Suppression du code mort | `_sync_publication_decision_refs`, `_secondary_publishable` (si totalement remplacée), vérification `grep` qu'aucun appelant ne reste (section 3.2) | — |
+| 14 | Mutation testing ciblé | Sur les fonctions modifiées (`apply_publication_decision`, `_should_attempt_publish`, filtre scope) — cohérent avec la pratique déjà en place sur ce repo (guardrails mutation mentionnés dans les stories précédentes) | — |
+| 15 | Guardrails + suite complète | `pytest tests/unit -q` (0 régression, convention Task 6 de la story), lint/type-check si applicable | — |
+| 16 | Preuve terrain (ii) + documentation fallback (i)/(iii) | Procédure section 7.3 (`saveFilteringConfig`), documentation des tests de fallback `sure_mapping` (section 6) | Preuve terrain |
+| 17 | Gate d'inventaire + rédaction PR | Gate obligatoire d'inventaire entités avant/après (convention repo, `sprint-status.yaml`), rédaction de la description PR (résumé, risques section 7, lien note de conception) | — |
 
-Soit environ **16 unités de 45 minutes (~12h)**, dont une (#9) explicitement bloquée en amont par
-l'arbitrage de la section 5.4.
+Soit environ **17 unités de 45 minutes (~13h)**. Aucune unité n'est bloquée en amont : l'arbitrage
+AC3 (section 5.4) est tranché par cette note (option (a), mesure A=0).
 
 ### Une PR ou plusieurs ?
 
 **Recommandation : une seule PR**, comme pour les stories 19-1/19-2/19-3 précédentes (toutes mergées
-en une PR chacune, cf. historique `git log` du repo). Justification : les unités 1-8 (helper +
+en une PR chacune, cf. historique `git log` du repo). Justification : les unités 1-9 (garde-fou + helper +
 branchement + AC1/AC2/AC4/AC5/AC6) forment un tout cohérent et interdépendant — brancher « Publier »
 sur `evaluate_equipment()` sans dépublication explicite (AC4) recréerait immédiatement un bug (ajout
-sans purge) ; scinder ne réduirait pas le risque de revue, seulement le nombre de commits. Seule
-exception envisageable : si l'arbitrage AC3 (section 5.4) tranche pour l'option (a) avec un risque
-terrain jugé trop élevé pour être mélangé au reste, sortir l'unité #9/#10 dans une **second PR séparée,
-après validation terrain isolée** — decision à prendre après l'arbitrage, pas avant.
+sans purge) ; scinder ne réduirait pas le risque de revue, seulement le nombre de commits. AC3 (unités
+10-11) reste dans la même PR : la mesure A=0 (5.3/5.4) écarte le risque terrain qui aurait justifié une
+PR séparée ; à isoler seulement si le harnais de parité rejoué juste avant merge (unité 10) révèle un A
+non nul entre-temps.
 
 ## 9. Questions ouvertes
 
