@@ -172,16 +172,6 @@
   {
     "payload": "",
     "retain": true,
-    "topic": "jeedom2ha/583/availability"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "jeedom2ha/457/availability"
-  },
-  {
-    "payload": "",
-    "retain": true,
     "topic": "jeedom2ha/2001/availability"
   },
   {

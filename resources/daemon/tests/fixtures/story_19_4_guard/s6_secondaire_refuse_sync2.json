@@ -55,5 +55,16 @@
       }
     },
     "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "eq_id": 628,
+    "node_ids": [
+      [
+        "switch",
+        "jeedom2ha_628_5980"
+      ]
+    ],
+    "op": "unpublish"
   }
 ]

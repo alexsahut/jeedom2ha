@@ -30,9 +30,16 @@ JSON/retain via le vrai `DiscoveryPublisher` posé sur `MqttRecordingBridge`).
   confiance) ; il ne devra plus être publié.
 - **S4** : le clic « Publier » devra publier les secondaires acceptés du
   candidat I11 (aujourd'hui 0 appel côté « Publier »).
-- **S5** : les eq 583 (5 secondaires `sure`) et 457 (2 capteurs) devront
-  garder leurs secondaires publiés lors de la transition de politique ; seuls
-  les candidats devenus refusés devront être dépubliés (aujourd'hui, tout est
-  republié puis dépublié dans le même sync — 18 unpublish figés).
-- **S6** : seul le secondaire refusé devra être dépublié (aujourd'hui, rien
-  n'est dépublié : la garde ne détecte pas cette transition publié → refusé).
+
+## Écarts réalisés à l'unité 3b-2 (C1, dépublication par candidat)
+
+Seules les fixtures S5 et S6 ont été régénérées (`JEEDOM2HA_GUARD_REGEN=1`).
+
+- **S5** : 583 ne dépublie plus que ses 3 switchs refusés (principal, 6009,
+  6010) et garde ses 5 secondaires `sure` ; 457 ne dépublie plus que sa
+  lumière et garde ses 2 capteurs. Effacements MQTT : 30 ⇒ 23. Disponibilité :
+  plus d'effacement pour 583 et 457 (48 ⇒ 46 messages). Toujours 18 appels
+  `unpublish`, un par équipement.
+- **S6** : un `unpublish` de `jeedom2ha_628_5980` seul ; un effacement MQTT de
+  plus ; disponibilité inchangée (`online`).
+- S1 à S4 : identiques.

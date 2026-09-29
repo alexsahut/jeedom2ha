@@ -2218,42 +2218,7 @@
   {
     "payload": "",
     "retain": true,
-    "topic": "homeassistant/sensor/jeedom2ha_583_5991/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/sensor/jeedom2ha_583_5992/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/sensor/jeedom2ha_583_5993/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/binary_sensor/jeedom2ha_583_5986/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/binary_sensor/jeedom2ha_583_5988/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
     "topic": "homeassistant/light/jeedom2ha_457/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/sensor/jeedom2ha_457_45705/config"
-  },
-  {
-    "payload": "",
-    "retain": true,
-    "topic": "homeassistant/sensor/jeedom2ha_457_45706/config"
   },
   {
     "payload": "",

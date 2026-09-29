@@ -118,5 +118,10 @@
     },
     "retain": true,
     "topic": "homeassistant/switch/jeedom2ha_628_6004/config"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "homeassistant/switch/jeedom2ha_628_5980/config"
   }
 ]
