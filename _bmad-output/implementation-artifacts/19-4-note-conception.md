@@ -225,30 +225,49 @@ Le sync distingue déjà deux cas différents, qui **restent distincts** après 
   de « Publier » (qui n'a pas de nouvelle topologie, section 2.4), reste géré uniquement par le sync,
   inchangé.
 
-### 4.3 Secondaire refusé, principal publié (dépublication par candidat)
+### 4.3 Secondaire refusé, principal publié — dépublication par candidat (C1, bug confirmé)
 
-`evaluate_equipment()` retourne un verdict **par candidat** (`equipment_decision` pour le principal,
-un élément de `secondary_decisions` par secondaire, section « evaluate_equipment.py » du rapport) —
-il n'y a donc, structurellement, aucune raison que la dépublication soit groupée : le nouveau helper
-doit appliquer l'étape 3 (dépublication) **indépendamment pour chaque candidat** (principal et chaque
-secondaire), en comparant son verdict frais à son propre état précédent via son propre
-`publication_decision_ref`/`previous_decision`. C'est déjà le sens de
-`_reset_secondary_runtime_state`, appelé par secondaire, jamais en bloc pour tout l'équipement.
-Concrètement : un secondaire qui passe `should_publish=True→False` doit être dépublié (son propre
-`unpublish_by_eq_id` avec ses propres node_ids) **même si le principal reste publié** — aucun code
-actuel ne l'empêche puisque `_publish_mapping_for_action` traite déjà les secondaires dans une boucle
-séparée (l.612-659) ; il suffit que la boucle de dépublication (étape 3) soit elle aussi par-candidat,
-symétrique à la boucle de publication.
+**Bug confirmé par lecture directe** (relecture ClaudeBox, points C1(i)/(ii)) :
+`_collect_unpublish_node_ids(mapping_result)` (l.796-848) prend **un seul** `mapping_result` et rend
+les node_ids du principal **et** de tous les secondaires **en un seul appel groupé** — jamais par
+candidat. Deux conséquences réelles, pas hypothétiques :
+- **(i)** bloc « policy change » (l.1648-1690) : quand le principal transite publié→refusé,
+  `_collect_unpublish_node_ids(previous_decision.mapping_result)` dépublie aussi les secondaires
+  **encore acceptés** ;
+- **(ii)** `_publish_additional_sensors` (l.237-312) fait un simple `continue` (l.281-284) quand un
+  secondaire est refusé — **aucune dépublication per-secondaire n'existe nulle part** dans le code actuel.
 
-### 4.4 Principal refusé (le cas déjà couvert)
+Mesuré sur la box (`19-4-mesure-terrain-2026-09-29.md`) : **C = 2** cas où le principal est refusé et
+des topics secondaires restent présents en fantômes (eq 579 Enphase, eq 585 chauffage piscine) — preuve
+terrain de (i). **B** (secondaire refusé isolément, principal publié, preuve de (ii)) n'est pas mesurable
+via les endpoints actuels (`/system/diagnostics` n'expose aucune décision par secondaire), mais le
+mécanisme visé par le correctif est le même.
 
-C'est le cas déjà géré par le mécanisme existant (4.1/4.2) : `previous_decision` du principal était
-publié, le nouveau `equipment_decision.should_publish` est `False` → dépublication du principal.
-Point à trancher en Task 2 (pas un blocage design, une question d'ordre d'opérations) : si le principal
-est dépublié, que deviennent ses secondaires actuellement publiés (dont le topic MQTT dépend souvent du
-device HA créé par le principal) ? Le code actuel de `_publish_mapping_for_action`/dépublication scope-exclue
-ne semble pas traiter explicitement la dépublication en cascade des secondaires quand seul le principal
-change de verdict — à vérifier par un test dédié (section 6) plutôt que supposé ici.
+**Correction retenue** : factoriser, à partir du corps actuel de `_collect_unpublish_node_ids`, une
+fonction qui résout les node_ids d'**un seul candidat** (principal ou un secondaire précis) — sans
+dupliquer la logique existante (l'ancienne fonction peut devenir un simple appel groupé sur chaque
+candidat, ou être réécrite pour déléguer à la version par-candidat). Le post-traitement partagé
+`apply_publication_decision()` (étape 3, section 2.2) appelle cette fonction **par candidat**,
+indépendamment pour le principal et chaque secondaire, en comparant son propre verdict frais à son
+propre `previous_decision`/`publication_decision_ref`. C'est un **changement de comportement déclaré** :
+un principal refusé ne dépublie plus, à tort, ses secondaires acceptés ; un secondaire refusé isolément
+est désormais dépublié. Effet chiffré : les 2 cas C (579, 585) basculent en dépublication effective des
+secondaires fantômes au prochain sync/clic ; B reste non quantifiable mais couvert par le même mécanisme.
+
+**Tests dédiés (section 6, à écrire avant le refactor sur ce point précis)** :
+- principal refusé, secondaire accepté ⇒ le secondaire reste publié (non-régression du cas symétrique) ;
+- secondaire refusé, principal accepté ⇒ seul le secondaire est dépublié.
+
+### 4.4 Principal refusé — devenir des secondaires (question n°4 fermée par 4.3)
+
+Avec la dépublication par candidat (4.3), le cas « principal refusé » n'entraîne plus de dépublication
+groupée de ses secondaires : chaque secondaire suit son propre verdict frais, indépendamment de celui
+du principal. La question ouverte n°4 de la v1 (« dépublication en cascade du principal vers ses
+secondaires ? ») est donc **fermée par construction** : il n'y a pas de cascade automatique — un
+secondaire encore accepté par `evaluate_equipment()` reste publié même si son principal ne l'est plus,
+sauf si son topic MQTT dépend structurellement du device HA créé par le principal (contrat multi-entités
+HA, hors périmètre de vérification de cette note — à confirmer en Task 2 par lecture du schéma discovery
+si un doute terrain apparaît).
 
 ### 4.5 Idempotence (AC5) — vérifié dans le code actuel
 
