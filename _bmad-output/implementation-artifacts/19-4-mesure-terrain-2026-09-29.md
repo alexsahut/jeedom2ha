@@ -60,19 +60,25 @@ décision principale `statut≠publie`) :
 | 579 | Enphase | 5369, 5493, 5494, 5689, 5695 |
 | 585 | chauffage piscine | 5497, 5504, 5505, 5536, 5537, 5546, 5631 |
 
+**Correction (D1, ClaudeBox) : 579 et 585 ne sont pas des fantômes.** Ce sont les candidats I11 de la
+story 19-2 : principal refusé (`ambiguous_skipped`), secondaires **acceptés et publiés légitimement**
+(preuve 19-2 du 28/09, republication réussie de leurs 12 écouteurs d'état). Le correctif C1 ne change
+rien pour ces 2 cas déjà observés ; il garantit seulement qu'une **future** transition du principal de
+publié à refusé n'effacera plus leurs secondaires encore acceptés.
+
 ## Effet attendu des correctifs 19-4
 
 - **1er sync après 19-4 (C1 corrigé, scope appliqué au sync si option a)** :
   - A restant à 0 : rien à changer côté principal, la garde existe déjà.
-  - C (579, 585) : avec la garde per-candidat sur `_publish_additional_sensors`
-    et le paramétrage du sync sur le scope, ces 2 cas devraient basculer en
-    dépublication effective des secondaires au prochain cycle — plus de
-    topics fantômes pour ces eq_id.
+  - C (579, 585) : **aucun changement** — leurs secondaires acceptés restent publiés à chaque sync,
+    comme aujourd'hui. La garde per-candidat sur `_publish_additional_sensors` ne produit d'effet
+    observable que sur un futur cas de transition principal publié→refusé, pas sur ces 2 cas déjà en
+    l'état `ambiguous_skipped`/secondaires acceptés.
   - B reste non quantifiable tant que le diagnostic n'expose pas de décision
     par secondaire ; un correctif de dépublication per-candidat réduirait le
     risque sans qu'on puisse en mesurer l'ampleur actuelle.
-- **Clic « Publier »** : mêmes effets pour les eq_id concernés, appliqués
-  immédiatement au lieu d'attendre le prochain sync.
+- **Clic « Publier »** : mêmes effets pour les eq_id concernés (aucun changement pour 579/585),
+  appliqués immédiatement au lieu d'attendre le prochain sync.
 
 ## Écarts vs analyse code (rapport `/tmp/jeedom2ha-19-4-design-v2-report.md`)
 

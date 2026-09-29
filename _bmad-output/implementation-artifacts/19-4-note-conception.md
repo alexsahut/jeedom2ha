@@ -172,14 +172,14 @@ le mini-sync « Publier ». Aucune autre voie ne doit produire ou modifier ce ve
   `apply_publication_decision()` à l'étape 4 (mise à jour des refs secondaires) — c'est exactement
   le mécanisme qui permet de fusionner un verdict frais (`secondary_decision` d'`evaluate_equipment()`)
   avec l'état d'exécution courant sans perdre l'un ou l'autre.
-- **`_sync_publication_decision_refs`** (l.563-609) : **supprimée** en tant que fonction séparée.
-  Aujourd'hui elle ne fait que boucler sur les secondaires et appeler `_reset_secondary_runtime_state`
-  pour chacun (jamais le principal — docstring l.563-570 explicite : « ne repointe jamais le ref du
-  principal, seul un sync complet le fait »). Une fois que **chaque appelant** (sync ET Publier) passe
-  par `apply_publication_decision()`, qui fait cette boucle en interne (étape 4, section 2.2), cette
-  fonction wrapper devient un pur pass-through sans appelant restant — à retirer pour éviter le code mort.
-  Point de vigilance Task 2 : vérifier qu'aucun autre appelant (hors les deux chemins étudiés ici)
-  n'utilise `_sync_publication_decision_refs` avant suppression (`grep -rn _sync_publication_decision_refs`).
+- **`_sync_publication_decision_refs`** (l.563-609) : **conservée (D3, ClaudeBox)**. Le handler
+  « Supprimer » l'utilise aussi (appels l.3477 et l.3490), pas seulement le sync — elle a donc un
+  appelant en dehors des deux chemins « sync »/« Publier » refactorés par cette story, et ne devient pas
+  un pur pass-through sans appelant restant. Ce qui devient effectivement mort, une fois que **chaque
+  appelant** (sync ET Publier) passe par `apply_publication_decision()`, c'est **`_secondary_publishable`**
+  — et seulement si l'inventaire Task 2 confirme qu'aucun appelant ne lui reste en dehors des deux
+  chemins étudiés ici. Point de vigilance Task 2 : `grep -rn _secondary_publishable` avant toute
+  suppression, et laisser `_sync_publication_decision_refs` intacte (utilisée par « Supprimer »).
 
 ### 3.3 Arbitrage : repointer ou fusionner le ref secondaire ?
 
@@ -251,11 +251,17 @@ candidat. Deux conséquences réelles, pas hypothétiques :
 - **(ii)** `_publish_additional_sensors` (l.237-312) fait un simple `continue` (l.281-284) quand un
   secondaire est refusé — **aucune dépublication per-secondaire n'existe nulle part** dans le code actuel.
 
-Mesuré sur la box (`19-4-mesure-terrain-2026-09-29.md`) : **C = 2** cas où le principal est refusé et
-des topics secondaires restent présents en fantômes (eq 579 Enphase, eq 585 chauffage piscine) — preuve
-terrain de (i). **B** (secondaire refusé isolément, principal publié, preuve de (ii)) n'est pas mesurable
-via les endpoints actuels (`/system/diagnostics` n'expose aucune décision par secondaire), mais le
-mécanisme visé par le correctif est le même.
+**Correction (D1, ClaudeBox) : les 2 cas mesurés sur la box (`19-4-mesure-terrain-2026-09-29.md`,
+eq 579 Enphase, eq 585 chauffage piscine) ne sont PAS des fantômes.** Ce sont les candidats I11 de la
+story 19-2 : le principal est refusé (`ambiguous_skipped`) et les secondaires sont **acceptés et
+publiés légitimement** — la preuve 19-2 (28/09) a republié leurs 12 écouteurs d'état sans anomalie.
+Avec la dépublication par candidat, rien ne change pour eux, ni au sync ni au clic « Publier » : leurs
+secondaires restent acceptés, donc restent publiés. Ce que corrige (i) couvre un cas **futur**, pas ces
+2 cas déjà observés : une transition ultérieure du principal de publié à refusé n'effacera plus, à
+tort, ses secondaires encore acceptés au moment de cette transition. **B** (secondaire refusé
+isolément, principal publié, preuve de (ii)) n'est pas mesurable via les endpoints actuels
+(`/system/diagnostics` n'expose aucune décision par secondaire), mais le mécanisme visé par le
+correctif est le même.
 
 **Correction retenue** : factoriser, à partir du corps actuel de `_collect_unpublish_node_ids`, une
 fonction qui résout les node_ids d'**un seul candidat** (principal ou un secondaire précis) — sans
@@ -265,12 +271,18 @@ candidat, ou être réécrite pour déléguer à la version par-candidat). Le po
 indépendamment pour le principal et chaque secondaire, en comparant son propre verdict frais à son
 propre `previous_decision`/`publication_decision_ref`. C'est un **changement de comportement déclaré** :
 un principal refusé ne dépublie plus, à tort, ses secondaires acceptés ; un secondaire refusé isolément
-est désormais dépublié. Effet chiffré : les 2 cas C (579, 585) basculent en dépublication effective des
-secondaires fantômes au prochain sync/clic ; B reste non quantifiable mais couvert par le même mécanisme.
+est désormais dépublié. Effet sur les 2 cas mesurés (579, 585) : **aucun changement** — leurs
+secondaires acceptés restent publiés à chaque sync et à chaque clic « Publier », exactement comme
+aujourd'hui ; le correctif ne fait que garantir ce même comportement lors d'une future transition du
+principal. B reste non quantifiable mais couvert par le même mécanisme.
 
 **Tests dédiés (section 6, à écrire avant le refactor sur ce point précis)** :
 - principal refusé, secondaire accepté ⇒ le secondaire reste publié (non-régression du cas symétrique) ;
-- secondaire refusé, principal accepté ⇒ seul le secondaire est dépublié.
+- secondaire refusé, principal accepté ⇒ seul le secondaire est dépublié ;
+- **fixture de type 579/585 (I11 : principal `ambiguous_skipped`, secondaires acceptés)** : deux syncs
+  successifs puis un clic « Publier » ⇒ aucun `unpublish` n'est déclenché, et les secondaires de 579 et
+  585 restent publiés à chaque passage. Critère terrain de non-régression : `listeners_removed` vide,
+  topics des secondaires de 579 et 585 toujours présents après déploiement.
 
 ### 4.4 Principal refusé — devenir des secondaires (question n°4 fermée par 4.3)
 
@@ -371,14 +383,13 @@ de la story 19-4 repose sur un chiffre qui n'est pas celui réellement mesuré.
 
 **Vérification terrain faite ce tour (C4, mesure A)** : sur les 102 exceptions de scope explicite,
 **A = 0** équipement combine à la fois `statut=publie` (topic discovery principal présent) ET un scope
-équipement `effective_state=exclude` (`19-4-mesure-terrain-2026-09-29.md`, section A). Autrement dit,
-**la décision de publication du principal respecte déjà le scope au moment où elle est calculée**
-aujourd'hui (le scope influence `eligibility`/`perimetre` en amont, avant `statut`) — l'écart identifié
-en 1.4/5.2 (le sync ne consulte jamais `_scope_entry_is_included` explicitement) n'a donc, sur l'état
-réel de la box, **aucun équipement actuellement publié qui basculerait en dépublication** si le sync
-appliquait littéralement AC3. Le postulat « effet nul » de la story est donc **vérifié vrai en pratique
-aujourd'hui**, malgré les 102 exceptions de scope existantes (qui portent sur des équipements déjà non
-publiés côté scope, pas sur des équipements publiés à tort).
+équipement `effective_state=exclude` (`19-4-mesure-terrain-2026-09-29.md`, section A). **Fait constaté
+(D4, ClaudeBox) : aucun équipement actuellement publié n'a de scope `exclude`** — sans plus d'explication
+sur le mécanisme qui produit ce résultat (l'hypothèse d'un scope déjà respecté en amont, en 1.4/5.2, n'a
+pas été démontrée par lecture de code et n'est pas retenue ici). Le postulat « effet nul » de la story
+est donc **vérifié vrai en pratique aujourd'hui, sur l'état mesuré de la box**, malgré les 102 exceptions
+de scope existantes (qui portent sur des équipements déjà non publiés côté scope) — sans affirmation sur
+la cause structurelle de ce résultat.
 
 ### 5.4 Décision (C4, tranchée par la mesure terrain A=0)
 
@@ -444,9 +455,12 @@ regroupé — voir remarque finale).
   - Cas déjà couvert par l'existant, à garder en non-régression : principal refusé sans secondaire
     ⇒ dépublication du principal (mécanisme 4.1/4.2, ne change pas).
 - **AC5 (idempotence)** : équipement déjà publié, verdict inchangé, clic « Publier » répété deux fois ;
-  vérifier qu'aucun second appel `publisher.publish(...)` n'est effectué (mock/spy sur `PublisherRegistry`)
-  au deuxième clic. Échoue sur `main` : constat vérifié section 4.5, le chemin actuel republie
-  systématiquement dès que `_should_attempt_publish` passe, sans condition d'inchangé.
+  vérifier que, sur les deux clics, **aucun `unpublish_by_eq_id` n'est appelé**, que les topics et le
+  contenu publiés sont **identiques** entre le premier et le second appel (mock/spy sur
+  `PublisherRegistry`), et que **la republication reste permise** (pas de saut d'appel — cf. 4.5, retrait
+  de C3). Ce n'est PAS un test « aucun second appel `publish` » : le second appel a bien lieu (republication
+  volontaire), seule l'absence d'effet de bord (dépublication parasite, dérive de topic/contenu) est
+  vérifiée. Échoue sur `main` si un cycle unpublish/publish parasite apparaît entre les deux clics.
 - **AC6 (secondaire réévalué, pas figé)** : secondaire publié, override modifiant son éligibilité ajouté
   après le dernier sync (donc `secondary.publication_decision_ref.should_publish` reste `True` en cache),
   clic « Publier ». Vérifier que le secondaire suit la décision fraîche (refusée) et non le ref figé.
@@ -572,7 +586,7 @@ existantes, pas un ajout de périmètre.
 | 10 | Implémentation AC3 (option (a) tranchée, section 5.4) | Appliquer `_scope_entry_is_included` après décision, dans « Publier » **et dans le sync** ; rejouer le harnais de parité (section 7.1) juste avant merge pour confirmer A=0 toujours vrai sur un export récent | AC3 |
 | 11 | Test AC3 (golden) | Golden test égalité des ensembles filtrés sync vs « Publier », plus un cas de fixture scope=exclude (section 6, aucun cas réel disponible sur le corpus actuel) | AC3 |
 | 12 | Test de parité à 4 points d'appel (AC7) | Nouveau test invoquant les 4 handlers réels (section 6), cas `sure_mapping` + cas override | AC7 |
-| 13 | Suppression du code mort | `_sync_publication_decision_refs`, `_secondary_publishable` (si totalement remplacée), vérification `grep` qu'aucun appelant ne reste (section 3.2) | — |
+| 13 | Suppression du code mort | `_secondary_publishable` uniquement (si totalement remplacée) — `_sync_publication_decision_refs` **reste**, utilisée par « Supprimer » (l.3477, l.3490) ; vérification `grep -rn _secondary_publishable` qu'aucun appelant ne reste avant suppression (section 3.2) | — |
 | 14 | Mutation testing ciblé | Sur les fonctions modifiées (`apply_publication_decision`, `_should_attempt_publish`, filtre scope) — cohérent avec la pratique déjà en place sur ce repo (guardrails mutation mentionnés dans les stories précédentes) | — |
 | 15 | Guardrails + suite complète | `pytest tests/unit -q` (0 régression, convention Task 6 de la story), lint/type-check si applicable | — |
 | 16 | Preuve terrain (ii) + documentation fallback (i)/(iii) | Procédure section 7.3 (`saveFilteringConfig`), documentation des tests de fallback `sure_mapping` (section 6) | Preuve terrain |
