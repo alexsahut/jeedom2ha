@@ -87,3 +87,40 @@ retrouve exactement C=2 via le même détecteur que celui déjà utilisé par le
 script officiel. B illustre concrètement la limite d'observabilité déjà
 signalée par ClaudeBox (pas de décision par secondaire exposée) — argument
 supplémentaire pour l'ajouter aux AC de 19-4 si on veut un jour mesurer B.
+
+## Rejeu avant fusion (29/09 soir, tête `118fe35`)
+
+Box 192.168.1.21, lecture seule stricte : `scripts/parity-snapshot.sh capture`
+(`/tmp/jeedom2ha-19-4-mesure-A2.json`, capturé 2026-09-29T18:19:38Z) +
+`GET /system/published_scope` (inclus dans le même relevé). Aucune écriture,
+aucun `/action/*`, aucun redémarrage.
+
+**A′ = 0.** Méthode : pour chaque équipement dont `perimetre != 'inclus'`
+(171 équipements — `exclu_par_piece`=69, `exclu_par_plugin`=102, dont 12
+niveau équipement + 90 niveau exception), recherche d'un topic discovery
+retenu correspondant, **principal ou secondaire**
+(`homeassistant/<type>/jeedom2ha_<eq_id>/config` ou
+`homeassistant/<type>/jeedom2ha_<eq_id>_<cmd_id>/config`) parmi les 355
+topics `jeedom2ha_*` relevés. Aucune correspondance trouvée : le filtre de
+scope au sync (19-4, unité 5, AC3) couvre déjà tous les cas observés sur la
+box, secondaires compris.
+
+Répartition par niveau (`/system/published_scope`, 292 équipements) :
+
+| niveau | effective_state | count |
+|---|---|---|
+| global (hérité) | include | 121 |
+| pièce | exclude | 69 |
+| équipement | exclude | 12 |
+| exception équipement | exclude | 90 |
+
+Inchangée depuis le relevé du matin — aucune modification de scope entre les
+deux mesures.
+
+579 (Enphase) et 585 (chauffage piscine) : `effective_state=include`
+(`perimetre='inclus'`), conforme à l'attendu ; `statut='non_publie'` pour le
+principal (ambiguous_skipped, story 19-2), leurs secondaires restent publiés
+via `additional_mappings`, comme au relevé du matin.
+
+Conclusion : rien à corriger avant fusion, aucune entité ne serait
+dépubliée par le passage du filtre de scope au sync.
