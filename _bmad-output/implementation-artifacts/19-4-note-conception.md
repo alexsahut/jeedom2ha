@@ -537,3 +537,40 @@ sans purge) ; scinder ne réduirait pas le risque de revue, seulement le nombre 
 exception envisageable : si l'arbitrage AC3 (section 5.4) tranche pour l'option (a) avec un risque
 terrain jugé trop élevé pour être mélangé au reste, sortir l'unité #9/#10 dans une **second PR séparée,
 après validation terrain isolée** — decision à prendre après l'arbitrage, pas avant.
+
+## 9. Questions ouvertes
+
+1. **(Priorité 1, bloquante) AC3 — scope au sync : option (a) ou (b) ?** (section 5.4) La story
+   affirme un « effet nul » basé sur « zéro état explicite » mesuré par 19-1 ; la mesure réelle de
+   19-1 (`19-1-field-proof-2026-09-28.md:38`) donne **102** exceptions de scope explicite, pas zéro.
+   Si (a) — le sync applique aussi le filtre de scope après décision, comme le texte AC3 le demande
+   littéralement — jusqu'à 102 équipements pourraient changer de statut de publication au premier sync
+   post-déploiement, sans clic utilisateur. Si (b) — seule « Publier » applique le filtre après décision,
+   le sync reste inchangé — AC3 n'est respecté qu'en partie. **Nécessite un arbitrage explicite d'Alex/
+   ClaudeBox avant Task 2**, avec, si (a) est choisi, une vérification préalable de la répartition
+   include/exclude réelle des 102 eq_ids (non faite dans cette note, faute de temps).
+2. **`_detect_lifecycle_changes` doit-il être branché sur « Publier » ?** (section 2.4) Un retypage/
+   renommage d'équipement survenu entre deux syncs (jamais rejoué par « Publier » aujourd'hui, et cette
+   story ne le demande pas explicitement) resterait invisible à un clic « Publier » isolé — à confirmer
+   que c'est un non-objectif assumé de cette story, ou un trou à couvrir dans une story ultérieure.
+3. **`traceability.decision_trace` suppose-t-il un appelant unique (le sync) ?** (section 3.4) Non
+   vérifié dans cette note (module non lu, contrainte de temps/lecture ciblée) — à vérifier en Task 1/2
+   avant de considérer les lecteurs de diagnostic comme totalement neutres au changement.
+4. **Dépublication en cascade du principal vers ses secondaires ?** (section 4.4) Quand le principal
+   passe de publié à refusé, le code actuel ne semble pas traiter explicitement le sort de ses
+   secondaires déjà publiés dans le même mouvement — comportement à clarifier par un test dédié plutôt
+   que supposé (section 6 ne le couvre pas encore explicitement, à ajouter si la réponse est « oui, il
+   faut aussi les dépublier »).
+5. **`_apply_pending_scope_flags` a-t-elle un second point de lecture de scope caché ?** (section 5.1)
+   La lecture de cette note ne trouve pas de duplication réelle à « consolider » comme le sous-entend
+   la story — à confirmer par un `grep` exhaustif en Task 2 avant de conclure qu'il n'y a rien à faire
+   à cet endroit précis.
+6. **`test_cc08_publisher_registry_matrix.py` — lu seulement 100/420 lignes.** Le reste du fichier
+   (matrice complète known_types × scénarios) n'a pas été inspecté dans cette note ; à lire intégralement
+   en Task 6 pour vérifier s'il couvre déjà, ou non, les cas `sure_mapping`/override requis par AC7 avant
+   d'écrire un nouveau test redondant.
+7. **Signature exacte de `apply_publication_decision()` — à valider, pas à considérer figée.** La
+   section 2.2 propose une signature et un découpage en 4 étapes à partir de la lecture du code existant ;
+   c'est une proposition de conception, pas un contrat gelé — Task 1 peut légitimement l'ajuster si
+   l'implémentation réelle révèle un couplage non anticipé ici (ex. accès à `request.app` non trivial à
+   passer en paramètre pur).
