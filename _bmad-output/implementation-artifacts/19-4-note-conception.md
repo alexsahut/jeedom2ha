@@ -295,16 +295,22 @@ vrai envoi MQTT (discovery + state), **même si rien n'a changé depuis la derni
 Donc : **oui, le chemin actuel republie à chaque clic** un équipement déjà publié et toujours valide,
 tant que son mapping garde une confiance suffisante.
 
-**Condition à ajouter pour AC5** (dans `apply_publication_decision()`, avant l'étape 2) :
-ne (re)publier réellement (appel MQTT) que si `previous_decision is None`, ou
-`previous_decision.should_publish != decision.should_publish`, ou
-`not _needs_discovery_unpublish` combiné à `previous_decision.discovery_published is not True`
-(cas où le verdict était déjà `True` mais la publication précédente avait échoué — auquel cas il FAUT
-retenter, ce n'est pas un cas d'idempotence). Autrement dit la garde est : « déjà publié
-(`discovery_published=True`) ET verdict inchangé (`should_publish=True` avant et après) » ⇒ ne pas
-rappeler `publisher.publish(...)`, seulement rafraîchir le bookkeeping (étape 1). C'est un changement
-de comportement réel par rapport à l'existant (qui republie toujours) — à couvrir par un test dédié
-(section 6) qui échoue sur `main` aujourd'hui.
+**Correction (C3) — pas de garde de saut supplémentaire.** La v1 proposait ici une condition
+explicite pour *sauter* l'appel `publisher.publish(...)` quand le verdict est inchangé. **Cette garde
+est retirée** : le bouton « Republier » (AC5, distinct d'un simple re-clic « Publier ») doit pouvoir
+forcer un renvoi MQTT réel même à verdict inchangé (retained message à rafraîchir, par exemple après un
+redémarrage du broker) — une garde de saut basée uniquement sur `discovery_published`/`should_publish`
+bloquerait ce cas légitime. AC5 (idempotence) n'exige pas un saut d'appel, seulement l'**absence d'effet
+de bord indésirable** en cas de re-publication : pas de cycle unpublish/publish parasite, mêmes topics,
+même payload. Cette propriété découle déjà de 4.3 (dépublication strictement par candidat, sur
+transition de verdict uniquement) — un appel `publisher.publish(...)` répété avec un verdict inchangé
+ne déclenche aucune dépublication (aucune transition `True→False`), donc aucun effet de bord, sans
+code de garde supplémentaire à écrire.
+
+**Test dédié (section 6)** : deux clics successifs sur « Publier » (ou « Publier » puis « Republier »)
+sur un équipement déjà publié, verdict inchangé ⇒ aucun `unpublish_by_eq_id` n'est appelé entre les deux
+clics, et les topics/payloads publiés au second appel sont identiques au premier (mock/spy sur
+`PublisherRegistry`, comparaison des arguments des deux appels `publish(...)`).
 
 ### 4.6 I11 — rien à changer côté lecteurs
 
