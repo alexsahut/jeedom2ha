@@ -189,24 +189,32 @@ class MqttRecordingBridge:
     """Faux pont MQTT posé sous le VRAI `DiscoveryPublisher` (non patché) :
     journalise chaque `publish_message` dont le topic commence par
     `homeassistant/`, sans horodatage ni référence d'objet — juste
-    topic/payload (JSON parsé, ou `""` pour une suppression)/retain."""
+    topic/payload (JSON parsé, ou `""` pour une suppression)/retain.
+    Journalise séparément (`avail_calls`) les topics de disponibilité locale
+    `jeedom2ha/<eq_id>/availability` (payload brut, pas de JSON : `"online"`,
+    `"offline"` ou `""` pour l'effacement)."""
 
     def __init__(self) -> None:
         self.is_connected = True
         self.calls: list[dict[str, Any]] = []
+        self.avail_calls: list[dict[str, Any]] = []
 
     def publish_message(self, topic: str, payload: str, qos: int = 0, retain: bool = False) -> bool:
         if topic.startswith("homeassistant/"):
             parsed: Any = json.loads(payload) if payload else ""
             self.calls.append({"topic": topic, "payload": parsed, "retain": retain})
+        elif topic.startswith("jeedom2ha/") and topic.endswith("/availability"):
+            self.avail_calls.append({"topic": topic, "payload": payload, "retain": retain})
         return True
 
 
-async def _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps) -> list[dict[str, Any]]:
+async def _run_mqtt_trace(
+    aiohttp_client, warmup_steps, measured_steps
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Exécute `warmup_steps` (non journalisés) puis `measured_steps` (coroutines
     `(cli, app) -> None`) sur une app fraîche, avec le vrai `DiscoveryPublisher`
-    (non patché) posé sur `MqttRecordingBridge` ; seule la trace de
-    `measured_steps` est retournée."""
+    (non patché) posé sur `MqttRecordingBridge` ; seules les traces (discovery,
+    availability) de `measured_steps` sont retournées."""
     fresh_app = create_app(local_secret=SECRET)
     bridge = MqttRecordingBridge()
     fresh_app["mqtt_bridge"] = bridge
@@ -214,20 +222,24 @@ async def _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps) -> list[
     for step in warmup_steps:
         await step(fresh_cli, fresh_app)
     bridge.calls = []
+    bridge.avail_calls = []
     for step in measured_steps:
         await step(fresh_cli, fresh_app)
-    return bridge.calls
+    return bridge.calls, bridge.avail_calls
 
 
 async def _assert_mqtt_trace_matches_reference(
     name: str, aiohttp_client, warmup_steps, measured_steps
 ) -> None:
-    """Vérifie le déterminisme (deux exécutions identiques) puis compare à la
-    référence `<name>_mqtt.json`."""
-    trace1 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
-    trace2 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
+    """Vérifie le déterminisme (deux exécutions identiques) puis compare aux
+    références `<name>_mqtt.json` (discovery) et `<name>_avail.json`
+    (disponibilité locale)."""
+    trace1, avail1 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
+    trace2, avail2 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
     assert trace1 == trace2, f"trace MQTT non déterministe pour {name}"
+    assert avail1 == avail2, f"trace availability non déterministe pour {name}"
     _assert_trace_matches_reference(f"{name}_mqtt", trace1)
+    _assert_trace_matches_reference(f"{name}_avail", avail1)
 
 
 async def test_s1_un_sync_corpus_dore(cli, app, aiohttp_client):
@@ -410,6 +422,15 @@ async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app, aiohttp_client):
     _assert_trace_matches_reference("s4_candidat_i11_sync2", recorder2.calls)
     _assert_trace_matches_reference("s4_candidat_i11_publier", recorder3.calls)
 
+    await _assert_mqtt_trace_matches_reference(
+        "s4_candidat_i11_sync1", aiohttp_client, [],
+        [lambda c, a: _sync_i11_under_patch(c, a, "s4-mqtt-1")],
+    )
+    await _assert_mqtt_trace_matches_reference(
+        "s4_candidat_i11_sync2", aiohttp_client,
+        [lambda c, a: _sync_i11_under_patch(c, a, "s4-mqtt-1")],
+        [lambda c, a: _sync_i11_under_patch(c, a, "s4-mqtt-2")],
+    )
     await _assert_mqtt_trace_matches_reference(
         "s4_candidat_i11_publier", aiohttp_client,
         [
