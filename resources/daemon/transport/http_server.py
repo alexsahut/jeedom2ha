@@ -1544,6 +1544,89 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
         raise
 
+async def _unpublish_refused_candidates(
+    eq_id: int,
+    previous_decision,
+    current_decision,
+    *,
+    publisher,
+    mqtt_bridge,
+    pending_discovery_unpublish: Dict[int, object],
+    pending_local_cleanup: Dict[int, str],
+) -> bool:
+    """Story 4.3 (Task 2.7) + Story 19.4 (C1) — dépublie les candidats devenus refusés.
+
+    Partagée par le sync et par « Publier » (mini-sync). Compare les candidats publiés
+    dans `previous_decision` à ceux acceptés dans `current_decision` :
+    - plus aucun candidat accepté : comportement historique (tout l'équipement, puis la
+      disponibilité locale) ;
+    - sinon : seuls les candidats refusés sont dépubliés (un appel par équipement) et la
+      disponibilité locale reste, car d'autres candidats l'utilisent encore.
+
+    Retourne True si une dépublication a été tentée (ou reportée), False sinon.
+    """
+    if previous_decision is None or current_decision is None:
+        return False
+    previous_mapping = getattr(previous_decision, "mapping_result", None)
+    if not _published_candidates(previous_mapping, previous_decision):
+        return False
+    current_mapping = getattr(current_decision, "mapping_result", None)
+    if _published_candidates(current_mapping, current_decision):
+        entries = _refused_candidate_entries(previous_decision, current_decision)
+        if not entries:
+            return False
+        entity_type = previous_mapping.ha_entity_type
+        _LOGGER.info(
+            "[SYNC] eq_id=%d: %d candidat(s) refusé(s) → dépublication ciblée",
+            eq_id, len(entries),
+        )
+        if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+            if not await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=entries):
+                _LOGGER.warning("[SYNC] Cannot unpublish refused candidates of eq_id=%d — deferring", eq_id)
+                _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
+        else:
+            _LOGGER.warning(
+                "[SYNC] Cannot unpublish refused candidates of eq_id=%d (bridge missing/disconnected) — deferring",
+                eq_id,
+            )
+            _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
+        return True
+    entity_type = previous_decision.mapping_result.ha_entity_type
+    node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
+    _LOGGER.info(
+        "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
+        eq_id, previous_decision.reason, current_decision.reason,
+    )
+    if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
+        if unpublish_ok:
+            pending_discovery_unpublish.pop(eq_id, None)
+        else:
+            _LOGGER.warning(
+                "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
+                eq_id,
+            )
+            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+    else:
+        _LOGGER.warning(
+            "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
+            eq_id,
+        )
+        _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+    # Nettoyer la disponibilité locale si elle était présente
+    if bool(getattr(previous_decision, "local_availability_supported", False)):
+        prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+        if mqtt_bridge and mqtt_bridge.is_connected:
+            clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, prev_local_topic)
+            if clear_ok:
+                pending_local_cleanup.pop(eq_id, None)
+            else:
+                _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+        else:
+            _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+    return True
+
+
 async def apply_publication_decision(
     eq_id,
     mapping,
@@ -1818,74 +1901,19 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 )
                 _defer_local_availability_cleanup(pending_local_cleanup, eq_id, previous_local_topic)
             
-    # Story 4.3 (Task 2.7) + Story 19.4 (C1) — dépublication des candidats devenus refusés.
-    # - Plus aucun candidat accepté : comportement historique (tout l'équipement, puis la
-    #   disponibilité locale).
-    # - Sinon : seuls les candidats refusés sont dépubliés (un appel par équipement) et la
-    #   disponibilité locale reste, car d'autres candidats l'utilisent encore.
+    # Story 4.3 (Task 2.7) + Story 19.4 (C1) — dépublication des candidats devenus refusés
+    # (`_unpublish_refused_candidates`, partagée avec « Publier »).
     # Ces eq_ids sont dans nouveaux_eq_ids (toujours éligibles) donc NON couverts par eq_ids_supprimes
     for eq_id in nouveaux_eq_ids:
-        previous_decision = request.app["publications"].get(eq_id)
-        current_decision = publications.get(eq_id)
-        if previous_decision is None or current_decision is None:
-            continue
-        previous_mapping = getattr(previous_decision, "mapping_result", None)
-        if not _published_candidates(previous_mapping, previous_decision):
-            continue
-        current_mapping = getattr(current_decision, "mapping_result", None)
-        if _published_candidates(current_mapping, current_decision):
-            entries = _refused_candidate_entries(previous_decision, current_decision)
-            if not entries:
-                continue
-            entity_type = previous_mapping.ha_entity_type
-            _LOGGER.info(
-                "[SYNC] eq_id=%d: %d candidat(s) refusé(s) → dépublication ciblée",
-                eq_id, len(entries),
-            )
-            if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                if not await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=entries):
-                    _LOGGER.warning("[SYNC] Cannot unpublish refused candidates of eq_id=%d — deferring", eq_id)
-                    _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
-            else:
-                _LOGGER.warning(
-                    "[SYNC] Cannot unpublish refused candidates of eq_id=%d (bridge missing/disconnected) — deferring",
-                    eq_id,
-                )
-                _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
-            continue
-        entity_type = previous_decision.mapping_result.ha_entity_type
-        node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
-        _LOGGER.info(
-            "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
-            eq_id, previous_decision.reason, current_decision.reason,
+        await _unpublish_refused_candidates(
+            eq_id,
+            request.app["publications"].get(eq_id),
+            publications.get(eq_id),
+            publisher=publisher,
+            mqtt_bridge=mqtt_bridge,
+            pending_discovery_unpublish=pending_discovery_unpublish,
+            pending_local_cleanup=pending_local_cleanup,
         )
-        if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-            if unpublish_ok:
-                pending_discovery_unpublish.pop(eq_id, None)
-            else:
-                _LOGGER.warning(
-                    "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
-                    eq_id,
-                )
-                _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
-        else:
-            _LOGGER.warning(
-                "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
-                eq_id,
-            )
-            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
-        # Nettoyer la disponibilité locale si elle était présente
-        if bool(getattr(previous_decision, "local_availability_supported", False)):
-            prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
-            if mqtt_bridge and mqtt_bridge.is_connected:
-                clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, prev_local_topic)
-                if clear_ok:
-                    pending_local_cleanup.pop(eq_id, None)
-                else:
-                    _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
-            else:
-                _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
 
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
@@ -3465,6 +3493,62 @@ _INTENTIONS_VALIDES = frozenset(("publier", "supprimer"))
 _PORTEES_VALIDES = frozenset(("global", "piece", "equipement"))
 
 
+def _evaluate_for_action(
+    eq_id: int,
+    topology,
+    eligibility,
+    *,
+    mapper_registry,
+    confidence_policy: str,
+    persisted_overrides,
+    persisted_equipment_overrides,
+):
+    """Story 19.4 — `evaluate_equipment()` frais pour une action (« Publier »).
+
+    Même appel que le sync, sur la topologie et l'éligibilité du dernier sync (pas de nouveau
+    payload Jeedom), avec les overrides relus au clic. None si l'équipement est inconnu ou
+    inéligible.
+    """
+    result = (eligibility or {}).get(eq_id)
+    eq = topology.eq_logics.get(eq_id) if topology is not None else None
+    if result is None or eq is None or not getattr(result, "is_eligible", False):
+        return None
+    return evaluate_equipment(
+        eq,
+        topology,
+        result,
+        mapper_registry=mapper_registry,
+        confidence_policy=confidence_policy,
+        persisted_overrides=persisted_overrides,
+        persisted_equipment_overrides=persisted_equipment_overrides,
+    )
+
+
+async def _replay_pending_for_action(
+    eq_id: int,
+    *,
+    publisher,
+    mqtt_bridge,
+    pending_discovery_unpublish: Dict[int, object],
+    pending_local_cleanup: Dict[int, str],
+) -> None:
+    """Story 19.4 — rejoue, avant de republier, les nettoyages reportés de CET équipement.
+
+    Même ordre que le sync (rejeu en début de cycle, puis publication) : un report encore
+    en attente est exécuté au lieu d'être oublié, puis la décision fraîche republie ce qui
+    doit l'être.
+    """
+    pending_value = pending_discovery_unpublish.get(eq_id)
+    if pending_value is not None and mqtt_bridge and mqtt_bridge.is_connected:
+        entity_type, node_ids = _pending_unpublish_parts(pending_value)
+        if await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids):
+            pending_discovery_unpublish.pop(eq_id, None)
+    pending_topic = pending_local_cleanup.get(eq_id)
+    if pending_topic is not None and mqtt_bridge and mqtt_bridge.is_connected:
+        if _clear_local_availability_topic(mqtt_bridge, eq_id, pending_topic):
+            pending_local_cleanup.pop(eq_id, None)
+
+
 async def _handle_action_execute(request: web.Request) -> web.Response:
     """Handle POST /action/execute — façade unique des opérations HA.
 
@@ -3741,13 +3825,25 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         }
         return _build_action_execute_response(payload=payload)
 
-    # --- Branche publier (Story 5.2) ---
+    # --- Branche publier (Story 5.2 ; Story 19.4 : mini-sync) ---
+    # « Publier » prend la MÊME décision que le sync : `evaluate_equipment()` frais (overrides
+    # relus une fois par clic, politique de confiance du dernier sync), puis le post-traitement
+    # partagé `apply_publication_decision()` et la dépublication par candidat. Le filtre de
+    # scope (`_scope_entry_is_included`) s'applique après la décision (AC3).
     scope_entries = {
         _to_int(entry.get("eq_id"), default=0): entry
         for entry in published_scope.get("equipements", [])
     }
     publisher = DiscoveryPublisher(mqtt_bridge)
     publisher_registry = PublisherRegistry(publisher)
+    data_dir = _resolve_data_dir(request)
+    overrides_cache = list_overrides(data_dir)
+    equipment_overrides_cache = list_equipment_overrides(data_dir)
+    mapper_registry = MapperRegistry()
+    confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
+    if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
+        confidence_policy = _DEFAULT_CONFIDENCE_POLICY
+    boot_cache = request.app.get("boot_cache", {})
 
     equipements_inclus = 0
     equipements_publies_ou_crees = 0
@@ -3758,107 +3854,75 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
     for eq_id in eq_ids:
         scope_entry = scope_entries.get(eq_id)
-        mapping = mappings.get(eq_id)
         previous_decision = publications.get(eq_id)
+        evaluation = _evaluate_for_action(
+            eq_id,
+            topology,
+            eligibility,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=overrides_cache,
+            persisted_equipment_overrides=equipment_overrides_cache,
+        )
+        mapping = evaluation.mapping if evaluation is not None else None
+        if mapping is None:
+            mapping = mappings.get(eq_id)
         is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
 
         if is_included:
             equipements_inclus += 1
-            pending_discovery_unpublish.pop(eq_id, None)
-            pending_local_cleanup.pop(eq_id, None)
-
-            if not _should_attempt_publish(mapping, previous_decision):
+            if evaluation is None or evaluation.mapping is None:
                 skips += 1
                 continue
 
-            publish_ok = await _publish_mapping_for_action(publisher_registry, mapping, topology)
-            await asyncio.sleep(_action_delay)
-            if not publish_ok:
-                failed_decision = PublicationDecision(
-                    should_publish=False,
-                    reason="discovery_publish_failed",
-                    mapping_result=mapping,
-                    state_topic=_resolve_state_topic(mapping),
-                    active_or_alive=False,
-                    discovery_published=False,
-                )
-                _apply_availability_metadata(failed_decision, mapping, topology)
-                publications[eq_id] = failed_decision
-                # P3 fix (ClaudeBox review round 2, PR #174) — publish_ok is False when
-                # EITHER the primary or any secondary failed inside
-                # _publish_mapping_for_action; secondaries that DID succeed there
-                # already have discovery_published/active_or_alive=True on their own
-                # decision_ref. secondary_discovery_published=None skips the blanket
-                # reset so those real per-candidate outcomes are preserved instead of
-                # being clobbered back to "not published" (main has the same limitation
-                # for secondaries left untouched by a failed publish attempt).
-                _sync_publication_decision_refs(
-                    mapping, failed_decision, secondary_discovery_published=None
-                )
-                publish_errors += 1
-                continue
-
-            publish_reason = getattr(previous_decision, "reason", "") if previous_decision else ""
-            if publish_reason in (
-                "",
-                "discovery_publish_failed",
-                "local_availability_publish_failed",
-                "ambiguous_skipped",
-                "probable_skipped",
-                "unknown_skipped",
-                "ignore_skipped",
-            ):
-                publish_reason = mapping.confidence
-
-            decision = PublicationDecision(
-                should_publish=True,
-                reason=publish_reason,
-                mapping_result=mapping,
-                state_topic=_resolve_state_topic(mapping),
-                active_or_alive=False,
-                discovery_published=True,
+            await _replay_pending_for_action(
+                eq_id,
+                publisher=publisher,
+                mqtt_bridge=mqtt_bridge,
+                pending_discovery_unpublish=pending_discovery_unpublish,
+                pending_local_cleanup=pending_local_cleanup,
             )
-            _apply_availability_metadata(decision, mapping, topology)
+            decision, config_published = await apply_publication_decision(
+                eq_id,
+                evaluation.mapping,
+                evaluation,
+                previous_decision,
+                topology,
+                is_first_sync=False,
+                boot_cache=boot_cache,
+                publisher=publisher,
+                publisher_registry=publisher_registry,
+                mqtt_bridge=mqtt_bridge,
+                pending_discovery_unpublish=pending_discovery_unpublish,
+                mapping_counters={},
+                publications=publications,
+                nouveaux_eq_ids=set(),
+            )
+            mappings[eq_id] = evaluation.mapping
+            if await _unpublish_refused_candidates(
+                eq_id,
+                previous_decision,
+                decision,
+                publisher=publisher,
+                mqtt_bridge=mqtt_bridge,
+                pending_discovery_unpublish=pending_discovery_unpublish,
+                pending_local_cleanup=pending_local_cleanup,
+            ):
+                ecarts_resolus += 1
+            await asyncio.sleep(_action_delay)
 
-            local_ok = True
-            if decision.local_availability_supported:
-                local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-
-            if not local_ok:
-                local_failed_decision = _mark_local_availability_publish_failed(decision, mapping)
-                publications[eq_id] = local_failed_decision
-                # P1-ter fix (ClaudeBox review round 3, PR #174) — the principal's ref is
-                # never repointed by an action path (see _sync_publication_decision_refs
-                # docstring); only a full sync may set mapping.publication_decision_ref.
-                # Secondaries were already (re)published above (_publish_mapping_for_action) —
-                # preserve each secondary's OWN discovery_published flag, on the same
-                # model as the principal's own decision
-                # (_mark_local_availability_publish_failed keeps decision.discovery_published
-                # as-is); only active_or_alive reflects the local-availability refusal.
-                # should_publish/reason are never touched by an action (P1-bis fix,
-                # ClaudeBox review round 2, PR #174) — _reset_secondary_runtime_state
-                # preserves them via dataclasses.replace().
-                for secondary in mapping.additional_mappings or []:
-                    prior_discovery_published = bool(
-                        getattr(getattr(secondary, "publication_decision_ref", None), "discovery_published", False)
-                    )
-                    _reset_secondary_runtime_state(
-                        secondary,
-                        discovery_published=prior_discovery_published,
-                        active_or_alive=False,
-                    )
-                publish_errors += 1
-                continue
-
-            decision.active_or_alive = True
-            publications[eq_id] = decision
-            # P1-bis fix (ClaudeBox review round 2, PR #174) — the principal's ref is no
-            # longer repointed to an action's runtime decision on the success path. I11
-            # readers (sync/state.py, sync/command.py) now resolve the principal's
-            # decision straight from app["publications"][eq_id] (the `decision` local
-            # variable in their loop), never from mapping.publication_decision_ref, so
-            # routing/streaming still picks up this fresh `decision` without the repoint.
-            equipements_publies_ou_crees += 1
+            if decision.should_publish:
+                if config_published and decision.active_or_alive:
+                    equipements_publies_ou_crees += 1
+                else:
+                    publish_errors += 1
+            elif any(
+                getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False)
+                for s in evaluation.mapping.additional_mappings or []
+            ):
+                equipements_publies_ou_crees += 1
+            else:
+                skips += 1
             continue
 
         if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
