@@ -8,10 +8,15 @@ Home Assistant jusqu'à son premier changement d'état. Le sync publie l'état i
 `apply_publication_decision` dans `_do_handle_action_sync`,
 `resources/daemon/transport/http_server.py:1868`) ; « Publier » ne le fait pas
 (vérifié : aucun appel à `publish_initial_states` dans la branche « Publier »,
-`resources/daemon/transport/http_server.py:3837-3951`). C'était un choix documenté
+`resources/daemon/transport/http_server.py:3838-4016`). C'était un choix documenté
 dans la Story 19.4 (« mieux vaut `unknown` explicite qu'une valeur silencieusement
-obsolète »). Cas terrain typique : « Suppr. » puis « Republier » sur une pièce —
-constaté par Alexandre.
+obsolète »). Relevé par `clawcode` lors de la relecture de 19-4 (unité 4), non
+constaté sur le terrain.
+
+Les états étant retenus et « Suppr. » n'effaçant que les topics discovery, CC-29
+prend deux formes (détail dans la story) : (a) aucun état retenu ⇒ `unknown` ;
+(b) après « Suppr. » puis « Republier », état retenu **périmé** si la valeur a
+changé entre-temps.
 
 ## 2. Décision
 
@@ -29,7 +34,8 @@ BMAD complet (`docs/bmad-parcours-rapide-complet.md`).
 - **Code concerné** : `core/ajax/jeedom2ha.ajax.php` (action `executeHaAction`,
   aujourd'hui un relais strict sans calcul local, Story 5.1) et
   `resources/daemon/transport/http_server.py` (branche « Publier »,
-  ligne ~3837).
+  l.3838) et `resources/daemon/sync/state.py` (`publish_initial_states`,
+  `handle_state_message`).
 - **UI Impact** : oui — `core/ajax/` est modifié, donc `ready-for-UX-validation`
   avant `done`.
 - Pas d'impact PRD/architecture/UX documents existants au-delà de l'ajout de la
@@ -41,16 +47,18 @@ BMAD complet (`docs/bmad-parcours-rapide-complet.md`).
 **minor** : implémentation directe par l'équipe de dev, sans réorganisation de
 backlog ni replan PM/Architecte.
 
-Conception (proposée par ClaudeBox, à challenger en dev-story si besoin) :
+Conception (proposée par ClaudeBox, revue après relecture de la story) :
 - Le relais PHP lit les valeurs au clic (`$cmd->getCache('value', null)`, motif
   déjà utilisé par `getFullTopology`, `core/class/jeedom2ha.class.php:729`) et les
   ajoute au payload sous `current_values: {cmd_id: valeur}`. Aucune logique de
   décision en PHP.
-- Le démon publie l'état initial pour « Publier », en réutilisant
+- Le démon publie l'état initial pour « Publier » en réutilisant
   `publish_initial_states()` après la discovery, avec le même garde par candidat
-  que le sync.
-- Une commande sans valeur fraîche au clic ne reçoit aucun état (pas de valeur
-  périmée).
+  que le sync, et les **seules** valeurs du clic (`fresh_values`) : la topologie
+  du dernier sync n'est jamais lue ni modifiée.
+- Une commande sans valeur au clic ne reçoit aucun état (pas de valeur périmée).
+- Un évènement Jeedom reçu pendant le clic l'emporte sur la valeur du clic.
+- Portée : types streamés seulement (`sensor`, `binary_sensor`, `switch`).
 
 ## 5. Changement d'artefact
 
