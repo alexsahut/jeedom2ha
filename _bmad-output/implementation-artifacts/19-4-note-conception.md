@@ -594,37 +594,35 @@ non nul entre-temps.
 
 ## 9. Questions ouvertes
 
-1. **(Priorité 1, bloquante) AC3 — scope au sync : option (a) ou (b) ?** (section 5.4) La story
-   affirme un « effet nul » basé sur « zéro état explicite » mesuré par 19-1 ; la mesure réelle de
-   19-1 (`19-1-field-proof-2026-09-28.md:38`) donne **102** exceptions de scope explicite, pas zéro.
-   Si (a) — le sync applique aussi le filtre de scope après décision, comme le texte AC3 le demande
-   littéralement — jusqu'à 102 équipements pourraient changer de statut de publication au premier sync
-   post-déploiement, sans clic utilisateur. Si (b) — seule « Publier » applique le filtre après décision,
-   le sync reste inchangé — AC3 n'est respecté qu'en partie. **Nécessite un arbitrage explicite d'Alex/
-   ClaudeBox avant Task 2**, avec, si (a) est choisi, une vérification préalable de la répartition
-   include/exclude réelle des 102 eq_ids (non faite dans cette note, faute de temps).
-2. **`_detect_lifecycle_changes` doit-il être branché sur « Publier » ?** (section 2.4) Un retypage/
-   renommage d'équipement survenu entre deux syncs (jamais rejoué par « Publier » aujourd'hui, et cette
-   story ne le demande pas explicitement) resterait invisible à un clic « Publier » isolé — à confirmer
-   que c'est un non-objectif assumé de cette story, ou un trou à couvrir dans une story ultérieure.
-3. **`traceability.decision_trace` suppose-t-il un appelant unique (le sync) ?** (section 3.4) Non
-   vérifié dans cette note (module non lu, contrainte de temps/lecture ciblée) — à vérifier en Task 1/2
-   avant de considérer les lecteurs de diagnostic comme totalement neutres au changement.
-4. **Dépublication en cascade du principal vers ses secondaires ?** (section 4.4) Quand le principal
-   passe de publié à refusé, le code actuel ne semble pas traiter explicitement le sort de ses
-   secondaires déjà publiés dans le même mouvement — comportement à clarifier par un test dédié plutôt
-   que supposé (section 6 ne le couvre pas encore explicitement, à ajouter si la réponse est « oui, il
-   faut aussi les dépublier »).
-5. **`_apply_pending_scope_flags` a-t-elle un second point de lecture de scope caché ?** (section 5.1)
-   La lecture de cette note ne trouve pas de duplication réelle à « consolider » comme le sous-entend
-   la story — à confirmer par un `grep` exhaustif en Task 2 avant de conclure qu'il n'y a rien à faire
-   à cet endroit précis.
-6. **`test_cc08_publisher_registry_matrix.py` — lu seulement 100/420 lignes.** Le reste du fichier
-   (matrice complète known_types × scénarios) n'a pas été inspecté dans cette note ; à lire intégralement
-   en Task 6 pour vérifier s'il couvre déjà, ou non, les cas `sure_mapping`/override requis par AC7 avant
-   d'écrire un nouveau test redondant.
-7. **Signature exacte de `apply_publication_decision()` — à valider, pas à considérer figée.** La
-   section 2.2 propose une signature et un découpage en 4 étapes à partir de la lecture du code existant ;
-   c'est une proposition de conception, pas un contrat gelé — Task 1 peut légitimement l'ajuster si
-   l'implémentation réelle révèle un couplage non anticipé ici (ex. accès à `request.app` non trivial à
-   passer en paramètre pur).
+**Questions fermées par la relecture ClaudeBox et la mesure terrain de ce tour** (gardées ici pour
+traçabilité, plus de décision à prendre) :
+
+- ~~AC3 — scope au sync : option (a) ou (b) ?~~ **Fermée : (a)** (section 5.4), la mesure terrain
+  A=0 (5.3) montre qu'aucun équipement actuellement publié ne bascule.
+- ~~`_detect_lifecycle_changes` branché sur « Publier » ?~~ **Fermée : oui** (C2, section 2.2/2.4),
+  intégrée à l'étape 0 du post-traitement partagé, dans les deux chemins.
+- ~~Dépublication en cascade du principal vers ses secondaires ?~~ **Fermée : non, pas de cascade**
+  (section 4.4) — chaque secondaire suit son propre verdict frais, conséquence directe de la
+  dépublication par candidat (C1, section 4.3).
+- ~~`traceability.decision_trace` suppose-t-il un appelant unique ?~~ **Fermée : non** (Q3 du rapport
+  ClaudeBox) — `_build_traceability()` (l.2091-2194) recalcule à la volée depuis l'état courant à chaque
+  `GET /system/diagnostics`, sans hypothèse sur qui (sync ou « Publier ») l'a écrit en dernier.
+- ~~`_apply_pending_scope_flags` a-t-elle un second point de lecture de scope caché ?~~ **Fermée : non**
+  (Q5 du rapport) — grep exhaustif fait, un seul point de décision réel (`_scope_entry_is_included`) plus
+  un flag d'affichage, rien à consolider.
+- ~~`test_cc08_publisher_registry_matrix.py` couvre-t-il déjà `sure_mapping`/override ?~~ **Fermée : non**
+  (Q6 du rapport, fichier lu en entier, 420 lignes) — AC7 reste entièrement à écrire, pas de redondance.
+
+**Questions restantes, à trancher/vérifier en Task 2 :**
+
+1. **Signature exacte de `apply_publication_decision()` — à valider, pas à considérer figée.** La
+   section 2.2 propose une signature et un découpage en étapes (dont l'étape 0 `_detect_lifecycle_changes`,
+   C2) à partir de la lecture du code existant ; c'est une proposition de conception, pas un contrat gelé —
+   Task 1 peut légitimement l'ajuster si l'implémentation réelle révèle un couplage non anticipé ici
+   (ex. accès à `request.app` non trivial à passer en paramètre pur).
+2. **Un secondaire dépend-il structurellement du device HA créé par son principal ?** (section 4.4,
+   nuance restante de l'ancienne question n°4) Si oui, un secondaire "accepté" pourrait quand même
+   perdre sa visibilité HA quand son principal est dépublié, même sans dépublication MQTT explicite de
+   ce secondaire — à vérifier par lecture du contrat de discovery multi-entités si un doute terrain
+   apparaît en Task 2/5 (aucun signe de ce couplage trouvé dans le code lu cette note, mais non exclu
+   par une lecture exhaustive du schéma discovery HA).
