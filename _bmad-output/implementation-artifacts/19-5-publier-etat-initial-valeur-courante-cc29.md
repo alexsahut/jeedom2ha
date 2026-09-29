@@ -102,7 +102,13 @@ aucun appel à `execCmd`
 **And** la portée est développée en équipements **avant** la lecture : l'UI
 envoie des ids d'équipements (`equipement`), `[pieceId]` (`piece`) ou `['all']`
 (`global`) (`desktop/js/jeedom2ha.js:544`, `:589`, `:637`), avec un test par portée
-(Codex P1, revue du 29/09).
+(Codex P1, revue du 29/09). Résiduel déclaré (Codex P2, revue du 30/09) :
+l'expansion `piece` suit l'état Jeedom courant, alors que le démon développe la
+même pièce depuis la topologie du dernier sync (`_resolve_eq_ids_for_portee`,
+`http_server.py:386-397`). Un équipement changé de pièce depuis le dernier sync
+n'a donc pas de valeur au clic : il ne reçoit **aucun** état (AC2, pas d'erreur,
+un journal DEBUG `initial_state_no_click_value`), jusqu'au sync suivant qui
+réaligne les deux côtés. Un test démon fige ce cas.
 
 **AC7 — Sans `current_values` : comportement 19-4 inchangé**
 
@@ -161,10 +167,19 @@ Jeedom ne relaie ses changements, car `jeedom2ha::syncStateListeners()`
 **Then** le relais appelle `jeedom2ha::syncStateListeners()`, dans un
 `try/catch` qui journalise un WARNING comme après un sync, sans changer la
 réponse renvoyée à l'UI ; les changements suivants du candidat sont relayés
-**And** un test PHP (appel injecté, sans cœur Jeedom) vérifie l'appel pour
-`publier`, son absence pour `supprimer` et quand le démon ne répond pas (Codex
-P1, revue du 30/09). Si le relais abandonne sur délai (CC-32), les écouteurs ne
-sont pas réalignés avant le sync suivant : déclaré.
+**And** `syncStateListeners()` récupère et valide les cibles
+(`GET /system/state_listeners`) **avant** de supprimer les listeners existants.
+Aujourd'hui il les supprime d'abord (`core/class/jeedom2ha.class.php:408-417`) :
+un GET en échec couperait toute remontée d'état du plugin jusqu'au réalignement
+suivant. En cas d'échec (exception, réponse invalide), les listeners existants
+sont **conservés** et un WARNING est journalisé. Une liste valide mais vide
+supprime tout, comme aujourd'hui. Le sync et le démarrage en bénéficient aussi
+(Codex P1, revue du 30/09)
+**And** des tests PHP sans cœur Jeedom vérifient l'appel pour `publier`, son
+absence pour `supprimer` et quand le démon ne répond pas, ainsi que l'ordre
+« récupérer, valider, puis purger » et la conservation sur échec (Codex P1,
+revue du 30/09). Si le relais abandonne sur délai (CC-32), les écouteurs ne sont
+pas réalignés avant le sync suivant : déclaré.
 
 ## UI Impact
 
@@ -192,11 +207,12 @@ sont pas réalignés avant le sync suivant : déclaré.
   démon se comporte comme en 19-4 (AC7). Aucune migration, aucun override touché.
   Les états retenus publiés restent sur le broker ; ils sont remplacés au
   changement suivant.
-- **Écouteurs** (AC11) : chaque « Publier » supprime puis recrée les listeners
-  d'état du plugin, comme chaque sync aujourd'hui. Un évènement survenu pendant
-  ces quelques millisecondes est perdu jusqu'au changement suivant (même risque
-  que le sync, déclaré). Aucun listener d'un autre plugin n'est touché
-  (`listener::byClass('jeedom2ha')`).
+- **Écouteurs** (AC11) : chaque « Publier » recrée les listeners d'état du
+  plugin, comme chaque sync aujourd'hui, mais seulement après avoir obtenu les
+  nouvelles cibles ; sur échec, l'ensemble précédent est gardé. Un évènement
+  survenu pendant les quelques millisecondes de la recréation est perdu jusqu'au
+  changement suivant (même risque que le sync, déclaré). Aucun listener d'un
+  autre plugin n'est touché (`listener::byClass('jeedom2ha')`).
 
 ## Preuve terrain
 
@@ -262,6 +278,12 @@ garde sa propre décision et son propre état initial (Story 19.2).
   - [ ] Après la réponse du démon, pour `publier` seulement : appeler
     `jeedom2ha::syncStateListeners()` dans un `try/catch` (WARNING), comme
     `scanTopology` (ajax l.437-442). Appel injectable pour le test (AC11).
+  - [ ] `syncStateListeners()` : déplacer la logique dans une fonction pure,
+    sans dépendance au cœur Jeedom (chargeable en CI, fonctions injectées pour
+    récupérer les cibles, lister, supprimer et créer les listeners), dans
+    l'ordre récupérer → valider → purger → créer ; sur échec, rien n'est
+    supprimé (AC11). `syncStateListeners()` l'appelle avec les fonctions liées à
+    `listener`.
   - [ ] Test PHP en CI (objets factices), un cas par portée (`equipement`,
     `piece`, `global`), plus AC11 ; découvert par le motif existant
     (`find tests -name '*.php'`).
@@ -295,8 +317,10 @@ garde sa propre décision et son propre état initial (Story 19.2).
     AC1 (principal, secondaire, secondaire sous principal refusé), AC2 (valeur
     du sync présente mais non fournie ⇒ rien), AC3 (parité), AC4, AC5, AC7
     (absent et `[]`), AC8 (évènement publié, évènement rejeté), AC9, AC10
-    (publication d'état en échec ⇒ `succes_partiel`/`echec`, WARNING).
-  - [ ] Test PHP de la fonction de lecture, de l'expansion des 3 portées (AC6) et du réalignement des écouteurs (AC11).
+    (publication d'état en échec ⇒ `succes_partiel`/`echec`, WARNING), et le
+    résiduel d'AC6 (équipement résolu par le démon sans valeur au clic ⇒ aucun
+    état, aucune erreur).
+  - [ ] Test PHP de la fonction de lecture, de l'expansion des 3 portées (AC6) et du réalignement des écouteurs (AC11 : appel, ordre récupérer → valider → purger, conservation sur échec).
   - [ ] Suite complète `python3 -m pytest -q` et `node --test tests/unit/*.node.test.js` :
     0 régression ; garde-fou 19-4 inchangé (écarts déclarés s'il y en a).
 
@@ -388,7 +412,10 @@ garde sa propre décision et son propre état initial (Story 19.2).
   (déjà traité par `fresh_values`, AC2/AC7). 30/09 (`415d609`) : P2 échec de
   l'état initial non propagé ⇒ AC10. 30/09 (`4feceb2`) : P1 écouteurs non
   réalignés après une première publication ⇒ AC11, et garantie d'AC8 restreinte
-  aux commandes déjà écoutées.
+  aux commandes déjà écoutées. 30/09 (`a3c1e4b`) : P1 purge des listeners avant
+  la récupération des cibles ⇒ ordre inversé et conservation sur échec (AC11) ;
+  P2 expansion `piece` depuis l'état courant contre la topologie du démon ⇒
+  résiduel déclaré et testé (AC6).
 
 ### File List
 
@@ -398,3 +425,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — relecture ClaudeBox (AC2 renforcé, AC8 et AC9 ajoutés, preuve terrain discriminante).
 - 2026-09-30 — revue Codex intégrée (AC6 : expansion de la portée testée ; AC10 : échec d'état compté).
 - 2026-09-30 — revue Codex (`4feceb2`) intégrée (AC11 : écouteurs réalignés après « Publier »).
+- 2026-09-30 — revue Codex (`a3c1e4b`) intégrée (AC11 : cibles récupérées avant la purge ; AC6 : résiduel pièce déclaré).
