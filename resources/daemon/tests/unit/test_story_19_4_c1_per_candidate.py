@@ -6,8 +6,11 @@ chacun sous son propre topic `homeassistant/switch/jeedom2ha_628_<cmd>/config`.
 sur le faux pont du garde-fou (`MqttRecordingBridge`), qui enregistre la discovery et
 la disponibilité locale.
 
-- T1, T2, T4 : `xfail(strict=True)` tant que C1 n'est pas corrigé (unité 3b-2).
-- T3 : garde contre la régression, vert aujourd'hui (tout refusé ⇒ tout part).
+- T1, T2, T4 : C1 corrigé (unité 3b-2) ; ils étaient en `xfail(strict=True)` avant.
+- T3 : garde contre la régression (tout refusé ⇒ tout part).
+- T5 : un secondaire qui partage le topic du principal n'est jamais dépublié seul.
+- T6 : forme 579/585 (principal jamais publié) dont tous les candidats deviennent refusés.
+- T7 : un report de dépublication par candidat n'écrase pas un report existant.
 """
 
 from __future__ import annotations
@@ -31,7 +34,6 @@ def _load_sibling(filename: str):
 
 G = _load_sibling("test_story_19_4_guard_publisher_calls.py")
 
-XFAIL_C1 = "C1 : dépublication par candidat, corrigée à l'unité 3b-2"
 SECONDARY_CMDS = (5980, 5983, 6004)
 PRINCIPAL_TOPIC = "homeassistant/switch/jeedom2ha_628_5977/config"
 AVAIL_TOPIC = "jeedom2ha/628/availability"
@@ -83,7 +85,6 @@ async def test_sanity_sync1_publie_les_4_topics(aiohttp_client):
     assert _avail_payloads(bridge) == ["online"]
 
 
-@pytest.mark.xfail(strict=True, reason=XFAIL_C1)
 async def test_t1_principal_refuse_les_secondaires_acceptes_restent(aiohttp_client):
     """C1 (i) : le principal passe de publié à refusé, les secondaires restent acceptés."""
     cli, bridge = await _new_client(aiohttp_client)
@@ -95,7 +96,6 @@ async def test_t1_principal_refuse_les_secondaires_acceptes_restent(aiohttp_clie
     assert "" not in _avail_payloads(bridge), "la disponibilité ne doit pas être effacée"
 
 
-@pytest.mark.xfail(strict=True, reason=XFAIL_C1)
 async def test_t2_secondaire_refuse_seul_lui_part(aiohttp_client):
     """C1 (ii) : le principal reste accepté, le secondaire 5980 passe d'accepté à refusé."""
     cli, bridge = await _new_client(aiohttp_client)
@@ -118,7 +118,6 @@ async def test_t3_tout_refuse_tout_part(aiohttp_client):
     assert _avail_payloads(bridge)[-1:] == [""]
 
 
-@pytest.mark.xfail(strict=True, reason=XFAIL_C1)
 async def test_t4_pont_coupe_puis_rejeu_seul_le_principal_part(aiohttp_client):
     """C1 (i) avec pont déconnecté au sync 2 : le rejeu au sync 3 ne doit effacer que
     le principal ; aucun secondaire accepté n'est effacé, même temporairement."""
@@ -133,3 +132,49 @@ async def test_t4_pont_coupe_puis_rejeu_seul_le_principal_part(aiohttp_client):
 
     assert _deleted(bridge) == [PRINCIPAL_TOPIC]
     assert "" not in _avail_payloads(bridge)
+
+
+def test_t5_secondaire_partageant_le_topic_du_principal_jamais_depublie_seul():
+    """Multi-domaine, principal sans node_id : un secondaire du même type sans node_id
+    a la même entrée que le principal (topic de niveau équipement). S'il devient refusé
+    alors que le principal reste accepté, cette entrée ne doit pas être dépubliée."""
+    from transport.http_server import _refused_candidate_entries
+
+    def _shaped(refused):
+        story_19_2 = G._load_sibling_module("test_story_19_2_decouplage_state_command_i11.py")
+        primary, decision = story_19_2._build_multi_switch(
+            principal_should_publish=True, refused_cmd_ids=frozenset(refused)
+        )
+        primary.reason_details.pop("node_id", None)
+        by_cmd = {s.reason_details["cmd_id"]: s for s in primary.additional_mappings}
+        by_cmd[6004].ha_entity_type = "sensor"
+        by_cmd[5983].reason_details.pop("node_id", None)
+        return decision
+
+    previous, current = _shaped(()), _shaped((5983,))
+    assert ("switch", "jeedom2ha_628") not in _refused_candidate_entries(previous, current)
+    assert _refused_candidate_entries(previous, current) == []
+
+
+async def test_t6_forme_579_tous_refuses_tout_part(aiohttp_client):
+    """Principal jamais publié, secondaires publiés, puis tout refusé : les topics des
+    secondaires sont effacés, et la disponibilité aussi."""
+    cli, bridge = await _new_client(aiohttp_client)
+    await _sync(cli, principal=False, request_id="t6-1")
+    _reset(bridge)
+    await _sync(cli, principal=False, refused=SECONDARY_CMDS, request_id="t6-2")
+
+    assert {_topic(c) for c in SECONDARY_CMDS} <= set(_deleted(bridge))
+    assert _avail_payloads(bridge)[-1:] == [""]
+
+
+def test_t7_report_par_candidat_sans_ecrasement():
+    """Un report existant (topic de niveau équipement) est conservé et complété."""
+    from transport.http_server import _merge_deferred_candidate_unpublish, _pending_unpublish_parts
+
+    pending = {628: {"entity_type": "switch", "node_ids": []}}
+    _merge_deferred_candidate_unpublish(pending, 628, "switch", [("switch", "jeedom2ha_628_5980")])
+
+    entity_type, node_ids = _pending_unpublish_parts(pending[628])
+    assert entity_type == "switch"
+    assert node_ids == [("switch", "jeedom2ha_628"), ("switch", "jeedom2ha_628_5980")]

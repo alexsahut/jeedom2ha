@@ -450,8 +450,9 @@ def _sync_body_with_policy(corpus: dict[str, Any], *, request_id: str, policy: s
 async def test_s5_transition_politique_sure_probable_vers_sure_only(cli, app, aiohttp_client):
     """S5 — 1er sync en `sure_probable`, puis 2e sync en `sure_only` : les
     candidats `probable` (eq 583/457) perdent leur droit de publication.
-    Défaut figé (corrigé à l'unité 3) : leurs secondaires `sure` sont
-    republiés PUIS dépubliés dans le même sync (19 unpublish au total)."""
+    Depuis l'unité 3b-2 (C1) : seuls les candidats devenus refusés sont
+    dépubliés ; 583 garde ses 5 secondaires `sure` et 457 ses 2 capteurs, et
+    leur disponibilité n'est plus effacée (18 unpublish, un par équipement)."""
     corpus = _load_golden_corpus()
     _connected_bridge_into(app)
 
@@ -464,7 +465,7 @@ async def test_s5_transition_politique_sure_probable_vers_sure_only(cli, app, ai
 
     unpublishes = [c for c in recorder.calls if c["op"] == "unpublish"]
     assert len(unpublishes) == 18, (
-        f"attendu 18 unpublish (défaut figé, corrigé à l'unité 3), obtenu {len(unpublishes)} : {unpublishes}"
+        f"attendu 18 unpublish (un par équipement), obtenu {len(unpublishes)} : {unpublishes}"
     )
     _assert_trace_matches_reference("s5_policy_transition_sure_only", recorder.calls)
 
@@ -497,11 +498,11 @@ async def _sync_i11_sure_one_refused(c, a, request_id: str) -> None:
         await _post_sync(c, _sync_body(_i11_corpus(), request_id=request_id))
 
 
-async def test_s6_secondaire_refuse_non_depublie(cli, app, aiohttp_client):
+async def test_s6_secondaire_refuse_seul_depublie(cli, app, aiohttp_client):
     """S6 — candidat I11 (eq628), 2 syncs : sync1 principal + tous les
     secondaires acceptés (`sure`), sync2 principal toujours accepté mais un
-    secondaire (cmd 5980) refusé. Défaut figé (corrigé à l'unité 3) : le
-    secondaire refusé n'est PAS dépublié."""
+    secondaire (cmd 5980) refusé. Depuis l'unité 3b-2 (C1) : seul ce
+    secondaire est dépublié ; le principal et les autres restent."""
     _connected_bridge_into(app)
 
     recorder1 = RecordingPublisher()
@@ -521,9 +522,9 @@ async def test_s6_secondaire_refuse_non_depublie(cli, app, aiohttp_client):
         await _post_sync(cli, _sync_body(_i11_corpus(), request_id="s6-sync-2"))
 
     unpublishes_2 = [c for c in recorder2.calls if c["op"] == "unpublish"]
-    assert unpublishes_2 == [], (
-        f"défaut figé : le secondaire refusé n'est pas dépublié aujourd'hui, obtenu {unpublishes_2}"
-    )
+    assert unpublishes_2 == [
+        {"op": "unpublish", "entity_type": "switch", "eq_id": 628, "node_ids": [["switch", "jeedom2ha_628_5980"]]}
+    ], f"C1 (ii) : seul le secondaire refusé 5980 doit être dépublié, obtenu {unpublishes_2}"
     _assert_trace_matches_reference("s6_secondaire_refuse_sync1", recorder1.calls)
     _assert_trace_matches_reference("s6_secondaire_refuse_sync2", recorder2.calls)
 

@@ -871,6 +871,105 @@ def _collect_unpublish_node_ids(mapping_result) -> list:
     return node_ids
 
 
+def _candidate_key(mapping_result, candidate) -> tuple:
+    """Stable identity of one candidate across two syncs (Story 19.4, C1).
+
+    The primary is ``("principal",)``; a secondary is identified by its Jeedom
+    ``cmd_id`` (and its node_id as a tie-breaker), never by object identity: each
+    sync rebuilds fresh mapping objects.
+    """
+    if candidate is mapping_result:
+        return ("principal",)
+    rd = getattr(candidate, "reason_details", None) or {}
+    return ("secondary", rd.get("cmd_id"), _node_id_of(candidate))
+
+
+def _published_candidates(mapping_result, principal_decision) -> dict:
+    """Candidates whose step-4 verdict allows publication, keyed by `_candidate_key`."""
+    candidates: dict = {}
+    if mapping_result is None:
+        return candidates
+    if principal_decision is not None and getattr(principal_decision, "should_publish", False):
+        candidates[_candidate_key(mapping_result, mapping_result)] = mapping_result
+    for secondary in getattr(mapping_result, "additional_mappings", None) or []:
+        ref = getattr(secondary, "publication_decision_ref", None)
+        if ref is not None and getattr(ref, "should_publish", False):
+            candidates[_candidate_key(mapping_result, secondary)] = secondary
+    return candidates
+
+
+def _candidate_topic_entries(mapping_result, candidate) -> list:
+    """Explicit ``(entity_type, node_id)`` entries for ONE candidate's discovery topic.
+
+    A mono-entity primary (empty contribution) maps to its eq-level topic, i.e. the
+    pseudo node_id ``jeedom2ha_<eq_id>`` (same topic as ``_build_topic`` without
+    node_id). A secondary with an empty contribution has no topic of its own and
+    yields nothing: it must never be turned into the eq-level (primary's) topic.
+    """
+    contribution = _collect_candidate_node_ids(mapping_result, candidate)
+    eq_id = getattr(mapping_result, "jeedom_eq_id", None)
+    entity_type = _entity_type_of(candidate)
+    if not contribution:
+        if candidate is mapping_result:
+            return [(entity_type, f"jeedom2ha_{eq_id}")]
+        return []
+    entries = []
+    for entry in contribution:
+        if isinstance(entry, (tuple, list)) and len(entry) == 2:
+            entries.append((str(entry[0]), str(entry[1])))
+        else:
+            entries.append((entity_type, str(entry)))
+    return entries
+
+
+def _refused_candidate_entries(previous_decision, current_decision) -> list:
+    """Topic entries of candidates published at the previous sync and refused now.
+
+    Entries still used by a currently accepted candidate are never returned (a
+    secondary can share the primary's eq-level topic in the multi-domain case).
+    """
+    previous_mapping = getattr(previous_decision, "mapping_result", None)
+    current_mapping = getattr(current_decision, "mapping_result", None)
+    previously = _published_candidates(previous_mapping, previous_decision)
+    currently = _published_candidates(current_mapping, current_decision)
+    protected = set()
+    for candidate in currently.values():
+        protected.update(_candidate_topic_entries(current_mapping, candidate))
+    entries: list = []
+    for key, candidate in previously.items():
+        if key in currently:
+            continue
+        for entry in _candidate_topic_entries(previous_mapping, candidate):
+            if entry not in protected and entry not in entries:
+                entries.append(entry)
+    return entries
+
+
+def _merge_deferred_candidate_unpublish(
+    pending_unpublish: Dict[int, object], eq_id: int, entity_type: str, entries: list,
+) -> None:
+    """Defer a per-candidate unpublish without overwriting a pending entry.
+
+    Existing entries are kept and made explicit (``(type, node_id)``; an eq-level
+    entry becomes the pseudo node_id), then the new entries are added.
+    """
+    merged: list = []
+    existing = pending_unpublish.get(int(eq_id))
+    if existing is not None:
+        existing_type, existing_ids = _pending_unpublish_parts(existing)
+        if not existing_ids:
+            merged.append((existing_type, f"jeedom2ha_{eq_id}"))
+        for entry in existing_ids:
+            if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                merged.append((str(entry[0]), str(entry[1])))
+            else:
+                merged.append((existing_type, str(entry)))
+    for entry in entries:
+        if entry not in merged:
+            merged.append(entry)
+    _defer_discovery_unpublish(pending_unpublish, eq_id, entity_type, node_ids=merged)
+
+
 def _defer_local_availability_cleanup(
     pending_cleanup: Dict[int, str],
     eq_id: int,
@@ -1719,49 +1818,74 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 )
                 _defer_local_availability_cleanup(pending_local_cleanup, eq_id, previous_local_topic)
             
-    # Story 4.3 — Task 2.7 : dépublication des équipements éligibles mais bloqués par la policy
-    # Cas : était publié avec "probable" sous "sure_probable", maintenant "sure_only" → unpublish
+    # Story 4.3 (Task 2.7) + Story 19.4 (C1) — dépublication des candidats devenus refusés.
+    # - Plus aucun candidat accepté : comportement historique (tout l'équipement, puis la
+    #   disponibilité locale).
+    # - Sinon : seuls les candidats refusés sont dépubliés (un appel par équipement) et la
+    #   disponibilité locale reste, car d'autres candidats l'utilisent encore.
     # Ces eq_ids sont dans nouveaux_eq_ids (toujours éligibles) donc NON couverts par eq_ids_supprimes
     for eq_id in nouveaux_eq_ids:
         previous_decision = request.app["publications"].get(eq_id)
         current_decision = publications.get(eq_id)
-        if (previous_decision is not None
-                and _needs_discovery_unpublish(previous_decision)
-                and current_decision is not None
-                and not current_decision.should_publish):
-            entity_type = previous_decision.mapping_result.ha_entity_type
-            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
+        if previous_decision is None or current_decision is None:
+            continue
+        previous_mapping = getattr(previous_decision, "mapping_result", None)
+        if not _published_candidates(previous_mapping, previous_decision):
+            continue
+        current_mapping = getattr(current_decision, "mapping_result", None)
+        if _published_candidates(current_mapping, current_decision):
+            entries = _refused_candidate_entries(previous_decision, current_decision)
+            if not entries:
+                continue
+            entity_type = previous_mapping.ha_entity_type
             _LOGGER.info(
-                "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
-                eq_id, previous_decision.reason, current_decision.reason,
+                "[SYNC] eq_id=%d: %d candidat(s) refusé(s) → dépublication ciblée",
+                eq_id, len(entries),
             )
             if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-                if unpublish_ok:
-                    pending_discovery_unpublish.pop(eq_id, None)
-                else:
-                    _LOGGER.warning(
-                        "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
-                        eq_id,
-                    )
-                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+                if not await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=entries):
+                    _LOGGER.warning("[SYNC] Cannot unpublish refused candidates of eq_id=%d — deferring", eq_id)
+                    _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
             else:
                 _LOGGER.warning(
-                    "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
+                    "[SYNC] Cannot unpublish refused candidates of eq_id=%d (bridge missing/disconnected) — deferring",
+                    eq_id,
+                )
+                _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
+            continue
+        entity_type = previous_decision.mapping_result.ha_entity_type
+        node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
+        _LOGGER.info(
+            "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
+            eq_id, previous_decision.reason, current_decision.reason,
+        )
+        if publisher and mqtt_bridge and mqtt_bridge.is_connected:
+            unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
+            if unpublish_ok:
+                pending_discovery_unpublish.pop(eq_id, None)
+            else:
+                _LOGGER.warning(
+                    "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
                     eq_id,
                 )
                 _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
-            # Nettoyer la disponibilité locale si elle était présente
-            if bool(getattr(previous_decision, "local_availability_supported", False)):
-                prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
-                if mqtt_bridge and mqtt_bridge.is_connected:
-                    clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, prev_local_topic)
-                    if clear_ok:
-                        pending_local_cleanup.pop(eq_id, None)
-                    else:
-                        _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+        else:
+            _LOGGER.warning(
+                "[SYNC] Cannot unpublish eq_id=%d for policy change (bridge missing/disconnected) — deferring",
+                eq_id,
+            )
+            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+        # Nettoyer la disponibilité locale si elle était présente
+        if bool(getattr(previous_decision, "local_availability_supported", False)):
+            prev_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+            if mqtt_bridge and mqtt_bridge.is_connected:
+                clear_ok = _clear_local_availability_topic(mqtt_bridge, eq_id, prev_local_topic)
+                if clear_ok:
+                    pending_local_cleanup.pop(eq_id, None)
                 else:
                     _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
+            else:
+                _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
 
     # Purge des équipements qui ne sont plus remontés ou plus éligibles
     eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids
