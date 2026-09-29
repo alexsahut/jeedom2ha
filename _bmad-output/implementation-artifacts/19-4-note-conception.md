@@ -66,3 +66,67 @@ arbre `raw_scope` fourni par le front-end), **sans lien algorithmique** avec
 les overrides `publication_excluded_*` consommés par `decide_publication()`.
 Ce sont deux mécanismes d'exclusion différents. Voir section 5 pour l'impact
 chiffré (102 exceptions de scope réelles mesurées sur la box, artefact 19-1).
+
+## 2. Conception cible
+
+### 2.1 Principe
+
+« Publier » devient un mini-sync sur son périmètre (`_resolve_eq_ids_for_portee`,
+déjà en place, l.391-422), qui traite chaque `eq_id` par **la même fonction de
+post-traitement que le sync** — aucune implémentation parallèle de la décision,
+du publish ou de la dépublication.
+
+### 2.2 Fonction extraite : `apply_publication_decision()`
+
+Nouvelle fonction (nom proposé, à ajuster en dev-story), extraite du corps
+actuel du sync, appelée **une fois par `eq_id`** par le sync ET par « Publier » :
+
+```python
+async def apply_publication_decision(
+    *,
+    eq_id: int,
+    mapping: MappingResult,                       # evaluation.mapping (frais)
+    decision: PublicationDecision,                 # evaluation.equipment_decision (frais)
+    secondary_decisions: List[PublicationDecision],# evaluation.secondary_decisions (frais)
+    snapshot: TopologySnapshot,
+    previous_decision: Optional[PublicationDecision],  # publications.get(eq_id) AVANT cet appel
+    publications: Dict[int, PublicationDecision],  # muté : publications[eq_id] = ...
+    publisher_registry: Optional[PublisherRegistry],
+    mqtt_bridge: Optional[MqttBridge],
+    publisher: Optional[DiscoveryPublisher],
+    pending_discovery_unpublish: Dict[int, object],
+    pending_local_cleanup: Dict[int, str],
+    mapping_counters: Optional[dict] = None,       # optionnel : "Publier" peut l'omettre
+) -> PublicationOutcome                            # nouveau petit dataclass (published/unpublished/skipped/failed + compteur)
+```
+
+Corps (assemblé à partir de code déjà existant, sans nouvelle logique de
+décision) :
+
+1. **Bookkeeping** — identique à `_prepare_publication_bookkeeping` (l.375-388) : `decision.state_topic = _resolve_state_topic(mapping)`, `decision.active_or_alive = False`, `_apply_availability_metadata(...)`, puis `publications[eq_id] = decision`.
+2. **Si `decision.should_publish`** — tente le publish MQTT du principal (`publisher_registry.publish(mapping, snapshot)`) puis des secondaires, **gatés par `secondary_decisions` frais** (plus par `_secondary_publishable`/`publication_decision_ref` figé) : reprend le corps utile du bloc sync l.1573-1619 (gestion `discovery_published`/`active_or_alive`/`publication_result`/compteurs/local availability) — ce bloc remplace à la fois le bloc sync existant ET `_publish_mapping_for_action` (Publier). Le couplage principal/secondaires (l.623-625, `_publish_mapping_for_action`) est supprimé : un échec du principal n'empêche plus de tenter chaque secondaire.
+3. **Sinon, ou si transition publié → refusé** — si `previous_decision` était publié (`_needs_discovery_unpublish(previous_decision)`) : dépublication explicite, réutilisant tel quel le corps du bloc sync l.1648-1690 (`_collect_unpublish_node_ids` + `publisher.unpublish_by_eq_id` + `_defer_discovery_unpublish` si échec + nettoyage local availability). C'est le MÊME code que le bloc `else` déjà présent côté « Publier » (l.3666-3736) pour l'exclusion de scope — les deux se fusionnent en un seul appel (voir section 4).
+4. **Mise à jour des refs secondaires** — pour chaque secondaire, repointer `secondary.publication_decision_ref` vers sa `secondary_decision` fraîche (ou la fusionner avec l'état d'exécution via `_reset_secondary_runtime_state`, arbitrage détaillé section 3.3) : garantit que `sync/state.py`/`sync/command.py` (lecteurs I11) restent corrects sans aucune modification de ces fichiers (pattern déjà vérifié : lecture directe pour le principal, `publication_decision_ref` pour chaque secondaire).
+
+### 2.3 Ce qui est déplacé/fusionné
+
+| Élément actuel | Devenir |
+|---|---|
+| `_prepare_publication_bookkeeping` (l.375-388) | Absorbée telle quelle, étape 1 du nouveau helper |
+| Bloc publish MQTT du sync (l.1570-1607) | Généralisé, étape 2 |
+| `_publish_additional_sensors` (sync, secondaires) | Fusionnée avec `_publish_mapping_for_action` (Publier) en une seule logique de publication secondaires, gatée par `secondary_decisions` frais |
+| `_publish_mapping_for_action` (l.612-659) | Supprimée en tant que fonction séparée ; son corps utile (dispatch `publisher_registry.publish`) migre dans le nouveau helper |
+| `_secondary_publishable` (l.500-514) | Supprimée — plus aucun lecteur (remplacée par lecture directe de `secondary_decisions`) |
+| Bloc « policy change → dépublication » (l.1648-1690) | Absorbé étape 3, appelé **inline** par eq_id (plus de seconde boucle sur `nouveaux_eq_ids` après la boucle principale : `previous_decision` est déjà disponible au même point que `decision`, cf. l.1545 déjà lu avant bookkeeping — la boucle séparée existante est redondante avec ce qui est disponible inline, elle date d'un ajout ultérieur, Story 4.3/Task 2.7) |
+| Bloc `else` scope-exclu de « Publier » (l.3666-3736) | Fusionné avec l'étape 3 (même mécanisme de dépublication) — le déclenchement (scope exclu vs décision refusée) devient une seule condition (section 4/5) |
+
+### 2.4 Ce qui NE bouge PAS
+
+- **Bloc « purge des disparus »** (`eq_ids_supprimes`, l.1692-1733+) reste propre au sync : concept différent (eq_id plus du tout dans `nouveaux_eq_ids`, càd absent de la nouvelle topologie ou devenu inéligible) — « Publier » n'a pas cette notion, son périmètre vient de la topologie déjà connue (`app["topology"]`), pas d'un nouveau payload Jeedom.
+- **`_detect_lifecycle_changes`** (retypage/renommage) reste appelé uniquement par le sync — aucun AC de cette story ne demande son branchement sur « Publier » (question ouverte, section 9, si un retypage entre deux syncs doit aussi être traité par un clic « Publier »).
+- **Branche « supprimer »** de `_handle_action_execute` (l.3409-3544) : inchangée, déjà conforme au principe 19-2 (n'écrit jamais le verdict canonique `evaluate_equipment()`, seulement un motif d'action `reason="excluded"`).
+
+### 2.5 Boucle appelante côté sync et côté « Publier »
+
+- **Sync** : pour chaque `eq_id` éligible (l.1519+), après `evaluate_equipment(...)` (l.1531-1539) et `_detect_lifecycle_changes` (l.1549), appelle `apply_publication_decision(eq_id=..., mapping=evaluation.mapping, decision=evaluation.equipment_decision, secondary_decisions=evaluation.secondary_decisions, ..., previous_decision=request.app["publications"].get(eq_id), ...)`. Le bloc « policy change » (l.1648-1690) est supprimé (absorbé, cf. 2.3). Le bloc « purge des disparus » reste séparé, après la boucle principale.
+- **« Publier »** (mini-sync) : relit `overrides_cache = list_overrides(data_dir)` / `equipment_overrides_cache = list_equipment_overrides(data_dir)` **une fois par clic** (comme le sync le fait une fois par cycle, l.1515-1517 — jamais par équipement). Pour chaque `eq_id` de `_resolve_eq_ids_for_portee(...)` : `result = eligibility.get(eq_id)` (depuis `app["eligibility"]`, calculé au dernier sync — pas de nouvelle éligibilité), `eq = snapshot.eq_logics.get(eq_id)` (depuis `app["topology"]`), puis `evaluate_equipment(eq, snapshot, result, mapper_registry=mapper_registry, confidence_policy=app["confidence_policy"], persisted_overrides=overrides_cache, persisted_equipment_overrides=equipment_overrides_cache)`, puis `apply_publication_decision(...)` avec `previous_decision = publications.get(eq_id)` (déjà lu, l.3564). `_should_attempt_publish` et `_scope_entry_is_included`-comme-gate-de-publication disparaissent de ce chemin (le filtre de scope pur reste appliqué séparément, section 5, mais pour le flag d'affichage, pas pour décider de publier — sauf arbitrage contraire, section 5/9).
