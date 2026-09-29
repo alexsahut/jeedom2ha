@@ -188,6 +188,7 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
   - **S5** (unité 3b) : passage `sure_probable` ⇒ `sure_only` : toujours 18 appels `unpublish` (un par équipement), mais 583 et 457 gardent leurs secondaires `sure` ; effacements MQTT 30 ⇒ 23, disponibilité 48 ⇒ 46.
   - **S6** (unité 3b) : le secondaire refusé `jeedom2ha_628_5980` est dépublié seul ; disponibilité inchangée.
 - **Unité 7** (revue Codex de la PR #180, correctifs préparés par ClaudeBox) — P1 : le domaine HA entre dans l'identité d'un secondaire (`_candidate_key`), un secondaire retypé sous le même `cmd_id` ne laisse plus de topic fantôme (test T8) ; P2 : « Publier » compte en erreur un équipement dont un secondaire accepté n'a pas pu être publié, principal accepté ou refusé (tests P9, P10) ; corrections de ce document et du corps de la PR.
+- **Correctif post-fusion 19-4b** (revue Codex de `7fabeb0`, publiée après la fusion `3bd0d68`, préparé par ClaudeBox) — CC-30 : la purge des équipements sortis du sync, « Supprimer », « Publier » hors périmètre et le premier sync après redémarrage tiennent compte des secondaires publiés (forme 579/585, principal refusé), qui restaient sinon retenus dans HA ; défaut antérieur à 19-4 pour les sorties par éligibilité. CC-31 : une dépublication reportée compte en erreur dans « Publier », jamais en succès. Tests U1 à U5 et V1 à V3 (`test_story_19_4b_purge_et_reports.py`) ; 1969 tests Python, 305 node.
 - **Tests** : 1961 tests Python (`python3 -m pytest -q`, testpaths `tests` + `resources/daemon/tests`) et 305 tests node (`node --test tests/unit/*.node.test.js`) — tous verts, 0 régression, rejoués au moment de cette review.
 - **Unité 6** (`371e525`, `07180fa`) — mesure A′ avant fusion, box en lecture seule stricte : **0** équipement exclu (scope) avec un topic discovery publié, principal ou secondaire — cf. section « Rejeu avant fusion » de `19-4-mesure-terrain-2026-09-29.md`.
 
@@ -195,7 +196,9 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 
 `git diff --stat origin/main...HEAD` après l'unité 7 (41 fichiers, 21381 insertions, 446 suppressions) :
 
-- `resources/daemon/transport/http_server.py` [MODIFIÉ — 907 lignes touchées]
+- `resources/daemon/transport/http_server.py` [MODIFIÉ — 907 lignes touchées, puis 19-4b]
+- `resources/daemon/cache/disk_cache.py` [MODIFIÉ en 19-4b — clé optionnelle `secondaries_published`]
+- `resources/daemon/tests/unit/test_story_19_4b_purge_et_reports.py` [NOUVEAU en 19-4b]
 - `resources/daemon/tests/unit/test_story_19_4_guard_publisher_calls.py` [NOUVEAU]
 - `resources/daemon/tests/unit/test_story_19_4_c1_per_candidate.py` [NOUVEAU]
 - `resources/daemon/tests/unit/test_story_19_4_publier_mini_sync.py` [NOUVEAU]
@@ -218,3 +221,4 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 - 2026-09-29 — unités 3b à 5 (C1, mini-sync « Publier », AC3/AC7) implémentées et testées, tête `118fe35`.
 - 2026-09-29 (soir) — unité 6 : rejeu mesure A′ (0, tous topics), documentation Tasks 1-4/6, Dev Agent Record, statut `review`.
 - 2026-09-29 (soir) — unité 7 : correctifs de la revue Codex (P1 domaine HA dans l'identité des secondaires, P2 échecs des secondaires propagés au résultat de « Publier »), sous-tâches cochées, écarts S3 à S6 corrigés.
+- 2026-09-29 (nuit) — PR #180 fusionnée (`3bd0d68`) et déployée ; 19-4b : correctifs CC-30 et CC-31 (revue Codex publiée après la fusion).

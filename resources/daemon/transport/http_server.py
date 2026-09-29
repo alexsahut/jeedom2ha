@@ -469,6 +469,20 @@ def _scope_excluded_decision(
     return decision
 
 
+def _secondary_discovery_published(decision: Optional[PublicationDecision]) -> bool:
+    """Story 19.4b (CC-30) — True si au moins un secondaire est encore publié.
+
+    Forme 579/585 : le principal est refusé mais ses secondaires sont publiés. L'état
+    d'exécution de chaque secondaire vit dans son propre `publication_decision_ref`.
+    """
+    mapping_result = getattr(decision, "mapping_result", None)
+    for secondary in getattr(mapping_result, "additional_mappings", None) or []:
+        ref = getattr(secondary, "publication_decision_ref", None)
+        if ref is not None and getattr(ref, "discovery_published", False):
+            return True
+    return False
+
+
 def _is_currently_published_in_ha(
     eq_id: int,
     decision: Optional[PublicationDecision],
@@ -481,6 +495,7 @@ def _is_currently_published_in_ha(
     return bool(
         getattr(decision, "active_or_alive", False)
         or getattr(decision, "discovery_published", False)
+        or _secondary_discovery_published(decision)
     )
 
 
@@ -728,6 +743,16 @@ def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
         return False
     # Backward compatibility with pre-flag runtime decisions.
     return bool(getattr(decision, "should_publish", False))
+
+
+def _needs_any_candidate_unpublish(decision: Optional[PublicationDecision]) -> bool:
+    """Story 19.4b (CC-30) — un candidat, principal OU secondaire, reste à dépublier.
+
+    `_needs_discovery_unpublish` ne regarde que le principal : pour la forme 579/585
+    (principal refusé, secondaires publiés), la purge d'un équipement sorti du sync
+    laissait les secondaires retenus dans Home Assistant.
+    """
+    return _needs_discovery_unpublish(decision) or _secondary_discovery_published(decision)
 
 
 def _node_id_of(m):
@@ -1493,7 +1518,7 @@ async def _unpublish_refused_candidates(
     mqtt_bridge,
     pending_discovery_unpublish: Dict[int, object],
     pending_local_cleanup: Dict[int, str],
-) -> bool:
+) -> Optional[str]:
     """Story 4.3 (Task 2.7) + Story 19.4 (C1) — dépublie les candidats devenus refusés.
 
     Partagée par le sync et par « Publier » (mini-sync). Compare les candidats publiés
@@ -1503,44 +1528,48 @@ async def _unpublish_refused_candidates(
     - sinon : seuls les candidats refusés sont dépubliés (un appel par équipement) et la
       disponibilité locale reste, car d'autres candidats l'utilisent encore.
 
-    Retourne True si une dépublication a été tentée (ou reportée), False sinon.
+    Retourne `None` s'il n'y avait rien à dépublier, `"unpublished"` si la dépublication
+    MQTT a réussi, `"deferred"` si elle est reportée (Story 19.4b, CC-31 : un report n'est
+    pas une résolution, « Publier » le compte en erreur).
     """
     if previous_decision is None or current_decision is None:
-        return False
+        return None
     previous_mapping = getattr(previous_decision, "mapping_result", None)
     if not _published_candidates(previous_mapping, previous_decision):
-        return False
+        return None
     current_mapping = getattr(current_decision, "mapping_result", None)
     if _published_candidates(current_mapping, current_decision):
         entries = _refused_candidate_entries(previous_decision, current_decision)
         if not entries:
-            return False
+            return None
         entity_type = previous_mapping.ha_entity_type
         _LOGGER.info(
             "[SYNC] eq_id=%d: %d candidat(s) refusé(s) → dépublication ciblée",
             eq_id, len(entries),
         )
         if publisher and mqtt_bridge and mqtt_bridge.is_connected:
-            if not await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=entries):
-                _LOGGER.warning("[SYNC] Cannot unpublish refused candidates of eq_id=%d — deferring", eq_id)
-                _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
+            if await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=entries):
+                return "unpublished"
+            _LOGGER.warning("[SYNC] Cannot unpublish refused candidates of eq_id=%d — deferring", eq_id)
         else:
             _LOGGER.warning(
                 "[SYNC] Cannot unpublish refused candidates of eq_id=%d (bridge missing/disconnected) — deferring",
                 eq_id,
             )
-            _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
-        return True
+        _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, entity_type, entries)
+        return "deferred"
     entity_type = previous_decision.mapping_result.ha_entity_type
     node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
     _LOGGER.info(
         "[SYNC] eq_id=%d: policy change → dépublication (was=%s now=%s)",
         eq_id, previous_decision.reason, current_decision.reason,
     )
+    outcome = "deferred"
     if publisher and mqtt_bridge and mqtt_bridge.is_connected:
         unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
         if unpublish_ok:
             pending_discovery_unpublish.pop(eq_id, None)
+            outcome = "unpublished"
         else:
             _LOGGER.warning(
                 "[SYNC] Cannot unpublish eq_id=%d for policy change — deferring",
@@ -1564,7 +1593,7 @@ async def _unpublish_refused_candidates(
                 _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
         else:
             _defer_local_availability_cleanup(pending_local_cleanup, eq_id, prev_local_topic)
-    return True
+    return outcome
 
 
 async def apply_publication_decision(
@@ -1734,7 +1763,10 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     is_first_sync = not request.app["mappings"]
     if is_first_sync:
         boot_cache = request.app.get("boot_cache", {})
-        anciens_eq_ids = {eq_id for eq_id, entry in boot_cache.items() if entry.get("published")}
+        anciens_eq_ids = {
+            eq_id for eq_id, entry in boot_cache.items()
+            if entry.get("published") or entry.get("secondaries_published")
+        }
         if anciens_eq_ids:
             _LOGGER.info(
                 "[CACHE] Premier sync post-boot : %d anciens eq_ids issus du cache disque",
@@ -1893,7 +1925,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         if old_decision is None and is_first_sync:
             boot_cache = request.app.get("boot_cache", {})
             boot_entry = boot_cache.get(old_eq_id)
-            if boot_entry and boot_entry.get("published"):
+            if boot_entry and (boot_entry.get("published") or boot_entry.get("secondaries_published")):
                 boot_entity_type = boot_entry.get("entity_type") or "light"
                 boot_node_ids = boot_entry.get("node_ids", []) or []
                 boot_cleanup_reason = "supprimé depuis downtime daemon" if elig_entry is None else cleanup_reason
@@ -1936,7 +1968,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 )
             continue  # old_decision is None — skip the standard unpublish path below
 
-        if _needs_discovery_unpublish(old_decision):
+        if _needs_any_candidate_unpublish(old_decision):
             entity_type = old_decision.mapping_result.ha_entity_type
             node_ids = _collect_unpublish_node_ids(old_decision.mapping_result)
             discovery_action = "discovery unpublish effectif"
@@ -3877,7 +3909,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 nouveaux_eq_ids=set(),
             )
             mappings[eq_id] = evaluation.mapping
-            if await _unpublish_refused_candidates(
+            unpublish_outcome = await _unpublish_refused_candidates(
                 eq_id,
                 previous_decision,
                 decision,
@@ -3885,8 +3917,11 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 mqtt_bridge=mqtt_bridge,
                 pending_discovery_unpublish=pending_discovery_unpublish,
                 pending_local_cleanup=pending_local_cleanup,
-            ):
+            )
+            if unpublish_outcome == "unpublished":
                 ecarts_resolus += 1
+            # Story 19.4b (CC-31) — une dépublication reportée laisse le topic retenu dans HA.
+            unpublish_deferred = unpublish_outcome == "deferred"
             await asyncio.sleep(_action_delay)
 
             # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
@@ -3897,11 +3932,16 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 for sec in evaluation.secondary_decisions or []
             )
             if decision.should_publish:
-                if config_published and decision.active_or_alive and not secondary_failed:
+                if (
+                    config_published
+                    and decision.active_or_alive
+                    and not secondary_failed
+                    and not unpublish_deferred
+                ):
                     equipements_publies_ou_crees += 1
                 else:
                     publish_errors += 1
-            elif secondary_failed:
+            elif secondary_failed or unpublish_deferred:
                 publish_errors += 1
             elif any(
                 getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False)
@@ -3929,6 +3969,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         await asyncio.sleep(_action_delay)
         if not unpublish_ok:
             _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+            publish_errors += 1  # Story 19.4b (CC-31) — reporté, pas résolu
             continue
 
         pending_discovery_unpublish.pop(eq_id, None)

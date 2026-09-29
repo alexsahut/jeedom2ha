@@ -9,7 +9,9 @@ The cache format is:
             "entity_type": "<type>",
             "published": <bool>,
             "ha_name": "<str>",
-            "suggested_area": "<str | null>"
+            "suggested_area": "<str | null>",
+            "node_ids": [...],
+            "secondaries_published": true   # optionnel (Story 19.4b), absent = false
         }
     }
 
@@ -118,6 +120,11 @@ def save_publications_cache(publications: dict, data_dir: str) -> None:
         if mapping_result is not None:
             entity_type = str(getattr(mapping_result, "ha_entity_type", "") or "")
         published = bool(getattr(decision, "discovery_published", False))
+        # Story 19.4b (CC-30) — forme 579/585 : principal non publié, secondaires publiés.
+        secondaries_published = any(
+            bool(getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False))
+            for s in (getattr(mapping_result, "additional_mappings", None) or [])
+        ) if mapping_result is not None else False
         ha_name = str(getattr(mapping_result, "ha_name", "") or "") if mapping_result is not None else ""
         suggested_area = getattr(mapping_result, "suggested_area", None) if mapping_result is not None else None
         cache[str(eq_id)] = {
@@ -129,6 +136,9 @@ def save_publications_cache(publications: dict, data_dir: str) -> None:
             # exhaustive au boot sans re-parser la topologie. Vide pour le cas mono-entité.
             "node_ids": _extract_node_ids(mapping_result),
         }
+        if secondaries_published:
+            # Clé optionnelle (absente = False) : le format historique reste inchangé.
+            cache[str(eq_id)]["secondaries_published"] = True
 
     if not os.path.isdir(data_dir):
         _LOGGER.warning("[CACHE] data_dir introuvable : %s — cache non sauvegardé", data_dir)
@@ -181,6 +191,9 @@ def load_publications_cache(data_dir: str) -> Dict[int, dict]:
                     "suggested_area": value.get("suggested_area", None),   # BC: absent in 5.1
                     "node_ids": node_ids,
                 }
+                if value.get("secondaries_published"):
+                    # Story 19.4b (CC-30) — clé optionnelle, absente avant 19.4b.
+                    result[eq_id]["secondaries_published"] = True
             except (ValueError, TypeError):
                 continue
 
