@@ -11,6 +11,8 @@ la disponibilité locale.
 - T5 : un secondaire qui partage le topic du principal n'est jamais dépublié seul.
 - T6 : forme 579/585 (principal jamais publié) dont tous les candidats deviennent refusés.
 - T7 : un report de dépublication par candidat n'écrase pas un report existant.
+- T8 : un secondaire retypé sous le même cmd_id (switch ⇒ sensor) ne laisse pas de
+  topic fantôme dans l'ancien domaine (revue Codex P1, PR #180).
 """
 
 from __future__ import annotations
@@ -178,3 +180,27 @@ def test_t7_report_par_candidat_sans_ecrasement():
     entity_type, node_ids = _pending_unpublish_parts(pending[628])
     assert entity_type == "switch"
     assert node_ids == [("switch", "jeedom2ha_628"), ("switch", "jeedom2ha_628_5980")]
+
+
+async def test_t8_secondaire_retype_meme_cmd_l_ancien_topic_part(aiohttp_client):
+    """Revue Codex P1 (PR #180) : le secondaire 5980 reste accepté mais change de
+    domaine HA (switch ⇒ sensor) sous les mêmes cmd_id et node_id. L'ancien topic
+    switch est dépublié, le topic sensor est publié, et rien d'autre ne part."""
+    cli, bridge = await _new_client(aiohttp_client)
+    await _sync(cli, principal=True, request_id="t8-1")
+    _reset(bridge)
+
+    def _retyped(*_args, **_kwargs):
+        evaluation = G._i11_evaluation_with(principal_should_publish=True)
+        for secondary in evaluation.mapping.additional_mappings:
+            if secondary.reason_details["cmd_id"] == 5980:
+                secondary.ha_entity_type = "sensor"
+        return evaluation
+
+    with patch("transport.http_server.evaluate_equipment", side_effect=_retyped):
+        await G._post_sync(cli, G._sync_body(G._i11_corpus(), request_id="t8-2"))
+
+    assert _deleted(bridge) == [_topic(5980)]
+    published = {c["topic"] for c in bridge.calls if c["payload"] != ""}
+    assert "homeassistant/sensor/jeedom2ha_628_5980/config" in published
+    assert "" not in _avail_payloads(bridge)

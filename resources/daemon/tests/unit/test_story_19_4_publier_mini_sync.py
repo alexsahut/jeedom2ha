@@ -15,6 +15,9 @@ partagé `apply_publication_decision()` et la dépublication par candidat.
   secondaires et leur disponibilité, jamais le principal.
 - P8 : une dépublication reportée (pont coupé au sync) est rejouée par le clic au lieu
   d'être oubliée, sans toucher aux secondaires acceptés.
+- P9, P10 (revue Codex P2, PR #180) : un secondaire accepté dont la publication échoue
+  au clic fait compter l'équipement en erreur, que le principal soit accepté (P9) ou
+  refusé (P10) ; le clic ne répond jamais « succès » ni « déjà à jour ».
 
 Étaient en `xfail(strict=True)` avant le branchement du mini-sync (unité 4).
 """
@@ -190,3 +193,56 @@ async def test_p8_report_en_attente_rejoue_par_publier(aiohttp_client, tmp_path)
 
     assert _deleted(bridge) == [_topic("switch", "jeedom2ha_628_5977")]
     assert 628 not in app["pending_discovery_unpublish"]
+
+
+class _FailingTopicsBridge(G.MqttRecordingBridge):
+    """Faux pont dont la publication échoue pour les topics listés dans `failing`."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.failing: set[str] = set()
+
+    def publish_message(self, topic, payload, qos=0, retain=False):
+        if topic in self.failing and payload:
+            return False
+        return super().publish_message(topic, payload, qos, retain)
+
+
+async def _publier_avec_echecs(aiohttp_client, tmp_path, evaluation_factory, failing) -> dict:
+    app = create_app(local_secret=G.SECRET)
+    app["data_dir"] = str(tmp_path)
+    bridge = _FailingTopicsBridge()
+    app["mqtt_bridge"] = bridge
+    cli = await aiohttp_client(app)
+    body = {"intention": "publier", "portee": "equipement", "selection": [628]}
+    with patch("transport.http_server.evaluate_equipment", side_effect=evaluation_factory):
+        await G._post_sync(cli, G._sync_body(G._i11_corpus(), request_id="i11-sync"))
+        bridge.failing = set(failing)
+        with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+            resp = await cli.post("/action/execute", json=body, headers={"X-Local-Secret": G.SECRET})
+    assert resp.status == 200, await resp.text()
+    return (await resp.json())["payload"]
+
+
+def _i11_principal_accepte_evaluation(*_args, **_kwargs):
+    return G._i11_evaluation_with(principal_should_publish=True)
+
+
+async def test_p9_principal_accepte_secondaire_en_echec_compte_en_erreur(aiohttp_client, tmp_path):
+    payload = await _publier_avec_echecs(
+        aiohttp_client, tmp_path, _i11_principal_accepte_evaluation,
+        failing={_topic("switch", "jeedom2ha_628_5980")},
+    )
+
+    assert payload["resultat"] == "echec"
+    assert payload["scope_reel"]["equipements_publies_ou_crees"] == 0
+
+
+async def test_p10_principal_refuse_secondaires_en_echec_compte_en_erreur(aiohttp_client, tmp_path):
+    payload = await _publier_avec_echecs(
+        aiohttp_client, tmp_path, _i11_principal_refuse_evaluation,
+        failing={_topic("switch", f"jeedom2ha_628_{c}") for c in (5980, 5983, 6004)},
+    )
+
+    assert payload["resultat"] == "echec"
+    assert payload["message"] != "Configuration déjà à jour dans Home Assistant."

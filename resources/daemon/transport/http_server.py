@@ -813,12 +813,15 @@ def _candidate_key(mapping_result, candidate) -> tuple:
 
     The primary is ``("principal",)``; a secondary is identified by its Jeedom
     ``cmd_id`` (and its node_id as a tie-breaker), never by object identity: each
-    sync rebuilds fresh mapping objects.
+    sync rebuilds fresh mapping objects. Its HA domain is part of the identity
+    (revue Codex P1, PR #180) : a secondary retyped under the same cmd_id/node_id
+    (switch ⇒ sensor) is a new candidate, so the old domain's topic is unpublished.
+    The primary's retyping is handled by `_detect_lifecycle_changes`.
     """
     if candidate is mapping_result:
         return ("principal",)
     rd = getattr(candidate, "reason_details", None) or {}
-    return ("secondary", rd.get("cmd_id"), _node_id_of(candidate))
+    return ("secondary", rd.get("cmd_id"), _node_id_of(candidate), _entity_type_of(candidate))
 
 
 def _published_candidates(mapping_result, principal_decision) -> dict:
@@ -3886,11 +3889,20 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 ecarts_resolus += 1
             await asyncio.sleep(_action_delay)
 
+            # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
+            # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
+            # cas de succès) fait compter l'équipement en erreur, comme l'ancien chemin.
+            secondary_failed = any(
+                sec.should_publish and not sec.active_or_alive
+                for sec in evaluation.secondary_decisions or []
+            )
             if decision.should_publish:
-                if config_published and decision.active_or_alive:
+                if config_published and decision.active_or_alive and not secondary_failed:
                     equipements_publies_ou_crees += 1
                 else:
                     publish_errors += 1
+            elif secondary_failed:
+                publish_errors += 1
             elif any(
                 getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False)
                 for s in evaluation.mapping.additional_mappings or []

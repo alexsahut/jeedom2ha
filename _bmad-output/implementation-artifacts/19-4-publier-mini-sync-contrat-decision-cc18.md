@@ -105,22 +105,22 @@ I2, I4, I6, I7 (mêmes garanties que le sync, puisque "Publier" consomme désorm
   - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant cette recherche de cas réels ni pendant la vérification post-correction — ces flags republient des messages MQTT retained **vides** sur les topics discovery, effaçant les entités déjà publiées et rendant impossible de distinguer une dépublication **causée par la correction** d'une dépublication causée par le script lui-même. Déploiement standard uniquement.
 
 - [x] Task 1 — Brancher les 4 fonctions du chemin "Publier" sur `evaluate_equipment()` (AC1, AC2, AC6)
-  - [ ] Réévaluer avec la topologie, `app["confidence_policy"]` et les overrides persistés courants, jamais `app["mappings"]` ; `_should_attempt_publish` (`http_server.py:475-490`) ne conserve ni tuple de confiance codé en dur ni `reason` de sync antérieur.
-  - [ ] `_secondary_publishable` (`http_server.py:493-502`) : remplacer la lecture de `publication_decision_ref.should_publish` (décision **figée** du dernier sync) par la décision **fraîchement recalculée** pour ce secondaire (AC6)
-  - [ ] `_publish_mapping_for_action` (`http_server.py:505+`) et `_handle_action_execute` (`http_server.py:3018`) : adapter l'orchestration pour consommer les décisions fraîches ci-dessus, sans dupliquer de logique de décision propre ; supprimer le couplage des secondaires au succès du principal (`http_server.py:516-518`).
-  - [ ] Vérifier que la résolution des overrides est identique à celle du sync (mêmes fonctions `list_overrides`/`list_equipment_overrides`, pas de logique parallèle)
+  - [x] Réévaluer avec la topologie, `app["confidence_policy"]` et les overrides persistés courants, jamais `app["mappings"]` ; `_should_attempt_publish` (`http_server.py:475-490`) ne conserve ni tuple de confiance codé en dur ni `reason` de sync antérieur. — Fait : `_evaluate_for_action()` (unité 4) ; `_should_attempt_publish` supprimée (unité 5). Tests P1, R1.
+  - [x] `_secondary_publishable` (`http_server.py:493-502`) : remplacer la lecture de `publication_decision_ref.should_publish` (décision **figée** du dernier sync) par la décision **fraîchement recalculée** pour ce secondaire (AC6) — Fait : « Publier » ne l'appelle plus ; chaque secondaire suit sa décision fraîche (`evaluation.secondary_decisions`, publiées par `_publish_additional_sensors` comme au sync). `_secondary_publishable` ne sert plus qu'à `_republish_all_from_cache` (republication depuis le cache, qui relit par nature la dernière décision). Tests P4, P7.
+  - [x] `_publish_mapping_for_action` (`http_server.py:505+`) et `_handle_action_execute` (`http_server.py:3018`) : adapter l'orchestration pour consommer les décisions fraîches ci-dessus, sans dupliquer de logique de décision propre ; supprimer le couplage des secondaires au succès du principal (`http_server.py:516-518`). — Fait : `_handle_action_execute` passe par `apply_publication_decision()`, partagé avec le sync ; `_publish_mapping_for_action` supprimée (unité 5).
+  - [x] Vérifier que la résolution des overrides est identique à celle du sync (mêmes fonctions `list_overrides`/`list_equipment_overrides`, pas de logique parallèle) — relus au clic par ces mêmes fonctions. Tests P2, P4, P5.
 
 - [x] Task 2 — Filtre de scope pur unique (AC3)
-  - [ ] Appliquer le filtre partagé après `evaluate_equipment()` au sync et à « Publier », sans logique locale concurrente.
-  - [ ] Documenter le changement sync dans l'impact/rollback et vérifier, par golden, l'égalité de l'ensemble global filtré ; effet nul si 19-1 mesure zéro état explicite.
+  - [x] Appliquer le filtre partagé après `evaluate_equipment()` au sync et à « Publier », sans logique locale concurrente. — Fait (unité 5) : `_scope_entry_is_included` puis `_scope_excluded_decision()` dans les deux chemins ; la surface applique le même filtre. `_apply_pending_scope_flags` reste inchangée : elle ne décide pas l'inclusion, elle calcule seulement les drapeaux « changements en attente » affichés. Tests Q1 à Q3, Q5.
+  - [x] Documenter le changement sync dans l'impact/rollback et vérifier, par golden, l'égalité de l'ensemble global filtré ; effet nul si 19-1 mesure zéro état explicite. — Golden Q4 (corpus de 59 équipements) ; mesure A′ = 0 avant fusion.
 
 - [x] Task 3 — Mini-sync complet avec dépublication explicite (AC4, AC5)
-  - [ ] Écrire la nouvelle décision dans `app["publications"]` pour l'ensemble du périmètre réévalué
-  - [ ] Dépublier explicitement (MQTT + `app["publications"]`) tout équipement passant de publié à refusé, symétriquement au nettoyage déjà fait au sync pour les équipements disparus
-  - [ ] Vérifier l'idempotence pour les équipements déjà publiés et toujours valides (AC5)
+  - [x] Écrire la nouvelle décision dans `app["publications"]` pour l'ensemble du périmètre réévalué — `apply_publication_decision()`. Tests P2, Q1.
+  - [x] Dépublier explicitement (MQTT + `app["publications"]`) tout équipement passant de publié à refusé, symétriquement au nettoyage déjà fait au sync pour les équipements disparus — `_unpublish_refused_candidates()`, par candidat, partagée avec le sync. Tests P2, P4, P5, P8 ; T1 à T8.
+  - [x] Vérifier l'idempotence pour les équipements déjà publiés et toujours valides (AC5) — Test P3.
 
 - [x] Task 4 — Test de parité croisée à 4 points d'appel (AC7)
-  - [x] Écrire un test comparant sync / "Publier" / surface pièce / aperçu sur au moins un cas `sure_mapping` et un cas d'exclusion par override, dans golden 59 et `test_cc08_publisher_registry_matrix.py`.
+  - [x] Écrire un test comparant sync / "Publier" / surface pièce / aperçu sur au moins un cas `sure_mapping` et un cas d'exclusion par override, dans golden 59 et `test_cc08_publisher_registry_matrix.py`. — R1 (`sure_mapping`) et R2 (exclusion par override) dans `test_story_19_4_scope_et_parite.py` ; golden 59 : Q4 ; la matrice CC-08 porte désormais sur `apply_publication_decision()`, partagé par le sync et « Publier ».
 
 - [ ] Task 5 — Preuve terrain (ii) et fallback documenté (i)/(iii)
   - [ ] Exclure un équipement sans risque dans l'UI, cliquer « Publier » sur une pièce, constater la non-publication puis le retour auto.
@@ -130,7 +130,7 @@ I2, I4, I6, I7 (mêmes garanties que le sync, puisque "Publier" consomme désorm
 - [x] Task 6 — Tests (AC1-AC7)
   - [x] `test_story_19_4_guard_publisher_calls.py`, `test_story_19_4_c1_per_candidate.py`, `test_story_19_4_publier_mini_sync.py`, `test_story_19_4_scope_et_parite.py` (préfixe `test_story_19_4_*`)
   - [x] `test_cc08_publisher_registry_matrix.py` (parité AC7)
-  - [x] Suite complète `python3 -m pytest -q` : **1958 passed**, `node --test tests/unit/*.node.test.js` : **305 passed** — 0 régression
+  - [x] Suite complète `python3 -m pytest -q` : **1961 passed** (1958 + T8, P9, P10 de l'unité 7), `node --test tests/unit/*.node.test.js` : **305 passed** — 0 régression
 
 ## Dev Notes
 
@@ -179,16 +179,21 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 
 - **create-story** — 2026-09-27 — statut résultant : `ready-for-dev`. Story documentaire créée directement (skill officielle non exposée cette session).
 - **Unité 3b-1** (`fd93c5b`, `e6b851d`) — extraction pure de `apply_publication_decision()` + tests de dépublication par candidat (C1), préalable au correctif de sync.
-- **Unité 3b/C1** (`34ef7ed`, `f0bb4c2`) — C1 : dépublication par candidat dans le sync ; garde-fou écart déclaré **S5/S6** (transition de politique `sure_probable`→`sure_only` : 18 unpublish figés ; secondaire refusé non dépublié par défaut, corrigé à cette unité).
+- **Unité 3b/C1** (`34ef7ed`, `f0bb4c2`) — C1 : dépublication par candidat dans le sync ; écarts de garde-fou déclarés **S5/S6** (détail ci-dessous).
 - **Unité 4** (`f203c74`, `3508e98`) — « Publier » en mini-sync : `evaluate_equipment()` frais + `apply_publication_decision()` + dépublication par candidat (AC1, AC2, AC4-AC6) ; garde-fou écart déclaré **S3/S4** (phase Publier sous patch `evaluate_equipment` + trace MQTT).
 - **Unité 5** (`118fe35`) — AC3 : filtre de scope pur appliqué au sync ; AC7 : parité vérifiée aux 4 points d'appel (sync, Publier, surface pièce, aperçu) ; retrait de l'ancien chemin « publier » (code mort après migration).
-- **Garde-fou déclaré (couverture complète)** : S3 81→80 (un cas retiré de la baseline factice après correction du chemin Publier), S4 « Publier » 0→3 (le chemin Publier n'émettait aucun appel MQTT observable avant le correctif, en émet 3 après), S5/S6 par candidat (transition de politique et secondaire refusé désormais gérés par candidat, plus de comportement global figé) — écarts assumés et testés explicitement, pas des régressions.
-- **Tests** : 1958 tests Python (`python3 -m pytest -q`, testpaths `tests` + `resources/daemon/tests`) et 305 tests node (`node --test tests/unit/*.node.test.js`) — tous verts, 0 régression, rejoués au moment de cette review.
-- **Unité 6** (`371e525`) — mesure A′ avant fusion, box en lecture seule stricte : **0** équipement exclu (scope) avec un topic discovery publié, principal ou secondaire — cf. section « Rejeu avant fusion » de `19-4-mesure-terrain-2026-09-29.md`.
+- **Écarts de garde-fou déclarés** (détail : `resources/daemon/tests/fixtures/story_19_4_guard/README.md`) — assumés et testés, pas des régressions :
+  - **S3** (unité 4) : l'eq 6000 (`ha_missing_command_topic`), que le sync refuse, n'est plus publié par « Publier » : 81 ⇒ 80 appels, MQTT 81 ⇒ 80, disponibilité 47 ⇒ 46.
+  - **S4** (unité 4) : sur la forme 579/585, « Publier » publie les 3 secondaires acceptés et leur disponibilité `online` (0 ⇒ 3 appels, 0 ⇒ 1 message), toujours sans `unpublish`.
+  - **S5** (unité 3b) : passage `sure_probable` ⇒ `sure_only` : toujours 18 appels `unpublish` (un par équipement), mais 583 et 457 gardent leurs secondaires `sure` ; effacements MQTT 30 ⇒ 23, disponibilité 48 ⇒ 46.
+  - **S6** (unité 3b) : le secondaire refusé `jeedom2ha_628_5980` est dépublié seul ; disponibilité inchangée.
+- **Unité 7** (revue Codex de la PR #180, correctifs préparés par ClaudeBox) — P1 : le domaine HA entre dans l'identité d'un secondaire (`_candidate_key`), un secondaire retypé sous le même `cmd_id` ne laisse plus de topic fantôme (test T8) ; P2 : « Publier » compte en erreur un équipement dont un secondaire accepté n'a pas pu être publié, principal accepté ou refusé (tests P9, P10) ; corrections de ce document et du corps de la PR.
+- **Tests** : 1961 tests Python (`python3 -m pytest -q`, testpaths `tests` + `resources/daemon/tests`) et 305 tests node (`node --test tests/unit/*.node.test.js`) — tous verts, 0 régression, rejoués au moment de cette review.
+- **Unité 6** (`371e525`, `07180fa`) — mesure A′ avant fusion, box en lecture seule stricte : **0** équipement exclu (scope) avec un topic discovery publié, principal ou secondaire — cf. section « Rejeu avant fusion » de `19-4-mesure-terrain-2026-09-29.md`.
 
 ### File List
 
-`git diff --stat origin/main...HEAD` (32 fichiers, 20321 insertions, 347 suppressions) :
+`git diff --stat origin/main...HEAD` après l'unité 7 (41 fichiers, 21381 insertions, 446 suppressions) :
 
 - `resources/daemon/transport/http_server.py` [MODIFIÉ — 907 lignes touchées]
 - `resources/daemon/tests/unit/test_story_19_4_guard_publisher_calls.py` [NOUVEAU]
@@ -201,12 +206,15 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 - `resources/daemon/tests/unit/test_story_5_2_execute_publier.py` [MODIFIÉ]
 - `resources/daemon/tests/unit/test_story_5_2_integration.py` [MODIFIÉ]
 - `resources/daemon/tests/unit/test_story_5_3_integration.py` [MODIFIÉ]
-- `resources/daemon/tests/fixtures/story_19_4_guard/` [NOUVEAU — 27 fichiers, corpus doré S1-S6 + README]
+- `resources/daemon/tests/fixtures/story_19_4_guard/` [NOUVEAU — 26 fichiers : traces de référence S1 à S6 + README]
 - `_bmad-output/implementation-artifacts/19-4-note-conception.md` [NOUVEAU]
 - `_bmad-output/implementation-artifacts/19-4-mesure-terrain-2026-09-29.md` [NOUVEAU, complété unité 6]
+- `_bmad-output/implementation-artifacts/19-4-publier-mini-sync-contrat-decision-cc18.md` [MODIFIÉ — ce document]
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ — statut `review`]
 
 ## Change Log
 
 - 2026-09-27 — `create-story` — statut `ready-for-dev`.
 - 2026-09-29 — unités 3b à 5 (C1, mini-sync « Publier », AC3/AC7) implémentées et testées, tête `118fe35`.
 - 2026-09-29 (soir) — unité 6 : rejeu mesure A′ (0, tous topics), documentation Tasks 1-4/6, Dev Agent Record, statut `review`.
+- 2026-09-29 (soir) — unité 7 : correctifs de la revue Codex (P1 domaine HA dans l'identité des secondaires, P2 échecs des secondaires propagés au résultat de « Publier »), sous-tâches cochées, écarts S3 à S6 corrigés.
