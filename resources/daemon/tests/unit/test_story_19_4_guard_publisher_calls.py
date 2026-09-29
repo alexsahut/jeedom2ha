@@ -408,3 +408,41 @@ async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app, aiohttp_client):
         ],
         [_publier_i11_under_patch],
     )
+
+
+def _sync_body_with_policy(corpus: dict[str, Any], *, request_id: str, policy: str) -> dict:
+    body = _sync_body(corpus, request_id=request_id)
+    body["payload"]["sync_config"] = {"confidence_policy": policy}
+    return body
+
+
+async def test_s5_transition_politique_sure_probable_vers_sure_only(cli, app, aiohttp_client):
+    """S5 — 1er sync en `sure_probable`, puis 2e sync en `sure_only` : les
+    candidats `probable` (eq 583/457) perdent leur droit de publication.
+    Défaut figé (corrigé à l'unité 3) : leurs secondaires `sure` sont
+    republiés PUIS dépubliés dans le même sync (19 unpublish au total)."""
+    corpus = _load_golden_corpus()
+    _connected_bridge_into(app)
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=RecordingPublisher()):
+        await _post_sync(cli, _sync_body_with_policy(corpus, request_id="s5-a", policy="sure_probable"))
+
+    recorder = RecordingPublisher()
+    with patch("transport.http_server.DiscoveryPublisher", return_value=recorder):
+        await _post_sync(cli, _sync_body_with_policy(corpus, request_id="s5-b", policy="sure_only"))
+
+    unpublishes = [c for c in recorder.calls if c["op"] == "unpublish"]
+    assert len(unpublishes) == 18, (
+        f"attendu 18 unpublish (défaut figé, corrigé à l'unité 3), obtenu {len(unpublishes)} : {unpublishes}"
+    )
+    _assert_trace_matches_reference("s5_policy_transition_sure_only", recorder.calls)
+
+    await _assert_mqtt_trace_matches_reference(
+        "s5_policy_transition_sure_only", aiohttp_client,
+        [lambda c, a: _post_sync(
+            c, _sync_body_with_policy(corpus, request_id="s5-a", policy="sure_probable")
+        )],
+        [lambda c, a: _post_sync(
+            c, _sync_body_with_policy(corpus, request_id="s5-b", policy="sure_only")
+        )],
+    )
