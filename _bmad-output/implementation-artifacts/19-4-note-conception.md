@@ -103,6 +103,12 @@ async def apply_publication_decision(
 Corps (assemblé à partir de code déjà existant, sans nouvelle logique de
 décision) :
 
+0. **Détection de retypage** — appel à `_detect_lifecycle_changes(...)` (l.931-970), **dans les deux
+   chemins** (C2, décision — section 2.4), avant toute autre étape : dépublie l'ancien topic si le
+   `eq_id` a été retypé (override TYPE) depuis la dernière écriture du verdict, y compris quand ce
+   retypage n'a jamais transité par un sync complet (cas : override TYPE posé, puis clic « Publier »
+   direct). Test dédié (section 6) : override TYPE posé sur un équipement déjà publié, clic « Publier »
+   ⇒ l'ancien topic est dépublié avant que le nouveau soit publié.
 1. **Bookkeeping** — identique à `_prepare_publication_bookkeeping` (l.375-388) : `decision.state_topic = _resolve_state_topic(mapping)`, `decision.active_or_alive = False`, `_apply_availability_metadata(...)`, puis `publications[eq_id] = decision`.
 2. **Si `decision.should_publish`** — tente le publish MQTT du principal (`publisher_registry.publish(mapping, snapshot)`) puis des secondaires, **gatés par `secondary_decisions` frais** (plus par `_secondary_publishable`/`publication_decision_ref` figé) : reprend le corps utile du bloc sync l.1573-1619 (gestion `discovery_published`/`active_or_alive`/`publication_result`/compteurs/local availability) — ce bloc remplace à la fois le bloc sync existant ET `_publish_mapping_for_action` (Publier). Le couplage principal/secondaires (l.623-625, `_publish_mapping_for_action`) est supprimé : un échec du principal n'empêche plus de tenter chaque secondaire.
 3. **Sinon, ou si transition publié → refusé** — si `previous_decision` était publié (`_needs_discovery_unpublish(previous_decision)`) : dépublication explicite, réutilisant tel quel le corps du bloc sync l.1648-1690 (`_collect_unpublish_node_ids` + `publisher.unpublish_by_eq_id` + `_defer_discovery_unpublish` si échec + nettoyage local availability). C'est le MÊME code que le bloc `else` déjà présent côté « Publier » (l.3666-3736) pour l'exclusion de scope — les deux se fusionnent en un seul appel (voir section 4).
@@ -123,7 +129,15 @@ décision) :
 ### 2.4 Ce qui NE bouge PAS
 
 - **Bloc « purge des disparus »** (`eq_ids_supprimes`, l.1692-1733+) reste propre au sync : concept différent (eq_id plus du tout dans `nouveaux_eq_ids`, càd absent de la nouvelle topologie ou devenu inéligible) — « Publier » n'a pas cette notion, son périmètre vient de la topologie déjà connue (`app["topology"]`), pas d'un nouveau payload Jeedom.
-- **`_detect_lifecycle_changes`** (retypage/renommage) reste appelé uniquement par le sync — aucun AC de cette story ne demande son branchement sur « Publier » (question ouverte, section 9, si un retypage entre deux syncs doit aussi être traité par un clic « Publier »).
+- **`_detect_lifecycle_changes`** (retypage/renommage) : **décision (C2, plus une question ouverte)** —
+  la fonction a déjà une signature compatible avec un appel depuis le post-traitement partagé (vérifié
+  par lecture, l.931-970). Elle est donc intégrée à `apply_publication_decision()`, appelée **dans les
+  deux chemins** (sync ET « Publier »), **avant** la décision de publication — cas concret couvert :
+  un retypage manuel (override TYPE) suivi d'un clic « Publier » doit dépublier l'ancien topic avant de
+  republier sous le nouveau type, symétriquement à ce que fait déjà le sync. Ce n'est plus une question
+  ouverte de cette note (l'ancienne question n°2 de la v1 est fermée), mais son placement exact dans
+  les 4 étapes du helper (avant l'étape 1 bookkeeping, section 2.2) reste à confirmer en Task 2 par
+  lecture fine de l'ordre d'opérations actuel du sync (l.1549, appelée avant l.1561).
 - **Branche « supprimer »** de `_handle_action_execute` (l.3409-3544) : inchangée, déjà conforme au principe 19-2 (n'écrit jamais le verdict canonique `evaluate_equipment()`, seulement un motif d'action `reason="excluded"`).
 
 ### 2.5 Boucle appelante côté sync et côté « Publier »
