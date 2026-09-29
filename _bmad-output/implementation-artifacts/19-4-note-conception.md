@@ -425,20 +425,24 @@ regroupé — voir remarque finale).
   ne reflète pas encore l'override ajouté après le dernier sync — cas exact du bug de cache (section 1/2) :
   `_should_attempt_publish` ne consulte jamais les overrides, seulement `mapping.confidence` et le
   `reason` précédent.
-- **AC3 (filtre de scope unique)** : golden test comparant, sur le corpus 59 eqLogics, l'ensemble des
-  eq_ids réellement publiés par le sync vs par « Publier » après filtrage scope — doit être égal.
+- **AC3 (filtre de scope unique, option (a) tranchée en 5.4)** : golden test comparant, sur le corpus
+  59 eqLogics, l'ensemble des eq_ids réellement publiés par le sync vs par « Publier » après filtrage
+  scope — doit être égal, **dans les deux chemins** (le sync applique désormais aussi le filtre).
   Échoue sur `main` aujourd'hui de façon triviale : le sync ne filtre pas du tout sur le scope
-  (section 1.4/5.2), donc toute exception de scope `exclude` non vide dans le corpus fait diverger
-  les deux ensembles. **Ce test ne doit être écrit qu'après l'arbitrage (a)/(b) de la section 5.4** —
-  sa forme dépend du choix (si (b) retenu, le test porte uniquement sur « Publier » et l'aperçu, pas sur
-  le sync).
-- **AC4 (dépublication explicite au transition publié→refusé)** : équipement `previous_decision.should_publish=True`
-  + `discovery_published=True`, override d'exclusion ajouté, clic « Publier ». Vérifier
-  `publisher.unpublish_by_eq_id` appelé avec les bons node_ids, `publications[eq_id].should_publish=False`
-  après coup. Échoue sur `main` : L.3572-3574 fait `skip += 1; continue` dès que `_should_attempt_publish`
-  est `False` (ce qui est le cas dès qu'un override exclut le mapping) — **aucune dépublication n'est
-  jamais tentée dans ce chemin actuellement**, l'équipement reste publié indéfiniment tant qu'aucun sync
-  complet n'a lieu.
+  (section 1.4/5.2). Inclure un cas construit avec un scope `exclude` explicite (le corpus réel n'en
+  a aucun sur un eq_id actuellement publié, mesure A=0, donc un cas de fixture est nécessaire pour
+  couvrir la branche « dépublication par scope côté sync »).
+- **AC4 (dépublication explicite, par candidat — C1)** : deux sous-cas distincts (section 4.3), chacun
+  échouant sur `main` pour une raison différente :
+  - principal refusé (override d'exclusion), secondaire toujours accepté ⇒ le secondaire reste publié.
+    Échoue sur `main` : `_collect_unpublish_node_ids(previous_decision.mapping_result)` (l.796-848)
+    dépublie aujourd'hui le secondaire avec le principal (C1-i) ;
+  - secondaire refusé isolément, principal toujours accepté ⇒ seul le secondaire est dépublié
+    (`publisher.unpublish_by_eq_id` appelé avec ses seuls node_ids). Échoue sur `main` :
+    `_publish_additional_sensors` (l.237-312) ne dépublie jamais un secondaire refusé (C1-ii, `continue`
+    silencieux l.281-284).
+  - Cas déjà couvert par l'existant, à garder en non-régression : principal refusé sans secondaire
+    ⇒ dépublication du principal (mécanisme 4.1/4.2, ne change pas).
 - **AC5 (idempotence)** : équipement déjà publié, verdict inchangé, clic « Publier » répété deux fois ;
   vérifier qu'aucun second appel `publisher.publish(...)` n'est effectué (mock/spy sur `PublisherRegistry`)
   au deuxième clic. Échoue sur `main` : constat vérifié section 4.5, le chemin actuel republie
@@ -460,6 +464,17 @@ regroupé — voir remarque finale).
   rapport à `test_story_19_0_parity_golden_corpus.py`. Complète `test_cc08_publisher_registry_matrix.py`
   en y ajoutant, si besoin, les cas `sure_mapping`/override qui n'y sont pas déjà couverts (à vérifier en
   Task 2 par lecture complète du fichier, lu seulement partiellement dans cette note — 100/420 lignes).
+
+- **Garde-fou du refactor (C5, à écrire AVANT toute extraction de code, pas après)** : un publisher
+  factice (`FakePublisherRegistry`/`FakeDiscoveryPublisher`, style déjà utilisé par
+  `test_cc08_publisher_registry_matrix.py`) enregistre chaque appel `publish`/`unpublish_by_eq_id`
+  (topic, payload/node_ids) pour le corpus doré des 59 eqLogics, exécuté via le sync complet **avant**
+  toute extraction. Rejouer le même corpus **après** l'extraction du helper `apply_publication_decision()`
+  (unité #1, section 8) doit produire une séquence d'appels **identique**, à l'exception des écarts
+  déclarés par C1 (4.3) et C3 (4.5) — tout autre écart est une régression du refactor, pas un changement
+  de comportement voulu. Les suites de parité existantes (19-0, 19-1, 19-2, `test_cc08_*`) doivent rester
+  vertes sans modification. Sur la box, le relevé de parité (section 7.1) doit être identique hors
+  changements déclarés. **Ce test est écrit en premier**, avant la Task 1 d'extraction (section 8, unité #1).
 
 **Remarque de découpage** : un fichier de test unique `test_story_19_4_publier_mini_sync.py` avec une
 classe/section par AC est recommandé plutôt que 7 fichiers séparés, pour partager les fixtures
