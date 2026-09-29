@@ -1,6 +1,6 @@
 # Story 19.4: "Publier" en mini-sync sur le contrat de décision (CC-18)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -99,10 +99,10 @@ I2, I4, I6, I7 (mêmes garanties que le sync, puisque "Publier" consomme désorm
 
 <!-- Story terrain : daemon / MQTT / publication / bouton Publier / box réelle → Task 0 Pre-flight terrain injectée. -->
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
-  - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Identifier, via le rapport de parité (Story 19.1) ou une recherche manuelle en lecture seule, des cas réels correspondant aux preuves (i), (ii) et (iii)
-  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant cette recherche de cas réels ni pendant la vérification post-correction — ces flags republient des messages MQTT retained **vides** sur les topics discovery, effaçant les entités déjà publiées et rendant impossible de distinguer une dépublication **causée par la correction** d'une dépublication causée par le script lui-même. Déploiement standard uniquement.
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
+  - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` — remplacé par les gardes du déploiement standard (CI verte du SHA, inventaire avant/après : 355 ⇒ 355, 0 topic ajouté ou retiré).
+  - [x] Identifier, via le rapport de parité (Story 19.1) ou une recherche manuelle en lecture seule, des cas réels correspondant aux preuves (i), (ii) et (iii) — (ii) : pièce « bureau » (eq 521, une seule entité publiée, absente des tableaux de bord HA) ; (i)/(iii) : aucun cas réel (pas de mapper `sure_mapping`), fallback par tests.
+  - [x] **Interdiction explicite (DANGER) :** ne jamais invoquer `--cleanup-discovery` ni `--stop-daemon-cleanup` (`scripts/deploy-to-box.sh:95,97`) pendant cette recherche de cas réels ni pendant la vérification post-correction — ces flags republient des messages MQTT retained **vides** sur les topics discovery, effaçant les entités déjà publiées et rendant impossible de distinguer une dépublication **causée par la correction** d'une dépublication causée par le script lui-même. Déploiement standard uniquement.
 
 - [x] Task 1 — Brancher les 4 fonctions du chemin "Publier" sur `evaluate_equipment()` (AC1, AC2, AC6)
   - [x] Réévaluer avec la topologie, `app["confidence_policy"]` et les overrides persistés courants, jamais `app["mappings"]` ; `_should_attempt_publish` (`http_server.py:475-490`) ne conserve ni tuple de confiance codé en dur ni `reason` de sync antérieur. — Fait : `_evaluate_for_action()` (unité 4) ; `_should_attempt_publish` supprimée (unité 5). Tests P1, R1.
@@ -122,10 +122,10 @@ I2, I4, I6, I7 (mêmes garanties que le sync, puisque "Publier" consomme désorm
 - [x] Task 4 — Test de parité croisée à 4 points d'appel (AC7)
   - [x] Écrire un test comparant sync / "Publier" / surface pièce / aperçu sur au moins un cas `sure_mapping` et un cas d'exclusion par override, dans golden 59 et `test_cc08_publisher_registry_matrix.py`. — R1 (`sure_mapping`) et R2 (exclusion par override) dans `test_story_19_4_scope_et_parite.py` ; golden 59 : Q4 ; la matrice CC-08 porte désormais sur `apply_publication_decision()`, partagé par le sync et « Publier ».
 
-- [ ] Task 5 — Preuve terrain (ii) et fallback documenté (i)/(iii)
-  - [ ] Exclure un équipement sans risque dans l'UI, cliquer « Publier » sur une pièce, constater la non-publication puis le retour auto.
-  - [ ] Documenter les tests de fallback pour (i)/(iii), car aucun mapper `sure_mapping` n'existe dans `main`.
-  - [ ] Documenter la preuve par clic réel de la dépublication visible (UI Impact `Oui`), avant passage `ready-for-UX-validation` → `done`
+- [x] Task 5 — Preuve terrain (ii) et fallback documenté (i)/(iii)
+  - [x] Exclure un équipement sans risque dans l'UI, cliquer « Publier » sur une pièce, constater la non-publication puis le retour auto. — Fait le 29/09 (23:06 → 23:26) : exclusion de la pièce « bureau » par « Pièces exclues », dépublication propre de l'eq 521 ; l'interface ne propose plus « Publier » pour une pièce exclue ; retour à l'identique (même `entity_id`) ; « Republier » idempotent sur « escalier ». Voir `19-4-field-proof-2026-09-29.md`.
+  - [x] Documenter les tests de fallback pour (i)/(iii), car aucun mapper `sure_mapping` n'existe dans `main`. — P1, R1 (`sure_mapping`), P2, P4, R2 (exclusion par override), P5 (retypage).
+  - [x] Documenter la preuve par clic réel de la dépublication visible (UI Impact `Oui`), avant passage `ready-for-UX-validation` → `done` — `19-4-field-proof-2026-09-29.md`, section « Preuve (ii) par clic réel » ; validation UX par Alex le 29/09 à 23:30 (statut `done`).
 
 - [x] Task 6 — Tests (AC1-AC7)
   - [x] `test_story_19_4_guard_publisher_calls.py`, `test_story_19_4_c1_per_candidate.py`, `test_story_19_4_publier_mini_sync.py`, `test_story_19_4_scope_et_parite.py` (préfixe `test_story_19_4_*`)
@@ -189,6 +189,7 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
   - **S6** (unité 3b) : le secondaire refusé `jeedom2ha_628_5980` est dépublié seul ; disponibilité inchangée.
 - **Unité 7** (revue Codex de la PR #180, correctifs préparés par ClaudeBox) — P1 : le domaine HA entre dans l'identité d'un secondaire (`_candidate_key`), un secondaire retypé sous le même `cmd_id` ne laisse plus de topic fantôme (test T8) ; P2 : « Publier » compte en erreur un équipement dont un secondaire accepté n'a pas pu être publié, principal accepté ou refusé (tests P9, P10) ; corrections de ce document et du corps de la PR.
 - **Correctif post-fusion 19-4b** (revue Codex de `7fabeb0`, publiée après la fusion `3bd0d68`, préparé par ClaudeBox) — CC-30 : la purge des équipements sortis du sync, « Supprimer », « Publier » hors périmètre et le premier sync après redémarrage tiennent compte des secondaires publiés (forme 579/585, principal refusé), qui restaient sinon retenus dans HA ; défaut antérieur à 19-4 pour les sorties par éligibilité. CC-31 : une dépublication reportée compte en erreur dans « Publier », jamais en succès. Tests U1 à U5 et V1 à V3 (`test_story_19_4b_purge_et_reports.py`) ; 1969 tests Python, 305 node.
+- **Preuve terrain** (29/09) — fusion `3bd0d68` déployée à 19:39Z, puis 19-4b (`be9a3f4`) à 20:53Z ; parité avant/après identique (292 décisions, 355 topics, 184 topics d'état) ; HA inchangé ; preuve (ii) par clic réel faite avec Alex (exclusion et retour de la pièce « bureau », « Republier » idempotent sur « escalier ») ; 0 ERROR. Écart déclaré : premier déploiement d'un `main` local périmé (`53b5731`) pendant environ 20 s, suivi d'un retour arrière, sans trace durable. Voir `19-4-field-proof-2026-09-29.md`.
 - **Tests** : 1961 tests Python (`python3 -m pytest -q`, testpaths `tests` + `resources/daemon/tests`) et 305 tests node (`node --test tests/unit/*.node.test.js`) — tous verts, 0 régression, rejoués au moment de cette review.
 - **Unité 6** (`371e525`, `07180fa`) — mesure A′ avant fusion, box en lecture seule stricte : **0** équipement exclu (scope) avec un topic discovery publié, principal ou secondaire — cf. section « Rejeu avant fusion » de `19-4-mesure-terrain-2026-09-29.md`.
 
@@ -212,6 +213,7 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 - `resources/daemon/tests/fixtures/story_19_4_guard/` [NOUVEAU — 26 fichiers : traces de référence S1 à S6 + README]
 - `_bmad-output/implementation-artifacts/19-4-note-conception.md` [NOUVEAU]
 - `_bmad-output/implementation-artifacts/19-4-mesure-terrain-2026-09-29.md` [NOUVEAU, complété unité 6]
+- `_bmad-output/implementation-artifacts/19-4-field-proof-2026-09-29.md` [NOUVEAU — preuve terrain]
 - `_bmad-output/implementation-artifacts/19-4-publier-mini-sync-contrat-decision-cc18.md` [MODIFIÉ — ce document]
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` [MODIFIÉ — statut `review`]
 
@@ -222,3 +224,4 @@ claude-cli/claude-sonnet-5 (unités 3b à 6, dev-story + review + mesure avant f
 - 2026-09-29 (soir) — unité 6 : rejeu mesure A′ (0, tous topics), documentation Tasks 1-4/6, Dev Agent Record, statut `review`.
 - 2026-09-29 (soir) — unité 7 : correctifs de la revue Codex (P1 domaine HA dans l'identité des secondaires, P2 échecs des secondaires propagés au résultat de « Publier »), sous-tâches cochées, écarts S3 à S6 corrigés.
 - 2026-09-29 (nuit) — PR #180 fusionnée (`3bd0d68`) et déployée ; 19-4b : correctifs CC-30 et CC-31 (revue Codex publiée après la fusion).
+- 2026-09-29 (23:30) — preuve terrain (ii) par clic réel faite avec Alex ; Tasks 0 et 5 cochées ; statut `done` (validation UX par Alex).
