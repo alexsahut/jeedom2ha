@@ -1,0 +1,1311 @@
+[
+  {
+    "entity_type": "alarm_control_panel",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "alarm_control_panel",
+      "ha_unique_id": "jeedom2ha_eq_230",
+      "jeedom_eq_id": 230,
+      "reason_code": "alarm_control_panel_state_commands",
+      "reason_details": {
+        "command_topic": "jeedom2ha/230/alarm/set"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5138",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5138,
+        "device_class": "power",
+        "node_id": "jeedom2ha_553_5138",
+        "object_id": "jeedom2ha_553_5138",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5137",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5137,
+        "device_class": "power",
+        "node_id": "jeedom2ha_553_5137",
+        "object_id": "jeedom2ha_553_5137",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5139",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5139,
+        "device_class": null,
+        "node_id": "jeedom2ha_553_5139",
+        "object_id": "jeedom2ha_553_5139",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5140",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5140,
+        "device_class": null,
+        "node_id": "jeedom2ha_553_5140",
+        "object_id": "jeedom2ha_553_5140",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5177",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5177,
+        "device_class": null,
+        "node_id": "jeedom2ha_553_5177",
+        "object_id": "jeedom2ha_553_5177",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5171",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5171,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_553_5171",
+        "object_id": "jeedom2ha_553_5171",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "Wh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5170",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5170,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_553_5170",
+        "object_id": "jeedom2ha_553_5170",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "Wh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_553_cmd_5169",
+      "jeedom_eq_id": 553,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5169,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_553_5169",
+        "object_id": "jeedom2ha_553_5169",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "Wh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_554",
+      "jeedom_eq_id": 554,
+      "reason_code": "switch_on_off_state",
+      "reason_details": {
+        "device_class_source": "virtual"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5205",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5205,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5205",
+        "object_id": "jeedom2ha_554_5205",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5530",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5530,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5530",
+        "object_id": "jeedom2ha_554_5530",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5206",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5206,
+        "device_class": "power",
+        "node_id": "jeedom2ha_554_5206",
+        "object_id": "jeedom2ha_554_5206",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5531",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5531,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5531",
+        "object_id": "jeedom2ha_554_5531",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5535",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5535,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_554_5535",
+        "object_id": "jeedom2ha_554_5535",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5532",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5532,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5532",
+        "object_id": "jeedom2ha_554_5532",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5533",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5533,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5533",
+        "object_id": "jeedom2ha_554_5533",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5534",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5534,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_554_5534",
+        "object_id": "jeedom2ha_554_5534",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5527",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5527,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_554_5527",
+        "object_id": "jeedom2ha_554_5527",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5542",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5542,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5542",
+        "object_id": "jeedom2ha_554_5542",
+        "unit_of_measurement": "H"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5538",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5538,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5538",
+        "object_id": "jeedom2ha_554_5538",
+        "unit_of_measurement": "H"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5543",
+      "jeedom_eq_id": 554,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5543,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5543",
+        "object_id": "jeedom2ha_554_5543",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_554_cmd_5510",
+      "jeedom_eq_id": 554,
+      "reason_code": "binary_sensor_multi_domain",
+      "reason_details": {
+        "cmd_id": 5510,
+        "device_class": null,
+        "node_id": "jeedom2ha_554_5510",
+        "object_id": "jeedom2ha_554_5510"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5987",
+      "jeedom_eq_id": 583,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5987,
+        "command_topic": "jeedom2ha/583/5987/set",
+        "device_class_source": "virtual",
+        "grouping_key": "charge",
+        "node_id": "jeedom2ha_583_5987",
+        "object_id": "jeedom2ha_583_5987"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_6009",
+      "jeedom_eq_id": 583,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 6009,
+        "command_topic": "jeedom2ha/583/6009/set",
+        "device_class_source": "virtual",
+        "grouping_key": "charge solaire",
+        "node_id": "jeedom2ha_583_6009",
+        "object_id": "jeedom2ha_583_6009"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_6010",
+      "jeedom_eq_id": 583,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 6010,
+        "command_topic": "jeedom2ha/583/6010/set",
+        "device_class_source": "virtual",
+        "grouping_key": "charge manuelle",
+        "node_id": "jeedom2ha_583_6010",
+        "object_id": "jeedom2ha_583_6010"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5991",
+      "jeedom_eq_id": 583,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5991,
+        "device_class": "power",
+        "node_id": "jeedom2ha_583_5991",
+        "object_id": "jeedom2ha_583_5991",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5992",
+      "jeedom_eq_id": 583,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5992,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_583_5992",
+        "object_id": "jeedom2ha_583_5992",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "Wh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5993",
+      "jeedom_eq_id": 583,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 5993,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_583_5993",
+        "object_id": "jeedom2ha_583_5993",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "Wh"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5986",
+      "jeedom_eq_id": 583,
+      "reason_code": "binary_sensor_multi_domain",
+      "reason_details": {
+        "cmd_id": 5986,
+        "device_class": null,
+        "node_id": "jeedom2ha_583_5986",
+        "object_id": "jeedom2ha_583_5986"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_583_cmd_5988",
+      "jeedom_eq_id": 583,
+      "reason_code": "binary_sensor_multi_domain",
+      "reason_details": {
+        "cmd_id": 5988,
+        "device_class": null,
+        "node_id": "jeedom2ha_583_5988",
+        "object_id": "jeedom2ha_583_5988"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_5977",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5977,
+        "command_topic": "jeedom2ha/628/5977/set",
+        "device_class_source": "virtual",
+        "grouping_key": "filtration piscine",
+        "node_id": "jeedom2ha_628_5977",
+        "object_id": "jeedom2ha_628_5977"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_5980",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5980,
+        "command_topic": "jeedom2ha/628/5980/set",
+        "device_class_source": "virtual",
+        "grouping_key": "chauffage piscine",
+        "node_id": "jeedom2ha_628_5980",
+        "object_id": "jeedom2ha_628_5980"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_5983",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5983,
+        "command_topic": "jeedom2ha/628/5983/set",
+        "device_class_source": "virtual",
+        "grouping_key": "chauffage spa",
+        "node_id": "jeedom2ha_628_5983",
+        "object_id": "jeedom2ha_628_5983"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_6004",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 6004,
+        "command_topic": "jeedom2ha/628/6004/set",
+        "device_class_source": "virtual",
+        "grouping_key": "charge voiture",
+        "node_id": "jeedom2ha_628_6004",
+        "object_id": "jeedom2ha_628_6004"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1000",
+      "jeedom_eq_id": 1000,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+on+off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1001",
+      "jeedom_eq_id": 1001,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+on (missing off)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1002",
+      "jeedom_eq_id": 1002,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+off (missing on)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1003",
+      "jeedom_eq_id": 1003,
+      "reason_code": "light_on_off_brightness",
+      "reason_details": {
+        "brightness": "slider_without_brightness_info",
+        "on_off": "slider_implicit_on_off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1004",
+      "jeedom_eq_id": 1004,
+      "reason_code": "light_on_off_brightness",
+      "reason_details": {
+        "brightness": "state_numeric_as_brightness",
+        "on_off": "state+on (missing off)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1005",
+      "jeedom_eq_id": 1005,
+      "reason_code": "light_on_off_brightness",
+      "reason_details": {
+        "brightness": "brightness_info+slider",
+        "on_off": "state+on+off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1006",
+      "jeedom_eq_id": 1006,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+on+off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1007",
+      "jeedom_eq_id": 1007,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+on (missing off)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1008",
+      "jeedom_eq_id": 1008,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+off (missing on)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_1009",
+      "jeedom_eq_id": 1009,
+      "reason_code": "light_on_off_brightness",
+      "reason_details": {
+        "brightness": "slider_without_brightness_info",
+        "on_off": "slider_implicit_on_off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2000",
+      "jeedom_eq_id": 2000,
+      "reason_code": "cover_open_close",
+      "reason_details": {
+        "open_close": "up+down+state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2001",
+      "jeedom_eq_id": 2001,
+      "reason_code": "cover_open_close",
+      "reason_details": {
+        "open_close": "up+down (missing state)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2002",
+      "jeedom_eq_id": 2002,
+      "reason_code": "cover_open_close_position",
+      "reason_details": {
+        "open_close": "slider_implicit_open_close",
+        "position": "slider_without_numeric_state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2003",
+      "jeedom_eq_id": 2003,
+      "reason_code": "cover_open_close_stop",
+      "reason_details": {
+        "open_close": "up+down+state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2004",
+      "jeedom_eq_id": 2004,
+      "reason_code": "cover_open_close_bso",
+      "reason_details": {
+        "open_close": "bso_up+bso_down (missing bso_state)"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2005",
+      "jeedom_eq_id": 2005,
+      "reason_code": "cover_open_close_bso",
+      "reason_details": {
+        "open_close": "bso_up+bso_down+bso_state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2006",
+      "jeedom_eq_id": 2006,
+      "reason_code": "cover_open_close_position",
+      "reason_details": {
+        "open_close": "up+down+state",
+        "position": "slider+state_numeric"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "cover",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "cover",
+      "ha_unique_id": "jeedom2ha_eq_2007",
+      "jeedom_eq_id": 2007,
+      "reason_code": "cover_open_close_position",
+      "reason_details": {
+        "open_close": "up+down (missing state)",
+        "position": "slider_without_numeric_state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_3000",
+      "jeedom_eq_id": 3000,
+      "reason_code": "switch_on_off_state",
+      "reason_details": {
+        "device_class_source": "prise"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_3001",
+      "jeedom_eq_id": 3001,
+      "reason_code": "switch_on_off_only",
+      "reason_details": {
+        "device_class_source": "virtual"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_3002",
+      "jeedom_eq_id": 3002,
+      "reason_code": "switch_on_only",
+      "reason_details": {
+        "device_class_source": "virtual"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_3003",
+      "jeedom_eq_id": 3003,
+      "reason_code": "switch_off_only",
+      "reason_details": {
+        "device_class_source": "virtual"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_3004",
+      "jeedom_eq_id": 3004,
+      "reason_code": "switch_partial",
+      "reason_details": {
+        "device_class_source": "energy_meter"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_6000",
+      "jeedom_eq_id": 6000,
+      "reason_code": "light_brightness_only",
+      "reason_details": {
+        "brightness": "state_numeric_as_brightness"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_6001",
+      "jeedom_eq_id": 6001,
+      "reason_code": "light_on_off_only",
+      "reason_details": {
+        "on_off": "state+on+off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_7000",
+      "jeedom_eq_id": 7000,
+      "reason_code": "sensor_temperature",
+      "reason_details": {
+        "device_class": "temperature",
+        "unit_of_measurement": "\u00b0C"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_7001",
+      "jeedom_eq_id": 7001,
+      "reason_code": "sensor_humidity",
+      "reason_details": {
+        "device_class": "humidity",
+        "unit_of_measurement": "%"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_7002",
+      "jeedom_eq_id": 7002,
+      "reason_code": "sensor_power",
+      "reason_details": {
+        "device_class": "power",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_7003",
+      "jeedom_eq_id": 7003,
+      "reason_code": "sensor_co2",
+      "reason_details": {
+        "device_class": "carbon_dioxide",
+        "unit_of_measurement": "ppm"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_7004",
+      "jeedom_eq_id": 7004,
+      "reason_code": "sensor_brightness",
+      "reason_details": {
+        "device_class": "illuminance",
+        "unit_of_measurement": "lx"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_8000",
+      "jeedom_eq_id": 8000,
+      "reason_code": "binary_sensor_presence",
+      "reason_details": {
+        "device_class": "occupancy"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_8001",
+      "jeedom_eq_id": 8001,
+      "reason_code": "binary_sensor_opening",
+      "reason_details": {
+        "device_class": "door"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_8002",
+      "jeedom_eq_id": 8002,
+      "reason_code": "binary_sensor_smoke",
+      "reason_details": {
+        "device_class": "smoke"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_8003",
+      "jeedom_eq_id": 8003,
+      "reason_code": "binary_sensor_flood",
+      "reason_details": {
+        "device_class": "moisture"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "binary_sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "binary_sensor",
+      "ha_unique_id": "jeedom2ha_eq_8004",
+      "jeedom_eq_id": 8004,
+      "reason_code": "binary_sensor_lock_state",
+      "reason_details": {
+        "device_class": "lock"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "button",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "button",
+      "ha_unique_id": "jeedom2ha_eq_9000",
+      "jeedom_eq_id": 9000,
+      "reason_code": "button_generic_action",
+      "reason_details": {
+        "command_topic": "jeedom2ha/9000/cmd"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "button",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "button",
+      "ha_unique_id": "jeedom2ha_eq_9001",
+      "jeedom_eq_id": 9001,
+      "reason_code": "button_media_pause",
+      "reason_details": {
+        "command_topic": "jeedom2ha/9001/cmd"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "button",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "button",
+      "ha_unique_id": "jeedom2ha_eq_9002",
+      "jeedom_eq_id": 9002,
+      "reason_code": "button_siren_on",
+      "reason_details": {
+        "command_topic": "jeedom2ha/9002/cmd"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_9700",
+      "jeedom_eq_id": 9700,
+      "reason_code": "presence_switch_set_on_off",
+      "reason_details": {}
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "climate",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "climate",
+      "ha_unique_id": "jeedom2ha_eq_11000",
+      "jeedom_eq_id": 11000,
+      "reason_code": "climate_thermostat_setpoint",
+      "reason_details": {
+        "current_temperature_topic": "jeedom2ha/11000/current_temperature",
+        "temperature_command_topic": "jeedom2ha/11000/temperature/set",
+        "temperature_state_topic": "jeedom2ha/11000/temperature/state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "climate",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "climate",
+      "ha_unique_id": "jeedom2ha_eq_11001",
+      "jeedom_eq_id": 11001,
+      "reason_code": "climate_thermostat_setpoint",
+      "reason_details": {
+        "temperature_command_topic": "jeedom2ha/11001/temperature/set",
+        "temperature_state_topic": "jeedom2ha/11001/temperature/state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "climate",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "climate",
+      "ha_unique_id": "jeedom2ha_eq_11002",
+      "jeedom_eq_id": 11002,
+      "reason_code": "climate_thermostat_setpoint",
+      "reason_details": {
+        "current_temperature_topic": "jeedom2ha/11002/current_temperature",
+        "temperature_command_topic": "jeedom2ha/11002/temperature/set",
+        "temperature_state_topic": "jeedom2ha/11002/temperature/state"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "alarm_control_panel",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "alarm_control_panel",
+      "ha_unique_id": "jeedom2ha_eq_12000",
+      "jeedom_eq_id": 12000,
+      "reason_code": "alarm_control_panel_state_commands",
+      "reason_details": {
+        "command_topic": "jeedom2ha/12000/alarm/set"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "light",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "light",
+      "ha_unique_id": "jeedom2ha_eq_457",
+      "jeedom_eq_id": 457,
+      "reason_code": "light_on_off_brightness",
+      "reason_details": {
+        "brightness": "slider_without_brightness_info",
+        "on_off": "state+on+off"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_457_cmd_45705",
+      "jeedom_eq_id": 457,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 45705,
+        "device_class": "power",
+        "node_id": "jeedom2ha_457_45705",
+        "object_id": "jeedom2ha_457_45705",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "sensor",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "ha_unique_id": "jeedom2ha_eq_457_cmd_45706",
+      "jeedom_eq_id": 457,
+      "reason_code": "sensor_multi_routeur_solaire",
+      "reason_details": {
+        "cmd_id": 45706,
+        "device_class": "energy",
+        "node_id": "jeedom2ha_457_45706",
+        "object_id": "jeedom2ha_457_45706",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      }
+    },
+    "op": "publish"
+  }
+]
