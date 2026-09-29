@@ -178,7 +178,14 @@ supprime tout, comme aujourd'hui. Le sync et le démarrage en bénéficient auss
 **And** des tests PHP sans cœur Jeedom vérifient l'appel pour `publier`, son
 absence pour `supprimer` et quand le démon ne répond pas, ainsi que l'ordre
 « récupérer, valider, puis purger » et la conservation sur échec (Codex P1,
-revue du 30/09). Si le relais abandonne sur délai (CC-32), les écouteurs ne sont
+revue du 30/09)
+**And** le réalignement a un budget court après « Publier » : GET
+`/system/state_listeners` avec un délai de 3 s et **une seule** tentative
+(`callDaemon` en fait aujourd'hui deux de 15 s pour un GET, class l.544-559 ;
+paramètre optionnel, défaut inchangé), pour rester sous le délai client de
+20 s (`desktop/js/jeedom2ha.js:343`). Un test couvre `/system/state_listeners`
+indisponible après une action réussie : réponse inchangée, listeners conservés
+(Codex P2, revue du 30/09). Si le relais abandonne sur délai (CC-32), les écouteurs ne sont
 pas réalignés avant le sync suivant : déclaré.
 
 ## UI Impact
@@ -320,7 +327,7 @@ garde sa propre décision et son propre état initial (Story 19.2).
     (publication d'état en échec ⇒ `succes_partiel`/`echec`, WARNING), et le
     résiduel d'AC6 (équipement résolu par le démon sans valeur au clic ⇒ aucun
     état, aucune erreur).
-  - [ ] Test PHP de la fonction de lecture, de l'expansion des 3 portées (AC6) et du réalignement des écouteurs (AC11 : appel, ordre récupérer → valider → purger, conservation sur échec).
+  - [ ] Test PHP de la fonction de lecture, de l'expansion des 3 portées (AC6) et du réalignement des écouteurs (AC11 : appel, ordre récupérer → valider → purger, conservation sur échec, budget de 3 s sans nouvelle tentative).
   - [ ] Suite complète `python3 -m pytest -q` et `node --test tests/unit/*.node.test.js` :
     0 régression ; garde-fou 19-4 inchangé (écarts déclarés s'il y en a).
 
@@ -415,7 +422,9 @@ garde sa propre décision et son propre état initial (Story 19.2).
   aux commandes déjà écoutées. 30/09 (`a3c1e4b`) : P1 purge des listeners avant
   la récupération des cibles ⇒ ordre inversé et conservation sur échec (AC11) ;
   P2 expansion `piece` depuis l'état courant contre la topologie du démon ⇒
-  résiduel déclaré et testé (AC6).
+  résiduel déclaré et testé (AC6). 30/09 (`a733d09`) : P2 réalignement
+  bloquant jusqu'à ~31 s contre 20 s côté client ⇒ budget de 3 s, une tentative
+  (AC11).
 
 ### File List
 
@@ -426,3 +435,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — revue Codex intégrée (AC6 : expansion de la portée testée ; AC10 : échec d'état compté).
 - 2026-09-30 — revue Codex (`4feceb2`) intégrée (AC11 : écouteurs réalignés après « Publier »).
 - 2026-09-30 — revue Codex (`a3c1e4b`) intégrée (AC11 : cibles récupérées avant la purge ; AC6 : résiduel pièce déclaré).
+- 2026-09-30 — revue Codex (`a733d09`) intégrée (AC11 : budget de 3 s pour le réalignement).
