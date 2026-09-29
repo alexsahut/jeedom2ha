@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -164,10 +165,16 @@ def _reference_path(name: str) -> Path:
 
 def _assert_trace_matches_reference(name: str, trace: list[dict[str, Any]]) -> None:
     """Compare la trace obtenue à la trace de référence stockée. Si le fichier de
-    référence n'existe pas encore, l'écrit (première génération de la baseline) —
-    sinon, exige une égalité stricte et signale tout écart explicitement."""
+    référence n'existe pas encore, échoue explicitement — la génération de la
+    baseline est un acte volontaire (`JEEDOM2HA_GUARD_REGEN=1`), jamais un
+    effet de bord silencieux d'un premier lancement."""
     ref_path = _reference_path(name)
     if not ref_path.exists():
+        if not os.environ.get("JEEDOM2HA_GUARD_REGEN"):
+            raise AssertionError(
+                f"Référence absente pour {name} ({ref_path}). "
+                "Lance avec JEEDOM2HA_GUARD_REGEN=1 pour la générer explicitement."
+            )
         FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
         ref_path.write_text(json.dumps(trace, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return
