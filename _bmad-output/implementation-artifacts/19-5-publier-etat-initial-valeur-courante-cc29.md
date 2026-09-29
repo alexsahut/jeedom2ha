@@ -98,7 +98,11 @@ filtrage métier, aucune traduction
 **And** la lecture est une fonction pure testée en CI
 (`JEEDOM2HA_AJAX_FUNCTIONS_ONLY`, motif de `tests/unit/test_story_5_1_php_relay.php`)
 avec des objets factices : valeurs `null` omises, commandes action ignorées,
-aucun appel à `execCmd`.
+aucun appel à `execCmd`
+**And** la portée est développée en équipements **avant** la lecture : l'UI
+envoie des ids d'équipements (`equipement`), `[pieceId]` (`piece`) ou `['all']`
+(`global`) (`desktop/js/jeedom2ha.js:544`, `:589`, `:637`), avec un test par portée
+(Codex P1, revue du 29/09).
 
 **AC7 — Sans `current_values` : comportement 19-4 inchangé**
 
@@ -127,8 +131,21 @@ démon (quelques millisecondes) est déclarée, non traitée.
 **Given** l'appel existant du sync (`http_server.py:1868`)
 **When** la story est livrée
 **Then** `publish_initial_states(decision)` sans argument nouveau garde
-exactement son comportement actuel
+exactement son comportement actuel (valeurs de la topologie, retour = nombre
+publié)
 **And** les tests Story 12.1 / 19.2 existants passent sans modification.
+
+**AC10 — Un état initial non publié compte comme une erreur du clic**
+
+**Given** une discovery réussie mais une publication MQTT d'état initial en
+échec (`publish_message` rend `False`, pont annoncé connecté)
+**When** « Publier » s'exécute
+**Then** l'équipement est compté dans `publish_errors`, comme un secondaire en
+échec (`secondary_failed`, `http_server.py:3930-3945`), le résultat du clic
+devient `succes_partiel` ou `echec`, et un journal WARNING
+`initial_state_publish_failed` nomme l'équipement et la commande
+**And** un test fige ce cas (Codex P2, revue du 30/09). Une commande sans valeur
+(AC2) n'est **pas** un échec.
 
 ## UI Impact
 
@@ -187,7 +204,7 @@ garde sa propre décision et son propre état initial (Story 19.2).
 
 ## Points visés
 
-- **CC-29** — fermé par cette story (AC1 à AC9 et preuve terrain).
+- **CC-29** — fermé par cette story (AC1 à AC10 et preuve terrain).
 - **CC-32** (hors périmètre, préexistant) : délai du « Republier » global,
   suivi à part.
 
@@ -213,37 +230,46 @@ garde sa propre décision et son propre état initial (Story 19.2).
     des équipements et rend `{cmd_id: valeur}` pour leurs commandes info, via
     `getCache('value', null)` (motif de `getFullTopology`,
     `core/class/jeedom2ha.class.php:729`), en omettant les `null`.
-  - [ ] Dans `executeHaAction`, pour `intention = publier` seulement : résoudre
-    les équipements visés (équipement : les ids ; pièce : `eqLogic::byObjectId` ;
-    global : tous) et ajouter `current_values` au payload. Aucune décision :
+  - [ ] Dans `executeHaAction`, pour `intention = publier` seulement : développer
+    la portée en équipements **avant** la lecture (équipement : les ids reçus ;
+    pièce : `eqLogic::byObjectId(pieceId)` ; global, `['all']` : tous les
+    équipements), puis ajouter `current_values` au payload. Aucune décision :
     le démon ignore ce qui ne le concerne pas.
-  - [ ] Test PHP en CI (objets factices), ajouté à `.github/workflows/test.yml`
-    s'il n'est pas pris par le motif existant.
+  - [ ] Test PHP en CI (objets factices), un cas par portée (`equipement`,
+    `piece`, `global`), ajouté à `.github/workflows/test.yml` s'il n'est pas pris
+    par le motif existant.
 
-- [ ] Task 2 — Démon (AC1-AC5, AC7-AC9)
-  - [ ] `publish_initial_states(decision, fresh_values=None, fresh_since=None)` :
-    `fresh_values is None` ⇒ comportement actuel inchangé (AC9). Sinon, pour
-    chaque candidat : valeur d'un évènement reçu après `fresh_since` (AC8), sinon
-    `fresh_values[cmd_id]` (clé via `_coerce_cmd_id`), sinon **aucun état**
-    (AC2). Ne jamais muter `app["topology"]`.
+- [ ] Task 2 — Démon (AC1-AC5, AC7-AC10)
+  - [ ] Extraire la boucle de `publish_initial_states` dans une méthode privée
+    paramétrée par la source de valeur, qui compte publiés **et** échecs.
+    `publish_initial_states(decision)` garde sa signature et son retour (nombre
+    publié, AC9). Nouvelle méthode pour le clic, par ex.
+    `publish_click_states(decision, fresh_values, fresh_since)` qui rend
+    `(publiés, échecs)` : pour chaque candidat, valeur d'un évènement reçu après
+    `fresh_since` (AC8), sinon `fresh_values[cmd_id]` (clé via `_coerce_cmd_id`),
+    sinon **aucun état** (AC2). Ne jamais muter `app["topology"]`.
+  - [ ] Échec de publication d'état : journal WARNING
+    `initial_state_publish_failed` (eq, cmd, topic) et comptage (AC10).
   - [ ] `handle_state_message` (`sync/state.py:90`) retient, pour chaque
     (eq, cmd) reçu, la valeur et l'instant monotone, **avant** la résolution de
     la cible (les évènements rejetés comptent, AC8).
   - [ ] `_handle_action_execute` : relever `fresh_since = time.monotonic()` à
     l'entrée ; normaliser `current_values` (dict, clés coercées en int ; `[]`,
     absent ou invalide ⇒ `None`, AC7).
-  - [ ] Branche « Publier » (boucle `http_server.py:3865`) : appeler
-    `publish_initial_states(decision, fresh_values, fresh_since)` juste après
-    `apply_publication_decision` (l.3895) et **avant** le `sleep` (l.3925), avec
-    le garde du sync (`state_sync is not None and mqtt_bridge.is_connected`,
-    l.1866-1868), seulement si `fresh_values is not None`.
+  - [ ] Branche « Publier » (boucle `http_server.py:3865`) : appeler la méthode
+    du clic juste après `apply_publication_decision` (l.3895) et **avant** le
+    `sleep` (l.3925), avec le garde du sync (`state_sync is not None and
+    mqtt_bridge.is_connected`, l.1866-1868), seulement si `fresh_values is not
+    None`. Un échec d'état fait compter l'équipement dans `publish_errors`, au
+    même titre que `secondary_failed` (l.3930-3945, AC10).
 
-- [ ] Task 3 — Tests (AC1-AC9)
+- [ ] Task 3 — Tests (AC1-AC10)
   - [ ] `resources/daemon/tests/unit/test_story_19_5_etat_initial_publier.py` :
     AC1 (principal, secondaire, secondaire sous principal refusé), AC2 (valeur
     du sync présente mais non fournie ⇒ rien), AC3 (parité), AC4, AC5, AC7
-    (absent et `[]`), AC8 (évènement publié, évènement rejeté), AC9.
-  - [ ] Test PHP de la fonction de lecture (AC6).
+    (absent et `[]`), AC8 (évènement publié, évènement rejeté), AC9, AC10
+    (publication d'état en échec ⇒ `succes_partiel`/`echec`, WARNING).
+  - [ ] Test PHP de la fonction de lecture et de l'expansion des 3 portées (AC6).
   - [ ] Suite complète `python3 -m pytest -q` et `node --test tests/unit/*.node.test.js` :
     0 régression ; garde-fou 19-4 inchangé (écarts déclarés s'il y en a).
 
@@ -327,6 +353,10 @@ garde sa propre décision et son propre état initial (Story 19.2).
   topologie » remplacée par `fresh_values` (AC2) ; course avec les évènements
   (AC8) ; sync inchangé (AC9) ; portée limitée aux types streamés ; test PHP
   (AC6) ; pointeurs corrigés (`deploy-to-box.sh:97,99`).
+- **Revue Codex** — 29/09 (`92c6888`) : P1 expansion de la portée avant la
+  lecture PHP (intégrée à AC6 et Task 1) ; P1 valeurs de l'ancienne topologie
+  (déjà traité par `fresh_values`, AC2/AC7). 30/09 (`415d609`) : P2 échec de
+  l'état initial non propagé ⇒ AC10.
 
 ### File List
 
@@ -334,3 +364,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 
 - 2026-09-29 — `correct-course` (CC-29) + `create-story` — statut `ready-for-dev`.
 - 2026-09-30 — relecture ClaudeBox (AC2 renforcé, AC8 et AC9 ajoutés, preuve terrain discriminante).
+- 2026-09-30 — revue Codex intégrée (AC6 : expansion de la portée testée ; AC10 : échec d'état compté).
