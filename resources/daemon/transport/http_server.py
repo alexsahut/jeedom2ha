@@ -1445,6 +1445,112 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
         _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
         raise
 
+async def apply_publication_decision(
+    eq_id,
+    mapping,
+    evaluation,
+    previous_decision,
+    snapshot,
+    *,
+    is_first_sync,
+    boot_cache,
+    publisher,
+    publisher_registry,
+    mqtt_bridge,
+    pending_discovery_unpublish,
+    mapping_counters,
+    publications,
+    nouveaux_eq_ids,
+):
+    await _detect_lifecycle_changes(
+        eq_id, mapping, previous_decision,
+        boot_cache=boot_cache,
+        is_first_sync=is_first_sync,
+        publisher=publisher,
+        pending_discovery_unpublish=pending_discovery_unpublish,
+    )
+    decision = evaluation.equipment_decision
+
+    if mapping.confidence in ("sure", "probable", "ambiguous"):
+        _increment_mapping_counter(mapping_counters, mapping, mapping.confidence)
+
+    _prepare_publication_bookkeeping(
+        eq_id,
+        mapping,
+        decision,
+        snapshot,
+        publications,
+        nouveaux_eq_ids,
+    )
+
+    config_published = False
+    # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
+    if decision.should_publish:
+        if publisher_registry and mqtt_bridge and mqtt_bridge.is_connected:
+            config_published = await publisher_registry.publish(mapping, snapshot)
+        else:
+            config_published = False
+            _LOGGER.warning(
+                "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
+                eq_id,
+            )
+        if not config_published:
+            # Préserver le marqueur HA stale si l'entité était précédemment publiée
+            if _needs_discovery_unpublish(previous_decision):
+                decision.discovery_published = True
+            if mapping.publication_result is None:
+                mapping.publication_result = _make_publication_result(
+                    "failed", "discovery_publish_failed"
+                )
+        else:
+            decision.discovery_published = True
+            local_ok = True
+            if decision.local_availability_supported:
+                local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+            if local_ok:
+                decision.active_or_alive = True
+                mapping.publication_result = _make_publication_result("success")
+                _increment_mapping_counter(mapping_counters, mapping, "published")
+            else:
+                mapping.publication_result = _make_publication_result(
+                    "failed", "local_availability_publish_failed"
+                )
+    else:
+        mapping.publication_result = _make_publication_result("not_attempted")
+    mapping.pipeline_step_reached = 5
+    if not decision.active_or_alive:
+        _increment_mapping_counter(mapping_counters, mapping, "skipped")
+
+    # Story 11.1 PE — publication des sensors secondaires (multi-sensor borné).
+    # Le device HA est commun à l'eqLogic ; chaque sensor a ses propres
+    # identifiants/topic. La décision/bookkeeping primaire reste inchangée.
+    if mapping.additional_mappings:
+        await _publish_additional_sensors(
+            primary_mapping=mapping,
+            secondary_decisions=evaluation.secondary_decisions,
+            snapshot=snapshot,
+            publisher_registry=publisher_registry,
+            mqtt_bridge=mqtt_bridge,
+            mapping_counters=mapping_counters,
+        )
+
+        # Correctif 19-2b : si le principal n'a pas publié la disponibilité locale
+        # (refusé ou échec discovery) mais qu'au moins un secondaire a été publié,
+        # l'availability_mode="all" du secondaire exige quand même le topic
+        # jeedom2ha/<eq>/availability, sinon il reste unavailable dans HA.
+        if (
+            not decision.discovery_published
+            and decision.local_availability_supported
+            and any(
+                sec_decision.discovery_published
+                for sec_decision in evaluation.secondary_decisions
+            )
+        ):
+            _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+
+    return decision, config_published
+
+
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
     """Handle POST /action/sync — synchronize Jeedom topology, assess eligibility, map and publish."""
     local_secret = request.app["local_secret"]
@@ -1569,91 +1675,22 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
         # Story 5.2 — detect lifecycle changes (rename, area change, retyping)
         # Called once per eq_id, before publish, common to all type branches
-        await _detect_lifecycle_changes(
-            eq_id, mapping, previous_decision,
-            boot_cache=request.app.get("boot_cache", {}),
-            is_first_sync=is_first_sync,
-            publisher=publisher,
-            pending_discovery_unpublish=pending_discovery_unpublish,
-        )
-        decision = evaluation.equipment_decision
-
-        if mapping.confidence in ("sure", "probable", "ambiguous"):
-            _increment_mapping_counter(mapping_counters, mapping, mapping.confidence)
-
-        _prepare_publication_bookkeeping(
+        decision, config_published = await apply_publication_decision(
             eq_id,
             mapping,
-            decision,
+            evaluation,
+            previous_decision,
             snapshot,
-            publications,
-            nouveaux_eq_ids,
+            is_first_sync=is_first_sync,
+            boot_cache=request.app.get("boot_cache", {}),
+            publisher=publisher,
+            publisher_registry=publisher_registry,
+            mqtt_bridge=mqtt_bridge,
+            pending_discovery_unpublish=pending_discovery_unpublish,
+            mapping_counters=mapping_counters,
+            publications=publications,
+            nouveaux_eq_ids=nouveaux_eq_ids,
         )
-
-        config_published = False
-        # Étape 5 — résultat technique (Story 5.2 PE : sous-bloc séparé, décision étape 4 intacte)
-        if decision.should_publish:
-            if publisher_registry and mqtt_bridge and mqtt_bridge.is_connected:
-                config_published = await publisher_registry.publish(mapping, snapshot)
-            else:
-                config_published = False
-                _LOGGER.warning(
-                    "[MAPPING] Discovery publish unavailable for eq_id=%d (bridge missing/disconnected)",
-                    eq_id,
-                )
-            if not config_published:
-                # Préserver le marqueur HA stale si l'entité était précédemment publiée
-                if _needs_discovery_unpublish(previous_decision):
-                    decision.discovery_published = True
-                if mapping.publication_result is None:
-                    mapping.publication_result = _make_publication_result(
-                        "failed", "discovery_publish_failed"
-                    )
-            else:
-                decision.discovery_published = True
-                local_ok = True
-                if decision.local_availability_supported:
-                    local_ok = _publish_local_availability_state(mqtt_bridge, eq_id, decision)
-                if local_ok:
-                    decision.active_or_alive = True
-                    mapping.publication_result = _make_publication_result("success")
-                    _increment_mapping_counter(mapping_counters, mapping, "published")
-                else:
-                    mapping.publication_result = _make_publication_result(
-                        "failed", "local_availability_publish_failed"
-                    )
-        else:
-            mapping.publication_result = _make_publication_result("not_attempted")
-        mapping.pipeline_step_reached = 5
-        if not decision.active_or_alive:
-            _increment_mapping_counter(mapping_counters, mapping, "skipped")
-
-        # Story 11.1 PE — publication des sensors secondaires (multi-sensor borné).
-        # Le device HA est commun à l'eqLogic ; chaque sensor a ses propres
-        # identifiants/topic. La décision/bookkeeping primaire reste inchangée.
-        if mapping.additional_mappings:
-            await _publish_additional_sensors(
-                primary_mapping=mapping,
-                secondary_decisions=evaluation.secondary_decisions,
-                snapshot=snapshot,
-                publisher_registry=publisher_registry,
-                mqtt_bridge=mqtt_bridge,
-                mapping_counters=mapping_counters,
-            )
-
-            # Correctif 19-2b : si le principal n'a pas publié la disponibilité locale
-            # (refusé ou échec discovery) mais qu'au moins un secondaire a été publié,
-            # l'availability_mode="all" du secondaire exige quand même le topic
-            # jeedom2ha/<eq>/availability, sinon il reste unavailable dans HA.
-            if (
-                not decision.discovery_published
-                and decision.local_availability_supported
-                and any(
-                    sec_decision.discovery_published
-                    for sec_decision in evaluation.secondary_decisions
-                )
-            ):
-                _publish_local_availability_state(mqtt_bridge, eq_id, decision)
 
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
         # sur le state_topic des entités vague 1 APRÈS la discovery (sinon HA l'ignore).
