@@ -197,3 +197,85 @@ verdict/exécution que 19-2 a justement introduite. Ce point est mécanique, pas
   supposé provenir uniquement du sync (à vérifier par lecture ciblée du module `traceability`,
   non lu dans cette note faute de temps — **question ouverte**, section 9, si le trace suppose
   implicitement « un seul appelant = le sync »).
+
+## 4. Dépublication (AC4, AC5, AC6, I11)
+
+### 4.1 Mécanisme réutilisé, sans rien inventer
+
+La dépublication passe déjà, aujourd'hui, par la même chaîne dans les deux endroits qui en ont besoin
+(sync « policy change » l.1648-1690, et « Publier » branche scope-exclue l.3666-3736) :
+`_needs_discovery_unpublish(previous_decision)` (garde : était-il effectivement publié ?) →
+`_collect_unpublish_node_ids(mapping)` (l.796, résout la liste de node_ids MQTT, gère le multi-domaine) →
+`publisher.unpublish_by_eq_id(eq_id, entity_type, node_ids)` → en cas d'échec réseau/broker,
+`_defer_discovery_unpublish(...)` (l.893-928) qui mémorise l'eq_id dans
+`pending_discovery_unpublish` pour rejouer plus tard (`_replay_deferred_discovery_unpublish`)
+→ nettoyage de l'availability locale. **Task 2 n'invente aucune nouvelle mécanique de dépublication** :
+le nouveau helper `apply_publication_decision()` (étape 3, section 2.2) appelle ce même enchaînement,
+factorisant les deux copies actuelles en une seule.
+
+### 4.2 Cas du sync : équipement disparu ou refusé
+
+Le sync distingue déjà deux cas différents, qui **restent distincts** après Task 2 :
+
+- **« policy change »** (l.1648-1690) : l'eq_id est toujours dans `nouveaux_eq_ids` (topologie actuelle),
+  mais `evaluate_equipment()` retourne cette fois `should_publish=False` alors qu'il était publié —
+  absorbé dans `apply_publication_decision()` (section 2/3).
+- **« purge des disparus »** (l.1692-1733+, `eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids`) :
+  l'eq_id a complètement disparu de la topologie ou est devenu inéligible — cas hors du périmètre
+  de « Publier » (qui n'a pas de nouvelle topologie, section 2.4), reste géré uniquement par le sync,
+  inchangé.
+
+### 4.3 Secondaire refusé, principal publié (dépublication par candidat)
+
+`evaluate_equipment()` retourne un verdict **par candidat** (`equipment_decision` pour le principal,
+un élément de `secondary_decisions` par secondaire, section « evaluate_equipment.py » du rapport) —
+il n'y a donc, structurellement, aucune raison que la dépublication soit groupée : le nouveau helper
+doit appliquer l'étape 3 (dépublication) **indépendamment pour chaque candidat** (principal et chaque
+secondaire), en comparant son verdict frais à son propre état précédent via son propre
+`publication_decision_ref`/`previous_decision`. C'est déjà le sens de
+`_reset_secondary_runtime_state`, appelé par secondaire, jamais en bloc pour tout l'équipement.
+Concrètement : un secondaire qui passe `should_publish=True→False` doit être dépublié (son propre
+`unpublish_by_eq_id` avec ses propres node_ids) **même si le principal reste publié** — aucun code
+actuel ne l'empêche puisque `_publish_mapping_for_action` traite déjà les secondaires dans une boucle
+séparée (l.612-659) ; il suffit que la boucle de dépublication (étape 3) soit elle aussi par-candidat,
+symétrique à la boucle de publication.
+
+### 4.4 Principal refusé (le cas déjà couvert)
+
+C'est le cas déjà géré par le mécanisme existant (4.1/4.2) : `previous_decision` du principal était
+publié, le nouveau `equipment_decision.should_publish` est `False` → dépublication du principal.
+Point à trancher en Task 2 (pas un blocage design, une question d'ordre d'opérations) : si le principal
+est dépublié, que deviennent ses secondaires actuellement publiés (dont le topic MQTT dépend souvent du
+device HA créé par le principal) ? Le code actuel de `_publish_mapping_for_action`/dépublication scope-exclue
+ne semble pas traiter explicitement la dépublication en cascade des secondaires quand seul le principal
+change de verdict — à vérifier par un test dédié (section 6) plutôt que supposé ici.
+
+### 4.5 Idempotence (AC5) — vérifié dans le code actuel
+
+**Constat vérifié (l.3546-3610, lu ce tour) : le chemin « Publier » actuel n'a PAS de garde
+d'idempotence.** `_should_attempt_publish(mapping, previous_decision)` (l.482-497) ne teste que :
+(1) `mapping.confidence in ("sure", "probable")` (bug CC-18 : omet `sure_mapping`), et (2) que le
+`reason` de la décision **précédente** n'est pas dans une liste figée de 4 motifs de skip. **Elle ne
+teste jamais si l'équipement est déjà publié avec un verdict inchangé.** Dès que ces deux conditions
+passent, le code appelle inconditionnellement `_publish_mapping_for_action` (l.3575), qui refait un
+vrai envoi MQTT (discovery + state), **même si rien n'a changé depuis la dernière publication réussie**.
+Donc : **oui, le chemin actuel republie à chaque clic** un équipement déjà publié et toujours valide,
+tant que son mapping garde une confiance suffisante.
+
+**Condition à ajouter pour AC5** (dans `apply_publication_decision()`, avant l'étape 2) :
+ne (re)publier réellement (appel MQTT) que si `previous_decision is None`, ou
+`previous_decision.should_publish != decision.should_publish`, ou
+`not _needs_discovery_unpublish` combiné à `previous_decision.discovery_published is not True`
+(cas où le verdict était déjà `True` mais la publication précédente avait échoué — auquel cas il FAUT
+retenter, ce n'est pas un cas d'idempotence). Autrement dit la garde est : « déjà publié
+(`discovery_published=True`) ET verdict inchangé (`should_publish=True` avant et après) » ⇒ ne pas
+rappeler `publisher.publish(...)`, seulement rafraîchir le bookkeeping (étape 1). C'est un changement
+de comportement réel par rapport à l'existant (qui republie toujours) — à couvrir par un test dédié
+(section 6) qui échoue sur `main` aujourd'hui.
+
+### 4.6 I11 — rien à changer côté lecteurs
+
+Comme établi en section 3.2/3.3 : tant que chaque candidat (principal et secondaires) a son verdict et
+son état d'exécution mis à jour par le helper unique, `sync/state.py`/`sync/command.py` restent corrects
+sans modification (lecture directe du `decision` pour le principal, `publication_decision_ref` pour
+les secondaires — pattern déjà homogène dans les deux fichiers, vérifié ligne 150-230/214-220).
