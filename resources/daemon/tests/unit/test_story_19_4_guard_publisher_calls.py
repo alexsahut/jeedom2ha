@@ -185,7 +185,52 @@ def _assert_trace_matches_reference(name: str, trace: list[dict[str, Any]]) -> N
     )
 
 
-async def test_s1_un_sync_corpus_dore(cli, app):
+class MqttRecordingBridge:
+    """Faux pont MQTT posé sous le VRAI `DiscoveryPublisher` (non patché) :
+    journalise chaque `publish_message` dont le topic commence par
+    `homeassistant/`, sans horodatage ni référence d'objet — juste
+    topic/payload (JSON parsé, ou `""` pour une suppression)/retain."""
+
+    def __init__(self) -> None:
+        self.is_connected = True
+        self.calls: list[dict[str, Any]] = []
+
+    def publish_message(self, topic: str, payload: str, qos: int = 0, retain: bool = False) -> bool:
+        if topic.startswith("homeassistant/"):
+            parsed: Any = json.loads(payload) if payload else ""
+            self.calls.append({"topic": topic, "payload": parsed, "retain": retain})
+        return True
+
+
+async def _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps) -> list[dict[str, Any]]:
+    """Exécute `warmup_steps` (non journalisés) puis `measured_steps` (coroutines
+    `(cli, app) -> None`) sur une app fraîche, avec le vrai `DiscoveryPublisher`
+    (non patché) posé sur `MqttRecordingBridge` ; seule la trace de
+    `measured_steps` est retournée."""
+    fresh_app = create_app(local_secret=SECRET)
+    bridge = MqttRecordingBridge()
+    fresh_app["mqtt_bridge"] = bridge
+    fresh_cli = await aiohttp_client(fresh_app)
+    for step in warmup_steps:
+        await step(fresh_cli, fresh_app)
+    bridge.calls = []
+    for step in measured_steps:
+        await step(fresh_cli, fresh_app)
+    return bridge.calls
+
+
+async def _assert_mqtt_trace_matches_reference(
+    name: str, aiohttp_client, warmup_steps, measured_steps
+) -> None:
+    """Vérifie le déterminisme (deux exécutions identiques) puis compare à la
+    référence `<name>_mqtt.json`."""
+    trace1 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
+    trace2 = await _run_mqtt_trace(aiohttp_client, warmup_steps, measured_steps)
+    assert trace1 == trace2, f"trace MQTT non déterministe pour {name}"
+    _assert_trace_matches_reference(f"{name}_mqtt", trace1)
+
+
+async def test_s1_un_sync_corpus_dore(cli, app, aiohttp_client):
     """S1 — 1 sync du corpus doré sur état vide : trace de référence."""
     recorder = RecordingPublisher()
     corpus = _load_golden_corpus()
@@ -196,8 +241,13 @@ async def test_s1_un_sync_corpus_dore(cli, app):
 
     _assert_trace_matches_reference("s1_sync_corpus_dore", recorder.calls)
 
+    await _assert_mqtt_trace_matches_reference(
+        "s1_sync_corpus_dore", aiohttp_client, [],
+        [lambda c, a: _post_sync(c, _sync_body(corpus, request_id="s1"))],
+    )
 
-async def test_s2_deux_syncs_zero_unpublish(cli, app):
+
+async def test_s2_deux_syncs_zero_unpublish(cli, app, aiohttp_client):
     """S2 — 2 syncs successifs du même corpus : le 2e ne doit produire aucun
     unpublish (pas de faux-positif de transition publié -> refusé)."""
     corpus = _load_golden_corpus()
@@ -215,8 +265,14 @@ async def test_s2_deux_syncs_zero_unpublish(cli, app):
     assert unpublishes == [], f"unpublish inattendu au 2e sync identique : {unpublishes}"
     _assert_trace_matches_reference("s2_second_sync_calls", recorder2.calls)
 
+    await _assert_mqtt_trace_matches_reference(
+        "s2_second_sync_calls", aiohttp_client,
+        [lambda c, a: _post_sync(c, _sync_body(corpus, request_id="s2-a"))],
+        [lambda c, a: _post_sync(c, _sync_body(corpus, request_id="s2-b"))],
+    )
 
-async def test_s3_sync_puis_publier_global(cli, app):
+
+async def test_s3_sync_puis_publier_global(cli, app, aiohttp_client):
     """S3 — S1 puis un clic "Publier" sur la portée globale (mêmes équipements,
     déjà publiés) : ne doit pas introduire de comportement publisher inattendu."""
     corpus = _load_golden_corpus()
@@ -230,6 +286,12 @@ async def test_s3_sync_puis_publier_global(cli, app):
         await _post_publier_global(cli, app)
 
     _assert_trace_matches_reference("s3_publier_global_after_sync", recorder.calls)
+
+    await _assert_mqtt_trace_matches_reference(
+        "s3_publier_global_after_sync", aiohttp_client,
+        [lambda c, a: _post_sync(c, _sync_body(corpus, request_id="s3-sync"))],
+        [lambda c, a: _post_publier_global(c, a)],
+    )
 
 
 _I11_EQ_ID = 628
