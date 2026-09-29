@@ -343,7 +343,23 @@ def _i11_corpus() -> dict[str, Any]:
     return {"objects": [{"id": 1, "name": "Salon"}], "eq_logics": [_i11_eq_payload()]}
 
 
-async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app):
+async def _sync_i11_under_patch(c, a, request_id: str) -> None:
+    with patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation(),
+    ):
+        await _post_sync(c, _sync_body(_i11_corpus(), request_id=request_id))
+
+
+async def _publier_i11_under_patch(c, a) -> None:
+    with patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation(),
+    ):
+        await _post_publier_global(c, a)
+
+
+async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app, aiohttp_client):
     """S4 — fixture façon eq 579/585 (19-2) : principal `ambiguous_skipped`,
     secondaires acceptés. D1 : aucun changement attendu — 2 syncs + 1 clic
     "Publier" ne doivent produire aucun unpublish, et les secondaires doivent
@@ -372,7 +388,9 @@ async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app):
     assert secondary_publishes_2, "les secondaires acceptés doivent être republiés à chaque sync"
 
     recorder3 = RecordingPublisher()
-    with patch("transport.http_server.DiscoveryPublisher", return_value=recorder3):
+    with patch("transport.http_server.DiscoveryPublisher", return_value=recorder3), patch(
+        "transport.http_server.evaluate_equipment", side_effect=_evaluate_side_effect
+    ):
         await _post_publier_global(cli, app)
 
     unpublishes_3 = [c for c in recorder3.calls if c["op"] == "unpublish"]
@@ -381,3 +399,12 @@ async def test_s4_candidat_i11_deux_syncs_et_publier(cli, app):
     _assert_trace_matches_reference("s4_candidat_i11_sync1", recorder1.calls)
     _assert_trace_matches_reference("s4_candidat_i11_sync2", recorder2.calls)
     _assert_trace_matches_reference("s4_candidat_i11_publier", recorder3.calls)
+
+    await _assert_mqtt_trace_matches_reference(
+        "s4_candidat_i11_publier", aiohttp_client,
+        [
+            lambda c, a: _sync_i11_under_patch(c, a, "s4-mqtt-1"),
+            lambda c, a: _sync_i11_under_patch(c, a, "s4-mqtt-2"),
+        ],
+        [_publier_i11_under_patch],
+    )
