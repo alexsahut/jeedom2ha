@@ -1,0 +1,122 @@
+[
+  {
+    "payload": {
+      "availability": [
+        {
+          "topic": "jeedom2ha/bridge/status"
+        },
+        {
+          "topic": "jeedom2ha/628/availability"
+        }
+      ],
+      "availability_mode": "all",
+      "command_topic": "jeedom2ha/628/5980/set",
+      "device": {
+        "identifiers": [
+          "jeedom2ha_628"
+        ],
+        "manufacturer": "Jeedom (virtual)",
+        "model": "virtual",
+        "name": "Chauffage piscine",
+        "suggested_area": "Energie",
+        "via_device": "jeedom2ha_bridge"
+      },
+      "name": "Chauffage piscine",
+      "object_id": "jeedom2ha_628_5980",
+      "origin": {
+        "name": "jeedom2ha",
+        "sw_version": "0.2.0"
+      },
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "payload_off": "OFF",
+      "payload_on": "ON",
+      "state_off": "OFF",
+      "state_on": "ON",
+      "state_topic": "jeedom2ha/628/5980/state",
+      "unique_id": "jeedom2ha_eq_628_cmd_5980"
+    },
+    "retain": true,
+    "topic": "homeassistant/switch/jeedom2ha_628_5980/config"
+  },
+  {
+    "payload": {
+      "availability": [
+        {
+          "topic": "jeedom2ha/bridge/status"
+        },
+        {
+          "topic": "jeedom2ha/628/availability"
+        }
+      ],
+      "availability_mode": "all",
+      "command_topic": "jeedom2ha/628/5983/set",
+      "device": {
+        "identifiers": [
+          "jeedom2ha_628"
+        ],
+        "manufacturer": "Jeedom (virtual)",
+        "model": "virtual",
+        "name": "Chauffage SPA",
+        "suggested_area": "Energie",
+        "via_device": "jeedom2ha_bridge"
+      },
+      "name": "Chauffage SPA",
+      "object_id": "jeedom2ha_628_5983",
+      "origin": {
+        "name": "jeedom2ha",
+        "sw_version": "0.2.0"
+      },
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "payload_off": "OFF",
+      "payload_on": "ON",
+      "state_off": "OFF",
+      "state_on": "ON",
+      "state_topic": "jeedom2ha/628/5983/state",
+      "unique_id": "jeedom2ha_eq_628_cmd_5983"
+    },
+    "retain": true,
+    "topic": "homeassistant/switch/jeedom2ha_628_5983/config"
+  },
+  {
+    "payload": {
+      "availability": [
+        {
+          "topic": "jeedom2ha/bridge/status"
+        },
+        {
+          "topic": "jeedom2ha/628/availability"
+        }
+      ],
+      "availability_mode": "all",
+      "command_topic": "jeedom2ha/628/6004/set",
+      "device": {
+        "identifiers": [
+          "jeedom2ha_628"
+        ],
+        "manufacturer": "Jeedom (virtual)",
+        "model": "virtual",
+        "name": "Charge voiture",
+        "suggested_area": "Energie",
+        "via_device": "jeedom2ha_bridge"
+      },
+      "name": "Charge voiture",
+      "object_id": "jeedom2ha_628_6004",
+      "origin": {
+        "name": "jeedom2ha",
+        "sw_version": "0.2.0"
+      },
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "payload_off": "OFF",
+      "payload_on": "ON",
+      "state_off": "OFF",
+      "state_on": "ON",
+      "state_topic": "jeedom2ha/628/6004/state",
+      "unique_id": "jeedom2ha_eq_628_cmd_6004"
+    },
+    "retain": true,
+    "topic": "homeassistant/switch/jeedom2ha_628_6004/config"
+  }
+]

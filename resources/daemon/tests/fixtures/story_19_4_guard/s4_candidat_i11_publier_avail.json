@@ -1,0 +1,7 @@
+[
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/628/availability"
+  }
+]

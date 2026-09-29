@@ -18,11 +18,10 @@ Fixture fidèle au terrain (box 192.168.1.21, capture 2026-06-19).
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from cache.disk_cache import load_publications_cache, save_publications_cache
 from discovery.publisher import DiscoveryPublisher
-from discovery.registry import PublisherRegistry
 from models.mapping import PublicationDecision
 from mapping.binary_sensor import BinarySensorMapper
 from mapping.registry import MapperRegistry
@@ -37,7 +36,6 @@ from models.topology import (
 )
 from transport.http_server import (
     _collect_unpublish_node_ids,
-    _publish_mapping_for_action,
     create_app,
 )
 
@@ -333,34 +331,35 @@ async def test_publish_binary_sensor_mono_backward_compatible_topic():
     assert payload["state_topic"] == "jeedom2ha/7100/state"
 
 
-async def test_action_publier_path_publishes_switch_and_all_secondaries():
-    # Régression PR #127 (review codex P2) : le chemin action « publier »
-    # (_publish_mapping_for_action) ne publiait que le switch primaire ; les 12 sensors
-    # + 1 binary_sensor (additional_mappings) restaient non publiés lors d'une
-    # re-inclusion sans sync complet → entités manquantes côté HA.
-    mqtt_bridge = MagicMock()
-    mqtt_bridge.publish_message.return_value = True
-    publisher_registry = PublisherRegistry(DiscoveryPublisher(mqtt_bridge))
+async def test_action_publier_path_publishes_switch_and_all_secondaries(aiohttp_client):
+    # Régression PR #127 (review codex P2) : le chemin action « publier » ne publiait que
+    # le switch primaire ; les 12 sensors + 1 binary_sensor (additional_mappings)
+    # restaient non publiés lors d'une re-inclusion sans sync complet → entités
+    # manquantes côté HA. Story 19.4 : « Publier » est un mini-sync (vrai endpoint,
+    # décision fraîche + `apply_publication_decision()` partagé avec le sync).
+    app = create_app(local_secret=_SECRET)
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message = MagicMock(return_value=True)
+    app["mqtt_bridge"] = bridge
+    client = await aiohttp_client(app)
+    headers = {"X-Local-Secret": _SECRET}
 
-    eq = _eq554()
-    snapshot = _snapshot(eq)
-    primary = MapperRegistry().map(eq, snapshot)
-    assert primary.ha_entity_type == "switch"
-    assert len(primary.additional_mappings) == 13
-
-    # L'action « publier » suit toujours un sync (revue Codex P1) : chaque secondaire
-    # doit porter la décision de ce dernier sync pour être (re)publié ici.
-    for secondary in primary.additional_mappings:
-        secondary.publication_decision_ref = PublicationDecision(
-            should_publish=True, reason="sure"
-        )
-
-    ok = await _publish_mapping_for_action(publisher_registry, primary, snapshot)
-    assert ok is True
+    with patch("transport.http_server.save_publications_cache"):
+        resp = await client.post("/action/sync", json=_sync_body(), headers=headers)
+        assert resp.status == 200
+        bridge.publish_message.reset_mock()
+        with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+            resp = await client.post(
+                "/action/execute",
+                json={"intention": "publier", "portee": "equipement", "selection": [554]},
+                headers=headers,
+            )
+    assert resp.status == 200
 
     config_topics = {
         call.args[0]
-        for call in mqtt_bridge.publish_message.call_args_list
+        for call in bridge.publish_message.call_args_list
         if call.args and call.args[0].endswith("/config")
     }
     expected = {"homeassistant/switch/jeedom2ha_554/config",

@@ -1,0 +1,232 @@
+[
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/553/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/554/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/583/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/1000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/1005/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/1006/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/2000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/2003/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/2005/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/2006/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/3000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/6001/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/7000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/7001/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/7002/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/7003/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/7004/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/8000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/8001/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/8002/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/8003/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/8004/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/9000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/9001/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/9002/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/9700/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/11000/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/11001/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/11002/availability"
+  },
+  {
+    "payload": "online",
+    "retain": true,
+    "topic": "jeedom2ha/457/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/3001/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/3002/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/3003/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/3004/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/2001/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/2002/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/2004/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/2007/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1001/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1002/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1003/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1004/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1007/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1008/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/1009/availability"
+  },
+  {
+    "payload": "",
+    "retain": true,
+    "topic": "jeedom2ha/628/availability"
+  }
+]

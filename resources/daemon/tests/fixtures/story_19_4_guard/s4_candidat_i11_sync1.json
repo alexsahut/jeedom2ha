@@ -1,0 +1,59 @@
+[
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_5980",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5980,
+        "command_topic": "jeedom2ha/628/5980/set",
+        "device_class_source": "virtual",
+        "grouping_key": "chauffage piscine",
+        "node_id": "jeedom2ha_628_5980",
+        "object_id": "jeedom2ha_628_5980"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_5983",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 5983,
+        "command_topic": "jeedom2ha/628/5983/set",
+        "device_class_source": "virtual",
+        "grouping_key": "chauffage spa",
+        "node_id": "jeedom2ha_628_5983",
+        "object_id": "jeedom2ha_628_5983"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "probable",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_628_cmd_6004",
+      "jeedom_eq_id": 628,
+      "reason_code": "switch_switch_on_off_state",
+      "reason_details": {
+        "cmd_id": 6004,
+        "command_topic": "jeedom2ha/628/6004/set",
+        "device_class_source": "virtual",
+        "grouping_key": "charge voiture",
+        "node_id": "jeedom2ha_628_6004",
+        "object_id": "jeedom2ha_628_6004"
+      }
+    },
+    "op": "publish"
+  }
+]

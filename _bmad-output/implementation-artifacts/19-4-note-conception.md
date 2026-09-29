@@ -1,0 +1,642 @@
+# Note de conception — Story 19.4 « Publier » en mini-sync (CC-18)
+
+Statut : brouillon pour relecture ClaudeBox avant tout code. Aucune ligne de
+production modifiée dans ce tour. Tous les numéros de ligne ci-dessous sont
+relevés sur `origin/main@5b14243` (fichier `resources/daemon/transport/
+http_server.py`, 3901 lignes) — **différents** de ceux cités dans la story
+(rédigée avant 19-2/19-3, donc périmés).
+
+## 1. État actuel, cartographié
+
+### 1.1 Les deux chemins, pas à pas
+
+**Chemin sync** (`_do_handle_action_sync`, l.1425-1885+) :
+
+1. Reconstruit une topologie fraîche depuis le payload Jeedom (`TopologySnapshot.from_jeedom_payload`, l.1452) et calcule `resolve_published_scope(snapshot, raw_scope=...)` (l.1457) → stocké dans `app["published_scope"]`, mais **jamais consulté ensuite pour décider de publier** (voir 1.4).
+2. `assess_all(snapshot)` (l.1460) → éligibilité par eq_id, stockée dans `app["eligibility"]`.
+3. Charge les overrides **une seule fois pour tout le cycle** (l.1515-1517) : `overrides_cache = list_overrides(data_dir)`, `equipment_overrides_cache = list_equipment_overrides(data_dir)`.
+4. Boucle sur `eligibility.items()` (l.1519) ; pour chaque eq_id éligible : `evaluate_equipment(eq, snapshot, result, mapper_registry=mapper_registry, confidence_policy=confidence_policy, persisted_overrides=overrides_cache, persisted_equipment_overrides=equipment_overrides_cache)` (l.1531-1539) → `evaluation.mapping` + `evaluation.equipment_decision` (+ `evaluation.secondary_decisions`, frais, un par secondaire).
+5. `_detect_lifecycle_changes(...)` (l.1549) dépublie l'ancien topic si retypage, AVANT toute republication.
+6. **`_prepare_publication_bookkeeping(eq_id, mapping, decision, snapshot, publications, nouveaux_eq_ids)` (l.1561, définie l.375-388) — LE point d'écriture canonique du verdict** : pose `decision.state_topic`, remet `decision.active_or_alive = False`, applique les métadonnées de disponibilité, puis `publications[eq_id] = decision` et `nouveaux_eq_ids.add(eq_id)`. Rien d'autre n'écrit le verdict `should_publish`/`reason` du principal dans ce chemin.
+7. Si `decision.should_publish` (l.1572) : tente le publish MQTT réel (`publisher_registry.publish`), gère `discovery_published`/`active_or_alive`/`publication_result`, republie les secondaires via `_publish_additional_sensors(... secondary_decisions=evaluation.secondary_decisions ...)` (l.1612-1619, **decisions fraîches**, pas `_secondary_publishable`).
+8. **Bloc « policy change → dépublication » (l.1648-1690)** : pour chaque `eq_id` toujours mappé (`nouveaux_eq_ids`), si `previous_decision` était publié (`_needs_discovery_unpublish`) ET que `current_decision.should_publish` est maintenant `False` → dépublication explicite (`publisher.unpublish_by_eq_id` + `_collect_unpublish_node_ids` + defer si échec + nettoyage local availability). C'est le mécanisme AC4 attend.
+9. **Bloc « purge des disparus » (l.1692-1733+)** : `eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids` — équipements plus du tout mappés (supprimés Jeedom ou devenus inéligibles) → même mécanique de dépublication, raison détaillée par `reason_code`.
+
+**Chemin « Publier »** (`_handle_action_execute`, l.3270-3901, branche `intention == "publier"` à partir de l.3546) :
+
+1. **N'utilise PAS un nouveau payload Jeedom.** Topologie = `request.app.get("topology")` (l.3331, le snapshot du DERNIER sync). `published_scope = request.app.get("published_scope")` (l.3332, calculé au dernier sync). `eligibility`/`mappings` (l.3393-3394) = les dicts figés du dernier sync.
+2. `eq_ids = _resolve_eq_ids_for_portee(portee, selection, topology)` (l.3386, définie l.391-422) — résout le périmètre demandé (équipement/pièce/global) en mémoire.
+3. Boucle sur `eq_ids` (l.3561+) : `mapping = mappings.get(eq_id)` — **le mapping CACHÉ du dernier sync, jamais recalculé** ; `previous_decision = publications.get(eq_id)` ; `is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)` (l.3565, définie l.455-464).
+4. Si `is_included` : `if not _should_attempt_publish(mapping, previous_decision): skip` (l.3572-3574, bug CC-18 ci-dessous), sinon `_publish_mapping_for_action(publisher_registry, mapping, topology)` (l.3576, définie l.612-659) qui publie le principal puis gate chaque secondaire via `_secondary_publishable(secondary)` (l.638, définie l.500-514, décision **figée** du dernier sync).
+5. Si **non** `is_included` : dépublication explicite si actuellement publié (l.3666-3736) — mécanisme déjà correct, mais **seulement pour l'exclusion de scope**, jamais pour un refus de `evaluate_equipment()`.
+
+### 1.2 Divergences avec le sync, localisées précisément
+
+| Divergence | Localisation | AC qui corrige |
+|---|---|---|
+| Tuple de confiance codé en dur `("sure", "probable")`, omet `"sure_mapping"` | `_should_attempt_publish`, l.482-489 (`mapping.confidence not in (...)`) | AC1 |
+| Vérifie le `reason` de la **décision précédente** (dernier sync/action) contre un tuple figé, jamais le verdict frais | `_should_attempt_publish`, l.490-497 | AC1 |
+| Deux codes du tuple (`unknown_skipped`, `ignore_skipped`) ne sont jamais produits par `decide_publication` (code mort) | `_should_attempt_publish`, l.493/496 vs `decide_publication.py:57` (`_PUBLISHABLE_CONFIDENCES`) | AC1 (nettoyage) |
+| `mapping = mappings.get(eq_id)` réutilise le mapping calculé au dernier sync **avec les overrides d'alors**, jamais recalculé avec les overrides/policy courants | `_handle_action_execute`, l.3563 | AC1, AC2, AC6 |
+| Équipement `is_included=True` mais devenu refusé (override d'exclusion ajouté) : `skip`, **aucune dépublication** | `_handle_action_execute`, l.3572-3574 (contraste avec le bloc sync l.1648-1690 qui, lui, dépublie) | AC4 |
+| `_secondary_publishable` lit `secondary.publication_decision_ref.should_publish` — verdict **figé** du dernier sync, jamais réévalué par une action | l.500-514 (docstring l.501-511 le documente explicitement comme voulu, contexte 19-2/P1-bis) | AC6 |
+| Couplage secondaires ↔ succès du principal : si `primary_ok` est `False`, `return False` immédiatement, secondaires jamais tentés | `_publish_mapping_for_action`, l.623-625 | Task 1 (guardrail, pas un AC direct — CC-18 ne le mentionne pas explicitement mais Task 1 l'exige) |
+| `_scope_entry_is_included` (l.455-464) gate réellement la publication côté « Publier », alors que le sync ne consulte JAMAIS `published_scope`/scope pour décider de publier (seulement `eligibility.is_eligible`, l.1519-1520) | `_scope_entry_is_included` vs boucle sync l.1519 | AC3 (voir section 5 — écart significatif, PAS nul en pratique, voir 19-1 terrain) |
+| `reason` reconstruit manuellement au succès (`publish_reason = mapping.confidence` si l'ancien reason était un code « skipped »/« failed ») au lieu du `reason` produit par `decide_publication()` | l.3603-3617 | Conséquence de AC1/AC2 une fois `evaluate_equipment()` branché : ce raccommodage disparaît, le `reason` vient directement de la décision fraîche |
+
+### 1.3 `_apply_pending_scope_flags` — précision utile
+
+Contrairement à ce que son commentaire dans la story laisse penser
+(« réimplémentation locale de l'inclusion de scope »), cette fonction
+(l.747-777) **ne recalcule pas** l'inclusion : elle lit `eq_entry.get(
+"effective_state")` déjà posé par `resolve_published_scope` et calcule
+uniquement un flag d'affichage `has_pending_home_assistant_changes` (état
+désiré vs `decision.active_or_alive`). Elle n'est donc pas la cible directe
+d'AC3 — la vraie question AC3 porte sur `_scope_entry_is_included` (qui, lui,
+gate réellement la publication côté « Publier », jamais côté sync). Voir
+section 5.
+
+### 1.4 Ce que ce bug NE fait PAS (pour cadrer la story)
+
+Le sync ignore aujourd'hui `published_scope`/`_scope_entry_is_included` pour
+décider de publier — il publie tout ce que `decision.should_publish` (verdict
+`decide_publication()`) autorise, indépendamment du scope UI. `published_scope`
+est une vue/contrat séparé (précédence équipement > pièce > global sur un
+arbre `raw_scope` fourni par le front-end), **sans lien algorithmique** avec
+les overrides `publication_excluded_*` consommés par `decide_publication()`.
+Ce sont deux mécanismes d'exclusion différents. Voir section 5 pour l'impact
+chiffré (102 exceptions de scope réelles mesurées sur la box, artefact 19-1).
+
+## 2. Conception cible
+
+### 2.1 Principe
+
+« Publier » devient un mini-sync sur son périmètre (`_resolve_eq_ids_for_portee`,
+déjà en place, l.391-422), qui traite chaque `eq_id` par **la même fonction de
+post-traitement que le sync** — aucune implémentation parallèle de la décision,
+du publish ou de la dépublication.
+
+### 2.2 Fonction extraite : `apply_publication_decision()`
+
+Nouvelle fonction (nom proposé, à ajuster en dev-story), extraite du corps
+actuel du sync, appelée **une fois par `eq_id`** par le sync ET par « Publier » :
+
+```python
+async def apply_publication_decision(
+    *,
+    eq_id: int,
+    mapping: MappingResult,                       # evaluation.mapping (frais)
+    decision: PublicationDecision,                 # evaluation.equipment_decision (frais)
+    secondary_decisions: List[PublicationDecision],# evaluation.secondary_decisions (frais)
+    snapshot: TopologySnapshot,
+    previous_decision: Optional[PublicationDecision],  # publications.get(eq_id) AVANT cet appel
+    publications: Dict[int, PublicationDecision],  # muté : publications[eq_id] = ...
+    publisher_registry: Optional[PublisherRegistry],
+    mqtt_bridge: Optional[MqttBridge],
+    publisher: Optional[DiscoveryPublisher],
+    pending_discovery_unpublish: Dict[int, object],
+    pending_local_cleanup: Dict[int, str],
+    mapping_counters: Optional[dict] = None,       # optionnel : "Publier" peut l'omettre
+) -> PublicationOutcome                            # nouveau petit dataclass (published/unpublished/skipped/failed + compteur)
+```
+
+Corps (assemblé à partir de code déjà existant, sans nouvelle logique de
+décision) :
+
+0. **Détection de retypage** — appel à `_detect_lifecycle_changes(...)` (l.931-970), **dans les deux
+   chemins** (C2, décision — section 2.4), avant toute autre étape : dépublie l'ancien topic si le
+   `eq_id` a été retypé (override TYPE) depuis la dernière écriture du verdict, y compris quand ce
+   retypage n'a jamais transité par un sync complet (cas : override TYPE posé, puis clic « Publier »
+   direct). Test dédié (section 6) : override TYPE posé sur un équipement déjà publié, clic « Publier »
+   ⇒ l'ancien topic est dépublié avant que le nouveau soit publié.
+1. **Bookkeeping** — identique à `_prepare_publication_bookkeeping` (l.375-388) : `decision.state_topic = _resolve_state_topic(mapping)`, `decision.active_or_alive = False`, `_apply_availability_metadata(...)`, puis `publications[eq_id] = decision`.
+2. **Si `decision.should_publish`** — tente le publish MQTT du principal (`publisher_registry.publish(mapping, snapshot)`) puis des secondaires, **gatés par `secondary_decisions` frais** (plus par `_secondary_publishable`/`publication_decision_ref` figé) : reprend le corps utile du bloc sync l.1573-1619 (gestion `discovery_published`/`active_or_alive`/`publication_result`/compteurs/local availability) — ce bloc remplace à la fois le bloc sync existant ET `_publish_mapping_for_action` (Publier). Le couplage principal/secondaires (l.623-625, `_publish_mapping_for_action`) est supprimé : un échec du principal n'empêche plus de tenter chaque secondaire.
+3. **Sinon, ou si transition publié → refusé** — si `previous_decision` était publié (`_needs_discovery_unpublish(previous_decision)`) : dépublication explicite, réutilisant tel quel le corps du bloc sync l.1648-1690 (`_collect_unpublish_node_ids` + `publisher.unpublish_by_eq_id` + `_defer_discovery_unpublish` si échec + nettoyage local availability). C'est le MÊME code que le bloc `else` déjà présent côté « Publier » (l.3666-3736) pour l'exclusion de scope — les deux se fusionnent en un seul appel (voir section 4).
+4. **Mise à jour des refs secondaires** — pour chaque secondaire, repointer `secondary.publication_decision_ref` vers sa `secondary_decision` fraîche (ou la fusionner avec l'état d'exécution via `_reset_secondary_runtime_state`, arbitrage détaillé section 3.3) : garantit que `sync/state.py`/`sync/command.py` (lecteurs I11) restent corrects sans aucune modification de ces fichiers (pattern déjà vérifié : lecture directe pour le principal, `publication_decision_ref` pour chaque secondaire).
+
+### 2.3 Ce qui est déplacé/fusionné
+
+| Élément actuel | Devenir |
+|---|---|
+| `_prepare_publication_bookkeeping` (l.375-388) | Absorbée telle quelle, étape 1 du nouveau helper |
+| Bloc publish MQTT du sync (l.1570-1607) | Généralisé, étape 2 |
+| `_publish_additional_sensors` (sync, secondaires) | Fusionnée avec `_publish_mapping_for_action` (Publier) en une seule logique de publication secondaires, gatée par `secondary_decisions` frais |
+| `_publish_mapping_for_action` (l.612-659) | Supprimée en tant que fonction séparée ; son corps utile (dispatch `publisher_registry.publish`) migre dans le nouveau helper |
+| `_secondary_publishable` (l.500-514) | Supprimée — plus aucun lecteur (remplacée par lecture directe de `secondary_decisions`) |
+| Bloc « policy change → dépublication » (l.1648-1690) | Absorbé étape 3, appelé **inline** par eq_id (plus de seconde boucle sur `nouveaux_eq_ids` après la boucle principale : `previous_decision` est déjà disponible au même point que `decision`, cf. l.1545 déjà lu avant bookkeeping — la boucle séparée existante est redondante avec ce qui est disponible inline, elle date d'un ajout ultérieur, Story 4.3/Task 2.7) |
+| Bloc `else` scope-exclu de « Publier » (l.3666-3736) | Fusionné avec l'étape 3 (même mécanisme de dépublication) — le déclenchement (scope exclu vs décision refusée) devient une seule condition (section 4/5) |
+
+### 2.4 Ce qui NE bouge PAS
+
+- **Bloc « purge des disparus »** (`eq_ids_supprimes`, l.1692-1733+) reste propre au sync : concept différent (eq_id plus du tout dans `nouveaux_eq_ids`, càd absent de la nouvelle topologie ou devenu inéligible) — « Publier » n'a pas cette notion, son périmètre vient de la topologie déjà connue (`app["topology"]`), pas d'un nouveau payload Jeedom.
+- **`_detect_lifecycle_changes`** (retypage/renommage) : **décision (C2, plus une question ouverte)** —
+  la fonction a déjà une signature compatible avec un appel depuis le post-traitement partagé (vérifié
+  par lecture, l.931-970). Elle est donc intégrée à `apply_publication_decision()`, appelée **dans les
+  deux chemins** (sync ET « Publier »), **avant** la décision de publication — cas concret couvert :
+  un retypage manuel (override TYPE) suivi d'un clic « Publier » doit dépublier l'ancien topic avant de
+  republier sous le nouveau type, symétriquement à ce que fait déjà le sync. Ce n'est plus une question
+  ouverte de cette note (l'ancienne question n°2 de la v1 est fermée), mais son placement exact dans
+  les 4 étapes du helper (avant l'étape 1 bookkeeping, section 2.2) reste à confirmer en Task 2 par
+  lecture fine de l'ordre d'opérations actuel du sync (l.1549, appelée avant l.1561).
+- **Branche « supprimer »** de `_handle_action_execute` (l.3409-3544) : inchangée, déjà conforme au principe 19-2 (n'écrit jamais le verdict canonique `evaluate_equipment()`, seulement un motif d'action `reason="excluded"`).
+
+### 2.5 Boucle appelante côté sync et côté « Publier »
+
+- **Sync** : pour chaque `eq_id` éligible (l.1519+), après `evaluate_equipment(...)` (l.1531-1539) et `_detect_lifecycle_changes` (l.1549), appelle `apply_publication_decision(eq_id=..., mapping=evaluation.mapping, decision=evaluation.equipment_decision, secondary_decisions=evaluation.secondary_decisions, ..., previous_decision=request.app["publications"].get(eq_id), ...)`. Le bloc « policy change » (l.1648-1690) est supprimé (absorbé, cf. 2.3). Le bloc « purge des disparus » reste séparé, après la boucle principale.
+- **« Publier »** (mini-sync) : relit `overrides_cache = list_overrides(data_dir)` / `equipment_overrides_cache = list_equipment_overrides(data_dir)` **une fois par clic** (comme le sync le fait une fois par cycle, l.1515-1517 — jamais par équipement). Pour chaque `eq_id` de `_resolve_eq_ids_for_portee(...)` : `result = eligibility.get(eq_id)` (depuis `app["eligibility"]`, calculé au dernier sync — pas de nouvelle éligibilité), `eq = snapshot.eq_logics.get(eq_id)` (depuis `app["topology"]`), puis `evaluate_equipment(eq, snapshot, result, mapper_registry=mapper_registry, confidence_policy=app["confidence_policy"], persisted_overrides=overrides_cache, persisted_equipment_overrides=equipment_overrides_cache)`, puis `apply_publication_decision(...)` avec `previous_decision = publications.get(eq_id)` (déjà lu, l.3564). `_should_attempt_publish` et `_scope_entry_is_included`-comme-gate-de-publication disparaissent de ce chemin (le filtre de scope pur reste appliqué séparément, section 5, mais pour le flag d'affichage, pas pour décider de publier — sauf arbitrage contraire, section 5/9).
+
+## 3. Principe 19-2 mis à jour, à écrire noir sur blanc
+
+### 3.1 Énoncé
+
+Le verdict canonique (`should_publish`/`reason` d'une `PublicationDecision`, principal ou secondaire)
+n'est **jamais** écrit ailleurs que par `evaluate_equipment()`, appelé via le post-traitement
+partagé `apply_publication_decision()` (section 2) — que ce soit depuis le sync complet ou depuis
+le mini-sync « Publier ». Aucune autre voie ne doit produire ou modifier ce verdict.
+
+- **« Supprimer »** (l.3409-3544) n'écrit jamais ce verdict : il écrit une `PublicationDecision(should_publish=False, reason="excluded")`
+  **directement**, sans passer par `evaluate_equipment()` — c'est un acte utilisateur explicite
+  (exclusion manuelle), pas une ré-évaluation de politique. Ce comportement existant reste inchangé ;
+  Task 2 ne doit pas le faire passer par le nouveau helper (il resterait cohérent avec 19-2, mais le
+  déplacement n'apporte rien et gonflerait le diff).
+- **L'état d'exécution** (`discovery_published`, `active_or_alive`, `publication_result`, timestamps
+  de dernière tentative) reste une notion séparée du verdict, déjà distinguée par
+  `_reset_secondary_runtime_state` (l.517-560, `dataclasses.replace` qui préserve `should_publish`/`reason`
+  et ne touche qu'aux champs d'exécution). Cette séparation est un invariant à **conserver**
+  tel quel dans `apply_publication_decision()` : l'étape 1 (bookkeeping) et l'étape 2/3 (publication
+  MQTT réelle) ne réécrivent jamais `should_publish`/`reason`, seulement les champs d'exécution.
+
+### 3.2 Devenir de `_sync_publication_decision_refs` et `_reset_secondary_runtime_state`
+
+- **`_reset_secondary_runtime_state`** (l.517-560) : **conservée**, réutilisée telle quelle par
+  `apply_publication_decision()` à l'étape 4 (mise à jour des refs secondaires) — c'est exactement
+  le mécanisme qui permet de fusionner un verdict frais (`secondary_decision` d'`evaluate_equipment()`)
+  avec l'état d'exécution courant sans perdre l'un ou l'autre.
+- **`_sync_publication_decision_refs`** (l.563-609) : **conservée (D3, ClaudeBox)**. Le handler
+  « Supprimer » l'utilise aussi (appels l.3477 et l.3490), pas seulement le sync — elle a donc un
+  appelant en dehors des deux chemins « sync »/« Publier » refactorés par cette story, et ne devient pas
+  un pur pass-through sans appelant restant. Ce qui devient effectivement mort, une fois que **chaque
+  appelant** (sync ET Publier) passe par `apply_publication_decision()`, c'est **`_secondary_publishable`**
+  — et seulement si l'inventaire Task 2 confirme qu'aucun appelant ne lui reste en dehors des deux
+  chemins étudiés ici. Point de vigilance Task 2 : `grep -rn _secondary_publishable` avant toute
+  suppression, et laisser `_sync_publication_decision_refs` intacte (utilisée par « Supprimer »).
+
+### 3.3 Arbitrage : repointer ou fusionner le ref secondaire ?
+
+Deux options pour l'étape 4 (mise à jour de `secondary.publication_decision_ref`) :
+
+- **(a) Repointer directement** vers `secondary_decision` (le verdict frais retourné par
+  `evaluate_equipment()`) — perd l'état d'exécution courant du secondaire (`discovery_published` etc.)
+  s'il n'est pas réappliqué séparément.
+- **(b) Fusionner** via `_reset_secondary_runtime_state(secondary, new_verdict=secondary_decision)`
+  (signature à vérifier/adapter, l.517-560) — préserve l'état d'exécution, ne change que
+  `should_publish`/`reason` si le verdict frais diffère du figé.
+
+**Recommandation : (b)**, par cohérence stricte avec le principe déjà appliqué au sync
+(`_reset_secondary_runtime_state` existe précisément pour ce cas). Reprendre (a) romprait la séparation
+verdict/exécution que 19-2 a justement introduite. Ce point est mécanique, pas un choix de design ouvert —
+à confirmer en Task 2 par simple lecture du corps actuel de `_reset_secondary_runtime_state`.
+
+### 3.4 Vérification des lecteurs de diagnostic
+
+- **`_compute_pipeline_step_visible`** (l.2211+, grep confirmé) : lit l'état des étapes du pipeline
+  (éligibilité → mapping → décision → publication) à partir des mêmes structures
+  (`eligibility`, `mappings`/`evaluation.mapping`, `publications[eq_id]`, état d'exécution) —
+  aucune de ces structures ne change de forme, seule leur **fraîcheur** change (verdict recalculé à
+  chaque « Publier » au lieu d'être lu depuis un cache figé). Le diagnostic reste correct sans
+  modification ; il devient même plus fiable puisqu'il reflète le verdict réellement appliqué,
+  plus une valeur périmée.
+- **`traceability.decision_trace`** : à vérifier en Task 2 s'il capture le verdict au moment de
+  `evaluate_equipment()` (cas correct, rien à changer) ou s'il capture un état antérieur
+  supposé provenir uniquement du sync (à vérifier par lecture ciblée du module `traceability`,
+  non lu dans cette note faute de temps — **question ouverte**, section 9, si le trace suppose
+  implicitement « un seul appelant = le sync »).
+
+## 4. Dépublication (AC4, AC5, AC6, I11)
+
+### 4.1 Mécanisme réutilisé, sans rien inventer
+
+La dépublication passe déjà, aujourd'hui, par la même chaîne dans les deux endroits qui en ont besoin
+(sync « policy change » l.1648-1690, et « Publier » branche scope-exclue l.3666-3736) :
+`_needs_discovery_unpublish(previous_decision)` (garde : était-il effectivement publié ?) →
+`_collect_unpublish_node_ids(mapping)` (l.796, résout la liste de node_ids MQTT, gère le multi-domaine) →
+`publisher.unpublish_by_eq_id(eq_id, entity_type, node_ids)` → en cas d'échec réseau/broker,
+`_defer_discovery_unpublish(...)` (l.893-928) qui mémorise l'eq_id dans
+`pending_discovery_unpublish` pour rejouer plus tard (`_replay_deferred_discovery_unpublish`)
+→ nettoyage de l'availability locale. **Task 2 n'invente aucune nouvelle mécanique de dépublication** :
+le nouveau helper `apply_publication_decision()` (étape 3, section 2.2) appelle ce même enchaînement,
+factorisant les deux copies actuelles en une seule.
+
+### 4.2 Cas du sync : équipement disparu ou refusé
+
+Le sync distingue déjà deux cas différents, qui **restent distincts** après Task 2 :
+
+- **« policy change »** (l.1648-1690) : l'eq_id est toujours dans `nouveaux_eq_ids` (topologie actuelle),
+  mais `evaluate_equipment()` retourne cette fois `should_publish=False` alors qu'il était publié —
+  absorbé dans `apply_publication_decision()` (section 2/3).
+- **« purge des disparus »** (l.1692-1733+, `eq_ids_supprimes = anciens_eq_ids - nouveaux_eq_ids`) :
+  l'eq_id a complètement disparu de la topologie ou est devenu inéligible — cas hors du périmètre
+  de « Publier » (qui n'a pas de nouvelle topologie, section 2.4), reste géré uniquement par le sync,
+  inchangé.
+
+### 4.3 Secondaire refusé, principal publié — dépublication par candidat (C1, bug confirmé)
+
+**Bug confirmé par lecture directe** (relecture ClaudeBox, points C1(i)/(ii)) :
+`_collect_unpublish_node_ids(mapping_result)` (l.796-848) prend **un seul** `mapping_result` et rend
+les node_ids du principal **et** de tous les secondaires **en un seul appel groupé** — jamais par
+candidat. Deux conséquences réelles, pas hypothétiques :
+- **(i)** bloc « policy change » (l.1648-1690) : quand le principal transite publié→refusé,
+  `_collect_unpublish_node_ids(previous_decision.mapping_result)` dépublie aussi les secondaires
+  **encore acceptés** ;
+- **(ii)** `_publish_additional_sensors` (l.237-312) fait un simple `continue` (l.281-284) quand un
+  secondaire est refusé — **aucune dépublication per-secondaire n'existe nulle part** dans le code actuel.
+
+**Correction (D1, ClaudeBox) : les 2 cas mesurés sur la box (`19-4-mesure-terrain-2026-09-29.md`,
+eq 579 Enphase, eq 585 chauffage piscine) ne sont PAS des fantômes.** Ce sont les candidats I11 de la
+story 19-2 : le principal est refusé (`ambiguous_skipped`) et les secondaires sont **acceptés et
+publiés légitimement** — la preuve 19-2 (28/09) a republié leurs 12 écouteurs d'état sans anomalie.
+Avec la dépublication par candidat, rien ne change pour eux, ni au sync ni au clic « Publier » : leurs
+secondaires restent acceptés, donc restent publiés. Ce que corrige (i) couvre un cas **futur**, pas ces
+2 cas déjà observés : une transition ultérieure du principal de publié à refusé n'effacera plus, à
+tort, ses secondaires encore acceptés au moment de cette transition. **B** (secondaire refusé
+isolément, principal publié, preuve de (ii)) n'est pas mesurable via les endpoints actuels
+(`/system/diagnostics` n'expose aucune décision par secondaire), mais le mécanisme visé par le
+correctif est le même.
+
+**Correction retenue** : factoriser, à partir du corps actuel de `_collect_unpublish_node_ids`, une
+fonction qui résout les node_ids d'**un seul candidat** (principal ou un secondaire précis) — sans
+dupliquer la logique existante (l'ancienne fonction peut devenir un simple appel groupé sur chaque
+candidat, ou être réécrite pour déléguer à la version par-candidat). Le post-traitement partagé
+`apply_publication_decision()` (étape 3, section 2.2) appelle cette fonction **par candidat**,
+indépendamment pour le principal et chaque secondaire, en comparant son propre verdict frais à son
+propre `previous_decision`/`publication_decision_ref`. C'est un **changement de comportement déclaré** :
+un principal refusé ne dépublie plus, à tort, ses secondaires acceptés ; un secondaire refusé isolément
+est désormais dépublié. Effet sur les 2 cas mesurés (579, 585) : **aucun changement** — leurs
+secondaires acceptés restent publiés à chaque sync et à chaque clic « Publier », exactement comme
+aujourd'hui ; le correctif ne fait que garantir ce même comportement lors d'une future transition du
+principal. B reste non quantifiable mais couvert par le même mécanisme.
+
+**Tests dédiés (section 6, à écrire avant le refactor sur ce point précis)** :
+- principal refusé, secondaire accepté ⇒ le secondaire reste publié (non-régression du cas symétrique) ;
+- secondaire refusé, principal accepté ⇒ seul le secondaire est dépublié ;
+- **fixture de type 579/585 (I11 : principal `ambiguous_skipped`, secondaires acceptés)** : deux syncs
+  successifs puis un clic « Publier » ⇒ aucun `unpublish` n'est déclenché, et les secondaires de 579 et
+  585 restent publiés à chaque passage. Critère terrain de non-régression : `listeners_removed` vide,
+  topics des secondaires de 579 et 585 toujours présents après déploiement.
+
+### 4.4 Principal refusé — devenir des secondaires (question n°4 fermée par 4.3)
+
+Avec la dépublication par candidat (4.3), le cas « principal refusé » n'entraîne plus de dépublication
+groupée de ses secondaires : chaque secondaire suit son propre verdict frais, indépendamment de celui
+du principal. La question ouverte n°4 de la v1 (« dépublication en cascade du principal vers ses
+secondaires ? ») est donc **fermée par construction** : il n'y a pas de cascade automatique — un
+secondaire encore accepté par `evaluate_equipment()` reste publié même si son principal ne l'est plus,
+sauf si son topic MQTT dépend structurellement du device HA créé par le principal (contrat multi-entités
+HA, hors périmètre de vérification de cette note — à confirmer en Task 2 par lecture du schéma discovery
+si un doute terrain apparaît).
+
+### 4.5 Idempotence (AC5) — vérifié dans le code actuel
+
+**Constat vérifié (l.3546-3610, lu ce tour) : le chemin « Publier » actuel n'a PAS de garde
+d'idempotence.** `_should_attempt_publish(mapping, previous_decision)` (l.482-497) ne teste que :
+(1) `mapping.confidence in ("sure", "probable")` (bug CC-18 : omet `sure_mapping`), et (2) que le
+`reason` de la décision **précédente** n'est pas dans une liste figée de 4 motifs de skip. **Elle ne
+teste jamais si l'équipement est déjà publié avec un verdict inchangé.** Dès que ces deux conditions
+passent, le code appelle inconditionnellement `_publish_mapping_for_action` (l.3575), qui refait un
+vrai envoi MQTT (discovery + state), **même si rien n'a changé depuis la dernière publication réussie**.
+Donc : **oui, le chemin actuel republie à chaque clic** un équipement déjà publié et toujours valide,
+tant que son mapping garde une confiance suffisante.
+
+**Correction (C3) — pas de garde de saut supplémentaire.** La v1 proposait ici une condition
+explicite pour *sauter* l'appel `publisher.publish(...)` quand le verdict est inchangé. **Cette garde
+est retirée** : le bouton « Republier » (AC5, distinct d'un simple re-clic « Publier ») doit pouvoir
+forcer un renvoi MQTT réel même à verdict inchangé (retained message à rafraîchir, par exemple après un
+redémarrage du broker) — une garde de saut basée uniquement sur `discovery_published`/`should_publish`
+bloquerait ce cas légitime. AC5 (idempotence) n'exige pas un saut d'appel, seulement l'**absence d'effet
+de bord indésirable** en cas de re-publication : pas de cycle unpublish/publish parasite, mêmes topics,
+même payload. Cette propriété découle déjà de 4.3 (dépublication strictement par candidat, sur
+transition de verdict uniquement) — un appel `publisher.publish(...)` répété avec un verdict inchangé
+ne déclenche aucune dépublication (aucune transition `True→False`), donc aucun effet de bord, sans
+code de garde supplémentaire à écrire.
+
+**Test dédié (section 6)** : deux clics successifs sur « Publier » (ou « Publier » puis « Republier »)
+sur un équipement déjà publié, verdict inchangé ⇒ aucun `unpublish_by_eq_id` n'est appelé entre les deux
+clics, et les topics/payloads publiés au second appel sont identiques au premier (mock/spy sur
+`PublisherRegistry`, comparaison des arguments des deux appels `publish(...)`).
+
+### 4.6 I11 — rien à changer côté lecteurs
+
+Comme établi en section 3.2/3.3 : tant que chaque candidat (principal et secondaires) a son verdict et
+son état d'exécution mis à jour par le helper unique, `sync/state.py`/`sync/command.py` restent corrects
+sans modification (lecture directe du `decision` pour le principal, `publication_decision_ref` pour
+les secondaires — pattern déjà homogène dans les deux fichiers, vérifié ligne 150-230/214-220).
+
+## 5. Filtre de scope unique (AC3)
+
+### 5.1 Ce que dit exactement la story (relu ce tour, texte source)
+
+AC3 : « **Given** une fonction pure de filtre de scope unique, appliquée après `evaluate_equipment()`
+par le sync et par « Publier » [...] **Then** cette fonction est le filtre de scope unique, sans
+réimplémentation locale, et est appliquée après la décision par le sync comme par « Publier » ».
+La section « Change Log » de la story ajoute explicitement : « *Le sync applique également le filtre
+de scope pur après la décision ; effet nul si 19-1 a relevé zéro état explicite.* » Les références
+techniques de la story désignent `_scope_entry_is_included` (l.448-457, désormais l.455 réel) comme
+« l'unique filtre d'inclusion de scope réel », et `_apply_pending_scope_flags` (l.630, désormais l.747)
+comme une « réimplémentation locale à consolider ».
+
+**Verdict de lecture du code (section 1/2) : `_apply_pending_scope_flags` n'est PAS une réimplémentation
+de la logique d'inclusion — elle lit déjà `effective_state` déjà calculé par `resolve_published_scope`,
+et ne fait que dériver un flag d'affichage (`has_pending_home_assistant_changes`).** La story a donc une
+prémisse à vérifier en Task 2 : il n'y a peut-être rien à « consolider » à cet endroit précis (pas de
+duplication trouvée), sauf si Task 2 découvre un troisième point de lecture de scope non vu ici
+(à chercher par `grep -n "effective_state\|is_included" resources/daemon/transport/http_server.py`
+avant de conclure qu'il n'y a rien à faire).
+
+### 5.2 La fonction pure retenue et son point d'application dans chaque chemin
+
+- **Fonction retenue** : `_scope_entry_is_included(eq_id, scope_entry, eligibility)` (l.455-466,
+  déjà pure — pas de lecture disque, pas de mutation), seule fonction qui décide réellement d'une
+  inclusion/exclusion de scope pour gater une action, aujourd'hui utilisée uniquement par « Publier ».
+- **« Publier »** : déjà appliquée aujourd'hui, avant la décision (l.3565-3567, `is_included` calculé
+  puis utilisé comme garde d'entrée dans la boucle). **Changement requis par AC3** : la story demande
+  qu'elle soit appliquée **après** la décision (`evaluate_equipment()`), pas avant, pour permettre le cas
+  où un équipement à la fois inclus au scope ET refusé par la décision doit être traité comme refusé
+  (fusion propre avec `apply_publication_decision()`, section 2), plutôt que deux filtres successifs
+  aux sémantiques mélangées.
+- **Sync** : **n'applique aujourd'hui aucun filtre de scope** avant de publier (section 1.4/2.5 —
+  seul `eligibility[eq_id].is_eligible` gate l'itération). AC3 demande de l'ajouter, après la décision,
+  symétriquement à « Publier ».
+
+### 5.3 ⚠️ Contradiction chiffrée entre l'hypothèse de la story et la mesure terrain 19-1
+
+La story justifie l'ajout du filtre de scope au sync par « effet nul si 19-1 a relevé zéro état
+explicite ». **Ce n'est pas ce que 19-1 a mesuré.** Le rapport terrain
+`19-1-field-proof-2026-09-28.md` (ligne 38, tableau avant/après) donne :
+
+```
+| Exceptions de scope explicite (mesure seule) | 102 | 102 |
+```
+
+— **102 exceptions de scope explicite réelles**, avant et après 19-1 (19-1 ne les modifie pas, il les
+mesure seulement), avec la liste des 102 `eq_id` en ligne 49+ du même artefact. Le postulat « effet nul »
+de la story 19-4 repose sur un chiffre qui n'est pas celui réellement mesuré.
+
+**Vérification terrain faite ce tour (C4, mesure A)** : sur les 102 exceptions de scope explicite,
+**A = 0** équipement combine à la fois `statut=publie` (topic discovery principal présent) ET un scope
+équipement `effective_state=exclude` (`19-4-mesure-terrain-2026-09-29.md`, section A). **Fait constaté
+(D4, ClaudeBox) : aucun équipement actuellement publié n'a de scope `exclude`** — sans plus d'explication
+sur le mécanisme qui produit ce résultat (l'hypothèse d'un scope déjà respecté en amont, en 1.4/5.2, n'a
+pas été démontrée par lecture de code et n'est pas retenue ici). Le postulat « effet nul » de la story
+est donc **vérifié vrai en pratique aujourd'hui, sur l'état mesuré de la box**, malgré les 102 exceptions
+de scope existantes (qui portent sur des équipements déjà non publiés côté scope) — sans affirmation sur
+la cause structurelle de ce résultat.
+
+### 5.4 Décision (C4, tranchée par la mesure terrain A=0)
+
+- **(a) Suivre AC3 à la lettre** : le sync applique aussi `_scope_entry_is_included` après la décision.
+- **(b) Limiter AC3 à « Publier » seul**, en changeant seulement le point d'application de
+  `_scope_entry_is_included` (avant → après décision) sans toucher au sync.
+
+**Décision retenue : (a), littéralement conforme au texte d'AC3.** La mesure terrain A=0 (5.3) montre
+qu'aucun équipement actuellement publié ne serait dépublié par ce changement — le risque décrit dans
+la version précédente de cette note (« jusqu'à 102 équipements pourraient changer de statut ») ne se
+matérialise pas sur l'état réel de la box : les 102 exceptions de scope portent sur des équipements déjà
+non publiés côté scope. L'option (a) aligne le sync sur le même filtre que « Publier », sans effet
+terrain immédiat mesuré, et ferme l'écart de fond entre les deux chemins plutôt que de le contourner.
+**Condition de sécurité conservée avant tout déploiement** : rejouer le harnais de parité (section 7.1)
+sur un export récent de la box juste avant la mise en production, pour confirmer que A est toujours à 0
+à ce moment-là (le scope explicite peut évoluer entre cette note et le déploiement réel).
+
+### 5.5 Retour arrière
+
+Le retour arrière prévu par la story reste valable quelle que soit l'option retenue : revert de la
+story/PR, `_should_attempt_publish` et `_secondary_publishable` reviennent à leur logique actuelle
+(CC-18 réintroduit), sans migration de données, aucun override existant perdu. Si l'option (a) a été
+retenue et déployée, le revert ne republie pas automatiquement les équipements dépubliés entre-temps
+par le nouveau gate scope du sync — à mentionner explicitement dans le plan de rollback si (a) est
+choisi (nuance absente du texte actuel de la story).
+
+## 6. Plan de tests
+
+Un test par AC, chacun explicitement écrit pour **échouer sur `main`** avant Task 2/3, puis passer
+après. Emplacement proposé : `resources/daemon/tests/unit/test_story_19_4_*.py` (nouveau, par AC ou
+regroupé — voir remarque finale).
+
+- **AC1 (`sure_mapping` publiable via « Publier »)** : fixture équipement dont le mapper retourne
+  `MappingResult(confidence="sure_mapping", ...)` (aucun mapper réel n'en produit aujourd'hui d'après
+  la lecture des mappers existants — **fixture construite à la main obligatoire**, justification :
+  `sure_mapping` est une valeur de confiance du contrat `decide_publication.py` (`_PUBLISHABLE_CONFIDENCES`)
+  prévue pour un usage futur/spécifique, mais aucun mapper du corpus doré actuel ne la produit ; sans
+  fixture manuelle, ce cas ne serait testable qu'en modifiant un mapper, hors périmètre de cette story).
+  Échoue sur `main` car `_should_attempt_publish` code en dur `("sure", "probable")` (l.487) — un
+  mapping `sure_mapping` y échoue toujours, quel que soit le `confidence_policy`.
+- **AC2 (override d'exclusion respecté par « Publier »)** : équipement avec
+  `publication_excluded_eqlogic`/`publication_excluded_command` actif ; appeler le handler « Publier ».
+  Échoue sur `main` si la décision **précédente en cache** (`mappings[eq_id]`/`previous_decision`, stale)
+  ne reflète pas encore l'override ajouté après le dernier sync — cas exact du bug de cache (section 1/2) :
+  `_should_attempt_publish` ne consulte jamais les overrides, seulement `mapping.confidence` et le
+  `reason` précédent.
+- **AC3 (filtre de scope unique, option (a) tranchée en 5.4)** : golden test comparant, sur le corpus
+  59 eqLogics, l'ensemble des eq_ids réellement publiés par le sync vs par « Publier » après filtrage
+  scope — doit être égal, **dans les deux chemins** (le sync applique désormais aussi le filtre).
+  Échoue sur `main` aujourd'hui de façon triviale : le sync ne filtre pas du tout sur le scope
+  (section 1.4/5.2). Inclure un cas construit avec un scope `exclude` explicite (le corpus réel n'en
+  a aucun sur un eq_id actuellement publié, mesure A=0, donc un cas de fixture est nécessaire pour
+  couvrir la branche « dépublication par scope côté sync »).
+- **AC4 (dépublication explicite, par candidat — C1)** : deux sous-cas distincts (section 4.3), chacun
+  échouant sur `main` pour une raison différente :
+  - principal refusé (override d'exclusion), secondaire toujours accepté ⇒ le secondaire reste publié.
+    Échoue sur `main` : `_collect_unpublish_node_ids(previous_decision.mapping_result)` (l.796-848)
+    dépublie aujourd'hui le secondaire avec le principal (C1-i) ;
+  - secondaire refusé isolément, principal toujours accepté ⇒ seul le secondaire est dépublié
+    (`publisher.unpublish_by_eq_id` appelé avec ses seuls node_ids). Échoue sur `main` :
+    `_publish_additional_sensors` (l.237-312) ne dépublie jamais un secondaire refusé (C1-ii, `continue`
+    silencieux l.281-284).
+  - Cas déjà couvert par l'existant, à garder en non-régression : principal refusé sans secondaire
+    ⇒ dépublication du principal (mécanisme 4.1/4.2, ne change pas).
+- **AC5 (idempotence)** : équipement déjà publié, verdict inchangé, clic « Publier » répété deux fois ;
+  vérifier que, sur les deux clics, **aucun `unpublish_by_eq_id` n'est appelé**, que les topics et le
+  contenu publiés sont **identiques** entre le premier et le second appel (mock/spy sur
+  `PublisherRegistry`), et que **la republication reste permise** (pas de saut d'appel — cf. 4.5, retrait
+  de C3). Ce n'est PAS un test « aucun second appel `publish` » : le second appel a bien lieu (republication
+  volontaire), seule l'absence d'effet de bord (dépublication parasite, dérive de topic/contenu) est
+  vérifiée. Échoue sur `main` si un cycle unpublish/publish parasite apparaît entre les deux clics.
+- **AC6 (secondaire réévalué, pas figé)** : secondaire publié, override modifiant son éligibilité ajouté
+  après le dernier sync (donc `secondary.publication_decision_ref.should_publish` reste `True` en cache),
+  clic « Publier ». Vérifier que le secondaire suit la décision fraîche (refusée) et non le ref figé.
+  Échoue sur `main` : `_secondary_publishable` (l.500-514) ne lit QUE `publication_decision_ref`, jamais
+  de recalcul — le test doit construire un scénario où le cache et le frais divergent, impossible à
+  distinguer sans modifier l'override entre deux évaluations dans le test.
+- **AC7 (parité 4 points d'appel)** : nouveau test, distinct du golden corpus 19.0 existant (qui compare
+  `evaluate_equipment()` à un appel pipeline direct, pas les 4 handlers HTTP réels). Structure proposée :
+  pour au moins un cas `sure_mapping` et un cas exclusion par override (les 2 cas exigés par le texte AC7),
+  invoquer/simuler les 4 chemins — sync (`_do_handle_action_sync`), « Publier » (`_handle_action_execute`
+  branche publier), surface pièce (lecteur `sync/state.py` déjà validé section 3.4/4.6), aperçu à blanc
+  (Story 19.3, chemin `proposed_overrides`) — et comparer les 4 verdicts obtenus pour le même eq_id/override
+  sur le même instantané. Réutilise le corpus doré 59 eqLogics comme source d'équipements, mais ajoute une
+  couche d'invocation des 4 handlers (pas seulement `evaluate_equipment()` isolé) — c'est le delta réel par
+  rapport à `test_story_19_0_parity_golden_corpus.py`. Complète `test_cc08_publisher_registry_matrix.py`
+  en y ajoutant, si besoin, les cas `sure_mapping`/override qui n'y sont pas déjà couverts (à vérifier en
+  Task 2 par lecture complète du fichier, lu seulement partiellement dans cette note — 100/420 lignes).
+
+- **Garde-fou du refactor (C5, à écrire AVANT toute extraction de code, pas après)** : un publisher
+  factice (`FakePublisherRegistry`/`FakeDiscoveryPublisher`, style déjà utilisé par
+  `test_cc08_publisher_registry_matrix.py`) enregistre chaque appel `publish`/`unpublish_by_eq_id`
+  (topic, payload/node_ids) pour le corpus doré des 59 eqLogics, exécuté via le sync complet **avant**
+  toute extraction. Rejouer le même corpus **après** l'extraction du helper `apply_publication_decision()`
+  (unité #1, section 8) doit produire une séquence d'appels **identique**, à l'exception des écarts
+  déclarés par C1 (4.3) et C3 (4.5) — tout autre écart est une régression du refactor, pas un changement
+  de comportement voulu. Les suites de parité existantes (19-0, 19-1, 19-2, `test_cc08_*`) doivent rester
+  vertes sans modification. Sur la box, le relevé de parité (section 7.1) doit être identique hors
+  changements déclarés. **Ce test est écrit en premier**, avant la Task 1 d'extraction (section 8, unité #1).
+
+**Remarque de découpage** : un fichier de test unique `test_story_19_4_publier_mini_sync.py` avec une
+classe/section par AC est recommandé plutôt que 7 fichiers séparés, pour partager les fixtures
+(topologie, overrides, mocks `PublisherRegistry`) sans dupliquer le setup — cohérent avec le style déjà
+observé dans `test_cc08_publisher_registry_matrix.py`/`test_story_19_0_parity_golden_corpus.py` (un seul
+fichier par thème, plusieurs cas internes).
+
+## 7. Risques et effet terrain
+
+**Rappel : cette section décrit une procédure, rien n'a été exécuté sur la box réelle (192.168.1.21)
+ce tour** — aucune commande de déploiement, aucun appel `/action/execute`, conformément au cadre de
+cette tâche (note de conception uniquement).
+
+### 7.1 Procédure (lecture seule) pour identifier les équipements à risque avant tout déploiement
+
+1. Lancer le harnais de parité existant (`parity_harness_19_0.compute_parity_report`, Story 19.0/19.1)
+   contre un export réel de la box (déjà produit pour 19-1, cf. `19-1-field-proof-2026-09-28.md`) —
+   comparer, pour chaque eq_id, le verdict `evaluate_equipment()` actuel au verdict produit par le
+   chemin « Publier » actuel (simulable en lisant le cache `app["publications"]` exporté, ou en
+   rejouant `_should_attempt_publish`/`_secondary_publishable` sur le même export). Tout eq_id où les
+   deux verdicts divergent (`should_publish` différent) est un candidat à changement de statut au
+   premier clic « Publier » post-déploiement — c'est la liste concrète à examiner avant toute mise en
+   production, pas une estimation abstraite.
+2. Croiser cette liste avec les 102 `eq_id` d'exceptions de scope explicite listés dans
+   `19-1-field-proof-2026-09-28.md` (ligne 49+) pour distinguer les divergences dues au bug CC-18
+   (AC1/AC2/AC6, changement voulu) de celles dues au filtre de scope (AC3, changement à arbitrer
+   section 5.4).
+3. Appeler `GET /system/diagnostics` (endpoint existant, `http_server.py:2913`, déjà exposé
+   `l.3865`) sur la box pour obtenir un instantané des étapes du pipeline par équipement
+   (`_compute_pipeline_step_visible`, section 3.4) — permet de vérifier, équipement par équipement
+   candidat à un changement, à quelle étape (éligibilité/mapping/décision/publication) le verdict
+   actuel diverge du verdict attendu après Task 2, sans déclencher de publication ni de dépublication
+   réelle (c'est un GET de diagnostic, pas une action).
+4. Ne déployer qu'après avoir documenté, pour chaque eq_id divergent trouvé à l'étape 1, s'il s'agit
+   d'un changement voulu (AC1/AC2/AC4/AC6, à assumer et communiquer) ou d'un effet de bord du choix
+   scope (AC3, à trancher avant, section 5.4).
+
+### 7.2 Risque automations Home Assistant
+
+Toute entité dépubliée (AC4, ou effet de bord AC3 si option (a) retenue, section 5.4) disparaît
+de Home Assistant. Si une automation HA référence directement l'`entity_id` correspondant (déclencheur,
+condition ou action), elle échoue silencieusement ou lève une erreur au prochain déclenchement — ce
+risque existe déjà aujourd'hui pour le sync (qui dépublie déjà les équipements disparus), mais devient
+**nouveau pour le bouton « Publier »**, qui aujourd'hui ne dépublie jamais rien (bug AC4). Un utilisateur
+cliquant « Publier » pour publier un nouvel équipement dans une pièce pourrait, sans le vouloir,
+dépublier un autre équipement de la même pièce devenu invalide entre-temps — c'est exactement le
+changement de comportement que l'« UI Impact: Oui » de la story anticipe déjà (texte relu section 5.1),
+mais qui mérite d'être communiqué explicitement à Alex avant déploiement (pas seulement noté dans le
+Change Log de la story).
+
+### 7.3 Preuve terrain (ii) — quel mécanisme d'exclusion UI existe réellement
+
+La story demande une preuve terrain (ii) : « exclusion UI équipement sans risque, cliquer « Publier »
+sur une pièce, constater la non-publication, puis le retour ». **Vérifié ce tour (grep + lecture,
+`core/ajax/jeedom2ha.ajax.php:590-604`, `core/class/jeedom2ha.class.php:665-745`,
+`plugin_info/configuration.php:118-303`)** : il n'existe, à ce jour, **aucune action UI qui écrit
+directement un override de publication** (`publication_excluded_eqlogic`/`publication_excluded_command`,
+Story 16.3) — confirmant le constat de ClaudeBox du 2026-09-29. Le SEUL mécanisme d'exclusion piloté
+par l'UI qui existe réellement est la page de configuration du plugin (`saveFilteringConfig`,
+`configuration.php` → `jeedom2ha.ajax.php:590`), qui écrit `excludedPlugins`/`excludedObjects`
+(config Jeedom, côté PHP). Ces deux clés sont lues par `jeedom2ha.class.php:665-745` lors de la
+construction de la topologie (`getFullTopology`) pour marquer un équipement `is_excluded=true`,
+`exclusion_source='plugin'|'object'` — **un mécanisme de SCOPE (fallback legacy déjà identifié en
+section 1/5, consommé par `resolve_published_scope`), pas un override de `decide_publication()`**.
+
+**Réponse à la question posée : oui, `saveFilteringConfig` est le bon candidat pour la preuve (ii)**,
+avec la nuance suivante à documenter dans la preuve terrain elle-même : elle prouve le chemin
+« exclusion de scope » (AC3), pas le chemin « override de décision » (AC2, qui n'a lui-même aucun
+proof-terrain UI possible faute d'action UI existante — cohérent avec le texte de la story qui ne
+demande la preuve (ii) que pour le sens « exclusion sans risque », pas pour un override explicite).
+Procédure exacte pour Task 5 : ajouter temporairement un `object_id` cible (une pièce de test, non
+critique) dans `excludedObjects` via la page de configuration, cliquer « Publier » sur cette pièce,
+constater l'absence de publication (ou la dépublication si déjà publiée, AC4), puis retirer la valeur
+de `excludedObjects` pour revenir à l'état initial (le « retour » de la preuve — manuel, pas automatique :
+le texte de la story dit « puis le retour », à ne pas lire comme un rollback automatisé par le code).
+
+## 8. Découpage en unités de 45 minutes
+
+Reprend les 7 tasks déjà définies par la story (relues ce tour, l.97-127), redécoupées en unités
+dev+tests d'environ 45 minutes chacune. L'extraction du helper partagé `apply_publication_decision()`
+(section 2) n'est pas une task supplémentaire : elle est le contenu technique des Tasks 1 et 3
+existantes, pas un ajout de périmètre.
+
+| # | Unité (~45 min) | Contenu | AC couverts |
+|---|---|---|---|
+| 1 | **Garde-fou du publisher factice (C5, en premier)** | Écrire le test de parité `FakePublisherRegistry` sur le corpus doré 59 (section 6, C5), exécuté sur le sync actuel **avant toute extraction** — capture la séquence d'appels publish/unpublish de référence | Garde-fou (aucun AC direct) |
+| 2 | Extraction du helper `apply_publication_decision()` | Créer la fonction (signature section 2.2, y compris l'étape 0 `_detect_lifecycle_changes`, C2) à partir du corps existant du sync (bookkeeping + publish + dépublication par candidat, C1), sans changer le comportement du sync ; rejouer le garde-fou #1, doit matcher hors écarts déclarés | Prépare AC1/AC4/AC5 |
+| 3 | Brancher le sync sur le helper | Remplacer le code inline du sync (l.1561-1690) par l'appel au helper ; supprimer la boucle « policy change » désormais redondante (section 2.3) ; suite de tests sync existante doit rester verte à 100% | Non-régression (pré-requis AC1-AC6) |
+| 4 | `_should_attempt_publish`/overrides frais côté « Publier » (AC1, AC2) | Remplacer la lecture de `mappings.get(eq_id)` (cache) par un appel `evaluate_equipment()` frais (overrides relus, `confidence_policy` de l'app) ; supprimer le tuple de confiance codé en dur | AC1, AC2 |
+| 5 | Tests AC1/AC2 | Écrire les deux tests dédiés (fixture `sure_mapping`, fixture override), vérifier qu'ils échouent avant le commit 3 et passent après | AC1, AC2 |
+| 6 | `_secondary_publishable` → décision fraîche (AC6) | Remplacer la lecture `publication_decision_ref.should_publish` par la lecture de `secondary_decisions` fraîches (section 3.3, option (b) recommandée) ; adapter `_reset_secondary_runtime_state` si besoin | AC6 |
+| 7 | Test AC6 | Scénario override ajouté après dernier sync, avant clic Publier | AC6 |
+| 8 | Brancher « Publier » sur le helper (AC4, AC5) | Remplacer `_publish_mapping_for_action` + la branche dépublication scope-exclue (l.3666-3736) par l'appel au helper commun ; supprimer le couplage principal/secondaires (l.623-625) | AC4, AC5 |
+| 9 | Tests AC4/AC5 | Scénario transition publié→refusé (dépublication), scénario idempotence (pas de republish inutile) | AC4, AC5 |
+| 10 | Implémentation AC3 (option (a) tranchée, section 5.4) | Appliquer `_scope_entry_is_included` après décision, dans « Publier » **et dans le sync** ; rejouer le harnais de parité (section 7.1) juste avant merge pour confirmer A=0 toujours vrai sur un export récent | AC3 |
+| 11 | Test AC3 (golden) | Golden test égalité des ensembles filtrés sync vs « Publier », plus un cas de fixture scope=exclude (section 6, aucun cas réel disponible sur le corpus actuel) | AC3 |
+| 12 | Test de parité à 4 points d'appel (AC7) | Nouveau test invoquant les 4 handlers réels (section 6), cas `sure_mapping` + cas override | AC7 |
+| 13 | Suppression du code mort | `_secondary_publishable` uniquement (si totalement remplacée) — `_sync_publication_decision_refs` **reste**, utilisée par « Supprimer » (l.3477, l.3490) ; vérification `grep -rn _secondary_publishable` qu'aucun appelant ne reste avant suppression (section 3.2) | — |
+| 14 | Mutation testing ciblé | Sur les fonctions modifiées (`apply_publication_decision`, `_should_attempt_publish`, filtre scope) — cohérent avec la pratique déjà en place sur ce repo (guardrails mutation mentionnés dans les stories précédentes) | — |
+| 15 | Guardrails + suite complète | `pytest tests/unit -q` (0 régression, convention Task 6 de la story), lint/type-check si applicable | — |
+| 16 | Preuve terrain (ii) + documentation fallback (i)/(iii) | Procédure section 7.3 (`saveFilteringConfig`), documentation des tests de fallback `sure_mapping` (section 6) | Preuve terrain |
+| 17 | Gate d'inventaire + rédaction PR | Gate obligatoire d'inventaire entités avant/après (convention repo, `sprint-status.yaml`), rédaction de la description PR (résumé, risques section 7, lien note de conception) | — |
+
+Soit environ **17 unités de 45 minutes (~13h)**. Aucune unité n'est bloquée en amont : l'arbitrage
+AC3 (section 5.4) est tranché par cette note (option (a), mesure A=0).
+
+### Une PR ou plusieurs ?
+
+**Recommandation : une seule PR**, comme pour les stories 19-1/19-2/19-3 précédentes (toutes mergées
+en une PR chacune, cf. historique `git log` du repo). Justification : les unités 1-9 (garde-fou + helper +
+branchement + AC1/AC2/AC4/AC5/AC6) forment un tout cohérent et interdépendant — brancher « Publier »
+sur `evaluate_equipment()` sans dépublication explicite (AC4) recréerait immédiatement un bug (ajout
+sans purge) ; scinder ne réduirait pas le risque de revue, seulement le nombre de commits. AC3 (unités
+10-11) reste dans la même PR : la mesure A=0 (5.3/5.4) écarte le risque terrain qui aurait justifié une
+PR séparée ; à isoler seulement si le harnais de parité rejoué juste avant merge (unité 10) révèle un A
+non nul entre-temps.
+
+## 9. Questions ouvertes
+
+**Questions fermées par la relecture ClaudeBox et la mesure terrain de ce tour** (gardées ici pour
+traçabilité, plus de décision à prendre) :
+
+- ~~AC3 — scope au sync : option (a) ou (b) ?~~ **Fermée : (a)** (section 5.4), la mesure terrain
+  A=0 (5.3) montre qu'aucun équipement actuellement publié ne bascule.
+- ~~`_detect_lifecycle_changes` branché sur « Publier » ?~~ **Fermée : oui** (C2, section 2.2/2.4),
+  intégrée à l'étape 0 du post-traitement partagé, dans les deux chemins.
+- ~~Dépublication en cascade du principal vers ses secondaires ?~~ **Fermée : non, pas de cascade**
+  (section 4.4) — chaque secondaire suit son propre verdict frais, conséquence directe de la
+  dépublication par candidat (C1, section 4.3).
+- ~~`traceability.decision_trace` suppose-t-il un appelant unique ?~~ **Fermée : non** (Q3 du rapport
+  ClaudeBox) — `_build_traceability()` (l.2091-2194) recalcule à la volée depuis l'état courant à chaque
+  `GET /system/diagnostics`, sans hypothèse sur qui (sync ou « Publier ») l'a écrit en dernier.
+- ~~`_apply_pending_scope_flags` a-t-elle un second point de lecture de scope caché ?~~ **Fermée : non**
+  (Q5 du rapport) — grep exhaustif fait, un seul point de décision réel (`_scope_entry_is_included`) plus
+  un flag d'affichage, rien à consolider.
+- ~~`test_cc08_publisher_registry_matrix.py` couvre-t-il déjà `sure_mapping`/override ?~~ **Fermée : non**
+  (Q6 du rapport, fichier lu en entier, 420 lignes) — AC7 reste entièrement à écrire, pas de redondance.
+
+**Questions restantes, à trancher/vérifier en Task 2 :**
+
+1. **Signature exacte de `apply_publication_decision()` — à valider, pas à considérer figée.** La
+   section 2.2 propose une signature et un découpage en étapes (dont l'étape 0 `_detect_lifecycle_changes`,
+   C2) à partir de la lecture du code existant ; c'est une proposition de conception, pas un contrat gelé —
+   Task 1 peut légitimement l'ajuster si l'implémentation réelle révèle un couplage non anticipé ici
+   (ex. accès à `request.app` non trivial à passer en paramètre pur).
+2. **Un secondaire dépend-il structurellement du device HA créé par son principal ?** (section 4.4,
+   nuance restante de l'ancienne question n°4) Si oui, un secondaire "accepté" pourrait quand même
+   perdre sa visibilité HA quand son principal est dépublié, même sans dépublication MQTT explicite de
+   ce secondaire — à vérifier par lecture du contrat de discovery multi-entités si un doute terrain
+   apparaît en Task 2/5 (aucun signe de ce couplage trouvé dans le code lu cette note, mais non exclu
+   par une lecture exhaustive du schéma discovery HA).

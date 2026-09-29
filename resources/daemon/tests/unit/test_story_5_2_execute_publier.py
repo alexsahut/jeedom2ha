@@ -55,6 +55,12 @@ def _unpublished_decision(mapping: MappingResult) -> PublicationDecision:
     )
 
 
+
+def _light_cmds(eq_id: int) -> list:
+    """Story 19.4 — « Publier » réévalue l'équipement à neuf (mini-sync) : la topologie
+    doit porter les commandes réelles, cohérentes avec `_light_mapping`."""
+    return list(_light_mapping(eq_id).commands.values())
+
 def _make_topology() -> TopologySnapshot:
     return TopologySnapshot(
         timestamp="2026-04-06T08:00:00Z",
@@ -63,10 +69,10 @@ def _make_topology() -> TopologySnapshot:
             2: JeedomObject(id=2, name="Cuisine"),
         },
         eq_logics={
-            10: JeedomEqLogic(id=10, name="Lampe Salon", object_id=1, is_enable=True),
-            11: JeedomEqLogic(id=11, name="Prise Salon", object_id=1, is_enable=True),
-            12: JeedomEqLogic(id=12, name="Lampe exclue", object_id=1, is_enable=True, is_excluded=True, exclusion_source="eqlogic"),
-            20: JeedomEqLogic(id=20, name="Lampe Cuisine", object_id=2, is_enable=True),
+            10: JeedomEqLogic(id=10, name="Lampe Salon", object_id=1, is_enable=True, cmds=_light_cmds(10)),
+            11: JeedomEqLogic(id=11, name="Applique Salon", object_id=1, is_enable=True, cmds=_light_cmds(11)),
+            12: JeedomEqLogic(id=12, name="Lampe exclue", object_id=1, is_enable=True, is_excluded=True, exclusion_source="eqlogic", cmds=_light_cmds(12)),
+            20: JeedomEqLogic(id=20, name="Lampe Cuisine", object_id=2, is_enable=True, cmds=_light_cmds(20)),
         },
     )
 
@@ -107,7 +113,7 @@ def _make_published_scope() -> dict:
             {
                 "eq_id": 11,
                 "object_id": 1,
-                "name": "Prise Salon",
+                "name": "Applique Salon",
                 "effective_state": "include",
                 "decision_source": "global",
                 "is_exception": False,
@@ -273,6 +279,9 @@ async def test_publier_piece_scope_enforces_unpublish_for_excluded_equipment(cli
 async def test_publier_returns_idempotent_success_when_no_change_and_no_error(cli, app):
     app["mappings"].pop(10)
     app["mappings"].pop(11)
+    # Story 19.4 — « Publier » réévalue à neuf : sans commandes, l'équipement ne se mappe plus.
+    app["topology"].eq_logics[10].cmds = []
+    app["topology"].eq_logics[11].cmds = []
     app["publications"][11] = _unpublished_decision(_light_mapping(11))
     app["publications"][12] = _unpublished_decision(_light_mapping(12))
 

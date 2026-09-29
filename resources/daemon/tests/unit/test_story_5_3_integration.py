@@ -44,13 +44,19 @@ def _published_decision(mapping: MappingResult) -> PublicationDecision:
     )
 
 
+
+def _light_cmds(eq_id: int) -> list:
+    """Story 19.4 — « Publier » réévalue l'équipement à neuf (mini-sync) : la topologie
+    doit porter les commandes réelles, cohérentes avec `_light_mapping`."""
+    return list(_light_mapping(eq_id).commands.values())
+
 def _make_topology() -> TopologySnapshot:
     return TopologySnapshot(
         timestamp="2026-04-07T08:00:00Z",
         objects={1: JeedomObject(id=1, name="Salon")},
         eq_logics={
-            10: JeedomEqLogic(id=10, name="Lampe Salon", object_id=1, is_enable=True),
-            11: JeedomEqLogic(id=11, name="Prise Salon", object_id=1, is_enable=True),
+            10: JeedomEqLogic(id=10, name="Lampe Salon", object_id=1, is_enable=True, cmds=_light_cmds(10)),
+            11: JeedomEqLogic(id=11, name="Applique Salon", object_id=1, is_enable=True, cmds=_light_cmds(11)),
         },
     )
 
@@ -84,7 +90,7 @@ def _make_published_scope() -> dict:
             {
                 "eq_id": 11,
                 "object_id": 1,
-                "name": "Prise Salon",
+                "name": "Applique Salon",
                 "effective_state": "include",
                 "decision_source": "global",
                 "is_exception": False,
