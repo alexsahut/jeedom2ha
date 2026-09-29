@@ -279,3 +279,90 @@ Comme établi en section 3.2/3.3 : tant que chaque candidat (principal et second
 son état d'exécution mis à jour par le helper unique, `sync/state.py`/`sync/command.py` restent corrects
 sans modification (lecture directe du `decision` pour le principal, `publication_decision_ref` pour
 les secondaires — pattern déjà homogène dans les deux fichiers, vérifié ligne 150-230/214-220).
+
+## 5. Filtre de scope unique (AC3)
+
+### 5.1 Ce que dit exactement la story (relu ce tour, texte source)
+
+AC3 : « **Given** une fonction pure de filtre de scope unique, appliquée après `evaluate_equipment()`
+par le sync et par « Publier » [...] **Then** cette fonction est le filtre de scope unique, sans
+réimplémentation locale, et est appliquée après la décision par le sync comme par « Publier » ».
+La section « Change Log » de la story ajoute explicitement : « *Le sync applique également le filtre
+de scope pur après la décision ; effet nul si 19-1 a relevé zéro état explicite.* » Les références
+techniques de la story désignent `_scope_entry_is_included` (l.448-457, désormais l.455 réel) comme
+« l'unique filtre d'inclusion de scope réel », et `_apply_pending_scope_flags` (l.630, désormais l.747)
+comme une « réimplémentation locale à consolider ».
+
+**Verdict de lecture du code (section 1/2) : `_apply_pending_scope_flags` n'est PAS une réimplémentation
+de la logique d'inclusion — elle lit déjà `effective_state` déjà calculé par `resolve_published_scope`,
+et ne fait que dériver un flag d'affichage (`has_pending_home_assistant_changes`).** La story a donc une
+prémisse à vérifier en Task 2 : il n'y a peut-être rien à « consolider » à cet endroit précis (pas de
+duplication trouvée), sauf si Task 2 découvre un troisième point de lecture de scope non vu ici
+(à chercher par `grep -n "effective_state\|is_included" resources/daemon/transport/http_server.py`
+avant de conclure qu'il n'y a rien à faire).
+
+### 5.2 La fonction pure retenue et son point d'application dans chaque chemin
+
+- **Fonction retenue** : `_scope_entry_is_included(eq_id, scope_entry, eligibility)` (l.455-466,
+  déjà pure — pas de lecture disque, pas de mutation), seule fonction qui décide réellement d'une
+  inclusion/exclusion de scope pour gater une action, aujourd'hui utilisée uniquement par « Publier ».
+- **« Publier »** : déjà appliquée aujourd'hui, avant la décision (l.3565-3567, `is_included` calculé
+  puis utilisé comme garde d'entrée dans la boucle). **Changement requis par AC3** : la story demande
+  qu'elle soit appliquée **après** la décision (`evaluate_equipment()`), pas avant, pour permettre le cas
+  où un équipement à la fois inclus au scope ET refusé par la décision doit être traité comme refusé
+  (fusion propre avec `apply_publication_decision()`, section 2), plutôt que deux filtres successifs
+  aux sémantiques mélangées.
+- **Sync** : **n'applique aujourd'hui aucun filtre de scope** avant de publier (section 1.4/2.5 —
+  seul `eligibility[eq_id].is_eligible` gate l'itération). AC3 demande de l'ajouter, après la décision,
+  symétriquement à « Publier ».
+
+### 5.3 ⚠️ Contradiction chiffrée entre l'hypothèse de la story et la mesure terrain 19-1
+
+La story justifie l'ajout du filtre de scope au sync par « effet nul si 19-1 a relevé zéro état
+explicite ». **Ce n'est pas ce que 19-1 a mesuré.** Le rapport terrain
+`19-1-field-proof-2026-09-28.md` (ligne 38, tableau avant/après) donne :
+
+```
+| Exceptions de scope explicite (mesure seule) | 102 | 102 |
+```
+
+— **102 exceptions de scope explicite réelles**, avant et après 19-1 (19-1 ne les modifie pas, il les
+mesure seulement), avec la liste des 102 `eq_id` en ligne 49+ du même artefact. Le postulat « effet nul »
+de la story 19-4 repose sur un chiffre qui n'est pas celui réellement mesuré.
+
+**Conséquence si AC3 est implémenté tel quel (sync applique aussi `_scope_entry_is_included` après
+décision)** : au premier sync suivant le déploiement de la story, tout équipement parmi ces 102 dont
+le scope explicite est `exclude` (à distinguer de `include`, le tableau ne détaille pas la répartition
+include/exclude dans les 102 — **à vérifier avant tout code**, `grep` sur la liste des 102 eq_ids dans
+19-1 croisée avec leur `raw_state`) pourrait être **dépublié par le sync lui-même**, alors qu'il ne
+l'était jamais avant (le sync ignorait le scope). C'est un changement de comportement réel et non
+négligeable, hors du contrôle utilisateur explicite (« Publier »), déclenché automatiquement par le
+prochain cycle de sync — à ne pas traiter comme un simple effet de bord de cette story.
+
+### 5.4 Deux options, à trancher avant Task 2 (pas par cette note)
+
+- **(a) Suivre AC3 à la lettre** : le sync applique aussi `_scope_entry_is_included` après la décision.
+  Risque réel mesuré : jusqu'à 102 équipements pourraient changer de statut de publication au premier
+  sync post-déploiement, sans action utilisateur. Nécessite au minimum : (i) vérifier la répartition
+  include/exclude réelle des 102 avant d'écrire le code, (ii) un test de non-régression golden-corpus
+  spécifique sur ces 102 eq_ids (ou un sous-ensemble représentatif), (iii) informer Alex du risque
+  terrain avant tout déploiement (section 7).
+- **(b) Limiter AC3 à « Publier » seul** : harmoniser uniquement la fonction pure utilisée (déjà
+  `_scope_entry_is_included`, déjà partagée en pratique puisque seul « Publier » l'utilise), en
+  changeant seulement SON point d'application (avant → après décision), sans toucher au comportement
+  du sync. Plus proche du risque nul réellement recherché par la story, mais **ne respecte pas la
+  lettre d'AC3** telle qu'écrite (« appliquée [...] par le sync comme par Publier »).
+
+**Recommandation de cette note : (b) par défaut, sauf si Alex/ClaudeBox confirment explicitement
+vouloir (a) en connaissance du chiffre réel (102, pas zéro).** AC3 devrait alors être reformulé pour
+ne plus affirmer un « effet nul » qui n'est pas vérifié. Ce point est la question ouverte n°1 de la
+section 9 — aucun code de Task 2 ne doit être écrit sur ce point avant arbitrage explicite.
+
+### 5.5 Retour arrière
+
+Le retour arrière prévu par la story reste valable quelle que soit l'option retenue : revert de la
+story/PR, `_should_attempt_publish` et `_secondary_publishable` reviennent à leur logique actuelle
+(CC-18 réintroduit), sans migration de données, aucun override existant perdu. Si l'option (a) a été
+retenue et déployée, le revert ne republie pas automatiquement les équipements dépubliés entre-temps
+par le nouveau gate scope du sync — à mentionner explicitement dans le plan de rollback si (a) est
+choisi (nuance absente du texte actuel de la story).
