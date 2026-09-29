@@ -137,11 +137,6 @@
   {
     "payload": "online",
     "retain": true,
-    "topic": "jeedom2ha/6000/availability"
-  },
-  {
-    "payload": "online",
-    "retain": true,
     "topic": "jeedom2ha/6001/availability"
   },
   {

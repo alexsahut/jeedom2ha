@@ -969,20 +969,6 @@
   {
     "entity_type": "light",
     "mapping": {
-      "confidence": "probable",
-      "ha_entity_type": "light",
-      "ha_unique_id": "jeedom2ha_eq_6000",
-      "jeedom_eq_id": 6000,
-      "reason_code": "light_brightness_only",
-      "reason_details": {
-        "brightness": "state_numeric_as_brightness"
-      }
-    },
-    "op": "publish"
-  },
-  {
-    "entity_type": "light",
-    "mapping": {
       "confidence": "sure",
       "ha_entity_type": "light",
       "ha_unique_id": "jeedom2ha_eq_6001",

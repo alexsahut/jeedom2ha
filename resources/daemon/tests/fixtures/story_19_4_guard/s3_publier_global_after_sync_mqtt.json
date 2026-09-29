@@ -2291,51 +2291,6 @@
           "topic": "jeedom2ha/bridge/status"
         },
         {
-          "topic": "jeedom2ha/6000/availability"
-        }
-      ],
-      "availability_mode": "all",
-      "brightness_command_topic": "jeedom2ha/6000/brightness/set",
-      "brightness_scale": 100,
-      "brightness_state_topic": "jeedom2ha/6000/brightness",
-      "color_mode": true,
-      "command_topic": "jeedom2ha/6000/set",
-      "device": {
-        "identifiers": [
-          "jeedom2ha_6000"
-        ],
-        "manufacturer": "Jeedom (virtual)",
-        "model": "virtual",
-        "name": "Blocked ha_missing_command_topic 6000",
-        "suggested_area": "Salon",
-        "via_device": "jeedom2ha_bridge"
-      },
-      "name": "Blocked ha_missing_command_topic 6000",
-      "object_id": "jeedom2ha_6000",
-      "origin": {
-        "name": "jeedom2ha",
-        "sw_version": "0.2.0"
-      },
-      "payload_available": "online",
-      "payload_not_available": "offline",
-      "payload_off": "OFF",
-      "payload_on": "ON",
-      "state_topic": "jeedom2ha/6000/state",
-      "supported_color_modes": [
-        "brightness"
-      ],
-      "unique_id": "jeedom2ha_eq_6000"
-    },
-    "retain": true,
-    "topic": "homeassistant/light/jeedom2ha_6000/config"
-  },
-  {
-    "payload": {
-      "availability": [
-        {
-          "topic": "jeedom2ha/bridge/status"
-        },
-        {
           "topic": "jeedom2ha/6001/availability"
         }
       ],

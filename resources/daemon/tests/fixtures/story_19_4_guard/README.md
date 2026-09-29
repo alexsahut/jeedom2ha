@@ -22,15 +22,6 @@ JSON/retain via le vrai `DiscoveryPublisher` posé sur `MqttRecordingBridge`).
   `sure` acceptés, sync2 principal toujours accepté mais un secondaire
   (cmd 5980) refusé.
 
-## Écarts attendus à l'unité #3 (refactor de `apply_publication_decision()`)
-
-- **S3** : 81 appels aujourd'hui ⇒ 80 attendus — l'eq 6000
-  (`ha_missing_command_topic`) est publié par le clic « Publier » global bien
-  que le sync le refuse (`_should_attempt_publish` ne regarde que la
-  confiance) ; il ne devra plus être publié.
-- **S4** : le clic « Publier » devra publier les secondaires acceptés du
-  candidat I11 (aujourd'hui 0 appel côté « Publier »).
-
 ## Écarts réalisés à l'unité 3b-2 (C1, dépublication par candidat)
 
 Seules les fixtures S5 et S6 ont été régénérées (`JEEDOM2HA_GUARD_REGEN=1`).
@@ -43,3 +34,15 @@ Seules les fixtures S5 et S6 ont été régénérées (`JEEDOM2HA_GUARD_REGEN=1`
 - **S6** : un `unpublish` de `jeedom2ha_628_5980` seul ; un effacement MQTT de
   plus ; disponibilité inchangée (`online`).
 - S1 à S4 : identiques.
+
+## Écarts réalisés à l'unité 4 (« Publier » en mini-sync)
+
+Seules les fixtures « Publier » de S3 et S4 ont été régénérées (`JEEDOM2HA_GUARD_REGEN=1`).
+
+- **S3** : 81 ⇒ 80 appels ; l'eq 6000 (`ha_missing_command_topic`), que le
+  sync refuse, n'est plus publié par « Publier ». MQTT : 81 ⇒ 80 ;
+  disponibilité : 47 ⇒ 46 (plus de `jeedom2ha/6000/availability`).
+- **S4** : le clic « Publier » publie les 3 secondaires acceptés du candidat
+  I11 et sa disponibilité `online` (0 ⇒ 3 appels, 0 ⇒ 1 message de
+  disponibilité) ; toujours aucun `unpublish`.
+- Syncs de S3 et S4, S1, S2, S5, S6 : identiques.
