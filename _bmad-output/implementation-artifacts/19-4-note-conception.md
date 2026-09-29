@@ -428,3 +428,72 @@ classe/section par AC est recommandé plutôt que 7 fichiers séparés, pour par
 (topologie, overrides, mocks `PublisherRegistry`) sans dupliquer le setup — cohérent avec le style déjà
 observé dans `test_cc08_publisher_registry_matrix.py`/`test_story_19_0_parity_golden_corpus.py` (un seul
 fichier par thème, plusieurs cas internes).
+
+## 7. Risques et effet terrain
+
+**Rappel : cette section décrit une procédure, rien n'a été exécuté sur la box réelle (192.168.1.21)
+ce tour** — aucune commande de déploiement, aucun appel `/action/execute`, conformément au cadre de
+cette tâche (note de conception uniquement).
+
+### 7.1 Procédure (lecture seule) pour identifier les équipements à risque avant tout déploiement
+
+1. Lancer le harnais de parité existant (`parity_harness_19_0.compute_parity_report`, Story 19.0/19.1)
+   contre un export réel de la box (déjà produit pour 19-1, cf. `19-1-field-proof-2026-09-28.md`) —
+   comparer, pour chaque eq_id, le verdict `evaluate_equipment()` actuel au verdict produit par le
+   chemin « Publier » actuel (simulable en lisant le cache `app["publications"]` exporté, ou en
+   rejouant `_should_attempt_publish`/`_secondary_publishable` sur le même export). Tout eq_id où les
+   deux verdicts divergent (`should_publish` différent) est un candidat à changement de statut au
+   premier clic « Publier » post-déploiement — c'est la liste concrète à examiner avant toute mise en
+   production, pas une estimation abstraite.
+2. Croiser cette liste avec les 102 `eq_id` d'exceptions de scope explicite listés dans
+   `19-1-field-proof-2026-09-28.md` (ligne 49+) pour distinguer les divergences dues au bug CC-18
+   (AC1/AC2/AC6, changement voulu) de celles dues au filtre de scope (AC3, changement à arbitrer
+   section 5.4).
+3. Appeler `GET /system/diagnostics` (endpoint existant, `http_server.py:2913`, déjà exposé
+   `l.3865`) sur la box pour obtenir un instantané des étapes du pipeline par équipement
+   (`_compute_pipeline_step_visible`, section 3.4) — permet de vérifier, équipement par équipement
+   candidat à un changement, à quelle étape (éligibilité/mapping/décision/publication) le verdict
+   actuel diverge du verdict attendu après Task 2, sans déclencher de publication ni de dépublication
+   réelle (c'est un GET de diagnostic, pas une action).
+4. Ne déployer qu'après avoir documenté, pour chaque eq_id divergent trouvé à l'étape 1, s'il s'agit
+   d'un changement voulu (AC1/AC2/AC4/AC6, à assumer et communiquer) ou d'un effet de bord du choix
+   scope (AC3, à trancher avant, section 5.4).
+
+### 7.2 Risque automations Home Assistant
+
+Toute entité dépubliée (AC4, ou effet de bord AC3 si option (a) retenue, section 5.4) disparaît
+de Home Assistant. Si une automation HA référence directement l'`entity_id` correspondant (déclencheur,
+condition ou action), elle échoue silencieusement ou lève une erreur au prochain déclenchement — ce
+risque existe déjà aujourd'hui pour le sync (qui dépublie déjà les équipements disparus), mais devient
+**nouveau pour le bouton « Publier »**, qui aujourd'hui ne dépublie jamais rien (bug AC4). Un utilisateur
+cliquant « Publier » pour publier un nouvel équipement dans une pièce pourrait, sans le vouloir,
+dépublier un autre équipement de la même pièce devenu invalide entre-temps — c'est exactement le
+changement de comportement que l'« UI Impact: Oui » de la story anticipe déjà (texte relu section 5.1),
+mais qui mérite d'être communiqué explicitement à Alex avant déploiement (pas seulement noté dans le
+Change Log de la story).
+
+### 7.3 Preuve terrain (ii) — quel mécanisme d'exclusion UI existe réellement
+
+La story demande une preuve terrain (ii) : « exclusion UI équipement sans risque, cliquer « Publier »
+sur une pièce, constater la non-publication, puis le retour ». **Vérifié ce tour (grep + lecture,
+`core/ajax/jeedom2ha.ajax.php:590-604`, `core/class/jeedom2ha.class.php:665-745`,
+`plugin_info/configuration.php:118-303`)** : il n'existe, à ce jour, **aucune action UI qui écrit
+directement un override de publication** (`publication_excluded_eqlogic`/`publication_excluded_command`,
+Story 16.3) — confirmant le constat de ClaudeBox du 2026-09-29. Le SEUL mécanisme d'exclusion piloté
+par l'UI qui existe réellement est la page de configuration du plugin (`saveFilteringConfig`,
+`configuration.php` → `jeedom2ha.ajax.php:590`), qui écrit `excludedPlugins`/`excludedObjects`
+(config Jeedom, côté PHP). Ces deux clés sont lues par `jeedom2ha.class.php:665-745` lors de la
+construction de la topologie (`getFullTopology`) pour marquer un équipement `is_excluded=true`,
+`exclusion_source='plugin'|'object'` — **un mécanisme de SCOPE (fallback legacy déjà identifié en
+section 1/5, consommé par `resolve_published_scope`), pas un override de `decide_publication()`**.
+
+**Réponse à la question posée : oui, `saveFilteringConfig` est le bon candidat pour la preuve (ii)**,
+avec la nuance suivante à documenter dans la preuve terrain elle-même : elle prouve le chemin
+« exclusion de scope » (AC3), pas le chemin « override de décision » (AC2, qui n'a lui-même aucun
+proof-terrain UI possible faute d'action UI existante — cohérent avec le texte de la story qui ne
+demande la preuve (ii) que pour le sens « exclusion sans risque », pas pour un override explicite).
+Procédure exacte pour Task 5 : ajouter temporairement un `object_id` cible (une pièce de test, non
+critique) dans `excludedObjects` via la page de configuration, cliquer « Publier » sur cette pièce,
+constater l'absence de publication (ou la dépublication si déjà publiée, AC4), puis retirer la valeur
+de `excludedObjects` pour revenir à l'état initial (le « retour » de la preuve — manuel, pas automatique :
+le texte de la story dit « puis le retour », à ne pas lire comme un rollback automatisé par le code).
