@@ -130,3 +130,70 @@ décision) :
 
 - **Sync** : pour chaque `eq_id` éligible (l.1519+), après `evaluate_equipment(...)` (l.1531-1539) et `_detect_lifecycle_changes` (l.1549), appelle `apply_publication_decision(eq_id=..., mapping=evaluation.mapping, decision=evaluation.equipment_decision, secondary_decisions=evaluation.secondary_decisions, ..., previous_decision=request.app["publications"].get(eq_id), ...)`. Le bloc « policy change » (l.1648-1690) est supprimé (absorbé, cf. 2.3). Le bloc « purge des disparus » reste séparé, après la boucle principale.
 - **« Publier »** (mini-sync) : relit `overrides_cache = list_overrides(data_dir)` / `equipment_overrides_cache = list_equipment_overrides(data_dir)` **une fois par clic** (comme le sync le fait une fois par cycle, l.1515-1517 — jamais par équipement). Pour chaque `eq_id` de `_resolve_eq_ids_for_portee(...)` : `result = eligibility.get(eq_id)` (depuis `app["eligibility"]`, calculé au dernier sync — pas de nouvelle éligibilité), `eq = snapshot.eq_logics.get(eq_id)` (depuis `app["topology"]`), puis `evaluate_equipment(eq, snapshot, result, mapper_registry=mapper_registry, confidence_policy=app["confidence_policy"], persisted_overrides=overrides_cache, persisted_equipment_overrides=equipment_overrides_cache)`, puis `apply_publication_decision(...)` avec `previous_decision = publications.get(eq_id)` (déjà lu, l.3564). `_should_attempt_publish` et `_scope_entry_is_included`-comme-gate-de-publication disparaissent de ce chemin (le filtre de scope pur reste appliqué séparément, section 5, mais pour le flag d'affichage, pas pour décider de publier — sauf arbitrage contraire, section 5/9).
+
+## 3. Principe 19-2 mis à jour, à écrire noir sur blanc
+
+### 3.1 Énoncé
+
+Le verdict canonique (`should_publish`/`reason` d'une `PublicationDecision`, principal ou secondaire)
+n'est **jamais** écrit ailleurs que par `evaluate_equipment()`, appelé via le post-traitement
+partagé `apply_publication_decision()` (section 2) — que ce soit depuis le sync complet ou depuis
+le mini-sync « Publier ». Aucune autre voie ne doit produire ou modifier ce verdict.
+
+- **« Supprimer »** (l.3409-3544) n'écrit jamais ce verdict : il écrit une `PublicationDecision(should_publish=False, reason="excluded")`
+  **directement**, sans passer par `evaluate_equipment()` — c'est un acte utilisateur explicite
+  (exclusion manuelle), pas une ré-évaluation de politique. Ce comportement existant reste inchangé ;
+  Task 2 ne doit pas le faire passer par le nouveau helper (il resterait cohérent avec 19-2, mais le
+  déplacement n'apporte rien et gonflerait le diff).
+- **L'état d'exécution** (`discovery_published`, `active_or_alive`, `publication_result`, timestamps
+  de dernière tentative) reste une notion séparée du verdict, déjà distinguée par
+  `_reset_secondary_runtime_state` (l.517-560, `dataclasses.replace` qui préserve `should_publish`/`reason`
+  et ne touche qu'aux champs d'exécution). Cette séparation est un invariant à **conserver**
+  tel quel dans `apply_publication_decision()` : l'étape 1 (bookkeeping) et l'étape 2/3 (publication
+  MQTT réelle) ne réécrivent jamais `should_publish`/`reason`, seulement les champs d'exécution.
+
+### 3.2 Devenir de `_sync_publication_decision_refs` et `_reset_secondary_runtime_state`
+
+- **`_reset_secondary_runtime_state`** (l.517-560) : **conservée**, réutilisée telle quelle par
+  `apply_publication_decision()` à l'étape 4 (mise à jour des refs secondaires) — c'est exactement
+  le mécanisme qui permet de fusionner un verdict frais (`secondary_decision` d'`evaluate_equipment()`)
+  avec l'état d'exécution courant sans perdre l'un ou l'autre.
+- **`_sync_publication_decision_refs`** (l.563-609) : **supprimée** en tant que fonction séparée.
+  Aujourd'hui elle ne fait que boucler sur les secondaires et appeler `_reset_secondary_runtime_state`
+  pour chacun (jamais le principal — docstring l.563-570 explicite : « ne repointe jamais le ref du
+  principal, seul un sync complet le fait »). Une fois que **chaque appelant** (sync ET Publier) passe
+  par `apply_publication_decision()`, qui fait cette boucle en interne (étape 4, section 2.2), cette
+  fonction wrapper devient un pur pass-through sans appelant restant — à retirer pour éviter le code mort.
+  Point de vigilance Task 2 : vérifier qu'aucun autre appelant (hors les deux chemins étudiés ici)
+  n'utilise `_sync_publication_decision_refs` avant suppression (`grep -rn _sync_publication_decision_refs`).
+
+### 3.3 Arbitrage : repointer ou fusionner le ref secondaire ?
+
+Deux options pour l'étape 4 (mise à jour de `secondary.publication_decision_ref`) :
+
+- **(a) Repointer directement** vers `secondary_decision` (le verdict frais retourné par
+  `evaluate_equipment()`) — perd l'état d'exécution courant du secondaire (`discovery_published` etc.)
+  s'il n'est pas réappliqué séparément.
+- **(b) Fusionner** via `_reset_secondary_runtime_state(secondary, new_verdict=secondary_decision)`
+  (signature à vérifier/adapter, l.517-560) — préserve l'état d'exécution, ne change que
+  `should_publish`/`reason` si le verdict frais diffère du figé.
+
+**Recommandation : (b)**, par cohérence stricte avec le principe déjà appliqué au sync
+(`_reset_secondary_runtime_state` existe précisément pour ce cas). Reprendre (a) romprait la séparation
+verdict/exécution que 19-2 a justement introduite. Ce point est mécanique, pas un choix de design ouvert —
+à confirmer en Task 2 par simple lecture du corps actuel de `_reset_secondary_runtime_state`.
+
+### 3.4 Vérification des lecteurs de diagnostic
+
+- **`_compute_pipeline_step_visible`** (l.2211+, grep confirmé) : lit l'état des étapes du pipeline
+  (éligibilité → mapping → décision → publication) à partir des mêmes structures
+  (`eligibility`, `mappings`/`evaluation.mapping`, `publications[eq_id]`, état d'exécution) —
+  aucune de ces structures ne change de forme, seule leur **fraîcheur** change (verdict recalculé à
+  chaque « Publier » au lieu d'être lu depuis un cache figé). Le diagnostic reste correct sans
+  modification ; il devient même plus fiable puisqu'il reflète le verdict réellement appliqué,
+  plus une valeur périmée.
+- **`traceability.decision_trace`** : à vérifier en Task 2 s'il capture le verdict au moment de
+  `evaluate_equipment()` (cas correct, rien à changer) ou s'il capture un état antérieur
+  supposé provenir uniquement du sync (à vérifier par lecture ciblée du module `traceability`,
+  non lu dans cette note faute de temps — **question ouverte**, section 9, si le trace suppose
+  implicitement « un seul appelant = le sync »).
