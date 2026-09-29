@@ -323,11 +323,15 @@ def _load_sibling_module(filename: str):
     return module
 
 
-def _i11_evaluation():
-    """Reconstruit à chaque appel la forme eq 579/585 (principal `ambiguous_skipped`,
-    secondaires acceptés) via les mêmes fixtures/helpers que la story 19-2."""
+def _i11_evaluation_with(
+    *, principal_should_publish: bool, refused_cmd_ids: frozenset[int] = frozenset()
+):
+    """Reconstruit à chaque appel la forme eq628 (19-2), avec un contrôle fin
+    du principal et des secondaires refusés via `_build_multi_switch`."""
     story_19_2 = _load_sibling_module("test_story_19_2_decouplage_state_command_i11.py")
-    primary, primary_decision = story_19_2._build_multi_switch(principal_should_publish=False)
+    primary, primary_decision = story_19_2._build_multi_switch(
+        principal_should_publish=principal_should_publish, refused_cmd_ids=refused_cmd_ids,
+    )
     from models.evaluate_equipment import EquipmentEvaluation
 
     secondary_decisions = [s.publication_decision_ref for s in primary.additional_mappings]
@@ -337,6 +341,12 @@ def _i11_evaluation():
         command_decisions=[],
         mapping=primary,
     )
+
+
+def _i11_evaluation():
+    """Forme eq 579/585 (principal `ambiguous_skipped`, secondaires acceptés)
+    utilisée par S4."""
+    return _i11_evaluation_with(principal_should_publish=False)
 
 
 def _i11_corpus() -> dict[str, Any]:
@@ -445,4 +455,59 @@ async def test_s5_transition_politique_sure_probable_vers_sure_only(cli, app, ai
         [lambda c, a: _post_sync(
             c, _sync_body_with_policy(corpus, request_id="s5-b", policy="sure_only")
         )],
+    )
+
+
+async def _sync_i11_sure_all_accepted(c, a, request_id: str) -> None:
+    with patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation_with(principal_should_publish=True),
+    ):
+        await _post_sync(c, _sync_body(_i11_corpus(), request_id=request_id))
+
+
+async def _sync_i11_sure_one_refused(c, a, request_id: str) -> None:
+    with patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation_with(
+            principal_should_publish=True, refused_cmd_ids=frozenset({5980}),
+        ),
+    ):
+        await _post_sync(c, _sync_body(_i11_corpus(), request_id=request_id))
+
+
+async def test_s6_secondaire_refuse_non_depublie(cli, app, aiohttp_client):
+    """S6 — candidat I11 (eq628), 2 syncs : sync1 principal + tous les
+    secondaires acceptés (`sure`), sync2 principal toujours accepté mais un
+    secondaire (cmd 5980) refusé. Défaut figé (corrigé à l'unité 3) : le
+    secondaire refusé n'est PAS dépublié."""
+    _connected_bridge_into(app)
+
+    recorder1 = RecordingPublisher()
+    with patch("transport.http_server.DiscoveryPublisher", return_value=recorder1), patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation_with(principal_should_publish=True),
+    ):
+        await _post_sync(cli, _sync_body(_i11_corpus(), request_id="s6-sync-1"))
+
+    recorder2 = RecordingPublisher()
+    with patch("transport.http_server.DiscoveryPublisher", return_value=recorder2), patch(
+        "transport.http_server.evaluate_equipment",
+        side_effect=lambda *_a, **_k: _i11_evaluation_with(
+            principal_should_publish=True, refused_cmd_ids=frozenset({5980}),
+        ),
+    ):
+        await _post_sync(cli, _sync_body(_i11_corpus(), request_id="s6-sync-2"))
+
+    unpublishes_2 = [c for c in recorder2.calls if c["op"] == "unpublish"]
+    assert unpublishes_2 == [], (
+        f"défaut figé : le secondaire refusé n'est pas dépublié aujourd'hui, obtenu {unpublishes_2}"
+    )
+    _assert_trace_matches_reference("s6_secondaire_refuse_sync1", recorder1.calls)
+    _assert_trace_matches_reference("s6_secondaire_refuse_sync2", recorder2.calls)
+
+    await _assert_mqtt_trace_matches_reference(
+        "s6_secondaire_refuse_sync2", aiohttp_client,
+        [lambda c, a: _sync_i11_sure_all_accepted(c, a, "s6-mqtt-1")],
+        [lambda c, a: _sync_i11_sure_one_refused(c, a, "s6-mqtt-2")],
     )
