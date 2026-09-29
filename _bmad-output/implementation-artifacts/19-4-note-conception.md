@@ -369,33 +369,32 @@ explicite ». **Ce n'est pas ce que 19-1 a mesuré.** Le rapport terrain
 mesure seulement), avec la liste des 102 `eq_id` en ligne 49+ du même artefact. Le postulat « effet nul »
 de la story 19-4 repose sur un chiffre qui n'est pas celui réellement mesuré.
 
-**Conséquence si AC3 est implémenté tel quel (sync applique aussi `_scope_entry_is_included` après
-décision)** : au premier sync suivant le déploiement de la story, tout équipement parmi ces 102 dont
-le scope explicite est `exclude` (à distinguer de `include`, le tableau ne détaille pas la répartition
-include/exclude dans les 102 — **à vérifier avant tout code**, `grep` sur la liste des 102 eq_ids dans
-19-1 croisée avec leur `raw_state`) pourrait être **dépublié par le sync lui-même**, alors qu'il ne
-l'était jamais avant (le sync ignorait le scope). C'est un changement de comportement réel et non
-négligeable, hors du contrôle utilisateur explicite (« Publier »), déclenché automatiquement par le
-prochain cycle de sync — à ne pas traiter comme un simple effet de bord de cette story.
+**Vérification terrain faite ce tour (C4, mesure A)** : sur les 102 exceptions de scope explicite,
+**A = 0** équipement combine à la fois `statut=publie` (topic discovery principal présent) ET un scope
+équipement `effective_state=exclude` (`19-4-mesure-terrain-2026-09-29.md`, section A). Autrement dit,
+**la décision de publication du principal respecte déjà le scope au moment où elle est calculée**
+aujourd'hui (le scope influence `eligibility`/`perimetre` en amont, avant `statut`) — l'écart identifié
+en 1.4/5.2 (le sync ne consulte jamais `_scope_entry_is_included` explicitement) n'a donc, sur l'état
+réel de la box, **aucun équipement actuellement publié qui basculerait en dépublication** si le sync
+appliquait littéralement AC3. Le postulat « effet nul » de la story est donc **vérifié vrai en pratique
+aujourd'hui**, malgré les 102 exceptions de scope existantes (qui portent sur des équipements déjà non
+publiés côté scope, pas sur des équipements publiés à tort).
 
-### 5.4 Deux options, à trancher avant Task 2 (pas par cette note)
+### 5.4 Décision (C4, tranchée par la mesure terrain A=0)
 
 - **(a) Suivre AC3 à la lettre** : le sync applique aussi `_scope_entry_is_included` après la décision.
-  Risque réel mesuré : jusqu'à 102 équipements pourraient changer de statut de publication au premier
-  sync post-déploiement, sans action utilisateur. Nécessite au minimum : (i) vérifier la répartition
-  include/exclude réelle des 102 avant d'écrire le code, (ii) un test de non-régression golden-corpus
-  spécifique sur ces 102 eq_ids (ou un sous-ensemble représentatif), (iii) informer Alex du risque
-  terrain avant tout déploiement (section 7).
-- **(b) Limiter AC3 à « Publier » seul** : harmoniser uniquement la fonction pure utilisée (déjà
-  `_scope_entry_is_included`, déjà partagée en pratique puisque seul « Publier » l'utilise), en
-  changeant seulement SON point d'application (avant → après décision), sans toucher au comportement
-  du sync. Plus proche du risque nul réellement recherché par la story, mais **ne respecte pas la
-  lettre d'AC3** telle qu'écrite (« appliquée [...] par le sync comme par Publier »).
+- **(b) Limiter AC3 à « Publier » seul**, en changeant seulement le point d'application de
+  `_scope_entry_is_included` (avant → après décision) sans toucher au sync.
 
-**Recommandation de cette note : (b) par défaut, sauf si Alex/ClaudeBox confirment explicitement
-vouloir (a) en connaissance du chiffre réel (102, pas zéro).** AC3 devrait alors être reformulé pour
-ne plus affirmer un « effet nul » qui n'est pas vérifié. Ce point est la question ouverte n°1 de la
-section 9 — aucun code de Task 2 ne doit être écrit sur ce point avant arbitrage explicite.
+**Décision retenue : (a), littéralement conforme au texte d'AC3.** La mesure terrain A=0 (5.3) montre
+qu'aucun équipement actuellement publié ne serait dépublié par ce changement — le risque décrit dans
+la version précédente de cette note (« jusqu'à 102 équipements pourraient changer de statut ») ne se
+matérialise pas sur l'état réel de la box : les 102 exceptions de scope portent sur des équipements déjà
+non publiés côté scope. L'option (a) aligne le sync sur le même filtre que « Publier », sans effet
+terrain immédiat mesuré, et ferme l'écart de fond entre les deux chemins plutôt que de le contourner.
+**Condition de sécurité conservée avant tout déploiement** : rejouer le harnais de parité (section 7.1)
+sur un export récent de la box juste avant la mise en production, pour confirmer que A est toujours à 0
+à ce moment-là (le scope explicite peut évoluer entre cette note et le déploiement réel).
 
 ### 5.5 Retour arrière
 
