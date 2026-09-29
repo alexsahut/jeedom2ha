@@ -168,26 +168,6 @@ def _clear_local_availability_topic(
     return ok
 
 
-def _mark_local_availability_publish_failed(
-    decision: PublicationDecision,
-    mapping: MappingResult,
-) -> PublicationDecision:
-    """Build a safe runtime decision when local availability retained publish fails."""
-    return PublicationDecision(
-        should_publish=False,
-        reason="local_availability_publish_failed",
-        mapping_result=mapping,
-        state_topic=decision.state_topic,
-        active_or_alive=False,
-        discovery_published=decision.discovery_published,
-        bridge_availability_topic=decision.bridge_availability_topic,
-        eqlogic_availability_topic=decision.eqlogic_availability_topic,
-        local_availability_supported=decision.local_availability_supported,
-        local_availability_state=decision.local_availability_state,
-        availability_reason=decision.availability_reason,
-    )
-
-
 def _to_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
@@ -464,6 +444,31 @@ def _scope_entry_is_included(
     return False
 
 
+def _scope_excluded_decision(
+    mapping: MappingResult,
+    topology: TopologySnapshot,
+) -> PublicationDecision:
+    """Story 19.4 (AC3) — décision d'un équipement exclu par le filtre de scope.
+
+    Le filtre de scope (`_scope_entry_is_included`) s'applique APRÈS la décision
+    (`evaluate_equipment()`), dans le sync comme dans « Publier » : un équipement hors
+    périmètre publié n'est jamais publié, quelle que soit la décision de mapping. Le
+    principal est refusé (`excluded`) et l'état d'exécution des secondaires est remis à
+    « non publié » (leur verdict d'étape 4 reste intact, cf. `_sync_publication_decision_refs`).
+    """
+    decision = PublicationDecision(
+        should_publish=False,
+        reason="excluded",
+        mapping_result=mapping,
+        state_topic=_resolve_state_topic(mapping),
+        active_or_alive=False,
+        discovery_published=False,
+    )
+    _apply_availability_metadata(decision, mapping, topology)
+    _sync_publication_decision_refs(mapping, decision)
+    return decision
+
+
 def _is_currently_published_in_ha(
     eq_id: int,
     decision: Optional[PublicationDecision],
@@ -476,24 +481,6 @@ def _is_currently_published_in_ha(
     return bool(
         getattr(decision, "active_or_alive", False)
         or getattr(decision, "discovery_published", False)
-    )
-
-
-def _should_attempt_publish(
-    mapping: Optional[MappingResult],
-    decision: Optional[PublicationDecision],
-) -> bool:
-    if mapping is None:
-        return False
-    if mapping.confidence not in ("sure", "probable"):
-        return False
-    if decision is None:
-        return True
-    return getattr(decision, "reason", "") not in (
-        "ambiguous_skipped",
-        "probable_skipped",
-        "unknown_skipped",
-        "ignore_skipped",
     )
 
 
@@ -594,10 +581,10 @@ def _sync_publication_decision_refs(
     (``should_publish``/``reason`` are preserved).
 
     ``secondary_discovery_published=None`` skips the secondary loop entirely
-    (P3 fix): used when the caller (``_publish_mapping_for_action``) already
-    recorded each secondary's real per-candidate outcome and a blanket reset
-    here would clobber the secondaries that were actually republished before a
-    later secondary or the local-availability step failed.
+    (P3 fix): kept for callers that already recorded each secondary's real
+    per-candidate outcome (Story 19.4 : l'ancien chemin « publier »
+    ``_publish_mapping_for_action`` a été supprimé, « Publier » passe désormais
+    par ``apply_publication_decision()`` comme le sync).
     """
     if secondary_discovery_published is None:
         return
@@ -607,56 +594,6 @@ def _sync_publication_decision_refs(
             discovery_published=secondary_discovery_published,
             active_or_alive=secondary_active_or_alive,
         )
-
-
-async def _publish_mapping_for_action(
-    publisher_registry: PublisherRegistry,
-    mapping: MappingResult,
-    topology: TopologySnapshot,
-) -> bool:
-    """Publie un mapping (action « publier ») via le registre unique (CC-08).
-
-    Un type non enregistré dans PublisherRegistry échoue explicitement : publish()
-    consigne une erreur et positionne mapping.publication_result à "failed" au lieu
-    de retourner un False silencieux qui masquerait le problème.
-    """
-    primary_ok = await publisher_registry.publish(mapping, topology)
-    if not primary_ok:
-        return False
-
-    # Story 11.2 — un eqLogic multi-domaine (eq554) porte ses sensors/binary_sensors
-    # secondaires dans additional_mappings. Le chemin action « publier » doit les
-    # publier comme le fait le chemin sync (_publish_additional_sensors), sinon une
-    # re-inclusion sans sync complet recrée le switch primaire en laissant les 12
-    # sensors + 1 binary_sensor non publiés (entités manquantes côté HA).
-    #
-    # Revue Codex (P1) : un secondaire ne doit être (re)publié ici que si sa décision
-    # du dernier sync l'y autorise (cf. _secondary_publishable) — sinon on republierait
-    # un secondaire explicitement refusé par decide_publication().
-    all_ok = True
-    for secondary in mapping.additional_mappings or []:
-        if not _secondary_publishable(secondary):
-            _LOGGER.info(
-                "[MAPPING] Action publier ignore le secondaire eq_id=%d cmd=%s "
-                "(entity_type=%s) — dernière décision de sync inconnue ou refusée",
-                mapping.jeedom_eq_id,
-                (secondary.reason_details or {}).get("cmd_id"),
-                secondary.ha_entity_type,
-            )
-            continue
-        if await publisher_registry.publish(secondary, topology):
-            # P1 fix (ClaudeBox review, 3a408db) — a secondary effectively
-            # republished here must have its OWN publication_decision_ref
-            # flipped alive/published, otherwise sync/state.py and
-            # sync/command.py (I11, per-candidate) keep routing it as if the
-            # republish never happened.
-            sec_decision = getattr(secondary, "publication_decision_ref", None)
-            if sec_decision is not None:
-                sec_decision.discovery_published = True
-                sec_decision.active_or_alive = True
-        else:
-            all_ok = False
-    return all_ok
 
 
 def _build_action_perimetre_impacte(
@@ -1827,6 +1764,13 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     # Story 16.3 — même principe pour les overrides de politique de publication (équipement).
     equipment_overrides_cache = list_equipment_overrides(data_dir)
 
+    # Story 19.4 (AC3) — filtre de scope unique, appliqué APRÈS la décision, comme « Publier ».
+    scope_entries = {
+        _to_int(entry.get("eq_id"), default=0): entry
+        for entry in published_scope_contract.get("equipements", [])
+    }
+    scope_excluded_eq_ids: set[int] = set()
+
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
             continue
@@ -1854,6 +1798,14 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
 
         mappings[eq_id] = mapping
         previous_decision = request.app["publications"].get(eq_id)
+
+        # Story 19.4 (AC3) — hors périmètre publié : jamais publié, quelle que soit la
+        # décision. L'équipement n'entre pas dans `nouveaux_eq_ids` : la purge plus bas
+        # (équipements retirés) dépublie ce qui l'était encore et efface sa disponibilité.
+        if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):
+            publications[eq_id] = _scope_excluded_decision(mapping, snapshot)
+            scope_excluded_eq_ids.add(eq_id)
+            continue
 
         # Story 5.2 — detect lifecycle changes (rename, area change, retyping)
         # Called once per eq_id, before publish, common to all type branches
@@ -1923,6 +1875,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         elig_entry = eligibility.get(old_eq_id)
         if elig_entry is None:
             cleanup_reason = "supprimé dans Jeedom"
+        elif old_eq_id in scope_excluded_eq_ids:
+            cleanup_reason = "exclu du périmètre publié (scope)"
         elif elig_entry.reason_code == "disabled_eqlogic":
             cleanup_reason = "désactivé dans Jeedom (disabled_eqlogic)"
         elif str(elig_entry.reason_code).startswith("excluded_"):
@@ -2868,7 +2822,12 @@ def _resolve_data_dir(request: web.Request) -> str:
 
 
 def _build_mapping_override_tree(
-    eq, snapshot, data_dir, confidence_policy=_DEFAULT_CONFIDENCE_POLICY, synced_decision=None
+    eq,
+    snapshot,
+    data_dir,
+    confidence_policy=_DEFAULT_CONFIDENCE_POLICY,
+    synced_decision=None,
+    scope_included=True,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -2888,6 +2847,9 @@ def _build_mapping_override_tree(
       l'appelant depuis `app["publications"]`) à la décision COURANTE (avec overrides
       persistés actuels) — `override_pending=True` signale un override sauvegardé mais pas
       encore appliqué par un sync (badge « pas encore appliqué »).
+      Story 19.4 (AC3) : le sync applique le filtre de scope après la décision ; la décision
+      COURANTE comparée ici l'applique donc aussi (`scope_included`), sinon un équipement hors
+      périmètre afficherait à tort « pas encore appliqué » alors que le sync ne le publiera jamais.
 
     Story 19.3 (P2, relecture ClaudeBox PR #176 tour 2) : la résolution primaire/secondaire
     par commande passe désormais par `_resolve_command_mapping()`, la même fonction que
@@ -2941,7 +2903,9 @@ def _build_mapping_override_tree(
         row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
         commands.append(row)
 
-    current_should_publish = mapped and evaluation.equipment_decision.should_publish
+    current_should_publish = bool(
+        mapped and evaluation.equipment_decision.should_publish and scope_included
+    )
     synced_should_publish = synced_decision.should_publish if synced_decision is not None else None
     override_pending = synced_should_publish is not None and synced_should_publish != current_should_publish
 
@@ -2986,8 +2950,19 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
     data_dir = _resolve_data_dir(request)
     confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
     synced_decision = (request.app.get("publications") or {}).get(eq_id)
+    published_scope = request.app.get("published_scope")
+    scope_included = True
+    if published_scope:
+        scope_entry = next(
+            (
+                entry for entry in published_scope.get("equipements", [])
+                if _to_int(entry.get("eq_id"), default=0) == eq_id
+            ),
+            None,
+        )
+        scope_included = _scope_entry_is_included(eq_id, scope_entry, request.app.get("eligibility"))
     payload = _build_mapping_override_tree(
-        eq, snapshot, data_dir, confidence_policy, synced_decision
+        eq, snapshot, data_dir, confidence_policy, synced_decision, scope_included=scope_included
     )
     return web.json_response({"status": "ok", "payload": payload})
 
@@ -3983,17 +3958,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             publications[eq_id] = new_decision
             _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
         elif mapping is not None:
-            resolved_decision = PublicationDecision(
-                should_publish=False,
-                reason="excluded",
-                mapping_result=mapping,
-                state_topic=_resolve_state_topic(mapping),
-                active_or_alive=False,
-                discovery_published=False,
-            )
-            _apply_availability_metadata(resolved_decision, mapping, topology)
-            publications[eq_id] = resolved_decision
-            _sync_publication_decision_refs(mapping, resolved_decision)
+            publications[eq_id] = _scope_excluded_decision(mapping, topology)
 
         ecarts_resolus += 1
 

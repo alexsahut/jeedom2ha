@@ -10,7 +10,9 @@ Les trois chemins testés appellent tous, en dernier ressort, la même
 ``PublisherRegistry.publish()`` :
   - sync            : appel direct (ligne ``publisher_registry.publish(...)``
                        dans la boucle de sync, identique pour ``_publish_additional_sensors``) ;
-  - action publier   : ``_publish_mapping_for_action`` ;
+  - action publier   : ``apply_publication_decision()`` — depuis la Story 19.4,
+                       « Publier » est un mini-sync et passe par le MÊME post-traitement
+                       que le sync (l'ancien ``_publish_mapping_for_action`` est supprimé) ;
   - republication    : ``_republish_all_from_cache``.
 
 Un type non enregistré dans PublisherRegistry doit échouer explicitement
@@ -27,9 +29,10 @@ import pytest
 
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
-from models.mapping import MappingResult, SensorCapabilities
+from models.evaluate_equipment import EquipmentEvaluation
+from models.mapping import MappingResult, PublicationDecision, SensorCapabilities
 from models.topology import TopologySnapshot
-from transport.http_server import _publish_mapping_for_action, _republish_all_from_cache
+from transport.http_server import _republish_all_from_cache, apply_publication_decision
 
 KNOWN_TYPES = PublisherRegistry.known_types()
 
@@ -137,29 +140,79 @@ class TestSyncPathMatrix:
         assert mapping.publication_result.technical_reason_code == "publisher_not_registered"
 
 
+def _connected_bridge() -> MagicMock:
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message.return_value = True
+    return bridge
+
+
+async def _apply(registry, primary: MappingResult, *, secondaries_publish=()):
+    """Appelle `apply_publication_decision()` (chemin partagé sync / « Publier ») avec une
+    décision fraîche : principal accepté, secondaires acceptés ou refusés selon
+    `secondaries_publish` (un booléen par secondaire, dans l'ordre)."""
+    snapshot = _snapshot()
+    decision = PublicationDecision(should_publish=True, reason="sure", mapping_result=primary)
+    secondary_decisions = [
+        PublicationDecision(
+            should_publish=flag,
+            reason="sure" if flag else "probable_skipped",
+            mapping_result=secondary,
+        )
+        for secondary, flag in zip(primary.additional_mappings, secondaries_publish)
+    ]
+    evaluation = EquipmentEvaluation(
+        equipment_decision=decision,
+        secondary_decisions=secondary_decisions,
+        mapping=primary,
+    )
+    result, config_published = await apply_publication_decision(
+        primary.jeedom_eq_id,
+        primary,
+        evaluation,
+        None,
+        snapshot,
+        is_first_sync=False,
+        boot_cache={},
+        publisher=None,
+        publisher_registry=registry,
+        mqtt_bridge=_connected_bridge(),
+        pending_discovery_unpublish={},
+        mapping_counters={},
+        publications={},
+        nouveaux_eq_ids=set(),
+    )
+    return result, config_published, snapshot
+
+
 class TestActionPublierPathMatrix:
-    """Action « publier » : _publish_mapping_for_action (primaire + additional_mappings)."""
+    """Action « publier » (Story 19.4 : mini-sync) : `apply_publication_decision()`,
+    partagé avec le sync — primaire + additional_mappings.
+
+    La cellule historique « secondaire jamais synchronisé » n'a plus d'objet : « Publier »
+    réévalue l'équipement à neuf (`evaluate_equipment()`), chaque secondaire porte donc
+    toujours une décision fraîche (couvert par `test_story_19_4_publier_mini_sync.py`, P4/P7).
+    """
 
     @pytest.mark.parametrize("entity_type", KNOWN_TYPES, ids=KNOWN_TYPES)
     async def test_publier_publishes_primary(self, entity_type):
         registry, publisher = _registry_with_patched_publishers()
         mapping = _mapping(entity_type, eq_id=1)
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, mapping, snapshot)
+        decision, ok, snapshot = await _apply(registry, mapping)
 
         assert ok is True
+        assert decision.discovery_published is True
         getattr(publisher, f"publish_{entity_type}").assert_awaited_once_with(mapping, snapshot)
 
     @pytest.mark.parametrize("entity_type", KNOWN_TYPES, ids=KNOWN_TYPES)
     async def test_publier_publishes_secondary(self, entity_type):
         registry, publisher = _registry_with_patched_publishers()
         primary_type = _distinct_primary_type(entity_type)
-        secondary = _mapping(entity_type, eq_id=2, should_publish=True)
+        secondary = _mapping(entity_type, eq_id=2)
         primary = _mapping(primary_type, eq_id=1, additional=[secondary])
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+        _decision, ok, snapshot = await _apply(registry, primary, secondaries_publish=(True,))
 
         assert ok is True
         getattr(publisher, f"publish_{entity_type}").assert_awaited_once_with(secondary, snapshot)
@@ -168,9 +221,8 @@ class TestActionPublierPathMatrix:
     async def test_publier_unregistered_primary_fails_explicitly(self):
         registry, _publisher = _registry_with_patched_publishers()
         mapping = _mapping("unknown_type", eq_id=99)
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, mapping, snapshot)
+        _decision, ok, _snapshot = await _apply(registry, mapping)
 
         assert ok is False
         assert mapping.publication_result.status == "failed"
@@ -178,55 +230,36 @@ class TestActionPublierPathMatrix:
 
     async def test_publier_unregistered_secondary_fails_explicitly_without_masking(self):
         registry, publisher = _registry_with_patched_publishers()
-        secondary = _mapping("unknown_type", eq_id=2, should_publish=True)
+        secondary = _mapping("unknown_type", eq_id=2)
         primary = _mapping("switch", eq_id=1, additional=[secondary])
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+        _decision, _ok, snapshot = await _apply(registry, primary, secondaries_publish=(True,))
 
-        assert ok is False
         assert secondary.publication_result.status == "failed"
         assert secondary.publication_result.technical_reason_code == "publisher_not_registered"
+        assert primary.publication_result.status == "failed"
         publisher.publish_switch.assert_awaited_once_with(primary, snapshot)
 
     async def test_publier_secondary_failure_does_not_short_circuit_remaining_secondaries(self):
         """Un secondaire en échec ne doit pas empêcher la publication des suivants."""
         registry, publisher = _registry_with_patched_publishers()
-        failing = _mapping("unknown_type", eq_id=2, should_publish=True)
-        ok_secondary = _mapping("sensor", eq_id=3, should_publish=True)
+        failing = _mapping("unknown_type", eq_id=2)
+        ok_secondary = _mapping("sensor", eq_id=3)
         primary = _mapping("switch", eq_id=1, additional=[failing, ok_secondary])
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+        _decision, _ok, snapshot = await _apply(registry, primary, secondaries_publish=(True, True))
 
-        assert ok is False
         publisher.publish_sensor.assert_awaited_once_with(ok_secondary, snapshot)
+        assert primary.publication_result.status == "failed"
 
-    async def test_publier_secondary_refused_at_last_sync_is_not_republished(self):
-        """Revue Codex (P1) : un secondaire dont la décision du dernier sync refuse
-        la publication (should_publish=False) ne doit pas être republié par l'action
-        « publier », même si le primaire l'est."""
+    async def test_publier_refused_secondary_is_not_published(self):
+        """Un secondaire refusé par la décision fraîche n'est pas publié, même si le
+        principal l'est."""
         registry, publisher = _registry_with_patched_publishers()
-        refused = _mapping("sensor", eq_id=2, should_publish=False)
+        refused = _mapping("sensor", eq_id=2)
         primary = _mapping("switch", eq_id=1, additional=[refused])
-        snapshot = _snapshot()
 
-        ok = await _publish_mapping_for_action(registry, primary, snapshot)
-
-        assert ok is True
-        publisher.publish_sensor.assert_not_awaited()
-        publisher.publish_switch.assert_awaited_once_with(primary, snapshot)
-
-    async def test_publier_secondary_without_known_decision_is_not_republished(self):
-        """Revue Codex (P1) : un secondaire jamais synchronisé (publication_decision_ref
-        absent) ne doit pas être publié par l'action « publier » — une décision inconnue
-        n'est jamais traitée comme une autorisation implicite."""
-        registry, publisher = _registry_with_patched_publishers()
-        never_synced = _mapping("sensor", eq_id=2)  # should_publish=None (pas de décision)
-        primary = _mapping("switch", eq_id=1, additional=[never_synced])
-        snapshot = _snapshot()
-
-        ok = await _publish_mapping_for_action(registry, primary, snapshot)
+        _decision, ok, snapshot = await _apply(registry, primary, secondaries_publish=(False,))
 
         assert ok is True
         publisher.publish_sensor.assert_not_awaited()
