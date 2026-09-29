@@ -1618,6 +1618,20 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
                 mapping_counters=mapping_counters,
             )
 
+            # Correctif 19-2b : si le principal n'a pas publié la disponibilité locale
+            # (refusé ou échec discovery) mais qu'au moins un secondaire a été publié,
+            # l'availability_mode="all" du secondaire exige quand même le topic
+            # jeedom2ha/<eq>/availability, sinon il reste unavailable dans HA.
+            if (
+                not decision.discovery_published
+                and decision.local_availability_supported
+                and any(
+                    sec_decision.discovery_published
+                    for sec_decision in evaluation.secondary_decisions
+                )
+            ):
+                _publish_local_availability_state(mqtt_bridge, eq_id, decision)
+
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
         # sur le state_topic des entités vague 1 APRÈS la discovery (sinon HA l'ignore).
         state_sync = request.app.get("state_synchronizer")
