@@ -366,3 +366,65 @@ story/PR, `_should_attempt_publish` et `_secondary_publishable` reviennent à le
 retenue et déployée, le revert ne republie pas automatiquement les équipements dépubliés entre-temps
 par le nouveau gate scope du sync — à mentionner explicitement dans le plan de rollback si (a) est
 choisi (nuance absente du texte actuel de la story).
+
+## 6. Plan de tests
+
+Un test par AC, chacun explicitement écrit pour **échouer sur `main`** avant Task 2/3, puis passer
+après. Emplacement proposé : `resources/daemon/tests/unit/test_story_19_4_*.py` (nouveau, par AC ou
+regroupé — voir remarque finale).
+
+- **AC1 (`sure_mapping` publiable via « Publier »)** : fixture équipement dont le mapper retourne
+  `MappingResult(confidence="sure_mapping", ...)` (aucun mapper réel n'en produit aujourd'hui d'après
+  la lecture des mappers existants — **fixture construite à la main obligatoire**, justification :
+  `sure_mapping` est une valeur de confiance du contrat `decide_publication.py` (`_PUBLISHABLE_CONFIDENCES`)
+  prévue pour un usage futur/spécifique, mais aucun mapper du corpus doré actuel ne la produit ; sans
+  fixture manuelle, ce cas ne serait testable qu'en modifiant un mapper, hors périmètre de cette story).
+  Échoue sur `main` car `_should_attempt_publish` code en dur `("sure", "probable")` (l.487) — un
+  mapping `sure_mapping` y échoue toujours, quel que soit le `confidence_policy`.
+- **AC2 (override d'exclusion respecté par « Publier »)** : équipement avec
+  `publication_excluded_eqlogic`/`publication_excluded_command` actif ; appeler le handler « Publier ».
+  Échoue sur `main` si la décision **précédente en cache** (`mappings[eq_id]`/`previous_decision`, stale)
+  ne reflète pas encore l'override ajouté après le dernier sync — cas exact du bug de cache (section 1/2) :
+  `_should_attempt_publish` ne consulte jamais les overrides, seulement `mapping.confidence` et le
+  `reason` précédent.
+- **AC3 (filtre de scope unique)** : golden test comparant, sur le corpus 59 eqLogics, l'ensemble des
+  eq_ids réellement publiés par le sync vs par « Publier » après filtrage scope — doit être égal.
+  Échoue sur `main` aujourd'hui de façon triviale : le sync ne filtre pas du tout sur le scope
+  (section 1.4/5.2), donc toute exception de scope `exclude` non vide dans le corpus fait diverger
+  les deux ensembles. **Ce test ne doit être écrit qu'après l'arbitrage (a)/(b) de la section 5.4** —
+  sa forme dépend du choix (si (b) retenu, le test porte uniquement sur « Publier » et l'aperçu, pas sur
+  le sync).
+- **AC4 (dépublication explicite au transition publié→refusé)** : équipement `previous_decision.should_publish=True`
+  + `discovery_published=True`, override d'exclusion ajouté, clic « Publier ». Vérifier
+  `publisher.unpublish_by_eq_id` appelé avec les bons node_ids, `publications[eq_id].should_publish=False`
+  après coup. Échoue sur `main` : L.3572-3574 fait `skip += 1; continue` dès que `_should_attempt_publish`
+  est `False` (ce qui est le cas dès qu'un override exclut le mapping) — **aucune dépublication n'est
+  jamais tentée dans ce chemin actuellement**, l'équipement reste publié indéfiniment tant qu'aucun sync
+  complet n'a lieu.
+- **AC5 (idempotence)** : équipement déjà publié, verdict inchangé, clic « Publier » répété deux fois ;
+  vérifier qu'aucun second appel `publisher.publish(...)` n'est effectué (mock/spy sur `PublisherRegistry`)
+  au deuxième clic. Échoue sur `main` : constat vérifié section 4.5, le chemin actuel republie
+  systématiquement dès que `_should_attempt_publish` passe, sans condition d'inchangé.
+- **AC6 (secondaire réévalué, pas figé)** : secondaire publié, override modifiant son éligibilité ajouté
+  après le dernier sync (donc `secondary.publication_decision_ref.should_publish` reste `True` en cache),
+  clic « Publier ». Vérifier que le secondaire suit la décision fraîche (refusée) et non le ref figé.
+  Échoue sur `main` : `_secondary_publishable` (l.500-514) ne lit QUE `publication_decision_ref`, jamais
+  de recalcul — le test doit construire un scénario où le cache et le frais divergent, impossible à
+  distinguer sans modifier l'override entre deux évaluations dans le test.
+- **AC7 (parité 4 points d'appel)** : nouveau test, distinct du golden corpus 19.0 existant (qui compare
+  `evaluate_equipment()` à un appel pipeline direct, pas les 4 handlers HTTP réels). Structure proposée :
+  pour au moins un cas `sure_mapping` et un cas exclusion par override (les 2 cas exigés par le texte AC7),
+  invoquer/simuler les 4 chemins — sync (`_do_handle_action_sync`), « Publier » (`_handle_action_execute`
+  branche publier), surface pièce (lecteur `sync/state.py` déjà validé section 3.4/4.6), aperçu à blanc
+  (Story 19.3, chemin `proposed_overrides`) — et comparer les 4 verdicts obtenus pour le même eq_id/override
+  sur le même instantané. Réutilise le corpus doré 59 eqLogics comme source d'équipements, mais ajoute une
+  couche d'invocation des 4 handlers (pas seulement `evaluate_equipment()` isolé) — c'est le delta réel par
+  rapport à `test_story_19_0_parity_golden_corpus.py`. Complète `test_cc08_publisher_registry_matrix.py`
+  en y ajoutant, si besoin, les cas `sure_mapping`/override qui n'y sont pas déjà couverts (à vérifier en
+  Task 2 par lecture complète du fichier, lu seulement partiellement dans cette note — 100/420 lignes).
+
+**Remarque de découpage** : un fichier de test unique `test_story_19_4_publier_mini_sync.py` avec une
+classe/section par AC est recommandé plutôt que 7 fichiers séparés, pour partager les fixtures
+(topologie, overrides, mocks `PublisherRegistry`) sans dupliquer le setup — cohérent avec le style déjà
+observé dans `test_cc08_publisher_registry_matrix.py`/`test_story_19_0_parity_golden_corpus.py` (un seul
+fichier par thème, plusieurs cas internes).
