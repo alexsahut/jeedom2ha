@@ -124,7 +124,11 @@ début de la requête « Publier » (qu'il ait été publié ou rejeté
 ancienne du clic
 **And** un test couvre les deux sous-cas (évènement publié, évènement rejeté).
 La fenêtre résiduelle entre la lecture PHP et la réception de la requête par le
-démon (quelques millisecondes) est déclarée, non traitée.
+démon (quelques millisecondes) est déclarée, non traitée. La garantie ne vaut
+que pour une commande **déjà écoutée** au moment du clic (listener Jeedom
+enregistré) : une commande publiée pour la première fois n'a pas d'écouteur
+avant AC11, donc aucun évènement pendant le clic (résiduel déclaré, forme (a)
+seulement).
 
 **AC9 — Le sync ne change pas**
 
@@ -146,6 +150,21 @@ devient `succes_partiel` ou `echec`, et un journal WARNING
 `initial_state_publish_failed` nomme l'équipement et la commande
 **And** un test fige ce cas (Codex P2, revue du 30/09). Une commande sans valeur
 (AC2) n'est **pas** un échec.
+
+**AC11 — Écouteurs réalignés après « Publier »**
+
+**Given** un candidat publié pour la première fois par le clic : aucun listener
+Jeedom ne relaie ses changements, car `jeedom2ha::syncStateListeners()`
+(`core/class/jeedom2ha.class.php:407-451`) n'est appelé qu'après un sync
+(`core/ajax/jeedom2ha.ajax.php:437-442`) ou au démarrage (class l.377-382)
+**When** `executeHaAction` reçoit une réponse du démon pour `intention = publier`
+**Then** le relais appelle `jeedom2ha::syncStateListeners()`, dans un
+`try/catch` qui journalise un WARNING comme après un sync, sans changer la
+réponse renvoyée à l'UI ; les changements suivants du candidat sont relayés
+**And** un test PHP (appel injecté, sans cœur Jeedom) vérifie l'appel pour
+`publier`, son absence pour `supprimer` et quand le démon ne répond pas (Codex
+P1, revue du 30/09). Si le relais abandonne sur délai (CC-32), les écouteurs ne
+sont pas réalignés avant le sync suivant : déclaré.
 
 ## UI Impact
 
@@ -173,6 +192,11 @@ devient `succes_partiel` ou `echec`, et un journal WARNING
   démon se comporte comme en 19-4 (AC7). Aucune migration, aucun override touché.
   Les états retenus publiés restent sur le broker ; ils sont remplacés au
   changement suivant.
+- **Écouteurs** (AC11) : chaque « Publier » supprime puis recrée les listeners
+  d'état du plugin, comme chaque sync aujourd'hui. Un évènement survenu pendant
+  ces quelques millisecondes est perdu jusqu'au changement suivant (même risque
+  que le sync, déclaré). Aucun listener d'un autre plugin n'est touché
+  (`listener::byClass('jeedom2ha')`).
 
 ## Preuve terrain
 
@@ -204,7 +228,7 @@ garde sa propre décision et son propre état initial (Story 19.2).
 
 ## Points visés
 
-- **CC-29** — fermé par cette story (AC1 à AC10 et preuve terrain).
+- **CC-29** — fermé par cette story (AC1 à AC11 et preuve terrain).
 - **CC-32** (hors périmètre, préexistant) : délai du « Republier » global,
   suivi à part.
 
@@ -225,7 +249,7 @@ garde sa propre décision et son propre état initial (Story 19.2).
     story** d'un effet causé par le script lui-même. Déploiement standard
     uniquement.
 
-- [ ] Task 1 — Relais PHP : lecture des valeurs au clic (AC6, AC7)
+- [ ] Task 1 — Relais PHP : lecture des valeurs au clic et écouteurs (AC6, AC7, AC11)
   - [ ] Fonction pure (chargeable sous `JEEDOM2HA_AJAX_FUNCTIONS_ONLY`) qui prend
     des équipements et rend `{cmd_id: valeur}` pour leurs commandes info, via
     `getCache('value', null)` (motif de `getFullTopology`,
@@ -235,9 +259,12 @@ garde sa propre décision et son propre état initial (Story 19.2).
     pièce : `eqLogic::byObjectId(pieceId)` ; global, `['all']` : tous les
     équipements), puis ajouter `current_values` au payload. Aucune décision :
     le démon ignore ce qui ne le concerne pas.
+  - [ ] Après la réponse du démon, pour `publier` seulement : appeler
+    `jeedom2ha::syncStateListeners()` dans un `try/catch` (WARNING), comme
+    `scanTopology` (ajax l.437-442). Appel injectable pour le test (AC11).
   - [ ] Test PHP en CI (objets factices), un cas par portée (`equipement`,
-    `piece`, `global`), ajouté à `.github/workflows/test.yml` s'il n'est pas pris
-    par le motif existant.
+    `piece`, `global`), plus AC11 ; découvert par le motif existant
+    (`find tests -name '*.php'`).
 
 - [ ] Task 2 — Démon (AC1-AC5, AC7-AC10)
   - [ ] Extraire la boucle de `publish_initial_states` dans une méthode privée
@@ -263,13 +290,13 @@ garde sa propre décision et son propre état initial (Story 19.2).
     None`. Un échec d'état fait compter l'équipement dans `publish_errors`, au
     même titre que `secondary_failed` (l.3930-3945, AC10).
 
-- [ ] Task 3 — Tests (AC1-AC10)
+- [ ] Task 3 — Tests (AC1-AC11)
   - [ ] `resources/daemon/tests/unit/test_story_19_5_etat_initial_publier.py` :
     AC1 (principal, secondaire, secondaire sous principal refusé), AC2 (valeur
     du sync présente mais non fournie ⇒ rien), AC3 (parité), AC4, AC5, AC7
     (absent et `[]`), AC8 (évènement publié, évènement rejeté), AC9, AC10
     (publication d'état en échec ⇒ `succes_partiel`/`echec`, WARNING).
-  - [ ] Test PHP de la fonction de lecture et de l'expansion des 3 portées (AC6).
+  - [ ] Test PHP de la fonction de lecture, de l'expansion des 3 portées (AC6) et du réalignement des écouteurs (AC11).
   - [ ] Suite complète `python3 -m pytest -q` et `node --test tests/unit/*.node.test.js` :
     0 régression ; garde-fou 19-4 inchangé (écarts déclarés s'il y en a).
 
@@ -316,7 +343,10 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - `resources/daemon/discovery/publisher.py` : `unpublish_by_eq_id` l.305-345
   (topics `.../config` seulement).
 - `core/ajax/jeedom2ha.ajax.php` : `executeHaAction` l.606-622, `callDaemon`
-  avec délai 15 s l.617.
+  avec délai 15 s l.617 ; `scanTopology` puis `syncStateListeners` l.430-444.
+- `core/class/jeedom2ha.class.php` : `syncStateListeners` l.407-451 (cibles
+  `GET /system/state_listeners`, `http_server.py:3472` →
+  `StateSynchronizer.list_state_targets`, `sync/state.py:137`).
 - `core/class/jeedom2ha.class.php` : `'current_value' => $cmd->getCache('value', null)` l.729.
 - `tests/unit/test_story_5_1_php_relay.php` : motif de test PHP sous
   `JEEDOM2HA_AJAX_FUNCTIONS_ONLY`.
@@ -356,7 +386,9 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - **Revue Codex** — 29/09 (`92c6888`) : P1 expansion de la portée avant la
   lecture PHP (intégrée à AC6 et Task 1) ; P1 valeurs de l'ancienne topologie
   (déjà traité par `fresh_values`, AC2/AC7). 30/09 (`415d609`) : P2 échec de
-  l'état initial non propagé ⇒ AC10.
+  l'état initial non propagé ⇒ AC10. 30/09 (`4feceb2`) : P1 écouteurs non
+  réalignés après une première publication ⇒ AC11, et garantie d'AC8 restreinte
+  aux commandes déjà écoutées.
 
 ### File List
 
@@ -365,3 +397,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-29 — `correct-course` (CC-29) + `create-story` — statut `ready-for-dev`.
 - 2026-09-30 — relecture ClaudeBox (AC2 renforcé, AC8 et AC9 ajoutés, preuve terrain discriminante).
 - 2026-09-30 — revue Codex intégrée (AC6 : expansion de la portée testée ; AC10 : échec d'état compté).
+- 2026-09-30 — revue Codex (`4feceb2`) intégrée (AC11 : écouteurs réalignés après « Publier »).
