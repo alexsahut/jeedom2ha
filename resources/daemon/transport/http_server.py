@@ -793,6 +793,53 @@ def _needs_discovery_unpublish(decision: Optional[PublicationDecision]) -> bool:
     return bool(getattr(decision, "should_publish", False))
 
 
+def _node_id_of(m):
+    rd = getattr(m, "reason_details", None) or {}
+    nid = rd.get("node_id")
+    return nid if isinstance(nid, str) and nid else None
+
+
+def _entity_type_of(m) -> str:
+    return str(getattr(m, "ha_entity_type", "") or "")
+
+
+def _collect_candidate_node_ids(mapping_result, candidate) -> list:
+    """Collect the node-scoped identifier contribution of ONE candidate — the
+    primary `mapping_result` itself, or one of its `additional_mappings` — to
+    the exhaustive unpublish list built by `_collect_unpublish_node_ids`.
+
+    Returns, in the exact same shape that function returns for this single
+    candidate: a `(entity_type, node_id)` tuple when the eqLogic is
+    multi-domaine (heterogeneous entity types across candidates); a bare
+    `node_id` string when homogeneous and the candidate carries one; or `[]`
+    when the candidate contributes nothing (mono-entity primary, or a
+    secondary without `node_id` in the homogeneous case).
+
+    Unit 3b: an empty `[]` contribution from a SECONDARY must never on its own
+    trigger an `unpublish_by_eq_id` call with empty `node_ids` — that call
+    targets the eq-level topic, i.e. the primary's topic, not the secondary's.
+    """
+    if mapping_result is None:
+        return []
+
+    secondaries = list(getattr(mapping_result, "additional_mappings", None) or [])
+    all_types = {_entity_type_of(mapping_result)} | {_entity_type_of(s) for s in secondaries}
+    is_primary = candidate is mapping_result
+
+    # Multi-domaine hétérogène : porter le type par entité (anti-fantôme cross-domaine).
+    if len(all_types) > 1:
+        eq_id = getattr(mapping_result, "jeedom_eq_id", None)
+        if is_primary:
+            nid = _node_id_of(mapping_result) or f"jeedom2ha_{eq_id}"
+        else:
+            nid = _node_id_of(candidate) or f"jeedom2ha_{getattr(candidate, 'jeedom_eq_id', eq_id)}"
+        return [(_entity_type_of(candidate), nid)]
+
+    # Homogène (mono / multi-sensor) : contrat list[str] historique (Story 11.1.bis).
+    nid = _node_id_of(candidate)
+    return [nid] if nid else []
+
+
 def _collect_unpublish_node_ids(mapping_result) -> list:
     """Collect node-scoped topic identifiers to unpublish for one eqLogic (Story 11.1.bis).
 
@@ -810,41 +857,17 @@ def _collect_unpublish_node_ids(mapping_result) -> list:
     de tuples ``(entity_type, node_id)`` couvrant TOUTES les entités, y compris le
     switch primaire au topic eq-level (node_id pseudo ``jeedom2ha_<eq_id>``). Le cas
     homogène (mono / multi-sensor) conserve strictement le contrat list[str] historique.
+
+    Story 19.4 unité 3a — concaténation, dans l'ordre (principal puis secondaires),
+    des contributions individuelles de `_collect_candidate_node_ids`.
     """
     if mapping_result is None:
         return []
 
-    def _nid(m):
-        rd = getattr(m, "reason_details", None) or {}
-        nid = rd.get("node_id")
-        return nid if isinstance(nid, str) and nid else None
-
-    def _etype(m) -> str:
-        return str(getattr(m, "ha_entity_type", "") or "")
-
     secondaries = list(getattr(mapping_result, "additional_mappings", None) or [])
-    all_types = {_etype(mapping_result)} | {_etype(s) for s in secondaries}
-
-    # Multi-domaine hétérogène : porter le type par entité (anti-fantôme cross-domaine).
-    if len(all_types) > 1:
-        eq_id = getattr(mapping_result, "jeedom_eq_id", None)
-        entries: list = []
-        primary_nid = _nid(mapping_result) or f"jeedom2ha_{eq_id}"
-        entries.append((_etype(mapping_result), primary_nid))
-        for secondary in secondaries:
-            sec_nid = _nid(secondary) or f"jeedom2ha_{getattr(secondary, 'jeedom_eq_id', eq_id)}"
-            entries.append((_etype(secondary), sec_nid))
-        return entries
-
-    # Homogène (mono / multi-sensor) : contrat list[str] historique (Story 11.1.bis).
     node_ids: list = []
-    primary_nid = _nid(mapping_result)
-    if primary_nid:
-        node_ids.append(primary_nid)
-    for secondary in secondaries:
-        sec_nid = _nid(secondary)
-        if sec_nid:
-            node_ids.append(sec_nid)
+    for candidate in (mapping_result, *secondaries):
+        node_ids.extend(_collect_candidate_node_ids(mapping_result, candidate))
     return node_ids
 
 
