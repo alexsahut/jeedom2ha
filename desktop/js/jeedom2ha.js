@@ -340,7 +340,11 @@ function executeHaAction(intention, portee, selection, handlers) {
       selection: JSON.stringify(selection || []),
     },
     dataType: 'json',
-    timeout: 20000,
+    // Story 19.6 (AC2) — délai fixe, indépendant de N, au-dessus du pire des deux
+    // chemins du relais PHP (voir desktop/js/jeedom2ha_action_budget.js, CLIENT_TIMEOUT_MS).
+    // Repli à 90000 si le module n'est pas chargé (revue de code, corrections bloc C).
+    timeout: (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS)
+      || 90000,
     success: function(data) {
       if (data.state !== 'ok') {
         if (handlers && typeof handlers.onError === 'function') {

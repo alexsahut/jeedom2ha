@@ -256,6 +256,53 @@ Vos overrides peuvent être exportés dans un **profil partageable** :
 
 ---
 
+## Durée des actions « Publier » / « Supprimer »
+
+Les actions groupées (Publier / Supprimer une sélection) ont une durée bornée côté relais,
+pas côté démon : **le démon n'arrête jamais son travail**. C'est le relais qui cesse
+d'attendre après 60 s et répond au navigateur ; l'action se poursuit côté démon jusqu'à sa
+fin réelle, quel que soit le temps que cela prend.
+
+La taille supportée s'exprime d'abord en **appels MQTT par action** (le budget de travail
+divisé par le coût mesuré d'un appel MQTT, de l'ordre du millier d'appels), puisque c'est le
+poste dominant. Traduit en équipements typiques (environ 5 appels MQTT par équipement en
+publication — découverte + état au clic), ce budget correspond à un parc d'environ **250
+équipements typiques** (estimation prudente mesurée hors de la box, à confirmer par la mesure
+sur la box). Un retypage (un équipement déjà publié change de type d'entité HA, principal ou
+secondaire) coûte davantage par équipement que cette hypothèse : mesuré à **10 appels MQTT
+par équipement** (dépublication de l'ancien type puis nouvelle découverte), soit deux fois
+la publication initiale, ce qui ramène le parc supporté à environ **155 équipements** pour
+un retypage en masse. Une suppression d'équipements multi-entités (un dimmer avec ses
+capteurs secondaires, par exemple) coûte environ **3 appels MQTT par équipement** mesurés —
+moins qu'une publication, mais à garder en tête pour dimensionner une sélection dominée par
+ce type d'équipement (parc supporté : environ **510 équipements**).
+
+Si l'action ne se termine pas dans ce délai (parc inhabituellement volumineux, démon
+ralenti), le message suivant apparaît :
+
+> L'action Home Assistant dure plus longtemps que prévu (plus de 60 s). Elle peut se
+> poursuivre côté démon : actualisez la page dans un instant pour voir le résultat.
+
+**Que faire** : le démon (pas Home Assistant) continue le travail en arrière-plan.
+Attendez quelques secondes puis rafraîchissez la page — l'état publié reflète alors le
+résultat réel. Si le message persiste après plusieurs rafraîchissements, consultez les
+logs (`Jeedom → Analyse → Logs → jeedom2ha`, niveau `warning`/`error`) pour vérifier que
+le démon tourne normalement.
+
+Si le démon répond immédiatement par une erreur (pas un dépassement du délai), le message
+est différent : « Le démon a renvoyé une erreur pendant l'action Home Assistant — consultez
+les logs du plugin » — consultez directement les logs pour le détail de l'erreur.
+
+Si vous déclenchez une nouvelle action pendant que le démon travaille encore sur la
+précédente, le message suivant apparaît :
+
+> Une action Home Assistant est déjà en cours.
+
+**Que faire** : attendez que l'action en cours se termine, puis rafraîchissez la page
+avant de relancer une nouvelle action.
+
+---
+
 ## Troubleshooting
 
 | Symptôme | Cause probable | Action |

@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 import paho.mqtt.client as mqtt
 from aiohttp import web
 
+from . import action_pacing
 from .mqtt_client import MqttBridge
 from models.availability import (
     AVAILABILITY_OFFLINE,
@@ -3638,6 +3639,24 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             status=400,
         )
 
+    # Story 19.6 (AC1bis) — échéance optionnelle transmise par le relais PHP (AC1) : absente,
+    # comportement inchangé (Décision 8). Présente mais invalide => 400.
+    deadline_s: Optional[float] = None
+    raw_deadline = body.get("deadline_s")
+    if raw_deadline is not None:
+        try:
+            deadline_s = float(raw_deadline)
+        except (TypeError, ValueError):
+            deadline_s = None
+        if deadline_s is None or deadline_s <= 0:
+            return web.json_response(
+                {
+                    "status": "error",
+                    "message": f"Champ 'deadline_s' invalide : '{raw_deadline}'. Doit être un nombre strictement positif.",
+                },
+                status=400,
+            )
+
     topology = request.app.get("topology")
     published_scope = request.app.get("published_scope")
     if topology is None or published_scope is None:
@@ -3715,40 +3734,424 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         pending_local_cleanup = {}
         request.app["pending_local_availability_cleanup"] = pending_local_cleanup
 
-    # --- Branche supprimer (Story 5.3) ---
-    if intention == "supprimer":
+    # Story 19.6 (AC8) — une seule action `publier`/`supprimer` à la fois. Refus immédiat
+    # (409) si le verrou est déjà pris, avant de créer la tâche protégée (AC6).
+    action_lock: asyncio.Lock = request.app["action_lock"]
+    if action_lock.locked():
+        return web.json_response(
+            {
+                "status": "error",
+                "code": "action_in_progress",
+                "message": "Une action Home Assistant est déjà en cours.",
+            },
+            status=409,
+        )
+    await action_lock.acquire()
+
+    async def _run_action() -> web.Response:
+        # Story 19.6 (AC6) — le corps de l'action (boucle, fin d'action, construction du
+        # résultat) tourne dans cette tâche unique, protégée de l'annulation du handler par
+        # `asyncio.shield` plus bas : une déconnexion du client PHP ne l'interrompt jamais.
+        try:
+            return await _run_action_body()
+        finally:
+            # Story 19.6 (AC8) — libéré ici (jamais dans le handler) : le verrou reste tenu
+            # tant que l'action protégée tourne, y compris après une déconnexion client, et
+            # il est libéré même en cas d'exception.
+            action_lock.release()
+
+    async def _run_action_body() -> web.Response:
+        # --- Branche supprimer (Story 5.3) ---
+        if intention == "supprimer":
+            _action_start = time.monotonic()
+            publisher = DiscoveryPublisher(mqtt_bridge)
+            equipements_supprimes = 0
+            supprimer_errors = 0
+            skips = 0
+            _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+    
+            # Story 19.6 (AC1bis) — plafond du lissage si une échéance est transmise. Le compte
+            # est exact ici : c'est la même condition qui décide d'une pause plus bas.
+            _plafond = action_pacing.plafond_pauses(deadline_s) if deadline_s is not None else None
+            _pauses_totales = (
+                sum(
+                    1
+                    for eq_id in eq_ids
+                    if _is_currently_published_in_ha(eq_id, publications.get(eq_id), pending_discovery_unpublish)
+                )
+                if deadline_s is not None
+                else 0
+            )
+            _pauses_faites = 0.0
+            _pauses_index = 0
+
+            for eq_id in eq_ids:
+                # Revue Codex P2 (PR #189, 3e tour) : céder la main aussi sur les itérations
+                # sautées (ignoré), pas comptée dans `_pauses_faites` — sinon un grand parc
+                # surtout ignoré monopolise la boucle aiohttp sans jamais y passer.
+                if deadline_s is not None:
+                    await asyncio.sleep(0)
+                previous_decision = publications.get(eq_id)
+
+                if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
+                    skips += 1
+                    continue
+    
+                if previous_decision and previous_decision.mapping_result is not None:
+                    entity_type = previous_decision.mapping_result.ha_entity_type
+                    node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
+                elif mappings.get(eq_id) is not None:
+                    entity_type = mappings[eq_id].ha_entity_type
+                    node_ids = _collect_unpublish_node_ids(mappings[eq_id])
+                else:
+                    entity_type = "light"
+                    node_ids = []
+    
+                unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
+                if deadline_s is None:
+                    await asyncio.sleep(_action_delay)
+                else:
+                    _pauses_index += 1
+                    _pauses_restantes = _pauses_totales - _pauses_index
+                    if _pauses_restantes > 0:
+                        _pause = action_pacing.prochaine_pause(_action_delay, _plafond, _pauses_faites, _pauses_restantes)
+                        if _pause > 0:
+                            _t0 = time.monotonic()
+                            await asyncio.sleep(_pause)
+                            _pauses_faites += time.monotonic() - _t0
+                        else:
+                            await asyncio.sleep(0)
+                if not unpublish_ok:
+                    _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
+                    supprimer_errors += 1
+                    continue
+    
+                pending_discovery_unpublish.pop(eq_id, None)
+    
+                previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
+                previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
+                pending_local_topic = pending_local_cleanup.get(eq_id)
+                if previous_local_supported or previous_local_topic or pending_local_topic:
+                    clear_ok = _clear_local_availability_topic(
+                        mqtt_bridge,
+                        eq_id,
+                        previous_local_topic or pending_local_topic,
+                    )
+                    if clear_ok:
+                        pending_local_cleanup.pop(eq_id, None)
+                    else:
+                        _defer_local_availability_cleanup(
+                            pending_local_cleanup,
+                            eq_id,
+                            previous_local_topic or pending_local_topic,
+                        )
+                else:
+                    pending_local_cleanup.pop(eq_id, None)
+    
+                if previous_decision and previous_decision.mapping_result is not None:
+                    new_decision = PublicationDecision(
+                        should_publish=False,
+                        reason=getattr(previous_decision, "reason", "excluded"),
+                        mapping_result=previous_decision.mapping_result,
+                        state_topic=previous_decision.state_topic,
+                        active_or_alive=False,
+                        discovery_published=False,
+                        bridge_availability_topic=previous_decision.bridge_availability_topic,
+                        eqlogic_availability_topic=previous_decision.eqlogic_availability_topic,
+                        local_availability_supported=previous_decision.local_availability_supported,
+                        local_availability_state=previous_decision.local_availability_state,
+                        availability_reason=previous_decision.availability_reason,
+                    )
+                    publications[eq_id] = new_decision
+                    _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
+                elif mappings.get(eq_id) is not None:
+                    mapping = mappings[eq_id]
+                    resolved_decision = PublicationDecision(
+                        should_publish=False,
+                        reason="excluded",
+                        mapping_result=mapping,
+                        state_topic=_resolve_state_topic(mapping),
+                        active_or_alive=False,
+                        discovery_published=False,
+                    )
+                    _apply_availability_metadata(resolved_decision, mapping, topology)
+                    publications[eq_id] = resolved_decision
+                    _sync_publication_decision_refs(mapping, resolved_decision)
+    
+                equipements_supprimes += 1
+    
+            if supprimer_errors > 0 and equipements_supprimes == 0:
+                resultat = "echec"
+            elif supprimer_errors > 0 and equipements_supprimes > 0:
+                resultat = "succes_partiel"
+            else:
+                resultat = "succes"
+
+            perimetre = _build_action_perimetre_impacte(
+                portee=portee,
+                selection=selection,
+                topology=topology,
+                eq_ids=eq_ids,
+                equipements_inclus=len(eq_ids),
+            )
+
+            request.app["published_scope"] = _apply_pending_scope_flags(
+                published_scope,
+                publications,
+                pending_discovery_unpublish,
+            )
+            save_publications_cache(publications, _resolve_data_dir(request))
+            _supprimer_msg = _build_supprimer_message(
+                resultat=resultat,
+                equipements_supprimes=equipements_supprimes,
+                supprimer_errors=supprimer_errors,
+            )
+            request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+                resultat="partiel" if resultat == "succes_partiel" else resultat,
+                intention="supprimer",
+                portee=portee,
+                message=_supprimer_msg,
+                volume=equipements_supprimes,
+            )
+
+            _LOGGER.info(
+                "[ACTION] intention=supprimer deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+                f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+                time.monotonic() - _action_start,
+                _pauses_faites,
+            )
+
+            payload = {
+                "intention": intention,
+                "portee": portee,
+                "selection": selection,
+                "resultat": resultat,
+                "message": _supprimer_msg,
+                "perimetre_impacte": {
+                    "nom": perimetre["nom"],
+                    "equipements_publies": equipements_supprimes + supprimer_errors + skips,
+                },
+                "scope_reel": {
+                    "equipements_supprimes": equipements_supprimes,
+                    "supprimer_errors": supprimer_errors,
+                    "skips": skips,
+                },
+            }
+            return _build_action_execute_response(payload=payload)
+    
+        # --- Branche publier (Story 5.2 ; Story 19.4 : mini-sync) ---
+        # « Publier » prend la MÊME décision que le sync : `evaluate_equipment()` frais (overrides
+        # relus une fois par clic, politique de confiance du dernier sync), puis le post-traitement
+        # partagé `apply_publication_decision()` et la dépublication par candidat. Le filtre de
+        # scope (`_scope_entry_is_included`) s'applique après la décision (AC3).
+        scope_entries = {
+            _to_int(entry.get("eq_id"), default=0): entry
+            for entry in published_scope.get("equipements", [])
+        }
         publisher = DiscoveryPublisher(mqtt_bridge)
-        equipements_supprimes = 0
-        supprimer_errors = 0
+        publisher_registry = PublisherRegistry(publisher)
+        data_dir = _resolve_data_dir(request)
+        overrides_cache = list_overrides(data_dir)
+        equipment_overrides_cache = list_equipment_overrides(data_dir)
+        mapper_registry = MapperRegistry()
+        confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
+        if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
+            confidence_policy = _DEFAULT_CONFIDENCE_POLICY
+        boot_cache = request.app.get("boot_cache", {})
+    
+        _action_start = time.monotonic()
+        equipements_inclus = 0
+        equipements_publies_ou_crees = 0
+        ecarts_resolus = 0
         skips = 0
+        publish_errors = 0
         _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+    
+        # Story 19.6 (AC1bis) — plafond du lissage si une échéance est transmise. Le décompte est
+        # une borne supérieure (revue Codex `ecce1dc` : pas de précompte exact du travail) : elle
+        # ne sert qu'à répartir les pauses, jamais à couper le travail lui-même.
+        _plafond = action_pacing.plafond_pauses(deadline_s) if deadline_s is not None else None
+        _pauses_totales = (
+            sum(
+                1
+                for eq_id in eq_ids
+                if _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility)
+                or _is_currently_published_in_ha(eq_id, publications.get(eq_id), pending_discovery_unpublish)
+            )
+            if deadline_s is not None
+            else 0
+        )
+        _pauses_faites = 0.0
+        _potentiels_restants = _pauses_totales
+        _premier_travail_fait = False
+
+        # Revue Codex P2 (PR #189) : la pause se fait AVANT le traitement de chaque
+        # équipement qui travaille réellement, sauf le premier. Un équipement sauté
+        # (inclus mais non mappable) ne travaille jamais et ne déclenche donc jamais de
+        # pause, et il n'y a plus de pause finale après le dernier équipement traité.
+        async def _pace_avant_travail() -> None:
+            nonlocal _pauses_faites, _premier_travail_fait
+            if deadline_s is None:
+                return
+            if not _premier_travail_fait:
+                _premier_travail_fait = True
+                return
+            # `pauses_restantes` compte la pause courante (1) + la borne supérieure des
+            # équipements à venir qui travailleront (`_potentiels_restants`, déjà
+            # décrémenté du présent équipement) — jamais < 1.
+            pauses_restantes = 1 + _potentiels_restants
+            pause = action_pacing.prochaine_pause(_action_delay, _plafond, _pauses_faites, pauses_restantes)
+            if pause > 0:
+                t0 = time.monotonic()
+                await asyncio.sleep(pause)
+                _pauses_faites += time.monotonic() - t0
+            else:
+                await asyncio.sleep(0)
+
+        async def _delai_sans_deadline() -> None:
+            if deadline_s is None:
+                await asyncio.sleep(_action_delay)
 
         for eq_id in eq_ids:
+            # Revue Codex P2 (PR #189, 3e tour) : céder la main aussi sur les itérations
+            # sautées (ignoré, inclus non mappable, ou non publié), pas comptée dans
+            # `_pauses_faites` — sinon un grand parc surtout ignoré monopolise la boucle
+            # aiohttp sans jamais y passer.
+            if deadline_s is not None:
+                await asyncio.sleep(0)
+            scope_entry = scope_entries.get(eq_id)
             previous_decision = publications.get(eq_id)
+            evaluation = _evaluate_for_action(
+                eq_id,
+                topology,
+                eligibility,
+                mapper_registry=mapper_registry,
+                confidence_policy=confidence_policy,
+                persisted_overrides=overrides_cache,
+                persisted_equipment_overrides=equipment_overrides_cache,
+            )
+            mapping = evaluation.mapping if evaluation is not None else None
+            if mapping is None:
+                mapping = mappings.get(eq_id)
+            is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
+            if deadline_s is not None and (
+                is_included
+                or _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish)
+            ):
+                _potentiels_restants -= 1
 
-            if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
-                skips += 1
+            if is_included:
+                equipements_inclus += 1
+                if evaluation is None or evaluation.mapping is None:
+                    skips += 1
+                    continue
+
+                await _pace_avant_travail()
+                await _replay_pending_for_action(
+                    eq_id,
+                    publisher=publisher,
+                    mqtt_bridge=mqtt_bridge,
+                    pending_discovery_unpublish=pending_discovery_unpublish,
+                    pending_local_cleanup=pending_local_cleanup,
+                )
+                decision, config_published = await apply_publication_decision(
+                    eq_id,
+                    evaluation.mapping,
+                    evaluation,
+                    previous_decision,
+                    topology,
+                    is_first_sync=False,
+                    boot_cache=boot_cache,
+                    publisher=publisher,
+                    publisher_registry=publisher_registry,
+                    mqtt_bridge=mqtt_bridge,
+                    pending_discovery_unpublish=pending_discovery_unpublish,
+                    mapping_counters={},
+                    publications=publications,
+                    nouveaux_eq_ids=set(),
+                )
+                mappings[eq_id] = evaluation.mapping
+                unpublish_outcome = await _unpublish_refused_candidates(
+                    eq_id,
+                    previous_decision,
+                    decision,
+                    publisher=publisher,
+                    mqtt_bridge=mqtt_bridge,
+                    pending_discovery_unpublish=pending_discovery_unpublish,
+                    pending_local_cleanup=pending_local_cleanup,
+                )
+                if unpublish_outcome == "unpublished":
+                    ecarts_resolus += 1
+                # Story 19.4b (CC-31) — une dépublication reportée laisse le topic retenu dans HA.
+                unpublish_deferred = unpublish_outcome == "deferred"
+    
+                # Story 19.5 (AC1-AC5, AC10) — état initial avec la valeur lue au clic, juste
+                # après la décision et AVANT le délai, comme le sync (l.1866-1868) : appelé
+                # inconditionnellement (I11, un secondaire peut être publié sous un principal
+                # refusé) dès qu'il y a une valeur fraîche à publier.
+                click_publish_failed = False
+                if fresh_values is not None:
+                    state_sync = request.app.get("state_synchronizer")
+                    if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
+                        _click_published, click_failed_count = await state_sync.publish_click_states(
+                            decision, fresh_values, fresh_since,
+                        )
+                        click_publish_failed = click_failed_count > 0
+    
+                await _delai_sans_deadline()
+
+                # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
+                # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
+                # cas de succès) fait compter l'équipement en erreur, comme l'ancien chemin.
+                # Story 19.5 (AC10) : un état initial non publié compte de la même façon.
+                secondary_failed = click_publish_failed or any(
+                    sec.should_publish and not sec.active_or_alive
+                    for sec in evaluation.secondary_decisions or []
+                )
+                if decision.should_publish:
+                    if (
+                        config_published
+                        and decision.active_or_alive
+                        and not secondary_failed
+                        and not unpublish_deferred
+                    ):
+                        equipements_publies_ou_crees += 1
+                    else:
+                        publish_errors += 1
+                elif secondary_failed or unpublish_deferred:
+                    publish_errors += 1
+                elif any(
+                    getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False)
+                    for s in evaluation.mapping.additional_mappings or []
+                ):
+                    equipements_publies_ou_crees += 1
+                else:
+                    skips += 1
                 continue
-
+    
+            if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
+                continue
+    
             if previous_decision and previous_decision.mapping_result is not None:
                 entity_type = previous_decision.mapping_result.ha_entity_type
                 node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
-            elif mappings.get(eq_id) is not None:
-                entity_type = mappings[eq_id].ha_entity_type
-                node_ids = _collect_unpublish_node_ids(mappings[eq_id])
+            elif mapping is not None:
+                entity_type = mapping.ha_entity_type
+                node_ids = _collect_unpublish_node_ids(mapping)
             else:
                 entity_type = "light"
                 node_ids = []
-
+    
+            await _pace_avant_travail()
             unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-            await asyncio.sleep(_action_delay)
+            await _delai_sans_deadline()
             if not unpublish_ok:
                 _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
-                supprimer_errors += 1
+                publish_errors += 1  # Story 19.4b (CC-31) — reporté, pas résolu
                 continue
-
+    
             pending_discovery_unpublish.pop(eq_id, None)
-
+    
             previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
             previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
             pending_local_topic = pending_local_cleanup.get(eq_id)
@@ -3768,7 +4171,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                     )
             else:
                 pending_local_cleanup.pop(eq_id, None)
-
+    
             if previous_decision and previous_decision.mapping_result is not None:
                 new_decision = PublicationDecision(
                     should_publish=False,
@@ -3785,36 +4188,17 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 )
                 publications[eq_id] = new_decision
                 _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
-            elif mappings.get(eq_id) is not None:
-                mapping = mappings[eq_id]
-                resolved_decision = PublicationDecision(
-                    should_publish=False,
-                    reason="excluded",
-                    mapping_result=mapping,
-                    state_topic=_resolve_state_topic(mapping),
-                    active_or_alive=False,
-                    discovery_published=False,
-                )
-                _apply_availability_metadata(resolved_decision, mapping, topology)
-                publications[eq_id] = resolved_decision
-                _sync_publication_decision_refs(mapping, resolved_decision)
-
-            equipements_supprimes += 1
-
-        if supprimer_errors > 0 and equipements_supprimes == 0:
+            elif mapping is not None:
+                publications[eq_id] = _scope_excluded_decision(mapping, topology)
+    
+            ecarts_resolus += 1
+    
+        if publish_errors > 0 and equipements_publies_ou_crees == 0:
             resultat = "echec"
-        elif supprimer_errors > 0 and equipements_supprimes > 0:
+        elif publish_errors > 0 and equipements_publies_ou_crees > 0:
             resultat = "succes_partiel"
         else:
             resultat = "succes"
-
-        perimetre = _build_action_perimetre_impacte(
-            portee=portee,
-            selection=selection,
-            topology=topology,
-            eq_ids=eq_ids,
-            equipements_inclus=len(eq_ids),
-        )
 
         request.app["published_scope"] = _apply_pending_scope_flags(
             published_scope,
@@ -3822,17 +4206,24 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             pending_discovery_unpublish,
         )
         save_publications_cache(publications, _resolve_data_dir(request))
-        _supprimer_msg = _build_supprimer_message(
+        _publier_msg = _build_publier_message(
             resultat=resultat,
-            equipements_supprimes=equipements_supprimes,
-            supprimer_errors=supprimer_errors,
+            equipements_publies_ou_crees=equipements_publies_ou_crees,
+            publish_errors=publish_errors,
         )
         request.app["derniere_operation_resultat"] = _build_operation_snapshot(
             resultat="partiel" if resultat == "succes_partiel" else resultat,
-            intention="supprimer",
+            intention="publier",
             portee=portee,
-            message=_supprimer_msg,
-            volume=equipements_supprimes,
+            message=_publier_msg,
+            volume=equipements_publies_ou_crees,
+        )
+
+        _LOGGER.info(
+            "[ACTION] intention=publier deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+            f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+            time.monotonic() - _action_start,
+            _pauses_faites,
         )
 
         payload = {
@@ -3840,262 +4231,35 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             "portee": portee,
             "selection": selection,
             "resultat": resultat,
-            "message": _supprimer_msg,
-            "perimetre_impacte": {
-                "nom": perimetre["nom"],
-                "equipements_publies": equipements_supprimes + supprimer_errors + skips,
-            },
+            "message": _publier_msg,
+            "perimetre_impacte": _build_action_perimetre_impacte(
+                portee=portee,
+                selection=selection,
+                topology=topology,
+                eq_ids=eq_ids,
+                equipements_inclus=equipements_inclus,
+            ),
             "scope_reel": {
-                "equipements_supprimes": equipements_supprimes,
-                "supprimer_errors": supprimer_errors,
+                "equipements_inclus": equipements_inclus,
+                "equipements_publies_ou_crees": equipements_publies_ou_crees,
+                "ecarts_resolus": ecarts_resolus,
                 "skips": skips,
             },
+            "aucun_flux_supprimer_recree": True,
         }
         return _build_action_execute_response(payload=payload)
 
-    # --- Branche publier (Story 5.2 ; Story 19.4 : mini-sync) ---
-    # « Publier » prend la MÊME décision que le sync : `evaluate_equipment()` frais (overrides
-    # relus une fois par clic, politique de confiance du dernier sync), puis le post-traitement
-    # partagé `apply_publication_decision()` et la dépublication par candidat. Le filtre de
-    # scope (`_scope_entry_is_included`) s'applique après la décision (AC3).
-    scope_entries = {
-        _to_int(entry.get("eq_id"), default=0): entry
-        for entry in published_scope.get("equipements", [])
-    }
-    publisher = DiscoveryPublisher(mqtt_bridge)
-    publisher_registry = PublisherRegistry(publisher)
-    data_dir = _resolve_data_dir(request)
-    overrides_cache = list_overrides(data_dir)
-    equipment_overrides_cache = list_equipment_overrides(data_dir)
-    mapper_registry = MapperRegistry()
-    confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
-    if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
-        confidence_policy = _DEFAULT_CONFIDENCE_POLICY
-    boot_cache = request.app.get("boot_cache", {})
-
-    equipements_inclus = 0
-    equipements_publies_ou_crees = 0
-    ecarts_resolus = 0
-    skips = 0
-    publish_errors = 0
-    _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
-
-    for eq_id in eq_ids:
-        scope_entry = scope_entries.get(eq_id)
-        previous_decision = publications.get(eq_id)
-        evaluation = _evaluate_for_action(
-            eq_id,
-            topology,
-            eligibility,
-            mapper_registry=mapper_registry,
-            confidence_policy=confidence_policy,
-            persisted_overrides=overrides_cache,
-            persisted_equipment_overrides=equipment_overrides_cache,
-        )
-        mapping = evaluation.mapping if evaluation is not None else None
-        if mapping is None:
-            mapping = mappings.get(eq_id)
-        is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
-
-        if is_included:
-            equipements_inclus += 1
-            if evaluation is None or evaluation.mapping is None:
-                skips += 1
-                continue
-
-            await _replay_pending_for_action(
-                eq_id,
-                publisher=publisher,
-                mqtt_bridge=mqtt_bridge,
-                pending_discovery_unpublish=pending_discovery_unpublish,
-                pending_local_cleanup=pending_local_cleanup,
-            )
-            decision, config_published = await apply_publication_decision(
-                eq_id,
-                evaluation.mapping,
-                evaluation,
-                previous_decision,
-                topology,
-                is_first_sync=False,
-                boot_cache=boot_cache,
-                publisher=publisher,
-                publisher_registry=publisher_registry,
-                mqtt_bridge=mqtt_bridge,
-                pending_discovery_unpublish=pending_discovery_unpublish,
-                mapping_counters={},
-                publications=publications,
-                nouveaux_eq_ids=set(),
-            )
-            mappings[eq_id] = evaluation.mapping
-            unpublish_outcome = await _unpublish_refused_candidates(
-                eq_id,
-                previous_decision,
-                decision,
-                publisher=publisher,
-                mqtt_bridge=mqtt_bridge,
-                pending_discovery_unpublish=pending_discovery_unpublish,
-                pending_local_cleanup=pending_local_cleanup,
-            )
-            if unpublish_outcome == "unpublished":
-                ecarts_resolus += 1
-            # Story 19.4b (CC-31) — une dépublication reportée laisse le topic retenu dans HA.
-            unpublish_deferred = unpublish_outcome == "deferred"
-
-            # Story 19.5 (AC1-AC5, AC10) — état initial avec la valeur lue au clic, juste
-            # après la décision et AVANT le délai, comme le sync (l.1866-1868) : appelé
-            # inconditionnellement (I11, un secondaire peut être publié sous un principal
-            # refusé) dès qu'il y a une valeur fraîche à publier.
-            click_publish_failed = False
-            if fresh_values is not None:
-                state_sync = request.app.get("state_synchronizer")
-                if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
-                    _click_published, click_failed_count = await state_sync.publish_click_states(
-                        decision, fresh_values, fresh_since,
-                    )
-                    click_publish_failed = click_failed_count > 0
-
-            await asyncio.sleep(_action_delay)
-
-            # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
-            # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
-            # cas de succès) fait compter l'équipement en erreur, comme l'ancien chemin.
-            # Story 19.5 (AC10) : un état initial non publié compte de la même façon.
-            secondary_failed = click_publish_failed or any(
-                sec.should_publish and not sec.active_or_alive
-                for sec in evaluation.secondary_decisions or []
-            )
-            if decision.should_publish:
-                if (
-                    config_published
-                    and decision.active_or_alive
-                    and not secondary_failed
-                    and not unpublish_deferred
-                ):
-                    equipements_publies_ou_crees += 1
-                else:
-                    publish_errors += 1
-            elif secondary_failed or unpublish_deferred:
-                publish_errors += 1
-            elif any(
-                getattr(getattr(s, "publication_decision_ref", None), "discovery_published", False)
-                for s in evaluation.mapping.additional_mappings or []
-            ):
-                equipements_publies_ou_crees += 1
-            else:
-                skips += 1
-            continue
-
-        if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
-            continue
-
-        if previous_decision and previous_decision.mapping_result is not None:
-            entity_type = previous_decision.mapping_result.ha_entity_type
-            node_ids = _collect_unpublish_node_ids(previous_decision.mapping_result)
-        elif mapping is not None:
-            entity_type = mapping.ha_entity_type
-            node_ids = _collect_unpublish_node_ids(mapping)
-        else:
-            entity_type = "light"
-            node_ids = []
-
-        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-        await asyncio.sleep(_action_delay)
-        if not unpublish_ok:
-            _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
-            publish_errors += 1  # Story 19.4b (CC-31) — reporté, pas résolu
-            continue
-
-        pending_discovery_unpublish.pop(eq_id, None)
-
-        previous_local_supported = bool(getattr(previous_decision, "local_availability_supported", False))
-        previous_local_topic = getattr(previous_decision, "eqlogic_availability_topic", None)
-        pending_local_topic = pending_local_cleanup.get(eq_id)
-        if previous_local_supported or previous_local_topic or pending_local_topic:
-            clear_ok = _clear_local_availability_topic(
-                mqtt_bridge,
-                eq_id,
-                previous_local_topic or pending_local_topic,
-            )
-            if clear_ok:
-                pending_local_cleanup.pop(eq_id, None)
-            else:
-                _defer_local_availability_cleanup(
-                    pending_local_cleanup,
-                    eq_id,
-                    previous_local_topic or pending_local_topic,
-                )
-        else:
-            pending_local_cleanup.pop(eq_id, None)
-
-        if previous_decision and previous_decision.mapping_result is not None:
-            new_decision = PublicationDecision(
-                should_publish=False,
-                reason=getattr(previous_decision, "reason", "excluded"),
-                mapping_result=previous_decision.mapping_result,
-                state_topic=previous_decision.state_topic,
-                active_or_alive=False,
-                discovery_published=False,
-                bridge_availability_topic=previous_decision.bridge_availability_topic,
-                eqlogic_availability_topic=previous_decision.eqlogic_availability_topic,
-                local_availability_supported=previous_decision.local_availability_supported,
-                local_availability_state=previous_decision.local_availability_state,
-                availability_reason=previous_decision.availability_reason,
-            )
-            publications[eq_id] = new_decision
-            _sync_publication_decision_refs(previous_decision.mapping_result, new_decision)
-        elif mapping is not None:
-            publications[eq_id] = _scope_excluded_decision(mapping, topology)
-
-        ecarts_resolus += 1
-
-    if publish_errors > 0 and equipements_publies_ou_crees == 0:
-        resultat = "echec"
-    elif publish_errors > 0 and equipements_publies_ou_crees > 0:
-        resultat = "succes_partiel"
-    else:
-        resultat = "succes"
-
-    request.app["published_scope"] = _apply_pending_scope_flags(
-        published_scope,
-        publications,
-        pending_discovery_unpublish,
-    )
-    save_publications_cache(publications, _resolve_data_dir(request))
-    _publier_msg = _build_publier_message(
-        resultat=resultat,
-        equipements_publies_ou_crees=equipements_publies_ou_crees,
-        publish_errors=publish_errors,
-    )
-    request.app["derniere_operation_resultat"] = _build_operation_snapshot(
-        resultat="partiel" if resultat == "succes_partiel" else resultat,
-        intention="publier",
-        portee=portee,
-        message=_publier_msg,
-        volume=equipements_publies_ou_crees,
-    )
-
-    payload = {
-        "intention": intention,
-        "portee": portee,
-        "selection": selection,
-        "resultat": resultat,
-        "message": _publier_msg,
-        "perimetre_impacte": _build_action_perimetre_impacte(
-            portee=portee,
-            selection=selection,
-            topology=topology,
-            eq_ids=eq_ids,
-            equipements_inclus=equipements_inclus,
-        ),
-        "scope_reel": {
-            "equipements_inclus": equipements_inclus,
-            "equipements_publies_ou_crees": equipements_publies_ou_crees,
-            "ecarts_resolus": ecarts_resolus,
-            "skips": skips,
-        },
-        "aucun_flux_supprimer_recree": True,
-    }
-    return _build_action_execute_response(payload=payload)
+    # Story 19.6 (AC6) — `asyncio.shield` protège l'action d'une annulation du handler par
+    # aiohttp (déconnexion client) : quel que soit le comportement d'aiohttp à la
+    # déconnexion, la tâche continue jusqu'à sa fin même si `await` ci-dessous est annulé.
+    # Référence forte : `asyncio.ensure_future` ne garde qu'une référence faible côté
+    # event loop ; sans référence forte ailleurs, le garbage collector peut ramasser la
+    # tâche avant sa fin si le handler est annulé (revue PR #189, tour 7, Codex P1).
+    task = asyncio.ensure_future(_run_action())
+    action_tasks: set = request.app["action_tasks"]
+    action_tasks.add(task)
+    task.add_done_callback(action_tasks.discard)
+    return await asyncio.shield(task)
 
 
 def _normalize_state_update_body(body: Any) -> Dict[str, Any]:
@@ -4171,6 +4335,13 @@ def create_app(local_secret: str) -> web.Application:
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
     app["boot_cache"] = {}       # Dict[int, dict] — chargé du disque au boot, purgé après 1er sync
     app["boot_sync_received"] = None  # asyncio.Event — initialisé dans on_start()
+    # Story 19.6 (AC8) — verrou d'action HA : une seule action `publier`/`supprimer` à la
+    # fois. Le sync périodique ne le prend pas (concurrence préexistante, résiduel déclaré).
+    app["action_lock"] = asyncio.Lock()
+    # Story 19.6 — référence forte aux tâches d'action protégées (revue PR #189, tour 7,
+    # Codex P1) : évite la collecte prématurée par le garbage collector d'une tâche
+    # `asyncio.ensure_future` non référencée ailleurs si le handler est annulé.
+    app["action_tasks"] = set()
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)

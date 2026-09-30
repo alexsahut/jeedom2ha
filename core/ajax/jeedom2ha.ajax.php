@@ -17,6 +17,8 @@
 
 // Story 19.5 (AC11) — fonctions pures du réalignement des listeners (sans cœur Jeedom).
 require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
+// Story 19.6 (AC1-AC5, AC8) — budget fixe du relais et orchestration pure (sans cœur Jeedom).
+require_once __DIR__ . '/../php/jeedom2ha_action_budget.php';
 
 /**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
@@ -371,11 +373,53 @@ function _jeedom2ha_expand_portee_to_eq_ids(
 }
 
 /**
+ * Story 19.6 (AC2) — variante bornée de _jeedom2ha_read_current_values : s'arrête dès que
+ * l'échéance ($deadlineS, horloge injectée $_now) est atteinte, transmet les valeurs déjà
+ * lues, et avertit avec le nombre de commandes lues (tentées). Les commandes non atteintes
+ * restent sans état au clic, comme une valeur absente (AC7 de la Story 19.5).
+ */
+function _jeedom2ha_read_current_values_bounded(
+    array $cmds,
+    callable $_valueGetter,
+    callable $_now,
+    float $deadlineS,
+    callable $_warn
+): array {
+    $values = [];
+    $start = $_now();
+    $readCount = 0;
+    foreach ($cmds as $cmd) {
+        if (($_now() - $start) >= $deadlineS) {
+            $_warn('[ACTION] Échéance de lecture des valeurs au clic atteinte (' . $deadlineS
+                . ' s), ' . $readCount . ' commande(s) lue(s), le reste part sans état initial');
+            break;
+        }
+        if (!is_array($cmd) || ($cmd['type'] ?? '') !== 'info') {
+            continue;
+        }
+        $cmdId = (int)($cmd['cmd_id'] ?? 0);
+        if ($cmdId <= 0) {
+            continue;
+        }
+        $value = $_valueGetter($cmd);
+        $readCount++;
+        if ($value === null) {
+            continue;
+        }
+        $values[$cmdId] = $value;
+    }
+    return $values;
+}
+
+/**
  * Story 19.5 (AC6, AC7) — collecte des valeurs au clic, en best-effort : développe la
  * portée, liste les commandes et lit leurs valeurs (fonctions injectées). Toute exception
  * (cœur Jeedom, cache) rend null avec un avertissement : la publication part alors SANS
  * `current_values`, donc avec le comportement 19-4 (AC7), au lieu d'échouer
  * (relecture ClaudeBox, PR #185).
+ *
+ * Story 19.6 (AC2) — $_now/$deadlineS optionnels : bornent la lecture à $deadlineS secondes
+ * (horloge injectable, testée). Omis (défaut), le comportement 19.5 est inchangé.
  *
  * @return array|null {cmd_id: valeur}, ou null si la lecture a échoué
  */
@@ -386,15 +430,31 @@ function _jeedom2ha_collect_click_values(
     callable $_allEqIdsFetcher,
     callable $_cmdsFetcher,
     callable $_valueGetter,
-    callable $_warn
+    callable $_warn,
+    ?callable $_now = null,
+    ?float $deadlineS = null
 ): ?array {
+    $bounded = ($_now !== null && $deadlineS !== null);
+    // Correction de revue (bloc C) — l'horloge démarre ici, avant l'expansion de la
+    // portée : l'échéance couvre le développement de la portée et la liste des
+    // commandes, pas seulement la lecture des valeurs.
+    $start = $bounded ? $_now() : null;
     try {
         $eqIds = _jeedom2ha_expand_portee_to_eq_ids($portee, $selection, $_pieceEqIdsFetcher, $_allEqIdsFetcher);
         $cmds = [];
         foreach ($eqIds as $eqId) {
+            if ($bounded && ($_now() - $start) >= $deadlineS) {
+                $_warn('[ACTION] Échéance de lecture des valeurs au clic atteinte (' . $deadlineS
+                    . ' s) pendant la liste des commandes, 0 commande lue, le reste part sans état initial');
+                return [];
+            }
             foreach ($_cmdsFetcher($eqId) as $cmd) {
                 $cmds[] = $cmd;
             }
+        }
+        if ($bounded) {
+            $remainingS = max(0.0, $deadlineS - ($_now() - $start));
+            return _jeedom2ha_read_current_values_bounded($cmds, $_valueGetter, $_now, $remainingS, $_warn);
         }
         return _jeedom2ha_read_current_values($cmds, $_valueGetter);
     } catch (\Throwable $e) {
@@ -708,6 +768,8 @@ try {
     else if ($action == 'executeHaAction') {
       // Story 5.1 — Relay strict de la façade backend unique /action/execute.
       // Aucun calcul local : les paramètres sont transmis au daemon tel quel.
+      // Story 19.6 (AC1, AC3, AC4, AC5, AC8) — orchestration déléguée à la fonction pure
+      // jeedom2ha_dispatch_action_relay (budget fixe R, sonde de statut, échéance au démon).
       $params = array(
         'intention' => init('intention', ''),
         'portee'    => init('portee', ''),
@@ -720,8 +782,8 @@ try {
       // Story 19.5 (AC6) — pour 'publier' uniquement : étendre la portée en eq_id
       // AVANT toute lecture de valeur, puis lire les valeurs courantes (lecture
       // seule, getCache('value', null), jamais execCmd) pour transmission au démon.
-      if ($params['intention'] === 'publier') {
-        $clickValues = _jeedom2ha_collect_click_values(
+      $collectClickValues = ($params['intention'] === 'publier') ? function () use ($params) {
+        return _jeedom2ha_collect_click_values(
           (string)$params['portee'],
           $params['selection'],
           function ($pieceId) {
@@ -754,29 +816,46 @@ try {
           },
           function (string $message) {
             log::add('jeedom2ha', 'warning', $message);
-          }
+          },
+          // Story 19.6 (AC2) — échéance explicite de 10 s au plus pour la lecture au clic.
+          function () {
+            return microtime(true);
+          },
+          (float)JEEDOM2HA_ACTION_BUDGET_CLICK_READ_DEADLINE_S
         );
-        if ($clickValues !== null) {
-          $params['current_values'] = $clickValues;
-        }
-      }
+      } : null;
 
-      $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
-      if ($result === null) {
-        log::add('jeedom2ha', 'error', '[ACTION] Le démon n\'a pas répondu à /action/execute (timeout 15s)');
-        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
-      }
-
-      // Story 19.5 (AC11) — réalignement des listeners d'état après « publier » seulement,
-      // budget 3 s / une tentative, jamais d'exception vers l'UI (fonction pure testée).
-      jeedom2ha_realign_after_action(
+      $result = jeedom2ha_dispatch_action_relay(
         (string)$params['intention'],
-        $result,
-        function (int $timeout, int $maxAttempts) {
-          return jeedom2ha::syncStateListeners(null, $timeout, $maxAttempts);
+        $params,
+        function (int $timeoutS, int $maxAttempts) {
+          return jeedom2ha::callDaemon('/system/status', null, 'GET', $timeoutS, $maxAttempts);
         },
-        function (string $message) {
-          log::add('jeedom2ha', 'warning', $message);
+        $collectClickValues,
+        function (array $callParams, int $timeoutS) {
+          return jeedom2ha::callDaemon('/action/execute', $callParams, 'POST', $timeoutS, 1);
+        },
+        function (array $daemonResult) use ($params) {
+          // Story 19.5 (AC11) — réalignement des listeners d'état après « publier » seulement,
+          // budget 3 s / une tentative, jamais d'exception vers l'UI (fonction pure testée).
+          jeedom2ha_realign_after_action(
+            (string)$params['intention'],
+            $daemonResult,
+            function (int $timeout, int $maxAttempts) {
+              return jeedom2ha::syncStateListeners(null, $timeout, $maxAttempts);
+            },
+            function (string $message) {
+              log::add('jeedom2ha', 'warning', $message);
+            }
+          );
+        },
+        // Correction de revue (bloc C) — niveau porté par l'appelant : 'error' démon
+        // injoignable, 'warning' dépassement AC5 ou refus 409, 'info' ligne de budget AC1.
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        },
+        function () {
+          return microtime(true);
         }
       );
 

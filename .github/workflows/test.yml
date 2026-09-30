@@ -87,6 +87,34 @@ jobs:
           path: coverage.xml
           retention-days: 30
 
+  # Load stage - heavy scenarios excluded from the default `-m 'not load'` addopts
+  # (story 19.6 AC7), run explicitly here so they are exercised in CI.
+  load:
+    name: Load tests (Python 3.9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Run load tests
+        run: |
+          set -euo pipefail
+          python -m pytest -m load -q
+
   # Node stage - frontend unit tests (node --test, no build step)
   node:
     name: Node unit tests
@@ -239,7 +267,7 @@ jobs:
   report:
     name: Test Report
     runs-on: ubuntu-latest
-    needs: [lint, test, burn-in, node, php, shell-syntax]
+    needs: [lint, test, burn-in, load, node, php, shell-syntax]
     if: always()
 
     steps:
@@ -251,6 +279,7 @@ jobs:
           echo "- **Status (Lint)**: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status (Tests)**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Burn-in**: ${{ needs.burn-in.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status (Load)**: ${{ needs.load.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status (Node)**: ${{ needs.node.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status (PHP)**: ${{ needs.php.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status (Shell syntax)**: ${{ needs.shell-syntax.result }}" >> $GITHUB_STEP_SUMMARY
@@ -268,6 +297,7 @@ jobs:
           for result in \
             "lint:${{ needs.lint.result }}" \
             "test:${{ needs.test.result }}" \
+            "load:${{ needs.load.result }}" \
             "node:${{ needs.node.result }}" \
             "php:${{ needs.php.result }}" \
             "shell-syntax:${{ needs.shell-syntax.result }}"; do

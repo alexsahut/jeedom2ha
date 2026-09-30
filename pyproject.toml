@@ -31,3 +31,7 @@ namespaces = true
 testpaths = ["tests", "resources/daemon/tests"]
 pythonpath = [".", "resources/daemon"]
 asyncio_mode = "auto"
+addopts = "-m 'not load'"
+markers = [
+    "load: scénarios de charge lourds (story 19.6 AC7) ; exclus par défaut, lancer avec -m load",
+]
