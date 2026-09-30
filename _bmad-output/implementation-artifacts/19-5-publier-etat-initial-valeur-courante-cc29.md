@@ -1,6 +1,6 @@
 # Story 19.5: Publier l'état initial avec la valeur courante au clic « Publier » (CC-29)
 
-Status: review
+Status: ready-for-UX-validation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -259,11 +259,14 @@ garde sa propre décision et son propre état initial (Story 19.2).
 
 <!-- Story terrain : daemon / MQTT / publication / bouton Publier / box réelle → Task 0 Pre-flight terrain injectée. -->
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
-  - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (CI verte du SHA exigée).
-  - [ ] Identifier en lecture seule une petite pièce conforme à la preuve
-    terrain (capteur à valeur changeante, types streamés).
-  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
+  - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (CI verte du SHA exigée).
+    **Écart** : pas de dry-run séparé. La garde CI du script a vérifié le SHA
+    exact au déploiement réel, en plus de la vérification ClaudeBox.
+  - [x] Identifier en lecture seule une petite pièce conforme à la preuve
+    terrain (capteur à valeur changeante, types streamés) : « escalier »
+    (objet 9), capteur 4238 de l'eq 468.
+  - [x] **Interdiction explicite (DANGER) :** ne jamais invoquer
     `--cleanup-discovery` ni `--stop-daemon-cleanup`
     (`scripts/deploy-to-box.sh:97,99`) pendant cette recherche ni pendant la
     vérification post-correction — ces flags republient des messages MQTT
@@ -333,9 +336,10 @@ garde sa propre décision et son propre état initial (Story 19.2).
   - [x] Suite complète `python3 -m pytest -q` (1385 passed) et
     `node --test tests/unit/*.node.test.js` (305 passed) : 0 régression.
 
-- [ ] Task 4 — Preuve terrain et gate d'inventaire
-  - [ ] Dérouler la section « Preuve terrain » ; documenter la preuve par clic
-    réel avant `ready-for-UX-validation` → `done`.
+- [x] Task 4 — Preuve terrain et gate d'inventaire
+  - [x] Dérouler la section « Preuve terrain » ; documenter la preuve par clic
+    réel avant `ready-for-UX-validation` → `done` :
+    `19-5-field-proof-2026-09-30.md`.
 
 ## Dev Notes
 
@@ -477,6 +481,16 @@ garde sa propre décision et son propre état initial (Story 19.2).
   bloquant jusqu'à ~31 s contre 20 s côté client ⇒ budget de 3 s, une tentative
   (AC11).
 
+- **Preuve terrain (30/09, ClaudeBox et `clawcode`, règle 2)** — `ed9cc30`
+  déployé à 06:40:40Z (déploiement standard, `clawcode`). Parité identique, à un
+  écart près, expliqué et sans lien avec 19-5 : le bouton du scénario 2 est
+  republié, car le scénario est actif ce matin. Écouteurs : 227 avant et après.
+  0 ERROR. Preuve par clic sur « escalier » (ClaudeBox, dans Chrome) :
+  « Suppr. », changement de la valeur Jeedom (évènement rejeté par le démon),
+  puis « Republier ». Le démon émet `initial_state_published` pour les 3 capteurs
+  au clic. HA affiche la valeur Jeedom lue au clic, et non l'état retenu d'avant
+  « Suppr. ». Mêmes `entity_id`. Artefact : `19-5-field-proof-2026-09-30.md`.
+
 ### File List
 
 - `resources/daemon/sync/state.py` [MODIFIÉ]
@@ -499,3 +513,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — relecture de code ClaudeBox : AC11 extrait et testé, `fresh_since` avant le premier `await`, DEBUG du résiduel AC6, câblage AC10 testé.
 - 2026-09-30 — revue Codex PR #185 : listeners créés avant la purge (aucune commande sans écouteur en cas d'exception).
 - 2026-09-30 — code-review ClaudeBox : lecture des valeurs au clic en best-effort (AC7 sur échec).
+- 2026-09-30 — PR #185 fusionnée (`ed9cc30`), déployée et prouvée sur le terrain ; statut `ready-for-UX-validation`.
