@@ -1,6 +1,6 @@
 # Story 19.6: Durée des actions HA bornée pour les grands parcs (CC-32)
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 import paho.mqtt.client as mqtt
 from aiohttp import web
 
+from . import action_pacing
 from .mqtt_client import MqttBridge
 from models.availability import (
     AVAILABILITY_OFFLINE,
@@ -3638,6 +3639,24 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             status=400,
         )
 
+    # Story 19.6 (AC1bis) — échéance optionnelle transmise par le relais PHP (AC1) : absente,
+    # comportement inchangé (Décision 8). Présente mais invalide => 400.
+    deadline_s: Optional[float] = None
+    raw_deadline = body.get("deadline_s")
+    if raw_deadline is not None:
+        try:
+            deadline_s = float(raw_deadline)
+        except (TypeError, ValueError):
+            deadline_s = None
+        if deadline_s is None or deadline_s <= 0:
+            return web.json_response(
+                {
+                    "status": "error",
+                    "message": f"Champ 'deadline_s' invalide : '{raw_deadline}'. Doit être un nombre strictement positif.",
+                },
+                status=400,
+            )
+
     topology = request.app.get("topology")
     published_scope = request.app.get("published_scope")
     if topology is None or published_scope is None:
@@ -3717,11 +3736,27 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
 
     # --- Branche supprimer (Story 5.3) ---
     if intention == "supprimer":
+        _action_start = time.monotonic()
         publisher = DiscoveryPublisher(mqtt_bridge)
         equipements_supprimes = 0
         supprimer_errors = 0
         skips = 0
         _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+
+        # Story 19.6 (AC1bis) — plafond du lissage si une échéance est transmise. Le compte
+        # est exact ici : c'est la même condition qui décide d'une pause plus bas.
+        _plafond = action_pacing.plafond_pauses(deadline_s) if deadline_s is not None else None
+        _pauses_totales = (
+            sum(
+                1
+                for eq_id in eq_ids
+                if _is_currently_published_in_ha(eq_id, publications.get(eq_id), pending_discovery_unpublish)
+            )
+            if deadline_s is not None
+            else 0
+        )
+        _pauses_faites = 0.0
+        _pauses_index = 0
 
         for eq_id in eq_ids:
             previous_decision = publications.get(eq_id)
@@ -3741,7 +3776,17 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 node_ids = []
 
             unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-            await asyncio.sleep(_action_delay)
+            if deadline_s is None:
+                await asyncio.sleep(_action_delay)
+            else:
+                _pauses_index += 1
+                _pauses_restantes = _pauses_totales - _pauses_index
+                if _pauses_restantes > 0:
+                    _pause = action_pacing.prochaine_pause(_action_delay, _plafond, _pauses_faites, _pauses_restantes)
+                    if _pause > 0:
+                        _t0 = time.monotonic()
+                        await asyncio.sleep(_pause)
+                        _pauses_faites += time.monotonic() - _t0
             if not unpublish_ok:
                 _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
                 supprimer_errors += 1
@@ -3800,6 +3845,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 _sync_publication_decision_refs(mapping, resolved_decision)
 
             equipements_supprimes += 1
+
+        _LOGGER.info(
+            "[ACTION] intention=supprimer deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+            f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+            time.monotonic() - _action_start,
+            _pauses_faites,
+        )
 
         if supprimer_errors > 0 and equipements_supprimes == 0:
             resultat = "echec"
@@ -3873,12 +3925,45 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         confidence_policy = _DEFAULT_CONFIDENCE_POLICY
     boot_cache = request.app.get("boot_cache", {})
 
+    _action_start = time.monotonic()
     equipements_inclus = 0
     equipements_publies_ou_crees = 0
     ecarts_resolus = 0
     skips = 0
     publish_errors = 0
     _action_delay = max(0.1, 10.0 / max(1, len(eq_ids)))
+
+    # Story 19.6 (AC1bis) — plafond du lissage si une échéance est transmise. Le décompte est
+    # une borne supérieure (revue Codex `ecce1dc` : pas de précompte exact du travail) : elle
+    # ne sert qu'à répartir les pauses, jamais à couper le travail lui-même.
+    _plafond = action_pacing.plafond_pauses(deadline_s) if deadline_s is not None else None
+    _pauses_totales = (
+        sum(
+            1
+            for eq_id in eq_ids
+            if _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility)
+            or _is_currently_published_in_ha(eq_id, publications.get(eq_id), pending_discovery_unpublish)
+        )
+        if deadline_s is not None
+        else 0
+    )
+    _pauses_faites = 0.0
+    _pauses_index = 0
+
+    async def _pace_publier() -> None:
+        nonlocal _pauses_faites, _pauses_index
+        if deadline_s is None:
+            await asyncio.sleep(_action_delay)
+            return
+        _pauses_index += 1
+        pauses_restantes = _pauses_totales - _pauses_index
+        if pauses_restantes <= 0:
+            return
+        pause = action_pacing.prochaine_pause(_action_delay, _plafond, _pauses_faites, pauses_restantes)
+        if pause > 0:
+            t0 = time.monotonic()
+            await asyncio.sleep(pause)
+            _pauses_faites += time.monotonic() - t0
 
     for eq_id in eq_ids:
         scope_entry = scope_entries.get(eq_id)
@@ -3954,7 +4039,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                     )
                     click_publish_failed = click_failed_count > 0
 
-            await asyncio.sleep(_action_delay)
+            await _pace_publier()
 
             # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
             # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
@@ -3999,7 +4084,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             node_ids = []
 
         unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-        await asyncio.sleep(_action_delay)
+        await _pace_publier()
         if not unpublish_ok:
             _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
             publish_errors += 1  # Story 19.4b (CC-31) — reporté, pas résolu
@@ -4047,6 +4132,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             publications[eq_id] = _scope_excluded_decision(mapping, topology)
 
         ecarts_resolus += 1
+
+    _LOGGER.info(
+        "[ACTION] intention=publier deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+        f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+        time.monotonic() - _action_start,
+        _pauses_faites,
+    )
 
     if publish_errors > 0 and equipements_publies_ou_crees == 0:
         resultat = "echec"
