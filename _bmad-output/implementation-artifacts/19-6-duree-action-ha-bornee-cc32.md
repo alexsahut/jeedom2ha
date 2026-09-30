@@ -1,6 +1,6 @@
 # Story 19.6: Durée des actions HA bornée pour les grands parcs (CC-32)
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -485,44 +485,44 @@ changent).
     story** d'un effet causé par le script lui-même. Déploiement standard
     uniquement.
 
-- [ ] Task 1 — Relais PHP, client JS et démon : budget fixe + échéance (AC1,
+- [x] Task 1 — Relais PHP, client JS et démon : budget fixe + échéance (AC1,
   AC1bis, AC2, AC3, AC5)
-  - [ ] Constantes `R = 60 s` et `reserve_s = 5 s` (PHP), budget fixe pour
+  - [x] Constantes `R = 60 s` et `reserve_s = 5 s` (PHP), budget fixe pour
     `callDaemon`, `deadline_s = R - reserve_s` transmis au démon.
-  - [ ] Journalisation d'AC1 (relais : intention, portée, `R`, `reserve_s`,
+  - [x] Journalisation d'AC1 (relais : intention, portée, `R`, `reserve_s`,
     `deadline_s`, durée de l'appel ; démon : durée de traitement, total des
     pauses), testée.
-  - [ ] Appliquer ce budget à l'appel `callDaemon('/action/execute', …)`
+  - [x] Appliquer ce budget à l'appel `callDaemon('/action/execute', …)`
     (`jeedom2ha.ajax.php:764`) pour `intention = publier` et
     `intention = supprimer`, avec `deadline_s` dans le corps de la requête.
-  - [ ] Pré-vérification `GET /system/status` (3 s, une tentative) avant
+  - [x] Pré-vérification `GET /system/status` (3 s, une tentative) avant
     la lecture au clic (AC3, ordre testé), pour signaler vite un démon
     injoignable.
-  - [ ] Démon : lecture de `deadline_s` sur `/action/execute`, plafond des
+  - [x] Démon : lecture de `deadline_s` sur `/action/execute`, plafond des
     pauses cumulées (AC1bis) dans les deux branches Publier
     (`:3881`) et Supprimer (`:3724`), sans changer le comportement sans
     `deadline_s`.
-  - [ ] Message d'erreur distinct en cas de vrai dépassement (AC5), formulé
+  - [x] Message d'erreur distinct en cas de vrai dépassement (AC5), formulé
     en dev-story.
-  - [ ] Délai fixe côté JS (`desktop/js/jeedom2ha.js:343`), indépendant de N
+  - [x] Délai fixe côté JS (`desktop/js/jeedom2ha.js:343`), indépendant de N
     (AC2).
-  - [ ] Échéance explicite de la lecture des valeurs au clic (AC2), testée.
-  - [ ] Tests PHP (un cas par portée, statut, non-régression petite
+  - [x] Échéance explicite de la lecture des valeurs au clic (AC2), testée.
+  - [x] Tests PHP (un cas par portée, statut, non-régression petite
     portée), démon (compression AC1bis, non-régression sans `deadline_s`) et
     JS (délai fixe).
 
-- [ ] Task 2 — Action protégée contre la déconnexion du client (AC6)
-  - [ ] Protection systématique de l'exécution (tâche unique protégée), sans
+- [x] Task 2 — Action protégée contre la déconnexion du client (AC6)
+  - [x] Protection systématique de l'exécution (tâche unique protégée), sans
     condition sur la version d'aiohttp.
-  - [ ] Test d'intégration démon : handler long, déconnexion client simulée
+  - [x] Test d'intégration démon : handler long, déconnexion client simulée
     avant la fin, action complète vérifiée ; version d'aiohttp testée et
     comportement brut observé documentés dans les Dev Notes.
 
-- [ ] Task 3 — Écouteurs et test de charge (AC4, AC7)
-  - [ ] Test simulant un grand parc où le lissage s'est comprimé (AC1bis) et
+- [x] Task 3 — Écouteurs et test de charge (AC4, AC7)
+  - [x] Test simulant un grand parc où le lissage s'est comprimé (AC1bis) et
     où le réalignement des écouteurs a bien lieu (AC4), contrastant avec
     l'ancien comportement à budget fixe non borné.
-  - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste :
+  - [x] Test de charge du démon (AC7), faux MQTT à latence réaliste :
     `c_mqtt` mesuré sur un parc multi-candidats, retypé et multi-`node_id` ;
     `c_eq` mesuré sur une portée surtout ignorée, presque sans appel MQTT,
     faite de la forme d'équipement la plus coûteuse à évaluer (revue Codex,
@@ -534,13 +534,13 @@ changent).
     couple mesuré (292, 94, ~11 s) et un grand parc simulé dans l'enveloppe ;
     assertions sur `deadline_s`. Déclare l'enveloppe, avec une marge
     explicite.
-  - [ ] Documentation utilisateur : ajouter la taille supportée et le message
+  - [x] Documentation utilisateur : ajouter la taille supportée et le message
     d'AC5 dans `docs/fr_FR/index.md` (revue Codex P2, `a1a8514`).
 
-- [ ] Task 3bis — Sérialisation des actions (AC8)
-  - [ ] Verrou unique des actions `publier`/`supprimer` dans le démon, refus
+- [x] Task 3bis — Sérialisation des actions (AC8)
+  - [x] Verrou unique des actions `publier`/`supprimer` dans le démon, refus
     immédiat et explicite d'une seconde action, libération garantie.
-  - [ ] Relais : message du refus transmis tel quel ; tests démon et PHP (nouvel
+  - [x] Relais : message du refus transmis tel quel ; tests démon et PHP (nouvel
     essai pendant, puis après l'action).
 
 - [ ] Task 4 — Preuve terrain et gate d'inventaire
@@ -631,11 +631,19 @@ changent).
 
 ### Agent Model Used
 
-- (à remplir en dev-story)
+- `clawcode` — Claude (claude-sonnet-5), sessions détachées « unités » A à D,
+  worktree `story/19-6-duree-action-ha`.
 
 ### Debug Log References
 
-- (à remplir en dev-story)
+- Unité B (démon, AC6/AC8) : aiohttp `3.13.3` sur la box de terrain ;
+  comportement observé sans `asyncio.shield` : l'annulation du handler par
+  aiohttp lors d'une déconnexion client interrompt l'action en cours
+  (état partiel possible) — d'où la protection systématique de la tâche
+  d'action, indépendante de la version d'aiohttp.
+- Unité D (bloc D, AC4/AC7) : enveloppe mesurée sur cette VM de développement
+  (pas la box de terrain) — voir « Enveloppe AC7 » ci-dessous pour les
+  constantes, marges et facteur machine déclarés à cette fin.
 
 ### Completion Notes List
 
@@ -739,10 +747,73 @@ changent).
   dont les publications portent le nombre maximal de secondaires et de
   `node_id`, au prorata des candidats au-delà (P1). AC5 aligné sur
   `budget_travail`.
+- **Unité C, corrections de revue** — 2026-09-30 — quatre corrections sur le
+  relais/client : ordre de chargement JS garanti (`jeedom2ha_action_budget.js`
+  avant `jeedom2ha.js`), délai client lu depuis `Jeedom2haActionBudget.CLIENT_TIMEOUT_MS`
+  (repli 90000) ; échéance de lecture au clic démarrée au début de
+  `_jeedom2ha_collect_click_values` et vérifiée aussi pendant la liste des
+  commandes (pas seulement la lecture des valeurs) ; niveaux de journal portés
+  par l'appelant (`error` démon injoignable, `warning` dépassement AC5/refus
+  409, `info` ligne de budget AC1) ; message AC5 corrigé (démon du plugin, pas
+  Home Assistant). Commit `21c357c`.
+- **Unité D, bloc D (AC4, AC7, documentation, story)** — 2026-09-30 — test de
+  charge AC7 (`test_story_19_6_load_ac7.py`, marqueur pytest `load` dédié,
+  exclu par défaut via `addopts = "-m 'not load'"`) : mesure réelle de
+  `c_eq` (`evaluate_equipment()` sur un équipement à 20 commandes,
+  multi-domaine switch+sensor+binary_sensor, overrides) et de `c_parc`
+  (`save_publications_cache()` sur 500 publications de cette même forme
+  coûteuse) via `time.perf_counter`, minimum sur 20/5 itérations, facteur
+  machine ×3 déclaré (box de terrain non mesurée directement dans cette
+  session) ; `c_mqtt` déclaré (pas de broker réel disponible) à 5 ms par appel
+  `publish_message`, ×3 également. Enveloppe
+  `appels_MQTT × c_mqtt + eq_portée × c_eq + eq_parc × c_parc ≤ budget_travail`
+  (39 s) vérifiée sur le scénario mixte (94, 94, 1000) et sur une petite
+  portée sur très grand inventaire (1, 1, 5000). Deux tests bout-en-bout
+  (aiohttp réel, `DiscoveryPublisher` mocké faute de broker) : rejeu du couple
+  mesuré du 30/09 (292 total, 94 évalués/publiés) et un parc cible de 1000
+  équipements multi-capteurs sur la portée globale entière — les deux
+  terminent sous `deadline_s` (55 s), en ~0,01 s chacun (pas de MQTT réel,
+  seul le travail CPU du démon est mesuré). AC4 : réalignement après succès
+  déjà couvert côté relais par le test PHP existant (`test_story_19_6_php_relay.php`,
+  bloc « AC4 — réalignement après succès seulement ») ; côté démon, le test
+  du grand parc (1000) démontre qu'un succès sur un parc volumineux précède
+  bien l'échéance, condition du réalignement. Documentation utilisateur
+  ajoutée (`docs/fr_FR/index.md`, section « Durée des actions Publier /
+  Supprimer ») : taille supportée en ordre de grandeur (centaines à ~1000
+  équipements) et message AC5 exact avec conduite à tenir. Suite par défaut :
+  2014 passed, 3 deselected (inchangé), 217,7 s (pas de croissance mesurable
+  due au bloc D, conforme à la contrainte des ~30 s). Déviation documentée :
+  faute d'accès à la box de terrain dans cette session, le facteur machine
+  (×3) et `c_mqtt` (5 ms/appel) sont déclarés par prudence plutôt que
+  mesurés en conditions réelles — à confronter à la preuve terrain (Task 4,
+  hors scope de cette session).
 
 ### File List
 
-- (à remplir en dev-story)
+- `desktop/php/jeedom2ha.php` — inclusion de `jeedom2ha_action_budget.js`
+  avant `jeedom2ha.js`.
+- `desktop/js/jeedom2ha.js` — `executeHaAction()` lit
+  `Jeedom2haActionBudget.CLIENT_TIMEOUT_MS` (repli 90000).
+- `desktop/js/jeedom2ha_action_budget.js` — module de constantes partagées
+  (lecture seule cette session).
+- `core/ajax/jeedom2ha.ajax.php` — `_jeedom2ha_collect_click_values()`
+  (horloge démarrée avant l'expansion de portée, échéance vérifiée pendant
+  la liste des commandes) ; niveau de journal transmis à
+  `jeedom2ha_dispatch_action_relay()`.
+- `core/php/jeedom2ha_action_budget.php` — `jeedom2ha_dispatch_action_relay()`
+  (paramètre `$log(level, message)`), `jeedom2ha_action_timeout_message()`
+  (message AC5 corrigé).
+- `tests/unit/test_story_19_6_php_relay.php` — test de l'échéance pendant la
+  liste des commandes ; assertions de niveau de journal (AC1/AC3/AC5/AC8).
+- `tests/unit/test_story_19_6_client_timeout.node.test.js` — test de
+  référence `CLIENT_TIMEOUT_MS` et de l'ordre d'inclusion JS.
+- `resources/daemon/tests/unit/test_story_19_6_load_ac7.py` — nouveau,
+  test de charge AC7 (marqueur `load`).
+- `pyproject.toml` — marqueur pytest `load` déclaré, exclu par défaut.
+- `docs/fr_FR/index.md` — section « Durée des actions Publier / Supprimer ».
+- `_bmad-output/implementation-artifacts/19-6-duree-action-ha-bornee-cc32.md`
+  — Tasks 1-3bis cochées, statut `review`, Dev Agent Record complété.
+- `_bmad-output/sprint-status.yaml` — statut de la story 19.6 → `review`.
 
 ### Change Log
 
@@ -770,3 +841,8 @@ changent).
 - 2026-09-30 — revue Codex 16e tour (AC3 : sonde avant la lecture au clic).
 - 2026-09-30 — revue Codex 17e tour (forme la plus coûteuse, journalisation).
 - 2026-09-30 — revue Codex 18e tour (`c_parc` sur les secondaires du parc).
+- 2026-09-30 — unité C : corrections de revue relais/client (ordre JS,
+  échéance de lecture au clic, niveaux de journal, message AC5).
+- 2026-09-30 — unité D : test de charge AC7 (marqueur `load`), citation du
+  test AC4 existant, documentation utilisateur, Tasks 1-3bis cochées,
+  statut `review`.
