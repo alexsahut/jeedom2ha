@@ -40,15 +40,26 @@ describe('19.6 / AC2 — délai fixe du client strictement supérieur au pire ch
     assert.ok(Budget.CLIENT_TIMEOUT_MS < 300000);
   });
 
-  it('executeHaAction() déclare le même délai fixe que le module de budget (AJAX timeout)', () => {
+  it('executeHaAction() référence Jeedom2haActionBudget.CLIENT_TIMEOUT_MS (AJAX timeout), sans littéral dupliqué', () => {
     const fnStart = clientSource.indexOf('function executeHaAction(');
     assert.ok(fnStart >= 0, 'executeHaAction introuvable dans desktop/js/jeedom2ha.js');
     const fnEnd = clientSource.indexOf('\nfunction ', fnStart + 1);
     const fnBody = clientSource.slice(fnStart, fnEnd > 0 ? fnEnd : undefined);
-    const match = fnBody.match(/timeout:\s*(\d+)\s*,/);
-    assert.ok(match, 'aucun "timeout: N," trouvé dans executeHaAction()');
-    const declaredTimeoutMs = Number(match[1]);
-    assert.strictEqual(declaredTimeoutMs, Budget.CLIENT_TIMEOUT_MS);
-    assert.ok(declaredTimeoutMs > Budget.worstPathMs());
+    const match = fnBody.match(/timeout:\s*\(typeof Jeedom2haActionBudget[^,]*CLIENT_TIMEOUT_MS[^,]*\)\s*\|\|\s*(\d+)\s*,/);
+    assert.ok(match, 'executeHaAction() doit lire timeout depuis Jeedom2haActionBudget.CLIENT_TIMEOUT_MS, avec un repli littéral');
+    const fallbackMs = Number(match[1]);
+    assert.strictEqual(fallbackMs, 90000, 'le repli doit valoir 90000 si le module manque');
+    assert.ok(Budget.CLIENT_TIMEOUT_MS > Budget.worstPathMs());
+  });
+
+  it('desktop/php/jeedom2ha.php charge jeedom2ha_action_budget.js avant jeedom2ha.js', () => {
+    const phpSource = fs.readFileSync(
+      path.join(__dirname, '../../desktop/php/jeedom2ha.php'), 'utf8'
+    );
+    const budgetIdx = phpSource.indexOf("include_file('desktop', 'jeedom2ha_action_budget', 'js', 'jeedom2ha')");
+    const mainIdx = phpSource.indexOf("include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha')");
+    assert.ok(budgetIdx >= 0, 'inclusion de jeedom2ha_action_budget.js introuvable');
+    assert.ok(mainIdx >= 0, 'inclusion de jeedom2ha.js introuvable');
+    assert.ok(budgetIdx < mainIdx, 'jeedom2ha_action_budget.js doit être chargé avant jeedom2ha.js');
   });
 });

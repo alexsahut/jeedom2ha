@@ -104,8 +104,8 @@ $callAction = function (array $params, int $timeout) use (&$calls) {
 $realign = function (array $result) use (&$calls) {
     $calls[] = 'realign';
 };
-$logInfo = function (string $m) use (&$calls) {
-    $calls[] = 'log:' . $m;
+$logInfo = function (string $level, string $m) use (&$calls) {
+    $calls[] = 'log:' . $level . ':' . $m;
 };
 $now = make_clock([0.0, 1.0]);
 
@@ -186,6 +186,43 @@ assert_eq('valeurs partielles transmises (2 lues)', [1 => 'v1', 2 => 'v2'], $bou
 assert_eq('un WARNING journalisé', 1, count($warns));
 assert_eq('le WARNING mentionne le nombre de commandes lues (2)', true, strpos($warns[0], '2 commande') !== false);
 
+// Correction de revue (bloc C) — l'échéance couvre aussi la liste des commandes
+// (_cmdsFetcher), pas seulement la lecture des valeurs : l'horloge démarre avant
+// l'expansion de la portée.
+echo "\nStory 19.6 / AC2 — échéance atteinte pendant la liste des commandes\n";
+
+$listWarns = [];
+$listWarn = function (string $m) use (&$listWarns) { $listWarns[] = $m; };
+// 2 équipements dans la portée piece ; le fetcher de commandes consomme du temps.
+$pieceFetcherList = function (int $p) { return [10, 20]; };
+$allFetcherList = function () { return []; };
+$cmdsFetcherCalls = 0;
+$cmdsFetcherList = function ($eqId) use (&$cmdsFetcherCalls) {
+    $cmdsFetcherCalls++;
+    return [['cmd_id' => $eqId, 'type' => 'info']];
+};
+$valuesGetterList = function ($c) { return 'v' . $c['cmd_id']; };
+// Horloge : start=0.0 ; le 1er eqId est listé sous l'échéance (1.0 < 4.0) ; avant le
+// 2e eqId, le temps écoulé dépasse déjà l'échéance (5.0 >= 4.0).
+$clockList = make_clock([0.0, 1.0, 5.0]);
+
+$listResult = _jeedom2ha_collect_click_values(
+    'piece',
+    [9],
+    $pieceFetcherList,
+    $allFetcherList,
+    $cmdsFetcherList,
+    $valuesGetterList,
+    $listWarn,
+    $clockList,
+    4.0
+);
+
+assert_eq('résultat vide : arrêt avant toute lecture de valeur', [], $listResult);
+assert_eq('un seul eqId a eu le temps d\'être listé', 1, $cmdsFetcherCalls);
+assert_eq('un WARNING journalisé, mentionnant la liste des commandes', 1, count($listWarns));
+assert_eq('le WARNING mentionne "liste des commandes"', true, strpos($listWarns[0], 'liste des commandes') !== false);
+
 // ---------------------------------------------------------------------------
 // AC5 — les deux messages distincts en cas de vrai dépassement
 // ---------------------------------------------------------------------------
@@ -201,13 +238,16 @@ $probeStatusSeqA = function (int $t, int $a) use (&$statusIdx, $statusSeq) {
     $statusIdx++;
     return $v;
 };
+$logsA = [];
+$logA = function (string $level, string $m) use (&$logsA) { $logsA[] = [$level, $m]; };
 assert_throws_message(
     'second statut injoignable : message démon injoignable',
-    function () use ($probeStatusSeqA, $callActionTimeout) {
-        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqA, function () { return null; }, $callActionTimeout, function () {}, function () {}, make_clock([0.0, 1.0]));
+    function () use ($probeStatusSeqA, $callActionTimeout, $logA) {
+        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqA, function () { return null; }, $callActionTimeout, function () {}, $logA, make_clock([0.0, 1.0]));
     },
     jeedom2ha_action_daemon_unreachable_message()
 );
+assert_eq('journal : ligne info puis error (démon injoignable)', ['info', 'error'], array_column($logsA, 0));
 
 // Cas b : démon joignable au second statut -> message de dépassement, pas de réalignement
 $statusSeq2 = [['status' => 'ok'], ['status' => 'ok']];
@@ -218,14 +258,17 @@ $probeStatusSeqB = function (int $t, int $a) use (&$statusIdx2, $statusSeq2) {
     return $v;
 };
 $realignCalledB = false;
+$logsB = [];
+$logB = function (string $level, string $m) use (&$logsB) { $logsB[] = [$level, $m]; };
 assert_throws_message(
     'second statut joignable : message de vrai dépassement',
-    function () use ($probeStatusSeqB, $callActionTimeout, &$realignCalledB) {
-        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqB, function () { return null; }, $callActionTimeout, function () use (&$realignCalledB) { $realignCalledB = true; }, function () {}, make_clock([0.0, 1.0]));
+    function () use ($probeStatusSeqB, $callActionTimeout, &$realignCalledB, $logB) {
+        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqB, function () { return null; }, $callActionTimeout, function () use (&$realignCalledB) { $realignCalledB = true; }, $logB, make_clock([0.0, 1.0]));
     },
     jeedom2ha_action_timeout_message()
 );
 assert_eq('aucun réalignement en cas de vrai dépassement', false, $realignCalledB);
+assert_eq('journal : ligne info puis warning (dépassement AC5)', ['info', 'warning'], array_column($logsB, 0));
 
 // ---------------------------------------------------------------------------
 // AC8 — 409 (action_in_progress) transmis tel quel, sans second statut ni réalignement
@@ -242,15 +285,18 @@ $callActionConflict = function (array $params, int $timeout) {
     return ['status' => 'error', 'code' => 'action_in_progress', 'message' => 'Une action Home Assistant est déjà en cours.'];
 };
 $realignCalledConflict = false;
+$logsConflict = [];
+$logConflict = function (string $level, string $m) use (&$logsConflict) { $logsConflict[] = [$level, $m]; };
 assert_throws_message(
     '409 : message transmis tel quel',
-    function () use ($probeStatusOnce, $callActionConflict, &$realignCalledConflict) {
-        jeedom2ha_dispatch_action_relay('supprimer', ['intention' => 'supprimer', 'portee' => 'global'], $probeStatusOnce, null, $callActionConflict, function () use (&$realignCalledConflict) { $realignCalledConflict = true; }, function () {}, make_clock([0.0, 1.0]));
+    function () use ($probeStatusOnce, $callActionConflict, &$realignCalledConflict, $logConflict) {
+        jeedom2ha_dispatch_action_relay('supprimer', ['intention' => 'supprimer', 'portee' => 'global'], $probeStatusOnce, null, $callActionConflict, function () use (&$realignCalledConflict) { $realignCalledConflict = true; }, $logConflict, make_clock([0.0, 1.0]));
     },
     'Une action Home Assistant est déjà en cours.'
 );
 assert_eq('statut appelé une seule fois (préalable seulement)', 1, $statusCallCount);
 assert_eq('aucun réalignement après un refus 409', false, $realignCalledConflict);
+assert_eq('journal : ligne info puis warning (refus 409)', ['info', 'warning'], array_column($logsConflict, 0));
 
 // ---------------------------------------------------------------------------
 // AC4 — réalignement après succès seulement

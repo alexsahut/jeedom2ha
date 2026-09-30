@@ -434,16 +434,27 @@ function _jeedom2ha_collect_click_values(
     ?callable $_now = null,
     ?float $deadlineS = null
 ): ?array {
+    $bounded = ($_now !== null && $deadlineS !== null);
+    // Correction de revue (bloc C) — l'horloge démarre ici, avant l'expansion de la
+    // portée : l'échéance couvre le développement de la portée et la liste des
+    // commandes, pas seulement la lecture des valeurs.
+    $start = $bounded ? $_now() : null;
     try {
         $eqIds = _jeedom2ha_expand_portee_to_eq_ids($portee, $selection, $_pieceEqIdsFetcher, $_allEqIdsFetcher);
         $cmds = [];
         foreach ($eqIds as $eqId) {
+            if ($bounded && ($_now() - $start) >= $deadlineS) {
+                $_warn('[ACTION] Échéance de lecture des valeurs au clic atteinte (' . $deadlineS
+                    . ' s) pendant la liste des commandes, 0 commande lue, le reste part sans état initial');
+                return [];
+            }
             foreach ($_cmdsFetcher($eqId) as $cmd) {
                 $cmds[] = $cmd;
             }
         }
-        if ($_now !== null && $deadlineS !== null) {
-            return _jeedom2ha_read_current_values_bounded($cmds, $_valueGetter, $_now, $deadlineS, $_warn);
+        if ($bounded) {
+            $remainingS = max(0.0, $deadlineS - ($_now() - $start));
+            return _jeedom2ha_read_current_values_bounded($cmds, $_valueGetter, $_now, $remainingS, $_warn);
         }
         return _jeedom2ha_read_current_values($cmds, $_valueGetter);
     } catch (\Throwable $e) {
@@ -838,8 +849,10 @@ try {
             }
           );
         },
-        function (string $message) {
-          log::add('jeedom2ha', 'info', $message);
+        // Correction de revue (bloc C) — niveau porté par l'appelant : 'error' démon
+        // injoignable, 'warning' dépassement AC5 ou refus 409, 'info' ligne de budget AC1.
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
         },
         function () {
           return microtime(true);

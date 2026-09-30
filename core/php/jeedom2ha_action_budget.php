@@ -61,8 +61,9 @@ function jeedom2ha_build_action_budget_log_line(
  * jeedom2ha_state_listeners.php) ; la traduction éventuelle relève de l'appelant runtime.
  */
 function jeedom2ha_action_timeout_message(): string {
-    return 'Le démon Home Assistant est joignable mais n\'a pas répondu dans le délai imparti. '
-        . 'L\'action peut se poursuivre en arrière-plan côté démon : actualisez la page dans un instant pour voir le résultat.';
+    // Correction de revue (bloc C) — le démon est celui du plugin, pas Home Assistant.
+    return 'L\'action Home Assistant dure plus longtemps que prévu (plus de 60 s). '
+        . 'Elle peut se poursuivre côté démon : actualisez la page dans un instant pour voir le résultat.';
 }
 
 /** AC3 / AC5 — message d'erreur pour un démon injoignable (statut préalable ou de diagnostic). */
@@ -81,7 +82,10 @@ function jeedom2ha_action_daemon_unreachable_message(): string {
  * @param callable|null $collectClickValues function(): ?array — lecture au clic (publier seulement, déjà bornée par l'appelant, AC2)
  * @param callable $callAction         function(array $params, int $timeoutS): ?array — POST /action/execute
  * @param callable $realign            function(array $daemonResult): void — réalignement (AC4), no-op si non applicable
- * @param callable $logInfo            function(string $message): void — ligne de budget (AC1)
+ * @param callable $log                function(string $level, string $message): void — journal niveau + message
+ *                                     (correction de revue, bloc C) : 'info' pour la ligne de budget (AC1),
+ *                                     'error' quand le démon est injoignable (statut préalable ou second statut),
+ *                                     'warning' pour le dépassement d'AC5, 'warning' pour le refus 409 (AC8).
  * @param callable $now                function(): float — horloge injectable pour mesurer la durée de l'appel
  * @return array résultat du démon (payload /action/execute)
  * @throws Exception message destiné à l'UI
@@ -93,7 +97,7 @@ function jeedom2ha_dispatch_action_relay(
     ?callable $collectClickValues,
     callable $callAction,
     callable $realign,
-    callable $logInfo,
+    callable $log,
     callable $now
 ): array {
     $r         = JEEDOM2HA_ACTION_BUDGET_R;
@@ -103,6 +107,7 @@ function jeedom2ha_dispatch_action_relay(
     // AC3 — sonde de statut AVANT toute lecture au clic et avant l'action.
     $status = $probeStatus(JEEDOM2HA_ACTION_BUDGET_STATUS_TIMEOUT_S, 1);
     if ($status === null) {
+        $log('error', '[ACTION] ' . jeedom2ha_action_daemon_unreachable_message());
         throw new Exception(jeedom2ha_action_daemon_unreachable_message());
     }
 
@@ -121,7 +126,7 @@ function jeedom2ha_dispatch_action_relay(
     $result   = $callAction($params, $r);
     $duration = $now() - $start;
 
-    $logInfo(jeedom2ha_build_action_budget_log_line(
+    $log('info', jeedom2ha_build_action_budget_log_line(
         $intention,
         (string)($params['portee'] ?? ''),
         $r,
@@ -135,14 +140,18 @@ function jeedom2ha_dispatch_action_relay(
         // un démon injoignable d'un démon joignable mais qui n'a pas répondu dans R.
         $status2 = $probeStatus(JEEDOM2HA_ACTION_BUDGET_STATUS_TIMEOUT_S, 1);
         if ($status2 === null) {
+            $log('error', '[ACTION] ' . jeedom2ha_action_daemon_unreachable_message());
             throw new Exception(jeedom2ha_action_daemon_unreachable_message());
         }
+        $log('warning', '[ACTION] ' . jeedom2ha_action_timeout_message());
         throw new Exception(jeedom2ha_action_timeout_message());
     }
 
     if (($result['code'] ?? null) === 'action_in_progress') {
         // AC8 — transmis tel quel à l'UI, sans réalignement ni second statut.
-        throw new Exception((string)($result['message'] ?? 'Une action Home Assistant est déjà en cours.'));
+        $conflictMessage = (string)($result['message'] ?? 'Une action Home Assistant est déjà en cours.');
+        $log('warning', '[ACTION] ' . $conflictMessage);
+        throw new Exception($conflictMessage);
     }
 
     // AC4 — réalignement (délégué : la décision intention === 'publier' reste dans $realign).
