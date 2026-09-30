@@ -2357,7 +2357,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ### Epic 19 — Étape 3 : contrat de décision unifié (`CommandDecision` / `evaluate_equipment`)
 
-**Statut :** `in-progress` — cadrage documentaire 2026-09-27, à la demande directe du mainteneur (pas de sprint-change-proposal dédié : contenu purement architectural/documentaire, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR).
+**Statut :** `done` — clos le 2026-10-01 (7/7 stories `done`, gates epic-level tenus, rétrospective `pe-epic-19-retro-2026-10-01.md`). Cadrage documentaire 2026-09-27, à la demande directe du mainteneur (pas de sprint-change-proposal dédié : contenu purement architectural/documentaire, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR).
 
 **Origine :** le pipeline compte aujourd'hui **4 points d'appel indépendants** qui recalculent chacun une décision de publication de façon divergente : le sync (`_do_handle_action_sync` → `decide_publication` dans `resources/daemon/models/decide_publication.py`), la surface de navigation par pièce (`_build_mapping_override_tree`, Story 16.8), l'aperçu à blanc (`_handle_overrides_preview`), et le bouton "Publier" (`_should_attempt_publish`). Ces divergences produisent des bugs constatés en production :
 - **CC-03** : la surface par pièce affiche "sera publié" pour des équipements en réalité exclus, car elle ne revérifie pas l'éligibilité déjà calculée par le sync.
