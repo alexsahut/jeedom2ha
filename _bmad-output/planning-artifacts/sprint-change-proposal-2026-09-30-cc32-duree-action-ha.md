@@ -68,8 +68,8 @@ du client proportionnels au nombre d'équipements) a été **abandonnée** aprè
 quatre tours de revue Codex (PR #188) qui ont chacun rouvert un nouveau trou
 dans la lecture externe de N. **Option (b′) retenue** par ClaudeBox : un
 lissage borné par une échéance donnée au démon — budget fixe côté
-relais/client, `deadline_s` transmis au démon, qui comprime son propre
-lissage à partir du travail qu'il mesure lui-même. Aucune UX nouvelle,
+relais/client, `deadline_s` transmis au démon, qui plafonne lui-même le
+total de ses pauses de lissage, sans estimer son travail. Aucune UX nouvelle,
 décision prise dans le cadre du GO d'Alex du 30/09 (pas de nouveau retour à
 Alex).
 

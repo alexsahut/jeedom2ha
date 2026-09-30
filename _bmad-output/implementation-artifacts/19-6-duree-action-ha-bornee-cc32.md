@@ -98,26 +98,25 @@ budget externe pour un travail interne au démon est structurellement fragile.
 
 **(b′) Lissage borné par une échéance donnée au démon.** [Retenue]
 - Le relais transmet au démon une **échéance** (`deadline_s`) dérivée d'un
-  budget **fixe** (pas fonction de N). Le démon comprime son propre lissage
-  pour tenir cette échéance, à partir du travail qu'il mesure lui-même en
-  temps réel (durée moyenne par équipement observée depuis le début de
-  l'action × équipements restants) — il n'a pas besoin qu'on lui dise N à
-  l'avance, ni que ce N soit exact.
+  budget **fixe** (pas fonction de N). Le démon **plafonne** le total de ses
+  pauses de lissage (`P_max`, AC1bis) : la durée de l'action est alors
+  bornée par son travail pur plus ce plafond, sans deviner N ni estimer le
+  travail restant.
 - Coût : moyen — touche `http_server.py` (lecture de `deadline_s`, calcul du
-  délai restant par équipement dans les deux branches Publier/Supprimer), en
+  plafond des pauses dans les deux branches Publier/Supprimer), en
   plus du relais et du client. Ne touche pas la Décision 8 : l'appelant
   redémarrage ne transmet jamais `deadline_s`, donc son comportement est
   inchangé par construction (pas de branchement à distinguer, juste un
   paramètre optionnel).
 - Risque : faible à moyen — le lissage ne descend jamais en dessous de 0 (pas
-  de rafale plus dense que « tout de suite »), et seulement quand l'échéance
-  approche réellement ; sur les petits parcs, l'échéance est loin et le délai
-  d'origine (10/N) reste intact.
+  de rafale plus dense que « tout de suite »), et seulement quand les pauses
+  cumulées atteindraient `P_max` (au-delà de 150 équipements évalués) ; sur
+  les petits parcs, le délai d'origine (10/N) reste intact.
 - Effet visible : aucun changement d'UX — toujours un clic bloquant, un seul
   retour ; l'attente reste bornée par un budget fixe, indépendamment de N,
   puisque c'est le démon qui adapte son propre rythme.
-- **Ferme le trou de fond (source unique de vérité : le démon mesure son
-  propre travail) plutôt que de le contourner.**
+- **Ferme le trou de fond (le démon borne lui-même la seule part qu'il
+  maîtrise, ses pauses) plutôt que de le contourner.**
 
 **(c) Action asynchrone suivie par polling.** [Hors périmètre]
 - Le clic déclenche l'action en tâche de fond côté démon, répond
@@ -140,9 +139,11 @@ option synchrone est bornée par la pile web de la box (`Timeout 300`
 d'Apache) : un budget fixe est donc inévitable, et un parc dont le travail
 pur dépasse ce budget le dépassera malgré la compression du lissage (AC5).
 L'option (b′) ne promet pas « jamais » : elle fixe une **taille de parc
-supportée**, mesurée par un test de charge (AC7) et déclarée en nombre total
-d'appels MQTT de l'action (tous chemins), pas en N d'équipements — cela
-répond au P2 de Codex sur le travail par équipement variable. Au-delà, le
+supportée**, celle dont le travail pur tient dans `deadline_s` moins le
+plafond des pauses (AC1bis), mesurée par un test de charge (AC7) et déclarée
+par deux bornes, en nombre total d'appels MQTT de l'action (tous chemins) et
+en nombre d'équipements — cela répond au P2 de Codex sur le travail par
+équipement variable. Au-delà, le
 message juste d'AC5 s'applique. Seule l'option (c) lèverait cette limite ;
 elle changerait l'UX et reviendrait à Alex si les parcs du Market
 l'exigent. L'option (c) n'est pas recommandée pour cette story ; si le
@@ -171,66 +172,45 @@ couvrant la sérialisation de la réponse et le trajet retour)
 preuve terrain
 **And** un test par portée (publier, supprimer) fige `R` et `deadline_s`.
 
-**AC1bis — Le démon comprime son lissage pour tenir l'échéance transmise**
+**AC1bis — Le démon plafonne son lissage pour tenir l'échéance transmise**
 
 **Given** une action (`publier` ou `supprimer`) qui porte `deadline_s`
 **When** le démon traite les équipements de la portée un par un
-**Then** la pause qui suit un équipement devient
-`min(_action_delay, max(0, (deadline_s - écoulé - reserve_travail) /
+**Then** le total des pauses de lissage de l'action est plafonné à
+`plafond_pauses = min(P_max, deadline_s / 2)`, avec `P_max = 15 s`
+(constante nommée) : la pause qui suit un équipement devient
+`min(_action_delay, max(0, (plafond_pauses - pauses_faites) /
 pauses_restantes))`, où `_action_delay` est la formule actuelle (Décision 8),
-`écoulé` le temps déjà passé depuis le début de l'action et `pauses_restantes`
-le nombre de pauses encore à faire, **y compris celle-ci** (toujours ≥ 1)
+`pauses_faites` la durée réellement dormie jusque-là (mesurée, pas
+nominale) et `pauses_restantes` le nombre de pauses encore à faire, **y
+compris celle-ci** (toujours ≥ 1)
 **And** aucune pause n'est faite après le dernier équipement traité : la
 dernière itération ne divise jamais par zéro (revue Codex P2, `472c372`) ;
 un test couvre explicitement la dernière itération, pour publier et pour
 supprimer
-**And** `reserve_travail` = publications MQTT **restantes, précomptées** ×
-coût unitaire prudent. Le précompte est une **borne supérieure** qui ne dépend
-pas du dernier mapping (revue Codex P1, `5570532` : l'évaluation fraîche de
-l'action peut produire plus de candidats qu'avant, après un override ou un
-changement de politique). Pour chaque équipement restant de « Publier » :
-**3 × (nombre de ses commandes dans la topologie en mémoire + 1)**, borne
-multiplicative couvrant, par candidat, la publication discovery
-(`apply_publication_decision`, `http_server.py:1641`), l'état publié au clic
-(`publish_click_states`, `sync/state.py:280-304`) et la disponibilité ; plus
-les nettoyages différés en attente pour cet équipement, rejoués avant sa
-décision (`http_server.py:3906-3912`), dont le nombre est connu (revue Codex
-P1, `17f8892`). Pour « Supprimer » : **max(1, nombre de `node_id`)** par
-équipement dépubliable — un équipement mono-entité a une liste vide mais
-`unpublish_by_eq_id` publie quand même un retained vide sur le topic
-historique (`http_server.py:813-814`, `discovery/publisher.py:326-342`, revue
-Codex P1, `f378ceb`) —, plus la disponibilité et les nettoyages en attente.
-**Règle générale** : le précompte est une borne supérieure des appels MQTT
-réellement émis par l'action ; le test du faux MQTT compte ces appels sur
-**chaque chemin** (publier, supprimer mono et multi-entité, état au clic,
-disponibilité, nettoyages rejoués) et échoue si le précompte est inférieur
-sur l'un d'eux. S'y ajoute le **coût d'évaluation** de chaque équipement
-restant de la portée, y compris ceux qui seront ignorés (exclus, sans
-mapping) et n'émettront rien (`_evaluate_for_action` et contrôles de portée,
-`http_server.py:3883-3898`, revue Codex P1, `99f2450`), estimé de la même
-façon : maximum non décroissant du coût observé et d'une valeur a priori
-prudente. Le coût unitaire est le **maximum**,
-pendant toute l'action, du coût observé par publication et d'une valeur a
-priori prudente (constante nommée, validée par le test de charge d'AC7) —
-jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
-équipements légers en tête font consommer le budget en pauses avant les
-équipements lourds de fin de portée)
-**And** un test place les équipements les plus coûteux (multi-candidats,
-nombreux `node_id`, valeurs fraîches au clic, nettoyages différés en file)
-**en fin de portée** et vérifie que la réponse arrive avant `deadline_s` pour
-un volume égal à la taille supportée d'AC7 ; un test vérifie que le précompte
-majore bien le nombre réel d'appels MQTT sur ces chemins
-(répond au P2 de Codex sur le travail par équipement variable : secondaires,
-`node_id` de dépublication)
+**And** la garantie ne repose sur **aucune estimation** du travail restant :
+la durée de l'action est au plus son travail pur plus `plafond_pauses`, donc
+la réponse arrive avant `deadline_s` dès que le travail pur tient dans
+`deadline_s - plafond_pauses` (40 s avec les constantes d'AC1). C'est ce
+travail pur que mesure la taille supportée d'AC7. Le précompte des appels
+MQTT restants, essayé aux tours Codex 6 à 12, est **abandonné** : chaque tour
+y trouvait un chemin non compté (secondaires, états au clic, dépublications
+de repli, nettoyages différés, évaluation des ignorés, puis dépublications
+immédiates de retypage, revue Codex P1, `ecce1dc`)
+**And** pour une portée dont le lissage actuel totalise au plus `P_max`
+(portée d'au plus 100 équipements, ou d'au plus 150 équipements évalués
+au-delà), les pauses sont identiques à aujourd'hui, hormis la pause finale
+supprimée ; un test le vérifie, dont la mesure du 30/09 (N total 292,
+N évalués 94)
 **And** sans `deadline_s` (appelant redémarrage, ou tout autre appelant qui
 ne le transmet pas), le comportement actuel de `_action_delay` est
 **inchangé** — la Décision 8 n'est pas touchée
 **And** le démon **n'interrompt jamais** une action en cours : si le travail
-pur dépasse à lui seul `deadline_s`, il va au bout sans pause et répond en
-retard (cas de l'AC5)
-**And** un test couvre la compression du lissage à l'approche de l'échéance,
-pour publier et pour supprimer, et un test couvre le comportement inchangé
-sans `deadline_s`.
+pur dépasse à lui seul `deadline_s - plafond_pauses`, il va au bout et
+répond en retard (cas de l'AC5)
+**And** un test couvre le plafond atteint (total des pauses au plus
+`plafond_pauses`), pour publier et pour supprimer, et un test couvre le
+comportement inchangé sans `deadline_s`.
 
 **AC2 — Délai fixe du client, indépendant de N**
 
@@ -278,7 +258,7 @@ qui aboutit**
 **Then** `jeedom2ha_realign_after_action` (AC11 de la Story 19.5) est appelé
 comme aujourd'hui, sans changement de son propre budget (3 s, une tentative)
 **And** un test couvre un grand parc simulé où le lissage du démon s'est
-comprimé pour tenir `deadline_s` (AC1 du démon) et où le réalignement a bien
+comprimé pour tenir `deadline_s` (AC1bis) et où le réalignement a bien
 lieu, alors qu'il aurait été sauté avec l'ancien lissage non borné.
 
 **AC5 — Message juste en cas de vrai dépassement**
@@ -335,18 +315,19 @@ une action en cours, puis après sa fin
 **And** la concurrence entre une action et le sync périodique existe déjà
 aujourd'hui ; elle n'est pas traitée ici et reste déclarée comme résiduel.
 
-**AC7 — Taille de parc supportée mesurée, en publications MQTT**
+**AC7 — Taille de parc supportée mesurée, deux bornes**
 
-**Given** le démon comprime son lissage pour tenir `deadline_s`, mais ne peut
-pas comprimer le travail pur (publication MQTT elle-même)
+**Given** le démon plafonne son lissage pour tenir `deadline_s`, mais ne
+peut pas comprimer le travail pur (publication MQTT elle-même)
 **When** un test de charge du démon simule un parc avec un faux MQTT à
 latence réaliste et des équipements multi-candidats (secondaires, plusieurs
-`node_id` par équipement)
-**Then** le test mesure la taille de parc supportée en **nombre total
-d'appels MQTT de l'action** (`publish_message`, sur tous les chemins :
-discovery des candidats, état au clic, disponibilité, dépublication de chaque
-`node_id` ou de repli, nettoyages rejoués), pas en nombre d'équipements — la
-même unité que le précompte d'AC1bis (revue Codex P1, `a1a8514`)
+`node_id` par équipement, retypés)
+**Then** le test mesure la taille de parc supportée — le plus grand parc
+dont le travail pur tient dans `deadline_s - plafond_pauses` (AC1bis) — en
+**nombre total d'appels MQTT de l'action** (`publish_message`, sur tous les
+chemins : discovery des candidats, état au clic, disponibilité, dépublication
+de chaque `node_id` ou de repli, dépublications de retypage, nettoyages
+rejoués), comptés sur le faux MQTT (revue Codex P1, `a1a8514`)
 **And** la taille supportée comporte une **seconde borne**, le nombre
 d'équipements de la portée (tous évalués, y compris les ignorés), mesurée par
 un test de charge dont la portée contient une grande majorité d'équipements
@@ -381,8 +362,8 @@ multi-capteurs) et vérifie que la réponse arrive avant `R`.
   `R` (60 s), lissage non comprimé.
 - **Risque principal : un lissage trop comprimé qui redevient une rafale.**
   Couvert par AC1bis (la compression ne descend jamais sous 0, et seulement
-  quand l'échéance approche réellement) et par le test de non-régression sur
-  petite portée.
+  quand les pauses cumulées atteindraient `P_max`, au-delà de 150
+  équipements évalués) et par le test de non-régression sur petite portée.
 - **Retour arrière** : redéploiement du SHA précédent. Aucune migration,
   aucun état persistant modifié — seuls des délais de requête HTTP, un
   paramètre `deadline_s` optionnel et un message d'erreur changent.
@@ -460,8 +441,8 @@ changent).
     `intention = supprimer`, avec `deadline_s` dans le corps de la requête.
   - [ ] Pré-vérification `GET /system/status` (3 s, une tentative) avant
     l'action (AC3), pour distinguer démon injoignable / vrai dépassement.
-  - [ ] Démon : lecture de `deadline_s` sur `/action/execute`, calcul du
-    délai comprimé par équipement (AC1bis) dans les deux branches Publier
+  - [ ] Démon : lecture de `deadline_s` sur `/action/execute`, plafond des
+    pauses cumulées (AC1bis) dans les deux branches Publier
     (`:3881`) et Supprimer (`:3724`), sans changer le comportement sans
     `deadline_s`.
   - [ ] Message d'erreur distinct en cas de vrai dépassement (AC5), formulé
@@ -484,10 +465,13 @@ changent).
   - [ ] Test simulant un grand parc où le lissage s'est comprimé (AC1bis) et
     où le réalignement des écouteurs a bien lieu (AC4), contrastant avec
     l'ancien comportement à budget fixe non borné.
-  - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste,
-    équipements multi-candidats ; rejoue le couple mesuré (292, 94, ~11 s) et
-    un grand parc simulé (par exemple 1 000 équipements) ; déclare la taille
-    de parc supportée en nombre total d'appels MQTT, avec une marge explicite.
+  - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste, deux
+    scénarios : parc multi-candidats, retypés et multi-`node_id` (borne en
+    appels MQTT totaux) ; portée surtout ignorée, presque sans appel MQTT
+    (borne en nombre d'équipements, revue Codex P2, `ecce1dc`). Rejoue le
+    couple mesuré (292, 94, ~11 s) et un grand parc simulé (par exemple
+    1 000 équipements) ; déclare **les deux bornes**, avec une marge
+    explicite.
   - [ ] Documentation utilisateur : ajouter la taille supportée et le message
     d'AC5 dans `docs/fr_FR/index.md` (revue Codex P2, `a1a8514`).
 
@@ -528,6 +512,9 @@ changent).
   fixes, indépendantes de N — ne pas réintroduire de lecture de
   `published_scope`/`topology` pour dimensionner un budget (c'est le trou
   qui a fait abandonner l'option (a)).
+- Ne pas réintroduire d'estimation du travail restant pour tenir
+  l'échéance : le plafond des pauses (AC1bis) suffit et ne dépend d'aucun
+  précompte (abandonné après la revue Codex, `ecce1dc`).
 - Ne pas modifier le budget du réalignement des écouteurs de la Story 19.5
   (3 s, une tentative).
 
@@ -655,6 +642,14 @@ changent).
 - **Revue Codex, 12e tour (`71097f6`)** — AC6 : exécution de l'action
   toujours protégée contre l'annulation du handler, sans condition sur la
   version d'aiohttp (non épinglée) ; le test vérifie l'action complète (P1).
+- **Revue Codex, 13e tour (`ecce1dc`), décision ClaudeBox** — le précompte
+  des appels MQTT restants manquait encore un chemin (dépublications
+  immédiates de retypage, P1), après les tours 7, 8, 9 et 11 : il est
+  abandonné. AC1bis plafonne désormais le total des pauses
+  (`min(P_max, deadline_s / 2)`, `P_max = 15 s`), ce qui borne la durée par
+  le travail pur plus ce plafond sans aucune estimation ; AC7 mesure ce
+  travail pur. Task 3 : scénario presque sans MQTT et déclaration des deux
+  bornes (P2).
 
 ### File List
 
@@ -678,3 +673,5 @@ changent).
 - 2026-09-30 — revue Codex 10e tour (unité de la taille supportée, doc utilisateur).
 - 2026-09-30 — revue Codex 11e tour (coût d'évaluation, seconde borne).
 - 2026-09-30 — revue Codex 12e tour (AC6 : protection systématique).
+- 2026-09-30 — revue Codex 13e tour : précompte abandonné, plafond des
+  pauses (AC1bis) ; deux scénarios de charge (Task 3).
