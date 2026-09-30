@@ -72,6 +72,15 @@ function jeedom2ha_action_daemon_unreachable_message(): string {
 }
 
 /**
+ * Revue Codex P2 (PR #189, tour 6) — message d'erreur pour une réponse démon non-JSON /
+ * échec immédiat (par exemple un HTTP 500), distinct du vrai dépassement d'AC5 : la durée
+ * mesurée de l'appel est très inférieure à R, ce n'est donc pas un dépassement du budget.
+ */
+function jeedom2ha_action_daemon_error_message(): string {
+    return 'Le démon a renvoyé une erreur pendant l\'action Home Assistant — consultez les logs du plugin';
+}
+
+/**
  * AC1, AC3, AC4, AC5, AC8 — orchestration pure de l'appel /action/execute.
  * Toute dépendance externe est injectée : aucun accès direct au démon ni au cœur Jeedom.
  * Ordre imposé (AC3) : sonde de statut, puis lecture au clic (publier), puis l'action.
@@ -136,6 +145,14 @@ function jeedom2ha_dispatch_action_relay(
     ));
 
     if ($result === null) {
+        // Revue Codex P2 (PR #189, tour 6) — une réponse null avec une durée très inférieure
+        // à R n'est pas un dépassement (par exemple un HTTP 500 immédiat côté démon) : pas de
+        // second statut, pas de réalignement, message distinct de celui d'AC5.
+        if ($duration < ($r - 1)) {
+            $log('error', '[ACTION] ' . jeedom2ha_action_daemon_error_message());
+            throw new Exception(jeedom2ha_action_daemon_error_message());
+        }
+
         // AC5 — second statut de diagnostic (distinct de celui d'AC3), pour distinguer
         // un démon injoignable d'un démon joignable mais qui n'a pas répondu dans R.
         $status2 = $probeStatus(JEEDOM2HA_ACTION_BUDGET_STATUS_TIMEOUT_S, 1);

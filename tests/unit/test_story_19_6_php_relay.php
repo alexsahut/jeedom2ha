@@ -243,7 +243,7 @@ $logA = function (string $level, string $m) use (&$logsA) { $logsA[] = [$level, 
 assert_throws_message(
     'second statut injoignable : message démon injoignable',
     function () use ($probeStatusSeqA, $callActionTimeout, $logA) {
-        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqA, function () { return null; }, $callActionTimeout, function () {}, $logA, make_clock([0.0, 1.0]));
+        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqA, function () { return null; }, $callActionTimeout, function () {}, $logA, make_clock([0.0, 59.0]));
     },
     jeedom2ha_action_daemon_unreachable_message()
 );
@@ -263,12 +263,39 @@ $logB = function (string $level, string $m) use (&$logsB) { $logsB[] = [$level, 
 assert_throws_message(
     'second statut joignable : message de vrai dépassement',
     function () use ($probeStatusSeqB, $callActionTimeout, &$realignCalledB, $logB) {
-        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqB, function () { return null; }, $callActionTimeout, function () use (&$realignCalledB) { $realignCalledB = true; }, $logB, make_clock([0.0, 1.0]));
+        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusSeqB, function () { return null; }, $callActionTimeout, function () use (&$realignCalledB) { $realignCalledB = true; }, $logB, make_clock([0.0, 59.0]));
     },
     jeedom2ha_action_timeout_message()
 );
 assert_eq('aucun réalignement en cas de vrai dépassement', false, $realignCalledB);
 assert_eq('journal : ligne info puis warning (dépassement AC5)', ['info', 'warning'], array_column($logsB, 0));
+
+// ---------------------------------------------------------------------------
+// Revue Codex P2 (PR #189, tour 6) — échec immédiat (réponse non-JSON, durée courte) distinct
+// du vrai dépassement d'AC5 : pas de second statut, pas de réalignement, message distinct.
+// ---------------------------------------------------------------------------
+
+echo "\nStory 19.6 / revue P2 tour 6 — échec immédiat distinct du dépassement\n";
+
+$callActionImmediateFail = function (array $params, int $timeout) { return null; };
+$statusCallCountImmediate = 0;
+$probeStatusImmediate = function (int $t, int $a) use (&$statusCallCountImmediate) {
+    $statusCallCountImmediate++;
+    return ['status' => 'ok'];
+};
+$realignCalledImmediate = false;
+$logsImmediate = [];
+$logImmediate = function (string $level, string $m) use (&$logsImmediate) { $logsImmediate[] = [$level, $m]; };
+assert_throws_message(
+    'échec immédiat (durée < R-1) : message distinct du dépassement',
+    function () use ($probeStatusImmediate, $callActionImmediateFail, &$realignCalledImmediate, $logImmediate) {
+        jeedom2ha_dispatch_action_relay('publier', ['intention' => 'publier', 'portee' => 'global'], $probeStatusImmediate, function () { return null; }, $callActionImmediateFail, function () use (&$realignCalledImmediate) { $realignCalledImmediate = true; }, $logImmediate, make_clock([0.0, 0.5]));
+    },
+    jeedom2ha_action_daemon_error_message()
+);
+assert_eq('statut appelé une seule fois (pas de second statut)', 1, $statusCallCountImmediate);
+assert_eq('aucun réalignement après un échec immédiat', false, $realignCalledImmediate);
+assert_eq('journal : ligne info puis error (échec immédiat)', ['info', 'error'], array_column($logsImmediate, 0));
 
 // ---------------------------------------------------------------------------
 // AC8 — 409 (action_in_progress) transmis tel quel, sans second statut ni réalignement

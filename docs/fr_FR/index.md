@@ -288,6 +288,10 @@ résultat réel. Si le message persiste après plusieurs rafraîchissements, con
 logs (`Jeedom → Analyse → Logs → jeedom2ha`, niveau `warning`/`error`) pour vérifier que
 le démon tourne normalement.
 
+Si le démon répond immédiatement par une erreur (pas un dépassement du délai), le message
+est différent : « Le démon a renvoyé une erreur pendant l'action Home Assistant — consultez
+les logs du plugin » — consultez directement les logs pour le détail de l'erreur.
+
 Si vous déclenchez une nouvelle action pendant que le démon travaille encore sur la
 précédente, le message suivant apparaît :
 

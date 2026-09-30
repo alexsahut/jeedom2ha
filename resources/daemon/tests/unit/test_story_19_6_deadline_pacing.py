@@ -390,6 +390,63 @@ async def test_supprimer_journalise_ligne_action(cli_factory, caplog):
     assert any("[ACTION] intention=supprimer" in rec.message for rec in caplog.records)
 
 
+# --- Revue Codex P2 (PR #189, tour 6) : la ligne de journal doit couvrir toute la
+# finalisation démon (apply_pending_scope_flags + save_publications_cache), pas seulement
+# la boucle de traitement des équipements ---
+
+
+@pytest.mark.asyncio
+async def test_publier_duree_journalisee_couvre_la_finalisation(cli_factory, caplog):
+    app = _build_app(3)
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+
+    def _slow_save(*args, **kwargs):
+        import time as _time
+
+        _time.sleep(0.05)
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.http_server.asyncio.sleep", new=AsyncMock()
+    ), patch(
+        "transport.http_server.save_publications_cache", side_effect=_slow_save
+    ), caplog.at_level("INFO"):
+        response = await _post_action(
+            cli, {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+
+    assert response.status == 200
+    record = next(rec for rec in caplog.records if "[ACTION] intention=publier" in rec.message)
+    duree = float(record.message.split("duree_s=")[1].split(" ")[0])
+    assert duree >= 0.05
+
+
+@pytest.mark.asyncio
+async def test_supprimer_duree_journalisee_couvre_la_finalisation(cli_factory, caplog):
+    app = _build_app(3)
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+
+    def _slow_save(*args, **kwargs):
+        import time as _time
+
+        _time.sleep(0.05)
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.http_server.asyncio.sleep", new=AsyncMock()
+    ), patch(
+        "transport.http_server.save_publications_cache", side_effect=_slow_save
+    ), caplog.at_level("INFO"):
+        response = await _post_action(
+            cli, {"intention": "supprimer", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+
+    assert response.status == 200
+    record = next(rec for rec in caplog.records if "[ACTION] intention=supprimer" in rec.message)
+    duree = float(record.message.split("duree_s=")[1].split(" ")[0])
+    assert duree >= 0.05
+
+
 # --- Revue Codex P2 (PR #189) : un équipement sauté (non mappable) après le dernier
 # équipement qui travaille ne doit plus provoquer de pause finale ---
 

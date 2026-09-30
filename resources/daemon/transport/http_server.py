@@ -3880,20 +3880,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     
                 equipements_supprimes += 1
     
-            _LOGGER.info(
-                "[ACTION] intention=supprimer deadline_s=%s duree_s=%.3f pauses_s=%.3f",
-                f"{deadline_s:.3f}" if deadline_s is not None else "absent",
-                time.monotonic() - _action_start,
-                _pauses_faites,
-            )
-    
             if supprimer_errors > 0 and equipements_supprimes == 0:
                 resultat = "echec"
             elif supprimer_errors > 0 and equipements_supprimes > 0:
                 resultat = "succes_partiel"
             else:
                 resultat = "succes"
-    
+
             perimetre = _build_action_perimetre_impacte(
                 portee=portee,
                 selection=selection,
@@ -3901,7 +3894,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 eq_ids=eq_ids,
                 equipements_inclus=len(eq_ids),
             )
-    
+
             request.app["published_scope"] = _apply_pending_scope_flags(
                 published_scope,
                 publications,
@@ -3920,7 +3913,14 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 message=_supprimer_msg,
                 volume=equipements_supprimes,
             )
-    
+
+            _LOGGER.info(
+                "[ACTION] intention=supprimer deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+                f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+                time.monotonic() - _action_start,
+                _pauses_faites,
+            )
+
             payload = {
                 "intention": intention,
                 "portee": portee,
@@ -4193,20 +4193,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     
             ecarts_resolus += 1
     
-        _LOGGER.info(
-            "[ACTION] intention=publier deadline_s=%s duree_s=%.3f pauses_s=%.3f",
-            f"{deadline_s:.3f}" if deadline_s is not None else "absent",
-            time.monotonic() - _action_start,
-            _pauses_faites,
-        )
-    
         if publish_errors > 0 and equipements_publies_ou_crees == 0:
             resultat = "echec"
         elif publish_errors > 0 and equipements_publies_ou_crees > 0:
             resultat = "succes_partiel"
         else:
             resultat = "succes"
-    
+
         request.app["published_scope"] = _apply_pending_scope_flags(
             published_scope,
             publications,
@@ -4225,7 +4218,14 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             message=_publier_msg,
             volume=equipements_publies_ou_crees,
         )
-    
+
+        _LOGGER.info(
+            "[ACTION] intention=publier deadline_s=%s duree_s=%.3f pauses_s=%.3f",
+            f"{deadline_s:.3f}" if deadline_s is not None else "absent",
+            time.monotonic() - _action_start,
+            _pauses_faites,
+        )
+
         payload = {
             "intention": intention,
             "portee": portee,
