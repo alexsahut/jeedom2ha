@@ -62,7 +62,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-09-28'  # Story 19-2 clôturée : gate d'inventaire terrain complet après fusion PR #174 (M=eee358a), 12/12 écouteurs d'état republiés (eq 579/585), 0 ERROR, 21 démons tiers inchangés, écart topics 353→354 (scénario Jeedom sans rapport) arbitré non bloquant. Story 19-1 clôturée précédemment : preuve terrain CC-22 complète après fusion PR #172 (M=0ccc5ce6), 2 déploiements + 1 retour arrière intermédiaire, tous "Deploy complete."/code 0, parité stricte 292 décisions + 353 topics MQTT avant/après (diff vide).
+last_updated: '2026-09-30'  # Story 19-5 passée en ready-for-UX-validation : PR #185 fusionnée (M=ed9cc30), déployée le 30/09 à 06:40Z (parité identique hors bouton scenario_2 sans rapport, écouteurs 227, 0 ERROR), preuve par clic réel sur escalier (Suppr., changement Jeedom, Republier : HA affiche la valeur lue au clic), dry-run a posteriori code 0 ; artefact 19-5-field-proof-2026-09-30.md.
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system

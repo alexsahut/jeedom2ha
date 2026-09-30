@@ -261,8 +261,12 @@ garde sa propre décision et son propre état initial (Story 19.2).
 
 - [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
   - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (CI verte du SHA exigée).
-    **Écart** : pas de dry-run séparé. La garde CI du script a vérifié le SHA
-    exact au déploiement réel, en plus de la vérification ClaudeBox.
+    **Écart d'ordre déclaré** : exécuté **a posteriori**, le 30/09 à 09:27:34,
+    sur `ed9cc30` (revue Codex, PR #186). Le déploiement réel de 06:40Z l'a
+    précédé, avec les mêmes garde-fous : SHA exact, CI verte, SSH, `sudo`.
+    Résultat : code 0, « Source Git validée » (arbre propre, check-runs verts),
+    `SSH OK | sudo OK`, simulation `rsync` vide (0 fichier : le staging de la
+    box est déjà identique à `ed9cc30`), « Simulation complete ».
   - [x] Identifier en lecture seule une petite pièce conforme à la preuve
     terrain (capteur à valeur changeante, types streamés) : « escalier »
     (objet 9), capteur 4238 de l'eq 468.
