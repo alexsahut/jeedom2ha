@@ -902,8 +902,10 @@ changent).
 - `pyproject.toml` — marqueur pytest `load` déclaré, exclu par défaut.
 - `docs/fr_FR/index.md` — section « Durée des actions Publier / Supprimer ».
 - `_bmad-output/implementation-artifacts/19-6-duree-action-ha-bornee-cc32.md`
-  — Tasks 1-3bis cochées, statut `review`, Dev Agent Record complété.
-- `_bmad-output/sprint-status.yaml` — statut de la story 19.6 → `review`.
+  — Tasks 0 à 4 cochées (dont 3bis), statut `ready-for-UX-validation`
+  après la preuve terrain, Dev Agent Record complété.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut de la
+  story 19.6 → `ready-for-UX-validation`.
 - `_bmad-output/implementation-artifacts/19-6-field-proof-2026-09-30.md` —
   preuve terrain (artefact durable, assaini).
 
