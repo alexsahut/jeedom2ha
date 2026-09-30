@@ -195,9 +195,16 @@ multiplicative couvrant, par candidat, la publication discovery
 (`publish_click_states`, `sync/state.py:280-304`) et la disponibilité ; plus
 les nettoyages différés en attente pour cet équipement, rejoués avant sa
 décision (`http_server.py:3906-3912`), dont le nombre est connu (revue Codex
-P1, `17f8892`). Pour « Supprimer » : le nombre de `node_id` effectivement
-dépubliables, plus la disponibilité et les nettoyages en attente. Le coût
-unitaire est le **maximum**,
+P1, `17f8892`). Pour « Supprimer » : **max(1, nombre de `node_id`)** par
+équipement dépubliable — un équipement mono-entité a une liste vide mais
+`unpublish_by_eq_id` publie quand même un retained vide sur le topic
+historique (`http_server.py:813-814`, `discovery/publisher.py:326-342`, revue
+Codex P1, `f378ceb`) —, plus la disponibilité et les nettoyages en attente.
+**Règle générale** : le précompte est une borne supérieure des appels MQTT
+réellement émis par l'action ; le test du faux MQTT compte ces appels sur
+**chaque chemin** (publier, supprimer mono et multi-entité, état au clic,
+disponibilité, nettoyages rejoués) et échoue si le précompte est inférieur
+sur l'un d'eux. Le coût unitaire est le **maximum**,
 pendant toute l'action, du coût observé par publication et d'une valeur a
 priori prudente (constante nommée, validée par le test de charge d'AC7) —
 jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
@@ -618,6 +625,9 @@ changent).
   multiplicative (discovery, état au clic, disponibilité) plus les nettoyages
   différés connus, avec un test qui compare le précompte aux appels MQTT réels
   (P1).
+- **Revue Codex, 9e tour (`f378ceb`)** — supprimer compte max(1, `node_id`)
+  (dépublication mono-entité de repli) ; règle générale : précompte ≥ appels
+  réels sur chaque chemin, vérifiée par le test du faux MQTT (P1).
 
 ### File List
 
@@ -637,3 +647,4 @@ changent).
   exécution protégée).
 - 2026-09-30 — revue Codex 7e tour (borne du précompte, AC8 sérialisation).
 - 2026-09-30 — revue Codex 8e tour (précompte de tous les appels MQTT).
+- 2026-09-30 — revue Codex 9e tour (max(1, node_id), règle générale du précompte).
