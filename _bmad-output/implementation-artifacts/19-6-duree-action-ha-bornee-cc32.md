@@ -188,18 +188,26 @@ supprimer
 coût unitaire prudent. Le précompte est une **borne supérieure** qui ne dépend
 pas du dernier mapping (revue Codex P1, `5570532` : l'évaluation fraîche de
 l'action peut produire plus de candidats qu'avant, après un override ou un
-changement de politique) : pour chaque équipement restant, le nombre de ses
-commandes dans la topologie en mémoire (un candidat consomme au moins une
-commande), plus sa disponibilité ; pour supprimer, le nombre de `node_id`
-effectivement dépubliables, qui est connu. Le coût unitaire est le **maximum**,
+changement de politique). Pour chaque équipement restant de « Publier » :
+**3 × (nombre de ses commandes dans la topologie en mémoire + 1)**, borne
+multiplicative couvrant, par candidat, la publication discovery
+(`apply_publication_decision`, `http_server.py:1641`), l'état publié au clic
+(`publish_click_states`, `sync/state.py:280-304`) et la disponibilité ; plus
+les nettoyages différés en attente pour cet équipement, rejoués avant sa
+décision (`http_server.py:3906-3912`), dont le nombre est connu (revue Codex
+P1, `17f8892`). Pour « Supprimer » : le nombre de `node_id` effectivement
+dépubliables, plus la disponibilité et les nettoyages en attente. Le coût
+unitaire est le **maximum**,
 pendant toute l'action, du coût observé par publication et d'une valeur a
 priori prudente (constante nommée, validée par le test de charge d'AC7) —
 jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
 équipements légers en tête font consommer le budget en pauses avant les
 équipements lourds de fin de portée)
 **And** un test place les équipements les plus coûteux (multi-candidats,
-nombreux `node_id`) **en fin de portée** et vérifie que la réponse arrive
-avant `deadline_s` pour un volume égal à la taille supportée d'AC7
+nombreux `node_id`, valeurs fraîches au clic, nettoyages différés en file)
+**en fin de portée** et vérifie que la réponse arrive avant `deadline_s` pour
+un volume égal à la taille supportée d'AC7 ; un test vérifie que le précompte
+majore bien le nombre réel d'appels MQTT sur ces chemins
 (répond au P2 de Codex sur le travail par équipement variable : secondaires,
 `node_id` de dépublication)
 **And** sans `deadline_s` (appelant redémarrage, ou tout autre appelant qui
@@ -606,6 +614,10 @@ changent).
   supérieure indépendante du dernier mapping (commandes de l'équipement) (P1) ;
   AC8 ajouté : une seule action HA à la fois, refus explicite d'une seconde
   (P1). Concurrence action/sync périodique : préexistante, déclarée.
+- **Revue Codex, 8e tour (`17f8892`)** — précompte majoré par une borne
+  multiplicative (discovery, état au clic, disponibilité) plus les nettoyages
+  différés connus, avec un test qui compare le précompte aux appels MQTT réels
+  (P1).
 
 ### File List
 
@@ -624,3 +636,4 @@ changent).
 - 2026-09-30 — revue Codex 6e tour (pause finale, précompte du travail,
   exécution protégée).
 - 2026-09-30 — revue Codex 7e tour (borne du précompte, AC8 sérialisation).
+- 2026-09-30 — revue Codex 8e tour (précompte de tous les appels MQTT).
