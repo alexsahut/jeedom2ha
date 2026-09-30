@@ -155,9 +155,16 @@ la preuve terrain
 **When** l'utilisateur clique sur « Publier » ou « Supprimer »
 **Then** le timeout AJAX du client est un délai fixe, égal au pire cas de la
 requête PHP : plafond du budget du relais + lecture de `published_scope`
-(3 s) + lecture des valeurs au clic (Story 19.5, bornée et mesurée en
-dev-story) + réalignement des écouteurs (3 s) + marge, et reste sous le
-`Timeout 300` d'Apache
+(3 s) + échéance de la lecture des valeurs au clic (voir ci-dessous) +
+réalignement des écouteurs (3 s) + marge, et reste sous le `Timeout 300`
+d'Apache
+**And** la lecture des valeurs au clic de la Story 19.5
+(`_jeedom2ha_collect_click_values`, `jeedom2ha.ajax.php:382`) reçoit une
+**échéance explicite** (10 s au plus, horloge injectable pour le test) :
+passé ce délai, elle s'arrête, transmet les valeurs déjà lues et journalise
+un WARNING avec le nombre de commandes lues. Les commandes non lues ne
+reçoivent aucun état au clic, comme une valeur absente (AC7 de la Story 19.5).
+Un test couvre l'échéance atteinte (revue Codex P1, PR #188, `786751d`)
 **And** il ne dépend d'aucun N lu dans la page (revue Codex P1, PR #188 : la
 synthèse affichée peut être plus ancienne que la topologie du démon) ; c'est
 le relais qui borne réellement la durée et rend la main (succès ou message
@@ -323,6 +330,7 @@ requête HTTP et un message d'erreur changent).
     en dev-story.
   - [ ] Délai fixe côté JS (`desktop/js/jeedom2ha.js:343`), strictement
     supérieur au pire cas de la requête PHP (AC2).
+  - [ ] Échéance explicite de la lecture des valeurs au clic (AC2), testée.
   - [ ] Tests PHP (un cas par portée, repli sur le plafond, non-régression
     petite portée) et JS (délai fixe > pire cas PHP).
 
@@ -337,9 +345,11 @@ requête HTTP et un message d'erreur changent).
   - [ ] Test simulant un grand parc (budget étendu) où le réalignement des
     écouteurs a bien lieu (AC4), contrastant avec l'ancien comportement à
     budget fixe.
-  - [ ] Test unitaire du modèle de durée (AC7) : calcul pour plusieurs N,
-    dont N=121 (mesure du 30/09) et un N au-delà de 125-130 ; vérifie que le
-    budget calculé (AC1) couvre la durée prévue avec une marge explicite.
+  - [ ] Test unitaire du modèle de durée (AC7), avec deux effectifs
+    distincts (N total, N évalués) : le couple (292, 94) de la mesure du
+    30/09 (environ 11 s côté démon) et des couples au-delà du seuil de 15 s,
+    par exemple (300, 130) et la taille supportée ; vérifie que le budget
+    calculé (AC1) couvre la durée prévue avec une marge explicite.
 
 - [ ] Task 4 — Preuve terrain et gate d'inventaire
   - [ ] Dérouler la section « Preuve terrain » ; documenter la preuve par
@@ -448,6 +458,8 @@ requête HTTP et un message d'erreur changent).
   #188, `c123d33`) : N lu dans la topologie du démon (`published_scope`) et
   non dans l'inventaire Jeedom courant, repli sur le plafond (P1) ; délai du
   client fixe couvrant le pire cas du relais, indépendant de la page (P1).
+  Troisième tour (`786751d`) : échéance explicite de la lecture au clic (P1) ;
+  Task 3 alignée sur le couple (N total, N évalués) = (292, 94) (P2).
 
 ### File List
 
