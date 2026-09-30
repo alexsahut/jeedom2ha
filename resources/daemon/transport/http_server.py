@@ -3570,6 +3570,11 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     Story 5.1 = socle contractuel. L'exécution réelle est Story 5.2 (publier) / 5.3 (supprimer).
     La façade valide et accepte les appels mais retourne 'non_implemente' pour l'exécution.
     """
+    # Story 19.5 (AC8) — relevé AVANT le premier `await` (lecture du corps) : un
+    # évènement Jeedom traité pendant que la requête est lue doit compter comme plus
+    # récent que la valeur lue au clic par le relais PHP (revue Codex P2, PR #184).
+    fresh_since = time.monotonic()
+
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
         return web.json_response(
@@ -3584,10 +3589,6 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             {"status": "error", "message": "Corps de requête JSON invalide."},
             status=400,
         )
-
-    # Story 19.5 (AC8) — relevé à l'entrée : un évènement Jeedom reçu après ce point
-    # l'emporte sur la valeur lue au clic par le relais PHP.
-    fresh_since = time.monotonic()
 
     body = _normalize_action_execute_body(raw_body)
     intention = body.get("intention")

@@ -280,17 +280,21 @@ async def test_ac10_commande_sans_valeur_nest_pas_un_echec():
 # --- Résiduel AC6 : équipement résolu par le démon sans valeur au clic ---
 
 @pytest.mark.asyncio
-async def test_residuel_ac6_equipement_sans_valeur_au_clic_aucun_etat():
+async def test_residuel_ac6_equipement_sans_valeur_au_clic_aucun_etat(caplog):
     decision = S12_1._mono_sensor_decision(eq_id=100, cmd_id=4001)
     bridge = S12_1._FakeBridge()
     sync = _sync({100: decision}, bridge)
 
-    published, failed = await sync.publish_click_states(
-        decision, fresh_values={9999: "231.0"}, fresh_since=time.monotonic() - 10,
-    )
+    with caplog.at_level("DEBUG"):
+        published, failed = await sync.publish_click_states(
+            decision, fresh_values={9999: "231.0"}, fresh_since=time.monotonic() - 10,
+        )
 
     assert (published, failed) == (0, 0)
     assert bridge.published == []
+    # Revue ClaudeBox (PR #184) : le résiduel est tracé en DEBUG, sans erreur.
+    assert "reason_code=initial_state_no_click_value" in caplog.text
+    assert "initial_state_publish_failed" not in caplog.text
 
 
 # --- Câblage http_server (AC1, AC7, AC9) : /action/execute publier => state_synchronizer ---
@@ -382,3 +386,50 @@ async def test_wiring_ac9_sync_publie_toujours_la_valeur_de_la_topologie(aiohttp
     # autres équipements qui, eux, en ont une.
     assert "jeedom2ha/3000/state" not in [c["topic"] for c in _state_calls(bridge)]
     assert len(_state_calls(bridge)) > 0
+
+
+# --- Revue ClaudeBox (PR #184) : AC10 câblé jusqu'au résultat du clic ---
+
+class _StateFailingBridge(_StateRecordingBridge):
+    """Discovery et disponibilité acceptées, publication des topics d'état en échec
+    (pont annoncé connecté) : cas d'AC10."""
+
+    def publish_message(self, topic, payload, qos=0, retain=False):
+        if topic.startswith("jeedom2ha/") and topic.endswith("/state"):
+            self.calls.append({"topic": topic, "payload": payload, "retain": retain, "ok": False})
+            return False
+        return super().publish_message(topic, payload, qos=qos, retain=retain)
+
+
+@pytest.mark.asyncio
+async def test_wiring_ac10_echec_etat_initial_rend_le_clic_en_erreur(aiohttp_client, tmp_path, caplog):
+    app = create_app(local_secret=G.SECRET)
+    app["data_dir"] = str(tmp_path)
+    bridge = _StateFailingBridge()
+    app["mqtt_bridge"] = bridge
+    app["state_synchronizer"] = StateSynchronizer(app=app, mqtt_bridge=bridge)
+    cli = await aiohttp_client(app)
+    await G._post_sync(cli, G._sync_body(G._load_golden_corpus(), request_id="golden"))
+    bridge.calls.clear()
+
+    with caplog.at_level("WARNING"):
+        payload = await _publier_with_current_values(cli, "equipement", [3000], {"30003": "1"})
+
+    assert [c["topic"] for c in _state_calls(bridge)] == ["jeedom2ha/3000/state"]
+    assert "initial_state_publish_failed" in caplog.text
+    body = payload.get("payload", payload)
+    assert body["resultat"] in ("echec", "succes_partiel")
+    assert body["scope_reel"]["equipements_publies_ou_crees"] == 0
+
+
+@pytest.mark.asyncio
+async def test_wiring_ac10_temoin_meme_clic_sans_echec_reussit(aiohttp_client, tmp_path):
+    cli, app, bridge = await _client_with_state_sync(aiohttp_client, tmp_path)
+    await G._post_sync(cli, G._sync_body(G._load_golden_corpus(), request_id="golden"))
+    bridge.calls.clear()
+
+    payload = await _publier_with_current_values(cli, "equipement", [3000], {"30003": "1"})
+
+    body = payload.get("payload", payload)
+    assert body["resultat"] == "succes"
+    assert body["scope_reel"]["equipements_publies_ou_crees"] == 1

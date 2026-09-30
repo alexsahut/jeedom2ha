@@ -15,6 +15,9 @@
  * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Story 19.5 (AC11) — fonctions pures du réalignement des listeners (sans cœur Jeedom).
+require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
+
 /**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
@@ -724,15 +727,18 @@ try {
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }
 
-      if ($params['intention'] === 'publier') {
-        // Story 19.5 (AC11) — réalignement des listeners d'état après publication,
-        // best-effort : un échec ne doit jamais faire échouer la requête utilisateur.
-        try {
-          jeedom2ha::syncStateListeners();
-        } catch (\Throwable $e) {
-          log::add('jeedom2ha', 'warning', '[ACTION] syncStateListeners après publier: ' . $e->getMessage());
+      // Story 19.5 (AC11) — réalignement des listeners d'état après « publier » seulement,
+      // budget 3 s / une tentative, jamais d'exception vers l'UI (fonction pure testée).
+      jeedom2ha_realign_after_action(
+        (string)$params['intention'],
+        $result,
+        function (int $timeout, int $maxAttempts) {
+          return jeedom2ha::syncStateListeners(null, $timeout, $maxAttempts);
+        },
+        function (string $message) {
+          log::add('jeedom2ha', 'warning', $message);
         }
-      }
+      );
 
       ajax::success($result);
     }

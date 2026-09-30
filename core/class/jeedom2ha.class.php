@@ -17,6 +17,7 @@
 
 /* * ***************************Includes********************************* */
 require_once __DIR__  . '/../../../../core/php/core.inc.php';
+require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -404,49 +405,45 @@ class jeedom2ha extends eqLogic {
    *
    * @return int nombre de listeners enregistrés
    */
-  public static function syncStateListeners(?callable $_targetsFetcher = null): int {
-    // Story 19.5 (AC11) — ordre inversé : fetch -> validate -> purge -> create.
-    // Un GET en échec (timeout budget serré post-Publier) conserve les listeners
-    // existants au lieu de couper toute remontée d'état jusqu'au réalignement suivant.
-    $fetcher = $_targetsFetcher ?: function ($_maxAttempts) {
-      return self::callDaemon('/system/state_listeners', null, 'GET', 3, $_maxAttempts);
+  public static function syncStateListeners(?callable $_targetsFetcher = null, int $_timeout = 15, ?int $_maxAttempts = null): int {
+    // Story 19.5 (AC11) — ordre récupérer -> valider -> purger -> créer, délégué à une
+    // fonction pure testée en CI (core/php/jeedom2ha_state_listeners.php) : sur échec ou
+    // réponse invalide, les listeners existants sont CONSERVÉS. Budget par défaut inchangé
+    // (15 s, tentatives par défaut de callDaemon) pour le sync et le démarrage ; « Publier »
+    // passe 3 s et une seule tentative (jeedom2ha_realign_after_action).
+    $fetcher = $_targetsFetcher ?: function () use ($_timeout, $_maxAttempts) {
+      return self::callDaemon('/system/state_listeners', null, 'GET', $_timeout, $_maxAttempts);
     };
 
-    try {
-      $response = $fetcher(1);
-    } catch (\Throwable $e) {
-      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Cibles indisponibles : ' . $e->getMessage());
-      return 0;
-    }
-
-    if (!is_array($response) || ($response['status'] ?? null) !== 'ok' || !isset($response['listeners']) || !is_array($response['listeners'])) {
-      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Contrat state_listeners indisponible — aucun listener enregistré, listeners existants conservés');
-      return 0;
-    }
-
-    foreach (listener::byClass(__CLASS__) as $existing) {
-      if ($existing->getFunction() === 'stateListener') {
-        $existing->remove();
+    $count = jeedom2ha_realign_state_listeners(
+      $fetcher,
+      function () {
+        $existing = [];
+        foreach (listener::byClass(__CLASS__) as $listener) {
+          if ($listener->getFunction() === 'stateListener') {
+            $existing[] = $listener;
+          }
+        }
+        return $existing;
+      },
+      function ($listener) {
+        $listener->remove();
+      },
+      function (int $eqId, int $cmdId) {
+        $listener = new listener();
+        $listener->setClass(__CLASS__);
+        $listener->setFunction('stateListener');
+        $listener->setOption('eq_id', $eqId);
+        $listener->setOption('cmd_id', $cmdId);
+        $listener->addEvent($cmdId);
+        $listener->save();
+      },
+      function (string $message) {
+        log::add(__CLASS__, 'warning', $message);
       }
-    }
-
-    $count = 0;
-    foreach ($response['listeners'] as $target) {
-      if (!is_array($target) || !isset($target['cmd_id'])) {
-        continue;
-      }
-      $cmd_id = intval($target['cmd_id']);
-      if ($cmd_id <= 0) {
-        continue;
-      }
-      $listener = new listener();
-      $listener->setClass(__CLASS__);
-      $listener->setFunction('stateListener');
-      $listener->setOption('eq_id', intval($target['eq_id'] ?? 0));
-      $listener->setOption('cmd_id', $cmd_id);
-      $listener->addEvent($cmd_id);
-      $listener->save();
-      $count++;
+    );
+    if ($count === null) {
+      return 0; // rien touché : avertissement déjà journalisé, listeners existants conservés
     }
 
     log::add(__CLASS__, 'info', '[STATE-LISTENER] ' . $count . ' listener(s) état (re)enregistré(s)');

@@ -429,6 +429,23 @@ garde sa propre décision et son propre état initial (Story 19.2).
   le développement) ; la suite complète a été relancée après coup et montre
   0 régression (voir rapport de session).
 - Task 0 et Task 4 (terrain) explicitement hors périmètre de ce tour.
+- **Relecture de code ClaudeBox (30/09, sur `549d0e7`)** — corrections écrites par
+  ClaudeBox :
+  - AC11 : l'écart ci-dessus est levé. La logique est extraite dans
+    `core/php/jeedom2ha_state_listeners.php` (fonctions pures, sans cœur Jeedom) :
+    récupérer → valider **toutes** les cibles (tout-ou-rien, Codex P2 PR #184) →
+    purger → créer, rien n'est touché sur échec. `syncStateListeners()` garde son
+    budget par défaut (15 s) pour le sync et le démarrage ; seul « Publier » passe
+    3 s et une tentative (`jeedom2ha_realign_after_action`). 21 tests PHP ajoutés
+    (ordre, conservation sur exception, réponse invalide ou cible mal formée, liste
+    vide, budget, `supprimer`, démon muet, indisponibilité sans exception).
+  - AC8 : `fresh_since` relevé avant le premier `await` du handler (Codex P2, PR #184).
+  - Résiduel AC6 : journal DEBUG `initial_state_no_click_value` ajouté et testé.
+  - AC10 : test de câblage jusqu'au résultat du clic (échec d'état ⇒ `echec`, témoin
+    ⇒ `succes`), vérifié par mutation.
+  - Décompte : la suite Python complète se lance depuis la racine du dépôt (comme la
+    CI), pas depuis `resources/daemon` ; les « 1385 passed » ci-dessus ne couvrent
+    qu'une partie de la suite.
 
 - **correct-course + create-story** — 2026-09-29 (23:51) — statut résultant :
   `ready-for-dev`. Créée par `clawcode` en session détachée, documentation
@@ -458,6 +475,7 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - `core/class/jeedom2ha.class.php` [MODIFIÉ]
 - `resources/daemon/tests/unit/test_story_19_5_etat_initial_publier.py` [NOUVEAU]
 - `tests/unit/test_story_19_5_php_relay.php` [NOUVEAU]
+- `core/php/jeedom2ha_state_listeners.php` [NOUVEAU — relecture ClaudeBox]
 
 ### Change Log
 
@@ -467,3 +485,5 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — revue Codex (`4feceb2`) intégrée (AC11 : écouteurs réalignés après « Publier »).
 - 2026-09-30 — revue Codex (`a3c1e4b`) intégrée (AC11 : cibles récupérées avant la purge ; AC6 : résiduel pièce déclaré).
 - 2026-09-30 — revue Codex (`a733d09`) intégrée (AC11 : budget de 3 s pour le réalignement).
+- 2026-09-30 — dev-story (`clawcode`, `549d0e7`), statut `review`.
+- 2026-09-30 — relecture de code ClaudeBox : AC11 extrait et testé, `fresh_since` avant le premier `await`, DEBUG du résiduel AC6, câblage AC10 testé.

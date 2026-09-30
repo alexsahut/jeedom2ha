@@ -248,7 +248,9 @@ class StateSynchronizer:
             return fresh_values.get(cmd_id)
 
         return await self._publish_initial_states_loop(
-            decision, _resolve, failure_reason_code="initial_state_publish_failed",
+            decision, _resolve,
+            failure_reason_code="initial_state_publish_failed",
+            no_value_reason_code="initial_state_no_click_value",
         )
 
     async def _publish_initial_states_loop(
@@ -256,12 +258,15 @@ class StateSynchronizer:
         decision: PublicationDecision,
         value_resolver: Any,
         failure_reason_code: Optional[str] = None,
+        no_value_reason_code: Optional[str] = None,
     ) -> Tuple[int, int]:
         """Shared candidate loop for `publish_initial_states` / `publish_click_states`.
 
         Counts publications AND failures (AC10); logging a failure WARNING only when
         ``failure_reason_code`` is given (the sync path, `publish_initial_states`,
-        keeps its exact pre-19.5 behaviour: no failure logging, AC9).
+        keeps its exact pre-19.5 behaviour: no failure logging, AC9). A candidate
+        without a value is skipped; it is logged at DEBUG only when
+        ``no_value_reason_code`` is given (résiduel AC6, click path only).
         """
         mapping = getattr(decision, "mapping_result", None)
         if mapping is None:
@@ -287,6 +292,10 @@ class StateSynchronizer:
             cmd_id = self._candidate_cmd_id(candidate)
             raw_value = value_resolver(eq_id, cmd_id, candidate)
             if raw_value is None:
+                if no_value_reason_code:
+                    self._log(logging.DEBUG, eq_id=eq_id, cmd_id=cmd_id,
+                              reason_code=no_value_reason_code, action="skip_snapshot",
+                              state_topic=state_topic)
                 continue
             payload = self._translate_value(candidate, raw_value)
             if payload is None:

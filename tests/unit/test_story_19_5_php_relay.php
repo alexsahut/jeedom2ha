@@ -85,6 +85,83 @@ $noneValues = _jeedom2ha_read_current_values(
 assert_eq('aucune valeur => tableau vide (pas une erreur)', [], $noneValues);
 
 // ---------------------------------------------------------------------------
+// AC11 — réalignement des listeners : récupérer -> valider -> purger -> créer
+// (revue ClaudeBox + Codex P2, PR #184 ; fonctions pures de
+// core/php/jeedom2ha_state_listeners.php, chargé par l'ajax)
+// ---------------------------------------------------------------------------
+
+echo "\nStory 19.5 / AC11 — réalignement des listeners\n";
+
+function _realign_harness($fetch) {
+    $trace = [];
+    $warnings = [];
+    $count = jeedom2ha_realign_state_listeners(
+        function () use ($fetch, &$trace) { $trace[] = 'fetch'; return $fetch(); },
+        function () use (&$trace) { $trace[] = 'list'; return ['L1', 'L2']; },
+        function ($l) use (&$trace) { $trace[] = 'remove:' . $l; },
+        function (int $eqId, int $cmdId) use (&$trace) { $trace[] = 'create:' . $eqId . '/' . $cmdId; },
+        function (string $m) use (&$warnings) { $warnings[] = $m; }
+    );
+    return [$count, $trace, $warnings];
+}
+
+list($c, $t, $w) = _realign_harness(function () {
+    return ['status' => 'ok', 'listeners' => [['eq_id' => 10, 'cmd_id' => 101], ['eq_id' => 11, 'cmd_id' => 111]]];
+});
+assert_eq('ordre : récupérer avant de purger, puis créer', ['fetch', 'list', 'remove:L1', 'remove:L2', 'create:10/101', 'create:11/111'], $t);
+assert_eq('nombre de listeners créés', 2, $c);
+assert_eq('aucun avertissement sur une réponse valide', 0, count($w));
+
+list($c, $t, $w) = _realign_harness(function () { throw new Exception('timeout'); });
+assert_eq('exception à la récupération : rien purgé, rien créé', ['fetch'], $t);
+assert_eq('exception à la récupération : null (rien touché)', null, $c);
+assert_eq('exception à la récupération : un avertissement', 1, count($w));
+
+list($c, $t, $w) = _realign_harness(function () { return null; });
+assert_eq('démon muet (null) : listeners conservés', ['fetch'], $t);
+assert_eq('démon muet (null) : null', null, $c);
+
+list($c, $t, $w) = _realign_harness(function () { return ['status' => 'error']; });
+assert_eq('status != ok : listeners conservés', ['fetch'], $t);
+
+list($c, $t, $w) = _realign_harness(function () { return ['status' => 'ok', 'listeners' => [[]]]; });
+assert_eq('cible mal formée ({}) : listeners conservés (tout-ou-rien)', ['fetch'], $t);
+assert_eq('cible mal formée : un avertissement', 1, count($w));
+
+list($c, $t, $w) = _realign_harness(function () {
+    return ['status' => 'ok', 'listeners' => [['eq_id' => 10, 'cmd_id' => 101], ['cmd_id' => 0]]];
+});
+assert_eq('une cible à cmd_id 0 parmi des valides : rien purgé', ['fetch'], $t);
+
+list($c, $t, $w) = _realign_harness(function () { return ['status' => 'ok', 'listeners' => []]; });
+assert_eq('liste valide vide : tout purgé, rien créé', ['fetch', 'list', 'remove:L1', 'remove:L2'], $t);
+assert_eq('liste valide vide : 0', 0, $c);
+
+echo "\nStory 19.5 / AC11 — réalignement après l'action (budget, portée)\n";
+
+$calls = [];
+$warns = [];
+$realign = function (int $timeout, int $attempts) use (&$calls) { $calls[] = [$timeout, $attempts]; return 1; };
+$warn = function (string $m) use (&$warns) { $warns[] = $m; };
+
+assert_eq('publier + réponse démon : réalignement tenté', true, jeedom2ha_realign_after_action('publier', ['status' => 'ok'], $realign, $warn));
+assert_eq('budget : 3 s, une seule tentative', [[3, 1]], $calls);
+
+$calls = [];
+assert_eq('supprimer : pas de réalignement', false, jeedom2ha_realign_after_action('supprimer', ['status' => 'ok'], $realign, $warn));
+assert_eq('publier sans réponse du démon : pas de réalignement', false, jeedom2ha_realign_after_action('publier', null, $realign, $warn));
+assert_eq('aucun appel dans ces deux cas', [], $calls);
+
+$threw = false;
+try {
+    $res = jeedom2ha_realign_after_action('publier', ['status' => 'ok'], function (int $t, int $a) { throw new Exception('state_listeners indisponible'); }, $warn);
+} catch (\Throwable $e) {
+    $threw = true;
+}
+assert_eq('state_listeners indisponible après une action réussie : aucune exception vers l UI', false, $threw);
+assert_eq('state_listeners indisponible : un avertissement journalisé', 1, count($warns));
+
+// ---------------------------------------------------------------------------
 // Résultat
 // ---------------------------------------------------------------------------
 
