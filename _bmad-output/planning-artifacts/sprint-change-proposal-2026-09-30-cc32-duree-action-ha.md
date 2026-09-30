@@ -36,9 +36,12 @@ l'AC11 de la Story 19.5 (« Si le relais abandonne sur délai (CC-32), les
 
 ## 2. Décision
 
-Pas de décision d'Alexandre à ce stade — proposition de correct-course
-documentaire, à valider avant tout développement. Aucun code n'est modifié par
-ce tour (session documentation seulement).
+**GO d'Alexandre le 2026-09-30 à 11:20** (« ok GO »), sur la proposition de
+ClaudeBox de trier puis traiter CC-32 jusqu'au bout. Option (a) retenue par
+ClaudeBox et clawcode : aucune UX nouvelle ; seul le message du cas de vrai
+dépassement change, et il passe par la validation UX d'Alex avant `done`.
+L'option (c) (asynchrone) reste hors périmètre : elle changerait l'UX et
+reviendrait à Alex.
 
 ## 3. Impact
 
@@ -48,9 +51,8 @@ ce tour (session documentation seulement).
 - **Code concerné** : `resources/daemon/transport/http_server.py` (branches
   Publier l.3881/3957/4002, Supprimer l.3724/3744), `core/ajax/jeedom2ha.ajax.php`
   (relais l.764, budget 15 s), `desktop/js/jeedom2ha.js` (délai client l.343).
-- **UI Impact** : possible selon l'option retenue — `desktop/` et `core/ajax/`
-  pourraient changer, donc `ready-for-UX-validation` avant `done` si c'est le
-  cas.
+- **UI Impact** : oui — `desktop/js/` et `core/ajax/` changent (option (a)),
+  donc `ready-for-UX-validation` avant `done`.
 - Pas d'impact PRD/architecture/UX documents existants au-delà de l'ajout de la
   story dans l'epic.
 

@@ -8,13 +8,14 @@ Status: ready-for-dev
 
 As un utilisateur,
 I want que les boutons « Publier » et « Supprimer », sur toutes les portées
-(équipement, pièce, global), n'échouent jamais côté UI à cause de la taille du
-parc,
+(équipement, pièce, global), n'échouent pas côté UI à cause de la taille du
+parc, jusqu'à une taille de parc supportée et déclarée,
 so that une republication ou une suppression sur un grand parc HA reste
 fiable, avec un message juste si elle prend plus longtemps que d'habitude.
 
-**Parcours : potentiellement complet selon l'option retenue** (voir « UI
-Impact »).
+**Parcours complet.** GO d'Alexandre le 2026-09-30 à 11:20 (« ok GO » pour
+traiter CC-32 jusqu'au bout). Option (a) retenue : `core/ajax/` et
+`desktop/js/` sont modifiés (voir « UI Impact »).
 
 ## Contexte mesuré (relevé à `07b5ab4`)
 
@@ -39,7 +40,13 @@ Impact »).
   la mesure reste sous les deux délais.
 - Comportement d'aiohttp à la déconnexion du client HTTP (le relais PHP
   abandonne à 15 s, le handler du démon continue-t-il de tourner ?) **non
-  vérifié** — `pyproject.toml` ne pin pas de version d'aiohttp.
+  vérifié** — `pyproject.toml` ne pin pas de version d'aiohttp. Version
+  installée sur la box (relevé ClaudeBox, 30/09) : **3.13.3**
+  (`/usr/local/lib/python3.9/dist-packages`).
+- Bornes de la pile web de la box (relevé ClaudeBox, 30/09, lecture seule) :
+  Apache `Timeout 300` (`/etc/apache2/apache2.conf:92`), PHP
+  `max_execution_time = 600` (`/etc/php/7.4/apache2/php.ini:388`). Le plafond
+  du budget doit rester sous le `Timeout` d'Apache.
 - L'AC11 de la Story 19.5 déclarait déjà ce cas comme préexistant, non traité :
   « Si le relais abandonne sur délai (CC-32), les écouteurs ne sont pas
   réalignés avant le sync suivant : déclaré. »
@@ -94,6 +101,14 @@ lissage inchangé.** [Préférence de ClaudeBox]
 
 **Recommandation : option (a).** Elle ferme CC-32 sans toucher à la Décision 8
 ni introduire de nouvelle UX, avec le risque et le coût les plus faibles.
+
+**Limite assumée (revue Codex P1, PR #188).** Toute option synchrone est bornée
+par la pile web de la box (`Timeout 300` d'Apache) : un plafond de budget est
+donc inévitable, et un parc assez grand le dépassera. L'option (a) ne promet
+pas « jamais » : elle fixe une **taille de parc supportée**, calculée par le
+modèle (AC7) à partir du plafond, et la déclare. Au-delà, le message juste
+d'AC5 s'applique. Seule l'option (c) lèverait cette limite ; elle changerait
+l'UX et reviendrait à Alex si les parcs du Market l'exigent.
 L'option (c) n'est pas recommandée pour cette story ; si le volume du Market
 la rend nécessaire plus tard, elle mérite sa propre story avec validation UX
 préalable.
@@ -107,20 +122,37 @@ Supprimer, 3 portées)**
 `intention = supprimer`, sur une portée `equipement`, `piece` ou `global`
 **When** le relais PHP (`executeHaAction`, `jeedom2ha.ajax.php`) construit
 l'appel `callDaemon`
-**Then** le budget transmis à `callDaemon` croît avec le nombre d'équipements
-réellement développés pour cette portée (au lieu du 15 s fixe), avec un
-plancher au moins égal à 15 s pour ne rien changer aux petits parcs
+**Then** le budget transmis à `callDaemon` croît avec N, le nombre
+d'équipements développés par le relais pour cette portée (au lieu du 15 s
+fixe), avec un plancher de 15 s pour ne rien changer aux petits parcs et un
+plafond explicite de 240 s au plus (sous le `Timeout 300` d'Apache)
+**And** ce plafond définit la taille de parc supportée (nombre d'équipements
+traités par le démon dont la durée prévue par le modèle d'AC7, marge comprise,
+tient dans le plafond) ; cette taille est calculée, figée par un test et
+déclarée dans la story et dans la documentation utilisateur
+**And** N vient de la même expansion que la Story 19.5
+(`_jeedom2ha_expand_portee_to_eq_ids`), étendue à `supprimer` ; c'est une
+borne supérieure du nombre d'équipements que le démon traite (il développe la
+portée sur sa propre topologie)
+**And** la formule couvre le pire cas du démon : N × max(0,1 ; 10/N) de
+lissage, plus le travail par équipement, avec une marge explicite
+**And** N et le budget calculé sont journalisés (`info`) à chaque action, pour
+la preuve terrain
 **And** un test par portée fige la formule du budget.
 
 **AC2 — Budget du client HA proportionnel, aligné sur le relais**
 
 **Given** le même appel `executeHaAction` côté client (`desktop/js/jeedom2ha.js:343`)
 **When** l'utilisateur clique sur « Publier » ou « Supprimer »
-**Then** le timeout AJAX du client suit le même calcul de budget que le relais
-(pas nécessairement identique en valeur, mais strictement supérieur au budget
-PHP pour ne jamais couper la requête avant que le relais ait pu répondre)
-**And** un test JS fige la formule et vérifie `client > relais` pour au moins
-un cas au-delà du plancher.
+**Then** le timeout AJAX du client est calculé à partir du même N, lu dans la
+synthèse pour la portée cliquée (`counts.total` du global ou de la pièce ; 1
+pour un équipement)
+**And** il reste strictement supérieur au budget du relais augmenté de la
+lecture des valeurs au clic (Story 19.5), du réalignement des écouteurs
+(3 s) et d'une marge, pour ne jamais couper la requête avant que le relais
+ait pu répondre
+**And** un test JS fige la formule et vérifie `client > relais + 3 s + marge`
+pour au moins un cas au-delà du plancher.
 
 **AC3 — Aucune régression pour les petites portées**
 
@@ -172,8 +204,9 @@ Notes et piloté par ce constat, pas supposé.
 
 **Given** le modèle t ≈ N évalués × (max(0,1 ; 10/N total) + ~0,017 s)
 **When** un test unitaire calcule la durée prévue pour plusieurs valeurs de N
-(dont les valeurs mesurées le 30/09 : N=121 inclus, ~10,7 s) et pour un N
-au-delà du seuil actuel de 15 s (autour de 125-130)
+(dont la mesure du 30/09 : N total = 292, N évalués = 94, environ 11 s côté
+démon et 10,7 s côté AJAX) et pour un N évalué au-delà du seuil actuel de
+15 s (autour de 125-130)
 **Then** le test vérifie que le budget calculé par AC1 couvre bien la durée
 prévue par le modèle, avec une marge explicite
 **And** le test échoue si la marge devient insuffisante (garde-fou pour un
@@ -181,12 +214,13 @@ futur changement de `_action_delay`).
 
 ## UI Impact
 
-- **UI Impact : dépend de l'option retenue.** L'option (a) recommandée ne
-  change ni l'apparence ni le flux du bouton (aucune barre de progression,
-  aucun nouvel état) — seul le message d'erreur du cas de vrai dépassement
-  (AC5) est visible, et seulement dans ce cas rare. Si le message change,
-  passage par `ready-for-UX-validation` avant `done`
-  (`docs/bmad-parcours-rapide-complet.md`), avec preuve par clic réel.
+- **UI Impact : Oui** — `desktop/js/jeedom2ha.js` (délai du client) et
+  `core/ajax/jeedom2ha.ajax.php` (budget du relais, message de vrai
+  dépassement). L'option (a) retenue ne change ni l'apparence ni le flux du
+  bouton (aucune barre de progression, aucun nouvel état) ; seul le message du
+  cas de vrai dépassement (AC5) change. Passage par `ready-for-UX-validation`
+  avant `done` (`docs/bmad-parcours-rapide-complet.md`), avec preuve par clic
+  réel.
 - Si l'option (c) était retenue en cours de dev-story (changement de flux),
   **halte obligatoire et retour à Alex** avant implémentation : hors périmètre
   de ce cadrage.
@@ -197,9 +231,8 @@ futur changement de `_action_delay`).
   budget calculé reste identique aux valeurs actuelles tant que
   `len(eq_ids)` reste sous le seuil qui aurait de toute façon tenu dans 15 s.
 - **Risque principal : un budget mal calculé qui allonge l'attente sans
-  limite.** Couvert par AC7 (modèle testé) et par un plafond explicite à
-  fixer en dev-story (le budget ne doit pas croître sans borne — documenter
-  la borne choisie).
+  limite.** Couvert par AC7 (modèle testé) et par le plafond de 240 s au
+  plus (AC1), qui fixe la taille de parc supportée. Au-delà, AC5.
 - **Retour arrière** : redéploiement du SHA précédent. Aucune migration,
   aucun état persistant modifié — seuls des délais de requête HTTP et un
   message d'erreur changent.
@@ -227,7 +260,10 @@ dépassement de délai. Elle démontre uniquement l'absence de régression.
    - registres HA inchangés en nombre et en `entity_id` ;
    - écouteurs réalignés après chaque « Publier » qui aboutit (AC4) ;
    - durées mesurées cohérentes avec le modèle (AC7), avec le nouveau budget
-     calculé (AC1) toujours ≥ à la durée mesurée.
+     calculé (AC1) toujours ≥ à la durée mesurée ;
+   - la ligne de journal du budget (AC1) montre N et le budget pour la portée
+     globale (attendu : N de l'ordre de 292 à ce jour) et pour la pièce, et le délai du
+     client relevé dans le navigateur lui est supérieur (AC2).
 
 **Gate d'inventaire obligatoire (convention repo, `sprint-status.yaml`)** :
 inventaire avant/après déploiement (0 erreur), en plus de la preuve par clic
@@ -264,8 +300,8 @@ requête HTTP et un message d'erreur changent).
 
 - [ ] Task 1 — Relais PHP et client JS : budgets proportionnels (AC1, AC2, AC3, AC5)
   - [ ] Fonction pure de calcul de budget (PHP), prenant `len(eq_ids)` en
-    entrée, avec le plancher à 15 s (AC3) et un plafond explicite à
-    documenter.
+    entrée, avec le plancher à 15 s (AC3) et le plafond de 240 s au plus
+    (AC1) ; taille de parc supportée calculée et déclarée.
   - [ ] Appliquer ce budget à l'appel `callDaemon('/action/execute', …)`
     (`jeedom2ha.ajax.php:764`) pour `intention = publier` et
     `intention = supprimer`.
@@ -316,8 +352,11 @@ requête HTTP et un message d'erreur changent).
 - Ne pas introduire de flux asynchrone/polling (option (c)) sans validation
   explicite d'Alex — hors périmètre de cette story.
 - Le budget calculé doit avoir un plancher (≥ 15 s PHP / ≥ 20 s JS, AC3) et un
-  plafond explicite (à documenter en dev-story) pour ne jamais devenir
-  illimité.
+  plafond explicite de 240 s au plus côté relais (sous le `Timeout 300`
+  d'Apache), pour ne jamais devenir illimité. Ce plafond borne la taille de
+  parc supportée : la calculer et la déclarer, sans promettre « jamais ».
+- Ne pas modifier le budget du réalignement des écouteurs de la Story 19.5
+  (3 s, une tentative).
 
 ### Guardrail — Déploiement terrain (DEV/TEST ONLY)
 
@@ -329,8 +368,11 @@ requête HTTP et un message d'erreur changent).
 - `resources/daemon/transport/http_server.py` : `_action_delay` Publier l.3881,
   `sleep` l.3957 et l.4002 ; `_action_delay` Supprimer l.3724, `sleep` l.3744.
 - `core/ajax/jeedom2ha.ajax.php` : `callDaemon('/action/execute', …, 15)`
-  l.764, exception si `null` l.766, appel `jeedom2ha_realign_after_action`
-  l.771.
+  l.764, journal ERROR l.766 et exception l.767 si `null`, appel
+  `jeedom2ha_realign_after_action` l.772 ; expansion de la portée
+  `_jeedom2ha_expand_portee_to_eq_ids` l.338 (Story 19.5, publier seulement).
+- `desktop/js/jeedom2ha_scope_summary.js` : `counts.total` du global et des
+  pièces (l.164, l.174), source de N côté client.
 - `desktop/js/jeedom2ha.js` : timeout AJAX l.343.
 - `_bmad-output/planning-artifacts/epic-5-lifecycle-matrix.md` : Décision 8
   (formule du lissage) à partir de l.439.
@@ -374,6 +416,17 @@ requête HTTP et un message d'erreur changent).
   `ready-for-dev`. Créée par `clawcode` en session détachée, documentation
   seulement, à partir d'une mesure réelle de ClaudeBox (30/09, 11:23, portée
   `global`, 121 inclus / 94 publiés, 10,7 s, succès).
+- **Relecture ClaudeBox (30/09)** — décision rendue explicite (GO d'Alex du
+  30/09 à 11:20, option (a) retenue), UI Impact tranché (Oui), N défini par
+  l'expansion de la portée du relais (étendue à `supprimer`), plafond du
+  budget sous le `Timeout 300` d'Apache, budget journalisé pour la preuve,
+  délai du client calculé sur `counts.total` de la synthèse et couvrant la
+  lecture au clic et le réalignement, chiffres du modèle corrigés (N total 292,
+  N évalués 94), version d'aiohttp de la box relevée (3.13.3), pointeurs
+  corrigés. Revue Codex (PR #188) intégrée : taille de parc supportée
+  déclarée au lieu de « jamais » (P1), marge du client couvrant le
+  traitement après le démon (P1), N total et N temporisé distingués (P2),
+  décision documentée avant `ready-for-dev` (P2).
 
 ### File List
 
@@ -383,3 +436,5 @@ requête HTTP et un message d'erreur changent).
 
 - 2026-09-30 — `correct-course` (CC-32) + `create-story` — statut
   `ready-for-dev`.
+- 2026-09-30 — relecture ClaudeBox (décision, UI Impact, N, plafond, délai du
+  client, modèle, pointeurs) et revue Codex PR #188 intégrée.
