@@ -1,6 +1,6 @@
 # Story 19.6: Durée des actions HA bornée pour les grands parcs (CC-32)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -473,13 +473,13 @@ changent).
 
 <!-- Story terrain : daemon / MQTT / publication / bouton Publier-Supprimer / box réelle → Task 0 Pre-flight terrain injectée. -->
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
-  - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (CI verte du SHA
+- [x] Task 0 — Pre-flight terrain (DEV/TEST ONLY)
+  - [x] Dry-run : `./scripts/deploy-to-box.sh --dry-run` (CI verte du SHA
     exigée), **avant** tout déploiement réel.
-  - [ ] Identifier en lecture seule le nombre d'équipements actuellement
+  - [x] Identifier en lecture seule le nombre d'équipements actuellement
     inclus en portée `global` (mesure du 30/09 : 121 inclus, 94 publiés) pour
     calibrer les tests de charge (AC7).
-  - [ ] **Interdiction explicite (DANGER) :** ne jamais invoquer
+  - [x] **Interdiction explicite (DANGER) :** ne jamais invoquer
     `--cleanup-discovery` ni `--stop-daemon-cleanup`
     (`scripts/deploy-to-box.sh:97,99`) pendant cette recherche ni pendant la
     vérification post-correction — ces flags republient des messages MQTT
@@ -546,8 +546,8 @@ changent).
   - [x] Relais : message du refus transmis tel quel ; tests démon et PHP (nouvel
     essai pendant, puis après l'action).
 
-- [ ] Task 4 — Preuve terrain et gate d'inventaire
-  - [ ] Dérouler la section « Preuve terrain » ; documenter la preuve par
+- [x] Task 4 — Preuve terrain et gate d'inventaire
+  - [x] Dérouler la section « Preuve terrain » ; documenter la preuve par
     clic réel (« Republier » global, « Suppr. » puis « Republier » sur une
     pièce) et la limite déclarée (pas de reproduction d'un vrai dépassement)
     avant `ready-for-UX-validation` → `done`.
@@ -867,6 +867,44 @@ changent).
   passed/8 deselected (217,8 s, inchangé) ; `-m load` 8 passed (84,0 s) ;
   node 311 pass ; PHP (CI) 5 passed/3 skipped ; flake8 propre sur le fichier
   touché.
+- Preuve terrain (Task 0 et Task 4), 30/09 : PR #189 fusionnée
+  (`95d3059`), dry-run puis déploiement standard à 19:02:34Z, gate
+  d'inventaire identique (292 / 356 / 190 / I11 2), écouteurs 227 avant et
+  après, 0 ERROR. Clics réels ClaudeBox : « Republier » global 10,180 s au
+  relais (94 équipements, AJAX 10,773 s), « Suppr. » puis « Republier » sur
+  escalier 2,009 s et 2,015 s ; registres HA inchangés (358 entités, mêmes
+  `entity_id` et dates de création). Travail propre du démon mesuré à
+  environ 2,5 ms par équipement : la capacité documentée (250) reste
+  prudente. Détail : `19-6-field-proof-2026-09-30.md`. Statut
+  `ready-for-UX-validation`.
+- **Validation UX (30/09, 21:33)** — Alex : « je valide », après le compte
+  rendu de la preuve par clic et la relecture des trois messages d'incident
+  (vrai dépassement d'AC5, erreur immédiate du démon, action déjà en cours).
+  Flux du bouton inchangé. Validé sur `95d3059`, déployé sur la box
+  (domobox). Statut `done`.
+- **Définition de `done`** (`docs/bmad-parcours-rapide-complet.md`) :
+  - SHA `95d30597490822494f87069e6a73d7b97d04ee9d` (fusion de la PR #189),
+    CI verte sur ce SHA (10 check-runs `success`, dont
+    `Load tests (Python 3.9)` ; `Burn-In` `skipped`).
+  - Tests ciblés, commandes exactes depuis la racine du dépôt après
+    `pip install -e ".[test]"` (relancées par ClaudeBox le 30/09 à 22:10
+    sur un clone dont le code est identique à `95d3059`) :
+    - démon (lissage, échéance, verrou, action protégée) :
+      `python -m pytest resources/daemon/tests/unit/test_story_19_6_action_pacing.py resources/daemon/tests/unit/test_story_19_6_deadline_pacing.py resources/daemon/tests/unit/test_story_19_6_action_lock_shield.py -q`
+      (33 passed) ;
+    - charge (AC7, marqueur `load`) :
+      `python -m pytest -m load -q resources/daemon/tests/unit/test_story_19_6_load_ac7.py`
+      (8 passed) ;
+    - relais PHP : `php tests/unit/test_story_19_6_php_relay.php` (34/34) ;
+    - délai du client (AC2) :
+      `node --test tests/unit/test_story_19_6_client_timeout.node.test.js`
+      (6 pass).
+  - Suites complètes, comme la CI (`.github/workflows/test.yml`) :
+    `python -m pytest`, `python -m pytest -m load -q`,
+    `node --test tests/unit/*.node.test.js`, puis `php <fichier>` pour chaque
+    fichier PHP de `tests/` (boucle du job `PHP lint & tests`).
+  - Preuve terrain après déploiement par le gate et validation UX nommée :
+    notes ci-dessus et `19-6-field-proof-2026-09-30.md`.
 
 ### File List
 
@@ -892,8 +930,14 @@ changent).
 - `pyproject.toml` — marqueur pytest `load` déclaré, exclu par défaut.
 - `docs/fr_FR/index.md` — section « Durée des actions Publier / Supprimer ».
 - `_bmad-output/implementation-artifacts/19-6-duree-action-ha-bornee-cc32.md`
-  — Tasks 1-3bis cochées, statut `review`, Dev Agent Record complété.
-- `_bmad-output/sprint-status.yaml` — statut de la story 19.6 → `review`.
+  — Tasks 0 à 4 cochées (dont 3bis), statut `done` après la preuve terrain
+  et la validation UX d'Alex, Dev Agent Record complété.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut de la
+  story 19.6 → `done`.
+- `_bmad-output/implementation-artifacts/19-6-field-proof-2026-09-30.md` —
+  preuve terrain (artefact durable, assaini).
+- `_bmad-output/planning-artifacts/epics-projection-engine.md` — CC-32
+  ajouté aux points fermés par l'epic 19 (Story 19.6).
 
 ### Change Log
 
@@ -960,3 +1004,9 @@ changent).
   coûteux (suppression multi-`node_id` : `== n*3` ; retypage : `== n*10`),
   avec `n_max` dédié de chaque chemin recalculé (suppression : 511 ;
   retypage : 155), recopié dans `docs/fr_FR/index.md`.
+- 2026-09-30 — preuve terrain (Task 0 et Task 4) : déploiement de `95d3059`,
+  gate d'inventaire et preuve par clic réel conformes, artefact
+  `19-6-field-proof-2026-09-30.md` ; statut → `ready-for-UX-validation`.
+- 2026-09-30 — validation UX d'Alex (21:33) ; statut `done`.
+- 2026-09-30 — revue PR #190 (Codex) : clôture de CC-32 reportée dans l'epic,
+  définition de `done` complétée (SHA, CI, tests ciblés et commandes exactes).
