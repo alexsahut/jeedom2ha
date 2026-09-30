@@ -3570,6 +3570,11 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     Story 5.1 = socle contractuel. L'exécution réelle est Story 5.2 (publier) / 5.3 (supprimer).
     La façade valide et accepte les appels mais retourne 'non_implemente' pour l'exécution.
     """
+    # Story 19.5 (AC8) — relevé AVANT le premier `await` (lecture du corps) : un
+    # évènement Jeedom traité pendant que la requête est lue doit compter comme plus
+    # récent que la valeur lue au clic par le relais PHP (revue Codex P2, PR #184).
+    fresh_since = time.monotonic()
+
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
         return web.json_response(
@@ -3589,6 +3594,19 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     intention = body.get("intention")
     portee = body.get("portee")
     selection = body.get("selection")
+    # Story 19.5 (AC7) — absent, `[]` (tableau PHP vide) ou invalide => None : comportement
+    # 19-4 inchangé (aucun état initial publié au clic).
+    fresh_values: Optional[Dict[int, Any]] = None
+    raw_current_values = body.get("current_values")
+    if isinstance(raw_current_values, dict) and raw_current_values:
+        coerced: Dict[int, Any] = {}
+        for raw_cmd_id, raw_value in raw_current_values.items():
+            try:
+                coerced[int(raw_cmd_id)] = raw_value
+            except (TypeError, ValueError):
+                continue
+        if coerced:
+            fresh_values = coerced
 
     # Validation — intention
     if intention not in _INTENTIONS_VALIDES:
@@ -3922,12 +3940,27 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 ecarts_resolus += 1
             # Story 19.4b (CC-31) — une dépublication reportée laisse le topic retenu dans HA.
             unpublish_deferred = unpublish_outcome == "deferred"
+
+            # Story 19.5 (AC1-AC5, AC10) — état initial avec la valeur lue au clic, juste
+            # après la décision et AVANT le délai, comme le sync (l.1866-1868) : appelé
+            # inconditionnellement (I11, un secondaire peut être publié sous un principal
+            # refusé) dès qu'il y a une valeur fraîche à publier.
+            click_publish_failed = False
+            if fresh_values is not None:
+                state_sync = request.app.get("state_synchronizer")
+                if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
+                    _click_published, click_failed_count = await state_sync.publish_click_states(
+                        decision, fresh_values, fresh_since,
+                    )
+                    click_publish_failed = click_failed_count > 0
+
             await asyncio.sleep(_action_delay)
 
             # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
             # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
             # cas de succès) fait compter l'équipement en erreur, comme l'ancien chemin.
-            secondary_failed = any(
+            # Story 19.5 (AC10) : un état initial non publié compte de la même façon.
+            secondary_failed = click_publish_failed or any(
                 sec.should_publish and not sec.active_or_alive
                 for sec in evaluation.secondary_decisions or []
             )

@@ -15,6 +15,9 @@
  * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Story 19.5 (AC11) — fonctions pures du réalignement des listeners (sans cœur Jeedom).
+require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
+
 /**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
@@ -299,6 +302,105 @@ function _jeedom2ha_build_export_summary(array $equipments): array {
         }
     }
     return $summary;
+}
+
+/**
+ * Story 19.5 (AC6) — fonction pure : rend {cmd_id: valeur} pour les commandes de
+ * type 'info' d'une liste de commandes injectées, via un getter de valeur injecté
+ * (motif de getFullTopology / getCache('value', null), jeedom2ha.class.php:729).
+ * Omet les commandes sans valeur (null) : c'est le résiduel AC6 (aucune erreur).
+ * $cmds : tableau de ['cmd_id' => int, 'type' => string, ...(payload libre pour le getter)].
+ */
+function _jeedom2ha_read_current_values(array $cmds, callable $_valueGetter): array {
+    $values = [];
+    foreach ($cmds as $cmd) {
+        if (!is_array($cmd) || ($cmd['type'] ?? '') !== 'info') {
+            continue;
+        }
+        $cmdId = (int)($cmd['cmd_id'] ?? 0);
+        if ($cmdId <= 0) {
+            continue;
+        }
+        $value = $_valueGetter($cmd);
+        if ($value === null) {
+            continue;
+        }
+        $values[$cmdId] = $value;
+    }
+    return $values;
+}
+
+/**
+ * Story 19.5 (AC6/AC11) — fonction pure : étend une portée (equipement/piece/global)
+ * en liste d'eq_id, AVANT toute lecture de valeur. Les résolveurs piece/global sont
+ * injectés (dépendent du cœur Jeedom en runtime, mockables en test).
+ */
+function _jeedom2ha_expand_portee_to_eq_ids(
+    string $portee,
+    array $selection,
+    callable $_pieceEqIdsFetcher,
+    callable $_allEqIdsFetcher
+): array {
+    $ids = [];
+    if ($portee === 'equipement') {
+        foreach ($selection as $s) {
+            if (ctype_digit((string)$s)) {
+                $ids[] = (int)$s;
+            }
+        }
+        return $ids;
+    }
+    if ($portee === 'piece') {
+        foreach ($selection as $pieceId) {
+            if (!ctype_digit((string)$pieceId)) {
+                continue;
+            }
+            foreach ($_pieceEqIdsFetcher((int)$pieceId) as $eqId) {
+                $ids[] = (int)$eqId;
+            }
+        }
+        return $ids;
+    }
+    if ($portee === 'global') {
+        foreach ($_allEqIdsFetcher() as $eqId) {
+            $ids[] = (int)$eqId;
+        }
+        return $ids;
+    }
+    return [];
+}
+
+/**
+ * Story 19.5 (AC6, AC7) — collecte des valeurs au clic, en best-effort : développe la
+ * portée, liste les commandes et lit leurs valeurs (fonctions injectées). Toute exception
+ * (cœur Jeedom, cache) rend null avec un avertissement : la publication part alors SANS
+ * `current_values`, donc avec le comportement 19-4 (AC7), au lieu d'échouer
+ * (relecture ClaudeBox, PR #185).
+ *
+ * @return array|null {cmd_id: valeur}, ou null si la lecture a échoué
+ */
+function _jeedom2ha_collect_click_values(
+    string $portee,
+    array $selection,
+    callable $_pieceEqIdsFetcher,
+    callable $_allEqIdsFetcher,
+    callable $_cmdsFetcher,
+    callable $_valueGetter,
+    callable $_warn
+): ?array {
+    try {
+        $eqIds = _jeedom2ha_expand_portee_to_eq_ids($portee, $selection, $_pieceEqIdsFetcher, $_allEqIdsFetcher);
+        $cmds = [];
+        foreach ($eqIds as $eqId) {
+            foreach ($_cmdsFetcher($eqId) as $cmd) {
+                $cmds[] = $cmd;
+            }
+        }
+        return _jeedom2ha_read_current_values($cmds, $_valueGetter);
+    } catch (\Throwable $e) {
+        $_warn('[ACTION] Lecture des valeurs au clic impossible, publication sans état initial : ' . $e->getMessage());
+        return null;
+    }
 }
 
 if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
@@ -614,11 +716,70 @@ try {
       if (!is_array($params['selection'])) {
         $params['selection'] = [];
       }
+
+      // Story 19.5 (AC6) — pour 'publier' uniquement : étendre la portée en eq_id
+      // AVANT toute lecture de valeur, puis lire les valeurs courantes (lecture
+      // seule, getCache('value', null), jamais execCmd) pour transmission au démon.
+      if ($params['intention'] === 'publier') {
+        $clickValues = _jeedom2ha_collect_click_values(
+          (string)$params['portee'],
+          $params['selection'],
+          function ($pieceId) {
+            $ids = [];
+            foreach (eqLogic::byObjectId($pieceId) as $eq) {
+              if ($eq->getEqType_name() !== 'jeedom2ha') {
+                $ids[] = $eq->getId();
+              }
+            }
+            return $ids;
+          },
+          function () {
+            $ids = [];
+            foreach (eqLogic::all() as $eq) {
+              if ($eq->getEqType_name() !== 'jeedom2ha') {
+                $ids[] = $eq->getId();
+              }
+            }
+            return $ids;
+          },
+          function ($eqId) {
+            $cmds = [];
+            foreach (cmd::byEqLogicId($eqId) as $cmd) {
+              $cmds[] = ['cmd_id' => $cmd->getId(), 'type' => $cmd->getType(), '_cmd' => $cmd];
+            }
+            return $cmds;
+          },
+          function ($c) {
+            return $c['_cmd']->getCache('value', null);
+          },
+          function (string $message) {
+            log::add('jeedom2ha', 'warning', $message);
+          }
+        );
+        if ($clickValues !== null) {
+          $params['current_values'] = $clickValues;
+        }
+      }
+
       $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
       if ($result === null) {
         log::add('jeedom2ha', 'error', '[ACTION] Le démon n\'a pas répondu à /action/execute (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }
+
+      // Story 19.5 (AC11) — réalignement des listeners d'état après « publier » seulement,
+      // budget 3 s / une tentative, jamais d'exception vers l'UI (fonction pure testée).
+      jeedom2ha_realign_after_action(
+        (string)$params['intention'],
+        $result,
+        function (int $timeout, int $maxAttempts) {
+          return jeedom2ha::syncStateListeners(null, $timeout, $maxAttempts);
+        },
+        function (string $message) {
+          log::add('jeedom2ha', 'warning', $message);
+        }
+      );
+
       ajax::success($result);
     }
     else if ($action == 'getMappingOverrides') {

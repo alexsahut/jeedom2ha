@@ -22,7 +22,8 @@ governed later waves (FR49).
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping, Optional, Tuple
+import time
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from models.mapping import MappingResult, PublicationDecision
 
@@ -65,6 +66,11 @@ class StateSynchronizer:
     ) -> None:
         self._app = app
         self._mqtt_bridge = mqtt_bridge
+        # Story 19.5 (AC8) — last (monotonic time, value) seen per (eq_id, cmd_id),
+        # recorded for EVERY inbound event regardless of whether it was published or
+        # rejected (state_target_not_found), so a click's fresh read never wins over
+        # a more recent Jeedom event received while the click was in flight.
+        self._pending_click_values: Dict[Tuple[int, int], Tuple[float, Any]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -102,6 +108,11 @@ class StateSynchronizer:
             self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
                       reason_code="invalid_state_identifiers", action="reject_state")
             return False
+
+        # Story 19.5 (AC8) — record BEFORE any other guard: an event rejected below
+        # (mqtt unavailable, unresolved target) must still count as "more recent than
+        # the click" for `publish_click_states`.
+        self._pending_click_values[(eq_id_int, cmd_id_int)] = (time.monotonic(), value)
 
         if not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
             self._log(logging.INFO, eq_id=eq_id_int, cmd_id=cmd_id_int,
@@ -205,14 +216,67 @@ class StateSynchronizer:
         candidate's ``publication_decision_ref.discovery_published``). Must run AFTER
         discovery so HA does not drop the state. Returns the count published.
         """
+        published, _failed = await self._publish_initial_states_loop(
+            decision, lambda eq_id, cmd_id, candidate: self._candidate_current_value(candidate),
+        )
+        return published
+
+    async def publish_click_states(
+        self,
+        decision: PublicationDecision,
+        fresh_values: Mapping[int, Any],
+        fresh_since: float,
+    ) -> Tuple[int, int]:
+        """Publish the state initial with the value read at "Publier" click time.
+
+        Story 19.5. Mirrors ``publish_initial_states`` (same discovery gate, same
+        `_translate_value`), but the value source differs:
+        - AC8: an event received (published or rejected) for the same (eq_id, cmd_id)
+          AFTER ``fresh_since`` wins over the click's value.
+        - AC2: otherwise ``fresh_values[cmd_id]`` (the PHP-read click value); NEVER the
+          last-sync topology value (`app["topology"]` is never read here).
+        - Otherwise no state is published for that candidate (no error, AC2/résiduel AC6).
+        Returns (published_count, failed_count) — a failed publish (AC10) is NOT logged
+        here as `initial_state_published`, but as a WARNING by the caller-visible count.
+        """
+        def _resolve(eq_id: Any, cmd_id: Optional[int], candidate: MappingResult) -> Any:
+            if cmd_id is None:
+                return None
+            pending = self._pending_click_values.get((eq_id, cmd_id))
+            if pending is not None and pending[0] > fresh_since:
+                return pending[1]
+            return fresh_values.get(cmd_id)
+
+        return await self._publish_initial_states_loop(
+            decision, _resolve,
+            failure_reason_code="initial_state_publish_failed",
+            no_value_reason_code="initial_state_no_click_value",
+        )
+
+    async def _publish_initial_states_loop(
+        self,
+        decision: PublicationDecision,
+        value_resolver: Any,
+        failure_reason_code: Optional[str] = None,
+        no_value_reason_code: Optional[str] = None,
+    ) -> Tuple[int, int]:
+        """Shared candidate loop for `publish_initial_states` / `publish_click_states`.
+
+        Counts publications AND failures (AC10); logging a failure WARNING only when
+        ``failure_reason_code`` is given (the sync path, `publish_initial_states`,
+        keeps its exact pre-19.5 behaviour: no failure logging, AC9). A candidate
+        without a value is skipped; it is logged at DEBUG only when
+        ``no_value_reason_code`` is given (résiduel AC6, click path only).
+        """
         mapping = getattr(decision, "mapping_result", None)
         if mapping is None:
-            return 0
+            return 0, 0
         if not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
-            return 0
+            return 0, 0
 
         eq_id = getattr(mapping, "jeedom_eq_id", None)
-        count = 0
+        published = 0
+        failed = 0
         for candidate in self._iter_streamed_candidates(mapping):
             # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
             cand_decision = (
@@ -225,16 +289,29 @@ class StateSynchronizer:
             state_topic = self._candidate_state_topic(candidate, cand_decision, eq_id)
             if not state_topic or not str(state_topic).startswith("jeedom2ha/"):
                 continue
-            payload = self._translate_value(candidate, self._candidate_current_value(candidate))
+            cmd_id = self._candidate_cmd_id(candidate)
+            raw_value = value_resolver(eq_id, cmd_id, candidate)
+            if raw_value is None:
+                if no_value_reason_code:
+                    self._log(logging.DEBUG, eq_id=eq_id, cmd_id=cmd_id,
+                              reason_code=no_value_reason_code, action="skip_snapshot",
+                              state_topic=state_topic)
+                continue
+            payload = self._translate_value(candidate, raw_value)
             if payload is None:
                 continue
             if self._mqtt_bridge.publish_message(state_topic, payload, qos=1, retain=True):
-                count += 1
-                self._log(logging.INFO, eq_id=eq_id,
-                          cmd_id=self._candidate_cmd_id(candidate),
+                published += 1
+                self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
                           reason_code="initial_state_published", action="publish_snapshot",
                           state_topic=state_topic, ha_type=candidate.ha_entity_type)
-        return count
+            else:
+                failed += 1
+                if failure_reason_code:
+                    self._log(logging.WARNING, eq_id=eq_id, cmd_id=cmd_id,
+                              reason_code=failure_reason_code, action="publish_snapshot",
+                              state_topic=state_topic)
+        return published, failed
 
     @staticmethod
     def _candidate_current_value(candidate: MappingResult) -> Any:
