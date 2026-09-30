@@ -258,11 +258,12 @@ Vos overrides peuvent être exportés dans un **profil partageable** :
 
 ## Durée des actions « Publier » / « Supprimer »
 
-Les actions groupées (Publier / Supprimer une sélection) ont une durée bornée côté démon :
-au-delà d'un budget fixe (indépendant du nombre d'équipements), le démon arrête son travail
-et répond au relais. Ce budget a été dimensionné et vérifié en charge pour des parcs de
-plusieurs **centaines à un millier d'équipements** (ordre de grandeur typique d'une
-installation Jeedom multi-pièces avec capteurs multiples par équipement).
+Les actions groupées (Publier / Supprimer une sélection) ont une durée bornée côté relais,
+pas côté démon : **le démon n'arrête jamais son travail**. C'est le relais qui cesse
+d'attendre après 60 s et répond au navigateur ; l'action se poursuit côté démon jusqu'à sa
+fin réelle, quel que soit le temps que cela prend. Ce budget a été dimensionné et mesuré
+pour un parc typique d'équipements multi-capteurs à hauteur d'environ **500 équipements**
+(estimation prudente mesurée hors de la box, à confirmer par la mesure sur la box).
 
 Si l'action ne se termine pas dans ce délai (parc inhabituellement volumineux, démon
 ralenti), le message suivant apparaît :
@@ -270,11 +271,19 @@ ralenti), le message suivant apparaît :
 > L'action Home Assistant dure plus longtemps que prévu (plus de 60 s). Elle peut se
 > poursuivre côté démon : actualisez la page dans un instant pour voir le résultat.
 
-**Que faire** : le démon (pas Home Assistant) peut continuer le travail en arrière-plan.
+**Que faire** : le démon (pas Home Assistant) continue le travail en arrière-plan.
 Attendez quelques secondes puis rafraîchissez la page — l'état publié reflète alors le
 résultat réel. Si le message persiste après plusieurs rafraîchissements, consultez les
 logs (`Jeedom → Analyse → Logs → jeedom2ha`, niveau `warning`/`error`) pour vérifier que
 le démon tourne normalement.
+
+Si vous déclenchez une nouvelle action pendant que le démon travaille encore sur la
+précédente, le message suivant apparaît :
+
+> Une action Home Assistant est déjà en cours.
+
+**Que faire** : attendez que l'action en cours se termine, puis rafraîchissez la page
+avant de relancer une nouvelle action.
 
 ---
 

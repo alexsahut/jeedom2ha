@@ -636,14 +636,19 @@ changent).
 
 ### Debug Log References
 
-- Unité B (démon, AC6/AC8) : aiohttp `3.13.3` sur la box de terrain ;
-  comportement observé sans `asyncio.shield` : l'annulation du handler par
-  aiohttp lors d'une déconnexion client interrompt l'action en cours
-  (état partiel possible) — d'où la protection systématique de la tâche
-  d'action, indépendante de la version d'aiohttp.
-- Unité D (bloc D, AC4/AC7) : enveloppe mesurée sur cette VM de développement
+- Unité B (démon, AC6/AC8) : aiohttp `3.8.4` testé sur la VM de développement
+  (pas la box de terrain), déconnexion simulée par l'annulation du handler —
+  le comportement brut d'aiohttp sans `asyncio.shield` n'a **pas été observé**
+  (la protection systématique de la tâche d'action reste indépendante de la
+  version d'aiohttp). Version d'aiohttp installée sur la box de terrain,
+  relevée par ClaudeBox le 30/09 : `3.13.3`.
+- Unité D/E (bloc D, AC4/AC7) : enveloppe mesurée sur cette VM de développement
   (pas la box de terrain) — voir « Enveloppe AC7 » ci-dessous pour les
-  constantes, marges et facteur machine déclarés à cette fin.
+  constantes, marges et facteur machine déclarés à cette fin. Revue PR #189
+  (Unité E, 2026-09-30) : coûts unitaires recalculés sur maximum mesuré
+  (`MARGE_MESURE=1.5` × `MACHINE_FACTOR=3.0`), MQTT et `c_eq`/`c_parc` mesurés
+  dans le chemin réel (vrai `DiscoveryPublisher`, vrai `MapperRegistry`) ;
+  `N_max` (parc typique multi-capteurs, 90% de l'enveloppe) mesuré à 513.
 
 ### Completion Notes List
 
@@ -846,3 +851,10 @@ changent).
 - 2026-09-30 — unité D : test de charge AC7 (marqueur `load`), citation du
   test AC4 existant, documentation utilisateur, Tasks 1-3bis cochées,
   statut `review`.
+- 2026-09-30 — unité E (revue PR #189, Codex + ClaudeBox) : test de charge
+  AC7 refondu (coûts au maximum mesuré, MQTT et `c_eq`/`c_parc` mesurés dans
+  le chemin réel, cache en `tmp_path`, `N_max=513` mesuré) ; pause de
+  lissage « Publier » déplacée avant le travail (plus de pause finale
+  superflue) ; documentation utilisateur corrigée (le démon ne s'arrête
+  jamais, message AC8, taille supportée `N_max`) ; Debug Log Reference AC6
+  corrigée (aiohttp `3.8.4` testé sur la VM, comportement brut non observé).

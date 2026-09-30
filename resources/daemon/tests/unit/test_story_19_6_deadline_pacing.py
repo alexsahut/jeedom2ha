@@ -384,3 +384,68 @@ async def test_supprimer_journalise_ligne_action(cli_factory, caplog):
 
     assert response.status == 200
     assert any("[ACTION] intention=supprimer" in rec.message for rec in caplog.records)
+
+
+# --- Revue Codex P2 (PR #189) : un équipement sauté (non mappable) après le dernier
+# équipement qui travaille ne doit plus provoquer de pause finale ---
+
+
+@pytest.mark.asyncio
+async def test_publier_equipement_non_mappable_apres_le_dernier_sans_pause(cli_factory):
+    """Publiable (eq 100) suivi d'un inclus mais non mappable (eq 101, aucune commande
+    reconnue par un mapper) : sans ce correctif, le décompte en borne supérieure comptait
+    eq 101 comme un travail à venir et faisait dormir après eq 100 (jusqu'à 5s à 2
+    équipements). Avec le correctif, la pause se fait avant le travail (jamais pour le
+    premier) : ici eq 100 est le premier ET le dernier à travailler, donc aucune pause."""
+    mapping_100 = _light_mapping(100)
+    eq_logics = {
+        100: JeedomEqLogic(
+            id=100, name="Lampe 100", object_id=1, is_enable=True,
+            cmds=list(mapping_100.commands.values()),
+        ),
+        101: JeedomEqLogic(id=101, name="Non mappable 101", object_id=1, is_enable=True, cmds=[]),
+    }
+    topology = TopologySnapshot(
+        timestamp="2026-09-30T00:00:00Z",
+        objects={1: JeedomObject(id=1, name="Salon")},
+        eq_logics=eq_logics,
+    )
+    scope_equipements = [
+        {"eq_id": 100, "object_id": 1, "name": "Lampe 100", "effective_state": "include",
+         "decision_source": "global", "is_exception": False, "has_pending_home_assistant_changes": False},
+        {"eq_id": 101, "object_id": 1, "name": "Non mappable 101", "effective_state": "include",
+         "decision_source": "global", "is_exception": False, "has_pending_home_assistant_changes": False},
+    ]
+    eligibility = {
+        100: EligibilityResult(is_eligible=True, reason_code="eligible"),
+        101: EligibilityResult(is_eligible=True, reason_code="eligible"),
+    }
+    published_scope = {
+        "global": {"counts": {"total": 2, "include": 2, "exclude": 0, "exceptions": 0},
+                   "effective_state": "include", "has_pending_home_assistant_changes": False},
+        "pieces": [],
+        "equipements": scope_equipements,
+    }
+    app = http_server.create_app(local_secret=SECRET)
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message.return_value = True
+    app["mqtt_bridge"] = bridge
+    app["topology"] = topology
+    app["published_scope"] = published_scope
+    app["eligibility"] = eligibility
+    app["mappings"] = {100: mapping_100}
+    app["publications"] = {}
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    sleep_mock = AsyncMock()
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.http_server.asyncio.sleep", sleep_mock
+    ):
+        response = await _post_action(
+            cli, {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+
+    assert response.status == 200
+    sleep_mock.assert_not_awaited()

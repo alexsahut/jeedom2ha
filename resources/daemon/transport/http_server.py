@@ -3975,23 +3975,34 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             else 0
         )
         _pauses_faites = 0.0
-        _pauses_index = 0
-    
-        async def _pace_publier() -> None:
-            nonlocal _pauses_faites, _pauses_index
+        _potentiels_restants = _pauses_totales
+        _premier_travail_fait = False
+
+        # Revue Codex P2 (PR #189) : la pause se fait AVANT le traitement de chaque
+        # équipement qui travaille réellement, sauf le premier. Un équipement sauté
+        # (inclus mais non mappable) ne travaille jamais et ne déclenche donc jamais de
+        # pause, et il n'y a plus de pause finale après le dernier équipement traité.
+        async def _pace_avant_travail() -> None:
+            nonlocal _pauses_faites, _premier_travail_fait
             if deadline_s is None:
-                await asyncio.sleep(_action_delay)
                 return
-            _pauses_index += 1
-            pauses_restantes = _pauses_totales - _pauses_index
-            if pauses_restantes <= 0:
+            if not _premier_travail_fait:
+                _premier_travail_fait = True
                 return
+            # `pauses_restantes` compte la pause courante (1) + la borne supérieure des
+            # équipements à venir qui travailleront (`_potentiels_restants`, déjà
+            # décrémenté du présent équipement) — jamais < 1.
+            pauses_restantes = 1 + _potentiels_restants
             pause = action_pacing.prochaine_pause(_action_delay, _plafond, _pauses_faites, pauses_restantes)
             if pause > 0:
                 t0 = time.monotonic()
                 await asyncio.sleep(pause)
                 _pauses_faites += time.monotonic() - t0
-    
+
+        async def _delai_sans_deadline() -> None:
+            if deadline_s is None:
+                await asyncio.sleep(_action_delay)
+
         for eq_id in eq_ids:
             scope_entry = scope_entries.get(eq_id)
             previous_decision = publications.get(eq_id)
@@ -4008,13 +4019,19 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             if mapping is None:
                 mapping = mappings.get(eq_id)
             is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
-    
+            if deadline_s is not None and (
+                is_included
+                or _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish)
+            ):
+                _potentiels_restants -= 1
+
             if is_included:
                 equipements_inclus += 1
                 if evaluation is None or evaluation.mapping is None:
                     skips += 1
                     continue
-    
+
+                await _pace_avant_travail()
                 await _replay_pending_for_action(
                     eq_id,
                     publisher=publisher,
@@ -4066,8 +4083,8 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                         )
                         click_publish_failed = click_failed_count > 0
     
-                await _pace_publier()
-    
+                await _delai_sans_deadline()
+
                 # Revue Codex P2 (PR #180) : un secondaire accepté dont la publication a
                 # échoué (`_publish_additional_sensors` : `active_or_alive` n'est vrai qu'en
                 # cas de succès) fait compter l'équipement en erreur, comme l'ancien chemin.
@@ -4110,8 +4127,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 entity_type = "light"
                 node_ids = []
     
+            await _pace_avant_travail()
             unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=entity_type, node_ids=node_ids)
-            await _pace_publier()
+            await _delai_sans_deadline()
             if not unpublish_ok:
                 _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
                 publish_errors += 1  # Story 19.4b (CC-31) — reporté, pas résolu
