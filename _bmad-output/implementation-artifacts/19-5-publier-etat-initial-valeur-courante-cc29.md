@@ -450,6 +450,12 @@ garde sa propre décision et son propre état initial (Story 19.2).
   - Décompte : la suite Python complète se lance depuis la racine du dépôt (comme la
     CI), pas depuis `resources/daemon` ; les « 1385 passed » ci-dessus ne couvrent
     qu'une partie de la suite.
+- **Code-review ClaudeBox (30/09, sur `bad53c2`, Codex « no major issues »)** — un
+  point corrigé : la lecture des valeurs au clic pouvait faire échouer « Publier »
+  entier (exception du cœur ou du cache), alors qu'elle n'est qu'un complément. Elle
+  passe par `_jeedom2ha_collect_click_values` (best-effort, testée) : en cas
+  d'échec, avertissement et publication **sans** `current_values`, donc comportement
+  19-4 (AC7). +6 cas PHP (39/39).
 
 - **correct-course + create-story** — 2026-09-29 (23:51) — statut résultant :
   `ready-for-dev`. Créée par `clawcode` en session détachée, documentation
@@ -492,3 +498,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — dev-story (`clawcode`, `549d0e7`), statut `review`.
 - 2026-09-30 — relecture de code ClaudeBox : AC11 extrait et testé, `fresh_since` avant le premier `await`, DEBUG du résiduel AC6, câblage AC10 testé.
 - 2026-09-30 — revue Codex PR #185 : listeners créés avant la purge (aucune commande sans écouteur en cas d'exception).
+- 2026-09-30 — code-review ClaudeBox : lecture des valeurs au clic en best-effort (AC7 sur échec).

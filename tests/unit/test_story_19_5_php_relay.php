@@ -85,6 +85,41 @@ $noneValues = _jeedom2ha_read_current_values(
 assert_eq('aucune valeur => tableau vide (pas une erreur)', [], $noneValues);
 
 // ---------------------------------------------------------------------------
+// AC6/AC7 — collecte best-effort : une exception ne bloque jamais la publication
+// (relecture ClaudeBox, PR #185)
+// ---------------------------------------------------------------------------
+
+echo "\nStory 19.5 / AC6-AC7 — collecte des valeurs au clic, best-effort\n";
+
+$collectWarns = [];
+$collectWarn = function (string $m) use (&$collectWarns) { $collectWarns[] = $m; };
+$pieceFetcher = function ($pieceId) { return $pieceId === 9 ? [125, 217] : []; };
+$allFetcher = function () { return [125, 217, 468]; };
+$cmdsFetcher = function ($eqId) {
+    return [
+        ['cmd_id' => $eqId * 10 + 1, 'type' => 'info', '_val' => 'v' . $eqId],
+        ['cmd_id' => $eqId * 10 + 2, 'type' => 'action', '_val' => 'ignored'],
+    ];
+};
+$getter = function ($c) { return $c['_val']; };
+
+assert_eq('pièce 9 : valeurs des commandes info de ses équipements',
+    [1251 => 'v125', 2171 => 'v217'],
+    _jeedom2ha_collect_click_values('piece', [9], $pieceFetcher, $allFetcher, $cmdsFetcher, $getter, $collectWarn));
+assert_eq('lecture réussie : aucun avertissement', 0, count($collectWarns));
+
+$boomCmds = function ($eqId) { throw new Exception('cmd::byEqLogicId en échec'); };
+assert_eq('exception à la liste des commandes : null (publication sans current_values)', null,
+    _jeedom2ha_collect_click_values('piece', [9], $pieceFetcher, $allFetcher, $boomCmds, $getter, $collectWarn));
+$boomGetter = function ($c) { throw new Exception('cache indisponible'); };
+assert_eq('exception à la lecture du cache : null', null,
+    _jeedom2ha_collect_click_values('global', ['all'], $pieceFetcher, $allFetcher, $cmdsFetcher, $boomGetter, $collectWarn));
+$boomPiece = function ($pieceId) { throw new Exception('eqLogic::byObjectId en échec'); };
+assert_eq('exception à l expansion de la pièce : null', null,
+    _jeedom2ha_collect_click_values('piece', [9], $boomPiece, $allFetcher, $cmdsFetcher, $getter, $collectWarn));
+assert_eq('trois échecs : trois avertissements', 3, count($collectWarns));
+
+// ---------------------------------------------------------------------------
 // AC11 — réalignement des listeners : récupérer -> valider -> créer -> purger
 // (revue ClaudeBox + Codex P2, PR #184 ; fonctions pures de
 // core/php/jeedom2ha_state_listeners.php, chargé par l'ajax)

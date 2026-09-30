@@ -370,6 +370,39 @@ function _jeedom2ha_expand_portee_to_eq_ids(
     return [];
 }
 
+/**
+ * Story 19.5 (AC6, AC7) — collecte des valeurs au clic, en best-effort : développe la
+ * portée, liste les commandes et lit leurs valeurs (fonctions injectées). Toute exception
+ * (cœur Jeedom, cache) rend null avec un avertissement : la publication part alors SANS
+ * `current_values`, donc avec le comportement 19-4 (AC7), au lieu d'échouer
+ * (relecture ClaudeBox, PR #185).
+ *
+ * @return array|null {cmd_id: valeur}, ou null si la lecture a échoué
+ */
+function _jeedom2ha_collect_click_values(
+    string $portee,
+    array $selection,
+    callable $_pieceEqIdsFetcher,
+    callable $_allEqIdsFetcher,
+    callable $_cmdsFetcher,
+    callable $_valueGetter,
+    callable $_warn
+): ?array {
+    try {
+        $eqIds = _jeedom2ha_expand_portee_to_eq_ids($portee, $selection, $_pieceEqIdsFetcher, $_allEqIdsFetcher);
+        $cmds = [];
+        foreach ($eqIds as $eqId) {
+            foreach ($_cmdsFetcher($eqId) as $cmd) {
+                $cmds[] = $cmd;
+            }
+        }
+        return _jeedom2ha_read_current_values($cmds, $_valueGetter);
+    } catch (\Throwable $e) {
+        $_warn('[ACTION] Lecture des valeurs au clic impossible, publication sans état initial : ' . $e->getMessage());
+        return null;
+    }
+}
+
 if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
 try {
     require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
@@ -688,8 +721,8 @@ try {
       // AVANT toute lecture de valeur, puis lire les valeurs courantes (lecture
       // seule, getCache('value', null), jamais execCmd) pour transmission au démon.
       if ($params['intention'] === 'publier') {
-        $eqIds = _jeedom2ha_expand_portee_to_eq_ids(
-          $params['portee'],
+        $clickValues = _jeedom2ha_collect_click_values(
+          (string)$params['portee'],
           $params['selection'],
           function ($pieceId) {
             $ids = [];
@@ -708,17 +741,24 @@ try {
               }
             }
             return $ids;
+          },
+          function ($eqId) {
+            $cmds = [];
+            foreach (cmd::byEqLogicId($eqId) as $cmd) {
+              $cmds[] = ['cmd_id' => $cmd->getId(), 'type' => $cmd->getType(), '_cmd' => $cmd];
+            }
+            return $cmds;
+          },
+          function ($c) {
+            return $c['_cmd']->getCache('value', null);
+          },
+          function (string $message) {
+            log::add('jeedom2ha', 'warning', $message);
           }
         );
-        $cmdsForValues = [];
-        foreach ($eqIds as $eqId) {
-          foreach (cmd::byEqLogicId($eqId) as $cmd) {
-            $cmdsForValues[] = ['cmd_id' => $cmd->getId(), 'type' => $cmd->getType(), '_cmd' => $cmd];
-          }
+        if ($clickValues !== null) {
+          $params['current_values'] = $clickValues;
         }
-        $params['current_values'] = _jeedom2ha_read_current_values($cmdsForValues, function ($c) {
-          return $c['_cmd']->getCache('value', null);
-        });
       }
 
       $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
