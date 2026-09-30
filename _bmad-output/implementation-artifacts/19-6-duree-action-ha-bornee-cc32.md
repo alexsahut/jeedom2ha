@@ -169,8 +169,11 @@ paramètre `deadline_s = R - reserve_s` (`reserve_s = 5 s`, constante nommée,
 couvrant la sérialisation de la réponse et le trajet retour)
 **And** ce budget reste sous le `Timeout 300` d'Apache par construction (60 s
 ≪ 300 s), sans calcul dépendant de N
-**And** `R` et `reserve_s` sont journalisées (`info`) à chaque action, pour la
-preuve terrain
+**And** à chaque action, le relais journalise (`info`) une ligne donnant
+l'intention, la portée, `R`, `reserve_s`, `deadline_s` et la durée mesurée de
+l'appel au démon ; le démon journalise sa durée de traitement et le total de
+ses pauses. Un test fige le contenu de ces lignes, nécessaires à la preuve
+terrain (revue Codex P2, `3dcdb54`)
 **And** un test par portée (publier, supprimer) fige `R` et `deadline_s`.
 
 **AC1bis — Le démon plafonne son lissage pour tenir l'échéance transmise**
@@ -346,7 +349,13 @@ observé majoré d'une marge explicite :
   mesuré sur un parc multi-candidats, multi-`node_id` et retypé ;
 - `c_eq`, le coût d'évaluation d'un équipement de la portée, ignorés compris,
   mesuré sur une portée surtout ignorée (exclus, sans mapping) et presque
-  sans appel MQTT (revue Codex P1, `99f2450`) ;
+  sans appel MQTT (revue Codex P1, `99f2450`), composée de la forme
+  d'équipement la plus coûteuse à évaluer (nombre maximal de commandes et de
+  mappings secondaires, déclaré) : l'évaluation a lieu avant le filtre de
+  portée (`http_server.py:3883-3898`) et parcourt toutes les commandes et
+  tous les mappings (`models/evaluate_equipment.py:341-420` ; revue Codex P1,
+  `3dcdb54`). Un équipement qui dépasse cette forme compte au prorata de ses
+  commandes ;
 - `c_parc`, le coût, par équipement du **parc entier**, du travail de fin
   d'action qui ne dépend pas de la portée : `_apply_pending_scope_flags` sur
   tout `published_scope` et `save_publications_cache` sur toutes les
@@ -358,6 +367,8 @@ observé majoré d'une marge explicite :
 indépendants (revue Codex P1, `55be1a1`) : un parc est supporté si
 `appels_MQTT × c_mqtt + équipements_portée × c_eq + équipements_parc × c_parc
 ≤ budget_travail` (AC1bis)
+**And** l'enveloppe est une borne supérieure : chaque coût unitaire est
+mesuré sur la forme la plus coûteuse de son chemin
 **And** l'enveloppe est un modèle linéaire mesuré : tout autre terme de coût
 découvert en dev-story ou en revue de code s'y ajoute sous la même forme,
 mesuré par le test de charge ; la durée **de bout en bout** de chaque
@@ -473,6 +484,9 @@ changent).
   AC1bis, AC2, AC3, AC5)
   - [ ] Constantes `R = 60 s` et `reserve_s = 5 s` (PHP), budget fixe pour
     `callDaemon`, `deadline_s = R - reserve_s` transmis au démon.
+  - [ ] Journalisation d'AC1 (relais : intention, portée, `R`, `reserve_s`,
+    `deadline_s`, durée de l'appel ; démon : durée de traitement, total des
+    pauses), testée.
   - [ ] Appliquer ce budget à l'appel `callDaemon('/action/execute', …)`
     (`jeedom2ha.ajax.php:764`) pour `intention = publier` et
     `intention = supprimer`, avec `deadline_s` dans le corps de la requête.
@@ -505,8 +519,9 @@ changent).
     l'ancien comportement à budget fixe non borné.
   - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste :
     `c_mqtt` mesuré sur un parc multi-candidats, retypé et multi-`node_id` ;
-    `c_eq` mesuré sur une portée surtout ignorée, presque sans appel MQTT
-    (revue Codex P2, `ecce1dc`) ; `c_parc` mesuré par une action sur un seul
+    `c_eq` mesuré sur une portée surtout ignorée, presque sans appel MQTT,
+    faite de la forme d'équipement la plus coûteuse à évaluer (revue Codex,
+    `ecce1dc`, `3dcdb54`) ; `c_parc` mesuré par une action sur un seul
     équipement d'un très grand inventaire (revue Codex P1, `dfc651e`) ;
     enveloppe conjointe vérifiée sur sa frontière par le scénario mixte et
     par la petite portée sur grand inventaire (revue Codex P1, `55be1a1`).
@@ -710,6 +725,11 @@ changent).
   la lecture au clic (ordre testé), pour qu'un évènement reçu pendant la
   sonde ne soit pas écrasé par une valeur plus ancienne (P1) ; fenêtre
   résiduelle de l'AC8 de 19.5 bornée par la durée de la lecture, déclarée.
+- **Revue Codex, 17e tour (`3dcdb54`)** — `c_eq` mesuré sur la forme
+  d'équipement la plus coûteuse à évaluer (commandes, mappings secondaires),
+  au prorata au-delà ; l'enveloppe est une borne supérieure, chaque coût
+  étant mesuré sur la forme la plus coûteuse de son chemin (P1) ;
+  journalisation d'AC1 complétée (`deadline_s`, durées, pauses) et testée (P2).
 
 ### File List
 
@@ -739,3 +759,4 @@ changent).
   `deadline_s`, garantie bornée à l'enveloppe).
 - 2026-09-30 — revue Codex 15e tour (coût du parc entier, marge de réveil).
 - 2026-09-30 — revue Codex 16e tour (AC3 : sonde avant la lecture au clic).
+- 2026-09-30 — revue Codex 17e tour (forme la plus coûteuse, journalisation).
