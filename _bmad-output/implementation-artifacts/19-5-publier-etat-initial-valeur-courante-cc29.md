@@ -1,6 +1,6 @@
 # Story 19.5: Publier l'état initial avec la valeur courante au clic « Publier » (CC-29)
 
-Status: ready-for-UX-validation
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -494,6 +494,9 @@ garde sa propre décision et son propre état initial (Story 19.2).
   puis « Republier ». Le démon émet `initial_state_published` pour les 3 capteurs
   au clic. HA affiche la valeur Jeedom lue au clic, et non l'état retenu d'avant
   « Suppr. ». Mêmes `entity_id`. Artefact : `19-5-field-proof-2026-09-30.md`.
+- **Validation UX (30/09, 09:57)** — Alex : « OK », après le compte rendu de la
+  preuve par clic. Un « Republier » sur une pièce affiche la valeur Jeedom
+  actuelle dans HA. Statut `done`.
 
 ### File List
 
@@ -518,3 +521,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — revue Codex PR #185 : listeners créés avant la purge (aucune commande sans écouteur en cas d'exception).
 - 2026-09-30 — code-review ClaudeBox : lecture des valeurs au clic en best-effort (AC7 sur échec).
 - 2026-09-30 — PR #185 fusionnée (`ed9cc30`), déployée et prouvée sur le terrain ; statut `ready-for-UX-validation`.
+- 2026-09-30 — validation UX d'Alex (09:57) ; statut `done`.
