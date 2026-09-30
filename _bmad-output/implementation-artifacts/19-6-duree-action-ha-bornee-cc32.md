@@ -1,6 +1,6 @@
 # Story 19.6: Durée des actions HA bornée pour les grands parcs (CC-32)
 
-Status: ready-for-UX-validation
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -877,6 +877,10 @@ changent).
   environ 2,5 ms par équipement : la capacité documentée (250) reste
   prudente. Détail : `19-6-field-proof-2026-09-30.md`. Statut
   `ready-for-UX-validation`.
+- **Validation UX (30/09, 21:33)** — Alex : « je valide », après le compte
+  rendu de la preuve par clic et la relecture des trois messages d'incident
+  (vrai dépassement d'AC5, erreur immédiate du démon, action déjà en cours).
+  Flux du bouton inchangé. Statut `done`.
 
 ### File List
 
@@ -902,10 +906,10 @@ changent).
 - `pyproject.toml` — marqueur pytest `load` déclaré, exclu par défaut.
 - `docs/fr_FR/index.md` — section « Durée des actions Publier / Supprimer ».
 - `_bmad-output/implementation-artifacts/19-6-duree-action-ha-bornee-cc32.md`
-  — Tasks 0 à 4 cochées (dont 3bis), statut `ready-for-UX-validation`
-  après la preuve terrain, Dev Agent Record complété.
+  — Tasks 0 à 4 cochées (dont 3bis), statut `done` après la preuve terrain
+  et la validation UX d'Alex, Dev Agent Record complété.
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut de la
-  story 19.6 → `ready-for-UX-validation`.
+  story 19.6 → `done`.
 - `_bmad-output/implementation-artifacts/19-6-field-proof-2026-09-30.md` —
   preuve terrain (artefact durable, assaini).
 
@@ -977,3 +981,4 @@ changent).
 - 2026-09-30 — preuve terrain (Task 0 et Task 4) : déploiement de `95d3059`,
   gate d'inventaire et preuve par clic réel conformes, artefact
   `19-6-field-proof-2026-09-30.md` ; statut → `ready-for-UX-validation`.
+- 2026-09-30 — validation UX d'Alex (21:33) ; statut `done`.
