@@ -297,24 +297,25 @@ d'attente de l'UI, et le relais **ne réaligne pas** les écouteurs (formulation
 précise à trancher en dev-story, cohérente avec le vocabulaire existant)
 **And** un test fige les deux messages distincts.
 
-**AC6 — Comportement d'aiohttp à la déconnexion du client, vérifié et testé**
+**AC6 — Action protégée contre la déconnexion du client, testée**
 
 **Given** une requête HTTP du relais PHP vers le démon qui expire côté client
 avant que le démon ait terminé (déconnexion TCP par le client PHP)
 **When** le handler aiohttp du démon est en cours d'exécution
-**Then** le comportement réel (le handler continue-t-il jusqu'au bout, ou
-est-il annulé ?) est déterminé par un test d'intégration reproduisant une
-déconnexion client pendant un handler long, avec la version d'aiohttp
-effectivement installée (`pyproject.toml` ne pin pas de version — noter la
-version testée dans le rapport de dev-story)
-**And** le résultat (poursuite ou annulation) est documenté dans les Dev
-Notes et piloté par ce constat, pas supposé
-**And** si le handler est annulé à la déconnexion, l'exécution de l'action
-est **protégée** (par exemple `asyncio.shield` d'une tâche qui porte toute
-l'action) pour qu'elle aille au bout, conformément à AC1bis et à AC5 ; un
-test vérifie qu'une action dont le client s'est déconnecté publie bien tous
-ses équipements (revue Codex P1, `472c372`). L'état partiel n'est pas un
-résultat acceptable.
+**Then** l'exécution de l'action est **toujours protégée** : elle est portée
+par une tâche unique protégée de l'annulation du handler (par exemple
+`asyncio.shield`), **quel que soit** le comportement d'aiohttp à la
+déconnexion — `pyproject.toml` n'épingle pas aiohttp, et une installation
+Market ou une mise à jour peut changer ce comportement (revue Codex P1,
+`71097f6`)
+**And** un test d'intégration reproduit une déconnexion client pendant un
+handler long, avec la version d'aiohttp installée (notée dans le rapport de
+dev-story ; box : 3.13.3), et vérifie qu'une action dont le client s'est
+déconnecté publie bien tous ses équipements, conformément à AC1bis et à AC5
+(revue Codex P1, `472c372`). L'état partiel n'est pas un résultat acceptable
+**And** le comportement brut du handler observé par ce test (poursuite ou
+annulation) est documenté dans les Dev Notes, pour information : il ne
+conditionne plus la protection.
 
 **AC8 — Une seule action HA à la fois**
 
@@ -472,12 +473,12 @@ changent).
     portée), démon (compression AC1bis, non-régression sans `deadline_s`) et
     JS (délai fixe).
 
-- [ ] Task 2 — Vérification du comportement aiohttp à la déconnexion (AC6)
+- [ ] Task 2 — Action protégée contre la déconnexion du client (AC6)
+  - [ ] Protection systématique de l'exécution (tâche unique protégée), sans
+    condition sur la version d'aiohttp.
   - [ ] Test d'intégration démon : handler long, déconnexion client simulée
-    avant la fin, constat documenté (poursuite ou annulation) avec la version
-    d'aiohttp effectivement installée.
-  - [ ] Documenter le résultat dans les Dev Notes, sans le supposer au
-    préalable.
+    avant la fin, action complète vérifiée ; version d'aiohttp testée et
+    comportement brut observé documentés dans les Dev Notes.
 
 - [ ] Task 3 — Écouteurs et test de charge (AC4, AC7)
   - [ ] Test simulant un grand parc où le lissage s'est comprimé (AC1bis) et
@@ -651,6 +652,9 @@ changent).
   (y compris ignorés) ajouté à la réserve, et seconde borne de taille
   supportée en nombre d'équipements, testée sur une portée surtout ignorée
   (P1).
+- **Revue Codex, 12e tour (`71097f6`)** — AC6 : exécution de l'action
+  toujours protégée contre l'annulation du handler, sans condition sur la
+  version d'aiohttp (non épinglée) ; le test vérifie l'action complète (P1).
 
 ### File List
 
@@ -673,3 +677,4 @@ changent).
 - 2026-09-30 — revue Codex 9e tour (max(1, node_id), règle générale du précompte).
 - 2026-09-30 — revue Codex 10e tour (unité de la taille supportée, doc utilisateur).
 - 2026-09-30 — revue Codex 11e tour (coût d'évaluation, seconde borne).
+- 2026-09-30 — revue Codex 12e tour (AC6 : protection systématique).
