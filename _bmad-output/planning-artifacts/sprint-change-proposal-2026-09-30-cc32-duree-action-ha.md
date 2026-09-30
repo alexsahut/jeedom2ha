@@ -61,9 +61,15 @@ reviendrait à Alex.
 **Direct Adjustment** — ajout d'une story (19.6) à l'epic 19 existant. Scope
 **minor à moderate** selon l'option choisie (voir story, section « Options »).
 
-Trois options sont comparées dans la story, avec préférence de ClaudeBox pour
-l'option (a) : budgets du relais et du client proportionnels au nombre
-d'équipements, lissage inchangé — changement minimal, aucune UX nouvelle.
+Trois options sont comparées dans la story. L'option (a) (budgets du relais et
+du client proportionnels au nombre d'équipements) a été **abandonnée** après
+quatre tours de revue Codex (PR #188) qui ont chacun rouvert un nouveau trou
+dans la lecture externe de N. **Option (b′) retenue** par ClaudeBox : un
+lissage borné par une échéance donnée au démon — budget fixe côté
+relais/client, `deadline_s` transmis au démon, qui comprime son propre
+lissage à partir du travail qu'il mesure lui-même. Aucune UX nouvelle,
+décision prise dans le cadre du GO d'Alex du 30/09 (pas de nouveau retour à
+Alex).
 
 ## 5. Changement d'artefact
 
@@ -72,10 +78,10 @@ ajout de la Story 19.6 (F) à la liste des stories, et CC-32 aux points visés.
 
 ## 6. Handoff
 
-- **Scope : Minor à Moderate** (selon l'option retenue en dev-story ; l'option
-  (a) recommandée reste minor). Implémentation directe par le dev, sous
-  réserve de la décision d'Alex sur l'option si elle change l'UX au-delà du
-  délai d'attente technique.
+- **Scope : Minor à Moderate** — option (b′) retenue (lissage borné par une
+  échéance donnée au démon), touche `http_server.py` en plus du relais/client.
+  Implémentation directe par le dev ; l'option (c), seule à changer l'UX,
+  reste hors périmètre et reviendrait à Alex si nécessaire.
 - Story détaillée :
   `_bmad-output/implementation-artifacts/19-6-duree-action-ha-bornee-cc32.md`.
 - `sprint-status.yaml` : `19-6-duree-action-ha-bornee-cc32: ready-for-dev`.
