@@ -48,7 +48,9 @@ reviendrait à Alex.
 ## 3. Impact
 
 - **Epic 19** (`_bmad-output/planning-artifacts/epics-projection-engine.md`) :
-  ajout de la Story 19.6, qui ferme CC-32. N'ouvre aucun nouveau FR/NFR PRD, ne
+  ajout de la Story 19.6, qui ferme CC-32 dans l'enveloppe de taille
+  supportée (AC7 ; au-delà, message juste d'AC5). N'ouvre aucun nouveau
+  FR/NFR PRD, ne
   touche pas `evaluate_equipment()`.
 - **Code concerné** : `resources/daemon/transport/http_server.py` (branches
   Publier l.3881/3957/4002, Supprimer l.3724/3744), `core/ajax/jeedom2ha.ajax.php`

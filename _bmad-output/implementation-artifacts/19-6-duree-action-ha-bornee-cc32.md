@@ -127,7 +127,8 @@ budget externe pour un travail interne au démon est structurellement fragile.
   au-delà du simple délai d'attente technique. Reste hors périmètre de cette
   story.
 
-**Recommandation : option (b′).** Elle ferme CC-32 à la racine (le démon
+**Recommandation : option (b′).** Dans l'enveloppe de taille supportée
+(AC7), elle ferme CC-32 à la racine (le démon
 adapte son propre lissage à une échéance donnée, sans deviner N depuis
 l'extérieur), sans toucher à la Décision 8 (l'appelant redémarrage ne
 transmet jamais `deadline_s`) ni introduire de nouvelle UX. Décision prise par
@@ -141,7 +142,7 @@ pur dépasse ce budget le dépassera malgré la compression du lissage (AC5).
 L'option (b′) ne promet pas « jamais » : elle fixe une **taille de parc
 supportée**, celle dont le travail pur tient dans `deadline_s` moins le
 plafond des pauses (AC1bis), mesurée par un test de charge (AC7) et déclarée
-par deux bornes, en nombre total d'appels MQTT de l'action (tous chemins) et
+comme une enveloppe conjointe en appels MQTT de l'action (tous chemins) et
 en nombre d'équipements — cela répond au P2 de Codex sur le travail par
 équipement variable. Au-delà, le
 message juste d'AC5 s'applique. Seule l'option (c) lèverait cette limite ;
@@ -315,32 +316,42 @@ une action en cours, puis après sa fin
 **And** la concurrence entre une action et le sync périodique existe déjà
 aujourd'hui ; elle n'est pas traitée ici et reste déclarée comme résiduel.
 
-**AC7 — Taille de parc supportée mesurée, deux bornes**
+**AC7 — Taille de parc supportée mesurée, enveloppe conjointe**
 
 **Given** le démon plafonne son lissage pour tenir `deadline_s`, mais ne
-peut pas comprimer le travail pur (publication MQTT elle-même)
-**When** un test de charge du démon simule un parc avec un faux MQTT à
-latence réaliste et des équipements multi-candidats (secondaires, plusieurs
-`node_id` par équipement, retypés)
-**Then** le test mesure la taille de parc supportée — le plus grand parc
-dont le travail pur tient dans `deadline_s - plafond_pauses` (AC1bis) — en
-**nombre total d'appels MQTT de l'action** (`publish_message`, sur tous les
-chemins : discovery des candidats, état au clic, disponibilité, dépublication
-de chaque `node_id` ou de repli, dépublications de retypage, nettoyages
-rejoués), comptés sur le faux MQTT (revue Codex P1, `a1a8514`)
-**And** la taille supportée comporte une **seconde borne**, le nombre
-d'équipements de la portée (tous évalués, y compris les ignorés), mesurée par
-un test de charge dont la portée contient une grande majorité d'équipements
-exclus ou sans mapping et presque aucun appel MQTT (revue Codex P1,
-`99f2450`) ; un parc est supporté s'il respecte les deux bornes
-**And** cette taille est figée par le test avec une marge explicite, et
-déclarée dans la story et dans la documentation utilisateur
-(`docs/fr_FR/index.md`), traduite en un ordre de grandeur lisible pour un
+peut pas comprimer le travail pur (publication MQTT et évaluation des
+équipements)
+**When** un test de charge du démon simule des parcs avec un faux MQTT à
+latence réaliste
+**Then** le test mesure deux coûts unitaires, chacun retenu comme le maximum
+observé majoré d'une marge explicite :
+- `c_mqtt`, le coût d'un appel MQTT de l'action (`publish_message`, sur tous
+  les chemins : discovery des candidats, état au clic, disponibilité,
+  dépublication de chaque `node_id` ou de repli, dépublications de retypage,
+  nettoyages rejoués, comptés sur le faux MQTT ; revue Codex P1, `a1a8514`),
+  mesuré sur un parc multi-candidats, multi-`node_id` et retypé ;
+- `c_eq`, le coût d'évaluation d'un équipement de la portée, ignorés compris,
+  mesuré sur une portée surtout ignorée (exclus, sans mapping) et presque
+  sans appel MQTT (revue Codex P1, `99f2450`)
+
+**And** la taille supportée est une **enveloppe conjointe**, pas deux maxima
+indépendants (revue Codex P1, `55be1a1`) : un parc est supporté si
+`appels_MQTT × c_mqtt + équipements × c_eq ≤ deadline_s - plafond_pauses`
+**And** un scénario **mixte** placé sur la frontière de l'enveloppe (beaucoup
+d'équipements ignorés et beaucoup d'appels MQTT à la fois) vérifie que la
+réponse du démon arrive avant `deadline_s`
+**And** l'enveloppe, ses constantes et leur marge sont figées par le test et
+déclarées dans la story et dans la documentation utilisateur
+(`docs/fr_FR/index.md`), traduites en ordres de grandeur lisibles pour un
 utilisateur (par exemple un nombre d'équipements typiques)
-**And** le test rejoue la mesure du 30/09 (N total = 292, N évalués = 94,
-environ 11 s) et vérifie qu'elle tient bien sous `R` (60 s)
-**And** un test simule un grand parc (par exemple 1 000 équipements
-multi-capteurs) et vérifie que la réponse arrive avant `R`.
+**And** les assertions de durée côté démon portent sur `deadline_s`, pas sur
+`R` : `reserve_s` couvre la sérialisation et le trajet retour (revue Codex
+P2, `55be1a1`). Le test rejoue la mesure du 30/09 (N total = 292,
+N évalués = 94, environ 11 s) et un grand parc simulé dans l'enveloppe (visé :
+1 000 équipements multi-capteurs ; si l'enveloppe mesurée est plus petite,
+le rapport le dit et la story le déclare), et vérifie que la réponse du
+démon arrive avant `deadline_s`. Le relais est testé séparément contre `R`
+(AC1, AC5).
 
 ## UI Impact
 
@@ -465,12 +476,13 @@ changent).
   - [ ] Test simulant un grand parc où le lissage s'est comprimé (AC1bis) et
     où le réalignement des écouteurs a bien lieu (AC4), contrastant avec
     l'ancien comportement à budget fixe non borné.
-  - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste, deux
-    scénarios : parc multi-candidats, retypés et multi-`node_id` (borne en
-    appels MQTT totaux) ; portée surtout ignorée, presque sans appel MQTT
-    (borne en nombre d'équipements, revue Codex P2, `ecce1dc`). Rejoue le
-    couple mesuré (292, 94, ~11 s) et un grand parc simulé (par exemple
-    1 000 équipements) ; déclare **les deux bornes**, avec une marge
+  - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste :
+    `c_mqtt` mesuré sur un parc multi-candidats, retypé et multi-`node_id` ;
+    `c_eq` mesuré sur une portée surtout ignorée, presque sans appel MQTT
+    (revue Codex P2, `ecce1dc`) ; enveloppe conjointe vérifiée par un
+    scénario mixte sur sa frontière (revue Codex P1, `55be1a1`). Rejoue le
+    couple mesuré (292, 94, ~11 s) et un grand parc simulé dans l'enveloppe ;
+    assertions sur `deadline_s`. Déclare l'enveloppe, avec une marge
     explicite.
   - [ ] Documentation utilisateur : ajouter la taille supportée et le message
     d'AC5 dans `docs/fr_FR/index.md` (revue Codex P2, `a1a8514`).
@@ -650,6 +662,12 @@ changent).
   le travail pur plus ce plafond sans aucune estimation ; AC7 mesure ce
   travail pur. Task 3 : scénario presque sans MQTT et déclaration des deux
   bornes (P2).
+- **Revue Codex, 14e tour (`55be1a1`)** — taille supportée déclarée comme une
+  enveloppe conjointe (`appels_MQTT × c_mqtt + équipements × c_eq`), vérifiée
+  par un scénario mixte, au lieu de deux maxima indépendants (P1) ;
+  assertions du test de charge sur `deadline_s`, relais testé contre `R`
+  (P2) ; la garantie du budget fixe est bornée à l'enveloppe dans l'epic et
+  la proposition (P2).
 
 ### File List
 
@@ -675,3 +693,5 @@ changent).
 - 2026-09-30 — revue Codex 12e tour (AC6 : protection systématique).
 - 2026-09-30 — revue Codex 13e tour : précompte abandonné, plafond des
   pauses (AC1bis) ; deux scénarios de charge (Task 3).
+- 2026-09-30 — revue Codex 14e tour (enveloppe conjointe, assertions sur
+  `deadline_s`, garantie bornée à l'enveloppe).
