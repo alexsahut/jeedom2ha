@@ -262,7 +262,7 @@ Les actions groupées (Publier / Supprimer une sélection) ont une durée borné
 pas côté démon : **le démon n'arrête jamais son travail**. C'est le relais qui cesse
 d'attendre après 60 s et répond au navigateur ; l'action se poursuit côté démon jusqu'à sa
 fin réelle, quel que soit le temps que cela prend. Ce budget a été dimensionné et mesuré
-pour un parc typique d'équipements multi-capteurs à hauteur d'environ **500 équipements**
+pour un parc typique d'équipements multi-capteurs à hauteur d'environ **300 équipements**
 (estimation prudente mesurée hors de la box, à confirmer par la mesure sur la box).
 
 Si l'action ne se termine pas dans ce délai (parc inhabituellement volumineux, démon

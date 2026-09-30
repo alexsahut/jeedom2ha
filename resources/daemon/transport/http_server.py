@@ -3814,6 +3814,8 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                             _t0 = time.monotonic()
                             await asyncio.sleep(_pause)
                             _pauses_faites += time.monotonic() - _t0
+                        else:
+                            await asyncio.sleep(0)
                 if not unpublish_ok:
                     _defer_discovery_unpublish(pending_discovery_unpublish, eq_id, entity_type, node_ids=node_ids)
                     supprimer_errors += 1
@@ -3998,6 +4000,8 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 t0 = time.monotonic()
                 await asyncio.sleep(pause)
                 _pauses_faites += time.monotonic() - t0
+            else:
+                await asyncio.sleep(0)
 
         async def _delai_sans_deadline() -> None:
             if deadline_s is None:

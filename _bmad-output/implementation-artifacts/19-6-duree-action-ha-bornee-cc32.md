@@ -649,6 +649,15 @@ changent).
   (`MARGE_MESURE=1.5` × `MACHINE_FACTOR=3.0`), MQTT et `c_eq`/`c_parc` mesurés
   dans le chemin réel (vrai `DiscoveryPublisher`, vrai `MapperRegistry`) ;
   `N_max` (parc typique multi-capteurs, 90% de l'enveloppe) mesuré à 513.
+  2e tour de revue (Codex P1, PR #189, 2026-09-30) : le vrai « Publier »
+  exécute aussi `publish_click_states()` (état au clic, un appel MQTT par
+  candidat streamé) — coût désormais mesuré dans le chemin réel via un vrai
+  `StateSynchronizer` branché sur le faux pont MQTT à latence, avec
+  `current_values` transmis comme le relais PHP. Appels MQTT par équipement
+  multi-capteurs mesurés : 3 discovery + 2 état = 5 (la disponibilité locale
+  n'ajoute aucun appel dans ce fixture). `N_max` recalculé à ~301-309
+  (mesures 2026-09-30, variance de mesure entre `test_ac7_couts_mesures_et_enveloppe_respectee`
+  et `test_ac7_parc_typique_90_pct_enveloppe_sous_deadline`).
 
 ### Completion Notes List
 
@@ -858,3 +867,9 @@ changent).
   superflue) ; documentation utilisateur corrigée (le démon ne s'arrête
   jamais, message AC8, taille supportée `N_max`) ; Debug Log Reference AC6
   corrigée (aiohttp `3.8.4` testé sur la VM, comportement brut non observé).
+- 2026-09-30 — unité F (2e tour de revue PR #189, Codex) : cession de la
+  main via `asyncio.sleep(0)` quand la pause de lissage vaut 0 (plafond
+  consommé), pour ne plus bloquer `/system/status` pendant une longue
+  action ; test de charge AC7 exerce désormais `publish_click_states()`
+  (vrai `StateSynchronizer`, `current_values` transmis) ; `N_max` recalculé
+  à ~301-309 (5 appels MQTT/équipement au lieu de 3).

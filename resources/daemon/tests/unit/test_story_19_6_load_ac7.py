@@ -24,6 +24,7 @@ Scénarios lourds -> marqueur `load`, exclus de la suite par défaut (voir pypro
 from __future__ import annotations
 
 import time
+from typing import Optional
 
 import pytest
 
@@ -33,6 +34,7 @@ from models.topology import EligibilityResult, JeedomCmd, JeedomEqLogic, JeedomO
 from mapping.registry import MapperRegistry
 from cache.disk_cache import save_publications_cache
 from discovery.publisher import DiscoveryPublisher
+from sync.state import StateSynchronizer
 import transport.http_server as http_server
 from transport import action_pacing
 
@@ -152,20 +154,29 @@ def test_ac7_couts_mesures_et_enveloppe_respectee(tmp_path):
     print(f"\n[AC7] c_eq_mesure={c_eq_mesure:.6f}s c_parc_mesure={c_parc_mesure:.6f}s "
           f"c_eq={c_eq:.6f}s c_parc={c_parc:.6f}s c_mqtt={c_mqtt:.6f}s")
 
+    # Revue Codex P1 (PR #189, 2e tour) : le vrai « Publier » exécute aussi
+    # `publish_click_states()` (état au clic) pour chaque candidat streamé (les 2 sensors
+    # secondaires du dimmer multi-capteurs ; le light principal n'est pas streamé, cf.
+    # `StateSynchronizer.streams_actionable_type`). Appels MQTT par équipement mesurés
+    # (test_ac7_parc_typique_90_pct_enveloppe_sous_deadline, faux pont MQTT réel) = 3
+    # discovery + 2 état = 5 (la disponibilité locale n'ajoute aucun appel ici : fixture
+    # sans `local_availability_supported`).
+    APPELS_MQTT_PAR_EQUIPEMENT = 5
+
     # Scénario mixte à la frontière : portée courante (30/09 : 94 évalués sur 292, 3 entités
     # HA par équipement multi-capteurs) + un grand parc (1000) dont 1 seul équipement cible.
-    appels_mqtt, eq_portee, eq_parc = 94 * 3, 94, 1000
+    appels_mqtt, eq_portee, eq_parc = 94 * APPELS_MQTT_PAR_EQUIPEMENT, 94, 1000
     cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
     assert cout <= budget_travail, f"enveloppe dépassée (mixte): {cout:.3f}s > {budget_travail}s"
 
     # Petite portée sur très grand inventaire (parc dominant).
-    appels_mqtt, eq_portee, eq_parc = 3, 1, 5000
+    appels_mqtt, eq_portee, eq_parc = APPELS_MQTT_PAR_EQUIPEMENT, 1, 5000
     cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
     assert cout <= budget_travail, f"enveloppe dépassée (grand inventaire): {cout:.3f}s > {budget_travail}s"
 
     # N_max : parc typique (équipement multi-capteurs, 3 entités HA/équipement) à 90% de
     # l'enveloppe -> calculé à partir des coûts mesurés ci-dessus.
-    n_max = int((0.90 * budget_travail) / (3 * c_mqtt + c_eq + c_parc))
+    n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
     print(f"[AC7] N_max (parc typique multi-capteurs, 90% enveloppe) = {n_max}")
     assert n_max > 0
 
@@ -218,7 +229,24 @@ def _build_app(n: int, n_inclus: int, tmp_path) -> tuple:
     app["mappings"] = mappings
     app["publications"] = publications
     app["data_dir"] = str(tmp_path)
+    # Revue Codex P1 (PR #189, 2e tour) : un vrai `StateSynchronizer` branché sur le faux
+    # pont MQTT, pour que `publish_click_states()` (état au clic) soit exercé et compté
+    # comme dans le vrai « Publier », pas seulement la découverte.
+    app["state_synchronizer"] = StateSynchronizer(app, bridge)
     return app, bridge
+
+
+def _current_values_for(n_inclus: int) -> dict:
+    """Une valeur `current_values` par commande info de chaque équipement inclus (Etat,
+    Puissance, Consommation), comme le relais PHP réel au clic « Publier »."""
+    values: dict = {}
+    for i in range(n_inclus):
+        eq_id = 100 + i
+        base = eq_id * 100
+        values[base + 3] = "1"  # Etat (LIGHT_STATE)
+        values[base + 5] = 42  # Puissance (POWER)
+        values[base + 6] = 3.5  # Consommation (CONSUMPTION)
+    return values
 
 
 @pytest.fixture
@@ -228,13 +256,12 @@ def cli_factory(aiohttp_client):
     return _make
 
 
-async def _run_publier(cli, deadline_s: float = 55.0):
+async def _run_publier(cli, deadline_s: float = 55.0, current_values: Optional[dict] = None):
     start = time.perf_counter()
-    response = await cli.post(
-        "/action/execute",
-        json={"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": deadline_s},
-        headers=VALID_HEADERS,
-    )
+    payload = {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": deadline_s}
+    if current_values:
+        payload["current_values"] = current_values
+    response = await cli.post("/action/execute", json=payload, headers=VALID_HEADERS)
     duration = time.perf_counter() - start
     return response, duration
 
@@ -249,8 +276,9 @@ async def test_ac7_rejeu_mesure_30_09_sous_deadline(cli_factory, tmp_path):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
-        response, duration = await _run_publier(cli)
-    print(f"\n[AC7] mesure 30/09 (292/94) : duration={duration:.3f}s appels_mqtt={bridge.call_count}")
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n_pause))
+    print(f"\n[AC7] mesure 30/09 (292/94) : duration={duration:.3f}s appels_mqtt={bridge.call_count} "
+          f"(par équipement={bridge.call_count / n_pause:.2f})")
     assert response.status == 200
     assert duration < 55.0
 
@@ -263,7 +291,7 @@ async def test_ac7_petite_portee_grand_inventaire_sous_deadline(cli_factory, tmp
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
-        response, duration = await _run_publier(cli)
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n_inclus))
     print(f"\n[AC7] petite portée / grand inventaire (1/5000) : duration={duration:.3f}s appels_mqtt={bridge.call_count}")
     assert response.status == 200
     assert duration < 55.0
@@ -277,7 +305,7 @@ async def test_ac7_scenario_mixte_sous_deadline(cli_factory, tmp_path):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
-        response, duration = await _run_publier(cli)
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n_inclus))
     print(f"\n[AC7] scénario mixte (94/1000) : duration={duration:.3f}s appels_mqtt={bridge.call_count}")
     assert response.status == 200
     assert duration < 55.0
@@ -291,15 +319,21 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
     c_parc = _measure_c_parc(500, str(tmp_path)) * MARGE_MESURE * MACHINE_FACTOR
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
     budget_travail = action_pacing.budget_travail(55.0)
-    n_max = int((0.90 * budget_travail) / (3 * c_mqtt + c_eq + c_parc))
+    # Revue Codex P1 (PR #189, 2e tour) : appels MQTT par équipement multi-capteurs = 3
+    # discovery (light + 2 sensors) + 2 état au clic (les 2 sensors streamés ; le light
+    # n'est pas streamé, cf. StateSynchronizer.streams_actionable_type) ; la disponibilité
+    # locale n'est pas publiée ici (`local_availability_supported` absent du fixture, comme
+    # en discovery seule) et n'ajoute donc aucun appel supplémentaire mesuré.
+    APPELS_MQTT_PAR_EQUIPEMENT = 5
+    n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
     assert n_max > 0
 
     app, bridge = _build_app(n_max, n_max, tmp_path)
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
-        response, duration = await _run_publier(cli)
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n_max))
     print(f"\n[AC7] parc typique à 90% enveloppe : N_max={n_max} duration={duration:.3f}s "
-          f"appels_mqtt={bridge.call_count}")
+          f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n_max:.2f})")
     assert response.status == 200
     assert duration < 55.0

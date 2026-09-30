@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -449,3 +450,114 @@ async def test_publier_equipement_non_mappable_apres_le_dernier_sans_pause(cli_f
 
     assert response.status == 200
     sleep_mock.assert_not_awaited()
+
+
+# --- Revue Codex P2 (PR #189, 2e tour) : plafond épuisé -> cession de la main quand même ---
+
+
+@pytest.mark.asyncio
+async def test_publier_plafond_epuise_cede_la_main(cli_factory):
+    """Une fois le plafond consommé, `prochaine_pause` renvoie 0 : le démon doit quand même
+    céder la main via `asyncio.sleep(0)`, sans quoi la boucle aiohttp reste monopolisée par
+    une longue action et un `/system/status` concurrent est servi en retard ou pas du tout."""
+    app = _build_app(5)
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    sleep_mock = AsyncMock()
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.http_server.asyncio.sleep", sleep_mock
+    ), patch("transport.action_pacing.prochaine_pause", return_value=0.0):
+        response = await _post_action(
+            cli, {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+
+    assert response.status == 200
+    # 5 équipements, la dernière itération jamais de pause -> 4 points de coopération, tous à
+    # une pause nulle mais chacun cède quand même la main (sleep(0)).
+    assert sleep_mock.await_count == 4
+    sleep_mock.assert_any_await(0)
+
+
+@pytest.mark.asyncio
+async def test_supprimer_plafond_epuise_cede_la_main(cli_factory):
+    app = _build_app(5)
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    sleep_mock = AsyncMock()
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.http_server.asyncio.sleep", sleep_mock
+    ), patch("transport.action_pacing.prochaine_pause", return_value=0.0):
+        response = await _post_action(
+            cli, {"intention": "supprimer", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+
+    assert response.status == 200
+    assert sleep_mock.await_count == 4
+    sleep_mock.assert_any_await(0)
+
+
+@pytest.mark.asyncio
+async def test_publier_plafond_epuise_status_concurrent_servi_pendant_action(cli_factory):
+    """Intégration : pendant une action « publier » dont le plafond est épuisé, une requête
+    GET /system/status concurrente doit être servie avant la fin de l'action (pas de blocage
+    de la boucle aiohttp faute de point de coopération)."""
+    app = _build_app(30)
+    app["mqtt_bridge"].state = "connected"
+    app["mqtt_bridge"].broker_info = "localhost:1883"
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    order = []
+
+    async def do_action():
+        resp = await _post_action(
+            cli, {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+        order.append("action")
+        return resp
+
+    async def do_status():
+        resp = await cli.get("/system/status", headers=VALID_HEADERS)
+        order.append("status")
+        return resp
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.action_pacing.prochaine_pause", return_value=0.0
+    ):
+        action_resp, status_resp = await asyncio.gather(do_action(), do_status())
+
+    assert action_resp.status == 200
+    assert status_resp.status == 200
+    assert order[0] == "status"
+
+
+@pytest.mark.asyncio
+async def test_supprimer_plafond_epuise_status_concurrent_servi_pendant_action(cli_factory):
+    app = _build_app(30)
+    app["mqtt_bridge"].state = "connected"
+    app["mqtt_bridge"].broker_info = "localhost:1883"
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    order = []
+
+    async def do_action():
+        resp = await _post_action(
+            cli, {"intention": "supprimer", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+        order.append("action")
+        return resp
+
+    async def do_status():
+        resp = await cli.get("/system/status", headers=VALID_HEADERS)
+        order.append("status")
+        return resp
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
+        "transport.action_pacing.prochaine_pause", return_value=0.0
+    ):
+        action_resp, status_resp = await asyncio.gather(do_action(), do_status())
+
+    assert action_resp.status == 200
+    assert status_resp.status == 200
+    assert order[0] == "status"
