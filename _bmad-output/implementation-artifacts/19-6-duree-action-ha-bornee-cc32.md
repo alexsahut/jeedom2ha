@@ -175,17 +175,28 @@ preuve terrain
 
 **Given** une action (`publier` ou `supprimer`) qui porte `deadline_s`
 **When** le démon traite les équipements de la portée un par un
-**Then** le délai entre deux équipements devient
+**Then** la pause qui suit un équipement devient
 `min(_action_delay, max(0, (deadline_s - écoulé - reserve_travail) /
-équipements_restants))`, où `_action_delay` est la formule actuelle (Décision
-8) et `écoulé` le temps déjà passé depuis le début de l'action
-**And** `reserve_travail` est estimée en continu à partir du travail
-réellement mesuré depuis le début de l'action (durée moyenne par équipement
-observée × équipements restants) — une mesure, pas un coefficient fixe ;
-tant que peu d'équipements ont été mesurés, l'estimation prend le maximum de
-la moyenne observée et d'une valeur a priori prudente (constante nommée), pour
-ne pas sous-estimer le travail restant au démarrage d'un grand parc (test
-dédié)
+pauses_restantes))`, où `_action_delay` est la formule actuelle (Décision 8),
+`écoulé` le temps déjà passé depuis le début de l'action et `pauses_restantes`
+le nombre de pauses encore à faire, **y compris celle-ci** (toujours ≥ 1)
+**And** aucune pause n'est faite après le dernier équipement traité : la
+dernière itération ne divise jamais par zéro (revue Codex P2, `472c372`) ;
+un test couvre explicitement la dernière itération, pour publier et pour
+supprimer
+**And** `reserve_travail` = publications MQTT **restantes, précomptées** ×
+coût unitaire prudent. Le précompte vient de ce que le démon connaît déjà en
+mémoire pour chaque équipement restant de la portée (candidats de son dernier
+mapping : principal et `additional_mappings` ; `node_id` à dépublier pour
+supprimer), à défaut 1 par équipement. Le coût unitaire est le **maximum**,
+pendant toute l'action, du coût observé par publication et d'une valeur a
+priori prudente (constante nommée, validée par le test de charge d'AC7) —
+jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
+équipements légers en tête font consommer le budget en pauses avant les
+équipements lourds de fin de portée)
+**And** un test place les équipements les plus coûteux (multi-candidats,
+nombreux `node_id`) **en fin de portée** et vérifie que la réponse arrive
+avant `deadline_s` pour un volume égal à la taille supportée d'AC7
 (répond au P2 de Codex sur le travail par équipement variable : secondaires,
 `node_id` de dépublication)
 **And** sans `deadline_s` (appelant redémarrage, ou tout autre appelant qui
@@ -274,7 +285,13 @@ déconnexion client pendant un handler long, avec la version d'aiohttp
 effectivement installée (`pyproject.toml` ne pin pas de version — noter la
 version testée dans le rapport de dev-story)
 **And** le résultat (poursuite ou annulation) est documenté dans les Dev
-Notes et piloté par ce constat, pas supposé.
+Notes et piloté par ce constat, pas supposé
+**And** si le handler est annulé à la déconnexion, l'exécution de l'action
+est **protégée** (par exemple `asyncio.shield` d'une tâche qui porte toute
+l'action) pour qu'elle aille au bout, conformément à AC1bis et à AC5 ; un
+test vérifie qu'une action dont le client s'est déconnecté publie bien tous
+ses équipements (revue Codex P1, `472c372`). L'état partiel n'est pas un
+résultat acceptable.
 
 **AC7 — Taille de parc supportée mesurée, en publications MQTT**
 
@@ -553,6 +570,11 @@ changent).
   couvrant le pire des deux chemins (statut préalable, lecture au clic, `R`,
   puis réalignement ou second statut) ; AC5 : second `GET /system/status`
   après l'échec pour le diagnostic.
+- **Revue Codex, 6e tour (`472c372`)** — pause finale supprimée et
+  dénominateur = pauses restantes (P2) ; travail restant précompté en
+  publications MQTT à coût unitaire non décroissant, test avec les
+  équipements lourds en fin de portée (P1) ; exécution protégée si aiohttp
+  annule le handler, état partiel refusé (P1).
 
 ### File List
 
@@ -568,3 +590,5 @@ changent).
   lissage borné par une échéance donnée au démon, option (a) abandonnée.
 - 2026-09-30 — relecture ClaudeBox de (b′) (doublon (c), estimation au
   démarrage, délai du client sur le pire chemin, second statut en AC5).
+- 2026-09-30 — revue Codex 6e tour (pause finale, précompte du travail,
+  exécution protégée).
