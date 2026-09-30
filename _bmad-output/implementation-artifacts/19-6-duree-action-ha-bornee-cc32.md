@@ -140,8 +140,8 @@ option synchrone est bornée par la pile web de la box (`Timeout 300`
 d'Apache) : un budget fixe est donc inévitable, et un parc dont le travail
 pur dépasse ce budget le dépassera malgré la compression du lissage (AC5).
 L'option (b′) ne promet pas « jamais » : elle fixe une **taille de parc
-supportée**, mesurée par un test de charge (AC7) et déclarée en nombre de
-publications MQTT (candidats et `node_id`), pas en N d'équipements — cela
+supportée**, mesurée par un test de charge (AC7) et déclarée en nombre total
+d'appels MQTT de l'action (tous chemins), pas en N d'équipements — cela
 répond au P2 de Codex sur le travail par équipement variable. Au-delà, le
 message juste d'AC5 s'applique. Seule l'option (c) lèverait cette limite ;
 elle changerait l'UX et reviendrait à Alex si les parcs du Market
@@ -336,12 +336,15 @@ pas comprimer le travail pur (publication MQTT elle-même)
 **When** un test de charge du démon simule un parc avec un faux MQTT à
 latence réaliste et des équipements multi-candidats (secondaires, plusieurs
 `node_id` par équipement)
-**Then** le test mesure la taille de parc supportée en **nombre de
-publications MQTT** (candidats et `node_id` traités), pas en nombre
-d'équipements — cela répond au P2 de Codex sur le travail par équipement
-variable
+**Then** le test mesure la taille de parc supportée en **nombre total
+d'appels MQTT de l'action** (`publish_message`, sur tous les chemins :
+discovery des candidats, état au clic, disponibilité, dépublication de chaque
+`node_id` ou de repli, nettoyages rejoués), pas en nombre d'équipements — la
+même unité que le précompte d'AC1bis (revue Codex P1, `a1a8514`)
 **And** cette taille est figée par le test avec une marge explicite, et
 déclarée dans la story et dans la documentation utilisateur
+(`docs/fr_FR/index.md`), traduite en un ordre de grandeur lisible pour un
+utilisateur (par exemple un nombre d'équipements typiques)
 **And** le test rejoue la mesure du 30/09 (N total = 292, N évalués = 94,
 environ 11 s) et vérifie qu'elle tient bien sous `R` (60 s)
 **And** un test simule un grand parc (par exemple 1 000 équipements
@@ -473,7 +476,9 @@ changent).
   - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste,
     équipements multi-candidats ; rejoue le couple mesuré (292, 94, ~11 s) et
     un grand parc simulé (par exemple 1 000 équipements) ; déclare la taille
-    de parc supportée en publications MQTT, avec une marge explicite.
+    de parc supportée en nombre total d'appels MQTT, avec une marge explicite.
+  - [ ] Documentation utilisateur : ajouter la taille supportée et le message
+    d'AC5 dans `docs/fr_FR/index.md` (revue Codex P2, `a1a8514`).
 
 - [ ] Task 3bis — Sérialisation des actions (AC8)
   - [ ] Verrou unique des actions `publier`/`supprimer` dans le démon, refus
@@ -549,7 +554,8 @@ changent).
   [À MODIFIER], `resources/daemon/transport/http_server.py` [À MODIFIER —
   lecture de `deadline_s`, compression du lissage AC1bis], tests PHP/JS/démon
   [NOUVEAU], test d'intégration démon (AC6) [NOUVEAU], test de charge (AC7)
-  [NOUVEAU].
+  [NOUVEAU], `docs/fr_FR/index.md` [À MODIFIER — taille supportée, message
+  d'AC5].
 
 ### References
 
@@ -628,6 +634,9 @@ changent).
 - **Revue Codex, 9e tour (`f378ceb`)** — supprimer compte max(1, `node_id`)
   (dépublication mono-entité de repli) ; règle générale : précompte ≥ appels
   réels sur chaque chemin, vérifiée par le test du faux MQTT (P1).
+- **Revue Codex, 10e tour (`a1a8514`)** — taille supportée mesurée en appels
+  MQTT totaux, même unité que le précompte (P1) ; documentation utilisateur
+  `docs/fr_FR/index.md` planifiée (P2).
 
 ### File List
 
@@ -648,3 +657,4 @@ changent).
 - 2026-09-30 — revue Codex 7e tour (borne du précompte, AC8 sérialisation).
 - 2026-09-30 — revue Codex 8e tour (précompte de tous les appels MQTT).
 - 2026-09-30 — revue Codex 9e tour (max(1, node_id), règle générale du précompte).
+- 2026-09-30 — revue Codex 10e tour (unité de la taille supportée, doc utilisateur).
