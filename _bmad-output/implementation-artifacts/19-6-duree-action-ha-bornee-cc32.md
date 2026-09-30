@@ -246,10 +246,20 @@ vérifie qu'il dépasse strictement le pire des deux chemins.
 **AC3 — Non-régression détectée en quelques secondes, pas au bout de `R`**
 
 **Given** un appel `/action/execute` (n'importe quelle portée)
-**When** le relais PHP s'apprête à appeler `callDaemon`
+**When** le relais PHP traite le clic, **avant** la lecture des valeurs au
+clic (`_jeedom2ha_collect_click_values`)
 **Then** il fait d'abord un `GET /system/status` (3 s, une tentative) : un
 démon injoignable est ainsi signalé en quelques secondes, avec le message
 actuel, sans attendre `R` (60 s)
+**And** l'ordre est imposé : statut, puis lecture au clic, puis `callDaemon`.
+La sonde ne s'intercale jamais entre la lecture et l'action : un évènement
+Jeedom reçu pendant la sonde serait antérieur à `fresh_since`
+(`http_server.py:3573-3576`, `sync/state.py:245-248`) et la valeur lue au
+clic, plus ancienne, l'écraserait dans HA (revue Codex P1, `2cd9428`). Un
+test PHP vérifie cet ordre. La fenêtre résiduelle reste celle de l'AC8 de la
+Story 19.5 (entre la lecture au clic et la réception de la requête par le
+démon), bornée par la durée de la lecture (quelques millisecondes en temps
+normal, 10 s au plus, AC2) : déclarée, non traitée
 **And** écart déclaré : un démon qui répond au statut mais se bloque ensuite
 n'est signalé qu'au bout de `R` (couvert par AC5)
 **And** pour un petit parc, le comportement observable reste inchangé
@@ -467,7 +477,8 @@ changent).
     (`jeedom2ha.ajax.php:764`) pour `intention = publier` et
     `intention = supprimer`, avec `deadline_s` dans le corps de la requête.
   - [ ] Pré-vérification `GET /system/status` (3 s, une tentative) avant
-    l'action (AC3), pour distinguer démon injoignable / vrai dépassement.
+    la lecture au clic (AC3, ordre testé), pour signaler vite un démon
+    injoignable.
   - [ ] Démon : lecture de `deadline_s` sur `/action/execute`, plafond des
     pauses cumulées (AC1bis) dans les deux branches Publier
     (`:3881`) et Supprimer (`:3724`), sans changer le comportement sans
@@ -695,6 +706,10 @@ changent).
   `deadline_s` (P1) ; marge de réveil des pauses `marge_reveil` et
   `budget_travail = deadline_s - plafond_pauses - marge_reveil`, testée par
   un sommeil en retard (P2).
+- **Revue Codex, 16e tour (`2cd9428`)** — AC3 : la sonde de statut précède
+  la lecture au clic (ordre testé), pour qu'un évènement reçu pendant la
+  sonde ne soit pas écrasé par une valeur plus ancienne (P1) ; fenêtre
+  résiduelle de l'AC8 de 19.5 bornée par la durée de la lecture, déclarée.
 
 ### File List
 
@@ -723,3 +738,4 @@ changent).
 - 2026-09-30 — revue Codex 14e tour (enveloppe conjointe, assertions sur
   `deadline_s`, garantie bornée à l'enveloppe).
 - 2026-09-30 — revue Codex 15e tour (coût du parc entier, marge de réveil).
+- 2026-09-30 — revue Codex 16e tour (AC3 : sonde avant la lecture au clic).
