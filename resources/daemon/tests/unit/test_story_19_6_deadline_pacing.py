@@ -329,7 +329,10 @@ async def test_publier_derniere_iteration_sans_pause(cli_factory):
         )
 
     assert response.status == 200
-    assert sleep_mock.await_count == 2  # 3 équipements à pause, la dernière supprimée
+    # Revue Codex P2 (PR #189, 3e tour) : chaque itération cède aussi la main en tête de
+    # boucle (asyncio.sleep(0), non compté dans les pauses) -> 3 cessions de tête + 2
+    # pauses de lissage (la dernière itération jamais de pause) = 5.
+    assert sleep_mock.await_count == 5
 
 
 @pytest.mark.asyncio
@@ -347,7 +350,7 @@ async def test_supprimer_derniere_iteration_sans_pause(cli_factory):
         )
 
     assert response.status == 200
-    assert sleep_mock.await_count == 2
+    assert sleep_mock.await_count == 5
 
 
 # --- AC1 : ligne de journal présente ---
@@ -449,7 +452,11 @@ async def test_publier_equipement_non_mappable_apres_le_dernier_sans_pause(cli_f
         )
 
     assert response.status == 200
-    sleep_mock.assert_not_awaited()
+    # Revue Codex P2 (PR #189, 3e tour) : eq 101 (sauté) cède quand même la main en tête
+    # d'itération (sleep(0), non compté dans les pauses) -> 2 cessions de tête, aucune pause
+    # de lissage (eq 100 est le premier ET le dernier à travailler).
+    assert sleep_mock.await_count == 2
+    sleep_mock.assert_any_await(0)
 
 
 # --- Revue Codex P2 (PR #189, 2e tour) : plafond épuisé -> cession de la main quand même ---
@@ -473,9 +480,11 @@ async def test_publier_plafond_epuise_cede_la_main(cli_factory):
         )
 
     assert response.status == 200
-    # 5 équipements, la dernière itération jamais de pause -> 4 points de coopération, tous à
-    # une pause nulle mais chacun cède quand même la main (sleep(0)).
-    assert sleep_mock.await_count == 4
+    # 5 équipements, la dernière itération jamais de pause -> 4 points de coopération de
+    # lissage, tous à une pause nulle mais chacun cède quand même la main (sleep(0)).
+    # Revue Codex P2 (PR #189, 3e tour) : + 5 cessions de tête d'itération (une par
+    # équipement, non comptées dans les pauses) = 9.
+    assert sleep_mock.await_count == 9
     sleep_mock.assert_any_await(0)
 
 
@@ -494,7 +503,7 @@ async def test_supprimer_plafond_epuise_cede_la_main(cli_factory):
         )
 
     assert response.status == 200
-    assert sleep_mock.await_count == 4
+    assert sleep_mock.await_count == 9
     sleep_mock.assert_any_await(0)
 
 
@@ -525,6 +534,73 @@ async def test_publier_plafond_epuise_status_concurrent_servi_pendant_action(cli
     with patch("transport.http_server.DiscoveryPublisher", return_value=publisher), patch(
         "transport.action_pacing.prochaine_pause", return_value=0.0
     ):
+        action_resp, status_resp = await asyncio.gather(do_action(), do_status())
+
+    assert action_resp.status == 200
+    assert status_resp.status == 200
+    assert order[0] == "status"
+
+
+# --- Revue Codex P2 (PR #189, 3e tour) : grande portée surtout ignorée -> cession de la
+# main aussi sur les itérations sautées (sans dépendre du plafond des pauses) ---
+
+
+@pytest.mark.asyncio
+async def test_publier_grande_portee_ignoree_status_concurrent_servi_pendant_action(cli_factory):
+    """500 équipements, dont 1 seul inclus/publiable : les 499 autres sont ignorés (exclus
+    du scope, jamais publiés) et, avant ce correctif, ne cédaient jamais la main. Un
+    `GET /system/status` concurrent doit être servi avant la fin de l'action."""
+    app = _build_app(500, 1)
+    app["mqtt_bridge"].state = "connected"
+    app["mqtt_bridge"].broker_info = "localhost:1883"
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    order = []
+
+    async def do_action():
+        resp = await _post_action(
+            cli, {"intention": "publier", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+        order.append("action")
+        return resp
+
+    async def do_status():
+        resp = await cli.get("/system/status", headers=VALID_HEADERS)
+        order.append("status")
+        return resp
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher):
+        action_resp, status_resp = await asyncio.gather(do_action(), do_status())
+
+    assert action_resp.status == 200
+    assert status_resp.status == 200
+    assert order[0] == "status"
+
+
+@pytest.mark.asyncio
+async def test_supprimer_grande_portee_ignoree_status_concurrent_servi_pendant_action(cli_factory):
+    """500 équipements, dont 1 seul inclus/publié : les 499 autres ne sont pas publiés dans
+    HA (skip immédiat) et, avant ce correctif, ne cédaient jamais la main."""
+    app = _build_app(500, 1)
+    app["mqtt_bridge"].state = "connected"
+    app["mqtt_bridge"].broker_info = "localhost:1883"
+    cli = await cli_factory(app)
+    publisher = _publisher_mock()
+    order = []
+
+    async def do_action():
+        resp = await _post_action(
+            cli, {"intention": "supprimer", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+        )
+        order.append("action")
+        return resp
+
+    async def do_status():
+        resp = await cli.get("/system/status", headers=VALID_HEADERS)
+        order.append("status")
+        return resp
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher):
         action_resp, status_resp = await asyncio.gather(do_action(), do_status())
 
     assert action_resp.status == 200

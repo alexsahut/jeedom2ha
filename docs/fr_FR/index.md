@@ -261,9 +261,20 @@ Vos overrides peuvent être exportés dans un **profil partageable** :
 Les actions groupées (Publier / Supprimer une sélection) ont une durée bornée côté relais,
 pas côté démon : **le démon n'arrête jamais son travail**. C'est le relais qui cesse
 d'attendre après 60 s et répond au navigateur ; l'action se poursuit côté démon jusqu'à sa
-fin réelle, quel que soit le temps que cela prend. Ce budget a été dimensionné et mesuré
-pour un parc typique d'équipements multi-capteurs à hauteur d'environ **300 équipements**
-(estimation prudente mesurée hors de la box, à confirmer par la mesure sur la box).
+fin réelle, quel que soit le temps que cela prend.
+
+La taille supportée s'exprime d'abord en **appels MQTT par action** (le budget de travail
+divisé par le coût mesuré d'un appel MQTT, de l'ordre du millier d'appels), puisque c'est le
+poste dominant. Traduit en équipements typiques (environ 5 appels MQTT par équipement en
+publication — découverte + état au clic), ce budget correspond à un parc d'environ **300
+équipements** (estimation prudente mesurée hors de la box, à confirmer par la mesure sur la
+box). Un retypage (un équipement déjà publié change de type d'entité HA, principal ou
+secondaire) coûte davantage par équipement que cette hypothèse : mesuré à **10 appels MQTT
+par équipement** (dépublication de l'ancien type puis nouvelle découverte), soit deux fois
+la publication initiale. Une suppression d'équipements multi-entités (un dimmer avec ses
+capteurs secondaires, par exemple) coûte environ **3 appels MQTT par équipement** mesurés —
+moins qu'une publication, mais à garder en tête pour dimensionner une sélection dominée par
+ce type d'équipement.
 
 Si l'action ne se termine pas dans ce délai (parc inhabituellement volumineux, démon
 ralenti), le message suivant apparaît :

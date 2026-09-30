@@ -565,6 +565,11 @@ changent).
 
 - La Décision 8 (lissage post-redémarrage) reste inchangée par construction :
   l'appelant redémarrage ne transmet jamais `deadline_s`.
+- Résiduel déclaré (AC2, revue Codex P2, PR #189, 3e tour) : un appel individuel au cœur
+  Jeedom (`cmd::byEqLogicId`, `getCache`) est synchrone et non interruptible en PHP sans
+  refonte — l'échéance de `_jeedom2ha_collect_click_values` n'est vérifiée qu'entre deux
+  appels, et la marge du délai client (14 s, 90 s contre un pire chemin de 76 s) couvre ce
+  résidu.
 - Ne pas introduire de flux asynchrone/polling (option (c)) sans validation
   explicite d'Alex — hors périmètre de cette story.
 - Le démon **n'interrompt jamais** une action en cours pour tenir
@@ -801,6 +806,24 @@ changent).
   (×3) et `c_mqtt` (5 ms/appel) sont déclarés par prudence plutôt que
   mesurés en conditions réelles — à confronter à la preuve terrain (Task 4,
   hors scope de cette session).
+- **Unité G (3e tour de revue PR #189, Codex)** — 2026-09-30 — trois points :
+  (1) cession de la main (`asyncio.sleep(0)`) ajoutée en tête de chaque
+  itération des boucles Publier/Supprimer, y compris les équipements sautés
+  (ignorés, inclus non mappables, ou non publiés), pour qu'un grand parc
+  surtout ignoré ne monopolise pas la boucle aiohttp ; deux nouveaux tests
+  d'intégration vérifient qu'un `GET /system/status` concurrent est servi
+  avant la fin d'une action sur une portée à 499/500 équipements ignorés
+  (P2). (2) deux scénarios de charge ajoutés à `test_story_19_6_load_ac7.py` :
+  « Supprimer » sur des équipements multi-`node_id` (94 équipements, mesuré
+  3,00 appels MQTT/équipement) et « Publier » avec retypage du principal et
+  des secondaires (94 équipements, mesuré 10,00 appels MQTT/équipement, deux
+  fois le coût d'une publication initiale) — les deux sous `deadline_s` ;
+  documentation utilisateur corrigée pour exprimer la taille supportée en
+  appels MQTT par action d'abord, puis en équipements typiques, avec les
+  coûts mesurés du retypage et de la suppression multi-entités (P1). (3)
+  résiduel PHP déclaré (AC2, sans code) : un appel individuel au cœur Jeedom
+  reste non interruptible en synchrone, couvert par la marge du délai client
+  (14 s) (P2).
 
 ### File List
 
@@ -873,3 +896,9 @@ changent).
   action ; test de charge AC7 exerce désormais `publish_click_states()`
   (vrai `StateSynchronizer`, `current_values` transmis) ; `N_max` recalculé
   à ~301-309 (5 appels MQTT/équipement au lieu de 3).
+- 2026-09-30 — unité G (3e tour de revue PR #189, Codex) : cession de la
+  main aussi sur les itérations sautées (ignorées/non mappables/non
+  publiées) ; deux scénarios de charge mesurant les chemins MQTT plus
+  coûteux (suppression multi-`node_id` : 3,00 appels/équipement ; publier
+  avec retypage : 10,00 appels/équipement) et documentation utilisateur
+  corrigée en conséquence ; résiduel PHP (AC2) déclaré sans code.

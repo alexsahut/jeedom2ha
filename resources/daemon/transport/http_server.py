@@ -3784,10 +3784,15 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             )
             _pauses_faites = 0.0
             _pauses_index = 0
-    
+
             for eq_id in eq_ids:
+                # Revue Codex P2 (PR #189, 3e tour) : céder la main aussi sur les itérations
+                # sautées (ignoré), pas comptée dans `_pauses_faites` — sinon un grand parc
+                # surtout ignoré monopolise la boucle aiohttp sans jamais y passer.
+                if deadline_s is not None:
+                    await asyncio.sleep(0)
                 previous_decision = publications.get(eq_id)
-    
+
                 if not _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish):
                     skips += 1
                     continue
@@ -4008,6 +4013,12 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 await asyncio.sleep(_action_delay)
 
         for eq_id in eq_ids:
+            # Revue Codex P2 (PR #189, 3e tour) : céder la main aussi sur les itérations
+            # sautées (ignoré, inclus non mappable, ou non publié), pas comptée dans
+            # `_pauses_faites` — sinon un grand parc surtout ignoré monopolise la boucle
+            # aiohttp sans jamais y passer.
+            if deadline_s is not None:
+                await asyncio.sleep(0)
             scope_entry = scope_entries.get(eq_id)
             previous_decision = publications.get(eq_id)
             evaluation = _evaluate_for_action(

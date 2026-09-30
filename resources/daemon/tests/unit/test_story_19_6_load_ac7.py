@@ -23,6 +23,7 @@ Scénarios lourds -> marqueur `load`, exclus de la suite par défaut (voir pypro
 
 from __future__ import annotations
 
+import dataclasses
 import time
 from typing import Optional
 
@@ -335,5 +336,72 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
         response, duration = await _run_publier(cli, current_values=_current_values_for(n_max))
     print(f"\n[AC7] parc typique à 90% enveloppe : N_max={n_max} duration={duration:.3f}s "
           f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n_max:.2f})")
+    assert response.status == 200
+    assert duration < 55.0
+
+
+# --- Revue Codex P1 (PR #189, 3e tour) : chemins MQTT plus coûteux que l'hypothèse
+# « 5 appels/équipement » de l'enveloppe AC7 (multi-`node_id` et retypage) ---
+
+
+@pytest.mark.asyncio
+async def test_ac7_supprimer_multi_node_id_sous_deadline(cli_factory, tmp_path):
+    """« Supprimer » sur des équipements multi-`node_id` (dimmer + 2 sensors, Story 11.4) :
+    chaque équipement dépublié porte 3 node_ids (principal + 2 secondaires), donc plus
+    d'appels MQTT par équipement qu'un mono-entité. L'enveloppe AC7 reste juste car
+    exprimée en appels MQTT réels, pas en équipements : ce test compte les appels réels via
+    le vrai `DiscoveryPublisher` + faux pont MQTT à latence, et vérifie `duree < deadline_s`."""
+    n = 94
+    app, bridge = _build_app(n, n, tmp_path)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
+        cli = await cli_factory(app)
+        start = time.perf_counter()
+        response = await cli.post(
+            "/action/execute",
+            json={"intention": "supprimer", "portee": "global", "selection": ["all"], "deadline_s": 55.0},
+            headers=VALID_HEADERS,
+        )
+        duration = time.perf_counter() - start
+    print(f"\n[AC7] supprimer multi-node_id ({n} équipements, 3 node_ids/équipement) : "
+          f"duration={duration:.3f}s appels_mqtt={bridge.call_count} "
+          f"(par équipement={bridge.call_count / n:.2f})")
+    assert response.status == 200
+    assert duration < 55.0
+
+
+def _retype_previous_publications(publications: dict) -> dict:
+    """Retype la publication précédente de chaque équipement : le principal passe de
+    ``light`` à ``switch`` et chaque secondaire de ``sensor`` à ``binary_sensor``, pour
+    simuler une publication antérieure sous un autre type que l'évaluation courante
+    (retypage : les anciens candidats doivent être dépubliés avant que les nouveaux ne
+    soient publiés sous le type courant)."""
+    retyped = {}
+    for eq_id, decision in publications.items():
+        mapping = decision.mapping_result
+        retyped_additional = [
+            dataclasses.replace(am, ha_entity_type="binary_sensor") for am in mapping.additional_mappings
+        ]
+        retyped_mapping = dataclasses.replace(mapping, ha_entity_type="switch", additional_mappings=retyped_additional)
+        retyped[eq_id] = dataclasses.replace(decision, mapping_result=retyped_mapping)
+    return retyped
+
+
+@pytest.mark.asyncio
+async def test_ac7_publier_retypage_sous_deadline(cli_factory, tmp_path):
+    """« Publier » quand la publication précédente porte un autre type pour le principal
+    (``switch`` au lieu de ``light``) et les secondaires (``binary_sensor`` au lieu de
+    ``sensor``) : le retypage dépublie les anciens candidats (3 node_ids/équipement) en
+    plus de publier les nouvelles discoveries + état au clic, donc plus d'appels MQTT par
+    équipement qu'une publication initiale. Mesure des appels réels et de la durée."""
+    n = 94
+    app, bridge = _build_app(n, n, tmp_path)
+    app["publications"] = _retype_previous_publications(app["publications"])
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
+        cli = await cli_factory(app)
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n))
+    print(f"\n[AC7] publier avec retypage ({n} équipements) : duration={duration:.3f}s "
+          f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n:.2f})")
     assert response.status == 200
     assert duration < 55.0
