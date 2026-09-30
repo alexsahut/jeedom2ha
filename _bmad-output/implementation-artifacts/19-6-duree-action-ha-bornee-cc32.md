@@ -185,10 +185,13 @@ dernière itération ne divise jamais par zéro (revue Codex P2, `472c372`) ;
 un test couvre explicitement la dernière itération, pour publier et pour
 supprimer
 **And** `reserve_travail` = publications MQTT **restantes, précomptées** ×
-coût unitaire prudent. Le précompte vient de ce que le démon connaît déjà en
-mémoire pour chaque équipement restant de la portée (candidats de son dernier
-mapping : principal et `additional_mappings` ; `node_id` à dépublier pour
-supprimer), à défaut 1 par équipement. Le coût unitaire est le **maximum**,
+coût unitaire prudent. Le précompte est une **borne supérieure** qui ne dépend
+pas du dernier mapping (revue Codex P1, `5570532` : l'évaluation fraîche de
+l'action peut produire plus de candidats qu'avant, après un override ou un
+changement de politique) : pour chaque équipement restant, le nombre de ses
+commandes dans la topologie en mémoire (un candidat consomme au moins une
+commande), plus sa disponibilité ; pour supprimer, le nombre de `node_id`
+effectivement dépubliables, qui est connu. Le coût unitaire est le **maximum**,
 pendant toute l'action, du coût observé par publication et d'une valeur a
 priori prudente (constante nommée, validée par le test de charge d'AC7) —
 jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
@@ -292,6 +295,24 @@ l'action) pour qu'elle aille au bout, conformément à AC1bis et à AC5 ; un
 test vérifie qu'une action dont le client s'est déconnecté publie bien tous
 ses équipements (revue Codex P1, `472c372`). L'état partiel n'est pas un
 résultat acceptable.
+
+**AC8 — Une seule action HA à la fois**
+
+**Given** une action `publier` ou `supprimer` encore en cours dans le démon,
+par exemple une action qui a survécu au délai du relais (AC5, AC6)
+**When** une nouvelle requête `/action/execute` arrive, quelle que soit sa
+portée ou son intention
+**Then** le démon la **refuse immédiatement**, avec un statut explicite (par
+exemple HTTP 409) et un message « une action Home Assistant est déjà en
+cours » ; il ne lance jamais deux actions concurrentes sur `publications`,
+`mappings` et les files de dépublication (revue Codex P1, `5570532`)
+**And** le relais transmet ce message à l'interface tel quel, sans le
+confondre avec un démon injoignable ni avec un dépassement
+**And** le verrou est libéré dans tous les cas (succès, exception, action
+protégée terminée après déconnexion) ; un test couvre un nouvel essai pendant
+une action en cours, puis après sa fin
+**And** la concurrence entre une action et le sync périodique existe déjà
+aujourd'hui ; elle n'est pas traitée ici et reste déclarée comme résiduel.
 
 **AC7 — Taille de parc supportée mesurée, en publications MQTT**
 
@@ -439,6 +460,12 @@ changent).
     un grand parc simulé (par exemple 1 000 équipements) ; déclare la taille
     de parc supportée en publications MQTT, avec une marge explicite.
 
+- [ ] Task 3bis — Sérialisation des actions (AC8)
+  - [ ] Verrou unique des actions `publier`/`supprimer` dans le démon, refus
+    immédiat et explicite d'une seconde action, libération garantie.
+  - [ ] Relais : message du refus transmis tel quel ; tests démon et PHP (nouvel
+    essai pendant, puis après l'action).
+
 - [ ] Task 4 — Preuve terrain et gate d'inventaire
   - [ ] Dérouler la section « Preuve terrain » ; documenter la preuve par
     clic réel (« Republier » global, « Suppr. » puis « Republier » sur une
@@ -575,6 +602,10 @@ changent).
   publications MQTT à coût unitaire non décroissant, test avec les
   équipements lourds en fin de portée (P1) ; exécution protégée si aiohttp
   annule le handler, état partiel refusé (P1).
+- **Revue Codex, 7e tour (`5570532`)** — précompte du travail sur une borne
+  supérieure indépendante du dernier mapping (commandes de l'équipement) (P1) ;
+  AC8 ajouté : une seule action HA à la fois, refus explicite d'une seconde
+  (P1). Concurrence action/sync périodique : préexistante, déclarée.
 
 ### File List
 
@@ -592,3 +623,4 @@ changent).
   démarrage, délai du client sur le pire chemin, second statut en AC5).
 - 2026-09-30 — revue Codex 6e tour (pause finale, précompte du travail,
   exécution protégée).
+- 2026-09-30 — revue Codex 7e tour (borne du précompte, AC8 sérialisation).
