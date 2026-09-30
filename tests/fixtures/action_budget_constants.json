@@ -1,0 +1,9 @@
+{
+  "R": 60,
+  "reserve_s": 5,
+  "status_timeout_s": 3,
+  "click_read_deadline_s": 10,
+  "realign_timeout_s": 3,
+  "deadline_s": 55,
+  "client_timeout_ms": 90000
+}
