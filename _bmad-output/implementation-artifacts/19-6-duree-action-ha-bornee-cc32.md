@@ -58,9 +58,10 @@ traiter CC-32 jusqu'au bout). Option (a) retenue : `core/ajax/` et
 
 **(a) Budgets du relais et du client proportionnels au nombre d'équipements,
 lissage inchangé.** [Préférence de ClaudeBox]
-- Le relais PHP calcule un budget `callDaemon` fonction de `len(eq_ids)`
-  (ex. `max(15, N * (0.1 + marge))`), au lieu du 15 s fixe. Le client JS suit
-  le même calcul pour son propre timeout (au lieu du 20 s fixe).
+- Le relais PHP calcule un budget `callDaemon` fonction de N, le nombre
+  d'équipements de la portée **dans la topologie du démon** (voir AC1), au
+  lieu du 15 s fixe. Le client JS prend un délai fixe qui couvre le pire cas
+  du relais (voir AC2), au lieu du 20 s fixe.
 - Coût : faible — un calcul de budget en PHP et en JS, pas de changement du
   démon.
 - Risque : faible — aucun changement de comportement pour les petits parcs (le
@@ -123,44 +124,56 @@ Supprimer, 3 portées)**
 **When** le relais PHP (`executeHaAction`, `jeedom2ha.ajax.php`) construit
 l'appel `callDaemon`
 **Then** le budget transmis à `callDaemon` croît avec N, le nombre
-d'équipements développés par le relais pour cette portée (au lieu du 15 s
+d'équipements de la portée dans la topologie du démon (au lieu du 15 s
 fixe), avec un plancher de 15 s pour ne rien changer aux petits parcs et un
 plafond explicite de 240 s au plus (sous le `Timeout 300` d'Apache)
 **And** ce plafond définit la taille de parc supportée (nombre d'équipements
 traités par le démon dont la durée prévue par le modèle d'AC7, marge comprise,
 tient dans le plafond) ; cette taille est calculée, figée par un test et
 déclarée dans la story et dans la documentation utilisateur
-**And** N vient de la même expansion que la Story 19.5
-(`_jeedom2ha_expand_portee_to_eq_ids`), étendue à `supprimer` ; c'est une
-borne supérieure du nombre d'équipements que le démon traite (il développe la
-portée sur sa propre topologie)
+**And** N vient de la **même topologie que celle que le démon parcourt**
+(`_resolve_eq_ids_for_portee`, `http_server.py:371`, topologie du dernier
+sync) et non de l'inventaire Jeedom courant (revue Codex P1, PR #188 : après
+une suppression ou un déplacement sans sync, les deux divergent). Le relais le
+lit dans le contrat `published_scope` du démon (`GET /system/published_scope`,
+3 s, une tentative) juste avant l'action : `counts.total` du global ou de la
+pièce ; pour la portée `equipement`, le nombre d'éléments de la sélection
+**And** si cette lecture échoue ou si la portée n'y figure pas, le relais prend
+le plafond (budget maximal) et journalise un WARNING ; il ne retombe jamais
+sur un budget plus petit que celui du démon
+**And** la fenêtre entre cette lecture et le traitement du démon (un sync qui
+s'intercalerait, quelques millisecondes) est déclarée comme résiduel
 **And** la formule couvre le pire cas du démon : N × max(0,1 ; 10/N) de
 lissage, plus le travail par équipement, avec une marge explicite
 **And** N et le budget calculé sont journalisés (`info`) à chaque action, pour
 la preuve terrain
 **And** un test par portée fige la formule du budget.
 
-**AC2 — Budget du client HA proportionnel, aligné sur le relais**
+**AC2 — Délai du client qui couvre toujours le relais**
 
 **Given** le même appel `executeHaAction` côté client (`desktop/js/jeedom2ha.js:343`)
 **When** l'utilisateur clique sur « Publier » ou « Supprimer »
-**Then** le timeout AJAX du client est calculé à partir du même N, lu dans la
-synthèse pour la portée cliquée (`counts.total` du global ou de la pièce ; 1
-pour un équipement)
-**And** il reste strictement supérieur au budget du relais augmenté de la
-lecture des valeurs au clic (Story 19.5), du réalignement des écouteurs
-(3 s) et d'une marge, pour ne jamais couper la requête avant que le relais
-ait pu répondre
-**And** un test JS fige la formule et vérifie `client > relais + 3 s + marge`
-pour au moins un cas au-delà du plancher.
+**Then** le timeout AJAX du client est un délai fixe, égal au pire cas de la
+requête PHP : plafond du budget du relais + lecture de `published_scope`
+(3 s) + lecture des valeurs au clic (Story 19.5, bornée et mesurée en
+dev-story) + réalignement des écouteurs (3 s) + marge, et reste sous le
+`Timeout 300` d'Apache
+**And** il ne dépend d'aucun N lu dans la page (revue Codex P1, PR #188 : la
+synthèse affichée peut être plus ancienne que la topologie du démon) ; c'est
+le relais qui borne réellement la durée et rend la main (succès ou message
+d'AC5)
+**And** un test JS fige ce délai et vérifie qu'il est strictement supérieur au
+pire cas de la requête PHP calculé à partir des mêmes constantes.
 
 **AC3 — Aucune régression pour les petites portées**
 
 **Given** une portée `equipement` ou `piece` de petite taille (comme
 aujourd'hui, quelques équipements)
 **When** « Publier » ou « Supprimer » s'exécute
-**Then** le budget calculé reste égal aux valeurs actuelles (15 s PHP,
-20 s JS) — aucun changement de comportement observable
+**Then** le budget du relais reste égal à la valeur actuelle (15 s) : un
+démon muet produit toujours son message au bout de 15 s, comme aujourd'hui
+**And** le délai fixe du client (AC2), plus long que 20 s, ne change rien
+d'observable tant que le relais répond ; écart déclaré
 **And** un test fige ce cas de non-régression.
 
 **AC4 — Le réalignement des écouteurs a toujours lieu après un « Publier »
@@ -299,18 +312,19 @@ requête HTTP et un message d'erreur changent).
     uniquement.
 
 - [ ] Task 1 — Relais PHP et client JS : budgets proportionnels (AC1, AC2, AC3, AC5)
-  - [ ] Fonction pure de calcul de budget (PHP), prenant `len(eq_ids)` en
-    entrée, avec le plancher à 15 s (AC3) et le plafond de 240 s au plus
-    (AC1) ; taille de parc supportée calculée et déclarée.
+  - [ ] Fonction pure de calcul de budget (PHP), prenant N (topologie du
+    démon, lue dans `published_scope`) en entrée, avec le plancher à 15 s
+    (AC3) et le plafond de 240 s au plus (AC1) ; taille de parc supportée
+    calculée et déclarée ; repli sur le plafond si la lecture échoue.
   - [ ] Appliquer ce budget à l'appel `callDaemon('/action/execute', …)`
     (`jeedom2ha.ajax.php:764`) pour `intention = publier` et
     `intention = supprimer`.
   - [ ] Message d'erreur distinct en cas de vrai dépassement (AC5), formulé
     en dev-story.
-  - [ ] Même formule côté JS (`desktop/js/jeedom2ha.js:343`), strictement
-    supérieure au budget PHP (AC2).
-  - [ ] Tests PHP (un cas par portée, non-régression petite portée) et JS
-    (formule, comparaison client > relais).
+  - [ ] Délai fixe côté JS (`desktop/js/jeedom2ha.js:343`), strictement
+    supérieur au pire cas de la requête PHP (AC2).
+  - [ ] Tests PHP (un cas par portée, repli sur le plafond, non-régression
+    petite portée) et JS (délai fixe > pire cas PHP).
 
 - [ ] Task 2 — Vérification du comportement aiohttp à la déconnexion (AC6)
   - [ ] Test d'intégration démon : handler long, déconnexion client simulée
@@ -351,7 +365,9 @@ requête HTTP et un message d'erreur changent).
   (option (a)).
 - Ne pas introduire de flux asynchrone/polling (option (c)) sans validation
   explicite d'Alex — hors périmètre de cette story.
-- Le budget calculé doit avoir un plancher (≥ 15 s PHP / ≥ 20 s JS, AC3) et un
+- N ne vient jamais de l'inventaire Jeedom courant ni de la page : il vient
+  de la topologie du démon (`published_scope`), sinon le plafond (AC1).
+- Le budget du relais doit avoir un plancher (15 s, AC3) et un
   plafond explicite de 240 s au plus côté relais (sous le `Timeout 300`
   d'Apache), pour ne jamais devenir illimité. Ce plafond borne la taille de
   parc supportée : la calculer et la déclarer, sans promettre « jamais ».
@@ -371,8 +387,10 @@ requête HTTP et un message d'erreur changent).
   l.764, journal ERROR l.766 et exception l.767 si `null`, appel
   `jeedom2ha_realign_after_action` l.772 ; expansion de la portée
   `_jeedom2ha_expand_portee_to_eq_ids` l.338 (Story 19.5, publier seulement).
-- `desktop/js/jeedom2ha_scope_summary.js` : `counts.total` du global et des
-  pièces (l.164, l.174), source de N côté client.
+- `resources/daemon/transport/http_server.py` : `_resolve_eq_ids_for_portee`
+  l.371 (topologie du démon) ; `GET /system/published_scope` l.3447 (source de
+  N pour le relais, `counts.total`).
+- `resources/daemon/models/published_scope.py` : compteur `total` l.65.
 - `desktop/js/jeedom2ha.js` : timeout AJAX l.343.
 - `_bmad-output/planning-artifacts/epic-5-lifecycle-matrix.md` : Décision 8
   (formule du lissage) à partir de l.439.
@@ -426,7 +444,10 @@ requête HTTP et un message d'erreur changent).
   corrigés. Revue Codex (PR #188) intégrée : taille de parc supportée
   déclarée au lieu de « jamais » (P1), marge du client couvrant le
   traitement après le démon (P1), N total et N temporisé distingués (P2),
-  décision documentée avant `ready-for-dev` (P2).
+  décision documentée avant `ready-for-dev` (P2). Second tour Codex (PR
+  #188, `c123d33`) : N lu dans la topologie du démon (`published_scope`) et
+  non dans l'inventaire Jeedom courant, repli sur le plafond (P1) ; délai du
+  client fixe couvrant le pire cas du relais, indépendant de la page (P1).
 
 ### File List
 
