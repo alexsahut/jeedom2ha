@@ -266,9 +266,9 @@ fin réelle, quel que soit le temps que cela prend.
 La taille supportée s'exprime d'abord en **appels MQTT par action** (le budget de travail
 divisé par le coût mesuré d'un appel MQTT, de l'ordre du millier d'appels), puisque c'est le
 poste dominant. Traduit en équipements typiques (environ 5 appels MQTT par équipement en
-publication — découverte + état au clic), ce budget correspond à un parc d'environ **300
-équipements** (estimation prudente mesurée hors de la box, à confirmer par la mesure sur la
-box). Un retypage (un équipement déjà publié change de type d'entité HA, principal ou
+publication — découverte + état au clic), ce budget correspond à un parc d'environ **250
+équipements typiques** (estimation prudente mesurée hors de la box, à confirmer par la mesure
+sur la box). Un retypage (un équipement déjà publié change de type d'entité HA, principal ou
 secondaire) coûte davantage par équipement que cette hypothèse : mesuré à **10 appels MQTT
 par équipement** (dépublication de l'ancien type puis nouvelle découverte), soit deux fois
 la publication initiale. Une suppression d'équipements multi-entités (un dimmer avec ses

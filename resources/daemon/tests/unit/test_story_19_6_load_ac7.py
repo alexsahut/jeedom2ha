@@ -51,6 +51,10 @@ MACHINE_FACTOR = 3.0  # box de terrain présumée <= 3x plus lente que la VM de 
 MARGE_MESURE = 1.5  # marge explicite au-dessus du maximum observé (bruit de mesure).
 LATENCE_MQTT_S = 0.005  # borne prudente d'un aller-retour loopback (paho ne fait que publier en file).
 MEASURE_ITERATIONS = 20
+# Capacité annoncée dans docs/fr_FR/index.md (« environ 250 équipements typiques ») : seuil
+# protégé par la CI, en retrait de `n_max` mesuré (~300) pour rester stable sur des runners
+# plus lents (revue Codex P1, PR #189, 5e tour).
+CAPACITE_DOCUMENTEE = 250
 
 
 def _cmd(cmd_id, name, cmd_type, sub_type, generic_type=None, unit=None, value=None):
@@ -207,13 +211,31 @@ async def _run_publier(cli, deadline_s: float = 55.0, current_values: Optional[d
     return response, duration
 
 
+async def _run_publier_equipement(
+    cli, eq_id: int, deadline_s: float = 55.0, current_values: Optional[dict] = None
+):
+    """Comme `_run_publier`, mais ciblé sur un seul équipement (`portee: equipement`), pour
+    isoler le coût du parc (N publications déjà en mémoire) du coût de la portée traitée."""
+    start = time.perf_counter()
+    payload = {"intention": "publier", "portee": "equipement", "selection": [eq_id], "deadline_s": deadline_s}
+    if current_values:
+        payload["current_values"] = current_values
+    response = await cli.post("/action/execute", json=payload, headers=VALID_HEADERS)
+    duration = time.perf_counter() - start
+    return response, duration
+
+
 async def _measure_c_parc_e2e(cli_factory, tmp_path) -> float:
-    """c_parc mesuré de bout en bout via le handler réel « Publier » (revue Codex P2, PR
-    #189, 4e tour) : `_apply_pending_scope_flags()` parcourt tout `published_scope` en fin
+    """c_parc mesuré de bout en bout via le handler réel « Publier » (revue ClaudeBox, PR
+    #189, 5e tour) : `_apply_pending_scope_flags()` parcourt tout `published_scope` en fin
     d'action, en plus de `save_publications_cache()` — les deux sont comptés ici, pas
-    seulement la seconde. Coût marginal par équipement du parc = pente mesurée (MAX, pas
-    min, sur plusieurs essais) entre deux tailles d'inventaire, portée fixée à 1 seul
-    équipement inclus dans les deux cas pour isoler le coût du parc de celui de la portée."""
+    seulement la seconde. `_build_app(n, n, …)` peuple les publications des N équipements
+    sous leur forme multi-capteurs coûteuse (principal + 2 secondaires), pour que
+    `save_publications_cache()` sérialise réellement tout le parc (et pas presque rien,
+    comme avec un seul équipement inclus). L'action ne cible qu'un seul équipement
+    (`portee: equipement`), pour isoler le coût du parc (déjà en mémoire) de celui de la
+    portée traitée. Coût marginal par équipement du parc = pente mesurée (MAX, pas min, sur
+    plusieurs essais) entre deux tailles d'inventaire."""
     tailles = (1000, 5000)
     essais = 3
     durations: dict = {n: [] for n in tailles}
@@ -221,11 +243,12 @@ async def _measure_c_parc_e2e(cli_factory, tmp_path) -> float:
         for essai in range(essais):
             data_dir = tmp_path / f"c_parc-{n}-{essai}"
             data_dir.mkdir()
-            app, _bridge = _build_app(n, 1, data_dir)
+            app, _bridge = _build_app(n, n, data_dir)
+            eq_id_cible = 100  # premier équipement du parc (les N publications sont déjà en mémoire)
             with pytest.MonkeyPatch.context() as mp:
                 mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
                 cli = await cli_factory(app)
-                _, duration = await _run_publier(cli, current_values=_current_values_for(1))
+                _, duration = await _run_publier_equipement(cli, eq_id_cible, current_values=_current_values_for(1))
             durations[n].append(duration)
     n_petit, n_grand = tailles
     pentes = [
@@ -277,7 +300,11 @@ async def test_ac7_couts_mesures_et_enveloppe_respectee(cli_factory, tmp_path):
     # l'enveloppe -> calculé à partir des coûts mesurés ci-dessus.
     n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
     print(f"[AC7] N_max (parc typique multi-capteurs, 90% enveloppe) = {n_max}")
-    assert n_max > 0
+    # Revue Codex P1 (PR #189, 5e tour) : la capacité annoncée dans la doc doit rester tenue
+    # par la mesure réelle, pas seulement être positive.
+    assert n_max >= CAPACITE_DOCUMENTEE, (
+        f"n_max mesuré ({n_max}) sous la capacité documentée ({CAPACITE_DOCUMENTEE})"
+    )
 
 
 @pytest.mark.asyncio
@@ -327,8 +354,10 @@ async def test_ac7_scenario_mixte_sous_deadline(cli_factory, tmp_path):
 
 @pytest.mark.asyncio
 async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_path):
-    """Parc typique (équipement multi-capteurs) dimensionné à `N_max` (90% de l'enveloppe),
-    calculé à partir des coûts mesurés (cf. `test_ac7_couts_mesures_et_enveloppe_respectee`)."""
+    """Parc typique (équipement multi-capteurs) dimensionné à `CAPACITE_DOCUMENTEE` (la
+    capacité annoncée dans docs/fr_FR/index.md), et non plus seulement au `n_max` recalculé
+    (revue Codex P1, PR #189, 5e tour) : la mesure exerce réellement le parc que la doc
+    promet, pas uniquement la valeur mesurée sur cette VM."""
     c_eq = _measure_c_eq() * MARGE_MESURE * MACHINE_FACTOR
     c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
@@ -340,17 +369,20 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
     # en discovery seule) et n'ajoute donc aucun appel supplémentaire mesuré.
     APPELS_MQTT_PAR_EQUIPEMENT = 5
     n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
-    assert n_max > 0
+    assert n_max >= CAPACITE_DOCUMENTEE, (
+        f"n_max mesuré ({n_max}) sous la capacité documentée ({CAPACITE_DOCUMENTEE})"
+    )
 
     data_dir = tmp_path / "parc-typique"
     data_dir.mkdir()
-    app, bridge = _build_app(n_max, n_max, data_dir)
+    n = CAPACITE_DOCUMENTEE
+    app, bridge = _build_app(n, n, data_dir)
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
-        response, duration = await _run_publier(cli, current_values=_current_values_for(n_max))
-    print(f"\n[AC7] parc typique à 90% enveloppe : N_max={n_max} duration={duration:.3f}s "
-          f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n_max:.2f})")
+        response, duration = await _run_publier(cli, current_values=_current_values_for(n))
+    print(f"\n[AC7] parc typique à 90% enveloppe : N={n} (n_max mesuré={n_max}) duration={duration:.3f}s "
+          f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n:.2f})")
     assert response.status == 200
     assert duration < 55.0
 

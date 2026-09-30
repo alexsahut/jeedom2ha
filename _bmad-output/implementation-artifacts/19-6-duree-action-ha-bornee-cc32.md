@@ -836,6 +836,29 @@ changent).
   résiduel PHP déclaré (AC2, sans code) : un appel individuel au cœur Jeedom
   reste non interruptible en synchrone, couvert par la marge du délai client
   (14 s) (P2).
+- **Unité I (5e tour de revue PR #189, Codex + ClaudeBox)** — 2026-09-30 —
+  deux points. (1, ClaudeBox) `_measure_c_parc_e2e` peuplait un inventaire
+  publié à presque rien (`_build_app(n, 1, …)` : une seule publication),
+  minorant `c_parc` (pente mesurée 4 µs/équipement au lieu des 18 µs
+  attendus). Corrigé : `_build_app(n, n, …)` peuple les publications
+  multi-capteurs de tout le parc, l'action réelle ciblant désormais un seul
+  équipement (`portee: equipement`, nouvel helper `_run_publier_equipement`)
+  pour isoler le coût du parc de celui de la portée traitée.
+  `c_parc_mesure` mesuré à `0.000075s` (vs `0.000004s` avant correction),
+  `c_parc≈0.000336s` après marge/facteur machine ; `N_max` toujours ~301-309
+  (dominé par `c_mqtt`, variation négligeable à cette échelle). (2, Codex P1)
+  la capacité annoncée (« environ 300 équipements ») n'était pas protégée par
+  la CI (`assert n_max > 0` seulement), trop proche du `n_max` mesuré pour
+  servir de seuil stable sur des runners plus lents. Doc corrigée : « environ
+  250 équipements typiques » ; constante `CAPACITE_DOCUMENTEE = 250` ajoutée
+  au test de charge, `assert n_max >= CAPACITE_DOCUMENTEE` dans
+  `test_ac7_couts_mesures_et_enveloppe_respectee` et
+  `test_ac7_parc_typique_90_pct_enveloppe_sous_deadline` ; ce dernier exerce
+  désormais réellement `N = CAPACITE_DOCUMENTEE` (250), pas seulement le
+  `n_max` recalculé sur la VM de mesure. Suites : pytest racine 2021
+  passed/8 deselected (217,8 s, inchangé) ; `-m load` 8 passed (84,0 s) ;
+  node 311 pass ; PHP (CI) 5 passed/3 skipped ; flake8 propre sur le fichier
+  touché.
 
 ### File List
 
