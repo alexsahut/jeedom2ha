@@ -663,6 +663,18 @@ changent).
   n'ajoute aucun appel dans ce fixture). `N_max` recalculé à ~301-309
   (mesures 2026-09-30, variance de mesure entre `test_ac7_couts_mesures_et_enveloppe_respectee`
   et `test_ac7_parc_typique_90_pct_enveloppe_sous_deadline`).
+  4e tour de revue (Codex P2, PR #189, 2026-09-30) : `c_parc` ne chronométrait
+  que `save_publications_cache()`, alors que la fin de l'action parcourt aussi
+  tout `published_scope` via `_apply_pending_scope_flags()`. `c_parc` est
+  désormais mesuré de bout en bout par le handler réel « Publier » (1 seul
+  équipement ciblé), en pente entre deux tailles d'inventaire (N=1000 et
+  N=5000, 3 essais chacune) : `c_parc_mesure≈0.000004s`, `c_parc≈0.000018s`
+  après marge (`×1.5`) et facteur machine (`×3`). `N_max` recalculé à
+  ~301-309 (inchangé à l'échelle). Nouveau scénario « petite portée sur grand
+  inventaire » à la frontière
+  (`test_ac7_petite_portee_grand_inventaire_frontiere_sous_deadline`) :
+  `N_parc` théorique à 90% de l'enveloppe ≈ 1 990 773, plafonné à 50 000 ;
+  durée mesurée à `N_parc=50000` ≈ 0,24 s, largement sous `deadline_s=55s`.
 
 ### Completion Notes List
 

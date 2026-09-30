@@ -12,7 +12,11 @@ simulés :
   d'attente (`publish()` retourne avant l'envoi réseau) ; 5 ms est donc une borne
   prudente pour un aller-retour loopback local, largement au-dessus du coût réel de mise
   en file.
-- c_parc : `save_publications_cache()` réel, écrit dans `tmp_path` (jamais `/tmp`).
+- c_parc : mesuré de bout en bout via le handler réel « Publier » (revue Codex P2, PR
+  #189, 4e tour) — pente entre deux tailles d'inventaire (1 seul équipement ciblé dans
+  les deux cas), couvrant `_apply_pending_scope_flags()` (parcourt tout `published_scope`
+  en fin d'action) ET `save_publications_cache()`, pas seulement cette dernière. Écrit
+  dans `tmp_path` (jamais `/tmp`).
 
 Chaque coût unitaire retient le MAXIMUM des mesures (pas le minimum), avec une marge
 explicite `MARGE_MESURE` (x1.5) et le facteur machine `MACHINE_FACTOR` (x3, la box de
@@ -33,7 +37,6 @@ from models.evaluate_equipment import evaluate_equipment
 from models.mapping import PublicationDecision
 from models.topology import EligibilityResult, JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
 from mapping.registry import MapperRegistry
-from cache.disk_cache import save_publications_cache
 from discovery.publisher import DiscoveryPublisher
 from sync.state import StateSynchronizer
 import transport.http_server as http_server
@@ -104,26 +107,6 @@ def _measure_c_eq() -> float:
     )
 
 
-def _measure_c_parc(n: int, data_dir: str) -> float:
-    """MAX (pas min) sur 5 écritures réelles de `save_publications_cache()`, dans
-    `data_dir` (jamais `/tmp`), avec un registre de cardinalité `n`."""
-    publications = {}
-    for i in range(n):
-        eq_id = 100 + i
-        eq = _multi_capteur_eq(eq_id)
-        mapping = evaluate_equipment(
-            eq, _snapshot(eq), EligibilityResult(is_eligible=True, reason_code="eligible"),
-            mapper_registry=MapperRegistry(), confidence_policy="strict",
-            persisted_overrides={}, persisted_equipment_overrides={},
-        ).mapping
-        publications[eq_id] = PublicationDecision(
-            should_publish=True, reason="sure", mapping_result=mapping,
-            state_topic=f"jeedom2ha/{eq_id}/state", active_or_alive=True, discovery_published=True,
-        )
-    best = max(_time_call(lambda: save_publications_cache(publications, data_dir)) for _ in range(5))
-    return best / n  # coût par équipement du parc
-
-
 class _FakeMqttBridge:
     """Faux pont MQTT synchrone (comme paho) : compte les appels et bloque
     `LATENCE_MQTT_S`, pour mesurer le coût MQTT de bout en bout via le vrai
@@ -137,49 +120,6 @@ class _FakeMqttBridge:
         self.call_count += 1
         time.sleep(LATENCE_MQTT_S)
         return True
-
-
-# --- AC7 : mesure des trois coûts unitaires + déclaration de l'enveloppe ---
-
-
-def test_ac7_couts_mesures_et_enveloppe_respectee(tmp_path):
-    c_eq_mesure = _measure_c_eq()
-    c_parc_mesure = _measure_c_parc(500, str(tmp_path))
-    c_eq = c_eq_mesure * MARGE_MESURE * MACHINE_FACTOR
-    c_parc = c_parc_mesure * MARGE_MESURE * MACHINE_FACTOR
-    c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
-
-    budget_travail = action_pacing.budget_travail(55.0)
-    assert budget_travail == pytest.approx(39.0)
-
-    print(f"\n[AC7] c_eq_mesure={c_eq_mesure:.6f}s c_parc_mesure={c_parc_mesure:.6f}s "
-          f"c_eq={c_eq:.6f}s c_parc={c_parc:.6f}s c_mqtt={c_mqtt:.6f}s")
-
-    # Revue Codex P1 (PR #189, 2e tour) : le vrai « Publier » exécute aussi
-    # `publish_click_states()` (état au clic) pour chaque candidat streamé (les 2 sensors
-    # secondaires du dimmer multi-capteurs ; le light principal n'est pas streamé, cf.
-    # `StateSynchronizer.streams_actionable_type`). Appels MQTT par équipement mesurés
-    # (test_ac7_parc_typique_90_pct_enveloppe_sous_deadline, faux pont MQTT réel) = 3
-    # discovery + 2 état = 5 (la disponibilité locale n'ajoute aucun appel ici : fixture
-    # sans `local_availability_supported`).
-    APPELS_MQTT_PAR_EQUIPEMENT = 5
-
-    # Scénario mixte à la frontière : portée courante (30/09 : 94 évalués sur 292, 3 entités
-    # HA par équipement multi-capteurs) + un grand parc (1000) dont 1 seul équipement cible.
-    appels_mqtt, eq_portee, eq_parc = 94 * APPELS_MQTT_PAR_EQUIPEMENT, 94, 1000
-    cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
-    assert cout <= budget_travail, f"enveloppe dépassée (mixte): {cout:.3f}s > {budget_travail}s"
-
-    # Petite portée sur très grand inventaire (parc dominant).
-    appels_mqtt, eq_portee, eq_parc = APPELS_MQTT_PAR_EQUIPEMENT, 1, 5000
-    cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
-    assert cout <= budget_travail, f"enveloppe dépassée (grand inventaire): {cout:.3f}s > {budget_travail}s"
-
-    # N_max : parc typique (équipement multi-capteurs, 3 entités HA/équipement) à 90% de
-    # l'enveloppe -> calculé à partir des coûts mesurés ci-dessus.
-    n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
-    print(f"[AC7] N_max (parc typique multi-capteurs, 90% enveloppe) = {n_max}")
-    assert n_max > 0
 
 
 # --- AC7 : rejeu bout-en-bout (handler réel, vrai DiscoveryPublisher, faux pont MQTT) ---
@@ -267,6 +207,79 @@ async def _run_publier(cli, deadline_s: float = 55.0, current_values: Optional[d
     return response, duration
 
 
+async def _measure_c_parc_e2e(cli_factory, tmp_path) -> float:
+    """c_parc mesuré de bout en bout via le handler réel « Publier » (revue Codex P2, PR
+    #189, 4e tour) : `_apply_pending_scope_flags()` parcourt tout `published_scope` en fin
+    d'action, en plus de `save_publications_cache()` — les deux sont comptés ici, pas
+    seulement la seconde. Coût marginal par équipement du parc = pente mesurée (MAX, pas
+    min, sur plusieurs essais) entre deux tailles d'inventaire, portée fixée à 1 seul
+    équipement inclus dans les deux cas pour isoler le coût du parc de celui de la portée."""
+    tailles = (1000, 5000)
+    essais = 3
+    durations: dict = {n: [] for n in tailles}
+    for n in tailles:
+        for essai in range(essais):
+            data_dir = tmp_path / f"c_parc-{n}-{essai}"
+            data_dir.mkdir()
+            app, _bridge = _build_app(n, 1, data_dir)
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
+                cli = await cli_factory(app)
+                _, duration = await _run_publier(cli, current_values=_current_values_for(1))
+            durations[n].append(duration)
+    n_petit, n_grand = tailles
+    pentes = [
+        (d_grand - d_petit) / (n_grand - n_petit)
+        for d_grand in durations[n_grand]
+        for d_petit in durations[n_petit]
+    ]
+    return max(pentes)
+
+
+# --- AC7 : mesure des trois coûts unitaires + déclaration de l'enveloppe ---
+
+
+@pytest.mark.asyncio
+async def test_ac7_couts_mesures_et_enveloppe_respectee(cli_factory, tmp_path):
+    c_eq_mesure = _measure_c_eq()
+    c_parc_mesure = await _measure_c_parc_e2e(cli_factory, tmp_path)
+    c_eq = c_eq_mesure * MARGE_MESURE * MACHINE_FACTOR
+    c_parc = c_parc_mesure * MARGE_MESURE * MACHINE_FACTOR
+    c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
+
+    budget_travail = action_pacing.budget_travail(55.0)
+    assert budget_travail == pytest.approx(39.0)
+
+    print(f"\n[AC7] c_eq_mesure={c_eq_mesure:.6f}s c_parc_mesure={c_parc_mesure:.6f}s "
+          f"c_eq={c_eq:.6f}s c_parc={c_parc:.6f}s c_mqtt={c_mqtt:.6f}s")
+
+    # Revue Codex P1 (PR #189, 2e tour) : le vrai « Publier » exécute aussi
+    # `publish_click_states()` (état au clic) pour chaque candidat streamé (les 2 sensors
+    # secondaires du dimmer multi-capteurs ; le light principal n'est pas streamé, cf.
+    # `StateSynchronizer.streams_actionable_type`). Appels MQTT par équipement mesurés
+    # (test_ac7_parc_typique_90_pct_enveloppe_sous_deadline, faux pont MQTT réel) = 3
+    # discovery + 2 état = 5 (la disponibilité locale n'ajoute aucun appel ici : fixture
+    # sans `local_availability_supported`).
+    APPELS_MQTT_PAR_EQUIPEMENT = 5
+
+    # Scénario mixte à la frontière : portée courante (30/09 : 94 évalués sur 292, 3 entités
+    # HA par équipement multi-capteurs) + un grand parc (1000) dont 1 seul équipement cible.
+    appels_mqtt, eq_portee, eq_parc = 94 * APPELS_MQTT_PAR_EQUIPEMENT, 94, 1000
+    cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
+    assert cout <= budget_travail, f"enveloppe dépassée (mixte): {cout:.3f}s > {budget_travail}s"
+
+    # Petite portée sur très grand inventaire (parc dominant).
+    appels_mqtt, eq_portee, eq_parc = APPELS_MQTT_PAR_EQUIPEMENT, 1, 5000
+    cout = appels_mqtt * c_mqtt + eq_portee * c_eq + eq_parc * c_parc
+    assert cout <= budget_travail, f"enveloppe dépassée (grand inventaire): {cout:.3f}s > {budget_travail}s"
+
+    # N_max : parc typique (équipement multi-capteurs, 3 entités HA/équipement) à 90% de
+    # l'enveloppe -> calculé à partir des coûts mesurés ci-dessus.
+    n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
+    print(f"[AC7] N_max (parc typique multi-capteurs, 90% enveloppe) = {n_max}")
+    assert n_max > 0
+
+
 @pytest.mark.asyncio
 async def test_ac7_rejeu_mesure_30_09_sous_deadline(cli_factory, tmp_path):
     """292 au total, 94 évalués/publiés (mesure terrain du 30/09) : le parcours réel
@@ -317,7 +330,7 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
     """Parc typique (équipement multi-capteurs) dimensionné à `N_max` (90% de l'enveloppe),
     calculé à partir des coûts mesurés (cf. `test_ac7_couts_mesures_et_enveloppe_respectee`)."""
     c_eq = _measure_c_eq() * MARGE_MESURE * MACHINE_FACTOR
-    c_parc = _measure_c_parc(500, str(tmp_path)) * MARGE_MESURE * MACHINE_FACTOR
+    c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
     budget_travail = action_pacing.budget_travail(55.0)
     # Revue Codex P1 (PR #189, 2e tour) : appels MQTT par équipement multi-capteurs = 3
@@ -329,13 +342,47 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
     n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
     assert n_max > 0
 
-    app, bridge = _build_app(n_max, n_max, tmp_path)
+    data_dir = tmp_path / "parc-typique"
+    data_dir.mkdir()
+    app, bridge = _build_app(n_max, n_max, data_dir)
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
         cli = await cli_factory(app)
         response, duration = await _run_publier(cli, current_values=_current_values_for(n_max))
     print(f"\n[AC7] parc typique à 90% enveloppe : N_max={n_max} duration={duration:.3f}s "
           f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n_max:.2f})")
+    assert response.status == 200
+    assert duration < 55.0
+
+
+@pytest.mark.asyncio
+async def test_ac7_petite_portee_grand_inventaire_frontiere_sous_deadline(cli_factory, tmp_path):
+    """Revue Codex P2 (PR #189, 4e tour) : scénario « petite portée sur grand inventaire »
+    placé sur la frontière de l'enveloppe, dimensionné à partir de `c_parc` mesuré de bout
+    en bout (handler réel, `_apply_pending_scope_flags()` + `save_publications_cache()`
+    comptés). `N_parc` remplit 90% de `budget_travail` avec 1 seul équipement publié ;
+    plafonné à 50 000 pour garder un temps de test raisonnable."""
+    c_eq = _measure_c_eq() * MARGE_MESURE * MACHINE_FACTOR
+    c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
+    c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
+    budget_travail = action_pacing.budget_travail(55.0)
+    APPELS_MQTT_PAR_EQUIPEMENT = 5
+
+    n_parc = int((0.90 * budget_travail - APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt - c_eq) / c_parc)
+    n_parc_plafonne = min(n_parc, 50_000)
+    print(f"\n[AC7] frontière petite portée / grand inventaire : c_parc={c_parc:.6f}s "
+          f"N_parc={n_parc} (plafonné={n_parc_plafonne})")
+    assert n_parc_plafonne > 0
+
+    data_dir = tmp_path / "frontiere"
+    data_dir.mkdir()
+    app, bridge = _build_app(n_parc_plafonne, 1, data_dir)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(http_server, "DiscoveryPublisher", lambda mqtt_bridge: DiscoveryPublisher(mqtt_bridge))
+        cli = await cli_factory(app)
+        response, duration = await _run_publier(cli, current_values=_current_values_for(1))
+    print(f"[AC7] frontière petite portée / grand inventaire : duration={duration:.3f}s "
+          f"appels_mqtt={bridge.call_count}")
     assert response.status == 200
     assert duration < 55.0
 
