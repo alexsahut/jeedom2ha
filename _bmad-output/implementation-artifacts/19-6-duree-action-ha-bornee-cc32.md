@@ -880,7 +880,31 @@ changent).
 - **Validation UX (30/09, 21:33)** — Alex : « je valide », après le compte
   rendu de la preuve par clic et la relecture des trois messages d'incident
   (vrai dépassement d'AC5, erreur immédiate du démon, action déjà en cours).
-  Flux du bouton inchangé. Statut `done`.
+  Flux du bouton inchangé. Validé sur `95d3059`, déployé sur la box
+  (domobox). Statut `done`.
+- **Définition de `done`** (`docs/bmad-parcours-rapide-complet.md`) :
+  - SHA `95d30597490822494f87069e6a73d7b97d04ee9d` (fusion de la PR #189),
+    CI verte sur ce SHA (10 check-runs `success`, dont
+    `Load tests (Python 3.9)` ; `Burn-In` `skipped`).
+  - Tests ciblés, commandes exactes depuis la racine du dépôt après
+    `pip install -e ".[test]"` (relancées par ClaudeBox le 30/09 à 22:10
+    sur un clone dont le code est identique à `95d3059`) :
+    - démon (lissage, échéance, verrou, action protégée) :
+      `python -m pytest resources/daemon/tests/unit/test_story_19_6_action_pacing.py resources/daemon/tests/unit/test_story_19_6_deadline_pacing.py resources/daemon/tests/unit/test_story_19_6_action_lock_shield.py -q`
+      (33 passed) ;
+    - charge (AC7, marqueur `load`) :
+      `python -m pytest -m load -q resources/daemon/tests/unit/test_story_19_6_load_ac7.py`
+      (8 passed) ;
+    - relais PHP : `php tests/unit/test_story_19_6_php_relay.php` (34/34) ;
+    - délai du client (AC2) :
+      `node --test tests/unit/test_story_19_6_client_timeout.node.test.js`
+      (6 pass).
+  - Suites complètes, comme la CI (`.github/workflows/test.yml`) :
+    `python -m pytest`, `python -m pytest -m load -q`,
+    `node --test tests/unit/*.node.test.js`, puis `php <fichier>` pour chaque
+    fichier PHP de `tests/` (boucle du job `PHP lint & tests`).
+  - Preuve terrain après déploiement par le gate et validation UX nommée :
+    notes ci-dessus et `19-6-field-proof-2026-09-30.md`.
 
 ### File List
 
@@ -912,6 +936,8 @@ changent).
   story 19.6 → `done`.
 - `_bmad-output/implementation-artifacts/19-6-field-proof-2026-09-30.md` —
   preuve terrain (artefact durable, assaini).
+- `_bmad-output/planning-artifacts/epics-projection-engine.md` — CC-32
+  ajouté aux points fermés par l'epic 19 (Story 19.6).
 
 ### Change Log
 
@@ -982,3 +1008,5 @@ changent).
   gate d'inventaire et preuve par clic réel conformes, artefact
   `19-6-field-proof-2026-09-30.md` ; statut → `ready-for-UX-validation`.
 - 2026-09-30 — validation UX d'Alex (21:33) ; statut `done`.
+- 2026-09-30 — revue PR #190 (Codex) : clôture de CC-32 reportée dans l'epic,
+  définition de `done` complétée (SHA, CI, tests ciblés et commandes exactes).
