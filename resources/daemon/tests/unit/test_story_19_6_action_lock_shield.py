@@ -250,3 +250,36 @@ async def test_ac8_lock_stays_held_during_protected_action_after_cancellation():
         await asyncio.sleep(0.2)
 
     assert app["action_lock"].locked() is False
+
+
+@pytest.mark.asyncio
+async def test_ac6_task_holds_strong_reference_until_done():
+    """Revue PR #189 (tour 7, Codex P1) : la tâche protégée est référencée fortement
+    dans `app["action_tasks"]` tant qu'elle tourne, puis retirée à sa fin — même après
+    annulation du handler, pour éviter une collecte prématurée par le garbage collector."""
+    app = _build_app()
+
+    publisher = MagicMock()
+
+    async def _slow_unpublish(*args, **kwargs):
+        await asyncio.sleep(0.1)
+        return True
+
+    publisher.unpublish_by_eq_id = AsyncMock(side_effect=_slow_unpublish)
+
+    with patch("transport.http_server.DiscoveryPublisher", return_value=publisher):
+        request = _make_request(app, {"intention": "supprimer", "portee": "equipement", "selection": [10], "deadline_s": 0.4})
+        handler_task = asyncio.ensure_future(http_server._handle_action_execute(request))
+        await asyncio.sleep(0.02)
+        handler_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await handler_task
+
+        # Juste après l'annulation du handler, la tâche protégée tourne encore :
+        # elle doit rester dans l'ensemble de référence forte.
+        assert len(app["action_tasks"]) == 1
+
+        await asyncio.sleep(0.2)
+
+    # La tâche est terminée : elle a été retirée de l'ensemble.
+    assert len(app["action_tasks"]) == 0

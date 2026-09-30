@@ -278,6 +278,9 @@ comme aujourd'hui, sans changement de son propre budget (3 s, une tentative)
 **And** un test couvre un grand parc simulé où le lissage du démon s'est
 comprimé pour tenir `deadline_s` (AC1bis) et où le réalignement a bien
 lieu, alors qu'il aurait été sauté avec l'ancien lissage non borné.
+Résiduel déclaré (revue Codex P2, PR #189, 7e tour) : la création/suppression
+des écouteurs en base (`core/class/jeedom2ha.class.php:419-440`) n'est pas
+bornée par les 3 s de `GET /system/state_listeners` — voir Dev Notes.
 
 **AC5 — Message juste en cas de vrai dépassement**
 
@@ -570,6 +573,11 @@ changent).
   refonte — l'échéance de `_jeedom2ha_collect_click_values` n'est vérifiée qu'entre deux
   appels, et la marge du délai client (14 s, 90 s contre un pire chemin de 76 s) couvre ce
   résidu.
+- Résiduel déclaré (AC4, revue Codex P2, PR #189, 7e tour) : les 3 s de
+  `GET /system/state_listeners` bornent la lecture, mais pas la création/suppression des
+  écouteurs en base (`core/class/jeedom2ha.class.php:419-440`) — la même marge du délai
+  client (14 s, 90 s contre 76 s) couvre ce résidu ; au-delà, l'AJAX peut expirer après une
+  action réussie (entités publiées, message d'échec faux), à mesurer par la preuve terrain.
 - Ne pas introduire de flux asynchrone/polling (option (c)) sans validation
   explicite d'Alex — hors périmètre de cette story.
 - Le démon **n'interrompt jamais** une action en cours pour tenir
@@ -937,3 +945,8 @@ changent).
   coûteux (suppression multi-`node_id` : 3,00 appels/équipement ; publier
   avec retypage : 10,00 appels/équipement) et documentation utilisateur
   corrigée en conséquence ; résiduel PHP (AC2) déclaré sans code.
+- 2026-09-30 — unité K (7e tour de revue PR #189, Codex) : référence forte
+  `app["action_tasks"]` sur la tâche protégée par `asyncio.shield` (AC6),
+  évitant une collecte prématurée par le garbage collector si le handler est
+  annulé ; résiduel AC4 (écouteurs en base non bornés par les 3 s de
+  `GET /system/state_listeners`) déclaré sans code.

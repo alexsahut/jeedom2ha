@@ -4252,7 +4252,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
     # Story 19.6 (AC6) — `asyncio.shield` protège l'action d'une annulation du handler par
     # aiohttp (déconnexion client) : quel que soit le comportement d'aiohttp à la
     # déconnexion, la tâche continue jusqu'à sa fin même si `await` ci-dessous est annulé.
+    # Référence forte : `asyncio.ensure_future` ne garde qu'une référence faible côté
+    # event loop ; sans référence forte ailleurs, le garbage collector peut ramasser la
+    # tâche avant sa fin si le handler est annulé (revue PR #189, tour 7, Codex P1).
     task = asyncio.ensure_future(_run_action())
+    action_tasks: set = request.app["action_tasks"]
+    action_tasks.add(task)
+    task.add_done_callback(action_tasks.discard)
     return await asyncio.shield(task)
 
 
@@ -4332,6 +4338,10 @@ def create_app(local_secret: str) -> web.Application:
     # Story 19.6 (AC8) — verrou d'action HA : une seule action `publier`/`supprimer` à la
     # fois. Le sync périodique ne le prend pas (concurrence préexistante, résiduel déclaré).
     app["action_lock"] = asyncio.Lock()
+    # Story 19.6 — référence forte aux tâches d'action protégées (revue PR #189, tour 7,
+    # Codex P1) : évite la collecte prématurée par le garbage collector d'une tâche
+    # `asyncio.ensure_future` non référencée ailleurs si le handler est annulé.
+    app["action_tasks"] = set()
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
