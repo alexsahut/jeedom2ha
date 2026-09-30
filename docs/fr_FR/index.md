@@ -271,10 +271,11 @@ publication — découverte + état au clic), ce budget correspond à un parc d'
 sur la box). Un retypage (un équipement déjà publié change de type d'entité HA, principal ou
 secondaire) coûte davantage par équipement que cette hypothèse : mesuré à **10 appels MQTT
 par équipement** (dépublication de l'ancien type puis nouvelle découverte), soit deux fois
-la publication initiale. Une suppression d'équipements multi-entités (un dimmer avec ses
+la publication initiale, ce qui ramène le parc supporté à environ **155 équipements** pour
+un retypage en masse. Une suppression d'équipements multi-entités (un dimmer avec ses
 capteurs secondaires, par exemple) coûte environ **3 appels MQTT par équipement** mesurés —
 moins qu'une publication, mais à garder en tête pour dimensionner une sélection dominée par
-ce type d'équipement.
+ce type d'équipement (parc supporté : environ **510 équipements**).
 
 Si l'action ne se termine pas dans ce délai (parc inhabituellement volumineux, démon
 ralenti), le message suivant apparaît :

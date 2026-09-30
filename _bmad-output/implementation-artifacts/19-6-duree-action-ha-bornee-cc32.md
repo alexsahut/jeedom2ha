@@ -950,3 +950,13 @@ changent).
   évitant une collecte prématurée par le garbage collector si le handler est
   annulé ; résiduel AC4 (écouteurs en base non bornés par les 3 s de
   `GET /system/state_listeners`) déclaré sans code.
+- 2026-09-30 — unité L (8e et dernier tour de revue PR #189, Codex) : test de
+  charge AC7 fidèle au filtre de scope réel — les équipements hors portée
+  restent `is_eligible=True` (`effective_state: exclude`) dans le fixture
+  `_multi_capteur_parc()`, car `_evaluate_for_action()` n'est jamais gatée par
+  `published_scope` (filtre appliqué APRÈS `evaluate_equipment()`, AC3) ;
+  `n_max` recalculé à 301-309 (inchangé, `CAPACITE_DOCUMENTEE=250` toujours
+  tenue) ; comptes d'appels MQTT figés par assertion pour les chemins
+  coûteux (suppression multi-`node_id` : `== n*3` ; retypage : `== n*10`),
+  avec `n_max` dédié de chaque chemin recalculé (suppression : 511 ;
+  retypage : 155), recopié dans `docs/fr_FR/index.md`.

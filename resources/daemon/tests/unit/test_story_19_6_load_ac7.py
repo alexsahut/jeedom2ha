@@ -130,6 +130,11 @@ class _FakeMqttBridge:
 
 
 def _multi_capteur_parc(n: int, n_inclus: int | None = None):
+    """Revue Codex P1 (PR #189, 8e tour) : les équipements hors `n_inclus` restent
+    `is_eligible=True` (`effective_state: exclude`) — en production, `_evaluate_for_action()`
+    n'est jamais gatée par `published_scope`, seulement par `eligibility` (le filtre de scope
+    s'applique APRÈS `evaluate_equipment()`, cf. commentaire AC3 dans `_handle_action_execute`).
+    Un équipement éligible mais exclu du scope est donc bien évalué, juste pas publié."""
     n_inclus = n if n_inclus is None else n_inclus
     eq_logics, scope_equipements, eligibility, mappings, publications = {}, [], {}, {}, {}
     registry = MapperRegistry()
@@ -143,7 +148,7 @@ def _multi_capteur_parc(n: int, n_inclus: int | None = None):
             "effective_state": "include" if inclus else "exclude", "decision_source": "global",
             "is_exception": False, "has_pending_home_assistant_changes": False,
         })
-        eligibility[eq_id] = EligibilityResult(is_eligible=inclus, reason_code="eligible" if inclus else "excluded_eqlogic")
+        eligibility[eq_id] = EligibilityResult(is_eligible=True, reason_code="eligible")
         if inclus:
             evaluation = evaluate_equipment(
                 eq, _snapshot(eq), eligibility[eq_id], mapper_registry=registry, confidence_policy="strict",
@@ -447,6 +452,19 @@ async def test_ac7_supprimer_multi_node_id_sous_deadline(cli_factory, tmp_path):
           f"(par équipement={bridge.call_count / n:.2f})")
     assert response.status == 200
     assert duration < 55.0
+    # Revue Codex P2 (PR #189, 8e tour) : compte figé (mesuré = 3 node_ids/équipement), pas
+    # seulement imprimé — 3 dépublications par équipement (principal + 2 secondaires).
+    assert bridge.call_count == n * 3
+
+    # Revue Codex P2 (PR #189, 8e tour) : n_max de ce chemin (3 appels MQTT/équipement),
+    # recalculé avec les coûts unitaires mesurés — pour situer la marge réelle au-delà de n=94.
+    c_eq = _measure_c_eq() * MARGE_MESURE * MACHINE_FACTOR
+    c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
+    c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
+    budget_travail = action_pacing.budget_travail(55.0)
+    n_max_suppression = int((0.90 * budget_travail) / (3 * c_mqtt + c_eq + c_parc))
+    print(f"[AC7] n_max (supprimer multi-node_id, 3 appels/équipement, 90% enveloppe) = {n_max_suppression}")
+    assert n_max_suppression >= n
 
 
 def _retype_previous_publications(publications: dict) -> dict:
@@ -484,3 +502,18 @@ async def test_ac7_publier_retypage_sous_deadline(cli_factory, tmp_path):
           f"appels_mqtt={bridge.call_count} (par équipement={bridge.call_count / n:.2f})")
     assert response.status == 200
     assert duration < 55.0
+    # Revue Codex P2 (PR #189, 8e tour) : compte figé au lieu d'un simple print (mesuré = 10
+    # appels/équipement : dépublication de l'ancien type (3 node_ids) + republication sous le
+    # nouveau type (3 discoveries + 2 état au clic, comme APPELS_MQTT_PAR_EQUIPEMENT) + 2
+    # appels supplémentaires propres au retypage).
+    assert bridge.call_count == n * 10
+
+    # Revue Codex P2 (PR #189, 8e tour) : n_max de ce chemin (10 appels MQTT/équipement),
+    # recalculé avec les coûts unitaires mesurés — pour situer la marge réelle au-delà de n=94.
+    c_eq = _measure_c_eq() * MARGE_MESURE * MACHINE_FACTOR
+    c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
+    c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
+    budget_travail = action_pacing.budget_travail(55.0)
+    n_max_retypage = int((0.90 * budget_travail) / (10 * c_mqtt + c_eq + c_parc))
+    print(f"[AC7] n_max (publier retypage, 10 appels/équipement, 90% enveloppe) = {n_max_retypage}")
+    assert n_max_retypage >= n
