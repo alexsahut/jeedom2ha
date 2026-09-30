@@ -282,7 +282,8 @@ lieu, alors qu'il aurait été sauté avec l'ancien lissage non borné.
 **AC5 — Message juste en cas de vrai dépassement**
 
 **Given** un appel qui dépasse malgré tout le budget fixe `R` (panne réseau,
-démon bloqué, ou travail pur du démon supérieur à `deadline_s` — le démon ne
+démon bloqué, ou travail pur du démon supérieur à `budget_travail` (AC1bis)
+— le démon ne
 s'interrompt jamais en cours d'action, voir Dev Notes)
 **When** le relais reçoit `null` de `callDaemon`
 **Then** le message d'erreur distingue deux cas, à partir d'un **second**
@@ -361,7 +362,11 @@ observé majoré d'une marge explicite :
   tout `published_scope` et `save_publications_cache` sur toutes les
   `publications` (`http_server.py:3819-3824` et `4058-4063`,
   `disk_cache.py:117-149` ; revue Codex P1, `dfc651e`), mesuré par une action
-  sur un seul équipement d'un très grand inventaire
+  sur un seul équipement d'un très grand inventaire dont les publications
+  portent le nombre maximal de secondaires et de `node_id` (déclaré) : la
+  sérialisation du cache parcourt tous les `additional_mappings` de chaque
+  publication (`disk_cache.py:56-76` ; revue Codex P1, `5f3cc0c`). Une
+  publication qui dépasse cette forme compte au prorata de ses candidats
 
 **And** la taille supportée est une **enveloppe conjointe**, pas des maxima
 indépendants (revue Codex P1, `55be1a1`) : un parc est supporté si
@@ -730,6 +735,10 @@ changent).
   au prorata au-delà ; l'enveloppe est une borne supérieure, chaque coût
   étant mesuré sur la forme la plus coûteuse de son chemin (P1) ;
   journalisation d'AC1 complétée (`deadline_s`, durées, pauses) et testée (P2).
+- **Revue Codex, 18e tour (`5f3cc0c`)** — `c_parc` mesuré sur un inventaire
+  dont les publications portent le nombre maximal de secondaires et de
+  `node_id`, au prorata des candidats au-delà (P1). AC5 aligné sur
+  `budget_travail`.
 
 ### File List
 
@@ -760,3 +769,4 @@ changent).
 - 2026-09-30 — revue Codex 15e tour (coût du parc entier, marge de réveil).
 - 2026-09-30 — revue Codex 16e tour (AC3 : sonde avant la lecture au clic).
 - 2026-09-30 — revue Codex 17e tour (forme la plus coûteuse, journalisation).
+- 2026-09-30 — revue Codex 18e tour (`c_parc` sur les secondaires du parc).
