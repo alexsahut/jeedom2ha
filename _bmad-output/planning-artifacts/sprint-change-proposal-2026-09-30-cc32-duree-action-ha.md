@@ -37,9 +37,11 @@ l'AC11 de la Story 19.5 (« Si le relais abandonne sur délai (CC-32), les
 ## 2. Décision
 
 **GO d'Alexandre le 2026-09-30 à 11:20** (« ok GO »), sur la proposition de
-ClaudeBox de trier puis traiter CC-32 jusqu'au bout. Option (a) retenue par
-ClaudeBox et clawcode : aucune UX nouvelle ; seul le message du cas de vrai
-dépassement change, et il passe par la validation UX d'Alex avant `done`.
+ClaudeBox de trier puis traiter CC-32 jusqu'au bout. **Option (b′) retenue**
+par ClaudeBox (lissage borné par une échéance donnée au démon, voir §4), après
+l'abandon de l'option (a) : aucune UX nouvelle ; seul le message du cas de
+vrai dépassement change, et il passe par la validation UX d'Alex avant
+`done`.
 L'option (c) (asynchrone) reste hors périmètre : elle changerait l'UX et
 reviendrait à Alex.
 
@@ -51,7 +53,7 @@ reviendrait à Alex.
 - **Code concerné** : `resources/daemon/transport/http_server.py` (branches
   Publier l.3881/3957/4002, Supprimer l.3724/3744), `core/ajax/jeedom2ha.ajax.php`
   (relais l.764, budget 15 s), `desktop/js/jeedom2ha.js` (délai client l.343).
-- **UI Impact** : oui — `desktop/js/` et `core/ajax/` changent (option (a)),
+- **UI Impact** : oui — `desktop/js/` et `core/ajax/` changent (option (b′)),
   donc `ready-for-UX-validation` avant `done`.
 - Pas d'impact PRD/architecture/UX documents existants au-delà de l'ajout de la
   story dans l'epic.
@@ -59,7 +61,7 @@ reviendrait à Alex.
 ## 4. Approche retenue
 
 **Direct Adjustment** — ajout d'une story (19.6) à l'epic 19 existant. Scope
-**minor à moderate** selon l'option choisie (voir story, section « Options »).
+**moderate** : option (b′) (voir story, section « Options »).
 
 Trois options sont comparées dans la story. L'option (a) (budgets du relais et
 du client proportionnels au nombre d'équipements) a été **abandonnée** après
@@ -89,9 +91,9 @@ ajout de la Story 19.6 (F) à la liste des stories, et CC-32 aux points visés.
 ## 7. Complétion
 
 - Issue traitée : CC-32 (durée des actions HA non bornée pour les grands parcs).
-- Scope : Minor à Moderate (ajout de story dans l'epic existant, option de mise
-  en œuvre à trancher en dev-story ou par Alex si elle a un effet UX).
+- Scope : Moderate (ajout de story dans l'epic existant, option (b′) retenue ;
+  l'option (c), seule à changer l'UX, reviendrait à Alex).
 - Artefacts modifiés : `epics-projection-engine.md`, story 19.6 (nouvelle),
   `sprint-status.yaml`.
 - Routé vers : équipe de dev (create-story → dev-story → code-review, puis
-  `ready-for-UX-validation` si `desktop/`/`core/ajax/` changent).
+  `ready-for-UX-validation`, `desktop/` et `core/ajax/` changeant).

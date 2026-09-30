@@ -119,20 +119,6 @@ budget externe pour un travail interne au démon est structurellement fragile.
 - **Ferme le trou de fond (source unique de vérité : le démon mesure son
   propre travail) plutôt que de le contourner.**
 
-**(c) Action asynchrone suivie par polling.**
-- Le clic déclenche l'action en tâche de fond côté démon, répond
-  immédiatement, et l'UI interroge périodiquement un endpoint de statut.
-- Coût : élevé — nouveau contrat d'API (démarrage, statut, résultat final),
-  nouvel état UI (barre de progression ou équivalent), nouveaux tests bout en
-  bout.
-- Risque : élevé — change fondamentalement le flux (un clic qui ne bloque
-  plus la fin de l'action), avec des cas limites nouveaux (fermeture de
-  l'onglet pendant l'action, actions concurrentes).
-- Effet visible : **UX nouvelle** — le bouton ne resterait plus bloquant
-  jusqu'à la fin ; nécessiterait un retour visuel de progression.
-- **Décision à Alex si cette option est envisagée** : elle change l'UX au-delà
-  du simple délai d'attente technique.
-
 **(c) Action asynchrone suivie par polling.** [Hors périmètre]
 - Le clic déclenche l'action en tâche de fond côté démon, répond
   immédiatement, et l'UI interroge périodiquement un endpoint de statut.
@@ -195,7 +181,11 @@ preuve terrain
 8) et `écoulé` le temps déjà passé depuis le début de l'action
 **And** `reserve_travail` est estimée en continu à partir du travail
 réellement mesuré depuis le début de l'action (durée moyenne par équipement
-observée × équipements restants) — une mesure, pas un coefficient fixe
+observée × équipements restants) — une mesure, pas un coefficient fixe ;
+tant que peu d'équipements ont été mesurés, l'estimation prend le maximum de
+la moyenne observée et d'une valeur a priori prudente (constante nommée), pour
+ne pas sous-estimer le travail restant au démarrage d'un grand parc (test
+dédié)
 (répond au P2 de Codex sur le travail par équipement variable : secondaires,
 `node_id` de dépublication)
 **And** sans `deadline_s` (appelant redémarrage, ou tout autre appelant qui
@@ -213,9 +203,12 @@ sans `deadline_s`.
 **Given** le même appel `executeHaAction` côté client (`desktop/js/jeedom2ha.js:343`)
 **When** l'utilisateur clique sur « Publier » ou « Supprimer »
 **Then** le timeout AJAX du client est un délai **fixe**, indépendant de N :
-`R` + échéance de la lecture des valeurs au clic (voir ci-dessous, 10 s au
-plus) + réalignement des écouteurs (3 s) + marge de réalignement (3 s), et
-reste sous le `Timeout 300` d'Apache
+le pire des deux chemins de la requête PHP, plus une marge. Chemin qui
+aboutit : statut préalable (3 s, AC3) + échéance de la lecture des valeurs au
+clic (voir ci-dessous, 10 s au plus) + `R` + réalignement des écouteurs
+(3 s). Chemin en échec : statut préalable (3 s) + lecture au clic (10 s) +
+`R` + second statut de diagnostic (3 s, AC5). Le délai reste sous le
+`Timeout 300` d'Apache
 **And** la lecture des valeurs au clic de la Story 19.5
 (`_jeedom2ha_collect_click_values`, `jeedom2ha.ajax.php:382`) reçoit une
 **échéance explicite** (10 s au plus, horloge injectable pour le test) :
@@ -228,7 +221,8 @@ inchangé par (b′))
 démon : c'est `R` (constante fixe, AC1) qui borne réellement la durée du
 relais et rend la main (succès ou message d'AC5)
 **And** un test JS fige ce délai fixe à partir des mêmes constantes que le
-relais (`R`, échéance de lecture au clic, réalignement, marge).
+relais (`R`, statuts, échéance de lecture au clic, réalignement, marge) et
+vérifie qu'il dépasse strictement le pire des deux chemins.
 
 **AC3 — Non-régression détectée en quelques secondes, pas au bout de `R`**
 
@@ -259,8 +253,10 @@ lieu, alors qu'il aurait été sauté avec l'ancien lissage non borné.
 démon bloqué, ou travail pur du démon supérieur à `deadline_s` — le démon ne
 s'interrompt jamais en cours d'action, voir Dev Notes)
 **When** le relais reçoit `null` de `callDaemon`
-**Then** le message d'erreur distingue deux cas, à partir du `GET
-/system/status` d'AC3 : démon injoignable (message actuel), ou démon
+**Then** le message d'erreur distingue deux cas, à partir d'un **second**
+`GET /system/status` fait après l'échec (3 s, une tentative ; celui d'AC3
+précède l'action et ne dit rien de son issue) : démon injoignable (message
+actuel), ou démon
 joignable mais qui n'a pas répondu dans `R` — dans ce second cas le message
 indique que l'action peut se poursuivre côté démon au-delà du délai
 d'attente de l'UI, et le relais **ne réaligne pas** les écouteurs (formulation
@@ -551,6 +547,12 @@ changent).
   redéclarée en publications MQTT (candidats et `node_id`), mesurée par un
   test de charge (AC7), plutôt qu'en N d'équipements. AC1 à AC7 réécrits,
   AC1bis ajouté, Tasks 1 et 3 réécrites, Dev Notes et pointeurs mis à jour.
+- **Relecture ClaudeBox de (b′)** — 2026-09-30 — doublon de l'option (c)
+  retiré ; AC1bis : estimation du travail restant bornée par une valeur a
+  priori prudente au démarrage (objection clawcode) ; AC2 : délai du client
+  couvrant le pire des deux chemins (statut préalable, lecture au clic, `R`,
+  puis réalignement ou second statut) ; AC5 : second `GET /system/status`
+  après l'échec pour le diagnostic.
 
 ### File List
 
@@ -564,3 +566,5 @@ changent).
   client, modèle, pointeurs) et revue Codex PR #188 intégrée.
 - 2026-09-30 — conception (b′), décision ClaudeBox après 4 tours Codex :
   lissage borné par une échéance donnée au démon, option (a) abandonnée.
+- 2026-09-30 — relecture ClaudeBox de (b′) (doublon (c), estimation au
+  démarrage, délai du client sur le pire chemin, second statut en AC5).
