@@ -434,11 +434,15 @@ garde sa propre décision et son propre état initial (Story 19.2).
   - AC11 : l'écart ci-dessus est levé. La logique est extraite dans
     `core/php/jeedom2ha_state_listeners.php` (fonctions pures, sans cœur Jeedom) :
     récupérer → valider **toutes** les cibles (tout-ou-rien, Codex P2 PR #184) →
-    purger → créer, rien n'est touché sur échec. `syncStateListeners()` garde son
+    créer → purger (Codex P2 PR #185 : les nouveaux listeners sont créés avant de
+    supprimer les anciens, donc une exception en cours de route ne laisse aucune
+    commande sans écouteur ; écart assumé à l'ordre littéral de la Task 1), rien
+    n'est touché sur échec de récupération ou de validation. `syncStateListeners()` garde son
     budget par défaut (15 s) pour le sync et le démarrage ; seul « Publier » passe
-    3 s et une tentative (`jeedom2ha_realign_after_action`). 21 tests PHP ajoutés
+    3 s et une tentative (`jeedom2ha_realign_after_action`). 27 cas PHP ajoutés
     (ordre, conservation sur exception, réponse invalide ou cible mal formée, liste
-    vide, budget, `supprimer`, démon muet, indisponibilité sans exception).
+    vide, création ou purge en échec, budget, `supprimer`, démon muet,
+    indisponibilité sans exception).
   - AC8 : `fresh_since` relevé avant le premier `await` du handler (Codex P2, PR #184).
   - Résiduel AC6 : journal DEBUG `initial_state_no_click_value` ajouté et testé.
   - AC10 : test de câblage jusqu'au résultat du clic (échec d'état ⇒ `echec`, témoin
@@ -487,3 +491,4 @@ garde sa propre décision et son propre état initial (Story 19.2).
 - 2026-09-30 — revue Codex (`a733d09`) intégrée (AC11 : budget de 3 s pour le réalignement).
 - 2026-09-30 — dev-story (`clawcode`, `549d0e7`), statut `review`.
 - 2026-09-30 — relecture de code ClaudeBox : AC11 extrait et testé, `fresh_since` avant le premier `await`, DEBUG du résiduel AC6, câblage AC10 testé.
+- 2026-09-30 — revue Codex PR #185 : listeners créés avant la purge (aucune commande sans écouteur en cas d'exception).

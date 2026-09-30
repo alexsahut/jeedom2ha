@@ -54,16 +54,21 @@ function jeedom2ha_normalize_state_listener_targets($response): ?array {
 }
 
 /**
- * Réaligne les listeners d'état dans l'ordre récupérer -> valider -> purger -> créer.
- * Sur échec de la récupération (exception) ou réponse invalide, RIEN n'est supprimé :
- * les listeners existants sont conservés et un avertissement est journalisé.
+ * Réaligne les listeners d'état dans l'ordre récupérer -> valider -> créer -> purger.
+ * Sur échec de la récupération (exception) ou réponse invalide, RIEN n'est touché : les
+ * listeners existants sont conservés et un avertissement est journalisé.
+ * Les nouveaux listeners sont créés AVANT de supprimer les anciens (revue Codex P2,
+ * PR #185) : une exception pendant la création laisse les anciens intacts ; une exception
+ * pendant la purge laisse des doublons temporaires (un évènement relayé deux fois, sans
+ * effet : même valeur publiée), résorbés au réalignement suivant. Aucune commande ne se
+ * retrouve sans écouteur.
  *
  * @param callable $fetchTargets  function(): mixed — réponse brute du démon
  * @param callable $listExisting  function(): iterable — listeners d'état existants
  * @param callable $removeListener function($listener): void
  * @param callable $createListener function(int $eqId, int $cmdId): void
  * @param callable $warn          function(string $message): void
- * @return int|null nombre de listeners créés, ou null si rien n'a été touché
+ * @return int|null nombre de listeners créés, ou null si l'ensemble n'a pas été remplacé
  */
 function jeedom2ha_realign_state_listeners(
   callable $fetchTargets,
@@ -85,14 +90,34 @@ function jeedom2ha_realign_state_listeners(
     return null;
   }
 
-  foreach ($listExisting() as $existing) {
-    $removeListener($existing);
+  try {
+    // Relevé AVANT la création, pour ne jamais supprimer les listeners qu'on vient de créer.
+    $existing = [];
+    foreach ($listExisting() as $listener) {
+      $existing[] = $listener;
+    }
+  } catch (\Throwable $e) {
+    $warn('[STATE-LISTENER] Listeners existants illisibles, rien modifié : ' . $e->getMessage());
+    return null;
   }
 
   $count = 0;
-  foreach ($targets as $target) {
-    $createListener($target['eq_id'], $target['cmd_id']);
-    $count++;
+  try {
+    foreach ($targets as $target) {
+      $createListener($target['eq_id'], $target['cmd_id']);
+      $count++;
+    }
+  } catch (\Throwable $e) {
+    $warn('[STATE-LISTENER] Création interrompue après ' . $count . ' listener(s), anciens listeners conservés : ' . $e->getMessage());
+    return null;
+  }
+
+  try {
+    foreach ($existing as $listener) {
+      $removeListener($listener);
+    }
+  } catch (\Throwable $e) {
+    $warn('[STATE-LISTENER] Purge interrompue, doublons temporaires jusqu\'au prochain réalignement : ' . $e->getMessage());
   }
   return $count;
 }

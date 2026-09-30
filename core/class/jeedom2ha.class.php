@@ -406,9 +406,10 @@ class jeedom2ha extends eqLogic {
    * @return int nombre de listeners enregistrés
    */
   public static function syncStateListeners(?callable $_targetsFetcher = null, int $_timeout = 15, ?int $_maxAttempts = null): int {
-    // Story 19.5 (AC11) — ordre récupérer -> valider -> purger -> créer, délégué à une
+    // Story 19.5 (AC11) — ordre récupérer -> valider -> créer -> purger, délégué à une
     // fonction pure testée en CI (core/php/jeedom2ha_state_listeners.php) : sur échec ou
-    // réponse invalide, les listeners existants sont CONSERVÉS. Budget par défaut inchangé
+    // réponse invalide, les listeners existants sont CONSERVÉS ; aucune commande ne reste
+    // sans écouteur si la création ou la purge échoue en cours de route. Budget par défaut inchangé
     // (15 s, tentatives par défaut de callDaemon) pour le sync et le démarrage ; « Publier »
     // passe 3 s et une seule tentative (jeedom2ha_realign_after_action).
     $fetcher = $_targetsFetcher ?: function () use ($_timeout, $_maxAttempts) {
