@@ -140,8 +140,8 @@ option synchrone est bornée par la pile web de la box (`Timeout 300`
 d'Apache) : un budget fixe est donc inévitable, et un parc dont le travail
 pur dépasse ce budget le dépassera malgré la compression du lissage (AC5).
 L'option (b′) ne promet pas « jamais » : elle fixe une **taille de parc
-supportée**, celle dont le travail pur tient dans `deadline_s` moins le
-plafond des pauses (AC1bis), mesurée par un test de charge (AC7) et déclarée
+supportée**, celle dont le travail pur tient dans `budget_travail`
+(AC1bis), mesurée par un test de charge (AC7) et déclarée
 comme une enveloppe conjointe en appels MQTT de l'action (tous chemins) et
 en nombre d'équipements — cela répond au P2 de Codex sur le travail par
 équipement variable. Au-delà, le
@@ -190,9 +190,13 @@ dernière itération ne divise jamais par zéro (revue Codex P2, `472c372`) ;
 un test couvre explicitement la dernière itération, pour publier et pour
 supprimer
 **And** la garantie ne repose sur **aucune estimation** du travail restant :
-la durée de l'action est au plus son travail pur plus `plafond_pauses`, donc
-la réponse arrive avant `deadline_s` dès que le travail pur tient dans
-`deadline_s - plafond_pauses` (40 s avec les constantes d'AC1). C'est ce
+la durée de l'action est au plus son travail pur plus `plafond_pauses`, au
+retard de réveil des pauses près. Ce retard (`asyncio.sleep` qui rend la main
+après la durée demandée, sur une boucle chargée) est couvert par une marge
+nommée `marge_reveil` (1 s par exemple ; revue Codex P2, `dfc651e`) : la
+réponse arrive avant `deadline_s` dès que le travail pur tient dans
+`budget_travail = deadline_s - plafond_pauses - marge_reveil` (39 s avec ces
+constantes) ; un test simule un sommeil qui rend la main en retard. C'est ce
 travail pur que mesure la taille supportée d'AC7. Le précompte des appels
 MQTT restants, essayé aux tours Codex 6 à 12, est **abandonné** : chaque tour
 y trouvait un chemin non compté (secondaires, états au clic, dépublications
@@ -207,7 +211,7 @@ N évalués 94)
 ne le transmet pas), le comportement actuel de `_action_delay` est
 **inchangé** — la Décision 8 n'est pas touchée
 **And** le démon **n'interrompt jamais** une action en cours : si le travail
-pur dépasse à lui seul `deadline_s - plafond_pauses`, il va au bout et
+pur dépasse à lui seul `budget_travail`, il va au bout et
 répond en retard (cas de l'AC5)
 **And** un test couvre le plafond atteint (total des pauses au plus
 `plafond_pauses`), pour publier et pour supprimer, et un test couvre le
@@ -332,14 +336,26 @@ observé majoré d'une marge explicite :
   mesuré sur un parc multi-candidats, multi-`node_id` et retypé ;
 - `c_eq`, le coût d'évaluation d'un équipement de la portée, ignorés compris,
   mesuré sur une portée surtout ignorée (exclus, sans mapping) et presque
-  sans appel MQTT (revue Codex P1, `99f2450`)
+  sans appel MQTT (revue Codex P1, `99f2450`) ;
+- `c_parc`, le coût, par équipement du **parc entier**, du travail de fin
+  d'action qui ne dépend pas de la portée : `_apply_pending_scope_flags` sur
+  tout `published_scope` et `save_publications_cache` sur toutes les
+  `publications` (`http_server.py:3819-3824` et `4058-4063`,
+  `disk_cache.py:117-149` ; revue Codex P1, `dfc651e`), mesuré par une action
+  sur un seul équipement d'un très grand inventaire
 
-**And** la taille supportée est une **enveloppe conjointe**, pas deux maxima
+**And** la taille supportée est une **enveloppe conjointe**, pas des maxima
 indépendants (revue Codex P1, `55be1a1`) : un parc est supporté si
-`appels_MQTT × c_mqtt + équipements × c_eq ≤ deadline_s - plafond_pauses`
-**And** un scénario **mixte** placé sur la frontière de l'enveloppe (beaucoup
-d'équipements ignorés et beaucoup d'appels MQTT à la fois) vérifie que la
-réponse du démon arrive avant `deadline_s`
+`appels_MQTT × c_mqtt + équipements_portée × c_eq + équipements_parc × c_parc
+≤ budget_travail` (AC1bis)
+**And** l'enveloppe est un modèle linéaire mesuré : tout autre terme de coût
+découvert en dev-story ou en revue de code s'y ajoute sous la même forme,
+mesuré par le test de charge ; la durée **de bout en bout** de chaque
+scénario est comparée à `deadline_s`, ce qui fait apparaître un terme oublié
+**And** deux scénarios placés sur la frontière de l'enveloppe vérifient que
+la réponse du démon arrive avant `deadline_s` : un scénario **mixte**
+(beaucoup d'équipements ignorés et beaucoup d'appels MQTT à la fois) et une
+**petite portée sur un très grand inventaire**
 **And** l'enveloppe, ses constantes et leur marge sont figées par le test et
 déclarées dans la story et dans la documentation utilisateur
 (`docs/fr_FR/index.md`), traduites en ordres de grandeur lisibles pour un
@@ -479,8 +495,11 @@ changent).
   - [ ] Test de charge du démon (AC7), faux MQTT à latence réaliste :
     `c_mqtt` mesuré sur un parc multi-candidats, retypé et multi-`node_id` ;
     `c_eq` mesuré sur une portée surtout ignorée, presque sans appel MQTT
-    (revue Codex P2, `ecce1dc`) ; enveloppe conjointe vérifiée par un
-    scénario mixte sur sa frontière (revue Codex P1, `55be1a1`). Rejoue le
+    (revue Codex P2, `ecce1dc`) ; `c_parc` mesuré par une action sur un seul
+    équipement d'un très grand inventaire (revue Codex P1, `dfc651e`) ;
+    enveloppe conjointe vérifiée sur sa frontière par le scénario mixte et
+    par la petite portée sur grand inventaire (revue Codex P1, `55be1a1`).
+    Rejoue le
     couple mesuré (292, 94, ~11 s) et un grand parc simulé dans l'enveloppe ;
     assertions sur `deadline_s`. Déclare l'enveloppe, avec une marge
     explicite.
@@ -668,6 +687,14 @@ changent).
   assertions du test de charge sur `deadline_s`, relais testé contre `R`
   (P2) ; la garantie du budget fixe est bornée à l'enveloppe dans l'epic et
   la proposition (P2).
+- **Revue Codex, 15e tour (`dfc651e`)** — terme `c_parc` (travail de fin
+  d'action proportionnel au parc entier : drapeaux de portée, cache des
+  publications) ajouté à l'enveloppe, avec un scénario petite portée sur très
+  grand inventaire ; clause générale : tout terme découvert plus tard s'ajoute
+  à l'enveloppe, et chaque scénario est comparé de bout en bout à
+  `deadline_s` (P1) ; marge de réveil des pauses `marge_reveil` et
+  `budget_travail = deadline_s - plafond_pauses - marge_reveil`, testée par
+  un sommeil en retard (P2).
 
 ### File List
 
@@ -695,3 +722,4 @@ changent).
   pauses (AC1bis) ; deux scénarios de charge (Task 3).
 - 2026-09-30 — revue Codex 14e tour (enveloppe conjointe, assertions sur
   `deadline_s`, garantie bornée à l'enveloppe).
+- 2026-09-30 — revue Codex 15e tour (coût du parc entier, marge de réveil).
