@@ -301,6 +301,72 @@ function _jeedom2ha_build_export_summary(array $equipments): array {
     return $summary;
 }
 
+/**
+ * Story 19.5 (AC6) — fonction pure : rend {cmd_id: valeur} pour les commandes de
+ * type 'info' d'une liste de commandes injectées, via un getter de valeur injecté
+ * (motif de getFullTopology / getCache('value', null), jeedom2ha.class.php:729).
+ * Omet les commandes sans valeur (null) : c'est le résiduel AC6 (aucune erreur).
+ * $cmds : tableau de ['cmd_id' => int, 'type' => string, ...(payload libre pour le getter)].
+ */
+function _jeedom2ha_read_current_values(array $cmds, callable $_valueGetter): array {
+    $values = [];
+    foreach ($cmds as $cmd) {
+        if (!is_array($cmd) || ($cmd['type'] ?? '') !== 'info') {
+            continue;
+        }
+        $cmdId = (int)($cmd['cmd_id'] ?? 0);
+        if ($cmdId <= 0) {
+            continue;
+        }
+        $value = $_valueGetter($cmd);
+        if ($value === null) {
+            continue;
+        }
+        $values[$cmdId] = $value;
+    }
+    return $values;
+}
+
+/**
+ * Story 19.5 (AC6/AC11) — fonction pure : étend une portée (equipement/piece/global)
+ * en liste d'eq_id, AVANT toute lecture de valeur. Les résolveurs piece/global sont
+ * injectés (dépendent du cœur Jeedom en runtime, mockables en test).
+ */
+function _jeedom2ha_expand_portee_to_eq_ids(
+    string $portee,
+    array $selection,
+    callable $_pieceEqIdsFetcher,
+    callable $_allEqIdsFetcher
+): array {
+    $ids = [];
+    if ($portee === 'equipement') {
+        foreach ($selection as $s) {
+            if (ctype_digit((string)$s)) {
+                $ids[] = (int)$s;
+            }
+        }
+        return $ids;
+    }
+    if ($portee === 'piece') {
+        foreach ($selection as $pieceId) {
+            if (!ctype_digit((string)$pieceId)) {
+                continue;
+            }
+            foreach ($_pieceEqIdsFetcher((int)$pieceId) as $eqId) {
+                $ids[] = (int)$eqId;
+            }
+        }
+        return $ids;
+    }
+    if ($portee === 'global') {
+        foreach ($_allEqIdsFetcher() as $eqId) {
+            $ids[] = (int)$eqId;
+        }
+        return $ids;
+    }
+    return [];
+}
+
 if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
 try {
     require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
@@ -614,11 +680,60 @@ try {
       if (!is_array($params['selection'])) {
         $params['selection'] = [];
       }
+
+      // Story 19.5 (AC6) — pour 'publier' uniquement : étendre la portée en eq_id
+      // AVANT toute lecture de valeur, puis lire les valeurs courantes (lecture
+      // seule, getCache('value', null), jamais execCmd) pour transmission au démon.
+      if ($params['intention'] === 'publier') {
+        $eqIds = _jeedom2ha_expand_portee_to_eq_ids(
+          $params['portee'],
+          $params['selection'],
+          function ($pieceId) {
+            $ids = [];
+            foreach (eqLogic::byObjectId($pieceId) as $eq) {
+              if ($eq->getEqType_name() !== 'jeedom2ha') {
+                $ids[] = $eq->getId();
+              }
+            }
+            return $ids;
+          },
+          function () {
+            $ids = [];
+            foreach (eqLogic::all() as $eq) {
+              if ($eq->getEqType_name() !== 'jeedom2ha') {
+                $ids[] = $eq->getId();
+              }
+            }
+            return $ids;
+          }
+        );
+        $cmdsForValues = [];
+        foreach ($eqIds as $eqId) {
+          foreach (cmd::byEqLogicId($eqId) as $cmd) {
+            $cmdsForValues[] = ['cmd_id' => $cmd->getId(), 'type' => $cmd->getType(), '_cmd' => $cmd];
+          }
+        }
+        $params['current_values'] = _jeedom2ha_read_current_values($cmdsForValues, function ($c) {
+          return $c['_cmd']->getCache('value', null);
+        });
+      }
+
       $result = jeedom2ha::callDaemon('/action/execute', $params, 'POST', 15);
       if ($result === null) {
         log::add('jeedom2ha', 'error', '[ACTION] Le démon n\'a pas répondu à /action/execute (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }
+
+      if ($params['intention'] === 'publier') {
+        // Story 19.5 (AC11) — réalignement des listeners d'état après publication,
+        // best-effort : un échec ne doit jamais faire échouer la requête utilisateur.
+        try {
+          jeedom2ha::syncStateListeners();
+        } catch (\Throwable $e) {
+          log::add('jeedom2ha', 'warning', '[ACTION] syncStateListeners après publier: ' . $e->getMessage());
+        }
+      }
+
       ajax::success($result);
     }
     else if ($action == 'getMappingOverrides') {

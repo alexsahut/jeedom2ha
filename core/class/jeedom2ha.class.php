@@ -405,26 +405,29 @@ class jeedom2ha extends eqLogic {
    * @return int nombre de listeners enregistrés
    */
   public static function syncStateListeners(?callable $_targetsFetcher = null): int {
-    foreach (listener::byClass(__CLASS__) as $existing) {
-      if ($existing->getFunction() === 'stateListener') {
-        $existing->remove();
-      }
-    }
-
-    $fetcher = $_targetsFetcher ?: function() {
-      return self::callDaemon('/system/state_listeners', null, 'GET', 15);
+    // Story 19.5 (AC11) — ordre inversé : fetch -> validate -> purge -> create.
+    // Un GET en échec (timeout budget serré post-Publier) conserve les listeners
+    // existants au lieu de couper toute remontée d'état jusqu'au réalignement suivant.
+    $fetcher = $_targetsFetcher ?: function ($_maxAttempts) {
+      return self::callDaemon('/system/state_listeners', null, 'GET', 3, $_maxAttempts);
     };
 
     try {
-      $response = $fetcher();
+      $response = $fetcher(1);
     } catch (\Throwable $e) {
       log::add(__CLASS__, 'warning', '[STATE-LISTENER] Cibles indisponibles : ' . $e->getMessage());
       return 0;
     }
 
     if (!is_array($response) || ($response['status'] ?? null) !== 'ok' || !isset($response['listeners']) || !is_array($response['listeners'])) {
-      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Contrat state_listeners indisponible — aucun listener enregistré');
+      log::add(__CLASS__, 'warning', '[STATE-LISTENER] Contrat state_listeners indisponible — aucun listener enregistré, listeners existants conservés');
       return 0;
+    }
+
+    foreach (listener::byClass(__CLASS__) as $existing) {
+      if ($existing->getFunction() === 'stateListener') {
+        $existing->remove();
+      }
     }
 
     $count = 0;
@@ -509,7 +512,7 @@ class jeedom2ha extends eqLogic {
     log::add(__CLASS__, 'info', '[DAEMON] Daemon stopped');
   }
 
-  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET', $_timeout = 3) {
+  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET', $_timeout = 3, $_maxAttempts = null) {
     $apiPort = config::byKey('daemonApiPort', __CLASS__, '55080');
     $localSecret = config::byKey('localSecret', __CLASS__);
     $url = 'http://127.0.0.1:' . $apiPort . $_endpoint;
@@ -540,8 +543,10 @@ class jeedom2ha extends eqLogic {
 
     $context = stream_context_create($opts);
 
-    // Retry only for idempotent GET requests
-    $maxAttempts = ($_method === 'GET') ? 2 : 1;
+    // Retry only for idempotent GET requests. Story 19.5 (AC11) — $_maxAttempts
+    // permet d'imposer 1 seule tentative (budget serré post-Publier) sans changer
+    // le comportement par défaut des autres appelants.
+    $maxAttempts = $_maxAttempts !== null ? max(1, (int)$_maxAttempts) : (($_method === 'GET') ? 2 : 1);
     $lastError = null;
 
     for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
