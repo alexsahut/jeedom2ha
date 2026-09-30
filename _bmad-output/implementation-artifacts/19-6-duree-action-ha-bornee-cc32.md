@@ -204,7 +204,12 @@ Codex P1, `f378ceb`) —, plus la disponibilité et les nettoyages en attente.
 réellement émis par l'action ; le test du faux MQTT compte ces appels sur
 **chaque chemin** (publier, supprimer mono et multi-entité, état au clic,
 disponibilité, nettoyages rejoués) et échoue si le précompte est inférieur
-sur l'un d'eux. Le coût unitaire est le **maximum**,
+sur l'un d'eux. S'y ajoute le **coût d'évaluation** de chaque équipement
+restant de la portée, y compris ceux qui seront ignorés (exclus, sans
+mapping) et n'émettront rien (`_evaluate_for_action` et contrôles de portée,
+`http_server.py:3883-3898`, revue Codex P1, `99f2450`), estimé de la même
+façon : maximum non décroissant du coût observé et d'une valeur a priori
+prudente. Le coût unitaire est le **maximum**,
 pendant toute l'action, du coût observé par publication et d'une valeur a
 priori prudente (constante nommée, validée par le test de charge d'AC7) —
 jamais une moyenne qui baisse (revue Codex P1, `472c372` : sinon, des
@@ -341,6 +346,11 @@ d'appels MQTT de l'action** (`publish_message`, sur tous les chemins :
 discovery des candidats, état au clic, disponibilité, dépublication de chaque
 `node_id` ou de repli, nettoyages rejoués), pas en nombre d'équipements — la
 même unité que le précompte d'AC1bis (revue Codex P1, `a1a8514`)
+**And** la taille supportée comporte une **seconde borne**, le nombre
+d'équipements de la portée (tous évalués, y compris les ignorés), mesurée par
+un test de charge dont la portée contient une grande majorité d'équipements
+exclus ou sans mapping et presque aucun appel MQTT (revue Codex P1,
+`99f2450`) ; un parc est supporté s'il respecte les deux bornes
 **And** cette taille est figée par le test avec une marge explicite, et
 déclarée dans la story et dans la documentation utilisateur
 (`docs/fr_FR/index.md`), traduite en un ordre de grandeur lisible pour un
@@ -637,6 +647,10 @@ changent).
 - **Revue Codex, 10e tour (`a1a8514`)** — taille supportée mesurée en appels
   MQTT totaux, même unité que le précompte (P1) ; documentation utilisateur
   `docs/fr_FR/index.md` planifiée (P2).
+- **Revue Codex, 11e tour (`99f2450`)** — coût d'évaluation par équipement
+  (y compris ignorés) ajouté à la réserve, et seconde borne de taille
+  supportée en nombre d'équipements, testée sur une portée surtout ignorée
+  (P1).
 
 ### File List
 
@@ -658,3 +672,4 @@ changent).
 - 2026-09-30 — revue Codex 8e tour (précompte de tous les appels MQTT).
 - 2026-09-30 — revue Codex 9e tour (max(1, node_id), règle générale du précompte).
 - 2026-09-30 — revue Codex 10e tour (unité de la taille supportée, doc utilisateur).
+- 2026-09-30 — revue Codex 11e tour (coût d'évaluation, seconde borne).
