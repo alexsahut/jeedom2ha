@@ -22,7 +22,9 @@ Durée : du 2026-09-27 au 2026-09-30.
   - PR #169, puis correctif CC-22 (PR #172).
   - Parité stricte avant et après : 292 décisions, 353 topics retenus, diff vide.
   - Préalable : CC-20 corrigé par une PR `fix/` dédiée.
-- **19-2** : découplage I11 entre états et commandes (`sync/state.py`, `sync/command.py`). PR #174. Les 12 écouteurs d'état attendus (eq 579 et 585) sont republiés.
+- **19-2** : découplage I11 entre états et commandes (`sync/state.py`, `sync/command.py`). PR #174.
+  - Les 12 écouteurs d'état attendus (eq 579 et 585) sont republiés.
+  - Correctif post-fusion 19-2b (PR #178, preuve PR #179) : leurs entités restaient indisponibles dans HA, faute de disponibilité publiée pour les secondaires ; elles reprennent une valeur (CC-28).
 - **19-3** : surface par pièce et aperçu branchés sur le contrat. PR #176.
   - Ferme CC-03 et CC-19.
   - « Revenir au mode automatique » efface tous les overrides de l'équipement.
@@ -34,7 +36,7 @@ Durée : du 2026-09-27 au 2026-09-30.
   - Budget fixe du relais et du client, échéance transmise au démon, pauses de lissage plafonnées, action protégée et sérialisée.
   - PR #188 (story), #189 (code), #190 (preuve et clôture). Ferme CC-32.
 
-**Points fermés** : CC-03, CC-14 P1, CC-18, CC-19, CC-22, CC-29, CC-30, CC-31, CC-32. CC-04 est partiellement fermé : son volet contrat est fait, son volet interface revient à l'étape 4.
+**Points fermés** : CC-03, CC-14 P1, CC-18, CC-19, CC-22, CC-28, CC-29, CC-30, CC-31, CC-32. CC-04 est partiellement fermé : son volet contrat est fait, son volet interface revient à l'étape 4.
 
 ## Gates epic-level (`epics-projection-engine.md`)
 
