@@ -11,6 +11,8 @@ L'epic 19 a remplacé les 4 calculs divergents de la décision de publication (s
 
 Les 7 stories sont `done`, de 19-0 à 19-6. Toutes, sauf 19-0 (fonction pure, sans branchement), ont été déployées sur la box et prouvées sur le terrain. Les 4 stories qui touchent l'interface (19-3 à 19-6) sont passées par `ready-for-UX-validation`.
 
+19-3 est close avec une dérogation sur AC5, décidée par Alex le 29/09 à 08:13 (option A). Aucune interface ne permet encore de poser un override de publication (CC-26) : la purge de cet override par « Revenir au mode automatique » est prouvée par test (AC3), et son clic réel est un critère obligatoire de l'étape 4.
+
 Durée : du 2026-09-27 au 2026-09-30.
 
 ## Valeur livrée
@@ -39,7 +41,7 @@ Durée : du 2026-09-27 au 2026-09-30.
 - **Une seule fonction fait foi** : sync (19-1), surface par pièce et aperçu (19-3), « Publier » (19-4). ✔
 - **Parité avant tout changement de comportement** : prouvée en 19-1 (diff vide), avant le découplage I11 de 19-2. ✔
 - **I11 corrigé par découplage**, sans couplage forcé du secondaire sur le principal. ✔
-- **CC-03, CC-18, CC-19 et CC-14 P1 fermés et prouvés**, par parité, clic réel et preuves terrain. CC-04 est partiel, comme prévu. ✔
+- **CC-03, CC-18, CC-19 et CC-14 P1 fermés et prouvés**, par parité, clic réel et preuves terrain. CC-04 est partiel, comme prévu. Pour CC-19, la purge de l'override de publication est prouvée par test ; son clic réel est reporté à l'étape 4 (dérogation d'AC5 de 19-3). ✔
 - **`local_secret` jamais exposé** par l'outil de parité : AC5 de 19-1, vérifié par un test et une revue. ✔
 
 ## Preuves

@@ -52,6 +52,8 @@ so that je ne vois plus "sera publié" pour un équipement en réalité exclu (C
 **And** cette story reste au statut `ready-for-UX-validation` tant que ce scénario de clic réel n'a pas été exécuté et documenté.
 **And** la validation est nommément identifiée : validateur, date, SHA déployé, environnement (box 192.168.1.21).
 
+**Dérogation (décision d'Alex, 29/09 à 08:13, option A)** : l'étape (4) du scénario n'a pu être jouée qu'avec un override TYPE, car aucune interface ne permet encore de poser un override de publication (CC-26). AC5 est close telle quelle. La purge de l'override de publication par le même bouton est prouvée par le test automatisé d'AC3 ; son clic réel devient un critère obligatoire de l'étape 4. Détail : `19-3-ac5-validation-2026-09-29.md`.
+
 **AC6 — Deux temporalités explicites**
 
 **Given** les données de l'application
@@ -105,9 +107,9 @@ I2, I4, I6 (cohérence de la décision affichée avec celle réellement appliqu�
   - [x] Ajouter dans `desktop/js/jeedom2ha_mapping_override.js` (l.199-211) un libellé français pour chaque nouvelle raison exposée par le branchement sur `evaluate_equipment()`.
   - [x] Citer le bouton/handler réellement concernés : `desktop/js/jeedom2ha_mapping_surface.js:190-200,264-278` et `_handle_mapping_override_revert` (`http_server.py:2642-2648`).
 
-- [ ] Task 5 — Preuve par clic réel (AC5)
-  - [ ] Exécuter le scénario de clic décrit en AC5 sur la box réelle, documenter le résultat
-  - [ ] Statut `ready-for-UX-validation` jusqu'à documentation de la preuve, puis passage à `done`
+- [x] Task 5 — Preuve par clic réel (AC5) — *faite le 29/09 par ClaudeBox (01:27-01:31, `5b14243` déployé), avec la dérogation d'AC5 décidée par Alex (29/09 08:13, option A)*
+  - [x] Exécuter le scénario de clic décrit en AC5 sur la box réelle, documenter le résultat (`19-3-ac5-validation-2026-09-29.md`)
+  - [x] Statut `ready-for-UX-validation` jusqu'à documentation de la preuve, puis passage à `done`
 
 - [x] Task 6 — Tests (AC1-AC4, AC6-AC7)
   - [x] `test_story_19_3_ac{1,2,3,6,7}_*.py` (préfixe `test_story_19_3_*`) côté backend, plus le garde-fou de parité JSON `test_story_19_3_guardrail_no_override_json_parity.py`
@@ -208,6 +210,8 @@ le test doit couvrir ce conflit dans le contrat puis dans l’aperçu.
 
 - **AC5 (validation UX, clic réel)** — 2026-09-29 — AC5 validée par clic réel (ClaudeBox, Chrome, 29/09 01:27-01:31), écart override de publication tranché par Alex le 29/09 à 08:13 (option A), reporté à l'étape 4 (CC-26) ; voir `19-3-ac5-validation-2026-09-29.md`. Statut résultant : `done`.
 
+- **Alignement (2026-10-01)** — revue Codex de la PR #191 : Task 5 cochée et dérogation d'AC5 consignée sous l'AC, conformément à la décision d'Alex du 29/09 (08:13, option A), déjà appliquée au statut `done`. Aucun changement de périmètre.
+
 ### File List
 
 **Production (Reprise 1, `2bc7c43` + travail antérieur en `1b9906f`) :**
@@ -248,3 +252,6 @@ le test doit couvrir ce conflit dans le contrat puis dans l’aperçu.
 
 **Validation AC5 (clic réel, 2026-09-29) :**
 - `_bmad-output/implementation-artifacts/19-3-ac5-validation-2026-09-29.md` [NOUVEAU]
+
+**Alignement (2026-10-01, revue Codex de la PR #191) :**
+- `_bmad-output/implementation-artifacts/19-3-surface-piece-apercu-contrat-decision-cc03-cc19.md` [MODIFIÉ] — Task 5 cochée, dérogation d'AC5 consignée.
