@@ -23,6 +23,19 @@ function blockingView() {
   };
 }
 
+// Commande non couverte par le mapping : forme de `_decision_view(decision, None)` côté
+// démon (branche `mapping=None` de l'arbre GET), `publication_reason=command_not_covered`.
+function uncoveredView() {
+  return {
+    ha_entity_type: null,
+    confidence: null,
+    reason_code: null,
+    projection_validity: { is_valid: false, reason_code: 'command_not_covered', missing_capabilities: [], missing_fields: [] },
+    should_publish: false,
+    publication_reason: 'command_not_covered',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // AC2/AC3 — normalisation de l'arbre pièce -> équipement (ordre natif préservé)
 // ---------------------------------------------------------------------------
@@ -127,6 +140,42 @@ describe('16.8 / AC9 — summarizePublication', () => {
     assert.strictEqual(s.will_publish, false);
     assert.strictEqual(M.publicationSummaryState(s), 'empty');
   });
+
+  it('commande non couverte (command_not_covered) : ni prête ni bloquante, jamais l’ancre', () => {
+    const s = M.summarizePublication(treeWith([readyView(), uncoveredView(), readyView()]));
+    assert.strictEqual(s.total, 3);
+    assert.strictEqual(s.ready_count, 2);
+    assert.strictEqual(s.blocking_count, 0);
+    assert.strictEqual(s.uncovered_count, 1);
+    assert.strictEqual(s.unknown_count, 0);
+    assert.strictEqual(s.first_blocking_cmd_id, null);
+    assert.strictEqual(M.publicationSummaryState(s), 'publish');
+  });
+
+  it('non couverte avant une vraie bloquante : l’ancre va à la bloquante', () => {
+    const s = M.summarizePublication(treeWith([uncoveredView(), readyView(), blockingView()]));
+    assert.strictEqual(s.uncovered_count, 1);
+    assert.strictEqual(s.blocking_count, 1);
+    assert.strictEqual(s.first_blocking_cmd_id, 12); // 10 = non couverte, 11 = prête, 12 = bloquante
+    assert.strictEqual(M.publicationSummaryState(s), 'partial');
+  });
+
+  it('seulement des non couvertes → état vide, jamais « ne sera pas publié »', () => {
+    const s = M.summarizePublication(treeWith([uncoveredView(), uncoveredView()]));
+    assert.strictEqual(s.uncovered_count, 2);
+    assert.strictEqual(s.blocking_count, 0);
+    assert.strictEqual(s.will_publish, false);
+    assert.strictEqual(M.publicationSummaryState(s), 'empty');
+  });
+
+  it('bascule par override : la commande devenue prête fait passer la synthèse de partiel à publié', () => {
+    const before = M.summarizePublication(treeWith([readyView(), blockingView()]));
+    const after = M.summarizePublication(treeWith([readyView(), readyView()]));
+    assert.strictEqual(M.publicationSummaryState(before), 'partial');
+    assert.strictEqual(before.first_blocking_cmd_id, 11);
+    assert.strictEqual(M.publicationSummaryState(after), 'publish');
+    assert.strictEqual(after.first_blocking_cmd_id, null);
+  });
 });
 
 describe('16.8 / AC9-AC10 — buildPublicationSummaryLabel', () => {
@@ -152,6 +201,12 @@ describe('16.8 / AC9-AC10 — buildPublicationSummaryLabel', () => {
   it('vide : message explicite « aucune commande projetable »', () => {
     const label = M.buildPublicationSummaryLabel(M.summarizePublication(treeWith([])));
     assert.match(label, /Aucune commande projetable/);
+  });
+
+  it('cas de l’eq 391 : 3 prêtes + 1 non couverte → « Sera publié », jamais « Partiellement »', () => {
+    const label = M.buildPublicationSummaryLabel(
+      M.summarizePublication(treeWith([readyView(), readyView(), readyView(), uncoveredView()])));
+    assert.strictEqual(label, 'Sera publié dans Home Assistant : 3 commande(s) prête(s).');
   });
 });
 
