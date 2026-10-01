@@ -8,39 +8,44 @@ Status: ready-for-dev
 
 As un mainteneur,
 I want un gate de preuve UX outillé (Playwright, compte Jeedom dédié, écritures interceptées) exécutable avant tout `done` d'interface,
-so that les stories 20.1 et suivantes puissent prouver leurs parcours réels par clic sans risque d'écrire dans la maison, et sans dépendre à chaque fois d'un clic manuel long (le constat de la rétrospective pe-epic-19 sur 19-3/19-5/19-6/16-8).
+so that les stories 20.1 et suivantes puissent prouver leurs parcours réels par clic sans risque d'écrire dans la maison, et sans dépendre à chaque fois d'un clic manuel long (plan d'action d'Alex du 2026-09-26, étape 4 : « d'abord un gate de preuve UX outillé »).
 
 **Parcours : complet.** Story bloquante, sans valeur utilisateur directe : aucune interface n'est modifiée par cette story.
 
 ## Acceptance Criteria
 
-**AC1 — Playwright exécute un parcours contre l'UI Jeedom réelle, sans écriture non maîtrisée**
+**AC1 — Interception par défaut : aucune écriture non maîtrisée**
 
 **Given** une page du plugin `jeedom2ha` ouverte via Playwright sur la VM openclaw, authentifiée avec le compte Jeedom dédié
-**When** un parcours de lecture (navigation par pièce, ouverture d'un équipement, consultation du diagnostic) est exécuté
-**Then** aucune requête AJAX d'écriture réelle vers Jeedom (`executeHaAction`, ou toute action qui modifierait l'état d'un équipement/scénario Jeedom) n'aboutit
-**And** la liste des requêtes interceptées et leur verdict (bloquée / laissée passer) sont journalisées par le gate.
+**When** un parcours est exécuté
+**Then** toute requête vers `core/ajax/*.ajax.php` ou `plugins/*/core/ajax/*.ajax.php` est bloquée par défaut, sauf si le couple (point d'entrée, `action`) figure dans la liste des lectures autorisées, dans la liste d'authentification, dans la liste blanche d'override (uniquement dans les conditions d'AC2), ou s'il fait l'objet d'une réponse simulée déclarée par le parcours (section « Mécanisme d'interception des écritures »)
+**And** aucune action à effet de bord n'aboutit, en particulier `scanTopology` (synchronisation complète vers HA), `executeHaAction` (« Publier » / « Suppr. »), `saveFilteringConfig`, `forceMqttManagerImport` et `testMqttConnection`
+**And** chaque requête interceptée est journalisée avec son verdict (lecture autorisée / authentification / liste blanche / simulée / bloquée), sans aucune valeur sensible.
 
-**AC2 — Liste blanche explicite pour les parcours d'override, avec restauration vérifiée**
+**AC2 — Liste blanche des parcours d'override, avec restauration garantie même en cas d'échec**
 
-**Given** un parcours de preuve qui pose ou purge un override de publication (`saveMappingOverride`, `revertMappingOverride`)
-**When** le gate autorise ce parcours via sa liste blanche explicite
-**Then** `data/ha_overrides.json` est lu avant le parcours (état de référence), le parcours s'exécute, puis `data/ha_overrides.json` est relu après restauration (purge de l'override posé) et comparé octet à octet à l'état de référence
-**And** le gate échoue si l'état final diffère de l'état de référence.
+**Given** un parcours de preuve inscrit explicitement en liste blanche, qui pose puis retire un override (`saveMappingOverride`, `revertMappingOverride`)
+**When** il s'exécute
+**Then** le parcours déclare la liste fermée des équipements qu'il vise ; une requête `saveMappingOverride` ou `revertMappingOverride` n'est laissée passer que si son `eqId` appartient à cette liste (et, pour `saveMappingOverride`, si son `cmdId` est une commande de cet équipement) ; toute autre est bloquée, journalisée, et fait échouer le gate
+**And** avant le parcours, le gate lit `data/ha_overrides.json` sur la box (lecture seule) : il exige que le fichier existe, relève son sha256 et son contenu JSON, et vérifie que chaque équipement visé n'a **aucun** override dans cet état de référence ; sinon, il refuse de lancer le parcours
+**And** la restauration s'exécute dans un bloc de nettoyage garanti (`finally` / teardown), y compris si Playwright, le navigateur ou une vérification échoue : purge « tout l'équipement » (`revertMappingOverride` sans `cmdId`) pour chaque équipement visé, puis relecture du fichier (contenu JSON et sha256) ; si le navigateur est tombé, la purge passe par une nouvelle session authentifiée (liste d'authentification)
+**And** le gate échoue si le contenu JSON final diffère de la référence (comparaison du JSON parsé ; les sha256 avant et après figurent au rapport), et l'écrit en tête de son rapport
+**And** une commande de restauration autonome, idempotente, rejoue la même purge et la même vérification si le processus du gate a été tué avant son nettoyage ; elle ouvre pour cela une nouvelle session authentifiée (liste d'authentification), car la session du navigateur n'est jamais conservée sur disque.
 
 **AC3 — Vérifications minimales avant tout `done` d'interface**
 
 **Given** une story d'interface de l'epic 20 (20.1 et suivantes) arrivée à `ready-for-UX-validation`
 **When** le gate 20.0 est exécuté sur cette story
-**Then** il vérifie au minimum : zéro requête d'écriture non maîtrisée pendant tout le parcours (AC1), restauration vérifiée de `data/ha_overrides.json` pour les parcours d'override (AC2), absence d'erreur JavaScript console pendant le parcours, absence d'entrée `ERROR` dans les journaux du démon pendant la fenêtre du parcours
-**And** le gate produit un rapport exploitable (liste des vérifications, verdict pass/fail par vérification) consommé par la story testée.
+**Then** il vérifie au minimum : aucune requête nécessaire au parcours bloquée sans réponse simulée déclarée, aucune écriture non maîtrisée (AC1), restauration vérifiée de `data/ha_overrides.json` pour les parcours d'override (AC2), aucune erreur JavaScript en console pendant le parcours, aucune ligne `ERROR` dans les journaux du démon pendant la fenêtre du parcours, et, pendant la fenêtre d'un parcours d'override, aucune ligne `DISCOVERY`, `Unpublishing`, `[SYNC]` ni `POST /action/sync` (une synchronisation pendant cette fenêtre publierait l'override temporaire dans HA : le gate est alors rouge et le signale, même si le fichier est restauré)
+**And** le gate produit un rapport exploitable (liste des vérifications, verdict pass/fail par vérification), joint à la story testée.
 
 **AC4 — Lecture des identifiants hors dépôt, jamais journalisée**
 
-**Given** un fichier d'identifiants du compte Jeedom dédié, déposé par Alexandre hors du dépôt, en permissions `600`
+**Given** le fichier d'identifiants `/home/asahut/.config/jeedom2ha-gate/jeedom.env` sur la VM openclaw (dossier en 700, fichier en 600, clés `JEEDOM_USER` et `JEEDOM_PASSWORD`), déposé par Alex
 **When** le gate démarre un parcours Playwright
-**Then** il lit ce fichier à l'exécution (jamais copié dans le dépôt, jamais écrit dans un journal ou une sortie de test)
-**And** un test dédié vérifie qu'aucune valeur lue depuis ce fichier n'apparaît dans les journaux produits par le gate.
+**Then** il lit ce fichier à l'exécution (chemin surchargeable par la variable `JEEDOM2HA_GATE_CREDENTIALS`), et refuse de démarrer si le fichier manque ou si ses droits ne sont pas 600
+**And** aucune valeur lue n'est copiée dans le dépôt, un journal, une capture, une trace ou un rapport ; l'état de session du navigateur (cookies) reste en mémoire et n'est jamais écrit sur disque
+**And** un test dédié vérifie qu'aucune valeur lue depuis ce fichier n'apparaît dans les journaux, traces et rapports produits par le gate.
 
 **AC5 — Gate bloquant, pas de `done` d'interface sans lui**
 
@@ -55,38 +60,51 @@ so that les stories 20.1 et suivantes puissent prouver leurs parcours réels par
 
 ## Impact sur la production et retour arrière
 
-Aucun impact sur la production : cette story ajoute un outillage de test (Playwright + scripts de gate), exécuté contre un compte Jeedom dédié non lié aux équipements réels de la maison, avec interception d'écriture. Aucun code de production (`desktop/`, `resources/daemon/`, `core/`) n'est modifié. Retour arrière : suppression de l'outillage de test ajouté, sans migration de données, sans impact sur `data/ha_overrides.json` ni sur l'état MQTT publié.
+Le compte dédié `clawcode` est un compte de la vraie box Jeedom. Le plugin exige un compte administrateur (`isConnect('admin')` dans `core/ajax/jeedom2ha.ajax.php` et `desktop/php/jeedom2ha.php`) : le compte n'isole donc rien, ni côté Jeedom ni côté démon. L'absence d'impact repose entièrement sur l'interception par défaut (AC1) et sur la restauration garantie et vérifiée (AC2).
+
+Aucun code de production (`desktop/`, `resources/daemon/`, `core/`) n'est modifié. Retour arrière : retrait de l'outillage de test, sans migration de données. En cas d'échec d'un parcours d'override, la commande de restauration autonome (AC2) remet `data/ha_overrides.json` dans son état de référence et le vérifie.
 
 ## Preuve terrain
 
-Aucune preuve terrain au sens "déploiement sur la box" : cette story outille la preuve des stories suivantes, elle ne modifie rien de déployé. Sa propre preuve est l'exécution réussie du gate lui-même (AC1-AC5) sur un parcours de référence contre l'UI réelle via le compte dédié, journalisée dans un artefact de cette story.
+Aucune preuve terrain au sens « déploiement sur la box » : cette story outille la preuve des stories suivantes, elle ne modifie rien de déployé. Sa propre preuve est l'exécution réussie du gate lui-même (AC1-AC5) sur un parcours de référence contre l'UI réelle via le compte dédié, journalisée dans un artefact de cette story.
 
 ## Task 0 — Pré-flight (bloquant, avant tout développement)
 
-- [ ] **Compte Jeedom dédié disponible.** Alexandre crée et fournit un compte Jeedom dédié aux parcours de preuve (annoncé pour le 2026-10-01). Bloquant : aucune Task de cette story ne démarre sans ce compte.
-- [ ] **Installation de Playwright et Chromium sur la VM openclaw actée.** Qui installe (Alexandre en pré-requis manuel, ou procédure documentée exécutée une fois par Alexandre) et où (chemin, utilisateur) : question ouverte posée à Alexandre dans `sprint-change-proposal-2026-10-01-etape-4-interface.md` (question 6). Bloquant : cette story ne peut pas installer de paquet elle-même (hors périmètre documentation), l'installation doit être actée et réalisée avant le dev de cette story.
-- [ ] **Emplacement du fichier d'identifiants confirmé.** Chemin hors dépôt, permissions `600`, nom exact attendu par le gate : question ouverte posée à Alexandre (question 7 de la SCP). Bloquant pour AC4.
-- [ ] **Vérifier l'existence du compte et du fichier d'identifiants avant de démarrer Task 1** (`ls -l` sur le chemin convenu, test de connexion), et consigner l'écart si l'un des deux manque encore.
+- [x] **Compte Jeedom dédié** : `clawcode`, créé par Alex le 2026-10-01 (16:22).
+- [ ] **Droits du compte** : vérifier qu'il ouvre la page du plugin sans erreur 401. S'il n'est pas administrateur, s'arrêter et le signaler à Alex : le plugin exige `isConnect('admin')`.
+- [ ] **Playwright et Chromium** : GO d'Alex le 2026-10-01 (16:22). Installation par clawcode sous `asahut` dans `/home/asahut/.openclaw/tools/jeedom2ha-gate` (navigateurs dans `~/.cache/ms-playwright`), sans `sudo` ni dépendance système. Relancer son test de fumée avant Task 1.
+- [ ] **Fichier d'identifiants** : vérifier sa présence et ses droits par `ls -l` seulement (chemin d'AC4). S'il manque, s'arrêter et le signaler.
+- [ ] **Accès en lecture de la VM vers la box** : le gate lit `data/ha_overrides.json` (sha256 et contenu) et les journaux du démon par SSH. Vérifier ce chemin avec les seules commandes `sha256sum`, `cat` sur ce fichier et `tail` sur les journaux ; consigner le compte utilisé. Sa clé SSH suit les mêmes règles qu'AC4 (jamais affichée, jamais copiée). Le gate n'envoie jamais d'autre commande à la box.
 
 ## Vérifications minimales du gate (AC3)
 
-1. Zéro requête AJAX d'écriture non maîtrisée vers Jeedom pendant tout le parcours (`executeHaAction` et toute action modifiant un équipement/scénario Jeedom, bloquées par défaut).
-2. Pour un parcours d'override en liste blanche (`saveMappingOverride`, `revertMappingOverride`) : état de `data/ha_overrides.json` restauré à l'identique après le parcours (comparaison avant/après).
-3. Absence d'erreur JavaScript dans la console du navigateur pendant le parcours.
-4. Absence d'entrée `ERROR` dans les journaux du démon pendant la fenêtre temporelle du parcours.
+1. Aucune requête nécessaire au parcours bloquée sans réponse simulée déclarée, et aucune écriture non maîtrisée vers Jeedom ou le démon pendant tout le parcours (AC1).
+2. Pour un parcours d'override en liste blanche : requêtes limitées aux équipements déclarés, et `data/ha_overrides.json` restauré à un contenu JSON identique à la référence, y compris après un échec (AC2).
+3. Aucune erreur JavaScript dans la console du navigateur pendant le parcours.
+4. Aucune ligne `ERROR` dans les journaux du démon pendant la fenêtre du parcours ; pendant la fenêtre d'un parcours d'override, aucune ligne `DISCOVERY`, `Unpublishing`, `[SYNC]` ni `POST /action/sync`.
 5. Rapport du gate généré et lisible (verdict par vérification), joint à la story testée.
 
 ## Mécanisme d'interception des écritures
 
-Le plugin `jeedom2ha` expose ses actions via `core/ajax/jeedom2ha.ajax.php`, dispatché par paramètre `action` (`scanTopology`, `getDiagnostics`, `executeHaAction`, `getMappingOverrides`, `previewMappingOverride`, `saveMappingOverride`, `revertMappingOverride`, entre autres). Le gate utilise l'interception réseau de Playwright (route-level) sur ces requêtes AJAX côté navigateur :
-- toute requête `action=executeHaAction` (ou toute action identifiée comme modifiant un équipement/scénario Jeedom réel) est bloquée par défaut (AC1) ;
-- les requêtes `action=saveMappingOverride` / `revertMappingOverride` sont laissées passer uniquement dans les parcours explicitement inscrits en liste blanche par le test (AC2), avec vérification avant/après de `data/ha_overrides.json` ;
-- les requêtes de lecture (`scanTopology`, `getDiagnostics`, `getMappingOverrides`, `getPublishedScopeForConsole`) sont laissées passer sans restriction.
-Le détail exact de la liste des actions à bloquer par défaut est à confirmer en Task 1, par lecture complète de `core/ajax/jeedom2ha.ajax.php` (dispatch des actions), avant tout premier parcours exécuté contre le compte dédié.
+Le plugin expose ses actions via `core/ajax/jeedom2ha.ajax.php`, dispatché par le paramètre `action`. Le gate intercepte côté navigateur (routes Playwright) toutes les requêtes vers `core/ajax/*.ajax.php` et `plugins/*/core/ajax/*.ajax.php`, et applique un refus par défaut. Classement des actions du plugin, relevé dans `core/ajax/jeedom2ha.ajax.php` :
+
+- **Lectures, autorisées** : `getMqttConfig`, `getBridgeStatus`, `getDiagnostics`, `getPublishedScopeForConsole`, `getMappingOverrides`, `previewMappingOverride` (aperçu à blanc, lecture seule par contrat, story 16.6), `exportDiagnostic` (lecture ; autorisée seulement si le parcours en a besoin).
+- **Effets de bord, toujours bloqués** :
+  - `scanTopology` : POST `/action/sync` vers le démon, qui publie les découvertes et les états MQTT et réaligne les écouteurs ;
+  - `executeHaAction` : « Publier » / « Suppr. » (POST `/action/execute`) ;
+  - `saveFilteringConfig`, `forceMqttManagerImport` : écrivent la configuration du plugin (`config::save`) ;
+  - `testMqttConnection` : ouvre une connexion au broker MQTT.
+- **Authentification** : la requête de connexion du cœur Jeedom (`core/ajax/user.ajax.php`, action de login), avec les identifiants d'AC4 ; aucune autre action de `user.ajax.php`.
+- **Liste blanche des seuls parcours d'override (AC2)** : `saveMappingOverride`, `revertMappingOverride`, limitées aux équipements déclarés par le parcours.
+- **Réponse simulée** : quand un parcours a besoin d'une action toujours bloquée (par exemple le rescan `scanTopology` de la story 20.4), le gate répond à sa place (`route.fulfill`) avec une réponse fixée par le test, après avoir vérifié l'action et sa charge utile ; le rapport la marque « simulée ». L'effet réel d'une telle action est prouvé séparément, par la preuve terrain de la story (règle permanente d'Alex du 2026-09-28 sur les preuves terrain, plugin et HA seulement : déploiement standard, relevés avant/après, retour arrière si panne).
+- **Extension de la liste blanche** : une story qui ajoute une action d'écriture (par exemple la pose d'une exclusion ou d'un forçage en 20.2) l'inscrit dans le gate aux mêmes conditions qu'AC2 (limitée aux équipements déclarés, restaurée par la route de purge, vérifiée), et cette extension est relue par ClaudeBox.
+- **Toute autre requête** (actions inconnues du plugin, points d'entrée du cœur Jeedom) : bloquée et journalisée. Une lecture du cœur nécessaire au chargement de la page n'est autorisée qu'après inscription explicite du couple (point d'entrée, `action`) en Task 1, revue par ClaudeBox.
+
+Le gate lit l'état de `data/ha_overrides.json` sur la box en lecture seule (sha256 et contenu, par SSH) ; il n'écrit jamais ce fichier directement. La restauration passe uniquement par la route de purge du plugin.
 
 ## Lecture des identifiants
 
-Le fichier d'identifiants du compte Jeedom dédié est déposé par Alexandre hors du dépôt (chemin à confirmer, question 7 de la SCP), en permissions `600`. Le gate le lit à l'exécution via une variable d'environnement pointant vers ce chemin (jamais le contenu en dur dans un script versionné), ne l'écrit jamais dans un journal, une sortie de test ou un rapport, et échoue explicitement si le fichier est absent ou mal protégé (permissions différentes de `600`).
+Voir AC4. Le fichier `/home/asahut/.config/jeedom2ha-gate/jeedom.env` est déposé par Alex lui-même sur la VM openclaw ; personne d'autre ne le crée ni ne le modifie. Le gate le lit à l'exécution, ne l'affiche jamais, et échoue explicitement s'il est absent ou mal protégé.
 
 ## Invariants concernés
 
@@ -99,15 +117,15 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 ## Tasks / Subtasks
 
 - [ ] Task 0 — Pré-flight (voir section dédiée ci-dessus) — bloquant
-- [ ] Task 1 — Lire `core/ajax/jeedom2ha.ajax.php` en entier et lister exhaustivement les actions d'écriture réelle vers Jeedom à bloquer par défaut, vs. les actions de liste blanche override, vs. les actions de lecture (AC1, AC2)
-- [ ] Task 2 — Mettre en place Playwright contre une page du plugin, authentification avec le compte dédié, lecture des identifiants depuis le chemin confirmé en Task 0 (AC4)
-- [ ] Task 3 — Implémenter l'interception réseau (blocage par défaut des écritures, liste blanche explicite override) et le mécanisme de vérification avant/après de `data/ha_overrides.json` (AC1, AC2)
+- [ ] Task 1 — Relire `core/ajax/jeedom2ha.ajax.php` en entier pour confirmer le classement ci-dessus, et relever les requêtes du cœur Jeedom émises au chargement de la page du plugin (tout bloqué, journal seulement), pour inscrire explicitement les seules lectures nécessaires (AC1)
+- [ ] Task 2 — Mettre en place Playwright contre une page du plugin, authentification avec le compte dédié, lecture des identifiants selon AC4
+- [ ] Task 3 — Implémenter l'interception par défaut, la liste d'authentification, la liste blanche d'override limitée aux équipements déclarés, la réponse simulée, la restauration garantie (`finally`) et la commande de restauration autonome (AC1, AC2)
 - [ ] Task 4 — Implémenter les vérifications minimales (console JS, journaux démon `ERROR`) et le rapport de gate (AC3)
-- [ ] Task 5 — Exécuter un parcours de référence de bout en bout (navigation, ouverture équipement, pose puis purge d'un override) et consigner son résultat dans un artefact de cette story (preuve de la story elle-même)
-- [ ] Task 6 — Documenter dans cette story comment une story suivante invoque le gate et où elle doit joindre son rapport avant `done` (AC5)
+- [ ] Task 5 — Exécuter un parcours de référence de bout en bout (navigation, ouverture d'un équipement sans override dans l'état de référence, pose puis purge d'un override) et un parcours d'échec provoqué après la pose, pour prouver la restauration garantie ; consigner les deux dans un artefact de cette story
+- [ ] Task 6 — Documenter dans cette story comment une story suivante invoque le gate et où elle joint son rapport avant `done` (AC5)
 
 ## Dev Notes
 
-- Source : demande explicite d'Alexandre et constat de la rétrospective pe-epic-19 (`pe-epic-19-retro-2026-10-01.md`) sur le coût et la fragilité du clic réel manuel pour les stories UI (19-3, 19-5, 19-6, 16-8).
-- Le choix exact des identifiants/chemins et de la procédure d'installation Playwright/Chromium reste bloqué sur une décision d'Alexandre (questions 6 et 7 de la SCP) — Task 0 ne peut pas avancer tant que ces points ne sont pas actés.
+- Source : plan d'action d'Alex du 2026-09-26 (étape 4 : gate de preuve UX outillé d'abord), repris dans la conclusion de `pe-epic-19-retro-2026-10-01.md`.
+- Décisions d'Alex du 2026-10-01 (16:22 et 17:58) : compte `clawcode` créé, GO pour l'installation de Playwright, emplacement du fichier d'identifiants (voir `sprint-change-proposal-2026-10-01-etape-4-interface.md`, « Décisions d'Alex »).
 - Cette story n'ouvre aucun `PRODUCT_SCOPE`, n'ajoute aucun FR/NFR : c'est un outillage de test interne au dépôt.
