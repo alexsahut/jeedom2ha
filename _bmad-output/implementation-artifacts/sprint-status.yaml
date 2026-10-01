@@ -62,7 +62,7 @@
 #             puis vague de compatibilite minimale Homebridge -> HA utile
 
 generated: '2026-03-22 10:33:12 CET'
-last_updated: '2026-10-01'  # pe-epic-19 clos (retrospective pe-epic-19-retro-2026-10-01.md, 7/7 stories done, gates epic-level tenus) ; story 16-8 maintenue in-progress apres parcours navigateur reel partiel (AC14) par ClaudeBox le 2026-10-01 (16-8-ac14-validation-2026-10-01.md) : AC5 et bascule vue au clic a reprendre ; AC9-AC10 corrige dans le code, a deployer.
+last_updated: '2026-10-01'  # pe-epic-20 ouvert (etape 4, interface) : cadrage documentaire (sprint-change-proposal-2026-10-01-etape-4-interface.md), story 20-0 (gate de preuve UX outille) ready-for-dev, 20-1 a 20-5 en backlog ; story 16-8 maintenue in-progress apres parcours navigateur reel partiel (AC14) par ClaudeBox le 2026-10-01 (16-8-ac14-validation-2026-10-01.md) : AC5 et bascule vue au clic a reprendre ; AC9-AC10 corrige par PR #192 (M=d5901b0).
 project: jeedom2ha
 project_key: NOKEY
 tracking_system: file-system
@@ -369,3 +369,19 @@ development_status:
   19-5-publier-etat-initial-valeur-courante-cc29: done  # ferme CC-29 (Publier ne publiait pas l'etat initial) ; PR #185 fusionnee (M=ed9cc3026e27dcb5a852409d7e96a3357430da90) ; relais PHP lit current_values au clic (getCache value, best-effort), demon publish_click_states (evenement apres le clic prioritaire, jamais la topologie du sync), listeners realignes apres Publier (AC11) ; deploiement 2026-09-30 06:40Z : parite identique hors bouton scenario_2 (scenario actif, sans lien), listeners 227, 0 ERROR ; preuve par clic reel sur escalier (Suppr., changement Jeedom, Republier : HA affiche la valeur lue au clic, memes entity_id) ; artefact _bmad-output/implementation-artifacts/19-5-field-proof-2026-09-30.md ; validation UX Alex 2026-09-30 09:57
   19-6-duree-action-ha-bornee-cc32: done  # ferme CC-32 ; validation UX Alex 2026-09-30 21:33 ; preuve terrain 2026-09-30 conforme (PR #189 fusionnee M=95d3059, deploiement 19:02:34Z, gate d'inventaire identique, ecouteurs 227, 0 ERROR, Republier global 10.2s, escalier Suppr./Republier 2.0s, registres HA inchanges) ; artefact 19-6-field-proof-2026-09-30.md ; bloc C+D dev-story termines (clawcode, unites C/D, 2026-09-30) : AC1-AC8 codes/testes, enveloppe AC7 mesuree et verifiee, doc utilisateur ajoutee ; vise CC-32 (delai fixe de lissage Publier/Supprimer, plancher 0.1s/eq, depasse le budget 15s du relais PHP au-dela de ~125-130 eq evalues, saute le realignement des ecouteurs AC11 de 19-5) ; non reproduit sur le parc actuel (mesure ClaudeBox 30/09 11:23 : 121 inclus/94 publies, 10.7s, succes) ; option (a) abandonnee apres 4 tours revue Codex PR #188 (N desynchronise topology/published_scope, travail/eq variable, N perime, lecture au clic sans echeance) ; option (b prime) retenue par ClaudeBox dans le cadre du GO Alex 30/09 11:20 (budget fixe relais/client R=60s, echeance deadline_s transmise au demon qui plafonne le total de ses pauses de lissage (P_max 15s), sans estimation du travail, Decision 8 inchangee) ; correct-course + create-story + conception (b prime) par clawcode, session detachee, documentation seulement ; sprint-change-proposal-2026-09-30-cc32-duree-action-ha.md
   pe-epic-19-retrospective: done  # retro 2026-10-01 : gates epic-level tenus ; lecons = preuve terrain discriminante, SHA exact deploye (worktree neuf), bloc Definition de done d'office a la cloture, unites petites et rapports factuels, lecture du journal d'unite si elle meurt ; residuels vers etape 4 (CC-25, CC-26, CC-04 volet UI)
+
+  # ==============================================================
+  # pe-epic-20 — Étape 4 : l'interface (surface unique pièce → équipement → commande)
+  # Ouvert 2026-10-01 — cadrage documentaire a la suite directe de la cloture de pe-epic-19
+  # (sprint-change-proposal-2026-10-01-etape-4-interface.md), plan d'action Alexandre 2026-09-26,
+  # decision Alexandre 2026-09-29 08:13 (clic reel obligatoire sur la purge d'override)
+  # Residuels repris : CC-25, CC-26, CC-04 (volet UI). 16-8 non reprise : fin de 16-8 est un
+  # prerequis de 20-1, pas une story de cet epic. Ordre obligatoire : 20-0 -> 20-1 -> (20-2, 20-4) -> 20-3 -> 20-5
+  # ==============================================================
+  pe-epic-20: in-progress  # ouvert 2026-10-01 : cadrage documentaire (sprint-change-proposal-2026-10-01-etape-4-interface.md), epics-projection-engine.md#Epic-20 ; vise CC-25, CC-26, CC-04 (volet UI), CC-07 d
+  20-0-gate-preuve-ux-outille: ready-for-dev  # bloquante : Playwright VM openclaw, compte Jeedom dedie (Alexandre), ecritures interceptees sauf liste blanche override avec restauration verifiee de data/ha_overrides.json ; prealable a toute story d'interface suivante
+  20-1-surface-unique-piece-equipement-commande-lecture-seule: backlog  # ferme CC-25 ; depend de 20-0 et de la cloture de 16-8
+  20-2-exclusion-forcage-depuis-surface-cc26: backlog  # depend de 20-1 ; purge prouvee par clic reel (decision Alex 29/09 08:13)
+  20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui: backlog  # depend de 20-1 et 20-2
+  20-4-rescan-page-principale-cc04-ui: backlog  # depend de 20-1
+  20-5-documentation-utilisateur-reecrite-cc07d: backlog  # depend de 20-1 a 20-4

@@ -2406,3 +2406,43 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - I11 est corrigé par découplage explicite (jamais par couplage forcé du secondaire sur le principal) — non-régression du pattern "metering plug" obligatoire.
 - CC-03/CC-18/CC-19 et CC-14 P1 fermés et prouvés (parité, clic UI réel, cas de confiance/exclusion réels ou repli documenté) ; CC-04 est partiellement fermé et son volet UI reste à l'étape 4.
 - aucun outil créé dans cet epic (Story 19.1) n'expose `local_secret`, en ligne de commande, en journal ou en sortie — vérifié comme critère d'acceptation testable.
+
+### Epic 20 — Étape 4 : l'interface (surface unique pièce → équipement → commande)
+
+**Statut :** `in-progress` — ouvert le 2026-10-01. Cadrage documentaire (`sprint-change-proposal-2026-10-01-etape-4-interface.md`), à la suite directe de la clôture de pe-epic-19 (plan d'action d'Alexandre du 2026-09-26). Pas d'ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
+
+**Origine :** pe-epic-19 a fermé le volet contrat de CC-04 (décision canonique par commande, deux temporalités) mais a laissé son volet UI ouvert (jargon Jeedom, gabarit, surface unique), ainsi que CC-25 (équipements désactivés absents de la surface par pièce, état « non couverte » non rendu) et CC-26 (aucune interface pour poser un override de publication). La story 16.8, qui construit la navigation par pièce actuelle, reste `in-progress` après un parcours navigateur réel partiel le 2026-10-01 (`16-8-ac14-validation-2026-10-01.md`) : AC5 (diagnostic lu à l'ouverture de la modale au lieu de l'accordéon) et la bascule de la synthèse au clic (AC14) restent à reprendre. Décision d'Alex du 2026-09-29 08:13 : le clic réel sur la purge d'un override de publication est un critère obligatoire de cette étape.
+
+**Valeur utilisateur :** une seule surface pièce → équipement → commande, sans jargon Jeedom, qui affiche fidèlement l'état réel de publication (y compris les équipements désactivés et les commandes non couvertes) et permet de poser ou retirer un override de publication directement depuis la navigation, sans passer par une synthèse ou une modale séparée.
+
+**Résultat observable :** la surface unique consomme exclusivement `evaluate_equipment()` (contrat livré par pe-epic-19), rend l'arbre complet (équipements actifs et désactivés, commandes couvertes et non couvertes), permet l'exclusion/le forçage et leur purge par clic réel, et ne contient plus aucun gabarit Jeedom (« Mes templates », « Paramètre n°1 »…). La synthèse « Parc global » et la modale diagnostic distinctes sont retirées. Le rescan est accessible depuis la page principale. La documentation utilisateur décrit l'interface livrée.
+
+**Prérequis :** gate de preuve UX outillé (Story 20.0) vert avant tout `done` d'interface de cet epic ; clôture de la story 16.8 avant le remplacement de sa navigation par la surface unique (une seule implémentation de navigation par pièce à la fois).
+
+**Ordre de dépendance (obligatoire) :** `20.0` → `20.1` → (`20.2`, `20.4` en parallèle possible) → `20.3` → `20.5`. Aucune story d'interface (20.1 et suivantes) ne démarre avant que 20.0 soit `done`.
+
+**Stories :**
+
+- **Story 20.0 — Gate de preuve UX outillé.** Playwright sur la VM openclaw, compte Jeedom dédié (fourni par Alexandre), écritures interceptées (rien n'est écrit dans la maison sauf liste blanche explicite pour les parcours d'override, avec restauration vérifiée de `data/ha_overrides.json`), vérifications minimales exécutées avant tout `done` d'interface de cet epic. Story bloquante, aucune valeur utilisateur directe.
+- **Story 20.1 — Surface unique pièce → équipement → commande, lecture seule.** Remplace l'affichage de la navigation par pièce de 16.8 et de la synthèse « Parc global » : rend l'état « non couverte » dans l'arbre et inclut les équipements désactivés (ferme CC-25). Dépend de 20.0 et de la clôture de la story 16.8.
+- **Story 20.2 — Exclusion et forçage depuis la surface (CC-26).** Ajoute l'action de poser un override de publication (exclusion, forçage) depuis la surface unique ; sa purge (« revenir au mode automatique ») est prouvée par clic réel, critère obligatoire posé par Alexandre le 2026-09-29. Dépend de 20.1.
+- **Story 20.3 — Suppression du gabarit Jeedom et libellés français d'usage (CC-04 volet UI).** Retire la synthèse « Parc global » et la modale diagnostic devenues redondantes ; remplace le jargon résiduel (« Mes templates », « Paramètre n°1 »…) par des libellés d'usage. Dépend de 20.1 et 20.2.
+- **Story 20.4 — Rescan sur la page principale (CC-04 volet UI, fin).** Dépend de 20.1.
+- **Story 20.5 — Documentation utilisateur réécrite (CC-07 d).** Décrit l'interface finale livrée par l'epic. Dépend de 20.1 à 20.4.
+
+**Points fermés par cet epic (visés) :** CC-25, CC-26, CC-04 (volet UI, fermeture complète). CC-07 d (documentation utilisateur) fermé par Story 20.5.
+
+**Dev notes :**
+- source technique de cet epic : rétrospective `pe-epic-19-retro-2026-10-01.md` (résiduels CC-04 volet UI, CC-25, CC-26) + plan d'action d'Alexandre du 2026-09-26 + décision d'Alexandre du 2026-09-29 08:13 (clic réel obligatoire sur la purge d'override).
+- la story 16.8 n'est pas reprise par cet epic : ses écarts (AC5, AC9-AC10 — déjà corrigé par PR #192 hors cette story —, AC14) restent portés par 16.8 elle-même ; la fin de 16.8 est un prérequis déclaré avant que 20.1 ne remplace sa navigation.
+- workflow BMAD complet (pas de fast-track) : chaque story passe par `create-story -> dev-story -> code-review`, et toute story d'interface (20.1 et suivantes) passe en plus par `ready-for-UX-validation` avant `done`.
+- questions ouvertes pour Alexandre consignées dans `sprint-change-proposal-2026-10-01-etape-4-interface.md` : sort de la synthèse/modale, emplacement de l'exclusion/forçage, sort des équipements sans pièce, affichage de l'état « non couverte », granularité du chargement du diagnostic, installation de Playwright/Chromium, emplacement du fichier d'identifiants.
+
+### Gates epic-level pe-epic-20
+
+- la surface unique consomme exclusivement `evaluate_equipment()` ; aucun recalcul de décision propre à l'UI.
+- CC-25 et CC-26 fermés et prouvés par clic réel, y compris la purge d'un override de publication.
+- CC-04 (volet UI) fermé : aucun jargon Jeedom résiduel dans l'interface livrée.
+- story 16.8 `done` avant la bascule effective sur la surface unique.
+- gate 20.0 vert avant chaque `done` d'interface de cet epic ; aucune écriture non maîtrisée vers Jeedom pendant les parcours de preuve.
+- documentation utilisateur réécrite et alignée sur l'interface livrée.
