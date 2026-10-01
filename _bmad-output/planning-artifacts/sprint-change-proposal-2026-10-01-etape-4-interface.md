@@ -19,7 +19,7 @@ Clôture de pe-epic-19 (étape 3, contrat de décision unifié `evaluate_equipme
 
 1. **Reprendre 16-8 et fermer ses écarts avant d'ouvrir l'epic 20.** Retenu en partie : il ne reste à 16-8 aucun code à écrire (AC5 amendé, AC9-AC10 corrigé). Sa fin (déploiement, preuve AC14, validation UX) se fait en parallèle de 20-0 et ne bloque que le démarrage de 20-1.
 2. **Ouvrir directement la surface unique sans gate de preuve UX outillé.** Rejeté : le plan d'action d'Alex du 2026-09-26 place le gate de preuve UX outillé en tête de l'étape 4 ; le clic réel manuel de l'étape 3 (19-3, 19-6, 16-8) s'est fait sans interception d'écriture.
-3. **Gate de preuve UX outillé d'abord (story 20-0), puis la surface unique.** Retenu : un compte Jeedom dédié et des écritures interceptées permettent des parcours réels répétables, sans risque sur la maison, avant de livrer une interface qui remplace l'existant.
+3. **Gate de preuve UX outillé d'abord (story 20-0), puis la surface unique.** Retenu : une interception par défaut où aucune écriture n'est transmise à la box (toute écriture reçoit une réponse simulée vérifiée ; lectures et aperçus restent réels, sauf simulation déclarée par le parcours) permet des parcours réels répétables, sans risque sur la maison, avant de livrer une interface qui remplace l'existant. Le compte Jeedom dédié n'isole rien (voir « Point à confirmer » ci-dessous) ; l'écriture réelle est prouvée par la preuve terrain de chaque story.
 
 ## Recommandation
 
@@ -27,14 +27,14 @@ Ouvrir l'epic 20 avec la story 20-0 (gate de preuve UX outillé) comme préalabl
 
 ## Découpage proposé en stories
 
-- **20-0 — Gate de preuve UX outillé.** Playwright sur la VM openclaw, compte Jeedom dédié (fourni par Alex), interception des écritures (sauf liste blanche override, avec restauration vérifiée de `data/ha_overrides.json`), vérifications minimales avant tout `done` d'interface. Bloquante pour toutes les stories suivantes.
+- **20-0 — Gate de preuve UX outillé.** Playwright sur la VM openclaw, compte Jeedom dédié (fourni par Alex), interception par défaut sans aucune écriture transmise à la box (toute écriture, override compris, reçoit une réponse simulée après vérification de sa charge utile ; `data/ha_overrides.json` et le témoin d'activité du démon relevés inchangés avant/après), vérifications minimales avant tout `done` d'interface. Bloquante pour toutes les stories suivantes.
 - **20-1 — Surface unique pièce → équipement → commande.** Remplace la navigation par pièce de 16-8 et la synthèse « Parc global » pour l'affichage. Reprend sans régression l'édition du type HA par commande de 16-8 (aperçu, enregistrement automatique, retour au mode automatique) ; l'exclusion et le forçage viennent en 20-2. Selon les décisions d'Alex du 2026-10-01 :
   - diagnostic chargé à l'ouverture de la pièce ;
   - équipements sans pièce regroupés sous une pseudo-pièce « Sans pièce », en fin de liste ;
   - commandes non couvertes visibles, grisées, jamais comptées bloquantes ;
   - équipements désactivés inclus (CC-25).
   Dépend de 20-0 `done` et de 16-8 `done`.
-- **20-2 — Exclusion et forçage depuis la surface (CC-26).** Ajoute l'action de poser un override de publication (exclusion, forçage) depuis la surface unique, sur l'équipement et sur la commande (décision d'Alex du 2026-10-01), avec sa purge prouvée par clic réel. Dépend de 20-1.
+- **20-2 — Exclusion et forçage depuis la surface (CC-26).** Ajoute l'action de poser un override de publication (exclusion, forçage) depuis la surface unique, sur l'équipement et sur la commande (décision d'Alex du 2026-10-01), avec sa purge prouvée par clic réel lors de la preuve terrain de la story (le gate 20-0 ne transmet aucune écriture). Dépend de 20-1.
 - **20-3 — Suppression du gabarit Jeedom et libellés français d'usage (CC-04 volet UI).** Supprime la synthèse « Parc global » et la modale diagnostic (décision d'Alex du 2026-10-01), remplace le jargon (« Mes templates », « Paramètre n°1 »…). Dépend de 20-1 et 20-2.
 - **20-4 — Rescan sur la page principale (CC-04 volet UI, fin).** Dépend de 20-1.
 - **20-5 — Documentation utilisateur réécrite (CC-07 d).** Dépend de 20-1 à 20-4 (décrit l'interface finale, pas une interface intermédiaire).
@@ -58,9 +58,15 @@ Ordre de dépendance obligatoire : `20-0` → `20-1` → (`20-2`, `20-4` en para
 4. **Commandes non couvertes** : visibles, grisées, jamais comptées bloquantes, sans bascule d'affichage (story 20-1).
 5. **Chargement du diagnostic** : à l'ouverture de la pièce. AC5 de 16-8 est amendé en ce sens ; 20-1 garde ce comportement.
 6. **Playwright et Chromium** : GO d'Alex. Installés par clawcode sous l'utilisateur `asahut` de la VM openclaw, dans `/home/asahut/.openclaw/tools/jeedom2ha-gate` (navigateurs dans `~/.cache/ms-playwright`), sans `sudo` ni dépendance système.
-7. **Identifiants du compte dédié `clawcode`** (créé par Alex le 2026-10-01) : fichier `/home/asahut/.config/jeedom2ha-gate/jeedom.env` sur la VM openclaw (dossier en 700, fichier en 600, clés `JEEDOM_USER` et `JEEDOM_PASSWORD`), déposé par Alex lui-même. Le gate ne vérifie que sa présence et ses droits, et n'affiche jamais son contenu.
+7. **Identifiants du compte dédié `clawcode`** (créé par Alex le 2026-10-01) : fichier `/home/asahut/.config/jeedom2ha-gate/jeedom.env` sur la VM openclaw (dossier en 700, fichier en 600, clés `JEEDOM_USER` et `JEEDOM_PASSWORD`), déposé par Alex lui-même. Le pré-flight ne vérifie que sa présence et ses droits ; le gate le lit à l'exécution sans jamais en afficher le contenu (AC4 de 20-0).
 
 Point à confirmer par Alex : les actions du plugin exigent un compte administrateur (`isConnect('admin')` dans `core/ajax/jeedom2ha.ajax.php` et `desktop/php/jeedom2ha.php`). Le compte `clawcode` doit donc être administrateur. Il n'isole alors rien : la protection repose entièrement sur l'interception de la story 20-0.
+
+## Risques et suivi
+
+- Revue Codex du 2026-10-01 (P1) : le gate ne transmet plus aucune écriture ; les preuves terrain qui écrivent (AC14 de 16-8, purge de 20-2) suivent la règle : équipement non publié, témoin `getBridgeStatus` relevé avant/après, sync correctif (après le retrait de l'override) si le témoin a bougé, jamais d'exclusion d'un équipement publié sans GO d'Alex.
+- Défaut latent hors PR : écritures non atomiques de `data/ha_overrides.json` (`resources/daemon/mapping/overrides.py:266/310/430/462`, ouverture en écriture qui tronque le fichier avant de le réécrire ; un sync qui le lit à cet instant calcule sans aucun override) → story/PR séparée.
+- AC14 de 16-8 : constat du 2026-10-01 au soir (`16-8-ac14-validation-2026-10-01.md`, « Suite ») : aucune bascule « bloquante → prête » par override TYPE n'est démontrable sur les données réelles (17 commandes couvertes et bloquantes du périmètre inclus, toutes `ambiguous_skipped`). La voie de preuve de la bascule exigée par AC14 (amendement d'AC14, ou preuve par le gate 20-0 en écriture simulée) est à trancher par Alex.
 
 ## Notes
 
