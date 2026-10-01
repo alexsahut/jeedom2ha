@@ -95,4 +95,4 @@ Suite : l'étape 4 du plan d'action, l'interface. Elle comprend :
 - la surface unique pièce → équipement → commande ;
 - CC-04 (volet interface), CC-25 et CC-26.
 
-La story 16-8, dont cette surface est la base, reste `in-progress`. Son parcours navigateur réel du 2026-10-01 est partiel (`16-8-ac14-validation-2026-10-01.md`) : le chargement par équipement (AC5), la synthèse (AC9-AC10) et la bascule de la synthèse vue au clic (AC14) sont à reprendre avant sa validation UX.
+La story 16-8, dont cette surface est la base, reste `in-progress`. Son parcours navigateur réel du 2026-10-01 est partiel (`16-8-ac14-validation-2026-10-01.md`) : le chargement par équipement (AC5) et la bascule vue au clic (AC14) sont à reprendre ; la synthèse (AC9-AC10) est corrigée dans le code, à déployer. Tout cela précède sa validation UX.

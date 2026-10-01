@@ -371,14 +371,30 @@
   // Agrégation strictement front à partir des diagnostics par commande déjà portés
   // par le GET arbre. « sera publié » = au moins une commande projetable+publiable.
 
+  // Story 16.8 (AC9/AC10, parcours navigateur du 2026-10-01) — une commande non couverte
+  // par le mapping (`publication_reason === 'command_not_covered'`, décision propre à la
+  // commande) n'est ni prête ni bloquante : elle n'est simplement pas projetée, et rien
+  // n'est à corriger sur elle. Elle est comptée à part et ne reçoit jamais l'ancre
+  // « première commande bloquante ». Avant ce correctif, « Rafraichir » de l'eq 391 faisait
+  // afficher « Partiellement publié » à un équipement bel et bien publié.
+  function isUncoveredDiagnostic(view) {
+    var d = readDiagnosticView(view);
+    return d !== null && d.publication_reason === 'command_not_covered';
+  }
+
   function summarizePublication(tree) {
     var t = normalizeTree(tree);
     var ready = 0;
     var blocking = 0;
     var unknown = 0;
+    var uncovered = 0;
     var firstBlockingCmdId = null;
     for (var i = 0; i < t.commands.length; i++) {
       var row = t.commands[i];
+      if (isUncoveredDiagnostic(row.diagnostic)) {
+        uncovered += 1;
+        continue;
+      }
       var state = diagnosticState(row.diagnostic);
       if (state === 'ready') {
         ready += 1;
@@ -396,6 +412,7 @@
       ready_count: ready,
       blocking_count: blocking,
       unknown_count: unknown,
+      uncovered_count: uncovered,
       will_publish: ready > 0,
       first_blocking_cmd_id: firstBlockingCmdId,
     };
