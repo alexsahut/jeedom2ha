@@ -91,24 +91,23 @@ function pageHtml(origin) {
   });
 
   window.__selftest = (async () => {
-    const forbidden = [];
     for (const action of ['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection']) {
-      forbidden.push(await attempted(post(action)));
+      await attempted(post(action));
     }
-    forbidden.push(await attempted(post('saveMappingOverride', { eqId: '9', cmdId: '2', haEntityType: 'switch' })));
-    forbidden.push(await attempted(post('revertMappingOverride', { eqId: '9', cmdId: '2' })));
-    forbidden.push(await attempted(fetch(endpoint + '?action=scanTopology')));
-    forbidden.push(await xhr());
-    forbidden.push(navigator.sendBeacon(endpoint, form('executeHaAction')));
+    await attempted(post('saveMappingOverride', { eqId: '9', cmdId: '2', haEntityType: 'switch' }));
+    await attempted(post('revertMappingOverride', { eqId: '9', cmdId: '2' }));
+    await attempted(fetch(endpoint + '?action=scanTopology'));
+    await xhr();
+    navigator.sendBeacon(endpoint, form('executeHaAction'));
     await frame();
     await image();
-    forbidden.push(await attempted(fetch('/core/api/jeeApi.php', { method: 'POST', body: 'action=write' })));
-    forbidden.push(await attempted(fetch(endpoint, { method: 'POST', body: 'action=getBridgeStatus&action=scanTopology' })));
+    await attempted(fetch('/core/api/jeeApi.php', { method: 'POST', body: 'action=write' }));
+    await attempted(fetch(endpoint, { method: 'POST', body: 'action=getBridgeStatus&action=scanTopology' }));
     window.open(endpoint + '?action=executeHaAction', '_blank', 'noopener');
     await new Promise((resolve) => setTimeout(resolve, 25));
     await socket();
     const serviceWorkerBlocked = await attempted(navigator.serviceWorker.register('/selftest-sw.js'));
-    forbidden.push(await attempted(fetch('/core/ajax/user.ajax.php', { method: 'POST', body: 'action=login' })));
+    await attempted(fetch('/core/ajax/user.ajax.php', { method: 'POST', body: 'action=login' }));
 
     const preview = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
     const saved = await post('saveMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
@@ -117,7 +116,7 @@ function pageHtml(origin) {
     const real = await post('getMappingOverrides', { eqId: '1' });
     const bascule = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'light' });
 
-    return { forbidden, serviceWorkerBlocked, preview, saved, derived, reverted, real, bascule };
+    return { serviceWorkerBlocked, preview, saved, derived, reverted, real, bascule };
   })();
 })();
 </script>`;
@@ -132,8 +131,9 @@ function makeServer() {
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       const params = new URLSearchParams(body);
-      const action = url.searchParams.get('action') ?? params.get('action');
-      requests.push({ method: req.method, path: url.pathname, action });
+      const actions = [...url.searchParams.getAll('action'), ...params.getAll('action')];
+      const action = actions.length === 1 ? actions[0] : null;
+      requests.push({ method: req.method, path: url.pathname, actions });
 
       if (url.pathname === '/index.php' && url.searchParams.get('v') === 'd') {
         const content = pageHtml(`http://${req.headers.host}`);
@@ -159,7 +159,7 @@ function makeServer() {
   // Un upgrade ne doit jamais être atteint : routeWebSocket() ferme sans se connecter.
   // Le consigner le rend visible si cette garantie régressait.
   server.on('upgrade', (req, socket) => {
-    requests.push({ method: 'WEBSOCKET', path: new URL(req.url, 'http://127.0.0.1').pathname, action: null });
+    requests.push({ method: 'WEBSOCKET', path: new URL(req.url, 'http://127.0.0.1').pathname, actions: [] });
     socket.destroy();
   });
   return { server, requests };
@@ -176,12 +176,20 @@ function listen(server) {
 }
 
 function close(server) {
+  server.closeAllConnections();
   return new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
 function report(label, condition, failures) {
   console.log(`${condition ? 'PASS' : 'FAIL'} ${label}`);
   if (!condition) failures.push(label);
+}
+
+function takeMatchingFailure(failures, expected) {
+  const index = failures.findIndex(
+    (entry) => entry.path === expected.path && entry.action === expected.action && entry.verdict === expected.verdict
+  );
+  return index === -1 ? null : failures.splice(index, 1)[0];
 }
 
 async function main() {
@@ -215,21 +223,56 @@ async function main() {
     await page.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
     const results = await page.evaluate(() => window.__selftest);
 
+    // Les éléments sans réponse attendue (beacon, popup, iframe, WebSocket) peuvent
+    // encore être en file après evaluate(). La fermeture du contexte annule tout ce
+    // qui resterait avant que le serveur et le journal soient inspectés.
+    await page.waitForTimeout(1_500);
+    await context.close();
+
     const forbiddenActions = new Set([
       'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
       'saveMappingOverride', 'revertMappingOverride', 'login',
     ]);
     const serverReceivedForbidden = requests.some(
-      (request) => forbiddenActions.has(request.action) || request.path === '/core/api/jeeApi.php' || request.path === '/socket'
+      (request) =>
+        request.actions.some((action) => forbiddenActions.has(action))
+        || request.actions.length > 1
+        || request.path === '/core/api/jeeApi.php'
+        || request.path === '/socket'
     );
     report('aucune ecriture, effet de bord, connexion, core API ou WebSocket n atteint le serveur', !serverReceivedForbidden, failures);
     report('les lectures du flux ont atteint le serveur',
-      requests.filter((request) => request.action === 'previewMappingOverride').length === 2
-        && requests.filter((request) => request.action === 'getMappingOverrides').length === 2,
+      requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'previewMappingOverride').length === 2
+        && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 2,
       failures);
-    report('toutes les tentatives HTTP interdites sont bloquees', results.forbidden.every(Boolean), failures);
     report('service worker bloque', results.serviceWorkerBlocked, failures);
-    report('journal en echec avec une entree par tentative interdite', journal.failed && journal.failures.length >= 18, failures);
+
+    const expectedFailures = [
+      ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride']
+        .map((action) => ({ path: PLUGIN_AJAX, action, verdict: 'block-fail' })),
+      { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
+      { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
+      { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
+      { path: PLUGIN_AJAX, action: 'saveFilteringConfig', verdict: 'block-fail' },
+      { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
+      { path: '/core/api/jeeApi.php', action: null, verdict: 'block' },
+      { path: PLUGIN_AJAX, action: null, verdict: 'block-fail' },
+      { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
+      { path: '/socket', action: null, verdict: 'websocket-bloque' },
+      { path: '/core/ajax/user.ajax.php', action: 'login', verdict: 'auth' },
+    ];
+    const remainingFailures = [...journal.failures];
+    for (const expected of expectedFailures) {
+      report(
+        `journal : ${expected.path} action=${expected.action ?? '-'} verdict=${expected.verdict}`,
+        takeMatchingFailure(remainingFailures, expected) !== null,
+        failures
+      );
+    }
+    report('journal marque le gate en echec', journal.failed, failures);
+    for (const extra of remainingFailures) {
+      console.log(`EXTRA ${extra.path} action=${extra.action ?? '-'} verdict=${extra.verdict}`);
+    }
 
     const derivedRow = results.derived.result.payload.commands[0];
     report('relecture derivee : override, type et diagnostic simules',
@@ -253,7 +296,6 @@ async function main() {
 
     console.log(`${failures.length === 0 ? 'PASS' : 'FAIL'} bilan (${failures.length} echec(s))`);
     process.exitCode = failures.length === 0 ? 0 : 1;
-    await context.close();
   } finally {
     if (browser) await browser.close();
     await close(server);
