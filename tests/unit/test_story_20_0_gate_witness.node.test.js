@@ -18,6 +18,8 @@ test('story 20-0 — témoin box pur et injectable', async (t) => {
     assert.equal(m.validPid('123'), true); assert.equal(m.validPid('12;id'), false);
     assert.equal(m.validBoxTime('2026-10-02 10:00:00'), true); assert.equal(m.validBoxTime('2026-10-02; id'), false);
     assert.throws(() => m.remoteWindowCommand('/x', 'ERROR', 'bad', '2026-10-02 10:00:00'));
+    assert.throws(() => m.remoteWindowCommand('/x', 'ERROR', '2026-10-02 10:00:00" || "', '2026-10-02 10:01:00'));
+    assert.match(m.remoteWindowCommand('/x', 'ERROR', '2026-10-02 10:00:00', '2026-10-02 10:01:00'), /\[ -r/);
   });
   await t.test('parse le schéma v1/v2 et refuse un JSON invalide', () => {
     assert.equal(m.parseOverrides(null).present, false);
@@ -33,17 +35,25 @@ test('story 20-0 — témoin box pur et injectable', async (t) => {
   });
   await t.test('compare tout écart AC2/AC3', () => {
     const before = witness(); const after = witness();
-    after.overrides = { ...after.overrides, sha256: 'b' }; after.daemon = { ...after.daemon, pid: '43', logLevel: 'warn' };
+    after.overrides = { ...after.overrides, sha256: 'b', mtime: 'other', content: 'other' }; after.daemon = { ...after.daemon, pid: '43', startedAt: 'other', logLevel: 'warning' };
     after.logs.daemon = { size: 9, firstTimestamp: '[2026-10-02 10:01:00]' };
     const diffs = m.compareWitness(before, after);
-    assert.ok(diffs.includes('overrides-sha256')); assert.ok(diffs.includes('daemon-pid'));
+    assert.ok(diffs.includes('overrides-sha256')); assert.ok(diffs.includes('overrides-mtime')); assert.ok(diffs.includes('overrides-content')); assert.ok(diffs.includes('daemon-pid')); assert.ok(diffs.includes('daemon-demarrage'));
     assert.ok(diffs.includes('niveau-journal-invalide')); assert.ok(diffs.includes('journal-daemon-troncature-taille'));
     assert.ok(diffs.includes('journal-daemon-troncature-horodatage'));
+    const nullTimestamp = witness(); nullTimestamp.logs.plugin.firstTimestamp = null;
+    assert.ok(m.compareWitness(witness(), nullTimestamp).includes('journal-plugin-illisible'));
+    const unreadable = witness(); unreadable.readable = false;
+    assert.ok(m.compareWitness(witness(), unreadable).includes('temoin-illisible'));
   });
   await t.test('takeWitness et countWindow utilisent uniquement l exécuteur injecté', async () => {
     const seen = [];
-    const run = async (command) => { seen.push(command); if (command.startsWith('pgrep')) return '42\n'; if (command.startsWith('ps -o lstart')) return 'Wed Oct  2 10:00:00 2026\n'; if (command.startsWith('ps -o args')) return '--loglevel info\n'; if (command.startsWith('date')) return '2026-10-02 10:00:00\n'; if (command.startsWith('stat -c %s')) return '10\n'; if (command.startsWith('grep -m1')) return '[2026-10-02 10:00:00]\n'; if (command.includes('sha256sum') || command.includes('stat -c %y') || command.includes('cat ')) return '__ABSENT__\n'; return '0\n'; };
+    const run = async (command) => { seen.push(command); if (command.startsWith('pgrep')) return '42\n'; if (command.startsWith('ps -o lstart')) return 'Wed Oct  2 10:00:00 2026\n'; if (command.startsWith('ps -o args')) return '--loglevel info\n'; if (command.startsWith('date')) return '2026-10-02 10:00:00\n'; if (command.includes('stat -c %s')) return '10\n'; if (command.includes('grep -m1')) return '[2026-10-02 10:00:00]\n'; if (command.includes('sha256sum') || command.includes('stat -c %y') || command.includes('cat ')) return '__ABSENT__\n'; return '0\n'; };
     const taken = await m.takeWitness({ run }); const counts = await m.countWindow('2026-10-02 10:00:00', '2026-10-02 10:01:00', { run });
-    assert.equal(taken.readable, true); assert.equal(taken.overrides.present, false); assert.equal(counts.daemonErrors, 0); assert.equal(counts.pluginErrors, 0); assert.ok(seen.every((command) => typeof command === 'string'));
+    assert.equal(taken.readable, true); assert.equal(taken.overrides.present, false); assert.equal(counts.daemonErrors, 0); assert.equal(counts.pluginErrors, 0); assert.ok(seen.every((command) => typeof command === 'string')); assert.ok(seen.some((command) => command.includes('[ -r')));
+    const doublePid = await m.takeWitness({ run: async (command) => command.startsWith('pgrep') ? '1\n2\n' : run(command) });
+    assert.equal(doublePid.readable, false);
+    const emptyTimestamp = await m.takeWitness({ run: async (command) => command.includes('grep -m1') ? '' : run(command) });
+    assert.equal(emptyTimestamp.readable, false);
   });
 });

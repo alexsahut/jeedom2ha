@@ -105,7 +105,7 @@ export function compareWitness(before, after) {
   for (const name of ['daemon', 'plugin']) {
     const oldLog = before?.logs?.[name];
     const newLog = after?.logs?.[name];
-    if (!oldLog || !newLog) { differences.push(`journal-${name}-illisible`); continue; }
+    if (!oldLog || !newLog || !oldLog.firstTimestamp || !newLog.firstTimestamp) { differences.push(`journal-${name}-illisible`); continue; }
     if (newLog.size < oldLog.size) differences.push(`journal-${name}-troncature-taille`);
     if (newLog.firstTimestamp !== oldLog.firstTimestamp) differences.push(`journal-${name}-troncature-horodatage`);
   }
@@ -114,7 +114,7 @@ export function compareWitness(before, after) {
 
 export function remoteWindowCommand(path, marker, start, end) {
   if (!validBoxTime(start) || !validBoxTime(end)) throw new Error('bornes-horloge-invalides');
-  return `awk '$0 ~ /^\\[[0-9-]+ [0-9:]+\\]/ { t=substr($0,2,19); if (t >= "${start}" && t <= "${end}") print }' ${quote(path)} | grep -cF ${quote(marker)} || true`;
+  return `[ -r ${quote(path)} ] || exit 3; awk '$0 ~ /^\\[[0-9-]+ [0-9:]+\\]/ { t=substr($0,2,19); if (t >= "${start}" && t <= "${end}") print }' ${quote(path)} | grep -cF ${quote(marker)} || true`;
 }
 
 export function runRemote(command) {
@@ -132,10 +132,10 @@ async function optionalFile(run, command) {
 }
 
 async function takeLog(run, path) {
-  return {
-    size: parseNumber(await run(`stat -c %s ${quote(path)}`), 'taille-journal'),
-    firstTimestamp: (await run(`grep -m1 -o '^\\[[0-9-]* [0-9:]*\\]' ${quote(path)} || true`)).trim() || null,
-  };
+  const readable = `[ -r ${quote(path)} ] || exit 3; `;
+  const firstTimestamp = (await run(`${readable}grep -m1 -o '^\\[[0-9-]* [0-9:]*\\]' ${quote(path)} || true`)).trim();
+  if (!firstTimestamp) throw new Error('journal-horodatage-illisible');
+  return { size: parseNumber(await run(`${readable}stat -c %s ${quote(path)}`), 'taille-journal'), firstTimestamp };
 }
 
 export async function takeWitness({ run = runRemote } = {}) {
