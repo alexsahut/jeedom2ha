@@ -96,3 +96,5 @@ Suite : l'étape 4 du plan d'action, l'interface. Elle comprend :
 - CC-04 (volet interface), CC-25 et CC-26.
 
 La story 16-8, dont cette surface est la base, reste `in-progress`. Son parcours navigateur réel du 2026-10-01 est partiel (`16-8-ac14-validation-2026-10-01.md`) : AC5 est amendé par décision d'Alex (chargement à l'ouverture de la pièce) et la synthèse (AC9-AC10) est corrigée dans le code, à déployer ; reste la bascule vue au clic (AC14), avant sa validation UX.
+
+Mise à jour du 2026-10-02 : AC14 est amendé par décision d'Alex (09:44) ; la story 16-8 est en `ready-for-UX-validation` (voir la story et `16-8-ac14-validation-2026-10-01.md`, « Clôture »).

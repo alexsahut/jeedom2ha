@@ -11,8 +11,9 @@ Clôture de pe-epic-19 (étape 3, contrat de décision unifié `evaluate_equipme
 - **CC-04 (volet UI)** : jargon Jeedom encore visible (« Mes templates », « Paramètre n°1 »…), synthèse « Parc global » et modale diagnostic distinctes de la navigation par pièce — pas de surface unique pièce → équipement → commande.
 - **16-8 se termine sans nouveau code, avant 20-1.** Son parcours navigateur réel du 2026-10-01 (`16-8-ac14-validation-2026-10-01.md`) était partiel. Depuis :
   - AC5 est amendé dans la story 16-8 par décision d'Alex (2026-10-01, 16:22) : le diagnostic est chargé à l'ouverture de la pièce, ce que fait déjà le code ;
-  - AC9-AC10 est corrigé par la PR #192 (`7a819df`), à déployer ;
-  - reste la preuve au clic d'AC14 (bascule d'une commande bloquante en prête), après ce déploiement, puis la validation UX d'Alex.
+  - AC9-AC10 est corrigé par la PR #192 (`7a819df`), déployé et vu au clic le 2026-10-01 au soir ;
+  - AC14 est amendé par décision d'Alex (2026-10-02, 09:44) : la bascule d'une commande bloquante en prête est prouvée par les tests unitaires, et le sera au clic sur un aperçu simulé par le gate 20-0 ; le reste du parcours est prouvé au clic réel ;
+  - reste la validation UX d'Alex.
   Ces écarts restent portés par 16-8, pas par l'epic 20. La fin de 16-8 conditionne seulement le démarrage de 20-1 : une seule implémentation de navigation par pièce existe quand 20-1 la remplace.
 
 ## Options considérées
@@ -46,7 +47,7 @@ Ordre de dépendance obligatoire : `20-0` → `20-1` → (`20-2`, `20-4` en para
 - Une seule surface pièce → équipement → commande fait foi ; la synthèse « Parc global » et la modale diagnostic distinctes n'existent plus.
 - CC-25 et CC-26 fermés et prouvés par clic réel (y compris la purge d'un override de publication, décision d'Alex du 2026-09-29).
 - CC-04 (volet UI) fermé : aucun jargon Jeedom résiduel, exclusion/forçage/rescan accessibles depuis la surface unique.
-- 16-8 `done` avant 20-1 : AC5 amendé par décision d'Alex, AC9-AC10 corrigé, AC14 prouvé au clic, validation UX d'Alex.
+- 16-8 `done` avant 20-1 : AC5 amendé par décision d'Alex, AC9-AC10 corrigé, AC14 tenu tel qu'amendé le 2026-10-02, validation UX d'Alex.
 - Documentation utilisateur réécrite et alignée sur l'interface livrée.
 - Gate 20-0 exécuté et vert avant chaque `done` d'interface de l'epic.
 
@@ -64,9 +65,9 @@ Point à confirmer par Alex : les actions du plugin exigent un compte administra
 
 ## Risques et suivi
 
-- Revue Codex du 2026-10-01 (P1) : le gate ne transmet plus aucune écriture ; les preuves terrain qui écrivent (AC14 de 16-8, purge de 20-2) suivent la règle : équipement non publié, témoin `getBridgeStatus` relevé avant/après, sync correctif (après le retrait de l'override) si le témoin a bougé, jamais d'exclusion d'un équipement publié sans GO d'Alex.
+- Revue Codex du 2026-10-01 (P1) : le gate ne transmet plus aucune écriture ; les preuves terrain qui écrivent (par exemple la purge de 20-2) suivent la règle : équipement non publié, témoin `getBridgeStatus` relevé avant/après, sync correctif (après le retrait de l'override) si le témoin a bougé, jamais d'exclusion d'un équipement publié sans GO d'Alex.
 - Défaut latent hors PR : écritures non atomiques de `data/ha_overrides.json` (`resources/daemon/mapping/overrides.py:266/310/430/462`, ouverture en écriture qui tronque le fichier avant de le réécrire ; un sync qui le lit à cet instant calcule sans aucun override) → story/PR séparée.
-- AC14 de 16-8 : constat du 2026-10-01 au soir (`16-8-ac14-validation-2026-10-01.md`, « Suite ») : aucune bascule « bloquante → prête » par override TYPE n'est démontrable sur les données réelles (17 commandes couvertes et bloquantes du périmètre inclus, toutes `ambiguous_skipped`). La voie de preuve de la bascule exigée par AC14 (amendement d'AC14, ou preuve par le gate 20-0 en écriture simulée) est à trancher par Alex.
+- AC14 de 16-8 : constat du 2026-10-01 au soir (`16-8-ac14-validation-2026-10-01.md`, « Suite ») : aucune bascule « bloquante → prête » par override TYPE n'est démontrable sur les données réelles (17 commandes couvertes et bloquantes du périmètre inclus, toutes `ambiguous_skipped`). Décision d'Alex du 2026-10-02 (09:44) : AC14 est amendé ; la bascule est prouvée par les tests unitaires et le sera au clic, sur un aperçu simulé déclaré, par le gate 20-0 ; le reste du parcours est prouvé au clic réel (2026-10-01, `95d3059` puis `7a819df`). Le sort des 17 `ambiguous_skipped` sera tranché au cadrage de 20-2 (accord d'Alex du même jour).
 
 ## Notes
 
