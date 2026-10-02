@@ -3,28 +3,50 @@
  * Story 20.0 (Task 1) — relevé des requêtes émises au chargement de la page du plugin.
  *
  * Script de reconnaissance, pas encore le gate complet (Tasks 2-4) : il ouvre un seul
- * contexte Chromium headless, refuse toute requête par défaut, n'autorise que les GET
- * statiques, la page de connexion et la page du plugin, fait un seul essai de connexion,
- * puis journalise le verdict de chaque requête observée pendant le chargement. Sert à
- * établir, avec des faits d'exécution (pas seulement la lecture du code), la liste des
- * couples (point d'entrée, action) que Task 1 doit inscrire explicitement comme lectures
- * nécessaires (AC1).
+ * contexte Chromium headless, refuse toute requête par défaut (HTTP et WebSocket),
+ * n'autorise que les GET statiques, la page de connexion et la page du plugin, fait un
+ * seul essai de connexion, puis journalise le verdict de chaque requête observée pendant
+ * le chargement. Sert à établir, avec des faits d'exécution (pas seulement la lecture du
+ * code), la liste des couples (point d'entrée, action) que Task 1 doit inscrire
+ * explicitement comme lectures nécessaires (AC1).
  *
  * NE PAS EXÉCUTER sans relecture de ClaudeBox au préalable (règle de l'unité 20-0).
  *
- * Exécution prévue (hors de ce tour) : Playwright est installé hors du dépôt, dans
- * /home/asahut/.openclaw/tools/jeedom2ha-gate (node_modules, Chromium en cache). Lancer
- * ce script suppose donc de résoudre le module 'playwright' depuis cet emplacement
- * externe (par ex. NODE_PATH=/home/asahut/.openclaw/tools/jeedom2ha-gate/node_modules
- * node tests/e2e/gate/page-load-request-inventory.mjs), wiring laissé à la Task 2
- * (« Mettre en place Playwright contre une page du plugin »).
+ * Résolution de Playwright : installé hors du dépôt, dans le dossier outils
+ * (JEEDOM2HA_GATE_TOOLS, par défaut /home/asahut/.openclaw/tools/jeedom2ha-gate). En
+ * ESM, Node ignore NODE_PATH : le module est donc chargé par createRequire(), ancré sur
+ * le package.json de ce dossier (vérifié sur Node 22 et Playwright 1.63.0, qui fournit
+ * context.routeWebSocket).
  *
  * Aucune capture, trace, HAR ni état de session n'est écrite sur disque : le journal va
  * uniquement sur stdout, à rediriger par l'appelant s'il veut le conserver.
  */
 
-import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import { statSync, readFileSync } from 'node:fs';
+
+const GATE_TOOLS_DIR = process.env.JEEDOM2HA_GATE_TOOLS || '/home/asahut/.openclaw/tools/jeedom2ha-gate';
+
+function loadPlaywright() {
+  const toolsPackageJson = path.join(GATE_TOOLS_DIR, 'package.json');
+  const requireFromTools = createRequire(toolsPackageJson);
+  try {
+    return requireFromTools('playwright');
+  } catch (err) {
+    throw new Error(
+      `Playwright introuvable depuis ${GATE_TOOLS_DIR} (résolu via ${toolsPackageJson}) : ${err.message}`
+    );
+  }
+}
+
+let chromium;
+try {
+  ({ chromium } = loadPlaywright());
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
 
 const ORIGIN = 'https://domobox.famille-sahut.fr';
 const LOGIN_PAGE_PATH = '/index.php';
@@ -140,6 +162,29 @@ function logLine(method, resourceType, pathname, action, verdict) {
   console.log(`${ts} ${method} ${resourceType} ${pathname} ${actionPart} verdict=${verdict}`);
 }
 
+/** Compte les sauts d'une chaîne de redirection en remontant redirectedFrom(). Playwright
+ * n'appelle context.route que pour la toute première URL de la chaîne : les cibles de
+ * redirection ne sont pas interceptées, seulement reconstituées ici après coup. */
+function countRedirects(request) {
+  let count = 0;
+  let current = request.redirectedFrom();
+  while (current) {
+    count++;
+    current = current.redirectedFrom();
+  }
+  return count;
+}
+
+function logDoc(label, response) {
+  if (!response) {
+    console.log(`DOC ${label} reponse=absente`);
+    return;
+  }
+  const url = new URL(response.url());
+  const redirects = countRedirects(response.request());
+  console.log(`DOC ${label} http=${response.status()} chemin=${url.pathname} redirections=${redirects}`);
+}
+
 async function main() {
   const credentials = loadCredentials();
 
@@ -179,10 +224,21 @@ async function main() {
       await route.abort('blockedbyclient');
     });
 
+    // context.route n'intercepte pas les WebSockets (API séparée). Refus par défaut ici :
+    // jamais de connectToServer() (donc jamais connecté au serveur réel), fermeture
+    // immédiate de la connexion côté page.
+    await context.routeWebSocket(/.*/, (ws) => {
+      const wsUrl = new URL(ws.url());
+      logLine('WS', 'websocket', wsUrl.pathname, null, 'bloquee');
+      blocked.set(`${wsUrl.pathname}|`, { pathname: wsUrl.pathname, action: null });
+      ws.close({ code: 1000, reason: 'blocked by gate' });
+    });
+
     const page = await context.newPage();
 
     // 1. GET de la page de connexion (autorisée par l'intercepteur ci-dessus).
-    await page.goto(`${ORIGIN}${LOGIN_PAGE_PATH}`, { waitUntil: 'load' });
+    const loginPageResponse = await page.goto(`${ORIGIN}${LOGIN_PAGE_PATH}`, { waitUntil: 'load' });
+    logDoc('page-connexion', loginPageResponse);
 
     // 2. Connexion — un seul essai, via context.request plutôt que le formulaire de la
     // page : ses sélecteurs DOM réels n'ont pas pu être vérifiés sans exécuter le script
@@ -203,24 +259,46 @@ async function main() {
       },
     });
 
-    let loginOk = false;
+    let state = 'inconnu';
     if (loginResponse.ok()) {
       try {
         const body = await loginResponse.json();
-        loginOk = body && body.state === 'ok';
+        if (body && typeof body.state === 'string') {
+          state = body.state;
+        }
       } catch {
-        loginOk = false;
+        state = 'reponse-non-json';
       }
     }
+    // Jamais le corps : seuls le code HTTP et le champ 'state' (ok/error) sont journalisés.
+    console.log(`DOC authentification http=${loginResponse.status()} state=${state}`);
 
-    if (!loginOk) {
+    if (state !== 'ok') {
       console.log('Connexion refusée ou réponse inattendue — arrêt immédiat, aucune autre requête.');
       return;
     }
 
-    // 3. GET de la page du plugin (autorisée), puis attente bornée pour laisser le
-    // chargement émettre ses requêtes (toutes journalisées par l'intercepteur).
-    await page.goto(`${ORIGIN}${PLUGIN_PAGE_PATH}?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
+    // 3. GET de la page du plugin (autorisée par l'intercepteur).
+    const pluginPageResponse = await page.goto(
+      `${ORIGIN}${PLUGIN_PAGE_PATH}?v=d&m=jeedom2ha&p=jeedom2ha`,
+      { waitUntil: 'load' }
+    );
+    logDoc('page-plugin', pluginPageResponse);
+
+    const finalUrl = new URL(pluginPageResponse.url());
+    const reachedPluginPage = Object.entries(PLUGIN_PAGE_QUERY).every(
+      ([key, value]) => finalUrl.searchParams.get(key) === value
+    );
+    if (!reachedPluginPage) {
+      // Une chaîne de redirection a pu mener ailleurs (ex. retour à la page de connexion,
+      // session refusée après coup) : les cibles de redirection ne sont pas interceptées
+      // par context.route, donc ce contrôle après coup est la seule garantie ici.
+      console.log('page du plugin non atteinte');
+      return;
+    }
+
+    // Attente bornée pour laisser le chargement émettre ses requêtes (toutes
+    // journalisées par l'intercepteur HTTP/WebSocket ci-dessus).
     await page.waitForTimeout(PAGE_LOAD_WAIT_MS);
   } finally {
     await context.close();
