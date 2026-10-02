@@ -49,16 +49,23 @@ function sampleAuto() {
   };
 }
 
-function previewResponse({ covered = true, overridden = sampleOverridden() } = {}) {
+// Forme réelle confirmée par relecture ClaudeBox (commit 698588c) :
+// `jeedom2ha::callDaemon` rend tel quel le JSON du démon, qui enveloppe sa réponse dans
+// `payload` même pour previewMappingOverride (`http_server.py:2726-2849`) — comme pour
+// getMappingOverrides/saveMappingOverride/revertMappingOverride.
+function previewResponse({ covered = true, overridden = sampleOverridden(), status = 'ok' } = {}) {
   return {
     state: 'ok',
     result: {
-      mapped: true,
-      covered,
-      auto: sampleAuto(),
-      overridden,
-      native_generic_types: ['LIGHT'],
-      support_export: true,
+      status,
+      payload: {
+        mapped: true,
+        covered,
+        auto: sampleAuto(),
+        overridden,
+        native_generic_types: ['LIGHT'],
+        support_export: true,
+      },
     },
   };
 }
@@ -124,7 +131,7 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     assert.equal(row.override_applied, true);
     assert.equal(row.override_source, 'user');
     assert.equal(row.effective_ha, 'switch');
-    assert.deepEqual(row.diagnostic, preview.result.overridden);
+    assert.deepEqual(row.diagnostic, preview.result.payload.overridden);
 
     // Champs de lecture pure inchangés (D10).
     assert.equal(row.attendu_ha, 'light');
@@ -238,12 +245,12 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     const base = previewResponse({ overridden: sampleOverridden({ isValid: false, shouldPublish: false }) });
     const bascule = simulatePreviewBascule(base);
 
-    assert.equal(bascule.result.overridden.projection_validity.is_valid, true);
-    assert.equal(bascule.result.overridden.should_publish, true);
+    assert.equal(bascule.result.payload.overridden.projection_validity.is_valid, true);
+    assert.equal(bascule.result.payload.overridden.should_publish, true);
 
     const expected = structuredClone(base);
-    expected.result.overridden.projection_validity.is_valid = true;
-    expected.result.overridden.should_publish = true;
+    expected.result.payload.overridden.projection_validity.is_valid = true;
+    expected.result.payload.overridden.should_publish = true;
     assert.deepEqual(bascule, expected);
   });
 
@@ -270,6 +277,27 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
 
   await t.test('erreur : bascule sans overridden', () => {
     assert.throws(() => simulatePreviewBascule(previewResponse({ overridden: null })));
+  });
+
+  await t.test('forme fautive (sans payload intermédiaire) -> non mémorisée, bascule impossible', () => {
+    const state = createState();
+    // Ancienne forme erronée (bogue corrigé après relecture ClaudeBox, commit 698588c) :
+    // `overridden`/`covered` directement sous `result`, sans `payload` intermédiaire.
+    const faultyResponse = {
+      state: 'ok',
+      result: {
+        mapped: true,
+        covered: true,
+        auto: sampleAuto(),
+        overridden: sampleOverridden({ isValid: true, shouldPublish: true }),
+        native_generic_types: ['LIGHT'],
+      },
+    };
+
+    const recorded = recordPreview(state, { eqId: '1', cmdId: '2', type: 'switch', response: faultyResponse });
+    assert.equal(recorded, false);
+    assert.throws(() => recordSave(state, { eqId: '1', cmdId: '2', type: 'switch' }));
+    assert.throws(() => simulatePreviewBascule(faultyResponse));
   });
 
   await t.test('erreur : commande simulée absente de l\'arbre réel', () => {

@@ -10,13 +10,19 @@
  * simulation revient simplement à ne plus l'appliquer à la lecture dérivée.
  *
  * Contrats de réponse réels repris de `/tmp/jeedom2ha-200-simulation-design.md` (incrément
- * B1a) : enveloppe ajax::success `{"state":"ok","result":...}`.
- *   - previewMappingOverride : result = {mapped, covered, auto, overridden, ...} (pas de
- *     `payload` intermédiaire).
+ * B1a) et corrigés après relecture ClaudeBox (commit 698588c) : `previewMappingOverride`
+ * passe par `jeedom2ha::callDaemon`, qui rend tel quel le JSON du démon
+ * (`core/class/jeedom2ha.class.php:551-556`, `return $data`). L'enveloppe ajax::success
+ * `{"state":"ok","result":...}` a donc TOUJOURS un `payload` intermédiaire dans `result`,
+ * identique pour les 4 actions :
+ *   - previewMappingOverride : result = {"status":"ok","payload":{mapped, covered, auto,
+ *     overridden, native_generic_types, ...}} (`http_server.py:2726-2849`).
  *   - getMappingOverrides / saveMappingOverride / revertMappingOverride : result =
  *     {"status":"ok","payload":{...}} — pour getMappingOverrides, payload = {jeedom_eq_id,
  *     eq_name, mapped, sync_status, commands[]} (confirmé par
- *     jeedom2ha_mapping_surface.js:329, `result.payload ? result.payload : result`).
+ *     jeedom2ha_mapping_surface.js:329, `result.payload ? result.payload : result`, et par
+ *     `readPreviewOverridden`/`readPreviewCovered` de `jeedom2ha_mapping_override.js:120-135`,
+ *     qui font `p = payload.payload ? payload.payload : payload`).
  *
  * state = { previews, simulations, lastPreviewType }, créé par createState() :
  *   - previews[`${eqId}:${cmdId}`] = { type, overridden } — dernier aperçu exploitable.
@@ -42,37 +48,49 @@ export function createState() {
   };
 }
 
+function readPayload(result) {
+  if (!result || result.status !== 'ok') return null;
+  const payload = result.payload;
+  if (!payload || typeof payload !== 'object') return null;
+  return payload;
+}
+
 // recordPreview : mémorise le type proposé et la vue `overridden` d'un aperçu réel
 // exploitable (AC2), et tient à jour lastPreviewType (lu par policy.mjs). N'enregistre rien
-// si l'aperçu n'est pas exploitable (enveloppe en échec, commande non couverte, overridden
-// nul) : recordSave échouera alors explicitement, comme pour tout aperçu jamais obtenu.
+// si l'aperçu n'est pas exploitable (enveloppe en échec, `payload` absent/invalide, commande
+// non couverte, overridden nul) : recordSave échouera alors explicitement, comme pour tout
+// aperçu jamais obtenu.
 export function recordPreview(state, { eqId, cmdId, type, response }) {
   if (!response || response.state !== 'ok') return false;
-  const result = response.result;
-  if (!result || result.covered !== true || result.overridden == null) return false;
+  const payload = readPayload(response.result);
+  if (!payload || payload.covered !== true || payload.overridden == null) return false;
 
   const k = key(eqId, cmdId);
-  state.previews[k] = { type, overridden: structuredClone(result.overridden) };
+  state.previews[k] = { type, overridden: structuredClone(payload.overridden) };
   state.lastPreviewType[k] = type;
   return true;
 }
 
 // simulatePreviewBascule (section 4 de la conception) : copie profonde de realResponse
-// (enveloppe previewMappingOverride) avec uniquement les 2 booléens forcés à « prêt ».
-// ha_entity_type/confidence/reason_code reflètent déjà le type proposé par le moteur réel
-// et n'ont pas besoin d'être changés — inventer davantage serait une donnée non prouvée.
+// (enveloppe previewMappingOverride) avec uniquement les 2 booléens forcés à « prêt », dans
+// `result.payload.overridden`. ha_entity_type/confidence/reason_code reflètent déjà le type
+// proposé par le moteur réel et n'ont pas besoin d'être changés — inventer davantage serait
+// une donnée non prouvée.
 export function simulatePreviewBascule(realResponse) {
-  const result = realResponse && realResponse.result;
-  if (!result || result.covered !== true) {
+  const payload = readPayload(realResponse && realResponse.result);
+  if (!payload) {
+    throw new Error('simulatePreviewBascule: payload absent ou invalide, bascule impossible');
+  }
+  if (payload.covered !== true) {
     throw new Error('simulatePreviewBascule: aperçu non couvert, bascule impossible');
   }
-  if (result.overridden == null) {
+  if (payload.overridden == null) {
     throw new Error('simulatePreviewBascule: overridden absent, bascule impossible');
   }
 
   const copy = structuredClone(realResponse);
-  copy.result.overridden.projection_validity.is_valid = true;
-  copy.result.overridden.should_publish = true;
+  copy.result.payload.overridden.projection_validity.is_valid = true;
+  copy.result.payload.overridden.should_publish = true;
   return copy;
 }
 
@@ -152,7 +170,7 @@ export function hasActiveSimulation(state, eqId) {
 
 // deriveOverrideTree (section 3 de la conception) : copie profonde du dernier arbre réel
 // observé, transformée UNIQUEMENT sur les commandes qui portent une simulation en vigueur
-// pour cet équipement. sync_status n'est JAMAIS recalculé (arbitrage Alexandre 2026-10-02) :
+// pour cet équipement. sync_status n'est JAMAIS recalculé (arbitrage ClaudeBox 2026-10-02) :
 // current_should_publish est une décision d'équipement du démon (mapped and
 // equipment_decision.should_publish and scope_included), pas une agrégation « au moins une
 // commande prête » — une telle agrégation inventerait une donnée que le gate ne peut pas
