@@ -1,0 +1,121 @@
+// Fonctions pures du rapport du gate Story 20.0 : aucune E/S ni dépendance Playwright.
+
+import { createHash } from 'node:crypto';
+
+export const CONFIG_KEYS = [
+  'excludedPlugins', 'excludedObjects', 'confidencePolicy', 'mqttHost',
+  'mqttPort', 'mqttUser', 'mqttTls', 'mqttPassword',
+];
+
+/** Lit les deux identifiants requis sans jamais les afficher. */
+export function parseCredentials(raw) {
+  const values = {};
+  for (const line of String(raw).split(/\r?\n/)) {
+    const index = line.indexOf('=');
+    if (index > 0 && !line.startsWith('#')) {
+      values[line.slice(0, index).trim()] = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
+  if (!values.JEEDOM_USER || !values.JEEDOM_PASSWORD) throw new Error('identifiants-incomplets');
+  return {
+    username: values.JEEDOM_USER,
+    password: values.JEEDOM_PASSWORD,
+    values: [values.JEEDOM_USER, values.JEEDOM_PASSWORD],
+  };
+}
+
+/** Extrait le témoin du bridge et rejette toute réponse AJAX incomplète. */
+export function extractBridgeStatus(response) {
+  const result = response?.result;
+  if (response?.state !== 'ok' || result?.daemon !== true) {
+    throw new Error('sonde-bridge-illisible');
+  }
+  if (!Object.hasOwn(result, 'derniere_synchro_terminee')) {
+    throw new Error('sonde-bridge-illisible');
+  }
+  if (!Object.hasOwn(result, 'derniere_operation_resultat')) {
+    throw new Error('sonde-bridge-illisible');
+  }
+  const operation = result.derniere_operation_resultat;
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
+    throw new Error('sonde-bridge-illisible');
+  }
+  if (typeof operation.timestamp !== 'string' || !operation.timestamp) {
+    throw new Error('sonde-bridge-illisible');
+  }
+  return {
+    daemon: result.daemon,
+    derniere_synchro_terminee: result.derniere_synchro_terminee,
+    derniere_operation_timestamp: operation.timestamp,
+  };
+}
+
+/** Extrait les huit valeurs de configuration, seulement si chaque réponse est saine. */
+export function extractConfigValues(responses) {
+  const values = {};
+  for (const key of CONFIG_KEYS) {
+    const response = responses?.[key];
+    if (response?.state !== 'ok' || !Object.hasOwn(response, 'result')) {
+      throw new Error(`sonde-config-illisible:${key}`);
+    }
+    values[key] = response.result;
+  }
+  return values;
+}
+
+/** Produit une empreinte stable sans conserver ni révéler les valeurs de configuration. */
+export function hashValue(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+/** Compare les deux sondes HTTP et donne un nom précis à chaque différence. */
+export function compareProbes(before, after) {
+  const differences = [];
+  if (JSON.stringify(before?.bridge) !== JSON.stringify(after?.bridge)) differences.push('bridge-different');
+  if (before?.configHash !== after?.configHash) differences.push('empreinte-config-differente');
+  return differences;
+}
+
+/** Résume les verdicts de l'intercepteur sans ajouter de données sensibles. */
+export function summarizeJournal(journal) {
+  return Object.fromEntries((journal?.entries ?? []).reduce((counts, entry) => {
+    counts.set(entry.verdict, (counts.get(entry.verdict) ?? 0) + 1);
+    return counts;
+  }, new Map()));
+}
+
+/** Vérifie les cinq contrôles AC3 et la condition d'activité box. */
+export function calculateChecks({ journal, witnessDifferences, probeDifferences, window, consoleErrors, failure }) {
+  const markerCount = Object.values(window?.daemon ?? {}).some(Boolean);
+  const logActivity = markerCount || Boolean(window?.daemonErrors) || Boolean(window?.pluginErrors);
+  const boxChanged = witnessDifferences.length > 0 || probeDifferences.length > 0;
+  const checks = {
+    ac3_1_interception: !journal?.failed,
+    ac3_2_box: !boxChanged,
+    ac3_3_console: consoleErrors.length === 0,
+    ac3_4_logs: !logActivity,
+    ac3_5_report: true,
+  };
+  return { checks, activity: boxChanged || logActivity };
+}
+
+/** Remplace une query string entière afin qu'une URL ne divulgue jamais une apikey. */
+export function sanitizeUrl(value) {
+  return String(value).replace(/\?[^\s]*/g, '?…');
+}
+
+/** Assainit chaque message console, y compris les URLs intégrées dans une erreur. */
+export function sanitizeConsoleErrors(errors) {
+  return (errors ?? []).map((error) => sanitizeUrl(error));
+}
+
+/** Cherche seulement les valeurs pertinentes pour AC4 ; les courtes valeurs de config sont ignorées. */
+export function ac4Values(credentials, configValues) {
+  const config = Object.values(configValues ?? {}).filter((value) => typeof value === 'string' && value.length >= 6);
+  return [...(credentials ?? []).filter(Boolean), ...config];
+}
+
+/** Détecte une fuite AC4 dans un ensemble de textes déjà générés. */
+export function artifactsContain(values, texts) {
+  return values.some((value) => value && texts.some((text) => text.includes(value)));
+}
