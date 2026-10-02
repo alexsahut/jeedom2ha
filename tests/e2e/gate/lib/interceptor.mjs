@@ -1,0 +1,191 @@
+// tests/e2e/gate/lib/interceptor.mjs
+/**
+ * Story 20.0 (incrément B2a) — intercepteur Playwright à refus par défaut.
+ *
+ * L'appelant crée le BrowserContext avec `serviceWorkers: 'block'`, effectue la
+ * connexion avant cette installation, puis fournit un journal vide :
+ * `{ entries: [], failed: false, failures: [] }`. Ce module ne crée ni
+ * navigateur ni connexion et ne contient aucun témoin de la box.
+ */
+
+import { classifyRequest } from './policy.mjs';
+import {
+  buildRevertResponse,
+  buildSaveResponse,
+  deriveOverrideTree,
+  hasActiveSimulation,
+  recordPreview,
+  recordRevert,
+  recordSave,
+  simulatePreviewBascule,
+} from './simulate.mjs';
+
+function requestDetails(request) {
+  return {
+    method: request.method(),
+    url: request.url(),
+    resourceType: request.resourceType(),
+    postData: request.postData(),
+  };
+}
+
+function pathname(url) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return null;
+  }
+}
+
+function appendEntry(journal, { method, resourceType, url, action, verdict, reason }) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    method,
+    resourceType,
+    path: pathname(url),
+    action: action ?? null,
+    verdict,
+    reason,
+  };
+  journal.entries.push(entry);
+  return entry;
+}
+
+function fail(journal, entry) {
+  journal.failed = true;
+  journal.failures.push(entry);
+}
+
+// Les paramètres d'override sont lus uniquement du corps form-urlencoded, comme
+// dans policy.mjs. Ils ne sortent jamais de cette fonction et ne sont jamais journalisés.
+function overrideParams(req) {
+  const body = req.method === 'POST' && typeof req.postData === 'string' ? new URLSearchParams(req.postData) : null;
+  return {
+    eqId: body ? body.get('eqId') : null,
+    cmdId: body ? body.get('cmdId') : null,
+    haEntityType: body ? body.get('haEntityType') : null,
+  };
+}
+
+function isDeclaredBascule(declaredBascules, { eqId, cmdId, haEntityType }) {
+  if (!Array.isArray(declaredBascules)) return false;
+  return declaredBascules.some(
+    (item) =>
+      item &&
+      String(item.eqId) === eqId &&
+      String(item.cmdId) === cmdId &&
+      String(item.haEntityType) === haEntityType
+  );
+}
+
+async function fulfillJson(route, response, body) {
+  await route.fulfill({ response, json: body });
+}
+
+/**
+ * Installe l'intercepteur sur le contexte déjà créé par le lanceur.
+ *
+ * `declaredBascules` est une liste fermée de `{ eqId, cmdId, haEntityType }`.
+ * Les valeurs sont comparées comme chaînes, car elles proviennent du corps URL-encodé.
+ */
+export async function installInterceptor(context, { ctx, simState, journal, declaredBascules }) {
+  await context.route('**/*', async (route) => {
+    let req;
+    let decision;
+
+    try {
+      req = requestDetails(route.request());
+      decision = classifyRequest(req, ctx);
+
+      if (decision.verdict === 'static' || decision.verdict === 'document') {
+        await route.continue();
+        appendEntry(journal, { ...req, ...decision });
+        return;
+      }
+
+      if (decision.verdict === 'read') {
+        const params = overrideParams(req);
+
+        if (decision.action === 'getMappingOverrides' && hasActiveSimulation(simState, params.eqId)) {
+          const response = await route.fetch();
+          const served = deriveOverrideTree(simState, params.eqId, await response.json());
+          await fulfillJson(route, response, served);
+          appendEntry(journal, { ...req, ...decision, verdict: 'lecture-derivee' });
+          return;
+        }
+
+        if (decision.action === 'previewMappingOverride') {
+          const response = await route.fetch();
+          const realResponse = await response.json();
+          const declared = isDeclaredBascule(declaredBascules, params);
+          const served = declared ? simulatePreviewBascule(realResponse) : realResponse;
+
+          // Un aperçu réel non exploitable n'est pas une écriture ni une erreur de
+          // transport : recordPreview ne l'enregistre pas, et un enregistrement
+          // ultérieur échouera explicitement dans recordSave. Une bascule déclarée
+          // impossible, elle, lève déjà dans simulatePreviewBascule et atteint catch.
+          recordPreview(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType, response: served });
+          ctx.lastPreviewType = simState.lastPreviewType;
+          await fulfillJson(route, response, served);
+          appendEntry(journal, {
+            ...req,
+            ...decision,
+            verdict: declared ? 'apercu-simule' : 'lecture-reelle',
+          });
+          return;
+        }
+
+        await route.continue();
+        appendEntry(journal, { ...req, ...decision });
+        return;
+      }
+
+      if (decision.verdict === 'simulate') {
+        const params = overrideParams(req);
+        let response;
+        if (decision.action === 'saveMappingOverride') {
+          recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
+          response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
+        } else {
+          const revert = recordRevert(simState, { eqId: params.eqId, cmdId: params.cmdId });
+          response = buildRevertResponse(revert);
+        }
+        await route.fulfill({ json: response });
+        appendEntry(journal, { ...req, ...decision, verdict: 'simulee' });
+        return;
+      }
+
+      const entry = appendEntry(journal, { ...req, ...decision });
+      fail(journal, entry);
+      await route.abort();
+    } catch {
+      try {
+        await route.abort();
+      } catch {
+        // Le refus est déjà tenté ; l'échec reste impérativement consigné ci-dessous.
+      }
+      const entry = appendEntry(journal, {
+        method: req?.method ?? null,
+        resourceType: req?.resourceType ?? null,
+        url: req?.url ?? null,
+        action: decision?.action ?? null,
+        verdict: 'exception-intercepteur',
+        reason: 'exception-intercepteur',
+      });
+      fail(journal, entry);
+    }
+  });
+
+  await context.routeWebSocket(/.*/, async (route) => {
+    const entry = appendEntry(journal, {
+      method: 'WEBSOCKET',
+      resourceType: 'websocket',
+      url: route.url(),
+      action: null,
+      verdict: 'websocket-bloque',
+      reason: 'websocket-interdit',
+    });
+    fail(journal, entry);
+    await route.close();
+  });
+}
