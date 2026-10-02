@@ -104,24 +104,58 @@ function findAllowedRead(url, action) {
   return ALLOWED_READS.some((entry) => entry.pathname === url.pathname && entry.actions.includes(action));
 }
 
-function validateOverrideWrite(action, params, ctx) {
-  const eqId = params.get('eqId');
-  const cmdId = params.get('cmdId');
-  const haEntityType = params.get('haEntityType');
+// Clé jamais résolue via le prototype (constructor, __proto__, ...) : évite une valeur
+// héritée ou une TypeError sur ctx.declaredEquipments[eqId]/ctx.lastPreviewType[clé].
+function hasOwnSafe(obj, key) {
+  return typeof obj === 'object' && obj !== null && Object.hasOwn(obj, key);
+}
 
-  if (!eqId) return false;
-  const declared = ctx.declaredEquipments && ctx.declaredEquipments[eqId];
-  if (!declared) return false;
+function isDigitsOnly(value) {
+  return /^[0-9]+$/.test(value);
+}
+
+const OVERRIDE_PARAM_NAMES = ['eqId', 'cmdId', 'haEntityType'];
+
+// init() PHP lit l'URL avant le corps : pour ne jamais laisser l'URL influencer une
+// écriture d'override, eqId/cmdId/haEntityType doivent être absents de l'URL, apparaître
+// au plus une fois dans le corps, et eqId (et cmdId s'il est présent et non vide) doivent
+// être des chiffres seuls — sinon la requête est structurellement invalide.
+function readOverrideParams(url, postParams) {
+  if (OVERRIDE_PARAM_NAMES.some((name) => url.searchParams.has(name))) return null;
+  if (!postParams) return null;
+  if (OVERRIDE_PARAM_NAMES.some((name) => postParams.getAll(name).length > 1)) return null;
+
+  const eqId = postParams.get('eqId');
+  const cmdId = postParams.get('cmdId');
+  const haEntityType = postParams.get('haEntityType');
+
+  if (!eqId || !isDigitsOnly(eqId)) return null;
+  if (cmdId !== null && cmdId !== '' && !isDigitsOnly(cmdId)) return null;
+
+  return { eqId, cmdId, haEntityType };
+}
+
+function validateOverrideWrite(action, url, postParams, ctx) {
+  const params = readOverrideParams(url, postParams);
+  if (!params) return false;
+  if (!ctx || typeof ctx !== 'object') return false;
+
+  const declaredEquipments = ctx.declaredEquipments;
+  if (!hasOwnSafe(declaredEquipments, params.eqId)) return false;
+  const declared = declaredEquipments[params.eqId];
+  if (!declared || !Array.isArray(declared.commands)) return false;
 
   if (action === 'saveMappingOverride') {
-    if (!cmdId || !declared.commands.includes(cmdId)) return false;
-    const expectedType = ctx.lastPreviewType && ctx.lastPreviewType[`${eqId}:${cmdId}`];
-    return haEntityType === expectedType;
+    if (!params.cmdId || !declared.commands.includes(params.cmdId)) return false;
+    const lastPreviewType = ctx.lastPreviewType;
+    const key = `${params.eqId}:${params.cmdId}`;
+    if (!hasOwnSafe(lastPreviewType, key)) return false;
+    return params.haEntityType === lastPreviewType[key];
   }
 
-  // revertMappingOverride : cmdId absent (équipement entier), ou commande déclarée.
-  if (!cmdId) return true;
-  return declared.commands.includes(cmdId);
+  // revertMappingOverride : cmdId absent/vide (équipement entier), ou commande déclarée.
+  if (!params.cmdId) return true;
+  return declared.commands.includes(params.cmdId);
 }
 
 export function classifyRequest(req, ctx) {
@@ -163,12 +197,14 @@ export function classifyRequest(req, ctx) {
     return { verdict: 'read', reason: 'lecture-autorisee', action };
   }
 
-  if (req.method === 'POST' && url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
+  // Effets de bord et écritures d'override : rejetés quelle que soit la méthode HTTP,
+  // dès lors que le chemin et l'action correspondent — un GET ne doit pas leur échapper.
+  if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
     return { verdict: 'block-fail', reason: 'effet-de-bord', action };
   }
 
-  if (req.method === 'POST' && url.pathname === PLUGIN_AJAX_PATH && OVERRIDE_WRITE_ACTIONS.includes(action)) {
-    if (postParams && validateOverrideWrite(action, postParams, ctx)) {
+  if (url.pathname === PLUGIN_AJAX_PATH && OVERRIDE_WRITE_ACTIONS.includes(action)) {
+    if (validateOverrideWrite(action, url, postParams, ctx)) {
       return { verdict: 'simulate', reason: 'ecriture-override-declaree', action };
     }
     return { verdict: 'block-fail', reason: 'ecriture-override-non-declaree', action };

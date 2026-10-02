@@ -193,4 +193,107 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     );
     assert.equal(result.verdict, 'block');
   });
+
+  await t.test('GET scanTopology -> block-fail', () => {
+    const result = classifyRequest(
+      req({ method: 'GET', url: `${ORIGIN}${PLUGIN_AJAX}?action=scanTopology`, resourceType: 'xhr' }),
+      baseCtx()
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('GET saveMappingOverride -> block-fail', () => {
+    const ctx = baseCtx({
+      declaredEquipments: { '1': { commands: ['2'] } },
+      lastPreviewType: { '1:2': 'switch' },
+    });
+    const result = classifyRequest(
+      req({ method: 'GET', url: `${ORIGIN}${PLUGIN_AJAX}?action=saveMappingOverride&eqId=1&cmdId=2&haEntityType=switch`, resourceType: 'xhr' }),
+      ctx
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test("eqId dans l'URL d'une écriture -> block-fail", () => {
+    const ctx = baseCtx({
+      declaredEquipments: { '1': { commands: ['2'] } },
+      lastPreviewType: { '1:2': 'switch' },
+    });
+    const result = classifyRequest(
+      req({
+        method: 'POST',
+        url: `${ORIGIN}${PLUGIN_AJAX}?eqId=1`,
+        resourceType: 'xhr',
+        postData: 'action=saveMappingOverride&eqId=1&cmdId=2&haEntityType=switch',
+      }),
+      ctx
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('cmdId en double dans le corps -> block-fail', () => {
+    const ctx = baseCtx({
+      declaredEquipments: { '1': { commands: ['2'] } },
+      lastPreviewType: { '1:2': 'switch' },
+    });
+    const result = classifyRequest(
+      req({
+        method: 'POST',
+        url: `${ORIGIN}${PLUGIN_AJAX}`,
+        resourceType: 'xhr',
+        postData: 'action=saveMappingOverride&eqId=1&cmdId=2&cmdId=2&haEntityType=switch',
+      }),
+      ctx
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('revertMappingOverride avec cmdId=abc -> block-fail', () => {
+    const ctx = baseCtx({
+      declaredEquipments: { '1': { commands: ['2'] } },
+    });
+    const result = classifyRequest(
+      req({
+        method: 'POST',
+        url: `${ORIGIN}${PLUGIN_AJAX}`,
+        resourceType: 'xhr',
+        postData: 'action=revertMappingOverride&eqId=1&cmdId=abc',
+      }),
+      ctx
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('eqId = constructor puis __proto__ -> block-fail, sans exception', () => {
+    const ctx = baseCtx();
+    for (const eqId of ['constructor', '__proto__']) {
+      assert.doesNotThrow(() => {
+        const result = classifyRequest(
+          req({
+            method: 'POST',
+            url: `${ORIGIN}${PLUGIN_AJAX}`,
+            resourceType: 'xhr',
+            postData: `action=revertMappingOverride&eqId=${eqId}`,
+          }),
+          ctx
+        );
+        assert.equal(result.verdict, 'block-fail', `eqId=${eqId}`);
+      });
+    }
+  });
+
+  await t.test('ctx absent -> block-fail pour une écriture, sans exception', () => {
+    assert.doesNotThrow(() => {
+      const result = classifyRequest(
+        req({
+          method: 'POST',
+          url: `${ORIGIN}${PLUGIN_AJAX}`,
+          resourceType: 'xhr',
+          postData: 'action=saveMappingOverride&eqId=1&cmdId=2&haEntityType=switch',
+        }),
+        undefined
+      );
+      assert.equal(result.verdict, 'block-fail');
+    });
+  });
 });
