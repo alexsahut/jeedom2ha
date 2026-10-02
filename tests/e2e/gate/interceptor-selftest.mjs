@@ -106,7 +106,9 @@ function pageHtml(origin) {
     window.open(endpoint + '?action=executeHaAction', '_blank', 'noopener');
     await new Promise((resolve) => setTimeout(resolve, 25));
     await socket();
-    const serviceWorkerBlocked = await attempted(navigator.serviceWorker.register('/selftest-sw.js'));
+    const serviceWorkerRegistration = await navigator.serviceWorker.register('/selftest-sw.js');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const serviceWorkerRegistrations = await navigator.serviceWorker.getRegistrations();
     await attempted(fetch('/core/ajax/user.ajax.php', { method: 'POST', body: 'action=login' }));
 
     const preview = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
@@ -116,7 +118,16 @@ function pageHtml(origin) {
     const real = await post('getMappingOverrides', { eqId: '1' });
     const bascule = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'light' });
 
-    return { serviceWorkerBlocked, preview, saved, derived, reverted, real, bascule };
+    return {
+      serviceWorkerRegistrationIsUndefined: serviceWorkerRegistration === undefined,
+      serviceWorkerRegistrationsCount: serviceWorkerRegistrations.length,
+      preview,
+      saved,
+      derived,
+      reverted,
+      real,
+      bascule,
+    };
   })();
 })();
 </script>`;
@@ -245,7 +256,11 @@ async function main() {
       requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'previewMappingOverride').length === 2
         && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 2,
       failures);
-    report('service worker bloque', results.serviceWorkerBlocked, failures);
+    report('service worker : register retourne undefined', results.serviceWorkerRegistrationIsUndefined, failures);
+    report('service worker : aucune inscription apres 500 ms', results.serviceWorkerRegistrationsCount === 0, failures);
+    report('service worker : script jamais recu par le serveur',
+      !requests.some((request) => request.path === '/selftest-sw.js'),
+      failures);
 
     const expectedFailures = [
       ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride']
@@ -255,7 +270,7 @@ async function main() {
       { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'saveFilteringConfig', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
-      { path: '/core/api/jeeApi.php', action: null, verdict: 'block' },
+      { path: '/core/api/jeeApi.php', action: 'write', verdict: 'block' },
       { path: PLUGIN_AJAX, action: null, verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
       { path: '/socket', action: null, verdict: 'websocket-bloque' },
