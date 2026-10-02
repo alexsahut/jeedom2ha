@@ -4,11 +4,15 @@
  *
  * Script de reconnaissance, pas encore le gate complet (Tasks 2-4) : il ouvre un seul
  * contexte Chromium headless, refuse toute requête par défaut (HTTP et WebSocket),
- * n'autorise que les GET statiques, la page de connexion et la page du plugin, fait un
- * seul essai de connexion, puis journalise le verdict de chaque requête observée pendant
- * le chargement. Sert à établir, avec des faits d'exécution (pas seulement la lecture du
- * code), la liste des couples (point d'entrée, action) que Task 1 doit inscrire
- * explicitement comme lectures nécessaires (AC1).
+ * n'autorise que les GET statiques, la page de connexion, la page du plugin, et une
+ * liste fermée de lectures POST (même origine, chemin et action en correspondance
+ * exacte — voir ALLOWED_READS, validée par ClaudeBox le 2026-10-02 après le premier
+ * relevé) ; une action présente plus d'une fois (URL et/ou corps) est jugée ambiguë et
+ * bloquée, même si l'une des valeurs est par ailleurs autorisée. Fait un seul essai de
+ * connexion, puis journalise le verdict de chaque requête observée pendant le
+ * chargement, et le décompte final par verdict. Sert à établir, avec des faits
+ * d'exécution (pas seulement la lecture du code), la liste des couples (point d'entrée,
+ * action) que Task 1 doit inscrire explicitement comme lectures nécessaires (AC1).
  *
  * NE PAS EXÉCUTER sans relecture de ClaudeBox au préalable (règle de l'unité 20-0).
  *
@@ -108,24 +112,35 @@ function loadCredentials() {
   return { username: values.JEEDOM_USER, password: values.JEEDOM_PASSWORD };
 }
 
-/** Extrait uniquement la valeur du paramètre 'action' (query string ou corps urlencoded),
- * jamais le reste du corps ou des paramètres (identifiants, cmdId, selection, etc.). */
-function extractAction(request, url) {
-  const qsAction = url.searchParams.get('action');
-  if (qsAction) return qsAction;
+/** Relève toutes les occurrences du paramètre 'action' (query string, puis corps
+ * urlencoded) — jamais le reste du corps ou des paramètres (identifiants, cmdId,
+ * selection, etc.). Plusieurs occurrences (même emplacement dupliqué, ou présentes à la
+ * fois dans l'URL et dans le corps) rendent l'action ambiguë : voir resolveAction(). */
+function collectActionOccurrences(request, url) {
+  const occurrences = [...url.searchParams.getAll('action')];
   if (request.method() === 'POST') {
     const postData = request.postData();
     if (postData) {
       try {
         const params = new URLSearchParams(postData);
-        const action = params.get('action');
-        if (action) return action;
+        occurrences.push(...params.getAll('action'));
       } catch {
-        // corps non urlencoded : jamais journalisé tel quel, action reste absente.
+        // corps non urlencoded : aucune valeur 'action' exploitable depuis le corps.
       }
     }
   }
-  return null;
+  return occurrences;
+}
+
+/** Résout l'action à partir des occurrences relevées : une seule occurrence -> cette
+ * valeur ; zéro -> null ; plus d'une (duplication, ou URL + corps à la fois) -> ambiguë,
+ * jamais résolue à une valeur (même si l'une des occurrences est par ailleurs
+ * autorisée), et jamais journalisée telle quelle. */
+function resolveAction(request, url) {
+  const occurrences = collectActionOccurrences(request, url);
+  if (occurrences.length === 0) return { action: null, ambiguous: false };
+  if (occurrences.length === 1) return { action: occurrences[0], ambiguous: false };
+  return { action: null, ambiguous: true };
 }
 
 function isAllowedStatic(request, url) {
@@ -156,10 +171,45 @@ function isPluginPageDocument(request, url) {
   return Object.entries(PLUGIN_PAGE_QUERY).every(([key, value]) => url.searchParams.get(key) === value);
 }
 
+/* Lectures autorisées (Task 1, seconde itération — validées par ClaudeBox le 2026-10-02) :
+ * POST seulement, même origine, correspondance exacte du chemin ET de la valeur
+ * d'action (pas de préfixe, pas de motif). `exportDiagnostic` reste délibérément absent
+ * (hors liste, donc bloqué). `event.ajax.php action=changes` est une attente longue du
+ * cœur Jeedom (long-polling) : voir la note Task 1 de la story sur la fermeture du
+ * contexte avant le témoin final. */
+const ALLOWED_READS = [
+  {
+    pathname: '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    actions: [
+      'getMqttConfig',
+      'getBridgeStatus',
+      'getDiagnostics',
+      'getPublishedScopeForConsole',
+      'getMappingOverrides',
+      'previewMappingOverride',
+    ],
+  },
+  { pathname: '/core/ajax/eqLogic.ajax.php', actions: ['listByType'] },
+  { pathname: '/core/ajax/event.ajax.php', actions: ['changes'] },
+];
+
+function isAllowedRead(request, url, action, ambiguous) {
+  if (ambiguous) return false;
+  if (action === null) return false;
+  if (request.method() !== 'POST') return false;
+  if (url.origin !== ORIGIN) return false;
+  return ALLOWED_READS.some(
+    (entry) => entry.pathname === url.pathname && entry.actions.includes(action)
+  );
+}
+
+const verdictCounts = new Map();
+
 function logLine(method, resourceType, pathname, action, verdict) {
   const ts = new Date().toISOString();
   const actionPart = action ? `action=${action}` : 'action=-';
   console.log(`${ts} ${method} ${resourceType} ${pathname} ${actionPart} verdict=${verdict}`);
+  verdictCounts.set(verdict, (verdictCounts.get(verdict) ?? 0) + 1);
 }
 
 /** Compte les sauts d'une chaîne de redirection en remontant redirectedFrom(). Playwright
@@ -200,21 +250,35 @@ async function main() {
       const request = route.request();
       const url = new URL(request.url());
       const pathname = url.pathname;
-      const action = extractAction(request, url);
+      const { action, ambiguous } = resolveAction(request, url);
       const method = request.method();
       const resourceType = request.resourceType();
 
+      if (ambiguous) {
+        logLine(method, resourceType, pathname, null, 'bloquee-ambigue');
+        blocked.set(`${pathname}|`, { pathname, action: null });
+        await route.abort('blockedbyclient');
+        return;
+      }
+
       let allowed = false;
+      let verdict = 'bloquee';
       if (isAllowedStatic(request, url)) {
         allowed = true;
+        verdict = 'autorisee';
       } else if (isLoginPageDocument(request, url)) {
         allowed = true;
+        verdict = 'autorisee';
       } else if (isPluginPageDocument(request, url)) {
         allowed = true;
+        verdict = 'autorisee';
+      } else if (isAllowedRead(request, url, action, ambiguous)) {
+        allowed = true;
+        verdict = 'lecture';
       }
 
       if (allowed) {
-        logLine(method, resourceType, pathname, action, 'autorisee');
+        logLine(method, resourceType, pathname, action, verdict);
         await route.continue();
         return;
       }
@@ -308,6 +372,11 @@ async function main() {
   console.log('--- Requêtes bloquées, dédoublonnées (point d\'entrée, action) ---');
   for (const { pathname, action } of blocked.values()) {
     console.log(`${pathname} action=${action ?? '-'}`);
+  }
+
+  console.log('--- Décompte des requêtes par verdict ---');
+  for (const [verdict, count] of verdictCounts) {
+    console.log(`${verdict}: ${count}`);
   }
 }
 
