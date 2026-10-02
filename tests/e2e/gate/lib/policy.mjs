@@ -9,6 +9,8 @@
  *
  * req = { method, url, resourceType, postData } — toutes des chaînes (postData peut
  * être null/undefined si absent). ctx = état du parcours tenu par l'appelant :
+ *   - ctx.origin : origine autorisée pour ce parcours (défaut DEFAULT_ORIGIN) — permet de
+ *     pointer l'intercepteur vers un serveur de test local sans changer la politique.
  *   - ctx.loginAttempts : nombre de tentatives de connexion déjà émises par ce parcours.
  *   - ctx.declaredEquipments : { [eqId]: { commands: [cmdId, ...] } } — équipements et
  *     commandes déclarés par le parcours (AC2).
@@ -17,7 +19,16 @@
  *     saveMappingOverride (AC2).
  */
 
-const ORIGIN = 'https://domobox.famille-sahut.fr';
+// Origine autorisée par défaut ; surchargée par ctx.origin (intercepteur à venir,
+// par exemple pour pointer vers un serveur de test local).
+export const DEFAULT_ORIGIN = 'https://domobox.famille-sahut.fr';
+
+function resolveOrigin(ctx) {
+  if (ctx && typeof ctx === 'object' && typeof ctx.origin === 'string' && ctx.origin) {
+    return ctx.origin;
+  }
+  return DEFAULT_ORIGIN;
+}
 
 const LOGIN_PAGE_PATH = '/index.php';
 const PLUGIN_PAGE_PATH = '/index.php';
@@ -159,56 +170,68 @@ function validateOverrideWrite(action, url, postParams, ctx) {
 }
 
 export function classifyRequest(req, ctx) {
-  const url = new URL(req.url);
-
-  if (url.origin !== ORIGIN) {
-    return { verdict: 'block', reason: 'origine-differente', action: null };
-  }
-
-  const postParams = parsePostParams(req);
-  const actionOccurrences = collectActionOccurrences(url, postParams);
-
-  if (actionOccurrences.length > 1) {
-    return { verdict: 'block-fail', reason: 'action-ambigue', action: null };
-  }
-
-  const action = actionOccurrences[0] ?? null;
-
-  if (isStaticResource(req, url, actionOccurrences)) {
-    return { verdict: 'static', reason: 'ressource-statique', action: null };
-  }
-
-  if (isLoginPageDocument(req, url)) {
-    return { verdict: 'document', reason: 'page-connexion', action: null };
-  }
-
-  if (isPluginPageDocument(req, url)) {
-    return { verdict: 'document', reason: 'page-plugin', action: null };
-  }
-
-  if (req.method === 'POST' && url.pathname === LOGIN_AJAX_PATH && action === LOGIN_ACTION) {
-    if ((ctx.loginAttempts ?? 0) >= 1) {
-      return { verdict: 'block-fail', reason: 'second-essai-connexion', action };
+  try {
+    let url;
+    try {
+      url = new URL(req.url);
+    } catch {
+      return { verdict: 'block-fail', reason: 'url-illisible', action: null };
     }
-    return { verdict: 'auth', reason: 'connexion', action };
-  }
 
-  if (req.method === 'POST' && action !== null && findAllowedRead(url, action)) {
-    return { verdict: 'read', reason: 'lecture-autorisee', action };
-  }
-
-  // Effets de bord et écritures d'override : rejetés quelle que soit la méthode HTTP,
-  // dès lors que le chemin et l'action correspondent — un GET ne doit pas leur échapper.
-  if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
-    return { verdict: 'block-fail', reason: 'effet-de-bord', action };
-  }
-
-  if (url.pathname === PLUGIN_AJAX_PATH && OVERRIDE_WRITE_ACTIONS.includes(action)) {
-    if (validateOverrideWrite(action, url, postParams, ctx)) {
-      return { verdict: 'simulate', reason: 'ecriture-override-declaree', action };
+    if (url.origin !== resolveOrigin(ctx)) {
+      return { verdict: 'block', reason: 'origine-differente', action: null };
     }
-    return { verdict: 'block-fail', reason: 'ecriture-override-non-declaree', action };
-  }
 
-  return { verdict: 'block', reason: 'non-inscrit', action };
+    const postParams = parsePostParams(req);
+    const actionOccurrences = collectActionOccurrences(url, postParams);
+
+    if (actionOccurrences.length > 1) {
+      return { verdict: 'block-fail', reason: 'action-ambigue', action: null };
+    }
+
+    const action = actionOccurrences[0] ?? null;
+
+    if (isStaticResource(req, url, actionOccurrences)) {
+      return { verdict: 'static', reason: 'ressource-statique', action: null };
+    }
+
+    if (isLoginPageDocument(req, url)) {
+      return { verdict: 'document', reason: 'page-connexion', action: null };
+    }
+
+    if (isPluginPageDocument(req, url)) {
+      return { verdict: 'document', reason: 'page-plugin', action: null };
+    }
+
+    if (req.method === 'POST' && url.pathname === LOGIN_AJAX_PATH && action === LOGIN_ACTION) {
+      if (!ctx || typeof ctx !== 'object') {
+        return { verdict: 'block-fail', reason: 'ctx-invalide', action };
+      }
+      if ((ctx.loginAttempts ?? 0) >= 1) {
+        return { verdict: 'block-fail', reason: 'second-essai-connexion', action };
+      }
+      return { verdict: 'auth', reason: 'connexion', action };
+    }
+
+    if (req.method === 'POST' && action !== null && findAllowedRead(url, action)) {
+      return { verdict: 'read', reason: 'lecture-autorisee', action };
+    }
+
+    // Effets de bord et écritures d'override : rejetés quelle que soit la méthode HTTP,
+    // dès lors que le chemin et l'action correspondent — un GET ne doit pas leur échapper.
+    if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
+      return { verdict: 'block-fail', reason: 'effet-de-bord', action };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && OVERRIDE_WRITE_ACTIONS.includes(action)) {
+      if (validateOverrideWrite(action, url, postParams, ctx)) {
+        return { verdict: 'simulate', reason: 'ecriture-override-declaree', action };
+      }
+      return { verdict: 'block-fail', reason: 'ecriture-override-non-declaree', action };
+    }
+
+    return { verdict: 'block', reason: 'non-inscrit', action };
+  } catch {
+    return { verdict: 'block-fail', reason: 'exception-politique', action: null };
+  }
 }

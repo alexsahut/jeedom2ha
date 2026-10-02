@@ -296,4 +296,40 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
       assert.equal(result.verdict, 'block-fail');
     });
   });
+
+  await t.test('connexion avec ctx absent -> block-fail, sans exception', () => {
+    assert.doesNotThrow(() => {
+      const result = classifyRequest(
+        req({ method: 'POST', url: `${ORIGIN}/core/ajax/user.ajax.php`, resourceType: 'xhr', postData: 'action=login' }),
+        undefined
+      );
+      assert.equal(result.verdict, 'block-fail');
+    });
+  });
+
+  await t.test('URL illisible -> block-fail', () => {
+    assert.doesNotThrow(() => {
+      const result = classifyRequest(
+        req({ method: 'GET', url: 'not a valid url', resourceType: 'document' }),
+        baseCtx()
+      );
+      assert.equal(result.verdict, 'block-fail');
+    });
+  });
+
+  await t.test('ctx.origin injectable : lecture sur cette origine -> read, sur la box -> block', () => {
+    const ctx = baseCtx({ origin: 'http://127.0.0.1:8123' });
+
+    const onInjectedOrigin = classifyRequest(
+      req({ method: 'POST', url: `http://127.0.0.1:8123${PLUGIN_AJAX}`, resourceType: 'xhr', postData: 'action=getBridgeStatus' }),
+      ctx
+    );
+    assert.equal(onInjectedOrigin.verdict, 'read');
+
+    const onBoxOrigin = classifyRequest(
+      req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: 'action=getBridgeStatus' }),
+      ctx
+    );
+    assert.equal(onBoxOrigin.verdict, 'block');
+  });
 });
