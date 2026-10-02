@@ -1,0 +1,49 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+const MODULE = path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'box-witness.mjs');
+const load = () => import(pathToFileURL(MODULE).href);
+
+function witness(overrides = { sha256: 'a', mtime: '2026-10-02 10:00:00.000000000 +0000', content: '{}', present: false, json: null }) {
+  return { readable: true, overrides, daemon: { pid: '42', startedAt: 'Wed Oct  2 10:00:00 2026', logLevel: 'info' }, logs: { daemon: { size: 10, firstTimestamp: '[2026-10-02 10:00:00]' }, plugin: { size: 20, firstTimestamp: '[2026-10-02 10:00:00]' } } };
+}
+
+test('story 20-0 — témoin box pur et injectable', async (t) => {
+  const m = await load();
+  await t.test('validation stricte PID et bornes', () => {
+    assert.equal(m.validPid('123'), true); assert.equal(m.validPid('12;id'), false);
+    assert.equal(m.validBoxTime('2026-10-02 10:00:00'), true); assert.equal(m.validBoxTime('2026-10-02; id'), false);
+    assert.throws(() => m.remoteWindowCommand('/x', 'ERROR', 'bad', '2026-10-02 10:00:00'));
+  });
+  await t.test('parse le schéma v1/v2 et refuse un JSON invalide', () => {
+    assert.equal(m.parseOverrides(null).present, false);
+    assert.equal(m.parseOverrides('{"schema_version":1,"overrides":{}}').json.equipment_overrides, undefined);
+    assert.equal(m.parseOverrides('{"schema_version":2,"overrides":{},"equipment_overrides":{}}').present, true);
+    assert.throws(() => m.parseOverrides('{')); assert.throws(() => m.parseOverrides('{"schema_version":2,"overrides":{}}'));
+  });
+  await t.test('refuse les overrides de commande et équipement déclarés', () => {
+    const w = witness({ present: true, json: { schema_version: 2, overrides: { '1:2': {} }, equipment_overrides: { '3': {} } } });
+    assert.throws(() => m.assertNoOverrideOn(w, ['1']));
+    assert.throws(() => m.assertNoOverrideOn(w, ['3']));
+    assert.doesNotThrow(() => m.assertNoOverrideOn(w, ['9']));
+  });
+  await t.test('compare tout écart AC2/AC3', () => {
+    const before = witness(); const after = witness();
+    after.overrides = { ...after.overrides, sha256: 'b' }; after.daemon = { ...after.daemon, pid: '43', logLevel: 'warn' };
+    after.logs.daemon = { size: 9, firstTimestamp: '[2026-10-02 10:01:00]' };
+    const diffs = m.compareWitness(before, after);
+    assert.ok(diffs.includes('overrides-sha256')); assert.ok(diffs.includes('daemon-pid'));
+    assert.ok(diffs.includes('niveau-journal-invalide')); assert.ok(diffs.includes('journal-daemon-troncature-taille'));
+    assert.ok(diffs.includes('journal-daemon-troncature-horodatage'));
+  });
+  await t.test('takeWitness et countWindow utilisent uniquement l exécuteur injecté', async () => {
+    const seen = [];
+    const run = async (command) => { seen.push(command); if (command.startsWith('pgrep')) return '42\n'; if (command.startsWith('ps -o lstart')) return 'Wed Oct  2 10:00:00 2026\n'; if (command.startsWith('ps -o args')) return '--loglevel info\n'; if (command.startsWith('date')) return '2026-10-02 10:00:00\n'; if (command.startsWith('stat -c %s')) return '10\n'; if (command.startsWith('grep -m1')) return '[2026-10-02 10:00:00]\n'; if (command.includes('sha256sum') || command.includes('stat -c %y') || command.includes('cat ')) return '__ABSENT__\n'; return '0\n'; };
+    const taken = await m.takeWitness({ run }); const counts = await m.countWindow('2026-10-02 10:00:00', '2026-10-02 10:01:00', { run });
+    assert.equal(taken.readable, true); assert.equal(taken.overrides.present, false); assert.equal(counts.daemonErrors, 0); assert.equal(counts.pluginErrors, 0); assert.ok(seen.every((command) => typeof command === 'string'));
+  });
+});
