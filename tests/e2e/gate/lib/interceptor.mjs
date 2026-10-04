@@ -157,7 +157,12 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       decision = classifyRequest(req, ctx);
 
       if (decision.verdict === 'static' || decision.verdict === 'document') {
-        await forward(journal, () => route.continue());
+        // route.continue() laisserait le navigateur suivre une redirection sans
+        // repasser par ce gestionnaire : on récupère la réponse nous-mêmes, comme
+        // pour les lectures AJAX, afin de refuser toute redirection avant de servir.
+        const response = await fetchRead(route, journal, req, decision);
+        if (!response) return;
+        await route.fulfill({ response });
         appendEntry(journal, { ...req, ...decision });
         return;
       }
@@ -179,6 +184,10 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         const params = decision.params;
 
         if (decision.action === 'changes' && new URL(req.url).pathname === EVENT_CHANGES_PATH) {
+          // Enregistrée dès l'interception : si la page ferme pendant les 5 s
+          // d'attente, l'horodatage doit refléter ce long-polling, pas une
+          // requête antérieure, sous peine de raccourcir waitForQuietWindow().
+          appendEntry(journal, { ...req, ...decision, verdict: 'lecture-simulee' });
           await wait(EVENT_CHANGES_DELAY_MS);
           if (pageClosed(route)) return;
           try {
@@ -187,7 +196,6 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
             if (pageClosed(route)) return;
             throw error;
           }
-          appendEntry(journal, { ...req, ...decision, verdict: 'lecture-simulee' });
           return;
         }
 

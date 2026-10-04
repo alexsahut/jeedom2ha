@@ -14,6 +14,7 @@ import { createState } from './lib/simulate.mjs';
 
 const PLUGIN_AJAX = '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
 const EVENT_AJAX = '/core/ajax/event.ajax.php';
+const REDIRECT_PNG = '/redirect.png';
 
 function json(state, result) {
   return JSON.stringify({ state, result: { status: 'ok', payload: result } });
@@ -80,6 +81,11 @@ function pageHtml(origin) {
     node.onload = node.onerror = () => resolve(true);
     node.src = endpoint + '?action=scanTopology';
   });
+  const redirect = () => new Promise((resolve) => {
+    const node = new Image();
+    node.onload = node.onerror = () => resolve(true);
+    node.src = ${JSON.stringify(REDIRECT_PNG)};
+  });
   const frame = () => new Promise((resolve) => {
     const node = document.createElement('iframe');
     node.addEventListener('load', () => setTimeout(resolve, 25), { once: true });
@@ -103,6 +109,7 @@ function pageHtml(origin) {
     navigator.sendBeacon(endpoint, form('executeHaAction'));
     await frame();
     await image();
+    await redirect();
     await attempted(fetch('/core/api/jeeApi.php', {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'action=write',
     }));
@@ -162,6 +169,23 @@ function makeServer() {
         const content = pageHtml(`http://${req.headers.host}`);
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-length': Buffer.byteLength(content) });
         res.end(content);
+        return;
+      }
+
+      // Ressource statique qui redirige vers une action interdite : si l'intercepteur
+      // suivait cette redirection (le fetch interne ou un route.continue()), la cible
+      // l'atteindrait directement.
+      if (url.pathname === REDIRECT_PNG) {
+        res.writeHead(302, { location: `${PLUGIN_AJAX}?action=scanTopology` });
+        res.end();
+        return;
+      }
+
+      // Document (page de connexion, zéro paramètre) qui redirige vers la même action
+      // interdite : même garantie que REDIRECT_PNG, mais pour une navigation.
+      if (url.pathname === '/index.php' && url.searchParams.size === 0) {
+        res.writeHead(302, { location: `${PLUGIN_AJAX}?action=scanTopology` });
+        res.end();
         return;
       }
 
@@ -247,6 +271,13 @@ async function main() {
     await page.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
     const results = await page.evaluate(() => window.__selftest);
 
+    // Document (page de connexion) qui redirige vers la même action interdite que
+    // REDIRECT_PNG : la navigation doit échouer puisque l'intercepteur abandonne la
+    // route avant tout fulfill, sans jamais joindre le serveur sur la cible.
+    const redirectPage = await context.newPage();
+    await redirectPage.goto(`${origin}/index.php`, { waitUntil: 'load' }).catch(() => {});
+    await redirectPage.close();
+
     // Les éléments sans réponse attendue (beacon, popup, iframe, WebSocket) peuvent
     // encore être en file après evaluate(). La fermeture du contexte annule tout ce
     // qui resterait avant que le serveur et le journal soient inspectés.
@@ -286,6 +317,9 @@ async function main() {
         (entry) => entry.path === EVENT_AJAX && entry.action === 'changes' && entry.verdict === 'lecture-simulee',
       ),
       failures);
+    report('redirection depuis une ressource statique ou un document : cible jamais atteinte par le serveur',
+      !requests.some((request) => request.path === PLUGIN_AJAX && request.method === 'GET' && request.actions.includes('scanTopology')),
+      failures);
 
     const expectedFailures = [
       ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride']
@@ -301,6 +335,8 @@ async function main() {
       { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
       { path: '/socket', action: null, verdict: 'websocket-bloque' },
       { path: '/core/ajax/user.ajax.php', action: 'login', verdict: 'auth', reason: 'connexion-par-la-page-interdite' },
+      { path: REDIRECT_PNG, action: null, verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee' },
+      { path: '/index.php', action: null, verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee' },
     ];
     const remainingFailures = [...journal.failures];
     for (const expected of expectedFailures) {
