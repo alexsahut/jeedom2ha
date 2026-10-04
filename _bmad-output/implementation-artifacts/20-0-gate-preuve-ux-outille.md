@@ -1,6 +1,6 @@
 # Story 20.0: Gate de preuve UX outillé
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -44,7 +44,7 @@ so that les stories 20.1 et suivantes puissent prouver leurs parcours réels par
 **Given** le fichier d'identifiants `/home/asahut/.config/jeedom2ha-gate/jeedom.env` sur la VM openclaw (dossier en 700, fichier en 600, clés `JEEDOM_USER` et `JEEDOM_PASSWORD`), déposé par Alex
 **When** le gate démarre un parcours Playwright
 **Then** il lit ce fichier à l'exécution (chemin surchargeable par la variable `JEEDOM2HA_GATE_CREDENTIALS`), et refuse de démarrer si le fichier manque ou si ses droits ne sont pas 600
-**And** AC4 contrôle uniquement les deux valeurs du fichier d'identifiants et la valeur `mqttPassword` (protégée aussi par AC2) ; les autres clés de configuration ne sont pas des secrets et ne sont pas recherchées dans les artefacts *(amendé le 2026-10-04, premier passage réel : `mqttUser` apparaît légitimement dans les chemins du plugin ; texte d'origine : « aucune valeur lue n'est copiée dans le dépôt, un journal, une capture, une trace ou un rapport ; l'état de session du navigateur (cookies) reste en mémoire et n'est jamais écrit sur disque »)*
+**And** aucune valeur lue n'est copiée dans le dépôt, un journal, une capture, une trace ou un rapport ; l'état de session du navigateur (cookies) reste en mémoire et n'est jamais écrit sur disque *(amendé le 2026-10-04 : le périmètre du contrôle automatique se limite aux deux valeurs du fichier d'identifiants et à `mqttPassword` (AC2) ; les autres clés ne sont pas des secrets, `mqttUser` apparaissant légitimement dans les chemins du plugin ; texte d'origine : « aucune valeur lue n'est copiée dans le dépôt, un journal, une capture, une trace ou un rapport ; l'état de session du navigateur (cookies) reste en mémoire et n'est jamais écrit sur disque »)*
 **And** un test dédié vérifie qu'aucune valeur lue depuis ce fichier n'apparaît dans les journaux, traces et rapports produits par le gate.
 
 **AC5 — Gate bloquant, pas de `done` d'interface sans lui**
@@ -134,7 +134,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 - [x] Task 2 — Mettre en place Playwright contre une page du plugin, authentification avec le compte dédié, lecture des identifiants selon AC4 — *réalisée le 2026-10-04 : `run-gate.mjs` et `lib/playwright.mjs`, vérifiés par les tests unitaires 20-0 et le self-test local.*
 - [x] Task 3 — Implémenter l'interception par défaut au niveau du contexte (service workers bloqués), la liste d'authentification, les écritures simulées limitées aux équipements déclarés avec vérification de la charge utile, la relecture dérivée, la réponse simulée et le test dédié de l'intercepteur (AC1, AC2) — *réalisée le 2026-10-04 : `lib/policy.mjs`, `lib/interceptor.mjs`, `lib/simulate.mjs` et `interceptor-selftest.mjs`, vérifiés par le self-test et les tests unitaires 20-0.*
 - [x] Task 4 — Implémenter les vérifications minimales (console JS, lignes `ERROR` des journaux `jeedom2ha_daemon` et `jeedom2ha`, absence des lignes d'écriture listées en AC3 et niveau de journal du démon, relevé avant/après de `data/ha_overrides.json` avec sa date de modification, du processus du démon (PID, heure de démarrage), du témoin `getBridgeStatus` et de l'empreinte de configuration, relevé final au moins 90 s après la dernière requête du parcours (sondes du relevé exclues)) et le rapport de gate (AC2, AC3) — *réalisée le 2026-10-04 : `lib/box-witness.mjs`, `lib/report.mjs` et `run-gate.mjs`, vérifiés par les tests unitaires 20-0.*
-- [ ] Task 5 — Exécuter un parcours de référence de bout en bout (navigation, ouverture d'un équipement sans override dans `data/ha_overrides.json`, aperçu d'un changement de type, réel, puis simulé et déclaré pour la bascule « bloquante → prête », enregistrement et retour au mode automatique simulés, bascule rendue dans le diagnostic et la synthèse, qui porte aussi la vue au clic de la bascule d'AC14 de 16.8, amendé le 2026-10-02, condition du `done` de 16.8), puis un parcours de contrôle où une écriture non déclarée est émise : elle doit être bloquée et faire échouer le gate ; dans les deux cas, `data/ha_overrides.json` et le témoin du démon restent inchangés ; consigner les deux dans un artefact de cette story
+- [x] Task 5 — Exécuter un parcours de référence de bout en bout (navigation, ouverture d'un équipement sans override dans `data/ha_overrides.json`, aperçu d'un changement de type, réel, puis simulé et déclaré pour la bascule « bloquante → prête », enregistrement et retour au mode automatique simulés, bascule rendue dans le diagnostic et la synthèse, qui porte aussi la vue au clic de la bascule d'AC14 de 16.8, amendé le 2026-10-02, condition du `done` de 16.8), puis un parcours de contrôle où une écriture non déclarée est émise : elle doit être bloquée et faire échouer le gate ; dans les deux cas, `data/ha_overrides.json` et le témoin du démon restent inchangés ; consigner les deux dans un artefact de cette story — *réalisée le 2026-10-04 : parcours référence PASS et contrôle FAIL attendu, consignés dans `20-0-gate-2026-10-04.md`.*
 - [x] Task 6 — Documenter dans cette story comment une story suivante invoque le gate et où elle joint son rapport avant `done` (AC5) — *réalisée le 2026-10-04 : section « Invocation du gate par une story suivante », avec le contrat de parcours, la commande, l'artefact attendu, la lecture du verdict et les limites connues.*
 
 ## Dev Notes
@@ -146,3 +146,36 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 - Revue Codex du 2026-10-02 (PR #193, sur `95fc370`) : (P1) une écriture transmise par erreur puis purgée laisserait le contenu de `data/ha_overrides.json` inchangé sans toucher au témoin `getBridgeStatus` ; le gate exige donc aussi une date de modification inchangée et l'absence des lignes d'écriture de chaque action du plugin dans les journaux (niveau `info` vérifié sur le processus du démon) ; (P2) un redémarrage se détecte par le PID et l'heure de démarrage du processus, lus sur la box, pas par un `uptime` inférieur ni par une heure déduite sur l'horloge de la VM.
 - Revue Codex du 2026-10-02 (PR #193, sur `f26b1e9`) : (P1) une action du démon transmise à tort n'écrit son issue qu'à la fin : le relevé final attend au moins 90 s après la dernière requête du parcours (sondes du relevé exclues) ; (P2) l'option `--loglevel` du démon ne prouve rien sur le journal PHP : les écritures de configuration du PHP sont prouvées par une empreinte de configuration avant/après ; le contrôle principal reste l'intercepteur, couvert par un test dédié (AC1).
 - Modèle de menace retenu (2026-10-02) : la garantie « aucune écriture sur la box » repose sur l'intercepteur à refus par défaut, testé par AC1 avant tout parcours ; les témoins côté box (AC2, AC3) sont une détection complémentaire au mieux, non exhaustive par construction. Un angle mort de témoin découvert plus tard est une amélioration de la détection, traitée hors de cette story, et ne remet pas en cause la garantie.
+
+## Dev Agent Record
+
+### Completion Notes List
+
+- 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
+
+### File List
+
+- `_bmad-output/implementation-artifacts/16-8-surface-navigation-piece-equipement-commande-homebridge.md`
+- `_bmad-output/implementation-artifacts/20-0-gate-2026-10-04.md`
+- `_bmad-output/implementation-artifacts/20-0-gate-preuve-ux-outille.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `tests/e2e/gate/interceptor-selftest.mjs`
+- `tests/e2e/gate/lib/box-witness.mjs`
+- `tests/e2e/gate/lib/interceptor.mjs`
+- `tests/e2e/gate/lib/playwright.mjs`
+- `tests/e2e/gate/lib/policy.mjs`
+- `tests/e2e/gate/lib/report.mjs`
+- `tests/e2e/gate/lib/simulate.mjs`
+- `tests/e2e/gate/page-load-request-inventory.mjs`
+- `tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs`
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
+- `tests/e2e/gate/parcours/reference-bascule-enphase.mjs`
+- `tests/e2e/gate/run-gate.mjs`
+- `tests/unit/test_story_20_0_gate_policy.node.test.js`
+- `tests/unit/test_story_20_0_gate_runner.node.test.js`
+- `tests/unit/test_story_20_0_gate_simulate.node.test.js`
+- `tests/unit/test_story_20_0_gate_witness.node.test.js`
+
+### Change Log
+
+- 2026-10-04 — Tasks 2 à 6 clôturées ; AC4 précisé sans affaiblir son exigence, artefact des sept exécutions joint, statut `in-progress` → `review`.
