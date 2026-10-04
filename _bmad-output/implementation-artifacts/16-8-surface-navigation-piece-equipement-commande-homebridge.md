@@ -158,6 +158,10 @@ claude-opus-4-8 (create-story workflow, BMAD ; discipline bmad-story-workflow-di
 - `desktop/js/jeedom2ha_mapping_override.js` — `summarizePublication` : commandes non couvertes comptées à part (`uncovered_count`), hors bloquantes et hors ancre (AC9-AC10).
 - `tests/unit/test_story_16_8_mapping_surface.node.test.js` — 5 tests ajoutés (commande non couverte, ancre, cas de l'eq 391, bascule par override) ; 32 tests au total.
 
+**Code (2026-10-04, CC-37)**
+- `desktop/js/jeedom2ha_mapping_override.js` — `normalizeCommandRow` recopie désormais `covered` depuis l'arbre GET (`null` si absent, démon plus ancien) ; avant ce correctif, `renderDiagnosticCell` recevait `row.covered === undefined`, jamais `=== false`, et rendait une commande non couverte comme bloquante au lieu du libellé « non couverte ».
+- `tests/unit/test_story_16_8_cc37_covered.node.test.js` — tests node purs ajoutés : préservation de `covered` (false/true/absent→null), non-régression de l'état « non couverte » vs bloquant, cohérence avec `summarizePublication`.
+
 **Documentation (2026-10-02)**
 - `_bmad-output/implementation-artifacts/16-8-ac14-validation-2026-10-01.md` — section « Clôture (2026-10-02) » : décision d'Alex sur AC14 et second parcours du 2026-10-01 au soir.
 - `_bmad-output/implementation-artifacts/16-8-surface-navigation-piece-equipement-commande-homebridge.md` — AC14 amendé, Task 0 complétée sauf la vue au clic de la bascule (gate 20.0), statut `ready-for-UX-validation`.
@@ -179,3 +183,4 @@ claude-opus-4-8 (create-story workflow, BMAD ; discipline bmad-story-workflow-di
 - 2026-10-01 — File List alignée sur AC5 amendé ; une preuve d'AC14 qui écrit réellement un override suit la règle de la revue Codex du 2026-10-01 (SCP étape 4, « Risques et suivi ») ; constat du soir : bascule « bloquante → prête » non démontrable par override TYPE sur les données réelles, voie de preuve d'AC14 à trancher par Alex ; statut maintenu `in-progress`.
 - 2026-10-02 — AC14 amendé par décision d'Alex (09:44 : bascule « bloquante → prête » prouvée par les tests unitaires, et au clic sur un aperçu simulé par le gate 20.0) ; Task 0 complétée avec le second parcours du 2026-10-01 au soir sur `7a819df`, sauf la vue au clic de la bascule, attendue du gate 20.0 et condition du `done` (revue Codex de la PR #195) ; statut `in-progress` → `ready-for-UX-validation`.
 - 2026-10-04 — Vue au clic de la bascule AC14 obtenue par le gate 20.0 ; Task 0 cochée, artefact `20-0-gate-2026-10-04.md`. CC-37 documenté pour traitement avant validation UX ou dans 20-1 ; statut `ready-for-UX-validation` inchangé.
+- 2026-10-04 — **Fix CC-37** : `normalizeCommandRow` ne recopiait pas `covered`, ce qui faisait rendre une commande non couverte comme bloquante dans sa cellule de diagnostic (ex. eq 579 Enphase : la cellule de la commande non couverte 5368 était rendue bloquante, à côté de la commande réellement bloquante 5369) alors que la synthèse de l'équipement la comptait déjà à part. Correctif isolé sur `normalizeCommandRow`, aucun autre lecteur de `covered` concerné (`grep` à l'appui) ; statut `ready-for-UX-validation` inchangé, preuve terrain après fusion via le gate 20.0.

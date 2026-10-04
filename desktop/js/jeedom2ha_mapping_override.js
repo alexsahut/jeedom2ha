@@ -40,6 +40,12 @@
       cmd_name: typeof r.cmd_name === 'string' ? r.cmd_name : '',
       generic_type: typeof r.generic_type === 'string' && r.generic_type ? r.generic_type : null,
       coverable: r.coverable === true,
+      // CC-37 : le backend porte `covered` sur chaque ligne de l'arbre GET (voir
+      // `http_server.py`), mais cette normalisation ne le recopiait pas — renderCommandRow
+      // lisait `row.covered === undefined`, jamais `=== false`, donc renderDiagnosticCell
+      // retombait sur diagnosticState() (= 'blocking' pour command_not_covered) au lieu du
+      // libellé « non couverte ». `null` si absent (démon plus ancien) préserve ce comportement.
+      covered: typeof r.covered === 'boolean' ? r.covered : null,
       attendu_ha: typeof r.attendu_ha === 'string' && r.attendu_ha ? r.attendu_ha : null,
       effective_ha: typeof r.effective_ha === 'string' && r.effective_ha ? r.effective_ha : null,
       override_applied: overrideApplied,
