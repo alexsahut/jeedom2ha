@@ -30,6 +30,7 @@ function requestDetails(request) {
     url: request.url(),
     resourceType: request.resourceType(),
     postData: request.postData(),
+    headers: request.headers(),
   };
 }
 
@@ -58,17 +59,6 @@ function appendEntry(journal, { method, resourceType, url, action, verdict, reas
 function fail(journal, entry) {
   journal.failed = true;
   journal.failures.push(entry);
-}
-
-// Les paramètres d'override sont lus uniquement du corps form-urlencoded, comme
-// dans policy.mjs. Ils ne sortent jamais de cette fonction et ne sont jamais journalisés.
-function overrideParams(req) {
-  const body = req.method === 'POST' && typeof req.postData === 'string' ? new URLSearchParams(req.postData) : null;
-  return {
-    eqId: body ? body.get('eqId') : null,
-    cmdId: body ? body.get('cmdId') : null,
-    haEntityType: body ? body.get('haEntityType') : null,
-  };
 }
 
 function isDeclaredBascule(declaredBascules, { eqId, cmdId, haEntityType }) {
@@ -122,7 +112,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       }
 
       if (decision.verdict === 'read') {
-        const params = overrideParams(req);
+        const params = decision.params;
 
         if (decision.action === 'changes' && new URL(req.url).pathname === EVENT_CHANGES_PATH) {
           await wait(EVENT_CHANGES_DELAY_MS);
@@ -172,7 +162,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       }
 
       if (decision.verdict === 'simulate') {
-        const params = overrideParams(req);
+        const params = decision.params;
         let response;
         if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });

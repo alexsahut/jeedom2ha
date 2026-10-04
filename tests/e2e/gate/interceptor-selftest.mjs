@@ -103,7 +103,9 @@ function pageHtml(origin) {
     navigator.sendBeacon(endpoint, form('executeHaAction'));
     await frame();
     await image();
-    await attempted(fetch('/core/api/jeeApi.php', { method: 'POST', body: 'action=write' }));
+    await attempted(fetch('/core/api/jeeApi.php', {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'action=write',
+    }));
     await attempted(fetch(endpoint, { method: 'POST', body: 'action=getBridgeStatus&action=scanTopology' }));
     window.open(endpoint + '?action=executeHaAction', '_blank', 'noopener');
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -111,7 +113,9 @@ function pageHtml(origin) {
     const serviceWorkerRegistration = await navigator.serviceWorker.register('/selftest-sw.js');
     await new Promise((resolve) => setTimeout(resolve, 500));
     const serviceWorkerRegistrations = await navigator.serviceWorker.getRegistrations();
-    await attempted(fetch('/core/ajax/user.ajax.php', { method: 'POST', body: 'action=login' }));
+    await attempted(fetch('/core/ajax/user.ajax.php', {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'action=login',
+    }));
     const changes = await fetch(changesEndpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -287,7 +291,8 @@ async function main() {
         .map((action) => ({ path: PLUGIN_AJAX, action, verdict: 'block-fail' })),
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
-      { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
+      // sendBeacon() impose text/plain : le refus survient avant l'extraction de l'action.
+      { path: PLUGIN_AJAX, action: null, verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'saveFilteringConfig', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
       { path: '/core/api/jeeApi.php', action: 'write', verdict: 'block' },

@@ -28,6 +28,7 @@ function req(overrides) {
     url: ORIGIN + '/index.php',
     resourceType: 'document',
     postData: null,
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
     ...overrides,
   };
 }
@@ -331,5 +332,87 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
       ctx
     );
     assert.equal(onBoxOrigin.verdict, 'block');
+  });
+
+  await t.test('noms de paramètres PHP ambigus ou invalides -> block-fail', () => {
+    const variants = [
+      `action=listByType&type=jeedom2ha&+action=remove&id=579`,
+      `action=listByType&type=jeedom2ha&%20action=remove&id=579`,
+      'action=getBridgeStatus&action%00=scanTopology',
+      'action=getBridgeStatus&action%5B%5D=scanTopology',
+    ];
+    for (const postData of variants) {
+      const result = classifyRequest(
+        req({ method: 'POST', url: `${ORIGIN}/core/ajax/eqLogic.ajax.php`, resourceType: 'xhr', postData }),
+        baseCtx(),
+      );
+      assert.equal(result.verdict, 'block-fail', postData);
+    }
+  });
+
+  await t.test('corps non form, duplicat URL/corps et doublon de lecture -> block-fail', () => {
+    const cases = [
+      req({
+        method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+        postData: 'field=abc%26action%3DscanTopology',
+        headers: { 'content-type': 'multipart/form-data; boundary=gate' },
+      }),
+      req({
+        method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+        postData: '{"action":"getBridgeStatus"}', headers: { 'content-type': 'application/json' },
+      }),
+      req({
+        method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}?action=getBridgeStatus`, resourceType: 'xhr',
+        postData: 'action=getBridgeStatus',
+      }),
+      req({
+        method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}?eqId=1`, resourceType: 'xhr',
+        postData: 'action=previewMappingOverride&eqId=1&cmdId=2&haEntityType=switch',
+      }),
+    ];
+    for (const input of cases) assert.equal(classifyRequest(input, baseCtx()).verdict, 'block-fail');
+  });
+
+  await t.test('écritures camouflées par des clés PHP ambiguës -> block-fail', () => {
+    const result = classifyRequest(
+      req({
+        method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+        postData: 'action=previewMappingOverride&eqId=1&cmdId=2&haEntityType=switch&+action=saveMappingOverride',
+      }),
+      baseCtx(),
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('chemins non canoniques et PHP chargé comme ressource -> block-fail ou block', () => {
+    assert.equal(classifyRequest(req({
+      method: 'GET', url: `${ORIGIN}/core//api/jeeApi.php`, resourceType: 'image',
+    }), baseCtx()).verdict, 'block-fail');
+    assert.equal(classifyRequest(req({
+      method: 'GET', url: `${ORIGIN}/core%2Fapi/jeeApi.php`, resourceType: 'image',
+    }), baseCtx()).verdict, 'block-fail');
+    assert.equal(classifyRequest(req({
+      method: 'GET', url: `${ORIGIN}/plugins/x/y.php`, resourceType: 'script',
+    }), baseCtx()).verdict, 'block');
+  });
+
+  await t.test('getResource n’autorise que file et md5, avec un fichier JS/CSS sans traversée', () => {
+    const allowed = classifyRequest(req({
+      method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js&md5=abc`, resourceType: 'script',
+    }), baseCtx());
+    assert.equal(allowed.verdict, 'static');
+    for (const suffix of ['&extra=x', '&file=..%2Fsecret.js']) {
+      const result = classifyRequest(req({
+        method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js${suffix}`, resourceType: 'script',
+      }), baseCtx());
+      assert.ok(['block', 'block-fail'].includes(result.verdict));
+    }
+  });
+
+  await t.test('page plugin : triplet strict, aucun paramètre supplémentaire', () => {
+    for (const query of ['v=d&m=jeedom2ha&p=administration', 'v=d&m=jeedom2ha&p=jeedom2ha&modal=x', 'v=d&m=jeedom2ha&p=jeedom2ha&configure=1']) {
+      const result = classifyRequest(req({ method: 'GET', url: `${ORIGIN}/index.php?${query}`, resourceType: 'document' }), baseCtx());
+      assert.equal(result.verdict, 'block');
+    }
   });
 });
