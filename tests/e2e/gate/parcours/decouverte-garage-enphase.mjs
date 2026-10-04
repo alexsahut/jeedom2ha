@@ -47,6 +47,18 @@ async function waitAtStep(helpers, index, label, operation) {
   }
 }
 
+/** Consigne au plus trente noms d'équipement de la modale pour diagnostiquer un sélecteur absent. */
+async function recordEquipmentNames(modal, helpers) {
+  const names = await modal.locator('.j2ha-eq-name').allTextContents();
+  for (const [index, name] of names.slice(0, 30).entries()) {
+    try {
+      helpers.record(`eq_nom_${index + 1}`, name.trim());
+    } catch {
+      // Les noms refusés par le contrat de rapport sont volontairement ignorés.
+    }
+  }
+}
+
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
@@ -57,9 +69,14 @@ export async function run(page, { helpers }) {
   const modal = page.locator('.modal-j2ha-room');
   await waitAtStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
   const panel = modal.locator('.j2ha-eq-panel').filter({
-    has: modal.locator('.j2ha-eq-name', { hasText: /^Enphase$/ }),
+    has: page.locator('.j2ha-eq-name', { hasText: /^\s*Enphase\s*$/ }),
   });
-  await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
+  try {
+    await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
+  } catch (error) {
+    await recordEquipmentNames(modal, helpers);
+    throw error;
+  }
 
   const eqId = await panel.getAttribute('data-eq-id');
   if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-enphase-illisible');
