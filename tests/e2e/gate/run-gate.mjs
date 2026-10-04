@@ -151,7 +151,7 @@ async function writeReport(reportDir, data, secrets) {
       verdicts: summarizeJournal(data.journal),
       failures: data.journal.failures,
       simulated: data.journal.entries.filter(
-        (entry) => entry.verdict === 'simulee' || entry.verdict === 'lecture-simulee',
+        (entry) => ['simulee', 'lecture-simulee', 'apercu-simule', 'lecture-derivee'].includes(entry.verdict),
       ),
     },
     console: { count: data.consoleErrors.length, messages: sanitizeConsoleErrors(data.consoleErrors) },
