@@ -61,6 +61,17 @@ function fail(journal, entry) {
   journal.failures.push(entry);
 }
 
+/** Suit les seules requêtes réellement transmises, pour la fenêtre de calme AC3. */
+async function forward(journal, operation) {
+  journal.inFlight = (journal.inFlight ?? 0) + 1;
+  journal.lastSentAt = new Date().toISOString();
+  try {
+    return await operation();
+  } finally {
+    journal.inFlight -= 1;
+  }
+}
+
 function isDeclaredBascule(declaredBascules, { eqId, cmdId, haEntityType }) {
   if (!Array.isArray(declaredBascules)) return false;
   return declaredBascules.some(
@@ -106,7 +117,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       decision = classifyRequest(req, ctx);
 
       if (decision.verdict === 'static' || decision.verdict === 'document') {
-        await route.continue();
+        await forward(journal, () => route.continue());
         appendEntry(journal, { ...req, ...decision });
         return;
       }
@@ -128,7 +139,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         }
 
         if (decision.action === 'getMappingOverrides' && hasActiveSimulation(simState, params.eqId)) {
-          const response = await route.fetch();
+          const response = await forward(journal, () => route.fetch());
           const served = deriveOverrideTree(simState, params.eqId, await response.json());
           await fulfillJson(route, response, served);
           appendEntry(journal, { ...req, ...decision, verdict: 'lecture-derivee' });
@@ -136,7 +147,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         }
 
         if (decision.action === 'previewMappingOverride') {
-          const response = await route.fetch();
+          const response = await forward(journal, () => route.fetch());
           const realResponse = await response.json();
           const declared = isDeclaredBascule(declaredBascules, params);
           const served = declared ? simulatePreviewBascule(realResponse) : realResponse;
@@ -156,7 +167,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           return;
         }
 
-        await route.continue();
+        await forward(journal, () => route.continue());
         appendEntry(journal, { ...req, ...decision });
         return;
       }

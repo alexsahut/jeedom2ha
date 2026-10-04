@@ -68,15 +68,15 @@ async function summary(panel) {
   return (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
 }
 
-function writesSince(journal, start) {
-  return journal.entries.slice(start).filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action));
+function writesSince(journalEntries, start) {
+  return journalEntries().slice(start).filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action));
 }
 
 /** Attend une séquence ordonnée d'entrées de l'intercepteur, sans délai implicite. */
-async function waitForJournal(journal, start, expected) {
+async function waitForJournal(journalEntries, start, expected) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const entries = journal.entries.slice(start);
+    const entries = journalEntries().slice(start);
     const matched = [];
     let cursor = 0;
     for (const entry of entries) {
@@ -92,7 +92,7 @@ async function waitForJournal(journal, start, expected) {
   throw new Error('journal-attendu-absent');
 }
 
-export async function run(page, { helpers, journal }) {
+export async function run(page, { helpers }) {
   const panel = await openEnphase(page, helpers);
   const initialSummary = await atStep(helpers, 7, 'synthese-initiale', () => summary(panel));
   helpers.record('synthese_initiale', initialSummary);
@@ -101,10 +101,10 @@ export async function run(page, { helpers, journal }) {
   helpers.record('cmd_cible_id', Number(cmdId));
   helpers.record('cmd_cible_initial', await diagnosticState(target));
 
-  const journalA = journal.entries.length;
+  const journalA = helpers.journalEntries().length;
   await atStep(helpers, 9, 'apercu-reel-bloquant', async () => {
     await target.locator('select').selectOption('sensor');
-    await waitForJournal(journal, journalA, [
+    await waitForJournal(helpers.journalEntries, journalA, [
       { action: 'previewMappingOverride', verdict: 'lecture-reelle' },
     ]);
     await page.waitForFunction((id) => {
@@ -115,15 +115,15 @@ export async function run(page, { helpers, journal }) {
   });
   const stateA = await diagnosticState(target);
   if (stateA !== 'bloquante') throw new Error('apercu-reel-non-bloquant');
-  if (writesSince(journal, journalA).length !== 0) throw new Error('ecriture-apres-apercu-reel');
+  if (writesSince(helpers.journalEntries, journalA).length !== 0) throw new Error('ecriture-apres-apercu-reel');
   helpers.record('etape_a_cellule', stateA);
   helpers.record('etape_a_ecriture', false);
-  helpers.record('etape_a_entrees_journal', journal.entries.length - journalA);
+  helpers.record('etape_a_entrees_journal', helpers.journalEntries().length - journalA);
 
-  const journalB = journal.entries.length;
+  const journalB = helpers.journalEntries().length;
   await atStep(helpers, 10, 'bascule-simulee', async () => {
     await target.locator('select').selectOption('binary_sensor');
-    await waitForJournal(journal, journalB, [
+    await waitForJournal(helpers.journalEntries, journalB, [
       { action: 'previewMappingOverride', verdict: 'apercu-simule' },
       { action: 'saveMappingOverride', verdict: 'simulee' },
       { action: 'getMappingOverrides', verdict: 'lecture-derivee' },
@@ -142,12 +142,12 @@ export async function run(page, { helpers, journal }) {
     throw new Error('synthese-bascule-encore-bloquante');
   }
   helpers.record('etape_b_cellule', stateB);
-  helpers.record('etape_b_entrees_journal', journal.entries.length - journalB);
+  helpers.record('etape_b_entrees_journal', helpers.journalEntries().length - journalB);
 
-  const journalC = journal.entries.length;
+  const journalC = helpers.journalEntries().length;
   await atStep(helpers, 11, 'retour-automatique', async () => {
     await target.locator('.mo-revert-cmd').click();
-    await waitForJournal(journal, journalC, [
+    await waitForJournal(helpers.journalEntries, journalC, [
       { action: 'revertMappingOverride', verdict: 'simulee' },
       { action: 'getMappingOverrides', verdict: 'read' },
     ]);
@@ -162,5 +162,5 @@ export async function run(page, { helpers, journal }) {
   helpers.record('etape_c_synthese', summaryC);
   if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
   helpers.record('etape_c_cellule', stateC);
-  helpers.record('etape_c_entrees_journal', journal.entries.length - journalC);
+  helpers.record('etape_c_entrees_journal', helpers.journalEntries().length - journalC);
 }

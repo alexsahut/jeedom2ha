@@ -113,6 +113,12 @@ test('story 20-0 — AC4 étiquette mqttPassword et les deux identifiants', asyn
   ]);
 });
 
+test('story 20-0 — AC4 trouve les formes JSON et URL encodées', async () => {
+  const { artifactsContain } = await mod();
+  const value = 'mot de passe/é';
+  assert.deepEqual(artifactsContain([{ categorie: 'secret', valeur: value }], [JSON.stringify(value), encodeURIComponent(value)]), ['secret']);
+});
+
 test('story 20-0 — le témoin AC4 ne contient aucune valeur', async () => {
   const { enforceAc4 } = await runner();
   const directory = await mkdtemp(path.join(os.tmpdir(), 'jeedom2ha-ac4-'));
@@ -123,6 +129,7 @@ test('story 20-0 — le témoin AC4 ne contient aucune valeur', async () => {
   try {
     await writeFile(path.join(directory, 'gate-report.md'), 'identifiant-prive');
     await writeFile(path.join(directory, 'gate-report.json'), 'mot-de-passe-prive');
+    await writeFile(path.join(directory, 'gate-report-ac4.txt'), 'ancienne-preuve');
     await assert.rejects(() => enforceAc4(directory, values), /ac4-fuite-rapport:identifiant,mot-de-passe/);
     const witness = await readFile(path.join(directory, 'gate-report-ac4.txt'), 'utf8');
     assert.equal(witness, 'FAIL ac4\nidentifiant\nmot-de-passe\n');
@@ -131,4 +138,33 @@ test('story 20-0 — le témoin AC4 ne contient aucune valeur', async () => {
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('story 20-0 — parcours isolé : journal gelé et API Playwright interdite', async () => {
+  const { journalEntriesSnapshot, loadParcours } = await runner();
+  const snapshot = journalEntriesSnapshot({ entries: [{ action: 'read', verdict: 'read' }] });
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(Object.isFrozen(snapshot[0]), true);
+  assert.throws(() => { snapshot[0].action = 'write'; }, /Cannot assign/);
+
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'jeedom2ha-parcours-'));
+  const modulePath = path.join(directory, 'refused.mjs');
+  try {
+    await writeFile(modulePath, 'export const run = () => page.context();\n');
+    await assert.rejects(() => loadParcours(modulePath), /parcours-refuse/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('story 20-0 — navigation : seul document exact ou about:blank est recevable', async () => {
+  const { documentAllowed, assertOpenPagesAllowed } = await runner();
+  const ctx = { origin: 'https://domobox.famille-sahut.fr' };
+  assert.equal(documentAllowed('https://domobox.famille-sahut.fr/index.php?v=d&m=jeedom2ha&p=jeedom2ha', ctx), true);
+  assert.equal(documentAllowed('https://domobox.famille-sahut.fr/plugins/x/y.php', ctx), false);
+  const journal = { entries: [], failures: [], failed: false };
+  const context = { pages: () => [{ url: () => 'https://domobox.famille-sahut.fr/plugins/x/y.php' }] };
+  assert.throws(() => assertOpenPagesAllowed(context, ctx, journal), /navigation-non-autorisee/);
+  assert.equal(journal.failed, true);
+  assert.equal(journal.failures[0].verdict, 'navigation-non-autorisee');
 });

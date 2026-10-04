@@ -24,6 +24,7 @@ import {
   normalizeParcoursRecord,
 } from './lib/report.mjs';
 import { createState } from './lib/simulate.mjs';
+import { classifyRequest } from './lib/policy.mjs';
 
 const ORIGIN = 'https://domobox.famille-sahut.fr';
 const PLUGIN = '/index.php?v=d&m=jeedom2ha&p=jeedom2ha';
@@ -33,11 +34,74 @@ const CREDENTIALS = process.env.JEEDOM2HA_GATE_CREDENTIALS
 /** Lance le self-test isolé avant tout contact avec la box. */
 function runChild(file) {
   return new Promise((resolve, reject) => {
-    execFile(process.execPath, [file], { encoding: 'utf8' }, (error) => {
+    execFile(process.execPath, [file], { encoding: 'utf8', timeout: 120_000 }, (error) => {
       if (error) reject(new Error(`processus-echec: ${error.message}`));
       else resolve();
     });
   });
+}
+
+function withTimeout(promise, milliseconds, reason) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(reason)), milliseconds); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+export function journalEntriesSnapshot(journal) {
+  const snapshot = (journal?.entries ?? []).map((entry) => Object.freeze({ ...entry }));
+  return Object.freeze(snapshot);
+}
+
+function navigationFailure(journal, url) {
+  const entry = {
+    timestamp: new Date().toISOString(), method: 'GET', resourceType: 'document',
+    path: (() => { try { return new URL(url).pathname; } catch { return null; } })(),
+    action: null, verdict: 'navigation-non-autorisee', reason: 'navigation-non-autorisee',
+  };
+  journal.entries.push(entry);
+  journal.failures.push(entry);
+  journal.failed = true;
+}
+
+export function documentAllowed(url, ctx) {
+  return classifyRequest({ method: 'GET', url, resourceType: 'document', postData: null, headers: {} }, ctx).verdict === 'document';
+}
+
+/** Contrôle réponses de navigation et toutes les URL de leur chaîne de redirection. */
+export function installNavigationGuard(context, ctx, journal) {
+  context.on('response', (response) => {
+    try {
+      const request = response.request();
+      if (!request.isNavigationRequest()) return;
+      const chain = [];
+      for (let cursor = request; cursor; cursor = cursor.redirectedFrom()) chain.push(cursor.url());
+      chain.push(response.url());
+      for (const url of new Set(chain)) if (!documentAllowed(url, ctx)) navigationFailure(journal, url);
+    } catch {
+      navigationFailure(journal, 'about:blank');
+    }
+  });
+}
+
+export function assertOpenPagesAllowed(context, ctx, journal) {
+  for (const page of context.pages()) {
+    const url = page.url();
+    if (url !== 'about:blank' && !documentAllowed(url, ctx)) {
+      navigationFailure(journal, url);
+      throw new Error('navigation-non-autorisee');
+    }
+  }
+}
+
+const FORBIDDEN_PARCOURS_SOURCE = [/\.route\s*\(/, /\bunroute\b/, /\brouteFromHAR\b/, /\brouteWebSocket\b/, /\.request\b/, /\.context\s*\(/, /\baddInitScript\b/, /\bexposeFunction\b/, /\bexposeBinding\b/];
+
+export async function loadParcours(modulePath) {
+  const resolved = path.resolve(modulePath);
+  const source = await readFile(resolved, 'utf8');
+  if (FORBIDDEN_PARCOURS_SOURCE.some((pattern) => pattern.test(source))) throw new Error('parcours-refuse');
+  return import(pathToFileURL(resolved).href);
 }
 
 /** Lit les deux paramètres obligatoires du lanceur. */
@@ -114,8 +178,15 @@ async function closePages(context) {
 
 /** Attend 90 secondes après la dernière requête enregistrée par l'intercepteur. */
 async function waitForQuietWindow(journal) {
-  const last = journal.entries.at(-1)?.timestamp;
-  const delay = last ? Math.max(0, 90_000 - (Date.now() - Date.parse(last))) : 90_000;
+  const deadline = Date.now() + 60_000;
+  while ((journal.inFlight ?? 0) > 0) {
+    if (Date.now() >= deadline) throw new Error('requetes-en-cours-timeout');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const timestamps = [journal.entries.at(-1)?.timestamp, journal.lastSentAt]
+    .map((value) => Date.parse(value ?? '')).filter(Number.isFinite);
+  const last = timestamps.length ? Math.max(...timestamps) : Date.now();
+  const delay = Math.max(0, 90_000 - (Date.now() - last));
   await new Promise((resolve) => setTimeout(resolve, delay));
 }
 
@@ -173,6 +244,7 @@ async function writeReport(reportDir, data, secrets) {
     '',
   ].join('\n');
   await mkdir(reportDir, { recursive: true });
+  await rm(path.join(reportDir, 'gate-report-ac4.txt'), { force: true });
   await writeFile(path.join(reportDir, 'gate-report.json'), JSON.stringify(payload, null, 2));
   await writeFile(path.join(reportDir, 'gate-report.md'), markdown);
   await enforceAc4(reportDir, secrets);
@@ -185,7 +257,7 @@ async function main() {
   const ownDirectory = path.dirname(fileURLToPath(import.meta.url));
   await runChild(path.join(ownDirectory, 'interceptor-selftest.mjs'));
   const credentials = await readCredentials();
-  const parcours = await import(pathToFileURL(path.resolve(modulePath)).href);
+  const parcours = await loadParcours(modulePath);
   if (!parcours.name || !parcours.declaredEquipments || !Array.isArray(parcours.declaredBascules)) {
     throw new Error('parcours-invalide');
   }
@@ -224,6 +296,12 @@ async function main() {
       lastPreviewType: simState.lastPreviewType,
     };
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });
+    installNavigationGuard(context, ctx, journal);
+    context.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+    context.on('weberror', (webError) => {
+      const error = typeof webError?.error === 'function' ? webError.error() : webError;
+      consoleErrors.push(error?.message ?? String(error));
+    });
     ctx.loginAttempts = 1;
     const login = await jsonPost(context.request, `${ORIGIN}/core/ajax/user.ajax.php`, {
       action: 'login',
@@ -235,20 +313,14 @@ async function main() {
     if (login?.state !== 'ok') throw new Error('connexion-echouee');
     probeBefore = await probe(context.request);
     const page = await context.newPage();
-    page.on('console', (message) => {
-      if (message.type() === 'error') consoleErrors.push(message.text());
-    });
-    page.on('pageerror', (error) => consoleErrors.push(error.message));
     const navigation = await page.goto(`${ORIGIN}${PLUGIN}`, { waitUntil: 'load' });
     if (!expectedUrl(page) || !redirectsStayOnOrigin(navigation)) {
       throw new Error('navigation-finale-invalide');
     }
-    await parcours.run(page, {
-      journal,
-      simState,
-      ctx,
-      helpers: { record: createRecorder(data.parcours) },
-    });
+    await withTimeout(parcours.run(page, {
+      helpers: { record: createRecorder(data.parcours), journalEntries: () => journalEntriesSnapshot(journal) },
+    }), 180_000, 'parcours-timeout');
+    assertOpenPagesAllowed(context, ctx, journal);
   } catch (error) {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
@@ -265,7 +337,7 @@ async function main() {
       ? compareProbes(probeBefore, probeAfter)
       : ['sondes-illisibles'];
     try {
-      data.window = await countWindow(before.clock, after.clock);
+    data.window = await countWindow(before, after);
     } catch (error) {
       failure ??= error instanceof Error ? error : new Error(String(error));
     }
@@ -283,7 +355,7 @@ async function main() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    console.error(error.message);
+    console.error(sanitizeReason(error));
     process.exitCode = 1;
   });
 }

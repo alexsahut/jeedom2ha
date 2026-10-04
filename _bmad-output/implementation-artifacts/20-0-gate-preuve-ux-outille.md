@@ -103,6 +103,7 @@ Le plugin expose ses actions via `core/ajax/jeedom2ha.ajax.php`, dispatché par 
 - **Toute autre requête** (actions inconnues du plugin, points d'entrée du cœur Jeedom, dont `core/api/jeeApi.php`) : bloquée et journalisée. Une lecture du cœur nécessaire au chargement de la page n'est autorisée qu'après inscription explicite du couple (point d'entrée, `action`) en Task 1, revue par ClaudeBox.
 - **Règles pour Task 3** : un GET « statique » n'est autorisé que sans paramètre `action`, et hors des chemins `*/ajax/*` et `/core/api/*` (le type de ressource seul ne suffit pas). Les cibles de redirection ne passent pas par `context.route` (qui n'intercepte que la première URL d'une chaîne de redirection) : après chaque navigation, le gate vérifie donc l'URL finale et reconstitue la chaîne de redirections après coup, et échoue si la page attendue n'est pas atteinte.
 - **Règle pour Task 4** : les lignes du journal du démon à vérifier (absence des marqueurs d'écriture, AC3) sont sélectionnées par horodatage, dans la fenêtre du parcours, sur l'horloge de la box — jamais par une simple différence de nombre de lignes. Le témoin est illisible si le journal a été tronqué pendant la fenêtre (troncature en place constatée le 2026-10-02, sans fichiers de rotation numérotés), c'est-à-dire si sa taille a baissé, ou si l'horodatage de sa première ligne datée a changé entre avant et après.
+- **Amendement 2026-10-04 — Règle pour Task 4** : le texte d'origine ci-dessus est conservé pour l'historique. Les compteurs AC3 utilisent désormais exclusivement les octets ajoutés entre les témoins : `tail -c +<taille_avant+1> <fichier> | head -c <taille_après-taille_avant>`. Les tailles sont des entiers validés; une baisse de taille, ou un changement de la première ligne datée, rend toujours le témoin illisible. La sélection par horodatage disparaît : les traces Python sans horodatage sont donc comptées.
 
 Le gate relit `data/ha_overrides.json` sur la box en lecture seule (sha256, date de modification et contenu, par SSH), le processus du démon (PID — trouvé par `pgrep -u www-data -f '[j]eedom2ha/.*resources/daemon/main\.py'`, exactement un PID attendu *(amendé le 2026-10-02 ; texte d'origine : « PID »)* —, heure de démarrage, niveau de journal, par SSH), le témoin du démon (`getBridgeStatus`) et l'empreinte de la configuration du plugin (`getKey` du cœur) avant et après chaque parcours (AC2) ; il n'écrit jamais rien sur la box, ni directement ni par une route du plugin.
 
@@ -152,6 +153,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 ### Completion Notes List
 
 - 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
+- 2026-10-04 — Amendement H2 : lanceur durci (navigations, console contexte, AC4, isolation des parcours, fenêtres de journaux par octets et délais); validation locale requise avant toute nouvelle exécution terrain. Statut inchangé : `review`.
 
 ### File List
 

@@ -141,6 +141,10 @@ export function ac4Values(credentials, configValues) {
 /** Retourne les catégories de valeurs AC4 présentes, sans jamais retourner les valeurs. */
 export function artifactsContain(values, texts) {
   return [...new Set((values ?? [])
-    .filter(({ valeur }) => valeur && (texts ?? []).some((text) => String(text).includes(valeur)))
+    .filter(({ valeur }) => {
+      if (!valeur) return false;
+      const forms = [valeur, JSON.stringify(valeur).slice(1, -1), encodeURIComponent(valeur)];
+      return (texts ?? []).some((text) => forms.some((form) => String(text).includes(form)));
+    })
     .map(({ categorie }) => categorie))];
 }

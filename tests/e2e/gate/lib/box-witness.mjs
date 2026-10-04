@@ -52,6 +52,10 @@ export function parseNumber(stdout, label) {
   return Number(value);
 }
 
+function validSize(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
 export function parseOverrides(content) {
   if (content === null) return { present: false, json: null };
   let json;
@@ -112,14 +116,15 @@ export function compareWitness(before, after) {
   return [...new Set(differences)];
 }
 
-export function remoteWindowCommand(path, marker, start, end) {
-  if (!validBoxTime(start) || !validBoxTime(end)) throw new Error('bornes-horloge-invalides');
-  return `[ -r ${quote(path)} ] || exit 3; awk '$0 ~ /^\\[[0-9-]+ [0-9:]+\\]/ { t=substr($0,2,19); if (t >= "${start}" && t <= "${end}") print }' ${quote(path)} | grep -cF ${quote(marker)} || true`;
+export function remoteWindowCommand(path, marker, beforeSize, afterSize) {
+  if (!validSize(beforeSize) || !validSize(afterSize) || afterSize < beforeSize) throw new Error('bornes-journal-invalides');
+  const length = afterSize - beforeSize;
+  return `[ -r ${quote(path)} ] || exit 3; tail -c +${beforeSize + 1} ${quote(path)} | head -c ${length} | grep -cF ${quote(marker)} || true`;
 }
 
 export function runRemote(command) {
   return new Promise((resolve, reject) => {
-    execFile('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', SSH_TARGET, command], { encoding: 'utf8' }, (error, stdout, stderr) => {
+    execFile('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=3', SSH_TARGET, command], { encoding: 'utf8', timeout: 60_000 }, (error, stdout, stderr) => {
       if (error) reject(new Error(`ssh-echec: ${error.message}`));
       else resolve(stdout);
     });
@@ -160,13 +165,23 @@ export async function takeWitness({ run = runRemote } = {}) {
   return witness;
 }
 
-export async function countWindow(start, end, { run = runRemote } = {}) {
-  if (!validBoxTime(start) || !validBoxTime(end) || start > end) throw new Error('bornes-horloge-invalides');
+export async function countWindow(before, after, { run = runRemote } = {}) {
+  const beforeLogs = before?.logs;
+  const afterLogs = after?.logs;
+  for (const name of ['daemon', 'plugin']) {
+    if (!validSize(beforeLogs?.[name]?.size) || !validSize(afterLogs?.[name]?.size) || afterLogs[name].size < beforeLogs[name].size) {
+      throw new Error('bornes-journal-invalides');
+    }
+  }
+  const daemonBefore = beforeLogs.daemon.size;
+  const daemonAfter = afterLogs.daemon.size;
+  const pluginBefore = beforeLogs.plugin.size;
+  const pluginAfter = afterLogs.plugin.size;
   const daemon = {};
-  for (const marker of AC3_MARKERS) daemon[marker] = parseNumber(await run(remoteWindowCommand(DAEMON_LOG, marker, start, end)), 'compteur-daemon');
+  for (const marker of AC3_MARKERS) daemon[marker] = parseNumber(await run(remoteWindowCommand(DAEMON_LOG, marker, daemonBefore, daemonAfter)), 'compteur-daemon');
   return {
     daemon,
-    daemonErrors: parseNumber(await run(remoteWindowCommand(DAEMON_LOG, 'ERROR', start, end)), 'compteur-erreurs-daemon'),
-    pluginErrors: parseNumber(await run(remoteWindowCommand(PLUGIN_LOG, 'ERROR', start, end)), 'compteur-erreurs-plugin'),
+    daemonErrors: parseNumber(await run(remoteWindowCommand(DAEMON_LOG, 'ERROR', daemonBefore, daemonAfter)), 'compteur-erreurs-daemon'),
+    pluginErrors: parseNumber(await run(remoteWindowCommand(PLUGIN_LOG, 'ERROR', pluginBefore, pluginAfter)), 'compteur-erreurs-plugin'),
   };
 }
