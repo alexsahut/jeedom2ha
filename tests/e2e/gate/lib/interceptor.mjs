@@ -24,6 +24,10 @@ import {
 const EVENT_CHANGES_PATH = '/core/ajax/event.ajax.php';
 const EVENT_CHANGES_DELAY_MS = 5_000;
 
+/** Budget d'action du plugin (60 s) plus marge : le lanceur attend plus longtemps
+ * que ce délai avant de déclarer une requête en cours comme bloquée (run-gate.mjs). */
+export const ROUTE_FETCH_TIMEOUT_MS = 70_000;
+
 function requestDetails(request) {
   return {
     method: request.method(),
@@ -123,7 +127,7 @@ export function isRedirectResponse(status, headers = {}) {
 
 /** Récupère une lecture sans suivre de redirection, puis la sert au navigateur. */
 async function fetchRead(route, journal, req, decision) {
-  const response = await forward(journal, () => route.fetch({ maxRedirects: 0, timeout: 70_000 }));
+  const response = await forward(journal, () => route.fetch({ maxRedirects: 0, timeout: ROUTE_FETCH_TIMEOUT_MS }));
   if (!isRedirectResponse(response.status(), response.headers())) return response;
 
   const entry = appendEntry(journal, {

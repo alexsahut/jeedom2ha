@@ -6,7 +6,7 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertNoOverrideOn, compareWitness, countWindow, takeWitness } from './lib/box-witness.mjs';
-import { installInterceptor } from './lib/interceptor.mjs';
+import { installInterceptor, ROUTE_FETCH_TIMEOUT_MS } from './lib/interceptor.mjs';
 import { loadPlaywright } from './lib/playwright.mjs';
 import {
   ac4Values,
@@ -253,9 +253,17 @@ export function calculateQuietDelay(journal, now = Date.now()) {
   return Math.max(0, QUIET_WINDOW_MS - (now - last));
 }
 
+/**
+ * Marge au-delà de `ROUTE_FETCH_TIMEOUT_MS` (interceptor.mjs) : une lecture encore en
+ * cours jusqu'à ce timeout ne doit jamais déclencher `requetes-en-cours-timeout` avant
+ * que `route.fetch` lui-même n'ait eu la chance d'aboutir ou d'échouer, sans quoi un
+ * témoin serait pris pendant qu'une requête tourne encore.
+ */
+const IN_FLIGHT_WAIT_MS = ROUTE_FETCH_TIMEOUT_MS + 10_000;
+
 /** Attend 90 secondes après la dernière requête enregistrée par l'intercepteur. */
 async function waitForQuietWindow(journal) {
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + IN_FLIGHT_WAIT_MS;
   while ((journal.inFlight ?? 0) > 0) {
     if (Date.now() >= deadline) throw new Error('requetes-en-cours-timeout');
     await new Promise((resolve) => setTimeout(resolve, 100));
