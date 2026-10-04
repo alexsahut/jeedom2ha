@@ -162,6 +162,19 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         return;
       }
 
+      if (decision.verdict === 'auth') {
+        // Le lanceur seul s'authentifie via context.request, avant toute page.
+        // Une page ne doit jamais porter les identifiants ni ouvrir une connexion.
+        const entry = appendEntry(journal, {
+          ...req,
+          ...decision,
+          reason: 'connexion-par-la-page-interdite',
+        });
+        fail(journal, entry);
+        await route.abort();
+        return;
+      }
+
       if (decision.verdict === 'read') {
         const params = decision.params;
 

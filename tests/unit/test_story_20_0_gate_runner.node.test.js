@@ -228,6 +228,19 @@ test('story 20-0 — une connexion est journalisée sans clé, et seul le refus 
   assert.equal(Object.hasOwn(denied, 'keys'), false);
 });
 
+test('story 20-0 — une étape finale en erreur conserve le premier échec et laisse les suivantes courir', async () => {
+  const { captureFinallyFailure } = await runner();
+  const state = { failure: null };
+  const calls = [];
+  const first = new Error('delai-calme-depasse');
+  await captureFinallyFailure(state, async () => { calls.push('calme'); throw first; });
+  const witness = await captureFinallyFailure(state, async () => { calls.push('temoin'); return 'apres'; });
+  await captureFinallyFailure(state, async () => { calls.push('rapport'); });
+  assert.equal(state.failure, first);
+  assert.equal(witness, 'apres');
+  assert.deepEqual(calls, ['calme', 'temoin', 'rapport']);
+});
+
 test('story 20-0 — les sondes JSON exigent strictement HTTP 200', async () => {
   const { isExpectedJsonResponse } = await runner();
   assert.equal(isExpectedJsonResponse({ status: () => 200 }), true);

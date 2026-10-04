@@ -168,6 +168,16 @@ export function isExpectedJsonResponse(response) {
   return response?.status?.() === 200;
 }
 
+/** Conserve le premier échec tout en permettant aux témoins finaux de se poursuivre. */
+export async function captureFinallyFailure(state, operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    state.failure ??= error instanceof Error ? error : new Error(String(error));
+    return undefined;
+  }
+}
+
 export async function jsonPost(request, url, form) {
   const response = await request.post(url, { form, maxRedirects: 0 });
   if (!isExpectedJsonResponse(response)) throw new Error(`sonde-http-invalide:${response.status()}`);
@@ -354,7 +364,6 @@ async function main() {
       consoleErrors.push(error?.message ?? String(error));
     });
     try {
-      ctx.loginAttempts = 1;
       const login = await jsonPost(context.request, `${ORIGIN}/core/ajax/user.ajax.php`, {
         action: 'login',
         username: credentials.username,
@@ -380,33 +389,34 @@ async function main() {
   } catch (error) {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
-    await closePages(context);
+    const finalization = { failure };
+    await captureFinallyFailure(finalization, () => closePages(context));
     if (authenticated) {
-      await waitForQuietWindow(journal);
-      try {
-        if (context) probeAfter = await probe(context.request);
-      } catch (error) {
-        failure ??= error instanceof Error ? error : new Error(String(error));
-      }
+      await captureFinallyFailure(finalization, () => waitForQuietWindow(journal));
+      probeAfter = await captureFinallyFailure(finalization, () => context ? probe(context.request) : undefined);
     }
-    const after = await takeWitness();
-    data.witnessDifferences = compareWitness(before, after);
-    data.probeDifferences = probeBefore && probeAfter
-      ? compareProbes(probeBefore, probeAfter)
-      : ['sondes-illisibles'];
-    try {
-    data.window = await countWindow(before, after);
-    } catch (error) {
-      failure ??= error instanceof Error ? error : new Error(String(error));
-    }
-    data.failure = failure;
+    const after = await captureFinallyFailure(finalization, () => takeWitness());
+    await captureFinallyFailure(finalization, () => {
+      if (!after) throw new Error('temoin-apres-illisible');
+      data.witnessDifferences = compareWitness(before, after);
+    });
+    await captureFinallyFailure(finalization, () => {
+      data.probeDifferences = probeBefore && probeAfter
+        ? compareProbes(probeBefore, probeAfter)
+        : ['sondes-illisibles'];
+    });
+    await captureFinallyFailure(finalization, async () => { data.window = await countWindow(before, after); });
+    data.failure = finalization.failure;
     const configValues = probeBefore?.configValues ?? probeAfter?.configValues ?? {};
+    let secrets = [];
+    await captureFinallyFailure(finalization, () => { secrets = ac4Values(credentials.values, configValues); });
+    data.failure = finalization.failure;
     try {
-      const result = await writeReport(reportDir, data, ac4Values(credentials.values, configValues));
-      if (result.verdict !== 'PASS') process.exitCode = 1;
+      const result = await captureFinallyFailure(finalization, () => writeReport(reportDir, data, secrets));
+      if (!result || result.verdict !== 'PASS') process.exitCode = 1;
     } finally {
-      await context?.close().catch(() => undefined);
-      await browser?.close().catch(() => undefined);
+      await captureFinallyFailure(finalization, () => context?.close());
+      await captureFinallyFailure(finalization, () => browser?.close());
     }
   }
 }

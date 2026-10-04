@@ -211,6 +211,7 @@ function report(label, condition, failures) {
 function takeMatchingFailure(failures, expected) {
   const index = failures.findIndex(
     (entry) => entry.path === expected.path && entry.action === expected.action && entry.verdict === expected.verdict
+      && (expected.reason === undefined || entry.reason === expected.reason)
   );
   return index === -1 ? null : failures.splice(index, 1)[0];
 }
@@ -299,7 +300,7 @@ async function main() {
       { path: PLUGIN_AJAX, action: null, verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'executeHaAction', verdict: 'block-fail' },
       { path: '/socket', action: null, verdict: 'websocket-bloque' },
-      { path: '/core/ajax/user.ajax.php', action: 'login', verdict: 'auth' },
+      { path: '/core/ajax/user.ajax.php', action: 'login', verdict: 'auth', reason: 'connexion-par-la-page-interdite' },
     ];
     const remainingFailures = [...journal.failures];
     for (const expected of expectedFailures) {
