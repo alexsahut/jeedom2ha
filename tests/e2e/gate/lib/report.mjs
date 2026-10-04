@@ -128,13 +128,19 @@ export function normalizeParcoursRecord(key, value) {
   throw new Error('parcours-record-valeur-invalide');
 }
 
-/** Cherche seulement les valeurs pertinentes pour AC4 ; les courtes valeurs de config sont ignorées. */
+/** Étiquette les seules valeurs qui ne doivent jamais apparaître dans les rapports AC4. */
 export function ac4Values(credentials, configValues) {
-  const config = Object.values(configValues ?? {}).filter((value) => typeof value === 'string' && value.length >= 6);
-  return [...(credentials ?? []).filter(Boolean), ...config];
+  const candidates = [
+    { categorie: 'identifiant', valeur: credentials?.[0] },
+    { categorie: 'mot-de-passe', valeur: credentials?.[1] },
+    { categorie: 'config-mqttPassword', valeur: configValues?.mqttPassword },
+  ];
+  return candidates.filter(({ valeur }) => typeof valeur === 'string' && valeur.length > 0);
 }
 
-/** Détecte une fuite AC4 dans un ensemble de textes déjà générés. */
+/** Retourne les catégories de valeurs AC4 présentes, sans jamais retourner les valeurs. */
 export function artifactsContain(values, texts) {
-  return values.some((value) => value && texts.some((text) => text.includes(value)));
+  return [...new Set((values ?? [])
+    .filter(({ valeur }) => valeur && (texts ?? []).some((text) => String(text).includes(valeur)))
+    .map(({ categorie }) => categorie))];
 }

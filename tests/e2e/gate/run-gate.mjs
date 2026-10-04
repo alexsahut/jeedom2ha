@@ -129,12 +129,14 @@ function createRecorder(parcours) {
 }
 
 /** Supprime les rapports si un contrôle AC4 détecte une valeur en clair. */
-async function enforceAc4(reportDir, values) {
+export async function enforceAc4(reportDir, values) {
   const files = ['gate-report.md', 'gate-report.json'].map((name) => path.join(reportDir, name));
   const texts = await Promise.all(files.map((file) => readFile(file, 'utf8')));
-  if (!artifactsContain(values, texts)) return;
+  const categories = artifactsContain(values, texts);
+  if (categories.length === 0) return;
   await Promise.all(files.map((file) => rm(file, { force: true })));
-  throw new Error('ac4-fuite-rapport');
+  await writeFile(path.join(reportDir, 'gate-report-ac4.txt'), `FAIL ac4\n${categories.join('\n')}\n`);
+  throw new Error(`ac4-fuite-rapport:${categories.join(',')}`);
 }
 
 /** Écrit le rapport final, y compris lorsqu'un parcours a échoué après le témoin initial. */

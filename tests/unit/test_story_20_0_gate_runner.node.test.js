@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { mkdtemp, readFile, rm, writeFile } = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
@@ -12,6 +14,14 @@ const mod = () => import(pathToFileURL(path.join(
   'gate',
   'lib',
   'report.mjs',
+)).href);
+
+const runner = () => import(pathToFileURL(path.join(
+  __dirname,
+  '..',
+  'e2e',
+  'gate',
+  'run-gate.mjs',
 )).href);
 
 test('story 20-0 — identifiants incomplets refusés', async () => {
@@ -85,12 +95,40 @@ test('story 20-0 — les constats de parcours sont strictement bornés', async (
   assert.throws(() => normalizeParcoursRecord('etat', 'x'.repeat(81)));
 });
 
-test('story 20-0 — AC4 détecte la valeur longue et ignore une config courte', async () => {
+test('story 20-0 — AC4 ignore une valeur de configuration présente dans un chemin', async () => {
   const { ac4Values, artifactsContain } = await mod();
-  const values = ac4Values(['user', 'password-long'], {
-    mqttHost: 'court',
-    mqttPassword: 'secret-config',
+  const values = ac4Values(['identifiant-prive', 'mot-de-passe-prive'], {
+    mqttUser: 'jeedom',
   });
-  assert.equal(artifactsContain(values, ['rapport secret-config']), true);
-  assert.equal(artifactsContain(values, ['rapport court']), false);
+  assert.deepEqual(artifactsContain(values, ['/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php']), []);
+});
+
+test('story 20-0 — AC4 étiquette mqttPassword et les deux identifiants', async () => {
+  const { ac4Values, artifactsContain } = await mod();
+  const values = ac4Values(['identifiant-prive', 'mot-de-passe-prive'], {
+    mqttPassword: 'mot-de-passe-mqtt-prive',
+  });
+  assert.deepEqual(artifactsContain(values, ['identifiant-prive mot-de-passe-prive mot-de-passe-mqtt-prive']), [
+    'identifiant', 'mot-de-passe', 'config-mqttPassword',
+  ]);
+});
+
+test('story 20-0 — le témoin AC4 ne contient aucune valeur', async () => {
+  const { enforceAc4 } = await runner();
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'jeedom2ha-ac4-'));
+  const values = [
+    { categorie: 'identifiant', valeur: 'identifiant-prive' },
+    { categorie: 'mot-de-passe', valeur: 'mot-de-passe-prive' },
+  ];
+  try {
+    await writeFile(path.join(directory, 'gate-report.md'), 'identifiant-prive');
+    await writeFile(path.join(directory, 'gate-report.json'), 'mot-de-passe-prive');
+    await assert.rejects(() => enforceAc4(directory, values), /ac4-fuite-rapport:identifiant,mot-de-passe/);
+    const witness = await readFile(path.join(directory, 'gate-report-ac4.txt'), 'utf8');
+    assert.equal(witness, 'FAIL ac4\nidentifiant\nmot-de-passe\n');
+    assert.equal(witness.includes('identifiant-prive'), false);
+    assert.equal(witness.includes('mot-de-passe-prive'), false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
