@@ -81,7 +81,7 @@ test('story 20-0 — les cinq vérifications et la ligne activité sont calculé
   assert.equal(result.activity, true);
 });
 
-test('story 20-0 — une fenêtre {} ne vaut jamais « aucune activité »', async () => {
+test('story 20-0 — une fenêtre {} ne vaut jamais « aucune activité » et déclenche la ligne activité', async () => {
   const { calculateChecks } = await mod();
   const result = calculateChecks({
     journal: { failed: false },
@@ -92,7 +92,7 @@ test('story 20-0 — une fenêtre {} ne vaut jamais « aucune activité »', asy
     failure: null,
   });
   assert.equal(result.checks.ac3_4_logs, false);
-  assert.equal(result.activity, false);
+  assert.equal(result.activity, true);
 });
 
 test('story 20-0 — un compteur manquant dans la fenêtre ne vaut jamais « aucune activité »', async () => {
@@ -121,7 +121,8 @@ test('story 20-0 — un compteur manquant dans la fenêtre ne vaut jamais « auc
     failure: null,
   });
   assert.equal(missingMarker.checks.ac3_4_logs, false);
-  assert.equal(missingMarker.activity, false);
+  // Une fenêtre illisible (marqueur manquant) ne vaut jamais « aucune activité ».
+  assert.equal(missingMarker.activity, true);
   assert.ok(firstMarker, 'AC3_MARKERS doit contenir au moins un marqueur');
 
   const missingPluginErrors = calculateChecks({
@@ -311,14 +312,25 @@ test('story 20-0 — les sondes JSON exigent strictement HTTP 200', async () => 
   assert.equal(isExpectedJsonResponse({ status: () => 302 }), false);
 });
 
-test('story 20-0 — le délai de calme se compte depuis la dernière interception, puis se replie sur la dernière entrée', async () => {
+test('story 20-0 — le délai de calme se compte depuis le plus tardif de lastInterceptedAt et de la dernière entrée du journal', async () => {
   const { calculateQuietDelay } = await runner();
   const now = Date.parse('2026-10-04T12:00:00.000Z');
 
-  // lastInterceptedAt a priorité, même si une entrée plus ancienne existe aussi.
+  // lastInterceptedAt est le plus tardif : il l'emporte sur une entrée plus ancienne.
   assert.equal(
     calculateQuietDelay(
       { lastInterceptedAt: now - 10_000, entries: [{ timestamp: new Date(now - 90_000).toISOString() }] },
+      now,
+    ),
+    80_000,
+  );
+
+  // La dernière entrée du journal est le plus tardif : elle l'emporte sur un
+  // lastInterceptedAt plus ancien (ex. l'attente du long-polling `changes`, dont
+  // l'entrée est consignée après coup, plus tard que l'interception initiale).
+  assert.equal(
+    calculateQuietDelay(
+      { lastInterceptedAt: now - 90_000, entries: [{ timestamp: new Date(now - 10_000).toISOString() }] },
       now,
     ),
     80_000,

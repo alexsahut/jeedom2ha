@@ -236,16 +236,20 @@ async function closePages(context) {
 const QUIET_WINDOW_MS = 90_000;
 
 /**
- * Calcule le délai de calme restant (fonction pure) : priorité à
+ * Calcule le délai de calme restant (fonction pure) : compte depuis le plus tardif de
  * `journal.lastInterceptedAt` (posé dès l'entrée du gestionnaire de route, avant tout
- * `await`), repli sur l'horodatage de la dernière entrée du journal. Si aucun des deux
+ * `await`) et de l'horodatage de la dernière entrée du journal (qui peut être consignée
+ * après coup, par exemple après l'attente du long-polling `changes`). Si aucun des deux
  * n'est lisible, le calme n'est pas prouvé : on attend les 90 s pleines.
  */
 export function calculateQuietDelay(journal, now = Date.now()) {
-  const last = typeof journal?.lastInterceptedAt === 'number' && Number.isFinite(journal.lastInterceptedAt)
+  const intercepted = typeof journal?.lastInterceptedAt === 'number' && Number.isFinite(journal.lastInterceptedAt)
     ? journal.lastInterceptedAt
-    : Date.parse(journal?.entries?.at(-1)?.timestamp ?? '');
-  if (!Number.isFinite(last)) return QUIET_WINDOW_MS;
+    : NaN;
+  const lastEntry = Date.parse(journal?.entries?.at(-1)?.timestamp ?? '');
+  const candidates = [intercepted, lastEntry].filter(Number.isFinite);
+  if (candidates.length === 0) return QUIET_WINDOW_MS;
+  const last = Math.max(...candidates);
   return Math.max(0, QUIET_WINDOW_MS - (now - last));
 }
 
@@ -420,12 +424,27 @@ async function main() {
     await captureFinallyFailure(finalization, async () => { data.window = await countWindow(before, after); });
     data.failure = finalization.failure;
     const configValues = probeBefore?.configValues ?? probeAfter?.configValues ?? {};
-    let secrets = [];
-    await captureFinallyFailure(finalization, () => { secrets = ac4Values(credentials.values, configValues); });
+    let secrets;
+    try {
+      secrets = ac4Values(credentials.values, configValues);
+    } catch (error) {
+      finalization.failure ??= error instanceof Error ? error : new Error(String(error));
+      // Sans valeurs à contrôler, un rapport serait trompeur : échec explicite, fail-closed.
+      console.error(sanitizeReason(finalization.failure));
+      process.exitCode = 1;
+      await captureFinallyFailure(finalization, () => context?.close());
+      await captureFinallyFailure(finalization, () => browser?.close());
+      return;
+    }
     data.failure = finalization.failure;
     try {
       const result = await captureFinallyFailure(finalization, () => writeReport(reportDir, data, secrets));
-      if (!result || result.verdict !== 'PASS') process.exitCode = 1;
+      if (!result) {
+        console.error(sanitizeReason(finalization.failure));
+        process.exitCode = 1;
+      } else if (result.verdict !== 'PASS') {
+        process.exitCode = 1;
+      }
     } finally {
       await captureFinallyFailure(finalization, () => context?.close());
       await captureFinallyFailure(finalization, () => browser?.close());

@@ -104,7 +104,9 @@ export function calculateChecks({ journal, witnessDifferences, probeDifferences,
     ac3_4_logs: windowReadable && !logActivity,
     ac3_5_report: true,
   };
-  return { checks, activity: boxChanged || logActivity };
+  // Une fenêtre illisible ne prouve aucun calme : elle doit aussi déclencher la
+  // ligne d'activité, pas seulement faire échouer ac3_4_logs en silence.
+  return { checks, activity: boxChanged || logActivity || !windowReadable };
 }
 
 /** Remplace une query string entière afin qu'une URL ne divulgue jamais une apikey. */

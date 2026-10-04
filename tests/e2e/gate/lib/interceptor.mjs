@@ -123,7 +123,7 @@ export function isRedirectResponse(status, headers = {}) {
 
 /** Récupère une lecture sans suivre de redirection, puis la sert au navigateur. */
 async function fetchRead(route, journal, req, decision) {
-  const response = await forward(journal, () => route.fetch({ maxRedirects: 0 }));
+  const response = await forward(journal, () => route.fetch({ maxRedirects: 0, timeout: 70_000 }));
   if (!isRedirectResponse(response.status(), response.headers())) return response;
 
   const entry = appendEntry(journal, {
@@ -195,14 +195,24 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           if (pageClosed(route)) {
             // La page a fermé pendant l'attente : la réponse n'est jamais servie, mais
             // ce n'est pas un échec du gate, seulement une fin de parcours anticipée.
-            appendEntry(journal, { ...req, ...decision, reason: 'page-fermee-avant-reponse' });
+            appendEntry(journal, {
+              ...req,
+              ...decision,
+              verdict: 'lecture-simulee-annulee',
+              reason: 'page-fermee-avant-reponse',
+            });
             return;
           }
           try {
             await route.fulfill({ json: buildEmptyChangesResponse(Date.now() / 1_000) });
           } catch (error) {
             if (pageClosed(route)) {
-              appendEntry(journal, { ...req, ...decision, reason: 'page-fermee-avant-reponse' });
+              appendEntry(journal, {
+                ...req,
+                ...decision,
+                verdict: 'lecture-simulee-annulee',
+                reason: 'page-fermee-avant-reponse',
+              });
               return;
             }
             throw error;
