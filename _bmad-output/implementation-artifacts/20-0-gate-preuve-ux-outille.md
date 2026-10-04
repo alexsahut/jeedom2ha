@@ -153,6 +153,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 
 ### Completion Notes List
 
+- 2026-10-04 — troisième tour de Codex (PR #197) traité par `156f7f7` ; preuve refaite à ce head. Statut inchangé.
 - 2026-10-04 — Second tour de Codex traité par `ba02b1f` et `0ba76d8` ; preuve refaite au head `0ba76d8`. Statut inchangé.
 - 2026-10-04 après-midi — Preuve finale au head `3db15e5` : référence PASS et contrôle d'écriture non déclarée en FAIL attendu ; artefact `20-0-gate-2026-10-04.md` mis à jour. Statut inchangé.
 - 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
