@@ -1,6 +1,6 @@
 # Story 20.0: Gate de preuve UX outillé
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -159,6 +159,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 - 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
 - 2026-10-04 — Amendement H2 : lanceur durci (navigations, console contexte, AC4, garde-fou de parcours, fenêtres de journaux par octets et délais); validation locale requise avant toute nouvelle exécution terrain. Statut inchangé : `review`.
 - 2026-10-04 — quatrième tour de Codex (PR #197) traité par `dd03c63`, `5f0e72c` et `35e7ca3` ; preuve refaite à ce head.
+- 2026-10-04 — preuve finale au head `51f6085` ; relecture indépendante ClaudeBox (5e tour, Codex en limite d'usage) ; story close.
 
 ### File List
 
