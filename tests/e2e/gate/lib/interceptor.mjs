@@ -113,6 +113,34 @@ function pageClosed(route) {
   }
 }
 
+/** Une lecture AJAX ne doit jamais suivre une redirection, même interne. */
+export function isRedirectResponse(status, headers = {}) {
+  if ([301, 302, 303, 307, 308].includes(status)) return true;
+  return typeof headers === 'object'
+    && headers !== null
+    && Object.keys(headers).some((name) => name.toLowerCase() === 'location');
+}
+
+/** Récupère une lecture sans suivre de redirection, puis la sert au navigateur. */
+async function fetchRead(route, journal, req, decision) {
+  const response = await forward(journal, () => route.fetch({ maxRedirects: 0 }));
+  if (!isRedirectResponse(response.status(), response.headers())) return response;
+
+  const entry = appendEntry(journal, {
+    ...req,
+    ...decision,
+    verdict: 'redirection-non-autorisee',
+    reason: 'redirection-non-autorisee',
+  });
+  fail(journal, entry);
+  try {
+    await route.abort();
+  } catch {
+    // Le refus est déjà consigné ; une page fermée ne doit pas masquer ce constat.
+  }
+  return null;
+}
+
 /**
  * Installe l'intercepteur sur le contexte déjà créé par le lanceur.
  *
@@ -151,7 +179,8 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         }
 
         if (decision.action === 'getMappingOverrides' && hasActiveSimulation(simState, params.eqId)) {
-          const response = await forward(journal, () => route.fetch());
+          const response = await fetchRead(route, journal, req, decision);
+          if (!response) return;
           const served = deriveOverrideTree(simState, params.eqId, await response.json());
           await fulfillJson(route, response, served);
           appendEntry(journal, { ...req, ...decision, verdict: 'lecture-derivee' });
@@ -159,7 +188,8 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         }
 
         if (decision.action === 'previewMappingOverride') {
-          const response = await forward(journal, () => route.fetch());
+          const response = await fetchRead(route, journal, req, decision);
+          if (!response) return;
           const realResponse = await response.json();
           const declared = isDeclaredBascule(declaredBascules, params);
           const served = declared ? simulatePreviewBascule(realResponse) : realResponse;
@@ -179,7 +209,9 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           return;
         }
 
-        await forward(journal, () => route.continue());
+        const response = await fetchRead(route, journal, req, decision);
+        if (!response) return;
+        await route.fulfill({ response });
         appendEntry(journal, { ...req, ...decision });
         return;
       }

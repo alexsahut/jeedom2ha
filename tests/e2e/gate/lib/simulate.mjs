@@ -69,11 +69,17 @@ function readPayload(result) {
 // non couverte, overridden nul) : recordSave échouera alors explicitement, comme pour tout
 // aperçu jamais obtenu.
 export function recordPreview(state, { eqId, cmdId, type, response }) {
+  const k = key(eqId, cmdId);
+  // Chaque aperçu remplace intégralement le précédent pour ce couple. Un aperçu
+  // inexploitable ne doit jamais autoriser l'enregistrement d'un type périmé.
+  delete state.previews[k];
+  delete state.lastPreviewType[k];
+
+  if (typeof type !== 'string' || type.trim().length === 0) return false;
   if (!response || response.state !== 'ok') return false;
   const payload = readPayload(response.result);
   if (!payload || payload.covered !== true || payload.overridden == null) return false;
 
-  const k = key(eqId, cmdId);
   state.previews[k] = { type, overridden: structuredClone(payload.overridden) };
   state.lastPreviewType[k] = type;
   return true;

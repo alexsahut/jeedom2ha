@@ -65,6 +65,28 @@ function navigationFailure(journal, url) {
   journal.failed = true;
 }
 
+/** Les redirections non-navigation (ressources, documents annexes) sont suspectes. */
+export function isRedirectedNonNavigationRequest(request) {
+  try {
+    return request.redirectedFrom() !== null && !request.isNavigationRequest();
+  } catch {
+    return false;
+  }
+}
+
+export function redirectedRequestFailure(journal, request) {
+  const url = request.url();
+  const entry = {
+    timestamp: new Date().toISOString(),
+    method: request.method(), resourceType: request.resourceType(),
+    path: (() => { try { return new URL(url).pathname; } catch { return null; } })(),
+    action: null, verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee',
+  };
+  journal.entries.push(entry);
+  journal.failures.push(entry);
+  journal.failed = true;
+}
+
 export function documentAllowed(url, ctx) {
   return classifyRequest({ method: 'GET', url, resourceType: 'document', postData: null, headers: {} }, ctx).verdict === 'document';
 }
@@ -122,8 +144,13 @@ async function readCredentials() {
 }
 
 /** Envoie une sonde AJAX et exige une réponse JSON exploitable. */
-async function jsonPost(request, url, form) {
-  const response = await request.post(url, { form });
+export function isExpectedJsonResponse(response) {
+  return response?.status?.() === 200;
+}
+
+export async function jsonPost(request, url, form) {
+  const response = await request.post(url, { form, maxRedirects: 0 });
+  if (!isExpectedJsonResponse(response)) throw new Error(`sonde-http-invalide:${response.status()}`);
   return response.json();
 }
 
@@ -297,6 +324,9 @@ async function main() {
     };
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });
     installNavigationGuard(context, ctx, journal);
+    context.on('request', (request) => {
+      if (isRedirectedNonNavigationRequest(request)) redirectedRequestFailure(journal, request);
+    });
     context.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
     context.on('weberror', (webError) => {
       const error = typeof webError?.error === 'function' ? webError.error() : webError;

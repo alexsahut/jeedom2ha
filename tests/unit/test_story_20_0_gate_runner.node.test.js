@@ -169,6 +169,45 @@ test('story 20-0 — navigation : seul document exact ou about:blank est recevab
   assert.equal(journal.failures[0].verdict, 'navigation-non-autorisee');
 });
 
+test('story 20-0 — statuts de redirection et en-tête Location sont refusés', async () => {
+  const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
+  for (const status of [301, 302, 303, 307, 308]) assert.equal(interceptor.isRedirectResponse(status, {}), true);
+  assert.equal(interceptor.isRedirectResponse(200, { location: '/suite' }), true);
+  assert.equal(interceptor.isRedirectResponse(200, { Location: '/suite' }), true);
+  assert.equal(interceptor.isRedirectResponse(200, {}), false);
+  assert.equal(interceptor.isRedirectResponse(304, {}), false);
+});
+
+test('story 20-0 — le garde refuse seulement les requêtes redirigées hors navigation', async () => {
+  const { isRedirectedNonNavigationRequest, redirectedRequestFailure } = await runner();
+  const request = ({ redirected, navigation }) => ({
+    redirectedFrom: () => redirected ? {} : null,
+    isNavigationRequest: () => navigation,
+    url: () => 'https://box.test/static.js?cache=private',
+    method: () => 'GET',
+    resourceType: () => 'script',
+  });
+  assert.equal(isRedirectedNonNavigationRequest(request({ redirected: true, navigation: false })), true);
+  assert.equal(isRedirectedNonNavigationRequest(request({ redirected: true, navigation: true })), false);
+  assert.equal(isRedirectedNonNavigationRequest(request({ redirected: false, navigation: false })), false);
+
+  const journal = { entries: [], failures: [], failed: false };
+  redirectedRequestFailure(journal, request({ redirected: true, navigation: false }));
+  assert.equal(journal.failed, true);
+  assert.deepEqual(journal.failures[0], {
+    timestamp: journal.failures[0].timestamp,
+    method: 'GET', resourceType: 'script', path: '/static.js', action: null,
+    verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee',
+  });
+});
+
+test('story 20-0 — les sondes JSON exigent strictement HTTP 200', async () => {
+  const { isExpectedJsonResponse } = await runner();
+  assert.equal(isExpectedJsonResponse({ status: () => 200 }), true);
+  assert.equal(isExpectedJsonResponse({ status: () => 201 }), false);
+  assert.equal(isExpectedJsonResponse({ status: () => 302 }), false);
+});
+
 test('story 20-0 — journal de refus : clés triées sans valeur', async () => {
   const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
   const journal = { entries: [] };

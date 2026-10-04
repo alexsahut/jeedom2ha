@@ -275,6 +275,45 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     assert.throws(() => recordSave(state, { eqId: '1', cmdId: '2', type: 'switch' }));
   });
 
+  await t.test('un aperçu inexploitable efface le type précédent et bloque sa sauvegarde', async () => {
+    const state = createState();
+    const ctx = {
+      origin: 'https://box.test',
+      loginAttempts: 0,
+      declaredEquipments: { '1': { commands: ['2'] } },
+      lastPreviewType: state.lastPreviewType,
+    };
+    recordPreview(state, { eqId: '1', cmdId: '2', type: 'binary_sensor', response: previewResponse() });
+    assert.equal(state.lastPreviewType['1:2'], 'binary_sensor');
+
+    assert.equal(
+      recordPreview(state, { eqId: '1', cmdId: '2', type: 'sensor', response: previewResponse({ covered: false }) }),
+      false,
+    );
+    assert.equal(state.lastPreviewType['1:2'], undefined);
+    assert.equal(state.previews['1:2'], undefined);
+    assert.throws(() => recordSave(state, { eqId: '1', cmdId: '2', type: 'binary_sensor' }));
+
+    const { classifyRequest } = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'policy.mjs')).href);
+    const decision = classifyRequest({
+      method: 'POST',
+      url: 'https://box.test/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+      resourceType: 'fetch',
+      postData: 'action=saveMappingOverride&eqId=1&cmdId=2&haEntityType=binary_sensor',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    }, ctx);
+    assert.equal(decision.verdict, 'block-fail');
+  });
+
+  await t.test('un type vide ou non chaîne efface aussi tout aperçu précédent', () => {
+    const state = createState();
+    recordPreview(state, { eqId: '1', cmdId: '2', type: 'switch', response: previewResponse() });
+    assert.equal(recordPreview(state, { eqId: '1', cmdId: '2', type: '', response: previewResponse() }), false);
+    assert.equal(state.previews['1:2'], undefined);
+    assert.equal(recordPreview(state, { eqId: '1', cmdId: '2', type: null, response: previewResponse() }), false);
+    assert.equal(state.lastPreviewType['1:2'], undefined);
+  });
+
   await t.test('erreur : type différent de l\'aperçu mémorisé', () => {
     const state = createState();
     recordPreview(state, { eqId: '1', cmdId: '2', type: 'switch', response: previewResponse() });
