@@ -10,7 +10,12 @@ async function waitForDiagnostics(page, eqId) {
     const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
     const panel = panels.find((item) => item.getAttribute('data-eq-id') === targetId);
     const rows = panel ? [...panel.querySelectorAll('tr.mapping-override-cmd')] : [];
-    const states = ['j2ha-diag-ready', 'j2ha-diag-blocking', 'j2ha-diag-uncovered'];
+    const states = [
+      'j2ha-diag-ready',
+      'j2ha-diag-blocking',
+      'j2ha-diag-uncovered',
+      'j2ha-diag-unknown',
+    ];
     return rows.length > 0 && rows.every((row) => {
       const diagnostic = row.querySelector('.mo-diag-cell');
       return diagnostic && states.some((state) => diagnostic.classList.contains(state));
@@ -26,6 +31,7 @@ async function readCommandStates(panel) {
     if (diagnostic?.classList.contains('j2ha-diag-ready')) state = 'prete';
     if (diagnostic?.classList.contains('j2ha-diag-blocking')) state = 'bloquante';
     if (diagnostic?.classList.contains('j2ha-diag-uncovered')) state = 'non-couverte';
+    if (diagnostic?.classList.contains('j2ha-diag-unknown')) state = 'inconnue';
     return { id: row.getAttribute('data-cmd-id'), state };
   }));
 }
