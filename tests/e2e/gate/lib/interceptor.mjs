@@ -149,6 +149,9 @@ async function fetchRead(route, journal, req, decision) {
  */
 export async function installInterceptor(context, { ctx, simState, journal, declaredBascules }) {
   await context.route('**/*', async (route) => {
+    // Posé avant tout await : waitForQuietWindow() compte la fenêtre de calme depuis
+    // cette interception, pas depuis la dernière réponse effectivement transmise.
+    journal.lastInterceptedAt = Date.now();
     let req;
     let decision;
 
@@ -189,11 +192,19 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           // requête antérieure, sous peine de raccourcir waitForQuietWindow().
           appendEntry(journal, { ...req, ...decision, verdict: 'lecture-simulee' });
           await wait(EVENT_CHANGES_DELAY_MS);
-          if (pageClosed(route)) return;
+          if (pageClosed(route)) {
+            // La page a fermé pendant l'attente : la réponse n'est jamais servie, mais
+            // ce n'est pas un échec du gate, seulement une fin de parcours anticipée.
+            appendEntry(journal, { ...req, ...decision, reason: 'page-fermee-avant-reponse' });
+            return;
+          }
           try {
             await route.fulfill({ json: buildEmptyChangesResponse(Date.now() / 1_000) });
           } catch (error) {
-            if (pageClosed(route)) return;
+            if (pageClosed(route)) {
+              appendEntry(journal, { ...req, ...decision, reason: 'page-fermee-avant-reponse' });
+              return;
+            }
             throw error;
           }
           return;
@@ -274,6 +285,7 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
   });
 
   await context.routeWebSocket(/.*/, async (route) => {
+    journal.lastInterceptedAt = Date.now();
     const entry = appendEntry(journal, {
       method: 'WEBSOCKET',
       resourceType: 'websocket',

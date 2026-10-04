@@ -311,6 +311,33 @@ test('story 20-0 — les sondes JSON exigent strictement HTTP 200', async () => 
   assert.equal(isExpectedJsonResponse({ status: () => 302 }), false);
 });
 
+test('story 20-0 — le délai de calme se compte depuis la dernière interception, puis se replie sur la dernière entrée', async () => {
+  const { calculateQuietDelay } = await runner();
+  const now = Date.parse('2026-10-04T12:00:00.000Z');
+
+  // lastInterceptedAt a priorité, même si une entrée plus ancienne existe aussi.
+  assert.equal(
+    calculateQuietDelay(
+      { lastInterceptedAt: now - 10_000, entries: [{ timestamp: new Date(now - 90_000).toISOString() }] },
+      now,
+    ),
+    80_000,
+  );
+
+  // Repli sur la dernière entrée du journal quand lastInterceptedAt est absent.
+  assert.equal(
+    calculateQuietDelay({ entries: [{ timestamp: new Date(now - 30_000).toISOString() }] }, now),
+    60_000,
+  );
+
+  // Ni l'un ni l'autre n'est lisible : attente pleine de 90 s.
+  assert.equal(calculateQuietDelay({ entries: [] }, now), 90_000);
+  assert.equal(calculateQuietDelay({}, now), 90_000);
+
+  // Le délai ne devient jamais négatif au-delà de 90 s d'inactivité.
+  assert.equal(calculateQuietDelay({ lastInterceptedAt: now - 120_000 }, now), 0);
+});
+
 test('story 20-0 — journal de refus : clés triées sans valeur', async () => {
   const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
   const journal = { entries: [] };

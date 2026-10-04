@@ -233,6 +233,22 @@ async function closePages(context) {
   await Promise.all(context.pages().map((page) => page.close().catch(() => undefined)));
 }
 
+const QUIET_WINDOW_MS = 90_000;
+
+/**
+ * Calcule le délai de calme restant (fonction pure) : priorité à
+ * `journal.lastInterceptedAt` (posé dès l'entrée du gestionnaire de route, avant tout
+ * `await`), repli sur l'horodatage de la dernière entrée du journal. Si aucun des deux
+ * n'est lisible, le calme n'est pas prouvé : on attend les 90 s pleines.
+ */
+export function calculateQuietDelay(journal, now = Date.now()) {
+  const last = typeof journal?.lastInterceptedAt === 'number' && Number.isFinite(journal.lastInterceptedAt)
+    ? journal.lastInterceptedAt
+    : Date.parse(journal?.entries?.at(-1)?.timestamp ?? '');
+  if (!Number.isFinite(last)) return QUIET_WINDOW_MS;
+  return Math.max(0, QUIET_WINDOW_MS - (now - last));
+}
+
 /** Attend 90 secondes après la dernière requête enregistrée par l'intercepteur. */
 async function waitForQuietWindow(journal) {
   const deadline = Date.now() + 60_000;
@@ -240,11 +256,7 @@ async function waitForQuietWindow(journal) {
     if (Date.now() >= deadline) throw new Error('requetes-en-cours-timeout');
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const timestamps = [journal.entries.at(-1)?.timestamp, journal.lastSentAt]
-    .map((value) => Date.parse(value ?? '')).filter(Number.isFinite);
-  const last = timestamps.length ? Math.max(...timestamps) : Date.now();
-  const delay = Math.max(0, 90_000 - (Date.now() - last));
-  await new Promise((resolve) => setTimeout(resolve, delay));
+  await new Promise((resolve) => setTimeout(resolve, calculateQuietDelay(journal)));
 }
 
 /** Crée le collecteur borné des constats DOM transmis par le parcours. */
