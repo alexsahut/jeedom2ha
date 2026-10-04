@@ -48,6 +48,14 @@ export function createState() {
   };
 }
 
+/** Construit la réponse AJAX vide du long-polling du cœur Jeedom, sans E/S. */
+export function buildEmptyChangesResponse(datetime) {
+  if (typeof datetime !== 'number' || !Number.isFinite(datetime)) {
+    throw new Error('changes-datetime-invalide');
+  }
+  return { state: 'ok', result: { datetime, result: [] } };
+}
+
 function readPayload(result) {
   if (!result || result.status !== 'ok') return null;
   const payload = result.payload;

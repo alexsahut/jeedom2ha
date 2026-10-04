@@ -107,6 +107,7 @@ function realTreeResponse({ eqId = 1, commands = [commandRow()], syncStatus } = 
 test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', async (t) => {
   const {
     createState,
+    buildEmptyChangesResponse,
     recordPreview,
     simulatePreviewBascule,
     recordSave,
@@ -116,6 +117,15 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     hasActiveSimulation,
     deriveOverrideTree,
   } = await loadSimulate();
+
+  await t.test('changes simulé : datetime numérique et liste vide', () => {
+    const response = buildEmptyChangesResponse(1_728_000_000.123);
+    assert.deepEqual(response, {
+      state: 'ok',
+      result: { datetime: 1_728_000_000.123, result: [] },
+    });
+    assert.throws(() => buildEmptyChangesResponse('1_728_000_000'));
+  });
 
   await t.test('enregistrement puis relecture dérivée', () => {
     const state = createState();

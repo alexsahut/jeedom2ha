@@ -36,26 +36,41 @@ async function readCommandStates(panel) {
   }));
 }
 
+/** Consigne une étape avant son attente et préfixe toute erreur avec son nom. */
+async function waitAtStep(helpers, index, label, operation) {
+  helpers.record(`etape_${index}`, label);
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message.split(/\r?\n/, 1)[0] : String(error);
+    throw new Error(`etape ${label} : ${message}`);
+  }
+}
+
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
     has: page.locator('.name', { hasText: /^Garage$/ }),
   });
-  await roomCard.click();
+  await waitAtStep(helpers, 1, 'carte-garage', () => roomCard.click());
 
   const modal = page.locator('.modal-j2ha-room');
-  await modal.waitFor({ state: 'visible' });
+  await waitAtStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
   const panel = modal.locator('.j2ha-eq-panel').filter({
     has: modal.locator('.j2ha-eq-name', { hasText: /^Enphase$/ }),
   });
-  await panel.waitFor({ state: 'visible' });
+  await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
 
   const eqId = await panel.getAttribute('data-eq-id');
   if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-enphase-illisible');
-  await panel.locator('.j2ha-eq-toggle').click();
-  await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
-  await panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' });
-  await waitForDiagnostics(page, eqId);
+  await waitAtStep(helpers, 4, 'depliage', async () => {
+    await panel.locator('.j2ha-eq-toggle').click();
+    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+  });
+  await waitAtStep(helpers, 5, 'table', () => {
+    return panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' });
+  });
+  await waitAtStep(helpers, 6, 'diagnostics', () => waitForDiagnostics(page, eqId));
 
   helpers.record('eq_id', Number(eqId));
   for (const command of await readCommandStates(panel)) {

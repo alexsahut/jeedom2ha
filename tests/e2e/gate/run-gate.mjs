@@ -148,7 +148,9 @@ async function writeReport(reportDir, data, secrets) {
     interceptor: {
       verdicts: summarizeJournal(data.journal),
       failures: data.journal.failures,
-      simulated: data.journal.entries.filter((entry) => entry.verdict === 'simulee'),
+      simulated: data.journal.entries.filter(
+        (entry) => entry.verdict === 'simulee' || entry.verdict === 'lecture-simulee',
+      ),
     },
     console: { count: data.consoleErrors.length, messages: sanitizeConsoleErrors(data.consoleErrors) },
     parcours: data.parcours,

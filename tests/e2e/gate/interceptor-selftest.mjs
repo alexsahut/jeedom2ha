@@ -13,6 +13,7 @@ import { installInterceptor } from './lib/interceptor.mjs';
 import { createState } from './lib/simulate.mjs';
 
 const PLUGIN_AJAX = '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
+const EVENT_AJAX = '/core/ajax/event.ajax.php';
 
 function json(state, result) {
   return JSON.stringify({ state, result: { status: 'ok', payload: result } });
@@ -55,6 +56,7 @@ function pageHtml(origin) {
 <script>
 (() => {
   const endpoint = ${JSON.stringify(endpoint)};
+  const changesEndpoint = ${JSON.stringify(`${origin}/core/ajax/event.ajax.php`)};
   const websocket = ${JSON.stringify(websocket)};
   const form = (action, fields = {}) => new URLSearchParams({ action, ...fields }).toString();
   const post = async (action, fields = {}) => {
@@ -110,6 +112,11 @@ function pageHtml(origin) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const serviceWorkerRegistrations = await navigator.serviceWorker.getRegistrations();
     await attempted(fetch('/core/ajax/user.ajax.php', { method: 'POST', body: 'action=login' }));
+    const changes = await fetch(changesEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'action=changes&datetime=0',
+    }).then((response) => response.json());
 
     const preview = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
     const saved = await post('saveMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
@@ -121,6 +128,7 @@ function pageHtml(origin) {
     return {
       serviceWorkerRegistrationIsUndefined: serviceWorkerRegistration === undefined,
       serviceWorkerRegistrationsCount: serviceWorkerRegistrations.length,
+      changes,
       preview,
       saved,
       derived,
@@ -260,6 +268,18 @@ async function main() {
     report('service worker : aucune inscription apres 500 ms', results.serviceWorkerRegistrationsCount === 0, failures);
     report('service worker : script jamais recu par le serveur',
       !requests.some((request) => request.path === '/selftest-sw.js'),
+      failures);
+    report('changes est simule : serveur non atteint et liste vide recue par la page',
+      !requests.some((request) => request.path === EVENT_AJAX && request.actions.includes('changes'))
+        && results.changes.state === 'ok'
+        && Array.isArray(results.changes.result.result)
+        && results.changes.result.result.length === 0
+        && typeof results.changes.result.datetime === 'number',
+      failures);
+    report('journal : changes marque lecture-simulee',
+      journal.entries.some(
+        (entry) => entry.path === EVENT_AJAX && entry.action === 'changes' && entry.verdict === 'lecture-simulee',
+      ),
       failures);
 
     const expectedFailures = [

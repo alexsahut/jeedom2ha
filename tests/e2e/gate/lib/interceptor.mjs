@@ -12,6 +12,7 @@ import { classifyRequest } from './policy.mjs';
 import {
   buildRevertResponse,
   buildSaveResponse,
+  buildEmptyChangesResponse,
   deriveOverrideTree,
   hasActiveSimulation,
   recordPreview,
@@ -19,6 +20,9 @@ import {
   recordSave,
   simulatePreviewBascule,
 } from './simulate.mjs';
+
+const EVENT_CHANGES_PATH = '/core/ajax/event.ajax.php';
+const EVENT_CHANGES_DELAY_MS = 5_000;
 
 function requestDetails(request) {
   return {
@@ -82,6 +86,20 @@ async function fulfillJson(route, response, body) {
   await route.fulfill({ response, json: body });
 }
 
+/** Attend le délai déterministe du long-polling sans ajouter de dépendance réseau. */
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+/** Indique si le navigateur a fermé la page à l'origine d'une route. */
+function pageClosed(route) {
+  try {
+    return route.request().frame().page().isClosed();
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Installe l'intercepteur sur le contexte déjà créé par le lanceur.
  *
@@ -105,6 +123,19 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
 
       if (decision.verdict === 'read') {
         const params = overrideParams(req);
+
+        if (decision.action === 'changes' && new URL(req.url).pathname === EVENT_CHANGES_PATH) {
+          await wait(EVENT_CHANGES_DELAY_MS);
+          if (pageClosed(route)) return;
+          try {
+            await route.fulfill({ json: buildEmptyChangesResponse(Date.now() / 1_000) });
+          } catch (error) {
+            if (pageClosed(route)) return;
+            throw error;
+          }
+          appendEntry(journal, { ...req, ...decision, verdict: 'lecture-simulee' });
+          return;
+        }
 
         if (decision.action === 'getMappingOverrides' && hasActiveSimulation(simState, params.eqId)) {
           const response = await route.fetch();
