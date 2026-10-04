@@ -1,6 +1,7 @@
 // Fonctions pures du rapport du gate Story 20.0 : aucune E/S ni dépendance Playwright.
 
 import { createHash } from 'node:crypto';
+import { AC3_MARKERS } from './box-witness.mjs';
 
 export const CONFIG_KEYS = [
   'excludedPlugins', 'excludedObjects', 'confidencePolicy', 'mqttHost',
@@ -86,14 +87,21 @@ export function summarizeJournal(journal) {
 
 /** Vérifie les cinq contrôles AC3 et la condition d'activité box. */
 export function calculateChecks({ journal, witnessDifferences, probeDifferences, window, consoleErrors, failure }) {
-  const markerCount = Object.values(window?.daemon ?? {}).some(Boolean);
+  // Une fenêtre illisible (SSH en échec, journal tronqué) laisse window à {} ou
+  // à un objet partiel : les huit compteurs (les marqueurs AC3_MARKERS plus
+  // daemonErrors et pluginErrors) doivent tous être présents et numériques,
+  // sans quoi l'absence ne doit jamais se lire comme « aucune activité ».
+  const windowReadable = typeof window?.daemon === 'object' && window.daemon !== null
+    && AC3_MARKERS.every((marker) => typeof window.daemon[marker] === 'number')
+    && typeof window?.daemonErrors === 'number' && typeof window?.pluginErrors === 'number';
+  const markerCount = windowReadable && Object.values(window.daemon).some(Boolean);
   const logActivity = markerCount || Boolean(window?.daemonErrors) || Boolean(window?.pluginErrors);
   const boxChanged = witnessDifferences.length > 0 || probeDifferences.length > 0;
   const checks = {
     ac3_1_interception: !journal?.failed,
     ac3_2_box: !boxChanged,
     ac3_3_console: consoleErrors.length === 0,
-    ac3_4_logs: !logActivity,
+    ac3_4_logs: windowReadable && !logActivity,
     ac3_5_report: true,
   };
   return { checks, activity: boxChanged || logActivity };

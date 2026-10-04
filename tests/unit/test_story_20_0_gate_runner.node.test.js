@@ -24,6 +24,15 @@ const runner = () => import(pathToFileURL(path.join(
   'run-gate.mjs',
 )).href);
 
+const boxWitness = () => import(pathToFileURL(path.join(
+  __dirname,
+  '..',
+  'e2e',
+  'gate',
+  'lib',
+  'box-witness.mjs',
+)).href);
+
 test('story 20-0 — identifiants incomplets refusés', async () => {
   const { parseCredentials } = await mod();
   assert.throws(() => parseCredentials('JEEDOM_USER=clawcode\n'), /identifiants-incomplets/);
@@ -70,6 +79,60 @@ test('story 20-0 — les cinq vérifications et la ligne activité sont calculé
     ac3_5_report: true,
   });
   assert.equal(result.activity, true);
+});
+
+test('story 20-0 — une fenêtre {} ne vaut jamais « aucune activité »', async () => {
+  const { calculateChecks } = await mod();
+  const result = calculateChecks({
+    journal: { failed: false },
+    witnessDifferences: [],
+    probeDifferences: [],
+    window: {},
+    consoleErrors: [],
+    failure: null,
+  });
+  assert.equal(result.checks.ac3_4_logs, false);
+  assert.equal(result.activity, false);
+});
+
+test('story 20-0 — un compteur manquant dans la fenêtre ne vaut jamais « aucune activité »', async () => {
+  const { calculateChecks } = await mod();
+  const { AC3_MARKERS } = await boxWitness();
+  const completeDaemon = Object.fromEntries(AC3_MARKERS.map((marker) => [marker, 0]));
+  const [firstMarker, ...remainingMarkers] = AC3_MARKERS;
+  const incompleteDaemon = Object.fromEntries(remainingMarkers.map((marker) => [marker, 0]));
+
+  const complete = calculateChecks({
+    journal: { failed: false },
+    witnessDifferences: [],
+    probeDifferences: [],
+    window: { daemon: completeDaemon, daemonErrors: 0, pluginErrors: 0 },
+    consoleErrors: [],
+    failure: null,
+  });
+  assert.equal(complete.checks.ac3_4_logs, true);
+
+  const missingMarker = calculateChecks({
+    journal: { failed: false },
+    witnessDifferences: [],
+    probeDifferences: [],
+    window: { daemon: incompleteDaemon, daemonErrors: 0, pluginErrors: 0 },
+    consoleErrors: [],
+    failure: null,
+  });
+  assert.equal(missingMarker.checks.ac3_4_logs, false);
+  assert.equal(missingMarker.activity, false);
+  assert.ok(firstMarker, 'AC3_MARKERS doit contenir au moins un marqueur');
+
+  const missingPluginErrors = calculateChecks({
+    journal: { failed: false },
+    witnessDifferences: [],
+    probeDifferences: [],
+    window: { daemon: completeDaemon, daemonErrors: 0 },
+    consoleErrors: [],
+    failure: null,
+  });
+  assert.equal(missingPluginErrors.checks.ac3_4_logs, false);
 });
 
 test('story 20-0 — les URLs de console perdent toute query string', async () => {
