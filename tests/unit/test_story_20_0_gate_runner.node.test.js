@@ -140,7 +140,7 @@ test('story 20-0 — le témoin AC4 ne contient aucune valeur', async () => {
   }
 });
 
-test('story 20-0 — parcours isolé : journal gelé et API Playwright interdite', async () => {
+test('story 20-0 — garde-fou de parcours : journal gelé et API Playwright/imports interdits', async () => {
   const { journalEntriesSnapshot, loadParcours } = await runner();
   const snapshot = journalEntriesSnapshot({ entries: [{ action: 'read', verdict: 'read' }] });
   assert.equal(Object.isFrozen(snapshot), true);
@@ -150,8 +150,15 @@ test('story 20-0 — parcours isolé : journal gelé et API Playwright interdite
   const directory = await mkdtemp(path.join(os.tmpdir(), 'jeedom2ha-parcours-'));
   const modulePath = path.join(directory, 'refused.mjs');
   try {
-    await writeFile(modulePath, 'export const run = () => page.context();\n');
-    await assert.rejects(() => loadParcours(modulePath), /parcours-refuse/);
+    for (const source of [
+      'export const run = () => page.context();\n',
+      'import x from "./x.mjs"; export const run = () => x;\n',
+      'const x = require("x"); export const run = () => x;\n',
+      'export const run = () => import("./x.mjs");\n',
+    ]) {
+      await writeFile(modulePath, source);
+      await assert.rejects(() => loadParcours(modulePath), /parcours-refuse/);
+    }
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -190,6 +197,7 @@ test('story 20-0 — le garde refuse seulement les requêtes redirigées hors na
   assert.equal(isRedirectedNonNavigationRequest(request({ redirected: true, navigation: false })), true);
   assert.equal(isRedirectedNonNavigationRequest(request({ redirected: true, navigation: true })), false);
   assert.equal(isRedirectedNonNavigationRequest(request({ redirected: false, navigation: false })), false);
+  assert.equal(isRedirectedNonNavigationRequest({ redirectedFrom: () => { throw new Error('lecture-impossible'); } }), true);
 
   const journal = { entries: [], failures: [], failed: false };
   redirectedRequestFailure(journal, request({ redirected: true, navigation: false }));
@@ -199,6 +207,25 @@ test('story 20-0 — le garde refuse seulement les requêtes redirigées hors na
     method: 'GET', resourceType: 'script', path: '/static.js', action: null,
     verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee',
   });
+});
+
+test('story 20-0 — une connexion est journalisée sans clé, et seul le refus échoue', async () => {
+  const { recordLoginAttempt } = await runner();
+  const success = { entries: [], failures: [], failed: false };
+  const accepted = recordLoginAttempt(success, true);
+  assert.equal(success.failed, false);
+  assert.deepEqual({ ...accepted, timestamp: '<horodatage>' }, {
+    timestamp: '<horodatage>', method: 'POST', resourceType: 'request', path: '/core/ajax/user.ajax.php',
+    action: 'login', verdict: 'auth', reason: 'connexion-ok',
+  });
+  assert.equal(Object.hasOwn(accepted, 'keys'), false);
+
+  const refused = { entries: [], failures: [], failed: false };
+  const denied = recordLoginAttempt(refused, false);
+  assert.equal(refused.failed, true);
+  assert.deepEqual(refused.failures, [denied]);
+  assert.equal(denied.reason, 'connexion-refusee');
+  assert.equal(Object.hasOwn(denied, 'keys'), false);
 });
 
 test('story 20-0 — les sondes JSON exigent strictement HTTP 200', async () => {

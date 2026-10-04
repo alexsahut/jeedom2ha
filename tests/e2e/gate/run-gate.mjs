@@ -70,7 +70,8 @@ export function isRedirectedNonNavigationRequest(request) {
   try {
     return request.redirectedFrom() !== null && !request.isNavigationRequest();
   } catch {
-    return false;
+    // Une exception empêche de prouver l'absence de redirection : refus par défaut.
+    return true;
   }
 }
 
@@ -83,6 +84,23 @@ export function redirectedRequestFailure(journal, request) {
     action: null, verdict: 'redirection-non-autorisee', reason: 'redirection-non-autorisee',
   };
   journal.entries.push(entry);
+  journal.failures.push(entry);
+  journal.failed = true;
+}
+
+/** Journalise sans valeur le seul essai de connexion autorisé. */
+export function recordLoginAttempt(journal, accepted) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    method: 'POST', resourceType: 'request', path: '/core/ajax/user.ajax.php',
+    action: 'login', verdict: 'auth', reason: accepted ? 'connexion-ok' : 'connexion-refusee',
+  };
+  journal.entries.push(entry);
+  if (!accepted) failJournal(journal, entry);
+  return entry;
+}
+
+function failJournal(journal, entry) {
   journal.failures.push(entry);
   journal.failed = true;
 }
@@ -117,7 +135,9 @@ export function assertOpenPagesAllowed(context, ctx, journal) {
   }
 }
 
-const FORBIDDEN_PARCOURS_SOURCE = [/\.route\s*\(/, /\bunroute\b/, /\brouteFromHAR\b/, /\brouteWebSocket\b/, /\.request\b/, /\.context\s*\(/, /\baddInitScript\b/, /\bexposeFunction\b/, /\bexposeBinding\b/];
+// Garde-fou contre un usage accidentel des pouvoirs du lanceur, pas bac à sable :
+// un parcours est du code du dépôt, relu avant exécution, dans ce même processus.
+const FORBIDDEN_PARCOURS_SOURCE = [/\.route\s*\(/, /\bunroute\b/, /\brouteFromHAR\b/, /\brouteWebSocket\b/, /\.request\b/, /\.context\s*\(/, /\baddInitScript\b/, /\bexposeFunction\b/, /\bexposeBinding\b/, /\bimport\b/, /\brequire\b/, /\bimport\s*\(/];
 
 export async function loadParcours(modulePath) {
   const resolved = path.resolve(modulePath);
@@ -311,6 +331,7 @@ async function main() {
   let failure;
   let probeBefore;
   let probeAfter;
+  let authenticated = false;
   try {
     const { chromium } = loadPlaywright();
     browser = await chromium.launch({ headless: true });
@@ -332,15 +353,20 @@ async function main() {
       const error = typeof webError?.error === 'function' ? webError.error() : webError;
       consoleErrors.push(error?.message ?? String(error));
     });
-    ctx.loginAttempts = 1;
-    const login = await jsonPost(context.request, `${ORIGIN}/core/ajax/user.ajax.php`, {
-      action: 'login',
-      username: credentials.username,
-      password: credentials.password,
-      twoFactorCode: '',
-      storeConnection: '0',
-    });
-    if (login?.state !== 'ok') throw new Error('connexion-echouee');
+    try {
+      ctx.loginAttempts = 1;
+      const login = await jsonPost(context.request, `${ORIGIN}/core/ajax/user.ajax.php`, {
+        action: 'login',
+        username: credentials.username,
+        password: credentials.password,
+        twoFactorCode: '',
+        storeConnection: '0',
+      });
+      if (login?.state !== 'ok') throw new Error('connexion-echouee');
+      authenticated = true;
+    } finally {
+      recordLoginAttempt(journal, authenticated);
+    }
     probeBefore = await probe(context.request);
     const page = await context.newPage();
     const navigation = await page.goto(`${ORIGIN}${PLUGIN}`, { waitUntil: 'load' });
@@ -355,11 +381,13 @@ async function main() {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
     await closePages(context);
-    await waitForQuietWindow(journal);
-    try {
-      if (context) probeAfter = await probe(context.request);
-    } catch (error) {
-      failure ??= error instanceof Error ? error : new Error(String(error));
+    if (authenticated) {
+      await waitForQuietWindow(journal);
+      try {
+        if (context) probeAfter = await probe(context.request);
+      } catch (error) {
+        failure ??= error instanceof Error ? error : new Error(String(error));
+      }
     }
     const after = await takeWitness();
     data.witnessDifferences = compareWitness(before, after);

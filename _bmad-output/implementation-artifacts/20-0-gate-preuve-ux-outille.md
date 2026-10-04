@@ -147,6 +147,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 - Revue Codex du 2026-10-02 (PR #193, sur `95fc370`) : (P1) une écriture transmise par erreur puis purgée laisserait le contenu de `data/ha_overrides.json` inchangé sans toucher au témoin `getBridgeStatus` ; le gate exige donc aussi une date de modification inchangée et l'absence des lignes d'écriture de chaque action du plugin dans les journaux (niveau `info` vérifié sur le processus du démon) ; (P2) un redémarrage se détecte par le PID et l'heure de démarrage du processus, lus sur la box, pas par un `uptime` inférieur ni par une heure déduite sur l'horloge de la VM.
 - Revue Codex du 2026-10-02 (PR #193, sur `f26b1e9`) : (P1) une action du démon transmise à tort n'écrit son issue qu'à la fin : le relevé final attend au moins 90 s après la dernière requête du parcours (sondes du relevé exclues) ; (P2) l'option `--loglevel` du démon ne prouve rien sur le journal PHP : les écritures de configuration du PHP sont prouvées par une empreinte de configuration avant/après ; le contrôle principal reste l'intercepteur, couvert par un test dédié (AC1).
 - Modèle de menace retenu (2026-10-02) : la garantie « aucune écriture sur la box » repose sur l'intercepteur à refus par défaut, testé par AC1 avant tout parcours ; les témoins côté box (AC2, AC3) sont une détection complémentaire au mieux, non exhaustive par construction. Un angle mort de témoin découvert plus tard est une amélioration de la détection, traitée hors de cette story, et ne remet pas en cause la garantie.
+- 2026-10-04 — La garantie du gate porte sur les requêtes émises par la page ; un parcours est du code du dépôt, relu par ClaudeBox avant exécution, qui tourne dans le processus du lanceur avec ses privilèges. Le filtrage du source est un garde-fou, pas un isolement. Un isolement réel (processus séparé sans réseau ni clé SSH) serait une évolution hors de 20-0 (revue Codex PR #196).
 
 ## Dev Agent Record
 
@@ -154,7 +155,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 
 - 2026-10-04 après-midi — Preuve finale au head `3db15e5` : référence PASS et contrôle d'écriture non déclarée en FAIL attendu ; artefact `20-0-gate-2026-10-04.md` mis à jour. Statut inchangé.
 - 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
-- 2026-10-04 — Amendement H2 : lanceur durci (navigations, console contexte, AC4, isolation des parcours, fenêtres de journaux par octets et délais); validation locale requise avant toute nouvelle exécution terrain. Statut inchangé : `review`.
+- 2026-10-04 — Amendement H2 : lanceur durci (navigations, console contexte, AC4, garde-fou de parcours, fenêtres de journaux par octets et délais); validation locale requise avant toute nouvelle exécution terrain. Statut inchangé : `review`.
 
 ### File List
 
