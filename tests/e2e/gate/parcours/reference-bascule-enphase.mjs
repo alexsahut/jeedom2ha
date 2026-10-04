@@ -136,10 +136,12 @@ export async function run(page, { helpers, journal }) {
   });
   const stateB = await diagnosticState(target);
   const summaryB = await summary(panel);
-  if (stateB !== 'prete') throw new Error('bascule-simulee-non-prete');
-  if (!/0\s+bloquante\(s\)/.test(summaryB)) throw new Error('synthese-bascule-encore-bloquante');
-  helpers.record('etape_b_cellule', stateB);
   helpers.record('etape_b_synthese', summaryB);
+  if (stateB !== 'prete') throw new Error('bascule-simulee-non-prete');
+  if (!/^Sera publié dans Home Assistant : \d+ commande\(s\) prête\(s\)\.$/.test(summaryB)) {
+    throw new Error('synthese-bascule-encore-bloquante');
+  }
+  helpers.record('etape_b_cellule', stateB);
   helpers.record('etape_b_entrees_journal', journal.entries.length - journalB);
 
   const journalC = journal.entries.length;
@@ -157,8 +159,8 @@ export async function run(page, { helpers, journal }) {
   });
   const stateC = await diagnosticState(target);
   const summaryC = await summary(panel);
+  helpers.record('etape_c_synthese', summaryC);
   if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
   helpers.record('etape_c_cellule', stateC);
-  helpers.record('etape_c_synthese', summaryC);
   helpers.record('etape_c_entrees_journal', journal.entries.length - journalC);
 }
