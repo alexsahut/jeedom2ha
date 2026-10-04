@@ -152,6 +152,7 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 
 ### Completion Notes List
 
+- 2026-10-04 après-midi — Preuve finale au head `3db15e5` : référence PASS et contrôle d'écriture non déclarée en FAIL attendu ; artefact `20-0-gate-2026-10-04.md` mis à jour. Statut inchangé.
 - 2026-10-04 — Workflow `dev-story` : Tasks 2 à 6 terminées ; le parcours de référence est PASS et le contrôle produit le `block-fail` attendu, documentés dans `20-0-gate-2026-10-04.md`. Statut résultant : `review` ; le code review est le prochain jalon BMAD.
 - 2026-10-04 — Amendement H2 : lanceur durci (navigations, console contexte, AC4, isolation des parcours, fenêtres de journaux par octets et délais); validation locale requise avant toute nouvelle exécution terrain. Statut inchangé : `review`.
 
