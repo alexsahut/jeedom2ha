@@ -42,7 +42,18 @@ function pathname(url) {
   }
 }
 
-function appendEntry(journal, { method, resourceType, url, action, verdict, reason }) {
+export function requestKeys({ url, postData }) {
+  const keys = new Set();
+  try {
+    for (const [key] of new URL(url).searchParams) keys.add(key);
+  } catch {
+    // Une URL illisible n'ajoute aucun nom; le verdict reste le refus strict.
+  }
+  if (typeof postData === 'string') for (const [key] of new URLSearchParams(postData)) keys.add(key);
+  return [...keys].sort().slice(0, 10);
+}
+
+export function appendEntry(journal, { method, resourceType, url, postData, action, verdict, reason }) {
   const entry = {
     timestamp: new Date().toISOString(),
     method,
@@ -52,6 +63,7 @@ function appendEntry(journal, { method, resourceType, url, action, verdict, reas
     verdict,
     reason,
   };
+  if (verdict === 'block' || verdict === 'block-fail') entry.keys = requestKeys({ url, postData });
   journal.entries.push(entry);
   return entry;
 }

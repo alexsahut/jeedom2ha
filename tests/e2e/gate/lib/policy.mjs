@@ -73,7 +73,8 @@ const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride'];
 const PARAMETER_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 const STATIC_EXTENSIONS = /\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|map)$/i;
 const GET_RESOURCE_PATH = '/core/php/getResource.php';
-const GET_RESOURCE_KEYS = new Set(['file', 'md5']);
+// include_file() du cœur Jeedom ajoute `lang` à l'URL; getResource.php lit file/md5.
+const GET_RESOURCE_KEYS = new Set(['file', 'md5', 'lang']);
 
 function protectedPath(path) {
   return path.endsWith('.ajax.php') || path.startsWith('/core/api/');
@@ -110,7 +111,11 @@ function isStaticResource(req, url, params) {
   if (url.pathname === GET_RESOURCE_PATH) {
     if (!['script', 'stylesheet'].includes(req.resourceType)) return false;
     if (!Object.keys(params).every((key) => GET_RESOURCE_KEYS.has(key))) return false;
-    return typeof params.file === 'string' && /\.(?:js|css)$/i.test(params.file) && !params.file.includes('..');
+    return typeof params.file === 'string'
+      && /\.(?:js|css)$/i.test(params.file)
+      && !params.file.includes('..')
+      && (params.md5 === undefined || /^[0-9a-f]{32}$/.test(params.md5))
+      && (params.lang === undefined || /^[a-z]{2}_[A-Z]{2}$/.test(params.lang));
   }
   return STATIC_EXTENSIONS.test(url.pathname);
 }

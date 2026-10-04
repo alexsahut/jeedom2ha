@@ -396,14 +396,14 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     }), baseCtx()).verdict, 'block');
   });
 
-  await t.test('getResource n’autorise que file et md5, avec un fichier JS/CSS sans traversée', () => {
+  await t.test('getResource n’autorise que file, md5 et lang strictement valides', () => {
     const allowed = classifyRequest(req({
-      method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js&md5=abc`, resourceType: 'script',
+      method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js&md5=0123456789abcdef0123456789abcdef&lang=fr_FR`, resourceType: 'script',
     }), baseCtx());
     assert.equal(allowed.verdict, 'static');
-    for (const suffix of ['&extra=x', '&file=..%2Fsecret.js']) {
+    for (const suffix of ['&extra=x', '&file=..%2Fsecret.js', '&lang=..%2Fx', '&md5=pas-un-md5']) {
       const result = classifyRequest(req({
-        method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js${suffix}`, resourceType: 'script',
+        method: 'GET', url: `${ORIGIN}/core/php/getResource.php?file=core%2Fjs%2Fapp.js&md5=0123456789abcdef0123456789abcdef${suffix}`, resourceType: 'script',
       }), baseCtx());
       assert.ok(['block', 'block-fail'].includes(result.verdict));
     }

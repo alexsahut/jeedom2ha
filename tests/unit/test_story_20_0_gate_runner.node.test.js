@@ -168,3 +168,15 @@ test('story 20-0 — navigation : seul document exact ou about:blank est recevab
   assert.equal(journal.failed, true);
   assert.equal(journal.failures[0].verdict, 'navigation-non-autorisee');
 });
+
+test('story 20-0 — journal de refus : clés triées sans valeur', async () => {
+  const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
+  const journal = { entries: [] };
+  const entry = interceptor.appendEntry(journal, {
+    method: 'POST', resourceType: 'xhr', url: 'https://box.test/x?action=read&z=visible',
+    postData: 'body=valeur-privee&action=write', action: 'write', verdict: 'block-fail', reason: 'test',
+  });
+  assert.deepEqual(entry.keys, ['action', 'body', 'z']);
+  assert.equal(JSON.stringify(entry).includes('valeur-privee'), false);
+  assert.equal(JSON.stringify(entry).includes('visible'), false);
+});
