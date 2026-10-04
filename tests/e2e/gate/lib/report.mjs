@@ -109,6 +109,25 @@ export function sanitizeConsoleErrors(errors) {
   return (errors ?? []).map((error) => sanitizeUrl(error));
 }
 
+/** Réduit une erreur externe à une seule ligne sûre pour le rapport. */
+export function sanitizeReason(error) {
+  const firstLine = String(error?.message ?? error ?? '').split(/\r?\n/, 1)[0];
+  return sanitizeUrl(firstLine).slice(0, 300);
+}
+
+/** Valide une observation déclarée par un parcours avant son ajout au rapport. */
+export function normalizeParcoursRecord(key, value) {
+  if (typeof key !== 'string' || !/^[a-z][a-z0-9_-]{0,79}$/.test(key)) {
+    throw new Error('parcours-record-cle-invalide');
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return [key, value];
+  if (typeof value === 'boolean') return [key, value];
+  if (typeof value === 'string' && value.length <= 80 && !/[?=]/.test(value)) {
+    return [key, value];
+  }
+  throw new Error('parcours-record-valeur-invalide');
+}
+
 /** Cherche seulement les valeurs pertinentes pour AC4 ; les courtes valeurs de config sont ignorées. */
 export function ac4Values(credentials, configValues) {
   const config = Object.values(configValues ?? {}).filter((value) => typeof value === 'string' && value.length >= 6);

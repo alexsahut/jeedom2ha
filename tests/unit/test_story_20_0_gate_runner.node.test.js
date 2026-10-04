@@ -68,6 +68,23 @@ test('story 20-0 — les URLs de console perdent toute query string', async () =
   assert.equal(sanitizeUrl(value), 'Erreur https://box.test/path?… suite');
 });
 
+test('story 20-0 — la raison conserve une ligne, assainie et bornée', async () => {
+  const { sanitizeReason } = await mod();
+  const detail = `https://box.test/path?apikey=secret ${'x'.repeat(400)}\ntrace Playwright`;
+  const result = sanitizeReason(new Error(detail));
+  assert.equal(result.includes('apikey=secret'), false);
+  assert.equal(result.includes('\n'), false);
+  assert.equal(result.length, 300);
+});
+
+test('story 20-0 — les constats de parcours sont strictement bornés', async () => {
+  const { normalizeParcoursRecord } = await mod();
+  assert.deepEqual(normalizeParcoursRecord('cmd_42_etat', 'prete'), ['cmd_42_etat', 'prete']);
+  assert.throws(() => normalizeParcoursRecord('cmd?42', 'prete'));
+  assert.throws(() => normalizeParcoursRecord('etat', 'a=b'));
+  assert.throws(() => normalizeParcoursRecord('etat', 'x'.repeat(81)));
+});
+
 test('story 20-0 — AC4 détecte la valeur longue et ignore une config courte', async () => {
   const { ac4Values, artifactsContain } = await mod();
   const values = ac4Values(['user', 'password-long'], {

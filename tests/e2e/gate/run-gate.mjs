@@ -19,7 +19,9 @@ import {
   hashValue,
   parseCredentials,
   sanitizeConsoleErrors,
+  sanitizeReason,
   summarizeJournal,
+  normalizeParcoursRecord,
 } from './lib/report.mjs';
 import { createState } from './lib/simulate.mjs';
 
@@ -117,6 +119,15 @@ async function waitForQuietWindow(journal) {
   await new Promise((resolve) => setTimeout(resolve, delay));
 }
 
+/** Crée le collecteur borné des constats DOM transmis par le parcours. */
+function createRecorder(parcours) {
+  return (key, value) => {
+    const [safeKey, safeValue] = normalizeParcoursRecord(key, value);
+    if (Object.hasOwn(parcours, safeKey)) throw new Error('parcours-record-cle-dupliquee');
+    parcours[safeKey] = safeValue;
+  };
+}
+
 /** Supprime les rapports si un contrôle AC4 détecte une valeur en clair. */
 async function enforceAc4(reportDir, values) {
   const files = ['gate-report.md', 'gate-report.json'].map((name) => path.join(reportDir, name));
@@ -140,7 +151,8 @@ async function writeReport(reportDir, data, secrets) {
       simulated: data.journal.entries.filter((entry) => entry.verdict === 'simulee'),
     },
     console: { count: data.consoleErrors.length, messages: sanitizeConsoleErrors(data.consoleErrors) },
-    reason: data.failure?.message ?? null,
+    parcours: data.parcours,
+    reason: data.failure ? sanitizeReason(data.failure) : null,
     note: 'badge « pas encore appliqué » non prouvé par le gate',
   };
   const lines = Object.entries(checks).map(([name, pass]) => `- ${name}: ${pass ? 'PASS' : 'FAIL'}`);
@@ -188,6 +200,7 @@ async function main() {
     consoleErrors,
     witnessDifferences: [],
     probeDifferences: [],
+    parcours: {},
     window: {},
   };
   let browser;
@@ -226,7 +239,12 @@ async function main() {
     if (!expectedUrl(page) || !redirectsStayOnOrigin(navigation)) {
       throw new Error('navigation-finale-invalide');
     }
-    await parcours.run(page, { journal, simState, ctx });
+    await parcours.run(page, {
+      journal,
+      simState,
+      ctx,
+      helpers: { record: createRecorder(data.parcours) },
+    });
   } catch (error) {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
@@ -249,10 +267,13 @@ async function main() {
     }
     data.failure = failure;
     const configValues = probeBefore?.configValues ?? probeAfter?.configValues ?? {};
-    const result = await writeReport(reportDir, data, ac4Values(credentials.values, configValues));
-    if (result.verdict !== 'PASS') process.exitCode = 1;
-    await context?.close().catch(() => undefined);
-    await browser?.close().catch(() => undefined);
+    try {
+      const result = await writeReport(reportDir, data, ac4Values(credentials.values, configValues));
+      if (result.verdict !== 'PASS') process.exitCode = 1;
+    } finally {
+      await context?.close().catch(() => undefined);
+      await browser?.close().catch(() => undefined);
+    }
   }
 }
 
