@@ -44,11 +44,12 @@ async function openEnphase(page, helpers) {
 
 async function waitForTarget(page, panel) {
   await panel.locator('.j2ha-goto-blocking').click();
-  await page.waitForFunction(() => document.querySelectorAll(
-    'tr.mapping-override-cmd.j2ha-diag-target-highlight',
-  ).length === 1);
-  const highlighted = panel.locator('tr.mapping-override-cmd.j2ha-diag-target-highlight');
-  const cmdId = await highlighted.getAttribute('data-cmd-id');
+  const targetHandle = await page.waitForFunction(() => {
+    const targets = document.querySelectorAll('tr.mapping-override-cmd.j2ha-diag-target-highlight');
+    return targets.length === 1 ? targets[0].getAttribute('data-cmd-id') : null;
+  });
+  const cmdId = await targetHandle.jsonValue();
+  await targetHandle.dispose();
   if (!['5368', '5369'].includes(cmdId ?? '')) throw new Error('cmd-cible-inattendue');
   return { target: panel.locator(`tr.mapping-override-cmd[data-cmd-id="${cmdId}"]`), cmdId };
 }
@@ -67,8 +68,28 @@ async function summary(panel) {
   return (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
 }
 
-function writeCount(journal) {
-  return journal.entries.filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action)).length;
+function writesSince(journal, start) {
+  return journal.entries.slice(start).filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action));
+}
+
+/** Attend une séquence ordonnée d'entrées de l'intercepteur, sans délai implicite. */
+async function waitForJournal(journal, start, expected) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const entries = journal.entries.slice(start);
+    const matched = [];
+    let cursor = 0;
+    for (const entry of entries) {
+      const next = expected[cursor];
+      if (next && entry.action === next.action && entry.verdict === next.verdict) {
+        matched.push(entry);
+        cursor += 1;
+      }
+    }
+    if (cursor === expected.length) return { entries, matched };
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('journal-attendu-absent');
 }
 
 export async function run(page, { helpers, journal }) {
@@ -80,9 +101,12 @@ export async function run(page, { helpers, journal }) {
   helpers.record('cmd_cible_id', Number(cmdId));
   helpers.record('cmd_cible_initial', await diagnosticState(target));
 
-  const writesBeforeA = writeCount(journal);
+  const journalA = journal.entries.length;
   await atStep(helpers, 9, 'apercu-reel-bloquant', async () => {
     await target.locator('select').selectOption('sensor');
+    await waitForJournal(journal, journalA, [
+      { action: 'previewMappingOverride', verdict: 'lecture-reelle' },
+    ]);
     await page.waitForFunction((id) => {
       const row = document.querySelector(`tr.mapping-override-cmd[data-cmd-id="${id}"]`);
       return row?.querySelector('.mo-diag-cell')?.classList.contains('j2ha-diag-blocking')
@@ -91,12 +115,19 @@ export async function run(page, { helpers, journal }) {
   });
   const stateA = await diagnosticState(target);
   if (stateA !== 'bloquante') throw new Error('apercu-reel-non-bloquant');
-  if (writeCount(journal) !== writesBeforeA) throw new Error('ecriture-apres-apercu-reel');
+  if (writesSince(journal, journalA).length !== 0) throw new Error('ecriture-apres-apercu-reel');
   helpers.record('etape_a_cellule', stateA);
   helpers.record('etape_a_ecriture', false);
+  helpers.record('etape_a_entrees_journal', journal.entries.length - journalA);
 
+  const journalB = journal.entries.length;
   await atStep(helpers, 10, 'bascule-simulee', async () => {
     await target.locator('select').selectOption('binary_sensor');
+    await waitForJournal(journal, journalB, [
+      { action: 'previewMappingOverride', verdict: 'apercu-simule' },
+      { action: 'saveMappingOverride', verdict: 'simulee' },
+      { action: 'getMappingOverrides', verdict: 'lecture-derivee' },
+    ]);
     await page.waitForFunction((id) => {
       const row = document.querySelector(`tr.mapping-override-cmd[data-cmd-id="${id}"]`);
       return row?.querySelector('.mo-diag-cell')?.classList.contains('j2ha-diag-ready')
@@ -109,9 +140,15 @@ export async function run(page, { helpers, journal }) {
   if (!/0\s+bloquante\(s\)/.test(summaryB)) throw new Error('synthese-bascule-encore-bloquante');
   helpers.record('etape_b_cellule', stateB);
   helpers.record('etape_b_synthese', summaryB);
+  helpers.record('etape_b_entrees_journal', journal.entries.length - journalB);
 
+  const journalC = journal.entries.length;
   await atStep(helpers, 11, 'retour-automatique', async () => {
     await target.locator('.mo-revert-cmd').click();
+    await waitForJournal(journal, journalC, [
+      { action: 'revertMappingOverride', verdict: 'simulee' },
+      { action: 'getMappingOverrides', verdict: 'read' },
+    ]);
     await page.waitForFunction((id) => {
       const row = document.querySelector(`tr.mapping-override-cmd[data-cmd-id="${id}"]`);
       return row?.querySelector('.mo-diag-cell')?.classList.contains('j2ha-diag-blocking')
@@ -123,4 +160,5 @@ export async function run(page, { helpers, journal }) {
   if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
   helpers.record('etape_c_cellule', stateC);
   helpers.record('etape_c_synthese', summaryC);
+  helpers.record('etape_c_entrees_journal', journal.entries.length - journalC);
 }
