@@ -1,6 +1,6 @@
 # Story 20.1 : Surface unique pièce → équipement → commande
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -203,6 +203,26 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 
 ### Agent Model Used
 
+GPT-5 Codex
+
 ### Completion Notes List
 
+- 2026-10-05 — BMAD `dev-story` non interactif terminé pour les Tasks 0 à 5 et 6.1 ; confirmations par défaut consignées au rapport externe.
+- 2026-10-05 — 424 tests node verts ; `php -l` et `node --check` verts ; auto-test local de l'intercepteur PASS (0 échec).
+- 2026-10-05 — 6.2 reste explicitement hors unité : déploiement, gate sur box et passage Chrome seront faits après fusion.
+- 2026-10-05 — Signature box lue : `byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)`.
+
 ### File List
+
+- `desktop/php/jeedom2ha.php`
+- `desktop/js/jeedom2ha_mapping_override.js`
+- `desktop/js/jeedom2ha_mapping_surface.js`
+- `desktop/css/jeedom2ha.css`
+- `tests/unit/test_story_16_8_mapping_surface.node.test.js`
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
+- `_bmad-output/implementation-artifacts/20-1-surface-unique-piece-equipement-commande.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-10-05 — Surface unique complétée : Sans pièce, désactivés neutres, sélecteurs inactifs et découverte gate étendue.
