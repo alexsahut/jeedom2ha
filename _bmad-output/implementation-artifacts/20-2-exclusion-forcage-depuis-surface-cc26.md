@@ -1,6 +1,6 @@
 # Story 20.2 : Exclusion et forçage depuis la surface (CC-26)
 
-Status: in-progress
+Status: review
 
 ## Story
 
@@ -147,13 +147,13 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
   - [x] 2.1 Fusion champ par champ des overrides de type et de publication.
   - [x] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
   - [x] 2.3 Purge par entité et par équipement (CC-19).
-- [ ] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
+- [x] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
 - [x] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
-  - [ ] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
-  - [ ] 3.3 Libellés de l'ambiguïté par cause.
-- [ ] **Task 4 — Tests (AC: 1 à 10)** : Python (précédence, I2, I3 et I4 amendés, capacités, commandes inchangées, parité sans override, fusion, clé d'entité), PHP, Node (actions, libellés, absence de recalcul), non-régression TYPE.
+  - [x] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
+  - [x] 3.3 Libellés de l'ambiguïté par cause.
+- [x] **Task 4 — Tests (AC: 1 à 10)** : Python (précédence, I2, I3 et I4 amendés, capacités, commandes inchangées, parité sans override, fusion, clé d'entité), PHP, Node (actions, libellés, absence de recalcul), non-régression TYPE.
 - [ ] **Task 5 — Gate et preuve (AC: 11)**
-  - [ ] 5.1 Gate : nouvelles écritures autorisées comme écritures simulées déclarées (F12), auto-test local, parcours de pose et de retrait d'une exclusion.
+  - [x] 5.1 Gate : nouvelles écritures autorisées comme écritures simulées déclarées (F12), auto-test local, parcours de pose et de retrait d'une exclusion.
   - [ ] 5.2 Après fusion : déploiement standard, relevés avant et après (parité : `changed_decisions` vide hors écarts listés en 0.3), gate sur `main`.
   - [ ] 5.3 Preuve terrain au clic réel (AC11), passage Chrome par ClaudeBox, `ready-for-UX-validation`, validation UX.
 
@@ -205,6 +205,8 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 ### Agent Model Used
 
+GPT-5 Codex
+
 ### Completion Notes List
 
 - 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
@@ -212,6 +214,8 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - 2026-10-05 — Reprise X2c : routes publication couvertes; arbre enrichi sans recalcul UI par `equipment_decision` et `entities[]` (`ha_entity_type`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`). Une commande partagée ne devient jamais clé d'action.
 - 2026-10-06 — Reprise X2d : garde-fou de parité amendé pour les ajouts additifs AC8; badge AC7 par entité. La dernière décision appliquée du principal vient de `app["publications"][eq_id]`; celle d'un secondaire vient de la `publication_decision_ref` du secondaire du mapping conservé dans cette même entrée (alimentée par sync et « Publier »). `entities[]` porte `ha_entity_type`, `decision`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`; l'aperçu de forçage porte `command_ids`.
 - 2026-10-06 — Reprise X2d : tests AC3 (`ambiguous` forcée, projection/scope/no_mapping/exclusion), aperçu, routes 409 et retrait TYPE ajoutés; statut story conservé `in-progress` (surface, gate et preuve hors unité).
+- 2026-10-06 — Reprise X3b : l'arbre ajoute `entities[].command_ids`; la surface lit les entités, leurs commandes, leurs décisions et leur clé d'override depuis le démon. Actions exclusion/forçage/retour, aperçu forcé, badge et application ciblée sont couverts par tests Node; le retour de publication retire type et politique.
+- 2026-10-06 — Reprise X3b : le gate simule exclusivement les écritures de publication explicitement déclarées; les écritures non déclarées et « Appliquer » restent bloquées. Auto-test local PASS; 5.2 et 5.3 restent post-fusion et terrain.
 
 ### File List
 
@@ -231,3 +235,15 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - resources/daemon/tests/unit/test_story_19_3_guardrail_no_override_json_parity.py
 - resources/daemon/tests/unit/test_story_16_5_mapping_override_ui_endpoints.py
 - resources/daemon/tests/unit/test_story_16_6_preview_dry_run.py
+- desktop/js/jeedom2ha_mapping_override.js
+- desktop/js/jeedom2ha_mapping_surface.js
+- tests/unit/test_story_20_2_publication_surface.node.test.js
+- tests/e2e/gate/lib/policy.mjs
+- tests/e2e/gate/lib/interceptor.mjs
+- tests/e2e/gate/interceptor-selftest.mjs
+- tests/e2e/gate/run-gate.mjs
+- tests/e2e/gate/parcours/decouverte-garage-enphase.mjs
+- tests/e2e/gate/parcours/reference-bascule-enphase.mjs
+- tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs
+- tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs
+- tests/unit/test_story_20_0_gate_policy.node.test.js
