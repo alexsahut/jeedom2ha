@@ -69,7 +69,7 @@ async def test_ac3_equipment_revert_purges_both_command_type_and_publication_ove
     assert len(list_equipment_overrides(data_dir)) == 1
 
     resp = await cli.post(
-        "/action/mapping_override_revert",
+        "/action/publication_override_revert",
         headers=_headers(),
         json={"payload": {"jeedom_eq_id": eq.id}},
     )

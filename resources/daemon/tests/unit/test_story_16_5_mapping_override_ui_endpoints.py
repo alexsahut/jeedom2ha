@@ -235,7 +235,7 @@ async def test_revert_equipment_scope_when_no_cmd(cli, app, tmp_path):
     save_equipment_override(200, {"publication_override": "exclude"}, str(tmp_path))
 
     resp = await cli.post(
-        "/action/mapping_override_revert",
+        "/action/publication_override_revert",
         headers=_headers(),
         json={"payload": {"jeedom_eq_id": 200}},
     )

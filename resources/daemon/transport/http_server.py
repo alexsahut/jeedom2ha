@@ -57,8 +57,8 @@ from mapping.overrides import (
     list_overrides,
     mapping_cmd_ids,
     parse_override_key,
-    remove_equipment_override,
-    remove_override,
+    remove_equipment_override_fields,
+    remove_override_fields,
     resolve_publication_override,
     save_equipment_override,
     save_override,
@@ -2983,7 +2983,6 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
         return web.json_response(
             {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
         )
-
     data_dir = _resolve_data_dir(request)
     confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
     synced_decision = (request.app.get("publications") or {}).get(eq_id)
@@ -3113,7 +3112,11 @@ async def _handle_publication_override_save(request: web.Request) -> web.Respons
         "jeedom_cmd_id": cmd_id, "publication_policy": policy, "saved": saved}})
 
 
-async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
+async def _handle_mapping_override_revert(
+    request: web.Request,
+    fields=("ha_entity_type",),
+    entity_scope=False,
+) -> web.Response:
     """POST /action/mapping_override_revert — Story 16.5 (AC10) : retour au mode auto.
 
     Supprime l'override de commande (`remove_override`) ou d'équipement
@@ -3156,20 +3159,44 @@ async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
         return web.json_response(
             {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
         )
+    if isinstance(cmd_id, int) and not any(cmd.id == cmd_id for cmd in eq.cmds):
+        return web.json_response(
+            {"status": "error", "message": f"Commande {cmd_id} introuvable"}, status=404
+        )
 
     data_dir = _resolve_data_dir(request)
     if isinstance(cmd_id, int):
-        removed = remove_override(eq_id, cmd_id, data_dir)
+        cmd_ids = [cmd_id]
+        if entity_scope:
+            evaluation = evaluate_equipment(
+                eq, snapshot, assess_eligibility(eq), mapper_registry=MapperRegistry(),
+                confidence_policy=request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY,
+                persisted_overrides=list_overrides(data_dir),
+                persisted_equipment_overrides=list_equipment_overrides(data_dir),
+            )
+            mappings = [evaluation.mapping] + list(
+                (evaluation.mapping.additional_mappings or []) if evaluation.mapping else []
+            )
+            owner = next((item for item in mappings if cmd_id in mapping_cmd_ids(item)), None)
+            if owner is None:
+                return web.json_response({"status": "error", "message": "Commande sans entité"}, status=409)
+            cmd_ids = mapping_cmd_ids(owner)
+        removed_commands = [
+            cid for cid in cmd_ids if remove_override_fields(eq_id, cid, fields, data_dir)
+        ]
+        removed = bool(removed_commands)
         scope = "command"
-        removed_commands = [cmd_id] if removed else []
     else:
         # CC-19 (Story 19.3, AC3) — purger tous les overrides TYPE par commande de cet
         # équipement avant de supprimer l'override équipement, sinon ils survivent au retour
         # au mode automatique (bug historique : seul `equipment_overrides` était nettoyé).
         parsed_keys = (parse_override_key(key) for key in list_overrides(data_dir))
         eq_cmd_ids = sorted(cid for eid, cid in parsed_keys if eid == eq_id)
-        removed_commands = [cid for cid in eq_cmd_ids if remove_override(eq_id, cid, data_dir)]
-        removed = remove_equipment_override(eq_id, data_dir)
+        removed_commands = [
+            cid for cid in eq_cmd_ids
+            if remove_override_fields(eq_id, cid, fields, data_dir)
+        ]
+        removed = remove_equipment_override_fields(eq_id, fields, data_dir)
         scope = "equipment"
 
     _LOGGER.info(
@@ -3193,7 +3220,9 @@ async def _handle_publication_override_revert(request: web.Request) -> web.Respo
     The canonical removal operation deliberately clears both override fields for
     the selected entity (or every entity of an equipment), as required by CC-19.
     """
-    return await _handle_mapping_override_revert(request)
+    return await _handle_mapping_override_revert(
+        request, fields=("ha_entity_type", "publication_override"), entity_scope=True,
+    )
 
 
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
