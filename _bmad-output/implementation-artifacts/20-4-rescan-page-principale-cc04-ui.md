@@ -1,6 +1,6 @@
 # Story 20.4 : Rescan depuis la page principale (CC-04, volet UI)
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -163,7 +163,7 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés préalables, lecture seule (AC: 1, 4, 7)**
+- [x] **Task 0 — Relevés préalables, lecture seule (AC: 1, 4, 7)**
   - [ ] Relever le statut bridge, la dernière synchro, la dernière opération et la
     parité de référence, sans lancer de rescan ; vérifier qu'aucun override n'est en
     attente d'application (sinon la parité changera légitimement au clic réel).
