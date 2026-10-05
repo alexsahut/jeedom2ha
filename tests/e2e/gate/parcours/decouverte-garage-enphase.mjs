@@ -83,13 +83,19 @@ async function waitAtStep(helpers, index, label, operation) {
 
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
-  const managementBeforeSurface = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
+  const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
     const actions = nodes.find((node) => node.querySelector('[data-action="add"]') && node.querySelector('[data-action="gotoPluginConf"]') && node.querySelector('[data-action="diagnostic"]'));
     const surface = document.querySelector('#j2ha_roomCards');
-    return Boolean(actions && surface && (actions.compareDocumentPosition(surface) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const banner = document.querySelector('#div_bridgeHealthBanner');
+    return {
+      beforeSurface: Boolean(actions && surface && (actions.compareDocumentPosition(surface) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      beforeBanner: Boolean(actions && banner && (actions.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    };
   });
-  if (!managementBeforeSurface) throw new Error('gestion-apres-surface');
+  if (!managementOrder.beforeSurface) throw new Error('gestion-apres-surface');
+  if (!managementOrder.beforeBanner) throw new Error('gestion-apres-bandeau');
   helpers.record('gestion_avant_surface', true);
+  helpers.record('gestion_avant_bandeau', true);
   const journalBeforeRoom = helpers.journalEntries().filter((entry) => entry.action === 'getMappingOverrides').length;
   if (journalBeforeRoom !== 0) throw new Error('lecture-mapping-avant-piece');
   helpers.record('mapping_avant_piece', 0);
@@ -145,7 +151,6 @@ export async function run(page, { helpers }) {
   if (!disabledBadge || !(await disabledPanel.locator('.j2ha-eq-publish-badge').evaluate((badge) => badge.classList.contains('j2ha-publish-disabled')))) {
     throw new Error('badge-eq-279-non-desactive');
   }
-  helpers.record('eq_279_badge', 'desactive');
   for (const command of await readCommandStates(disabledPanel)) {
     if (command.state !== 'desactive') throw new Error('cellule-eq-279-non-desactive');
     helpers.record(`eq_279_cmd_${command.id}_etat`, command.state);
