@@ -1251,6 +1251,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
+        data = await resp.json()
+        assert data["operation_result"] == "succes"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "succes"
         assert http_app["derniere_synchro_terminee"] is not None
@@ -1302,6 +1305,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
+        data = await resp.json()
+        assert data["operation_result"] == "partiel"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "partiel"
 
