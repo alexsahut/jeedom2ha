@@ -282,6 +282,16 @@
     no_commands: 'aucune commande configurée dans Jeedom',
   };
 
+  // CC-38 : une exclusion volontaire est un état produit distinct, pas une erreur à corriger.
+  // Elle doit rester visible dans la synthèse sans déclencher badge bloquant ni ancre.
+  var EXCLUDED_PUBLICATION_REASONS = [
+    'excluded_eqlogic',
+    'excluded_plugin',
+    'excluded_object',
+    'publication_excluded_eqlogic',
+    'publication_excluded_command',
+  ];
+
   // Story 16.8 — raison de blocage concise pour la cellule diagnostic du tableau.
   function buildBlockingReason(view) {
     var d = readDiagnosticView(view);
@@ -319,6 +329,16 @@
       return reason ? 'Ne sera pas publié — ' + reason : 'Ne sera pas publié';
     }
     return '—';
+  }
+
+  function isExcludedDiagnostic(view) {
+    var d = readDiagnosticView(view);
+    return d !== null && EXCLUDED_PUBLICATION_REASONS.indexOf(d.publication_reason) !== -1;
+  }
+
+  function buildExcludedLabel(view) {
+    var d = readDiagnosticView(view);
+    return 'Ne sera pas publié — ' + REASON_LABELS[d.publication_reason];
   }
 
   // --- AC14 — bandeau « aucun impact Homebridge » : une seule fois par équipement ---
@@ -394,11 +414,16 @@
     var blocking = 0;
     var unknown = 0;
     var uncovered = 0;
+    var excluded = 0;
     var firstBlockingCmdId = null;
     for (var i = 0; i < t.commands.length; i++) {
       var row = t.commands[i];
       if (isUncoveredDiagnostic(row.diagnostic)) {
         uncovered += 1;
+        continue;
+      }
+      if (isExcludedDiagnostic(row.diagnostic)) {
+        excluded += 1;
         continue;
       }
       var state = diagnosticState(row.diagnostic);
@@ -419,6 +444,7 @@
       blocking_count: blocking,
       unknown_count: unknown,
       uncovered_count: uncovered,
+      excluded_count: excluded,
       will_publish: ready > 0,
       first_blocking_cmd_id: firstBlockingCmdId,
     };
@@ -429,6 +455,10 @@
     var s = summary || {};
     var ready = s.ready_count || 0;
     var blocking = s.blocking_count || 0;
+    var excluded = s.excluded_count || 0;
+    if (ready === 0 && blocking === 0 && excluded > 0) {
+      return 'Exclu de Jeedom2HA : ne sera pas publié dans Home Assistant.';
+    }
     if (ready === 0 && blocking === 0) {
       return 'Aucune commande projetable en Home Assistant pour cet équipement.';
     }
@@ -446,6 +476,10 @@
     var s = summary || {};
     var ready = s.ready_count || 0;
     var blocking = s.blocking_count || 0;
+    var excluded = s.excluded_count || 0;
+    if (ready === 0 && blocking === 0 && excluded > 0) {
+      return 'excluded';
+    }
     if (ready === 0 && blocking === 0) {
       return 'empty';
     }
@@ -492,6 +526,8 @@
     buildDiagnosticMessage: buildDiagnosticMessage,
     buildBlockingReason: buildBlockingReason,
     buildPublishCellLabel: buildPublishCellLabel,
+    isExcludedDiagnostic: isExcludedDiagnostic,
+    buildExcludedLabel: buildExcludedLabel,
     initReassuranceState: initReassuranceState,
     shouldShowReassurance: shouldShowReassurance,
     markReassuranceShown: markReassuranceShown,
