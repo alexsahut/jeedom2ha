@@ -287,6 +287,14 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-10-06 — R6 code-review : `confirmHaPublishAction` rattache désormais
+  l'annulation du rescan à `onEscape` et à `hidden.bs.modal`, avec une annulation
+  idempotente. Après confirmation, la fermeture de la modale ne libère pas la
+  réservation : seule la fin de la requête propriétaire le fait. Les confirmations
+  « Republier » et « Supprimer puis recréer » ne reçoivent aucun nouveau gestionnaire.
+  Les tests Node couvrent croix, Échap, Annuler, fermeture après confirmation et les
+  autres appelants. Aucun déploiement, rescan réel ou gate contre la box.
+
 - 2026-10-06 — R5 dev-story : corrections des deux constats Codex PR #209.
   `99a3315` cible le bouton primaire exact « Rescanner » du parcours gate.
   `4748847` réserve le rescan dès l'ouverture de sa confirmation, interdit une

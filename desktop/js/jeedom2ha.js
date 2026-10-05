@@ -317,26 +317,52 @@ function showHaActionFeedback(payload) {
   });
 }
 
+function releaseTopologyRescanReservation($button, snapshot, owner) {
+  if (window.jeedom2haRescanOwner !== owner) {
+    return;
+  }
+  window.jeedom2haRescanOwner = null;
+  window.jeedom2haRescanInProgress = false;
+  restoreHaActionPendingState($button, snapshot);
+  applyHAGating(window.jeedom2haLastBridgeStatus || null);
+}
+
 function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel) {
   if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
-    bootbox.dialog({
+    var confirmed = false;
+    var cancelled = false;
+    var cancelConfirmation = function() {
+      if (confirmed || cancelled) {
+        return;
+      }
+      cancelled = true;
+      if (typeof onCancel === 'function') {
+        onCancel();
+      }
+    };
+    var dialog = bootbox.dialog({
       title: title,
       message: '<div>' + message + '</div>',
+      onEscape: typeof onCancel === 'function' ? cancelConfirmation : undefined,
       buttons: {
         cancel: {
           label: '{{Annuler}}',
           className: 'btn-default',
-          callback: onCancel || function() {},
+          callback: cancelConfirmation,
         },
         confirm: {
           label: confirmLabel,
           className: 'btn-primary',
           callback: function() {
+            confirmed = true;
             onConfirm();
           },
         },
       },
     });
+    if (typeof onCancel === 'function' && dialog && typeof dialog.on === 'function') {
+      dialog.on('hidden.bs.modal', cancelConfirmation);
+    }
     return;
   }
   if (window.confirm(message)) onConfirm();
@@ -422,12 +448,7 @@ function triggerTopologyRescan($button, snapshot, owner) {
       $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
-      if (window.jeedom2haRescanOwner === owner) {
-        window.jeedom2haRescanOwner = null;
-        window.jeedom2haRescanInProgress = false;
-        restoreHaActionPendingState($button, snapshot);
-        applyHAGating(window.jeedom2haLastBridgeStatus || null);
-      }
+      releaseTopologyRescanReservation($button, snapshot, owner);
     },
   });
 }
@@ -565,11 +586,7 @@ $(function() {
     confirmTopologyRescan(function() {
       triggerTopologyRescan($button, snapshot, owner);
     }, function() {
-      if (window.jeedom2haRescanOwner !== owner) return;
-      window.jeedom2haRescanOwner = null;
-      window.jeedom2haRescanInProgress = false;
-      restoreHaActionPendingState($button, snapshot);
-      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+      releaseTopologyRescanReservation($button, snapshot, owner);
     });
   });
 
