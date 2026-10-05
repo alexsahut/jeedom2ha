@@ -71,8 +71,8 @@ _EXPECTED_COMMAND_DIAGNOSTIC = {
 
 
 async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status(cli, app, tmp_path):
-    """Sonde 49dc70b (Reprise 2) : le seul champ nouveau de l'arbre est `sync_status` ;
-    chaque commande garde exactement son diagnostic pré-story."""
+    """La parité pré-story est conservée, sauf `sync_status` et les ajouts additifs
+    de Story 20-2 (`equipment_decision`, `entities`) dont la forme est vérifiée ici."""
     snapshot, eq = _plain_light()
     app["topology"] = snapshot
     app["data_dir"] = str(tmp_path)
@@ -82,7 +82,16 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
 
     assert payload["mapped"] is True
     assert payload["eq_name"] == "Lampe garde-fou"
-    assert set(payload.keys()) == {"jeedom_eq_id", "eq_name", "mapped", "sync_status", "commands"}
+    assert set(payload.keys()) == {
+        "jeedom_eq_id", "eq_name", "mapped", "equipment_decision", "entities",
+        "sync_status", "commands",
+    }
+    assert payload["equipment_decision"] == _EXPECTED_COMMAND_DIAGNOSTIC
+    assert payload["entities"] == [{
+        "ha_entity_type": "light", "publication_override": None,
+        "reason_details": {"on_off": "state+on+off"}, "override_command_id": EQ_ID * 10 + 1,
+        "override_pending": True,
+    }]
 
     for row, cmd in zip(payload["commands"], eq.cmds):
         assert set(row.keys()) == {
