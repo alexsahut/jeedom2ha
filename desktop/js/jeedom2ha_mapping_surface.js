@@ -414,7 +414,7 @@
     var $content = buildRoomModalHtml(room);
 
     bootbox.dialog({
-      title: '<i class="fas fa-house-signal"></i> ' + $('<span>').text(room.object_name).html(),
+      title: '<i class="fas fa-home"></i> ' + $('<span>').text(room.object_name).html(),
       message: $content,
       size: 'large',
       className: 'modal-j2ha-room',

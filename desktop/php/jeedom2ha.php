@@ -121,7 +121,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 
 		<!-- Story 16.8 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
 		     Point d'entrée dédié, supersède l'onglet inatteignable de la 16.5. -->
-		<legend><i class="fas fa-house-signal"></i> {{Configuration mapping Home Assistant par pièce}}</legend>
+		<legend><i class="fas fa-home"></i> {{Configuration mapping Home Assistant par pièce}}</legend>
 		<div class="alert alert-info" style="margin:10px 5px;">
 			<i class="fas fa-info-circle"></i>
 			{{Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle répond aux prérequis Home Assistant (prêt / bloquant + pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
