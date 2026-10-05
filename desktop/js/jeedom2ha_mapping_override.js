@@ -457,7 +457,7 @@
     var blocking = s.blocking_count || 0;
     var excluded = s.excluded_count || 0;
     if (ready === 0 && blocking === 0 && excluded > 0) {
-      return 'Exclu de Jeedom2HA : ne sera pas publié dans Home Assistant.';
+      return 'Exclu : ne sera pas publié dans Home Assistant.';
     }
     if (ready === 0 && blocking === 0) {
       return 'Aucune commande projetable en Home Assistant pour cet équipement.';
@@ -499,6 +499,9 @@
     var ids = [];
     for (var i = 0; i < t.commands.length && ids.length < limit; i++) {
       var row = t.commands[i];
+      if (isUncoveredDiagnostic(row.diagnostic) || isExcludedDiagnostic(row.diagnostic)) {
+        continue;
+      }
       if (row.diagnostic != null && isBlockingDiagnostic(row.diagnostic)) {
         ids.push(row.jeedom_cmd_id);
       }

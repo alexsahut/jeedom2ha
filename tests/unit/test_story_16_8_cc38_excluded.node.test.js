@@ -69,7 +69,7 @@ describe('CC-38 — exclusions volontaires', () => {
       excluded_count: summary.excluded_count,
       first_blocking_cmd_id: summary.first_blocking_cmd_id,
     }, { ready_count: 0, blocking_count: 0, excluded_count: 3, first_blocking_cmd_id: null });
-    assert.strictEqual(M.buildPublicationSummaryLabel(summary), 'Exclu de Jeedom2HA : ne sera pas publié dans Home Assistant.');
+    assert.strictEqual(M.buildPublicationSummaryLabel(summary), 'Exclu : ne sera pas publié dans Home Assistant.');
     assert.strictEqual(M.publicationSummaryState(summary), 'excluded');
   });
 
@@ -106,5 +106,18 @@ describe('CC-38 — exclusions volontaires', () => {
 
   it('diagnosticState d’une exclusion reste blocking : édition inchangée', () => {
     assert.strictEqual(M.diagnosticState(decisionView('excluded_eqlogic')), 'blocking');
+  });
+
+  it('eq 559 : excluded_plugin + covered:false ne reçoit pas le libellé non couverte', () => {
+    assert.strictEqual(M.shouldShowUncoveredLabel(decisionView('excluded_plugin')), false);
+  });
+
+  it('collectBlockingCommandIds ignore les commandes non couvertes et exclues', () => {
+    const ids = M.collectBlockingCommandIds({ commands: [
+      command(1, decisionView('command_not_covered')),
+      command(2, decisionView('excluded_plugin')),
+      command(3, decisionView('ambiguous_skipped')),
+    ] });
+    assert.deepStrictEqual(ids, [3]);
   });
 });
