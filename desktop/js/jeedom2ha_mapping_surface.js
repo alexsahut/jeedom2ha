@@ -108,6 +108,10 @@
     // Colonne 3 : override HA — menu déroulant inline + spinner + retour auto.
     var $tdOverride = $('<td class="mo-td-override"></td>');
     var $select = buildOptions(row.override_applied ? row.effective_ha : '');
+    var selectorState = M.getOverrideSelectorState(row);
+    if (!selectorState.active) {
+      $select.prop('disabled', true).attr('title', selectorState.reason);
+    }
     $tdOverride.append($select);
     var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
     $tdOverride.append($spinner);
@@ -122,19 +126,21 @@
     $tr.append($diagCell);
 
     // Débounce dry-run instantané + auto-validation (logique 16.5 inchangée).
-    $select.on('change', function () {
-      var type = $(this).val();
-      if (ctx.timers[cmdId]) {
-        clearTimeout(ctx.timers[cmdId]);
-      }
-      if (!type) {
-        revertCommand(eqId, cmdId);
-        return;
-      }
-      ctx.timers[cmdId] = setTimeout(function () {
-        runDryRun(eqId, cmdId, type, $diagCell, $spinner);
-      }, DEBOUNCE_MS);
-    });
+    if (selectorState.active) {
+      $select.on('change', function () {
+        var type = $(this).val();
+        if (ctx.timers[cmdId]) {
+          clearTimeout(ctx.timers[cmdId]);
+        }
+        if (!type) {
+          revertCommand(eqId, cmdId);
+          return;
+        }
+        ctx.timers[cmdId] = setTimeout(function () {
+          runDryRun(eqId, cmdId, type, $diagCell, $spinner);
+        }, DEBOUNCE_MS);
+      });
+    }
 
     $tr.find('.mo-revert-cmd').on('click', function () {
       revertCommand(eqId, cmdId);

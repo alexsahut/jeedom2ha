@@ -352,6 +352,20 @@
     return isDisabledDiagnostic(view) ? 'Ne sera pas publié — équipement désactivé dans Jeedom' : '—';
   }
 
+  function getOverrideSelectorState(row) {
+    var r = normalizeCommandRow(row);
+    if (isExcludedDiagnostic(r.diagnostic)) {
+      return { active: false, reason: 'Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici.' };
+    }
+    if (isDisabledDiagnostic(r.diagnostic)) {
+      return { active: false, reason: 'Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici.' };
+    }
+    if (r.covered === false && shouldShowUncoveredLabel(r.diagnostic)) {
+      return { active: false, reason: 'Aucun mapping ne couvre cette commande : son type HA ne peut pas être réglé ici.' };
+    }
+    return { active: true, reason: null };
+  }
+
   // --- AC14 — bandeau « aucun impact Homebridge » : une seule fois par équipement ---
 
   function initReassuranceState() {
@@ -558,6 +572,7 @@
     buildExcludedLabel: buildExcludedLabel,
     isDisabledDiagnostic: isDisabledDiagnostic,
     buildDisabledLabel: buildDisabledLabel,
+    getOverrideSelectorState: getOverrideSelectorState,
     initReassuranceState: initReassuranceState,
     shouldShowReassurance: shouldShowReassurance,
     markReassuranceShown: markReassuranceShown,

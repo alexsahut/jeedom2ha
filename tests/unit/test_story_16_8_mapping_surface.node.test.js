@@ -288,6 +288,20 @@ describe('16.8 / tableau — buildPublishCellLabel', () => {
   });
 });
 
+describe('20.1 / AC7 — sélecteur de type HA', () => {
+  it('reste actif pour les diagnostics prêts ou bloquants', () => {
+    assert.deepStrictEqual(M.getOverrideSelectorState({ covered: true, diagnostic: readyView() }), { active: true, reason: null });
+    assert.deepStrictEqual(M.getOverrideSelectorState({ covered: true, diagnostic: blockingView() }), { active: true, reason: null });
+  });
+
+  it('est désactivé avec une raison factuelle pour non couverte, exclue et désactivée', () => {
+    assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: uncoveredView() }).reason, /Aucun mapping ne couvre/);
+    assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: Object.assign({}, disabledView(), { publication_reason: 'excluded_plugin' }) }).reason, /exclue/);
+    assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: disabledView() }).reason, /désactivé/);
+    assert.strictEqual(M.getOverrideSelectorState({ covered: false, diagnostic: disabledView() }).active, false);
+  });
+});
+
 describe('16.8 / tableau — buildBlockingReason', () => {
   it('priorise les champs manquants sur les codes', () => {
     const view = {

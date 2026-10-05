@@ -144,9 +144,9 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 - [x] **Task 3 — État désactivé (AC: 4, 6)**
   - [x] 3.1 — Module pur : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
   - [x] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
-- [ ] **Task 4 — Sélecteur inactif (AC: 7)**
-  - [ ] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
-  - [ ] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
+- [x] **Task 4 — Sélecteur inactif (AC: 7)**
+  - [x] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
+  - [x] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
 - [ ] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
   - [ ] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
   - [ ] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
