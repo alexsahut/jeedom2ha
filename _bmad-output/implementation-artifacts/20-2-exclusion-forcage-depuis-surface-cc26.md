@@ -210,6 +210,8 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
 - 2026-10-05 — Task 2 : fusion des deux champs d'override, routes de publication dédiées avec validation d'ID et refus des commandes partagées; purge CC-19 réutilisée. Tests Python ciblés : 28 passés; Node : 424 passés; flake8 et PHP lint OK.
 - 2026-10-05 — Reprise X2c : routes publication couvertes; arbre enrichi sans recalcul UI par `equipment_decision` et `entities[]` (`ha_entity_type`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`). Une commande partagée ne devient jamais clé d'action.
+- 2026-10-06 — Reprise X2d : garde-fou de parité amendé pour les ajouts additifs AC8; badge AC7 par entité. La dernière décision appliquée du principal vient de `app["publications"][eq_id]`; celle d'un secondaire vient de la `publication_decision_ref` du secondaire du mapping conservé dans cette même entrée (alimentée par sync et « Publier »). `entities[]` porte `ha_entity_type`, `decision`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`; l'aperçu de forçage porte `command_ids`.
+- 2026-10-06 — Reprise X2d : tests AC3 (`ambiguous` forcée, projection/scope/no_mapping/exclusion), aperçu, routes 409 et retrait TYPE ajoutés; statut story conservé `in-progress` (surface, gate et preuve hors unité).
 
 ### File List
 
@@ -225,3 +227,7 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - core/ajax/jeedom2ha.ajax.php
 - resources/daemon/tests/unit/test_story_20_2_publication_routes.py
 - resources/daemon/tests/unit/test_story_19_3_p2_shared_command_priority.py
+- resources/daemon/tests/unit/test_story_19_3_ac6_sync_status.py
+- resources/daemon/tests/unit/test_story_19_3_guardrail_no_override_json_parity.py
+- resources/daemon/tests/unit/test_story_16_5_mapping_override_ui_endpoints.py
+- resources/daemon/tests/unit/test_story_16_6_preview_dry_run.py
