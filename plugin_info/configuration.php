@@ -147,7 +147,7 @@ if (!isConnect()) {
     <div class="form-group">
       <div class="col-md-offset-4 col-md-4">
         <button type="button" id="bt_applyAndRescan" class="btn btn-primary">
-          <i class="fas fa-sync"></i> {{Appliquer et Rescanner}}
+          <i class="fas fa-sync"></i> {{Appliquer les filtres et rescanner}}
         </button>
         <span id="span_rescanResult" class="label" style="display:none; margin-left:10px;"></span>
       </div>
@@ -328,6 +328,10 @@ $(function() {
               return;
             }
             var r = scanData.result || {};
+            if (r.status !== 'ok' || r.operation_result !== 'succes') {
+              $status.addClass('label-warning').text(r.operation_message || '{{Résultat inconnu, relire Dernière opération}}');
+              return;
+            }
             var summary = (r.payload && r.payload.mapping_summary) ? r.payload.mapping_summary : {};
             var published = Object.keys(summary).reduce(function(total, key) {
               if (!key.endsWith('_published')) {

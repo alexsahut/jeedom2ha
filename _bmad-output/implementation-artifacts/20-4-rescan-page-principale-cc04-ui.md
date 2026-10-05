@@ -187,8 +187,8 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
     au bout (`status: "ok"`), jamais sur une erreur ou une expiration.
   - [x] Gérer attente, succès, échec, expiration, réactivation et
     `refreshBridgeStatus()` sans calcul local.
-- [ ] **Task 3 — Configuration (AC: 5)**
-  - [ ] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.
+- [x] **Task 3 — Configuration (AC: 5)**
+  - [x] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.
 - [ ] **Task 4 — Tests et gate (AC: 1-8)**
   - [ ] Tester le garde-fou, annulation, appel unique, retour et erreurs.
   - [ ] Étendre la politique du gate (`tests/e2e/gate/lib/policy.mjs`) pour simuler
