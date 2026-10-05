@@ -33,7 +33,11 @@ from models.decide_publication import (
     VALID_CONFIDENCE_POLICIES,
     decide_publication,
 )
-from models.evaluate_equipment import evaluate_equipment, merge_override_layer
+from models.evaluate_equipment import (
+    _resolve_publication_override_for_mapping,
+    evaluate_equipment,
+    merge_override_layer,
+)
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
 from models.taxonomy import get_primary_status
 from models.aggregation import build_summary
@@ -191,29 +195,6 @@ def _make_publication_result(
         technical_reason_code=technical_reason_code,
         attempted_at=datetime.now(timezone.utc).isoformat(),
     )
-
-
-def _resolve_publication_override_for_mapping(
-    mapping: MappingResult,
-    overrides_cache: Dict[str, dict],
-    equipment_overrides_cache: Dict[str, dict],
-) -> Optional[str]:
-    """Resolve `publication_override` for a mapping (Story 16.3, AC1/AC2).
-
-    Thin wrapper around `resolve_publication_override(eq_id, cmd_id, ...)` : the equipment-level
-    rules (exclusion veto, force_publish default) don't depend on `cmd_id`, but the low-level
-    function still expects one — so this loops `mapping_cmd_ids(mapping)` (same deterministic
-    first-match order as `apply_type_override`) and falls back to a sentinel `-1` (never a real
-    Jeedom cmd_id) when a mapping carries none, so equipment-level checks still run.
-    """
-    eq_id = mapping.jeedom_eq_id
-    for cmd_id in mapping_cmd_ids(mapping) or [-1]:
-        override = resolve_publication_override(
-            eq_id, cmd_id, overrides_cache, equipment_overrides_cache
-        )
-        if override is not None:
-            return override
-    return None
 
 
 async def _publish_additional_sensors(

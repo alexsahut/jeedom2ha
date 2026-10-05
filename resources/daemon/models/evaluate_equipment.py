@@ -14,7 +14,8 @@ Rôle :
 Invariants I1-I7 (portés de `decide_publication()`, Story 16.3) :
     I1 : équipement inéligible → décision refusée de niveau 1, sans mapping ni projection.
     I2 : projection invalide → jamais publié, même avec un override "force_publish".
-    I3 : should_publish=True ⇔ confidence publishable ET is_valid=True ET type dans PRODUCT_SCOPE.
+    I3 : should_publish=True ⇔ confiance publiable, ou `ambiguous` forcée par l'utilisateur,
+         ET projection valide ET type dans PRODUCT_SCOPE.
     I4 : le premier échec dans l'ordre 1→2→3→4 fait foi, jamais écrasé en aval.
     I5 : tout équipement éligible produit ses 3 sous-blocs (mapping → overrides → projection
          → décision) — jamais `None`, jamais une décision omise.
