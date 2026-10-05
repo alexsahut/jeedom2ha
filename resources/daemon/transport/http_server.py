@@ -2977,6 +2977,9 @@ def _build_mapping_override_tree(
         )
         entity_rows.append({
             "ha_entity_type": mapping.ha_entity_type,
+            # Contrat surface 20-2 : l'UI affiche les commandes regroupées sans
+            # reconstruire l'appartenance d'une entité côté navigateur.
+            "command_ids": cmd_ids,
             "decision": _decision_view(current_decision, mapping),
             "publication_override": publication_override,
             "reason_details": dict(mapping.reason_details or {}),

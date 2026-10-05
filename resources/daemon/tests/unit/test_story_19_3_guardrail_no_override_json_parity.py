@@ -89,6 +89,7 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
     assert payload["equipment_decision"] == _EXPECTED_COMMAND_DIAGNOSTIC
     assert payload["entities"] == [{
         "ha_entity_type": "light", "decision": _EXPECTED_COMMAND_DIAGNOSTIC,
+        "command_ids": [EQ_ID * 10 + 1, EQ_ID * 10 + 2, EQ_ID * 10 + 3],
         "publication_override": None,
         "reason_details": {"on_off": "state+on+off"}, "override_command_id": EQ_ID * 10 + 1,
         "override_pending": True,
