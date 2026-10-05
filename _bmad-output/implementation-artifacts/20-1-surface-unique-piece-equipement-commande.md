@@ -135,10 +135,10 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
     - 7 équipements désactivés au total : Garage 1 (eq 279), bureau 1, exterieur 3, sans pièce 2 ;
     - **pièce désignée pour le gate : Garage**, avec l'eq 279.
   - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
-- [ ] **Task 1 — Données Jeedom (AC: 3, 4)**
-  - [ ] 1.1 — `desktop/php/jeedom2ha.php:14-36` : `eqLogic::byObjectId($object->getId(), false)`.
-  - [ ] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` (`desktop/js/jeedom2ha_mapping_override.js:389-392`) n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
-  - [ ] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
+- [x] **Task 1 — Données Jeedom (AC: 3, 4)**
+  - [x] 1.1 — `desktop/php/jeedom2ha.php` appelle `eqLogic::byObjectId($object->getId(), false)`.
+  - [x] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
+  - [x] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
 - [ ] **Task 2 — Bloc « Gestion » (AC: 2)**
   - [ ] 2.1 — Déplacer le bloc des trois actions sous le titre « Gestion », sans changer ses classes ni ses attributs.
 - [ ] **Task 3 — État désactivé (AC: 4, 6)**

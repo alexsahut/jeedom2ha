@@ -13,7 +13,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 $j2haRoomsTree = array();
 foreach ((jeeObject::buildTree(null, false)) as $object) {
 	$roomEqList = array();
-	foreach (eqLogic::byObjectId($object->getId()) as $roomEq) {
+	foreach (eqLogic::byObjectId($object->getId(), false) as $roomEq) {
 		if ($roomEq->getEqType_name() === 'jeedom2ha') {
 			continue;
 		}
@@ -31,6 +31,27 @@ foreach ((jeeObject::buildTree(null, false)) as $object) {
 		'object_name'   => $object->getName(),
 		'parent_number' => (int) $object->getConfiguration('parentNumber'),
 		'equipments'    => $roomEqList,
+	);
+}
+// Story 20.1 : la convention daemon object_id=0 rassemble les équipements sans
+// objet (null ou -1). Les désactivés restent dans l'ordre natif Jeedom.
+$unassignedEqList = array();
+foreach (eqLogic::byObjectId(null, false) as $roomEq) {
+	if ($roomEq->getEqType_name() === 'jeedom2ha') {
+		continue;
+	}
+	$unassignedEqList[] = array(
+		'eq_id'   => (int) $roomEq->getId(),
+		'eq_name' => $roomEq->getName(),
+		'enabled' => ($roomEq->getIsEnable() == 1),
+	);
+}
+if (count($unassignedEqList) > 0) {
+	$j2haRoomsTree[] = array(
+		'object_id'     => 0,
+		'object_name'   => 'Sans pièce',
+		'parent_number' => 0,
+		'equipments'    => $unassignedEqList,
 	);
 }
 sendVarToJS('j2haRoomsTree', $j2haRoomsTree);

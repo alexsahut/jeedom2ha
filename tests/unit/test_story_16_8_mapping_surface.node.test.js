@@ -86,6 +86,20 @@ describe('16.8 / AC2-AC3 — normalizeRoomsTree', () => {
     assert.strictEqual(rooms[0].object_id, 8);
     assert.strictEqual(rooms[0].equipments[0].eq_id, 61);
   });
+
+  it('conserve « Sans pièce » (object_id 0) en dernière position et les désactivés en ordre natif', () => {
+    const rooms = M.normalizeRoomsTree([
+      { object_id: 7, object_name: 'Garage', equipments: [{ eq_id: 279, eq_name: 'Porte', enabled: false }] },
+      { object_id: 0, object_name: 'Sans pièce', equipments: [
+        { eq_id: 51, eq_name: 'Premier', enabled: false },
+        { eq_id: 52, eq_name: 'Second', enabled: true },
+      ] },
+    ]);
+    assert.deepStrictEqual(rooms.map((r) => r.object_id), [7, 0]);
+    assert.deepStrictEqual(rooms[1].equipments.map((e) => e.eq_id), [51, 52]);
+    assert.strictEqual(rooms[0].equipments[0].enabled, false);
+    assert.strictEqual(rooms[1].equipments[0].enabled, false);
+  });
 });
 
 // ---------------------------------------------------------------------------
