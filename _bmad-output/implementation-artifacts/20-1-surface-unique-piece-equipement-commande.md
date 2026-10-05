@@ -147,9 +147,9 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 - [x] **Task 4 — Sélecteur inactif (AC: 7)**
   - [x] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
   - [x] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
-- [ ] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
-  - [ ] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
-  - [ ] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
+- [x] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
+  - [x] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
+  - [x] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
 - [ ] **Task 6 — Gate et preuve (AC: 10)**
   - [ ] 6.1 — Étendre le parcours de découverte (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; adapter le parcours de référence si le DOM change.
   - [ ] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`.
