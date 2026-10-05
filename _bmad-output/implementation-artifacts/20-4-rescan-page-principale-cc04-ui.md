@@ -1,6 +1,6 @@
 # Story 20.4 : Rescan depuis la page principale (CC-04, volet UI)
 
-Status: in-progress
+Status: review
 
 ## Story
 
@@ -189,12 +189,12 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
     `refreshBridgeStatus()` sans calcul local.
 - [x] **Task 3 — Configuration (AC: 5)**
   - [x] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.
-- [ ] **Task 4 — Tests et gate (AC: 1-8)**
-  - [ ] Tester le garde-fou, annulation, appel unique, retour et erreurs.
-  - [ ] Étendre la politique du gate (`tests/e2e/gate/lib/policy.mjs`) pour simuler
+- [x] **Task 4 — Tests et gate (AC: 1-8)**
+  - [x] Tester le garde-fou, annulation, appel unique, retour et erreurs.
+  - [x] Étendre la politique du gate (`tests/e2e/gate/lib/policy.mjs`) pour simuler
     `scanTopology` déclaré, avec une réponse de sync simulée qui porte le résultat
     d'opération ; auto-test local ; relecture ClaudeBox ; puis le parcours.
-  - [ ] Tests Python du verrou (deux sens, attente bornée) et du `shield`.
+  - [x] Tests Python du verrou (deux sens, attente bornée) et du `shield`.
 - [ ] **Task 5 — Déploiement et preuve terrain (AC: 7)**
   - [ ] Déployer le SHA exact par le chemin standard, après CI et revue.
   - [ ] Relever avant/après, cliquer réellement une fois, consigner durée, résumé,
@@ -287,6 +287,13 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-10-05 — R3 dev-story : revue corrigée et tests locaux verts. AC8 distingue
+  l'appelant rescan par l'en-tête `X-Jeedom2ha-Sync-Mode: rescan`; le rescan reçoit
+  409 immédiatement, les autres syncs attendent au plus 7 s. Gate local étendu :
+  `scanTopology` est simulé seulement avec `declaredRescan: true` et seulement en POST.
+- 2026-10-05 — R2 dev-story : Tasks 0 à 3 implémentées, HEAD `70b105e`.
+- 2026-10-05 — R dev-story : décisions R1A/R2A/R3A appliquées.
+
 - 2026-10-05 — Brouillon create-story non interactif ; confirmations par défaut :
   création seule, statut `draft`, aucune modification de `sprint-status.yaml`.
 - 2026-10-05 — Relu par ClaudeBox puis par une relecture indépendante : sync sans
@@ -297,3 +304,16 @@ GPT-5 Codex
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-4-rescan-page-principale-cc04-ui.md`
+- `resources/daemon/transport/http_server.py`
+- `core/ajax/jeedom2ha.ajax.php`
+- `core/class/jeedom2ha.class.php`
+- `desktop/php/jeedom2ha.php`
+- `desktop/js/jeedom2ha.js`
+- `plugin_info/configuration.php`
+- `tests/unit/test_http_server.py`
+- `tests/unit/test_story_20_0_gate_policy.node.test.js`
+- `tests/e2e/gate/lib/policy.mjs`
+- `tests/e2e/gate/lib/interceptor.mjs`
+- `tests/e2e/gate/interceptor-selftest.mjs`
+- `tests/e2e/gate/run-gate.mjs`
+- `tests/e2e/gate/parcours/rescan-page-principale.mjs`
