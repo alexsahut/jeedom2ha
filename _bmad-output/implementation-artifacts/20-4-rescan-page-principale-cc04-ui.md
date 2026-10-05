@@ -73,7 +73,6 @@ topologie, décider la publication, ni calculer les compteurs côté interface.
 **Given** un rescan en cours
 **When** `scanTopology` répond avec succès, c'est-à-dire `state === 'ok'`,
 `result.status === 'ok'` et un résultat d'opération `succes`
-(`resources/daemon/transport/http_server.py:2111-2120`)
 **Then** l'interface affiche un succès à partir du résumé backend retourné, puis
 rafraîchit le bandeau santé, dont « Dernière synchro » et « Dernière opération »
 **And** elle réactive le bouton.
@@ -81,6 +80,13 @@ rafraîchit le bandeau santé, dont « Dernière synchro » et « Dernière opé
 d'opération autre que le succès (`partiel`, `echec`)
 **Then** elle affiche l'erreur ou le résultat partiel retourné, ou une erreur de
 communication, réactive le bouton et ne déclare pas de succès
+**And** le résultat d'opération vient de la réponse même du sync : aujourd'hui, le
+démon le calcule (`succes`, `partiel`, `echec`) mais ne le range que dans l'état de
+santé global (`resources/daemon/transport/http_server.py:2097-2120`), et sa réponse
+ne porte que `status: "ok"` et le résumé (`:2122-2128`). Le démon ajoute donc à cette
+réponse le résultat et le message de l'opération qu'il vient de terminer, en champ
+additif ; le relais et l'interface décident sur ce champ, jamais sur le bandeau santé
+relu après coup, qu'une autre opération a pu réécrire
 **And** côté relais, les écouteurs d'état ne sont réalignés qu'après un sync réussi ;
 le bouton de la configuration applique la même définition du succès
 **And** en cas d'expiration, le message invite à relire « Dernière synchro » plutôt
@@ -128,8 +134,15 @@ et après ; la parité attendue est identique, sauf écart explicitement expliqu
 (« une opération est déjà en cours ») ; inversement, une action demandée pendant un
 sync est refusée de la même façon
 **And** les syncs du démarrage du démon et du déploiement attendent la fin de
-l'opération en cours, avec un délai borné, au lieu d'échouer ; les tests couvrent les
-deux sens et l'attente.
+l'opération en cours, avec un délai borné plus court que leur propre délai d'appel,
+au lieu d'échouer ; les tests couvrent les deux sens et l'attente.
+**And** les trois appelants envoient aujourd'hui le même `POST /action/sync`
+(`core/ajax/jeedom2ha.ajax.php:594`, `core/class/jeedom2ha.class.php:301-303`,
+`scripts/deploy-to-box.sh:321-325`) : le rescan y ajoute un mode explicite (un champ
+du corps ou un en-tête de la requête existante, documenté dans le Dev Agent Record)
+qui demande le refus immédiat par 409 ; sans ce mode, le démon attend le verrou avec
+le délai borné. Le démarrage et le déploiement restent donc inchangés, y compris un
+script de déploiement plus ancien.
 
 ## UI Impact
 
@@ -155,8 +168,9 @@ deux sens et l'attente.
   - [ ] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
 - [ ] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
   - [ ] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
-  - [ ] Démon : le sync prend `action_lock` (409 si pris, attente bornée pour les
-    syncs du démarrage et du déploiement) et est protégé par `asyncio.shield`.
+  - [ ] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,
+    attente bornée sans ce mode), est protégé par `asyncio.shield`, et sa réponse
+    porte le résultat et le message de l'opération (AC4).
   - [ ] Relais : succès défini par AC4 ; écouteurs réalignés seulement après succès.
   - [ ] Gérer attente, succès, échec, expiration, réactivation et
     `refreshBridgeStatus()` sans calcul local.
@@ -194,7 +208,8 @@ deux sens et l'attente.
 
 - Aucun recalcul de topologie, de décision, de publication ou de compteurs en JS.
 - Aucun nouveau point d'entrée daemon et aucun changement de la sémantique 20-2 ; le
-  seul changement du démon est le verrou et la protection du sync (AC8, AC4).
+  seul changement du démon est le verrou, la protection du sync et le résultat
+  d'opération ajouté à sa réponse (AC8, AC4).
 - Ne pas transformer le rescan en « Republier » ou « Supprimer puis recréer » :
   ces actions appellent `executeHaAction` (`desktop/js/jeedom2ha.js:332-420`) ;
   le rescan appelle `scanTopology` et refait tout le pipeline.
@@ -205,10 +220,10 @@ deux sens et l'attente.
 
 `desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`,
 `plugin_info/configuration.php` (libellé et définition du succès),
-`core/ajax/jeedom2ha.ajax.php` (écouteurs après succès seulement),
-`resources/daemon/transport/http_server.py` (verrou et `shield` du sync),
-`scripts/deploy-to-box.sh` si le 409 du verrou doit y être attendu, tests et
-politique du gate 20-0.
+`core/ajax/jeedom2ha.ajax.php` (mode rescan, écouteurs après succès seulement),
+`resources/daemon/transport/http_server.py` (verrou, `shield` et résultat d'opération
+du sync), tests et politique du gate 20-0. `scripts/deploy-to-box.sh` et le démarrage
+du démon ne changent pas (AC8).
 
 ## Décisions d'Alex (2026-10-05, 20:26)
 
@@ -223,6 +238,9 @@ Réponse « R1A, R2A, R3A », sur recommandation de ClaudeBox.
 - 2026-10-05 — Brouillon `create-story` de clawcode (`19c0afe`), retouché par ClaudeBox puis relu par une relecture indépendante (AC8 verrou du sync, AC4 définition du succès et écouteurs, AC3 bouton pendant le rescan, AC7 gate à étendre).
 - 2026-10-05 — Questions R1 à R3 posées à Alex, avec recommandation R1A, R2A, R3A.
 - 2026-10-05, 20:26 — **Décision d'Alex : « R1A, R2A, R3A ».** Story passée `ready-for-dev`.
+- 2026-10-05 — Revue Codex de la PR #208 : le résultat d'opération est ajouté à la
+  réponse du sync (AC4), et le rescan porte un mode explicite qui seul reçoit le 409
+  (AC8).
 
 ## Définition de done
 
