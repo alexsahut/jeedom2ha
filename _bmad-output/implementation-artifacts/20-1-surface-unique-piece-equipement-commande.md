@@ -132,9 +132,10 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 0.1 — Lecture seule le 2026-10-05 : `eqLogic.class.php:116` : `public static function byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)` ; accepte donc `null` et `-1` avec `$_onlyEnable = false`.
   - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
     - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
-    - 7 équipements désactivés au total : Garage 1 (eq 514), bureau 1 (eq 279), exterieur 3, sans pièce 2 ;
+    - 7 équipements désactivés et non exclus au total (raison `disabled_eqlogic` ; l'exclusion est évaluée avant la désactivation, `resources/daemon/models/topology.py:306-312`) : Garage 1 (eq 514), bureau 1 (eq 279), exterieur 3, sans pièce 2 ;
+    - le Garage compte aussi l'eq 339, désactivé et exclu : il est compté parmi les exclus et s'affiche « Exclu » ;
     - **pièce désignée pour le gate : Garage**, avec l'eq 514 (relevé corrigé le 2026-10-05, voir Journal des décisions).
-  - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
+  - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279, bureau) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
 - [x] **Task 1 — Données Jeedom (AC: 3, 4)**
   - [x] 1.1 — `desktop/php/jeedom2ha.php` appelle `eqLogic::byObjectId($object->getId(), false)`.
   - [x] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
