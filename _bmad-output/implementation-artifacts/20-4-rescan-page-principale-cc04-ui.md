@@ -287,6 +287,16 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-10-06 — R5 dev-story : corrections des deux constats Codex PR #209.
+  `99a3315` cible le bouton primaire exact « Rescanner » du parcours gate.
+  `4748847` réserve le rescan dès l'ouverture de sa confirmation, interdit une
+  seconde modale/requête et donne à sa requête propriétaire seule le droit de
+  libérer le garde-fou. Les retours `echec` sont rouges (`danger`), les
+  `partiel` restent en avertissement ; tests Node ajoutés pour le garde, les
+  résultats et le succès de la configuration. `74e9fc0` couvre l'AC8 : action
+  pendant sync, attente service, expiration 409 et réponse sync `echec` avec
+  résultat/message. Aucun déploiement, rescan réel ou gate contre la box.
+
 - 2026-10-05 — R3 dev-story : revue corrigée et tests locaux verts. AC8 distingue
   l'appelant rescan par l'en-tête `X-Jeedom2ha-Sync-Mode: rescan`; le rescan reçoit
   409 immédiatement, les autres syncs attendent au plus 7 s. Gate local étendu :
@@ -317,3 +327,4 @@ GPT-5 Codex
 - `tests/e2e/gate/interceptor-selftest.mjs`
 - `tests/e2e/gate/run-gate.mjs`
 - `tests/e2e/gate/parcours/rescan-page-principale.mjs`
+- `tests/unit/test_story_20_4_rescan_ui.node.test.js`
