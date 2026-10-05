@@ -2,6 +2,7 @@
 
 export const name = 'decouverte-garage-enphase';
 export const declaredEquipments = {};
+export const declaredPublicationOverrides = {};
 export const declaredBascules = [];
 
 /** Attend le rendu complet des diagnostics factuels de toutes les commandes de l'équipement. */

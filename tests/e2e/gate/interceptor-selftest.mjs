@@ -104,6 +104,8 @@ function pageHtml(origin) {
     }
     await attempted(post('saveMappingOverride', { eqId: '9', cmdId: '2', haEntityType: 'switch' }));
     await attempted(post('revertMappingOverride', { eqId: '9', cmdId: '2' }));
+    await attempted(post('savePublicationOverride', { eqId: '9', publicationPolicy: 'exclude' }));
+    await attempted(post('revertPublicationOverride', { eqId: '9' }));
     await attempted(fetch(endpoint + '?action=scanTopology'));
     await xhr();
     navigator.sendBeacon(endpoint, form('executeHaAction'));
@@ -133,6 +135,8 @@ function pageHtml(origin) {
     const saved = await post('saveMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
     const derived = await post('getMappingOverrides', { eqId: '1' });
     const reverted = await post('revertMappingOverride', { eqId: '1', cmdId: '2' });
+    const publicationSaved = await post('savePublicationOverride', { eqId: '1', publicationPolicy: 'exclude' });
+    const publicationReverted = await post('revertPublicationOverride', { eqId: '1' });
     const real = await post('getMappingOverrides', { eqId: '1' });
     const bascule = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'light' });
 
@@ -144,6 +148,8 @@ function pageHtml(origin) {
       saved,
       derived,
       reverted,
+      publicationSaved,
+      publicationReverted,
       real,
       bascule,
     };
@@ -257,6 +263,7 @@ async function main() {
       origin,
       loginAttempts: 0,
       declaredEquipments: { '1': { commands: ['2'] } },
+      declaredPublicationOverrides: { '1': { commands: [] } },
       lastPreviewType: simState.lastPreviewType,
     };
 
@@ -287,6 +294,7 @@ async function main() {
     const forbiddenActions = new Set([
       'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
       'saveMappingOverride', 'revertMappingOverride', 'login',
+      'savePublicationOverride', 'revertPublicationOverride',
     ]);
     const serverReceivedForbidden = requests.some(
       (request) =>
@@ -322,7 +330,7 @@ async function main() {
       failures);
 
     const expectedFailures = [
-      ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride']
+      ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride']
         .map((action) => ({ path: PLUGIN_AJAX, action, verdict: 'block-fail' })),
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
@@ -361,6 +369,12 @@ async function main() {
     report('apercu de bascule declaree pret',
       results.bascule.result.payload.overridden.projection_validity.is_valid === true
         && results.bascule.result.payload.overridden.should_publish === true,
+      failures);
+    report('publication declaree : exclusion puis retrait simules',
+      results.publicationSaved?.result?.payload?.publication_policy === 'exclude'
+        && results.publicationReverted?.result?.payload?.scope === 'equipment'
+        && journal.entries.some((entry) => entry.action === 'savePublicationOverride' && entry.verdict === 'simulee')
+        && journal.entries.some((entry) => entry.action === 'revertPublicationOverride' && entry.verdict === 'simulee'),
       failures);
     report('reponses fulfill JSON lisibles malgre content-length reel',
       results.preview.state === 'ok'

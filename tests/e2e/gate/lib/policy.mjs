@@ -68,7 +68,7 @@ const SIDE_EFFECT_ACTIONS = [
 
 // Paramètres de core/ajax/jeedom2ha.ajax.php:877-920 (previewMappingOverride,
 // saveMappingOverride, revertMappingOverride) : eqId, cmdId, haEntityType.
-const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride'];
+const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride'];
 
 const PARAMETER_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 const STATIC_EXTENSIONS = /\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|map)$/i;
@@ -189,6 +189,20 @@ function validateOverrideWrite(action, params, ctx) {
   return declared.commands.includes(override.cmdId);
 }
 
+function validatePublicationWrite(action, params, ctx) {
+  const override = readOverrideParams(params);
+  if (!override || !ctx || typeof ctx !== 'object') return false;
+  const declared = ctx.declaredPublicationOverrides;
+  if (!hasOwnSafe(declared, override.eqId)) return false;
+  const target = declared[override.eqId];
+  if (!target || !Array.isArray(target.commands)) return false;
+  if (override.cmdId && !target.commands.includes(override.cmdId)) return false;
+  if (action === 'savePublicationOverride') {
+    return (params.publicationPolicy === 'exclude' || params.publicationPolicy === 'force_publish');
+  }
+  return params.publicationPolicy === undefined;
+}
+
 export function classifyRequest(req, ctx) {
   try {
     let url;
@@ -243,7 +257,10 @@ export function classifyRequest(req, ctx) {
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && OVERRIDE_WRITE_ACTIONS.includes(action)) {
-      if (req.method === 'POST' && validateOverrideWrite(action, params, ctx)) {
+      const allowed = action === 'savePublicationOverride' || action === 'revertPublicationOverride'
+        ? validatePublicationWrite(action, params, ctx)
+        : validateOverrideWrite(action, params, ctx);
+      if (req.method === 'POST' && allowed) {
         return { verdict: 'simulate', reason: 'ecriture-override-declaree', action, params };
       }
       return { verdict: 'block-fail', reason: 'ecriture-override-non-declaree', action };

@@ -339,7 +339,7 @@ async function main() {
   await runChild(path.join(ownDirectory, 'interceptor-selftest.mjs'));
   const credentials = await readCredentials();
   const parcours = await loadParcours(modulePath);
-  if (!parcours.name || !parcours.declaredEquipments || !Array.isArray(parcours.declaredBascules)) {
+  if (!parcours.name || !parcours.declaredEquipments || !parcours.declaredPublicationOverrides || !Array.isArray(parcours.declaredBascules)) {
     throw new Error('parcours-invalide');
   }
   if (typeof parcours.run !== 'function') throw new Error('parcours-invalide');
@@ -375,6 +375,7 @@ async function main() {
       origin: ORIGIN,
       loginAttempts: 0,
       declaredEquipments: parcours.declaredEquipments,
+      declaredPublicationOverrides: parcours.declaredPublicationOverrides,
       lastPreviewType: simState.lastPreviewType,
     };
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });

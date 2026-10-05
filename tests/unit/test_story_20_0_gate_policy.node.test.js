@@ -63,6 +63,19 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     assert.equal(result.verdict, 'block-fail');
   });
 
+  await t.test('publication déclarée : exclusion puis retrait simulables, Appliquer reste bloqué', () => {
+    const ctx = baseCtx({ declaredPublicationOverrides: { '287': { commands: [] } } });
+    const save = classifyRequest(req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+      postData: 'action=savePublicationOverride&eqId=287&publicationPolicy=exclude' }), ctx);
+    const revert = classifyRequest(req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+      postData: 'action=revertPublicationOverride&eqId=287' }), ctx);
+    const apply = classifyRequest(req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr',
+      postData: 'action=executeHaAction&intention=publier' }), ctx);
+    assert.equal(save.verdict, 'simulate');
+    assert.equal(revert.verdict, 'simulate');
+    assert.equal(apply.verdict, 'block-fail');
+  });
+
   await t.test('écriture déclarée et conforme -> simulate', () => {
     const ctx = baseCtx({
       declaredEquipments: { '1': { commands: ['2'] } },

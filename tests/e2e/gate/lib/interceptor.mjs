@@ -265,7 +265,16 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       if (decision.verdict === 'simulate') {
         const params = decision.params;
         let response;
-        if (decision.action === 'saveMappingOverride') {
+        if (decision.action === 'savePublicationOverride') {
+          response = { state: 'ok', result: { status: 'ok', payload: {
+            jeedom_eq_id: Number(params.eqId), jeedom_cmd_id: params.cmdId ? Number(params.cmdId) : null,
+            publication_policy: params.publicationPolicy, override_applied: true,
+          } } };
+        } else if (decision.action === 'revertPublicationOverride') {
+          response = { state: 'ok', result: { status: 'ok', payload: {
+            jeedom_eq_id: Number(params.eqId), scope: params.cmdId ? 'command' : 'equipment', removed: true,
+          } } };
+        } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
         } else {
