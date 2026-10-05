@@ -832,6 +832,28 @@ def _candidate_key(mapping_result, candidate) -> tuple:
     return ("secondary", rd.get("cmd_id"), _node_id_of(candidate), _entity_type_of(candidate))
 
 
+def _last_applied_candidate_decision(current_primary, candidate, synced_decision):
+    """Return the per-entity step-4 decision recorded by sync or ``Publier``.
+
+    Principal state is held in ``app['publications'][eq_id]``; each secondary's
+    state is held by its old mapping's ``publication_decision_ref``. Candidate keys
+    deliberately survive fresh mapping objects rebuilt by a later tree read.
+    """
+    if synced_decision is None:
+        return None
+    previous_primary = getattr(synced_decision, "mapping_result", None)
+    if previous_primary is None:
+        return synced_decision if candidate is current_primary else None
+    wanted = _candidate_key(current_primary, candidate)
+    for previous in [previous_primary, *(previous_primary.additional_mappings or [])]:
+        if _candidate_key(previous_primary, previous) == wanted:
+            return (
+                synced_decision if previous is previous_primary
+                else getattr(previous, "publication_decision_ref", None)
+            )
+    return None
+
+
 def _published_candidates(mapping_result, principal_decision) -> dict:
     """Candidates whose step-4 verdict allows publication, keyed by `_candidate_key`."""
     candidates: dict = {}
@@ -2942,12 +2964,24 @@ def _build_mapping_override_tree(
         publication_override = _resolve_publication_override_for_mapping(
             mapping, overrides_cache, equipment_overrides_cache
         )
+        current_decision = (
+            evaluation.equipment_decision if mapping is evaluation.mapping
+            else mapping.publication_decision_ref
+        )
+        applied_decision = _last_applied_candidate_decision(
+            evaluation.mapping, mapping, synced_decision
+        )
         entity_rows.append({
             "ha_entity_type": mapping.ha_entity_type,
+            "decision": _decision_view(current_decision, mapping),
             "publication_override": publication_override,
             "reason_details": dict(mapping.reason_details or {}),
             "override_command_id": unique_cmd_id,
-            "override_pending": override_pending or synced_decision is None,
+            "override_pending": (
+                applied_decision is None
+                or applied_decision.should_publish != current_decision.should_publish
+                or applied_decision.reason != current_decision.reason
+            ),
         })
 
     return {

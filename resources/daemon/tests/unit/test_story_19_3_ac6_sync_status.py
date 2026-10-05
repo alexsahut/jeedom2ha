@@ -62,6 +62,7 @@ async def test_ac6_sync_status_no_pending_override(cli, app, tmp_path):
         "current_should_publish": True,
         "override_pending": False,
     }
+    assert payload["entities"][0]["override_pending"] is False
 
 
 async def test_ac6_sync_status_override_pending_after_unsynced_exclusion(cli, app, tmp_path):
@@ -83,6 +84,8 @@ async def test_ac6_sync_status_override_pending_after_unsynced_exclusion(cli, ap
         "current_should_publish": False,
         "override_pending": True,
     }
+    assert payload["entities"][0]["decision"]["publication_reason"] == "publication_excluded_eqlogic"
+    assert payload["entities"][0]["override_pending"] is True
 
 
 async def test_ac6_sync_status_no_prior_sync(cli, app, tmp_path):
@@ -98,3 +101,4 @@ async def test_ac6_sync_status_no_prior_sync(cli, app, tmp_path):
 
     assert payload["sync_status"]["synced_should_publish"] is None
     assert payload["sync_status"]["override_pending"] is False
+    assert payload["entities"][0]["override_pending"] is True
