@@ -148,7 +148,7 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
   - [x] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
   - [x] 2.3 Purge par entité et par équipement (CC-19).
 - [ ] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
-  - [ ] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
+- [x] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
   - [ ] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
   - [ ] 3.3 Libellés de l'ambiguïté par cause.
 - [ ] **Task 4 — Tests (AC: 1 à 10)** : Python (précédence, I2, I3 et I4 amendés, capacités, commandes inchangées, parité sans override, fusion, clé d'entité), PHP, Node (actions, libellés, absence de recalcul), non-régression TYPE.
@@ -209,6 +209,7 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 - 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
 - 2026-10-05 — Task 2 : fusion des deux champs d'override, routes de publication dédiées avec validation d'ID et refus des commandes partagées; purge CC-19 réutilisée. Tests Python ciblés : 28 passés; Node : 424 passés; flake8 et PHP lint OK.
+- 2026-10-05 — Reprise X2c : routes publication couvertes; arbre enrichi sans recalcul UI par `equipment_decision` et `entities[]` (`ha_entity_type`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`). Une commande partagée ne devient jamais clé d'action.
 
 ### File List
 
@@ -222,3 +223,5 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - _bmad-output/planning-artifacts/pipeline-contract.md
 - resources/daemon/transport/http_server.py
 - core/ajax/jeedom2ha.ajax.php
+- resources/daemon/tests/unit/test_story_20_2_publication_routes.py
+- resources/daemon/tests/unit/test_story_19_3_p2_shared_command_priority.py
