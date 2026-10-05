@@ -144,7 +144,7 @@
     }
 
     $tr.find('.mo-revert-cmd').on('click', function () {
-      revertCommand(eqId, cmdId);
+      revertPublication(eqId, cmdId, $tr.find('button,select'));
     });
 
     return $tr;
@@ -223,6 +223,50 @@
     });
   }
 
+  function publicationRequest(eqId, cmdId, policy, $buttons) {
+    $buttons.prop('disabled', true);
+    var data = { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: policy };
+    if (cmdId !== null) data.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
+      .always(function () { $buttons.prop('disabled', false); })
+      .done(function () { reloadEquipment(eqId); });
+  }
+
+  function revertPublication(eqId, cmdId, $buttons) {
+    $buttons.prop('disabled', true);
+    var data = { action: 'revertPublicationOverride', eqId: eqId };
+    if (cmdId !== null) data.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
+      .always(function () { $buttons.prop('disabled', false); })
+      .done(function () { reloadEquipment(eqId); });
+  }
+
+  function requestPublication(eqId, target, equipment, policy, $buttons) {
+    var cmdId = equipment ? null : target.override_command_id;
+    function save() { publicationRequest(eqId, cmdId, policy, $buttons); }
+    if (policy === 'exclude') {
+      if (!M.shouldConfirmPublication(policy, target.decision || target) ||
+          window.confirm('{{Exclure cette entité de Home Assistant ?}}')) save();
+      return;
+    }
+    // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
+    $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'previewMappingOverride', eqId: eqId,
+      cmdId: cmdId, publicationPolicy: 'force_publish' }, dataType: 'json' })
+      .done(function (data) {
+        var payload = data && data.result ? data.result : data;
+        var view = M.readPreviewOverridden(payload);
+        if (window.confirm('{{Aperçu du forçage : }}' + M.buildPublishCellLabel(view) + '{{. Continuer ?}}')) save();
+      });
+  }
+
+  function applyEquipment(eqId, $button) {
+    $button.prop('disabled', true);
+    $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
+      portee: 'equipement', selection: JSON.stringify([eqId]) }, dataType: 'json' })
+      .always(function () { $button.prop('disabled', false); })
+      .done(function () { reloadEquipment(eqId); });
+  }
+
   // --- Synthèse de publication par équipement (Bloc C) ---
 
   function renderSummary($panel, tree) {
@@ -289,6 +333,36 @@
       .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
   }
 
+  function appendPublicationActions($host, eqId, target, equipment) {
+    var state = M.publicationActionState(target, equipment);
+    var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
+    function button(label, policy, enabled) {
+      var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
+      if (!enabled) $button.prop('disabled', true).attr('title', state.reason || '{{Cette action est sans effet dans l’état courant.}}');
+      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button')); });
+      $group.append($button);
+    }
+    button('{{Exclure}}', 'exclude', state.can_exclude);
+    button('{{Forcer}}', 'force_publish', state.can_force);
+    var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>').text('{{Revenir au mode automatique}}');
+    if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.reason || '{{Aucun override de publication à retirer.}}');
+    $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button')); });
+    $group.append($revert);
+    $host.append($group);
+  }
+
+  function renderEntities($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-entities').first().empty();
+    for (var i = 0; i < tree.entities.length; i++) {
+      var entity = tree.entities[i];
+      var $row = $('<div class="j2ha-entity-row"></div>');
+      $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
+      $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity)));
+      appendPublicationActions($row, tree.jeedom_eq_id, entity, false);
+      $host.append($row);
+    }
+  }
+
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
 
   function renderEquipmentTree($panel, tree) {
@@ -298,6 +372,16 @@
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
 
     renderSyncBadge($panel, normalized);
+    renderEntities($panel, normalized);
+    appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
+      publication_override: null, has_publication_override: normalized.entities.some(function (entity) {
+        return entity.publication_override !== null;
+      }) }, true);
+    if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
+      var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
+      $apply.on('click', function () { applyEquipment(eqId, $apply); });
+      $actions.append($apply);
+    }
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -317,7 +401,7 @@
       var $revertEq = $('<a class="mo-revert-eq cursor btn btn-default btn-xs"><i class="fas fa-undo"></i> ' +
         '{{Revenir au mode automatique (tout l’équipement)}}</a>');
       $revertEq.on('click', function () {
-        revertEquipment(eqId);
+        revertPublication(eqId, null, $revertEq);
       });
       $actions.append($revertEq);
     }
@@ -407,6 +491,7 @@
       $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
+      $body.append($('<div class="j2ha-eq-entities" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-cmdlist panel-group" role="tablist" aria-multiselectable="true" style="max-height:calc(100vh - 320px); overflow-y:auto;"></div>'));
       $collapse.append($body);
       $panel.append($collapse);

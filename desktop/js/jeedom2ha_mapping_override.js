@@ -76,10 +76,48 @@
       jeedom_eq_id: p.jeedom_eq_id != null ? p.jeedom_eq_id : null,
       eq_name: typeof p.eq_name === 'string' ? p.eq_name : '',
       mapped: p.mapped === true,
+      equipment_decision: p.equipment_decision || null,
+      entities: (Array.isArray(p.entities) ? p.entities : []).map(function (entity) {
+        var e = entity || {};
+        return {
+          ha_entity_type: typeof e.ha_entity_type === 'string' ? e.ha_entity_type : null,
+          command_ids: Array.isArray(e.command_ids) ? e.command_ids.slice() : [],
+          decision: e.decision || null,
+          publication_override: e.publication_override === 'exclude' || e.publication_override === 'force_publish' ? e.publication_override : null,
+          reason_details: e.reason_details && typeof e.reason_details === 'object' ? e.reason_details : {},
+          override_command_id: Number.isInteger(e.override_command_id) ? e.override_command_id : null,
+          override_pending: e.override_pending === true,
+        };
+      }),
       // Ordre natif préservé strictement (AC3 : pas de tri/regroupement front).
       commands: commands.map(normalizeCommandRow),
       sync_status: normalizeSyncStatus(p.sync_status),
     };
+  }
+
+  // Story 20-2 : données d'action lues telles quelles dans l'arbre, sans inférence sur
+  // les commandes ni recalcul de décision côté client.
+  function entityCommandsLabel(entity) {
+    var ids = entity && Array.isArray(entity.command_ids) ? entity.command_ids : [];
+    return ids.length ? 'Commandes : ' + ids.map(function (id) { return '#' + id; }).join(', ') : 'Aucune commande regroupée';
+  }
+
+  function publicationActionState(target, equipment) {
+    var t = target || {};
+    var decision = t.decision || t;
+    var hasKey = equipment === true || Number.isInteger(t.override_command_id);
+    var policy = t.publication_override || null;
+    if (!hasKey) return { can_exclude: false, can_force: false, can_revert: false, reason: 'Aucune commande clé propre à cette entité.' };
+    return {
+      can_exclude: policy !== 'exclude',
+      can_force: policy !== 'force_publish' && decision.should_publish !== true,
+      can_revert: policy !== null || t.has_publication_override === true,
+      reason: null,
+    };
+  }
+
+  function shouldConfirmPublication(policy, decision) {
+    return policy === 'exclude' && decision && decision.should_publish === true;
   }
 
   // Story 19.3 (AC6) — l'accordéon pièce doit afficher un badge quand l'état courant
@@ -254,6 +292,9 @@
   // chercher un topic. Libellés courts alignés sur les messages produit du daemon.
   var REASON_LABELS = {
     ambiguous_skipped: 'mapping ambigu — précisez les types génériques dans Jeedom',
+    name_heuristic_rejection: 'un mot du nom de l’équipement écarte ce type',
+    duplicate_generic_types: 'types génériques en double',
+    switch_state_orphan: 'état sans ordre On/Off',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',
@@ -299,7 +340,12 @@
       return '';
     }
     // Priorité : cause de décision > cause de validité > symptôme brut.
-    var candidates = [d.publication_reason, d.reason_code, d.validity_reason_code];
+    // `ambiguous_skipped` est le résultat de publication générique ; la cause précise
+    // est portée par le mapping dans `reason_code` et doit donc passer avant lui.
+    var preciseAmbiguity = ['name_heuristic_rejection', 'duplicate_generic_types', 'switch_state_orphan'];
+    var candidates = d.publication_reason === 'ambiguous_skipped' && preciseAmbiguity.indexOf(d.reason_code) !== -1
+      ? [d.reason_code, d.publication_reason, d.validity_reason_code]
+      : [d.publication_reason, d.reason_code, d.validity_reason_code];
     for (var i = 0; i < candidates.length; i++) {
       var code = candidates[i];
       if (code && REASON_LABELS[code]) {
@@ -553,6 +599,9 @@
     getHaEntityTypeOptions: getHaEntityTypeOptions,
     normalizeCommandRow: normalizeCommandRow,
     normalizeTree: normalizeTree,
+    entityCommandsLabel: entityCommandsLabel,
+    publicationActionState: publicationActionState,
+    shouldConfirmPublication: shouldConfirmPublication,
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,
