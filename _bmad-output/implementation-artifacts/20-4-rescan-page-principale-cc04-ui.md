@@ -295,7 +295,9 @@ GPT-5 Codex
   `partiel` restent en avertissement ; tests Node ajoutés pour le garde, les
   résultats et le succès de la configuration. `74e9fc0` couvre l'AC8 : action
   pendant sync, attente service, expiration 409 et réponse sync `echec` avec
-  résultat/message. Aucun déploiement, rescan réel ou gate contre la box.
+  résultat/message. `d2e7a34` vérifie aussi que la déconnexion du client laisse
+  le sync protégé finir puis libérer le verrou. Aucun déploiement, rescan réel
+  ou gate contre la box.
 
 - 2026-10-05 — R3 dev-story : revue corrigée et tests locaux verts. AC8 distingue
   l'appelant rescan par l'en-tête `X-Jeedom2ha-Sync-Mode: rescan`; le rescan reçoit
