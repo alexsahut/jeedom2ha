@@ -40,6 +40,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from dataclasses import replace
 from typing import TYPE_CHECKING, Dict, List, Optional
 
@@ -58,6 +59,37 @@ def _overrides_path(data_dir: str) -> str:
 
 def _override_key(jeedom_eq_id: int, jeedom_cmd_id: int) -> str:
     return f"{jeedom_eq_id}:{jeedom_cmd_id}"
+
+
+def _write_raw_atomically(path: str, raw: Dict) -> None:
+    """Write overrides through a same-directory temporary file then replace it."""
+    temp_path = None
+    try:
+        try:
+            existing_mode = os.stat(path).st_mode & 0o7777
+        except FileNotFoundError:
+            existing_mode = None
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=os.path.dirname(path),
+            prefix=".ha_overrides.", suffix=".tmp", delete=False,
+        ) as temp_file:
+            temp_path = temp_file.name
+            json.dump(raw, temp_file, ensure_ascii=False, indent=2)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        if existing_mode is not None:
+            os.chmod(temp_path, existing_mode)
+        os.replace(temp_path, path)
+        temp_path = None
+    except Exception:
+        if temp_path is not None:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        raise
 
 
 # Story 16.7 (AC5/AC6) — champs sémantiques de mapping autorisés dans un profil partageable.
@@ -263,8 +295,7 @@ def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_di
 
     path = _overrides_path(data_dir)
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _write_raw_atomically(path, raw)
         _LOGGER.info(
             "[OVERRIDES] Override sauvegardé : %s dans %s",
             _override_key(jeedom_eq_id, jeedom_cmd_id), path,
@@ -307,8 +338,7 @@ def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) ->
 
     path = _overrides_path(data_dir)
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _write_raw_atomically(path, raw)
         _LOGGER.info(
             "[OVERRIDES] Override équipement sauvegardé : %s dans %s", jeedom_eq_id, path,
         )
@@ -427,8 +457,7 @@ def remove_override(jeedom_eq_id: int, jeedom_cmd_id: int, data_dir: str) -> boo
 
     path = _overrides_path(data_dir)
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _write_raw_atomically(path, raw)
         _LOGGER.info("[OVERRIDES] Override supprimé : %s dans %s", key, path)
     except OSError as exc:
         _LOGGER.error("[OVERRIDES] Échec sauvegarde après suppression : %s", exc)
@@ -459,8 +488,7 @@ def remove_equipment_override(jeedom_eq_id: int, data_dir: str) -> bool:
 
     path = _overrides_path(data_dir)
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=2)
+        _write_raw_atomically(path, raw)
         _LOGGER.info("[OVERRIDES] Override équipement supprimé : %s dans %s", key, path)
     except OSError as exc:
         _LOGGER.error("[OVERRIDES] Échec sauvegarde après suppression équipement : %s", exc)
