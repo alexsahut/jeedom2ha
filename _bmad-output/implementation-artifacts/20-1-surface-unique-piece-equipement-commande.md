@@ -213,7 +213,7 @@ GPT-5 Codex
 
 - 2026-10-05 — BMAD `dev-story` non interactif terminé pour les Tasks 0 à 5 et 6.1 ; confirmations par défaut consignées au rapport externe.
 - 2026-10-05 — 424 tests node verts ; `php -l` et `node --check` verts ; auto-test local de l'intercepteur PASS (0 échec).
-- 2026-10-05 — 6.2 reste explicitement hors unité : déploiement, gate sur box et passage Chrome seront faits après fusion.
+- 2026-10-05 — 6.2 était hors de l'unité de développement : déploiement, gate sur box et passage Chrome prévus après fusion (faits le même jour, voir la note de clôture ci-dessous).
 - 2026-10-05 — Signature box lue : `byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)`.
 - 2026-10-05 — Corrections de relecture ClaudeBox + relecture indépendante sur PR #204 (head 97cdaa8) : clé de rapport du gate en double (eq_279_badge, P1), ordre du DOM AC2 étendu au bandeau (gestion_avant_bandeau), info-bulle du sélecteur désactivé posée aussi sur la cellule, libellé « Sans pièce » traduit via `__()`.
 - 2026-10-05 — Preuve terrain et validation UX (Task 6.2) : déploiement de `95fde04`, gate 20-0 PASS sur `05634b8`, validation UX par ClaudeBox ; artefact `20-1-preuve-validation-ux-2026-10-05.md`. Story `done`.
