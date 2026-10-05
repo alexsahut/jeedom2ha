@@ -4,8 +4,11 @@ test_http_server.py — Unit tests for the daemon's local HTTP API server.
 Tests the /system/status endpoint, local_secret authentication,
 and server lifecycle (start/stop).
 """
+import asyncio
+import json
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
 from aiohttp import web
 
 _FAKE_CLI_ARGS = [
@@ -147,6 +150,41 @@ class TestSyncAction:
             }, json={})
             assert resp.status == 409
             assert (await resp.json())["code"] == "action_in_progress"
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_action_refuses_while_sync_holds_lock(self, http_client, http_app):
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/execute", headers={"X-Local-Secret": LOCAL_SECRET}, json={
+                "intention": "publier", "portee": "global", "selection": ["1"],
+            })
+            assert resp.status == 409
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_service_sync_waits_for_action_then_runs(self, http_app):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        http_app["action_lock"] = asyncio.Lock()
+        await http_app["action_lock"].acquire()
+        request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+        release = asyncio.create_task(asyncio.sleep(0.01))
+        release.add_done_callback(lambda _: http_app["action_lock"].release())
+        with patch("resources.daemon.transport.http_server._do_handle_action_sync_body", new=AsyncMock(return_value=web.Response())):
+            resp = await _do_handle_action_sync(request)
+        assert resp.status == 200
+
+    async def test_service_sync_timeout_returns_409(self, http_app, monkeypatch):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        import resources.daemon.transport.http_server as server
+        monkeypatch.setattr(server, "_SYNC_ACTION_LOCK_WAIT_SECONDS", 0.01)
+        http_app["action_lock"] = asyncio.Lock()
+        await http_app["action_lock"].acquire()
+        try:
+            request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+            resp = await _do_handle_action_sync(request)
+            assert resp.status == 409
+            assert json.loads(resp.body)["code"] == "action_in_progress"
         finally:
             http_app["action_lock"].release()
 
@@ -1324,6 +1362,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 500
+        data = await resp.json()
+        assert data["operation_result"] == "echec"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "echec"
         assert http_app["derniere_synchro_terminee"] is not None

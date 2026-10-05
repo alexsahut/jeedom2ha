@@ -1501,14 +1501,19 @@ async def _handle_action_sync(request: web.Request) -> web.Response:
     try:
         return await _do_handle_action_sync(request)
     except Exception as e:
-        request.app["derniere_operation_resultat"] = _build_operation_snapshot(
+        operation = _build_operation_snapshot(
             resultat="echec",
             intention="sync",
             message="Synchronisation échouée — erreur inattendue.",
         )
+        request.app["derniere_operation_resultat"] = operation
         request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
         _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
-        raise
+        return web.json_response({
+            "status": "error",
+            "operation_result": operation["resultat"],
+            "operation_message": operation["message"],
+        }, status=500)
 
 async def _unpublish_refused_candidates(
     eq_id: int,
