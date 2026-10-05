@@ -157,12 +157,13 @@ function applyHAGating(r) {
   }
 }
 
-function confirmTopologyRescan(onConfirm) {
+function confirmTopologyRescan(onConfirm, onCancel) {
   confirmHaPublishAction(
     '{{Rescanner la topologie Jeedom}}',
     '{{Un sync complet peut publier ou retirer des entités Home Assistant et applique les overrides persistés. Confirmer ?}}',
     '{{Rescanner}}',
-    onConfirm
+    onConfirm,
+    onCancel
   );
 }
 
@@ -316,7 +317,7 @@ function showHaActionFeedback(payload) {
   });
 }
 
-function confirmHaPublishAction(title, message, confirmLabel, onConfirm) {
+function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel) {
   if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
     bootbox.dialog({
       title: title,
@@ -325,6 +326,7 @@ function confirmHaPublishAction(title, message, confirmLabel, onConfirm) {
         cancel: {
           label: '{{Annuler}}',
           className: 'btn-default',
+          callback: onCancel || function() {},
         },
         confirm: {
           label: confirmLabel,
@@ -337,9 +339,8 @@ function confirmHaPublishAction(title, message, confirmLabel, onConfirm) {
     });
     return;
   }
-  if (window.confirm(message)) {
-    onConfirm();
-  }
+  if (window.confirm(message)) onConfirm();
+  else if (typeof onCancel === 'function') onCancel();
 }
 
 function executeHaAction(intention, portee, selection, handlers) {
@@ -393,9 +394,9 @@ function executeHaAction(intention, portee, selection, handlers) {
   });
 }
 
-function triggerTopologyRescan($button) {
-  var snapshot = setHaActionPendingState($button, '{{Rescan en cours…}}');
-  window.jeedom2haRescanInProgress = true;
+function triggerTopologyRescan($button, snapshot, owner) {
+  if (window.jeedom2haRescanOwner !== owner) return;
+  $button.html('<i class="fas fa-spinner fa-spin"></i> {{Rescan en cours…}}');
   $('[data-ha-action]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -405,6 +406,8 @@ function triggerTopologyRescan($button) {
       if (data.state === 'ok' && result && result.status === 'ok') {
         if (result.operation_result === 'succes') {
           $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée.}}', level: 'success'});
+        } else if (result.operation_result === 'echec') {
+          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation échouée.}}', level: 'danger'});
         } else if (typeof result.operation_result === 'string') {
           $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée avec avertissements.}}', level: 'warning'});
         } else {
@@ -419,9 +422,12 @@ function triggerTopologyRescan($button) {
       $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
-      window.jeedom2haRescanInProgress = false;
-      restoreHaActionPendingState($button, snapshot);
-      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+      if (window.jeedom2haRescanOwner === owner) {
+        window.jeedom2haRescanOwner = null;
+        window.jeedom2haRescanInProgress = false;
+        restoreHaActionPendingState($button, snapshot);
+        applyHAGating(window.jeedom2haLastBridgeStatus || null);
+      }
     },
   });
 }
@@ -551,9 +557,19 @@ $(function() {
 
   $('#bt_rescanTopology').on('click', function() {
     var $button = $(this);
-    if ($button.prop('disabled')) return;
+    if ($button.prop('disabled') || window.jeedom2haRescanInProgress === true) return;
+    var snapshot = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    var owner = {};
+    window.jeedom2haRescanInProgress = true;
+    window.jeedom2haRescanOwner = owner;
     confirmTopologyRescan(function() {
-      triggerTopologyRescan($button);
+      triggerTopologyRescan($button, snapshot, owner);
+    }, function() {
+      if (window.jeedom2haRescanOwner !== owner) return;
+      window.jeedom2haRescanOwner = null;
+      window.jeedom2haRescanInProgress = false;
+      restoreHaActionPendingState($button, snapshot);
+      applyHAGating(window.jeedom2haLastBridgeStatus || null);
     });
   });
 
