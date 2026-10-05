@@ -1,6 +1,6 @@
 # Story 20.1 : Surface unique pièce → équipement → commande
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -127,9 +127,9 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés préalables, lecture seule (AC: 3, 4)**
+- [x] **Task 0 — Relevés préalables, lecture seule (AC: 3, 4)**
   - [x] 0.0 — `epics-projection-engine.md` (Story 20.1 et 20.3) porte le déplacement des compteurs vers 20.3 (décision Q3 d'Alex, 2026-10-05).
-  - [ ] 0.1 — Lis la signature de `eqLogic::byObjectId` dans le cœur Jeedom de la box (lecture seule, `grep -n`), et cite-la. Référence : `byObjectId($_object_id, $_onlyEnable = true, …)` ; avec `null`, objet nul ou `-1`.
+  - [x] 0.1 — Lecture seule le 2026-10-05 : `eqLogic.class.php:116` : `public static function byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)` ; accepte donc `null` et `-1` avec `$_onlyEnable = false`.
   - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
     - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
     - 7 équipements désactivés au total : Garage 1 (eq 279), bureau 1, exterieur 3, sans pièce 2 ;
