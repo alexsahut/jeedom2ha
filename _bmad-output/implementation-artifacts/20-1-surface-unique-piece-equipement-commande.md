@@ -1,6 +1,6 @@
 # Story 20.1 : Surface unique pièce → équipement → commande
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -132,7 +132,7 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 0.1 — Lecture seule le 2026-10-05 : `eqLogic.class.php:116` : `public static function byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)` ; accepte donc `null` et `-1` avec `$_onlyEnable = false`.
   - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
     - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
-    - 7 équipements désactivés et non exclus au total (raison `disabled_eqlogic` ; l'exclusion est évaluée avant la désactivation, `resources/daemon/models/topology.py:306-312`) : Garage 1 (eq 514), bureau 1 (eq 279), exterieur 3, sans pièce 2 ;
+    - 7 équipements désactivés et non exclus au total (raison `disabled_eqlogic` ; l'exclusion est évaluée avant la désactivation, `resources/daemon/models/topology.py:303-312`) : Garage 1 (eq 514), bureau 1 (eq 279), exterieur 3, sans pièce 2 ;
     - le Garage compte aussi l'eq 339, désactivé et exclu : il est compté parmi les exclus et s'affiche « Exclu » ;
     - **pièce désignée pour le gate : Garage**, avec l'eq 514 (relevé corrigé le 2026-10-05, voir Journal des décisions).
   - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279, bureau) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
@@ -151,9 +151,9 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 - [x] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
   - [x] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
   - [x] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
-- [ ] **Task 6 — Gate et preuve (AC: 10)**
+- [x] **Task 6 — Gate et preuve (AC: 10)**
   - [x] 6.1 — Parcours de découverte étendu (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; parcours de référence inchangé, le DOM de ses cibles ne change pas.
-  - [ ] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`.
+  - [x] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`. Fait le 2026-10-05 : `95fde04` déployé, relevés box et HA sans écart, gate 20-0 PASS (découverte et référence) sur `main` `05634b8`, passage Chrome consigné ; voir `20-1-preuve-validation-ux-2026-10-05.md`.
 
 ## Dev Notes
 
@@ -193,6 +193,8 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 - 2026-10-05 — Questions Q1 à Q4 posées à Alex, avec recommandation 1A, 2A, 3C, 4A (Q3 et Q4 corrigées dans un second message).
 - 2026-10-05, 10:43 — **Décision d'Alex : « 1A 2A 3C 4A ».** Le déplacement des compteurs vers 20.3 est porté dans `epics-projection-engine.md` (Story 20.1 et 20.3). Story passée `ready-for-dev`.
 - 2026-10-05 — Correction d'un relevé de ClaudeBox (Task 0.2) : l'équipement désactivé du Garage est l'eq 514, pas l'eq 279, qui est dans le bureau. Erreur de correspondance entre identifiant d'objet et pièce, vue au passage Chrome après déploiement. Le parcours de découverte est corrigé avant son premier passage sur la box.
+- 2026-10-05 — Preuve terrain : déploiement standard de `95fde04` (09:36:47Z), relevés box et HA sans écart ; PR #205 (fusion `05634b8`) corrige le parcours ; gate 20-0 sur `main` : découverte PASS (11:32:58Z), référence PASS (11:36:08Z). Story `ready-for-UX-validation`.
+- 2026-10-05, 13:40 — Validation UX par ClaudeBox dans Chrome, en lecture seule, sur délégation d'Alex (05/10, 08:54) : conforme. Un constat non bloquant reporté en 20-2 : un équipement exclu sans commande dans son arbre s'affiche « Aucune commande projetable » au lieu de « Exclu ». Story `done`. Artefact `20-1-preuve-validation-ux-2026-10-05.md`.
 
 ## References
 
@@ -211,9 +213,10 @@ GPT-5 Codex
 
 - 2026-10-05 — BMAD `dev-story` non interactif terminé pour les Tasks 0 à 5 et 6.1 ; confirmations par défaut consignées au rapport externe.
 - 2026-10-05 — 424 tests node verts ; `php -l` et `node --check` verts ; auto-test local de l'intercepteur PASS (0 échec).
-- 2026-10-05 — 6.2 reste explicitement hors unité : déploiement, gate sur box et passage Chrome seront faits après fusion.
+- 2026-10-05 — 6.2 était hors de l'unité de développement : déploiement, gate sur box et passage Chrome prévus après fusion (faits le même jour, voir la note de clôture ci-dessous).
 - 2026-10-05 — Signature box lue : `byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)`.
 - 2026-10-05 — Corrections de relecture ClaudeBox + relecture indépendante sur PR #204 (head 97cdaa8) : clé de rapport du gate en double (eq_279_badge, P1), ordre du DOM AC2 étendu au bandeau (gestion_avant_bandeau), info-bulle du sélecteur désactivé posée aussi sur la cellule, libellé « Sans pièce » traduit via `__()`.
+- 2026-10-05 — Preuve terrain et validation UX (Task 6.2) : déploiement de `95fde04`, gate 20-0 PASS sur `05634b8`, validation UX par ClaudeBox ; artefact `20-1-preuve-validation-ux-2026-10-05.md`. Story `done`.
 
 ### File List
 
@@ -225,7 +228,9 @@ GPT-5 Codex
 - `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
 - `_bmad-output/implementation-artifacts/20-1-surface-unique-piece-equipement-commande.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/20-1-preuve-validation-ux-2026-10-05.md`
 
 ### Change Log
 
 - 2026-10-05 — Surface unique complétée : Sans pièce, désactivés neutres, sélecteurs inactifs et découverte gate étendue.
+- 2026-10-05 — Preuve terrain après fusion (`95fde04` déployé, gate 20-0 PASS) et validation UX ; artefact `20-1-preuve-validation-ux-2026-10-05.md` ; statut `done`.
