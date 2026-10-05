@@ -194,3 +194,18 @@ async def test_preview_evaluates_proposal_despite_type_override_on_another_comma
     assert result["projection_validity"]["is_valid"] is True
     assert result["should_publish"] is True
     assert list_overrides(str(tmp_path)) == persisted
+
+
+async def test_preview_type_proposal_keeps_persisted_publication_force(cli, app, tmp_path):
+    """AC3: la fusion de l'aperçu conserve un forçage publication déjà persisté."""
+    from mapping.overrides import save_override
+    snapshot, eq = _light_snapshot()
+    app["topology"], app["data_dir"] = snapshot, str(tmp_path)
+    save_override(eq.id, eq.cmds[0].id, {"publication_override": "force_publish"}, str(tmp_path))
+    response = await _preview(cli, {
+        "jeedom_eq_id": eq.id, "jeedom_cmd_id": eq.cmds[0].id, "ha_entity_type": "switch",
+    })
+    assert response.status == 200
+    result = (await response.json())["payload"]["overridden"]
+    assert result["ha_entity_type"] == "switch"
+    assert result["publication_override"] == "force_publish"
