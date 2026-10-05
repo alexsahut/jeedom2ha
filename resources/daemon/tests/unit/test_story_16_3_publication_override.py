@@ -29,6 +29,8 @@ import os
 from mapping.overrides import (
     list_equipment_overrides,
     list_overrides,
+    remove_equipment_override_fields,
+    remove_override_fields,
     remove_equipment_override,
     resolve_publication_override,
     save_equipment_override,
@@ -122,6 +124,28 @@ def test_remove_equipment_override_supprime_une_entree_existante(tmp_path):
 
 def test_remove_equipment_override_retourne_false_si_absente(tmp_path):
     assert remove_equipment_override(999, str(tmp_path)) is False
+
+
+def test_story_20_2_remove_command_field_keeps_the_other_override(tmp_path):
+    data_dir = str(tmp_path)
+    save_override(701, 702, {"ha_entity_type": "switch"}, data_dir)
+    save_override(701, 702, {"publication_override": "exclude"}, data_dir)
+
+    assert remove_override_fields(701, 702, ("ha_entity_type",), data_dir)
+    assert list_overrides(data_dir)["701:702"]["publication_override"] == "exclude"
+    assert remove_override_fields(701, 702, ("publication_override",), data_dir)
+    assert "701:702" not in list_overrides(data_dir)
+
+
+def test_story_20_2_remove_equipment_field_keeps_the_other_override(tmp_path):
+    data_dir = str(tmp_path)
+    save_equipment_override(701, {"ha_entity_type": "switch"}, data_dir)
+    save_equipment_override(701, {"publication_override": "exclude"}, data_dir)
+
+    assert remove_equipment_override_fields(701, ("ha_entity_type",), data_dir)
+    assert list_equipment_overrides(data_dir)["701"]["publication_override"] == "exclude"
+    assert remove_equipment_override_fields(701, ("publication_override",), data_dir)
+    assert "701" not in list_equipment_overrides(data_dir)
 
 
 def test_equipment_overrides_et_overrides_sont_des_sections_separees(tmp_path):

@@ -467,6 +467,34 @@ def remove_override(jeedom_eq_id: int, jeedom_cmd_id: int, data_dir: str) -> boo
     return True
 
 
+def _remove_entry_fields(raw: Dict, section: str, key: str, fields: tuple, data_dir: str) -> bool:
+    """Remove selected semantic fields and delete an entry only once it is empty."""
+    entry = raw[section].get(key)
+    if not entry:
+        return False
+    changed = any(field in entry for field in fields)
+    for field in fields:
+        entry.pop(field, None)
+    if not changed:
+        return False
+    if not any(field in entry for field in ("ha_entity_type", "publication_override")):
+        del raw[section][key]
+    raw["schema_version"] = _SCHEMA_VERSION
+    if not os.path.isdir(data_dir):
+        return True
+    try:
+        _write_raw_atomically(_overrides_path(data_dir), raw)
+    except OSError as exc:
+        _LOGGER.error("[OVERRIDES] Échec sauvegarde après retrait partiel : %s", exc)
+    return True
+
+
+def remove_override_fields(jeedom_eq_id: int, jeedom_cmd_id: int, fields: tuple, data_dir: str) -> bool:
+    """Remove only requested fields from a command override (Story 20.2 AC5)."""
+    raw = _load_raw(data_dir)
+    return bool(raw and _remove_entry_fields(raw, "overrides", _override_key(jeedom_eq_id, jeedom_cmd_id), fields, data_dir))
+
+
 def remove_equipment_override(jeedom_eq_id: int, data_dir: str) -> bool:
     """Remove a single equipment-level override entry if present (Story 16.3).
 
@@ -496,6 +524,12 @@ def remove_equipment_override(jeedom_eq_id: int, data_dir: str) -> bool:
         _LOGGER.error("[OVERRIDES] Échec sauvegarde après suppression équipement : %s", exc)
 
     return True
+
+
+def remove_equipment_override_fields(jeedom_eq_id: int, fields: tuple, data_dir: str) -> bool:
+    """Remove only requested fields from an equipment override (Story 20.2 AC5)."""
+    raw = _load_raw(data_dir)
+    return bool(raw and _remove_entry_fields(raw, "equipment_overrides", str(jeedom_eq_id), fields, data_dir))
 
 
 def resolve_publication_override(
