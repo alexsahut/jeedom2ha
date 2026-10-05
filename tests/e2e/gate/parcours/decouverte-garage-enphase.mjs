@@ -14,6 +14,7 @@ async function waitForDiagnostics(page, eqId) {
       'j2ha-diag-ready',
       'j2ha-diag-blocking',
       'j2ha-diag-uncovered',
+      'j2ha-diag-excluded',
       'j2ha-diag-unknown',
     ];
     return rows.length > 0 && rows.every((row) => {
@@ -31,8 +32,37 @@ async function readCommandStates(panel) {
     if (diagnostic?.classList.contains('j2ha-diag-ready')) state = 'prete';
     if (diagnostic?.classList.contains('j2ha-diag-blocking')) state = 'bloquante';
     if (diagnostic?.classList.contains('j2ha-diag-uncovered')) state = 'non-couverte';
+    if (diagnostic?.classList.contains('j2ha-diag-excluded')) state = 'exclue';
     if (diagnostic?.classList.contains('j2ha-diag-unknown')) state = 'inconnue';
     return { id: row.getAttribute('data-cmd-id'), state };
+  }));
+}
+
+/** Attend puis lit les états de badge de tous les équipements déjà présents dans la modale. */
+async function readEquipmentBadgeStates(page, modal) {
+  await page.waitForFunction(() => {
+    const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
+    const states = [
+      'j2ha-publish-ok',
+      'j2ha-publish-partial',
+      'j2ha-publish-blocked',
+      'j2ha-publish-excluded',
+      'j2ha-publish-empty',
+    ];
+    return panels.length > 0 && panels.every((item) => {
+      const badge = item.querySelector('.j2ha-eq-publish-badge');
+      return badge && states.some((state) => badge.classList.contains(state));
+    });
+  });
+  return modal.locator('.j2ha-eq-panel').evaluateAll((panels) => panels.map((item) => {
+    const badge = item.querySelector('.j2ha-eq-publish-badge');
+    let state = 'inconnu';
+    if (badge?.classList.contains('j2ha-publish-ok')) state = 'publie';
+    if (badge?.classList.contains('j2ha-publish-partial')) state = 'partiel';
+    if (badge?.classList.contains('j2ha-publish-blocked')) state = 'bloque';
+    if (badge?.classList.contains('j2ha-publish-excluded')) state = 'exclu';
+    if (badge?.classList.contains('j2ha-publish-empty')) state = 'vide';
+    return { id: item.getAttribute('data-eq-id'), state };
   }));
 }
 
@@ -98,4 +128,8 @@ export async function run(page, { helpers }) {
   const summary = (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
   if (!summary) throw new Error('synthese-enphase-illisible');
   helpers.record('synthese', summary);
+  for (const equipment of await readEquipmentBadgeStates(page, modal)) {
+    if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
+    helpers.record(`eq_${equipment.id}_badge`, equipment.state);
+  }
 }

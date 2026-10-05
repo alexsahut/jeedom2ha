@@ -68,6 +68,7 @@
 /* La classe est posée sur le <tr> ; on cible les <td> pour passer devant les fonds Bootstrap/Jeedom */
 .j2ha-diag-target-highlight > td {
   background-color: #fff9c4 !important;
+  color: #333 !important;
 }
 
 /* Story 16.8 — Tableau des commandes (Commande | generic_type | Override HA | Diagnostic). */
@@ -132,6 +133,10 @@
   color: #777;
   font-style: italic;
 }
+/* CC-38 — exclusion volontaire : neutre et distincte d’une commande non couverte. */
+.mo-diag-cell.j2ha-diag-excluded {
+  color: #777;
+}
 
 /* Story 16.8 — Surface par pièce (cartes pièces + accordéon équipements + synthèse publication). */
 .j2ha-room-card i.fa-door-open {
@@ -173,6 +178,10 @@
   color: #8a6d3b;
 }
 .j2ha-eq-publish-badge.j2ha-publish-empty {
+  background-color: #eee;
+  color: #777;
+}
+.j2ha-eq-publish-badge.j2ha-publish-excluded {
   background-color: #eee;
   color: #777;
 }

@@ -53,7 +53,7 @@
   }
 
   function renderDiagnosticCell($cell, view, covered) {
-    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered');
+    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered j2ha-diag-excluded');
     // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
     // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
     // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
@@ -63,6 +63,11 @@
     if (covered === false && M.shouldShowUncoveredLabel(view)) {
       $cell.addClass('j2ha-diag-uncovered').html('<i class="fas fa-ban"></i> ');
       $cell.append($('<span></span>').text(M.buildUncoveredLabel()));
+      return;
+    }
+    if (M.isExcludedDiagnostic(view)) {
+      $cell.addClass('j2ha-diag-excluded').html('<i class="fas fa-eye-slash"></i> ');
+      $cell.append($('<span></span>').text(M.buildExcludedLabel(view)));
       return;
     }
     var state = M.diagnosticState(view);
@@ -158,7 +163,7 @@
         }
         var view = M.readPreviewOverridden(result);
         renderDiagnosticCell($diagCell, view, true);
-        maybeShowReassurance(M.isBlockingDiagnostic(view));
+        maybeShowReassurance(M.isBlockingDiagnostic(view) && !M.isExcludedDiagnostic(view));
         if (M.shouldAutoValidate(view)) {
           saveOverride(eqId, cmdId, type);
         }
@@ -214,7 +219,7 @@
     var label = M.buildPublicationSummaryLabel(summary);
 
     var $badge = $panel.find('.j2ha-eq-publish-badge').first();
-    $badge.removeClass('j2ha-publish-ok j2ha-publish-partial j2ha-publish-blocked j2ha-publish-empty');
+    $badge.removeClass('j2ha-publish-ok j2ha-publish-partial j2ha-publish-blocked j2ha-publish-empty j2ha-publish-excluded');
     var icon;
     if (state === 'publish') {
       $badge.addClass('j2ha-publish-ok');
@@ -225,6 +230,9 @@
     } else if (state === 'blocked') {
       $badge.addClass('j2ha-publish-blocked');
       icon = 'fa-exclamation-triangle';
+    } else if (state === 'excluded') {
+      $badge.addClass('j2ha-publish-excluded');
+      icon = 'fa-eye-slash';
     } else {
       $badge.addClass('j2ha-publish-empty');
       icon = 'fa-minus-circle';
@@ -406,7 +414,7 @@
     var $content = buildRoomModalHtml(room);
 
     bootbox.dialog({
-      title: '<i class="fas fa-house-signal"></i> ' + $('<span>').text(room.object_name).html(),
+      title: '<i class="fas fa-home"></i> ' + $('<span>').text(room.object_name).html(),
       message: $content,
       size: 'large',
       className: 'modal-j2ha-room',

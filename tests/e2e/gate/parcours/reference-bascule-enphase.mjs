@@ -59,6 +59,7 @@ async function diagnosticState(row) {
     if (cell.classList.contains('j2ha-diag-ready')) return 'prete';
     if (cell.classList.contains('j2ha-diag-blocking')) return 'bloquante';
     if (cell.classList.contains('j2ha-diag-uncovered')) return 'non-couverte';
+    if (cell.classList.contains('j2ha-diag-excluded')) return 'exclue';
     if (cell.classList.contains('j2ha-diag-unknown')) return 'inconnue';
     return 'inconnu';
   });
