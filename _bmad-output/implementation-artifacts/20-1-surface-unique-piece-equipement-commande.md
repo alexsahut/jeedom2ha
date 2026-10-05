@@ -1,6 +1,6 @@
 # Story 20.1 : Surface unique pièce → équipement → commande
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -127,31 +127,31 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés préalables, lecture seule (AC: 3, 4)**
+- [x] **Task 0 — Relevés préalables, lecture seule (AC: 3, 4)**
   - [x] 0.0 — `epics-projection-engine.md` (Story 20.1 et 20.3) porte le déplacement des compteurs vers 20.3 (décision Q3 d'Alex, 2026-10-05).
-  - [ ] 0.1 — Lis la signature de `eqLogic::byObjectId` dans le cœur Jeedom de la box (lecture seule, `grep -n`), et cite-la. Référence : `byObjectId($_object_id, $_onlyEnable = true, …)` ; avec `null`, objet nul ou `-1`.
+  - [x] 0.1 — Lecture seule le 2026-10-05 : `eqLogic.class.php:116` : `public static function byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)` ; accepte donc `null` et `-1` avec `$_onlyEnable = false`.
   - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
     - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
     - 7 équipements désactivés au total : Garage 1 (eq 279), bureau 1, exterieur 3, sans pièce 2 ;
     - **pièce désignée pour le gate : Garage**, avec l'eq 279.
   - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
-- [ ] **Task 1 — Données Jeedom (AC: 3, 4)**
-  - [ ] 1.1 — `desktop/php/jeedom2ha.php:14-36` : `eqLogic::byObjectId($object->getId(), false)`.
-  - [ ] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` (`desktop/js/jeedom2ha_mapping_override.js:389-392`) n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
-  - [ ] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
-- [ ] **Task 2 — Bloc « Gestion » (AC: 2)**
-  - [ ] 2.1 — Déplacer le bloc des trois actions sous le titre « Gestion », sans changer ses classes ni ses attributs.
-- [ ] **Task 3 — État désactivé (AC: 4, 6)**
-  - [ ] 3.1 — Module pur, sur le modèle de CC-38 : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
-  - [ ] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
-- [ ] **Task 4 — Sélecteur inactif (AC: 7)**
-  - [ ] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
-  - [ ] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
-- [ ] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
-  - [ ] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
-  - [ ] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
+- [x] **Task 1 — Données Jeedom (AC: 3, 4)**
+  - [x] 1.1 — `desktop/php/jeedom2ha.php` appelle `eqLogic::byObjectId($object->getId(), false)`.
+  - [x] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
+  - [x] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
+- [x] **Task 2 — Bloc « Gestion » (AC: 2)**
+  - [x] 2.1 — Bloc des trois actions déplacé sous le titre « Gestion », classes et attributs conservés.
+- [x] **Task 3 — État désactivé (AC: 4, 6)**
+  - [x] 3.1 — Module pur : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
+  - [x] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
+- [x] **Task 4 — Sélecteur inactif (AC: 7)**
+  - [x] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
+  - [x] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
+- [x] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
+  - [x] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
+  - [x] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
 - [ ] **Task 6 — Gate et preuve (AC: 10)**
-  - [ ] 6.1 — Étendre le parcours de découverte (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; adapter le parcours de référence si le DOM change.
+  - [x] 6.1 — Parcours de découverte étendu (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; parcours de référence inchangé, le DOM de ses cibles ne change pas.
   - [ ] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`.
 
 ## Dev Notes
@@ -203,6 +203,27 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 
 ### Agent Model Used
 
+GPT-5 Codex
+
 ### Completion Notes List
 
+- 2026-10-05 — BMAD `dev-story` non interactif terminé pour les Tasks 0 à 5 et 6.1 ; confirmations par défaut consignées au rapport externe.
+- 2026-10-05 — 424 tests node verts ; `php -l` et `node --check` verts ; auto-test local de l'intercepteur PASS (0 échec).
+- 2026-10-05 — 6.2 reste explicitement hors unité : déploiement, gate sur box et passage Chrome seront faits après fusion.
+- 2026-10-05 — Signature box lue : `byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)`.
+- 2026-10-05 — Corrections de relecture ClaudeBox + relecture indépendante sur PR #204 (head 97cdaa8) : clé de rapport du gate en double (eq_279_badge, P1), ordre du DOM AC2 étendu au bandeau (gestion_avant_bandeau), info-bulle du sélecteur désactivé posée aussi sur la cellule, libellé « Sans pièce » traduit via `__()`.
+
 ### File List
+
+- `desktop/php/jeedom2ha.php`
+- `desktop/js/jeedom2ha_mapping_override.js`
+- `desktop/js/jeedom2ha_mapping_surface.js`
+- `desktop/css/jeedom2ha.css`
+- `tests/unit/test_story_16_8_mapping_surface.node.test.js`
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
+- `_bmad-output/implementation-artifacts/20-1-surface-unique-piece-equipement-commande.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-10-05 — Surface unique complétée : Sans pièce, désactivés neutres, sélecteurs inactifs et découverte gate étendue.

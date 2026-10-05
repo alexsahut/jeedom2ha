@@ -15,6 +15,7 @@ async function waitForDiagnostics(page, eqId) {
       'j2ha-diag-blocking',
       'j2ha-diag-uncovered',
       'j2ha-diag-excluded',
+      'j2ha-diag-disabled',
       'j2ha-diag-unknown',
     ];
     return rows.length > 0 && rows.every((row) => {
@@ -33,6 +34,7 @@ async function readCommandStates(panel) {
     if (diagnostic?.classList.contains('j2ha-diag-blocking')) state = 'bloquante';
     if (diagnostic?.classList.contains('j2ha-diag-uncovered')) state = 'non-couverte';
     if (diagnostic?.classList.contains('j2ha-diag-excluded')) state = 'exclue';
+    if (diagnostic?.classList.contains('j2ha-diag-disabled')) state = 'desactive';
     if (diagnostic?.classList.contains('j2ha-diag-unknown')) state = 'inconnue';
     return { id: row.getAttribute('data-cmd-id'), state };
   }));
@@ -48,6 +50,7 @@ async function readEquipmentBadgeStates(page, modal) {
       'j2ha-publish-blocked',
       'j2ha-publish-excluded',
       'j2ha-publish-empty',
+      'j2ha-publish-disabled',
     ];
     return panels.length > 0 && panels.every((item) => {
       const badge = item.querySelector('.j2ha-eq-publish-badge');
@@ -62,6 +65,7 @@ async function readEquipmentBadgeStates(page, modal) {
     if (badge?.classList.contains('j2ha-publish-blocked')) state = 'bloque';
     if (badge?.classList.contains('j2ha-publish-excluded')) state = 'exclu';
     if (badge?.classList.contains('j2ha-publish-empty')) state = 'vide';
+    if (badge?.classList.contains('j2ha-publish-disabled')) state = 'desactive';
     return { id: item.getAttribute('data-eq-id'), state };
   }));
 }
@@ -77,20 +81,34 @@ async function waitAtStep(helpers, index, label, operation) {
   }
 }
 
-/** Consigne au plus trente noms d'équipement de la modale pour diagnostiquer un sélecteur absent. */
-async function recordEquipmentNames(modal, helpers) {
-  const names = await modal.locator('.j2ha-eq-name').allTextContents();
-  for (const [index, name] of names.slice(0, 30).entries()) {
-    try {
-      helpers.record(`eq_nom_${index + 1}`, name.trim());
-    } catch {
-      // Les noms refusés par le contrat de rapport sont volontairement ignorés.
-    }
-  }
-}
-
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
+  const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
+    const actions = nodes.find((node) => node.querySelector('[data-action="add"]') && node.querySelector('[data-action="gotoPluginConf"]') && node.querySelector('[data-action="diagnostic"]'));
+    const surface = document.querySelector('#j2ha_roomCards');
+    const banner = document.querySelector('#div_bridgeHealthBanner');
+    return {
+      beforeSurface: Boolean(actions && surface && (actions.compareDocumentPosition(surface) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      beforeBanner: Boolean(actions && banner && (actions.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    };
+  });
+  if (!managementOrder.beforeSurface) throw new Error('gestion-apres-surface');
+  if (!managementOrder.beforeBanner) throw new Error('gestion-apres-bandeau');
+  helpers.record('gestion_avant_surface', true);
+  helpers.record('gestion_avant_bandeau', true);
+  const journalBeforeRoom = helpers.journalEntries().filter((entry) => entry.action === 'getMappingOverrides').length;
+  if (journalBeforeRoom !== 0) throw new Error('lecture-mapping-avant-piece');
+  helpers.record('mapping_avant_piece', 0);
+  const unassigned = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="0"]');
+  const unassignedCount = await unassigned.count();
+  if (unassignedCount > 1) throw new Error('cartes-sans-piece-dupliquees');
+  helpers.record('sans_piece_presente', unassignedCount === 1);
+  if (unassignedCount === 1) {
+    const countText = await unassigned.locator('.text-muted').innerText();
+    const count = Number(countText.replace(/[^0-9]/g, ''));
+    if (!Number.isInteger(count) || count < 1) throw new Error('compte-sans-piece-illisible');
+    helpers.record('sans_piece_equipements', count);
+  }
   const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
     has: page.locator('.name', { hasText: /^Garage$/ }),
   });
@@ -101,12 +119,7 @@ export async function run(page, { helpers }) {
   const panel = modal.locator('.j2ha-eq-panel').filter({
     has: page.locator('.j2ha-eq-name', { hasText: /^\s*Enphase\s*$/ }),
   });
-  try {
-    await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
-  } catch (error) {
-    await recordEquipmentNames(modal, helpers);
-    throw error;
-  }
+  await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
 
   const eqId = await panel.getAttribute('data-eq-id');
   if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-enphase-illisible');
@@ -131,5 +144,15 @@ export async function run(page, { helpers }) {
   for (const equipment of await readEquipmentBadgeStates(page, modal)) {
     if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
     helpers.record(`eq_${equipment.id}_badge`, equipment.state);
+  }
+  const disabledPanel = modal.locator('.j2ha-eq-panel[data-eq-id="279"]');
+  await waitAtStep(helpers, 7, 'diagnostics-eq-279', () => waitForDiagnostics(page, '279'));
+  const disabledBadge = (await disabledPanel.locator('.j2ha-eq-publish-badge').innerText()).trim();
+  if (!disabledBadge || !(await disabledPanel.locator('.j2ha-eq-publish-badge').evaluate((badge) => badge.classList.contains('j2ha-publish-disabled')))) {
+    throw new Error('badge-eq-279-non-desactive');
+  }
+  for (const command of await readCommandStates(disabledPanel)) {
+    if (command.state !== 'desactive') throw new Error('cellule-eq-279-non-desactive');
+    helpers.record(`eq_279_cmd_${command.id}_etat`, command.state);
   }
 }

@@ -13,7 +13,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 $j2haRoomsTree = array();
 foreach ((jeeObject::buildTree(null, false)) as $object) {
 	$roomEqList = array();
-	foreach (eqLogic::byObjectId($object->getId()) as $roomEq) {
+	foreach (eqLogic::byObjectId($object->getId(), false) as $roomEq) {
 		if ($roomEq->getEqType_name() === 'jeedom2ha') {
 			continue;
 		}
@@ -33,6 +33,27 @@ foreach ((jeeObject::buildTree(null, false)) as $object) {
 		'equipments'    => $roomEqList,
 	);
 }
+// Story 20.1 : la convention daemon object_id=0 rassemble les équipements sans
+// objet (null ou -1). Les désactivés restent dans l'ordre natif Jeedom.
+$unassignedEqList = array();
+foreach (eqLogic::byObjectId(null, false) as $roomEq) {
+	if ($roomEq->getEqType_name() === 'jeedom2ha') {
+		continue;
+	}
+	$unassignedEqList[] = array(
+		'eq_id'   => (int) $roomEq->getId(),
+		'eq_name' => $roomEq->getName(),
+		'enabled' => ($roomEq->getIsEnable() == 1),
+	);
+}
+if (count($unassignedEqList) > 0) {
+	$j2haRoomsTree[] = array(
+		'object_id'     => 0,
+		'object_name'   => __('Sans pièce', __FILE__),
+		'parent_number' => 0,
+		'equipments'    => $unassignedEqList,
+	);
+}
 sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 ?>
 
@@ -40,6 +61,11 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
+		<div class="eqLogicThumbnailContainer">
+			<div class="cursor eqLogicAction logoPrimary" data-action="add"><i class="fas fa-plus-circle"></i><br><span>{{Ajouter}}</span></div>
+			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
+			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic"><i class="fas fa-stethoscope"></i><br><span>{{Diagnostic}}</span></div>
+		</div>
 
 		<!-- Bandeau global de santé toujours visible (Story 2.2) -->
 		<div id="div_bridgeHealthBanner" class="well well-sm" style="margin:10px 5px; display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
@@ -143,24 +169,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 		}
 		?>
 
-		<!-- Boutons de gestion du plugin -->
-		<div class="eqLogicThumbnailContainer">
-			<div class="cursor eqLogicAction logoPrimary" data-action="add">
-				<i class="fas fa-plus-circle"></i>
-				<br>
-				<span>{{Ajouter}}</span>
-			</div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
-				<i class="fas fa-wrench"></i>
-				<br>
-				<span>{{Configuration}}</span>
-			</div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic">
-				<i class="fas fa-stethoscope"></i>
-				<br>
-				<span>{{Diagnostic}}</span>
-			</div>
-		</div>
 		<legend><i class="fas fa-table"></i> {{Mes templates}}</legend>
 		<?php
 		if (count($eqLogics) == 0) {

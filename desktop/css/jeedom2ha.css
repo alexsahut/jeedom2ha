@@ -137,6 +137,10 @@
 .mo-diag-cell.j2ha-diag-excluded {
   color: #777;
 }
+/* Story 20.1 — équipement désactivé : état neutre, non bloquant. */
+.mo-diag-cell.j2ha-diag-disabled {
+  color: #777;
+}
 
 /* Story 16.8 — Surface par pièce (cartes pièces + accordéon équipements + synthèse publication). */
 .j2ha-room-card i.fa-door-open {
@@ -182,6 +186,10 @@
   color: #777;
 }
 .j2ha-eq-publish-badge.j2ha-publish-excluded {
+  background-color: #eee;
+  color: #777;
+}
+.j2ha-eq-publish-badge.j2ha-publish-disabled {
   background-color: #eee;
   color: #777;
 }
