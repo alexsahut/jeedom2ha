@@ -145,14 +145,14 @@ export async function run(page, { helpers }) {
     if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
     helpers.record(`eq_${equipment.id}_badge`, equipment.state);
   }
-  const disabledPanel = modal.locator('.j2ha-eq-panel[data-eq-id="279"]');
-  await waitAtStep(helpers, 7, 'diagnostics-eq-279', () => waitForDiagnostics(page, '279'));
+  const disabledPanel = modal.locator('.j2ha-eq-panel[data-eq-id="514"]');
+  await waitAtStep(helpers, 7, 'diagnostics-eq-514', () => waitForDiagnostics(page, '514'));
   const disabledBadge = (await disabledPanel.locator('.j2ha-eq-publish-badge').innerText()).trim();
   if (!disabledBadge || !(await disabledPanel.locator('.j2ha-eq-publish-badge').evaluate((badge) => badge.classList.contains('j2ha-publish-disabled')))) {
-    throw new Error('badge-eq-279-non-desactive');
+    throw new Error('badge-eq-514-non-desactive');
   }
   for (const command of await readCommandStates(disabledPanel)) {
-    if (command.state !== 'desactive') throw new Error('cellule-eq-279-non-desactive');
-    helpers.record(`eq_279_cmd_${command.id}_etat`, command.state);
+    if (command.state !== 'desactive') throw new Error('cellule-eq-514-non-desactive');
+    helpers.record(`eq_514_cmd_${command.id}_etat`, command.state);
   }
 }

@@ -117,7 +117,7 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - l'ordre du DOM : actions de « Gestion » avant la surface (AC2) ;
   - aucune entrée `getMappingOverrides` au journal avant l'ouverture d'une pièce (AC5) ;
   - la présence de la carte « Sans pièce » et son nombre d'équipements, ou son absence ;
-  - dans le Garage, l'équipement désactivé eq 279 : l'état `desactive` de son badge et de ses cellules ;
+  - dans le Garage, l'équipement désactivé eq 514 : l'état `desactive` de son badge et de ses cellules ;
   - les états déjà relevés (Enphase, badges du Garage) ;
 - référence (bascule simulée de 5369), adaptée au DOM si nécessaire ;
 **And** le filtre des cartes du gate reste exact : le `span.name` d'une carte ne contient que le nom de la pièce
@@ -132,8 +132,8 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 0.1 — Lecture seule le 2026-10-05 : `eqLogic.class.php:116` : `public static function byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)` ; accepte donc `null` et `-1` avec `$_onlyEnable = false`.
   - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
     - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
-    - 7 équipements désactivés au total : Garage 1 (eq 279), bureau 1, exterieur 3, sans pièce 2 ;
-    - **pièce désignée pour le gate : Garage**, avec l'eq 279.
+    - 7 équipements désactivés au total : Garage 1 (eq 514), bureau 1 (eq 279), exterieur 3, sans pièce 2 ;
+    - **pièce désignée pour le gate : Garage**, avec l'eq 514 (relevé corrigé le 2026-10-05, voir Journal des décisions).
   - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
 - [x] **Task 1 — Données Jeedom (AC: 3, 4)**
   - [x] 1.1 — `desktop/php/jeedom2ha.php` appelle `eqLogic::byObjectId($object->getId(), false)`.
@@ -191,6 +191,7 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 - 2026-10-05 — Brouillon `create-story` de clawcode (`debc77c`), relu et réécrit par ClaudeBox, puis relu par une relecture indépendante (prémisse fausse sur les compteurs corrigée, état désactivé précisé, identifiant « Sans pièce » fixé, vérifications du gate ajoutées).
 - 2026-10-05 — Questions Q1 à Q4 posées à Alex, avec recommandation 1A, 2A, 3C, 4A (Q3 et Q4 corrigées dans un second message).
 - 2026-10-05, 10:43 — **Décision d'Alex : « 1A 2A 3C 4A ».** Le déplacement des compteurs vers 20.3 est porté dans `epics-projection-engine.md` (Story 20.1 et 20.3). Story passée `ready-for-dev`.
+- 2026-10-05 — Correction d'un relevé de ClaudeBox (Task 0.2) : l'équipement désactivé du Garage est l'eq 514, pas l'eq 279, qui est dans le bureau. Erreur de correspondance entre identifiant d'objet et pièce, vue au passage Chrome après déploiement. Le parcours de découverte est corrigé avant son premier passage sur la box.
 
 ## References
 
