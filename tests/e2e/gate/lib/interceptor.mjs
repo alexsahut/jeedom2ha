@@ -103,6 +103,17 @@ async function fulfillJson(route, response, body) {
   await route.fulfill({ response, json: body });
 }
 
+function buildRescanResponse() {
+  return {
+    state: 'ok',
+    result: {
+      status: 'ok', operation_result: 'succes',
+      operation_message: 'Synchronisation terminée.',
+      payload: { mapping_summary: { equipments_published: 0 } },
+    },
+  };
+}
+
 /** Attend le délai déterministe du long-polling sans ajouter de dépendance réseau. */
 function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -265,7 +276,9 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
       if (decision.verdict === 'simulate') {
         const params = decision.params;
         let response;
-        if (decision.action === 'saveMappingOverride') {
+        if (decision.action === 'scanTopology') {
+          response = buildRescanResponse();
+        } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
         } else {

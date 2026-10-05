@@ -203,6 +203,22 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     assert.equal(result.verdict, 'block-fail');
   });
 
+  await t.test('POST scanTopology déclaré -> simulate', () => {
+    const result = classifyRequest(
+      req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: 'action=scanTopology' }),
+      baseCtx({ declaredRescan: true })
+    );
+    assert.equal(result.verdict, 'simulate');
+    assert.equal(result.reason, 'rescan-declare');
+  });
+
+  await t.test('POST scanTopology non déclaré -> block-fail', () => {
+    const result = classifyRequest(
+      req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: 'action=scanTopology' }), baseCtx()
+    );
+    assert.equal(result.verdict, 'block-fail');
+  });
+
   await t.test('GET saveMappingOverride -> block-fail', () => {
     const ctx = baseCtx({
       declaredEquipments: { '1': { commands: ['2'] } },
