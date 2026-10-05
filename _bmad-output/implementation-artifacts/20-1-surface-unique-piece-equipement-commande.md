@@ -1,198 +1,208 @@
 # Story 20.1 : Surface unique pièce → équipement → commande
 
-Status: draft
+Status: ready-for-dev
+
+<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
 ## Story
 
-En tant qu'utilisateur du plugin,
-je veux une surface unique pièce → équipement → commande,
-afin de lire et régler le mapping HA sans navigations concurrentes.
+En tant qu'utilisateur du plugin (persona « Sébastien », modèle Homebridge),
+je veux une seule surface pièce → équipement → commande, complète (équipements désactivés et sans pièce compris) et fidèle à l'état réel de publication,
+afin de voir pièce par pièce ce qui est publié, exclu, désactivé ou à corriger, et de régler le type HA d'une commande sans passer par une autre vue.
+
+**Parcours : complet.** Story d'interface : gate 20-0, déploiement standard, preuve terrain, puis `ready-for-UX-validation` avant `done`.
 
 ## Contexte et périmètre
 
-- Cette story remplace l'affichage de navigation 16-8 et celui de la synthèse « Parc global » ; la suppression effective de cette synthèse et de la modale diagnostic reste à 20-3.
-- L'exclusion et le forçage restent à 20-2. Le rescan reste à 20-4.
-- La forme retenue par défaut est une surface en page, organisée par pièce, équipement puis commande. Cette recommandation reste à valider par Alex (voir Questions UX).
-- Les décisions viennent exclusivement de `evaluate_equipment()` via l'arbre déjà construit par le démon. L'UI ne réévalue aucune décision de publication.
+- La surface de 16-8 (cartes de pièces, modale par pièce, accordéon des équipements, table des commandes) devient la **surface unique** d'édition par pièce. Elle reste au modèle Homebridge, validé à la validation UX de 16-8 (Q1).
+- 20-1 la complète : pièce « Sans pièce », équipements désactivés (ferme CC-25) dans un état neutre, sélecteur de type inactif là où il n'a aucun effet, bloc « Gestion » d'un seul tenant.
+- Hors périmètre :
+  - compteurs par pièce et remplacement de la synthèse « Parc global » : décidés en 20-3, qui la supprime (Q3) ;
+  - suppression de la synthèse « Parc global » et de la modale diagnostic : 20-3 ;
+  - exclusion et forçage : 20-2 ; rescan : 20-4.
+- Les états par commande viennent exclusivement de `evaluate_equipment()`, via l'arbre renvoyé par le démon (`GET /system/mapping_overrides/{eq_id}`). L'interface ne recalcule aucune décision : elle classe seulement l'affichage selon `publication_reason`, comme en 16-8.
+
+## Décisions UX (2026-10-05)
+
+Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandation de ClaudeBox ; voir « Journal des décisions ».
+
+- **Q1 — Forme : modèle Homebridge conservé** (cartes de pièces, puis modale par pièce).
+- **Q2 — Sélecteur de type d'une commande exclue, non couverte ou désactivée : affiché, désactivé, avec la raison en info-bulle.**
+- **Q3 — Pas de compteurs par pièce en 20-1.** « Parc global » reste affiché jusqu'à 20-3, qui décidera de son remplacement. Faits à reprendre en 20-3 : la lecture de « Parc global » (`getPublishedScopeForConsole`) charge aussi le diagnostic de tout le parc (`/system/diagnostics`) ; ses compteurs (contrat 4D) comptent des équipements, pas des commandes, et ne comptent pas les exclusions manuelles comme « exclues ».
+- **Q4 — Équipement désactivé : à sa place dans l'ordre natif, grisé, état neutre « désactivé », jamais compté bloquant, sans ancre, sélecteur désactivé.**
 
 ## Acceptance Criteria
 
-1. **Surface unique (dépend de Q1).**
-   - **Given** la page principale du plugin ouverte
-   - **When** l'utilisateur consulte le mapping HA
-   - **Then** une seule surface en page présente pièce → équipement → commande, sans renvoyer vers une autre navigation pour ce même affichage.
-   - **And** la navigation par cartes/modale de 16-8 n'est plus l'affichage de référence.
-   - **And** la synthèse « Parc global » et la modale diagnostic distincte restent présentes jusqu'à 20-3, sans être supprimées par cette story.
+**AC1 — Surface unique d'édition par pièce**
 
-2. **Organisation du bloc Gestion.**
-   - **Given** la surface est rendue dans la page principale
-   - **When** l'utilisateur atteint le bloc « Gestion »
-   - **Then** « Ajouter », « Configuration » et « Diagnostic » restent groupés sous son titre, avant ou après la surface selon Q1, jamais séparés de ce titre.
+**Given** la page principale du plugin
+**When** l'utilisateur consulte le mapping HA
+**Then** une seule surface d'édition par pièce existe : cartes de pièces, modale de la pièce, accordéon des équipements, table des commandes (comportement de 16-8 conservé)
+**And** la synthèse « Parc global » et la modale diagnostic restent présentes et inchangées jusqu'à 20-3.
 
-3. **Pièces et équipements complets (dépend de Q3 et Q4).**
-   - **Given** l'arbre Jeedom est disponible
-   - **When** la surface liste les pièces
-   - **Then** elle conserve l'ordre natif, sauf choix UX explicite contraire.
-   - **And** elle rend tous les équipements non-`jeedom2ha`, actifs comme désactivés.
-   - **And** les équipements sans pièce sont rendus sous « Sans pièce », dernier élément de la liste.
+**AC2 — Bloc « Gestion » d'un seul tenant**
 
-4. **Diagnostic borné.**
-   - **Given** aucune pièce n'est ouverte
-   - **When** la page s'affiche
-   - **Then** aucun diagnostic de tous les équipements n'est chargé.
-   - **When** l'utilisateur ouvre une pièce
-   - **Then** un arbre de mapping est lu pour chacun de ses équipements seulement, afin d'afficher leurs états sans dépliage supplémentaire.
+**Given** la page principale
+**When** elle s'affiche
+**Then** les actions « Ajouter », « Configuration » et « Diagnostic » sont rendues directement sous le titre « Gestion », avant le bandeau de santé du bridge
+**And** la surface par pièce n'est plus suivie de ces actions
+**And** le bloc garde sa classe `eqLogicThumbnailContainer` et les attributs `eqLogicAction` / `data-action` dont dépend le cœur Jeedom.
 
-5. **États par commande, sans recalcul UI.**
-   - **Given** l'arbre de mapping d'un équipement reçu
-   - **When** une commande est rendue
-   - **Then** son état provient exclusivement de la décision fournie par le démon : prête, bloquante avec le pourquoi, non couverte grisée et jamais bloquante, ou exclue grise et jamais bloquante.
-   - **And** l'UI ne refait aucun calcul de publication, de couverture ou de priorité.
-   - **And** une commande non couverte ou exclue ne propose pas de sélecteur de type, ou présente un sélecteur désactivé avec une explication claire (dépend de Q2).
+**AC3 — Pièce « Sans pièce »**
 
-6. **Édition du type HA sans régression.**
-   - **Given** une commande couverte et non exclue
-   - **When** l'utilisateur choisit un type HA
-   - **Then** un aperçu sans persistance est demandé.
-   - **And** si l'aperçu est vert, l'override est enregistré automatiquement puis l'équipement est relu.
-   - **And** l'utilisateur peut revenir au mode automatique par commande et par équipement.
-   - **And** aucun chemin ne modifie le `generic_type` natif Jeedom.
+**Given** des équipements sans pièce côté Jeedom (objet nul ou `-1`), hors type `jeedom2ha`
+**When** la page s'affiche
+**Then** une carte « Sans pièce » apparaît en dernière position, avec l'identifiant de pièce `0` (convention du démon pour « aucune pièce »), et le même comportement qu'une pièce
+**And** les équipements d'objet `-1` y sont regroupés avec ceux d'objet nul
+**And** la carte n'apparaît pas s'il n'y a aucun équipement sans pièce.
 
-7. **Limites de périmètre.**
-   - **Given** l'interface 20-1 livrée
-   - **When** l'utilisateur cherche une exclusion, un forçage ou un rescan
-   - **Then** aucune nouvelle action de ce type n'est ajoutée par cette story.
-   - **And** aucune suppression effective de la synthèse « Parc global » ou de la modale diagnostic distincte n'est faite avant 20-3.
+**AC4 — Équipements désactivés inclus, état neutre (Q4, ferme CC-25)**
 
-8. **Preuve de fin.**
-   - **Given** l'implémentation terminée et prête à validation UX
-   - **When** son `done` est évalué
-   - **Then** les parcours `decouverte-garage-enphase.mjs` (lecture seule) et `reference-bascule-enphase.mjs` (bascule simulée) du gate 20-0 passent sur le code de `main`.
-   - **And** un déploiement standard et une preuve terrain discriminante sont consignés pour le SHA exact déployé.
-   - **And** le statut passe par `ready-for-UX-validation` avant `done`.
+**Given** une pièce qui contient des équipements désactivés dans Jeedom
+**When** la page s'affiche puis que l'utilisateur ouvre la pièce
+**Then** le compte d'équipements de la carte les inclut, et ils apparaissent dans l'ordre natif, grisés (`j2ha-eq-disabled`), avec la mention « désactivé dans Jeedom »
+**And** leur arbre est lu comme celui des autres (AC5)
+**And** une commande dont `publication_reason` vaut `disabled_eqlogic` prend un état neutre « désactivée » (classe dédiée, gris, icône Font Awesome 5), avec le libellé « Ne sera pas publié — équipement désactivé dans Jeedom »
+**And** cet état n'est jamais compté prêt ni bloquant et ne reçoit jamais l'ancre
+**And** un équipement sans commande prête ni bloquante, avec au moins une commande désactivée, affiche le badge neutre « Désactivé dans Jeedom : ne sera pas publié dans Home Assistant. »
+**And** si un équipement a à la fois des commandes exclues et désactivées, et aucune prête ni bloquante, le badge « Exclu » l'emporte.
 
-## UI Impact
+**AC5 — Diagnostic borné (AC5 amendé de 16-8, inchangé)**
 
-- **UI Impact : Oui.** Cette story modifie la page principale, le rendu de la navigation et les interactions visibles.
+**Given** aucune pièce ouverte
+**When** la page s'affiche
+**Then** aucun `getMappingOverrides` n'est lu
+**When** l'utilisateur ouvre une pièce
+**Then** l'arbre de mapping est lu pour les seuls équipements de cette pièce.
+
+**AC6 — États par commande, sans recalcul**
+
+**Given** l'arbre de mapping d'un équipement
+**When** ses commandes sont rendues
+**Then** chaque cellule a exactement l'un des cinq états : prête, bloquante (avec le pourquoi), non couverte (CC-37), exclue (CC-38), désactivée (AC4)
+**And** la synthèse, les comptes et l'ancre suivent les règles de 16-8, étendues à l'état désactivé
+**And** l'interface ne recalcule aucune décision de publication.
+
+**AC7 — Sélecteur de type inactif là où il n'a aucun effet (Q2)**
+
+**Given** une commande non couverte, exclue ou désactivée
+**When** sa ligne est rendue
+**Then** son sélecteur de type est affiché mais désactivé, avec une info-bulle :
+- non couverte : « Aucun mapping ne couvre cette commande : son type HA ne peut pas être réglé ici. » ;
+- exclue : « Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici. » ;
+- désactivée : « Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici. »
+**And** aucun aperçu ni enregistrement ne peut partir de ce sélecteur
+**And** les commandes prêtes ou bloquantes gardent un sélecteur actif
+**And** sur une ligne dont le sélecteur est désactivé mais qui porte un override, le lien de retour au mode automatique de la commande (`.mo-revert-cmd`) reste actif.
+
+**AC8 — Édition du type HA sans régression**
+
+**Given** une commande prête ou bloquante
+**When** l'utilisateur choisit un type HA
+**Then** l'aperçu est demandé, l'override est enregistré automatiquement si l'aperçu est vert, puis l'équipement est relu
+**And** le retour au mode automatique reste possible par commande et par équipement
+**And** aucun chemin ne modifie le `generic_type` natif de Jeedom (D10).
+
+**AC9 — Limites de périmètre (vérifiées à la revue)**
+
+**Given** la story livrée
+**Then** aucune action d'exclusion, de forçage ou de rescan n'est ajoutée, et aucun nouveau point d'entrée du démon n'est créé.
+
+**AC10 — Preuve**
+
+**Given** le code fusionné sur `main` et déployé
+**When** le `done` est évalué
+**Then** les parcours du gate 20-0 passent sur le code de `main` :
+- découverte (lecture seule), étendue pour relever :
+  - l'ordre du DOM : actions de « Gestion » avant la surface (AC2) ;
+  - aucune entrée `getMappingOverrides` au journal avant l'ouverture d'une pièce (AC5) ;
+  - la présence de la carte « Sans pièce » et son nombre d'équipements, ou son absence ;
+  - dans le Garage, l'équipement désactivé eq 279 : l'état `desactive` de son badge et de ses cellules ;
+  - les états déjà relevés (Enphase, badges du Garage) ;
+- référence (bascule simulée de 5369), adaptée au DOM si nécessaire ;
+**And** le filtre des cartes du gate reste exact : le `span.name` d'une carte ne contient que le nom de la pièce
+**And** un déploiement standard du SHA exact, avec relevés avant et après (box et HA), est consigné
+**And** un passage dans Chrome en lecture seule par ClaudeBox est consigné
+**And** la story passe par `ready-for-UX-validation` avant `done`.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Cadrer puis remplacer la structure de surface (AC: 1, 2, 3, 7)
-  - [ ] 1.1 — Obtenir la décision Alex pour Q1 à Q4 ; reporter les choix dans la story avant développement.
-  - [ ] 1.2 — Réorganiser la page pour ne plus séparer le titre « Gestion » de ses trois actions.
-  - [ ] 1.3 — Remplacer la navigation cartes/modale de 16-8 par la surface unique retenue, sans retirer la synthèse ou la modale réservées à 20-3.
-  - [ ] 1.4 — Inclure actifs, désactivés et « Sans pièce » selon les règles validées.
-
-- [ ] Task 2 — Rendre l'arbre de décision (AC: 3, 4, 5)
-  - [ ] 2.1 — Préserver l'ordre validé, puis charger le diagnostic uniquement à l'ouverture d'une pièce.
-  - [ ] 2.2 — Consommer l'arbre `GET /system/mapping_overrides/{eq_id}` et ses décisions ; ne créer aucun recalcul UI.
-  - [ ] 2.3 — Conserver exactement les quatre états et leurs exclusions de compte/ancre.
-
-- [ ] Task 3 — Préserver l'édition HA (AC: 5, 6)
-  - [ ] 3.1 — Réutiliser le contrôleur et le module pur d'override, avec aperçu, enregistrement automatique et retours au mode automatique existants.
-  - [ ] 3.2 — Désactiver ou ne pas rendre le sélecteur sans effet des commandes exclues ou non couvertes, avec explication conforme à Q2.
-  - [ ] 3.3 — Ajouter les tests ciblés des quatre états, du contrôle d'édition et de l'absence de mutation du type natif.
-
-- [ ] Task 4 — Vérifier la source des équipements désactivés (AC: 3)
-  - [ ] 4.1 — Vérifier par test que l'appel actuel `eqLogic::byObjectId($object->getId())` inclut les équipements désactivés ; le code lu ne passe aucun paramètre d'inclusion explicite.
-  - [ ] 4.2 — Si cet appel les écarte, appliquer le contrat Jeedom approprié et couvrir le cas par test. Si non, documenter la preuve de non-régression.
-
-- [ ] Task 5 — Prouver la surface (AC: 8)
-  - [ ] 5.1 — Exécuter les parcours 20-0 lecture seule et bascule simulée après intégration sur `main`, conformément au gate.
-  - [ ] 5.2 — Déployer par le flux standard le SHA relu, puis relever une preuve terrain discriminante avant/après.
-  - [ ] 5.3 — Obtenir la validation UX et enregistrer `ready-for-UX-validation` avant toute clôture `done`.
+- [ ] **Task 0 — Relevés préalables, lecture seule (AC: 3, 4)**
+  - [x] 0.0 — `epics-projection-engine.md` (Story 20.1 et 20.3) porte le déplacement des compteurs vers 20.3 (décision Q3 d'Alex, 2026-10-05).
+  - [ ] 0.1 — Lis la signature de `eqLogic::byObjectId` dans le cœur Jeedom de la box (lecture seule, `grep -n`), et cite-la. Référence : `byObjectId($_object_id, $_onlyEnable = true, …)` ; avec `null`, objet nul ou `-1`.
+  - [x] 0.2 — Relevé par ClaudeBox le 2026-10-05 vers 10:40, en lecture seule depuis la page du plugin (`getPublishedScopeForConsole`, déjà lue par la page) :
+    - 20 équipements sans pièce (pièce `0`, « Aucun » dans la synthèse), dont 2 désactivés, 13 exclus par plugin et 1 publié ;
+    - 7 équipements désactivés au total : Garage 1 (eq 279), bureau 1, exterieur 3, sans pièce 2 ;
+    - **pièce désignée pour le gate : Garage**, avec l'eq 279.
+  - [x] 0.3 — Relevé par ClaudeBox le 2026-10-05, en lecture seule (`getMappingOverrides`, eq 279) : 4 commandes, toutes `publication_reason: disabled_eqlogic` et `covered: false`.
+- [ ] **Task 1 — Données Jeedom (AC: 3, 4)**
+  - [ ] 1.1 — `desktop/php/jeedom2ha.php:14-36` : `eqLogic::byObjectId($object->getId(), false)`.
+  - [ ] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` (`desktop/js/jeedom2ha_mapping_override.js:389-392`) n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
+  - [ ] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
+- [ ] **Task 2 — Bloc « Gestion » (AC: 2)**
+  - [ ] 2.1 — Déplacer le bloc des trois actions sous le titre « Gestion », sans changer ses classes ni ses attributs.
+- [ ] **Task 3 — État désactivé (AC: 4, 6)**
+  - [ ] 3.1 — Module pur, sur le modèle de CC-38 : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
+  - [ ] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
+- [ ] **Task 4 — Sélecteur inactif (AC: 7)**
+  - [ ] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
+  - [ ] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.
+- [ ] **Task 5 — Non-régression (AC: 1, 5, 6, 8)**
+  - [ ] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
+  - [ ] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
+- [ ] **Task 6 — Gate et preuve (AC: 10)**
+  - [ ] 6.1 — Étendre le parcours de découverte (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; adapter le parcours de référence si le DOM change.
+  - [ ] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`.
 
 ## Dev Notes
 
-### Contrats à réutiliser
+### Contrats réutilisés (lignes au SHA `b4ce7b2`)
 
-- `desktop/php/jeedom2ha.php:14-36` construit `j2haRoomsTree` depuis `jeeObject::buildTree(null, false)` et `eqLogic::byObjectId(...)`, exclut le type `jeedom2ha`, et transmet `enabled`. L'appel lu ne précise pas si les désactivés sont inclus : à vérifier (Task 4).
-- `desktop/js/jeedom2ha_mapping_surface.js:328-345` lit un équipement avec l'action AJAX `getMappingOverrides`; `:437-446` limite la lecture aux équipements de la pièce ouverte.
-- `core/ajax/jeedom2ha.ajax.php:864-875` relaie cette action sur `GET /system/mapping_overrides/{eq_id}` ; la route est déclarée dans `resources/daemon/transport/http_server.py:4351-4355`.
-- L'arbre démon appelle `evaluate_equipment()` à `resources/daemon/transport/http_server.py:2900-2907` et porte `covered` par commande aux lignes `2927-2940`. Réutiliser cette sortie ; interdiction de rejouer la décision côté JS.
-- Les états non couvert/exclu sont déjà distingués dans `desktop/js/jeedom2ha_mapping_override.js:400-509` et stylés dans `desktop/css/jeedom2ha.css:131-139, 168-187`.
-- L'aperçu, la persistance automatique et les retours existants sont dans `desktop/js/jeedom2ha_mapping_surface.js:141-210`; les routes AJAX correspondantes sont dans `core/ajax/jeedom2ha.ajax.php:877-918`.
+- `desktop/php/jeedom2ha.php:14-36` : `j2haRoomsTree` (`jeeObject::buildTree(null, false)`, `eqLogic::byObjectId(...)`, exclusion du type `jeedom2ha`, drapeau `enabled`).
+- `desktop/php/jeedom2ha.php:42` (titre « Gestion »), `:122-144` (surface), `:146-163` (les trois actions).
+- `desktop/js/jeedom2ha_mapping_surface.js:370-381` : rendu déjà prévu de `j2ha-eq-disabled` et de « (désactivé) » ; `:141-210` (aperçu, enregistrement, retours ; un override sur une commande non couverte n'est jamais persisté, branche `!covered` de `runDryRun`) ; `:328-345` (lecture `getMappingOverrides`) ; `:437-446` (chargement borné).
+- `desktop/js/jeedom2ha_mapping_override.js` : état exclu (CC-38, l. 334 et suivantes), synthèse et ancre ; `:389-392` (`normalizeRoomsTree`).
+- `resources/daemon/models/topology.py:312` : éligibilité `disabled_eqlogic` d'un équipement désactivé.
+- `resources/daemon/transport/http_server.py:2900-2940` : l'arbre appelle `evaluate_equipment()` et porte `covered` ; route `:4351-4355`.
+- Démon : « aucune pièce » est l'identifiant `0` (`resources/daemon/models/published_scope.py:105` ; `desktop/js/jeedom2ha_scope_summary.js:308`).
+
+### Interdits
+
+- Ne jamais écrire `generic_type` (D10). Aucun recalcul de décision côté interface. Aucun nouveau point d'entrée du démon.
+- Ne pas charger les arbres de tout le parc. Ne pas toucher à la synthèse « Parc global » ni à la modale diagnostic.
+- Jamais `git add -A`, jamais `--admin`, aucun force-push. Déploiement standard seulement, jamais `--cleanup-discovery` ni `--stop-daemon-cleanup`.
 
 ### Fichiers probablement touchés
 
-- `desktop/php/jeedom2ha.php` — structure, arbre pièces et position du bloc Gestion.
-- `desktop/js/jeedom2ha_mapping_surface.js` — rendu de la surface, chargement borné et contrôle de sélecteur.
-- `desktop/js/jeedom2ha_mapping_override.js` — seulement si une normalisation/règle d'affichage manque ; pas de décision de publication.
-- `desktop/css/jeedom2ha.css` — styles de la nouvelle structure et des contrôles désactivés.
-- `tests/unit/test_story_16_8_mapping_surface.node.test.js` et tests ciblés nouveaux si nécessaires.
-- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` et `reference-bascule-enphase.mjs` — adapter les attentes au parcours retenu.
-
-### Interdits et garde-fous
-
-- Ne pas modifier `generic_type` : le type natif reste en lecture seule.
-- Ne pas ajouter exclusion, forçage, rescan, ni suppression effective de la synthèse/modale : ces périmètres sont affectés aux stories 20-2, 20-4 et 20-3.
-- Ne pas charger les diagnostics de tout le parc.
-- Ne pas remplacer `evaluate_equipment()` par une agrégation ou une règle de décision côté UI.
-- Conserver les contrats AJAX et démon existants sauf nécessité démontrée par un test ; aucun nouveau backend override n'est prévu.
-
-## Questions UX pour Alex
-
-**Q1 — Forme et place de la surface (AC 1, 2).**
-
-1. Arbre en page, sous le bloc Gestion complet — coût faible, navigation continue, recommandation : évite la modale et corrige directement la coupure du bloc Gestion.
-2. Arbre en page, après la synthèse temporaire — coût faible, mais deux lectures de parc concurrentes jusqu'à 20-3.
-3. Modale par pièce conservée — coût faible, mais ne répond pas clairement à « une seule surface » et garde le changement de contexte.
-
-**Recommandation : option 1.** Les actions de Gestion restent près de leur titre ; la surface devient l'entrée de lecture principale.
-
-**Q2 — Sélecteur sur commande exclue ou non couverte (AC 5).**
-
-1. Ne pas afficher le sélecteur — coût moyen, état le plus clair, mais colonnes visuellement hétérogènes.
-2. Afficher un sélecteur désactivé avec la raison — coût faible, table stable et explique pourquoi l'action est sans effet.
-3. Garder le sélecteur actif — coût nul, mais reproduit le constat UX du 05/10.
-
-**Recommandation : option 2.** Le contrôle reste reconnaissable sans suggérer une action inopérante.
-
-**Q3 — Compteurs qui remplacent à terme « Parc global » (AC 1, 3).**
-
-1. Compteurs par pièce dans l'arbre, calculés à partir des décisions déjà reçues — coût moyen, contextualisés ; recommandation.
-2. Un bandeau global au-dessus de l'arbre — coût moyen, compact, mais réintroduit une mini-synthèse concurrente.
-3. Aucun compteur avant 20-3 — coût faible, mais perte de repère pendant la transition.
-
-**Recommandation : option 1.** Elle prépare le remplacement de 20-3 sans créer une seconde vue globale.
-
-**Q4 — Présentation des désactivés et ordre (AC 3).**
-
-1. Garder l'ordre natif, afficher « désactivé » et un style atténué — coût faible, recommandation ; cohérent avec les données actuelles.
-2. Regrouper les désactivés en fin de chaque pièce — coût moyen ; plus lisible mais modifie l'ordre natif.
-3. Masquer les désactivés — hors périmètre : contredit CC-25.
-
-**Recommandation : option 1.** Elle rend le parc fidèle sans imposer une hiérarchie supplémentaire.
+`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/css/jeedom2ha.css`, tests node (16-8 et nouveaux), `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (et `reference-bascule-enphase.mjs` si le DOM change).
 
 ## Définition de done
 
-- Prérequis : 20-0 et 16-8 sont `done`.
-- Les AC sont vérifiés par tests ciblés et la File List est complète.
-- Les deux parcours obligatoires du gate 20-0 passent sur le code de `main` : découverte lecture seule et bascule simulée.
-- Le déploiement standard porte le SHA exact relu ; la preuve terrain est discriminante et consigne les relevés avant/après.
-- Une validation UX est obtenue dans l'environnement concerné ; la story passe par `ready-for-UX-validation` avant `done`.
-- Le passage `done` consigne SHA, CI, commandes de tests nommées, validation UX et environnement, conformément à la rétrospective epic 19.
+- 20-0 et 16-8 sont `done` (tenu).
+- Tous les AC sont couverts par des tests nommés ou par le gate ; la File List est complète.
+- CI verte ; revue Codex sans problème majeur (ou relecture indépendante si Codex est indisponible) ; relecture ClaudeBox.
+- Déploiement standard du SHA exact relu, relevés avant et après sans écart inexpliqué (box et HA).
+- Parcours de découverte et de référence du gate 20-0 PASS sur le code de `main`.
+- Passage Chrome de ClaudeBox consigné, puis `ready-for-UX-validation`, puis validation UX.
+- Au `done` : SHA, CI, commandes de tests, preuves et validation UX consignés (rétrospective pe-epic-19).
+
+## Journal des décisions
+
+- 2026-10-05 — Brouillon `create-story` de clawcode (`debc77c`), relu et réécrit par ClaudeBox, puis relu par une relecture indépendante (prémisse fausse sur les compteurs corrigée, état désactivé précisé, identifiant « Sans pièce » fixé, vérifications du gate ajoutées).
+- 2026-10-05 — Questions Q1 à Q4 posées à Alex, avec recommandation 1A, 2A, 3C, 4A (Q3 et Q4 corrigées dans un second message).
+- 2026-10-05, 10:43 — **Décision d'Alex : « 1A 2A 3C 4A ».** Le déplacement des compteurs vers 20.3 est porté dans `epics-projection-engine.md` (Story 20.1 et 20.3). Story passée `ready-for-dev`.
 
 ## References
 
-- [Source : `_bmad-output/planning-artifacts/epics-projection-engine.md`, Epic 20, lignes 2410-2455]
-- [Source : `_bmad-output/planning-artifacts/sprint-change-proposal-2026-10-01-etape-4-interface.md`, décisions 1 à 7 et « Risques et suivi », lignes 32-72]
-- [Source : `_bmad-output/implementation-artifacts/16-8-surface-navigation-piece-equipement-commande-homebridge.md`, AC et File List, lignes 21-80 et 146-206]
-- [Source : `_bmad-output/implementation-artifacts/16-8-validation-ux-2026-10-05.md`, constats reportés, lignes 30-33]
-- [Source : `_bmad-output/implementation-artifacts/20-0-gate-preuve-ux-outille.md`, AC3 et AC5]
-- [Source : `_bmad-output/implementation-artifacts/20-0-gate-2026-10-04.md`, preuve retenue et parcours]
-- [Source : `_bmad-output/implementation-artifacts/pe-epic-19-retro-2026-10-01.md`, leçons, lignes 73-84]
+- `_bmad-output/planning-artifacts/epics-projection-engine.md`, Epic 20 ; `_bmad-output/planning-artifacts/sprint-change-proposal-2026-10-01-etape-4-interface.md`, décisions 1 à 7.
+- `_bmad-output/implementation-artifacts/16-8-surface-navigation-piece-equipement-commande-homebridge.md` et `16-8-validation-ux-2026-10-05.md`.
+- `_bmad-output/implementation-artifacts/20-0-gate-preuve-ux-outille.md` et `20-0-gate-2026-10-04.md`.
+- `_bmad-output/implementation-artifacts/pe-epic-19-retro-2026-10-01.md`.
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
-Codex (création documentaire).
-
 ### Completion Notes List
 
-- 2026-10-05 — `create-story` exécuté en mode non interactif. Statut volontairement `draft` pour relecture ClaudeBox. Aucune tâche de développement, test, gate, déploiement ni modification de `sprint-status.yaml` n'a été exécuté par cette unité.
-
 ### File List
-
-- `_bmad-output/implementation-artifacts/20-1-surface-unique-piece-equipement-commande.md`
