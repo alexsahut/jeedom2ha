@@ -36,6 +36,15 @@ function uncoveredView() {
   };
 }
 
+function disabledView() {
+  return {
+    ha_entity_type: null,
+    projection_validity: { is_valid: false, reason_code: 'disabled_eqlogic', missing_capabilities: [], missing_fields: [] },
+    should_publish: false,
+    publication_reason: 'disabled_eqlogic',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // AC2/AC3 — normalisation de l'arbre pièce -> équipement (ordre natif préservé)
 // ---------------------------------------------------------------------------
@@ -115,6 +124,33 @@ function treeWith(diags) {
 }
 
 describe('16.8 / AC9 — summarizePublication', () => {
+  it('désactivées : état neutre, ni prête ni bloquante et jamais ancrée', () => {
+    const tree = treeWith([disabledView(), blockingView()]);
+    const s = M.summarizePublication(tree);
+    assert.strictEqual(M.isDisabledDiagnostic(disabledView()), true);
+    assert.strictEqual(s.disabled_count, 1);
+    assert.strictEqual(s.blocking_count, 1);
+    assert.strictEqual(s.first_blocking_cmd_id, 11);
+    assert.deepStrictEqual(M.collectBlockingCommandIds(tree), [11]);
+  });
+
+  it('seulement désactivées : badge neutre dédié et libellé factuel', () => {
+    const s = M.summarizePublication(treeWith([disabledView(), disabledView()]));
+    assert.strictEqual(M.publicationSummaryState(s), 'disabled');
+    assert.strictEqual(
+      M.buildPublicationSummaryLabel(s),
+      'Désactivé dans Jeedom : ne sera pas publié dans Home Assistant.');
+    assert.strictEqual(
+      M.buildDisabledLabel(disabledView()),
+      'Ne sera pas publié — équipement désactivé dans Jeedom');
+  });
+
+  it('exclu l’emporte sur désactivée quand aucune commande n’est prête ou bloquante', () => {
+    const excluded = Object.assign({}, disabledView(), { publication_reason: 'excluded_plugin' });
+    const s = M.summarizePublication(treeWith([disabledView(), excluded]));
+    assert.strictEqual(M.publicationSummaryState(s), 'excluded');
+  });
+
   it('toutes prêtes → sera publié, 0 bloquante', () => {
     const s = M.summarizePublication(treeWith([readyView(), readyView()]));
     assert.strictEqual(s.total, 2);

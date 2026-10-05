@@ -53,7 +53,7 @@
   }
 
   function renderDiagnosticCell($cell, view, covered) {
-    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered j2ha-diag-excluded');
+    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered j2ha-diag-excluded j2ha-diag-disabled');
     // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
     // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
     // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
@@ -68,6 +68,11 @@
     if (M.isExcludedDiagnostic(view)) {
       $cell.addClass('j2ha-diag-excluded').html('<i class="fas fa-eye-slash"></i> ');
       $cell.append($('<span></span>').text(M.buildExcludedLabel(view)));
+      return;
+    }
+    if (M.isDisabledDiagnostic(view)) {
+      $cell.addClass('j2ha-diag-disabled').html('<i class="fas fa-pause-circle"></i> ');
+      $cell.append($('<span></span>').text(M.buildDisabledLabel(view)));
       return;
     }
     var state = M.diagnosticState(view);
@@ -219,7 +224,7 @@
     var label = M.buildPublicationSummaryLabel(summary);
 
     var $badge = $panel.find('.j2ha-eq-publish-badge').first();
-    $badge.removeClass('j2ha-publish-ok j2ha-publish-partial j2ha-publish-blocked j2ha-publish-empty j2ha-publish-excluded');
+    $badge.removeClass('j2ha-publish-ok j2ha-publish-partial j2ha-publish-blocked j2ha-publish-empty j2ha-publish-excluded j2ha-publish-disabled');
     var icon;
     if (state === 'publish') {
       $badge.addClass('j2ha-publish-ok');
@@ -233,6 +238,9 @@
     } else if (state === 'excluded') {
       $badge.addClass('j2ha-publish-excluded');
       icon = 'fa-eye-slash';
+    } else if (state === 'disabled') {
+      $badge.addClass('j2ha-publish-disabled');
+      icon = 'fa-pause-circle';
     } else {
       $badge.addClass('j2ha-publish-empty');
       icon = 'fa-minus-circle';
@@ -378,7 +386,7 @@
         .attr('aria-controls', panelId);
       $toggle.append($('<span class="j2ha-eq-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
       if (!eq.enabled) {
-        $toggle.append($('<span class="text-muted"></span>').text(' {{(désactivé)}}'));
+        $toggle.append($('<span class="text-muted"></span>').text(' {{(désactivé dans Jeedom)}}'));
       }
       $toggle.append($('<span class="j2ha-eq-publish-badge label"></span>'));
       $head.append($('<h4 class="panel-title"></h4>').append($toggle));

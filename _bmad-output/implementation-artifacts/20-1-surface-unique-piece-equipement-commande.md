@@ -141,9 +141,9 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
 - [x] **Task 2 — Bloc « Gestion » (AC: 2)**
   - [x] 2.1 — Bloc des trois actions déplacé sous le titre « Gestion », classes et attributs conservés.
-- [ ] **Task 3 — État désactivé (AC: 4, 6)**
-  - [ ] 3.1 — Module pur, sur le modèle de CC-38 : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
-  - [ ] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
+- [x] **Task 3 — État désactivé (AC: 4, 6)**
+  - [x] 3.1 — Module pur : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
+  - [x] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
 - [ ] **Task 4 — Sélecteur inactif (AC: 7)**
   - [ ] 4.1 — Fonction pure qui dit si le sélecteur d'une ligne est actif et donne la raison sinon ; tests node.
   - [ ] 4.2 — `renderCommandRow` : `disabled` + `title`, aucun gestionnaire d'aperçu attaché.

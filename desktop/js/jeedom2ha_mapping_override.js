@@ -341,6 +341,17 @@
     return 'Ne sera pas publié — ' + REASON_LABELS[d.publication_reason];
   }
 
+  // Story 20.1 : un équipement désactivé est un état neutre, distinct d'une
+  // exclusion et d'un blocage actionnable. Le démon reste la seule source.
+  function isDisabledDiagnostic(view) {
+    var d = readDiagnosticView(view);
+    return d !== null && d.publication_reason === 'disabled_eqlogic';
+  }
+
+  function buildDisabledLabel(view) {
+    return isDisabledDiagnostic(view) ? 'Ne sera pas publié — équipement désactivé dans Jeedom' : '—';
+  }
+
   // --- AC14 — bandeau « aucun impact Homebridge » : une seule fois par équipement ---
 
   function initReassuranceState() {
@@ -415,6 +426,7 @@
     var unknown = 0;
     var uncovered = 0;
     var excluded = 0;
+    var disabled = 0;
     var firstBlockingCmdId = null;
     for (var i = 0; i < t.commands.length; i++) {
       var row = t.commands[i];
@@ -424,6 +436,10 @@
       }
       if (isExcludedDiagnostic(row.diagnostic)) {
         excluded += 1;
+        continue;
+      }
+      if (isDisabledDiagnostic(row.diagnostic)) {
+        disabled += 1;
         continue;
       }
       var state = diagnosticState(row.diagnostic);
@@ -445,6 +461,7 @@
       unknown_count: unknown,
       uncovered_count: uncovered,
       excluded_count: excluded,
+      disabled_count: disabled,
       will_publish: ready > 0,
       first_blocking_cmd_id: firstBlockingCmdId,
     };
@@ -456,8 +473,12 @@
     var ready = s.ready_count || 0;
     var blocking = s.blocking_count || 0;
     var excluded = s.excluded_count || 0;
+    var disabled = s.disabled_count || 0;
     if (ready === 0 && blocking === 0 && excluded > 0) {
       return 'Exclu : ne sera pas publié dans Home Assistant.';
+    }
+    if (ready === 0 && blocking === 0 && disabled > 0) {
+      return 'Désactivé dans Jeedom : ne sera pas publié dans Home Assistant.';
     }
     if (ready === 0 && blocking === 0) {
       return 'Aucune commande projetable en Home Assistant pour cet équipement.';
@@ -477,8 +498,12 @@
     var ready = s.ready_count || 0;
     var blocking = s.blocking_count || 0;
     var excluded = s.excluded_count || 0;
+    var disabled = s.disabled_count || 0;
     if (ready === 0 && blocking === 0 && excluded > 0) {
       return 'excluded';
+    }
+    if (ready === 0 && blocking === 0 && disabled > 0) {
+      return 'disabled';
     }
     if (ready === 0 && blocking === 0) {
       return 'empty';
@@ -499,7 +524,7 @@
     var ids = [];
     for (var i = 0; i < t.commands.length && ids.length < limit; i++) {
       var row = t.commands[i];
-      if (isUncoveredDiagnostic(row.diagnostic) || isExcludedDiagnostic(row.diagnostic)) {
+      if (isUncoveredDiagnostic(row.diagnostic) || isExcludedDiagnostic(row.diagnostic) || isDisabledDiagnostic(row.diagnostic)) {
         continue;
       }
       if (row.diagnostic != null && isBlockingDiagnostic(row.diagnostic)) {
@@ -531,6 +556,8 @@
     buildPublishCellLabel: buildPublishCellLabel,
     isExcludedDiagnostic: isExcludedDiagnostic,
     buildExcludedLabel: buildExcludedLabel,
+    isDisabledDiagnostic: isDisabledDiagnostic,
+    buildDisabledLabel: buildDisabledLabel,
     initReassuranceState: initReassuranceState,
     shouldShowReassurance: shouldShowReassurance,
     markReassuranceShown: markReassuranceShown,
