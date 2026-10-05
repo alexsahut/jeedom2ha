@@ -175,9 +175,9 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
   - [ ] Le clic réel de la preuve est fait par ClaudeBox dans Chrome (règle 2 d'Alex
     du 2026-09-28 : preuves qui ne touchent que le plugin et HA), hors des fenêtres du
     gate ; aucun équipement ni nom n'est choisi dans cette story.
-- [ ] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
-  - [ ] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
-  - [ ] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
+- [x] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
+  - [x] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
+  - [x] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
 - [ ] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
   - [ ] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
   - [ ] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,

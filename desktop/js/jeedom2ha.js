@@ -134,6 +134,10 @@ function isHABridgeAvailable(r) {
  * @param {Object} r - data.result de l'appel getBridgeStatus (peut être null si erreur)
  */
 function applyHAGating(r) {
+  if (window.jeedom2haRescanInProgress === true) {
+    $('[data-ha-action]').prop('disabled', true);
+    return;
+  }
   var available = r ? isHABridgeAvailable(r) : false;
   var $haActions = $('[data-ha-action]');
   var $reason = $('#div_haGatingReason');
@@ -151,6 +155,15 @@ function applyHAGating(r) {
     }
     $reason.text(reason).show();
   }
+}
+
+function confirmTopologyRescan(onConfirm) {
+  confirmHaPublishAction(
+    '{{Rescanner la topologie Jeedom}}',
+    '{{Un sync complet peut publier ou retirer des entités Home Assistant et applique les overrides persistés. Confirmer ?}}',
+    '{{Rescanner}}',
+    onConfirm
+  );
 }
 
 function _captureNavState() {
@@ -502,6 +515,14 @@ function refreshPublishedScopeSummary(preserveNavState) {
 $(function() {
   // Refresh MQTT badge on page load (no auto-refresh)
   refreshBridgeStatus();
+
+  $('#bt_rescanTopology').on('click', function() {
+    var $button = $(this);
+    if ($button.prop('disabled')) return;
+    confirmTopologyRescan(function() {
+      triggerTopologyRescan($button);
+    });
+  });
 
   // Story 4.5 — tableau hiérarchique unique (global -> pièce -> équipement)
   $('#div_scopeSummaryContent').on('click', '.j2ha-row-toggle', function() {
