@@ -188,6 +188,28 @@ class TestSyncAction:
         finally:
             http_app["action_lock"].release()
 
+    async def test_sync_completes_after_client_cancellation(self, http_app):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        http_app["action_lock"] = asyncio.Lock()
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def body(request):  # noqa: ARG001
+            started.set()
+            await release.wait()
+            return web.Response()
+
+        request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+        with patch("resources.daemon.transport.http_server._do_handle_action_sync_body", new=body):
+            handler = asyncio.create_task(_do_handle_action_sync(request))
+            await started.wait()
+            handler.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await handler
+            assert http_app["action_lock"].locked()
+            release.set()
+            while http_app["action_lock"].locked():
+                await asyncio.sleep(0)
+
     async def test_sync_populates_runtime_gating_fields_for_switch(self, http_client, http_app, mock_mqtt):
         payload = {
             "version": "1.0",
