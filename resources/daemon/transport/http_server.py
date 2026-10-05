@@ -1704,6 +1704,32 @@ async def apply_publication_decision(
 
 
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
+    """Serialize sync with HA actions; rescans fail fast, service syncs wait briefly."""
+    action_lock: asyncio.Lock = request.app["action_lock"]
+    rescan = request.headers.get("X-Jeedom2ha-Sync-Mode") == "rescan"
+    if action_lock.locked() and rescan:
+        return web.json_response({"status": "error", "code": "action_in_progress",
+                                  "message": "Une opération Home Assistant est déjà en cours."}, status=409)
+    try:
+        await asyncio.wait_for(action_lock.acquire(), timeout=7)
+    except asyncio.TimeoutError:
+        return web.json_response({"status": "error", "code": "action_in_progress",
+                                  "message": "Une opération Home Assistant est déjà en cours."}, status=409)
+
+    async def _run_sync() -> web.Response:
+        try:
+            return await _do_handle_action_sync_body(request)
+        finally:
+            action_lock.release()
+
+    task = asyncio.create_task(_run_sync())
+    tasks = request.app.setdefault("action_tasks", set())
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+    return await asyncio.shield(task)
+
+
+async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     """Handle POST /action/sync — synchronize Jeedom topology, assess eligibility, map and publish."""
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
@@ -2123,6 +2149,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         "action": "sync",
         "status": "ok",
         "payload": summary,
+        "operation_result": _snap_res,
+        "operation_message": _SYNC_MESSAGES[_snap_res],
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

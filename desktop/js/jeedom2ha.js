@@ -393,6 +393,39 @@ function executeHaAction(intention, portee, selection, handlers) {
   });
 }
 
+function triggerTopologyRescan($button) {
+  var snapshot = setHaActionPendingState($button, '{{Rescan en cours…}}');
+  window.jeedom2haRescanInProgress = true;
+  $('[data-ha-action]').prop('disabled', true);
+  $.ajax({
+    type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+    data: {action: 'scanTopology'}, dataType: 'json', timeout: 15000,
+    success: function(data) {
+      var result = data && data.result;
+      if (data.state === 'ok' && result && result.status === 'ok') {
+        if (result.operation_result === 'succes') {
+          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée.}}', level: 'success'});
+        } else if (typeof result.operation_result === 'string') {
+          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée avec avertissements.}}', level: 'warning'});
+        } else {
+          $('#div_alert').showAlert({message: '{{Résultat inconnu, relire Dernière opération.}}', level: 'warning'});
+        }
+        refreshBridgeStatus();
+        return;
+      }
+      $('#div_alert').showAlert({message: (result && result.message) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+    },
+    error: function() {
+      $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
+    },
+    complete: function() {
+      window.jeedom2haRescanInProgress = false;
+      restoreHaActionPendingState($button, snapshot);
+      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+    },
+  });
+}
+
 function triggerPublierAction($button, portee, selection) {
   var pendingState = setHaActionPendingState($button, '{{En cours...}}');
   executeHaAction('publier', portee, selection, {

@@ -178,14 +178,14 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
 - [x] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
   - [x] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
   - [x] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
-- [ ] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
-  - [ ] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
-  - [ ] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,
+- [x] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
+  - [x] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
+  - [x] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,
     attente d'au plus 7 s sans ce mode, puis 409), est protégé par `asyncio.shield`,
     et sa réponse porte le résultat et le message de l'opération (AC4).
-  - [ ] Relais : succès défini par AC4 ; écouteurs réalignés dès que le sync est allé
+  - [x] Relais : succès défini par AC4 ; écouteurs réalignés dès que le sync est allé
     au bout (`status: "ok"`), jamais sur une erreur ou une expiration.
-  - [ ] Gérer attente, succès, échec, expiration, réactivation et
+  - [x] Gérer attente, succès, échec, expiration, réactivation et
     `refreshBridgeStatus()` sans calcul local.
 - [ ] **Task 3 — Configuration (AC: 5)**
   - [ ] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.

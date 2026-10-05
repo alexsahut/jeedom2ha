@@ -510,16 +510,20 @@ class jeedom2ha extends eqLogic {
     log::add(__CLASS__, 'info', '[DAEMON] Daemon stopped');
   }
 
-  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET', $_timeout = 3, $_maxAttempts = null) {
+  public static function callDaemon($_endpoint, $_payload = array(), $_method = 'GET', $_timeout = 3, $_maxAttempts = null, $_headers = array()) {
     $apiPort = config::byKey('daemonApiPort', __CLASS__, '55080');
     $localSecret = config::byKey('localSecret', __CLASS__);
     $url = 'http://127.0.0.1:' . $apiPort . $_endpoint;
 
+    $extraHeaders = '';
+    foreach ($_headers as $name => $value) {
+      $extraHeaders .= $name . ': ' . $value . "\r\n";
+    }
     $opts = array(
       'http' => array(
         'method' => $_method,
         'header' => "X-Local-Secret: " . $localSecret . "\r\n" .
-                    "Content-Type: application/json\r\n",
+                    "Content-Type: application/json\r\n" . $extraHeaders,
         'timeout' => $_timeout,
         'ignore_errors' => true,
       ),
