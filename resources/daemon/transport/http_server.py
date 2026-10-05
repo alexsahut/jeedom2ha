@@ -1703,15 +1703,22 @@ async def apply_publication_decision(
     return decision, config_published
 
 
+_SYNC_ACTION_LOCK_WAIT_SECONDS = 7
+
+
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
     """Serialize sync with HA actions; rescans fail fast, service syncs wait briefly."""
+    # Authentifier avant toute attente du verrou : une requête inconnue ne doit
+    # jamais pouvoir être retardée par une opération légitime ni en apprendre l'état.
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
     action_lock: asyncio.Lock = request.app["action_lock"]
     rescan = request.headers.get("X-Jeedom2ha-Sync-Mode") == "rescan"
     if action_lock.locked() and rescan:
         return web.json_response({"status": "error", "code": "action_in_progress",
                                   "message": "Une opération Home Assistant est déjà en cours."}, status=409)
     try:
-        await asyncio.wait_for(action_lock.acquire(), timeout=7)
+        await asyncio.wait_for(action_lock.acquire(), timeout=_SYNC_ACTION_LOCK_WAIT_SECONDS)
     except asyncio.TimeoutError:
         return web.json_response({"status": "error", "code": "action_in_progress",
                                   "message": "Une opération Home Assistant est déjà en cours."}, status=409)

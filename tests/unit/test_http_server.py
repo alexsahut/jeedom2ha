@@ -130,6 +130,26 @@ class TestSyncAction:
         resp = await http_client.post("/action/sync", json={})
         assert resp.status == 401
 
+    async def test_sync_secret_is_checked_before_lock(self, http_client, http_app):
+        """Une requête non authentifiée ne voit pas le verrou détenu (AC8)."""
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/sync", json={})
+            assert resp.status == 401
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_rescan_refuses_immediately_when_action_is_running(self, http_client, http_app):
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/sync", headers={
+                "X-Local-Secret": LOCAL_SECRET, "X-Jeedom2ha-Sync-Mode": "rescan",
+            }, json={})
+            assert resp.status == 409
+            assert (await resp.json())["code"] == "action_in_progress"
+        finally:
+            http_app["action_lock"].release()
+
     async def test_sync_populates_runtime_gating_fields_for_switch(self, http_client, http_app, mock_mqtt):
         payload = {
             "version": "1.0",
