@@ -226,7 +226,10 @@ class LightMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=light_cmds,
                 capabilities=capabilities,
-                reason_details={"color_types": list(light_cmds.keys())},
+                reason_details={
+                    "color_types": list(light_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Phase 1: Detect On/Off capability
@@ -252,7 +255,10 @@ class LightMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=light_cmds,
                 capabilities=capabilities,
-                reason_details={"available_types": list(light_cmds.keys())},
+                reason_details={
+                    "available_types": list(light_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Build capabilities

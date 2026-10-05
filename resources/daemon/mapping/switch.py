@@ -228,7 +228,10 @@ class SwitchMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=energy_cmds,
                 capabilities=capabilities,
-                reason_details={"available_types": list(energy_cmds.keys())},
+                reason_details={
+                    "available_types": list(energy_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Phase 2: device_class — conservative rule based on eq_type_name only

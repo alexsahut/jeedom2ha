@@ -216,7 +216,10 @@ class CoverMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=flap_cmds,
                 capabilities=capabilities,
-                reason_details={"available_types": list(flap_cmds.keys())},
+                reason_details={
+                    "available_types": list(flap_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Build capabilities
