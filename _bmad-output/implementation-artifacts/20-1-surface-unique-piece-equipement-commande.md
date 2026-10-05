@@ -151,7 +151,7 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 5.1 — Chargement toujours borné à la pièce ouverte (`desktop/js/jeedom2ha_mapping_surface.js:437-446`).
   - [x] 5.2 — Suite node complète verte ; aucune modification de `diagnosticState`, `shouldAutoValidate`, ni des routes preview, save et revert.
 - [ ] **Task 6 — Gate et preuve (AC: 10)**
-  - [ ] 6.1 — Étendre le parcours de découverte (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; adapter le parcours de référence si le DOM change.
+  - [x] 6.1 — Parcours de découverte étendu (lecture seule, aucun nom d'équipement relevé, aucune écriture) ; parcours de référence inchangé, le DOM de ses cibles ne change pas.
   - [ ] 6.2 — Après fusion : déploiement standard, relevés, parcours du gate, passage Chrome par ClaudeBox, puis `ready-for-UX-validation`.
 
 ## Dev Notes
