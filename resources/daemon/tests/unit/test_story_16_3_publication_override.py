@@ -318,6 +318,31 @@ def test_decide_publication_force_publish_debloque_un_probable_sous_sure_only():
     assert result.reason_details["override_source"] == "user"
 
 
+def test_force_ambiguous_valid_is_published_with_forced_reason():
+    result = decide_publication(
+        _make_mapping(confidence="ambiguous"), publication_override="force_publish"
+    )
+    assert (result.should_publish, result.reason) == (True, "publication_forced")
+
+
+def test_force_ambiguous_keeps_projection_and_scope_refusals():
+    invalid = decide_publication(_make_mapping(
+        confidence="ambiguous", projection_validity=_invalid_pv("ha_missing_command_topic"),
+    ), publication_override="force_publish")
+    out_of_scope = decide_publication(
+        _make_mapping(confidence="ambiguous"), product_scope=[], publication_override="force_publish",
+    )
+    assert (invalid.should_publish, invalid.reason) == (False, "ha_missing_command_topic")
+    assert (out_of_scope.should_publish, out_of_scope.reason) == (False, "ha_component_not_in_product_scope")
+
+
+def test_force_no_mapping_refused_and_exclusion_beats_force():
+    no_mapping = decide_publication(_make_mapping(confidence="no_mapping"), publication_override="force_publish")
+    excluded = decide_publication(_make_mapping(confidence="ambiguous"), publication_override="exclude_command")
+    assert (no_mapping.should_publish, no_mapping.reason) == (False, "no_mapping")
+    assert (excluded.should_publish, excluded.reason) == (False, "publication_excluded_command")
+
+
 def test_decide_publication_absence_override_comportement_identique_existant():
     """Non-régression : `publication_override=None` (défaut) = comportement natif inchangé."""
     mapping = _make_mapping(confidence="sure")

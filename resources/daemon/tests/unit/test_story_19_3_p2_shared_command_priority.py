@@ -176,3 +176,17 @@ async def test_tree_secondary_pending_uses_its_last_applied_decision(cli, app, t
     assert primary["override_pending"] is False
     assert secondary["ha_entity_type"] == "sensor"
     assert secondary["override_pending"] is True
+
+
+async def test_publication_route_refuses_shared_command(cli, app, monkeypatch):
+    """AC10 : une commande partagée n'est la clé d'aucune entité (409)."""
+    import transport.http_server as http_server_module
+    snapshot, _ = _metering_plug()
+    app["topology"] = snapshot
+    monkeypatch.setattr(http_server_module, "evaluate_equipment", _make_shared_command_evaluator(
+        http_server_module.evaluate_equipment,
+    ))
+    response = await cli.post("/action/publication_override", headers=_headers(), json={"payload": {
+        "jeedom_eq_id": 13300, "jeedom_cmd_id": 133003, "publication_policy": "exclude",
+    }})
+    assert response.status == 409

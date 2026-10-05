@@ -39,6 +39,17 @@ def _light_snapshot(eq_id=200, state_id=2001, slider_id=2002):
     return snapshot, eq
 
 
+def _ambiguous_valid_snapshot(eq_id=210):
+    from mapping.light import _NON_LIGHT_KEYWORDS
+    keyword = next(iter(_NON_LIGHT_KEYWORDS))
+    eq = JeedomEqLogic(id=eq_id, name=f"x {keyword}", object_id=1, is_enable=True, cmds=[
+        JeedomCmd(id=2101, name="a", generic_type="LIGHT_ON", type="action", sub_type="other"),
+        JeedomCmd(id=2102, name="b", generic_type="LIGHT_OFF", type="action", sub_type="other"),
+        JeedomCmd(id=2103, name="c", generic_type="LIGHT_STATE", type="info", sub_type="binary"),
+    ])
+    return TopologySnapshot(timestamp="2026-10-06T00:00:00Z", objects={}, eq_logics={eq_id: eq}), eq
+
+
 async def _preview(cli, body):
     return await cli.post(
         "/system/overrides/preview",
@@ -209,3 +220,19 @@ async def test_preview_type_proposal_keeps_persisted_publication_force(cli, app,
     result = (await response.json())["payload"]["overridden"]
     assert result["ha_entity_type"] == "switch"
     assert result["publication_override"] == "force_publish"
+
+
+async def test_preview_proposed_force_ambiguous_exposes_publishable_orders(cli, app):
+    """AC3 : forçage proposé d'une ambiguïté valide montre le résultat et ses ordres."""
+    snapshot, eq = _ambiguous_valid_snapshot()
+    app["topology"] = snapshot
+    response = await _preview(cli, {
+        "jeedom_eq_id": eq.id, "jeedom_cmd_id": 2101,
+        "publication_policy": "force_publish",
+    })
+    assert response.status == 200
+    result = (await response.json())["payload"]["overridden"]
+    assert (result["should_publish"], result["publication_reason"]) == (True, "publication_forced")
+    assert result["ha_entity_type"] == "light"
+    assert result["projection_validity"]["is_valid"] is True
+    assert result["command_ids"] == [2101, 2102, 2103]

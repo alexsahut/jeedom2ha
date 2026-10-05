@@ -2821,6 +2821,10 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
         }
     if pub_override is not None:
         over_view["publication_override"] = pub_override
+    if proposed_policy == "force_publish" and over_target is not None:
+        # AC3 : un forçage doit exposer les commandes réellement portées par
+        # l'entité afin que la surface puisse montrer les ordres concernés.
+        over_view["command_ids"] = mapping_cmd_ids(over_target)
 
     # 4. Export support (AC4, Story 16.6) : trace de preview + raisons de refus (aucun nouveau
     # reason_code — les codes viennent tous d'`evaluate_equipment`/`decide_publication`).
