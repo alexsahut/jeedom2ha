@@ -284,7 +284,8 @@ def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_di
             f"fichier d'overrides existant invalide ou schema_version non supportée"
         )
 
-    entry = dict(override)
+    entry = dict(raw["overrides"].get(_override_key(jeedom_eq_id, jeedom_cmd_id)) or {})
+    entry.update(dict(override))
     entry.setdefault("source", "user")
     raw["overrides"][_override_key(jeedom_eq_id, jeedom_cmd_id)] = entry
     raw["schema_version"] = _SCHEMA_VERSION  # migration transparente v1 → v2 au premier write
@@ -327,7 +328,8 @@ def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) ->
             f"fichier d'overrides existant invalide ou schema_version non supportée"
         )
 
-    entry = dict(override)
+    entry = dict(raw["equipment_overrides"].get(str(jeedom_eq_id)) or {})
+    entry.update(dict(override))
     entry.setdefault("source", "user")
     raw["equipment_overrides"][str(jeedom_eq_id)] = entry
     raw["schema_version"] = _SCHEMA_VERSION  # migration transparente v1 → v2 au premier write

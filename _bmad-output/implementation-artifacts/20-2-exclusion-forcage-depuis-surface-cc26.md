@@ -143,10 +143,10 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
   - [x] 1.1 Exclusion utilisateur avant les niveaux 1 et 2 ; amendement d'I4 (code, `pipeline-contract.md`, tests).
   - [x] 1.2 Selon Q1 : capacités calculées malgré l'heuristique de nom (switch, light, cover), commandes inchangées ; forçage qui lève le niveau 1 pour `ambiguous` seulement, niveaux 2 et 3 conservés ; amendement d'I3 (code, `pipeline-contract.md`, tests) ; aperçu du forçage.
   - [x] 1.3 Précédence dans une entité (exclusion avant forçage) ; docstring alignée.
-- [ ] **Task 2 — Persistance et routes (AC: 1, 3, 5, 6, 10)**
-  - [ ] 2.1 Fusion champ par champ des overrides de type et de publication.
-  - [ ] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
-  - [ ] 2.3 Purge par entité et par équipement (CC-19).
+- [x] **Task 2 — Persistance et routes (AC: 1, 3, 5, 6, 10)**
+  - [x] 2.1 Fusion champ par champ des overrides de type et de publication.
+  - [x] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
+  - [x] 2.3 Purge par entité et par équipement (CC-19).
 - [ ] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
   - [ ] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
   - [ ] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
@@ -208,6 +208,7 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 ### Completion Notes List
 
 - 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
+- 2026-10-05 — Task 2 : fusion des deux champs d'override, routes de publication dédiées avec validation d'ID et refus des commandes partagées; purge CC-19 réutilisée. Tests Python ciblés : 28 passés; Node : 424 passés; flake8 et PHP lint OK.
 
 ### File List
 
@@ -219,3 +220,5 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - resources/daemon/mapping/overrides.py
 - resources/daemon/tests/unit/test_story_16_3_publication_override.py
 - _bmad-output/planning-artifacts/pipeline-contract.md
+- resources/daemon/transport/http_server.py
+- core/ajax/jeedom2ha.ajax.php

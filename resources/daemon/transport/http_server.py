@@ -60,6 +60,7 @@ from mapping.overrides import (
     remove_equipment_override,
     remove_override,
     resolve_publication_override,
+    save_equipment_override,
     save_override,
 )
 from discovery.publisher import DiscoveryPublisher
@@ -3072,6 +3073,46 @@ async def _handle_mapping_override_save(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_publication_override_save(request: web.Request) -> web.Response:
+    """POST /action/publication_override — persist an explicit publication policy."""
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+    try:
+        payload = (await request.json()).get("payload", {})
+    except Exception:
+        return web.json_response({"status": "error", "message": "Invalid JSON"}, status=400)
+    eq_id, cmd_id, policy = (payload.get("jeedom_eq_id"), payload.get("jeedom_cmd_id"),
+                             payload.get("publication_policy"))
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response({"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400)
+    if cmd_id is not None and (not isinstance(cmd_id, int) or isinstance(cmd_id, bool)):
+        return web.json_response({"status": "error", "message": "jeedom_cmd_id doit être un int ou absent"}, status=400)
+    if policy not in ("exclude", "force_publish"):
+        return web.json_response({"status": "error", "message": "publication_policy invalide"}, status=400)
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None or (cmd_id is not None and not any(c.id == cmd_id for c in eq.cmds)):
+        return web.json_response({"status": "error", "message": "Équipement ou commande introuvable"}, status=404)
+    data_dir = _resolve_data_dir(request)
+    if cmd_id is not None:
+        evaluation = evaluate_equipment(eq, snapshot, assess_eligibility(eq),
+            mapper_registry=MapperRegistry(), confidence_policy=request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY,
+            persisted_overrides=list_overrides(data_dir), persisted_equipment_overrides=list_equipment_overrides(data_dir))
+        mappings = [evaluation.mapping] + list((evaluation.mapping.additional_mappings or [])) if evaluation.mapping else []
+        owners = sum(cmd_id in mapping_cmd_ids(mapping) for mapping in mappings)
+        if owners != 1:
+            return web.json_response({"status": "error", "message": "Commande sans entité propre"}, status=409)
+    try:
+        if cmd_id is None:
+            saved = save_equipment_override(eq_id, {"publication_override": policy}, data_dir)
+        else:
+            saved = save_override(eq_id, cmd_id, {"publication_override": policy}, data_dir)
+    except ValueError as exc:
+        return web.json_response({"status": "error", "message": str(exc)}, status=500)
+    return web.json_response({"status": "ok", "payload": {"jeedom_eq_id": eq_id,
+        "jeedom_cmd_id": cmd_id, "publication_policy": policy, "saved": saved}})
+
+
 async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
     """POST /action/mapping_override_revert — Story 16.5 (AC10) : retour au mode auto.
 
@@ -3144,6 +3185,15 @@ async def _handle_mapping_override_revert(request: web.Request) -> web.Response:
             "removed_commands": removed_commands,
         },
     })
+
+
+async def _handle_publication_override_revert(request: web.Request) -> web.Response:
+    """POST /action/publication_override_revert — dedicated automatic-mode endpoint.
+
+    The canonical removal operation deliberately clears both override fields for
+    the selected entity (or every entity of an equipment), as required by CC-19.
+    """
+    return await _handle_mapping_override_revert(request)
 
 
 async def _handle_system_diagnostics(request: web.Request) -> web.Response:
@@ -4353,6 +4403,8 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_get("/system/mapping_overrides/{eq_id}", _handle_mapping_overrides_get)
     app.router.add_post("/action/mapping_override", _handle_mapping_override_save)
     app.router.add_post("/action/mapping_override_revert", _handle_mapping_override_revert)
+    app.router.add_post("/action/publication_override", _handle_publication_override_save)
+    app.router.add_post("/action/publication_override_revert", _handle_publication_override_revert)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)

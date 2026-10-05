@@ -903,6 +903,26 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'savePublicationOverride') {
+      $eqId = init('eqId', '');
+      $cmdId = init('cmdId', '');
+      $policy = init('publicationPolicy', '');
+      if (!ctype_digit((string)$eqId) || !in_array($policy, array('exclude', 'force_publish'), true)) {
+        throw new Exception(__('Override de publication invalide', __FILE__));
+      }
+      $payload = array('jeedom_eq_id' => (int)$eqId, 'publication_policy' => $policy);
+      if ($cmdId !== '') {
+        if (!ctype_digit((string)$cmdId)) {
+          throw new Exception(__('cmdId invalide', __FILE__));
+        }
+        $payload['jeedom_cmd_id'] = (int)$cmdId;
+      }
+      $result = jeedom2ha::callDaemon('/action/publication_override', $payload, 'POST', 15);
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
     else if ($action == 'revertMappingOverride') {
       // Story 16.5 — retour au mode auto (par commande si cmdId fourni, sinon équipement).
       $payload = array('jeedom_eq_id' => (int)init('eqId', 0));
@@ -912,6 +932,22 @@ try {
       }
       // Payload à plat : callDaemon ajoute lui-même la clé 'payload' (cf. previewMappingOverride).
       $result = jeedom2ha::callDaemon('/action/mapping_override_revert', $payload, 'POST', 15);
+      if ($result === null) {
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'revertPublicationOverride') {
+      $eqId = init('eqId', '');
+      $cmdId = init('cmdId', '');
+      if (!ctype_digit((string)$eqId) || ($cmdId !== '' && !ctype_digit((string)$cmdId))) {
+        throw new Exception(__('Override de publication invalide', __FILE__));
+      }
+      $payload = array('jeedom_eq_id' => (int)$eqId);
+      if ($cmdId !== '') {
+        $payload['jeedom_cmd_id'] = (int)$cmdId;
+      }
+      $result = jeedom2ha::callDaemon('/action/publication_override_revert', $payload, 'POST', 15);
       if ($result === null) {
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }

@@ -217,6 +217,14 @@ def test_mapping_exclusion_wins_over_force_independent_of_command_order():
     assert _resolve_publication_override_for_mapping(mapping, overrides, {}) == "exclude_command"
 
 
+def test_save_override_merges_type_and_publication_fields(tmp_path):
+    save_override(553, 5138, {"ha_entity_type": "switch"}, str(tmp_path))
+    save_override(553, 5138, {"publication_override": "exclude"}, str(tmp_path))
+    assert list_overrides(str(tmp_path))["553:5138"] == {
+        "ha_entity_type": "switch", "publication_override": "exclude", "source": "user"
+    }
+
+
 def test_resolve_publication_override_precedence_exclusion_equipement_bat_force_publish_commande():
     """Précédence tranchée par le SCP : veto exclusion-équipement (1) > override-commande (2)."""
     overrides = {"553:5138": {"publication_override": "force_publish"}}
