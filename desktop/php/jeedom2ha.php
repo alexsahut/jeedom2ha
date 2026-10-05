@@ -61,6 +61,11 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
+		<div class="eqLogicThumbnailContainer">
+			<div class="cursor eqLogicAction logoPrimary" data-action="add"><i class="fas fa-plus-circle"></i><br><span>{{Ajouter}}</span></div>
+			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
+			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic"><i class="fas fa-stethoscope"></i><br><span>{{Diagnostic}}</span></div>
+		</div>
 
 		<!-- Bandeau global de santé toujours visible (Story 2.2) -->
 		<div id="div_bridgeHealthBanner" class="well well-sm" style="margin:10px 5px; display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
@@ -164,24 +169,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 		}
 		?>
 
-		<!-- Boutons de gestion du plugin -->
-		<div class="eqLogicThumbnailContainer">
-			<div class="cursor eqLogicAction logoPrimary" data-action="add">
-				<i class="fas fa-plus-circle"></i>
-				<br>
-				<span>{{Ajouter}}</span>
-			</div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
-				<i class="fas fa-wrench"></i>
-				<br>
-				<span>{{Configuration}}</span>
-			</div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic">
-				<i class="fas fa-stethoscope"></i>
-				<br>
-				<span>{{Diagnostic}}</span>
-			</div>
-		</div>
 		<legend><i class="fas fa-table"></i> {{Mes templates}}</legend>
 		<?php
 		if (count($eqLogics) == 0) {

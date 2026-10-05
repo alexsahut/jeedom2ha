@@ -139,8 +139,8 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
   - [x] 1.1 — `desktop/php/jeedom2ha.php` appelle `eqLogic::byObjectId($object->getId(), false)`.
   - [x] 1.2 — « Sans pièce » : `eqLogic::byObjectId(null, false)`, hors type `jeedom2ha`, identifiant `0`, en dernier ; `normalizeRoomsTree` n'écarte qu'un `object_id` nul : avec `0`, aucun changement n'y est nécessaire.
   - [x] 1.3 — Tests node de la normalisation : « Sans pièce » en dernier, désactivés conservés dans l'ordre natif.
-- [ ] **Task 2 — Bloc « Gestion » (AC: 2)**
-  - [ ] 2.1 — Déplacer le bloc des trois actions sous le titre « Gestion », sans changer ses classes ni ses attributs.
+- [x] **Task 2 — Bloc « Gestion » (AC: 2)**
+  - [x] 2.1 — Bloc des trois actions déplacé sous le titre « Gestion », classes et attributs conservés.
 - [ ] **Task 3 — État désactivé (AC: 4, 6)**
   - [ ] 3.1 — Module pur, sur le modèle de CC-38 : `isDisabledDiagnostic`, libellé, `disabled_count` dans `summarizePublication`, état `disabled` de la synthèse, `collectBlockingCommandIds` aligné ; tests node.
   - [ ] 3.2 — Rendu : cellule et badge neutres, mention « désactivé dans Jeedom » sur l'en-tête ; CSS.
