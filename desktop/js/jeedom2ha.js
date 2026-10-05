@@ -442,7 +442,10 @@ function triggerTopologyRescan($button, snapshot, owner) {
         refreshBridgeStatus();
         return;
       }
-      $('#div_alert').showAlert({message: (result && result.message) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+      $('#div_alert').showAlert({message: (result && (result.message || result.operation_message)) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+      if (result && typeof result.operation_result === 'string') {
+        refreshBridgeStatus();
+      }
     },
     error: function() {
       $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});

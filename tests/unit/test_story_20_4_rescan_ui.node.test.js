@@ -28,6 +28,11 @@ test('20.4: les résultats UI distinguent succes, partiel, echec et champ absent
   assert.match(source, /Erreur de communication : relire Dernière synchro/);
 });
 
+test('20.4: une erreur terminale du démon affiche operation_message et rafraîchit la santé', () => {
+  assert.match(source, /\(result && \(result\.message \|\| result\.operation_message\)\) \|\| '\{\{Une opération est déjà en cours ou le rescan a échoué\.\}\}'/);
+  assert.match(source, /if \(result && typeof result\.operation_result === 'string'\) \{\s*refreshBridgeStatus\(\);\s*\}/);
+});
+
 test('20.4: annulation ne lance aucune requête et la configuration emploie le même succès', () => {
   assert.match(source, /else if \(typeof onCancel === 'function'\) onCancel\(\);/);
   assert.match(config, /r\.status !== 'ok' \|\| r\.operation_result !== 'succes'/);
