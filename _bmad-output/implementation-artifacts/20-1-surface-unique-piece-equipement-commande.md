@@ -211,6 +211,7 @@ GPT-5 Codex
 - 2026-10-05 — 424 tests node verts ; `php -l` et `node --check` verts ; auto-test local de l'intercepteur PASS (0 échec).
 - 2026-10-05 — 6.2 reste explicitement hors unité : déploiement, gate sur box et passage Chrome seront faits après fusion.
 - 2026-10-05 — Signature box lue : `byObjectId($_object_id, $_onlyEnable = true, $_onlyVisible = false, $_eqType_name = null, $_logicalId = null, $_orderByName = false, $_onlyHasCmds = false)`.
+- 2026-10-05 — Corrections de relecture ClaudeBox + relecture indépendante sur PR #204 (head 97cdaa8) : clé de rapport du gate en double (eq_279_badge, P1), ordre du DOM AC2 étendu au bandeau (gestion_avant_bandeau), info-bulle du sélecteur désactivé posée aussi sur la cellule, libellé « Sans pièce » traduit via `__()`.
 
 ### File List
 
