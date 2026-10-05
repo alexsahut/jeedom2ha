@@ -16,6 +16,7 @@ SECRET = "test-secret-story-8-4-golden"
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "golden_corpus"
 SYNC_FIXTURE_PATH = FIXTURES_DIR / "sync_payload.json"
 EXPECTED_SNAPSHOT_PATH = FIXTURES_DIR / "expected_sync_snapshot.json"
+PRE_20_2_PUBLICATIONS_PATH = FIXTURES_DIR / "expected_publication_decisions_before_20_2.json"
 
 
 def _load_json(path: Path) -> dict:
@@ -308,6 +309,18 @@ async def test_story_8_4_golden_file_non_regression_snapshot(aiohttp_client):
     assert "buttons_sure" in mapping_summary
 
     current_snapshot = _build_canonical_snapshot(sync_json, diagnostics_json, app)
+
+    # Story 20.2 may correct mapper diagnostics/capabilities, but must not
+    # alter the corpus publication decision (policy or should_publish).
+    expected_publications = _load_json(PRE_20_2_PUBLICATIONS_PATH)
+    current_publications = {
+        eq_id: {
+            "should_publish": decision["should_publish"],
+            "reason": decision["reason"],
+        }
+        for eq_id, decision in current_snapshot["runtime"]["publications"].items()
+    }
+    assert current_publications == expected_publications
 
     current_text = json.dumps(current_snapshot, indent=2, sort_keys=True) + "\n"
 
