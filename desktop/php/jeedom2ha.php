@@ -49,7 +49,7 @@ foreach (eqLogic::byObjectId(null, false) as $roomEq) {
 if (count($unassignedEqList) > 0) {
 	$j2haRoomsTree[] = array(
 		'object_id'     => 0,
-		'object_name'   => 'Sans pièce',
+		'object_name'   => __('Sans pièce', __FILE__),
 		'parent_number' => 0,
 		'equipments'    => $unassignedEqList,
 	);

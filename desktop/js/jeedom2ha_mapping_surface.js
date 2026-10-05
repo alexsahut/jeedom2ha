@@ -111,6 +111,7 @@
     var selectorState = M.getOverrideSelectorState(row);
     if (!selectorState.active) {
       $select.prop('disabled', true).attr('title', selectorState.reason);
+      $tdOverride.attr('title', selectorState.reason);
     }
     $tdOverride.append($select);
     var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
