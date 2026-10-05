@@ -2927,10 +2927,35 @@ def _build_mapping_override_tree(
     synced_should_publish = synced_decision.should_publish if synced_decision is not None else None
     override_pending = synced_should_publish is not None and synced_should_publish != current_should_publish
 
+    mappings = []
+    if evaluation.mapping is not None:
+        mappings = [evaluation.mapping] + list(evaluation.mapping.additional_mappings or [])
+    entity_rows = []
+    for mapping in mappings:
+        cmd_ids = mapping_cmd_ids(mapping)
+        # Une clé d'action doit désigner une seule entité : une commande partagée reste
+        # visible dans l'arbre, mais ne peut pas servir à poser un override ciblé.
+        unique_cmd_id = next(
+            (cid for cid in cmd_ids if sum(cid in mapping_cmd_ids(item) for item in mappings) == 1),
+            None,
+        )
+        publication_override = _resolve_publication_override_for_mapping(
+            mapping, overrides_cache, equipment_overrides_cache
+        )
+        entity_rows.append({
+            "ha_entity_type": mapping.ha_entity_type,
+            "publication_override": publication_override,
+            "reason_details": dict(mapping.reason_details or {}),
+            "override_command_id": unique_cmd_id,
+            "override_pending": override_pending or synced_decision is None,
+        })
+
     return {
         "jeedom_eq_id": eq.id,
         "eq_name": eq.name,
         "mapped": mapped,
+        "equipment_decision": _decision_view(evaluation.equipment_decision, evaluation.mapping),
+        "entities": entity_rows,
         "sync_status": {
             "synced_should_publish": synced_should_publish,
             "current_should_publish": current_should_publish,

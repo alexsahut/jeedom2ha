@@ -114,6 +114,11 @@ async def test_tree_resolves_shared_command_to_primary(cli, app, tmp_path, monke
     assert shared["attendu_ha"] == "switch"
     assert shared["effective_ha"] == "switch"
     assert shared["diagnostic"]["ha_entity_type"] == "switch"
+    assert payload["equipment_decision"]["should_publish"] is True
+    assert len(payload["entities"]) == 2
+    assert all("reason_details" in entity for entity in payload["entities"])
+    # La commande partagée ne peut devenir la clé d'action d'aucune entité.
+    assert all(entity["override_command_id"] != 133003 for entity in payload["entities"])
 
 
 async def test_preview_resolves_shared_command_to_primary(cli, app, monkeypatch):
