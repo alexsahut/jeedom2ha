@@ -205,19 +205,6 @@ class LightMapper:
                 "[MAPPING] eq_id=%d name='%s': name contains non-light keyword '%s' → ambiguous",
                 eq.id, eq.name, matched_kw
             )
-            capabilities = LightCapabilities()
-            return MappingResult(
-                ha_entity_type="light",
-                confidence="ambiguous",
-                reason_code="name_heuristic_rejection",
-                jeedom_eq_id=eq.id,
-                ha_unique_id=f"jeedom2ha_eq_{eq.id}",
-                ha_name=eq.name,
-                suggested_area=snapshot.get_suggested_area(eq.id),
-                commands=light_cmds,
-                capabilities=capabilities,
-                reason_details={"matched_keyword": matched_kw},
-            )
 
         # Check if ONLY color commands exist (V1 unsupported)
         non_color_cmds = {gt for gt in light_cmds if gt not in _COLOR_GENERIC_TYPES}
@@ -297,12 +284,18 @@ class LightMapper:
         else:
             reason_code = "light_brightness_only"
 
+        if matched_kw:
+            global_confidence = "ambiguous"
+            reason_code = "name_heuristic_rejection"
+
         # Build reason details
         reason_details = {}
         if on_off_reason:
             reason_details["on_off"] = on_off_reason
         if brightness_reason:
             reason_details["brightness"] = brightness_reason
+        if matched_kw:
+            reason_details["matched_keyword"] = matched_kw
         # Enrich with dedup metadata (Story 2.6) — last event wins if multiple
         if _dedup_events:
             reason_details.update(_dedup_events[-1])

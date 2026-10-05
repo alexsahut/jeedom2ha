@@ -34,8 +34,9 @@ from mapping.overrides import (
     save_equipment_override,
     save_override,
 )
+from models.evaluate_equipment import _resolve_publication_override_for_mapping
 from models.decide_publication import decide_publication
-from models.mapping import LightCapabilities, MappingResult, ProjectionValidity
+from models.mapping import LightCapabilities, MappingResult, ProjectionValidity, SwitchCapabilities
 import transport.http_server as http_server
 
 
@@ -199,6 +200,23 @@ def test_resolve_publication_override_force_publish_equipement_par_defaut():
     assert resolve_publication_override(553, 9999, {}, equipment_overrides) == "force_publish"
 
 
+def test_mapping_exclusion_wins_over_force_independent_of_command_order():
+    """20-2: a multi-command entity never depends on its command iteration order."""
+    mapping = MappingResult(
+        ha_entity_type="switch", confidence="ambiguous", reason_code="test",
+        jeedom_eq_id=553, ha_unique_id="test", ha_name="test", commands={},
+        capabilities=SwitchCapabilities(),
+    )
+    mapping.reason_details = {"cmd_id": 10}
+    # A second command is represented by a minimal command-like object.
+    mapping.commands = {"ENERGY_ON": type("Cmd", (), {"id": 11})()}
+    overrides = {
+        "553:10": {"publication_override": "force_publish"},
+        "553:11": {"publication_override": "exclude"},
+    }
+    assert _resolve_publication_override_for_mapping(mapping, overrides, {}) == "exclude_command"
+
+
 def test_resolve_publication_override_precedence_exclusion_equipement_bat_force_publish_commande():
     """Précédence tranchée par le SCP : veto exclusion-équipement (1) > override-commande (2)."""
     overrides = {"553:5138": {"publication_override": "force_publish"}}
@@ -296,9 +314,8 @@ def test_i2_force_publish_ne_bypass_jamais_une_projection_invalide():
     assert result.reason == "ha_missing_state_topic"  # cause amont (étape 3) préservée, I4
 
 
-def test_i2_exclude_eqlogic_evalue_apres_projection_invalide_i4():
-    """I4 : une projection invalide (étape 3) reste la cause retenue — l'exclusion utilisateur
-    (étape 4) ne doit jamais masquer un échec amont."""
+def test_i4_exclude_eqlogic_evalue_avant_projection_invalide():
+    """20-2 : l'exclusion utilisateur est visible même si la projection est invalide."""
     mapping = _make_mapping(
         confidence="sure", projection_validity=_invalid_pv("ha_component_unknown")
     )
@@ -306,7 +323,7 @@ def test_i2_exclude_eqlogic_evalue_apres_projection_invalide_i4():
     result = decide_publication(mapping, publication_override="exclude_eqlogic")
 
     assert result.should_publish is False
-    assert result.reason == "ha_component_unknown"
+    assert result.reason == "publication_excluded_eqlogic"
 
 
 def test_force_publish_ne_bypass_pas_le_niveau_3_product_scope():

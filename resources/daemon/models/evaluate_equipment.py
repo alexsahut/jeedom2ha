@@ -170,13 +170,16 @@ def _resolve_publication_override_for_mapping(
     """Résout l'override de publication effectif pour un mapping (mêmes règles que
     `transport/http_server.py:_resolve_publication_override_for_mapping`, répliquées ici en
     pur car ce module ne peut pas importer `transport/` — sens unique D8)."""
+    force_publish = None
     for cmd_id in mapping_cmd_ids(mapping) or [-1]:
         candidate = resolve_publication_override(
             mapping.jeedom_eq_id, cmd_id, overrides, equipment_overrides
         )
-        if candidate is not None:
+        if candidate in ("exclude_eqlogic", "exclude_command"):
             return candidate
-    return None
+        if candidate == "force_publish":
+            force_publish = candidate
+    return force_publish
 
 
 def _apply_type_override_with_proposed_priority(

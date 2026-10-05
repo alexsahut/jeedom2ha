@@ -1,6 +1,6 @@
 # Story 20.2 : Exclusion et forçage depuis la surface (CC-26)
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -133,16 +133,16 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés, lecture seule (AC: 2, 3, 4, 7, 11)**
-  - [ ] 0.1 Relire les 17 commandes ambiguës (F2) au SHA courant : pour les quatre équipements On/Off, confirmer les commandes On et Off ; pour 5369, le type qui validerait.
-  - [ ] 0.1b Relever les commandes partagées entre entités (principal et secondaires) sur les 8 équipements et sur l'eq 579 (AC1).
-  - [ ] 0.2 Confirmer ce que fait « Publier » par équipement sur une entité exclue (F8).
-  - [ ] 0.3 Lire la politique de confiance active ; relever les overrides de publication présents (nombre, portée, sans contenu) et ceux posés sur une entité ambiguë ou invalide (écarts attendus d'AC2).
-  - [ ] 0.4 Choisir un équipement non publié pour la preuve terrain.
-- [ ] **Task 1 — Décision et mapping (AC: 2, 3, 4, 10)**
-  - [ ] 1.1 Exclusion utilisateur avant les niveaux 1 et 2 ; amendement d'I4 (code, `pipeline-contract.md`, tests).
-  - [ ] 1.2 Selon Q1 : capacités calculées malgré l'heuristique de nom (switch, light, cover), commandes inchangées ; forçage qui lève le niveau 1 pour `ambiguous` seulement, niveaux 2 et 3 conservés ; amendement d'I3 (code, `pipeline-contract.md`, tests) ; aperçu du forçage.
-  - [ ] 1.3 Précédence dans une entité (exclusion avant forçage) ; docstring alignée.
+- [x] **Task 0 — Relevés, lecture seule (AC: 2, 3, 4, 7, 11)**
+  - [x] 0.1 Relire les 17 commandes ambiguës (F2) au SHA courant : pour les quatre équipements On/Off, confirmer les commandes On et Off ; pour 5369, le type qui validerait.
+  - [x] 0.1b Relever les commandes partagées entre entités (principal et secondaires) sur les 8 équipements et sur l'eq 579 (AC1).
+  - [x] 0.2 Confirmer ce que fait « Publier » par équipement sur une entité exclue (F8).
+  - [x] 0.3 Lire la politique de confiance active ; relever les overrides de publication présents (nombre, portée, sans contenu) et ceux posés sur une entité ambiguë ou invalide (écarts attendus d'AC2).
+  - [x] 0.4 Choisir un équipement non publié pour la preuve terrain.
+- [x] **Task 1 — Décision et mapping (AC: 2, 3, 4, 10)**
+  - [x] 1.1 Exclusion utilisateur avant les niveaux 1 et 2 ; amendement d'I4 (code, `pipeline-contract.md`, tests).
+  - [x] 1.2 Selon Q1 : capacités calculées malgré l'heuristique de nom (switch, light, cover), commandes inchangées ; forçage qui lève le niveau 1 pour `ambiguous` seulement, niveaux 2 et 3 conservés ; amendement d'I3 (code, `pipeline-contract.md`, tests) ; aperçu du forçage.
+  - [x] 1.3 Précédence dans une entité (exclusion avant forçage) ; docstring alignée.
 - [ ] **Task 2 — Persistance et routes (AC: 1, 3, 5, 6, 10)**
   - [ ] 2.1 Fusion champ par champ des overrides de type et de publication.
   - [ ] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
@@ -207,4 +207,15 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 ### Completion Notes List
 
+- 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
+
 ### File List
+
+- resources/daemon/models/decide_publication.py
+- resources/daemon/models/evaluate_equipment.py
+- resources/daemon/mapping/switch.py
+- resources/daemon/mapping/light.py
+- resources/daemon/mapping/cover.py
+- resources/daemon/mapping/overrides.py
+- resources/daemon/tests/unit/test_story_16_3_publication_override.py
+- _bmad-output/planning-artifacts/pipeline-contract.md

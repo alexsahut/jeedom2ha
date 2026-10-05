@@ -523,8 +523,9 @@ def resolve_publication_override(
     disambiguated into `"exclude_eqlogic"` / `"exclude_command"` so the caller (`decide_publication`)
     can select the correct dedicated `reason` (`publication_excluded_eqlogic` vs.
     `publication_excluded_command`, Task 4) without re-inspecting the override dicts itself.
-    `"force_publish"` is returned as-is (equipment-level only, no command-level `force_publish`
-    per the precedence rule above).
+    `"force_publish"` is returned as-is at either scope. The mapping-level resolver
+    scans every command and gives any exclusion priority over a force, independently of
+    command order.
     """
     equipment_entry = equipment_overrides.get(str(jeedom_eq_id))
     if equipment_entry and equipment_entry.get("publication_override") == "exclude":
