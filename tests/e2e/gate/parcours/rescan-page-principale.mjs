@@ -12,6 +12,15 @@ export async function run(page, { helpers }) {
   helpers.record('confirmation_ouverte', true);
   const confirm = page.locator('.bootbox .btn-primary').filter({ hasText: /^Rescanner$/ }).first();
   await confirm.click();
-  await page.waitForFunction(() => document.querySelector('#div_alert')?.textContent?.includes('Synchronisation terminée.'));
+  const zone = await page.waitForFunction(() => {
+    if (document.querySelector('#jeeToastContainer')?.textContent?.includes('Synchronisation terminée.')) {
+      return 'toast';
+    }
+    if (document.querySelector('#div_alert')?.textContent?.includes('Synchronisation terminée.')) {
+      return 'div_alert';
+    }
+    return false;
+  });
+  helpers.record('retour_rescan_zone', await zone.jsonValue());
   helpers.record('retour_rescan', 'succes-simule');
 }
