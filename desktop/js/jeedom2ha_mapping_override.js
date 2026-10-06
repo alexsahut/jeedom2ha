@@ -185,6 +185,34 @@
     return policy === 'exclude' && decision && decision.should_publish === true;
   }
 
+  // Story 20-2 (P2, relecture ClaudeBox AC3) : contenu de l'aperçu de forçage, lu
+  // strictement dans la réponse du démon (`previewMappingOverride`) — type, validité de
+  // projection, et commandes qui recevront les ordres (`view.command_ids`, uniquement
+  // peuplé par le démon quand `proposed_policy === 'force_publish'`). Si le forçage serait
+  // refusé (projection invalide ou publication toujours non déclenchée), `can_confirm` est
+  // faux et `refusal_reason` porte la cause lisible — à l'appelant de désactiver la
+  // confirmation en conséquence.
+  function forcePreviewState(view, commands) {
+    var d = readDiagnosticView(view);
+    var ids = (view && Array.isArray(view.command_ids)) ? view.command_ids : [];
+    var commandNames = resolveCommandNames(commands, ids);
+    if (d === null) {
+      return {
+        ha_entity_type: null, is_valid: false, will_publish: false, command_names: commandNames,
+        can_confirm: false, refusal_reason: 'Aperçu indisponible — réponse du démon inattendue.',
+      };
+    }
+    var canConfirm = d.is_valid && d.should_publish;
+    return {
+      ha_entity_type: d.ha_entity_type,
+      is_valid: d.is_valid,
+      will_publish: d.should_publish,
+      command_names: commandNames,
+      can_confirm: canConfirm,
+      refusal_reason: canConfirm ? null : buildBlockingReason(view),
+    };
+  }
+
   // Story 19.3 (AC6) — l'accordéon pièce doit afficher un badge quand l'état courant
   // (overrides actifs) diverge de la dernière décision synchronisée vers Home Assistant.
   function shouldShowOverridePendingBadge(tree) {
@@ -668,6 +696,7 @@
     entityCommandsLabel: entityCommandsLabel,
     publicationActionState: publicationActionState,
     shouldConfirmPublication: shouldConfirmPublication,
+    forcePreviewState: forcePreviewState,
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,

@@ -246,7 +246,11 @@
   // Modale Bootbox du plugin (même pattern que confirmHaPublishAction, jeedom2ha.js) :
   // fermeture par la croix, Échap ou « Annuler » appellent toutes `onEscape`/`cancel`, qui
   // libère l'état d'attente ; seul « Confirmer » déclenche l'action.
-  function confirmPublicationDialog(message, onConfirm, onCancel) {
+  // `options.disableConfirm` : cause lisible désactivant le bouton Confirmer (AC3 — aperçu
+  // de forçage refusé). `content` : chaîne (fallback window.confirm) ou noeud jQuery/DOM
+  // construit avec .text() pour les valeurs non fiables (noms de commande Jeedom).
+  function confirmPublicationDialog(content, onConfirm, onCancel, options) {
+    var opts = options || {};
     var settled = false;
     function cancel() {
       if (settled) return;
@@ -254,25 +258,49 @@
       if (onCancel) onCancel();
     }
     function confirm() {
-      if (settled) return;
+      if (settled || opts.disableConfirm) return;
       settled = true;
       onConfirm();
     }
     if (typeof bootbox === 'undefined' || !bootbox || typeof bootbox.dialog !== 'function') {
-      if (window.confirm(message)) { confirm(); } else { cancel(); }
+      var text = typeof content === 'string' ? content : '{{Confirmer cette action ?}}';
+      if (!opts.disableConfirm && window.confirm(text)) { confirm(); } else { cancel(); }
       return;
     }
-    bootbox.dialog({
-      message: '<div>' + message + '</div>',
+    var dialog = bootbox.dialog({
+      message: typeof content === 'string' ? '<div>' + content + '</div>' : content,
       onEscape: cancel,
       buttons: {
         cancel: { label: '{{Annuler}}', className: 'btn-default', callback: cancel },
         confirm: { label: '{{Confirmer}}', className: 'btn-primary', callback: confirm },
       },
     });
+    if (opts.disableConfirm) {
+      dialog.find('[data-bb-handler="confirm"]').prop('disabled', true).attr('title', opts.disableConfirm);
+    }
   }
 
-  function requestPublication(eqId, target, equipment, policy, $buttons) {
+  // Story 20-2 (P2, AC3) : contenu DOM de l'aperçu de forçage — type, validité, commandes
+  // qui recevront les ordres (noms lus dans `commands[]`, jamais injectés en HTML brut :
+  // les noms de commande sont du texte libre Jeedom, donc potentiellement non fiable).
+  function buildForcePreviewContent(state) {
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Type HA : }}' + (state.ha_entity_type || '{{aucun}}')));
+    $wrap.append($('<p></p>').text(state.is_valid
+      ? '{{Projection valide pour ce type.}}' : '{{Projection invalide pour ce type.}}'));
+    $wrap.append($('<p></p>').text(state.command_names.length
+      ? '{{Commandes qui recevront les ordres : }}' + state.command_names.join(', ')
+      : '{{Aucune commande ne recevra d’ordre.}}'));
+    if (state.can_confirm) {
+      $wrap.append($('<p></p>').text('{{Cette entité sera publiée dans Home Assistant.}}'));
+    } else {
+      $wrap.append($('<p class="text-danger"></p>')
+        .text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
+    }
+    return $wrap;
+  }
+
+  function requestPublication(eqId, target, equipment, policy, $buttons, commands) {
     var cmdId = equipment ? null : target.override_command_id;
     function save() { publicationRequest(eqId, cmdId, policy, $buttons); }
     function release() { $buttons.prop('disabled', false); }
@@ -292,7 +320,10 @@
       .done(function (data) {
         var payload = data && data.result ? data.result : data;
         var view = M.readPreviewOverridden(payload);
-        confirmPublicationDialog('{{Aperçu du forçage : }}' + M.buildPublishCellLabel(view) + '{{. Continuer ?}}', save, release);
+        var state = M.forcePreviewState(view, commands);
+        var dialogOptions = state.can_confirm ? null
+          : { disableConfirm: state.refusal_reason || '{{Le forçage serait refusé dans l’état actuel.}}' };
+        confirmPublicationDialog(buildForcePreviewContent(state), save, release, dialogOptions);
       })
       .fail(release);
   }
@@ -371,7 +402,7 @@
       .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
   }
 
-  function appendPublicationActions($host, eqId, target, equipment) {
+  function appendPublicationActions($host, eqId, target, equipment, commands) {
     var state = M.publicationActionState(target, equipment);
     var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
     // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton grisé porte SA cause propre
@@ -380,7 +411,7 @@
     function button(label, policy, enabled, reason) {
       var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
       if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
-      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button')); });
+      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands); });
       $group.append($button);
     }
     button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
@@ -399,7 +430,7 @@
       var $row = $('<div class="j2ha-entity-row"></div>');
       $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
       $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity, tree.commands)));
-      appendPublicationActions($row, tree.jeedom_eq_id, entity, false);
+      appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
       $host.append($row);
     }
   }
@@ -417,7 +448,7 @@
     appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
       publication_override: null, has_publication_override: normalized.entities.some(function (entity) {
         return entity.publication_override !== null;
-      }) }, true);
+      }) }, true, normalized.commands);
     if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
       var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
       $apply.on('click', function () { applyEquipment(eqId, $apply); });

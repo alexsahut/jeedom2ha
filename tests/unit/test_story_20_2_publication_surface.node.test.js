@@ -100,6 +100,32 @@ test('20-2 — P2 revue : libellé entité avec noms de commande réels (command
   assert.equal(M.entityCommandsLabel({ command_ids: [99] }, commands), 'Commandes : #99');
 });
 
+test('20-2 — P2 revue (AC3) : aperçu du forçage lit type, validité et commandes', () => {
+  const commands = [{ jeedom_cmd_id: 5, cmd_name: 'Ouvrir' }, { jeedom_cmd_id: 6, cmd_name: 'Fermer' }];
+  const acceptedView = {
+    ha_entity_type: 'cover', projection_validity: { is_valid: true }, should_publish: true,
+    publication_reason: 'sure', command_ids: [5, 6],
+  };
+  const accepted = M.forcePreviewState(acceptedView, commands);
+  assert.equal(accepted.ha_entity_type, 'cover');
+  assert.equal(accepted.is_valid, true);
+  assert.equal(accepted.can_confirm, true);
+  assert.equal(accepted.refusal_reason, null);
+  assert.deepEqual(accepted.command_names, ['Ouvrir', 'Fermer']);
+
+  const refusedView = {
+    ha_entity_type: 'cover', projection_validity: { is_valid: false, reason_code: 'ha_missing_command_topic' },
+    should_publish: false, publication_reason: 'ambiguous_skipped', command_ids: [5],
+  };
+  const refused = M.forcePreviewState(refusedView, commands);
+  assert.equal(refused.can_confirm, false);
+  assert.ok(refused.refusal_reason);
+
+  const emptyView = M.forcePreviewState(null, commands);
+  assert.equal(emptyView.can_confirm, false);
+  assert.ok(emptyView.refusal_reason);
+});
+
 test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', () => {
   for (const [code, phrase] of [
     ['name_heuristic_rejection', 'mot du nom'],
