@@ -426,10 +426,14 @@ function triggerTopologyRescan($button, snapshot, owner) {
   $('[data-ha-action]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
-    data: {action: 'scanTopology'}, dataType: 'json', timeout: 15000,
+    data: {action: 'scanTopology'}, dataType: 'json', timeout: 20000,
     success: function(data) {
       var result = data && data.result;
-      if (data.state === 'ok' && result && result.status === 'ok') {
+      if (data.state !== 'ok') {
+        $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+        return;
+      }
+      if (result && result.status === 'ok') {
         if (result.operation_result === 'succes') {
           $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée.}}', level: 'success'});
         } else if (result.operation_result === 'echec') {
