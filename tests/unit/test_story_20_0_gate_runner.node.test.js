@@ -350,6 +350,15 @@ test('story 20-0 — le délai de calme se compte depuis le plus tardif de lastI
   assert.equal(calculateQuietDelay({ lastInterceptedAt: now - 120_000 }, now), 0);
 });
 
+test('story 20-0 (CC-43) — le bloc finally coupe le réseau du contexte avant de fermer les pages', async () => {
+  const source = await readFile(path.join(__dirname, '..', 'e2e', 'gate', 'run-gate.mjs'), 'utf8');
+  const setOfflineIdx = source.indexOf('() => context?.setOffline(true)');
+  const closePagesIdx = source.indexOf('() => closePages(context)');
+  assert.ok(setOfflineIdx >= 0, 'context?.setOffline(true) introuvable dans run-gate.mjs');
+  assert.ok(closePagesIdx >= 0, 'closePages(context) introuvable dans run-gate.mjs');
+  assert.ok(setOfflineIdx < closePagesIdx, 'setOffline(true) doit précéder closePages(context) dans le bloc finally (CC-43)');
+});
+
 test('story 20-0 — journal de refus : clés triées sans valeur', async () => {
   const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
   const journal = { entries: [] };

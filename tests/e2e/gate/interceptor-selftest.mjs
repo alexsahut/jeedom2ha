@@ -287,6 +287,11 @@ async function main() {
       });
       return response.json();
     });
+    // CC-43 : couper le réseau du contexte avant de le fermer, pour qu'une
+    // requête en vol pendant la fermeture ne puisse jamais échapper au
+    // gestionnaire de route et atteindre le serveur (context.close() ferme
+    // aussi declaredPage).
+    await declaredContext.setOffline(true);
     await declaredContext.close();
 
     // Document (page de connexion) qui redirige vers la même action interdite que
@@ -296,10 +301,61 @@ async function main() {
     await redirectPage.goto(`${origin}/index.php`, { waitUntil: 'load' }).catch(() => {});
     await redirectPage.close();
 
+    // CC-43 : contrôle déterministe du risque réel (une écriture en vol pendant
+    // la fermeture). Une page envoie en boucle une écriture interdite ; on
+    // attend que le journal en ait bloqué au moins une (donc que le flux soit
+    // bien en cours), puis on coupe le réseau et on ferme la page puis le
+    // contexte sans arrêter la boucle au préalable. Le serveur ne doit avoir
+    // reçu aucune de ces écritures, y compris celle qui pouvait être en vol au
+    // moment de la fermeture.
+    const offlineContext = await browser.newContext({ serviceWorkers: 'block' });
+    const offlineJournal = { entries: [], failed: false, failures: [] };
+    await installInterceptor(offlineContext, {
+      ctx, simState: createState(), journal: offlineJournal, declaredBascules: [],
+    });
+    const offlinePage = await offlineContext.newPage();
+    await offlinePage.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
+    const offlineRequestsBefore = requests.length;
+    await offlinePage.evaluate((endpoint) => {
+      window.__cc43Interval = setInterval(() => {
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: 'action=saveFilteringConfig',
+        }).catch(() => {});
+      }, 10);
+    }, `${origin}${PLUGIN_AJAX}`);
+    const offlineDeadline = Date.now() + 5_000;
+    while (
+      Date.now() < offlineDeadline
+      && !offlineJournal.entries.some((entry) => entry.action === 'saveFilteringConfig')
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const offlineBlockedBeforeOffline = offlineJournal.entries.some(
+      (entry) => entry.action === 'saveFilteringConfig',
+    );
+    // La boucle n'est volontairement pas arrêtée avant la coupure réseau : on
+    // veut maximiser la chance qu'une requête soit en vol au moment où le
+    // contexte se ferme (context.close() ferme aussi offlinePage).
+    await offlineContext.setOffline(true);
+    await offlineContext.close();
+    const offlineServerReceivedForbidden = requests
+      .slice(offlineRequestsBefore)
+      .some((request) => request.actions.includes('saveFilteringConfig'));
+    report(
+      'ecriture en boucle : reseau coupe avant fermeture, aucune ecriture atteinte malgre le flux continu',
+      offlineBlockedBeforeOffline && !offlineServerReceivedForbidden,
+      failures,
+    );
+
     // Les éléments sans réponse attendue (beacon, popup, iframe, WebSocket) peuvent
     // encore être en file après evaluate(). La fermeture du contexte annule tout ce
     // qui resterait avant que le serveur et le journal soient inspectés.
     await page.waitForTimeout(1_500);
+    // CC-43 : couper le réseau du contexte avant sa fermeture (voir commentaire
+    // plus haut sur declaredContext).
+    await context.setOffline(true);
     await context.close();
 
     const forbiddenActions = new Set([

@@ -415,6 +415,11 @@ async function main() {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
     const finalization = { failure };
+    // CC-43 : couper le réseau du navigateur avant de fermer les pages, pour
+    // qu'une écriture lancée juste avant la fermeture (ex. enregistrement
+    // automatique après délai) ne puisse jamais atteindre la box en échappant
+    // au gestionnaire de route.
+    await captureFinallyFailure(finalization, () => context?.setOffline(true));
     await captureFinallyFailure(finalization, () => closePages(context));
     if (authenticated) {
       await captureFinallyFailure(finalization, () => waitForQuietWindow(journal));
