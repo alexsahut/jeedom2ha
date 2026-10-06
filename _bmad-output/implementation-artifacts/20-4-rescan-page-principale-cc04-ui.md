@@ -287,6 +287,30 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-10-06 — R7b dev-story : suite des corrections de revue indépendante sur
+  PR #209, HEAD de départ `1935bb9`. `a78882a` déplace la conversion d'une
+  exception sync en résultat `echec` (santé + date de fin) du wrapper
+  `_handle_action_sync` vers la tâche protégée `_run_sync` elle-même, via
+  `_build_sync_failure_response` partagée : auparavant, une déconnexion client
+  laissait `asyncio.shield` continuer la tâche sans que personne n'attende
+  l'exception, donc la santé restait figée sur l'ancienne opération. `c7fe917`
+  priorise `r.message` sur `r.operation_message` dans la page de configuration
+  pour qu'un 409 (« Publier » en cours) affiche le message du verrou plutôt
+  que « Résultat inconnu » (AC8). `2c46638` aligne le délai AJAX du rescan
+  (15 s → 20 s, comme la page de configuration) et affiche directement
+  `data.result` quand il s'agit d'une chaîne (démon injoignable) au lieu du
+  message générique de concurrence. Réponses françaises postées aux
+  commentaires Codex 4189911044 et 4189911052, fils résolus
+  (`PRRT_kwDORkr6Dc6pQezg`, `PRRT_kwDORkr6Dc6pQezl`), `@codex review` posté une
+  fois. Aucun déploiement, rescan réel, sync ou gate contre la box.
+
+- 2026-10-06 — R7 dev-story : `1935bb9` affiche `result.message` puis
+  `result.operation_message` sur une erreur terminale du sync et rafraîchit la
+  santé pour tout résultat portant `operation_result` (succès, partiel, échec),
+  pas pour un 409 — en réponse au commentaire Codex 4189911044. Unité
+  interrompue avant la rédaction du rapport (quota du modèle épuisé) ; reprise
+  par R7b, qui a vérifié le commit, les tests et poursuivi les points suivants.
+
 - 2026-10-06 — R6 code-review : `confirmHaPublishAction` rattache désormais
   l'annulation du rescan à `onEscape` et à `hidden.bs.modal`, avec une annulation
   idempotente. Après confirmation, la fermeture de la modale ne libère pas la
