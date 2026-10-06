@@ -3,7 +3,7 @@
 Status: backlog
 
 > **Statut : `create-story` terminé, `ready-for-dev` NON accordé (2026-10-06).** Deux blocages, détaillés en « Conditions de passage à `ready-for-dev` » :
-> 1. **Décisions produit Q1 à Q4 à prendre par Alex** (compteurs de remplacement, sort des actions et du contenu portés par la synthèse et la modale, sort de la page « gabarit »). L'epic demande à cette story de « décider puis livrer » le remplacement des compteurs, et la lecture du code montre que la synthèse et la modale portent bien plus que des compteurs (F2, F3). Les AC marqués **[Qx]** sont écrits sur la recommandation de ce brouillon et se figent à la réponse d'Alex.
+> 1. **Décisions produit Q1 à Q4 (dont Q2b) à prendre par Alex** (compteurs de remplacement, sort des actions et du contenu portés par la synthèse et la modale, sort de la page « gabarit »). L'epic demande à cette story de « décider puis livrer » le remplacement des compteurs, et la lecture du code montre que la synthèse et la modale portent bien plus que des compteurs (F2, F3). Les AC marqués **[Qx]** sont écrits sur la recommandation de ce brouillon et se figent à la réponse d'Alex.
 > 2. **20.2 n'est pas `done`** (`review` : code fusionné sur `main`, preuve post-fusion 5.2/5.3 et validation UX restantes). Aucun développement avant 20.2 `done`.
 
 ## Story
@@ -41,7 +41,11 @@ afin de comprendre l'état de mon installation avec des mots d'usage, au même e
   - page d'édition d'équipement du gabarit (`jeedom2ha.php:211-359`) : « Nom du paramètre n°1 » / « Renseignez le paramètre n°1… » / placeholder « Paramètre n°1 » (`:283-287`), « Paramètres spécifiques », « Mot de passe », « Auto-actualisation » avec assistant cron, « Description » ;
   - la classe `jeedom2ha` conserve des crochets de gabarit (`preInsert`, `preSave`, `postSave`, chiffrement d'un `password` d'équipement, `core/class/jeedom2ha.class.php:826-870`), et rien ne lit `param1` ni `autorefresh`.
   - Autres mots d'infrastructure visibles à inventorier (Task 1.2) : « Écart », « Confiance », « Parité FAN → switch », « Synthèse du périmètre publié », « mapping », « Ajouter » (crée un équipement `jeedom2ha`).
-- **F6 — Le gate 20-0 et les tests dépendent de ces éléments.** `getDiagnostics` et `getPublishedScopeForConsole` figurent dans les lectures autorisées de la politique du gate (`tests/e2e/gate/lib/policy.mjs:51-52`) et de l'inventaire de chargement (`tests/e2e/gate/page-load-request-inventory.mjs:186-187`). 15 fichiers de tests Node/PHP référencent la synthèse ou la modale (`test_story_3_4_ai5…`, `4_2`, `4_3`, `4_4`, `4_5`, `5_1`, `5_2`, `5_3`, `5_4`, `5_7`, `15_2`, `15_3`, `test_scope_summary_presenter`, `test_php_published_scope_relay.php`, `test_story_5_1_php_relay.php`) : chacun est à retirer (fonction supprimée) ou à réaffecter (fonction conservée), jamais laissé rouge ni supprimé en silence.
+- **F6 — Le gate 20-0 et les tests dépendent de ces éléments.** `getDiagnostics` et `getPublishedScopeForConsole` figurent dans les lectures autorisées de la politique du gate (`tests/e2e/gate/lib/policy.mjs:51-52`) et de l'inventaire de chargement (`tests/e2e/gate/page-load-request-inventory.mjs:186-187`). 22 fichiers de tests ou du gate référencent la synthèse, la modale ou leurs helpers (recherche reproductible : `grep -rlE "jeedom2ha_diagnostic_helpers|Jeedom2haDiagnosticHelpers|modal-diagnostic|Diagnostic de Couverture|jeedom2ha_scope_summary|Jeedom2haScopeSummary|getPublishedScopeForConsole|data-action=diagnostic|j2ha-ecart|div_scopeSummary|table_diagnostic" tests`) :
+  - Node : `test_scope_summary_presenter`, `test_story_3_4_ai5_frontend_passthrough`, `4_2_diagnostic_decision`, `4_2_vocab_exclusion`, `4_3_diagnostic_in_scope`, `4_4_integration_ui_4d`, `4_5_home_landing`, `4_6_diagnostic_modal`, `5_1_actions_ha_frontend`, `5_2_frontend`, `5_3_frontend`, `5_4_bandeau`, `5_7_badge_suppr_harmonie`, `6_1_pipeline_step`, `6_2_frontend_backend_first`, `6_3_honest_cause_mapping`, `15_2_streaming_badge_console`, `15_3_fan_parity_badge_console` ;
+  - PHP : `tests/test_php_published_scope_relay.php`, `tests/unit/test_story_5_1_php_relay.php` ;
+  - gate : `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`.
+  Les tests des stories 4.6 et 6.1 à 6.3 importent `jeedom2ha_diagnostic_helpers.js` ou exigent le rendu de la modale : ils échoueront au retrait. Chacun est à retirer (fonction supprimée) ou à réaffecter (fonction conservée), jamais laissé rouge ni supprimé en silence.
 - **F7 — Tension à trancher en Q1 :** 20.1 (AC5, inchangé) interdit de charger les arbres de tout le parc ; des compteurs **par carte de pièce** en exigeraient la lecture, ou un nouveau point d'entrée du démon.
 
 ## Décisions à prendre par Alex (blocantes pour `ready-for-dev`)
@@ -53,8 +57,12 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
   - **B — compteurs sur les cartes de pièces**, via un nouveau point d'entrée agrégé du démon appuyé sur `evaluate_equipment()`. Plus fidèle à l'ancienne synthèse, mais hors de la règle « aucun nouveau point d'entrée » de l'epic et du chargement borné de 20.1.
   - **C — un total unique** (« N équipements publiés ») sur la page, sans détail par pièce ; source à choisir (nouveau point d'entrée ou témoin existant).
 - **Q2 — Que deviennent Republier et Supprimer puis recréer par pièce et par équipement (F2) ?**
-  - **A (recommandé) — conservés, déplacés dans la surface** : « Appliquer » (20.2) couvre déjà « Publier » par équipement ; ajouter « Republier la pièce » dans la modale de pièce, et « Supprimer puis recréer » par équipement et par pièce avec la confirmation forte actuelle, sur les gestionnaires existants (`executeHaAction`). Les boutons globaux restent sur la page, leurs confirmations dérivent leurs nombres du parc sans la synthèse (à préciser au cadrage : relevé simple ou point d'entrée existant, jamais un recalcul).
+  - **A (recommandé) — conservés, déplacés dans la surface** : « Appliquer » (20.2) couvre déjà « Publier » par équipement ; ajouter « Republier la pièce » dans la modale de pièce, et « Supprimer puis recréer » par équipement et par pièce avec la confirmation forte actuelle, sur les gestionnaires existants (`executeHaAction`). Les boutons globaux restent sur la page, leurs confirmations dérivent leurs nombres du parc sans la synthèse (à préciser au cadrage : relevé simple ou point d'entrée existant, voir Q2b : par défaut sans nombre, jamais un recalcul).
   - **B — retirés** : seuls les boutons globaux subsistent ; l'utilisateur perd la republication et la suppression ciblées. À assumer explicitement.
+- **Q2b — D'où viennent les nombres des confirmations des boutons globaux (« N équipements inclus », « N publiés ») ?** Aujourd'hui : `published_scope` via la synthèse ; `getBridgeStatus` ne fournit aucun décompte, et la surface ne charge que les pièces ouvertes.
+  - **A (recommandé) — retirer les nombres** : « Republier tous les équipements inclus ? » / « Supprimer puis recréer tout le parc publié ? », avec la mise en garde forte actuelle. Aucune source nouvelle, AC7 tenu tel quel.
+  - **B — nommer une source globale autorisée** : lecture limitée de `published_scope` par ces seules confirmations (AC7 amendé pour cette exception unique).
+  - **C — nouveau point d'entrée agrégé** appuyé sur `evaluate_equipment()`.
 - **Q3 — Que reprend-on de la modale Diagnostic (F3, F4) ?**
   - **A (recommandé) — rien d'autre que ce que l'arbre porte déjà** (cause par commande et par entité, 20.2) ; l'échec technique de publication (étape 5), la trace du pipeline et le badge « Écart » disparaissent de l'interface ; « Télécharger le diagnostic support » reste l'outil de support. Liste des pertes écrite dans la story et confirmée.
   - **B — reprendre en plus un signal d'échec de publication par équipement** dans la surface (nécessite que l'arbre le porte : nouveau champ additif du démon).
@@ -95,7 +103,7 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
 **Given** les actions que portait la synthèse (F2)
 **When** la story est livrée
 **Then** chacune est soit disponible dans la surface (recommandation A : « Republier la pièce », « Supprimer puis recréer » par pièce et par équipement, mêmes confirmations fortes, mêmes routes), soit retirée et listée dans « Pertes assumées »
-**And** les boutons globaux « Republier » et « Supprimer puis recréer » fonctionnent sans la synthèse : le nombre de leur confirmation provient d'une source nommée par la décision d'Alex, jamais d'un recalcul de l'interface
+**And** les boutons globaux « Republier » et « Supprimer puis recréer » fonctionnent sans la synthèse : leurs confirmations suivent Q2b : sans nombre (recommandation A) ou avec le nombre d'une source globale nommée par Alex (B ou C), jamais d'un recalcul de l'interface
 **And** le gating des boutons globaux (`applyHAGating`) ne dépend plus d'un rendu de synthèse.
 
 **AC5 — Contenu diagnostic [Q3]**
@@ -155,7 +163,7 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
   - [ ] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
   - [ ] 1.3 Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
   - [ ] 1.4 Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
-  - [ ] 1.5 Classer les 15 fichiers de tests de F6 : retirer / réaffecter / conserver, avec justification.
+  - [ ] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
 - [ ] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
   - [ ] 2.1 `jeedom2ha.php` : retirer `#div_scopeSummary` et l'action « Diagnostic » ; garder classes et attributs du bloc « Gestion » ; ne plus inclure `jeedom2ha_scope_summary.js`.
   - [ ] 2.2 `jeedom2ha.js` : retirer `refreshPublishedScopeSummary`, les gestionnaires de synthèse, le gestionnaire `diagnostic` et la modale ; découpler `applyHAGating` et les confirmations globales de la synthèse (AC4).
@@ -164,7 +172,7 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
   - [ ] 3.1 Module pur de dénombrement à partir de l'arbre (équipements et commandes), testé sans DOM ; aucun recalcul de décision.
   - [ ] 3.2 Rendu de l'entête de pièce ; libellés d'unité.
   - [ ] 3.3 Selon Q2 : actions déplacées sur les gestionnaires existants, confirmations conservées ; sinon, « Pertes assumées » renseignées.
-  - [ ] 3.4 Source du nombre des confirmations globales (AC4).
+  - [ ] 3.4 Confirmations globales selon Q2b (AC4).
 - [ ] **Task 4 — Libellés d'usage (AC: 6) — selon Q4**
   - [ ] 4.1 Retrait de « Mes templates » et des champs sans usage ; réécriture des libellés restants selon la table validée.
   - [ ] 4.2 Test Node qui parcourt les chaînes rendues et échoue sur toute chaîne interdite.
@@ -207,7 +215,7 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
 
 ### Fichiers probablement touchés
 
-`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_scope_summary.js` (supprimé), `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé ou réduit), `desktop/css/jeedom2ha.css`, `core/ajax/jeedom2ha.ajax.php` et `core/class/jeedom2ha.class.php` (relais ou crochets de gabarit, selon Q2 et Q4), tests Node/PHP listés en F6, `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`, `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`.
+`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_scope_summary.js` (supprimé), `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé ou réduit), `desktop/css/jeedom2ha.css`, `core/ajax/jeedom2ha.ajax.php` et `core/class/jeedom2ha.class.php` (relais ou crochets de gabarit, selon Q2 et Q4), tests Node/PHP issus de la recherche de F6 (Task 1.5), `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`, `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`.
 
 ### Pertes assumées (à confirmer par Alex, recommandation A de Q2/Q3)
 
@@ -215,7 +223,7 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 
 ## Conditions de passage à `ready-for-dev`
 
-1. Alex répond à Q1 à Q4 (format « 1A 2A 3A 4A ») ; les AC **[Qx]**, la section « Pertes assumées » et la Task 3 sont alors figés.
+1. Alex répond à Q1, Q2, Q2b, Q3 et Q4 (format « 1A 2A 2bA 3A 4A ») ; les AC **[Qx]**, la section « Pertes assumées » et la Task 3 sont alors figés.
 2. 20.2 est `done` (preuve post-fusion, preuve terrain au clic réel, validation UX).
 3. Task 1.1 est refaite au SHA de ce moment si le code de 20.2 a bougé ; la table de libellés de la Task 1.2 est validée.
 
@@ -258,6 +266,7 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 
 - `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `docs/operations/delegations.md` (ligne de journal de délégation, commit `914110c` déjà présent sur la branche)
 
 ### Change Log
 
