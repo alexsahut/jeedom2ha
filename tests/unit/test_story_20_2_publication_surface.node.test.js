@@ -28,6 +28,26 @@ test('20-2 — actions : clé absente grisée, automatique retire publication et
   assert.equal(M.shouldConfirmPublication('force_publish', ready), false);
 });
 
+test('20-2 — P1 revue : exclude_eqlogic/exclude_command du démon restent lisibles après normalizeTree', () => {
+  const treeEqlogic = M.normalizeTree({ entities: [{
+    ha_entity_type: 'light', command_ids: [9], decision: blocked,
+    publication_override: 'exclude_eqlogic', override_command_id: 9, override_pending: false,
+  }] });
+  assert.equal(treeEqlogic.entities[0].publication_override, 'exclude_eqlogic');
+  const stateEqlogic = M.publicationActionState(treeEqlogic.entities[0]);
+  assert.equal(stateEqlogic.can_exclude, false);
+  assert.equal(stateEqlogic.can_revert, true);
+
+  const treeCommand = M.normalizeTree({ entities: [{
+    ha_entity_type: 'switch', command_ids: [11], decision: blocked,
+    publication_override: 'exclude_command', override_command_id: 11, override_pending: false,
+  }] });
+  assert.equal(treeCommand.entities[0].publication_override, 'exclude_command');
+  const stateCommand = M.publicationActionState(treeCommand.entities[0]);
+  assert.equal(stateCommand.can_exclude, false);
+  assert.equal(stateCommand.can_revert, true);
+});
+
 test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', () => {
   for (const [code, phrase] of [
     ['name_heuristic_rejection', 'mot du nom'],

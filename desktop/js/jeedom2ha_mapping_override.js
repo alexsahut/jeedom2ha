@@ -83,7 +83,17 @@
           ha_entity_type: typeof e.ha_entity_type === 'string' ? e.ha_entity_type : null,
           command_ids: Array.isArray(e.command_ids) ? e.command_ids.slice() : [],
           decision: e.decision || null,
-          publication_override: e.publication_override === 'exclude' || e.publication_override === 'force_publish' ? e.publication_override : null,
+          // Story 20-2 (P1, relecture ClaudeBox) : le démon résout un override de publication
+          // en 'exclude_eqlogic', 'exclude_command' ou 'force_publish' (jamais le littéral
+          // 'exclude' — celui-ci n'existe que côté action demandée par l'utilisateur). Garder
+          // les 3 valeurs réelles ici : les aplatir vers 'exclude'/'force_publish' faisait
+          // disparaître toute exclusion à la lecture (publicationActionState la voyait comme
+          // absente), rendant « Exclure » actif et « Revenir au mode automatique » grisé sur
+          // une entité pourtant déjà exclue.
+          publication_override: e.publication_override === 'exclude_eqlogic'
+            || e.publication_override === 'exclude_command'
+            || e.publication_override === 'force_publish'
+            ? e.publication_override : null,
           reason_details: e.reason_details && typeof e.reason_details === 'object' ? e.reason_details : {},
           override_command_id: Number.isInteger(e.override_command_id) ? e.override_command_id : null,
           override_pending: e.override_pending === true,
@@ -107,9 +117,12 @@
     var decision = t.decision || t;
     var hasKey = equipment === true || Number.isInteger(t.override_command_id);
     var policy = t.publication_override || null;
+    // Story 20-2 (P1) : les deux valeurs d'exclusion résolues par le démon désignent toutes
+    // deux une entité déjà exclue, qu'elle le soit via l'équipement ou via sa commande.
+    var excluded = policy === 'exclude_eqlogic' || policy === 'exclude_command';
     if (!hasKey) return { can_exclude: false, can_force: false, can_revert: false, reason: 'Aucune commande clé propre à cette entité.' };
     return {
-      can_exclude: policy !== 'exclude',
+      can_exclude: !excluded,
       can_force: policy !== 'force_publish' && decision.should_publish !== true,
       can_revert: policy !== null || t.has_publication_override === true,
       reason: null,
