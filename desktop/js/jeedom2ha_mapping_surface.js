@@ -235,13 +235,38 @@
     $errorSlot.empty().hide();
   }
 
+  // Story 20-2 (P2, revue ClaudeBox X4 point 5) : désactiver TOUT le groupe de boutons
+  // pendant une requête est correct (éviter un double clic), mais les réactiver en bloc à
+  // la fin ne l'est pas — un bouton déjà grisé pour sa propre cause (ex. « Forcer » déjà
+  // publiée, ou hérité d'une exclusion d'équipement, point 4) redevenait cliquable après
+  // n'importe quelle requête voisine. On capture l'état `disabled` de chaque bouton avant
+  // de tout griser, puis on restaure cet état exact plutôt qu'un `false` générique.
+  function disableButtons($buttons) {
+    $buttons.each(function () {
+      var $button = $(this);
+      if ($button.data('j2haPrevDisabled') === undefined) {
+        $button.data('j2haPrevDisabled', $button.prop('disabled'));
+      }
+      $button.prop('disabled', true);
+    });
+  }
+
+  function restoreButtons($buttons) {
+    $buttons.each(function () {
+      var $button = $(this);
+      var prevDisabled = $button.data('j2haPrevDisabled');
+      $button.prop('disabled', prevDisabled === true);
+      $button.removeData('j2haPrevDisabled');
+    });
+  }
+
   function publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot) {
-    $buttons.prop('disabled', true);
+    disableButtons($buttons);
     clearRequestError($errorSlot);
     var data = { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: policy };
     if (cmdId !== null) data.cmdId = cmdId;
     $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
-      .always(function () { $buttons.prop('disabled', false); })
+      .always(function () { restoreButtons($buttons); })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
         if (error) { showRequestError($errorSlot, error); return; }
@@ -251,12 +276,12 @@
   }
 
   function revertPublication(eqId, cmdId, $buttons, $errorSlot) {
-    $buttons.prop('disabled', true);
+    disableButtons($buttons);
     clearRequestError($errorSlot);
     var data = { action: 'revertPublicationOverride', eqId: eqId };
     if (cmdId !== null) data.cmdId = cmdId;
     $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
-      .always(function () { $buttons.prop('disabled', false); })
+      .always(function () { restoreButtons($buttons); })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
         if (error) { showRequestError($errorSlot, error); return; }
@@ -302,6 +327,13 @@
     if (opts.disableConfirm) {
       dialog.find('[data-bb-handler="confirm"]').prop('disabled', true).attr('title', opts.disableConfirm);
     }
+    // Story 20-2 (P2, revue ClaudeBox X4 point 5) : filet de sécurité repris de
+    // confirmHaPublishAction (jeedom2ha.js, PR #209) — toute fermeture de la modale non
+    // couverte par un bouton (croix, clic sur le fond) doit aussi libérer les boutons
+    // grisés ; `cancel()` est idempotent via `settled`, donc sûr même après Confirmer/Annuler.
+    if (dialog && typeof dialog.on === 'function') {
+      dialog.on('hidden.bs.modal', cancel);
+    }
   }
 
   // Story 20-2 (P2, AC3) : contenu DOM de l'aperçu de forçage — type, validité, commandes
@@ -327,18 +359,18 @@
   function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot) {
     var cmdId = equipment ? null : target.override_command_id;
     function save() { publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot); }
-    function release() { $buttons.prop('disabled', false); }
+    function release() { restoreButtons($buttons); }
     if (policy === 'exclude') {
       if (!M.shouldConfirmPublication(policy, target.decision || target)) {
         save();
         return;
       }
-      $buttons.prop('disabled', true);
+      disableButtons($buttons);
       confirmPublicationDialog('{{Exclure cette entité de Home Assistant ?}}', save, release);
       return;
     }
     // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
-    $buttons.prop('disabled', true);
+    disableButtons($buttons);
     clearRequestError($errorSlot);
     // Revue ClaudeBox X4 point 1 : ne jamais envoyer `cmdId` à la portée équipement — jQuery
     // sérialise sinon `null` en `cmdId=` (chaîne vide), que le relais PHP devait auparavant
