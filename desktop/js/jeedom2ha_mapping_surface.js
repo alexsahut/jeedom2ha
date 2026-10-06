@@ -437,10 +437,14 @@
         }
         var payload = data && data.result ? data.result : data;
         var view = M.readPreviewOverridden(payload);
-        var state = M.forcePreviewState(view, commands);
+        // Relecture indépendante PR #210 (point 3) : à la portée équipement, le forçage vaut
+        // pour TOUTES les entités du mapping (`view.entities`, champ additif démon AC3) —
+        // `forcePreviewState`/`buildForcePreviewContent` ne couvrent que l'entité principale.
+        var state = equipment ? M.equipmentForcePreviewState(view, commands) : M.forcePreviewState(view, commands);
+        var content = equipment ? buildEquipmentForcePreviewContent(state) : buildForcePreviewContent(state);
         var dialogOptions = state.can_confirm ? null
           : { disableConfirm: state.refusal_reason || '{{Le forçage serait refusé dans l’état actuel.}}' };
-        confirmPublicationDialog(buildForcePreviewContent(state), save, release, dialogOptions);
+        confirmPublicationDialog(content, save, release, dialogOptions);
       })
       .fail(function () {
         release();

@@ -187,3 +187,106 @@ test('Exclure, portée équipement : aucune modale si équipement et entités no
   assert.equal(h.dialogs.length, 0);
   assert.equal(ajax.calls.length, 1);
 });
+
+// Relecture indépendante PR #210 (point 6) : aperçu de forçage à la portée ENTITÉ —
+// previewMappingOverride envoie cmdId, la modale liste type/validité/commandes, et le
+// bouton Confirmer envoie l'écriture réelle (savePublicationOverride) une fois cliqué.
+test('Forcer, portée entité : aperçu accepté envoie cmdId et confirme la pose', () => {
+  const previewBody = {
+    state: 'ok',
+    result: { payload: { overridden: {
+      ha_entity_type: 'cover', projection_validity: { is_valid: true }, should_publish: true,
+      publication_reason: 'sure', command_ids: [5368],
+    } } },
+  };
+  var ajax = fakeAjax([{ kind: 'done', body: previewBody }, { kind: 'done', body: { state: 'ok', result: null } }]);
+  var h = loadHarness(ajax);
+  h.sandbox.requestPublication(20200, { decision: notPublished, override_command_id: 5368 },
+    false, 'force', fakeButtons(2), [{ jeedom_cmd_id: 5368, cmd_name: 'Ouvrir' }], fakeErrorSlot());
+  assert.deepEqual(ajax.calls[0], { action: 'previewMappingOverride', eqId: 20200, publicationPolicy: 'force_publish', cmdId: 5368 });
+  assert.equal(h.dialogs.length, 1);
+  h.dialogs[0].options.buttons.confirm.callback();
+  assert.equal(ajax.calls.length, 2, 'le clic sur Confirmer envoie la pose réelle (savePublicationOverride)');
+});
+
+test('Forcer, portée équipement : aucun cmdId envoyé, la modale liste chaque entité (entities[])', () => {
+  const entities = [
+    { ha_entity_type: 'switch', command_ids: [5368], decision: { should_publish: true } },
+    { ha_entity_type: 'sensor', command_ids: [5369], decision: { should_publish: false } },
+  ];
+  const previewBody = {
+    state: 'ok',
+    result: { payload: { overridden: {
+      ha_entity_type: 'switch', projection_validity: { is_valid: true }, should_publish: true,
+      command_ids: [5368], entities: entities,
+    } } },
+  };
+  var ajax = fakeAjax([{ kind: 'done', body: previewBody }]);
+  var h = loadHarness(ajax);
+  h.sandbox.requestPublication(20200, { decision: notPublished, override_command_id: null },
+    true, 'force', fakeButtons(2), [], fakeErrorSlot(), entities);
+  assert.deepEqual(ajax.calls[0], { action: 'previewMappingOverride', eqId: 20200, publicationPolicy: 'force_publish' });
+  assert.equal(h.dialogs.length, 1, 'un aperçu réussi ouvre la modale de confirmation');
+  var content = h.dialogs[0].options.message;
+  var text = content.children.map((p) => (p.children || []).map((li) => li.text()).concat(p.text() || []).join('|')).join('||');
+  assert.match(text, /switch/, 'la modale liste l’entité switch (AC3 — toutes les entités, pas seulement la principale)');
+  assert.match(text, /sensor/, 'la modale liste aussi l’entité sensor non publiée');
+});
+
+test('Forcer : un aperçu refusé grise Confirmer avec la cause réelle, sans jamais poser', () => {
+  const previewBody = {
+    state: 'ok',
+    result: { payload: { overridden: {
+      ha_entity_type: 'cover', projection_validity: { is_valid: false, reason_code: 'ha_missing_command_topic' },
+      should_publish: false, publication_reason: 'ambiguous_skipped', command_ids: [5368],
+    } } },
+  };
+  var ajax = fakeAjax([{ kind: 'done', body: previewBody }]);
+  var h = loadHarness(ajax);
+  h.sandbox.requestPublication(20200, { decision: notPublished, override_command_id: 5368 },
+    false, 'force', fakeButtons(2), [], fakeErrorSlot());
+  assert.equal(h.dialogs.length, 1);
+  h.dialogs[0].options.buttons.confirm.callback();
+  assert.equal(ajax.calls.length, 1, 'Confirmer grisé par disableConfirm : aucune écriture déclenchée');
+});
+
+test('Forcer : une erreur démon relayée par le PHP (409 inclus) n\'ouvre jamais de modale', () => {
+  var errorSlot = fakeErrorSlot();
+  var ajax = fakeAjax([{ kind: 'done', body: { state: 'ok', result: { status: 'error', message: 'Commande partagée sans entité propre' } } }]);
+  var h = loadHarness(ajax);
+  h.sandbox.requestPublication(20200, { decision: notPublished, override_command_id: 5368 },
+    false, 'force', fakeButtons(2), [], errorSlot);
+  assert.equal(h.dialogs.length, 0, 'erreur démon relayée : pas de modale, le message réel est affiché');
+  assert.equal(errorSlot._text, 'Commande partagée sans entité propre');
+});
+
+test('Forcer : le démon ne répond pas (.fail) affiche un message et libère les boutons', () => {
+  var errorSlot = fakeErrorSlot();
+  var buttons = fakeButtons(2);
+  var ajax = fakeAjax([{ kind: 'fail' }]);
+  var h = loadHarness(ajax);
+  h.sandbox.requestPublication(20200, { decision: notPublished, override_command_id: 5368 },
+    false, 'force', buttons, [], errorSlot);
+  assert.equal(h.dialogs.length, 0);
+  assert.match(errorSlot._text, /ne répond pas/);
+});
+
+// Point 6 : applyEquipment (bouton « Appliquer ») — succès (recharge l'équipement) et
+// erreur démon relayée (message affiché, aucun rechargement).
+test('Appliquer : succès recharge l\'équipement, erreur démon affiche le message sans recharger', () => {
+  var okButton = { _disabled: false, prop(name, value) { if (value === undefined) return this._disabled; this._disabled = value; return this; } };
+  var okAjax = fakeAjax([{ kind: 'done', body: { state: 'ok', result: null } }]);
+  var h1 = loadHarness(okAjax);
+  h1.sandbox.applyEquipment(20200, okButton, fakeErrorSlot());
+  assert.deepEqual(okAjax.calls[0], { action: 'executeHaAction', intention: 'publier', portee: 'equipement', selection: JSON.stringify([20200]) });
+  assert.deepEqual(h1.sandbox.reloadCalls, [20200]);
+  assert.equal(okButton.prop('disabled'), false, 'le bouton est réactivé après la requête');
+
+  var errSlot = fakeErrorSlot();
+  var errButton = { _disabled: false, prop(name, value) { if (value === undefined) return this._disabled; this._disabled = value; return this; } };
+  var errAjax = fakeAjax([{ kind: 'done', body: { state: 'ok', result: { status: 'error', message: 'Publication refusée' } } }]);
+  var h2 = loadHarness(errAjax);
+  h2.sandbox.applyEquipment(20200, errButton, errSlot);
+  assert.deepEqual(h2.sandbox.reloadCalls, [], 'une erreur démon ne doit jamais recharger l\'équipement');
+  assert.equal(errSlot._text, 'Publication refusée');
+});
