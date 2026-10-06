@@ -38,6 +38,10 @@ test('20.4: annulation ne lance aucune requête et la configuration emploie le m
   assert.match(config, /r\.status !== 'ok' \|\| r\.operation_result !== 'succes'/);
 });
 
+test('20.4: la page de configuration affiche aussi le message du 409 en priorité', () => {
+  assert.match(config, /\$status\.addClass\('label-warning'\)\.text\(r\.message \|\| r\.operation_message \|\| '\{\{Résultat inconnu, relire Dernière opération\}\}'\);/);
+});
+
 function loadConfirmationHarness() {
   const start = source.indexOf('function confirmHaPublishAction');
   const end = source.indexOf('function executeHaAction', start);

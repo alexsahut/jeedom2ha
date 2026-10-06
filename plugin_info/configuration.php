@@ -329,7 +329,7 @@ $(function() {
             }
             var r = scanData.result || {};
             if (r.status !== 'ok' || r.operation_result !== 'succes') {
-              $status.addClass('label-warning').text(r.operation_message || '{{Résultat inconnu, relire Dernière opération}}');
+              $status.addClass('label-warning').text(r.message || r.operation_message || '{{Résultat inconnu, relire Dernière opération}}');
               return;
             }
             var summary = (r.payload && r.payload.mapping_summary) ? r.payload.mapping_summary : {};
