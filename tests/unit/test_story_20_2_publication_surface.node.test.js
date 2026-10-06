@@ -143,6 +143,17 @@ test('20-2 — P2 revue : erreur de requête de publication lisible (y compris 4
   assert.ok(M.readPublicationRequestError(null));
 });
 
+test('20-2 — P2 revue (point 9) : le sélecteur de type (route TYPE) reste actif quelle que soit la publication', () => {
+  // getOverrideSelectorState ne lit jamais publication_override : exclure/forcer une entité
+  // (route PUBLICATION, story 20-2) ne doit jamais désactiver le sélecteur de type d'une
+  // commande couverte (route TYPE, story 16-8) — deux mécanismes indépendants.
+  const coveredRow = { diagnostic: { covered: true }, covered: true };
+  assert.equal(M.getOverrideSelectorState(coveredRow).active, true);
+  assert.equal(M.getOverrideSelectorState({ ...coveredRow, publication_override: 'exclude_eqlogic' }).active, true);
+  assert.equal(M.getOverrideSelectorState({ ...coveredRow, publication_override: 'exclude_command' }).active, true);
+  assert.equal(M.getOverrideSelectorState({ ...coveredRow, publication_override: 'force_publish' }).active, true);
+});
+
 test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', () => {
   for (const [code, phrase] of [
     ['name_heuristic_rejection', 'mot du nom'],
