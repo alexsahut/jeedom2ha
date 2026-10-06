@@ -236,3 +236,34 @@ async def test_preview_proposed_force_ambiguous_exposes_publishable_orders(cli, 
     assert result["ha_entity_type"] == "light"
     assert result["projection_validity"]["is_valid"] is True
     assert result["command_ids"] == [2101, 2102, 2103]
+
+
+async def test_preview_proposed_force_equipment_scope_exposes_publishable_orders(cli, app):
+    """Revue ClaudeBox X4 (point 1) : forçage à la portée ÉQUIPEMENT (sans jeedom_cmd_id,
+    cas envoyé par la surface pour « Forcer » au niveau équipement) expose les mêmes
+    `command_ids` qu'un forçage à la portée commande — même mapping résolu, override
+    appliqué à la clé équipement plutôt qu'à une clé commande."""
+    snapshot, eq = _ambiguous_valid_snapshot()
+    app["topology"] = snapshot
+    response = await _preview(cli, {
+        "jeedom_eq_id": eq.id,
+        "publication_policy": "force_publish",
+    })
+    assert response.status == 200
+    result = (await response.json())["payload"]["overridden"]
+    assert (result["should_publish"], result["publication_reason"]) == (True, "publication_forced")
+    assert result["command_ids"] == [2101, 2102, 2103]
+
+
+async def test_preview_proposed_exclude_equipment_scope(cli, app):
+    """Revue ClaudeBox X4 (point 1) : exclusion à la portée équipement (sans jeedom_cmd_id)."""
+    snapshot, eq = _light_snapshot()
+    app["topology"] = snapshot
+    response = await _preview(cli, {
+        "jeedom_eq_id": eq.id,
+        "publication_policy": "exclude",
+    })
+    assert response.status == 200
+    result = (await response.json())["payload"]["overridden"]
+    assert result["should_publish"] is False
+    assert result["publication_reason"] == "publication_excluded_eqlogic"

@@ -340,8 +340,12 @@
     // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
     $buttons.prop('disabled', true);
     clearRequestError($errorSlot);
-    $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'previewMappingOverride', eqId: eqId,
-      cmdId: cmdId, publicationPolicy: 'force_publish' }, dataType: 'json' })
+    // Revue ClaudeBox X4 point 1 : ne jamais envoyer `cmdId` à la portée équipement — jQuery
+    // sérialise sinon `null` en `cmdId=` (chaîne vide), que le relais PHP devait auparavant
+    // retomber à 0 (d'où le rejet démon 400 systématique sur un forçage d'équipement).
+    var previewData = { action: 'previewMappingOverride', eqId: eqId, publicationPolicy: 'force_publish' };
+    if (cmdId !== null) previewData.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: previewData, dataType: 'json' })
       .done(function (data) {
         var payload = data && data.result ? data.result : data;
         var view = M.readPreviewOverridden(payload);

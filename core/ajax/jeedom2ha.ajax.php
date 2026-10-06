@@ -463,6 +463,42 @@ function _jeedom2ha_collect_click_values(
     }
 }
 
+/**
+ * Story 20-2 (P1, revue ClaudeBox X4 point 1) — paramètres plats envoyés au démon pour
+ * l'aperçu d'override (route /system/overrides/preview), fonction pure testée isolément.
+ * `cmdId` '' ou non numérique = portée équipement (jamais 0 par défaut, écart X3 : le démon
+ * refusait alors tout aperçu de forçage/exclusion avec « ha_entity_type doit être une chaîne
+ * non vide »). `haEntityType` vide est omis (jamais envoyé comme chaîne vide). Au moins l'un
+ * des deux (`haEntityType` ou `publicationPolicy`) est requis, comme côté démon.
+ */
+function _jeedom2ha_build_override_preview_params(
+    $eqId,
+    $cmdId,
+    string $haEntityType,
+    string $publicationPolicy
+): array {
+    if (!ctype_digit((string)$eqId)) {
+        throw new Exception('eqId invalide');
+    }
+    $params = array('jeedom_eq_id' => (int)$eqId);
+    if ($cmdId !== null && $cmdId !== '' && ctype_digit((string)$cmdId)) {
+        $params['jeedom_cmd_id'] = (int)$cmdId;
+    }
+    if ($haEntityType !== '') {
+        $params['ha_entity_type'] = $haEntityType;
+    }
+    if ($publicationPolicy !== '') {
+        if (!in_array($publicationPolicy, array('exclude', 'force_publish'), true)) {
+            throw new Exception('publicationPolicy invalide (exclude|force_publish)');
+        }
+        $params['publication_policy'] = $publicationPolicy;
+    }
+    if (!isset($params['ha_entity_type']) && !isset($params['publication_policy'])) {
+        throw new Exception('haEntityType ou publicationPolicy requis');
+    }
+    return $params;
+}
+
 if (!defined('JEEDOM2HA_AJAX_FUNCTIONS_ONLY')) {
 try {
     require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
@@ -878,10 +914,13 @@ try {
       // Story 16.5 — dry-run instantané (lecture seule, aucune persistance) via 16.6.
       // callDaemon enveloppe déjà le payload dans une clé 'payload' : on passe donc
       // les champs à plat (ne jamais pré-wrapper, sinon double imbrication côté daemon).
-      $params = array(
-        'jeedom_eq_id'   => (int)init('eqId', 0),
-        'jeedom_cmd_id'  => (int)init('cmdId', 0),
-        'ha_entity_type' => init('haEntityType', ''),
+      // Story 20-2 (P1, revue ClaudeBox X4 point 1) : relaie aussi `publicationPolicy`
+      // (aperçu d'exclusion/forçage), via la fonction pure _jeedom2ha_build_override_preview_params.
+      $params = _jeedom2ha_build_override_preview_params(
+        init('eqId', ''),
+        init('cmdId', ''),
+        (string)init('haEntityType', ''),
+        (string)init('publicationPolicy', '')
       );
       $result = jeedom2ha::callDaemon('/system/overrides/preview', $params, 'POST', 15);
       if ($result === null) {
