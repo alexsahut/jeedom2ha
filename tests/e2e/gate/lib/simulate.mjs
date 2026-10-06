@@ -264,14 +264,28 @@ export function derivePublicationOverrideTree(state, eqId, realResponse) {
   const sims = Object.values(state.publicationSimulations).filter((sim) => sim.eqId === eqId);
   if (sims.length === 0) return copy;
 
-  const equipmentSim = sims.find((sim) => !sim.cmdId);
+  // Revue ClaudeBox X4 (point 8) : même ordre de précédence que le démon
+  // (resolve_publication_override, overrides.py l.540-581) — l'exclusion d'équipement est
+  // un VETO qui l'emporte sur tout override de commande ; seule l'absence d'exclusion
+  // d'équipement laisse l'override de commande s'appliquer ; seule l'absence des deux
+  // laisse le forçage d'équipement s'appliquer par défaut. L'ordre inverse (ancien code :
+  // tout override d'équipement, y compris un forçage, écrasait un override de commande)
+  // faisait simuler un forçage sur une entité pourtant exclue à sa propre commande.
+  const equipmentExclude = sims.find((sim) => !sim.cmdId && sim.policy === 'exclude');
+  const equipmentForce = sims.find((sim) => !sim.cmdId && sim.policy !== 'exclude');
   for (const entity of payload.entities) {
-    const sim = equipmentSim
-      || sims.find((candidate) => candidate.cmdId && String(candidate.cmdId) === String(entity.override_command_id));
-    if (!sim) continue;
-    entity.publication_override = sim.policy === 'exclude'
-      ? (sim.cmdId ? 'exclude_command' : 'exclude_eqlogic')
-      : 'force_publish';
+    if (equipmentExclude) {
+      entity.publication_override = 'exclude_eqlogic';
+      continue;
+    }
+    const commandSim = sims.find((candidate) => candidate.cmdId && String(candidate.cmdId) === String(entity.override_command_id));
+    if (commandSim) {
+      entity.publication_override = commandSim.policy === 'exclude' ? 'exclude_command' : 'force_publish';
+      continue;
+    }
+    if (equipmentForce) {
+      entity.publication_override = 'force_publish';
+    }
   }
 
   return copy;

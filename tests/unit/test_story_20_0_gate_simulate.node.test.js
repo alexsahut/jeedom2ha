@@ -450,6 +450,32 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     });
   });
 
+  // Revue ClaudeBox X4 (point 8) : même ordre de précédence que le démon
+  // (resolve_publication_override, overrides.py l.540-581) — un veto d'équipement l'emporte
+  // TOUJOURS sur un override de commande, qui l'emporte à son tour sur un forçage
+  // d'équipement par défaut. L'ancien code appliquait l'override d'équipement (y compris un
+  // simple forçage) en premier et écrasait l'exclusion propre d'une commande.
+  await t.test('précédence : exclusion d\'équipement l\'emporte sur un forçage de commande', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: '23', policy: 'force_publish' });
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'exclude' });
+
+    const derived = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_eqlogic');
+    assert.equal(derived.result.payload.entities[1].publication_override, 'exclude_eqlogic');
+  });
+
+  await t.test('précédence : l\'exclusion propre d\'une commande l\'emporte sur le forçage d\'équipement par défaut', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'force_publish' });
+    recordPublicationSave(state, { eqId: '1', cmdId: '21', policy: 'exclude' });
+
+    const derived = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_command');
+    // Aucun override propre sur la seconde entité : le forçage d'équipement par défaut s'applique.
+    assert.equal(derived.result.payload.entities[1].publication_override, 'force_publish');
+  });
+
   await t.test('aucune simulation de publication : réponse réelle inchangée', () => {
     const state = createState();
     const real = realEntityTreeResponse();
