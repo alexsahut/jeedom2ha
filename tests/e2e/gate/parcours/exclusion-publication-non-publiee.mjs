@@ -25,8 +25,8 @@ export async function run(page, { helpers }) {
   await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
   const actions = panel.locator('.j2ha-eq-actions');
   const start = helpers.journalEntries().length;
-  page.once('dialog', (dialog) => dialog.accept());
   await actions.getByRole('button', { name: 'Exclure', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmer', exact: true }).click();
   await waitForWrite(helpers.journalEntries, start, 'savePublicationOverride');
   const saved = writesSince(helpers.journalEntries, start);
   if (!saved.some((entry) => entry.action === 'savePublicationOverride' && entry.verdict === 'simulee')) {

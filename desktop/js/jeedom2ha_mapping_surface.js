@@ -241,22 +241,60 @@
       .done(function () { reloadEquipment(eqId); });
   }
 
+  // Story 20-2 (P1, relecture ClaudeBox) : `window.confirm` bloque le navigateur piloté
+  // (Playwright ferme les boîtes natives par défaut), ce qui empêche la preuve au clic réel.
+  // Modale Bootbox du plugin (même pattern que confirmHaPublishAction, jeedom2ha.js) :
+  // fermeture par la croix, Échap ou « Annuler » appellent toutes `onEscape`/`cancel`, qui
+  // libère l'état d'attente ; seul « Confirmer » déclenche l'action.
+  function confirmPublicationDialog(message, onConfirm, onCancel) {
+    var settled = false;
+    function cancel() {
+      if (settled) return;
+      settled = true;
+      if (onCancel) onCancel();
+    }
+    function confirm() {
+      if (settled) return;
+      settled = true;
+      onConfirm();
+    }
+    if (typeof bootbox === 'undefined' || !bootbox || typeof bootbox.dialog !== 'function') {
+      if (window.confirm(message)) { confirm(); } else { cancel(); }
+      return;
+    }
+    bootbox.dialog({
+      message: '<div>' + message + '</div>',
+      onEscape: cancel,
+      buttons: {
+        cancel: { label: '{{Annuler}}', className: 'btn-default', callback: cancel },
+        confirm: { label: '{{Confirmer}}', className: 'btn-primary', callback: confirm },
+      },
+    });
+  }
+
   function requestPublication(eqId, target, equipment, policy, $buttons) {
     var cmdId = equipment ? null : target.override_command_id;
     function save() { publicationRequest(eqId, cmdId, policy, $buttons); }
+    function release() { $buttons.prop('disabled', false); }
     if (policy === 'exclude') {
-      if (!M.shouldConfirmPublication(policy, target.decision || target) ||
-          window.confirm('{{Exclure cette entité de Home Assistant ?}}')) save();
+      if (!M.shouldConfirmPublication(policy, target.decision || target)) {
+        save();
+        return;
+      }
+      $buttons.prop('disabled', true);
+      confirmPublicationDialog('{{Exclure cette entité de Home Assistant ?}}', save, release);
       return;
     }
     // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
+    $buttons.prop('disabled', true);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'previewMappingOverride', eqId: eqId,
       cmdId: cmdId, publicationPolicy: 'force_publish' }, dataType: 'json' })
       .done(function (data) {
         var payload = data && data.result ? data.result : data;
         var view = M.readPreviewOverridden(payload);
-        if (window.confirm('{{Aperçu du forçage : }}' + M.buildPublishCellLabel(view) + '{{. Continuer ?}}')) save();
-      });
+        confirmPublicationDialog('{{Aperçu du forçage : }}' + M.buildPublishCellLabel(view) + '{{. Continuer ?}}', save, release);
+      })
+      .fail(release);
   }
 
   function applyEquipment(eqId, $button) {
