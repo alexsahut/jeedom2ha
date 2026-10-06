@@ -749,6 +749,17 @@
         unknown += 1;
       }
     }
+    // Story 20-2 (AC8, X6 — validation UX ClaudeBox 06/10, eq 588-591) : un équipement sans
+    // commande ne peut pas se résoudre par la boucle ci-dessus (rien à parcourir) ; la seule
+    // source pour « Exclu »/« Désactivé » est alors `equipment_decision`, déjà porté par le
+    // démon. Lecture pure, aucun recalcul ; n'affecte jamais un arbre qui a des commandes.
+    if (t.commands.length === 0) {
+      if (isExcludedDiagnostic(t.equipment_decision)) {
+        excluded = 1;
+      } else if (isDisabledDiagnostic(t.equipment_decision)) {
+        disabled = 1;
+      }
+    }
     return {
       total: t.commands.length,
       ready_count: ready,
