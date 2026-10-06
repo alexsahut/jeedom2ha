@@ -216,6 +216,7 @@ GPT-5 Codex
 - 2026-10-06 — Reprise X2d : tests AC3 (`ambiguous` forcée, projection/scope/no_mapping/exclusion), aperçu, routes 409 et retrait TYPE ajoutés; statut story conservé `in-progress` (surface, gate et preuve hors unité).
 - 2026-10-06 — Reprise X3b : l'arbre ajoute `entities[].command_ids`; la surface lit les entités, leurs commandes, leurs décisions et leur clé d'override depuis le démon. Actions exclusion/forçage/retour, aperçu forcé, badge et application ciblée sont couverts par tests Node; le retour de publication retire type et politique.
 - 2026-10-06 — Reprise X3b : le gate simule exclusivement les écritures de publication explicitement déclarées; les écritures non déclarées et « Appliquer » restent bloquées. Auto-test local PASS; 5.2 et 5.3 restent post-fusion et terrain.
+- 2026-10-06 — Reprise X3c (modèle `claude-sonnet-5`) : 9 points de revue ClaudeBox sur X3b traités, un commit par point. Points 1-6 : exclusions du démon conservées à la lecture, modale Bootbox à la place de `window.confirm`, aperçu riche du forçage (AC3), cause de blocage propre à chaque bouton, libellés d'entités avec vrais noms de commande, badge par entité et erreurs lisibles (AC7). Points 7-9 (gate) : les overrides de publication simulés deviennent visibles à une relecture `getMappingOverrides` (`simulate.mjs`, `interceptor.mjs`, auto-test étendu) ; `declaredPublicationOverrides` devient optionnel dans un parcours (`isValidParcours` extrait et testé) ; test de non-régression prouvant que le sélecteur de type (route TYPE, 16-8) reste actif quel que soit l'override de publication posé. Vérification finale au SHA `cad3a02` : 442 tests Node (`tests/unit/*.node.test.js`), 2048 tests Python (`pytest -m "not load"`), auto-test gate local PASS ; aucun fichier Python/PHP touché par les points 7-9. Écart assumé : les comportements DOM/Bootbox propres à `jeedom2ha_mapping_surface.js` (confirmation, bouton Appliquer, retrait au clic) restent non couverts par un test automatisé faute de harnais DOM dans ce dépôt — vérifiés par lecture de code et par les parcours gate existants, à confirmer en preuve terrain (5.2/5.3).
 
 ### File List
 
@@ -240,6 +241,7 @@ GPT-5 Codex
 - tests/unit/test_story_20_2_publication_surface.node.test.js
 - tests/e2e/gate/lib/policy.mjs
 - tests/e2e/gate/lib/interceptor.mjs
+- tests/e2e/gate/lib/simulate.mjs
 - tests/e2e/gate/interceptor-selftest.mjs
 - tests/e2e/gate/run-gate.mjs
 - tests/e2e/gate/parcours/decouverte-garage-enphase.mjs
@@ -247,3 +249,5 @@ GPT-5 Codex
 - tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs
 - tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs
 - tests/unit/test_story_20_0_gate_policy.node.test.js
+- tests/unit/test_story_20_0_gate_runner.node.test.js
+- tests/unit/test_story_20_0_gate_simulate.node.test.js
