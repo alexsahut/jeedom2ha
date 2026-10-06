@@ -137,8 +137,11 @@ export async function run(page, { helpers }) {
   }
 
   const actions = panel.locator('.j2ha-eq-actions');
-  const excludeButton = actions.getByRole('button', { name: 'Exclure', exact: true });
-  const revertButton = actions.getByRole('button', { name: 'Revenir au mode automatique', exact: true });
+  // La modale de pièce de Jeedom reste `aria-hidden="true"` une fois ouverte,
+  // donc un `getByRole` par défaut n'y trouve rien : `includeHidden: true` est
+  // nécessaire pour la localisation ; `click()` continue d'exiger la visibilité réelle.
+  const excludeButton = actions.getByRole('button', { name: 'Exclure', exact: true, includeHidden: true });
+  const revertButton = actions.getByRole('button', { name: 'Revenir au mode automatique', exact: true, includeHidden: true });
 
   const start = helpers.journalEntries().length;
   // Équipement non publié : aucune confirmation attendue (shouldConfirmPublication
@@ -151,7 +154,10 @@ export async function run(page, { helpers }) {
   // être « aucune bootbox visible » — l'absence de confirmation se lit dans l'absence du
   // bouton « Confirmer » (confirmPublicationDialog). Placé après l'apparition de
   // l'écriture au journal (reprise X5d), pour ne pas lire trop tôt.
-  if (await page.getByRole('button', { name: 'Confirmer', exact: true }).isVisible().catch(() => false)) {
+  // La modale de confirmation est aussi une bootbox `aria-hidden="true"` : un
+  // `getByRole` ne la verrait jamais, rendant ce garde-fou inopérant — un
+  // locator CSS voit les boutons visibles même sous un ancêtre `aria-hidden`.
+  if (await page.locator('.bootbox button:visible', { hasText: /^\s*Confirmer\s*$/ }).count() > 0) {
     throw new Error('modale-confirmation-inattendue');
   }
 
