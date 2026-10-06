@@ -379,6 +379,17 @@
     if (cmdId !== null) previewData.cmdId = cmdId;
     $.ajax({ type: 'POST', url: AJAX_URL, data: previewData, dataType: 'json' })
       .done(function (data) {
+        // Story 20-2 (P2, revue ClaudeBox X4 point 6) : le relais PHP lit le corps de la
+        // réponse démon quel que soit son code HTTP (400/404/409 inclus) — une requête
+        // d'aperçu refusée arrive donc ici en `.done()`, jamais en `.fail()`. Sans cette
+        // vérification, `readPreviewOverridden` renvoyait null et masquait la vraie cause
+        // démon derrière un message générique, sans jamais griser/restaurer les boutons.
+        var requestError = M.readPublicationRequestError(data);
+        if (requestError) {
+          release();
+          showRequestError($errorSlot, requestError);
+          return;
+        }
         var payload = data && data.result ? data.result : data;
         var view = M.readPreviewOverridden(payload);
         var state = M.forcePreviewState(view, commands);
