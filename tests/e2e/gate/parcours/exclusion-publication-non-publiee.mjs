@@ -75,7 +75,10 @@ async function findEquipmentPanel(page, eqId) {
     if (await panel.count() > 0) {
       return panel;
     }
-    await page.keyboard.press('Escape');
+    // Échap est perdu tant que le focus n'est pas entré dans la modale (fin de
+    // son animation d'ouverture) : on ferme par le bouton de fermeture, qui lui
+    // agit dès l'ouverture.
+    await modal.locator('.bootbox-close-button').click();
     await modal.waitFor({ state: 'hidden' });
   }
   throw new Error('eq-introuvable');
