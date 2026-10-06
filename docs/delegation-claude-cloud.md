@@ -48,7 +48,7 @@ Note l'ID/URL de session dans `docs/operations/delegations.md`.
 
 ### Suivi
 - Vérifie la PR et la CI toutes les 10-15 min (pas de polling plus rapproché).
-- CI verte et critères remplis : `git pull`, relis le diff, teste en local si besoin,
+- CI verte et critères remplis : récupère explicitement la branche de la PR (`git fetch origin <branche-pr> && git checkout <branche-pr>`, ou `gh pr checkout <n°>`) ; un simple `git pull` ne la récupère pas. Relis le diff, teste en local si besoin,
   puis signale à l'utilisateur que la PR est prête. Ne merge pas sans son accord.
 - CI rouge ou PR incomplète : au plus UNE session de correction, avec les logs
   d'erreur dans le prompt. Au deuxième échec, reprends la main ou préviens l'utilisateur.

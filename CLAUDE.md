@@ -22,7 +22,7 @@ Plugin Jeedom (PHP + JS) avec daemon Python asyncio qui publie les équipements 
 
 ## Règles Git
 - Les PR de développement ciblent **`main`** uniquement ; jamais de push direct sur `main`, `beta`, `stable`.
-- Titre de PR et commits en **Conventional Commits** (`feat|fix|docs|chore|refactor|test|ci|perf|build|revert(scope): ...`). Contrôlé par la CI.
+- Titre de PR et commits en **Conventional Commits** (`feat|fix|docs|chore|refactor|test|ci|perf|build|revert(scope): ...`). La CI ne contrôle que le **titre de la PR**, pas les messages de commit : respecte la convention sur les commits sans compter sur la CI.
 - Une branche / une PR = un seul sujet.
 - Préfixes de branche acceptés par la CI : `story/`, `fix/`, `docs/`, `chore/`, `refactor/`, `ci/`, `test/`, `hotfix/`.
 
