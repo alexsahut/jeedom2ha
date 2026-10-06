@@ -199,6 +199,37 @@
     return policy === 'exclude' && decision && decision.should_publish === true;
   }
 
+  // Story 20-2 (P2, relecture indépendante PR #210) : `shouldConfirmPublication` ne regarde
+  // que la décision de l'équipement (entité principale) — un équipement dont l'entité
+  // principale est non publiée mais dont une entité secondaire l'est (ex. capteurs de
+  // conso) s'excluait donc sans confirmation. À la portée équipement, confirmer dès que
+  // l'équipement OU au moins une entité (principale ou secondaire, `entities[]` de l'arbre
+  // déjà reçu) est publiée.
+  function shouldConfirmEquipmentExclude(equipmentDecision, entities) {
+    if (equipmentDecision && equipmentDecision.should_publish === true) {
+      return true;
+    }
+    return (Array.isArray(entities) ? entities : []).some(function (entity) {
+      return entity && entity.decision && entity.decision.should_publish === true;
+    });
+  }
+
+  // Liste des entités (principale et secondaires) qui quitteraient Home Assistant si
+  // l'exclusion d'équipement était confirmée — pour l'affichage dans la modale (AC5).
+  // Lecture pure de l'arbre déjà reçu, aucune décision recalculée ici.
+  function entitiesLeavingHomeAssistant(entities, commands) {
+    return (Array.isArray(entities) ? entities : [])
+      .filter(function (entity) {
+        return entity && entity.decision && entity.decision.should_publish === true;
+      })
+      .map(function (entity) {
+        return {
+          ha_entity_type: entity.ha_entity_type,
+          command_names: resolveCommandNames(commands, entity.command_ids),
+        };
+      });
+  }
+
   // Story 20-2 (P2, relecture ClaudeBox AC3) : contenu de l'aperçu de forçage, lu
   // strictement dans la réponse du démon (`previewMappingOverride`) — type, validité de
   // projection, et commandes qui recevront les ordres (`view.command_ids`, uniquement
@@ -224,6 +255,33 @@
       command_names: commandNames,
       can_confirm: canConfirm,
       refusal_reason: canConfirm ? null : buildBlockingReason(view),
+    };
+  }
+
+  // Story 20-2 (P2, relecture indépendante PR #210) : à la portée équipement, le forçage
+  // s'étend à TOUTES les entités (`entities[]`, champ additif de l'aperçu démon) — la modale
+  // doit donc lister chacune (type, publiée ou non et sa cause via `buildPublishCellLabel`,
+  // même libellé que la colonne diagnostic de l'arbre, commandes concernées), et
+  // « Confirmer » n'est actif que si au moins une entité serait effectivement publiée.
+  function equipmentForcePreviewEntities(view, commands) {
+    var entities = (view && Array.isArray(view.entities)) ? view.entities : [];
+    return entities.map(function (entity) {
+      return {
+        ha_entity_type: entity.ha_entity_type,
+        command_names: resolveCommandNames(commands, entity.command_ids),
+        will_publish: isReadyDiagnostic(entity.decision),
+        status_label: buildPublishCellLabel(entity.decision),
+      };
+    });
+  }
+
+  function equipmentForcePreviewState(view, commands) {
+    var items = equipmentForcePreviewEntities(view, commands);
+    var canConfirm = items.some(function (item) { return item.will_publish; });
+    return {
+      items: items,
+      can_confirm: canConfirm,
+      refusal_reason: canConfirm ? null : 'Aucune entité ne serait publiée dans l’état actuel.',
     };
   }
 
@@ -737,7 +795,10 @@
     entityCommandsLabel: entityCommandsLabel,
     publicationActionState: publicationActionState,
     shouldConfirmPublication: shouldConfirmPublication,
+    shouldConfirmEquipmentExclude: shouldConfirmEquipmentExclude,
+    entitiesLeavingHomeAssistant: entitiesLeavingHomeAssistant,
     forcePreviewState: forcePreviewState,
+    equipmentForcePreviewState: equipmentForcePreviewState,
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,

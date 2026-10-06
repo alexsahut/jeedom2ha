@@ -117,7 +117,7 @@
     var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
     $tdOverride.append($spinner);
     if (row.override_applied) {
-      $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au mode automatique}}"><i class="fas fa-undo"></i></a>'));
+      $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au type automatique}}"><i class="fas fa-undo"></i></a>'));
     }
     $tr.append($tdOverride);
 
@@ -143,8 +143,14 @@
       });
     }
 
+    // Story 20-2 (P1, relecture indépendante PR #210) : ce lien ne porte que sur l'override de
+    // TYPE de cette seule commande (route TYPE, 16-8) — jamais sur l'override de publication de
+    // toute l'entité. `revertPublication` (revertPublicationOverride) retirerait exclusion et
+    // forçage de l'entité entière sans confirmation, ce que ce lien ne doit jamais faire (AC5).
     $tr.find('.mo-revert-cmd').on('click', function () {
-      revertPublication(eqId, cmdId, $tr.find('button,select'));
+      var $link = $(this);
+      $link.prop('disabled', true).off('click');
+      revertCommand(eqId, cmdId);
     });
 
     return $tr;
@@ -211,19 +217,7 @@
     });
   }
 
-  function revertEquipment(eqId) {
-    $.ajax({
-      type: 'POST',
-      url: AJAX_URL,
-      data: { action: 'revertMappingOverride', eqId: eqId },
-      dataType: 'json',
-      success: function () {
-        reloadEquipment(eqId);
-      },
-    });
-  }
-
-  // Story 20-2 (P2, relecture ClaudeBox AC7) : affichage/effacement de l'erreur lisible
+  // Story 20-2 (P1, relecture indépendante PR #210) : affichage/effacement de l'erreur lisible
   // d'une requête de publication, dans le slot dédié posé à côté des boutons d'action.
   function showRequestError($errorSlot, message) {
     if (!$errorSlot || $errorSlot.length === 0) return;
@@ -356,17 +350,68 @@
     return $wrap;
   }
 
-  function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot) {
+  // Story 20-2 (P2, relecture indépendante PR #210) : contenu DOM de la confirmation
+  // d'exclusion d'équipement — liste les entités (type + commandes) qui quitteraient Home
+  // Assistant, lues dans l'arbre déjà reçu (jamais recalculées ici). Noms de commande en
+  // texte libre Jeedom : toujours injectés via .text(), jamais en HTML brut.
+  // Story 20-2 (P2, relecture indépendante PR #210) : contenu DOM de l'aperçu de forçage
+  // d'ÉQUIPEMENT — une ligne par entité (`view.entities`, champ additif démon AC3), jamais
+  // seulement l'entité principale. Même garantie que buildForcePreviewContent : noms de
+  // commande en texte libre Jeedom, toujours injectés via .text().
+  function buildEquipmentForcePreviewContent(state) {
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Entités concernées par ce forçage : }}'));
+    var $ul = $('<ul></ul>');
+    state.items.forEach(function (item) {
+      $ul.append($('<li></li>').text(
+        (item.ha_entity_type || '{{Entité HA}}') + ' — ' + item.status_label
+        + ' (' + (item.command_names.length ? item.command_names.join(', ') : '{{aucune commande}}') + ')'
+      ));
+    });
+    $wrap.append($ul);
+    if (state.can_confirm) {
+      $wrap.append($('<p></p>').text('{{Au moins une entité sera publiée dans Home Assistant.}}'));
+    } else {
+      $wrap.append($('<p class="text-danger"></p>').text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
+    }
+    return $wrap;
+  }
+
+  function buildEquipmentExcludeContent(entities, commands) {
+    var leaving = M.entitiesLeavingHomeAssistant(entities, commands);
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Exclure cet équipement de Home Assistant ?}}'));
+    if (leaving.length) {
+      $wrap.append($('<p></p>').text('{{Entités qui quitteront Home Assistant : }}'));
+      var $ul = $('<ul></ul>');
+      leaving.forEach(function (entity) {
+        $ul.append($('<li></li>').text((entity.ha_entity_type || '{{Entité HA}}') + ' — ' + entity.command_names.join(', ')));
+      });
+      $wrap.append($ul);
+    }
+    return $wrap;
+  }
+
+  function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot, entities) {
     var cmdId = equipment ? null : target.override_command_id;
     function save() { publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot); }
     function release() { restoreButtons($buttons); }
     if (policy === 'exclude') {
-      if (!M.shouldConfirmPublication(policy, target.decision || target)) {
+      // Story 20-2 (P2, relecture indépendante PR #210) : à la portée équipement, une
+      // entité secondaire publiée doit elle aussi déclencher la confirmation (AC5) —
+      // `shouldConfirmPublication` ne regardait que l'entité principale.
+      var confirmNeeded = equipment
+        ? M.shouldConfirmEquipmentExclude(target.decision || target, entities)
+        : M.shouldConfirmPublication(policy, target.decision || target);
+      if (!confirmNeeded) {
         save();
         return;
       }
       disableButtons($buttons);
-      confirmPublicationDialog('{{Exclure cette entité de Home Assistant ?}}', save, release);
+      var excludeContent = equipment
+        ? buildEquipmentExcludeContent(entities, commands)
+        : '{{Exclure cette entité de Home Assistant ?}}';
+      confirmPublicationDialog(excludeContent, save, release);
       return;
     }
     // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
@@ -485,7 +530,10 @@
 
   // Renvoie le slot d'erreur créé, pour que l'appelant (ex. le bouton « Appliquer »
   // équipement) puisse y afficher ses propres erreurs dans le même emplacement visuel.
-  function appendPublicationActions($host, eqId, target, equipment, commands) {
+  // `entities` (Story 20-2, P2, relecture indépendante PR #210) : l'arbre complet des
+  // entités, utilisé uniquement à la portée équipement pour la confirmation d'exclusion
+  // (AC5) — ignoré à la portée entité.
+  function appendPublicationActions($host, eqId, target, equipment, commands, entities) {
     var state = M.publicationActionState(target, equipment);
     var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
     var $error = $('<div class="j2ha-publication-error text-danger" style="display:none;margin-top:4px;"></div>');
@@ -495,7 +543,7 @@
     function button(label, policy, enabled, reason) {
       var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
       if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
-      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error); });
+      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error, entities); });
       $group.append($button);
     }
     button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
@@ -563,7 +611,8 @@
     // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
     var $equipmentError = appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
       publication_override: eqExcluded ? 'exclude_eqlogic' : null,
-      has_publication_override: hasEntityPublicationOverride || hasTypeOverride }, true, normalized.commands);
+      has_publication_override: hasEntityPublicationOverride || hasTypeOverride }, true, normalized.commands,
+      normalized.entities);
     if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
       var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
       $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
