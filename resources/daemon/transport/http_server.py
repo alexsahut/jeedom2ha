@@ -1496,19 +1496,36 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     })
 
 
+def _build_sync_failure_response(request: web.Request) -> web.Response:
+    """Convertit une exception sync en résultat `echec` et en réponse 500.
+
+    Appelée depuis un bloc `except`, directement ou via la tâche protégée par
+    `asyncio.shield` : dans les deux cas l'état global (santé, date de fin)
+    doit être mis à jour, même si le client PHP s'est déjà déconnecté.
+    """
+    operation = _build_operation_snapshot(
+        resultat="echec",
+        intention="sync",
+        message="Synchronisation échouée — erreur inattendue.",
+    )
+    request.app["derniere_operation_resultat"] = operation
+    request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
+    _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
+    return web.json_response({
+        "status": "error",
+        "operation_result": operation["resultat"],
+        "operation_message": operation["message"],
+    }, status=500)
+
+
 async def _handle_action_sync(request: web.Request) -> web.Response:
-    """Wrapper pour la synchronisation afin de capter l'état global en cas d'erreur inattendue."""
+    """Wrapper pour la synchronisation afin de capter l'état global en cas d'erreur inattendue
+    survenue avant le lancement de la tâche protégée (authentification, verrou)."""
     try:
         return await _do_handle_action_sync(request)
-    except Exception as e:
-        request.app["derniere_operation_resultat"] = _build_operation_snapshot(
-            resultat="echec",
-            intention="sync",
-            message="Synchronisation échouée — erreur inattendue.",
-        )
-        request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
-        _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
-        raise
+    except Exception:
+        return _build_sync_failure_response(request)
+
 
 async def _unpublish_refused_candidates(
     eq_id: int,
@@ -1703,7 +1720,42 @@ async def apply_publication_decision(
     return decision, config_published
 
 
+_SYNC_ACTION_LOCK_WAIT_SECONDS = 7
+
+
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
+    """Serialize sync with HA actions; rescans fail fast, service syncs wait briefly."""
+    # Authentifier avant toute attente du verrou : une requête inconnue ne doit
+    # jamais pouvoir être retardée par une opération légitime ni en apprendre l'état.
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+    action_lock: asyncio.Lock = request.app["action_lock"]
+    rescan = request.headers.get("X-Jeedom2ha-Sync-Mode") == "rescan"
+    if action_lock.locked() and rescan:
+        return web.json_response({"status": "error", "code": "action_in_progress",
+                                  "message": "Une opération Home Assistant est déjà en cours."}, status=409)
+    try:
+        await asyncio.wait_for(action_lock.acquire(), timeout=_SYNC_ACTION_LOCK_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        return web.json_response({"status": "error", "code": "action_in_progress",
+                                  "message": "Une opération Home Assistant est déjà en cours."}, status=409)
+
+    async def _run_sync() -> web.Response:
+        try:
+            return await _do_handle_action_sync_body(request)
+        except Exception:
+            return _build_sync_failure_response(request)
+        finally:
+            action_lock.release()
+
+    task = asyncio.create_task(_run_sync())
+    tasks = request.app.setdefault("action_tasks", set())
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+    return await asyncio.shield(task)
+
+
+async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     """Handle POST /action/sync — synchronize Jeedom topology, assess eligibility, map and publish."""
     local_secret = request.app["local_secret"]
     if not _check_secret(request, local_secret):
@@ -2123,6 +2175,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         "action": "sync",
         "status": "ok",
         "payload": summary,
+        "operation_result": _snap_res,
+        "operation_message": _SYNC_MESSAGES[_snap_res],
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

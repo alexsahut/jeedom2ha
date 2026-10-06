@@ -15,6 +15,7 @@
  *   - ctx.loginAttempts : nombre de tentatives de connexion déjà émises par ce parcours.
  *   - ctx.declaredEquipments : { [eqId]: { commands: [cmdId, ...] } } — équipements et
  *     commandes déclarés par le parcours (AC2).
+ *   - ctx.declaredRescan : true seulement si le parcours déclare le rescan (AC7).
  *   - ctx.lastPreviewType : { [`${eqId}:${cmdId}`]: haEntityType } — dernier type
  *     prévisualisé par previewMappingOverride pour ce couple, exigé identique par
  *     saveMappingOverride (AC2).
@@ -189,6 +190,10 @@ function validateOverrideWrite(action, params, ctx) {
   return declared.commands.includes(override.cmdId);
 }
 
+function validateDeclaredRescan(req, ctx) {
+  return req.method === 'POST' && ctx && ctx.declaredRescan === true;
+}
+
 export function classifyRequest(req, ctx) {
   try {
     let url;
@@ -238,6 +243,13 @@ export function classifyRequest(req, ctx) {
 
     // Effets de bord et écritures d'override : rejetés quelle que soit la méthode HTTP,
     // dès lors que le chemin et l'action correspondent — un GET ne doit pas leur échapper.
+    if (url.pathname === PLUGIN_AJAX_PATH && action === 'scanTopology') {
+      if (validateDeclaredRescan(req, ctx)) {
+        return { verdict: 'simulate', reason: 'rescan-declare', action, params };
+      }
+      return { verdict: 'block-fail', reason: 'effet-de-bord', action };
+    }
+
     if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
       return { verdict: 'block-fail', reason: 'effet-de-bord', action };
     }

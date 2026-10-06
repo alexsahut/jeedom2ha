@@ -271,6 +271,24 @@ async function main() {
     await page.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
     const results = await page.evaluate(() => window.__selftest);
 
+    // Un second parcours déclare explicitement le rescan : il est alors simulé,
+    // sans changer les attentes négatives du parcours principal ci-dessous.
+    const declaredContext = await browser.newContext({ serviceWorkers: 'block' });
+    const declaredJournal = { entries: [], failed: false, failures: [] };
+    const declaredCtx = { ...ctx, declaredRescan: true };
+    await installInterceptor(declaredContext, {
+      ctx: declaredCtx, simState: createState(), journal: declaredJournal, declaredBascules: [],
+    });
+    const declaredPage = await declaredContext.newPage();
+    await declaredPage.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
+    const declaredRescan = await declaredPage.evaluate(async () => {
+      const response = await fetch(location.origin + '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php', {
+        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'action=scanTopology',
+      });
+      return response.json();
+    });
+    await declaredContext.close();
+
     // Document (page de connexion) qui redirige vers la même action interdite que
     // REDIRECT_PNG : la navigation doit échouer puisque l'intercepteur abandonne la
     // route avant tout fulfill, sans jamais joindre le serveur sur la cible.
@@ -319,6 +337,12 @@ async function main() {
       failures);
     report('redirection depuis une ressource statique ou un document : cible jamais atteinte par le serveur',
       !requests.some((request) => request.path === PLUGIN_AJAX && request.method === 'GET' && request.actions.includes('scanTopology')),
+      failures);
+    report('rescan déclaré : réponse simulée complète, sans atteindre le serveur',
+      declaredRescan.state === 'ok' && declaredRescan.result.status === 'ok'
+        && declaredRescan.result.operation_result === 'succes'
+        && typeof declaredRescan.result.operation_message === 'string'
+        && declaredJournal.entries.some((entry) => entry.action === 'scanTopology' && entry.verdict === 'simulee'),
       failures);
 
     const expectedFailures = [

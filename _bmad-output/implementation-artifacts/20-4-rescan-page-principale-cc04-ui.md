@@ -1,6 +1,6 @@
 # Story 20.4 : Rescan depuis la page principale (CC-04, volet UI)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -163,7 +163,7 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés préalables, lecture seule (AC: 1, 4, 7)**
+- [x] **Task 0 — Relevés préalables, lecture seule (AC: 1, 4, 7)**
   - [ ] Relever le statut bridge, la dernière synchro, la dernière opération et la
     parité de référence, sans lancer de rescan ; vérifier qu'aucun override n'est en
     attente d'application (sinon la parité changera légitimement au clic réel).
@@ -175,26 +175,26 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
   - [ ] Le clic réel de la preuve est fait par ClaudeBox dans Chrome (règle 2 d'Alex
     du 2026-09-28 : preuves qui ne touchent que le plugin et HA), hors des fenêtres du
     gate ; aucun équipement ni nom n'est choisi dans cette story.
-- [ ] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
-  - [ ] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
-  - [ ] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
-- [ ] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
-  - [ ] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
-  - [ ] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,
+- [x] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
+  - [x] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
+  - [x] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
+- [x] **Task 2 — Exécution et retour (AC: 3, 4, 6, 8)**
+  - [x] Réutiliser `scanTopology` et son résumé backend. Aucun endpoint daemon neuf.
+  - [x] Démon : le sync prend `action_lock` (409 immédiat pour le mode rescan,
     attente d'au plus 7 s sans ce mode, puis 409), est protégé par `asyncio.shield`,
     et sa réponse porte le résultat et le message de l'opération (AC4).
-  - [ ] Relais : succès défini par AC4 ; écouteurs réalignés dès que le sync est allé
+  - [x] Relais : succès défini par AC4 ; écouteurs réalignés dès que le sync est allé
     au bout (`status: "ok"`), jamais sur une erreur ou une expiration.
-  - [ ] Gérer attente, succès, échec, expiration, réactivation et
+  - [x] Gérer attente, succès, échec, expiration, réactivation et
     `refreshBridgeStatus()` sans calcul local.
-- [ ] **Task 3 — Configuration (AC: 5)**
-  - [ ] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.
-- [ ] **Task 4 — Tests et gate (AC: 1-8)**
-  - [ ] Tester le garde-fou, annulation, appel unique, retour et erreurs.
-  - [ ] Étendre la politique du gate (`tests/e2e/gate/lib/policy.mjs`) pour simuler
+- [x] **Task 3 — Configuration (AC: 5)**
+  - [x] Conserver la chaîne sauvegarde puis rescan ; renommer selon R3.
+- [x] **Task 4 — Tests et gate (AC: 1-8)**
+  - [x] Tester le garde-fou, annulation, appel unique, retour et erreurs.
+  - [x] Étendre la politique du gate (`tests/e2e/gate/lib/policy.mjs`) pour simuler
     `scanTopology` déclaré, avec une réponse de sync simulée qui porte le résultat
     d'opération ; auto-test local ; relecture ClaudeBox ; puis le parcours.
-  - [ ] Tests Python du verrou (deux sens, attente bornée) et du `shield`.
+  - [x] Tests Python du verrou (deux sens, attente bornée) et du `shield`.
 - [ ] **Task 5 — Déploiement et preuve terrain (AC: 7)**
   - [ ] Déployer le SHA exact par le chemin standard, après CI et revue.
   - [ ] Relever avant/après, cliquer réellement une fois, consigner durée, résumé,
@@ -287,6 +287,57 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-10-06 — R7b dev-story : suite des corrections de revue indépendante sur
+  PR #209, HEAD de départ `1935bb9`. `a78882a` déplace la conversion d'une
+  exception sync en résultat `echec` (santé + date de fin) du wrapper
+  `_handle_action_sync` vers la tâche protégée `_run_sync` elle-même, via
+  `_build_sync_failure_response` partagée : auparavant, une déconnexion client
+  laissait `asyncio.shield` continuer la tâche sans que personne n'attende
+  l'exception, donc la santé restait figée sur l'ancienne opération. `c7fe917`
+  priorise `r.message` sur `r.operation_message` dans la page de configuration
+  pour qu'un 409 (« Publier » en cours) affiche le message du verrou plutôt
+  que « Résultat inconnu » (AC8). `2c46638` aligne le délai AJAX du rescan
+  (15 s → 20 s, comme la page de configuration) et affiche directement
+  `data.result` quand il s'agit d'une chaîne (démon injoignable) au lieu du
+  message générique de concurrence. Réponses françaises postées aux
+  commentaires Codex 4189911044 et 4189911052, fils résolus
+  (`PRRT_kwDORkr6Dc6pQezg`, `PRRT_kwDORkr6Dc6pQezl`), `@codex review` posté une
+  fois. Aucun déploiement, rescan réel, sync ou gate contre la box.
+
+- 2026-10-06 — R7 dev-story : `1935bb9` affiche `result.message` puis
+  `result.operation_message` sur une erreur terminale du sync et rafraîchit la
+  santé pour tout résultat portant `operation_result` (succès, partiel, échec),
+  pas pour un 409 — en réponse au commentaire Codex 4189911044. Unité
+  interrompue avant la rédaction du rapport (quota du modèle épuisé) ; reprise
+  par R7b, qui a vérifié le commit, les tests et poursuivi les points suivants.
+
+- 2026-10-06 — R6 code-review : `confirmHaPublishAction` rattache désormais
+  l'annulation du rescan à `onEscape` et à `hidden.bs.modal`, avec une annulation
+  idempotente. Après confirmation, la fermeture de la modale ne libère pas la
+  réservation : seule la fin de la requête propriétaire le fait. Les confirmations
+  « Republier » et « Supprimer puis recréer » ne reçoivent aucun nouveau gestionnaire.
+  Les tests Node couvrent croix, Échap, Annuler, fermeture après confirmation et les
+  autres appelants. Aucun déploiement, rescan réel ou gate contre la box.
+
+- 2026-10-06 — R5 dev-story : corrections des deux constats Codex PR #209.
+  `99a3315` cible le bouton primaire exact « Rescanner » du parcours gate.
+  `4748847` réserve le rescan dès l'ouverture de sa confirmation, interdit une
+  seconde modale/requête et donne à sa requête propriétaire seule le droit de
+  libérer le garde-fou. Les retours `echec` sont rouges (`danger`), les
+  `partiel` restent en avertissement ; tests Node ajoutés pour le garde, les
+  résultats et le succès de la configuration. `74e9fc0` couvre l'AC8 : action
+  pendant sync, attente service, expiration 409 et réponse sync `echec` avec
+  résultat/message. `d2e7a34` vérifie aussi que la déconnexion du client laisse
+  le sync protégé finir puis libérer le verrou. Aucun déploiement, rescan réel
+  ou gate contre la box.
+
+- 2026-10-05 — R3 dev-story : revue corrigée et tests locaux verts. AC8 distingue
+  l'appelant rescan par l'en-tête `X-Jeedom2ha-Sync-Mode: rescan`; le rescan reçoit
+  409 immédiatement, les autres syncs attendent au plus 7 s. Gate local étendu :
+  `scanTopology` est simulé seulement avec `declaredRescan: true` et seulement en POST.
+- 2026-10-05 — R2 dev-story : Tasks 0 à 3 implémentées, HEAD `70b105e`.
+- 2026-10-05 — R dev-story : décisions R1A/R2A/R3A appliquées.
+
 - 2026-10-05 — Brouillon create-story non interactif ; confirmations par défaut :
   création seule, statut `draft`, aucune modification de `sprint-status.yaml`.
 - 2026-10-05 — Relu par ClaudeBox puis par une relecture indépendante : sync sans
@@ -297,3 +348,17 @@ GPT-5 Codex
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-4-rescan-page-principale-cc04-ui.md`
+- `resources/daemon/transport/http_server.py`
+- `core/ajax/jeedom2ha.ajax.php`
+- `core/class/jeedom2ha.class.php`
+- `desktop/php/jeedom2ha.php`
+- `desktop/js/jeedom2ha.js`
+- `plugin_info/configuration.php`
+- `tests/unit/test_http_server.py`
+- `tests/unit/test_story_20_0_gate_policy.node.test.js`
+- `tests/e2e/gate/lib/policy.mjs`
+- `tests/e2e/gate/lib/interceptor.mjs`
+- `tests/e2e/gate/interceptor-selftest.mjs`
+- `tests/e2e/gate/run-gate.mjs`
+- `tests/e2e/gate/parcours/rescan-page-principale.mjs`
+- `tests/unit/test_story_20_4_rescan_ui.node.test.js`

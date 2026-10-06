@@ -118,6 +118,14 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 					<i class="fas fa-upload"></i> {{Republier dans Home Assistant}}
 				</button>
 				<button type="button"
+				        id="bt_rescanTopology"
+				        class="btn btn-default btn-sm j2ha-ha-action"
+				        data-ha-action="rescan"
+				        disabled
+				        style="margin-left:8px;">
+					<i class="fas fa-sync-alt"></i> {{Rescanner la topologie Jeedom}}
+				</button>
+				<button type="button"
 				        class="btn btn-default btn-sm j2ha-ha-action"
 				        data-ha-action="supprimer-recreer"
 				        disabled
