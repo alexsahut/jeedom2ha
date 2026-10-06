@@ -4,7 +4,7 @@ Ce document décrit comment un agent de codage local (ex. OpenClaw sur la VM) d�
 Il complète `docs/git-strategy.md` (qui reste l'autorité Git) et `CLAUDE.md` (lu automatiquement par les sessions cloud).
 
 ## Prérequis (une seule fois)
-1. Installer la CLI sur la VM (`npm i -g @anthropic-ai/claude-code` ou `claude install`) et la garder à jour : `claude --version`, `claude doctor`. Une CLI ancienne (testé : 2.1.137) refuse le lancement ; la version 2.1.291 fonctionne.
+1. Installer la CLI sur la VM (installation initiale : `curl -fsSL https://claude.ai/install.sh | bash` ou `npm i -g @anthropic-ai/claude-code` ; `claude install` sert uniquement à migrer une installation npm existante vers l'installeur natif) et la garder à jour : `claude --version`, `claude doctor`. Une CLI ancienne (testé : 2.1.137) refuse le lancement ; la version 2.1.291 fonctionne.
 2. S'authentifier avec le **compte claude.ai** (`claude` puis `/login`), pas avec une clé API : les crédits des sessions cloud sont liés au compte.
 3. L'app GitHub Claude doit être installée sur `alexsahut/jeedom2ha`.
 4. Configurer l'environnement cloud sur claude.ai/code (accès réseau, script de setup installant `pip install -e ".[test]"`).
@@ -39,7 +39,7 @@ La commande affiche « Created cloud session », l'URL `https://claude.ai/code/s
 Le lancement affiche un suivi en direct : exécute-le avec un timeout et récupère l'ID dans la sortie. Pour envoyer un complément à une session existante : `claude -p --cloud <session-id> "message"`.
 Ne lance jamais `claude` en `sudo`.
 
-Si le lancement est refusé, relève le message exact avant de conclure à une « procédure obsolète » : `Unable to get organization UUID` (connexion par clé API : `claude auth login`, pas de `ANTHROPIC_API_KEY`), fournisseur tiers configuré (`CLAUDE_CODE_USE_*`), dépôt sans remote GitHub, CLI trop ancienne.
+Si le lancement est refusé, relève le message exact avant de conclure à une « procédure obsolète » : `Unable to get organization UUID` (connexion par clé API : `claude auth login`, pas de `ANTHROPIC_API_KEY`), fournisseur tiers configuré (`CLAUDE_CODE_USE_*`), GitHub non connecté (app Claude ou `/web-setup`), CLI trop ancienne. Un dépôt sans remote GitHub n'est pas un refus systématique : la CLI peut empaqueter et téléverser le dépôt local (`CCR_FORCE_BUNDLE=1`, limites de taille documentées), les échecs viennent alors de cet empaquetage.
 
 ### Format obligatoire du prompt
 1. **Contexte** : une phrase + renvoi vers les fichiers utiles (story, spec) plutôt que de les recopier.
