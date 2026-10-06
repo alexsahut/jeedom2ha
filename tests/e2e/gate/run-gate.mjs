@@ -146,6 +146,16 @@ export async function loadParcours(modulePath) {
   return import(pathToFileURL(resolved).href);
 }
 
+// Story 20-2 (point 8, revue P2) : `declaredPublicationOverrides` est optionnel — un parcours
+// qui ne teste aucun override de publication n'a pas à le déclarer (défaut `{}` au call site).
+export function isValidParcours(parcours) {
+  return !!(parcours
+    && parcours.name
+    && parcours.declaredEquipments
+    && Array.isArray(parcours.declaredBascules)
+    && typeof parcours.run === 'function');
+}
+
 /** Lit les deux paramètres obligatoires du lanceur. */
 function parseArgs() {
   const values = process.argv.slice(2);
@@ -339,10 +349,7 @@ async function main() {
   await runChild(path.join(ownDirectory, 'interceptor-selftest.mjs'));
   const credentials = await readCredentials();
   const parcours = await loadParcours(modulePath);
-  if (!parcours.name || !parcours.declaredEquipments || !parcours.declaredPublicationOverrides || !Array.isArray(parcours.declaredBascules)) {
-    throw new Error('parcours-invalide');
-  }
-  if (typeof parcours.run !== 'function') throw new Error('parcours-invalide');
+  if (!isValidParcours(parcours)) throw new Error('parcours-invalide');
 
   const before = await takeWitness();
   if (!before.readable || !['info', 'debug'].includes(before.daemon.logLevel)) {
@@ -375,7 +382,7 @@ async function main() {
       origin: ORIGIN,
       loginAttempts: 0,
       declaredEquipments: parcours.declaredEquipments,
-      declaredPublicationOverrides: parcours.declaredPublicationOverrides,
+      declaredPublicationOverrides: parcours.declaredPublicationOverrides || {},
       lastPreviewType: simState.lastPreviewType,
     };
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });

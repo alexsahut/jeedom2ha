@@ -228,6 +228,18 @@ test('story 20-0 — garde-fou de parcours : journal gelé et API Playwright/imp
   }
 });
 
+test('story 20-2 (point 8) — isValidParcours : declaredPublicationOverrides optionnel', async () => {
+  const { isValidParcours } = await runner();
+  const base = { name: 'x', declaredEquipments: {}, declaredBascules: [], run: () => {} };
+  assert.equal(isValidParcours(base), true);
+  assert.equal(isValidParcours({ ...base, declaredPublicationOverrides: { '1': { commands: [] } } }), true);
+  assert.equal(isValidParcours({ ...base, name: '' }), false);
+  assert.equal(isValidParcours({ ...base, declaredEquipments: null }), false);
+  assert.equal(isValidParcours({ ...base, declaredBascules: undefined }), false);
+  assert.equal(isValidParcours({ ...base, run: null }), false);
+  assert.equal(isValidParcours(null), false);
+});
+
 test('story 20-0 — navigation : seul document exact ou about:blank est recevable', async () => {
   const { documentAllowed, assertOpenPagesAllowed } = await runner();
   const ctx = { origin: 'https://domobox.famille-sahut.fr' };
