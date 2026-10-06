@@ -47,6 +47,9 @@ function mappingPayload() {
         override_applied: false,
       },
     ],
+    entities: [
+      { ha_entity_type: 'light', command_ids: [2], publication_override: null, override_command_id: 2 },
+    ],
   };
 }
 
@@ -136,6 +139,7 @@ function pageHtml(origin) {
     const derived = await post('getMappingOverrides', { eqId: '1' });
     const reverted = await post('revertMappingOverride', { eqId: '1', cmdId: '2' });
     const publicationSaved = await post('savePublicationOverride', { eqId: '1', publicationPolicy: 'exclude' });
+    const publicationDerived = await post('getMappingOverrides', { eqId: '1' });
     const publicationReverted = await post('revertPublicationOverride', { eqId: '1' });
     const real = await post('getMappingOverrides', { eqId: '1' });
     const bascule = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'light' });
@@ -149,6 +153,7 @@ function pageHtml(origin) {
       derived,
       reverted,
       publicationSaved,
+      publicationDerived,
       publicationReverted,
       real,
       bascule,
@@ -306,7 +311,7 @@ async function main() {
     report('aucune ecriture, effet de bord, connexion, core API ou WebSocket n atteint le serveur', !serverReceivedForbidden, failures);
     report('les lectures du flux ont atteint le serveur',
       requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'previewMappingOverride').length === 2
-        && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 2,
+        && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 3,
       failures);
     report('service worker : register retourne undefined', results.serviceWorkerRegistrationIsUndefined, failures);
     report('service worker : aucune inscription apres 500 ms', results.serviceWorkerRegistrationsCount === 0, failures);
@@ -375,6 +380,10 @@ async function main() {
         && results.publicationReverted?.result?.payload?.scope === 'equipment'
         && journal.entries.some((entry) => entry.action === 'savePublicationOverride' && entry.verdict === 'simulee')
         && journal.entries.some((entry) => entry.action === 'revertPublicationOverride' && entry.verdict === 'simulee'),
+      failures);
+    report('publication simulee visible a la relecture, puis absente apres retrait',
+      results.publicationDerived?.result?.payload?.entities?.[0]?.publication_override === 'exclude_eqlogic'
+        && results.real?.result?.payload?.entities?.[0]?.publication_override === null,
       failures);
     report('reponses fulfill JSON lisibles malgre content-length reel',
       results.preview.state === 'ok'
