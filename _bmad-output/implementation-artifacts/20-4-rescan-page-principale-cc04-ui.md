@@ -1,6 +1,6 @@
 # Story 20.4 : Rescan depuis la page principale (CC-04, volet UI)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -164,17 +164,21 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
 ## Tasks / Subtasks
 
 - [x] **Task 0 — Relevés préalables, lecture seule (AC: 1, 4, 7)**
-  - [ ] Relever le statut bridge, la dernière synchro, la dernière opération et la
+  - [x] Relever le statut bridge, la dernière synchro, la dernière opération et la
     parité de référence, sans lancer de rescan ; vérifier qu'aucun override n'est en
     attente d'application (sinon la parité changera légitimement au clic réel).
-  - [ ] Relever la version d'aiohttp installée sur la box (comportement à la
-    déconnexion du client).
-  - [ ] Durée d'un sync complet : environ 2 s au démarrage du 2026-10-05 (11:36:50 →
+    Fait le 2026-10-06 : relevés avant du déploiement (06:05Z) ; `ha_overrides.json`
+    inchangé depuis 20-1 (`083ab5bf…`), aucun override en attente.
+  - [x] Relever la version d'aiohttp installée sur la box (comportement à la
+    déconnexion du client). Relevé le 2026-10-06 : 3.13.3.
+  - [x] Durée d'un sync complet : environ 2 s au démarrage du 2026-10-05 (11:36:50 →
     11:36:52, journal du plugin), à confirmer ; le délai de 15 s de `scanTopology`
-    (`core/ajax/jeedom2ha.ajax.php:594`) est donc confortable.
-  - [ ] Le clic réel de la preuve est fait par ClaudeBox dans Chrome (règle 2 d'Alex
+    (`core/ajax/jeedom2ha.ajax.php:594`) est donc confortable. Confirmé au clic réel
+    du 2026-10-06 : environ 1 s (09:28:00, journal du démon).
+  - [x] Le clic réel de la preuve est fait par ClaudeBox dans Chrome (règle 2 d'Alex
     du 2026-09-28 : preuves qui ne touchent que le plugin et HA), hors des fenêtres du
-    gate ; aucun équipement ni nom n'est choisi dans cette story.
+    gate ; aucun équipement ni nom n'est choisi dans cette story. Fait le 2026-10-06
+    à 09:28.
 - [x] **Task 1 — Entrée et garde-fou (AC: 1, 2)**
   - [x] Ajouter l'action dans le bloc HA existant, avec le même attribut de garde.
   - [x] Réutiliser la modale de confirmation ; son texte déclare les effets du sync.
@@ -195,10 +199,13 @@ accepter des en-têtes en paramètre optionnel, sans changer ses autres appels.
     `scanTopology` déclaré, avec une réponse de sync simulée qui porte le résultat
     d'opération ; auto-test local ; relecture ClaudeBox ; puis le parcours.
   - [x] Tests Python du verrou (deux sens, attente bornée) et du `shield`.
-- [ ] **Task 5 — Déploiement et preuve terrain (AC: 7)**
-  - [ ] Déployer le SHA exact par le chemin standard, après CI et revue.
-  - [ ] Relever avant/après, cliquer réellement une fois, consigner durée, résumé,
-    statut et parité ; corriger tout écart avant la validation UX.
+- [x] **Task 5 — Déploiement et preuve terrain (AC: 7)**
+  - [x] Déployer le SHA exact par le chemin standard, après CI et revue. Fait le
+    2026-10-06 à 06:06:12Z : `80f7a05` (fusion des PR #209 et #211), sans écart.
+  - [x] Relever avant/après, cliquer réellement une fois, consigner durée, résumé,
+    statut et parité ; corriger tout écart avant la validation UX. Fait le 2026-10-06 :
+    gate 20-0 PASS avec rescan simulé (après la PR #212), clic réel à 09:28, sync
+    d'environ 1 s, parité identique ; voir `20-4-preuve-validation-ux-2026-10-06.md`.
 
 ## Dev Notes
 
@@ -256,6 +263,23 @@ Réponse « R1A, R2A, R3A », sur recommandation de ClaudeBox.
   (AC8). Relecture indépendante du correctif : attente d'au plus 7 s puis 409, effet
   sur le déploiement dit (AC8) ; écouteurs réalignés aussi après un sync `partiel`,
   champ absent d'un démon plus ancien (AC4) ; réponse simulée du gate (Task 4).
+- 2026-10-06, 08:01 — **Go d'Alex : « go déploiement 20-4 »**, pour le déploiement,
+  le gate, le rescan au clic réel et la validation UX.
+- 2026-10-06 — Preuve terrain : déploiement standard de `80f7a05` (06:06:12Z), relevés
+  box et HA sans écart ; gate 20-0 : découverte et référence PASS ; le parcours du
+  rescan échoue sur sa propre lecture du message (Jeedom 4.4 affiche les alertes en
+  notification), corrigé par la PR #212 (fusion `cbad379`), puis PASS (rapport à 08:47:49). Story
+  `ready-for-UX-validation`.
+- 2026-10-06, 09:28 — Rescan au clic réel par ClaudeBox, puis validation UX dans
+  Chrome sur le go d'Alex de 08:01 : conforme. Deux constats non bloquants reportés :
+  scénarios désactivés dont HA garde les boutons (CC-44, antérieur à 20-4) ; autres
+  actions HA encore actives sous la confirmation (P3). Story `done`. Artefact
+  `20-4-preuve-validation-ux-2026-10-06.md`.
+- 2026-10-06, 11:05 — Revue Codex de la PR #213 (P1) : l'AC6 n'est pas tenue pour les
+  scénarios désactivés, qui gardent leur topic de discovery et leur bouton dans HA
+  (CC-44). Défaut présent à l'identique depuis la story 10.1 (PR #119), hors du
+  périmètre de cette story. **Décision d'Alex : clore 20-4 avec cette réserve** ;
+  CC-44 sera traité dans une story dédiée.
 
 ## Définition de done
 
@@ -286,6 +310,13 @@ Réponse « R1A, R2A, R3A », sur recommandation de ClaudeBox.
 GPT-5 Codex
 
 ### Completion Notes List
+
+- 2026-10-06 — Clôture (Task 5) : déploiement de `80f7a05`, gate 20-0 PASS (rescan
+  simulé, sur `cbad379` après la PR #212), clic réel du rescan par ClaudeBox à 09:28,
+  parité identique, HA inchangé ; validation UX par ClaudeBox (go d'Alex du 06/10 à
+  08:01). Artefact `20-4-preuve-validation-ux-2026-10-06.md`. Story `done`, avec une
+  réserve sur l'AC6 (scénarios désactivés, CC-44, décision d'Alex du 06/10) ; ferme
+  CC-40 et CC-41, et le rescan du volet UI de CC-04.
 
 - 2026-10-06 — R7b dev-story : suite des corrections de revue indépendante sur
   PR #209, HEAD de départ `1935bb9`. `a78882a` déplace la conversion d'une
@@ -362,3 +393,13 @@ GPT-5 Codex
 - `tests/e2e/gate/run-gate.mjs`
 - `tests/e2e/gate/parcours/rescan-page-principale.mjs`
 - `tests/unit/test_story_20_4_rescan_ui.node.test.js`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/20-4-preuve-validation-ux-2026-10-06.md`
+
+### Change Log
+
+- 2026-10-06 — Preuve terrain après fusion (`80f7a05` déployé, gate 20-0 PASS, clic
+  réel du rescan) et validation UX ; artefact `20-4-preuve-validation-ux-2026-10-06.md` ;
+  statut `done`.
+- 2026-10-06 — Réserve sur l'AC6 (scénarios désactivés, CC-44) après la revue Codex de
+  la PR #213 ; décision d'Alex : `done` avec cette réserve.
