@@ -362,6 +362,65 @@ test('story 20-0 — le délai de calme se compte depuis le plus tardif de lastI
   assert.equal(calculateQuietDelay({ lastInterceptedAt: now - 120_000 }, now), 0);
 });
 
+test('story 20-0 (CC-43, reprise G43b) — sealContext neutralise puis arrête la collecte puis coupe le réseau, dans cet ordre', async () => {
+  const { sealContext } = await runner();
+  const order = [];
+  let pageAUrl = 'https://domobox.famille-sahut.fr/page-a';
+  const pageA = {
+    url: () => pageAUrl,
+    on: (event) => { if (event === 'dialog') order.push('dialog:a'); },
+    goto: async (target) => { order.push('goto:a'); pageAUrl = target; },
+  };
+  let pageBUrl = 'https://domobox.famille-sahut.fr/page-b';
+  const pageB = {
+    url: () => pageBUrl,
+    on: (event) => { if (event === 'dialog') order.push('dialog:b'); },
+    goto: async (target) => { order.push('goto:b'); pageBUrl = target; },
+  };
+
+  const context = {
+    pages: () => [pageA, pageB],
+    setOffline: async () => { order.push('setOffline'); },
+  };
+  const journal = { entries: [], failed: false, failures: [] };
+  const stopCollecting = () => order.push('stopCollecting');
+
+  await sealContext(context, { journal, stopCollecting });
+
+  assert.deepEqual(order, ['dialog:a', 'goto:a', 'dialog:b', 'goto:b', 'stopCollecting', 'setOffline']);
+  assert.equal(journal.failed, false);
+});
+
+test('story 20-0 (CC-43, reprise G43b) — une page restée hors de about:blank est un échec, sans empêcher setOffline', async () => {
+  const { sealContext } = await runner();
+  const order = [];
+  const stuckUrl = 'https://domobox.famille-sahut.fr/page-coincee';
+  const stuckPage = {
+    url: () => stuckUrl,
+    on: (event) => { if (event === 'dialog') order.push('dialog'); },
+    goto: async () => { order.push('goto'); },
+  };
+  const context = {
+    pages: () => [stuckPage],
+    setOffline: async () => { order.push('setOffline'); },
+  };
+  const journal = { entries: [], failed: false, failures: [] };
+  const stopCollecting = () => order.push('stopCollecting');
+
+  await assert.rejects(
+    () => sealContext(context, { journal, stopCollecting }),
+    /neutralisation-incomplete/,
+  );
+
+  // setOffline reste atteint malgré l'échec de neutralisation : seul rempart
+  // pour un sendBeacon en vol.
+  assert.deepEqual(order, ['dialog', 'goto', 'stopCollecting', 'setOffline']);
+  assert.equal(journal.failed, true);
+  assert.equal(journal.failures.length, 1);
+  assert.equal(journal.failures[0].path, '/page-coincee');
+  assert.equal(journal.failures[0].verdict, 'navigation-non-autorisee');
+});
+
 test('story 20-0 — journal de refus : clés triées sans valeur', async () => {
   const interceptor = await import(pathToFileURL(path.join(__dirname, '..', 'e2e', 'gate', 'lib', 'interceptor.mjs')).href);
   const journal = { entries: [] };

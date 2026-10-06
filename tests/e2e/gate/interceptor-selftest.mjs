@@ -11,10 +11,23 @@ import http from 'node:http';
 import { loadPlaywright } from './lib/playwright.mjs';
 import { installInterceptor } from './lib/interceptor.mjs';
 import { createState } from './lib/simulate.mjs';
+import { neutralizeOpenPages } from './run-gate.mjs';
 
 const PLUGIN_AJAX = '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
 const EVENT_AJAX = '/core/ajax/event.ajax.php';
 const REDIRECT_PNG = '/redirect.png';
+
+const FORBIDDEN_ACTIONS = new Set([
+  'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
+  'saveMappingOverride', 'revertMappingOverride', 'login',
+  'savePublicationOverride', 'revertPublicationOverride',
+]);
+
+/** CC-43 (reprise) : même ordre que le gate — neutraliser avant de couper le réseau. */
+async function neutralizeThenOffline(context) {
+  await neutralizeOpenPages(context, { entries: [], failed: false, failures: [] }).catch(() => undefined);
+  await context.setOffline(true);
+}
 
 function json(state, result) {
   return JSON.stringify({ state, result: { status: 'ok', payload: result } });
@@ -299,6 +312,12 @@ async function main() {
       });
       return response.json();
     });
+    // CC-43 (reprise) : neutraliser (navigation vers about:blank, réseau encore
+    // ouvert) avant de couper le réseau, avant de fermer — même ordre que le
+    // gate — pour qu'une requête en vol pendant la fermeture ne puisse jamais
+    // échapper au gestionnaire de route et atteindre le serveur (context.close()
+    // ferme aussi declaredPage).
+    await neutralizeThenOffline(declaredContext);
     await declaredContext.close();
 
     // Document (page de connexion) qui redirige vers la même action interdite que
@@ -308,20 +327,81 @@ async function main() {
     await redirectPage.goto(`${origin}/index.php`, { waitUntil: 'load' }).catch(() => {});
     await redirectPage.close();
 
+    // CC-43 : contrôle déterministe du risque réel (une écriture en vol pendant
+    // la fermeture). Une page envoie en boucle une écriture interdite ; on
+    // attend que le journal en ait bloqué au moins une (donc que le flux soit
+    // bien en cours), puis on coupe le réseau et on ferme la page puis le
+    // contexte sans arrêter la boucle au préalable. Le serveur ne doit avoir
+    // reçu aucune de ces écritures, y compris celle qui pouvait être en vol au
+    // moment de la fermeture.
+    const offlineContext = await browser.newContext({ serviceWorkers: 'block' });
+    const offlineJournal = { entries: [], failed: false, failures: [] };
+    await installInterceptor(offlineContext, {
+      ctx, simState: createState(), journal: offlineJournal, declaredBascules: [],
+    });
+    const offlinePage = await offlineContext.newPage();
+    await offlinePage.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
+    const offlineRequestsBefore = requests.length;
+    await offlinePage.evaluate((endpoint) => {
+      window.__cc43Interval = setInterval(() => {
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: 'action=saveFilteringConfig',
+        }).catch(() => {});
+      }, 10);
+      // CC-43 (reprise) : écriture en boucle par *navigation* (iframe dont le
+      // formulaire se soumet lui-même), le chemin qui avait traversé setOffline()
+      // seul lors de la relecture de la PR #211 (requête reçue 3 à 8 ms après la
+      // fin de setOffline, après la fermeture du document précédent).
+      window.__cc43NavInterval = setInterval(() => {
+        const frame = document.createElement('iframe');
+        frame.style.display = 'none';
+        frame.srcdoc = '<form method="post" action="' + endpoint + '"><input name="action" value="saveFilteringConfig"></form><script>document.forms[0].submit()</script>';
+        document.body.append(frame);
+      }, 15);
+    }, `${origin}${PLUGIN_AJAX}`);
+    const offlineDeadline = Date.now() + 5_000;
+    while (
+      Date.now() < offlineDeadline
+      && !offlineJournal.entries.some((entry) => entry.action === 'saveFilteringConfig')
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const offlineBlockedBeforeOffline = offlineJournal.entries.some(
+      (entry) => entry.action === 'saveFilteringConfig',
+    );
+    // Les boucles (fetch et navigation) ne sont volontairement pas arrêtées avant
+    // la neutralisation : on veut maximiser la chance qu'une requête soit en vol
+    // au moment où le contexte se neutralise puis se ferme (context.close() ferme
+    // aussi offlinePage). neutralizeThenOffline() mène offlinePage vers
+    // about:blank — tuant les deux boucles — avant de couper le réseau, même
+    // ordre que le gate.
+    await neutralizeThenOffline(offlineContext);
+    await offlineContext.close();
+    // Depuis le début du contrôle : toute action interdite, pas seulement
+    // saveFilteringConfig, ne doit jamais avoir atteint le serveur.
+    const offlineServerReceivedForbidden = requests
+      .slice(offlineRequestsBefore)
+      .some((request) => request.actions.some((action) => FORBIDDEN_ACTIONS.has(action)));
+    report(
+      'ecriture en boucle (fetch et navigation) : pages neutralisees puis reseau coupe avant fermeture, aucune action interdite atteinte malgre le flux continu',
+      offlineBlockedBeforeOffline && !offlineServerReceivedForbidden,
+      failures,
+    );
+
     // Les éléments sans réponse attendue (beacon, popup, iframe, WebSocket) peuvent
     // encore être en file après evaluate(). La fermeture du contexte annule tout ce
     // qui resterait avant que le serveur et le journal soient inspectés.
     await page.waitForTimeout(1_500);
+    // CC-43 (reprise) : neutraliser avant de couper le réseau avant de fermer
+    // (voir commentaire plus haut sur declaredContext).
+    await neutralizeThenOffline(context);
     await context.close();
 
-    const forbiddenActions = new Set([
-      'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
-      'saveMappingOverride', 'revertMappingOverride', 'login',
-      'savePublicationOverride', 'revertPublicationOverride',
-    ]);
     const serverReceivedForbidden = requests.some(
       (request) =>
-        request.actions.some((action) => forbiddenActions.has(action))
+        request.actions.some((action) => FORBIDDEN_ACTIONS.has(action))
         || request.actions.length > 1
         || request.path === '/core/api/jeeApi.php'
         || request.path === '/socket'
