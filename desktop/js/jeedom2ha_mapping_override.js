@@ -152,8 +152,22 @@
         reason: noKeyReason,
       };
     }
+    // Story 20-2 (P2, revue ClaudeBox X4 point 4) : une entité qui hérite du veto
+    // d'équipement ('exclude_eqlogic' sur une cible entité, pas la cible équipement elle-même)
+    // n'a NI « Forcer » NI « Revenir au mode automatique » qui aient un sens à sa propre
+    // portée — l'override vit sur l'équipement, pas sur cette commande. Les deux boutons
+    // renvoient vers l'équipement plutôt que de tenter une action sans effet ou trompeuse.
+    var inheritedEqExclusion = !equipment && policy === 'exclude_eqlogic';
     var pv = decision.projection_validity || {};
     var excludeReason = excluded ? 'Entité déjà exclue de Home Assistant.' : null;
+    if (inheritedEqExclusion) {
+      var inheritedReason = 'Exclusion posée sur l’équipement : la retirer depuis l’équipement.';
+      return {
+        can_exclude: false, can_force: false, can_revert: false,
+        exclude_reason: excludeReason, force_reason: inheritedReason, revert_reason: inheritedReason,
+        reason: excludeReason || inheritedReason,
+      };
+    }
     var forceReason = null;
     if (forced) {
       forceReason = 'Publication déjà forcée sur cette entité.';

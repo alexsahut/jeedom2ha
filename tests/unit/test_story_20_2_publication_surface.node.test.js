@@ -76,7 +76,10 @@ test('20-2 — P1 revue : exclude_eqlogic/exclude_command du démon restent lisi
   assert.equal(treeEqlogic.entities[0].publication_override, 'exclude_eqlogic');
   const stateEqlogic = M.publicationActionState(treeEqlogic.entities[0]);
   assert.equal(stateEqlogic.can_exclude, false);
-  assert.equal(stateEqlogic.can_revert, true);
+  // Revue X4 (point 4) : exclude_eqlogic lu sur une cible ENTITÉ désigne le veto hérité de
+  // l'équipement — cette entité ne porte pas elle-même l'override, Revenir n'a donc aucun
+  // effet à sa propre portée (il faut le faire depuis l'équipement).
+  assert.equal(stateEqlogic.can_revert, false);
 
   const treeCommand = M.normalizeTree({ entities: [{
     ha_entity_type: 'switch', command_ids: [11], decision: blocked,
@@ -185,4 +188,26 @@ test('20-2 — revue X4 (point 3) : bouton équipement « Revenir au mode automa
   const withoutAnyOverride = M.publicationActionState({ publication_override: null, has_publication_override: false }, true);
   assert.equal(withoutAnyOverride.can_revert, false);
   assert.match(withoutAnyOverride.revert_reason, /[Aa]ucun override/);
+});
+
+test('20-2 — revue X4 (point 4) : entité héritant du veto d\'équipement — Forcer/Revenir grisés', () => {
+  // L'entité elle-même ne porte pas l'override (il vit sur l'équipement) : Forcer et
+  // Revenir n'ont aucun effet à sa portée et doivent pointer vers l'équipement.
+  const inherited = M.publicationActionState(
+    { publication_override: 'exclude_eqlogic', has_publication_override: true, override_command_id: 42, decision: { should_publish: false, ha_entity_type: 'light' } },
+    false,
+  );
+  assert.equal(inherited.can_exclude, false);
+  assert.equal(inherited.can_force, false);
+  assert.equal(inherited.can_revert, false);
+  assert.match(inherited.force_reason, /l’équipement|l'équipement/);
+  assert.match(inherited.revert_reason, /l’équipement|l'équipement/);
+
+  // Une entité exclue par SA PROPRE commande (exclude_command, pas le veto d'équipement)
+  // garde, elle, son bouton Revenir actif à sa propre portée — comportement inchangé.
+  const ownExclusion = M.publicationActionState(
+    { publication_override: 'exclude_command', has_publication_override: true, override_command_id: 42, decision: { should_publish: false, ha_entity_type: 'light' } },
+    false,
+  );
+  assert.equal(ownExclusion.can_revert, true);
 });
