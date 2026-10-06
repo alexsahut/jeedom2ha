@@ -219,6 +219,33 @@
     return normalizeTree(tree).sync_status.override_pending === true;
   }
 
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : badge « pas encore appliqué » par entité
+  // (miroir du badge équipement existant, porté par `sync_status`) — une entité dont
+  // l'override n'a pas encore été republié vers Home Assistant.
+  function shouldShowEntityPendingBadge(entity) {
+    return !!(entity && entity.override_pending === true);
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox) : lit une réponse AJAX `savePublicationOverride` /
+  // `revertPublicationOverride` / `previewMappingOverride` / `executeHaAction` et renvoie un
+  // message d'erreur lisible, ou `null` si la requête a réellement réussi. Le relais PHP
+  // (`jeedom2ha::callDaemon`) lit le corps de la réponse daemon quel que soit son code HTTP
+  // (y compris 409) : une erreur daemon (ex. commande partagée sans entité propre) remonte
+  // donc avec `data.state === 'ok'` mais `data.result.status === 'error'` — jamais comme un
+  // échec réseau jQuery. Ne JAMAIS recharger l'équipement sur ce chemin.
+  function readPublicationRequestError(data) {
+    if (!data || data.state !== 'ok') {
+      var top = data && typeof data.result === 'string' && data.result;
+      return top || 'La requête a échoué — réponse du serveur inattendue.';
+    }
+    var result = data.result;
+    if (result && typeof result === 'object' && result.status === 'error') {
+      return (typeof result.message === 'string' && result.message)
+        ? result.message : 'La requête a été refusée par le démon.';
+    }
+    return null;
+  }
+
   // AC5 — état vide explicite : jamais un champ vide silencieux.
   function buildEmptyStateLabel(row) {
     var r = normalizeCommandRow(row);
@@ -726,6 +753,8 @@
     buildPublicationSummaryLabel: buildPublicationSummaryLabel,
     publicationSummaryState: publicationSummaryState,
     shouldShowOverridePendingBadge: shouldShowOverridePendingBadge,
+    shouldShowEntityPendingBadge: shouldShowEntityPendingBadge,
+    readPublicationRequestError: readPublicationRequestError,
   };
 
   return api;

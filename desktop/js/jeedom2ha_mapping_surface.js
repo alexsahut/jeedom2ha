@@ -223,22 +223,46 @@
     });
   }
 
-  function publicationRequest(eqId, cmdId, policy, $buttons) {
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : affichage/effacement de l'erreur lisible
+  // d'une requête de publication, dans le slot dédié posé à côté des boutons d'action.
+  function showRequestError($errorSlot, message) {
+    if (!$errorSlot || $errorSlot.length === 0) return;
+    $errorSlot.text(message).show();
+  }
+
+  function clearRequestError($errorSlot) {
+    if (!$errorSlot || $errorSlot.length === 0) return;
+    $errorSlot.empty().hide();
+  }
+
+  function publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot) {
     $buttons.prop('disabled', true);
+    clearRequestError($errorSlot);
     var data = { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: policy };
     if (cmdId !== null) data.cmdId = cmdId;
     $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
       .always(function () { $buttons.prop('disabled', false); })
-      .done(function () { reloadEquipment(eqId); });
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
+        reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
-  function revertPublication(eqId, cmdId, $buttons) {
+  function revertPublication(eqId, cmdId, $buttons, $errorSlot) {
     $buttons.prop('disabled', true);
+    clearRequestError($errorSlot);
     var data = { action: 'revertPublicationOverride', eqId: eqId };
     if (cmdId !== null) data.cmdId = cmdId;
     $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
       .always(function () { $buttons.prop('disabled', false); })
-      .done(function () { reloadEquipment(eqId); });
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
+        reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
   // Story 20-2 (P1, relecture ClaudeBox) : `window.confirm` bloque le navigateur piloté
@@ -300,9 +324,9 @@
     return $wrap;
   }
 
-  function requestPublication(eqId, target, equipment, policy, $buttons, commands) {
+  function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot) {
     var cmdId = equipment ? null : target.override_command_id;
-    function save() { publicationRequest(eqId, cmdId, policy, $buttons); }
+    function save() { publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot); }
     function release() { $buttons.prop('disabled', false); }
     if (policy === 'exclude') {
       if (!M.shouldConfirmPublication(policy, target.decision || target)) {
@@ -315,6 +339,7 @@
     }
     // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
     $buttons.prop('disabled', true);
+    clearRequestError($errorSlot);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'previewMappingOverride', eqId: eqId,
       cmdId: cmdId, publicationPolicy: 'force_publish' }, dataType: 'json' })
       .done(function (data) {
@@ -325,15 +350,24 @@
           : { disableConfirm: state.refusal_reason || '{{Le forçage serait refusé dans l’état actuel.}}' };
         confirmPublicationDialog(buildForcePreviewContent(state), save, release, dialogOptions);
       })
-      .fail(release);
+      .fail(function () {
+        release();
+        showRequestError($errorSlot, '{{Aperçu indisponible — le démon ne répond pas.}}');
+      });
   }
 
-  function applyEquipment(eqId, $button) {
+  function applyEquipment(eqId, $button, $errorSlot) {
     $button.prop('disabled', true);
+    clearRequestError($errorSlot);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
       portee: 'equipement', selection: JSON.stringify([eqId]) }, dataType: 'json' })
       .always(function () { $button.prop('disabled', false); })
-      .done(function () { reloadEquipment(eqId); });
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
+        reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
   // --- Synthèse de publication par équipement (Bloc C) ---
@@ -402,25 +436,41 @@
       .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
   }
 
+  // Renvoie le slot d'erreur créé, pour que l'appelant (ex. le bouton « Appliquer »
+  // équipement) puisse y afficher ses propres erreurs dans le même emplacement visuel.
   function appendPublicationActions($host, eqId, target, equipment, commands) {
     var state = M.publicationActionState(target, equipment);
     var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
+    var $error = $('<div class="j2ha-publication-error text-danger" style="display:none;margin-top:4px;"></div>');
     // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton grisé porte SA cause propre
     // (déjà publiée, déjà forcée, projection invalide, type hors périmètre, pas de mapping,
     // pas de commande clé) — plus de tooltip générique partagé entre boutons.
     function button(label, policy, enabled, reason) {
       var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
       if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
-      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands); });
+      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error); });
       $group.append($button);
     }
     button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
     button('{{Forcer}}', 'force_publish', state.can_force, state.force_reason);
     var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>').text('{{Revenir au mode automatique}}');
     if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
-    $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button')); });
+    $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button'), $error); });
     $group.append($revert);
     $host.append($group);
+    $host.append($error);
+    return $error;
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : badge « pas encore appliqué » par entité,
+  // miroir du badge équipement (renderSyncBadge) mais lu sur `entity.override_pending`.
+  function appendEntityPendingBadge($row, entity) {
+    if (!M.shouldShowEntityPendingBadge(entity)) {
+      return;
+    }
+    $row.append($('<span class="label label-warning" style="margin-left:6px;"></span>')
+      .append($('<i class="fas fa-clock"></i> '))
+      .append(document.createTextNode('{{pas encore appliqué}}')));
   }
 
   function renderEntities($panel, tree) {
@@ -430,6 +480,7 @@
       var $row = $('<div class="j2ha-entity-row"></div>');
       $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
       $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity, tree.commands)));
+      appendEntityPendingBadge($row, entity);
       appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
       $host.append($row);
     }
@@ -445,13 +496,13 @@
 
     renderSyncBadge($panel, normalized);
     renderEntities($panel, normalized);
-    appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
+    var $equipmentError = appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
       publication_override: null, has_publication_override: normalized.entities.some(function (entity) {
         return entity.publication_override !== null;
       }) }, true, normalized.commands);
     if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
       var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
-      $apply.on('click', function () { applyEquipment(eqId, $apply); });
+      $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
       $actions.append($apply);
     }
 

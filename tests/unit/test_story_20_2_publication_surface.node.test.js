@@ -126,6 +126,23 @@ test('20-2 — P2 revue (AC3) : aperçu du forçage lit type, validité et comma
   assert.ok(emptyView.refusal_reason);
 });
 
+test('20-2 — P2 revue (AC7) : badge entité en attente, lu tel quel', () => {
+  assert.equal(M.shouldShowEntityPendingBadge({ override_pending: true }), true);
+  assert.equal(M.shouldShowEntityPendingBadge({ override_pending: false }), false);
+  assert.equal(M.shouldShowEntityPendingBadge(null), false);
+});
+
+test('20-2 — P2 revue : erreur de requête de publication lisible (y compris 409 relayé)', () => {
+  assert.equal(M.readPublicationRequestError({ state: 'ok', result: { status: 'ok', payload: {} } }), null);
+  assert.equal(
+    M.readPublicationRequestError({ state: 'ok', result: { status: 'error', message: 'Commande sans entité propre' } }),
+    'Commande sans entité propre',
+  );
+  assert.ok(M.readPublicationRequestError({ state: 'ok', result: { status: 'error' } }));
+  assert.ok(M.readPublicationRequestError({ state: 'error', result: '{{Erreur}}' }));
+  assert.ok(M.readPublicationRequestError(null));
+});
+
 test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', () => {
   for (const [code, phrase] of [
     ['name_heuristic_rejection', 'mot du nom'],
