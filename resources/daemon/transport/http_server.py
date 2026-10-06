@@ -1496,24 +1496,36 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     })
 
 
+def _build_sync_failure_response(request: web.Request) -> web.Response:
+    """Convertit une exception sync en résultat `echec` et en réponse 500.
+
+    Appelée depuis un bloc `except`, directement ou via la tâche protégée par
+    `asyncio.shield` : dans les deux cas l'état global (santé, date de fin)
+    doit être mis à jour, même si le client PHP s'est déjà déconnecté.
+    """
+    operation = _build_operation_snapshot(
+        resultat="echec",
+        intention="sync",
+        message="Synchronisation échouée — erreur inattendue.",
+    )
+    request.app["derniere_operation_resultat"] = operation
+    request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
+    _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
+    return web.json_response({
+        "status": "error",
+        "operation_result": operation["resultat"],
+        "operation_message": operation["message"],
+    }, status=500)
+
+
 async def _handle_action_sync(request: web.Request) -> web.Response:
-    """Wrapper pour la synchronisation afin de capter l'état global en cas d'erreur inattendue."""
+    """Wrapper pour la synchronisation afin de capter l'état global en cas d'erreur inattendue
+    survenue avant le lancement de la tâche protégée (authentification, verrou)."""
     try:
         return await _do_handle_action_sync(request)
-    except Exception as e:
-        operation = _build_operation_snapshot(
-            resultat="echec",
-            intention="sync",
-            message="Synchronisation échouée — erreur inattendue.",
-        )
-        request.app["derniere_operation_resultat"] = operation
-        request.app["derniere_synchro_terminee"] = datetime.now(timezone.utc).isoformat()
-        _LOGGER.error("[SYNC] Echec inattendu lors de la synchronisation", exc_info=True)
-        return web.json_response({
-            "status": "error",
-            "operation_result": operation["resultat"],
-            "operation_message": operation["message"],
-        }, status=500)
+    except Exception:
+        return _build_sync_failure_response(request)
+
 
 async def _unpublish_refused_candidates(
     eq_id: int,
@@ -1731,6 +1743,8 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
     async def _run_sync() -> web.Response:
         try:
             return await _do_handle_action_sync_body(request)
+        except Exception:
+            return _build_sync_failure_response(request)
         finally:
             action_lock.release()
 
