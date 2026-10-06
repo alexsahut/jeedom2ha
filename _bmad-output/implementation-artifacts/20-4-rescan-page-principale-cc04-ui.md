@@ -275,6 +275,11 @@ Réponse « R1A, R2A, R3A », sur recommandation de ClaudeBox.
   scénarios désactivés dont HA garde les boutons (CC-44, antérieur à 20-4) ; autres
   actions HA encore actives sous la confirmation (P3). Story `done`. Artefact
   `20-4-preuve-validation-ux-2026-10-06.md`.
+- 2026-10-06, 11:05 — Revue Codex de la PR #213 (P1) : l'AC6 n'est pas tenue pour les
+  scénarios désactivés, qui gardent leur topic de discovery et leur bouton dans HA
+  (CC-44). Défaut présent à l'identique depuis la story 10.1 (PR #119), hors du
+  périmètre de cette story. **Décision d'Alex : clore 20-4 avec cette réserve** ;
+  CC-44 sera traité dans une story dédiée.
 
 ## Définition de done
 
@@ -309,7 +314,8 @@ GPT-5 Codex
 - 2026-10-06 — Clôture (Task 5) : déploiement de `80f7a05`, gate 20-0 PASS (rescan
   simulé, sur `cbad379` après la PR #212), clic réel du rescan par ClaudeBox à 09:28,
   parité identique, HA inchangé ; validation UX par ClaudeBox (go d'Alex du 06/10 à
-  08:01). Artefact `20-4-preuve-validation-ux-2026-10-06.md`. Story `done` ; ferme
+  08:01). Artefact `20-4-preuve-validation-ux-2026-10-06.md`. Story `done`, avec une
+  réserve sur l'AC6 (scénarios désactivés, CC-44, décision d'Alex du 06/10) ; ferme
   CC-40 et CC-41, et le rescan du volet UI de CC-04.
 
 - 2026-10-06 — R7b dev-story : suite des corrections de revue indépendante sur
@@ -395,3 +401,5 @@ GPT-5 Codex
 - 2026-10-06 — Preuve terrain après fusion (`80f7a05` déployé, gate 20-0 PASS, clic
   réel du rescan) et validation UX ; artefact `20-4-preuve-validation-ux-2026-10-06.md` ;
   statut `done`.
+- 2026-10-06 — Réserve sur l'AC6 (scénarios désactivés, CC-44) après la revue Codex de
+  la PR #213 ; décision d'Alex : `done` avec cette réserve.
