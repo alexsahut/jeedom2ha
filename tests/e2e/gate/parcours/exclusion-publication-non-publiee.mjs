@@ -61,33 +61,66 @@ async function waitForActionButtonState(page, eqId, label, expectedDisabled) {
   }, { eqId, label, expectedDisabled });
 }
 
+/** Attend l'étape nommée, journalise son libellé avant exécution pour un rapport diagnosticable. */
+async function waitAtStep(helpers, index, label, operation) {
+  helpers.record(`etape_${index}`, label);
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message.split(/\r?\n/, 1)[0] : String(error);
+    throw new Error(`etape ${label} : ${message}`);
+  }
+}
+
+/** Ferme la modale de pièce sans clic par coordonnées : le bouton de fermeture peut se
+ * retrouver hors de la zone visible selon le défilement de la page sous-jacente. */
+async function closeRoomModal(modal) {
+  await modal.locator('.bootbox-close-button').dispatchEvent('click');
+  await modal.waitFor({ state: 'hidden' });
+}
+
 // Story 20-2 (point 4) : l'eq 287 n'est désigné que par son id, jamais par un
-// nom de pièce — on ouvre chaque carte de pièce jusqu'à trouver son panneau,
-// en refermant la modale des pièces sans résultat avant de passer à la suivante.
-async function findEquipmentPanel(page, eqId) {
+// nom de pièce. On tente d'abord directement la carte de son objet connu
+// (id d'objet 25) ; à défaut on referme et on retombe sur le parcours de
+// toutes les cartes, en refermant chaque modale sans résultat avant de
+// passer à la suivante.
+async function findEquipmentPanel(page, helpers, eqId) {
   const modal = page.locator('.modal-j2ha-room');
+  const knownCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
+  if (await knownCard.count() > 0) {
+    const panel = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
+      await knownCard.click();
+      await modal.waitFor({ state: 'visible' });
+      return modal.locator(`.j2ha-eq-panel[data-eq-id="${eqId}"]`);
+    });
+    if (await panel.count() > 0) {
+      return panel;
+    }
+    await waitAtStep(helpers, 2, 'fermeture-piece-connue', () => closeRoomModal(modal));
+  }
+
   const roomCards = page.locator('#j2ha_roomCards .j2ha-room-card');
   const roomCount = await roomCards.count();
   for (let i = 0; i < roomCount; i += 1) {
-    await roomCards.nth(i).click();
-    await modal.waitFor({ state: 'visible' });
+    await waitAtStep(helpers, `3_${i}`, `ouverture-piece-${i}`, async () => {
+      await roomCards.nth(i).click();
+      await modal.waitFor({ state: 'visible' });
+    });
     const panel = modal.locator(`.j2ha-eq-panel[data-eq-id="${eqId}"]`);
     if (await panel.count() > 0) {
       return panel;
     }
-    // Échap est perdu tant que le focus n'est pas entré dans la modale (fin de
-    // son animation d'ouverture) : on ferme par le bouton de fermeture, qui lui
-    // agit dès l'ouverture.
-    await modal.locator('.bootbox-close-button').click();
-    await modal.waitFor({ state: 'hidden' });
+    await waitAtStep(helpers, `4_${i}`, `fermeture-piece-${i}`, () => closeRoomModal(modal));
   }
   throw new Error('eq-introuvable');
 }
 
 export async function run(page, { helpers }) {
-  const panel = await findEquipmentPanel(page, '287');
-  await panel.locator('.j2ha-eq-toggle').click();
-  await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+  const panel = await findEquipmentPanel(page, helpers, '287');
+  await waitAtStep(helpers, 5, 'depliage', async () => {
+    await panel.locator('.j2ha-eq-toggle').click();
+    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+  });
 
   // Point P2 (reprise X5d) : les entités n'arrivent qu'après la relecture
   // `getMappingOverrides` déclenchée par le dépliage — attendre la première ligne
@@ -110,10 +143,10 @@ export async function run(page, { helpers }) {
   const start = helpers.journalEntries().length;
   // Équipement non publié : aucune confirmation attendue (shouldConfirmPublication
   // n'exige une modale que pour une entité déjà publiée) — un clic direct suffit.
-  await excludeButton.click();
-  await waitForJournal(helpers.journalEntries, start, [
+  await waitAtStep(helpers, 6, 'exclure', () => excludeButton.click());
+  await waitAtStep(helpers, 7, 'journal-exclusion', () => waitForJournal(helpers.journalEntries, start, [
     { action: 'savePublicationOverride', verdict: 'simulee' },
-  ]);
+  ]));
   // Point 4 : la modale de pièce est elle-même une bootbox, donc le contrôle ne peut pas
   // être « aucune bootbox visible » — l'absence de confirmation se lit dans l'absence du
   // bouton « Confirmer » (confirmPublicationDialog). Placé après l'apparition de
@@ -126,25 +159,27 @@ export async function run(page, { helpers }) {
   // (`getMappingOverrides`, verdict `lecture-derivee`) avant tout nouveau rendu des
   // boutons (reprise X5d) — attendre cette relecture, puis l'état DOM lui-même,
   // plutôt que l'apparition seule de l'écriture au journal.
-  await waitForJournal(helpers.journalEntries, start, [
+  await waitAtStep(helpers, 8, 'journal-relecture-exclusion', () => waitForJournal(helpers.journalEntries, start, [
     { action: 'savePublicationOverride', verdict: 'simulee' },
     { action: 'getMappingOverrides', verdict: 'lecture-derivee' },
-  ]);
+  ]));
   // Après la pose simulée et la relecture déclenchée par le rechargement de
   // l'équipement : « Exclure » devient sans effet (déjà exclu), « Revenir au
   // mode automatique » devient le seul moyen de retirer l'exclusion (point 3).
-  await waitForActionButtonState(page, '287', 'Exclure', true);
-  await waitForActionButtonState(page, '287', 'Revenir au mode automatique', false);
+  await waitAtStep(helpers, 9, 'etat-boutons-apres-exclusion', async () => {
+    await waitForActionButtonState(page, '287', 'Exclure', true);
+    await waitForActionButtonState(page, '287', 'Revenir au mode automatique', false);
+  });
 
   const afterSave = helpers.journalEntries().length;
-  await revertButton.click();
+  await waitAtStep(helpers, 10, 'revenir-au-mode-automatique', () => revertButton.click());
   // Après le retrait : relecture `getMappingOverrides` sans simulation active
   // (verdict `read`, l'exclusion a été purgée par `revertPublicationOverride`) avant
   // que « Exclure » ne redevienne actif (reprise X5d).
-  await waitForJournal(helpers.journalEntries, afterSave, [
+  await waitAtStep(helpers, 11, 'journal-retrait', () => waitForJournal(helpers.journalEntries, afterSave, [
     { action: 'revertPublicationOverride', verdict: 'simulee' },
     { action: 'getMappingOverrides', verdict: 'read' },
-  ]);
+  ]));
   // Après le retrait : « Exclure » redevient actif.
-  await waitForActionButtonState(page, '287', 'Exclure', false);
+  await waitAtStep(helpers, 12, 'etat-bouton-final', () => waitForActionButtonState(page, '287', 'Exclure', false));
 }
