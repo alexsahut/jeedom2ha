@@ -258,30 +258,55 @@
     };
   }
 
-  // Story 20-2 (P2, relecture indépendante PR #210) : à la portée équipement, le forçage
-  // s'étend à TOUTES les entités (`entities[]`, champ additif de l'aperçu démon) — la modale
-  // doit donc lister chacune (type, publiée ou non et sa cause via `buildPublishCellLabel`,
-  // même libellé que la colonne diagnostic de l'arbre, commandes concernées), et
-  // « Confirmer » n'est actif que si au moins une entité serait effectivement publiée.
-  function equipmentForcePreviewEntities(view, commands) {
+  // Trouve, dans l'arbre déjà reçu (jamais recalculé ici), l'entité courante correspondant
+  // à une entité de l'aperçu — même entité si elle partage au moins une commande (les deux
+  // listes portent les mêmes command_ids pour une même entité, principale ou secondaire).
+  function findCurrentEntity(currentEntities, commandIds) {
+    var ids = Array.isArray(commandIds) ? commandIds : [];
+    if (ids.length === 0) return null;
+    var pool = Array.isArray(currentEntities) ? currentEntities : [];
+    for (var i = 0; i < pool.length; i++) {
+      var currentIds = Array.isArray(pool[i].command_ids) ? pool[i].command_ids : [];
+      if (ids.some(function (id) { return currentIds.indexOf(id) !== -1; })) {
+        return pool[i];
+      }
+    }
+    return null;
+  }
+
+  // Story 20-2 (P2, relecture indépendante PR #210 ; reprise X5d, P3) : à la portée
+  // équipement, le forçage s'étend à TOUTES les entités (`entities[]`, champ additif de
+  // l'aperçu démon). Une entité DÉJÀ publiée (lue dans `currentEntities`, l'arbre déjà
+  // reçu) et qui le resterait après forçage n'est pas un changement dû à CETTE action —
+  // « Confirmer » ne doit s'activer que si au moins une entité PASSE de non publiée à
+  // publiée. Chaque entité est donc classée « déjà publiée », « sera publiée » (ce
+  // changement) ou « ne sera pas publiée : cause » (buildPublishCellLabel, même libellé
+  // que la colonne diagnostic de l'arbre).
+  function equipmentForcePreviewEntities(view, commands, currentEntities) {
     var entities = (view && Array.isArray(view.entities)) ? view.entities : [];
     return entities.map(function (entity) {
+      var current = findCurrentEntity(currentEntities, entity.command_ids);
+      var alreadyPublished = !!(current && current.decision && current.decision.should_publish === true);
+      var willPublish = isReadyDiagnostic(entity.decision);
       return {
         ha_entity_type: entity.ha_entity_type,
         command_names: resolveCommandNames(commands, entity.command_ids),
-        will_publish: isReadyDiagnostic(entity.decision),
-        status_label: buildPublishCellLabel(entity.decision),
+        already_published: alreadyPublished,
+        changes: !alreadyPublished && willPublish,
+        status_label: alreadyPublished ? 'Déjà publiée dans Home Assistant.'
+          : (willPublish ? 'Sera publiée dans Home Assistant.' : buildPublishCellLabel(entity.decision)),
       };
     });
   }
 
-  function equipmentForcePreviewState(view, commands) {
-    var items = equipmentForcePreviewEntities(view, commands);
-    var canConfirm = items.some(function (item) { return item.will_publish; });
+  function equipmentForcePreviewState(view, commands, currentEntities) {
+    var items = equipmentForcePreviewEntities(view, commands, currentEntities);
+    var canConfirm = items.some(function (item) { return item.changes; });
     return {
       items: items,
       can_confirm: canConfirm,
-      refusal_reason: canConfirm ? null : 'Aucune entité ne serait publiée dans l’état actuel.',
+      refusal_reason: canConfirm
+        ? null : 'Aucune entité ne changerait d’état : déjà publiées ou toujours non publiées.',
     };
   }
 

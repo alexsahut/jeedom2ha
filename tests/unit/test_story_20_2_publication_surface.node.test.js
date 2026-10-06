@@ -211,3 +211,59 @@ test('20-2 — revue X4 (point 4) : entité héritant du veto d\'équipement —
   );
   assert.equal(ownExclusion.can_revert, true);
 });
+
+// Story 20-2 (P3, relecture indépendante PR #210, reprise X5d) : à la portée équipement,
+// « Confirmer » doit lire l'arbre déjà reçu (currentEntities) pour distinguer une entité
+// déjà publiée (aucun changement dû à CE forçage) d'une entité qui deviendrait réellement
+// publiée — jamais recalculé, juste comparé par command_ids partagés.
+test('20-2 — P3 (reprise X5d) : entité déjà publiée, aucun changement, Confirmer refusé', () => {
+  const commands = [{ jeedom_cmd_id: 5, cmd_name: 'Ouvrir' }];
+  const view = { entities: [{ command_ids: [5], decision: ready }] };
+  const currentEntities = [{ command_ids: [5], decision: ready }];
+  const state = M.equipmentForcePreviewState(view, commands, currentEntities);
+  assert.equal(state.items[0].already_published, true);
+  assert.equal(state.items[0].changes, false);
+  assert.match(state.items[0].status_label, /Déjà publiée/);
+  assert.equal(state.can_confirm, false);
+  assert.match(state.refusal_reason, /ne changerait d.état/);
+});
+
+test('20-2 — P3 (reprise X5d) : entité non publiée qui le deviendrait, Confirmer actif', () => {
+  const commands = [{ jeedom_cmd_id: 6, cmd_name: 'Fermer' }];
+  const view = { entities: [{ command_ids: [6], decision: ready }] };
+  const currentEntities = [{ command_ids: [6], decision: blocked }];
+  const state = M.equipmentForcePreviewState(view, commands, currentEntities);
+  assert.equal(state.items[0].already_published, false);
+  assert.equal(state.items[0].changes, true);
+  assert.match(state.items[0].status_label, /Sera publiée/);
+  assert.equal(state.can_confirm, true);
+  assert.equal(state.refusal_reason, null);
+});
+
+test('20-2 — P3 (reprise X5d) : mix d\'entités déjà publiées et bloquées, aucune transition, Confirmer refusé', () => {
+  const commands = [{ jeedom_cmd_id: 5, cmd_name: 'Ouvrir' }, { jeedom_cmd_id: 7, cmd_name: 'Stop' }];
+  const view = { entities: [
+    { command_ids: [5], decision: ready },
+    { command_ids: [7], decision: blocked },
+  ] };
+  const currentEntities = [
+    { command_ids: [5], decision: ready },
+    { command_ids: [7], decision: blocked },
+  ];
+  const state = M.equipmentForcePreviewState(view, commands, currentEntities);
+  assert.equal(state.items[0].already_published, true);
+  assert.equal(state.items[0].changes, false);
+  assert.equal(state.items[1].already_published, false);
+  assert.equal(state.items[1].changes, false);
+  assert.match(state.items[1].status_label, /Ne sera pas publié/);
+  assert.equal(state.can_confirm, false);
+});
+
+test('20-2 — P3 (reprise X5d) : entité absente de l\'arbre courant (jamais vue) traitée comme non publiée', () => {
+  const commands = [{ jeedom_cmd_id: 9, cmd_name: 'Ouvrir' }];
+  const view = { entities: [{ command_ids: [9], decision: ready }] };
+  const state = M.equipmentForcePreviewState(view, commands, []);
+  assert.equal(state.items[0].already_published, false);
+  assert.equal(state.items[0].changes, true);
+  assert.equal(state.can_confirm, true);
+});

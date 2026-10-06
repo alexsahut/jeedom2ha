@@ -466,7 +466,10 @@
         // Relecture indépendante PR #210 (point 3) : à la portée équipement, le forçage vaut
         // pour TOUTES les entités du mapping (`view.entities`, champ additif démon AC3) —
         // `forcePreviewState`/`buildForcePreviewContent` ne couvrent que l'entité principale.
-        var state = equipment ? M.equipmentForcePreviewState(view, commands) : M.forcePreviewState(view, commands);
+        // Reprise X5d (P3) : `entities` (dernier paramètre de requestPublication, l'arbre déjà
+        // reçu) permet à equipmentForcePreviewState de distinguer une entité déjà publiée
+        // (aucun changement dû à CE forçage) d'une entité qui le deviendrait réellement.
+        var state = equipment ? M.equipmentForcePreviewState(view, commands, entities) : M.forcePreviewState(view, commands);
         var content = equipment ? buildEquipmentForcePreviewContent(state) : buildForcePreviewContent(state);
         var dialogOptions = state.can_confirm ? null
           : { disableConfirm: state.refusal_reason || '{{Le forçage serait refusé dans l’état actuel.}}' };
