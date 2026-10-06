@@ -116,8 +116,10 @@
     $tdOverride.append($select);
     var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
     $tdOverride.append($spinner);
+    var $revertError = $('<span class="mo-revert-error text-danger" style="display:none;margin-left:6px;"></span>');
     if (row.override_applied) {
-      $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au mode automatique}}"><i class="fas fa-undo"></i></a>'));
+      $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au type automatique}}"><i class="fas fa-undo"></i></a>'));
+      $tdOverride.append($revertError);
     }
     $tr.append($tdOverride);
 
@@ -143,9 +145,24 @@
       });
     }
 
-    $tr.find('.mo-revert-cmd').on('click', function () {
-      revertCommand(eqId, cmdId);
-    });
+    // Story 20-2 (P1, relecture indépendante PR #210) : ce lien ne porte que sur l'override de
+    // TYPE de cette seule commande (route TYPE, 16-8) — jamais sur l'override de publication de
+    // toute l'entité. `revertPublication` (revertPublicationOverride) retirerait exclusion et
+    // forçage de l'entité entière sans confirmation, ce que ce lien ne doit jamais faire (AC5).
+    // Reprise X5d (P3, relecture indépendante PR #210) : en cas d'échec (démon en erreur ou
+    // requête réseau), le lien restait inerte pour le reste de la session (`.off('click')` sans
+    // jamais être réattaché). On réaffiche une cause lisible dans `$revertError` et on réattache
+    // le gestionnaire pour permettre un nouvel essai ; en cas de succès, on recharge l'équipement
+    // comme avant.
+    var $revertLink = $tr.find('.mo-revert-cmd');
+    function attachRevertHandler() {
+      $revertLink.one('click', function () {
+        clearRequestError($revertError);
+        $revertLink.prop('disabled', true);
+        revertCommand(eqId, cmdId, $revertLink, $revertError, attachRevertHandler);
+      });
+    }
+    attachRevertHandler();
 
     return $tr;
   }
@@ -199,28 +216,283 @@
     });
   }
 
-  function revertCommand(eqId, cmdId) {
+  // `$link`/`$errorSlot`/`onFailure` : reprise X5d (P3) — en cas d'échec, réaffiche une cause
+  // lisible et réattache le gestionnaire de clic (`onFailure`) plutôt que de laisser le lien
+  // inerte ; en cas de succès, recharge l'équipement comme avant la correction.
+  function revertCommand(eqId, cmdId, $link, $errorSlot, onFailure) {
     $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'revertMappingOverride', eqId: eqId, cmdId: cmdId },
       dataType: 'json',
-      success: function () {
+      success: function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) {
+          showRequestError($errorSlot, error);
+          if ($link) $link.prop('disabled', false);
+          if (onFailure) onFailure();
+          return;
+        }
         reloadEquipment(eqId);
+      },
+      error: function () {
+        showRequestError($errorSlot, '{{Le démon ne répond pas.}}');
+        if ($link) $link.prop('disabled', false);
+        if (onFailure) onFailure();
       },
     });
   }
 
-  function revertEquipment(eqId) {
-    $.ajax({
-      type: 'POST',
-      url: AJAX_URL,
-      data: { action: 'revertMappingOverride', eqId: eqId },
-      dataType: 'json',
-      success: function () {
+  // Story 20-2 (P1, relecture indépendante PR #210) : affichage/effacement de l'erreur lisible
+  // d'une requête de publication, dans le slot dédié posé à côté des boutons d'action.
+  function showRequestError($errorSlot, message) {
+    if (!$errorSlot || $errorSlot.length === 0) return;
+    $errorSlot.text(message).show();
+  }
+
+  function clearRequestError($errorSlot) {
+    if (!$errorSlot || $errorSlot.length === 0) return;
+    $errorSlot.empty().hide();
+  }
+
+  // Story 20-2 (P2, revue ClaudeBox X4 point 5) : désactiver TOUT le groupe de boutons
+  // pendant une requête est correct (éviter un double clic), mais les réactiver en bloc à
+  // la fin ne l'est pas — un bouton déjà grisé pour sa propre cause (ex. « Forcer » déjà
+  // publiée, ou hérité d'une exclusion d'équipement, point 4) redevenait cliquable après
+  // n'importe quelle requête voisine. On capture l'état `disabled` de chaque bouton avant
+  // de tout griser, puis on restaure cet état exact plutôt qu'un `false` générique.
+  function disableButtons($buttons) {
+    $buttons.each(function () {
+      var $button = $(this);
+      if ($button.data('j2haPrevDisabled') === undefined) {
+        $button.data('j2haPrevDisabled', $button.prop('disabled'));
+      }
+      $button.prop('disabled', true);
+    });
+  }
+
+  function restoreButtons($buttons) {
+    $buttons.each(function () {
+      var $button = $(this);
+      var prevDisabled = $button.data('j2haPrevDisabled');
+      $button.prop('disabled', prevDisabled === true);
+      $button.removeData('j2haPrevDisabled');
+    });
+  }
+
+  function publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot) {
+    disableButtons($buttons);
+    clearRequestError($errorSlot);
+    var data = { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: policy };
+    if (cmdId !== null) data.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
+      .always(function () { restoreButtons($buttons); })
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
         reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
+  }
+
+  function revertPublication(eqId, cmdId, $buttons, $errorSlot) {
+    disableButtons($buttons);
+    clearRequestError($errorSlot);
+    var data = { action: 'revertPublicationOverride', eqId: eqId };
+    if (cmdId !== null) data.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
+      .always(function () { restoreButtons($buttons); })
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
+        reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
+  }
+
+  // Story 20-2 (P1, relecture ClaudeBox) : `window.confirm` bloque le navigateur piloté
+  // (Playwright ferme les boîtes natives par défaut), ce qui empêche la preuve au clic réel.
+  // Modale Bootbox du plugin (même pattern que confirmHaPublishAction, jeedom2ha.js) :
+  // fermeture par la croix, Échap ou « Annuler » appellent toutes `onEscape`/`cancel`, qui
+  // libère l'état d'attente ; seul « Confirmer » déclenche l'action.
+  // `options.disableConfirm` : cause lisible désactivant le bouton Confirmer (AC3 — aperçu
+  // de forçage refusé). `content` : chaîne (fallback window.confirm) ou noeud jQuery/DOM
+  // construit avec .text() pour les valeurs non fiables (noms de commande Jeedom).
+  function confirmPublicationDialog(content, onConfirm, onCancel, options) {
+    var opts = options || {};
+    var settled = false;
+    function cancel() {
+      if (settled) return;
+      settled = true;
+      if (onCancel) onCancel();
+    }
+    function confirm() {
+      if (settled || opts.disableConfirm) return;
+      settled = true;
+      onConfirm();
+    }
+    if (typeof bootbox === 'undefined' || !bootbox || typeof bootbox.dialog !== 'function') {
+      var text = typeof content === 'string' ? content : '{{Confirmer cette action ?}}';
+      if (!opts.disableConfirm && window.confirm(text)) { confirm(); } else { cancel(); }
+      return;
+    }
+    var dialog = bootbox.dialog({
+      message: typeof content === 'string' ? '<div>' + content + '</div>' : content,
+      onEscape: cancel,
+      buttons: {
+        cancel: { label: '{{Annuler}}', className: 'btn-default', callback: cancel },
+        confirm: { label: '{{Confirmer}}', className: 'btn-primary', callback: confirm },
       },
     });
+    if (opts.disableConfirm) {
+      dialog.find('[data-bb-handler="confirm"]').prop('disabled', true).attr('title', opts.disableConfirm);
+    }
+    // Story 20-2 (P2, revue ClaudeBox X4 point 5) : filet de sécurité repris de
+    // confirmHaPublishAction (jeedom2ha.js, PR #209) — toute fermeture de la modale non
+    // couverte par un bouton (croix, clic sur le fond) doit aussi libérer les boutons
+    // grisés ; `cancel()` est idempotent via `settled`, donc sûr même après Confirmer/Annuler.
+    if (dialog && typeof dialog.on === 'function') {
+      dialog.on('hidden.bs.modal', cancel);
+    }
+  }
+
+  // Story 20-2 (P2, AC3) : contenu DOM de l'aperçu de forçage — type, validité, commandes
+  // qui recevront les ordres (noms lus dans `commands[]`, jamais injectés en HTML brut :
+  // les noms de commande sont du texte libre Jeedom, donc potentiellement non fiable).
+  function buildForcePreviewContent(state) {
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Type HA : }}' + (state.ha_entity_type || '{{aucun}}')));
+    $wrap.append($('<p></p>').text(state.is_valid
+      ? '{{Projection valide pour ce type.}}' : '{{Projection invalide pour ce type.}}'));
+    $wrap.append($('<p></p>').text(state.command_names.length
+      ? '{{Commandes qui recevront les ordres : }}' + state.command_names.join(', ')
+      : '{{Aucune commande ne recevra d’ordre.}}'));
+    if (state.can_confirm) {
+      $wrap.append($('<p></p>').text('{{Cette entité sera publiée dans Home Assistant.}}'));
+    } else {
+      $wrap.append($('<p class="text-danger"></p>')
+        .text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
+    }
+    return $wrap;
+  }
+
+  // Story 20-2 (P2, relecture indépendante PR #210) : contenu DOM de la confirmation
+  // d'exclusion d'équipement — liste les entités (type + commandes) qui quitteraient Home
+  // Assistant, lues dans l'arbre déjà reçu (jamais recalculées ici). Noms de commande en
+  // texte libre Jeedom : toujours injectés via .text(), jamais en HTML brut.
+  // Story 20-2 (P2, relecture indépendante PR #210) : contenu DOM de l'aperçu de forçage
+  // d'ÉQUIPEMENT — une ligne par entité (`view.entities`, champ additif démon AC3), jamais
+  // seulement l'entité principale. Même garantie que buildForcePreviewContent : noms de
+  // commande en texte libre Jeedom, toujours injectés via .text().
+  function buildEquipmentForcePreviewContent(state) {
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Entités concernées par ce forçage : }}'));
+    var $ul = $('<ul></ul>');
+    state.items.forEach(function (item) {
+      $ul.append($('<li></li>').text(
+        (item.ha_entity_type || '{{Entité HA}}') + ' — ' + item.status_label
+        + ' (' + (item.command_names.length ? item.command_names.join(', ') : '{{aucune commande}}') + ')'
+      ));
+    });
+    $wrap.append($ul);
+    if (state.can_confirm) {
+      $wrap.append($('<p></p>').text('{{Au moins une entité sera publiée dans Home Assistant.}}'));
+    } else {
+      $wrap.append($('<p class="text-danger"></p>').text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
+    }
+    return $wrap;
+  }
+
+  function buildEquipmentExcludeContent(entities, commands) {
+    var leaving = M.entitiesLeavingHomeAssistant(entities, commands);
+    var $wrap = $('<div></div>');
+    $wrap.append($('<p></p>').text('{{Exclure cet équipement de Home Assistant ?}}'));
+    if (leaving.length) {
+      $wrap.append($('<p></p>').text('{{Entités qui quitteront Home Assistant : }}'));
+      var $ul = $('<ul></ul>');
+      leaving.forEach(function (entity) {
+        $ul.append($('<li></li>').text((entity.ha_entity_type || '{{Entité HA}}') + ' — ' + entity.command_names.join(', ')));
+      });
+      $wrap.append($ul);
+    }
+    return $wrap;
+  }
+
+  function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot, entities) {
+    var cmdId = equipment ? null : target.override_command_id;
+    function save() { publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot); }
+    function release() { restoreButtons($buttons); }
+    if (policy === 'exclude') {
+      // Story 20-2 (P2, relecture indépendante PR #210) : à la portée équipement, une
+      // entité secondaire publiée doit elle aussi déclencher la confirmation (AC5) —
+      // `shouldConfirmPublication` ne regardait que l'entité principale.
+      var confirmNeeded = equipment
+        ? M.shouldConfirmEquipmentExclude(target.decision || target, entities)
+        : M.shouldConfirmPublication(policy, target.decision || target);
+      if (!confirmNeeded) {
+        save();
+        return;
+      }
+      disableButtons($buttons);
+      var excludeContent = equipment
+        ? buildEquipmentExcludeContent(entities, commands)
+        : '{{Exclure cette entité de Home Assistant ?}}';
+      confirmPublicationDialog(excludeContent, save, release);
+      return;
+    }
+    // AC3 : l'aperçu vient du démon et précède toute écriture de forçage.
+    disableButtons($buttons);
+    clearRequestError($errorSlot);
+    // Revue ClaudeBox X4 point 1 : ne jamais envoyer `cmdId` à la portée équipement — jQuery
+    // sérialise sinon `null` en `cmdId=` (chaîne vide), que le relais PHP devait auparavant
+    // retomber à 0 (d'où le rejet démon 400 systématique sur un forçage d'équipement).
+    var previewData = { action: 'previewMappingOverride', eqId: eqId, publicationPolicy: 'force_publish' };
+    if (cmdId !== null) previewData.cmdId = cmdId;
+    $.ajax({ type: 'POST', url: AJAX_URL, data: previewData, dataType: 'json' })
+      .done(function (data) {
+        // Story 20-2 (P2, revue ClaudeBox X4 point 6) : le relais PHP lit le corps de la
+        // réponse démon quel que soit son code HTTP (400/404/409 inclus) — une requête
+        // d'aperçu refusée arrive donc ici en `.done()`, jamais en `.fail()`. Sans cette
+        // vérification, `readPreviewOverridden` renvoyait null et masquait la vraie cause
+        // démon derrière un message générique, sans jamais griser/restaurer les boutons.
+        var requestError = M.readPublicationRequestError(data);
+        if (requestError) {
+          release();
+          showRequestError($errorSlot, requestError);
+          return;
+        }
+        var payload = data && data.result ? data.result : data;
+        var view = M.readPreviewOverridden(payload);
+        // Relecture indépendante PR #210 (point 3) : à la portée équipement, le forçage vaut
+        // pour TOUTES les entités du mapping (`view.entities`, champ additif démon AC3) —
+        // `forcePreviewState`/`buildForcePreviewContent` ne couvrent que l'entité principale.
+        // Reprise X5d (P3) : `entities` (dernier paramètre de requestPublication, l'arbre déjà
+        // reçu) permet à equipmentForcePreviewState de distinguer une entité déjà publiée
+        // (aucun changement dû à CE forçage) d'une entité qui le deviendrait réellement.
+        var state = equipment ? M.equipmentForcePreviewState(view, commands, entities) : M.forcePreviewState(view, commands);
+        var content = equipment ? buildEquipmentForcePreviewContent(state) : buildForcePreviewContent(state);
+        var dialogOptions = state.can_confirm ? null
+          : { disableConfirm: state.refusal_reason || '{{Le forçage serait refusé dans l’état actuel.}}' };
+        confirmPublicationDialog(content, save, release, dialogOptions);
+      })
+      .fail(function () {
+        release();
+        showRequestError($errorSlot, '{{Aperçu indisponible — le démon ne répond pas.}}');
+      });
+  }
+
+  function applyEquipment(eqId, $button, $errorSlot) {
+    $button.prop('disabled', true);
+    clearRequestError($errorSlot);
+    $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
+      portee: 'equipement', selection: JSON.stringify([eqId]) }, dataType: 'json' })
+      .always(function () { $button.prop('disabled', false); })
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) { showRequestError($errorSlot, error); return; }
+        reloadEquipment(eqId);
+      })
+      .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
   // --- Synthèse de publication par équipement (Bloc C) ---
@@ -289,6 +561,59 @@
       .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
   }
 
+  // Renvoie le slot d'erreur créé, pour que l'appelant (ex. le bouton « Appliquer »
+  // équipement) puisse y afficher ses propres erreurs dans le même emplacement visuel.
+  // `entities` (Story 20-2, P2, relecture indépendante PR #210) : l'arbre complet des
+  // entités, utilisé uniquement à la portée équipement pour la confirmation d'exclusion
+  // (AC5) — ignoré à la portée entité.
+  function appendPublicationActions($host, eqId, target, equipment, commands, entities) {
+    var state = M.publicationActionState(target, equipment);
+    var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
+    var $error = $('<div class="j2ha-publication-error text-danger" style="display:none;margin-top:4px;"></div>');
+    // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton grisé porte SA cause propre
+    // (déjà publiée, déjà forcée, projection invalide, type hors périmètre, pas de mapping,
+    // pas de commande clé) — plus de tooltip générique partagé entre boutons.
+    function button(label, policy, enabled, reason) {
+      var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
+      if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
+      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error, entities); });
+      $group.append($button);
+    }
+    button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
+    button('{{Forcer}}', 'force_publish', state.can_force, state.force_reason);
+    var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>').text('{{Revenir au mode automatique}}');
+    if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
+    $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button'), $error); });
+    $group.append($revert);
+    $host.append($group);
+    $host.append($error);
+    return $error;
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : badge « pas encore appliqué » par entité,
+  // miroir du badge équipement (renderSyncBadge) mais lu sur `entity.override_pending`.
+  function appendEntityPendingBadge($row, entity) {
+    if (!M.shouldShowEntityPendingBadge(entity)) {
+      return;
+    }
+    $row.append($('<span class="label label-warning" style="margin-left:6px;"></span>')
+      .append($('<i class="fas fa-clock"></i> '))
+      .append(document.createTextNode('{{pas encore appliqué}}')));
+  }
+
+  function renderEntities($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-entities').first().empty();
+    for (var i = 0; i < tree.entities.length; i++) {
+      var entity = tree.entities[i];
+      var $row = $('<div class="j2ha-entity-row"></div>');
+      $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
+      $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity, tree.commands)));
+      appendEntityPendingBadge($row, entity);
+      appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
+      $host.append($row);
+    }
+  }
+
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
 
   function renderEquipmentTree($panel, tree) {
@@ -298,28 +623,40 @@
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
 
     renderSyncBadge($panel, normalized);
+    renderEntities($panel, normalized);
+
+    // Story 20-2 (P2, revue ClaudeBox X4 point 3) : l'exclusion d'équipement est un VETO
+    // testé en premier par le démon (`resolve_publication_override`, overrides.py l.566-568)
+    // — toute entité dont `publication_override` vaut 'exclude_eqlogic' le doit à CET
+    // équipement, jamais à elle-même. Lecture pure de l'arbre déjà reçu, aucun recalcul.
+    var eqExcluded = normalized.entities.some(function (entity) {
+      return entity.publication_override === 'exclude_eqlogic';
+    });
+    var hasTypeOverride = normalized.commands.some(function (cmd) { return cmd.override_applied; });
+    var hasEntityPublicationOverride = normalized.entities.some(function (entity) {
+      return entity.publication_override !== null;
+    });
+
+    // Fusion des deux boutons « Revenir au mode automatique » de l'équipement (le lien CC-19
+    // historique, affiché sur un override de type, et celui des actions de publication) :
+    // un seul bouton, actif s'il existe un override de type OU de publication. Il appelle
+    // `revertPublicationOverride` sans `cmdId` — cette route purge déjà les deux catégories
+    // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
+    var $equipmentError = appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
+      publication_override: eqExcluded ? 'exclude_eqlogic' : null,
+      has_publication_override: hasEntityPublicationOverride || hasTypeOverride }, true, normalized.commands,
+      normalized.entities);
+    if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
+      var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
+      $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
+      $actions.append($apply);
+    }
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
         .text('{{Aucune commande à configurer pour cet équipement.}}'));
       renderSummary($panel, normalized);
       return;
-    }
-
-    var hasOverride = false;
-    for (var k = 0; k < normalized.commands.length; k++) {
-      if (normalized.commands[k].override_applied) {
-        hasOverride = true;
-        break;
-      }
-    }
-    if (hasOverride) {
-      var $revertEq = $('<a class="mo-revert-eq cursor btn btn-default btn-xs"><i class="fas fa-undo"></i> ' +
-        '{{Revenir au mode automatique (tout l’équipement)}}</a>');
-      $revertEq.on('click', function () {
-        revertEquipment(eqId);
-      });
-      $actions.append($revertEq);
     }
 
     var $table = $('<table class="table table-condensed j2ha-cmd-table"></table>');
@@ -407,6 +744,7 @@
       $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
+      $body.append($('<div class="j2ha-eq-entities" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-cmdlist panel-group" role="tablist" aria-multiselectable="true" style="max-height:calc(100vh - 320px); overflow-y:auto;"></div>'));
       $collapse.append($body);
       $panel.append($collapse);

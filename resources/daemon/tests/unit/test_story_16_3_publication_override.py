@@ -29,13 +29,16 @@ import os
 from mapping.overrides import (
     list_equipment_overrides,
     list_overrides,
+    remove_equipment_override_fields,
+    remove_override_fields,
     remove_equipment_override,
     resolve_publication_override,
     save_equipment_override,
     save_override,
 )
+from models.evaluate_equipment import _resolve_publication_override_for_mapping
 from models.decide_publication import decide_publication
-from models.mapping import LightCapabilities, MappingResult, ProjectionValidity
+from models.mapping import LightCapabilities, MappingResult, ProjectionValidity, SwitchCapabilities
 import transport.http_server as http_server
 
 
@@ -123,6 +126,28 @@ def test_remove_equipment_override_retourne_false_si_absente(tmp_path):
     assert remove_equipment_override(999, str(tmp_path)) is False
 
 
+def test_story_20_2_remove_command_field_keeps_the_other_override(tmp_path):
+    data_dir = str(tmp_path)
+    save_override(701, 702, {"ha_entity_type": "switch"}, data_dir)
+    save_override(701, 702, {"publication_override": "exclude"}, data_dir)
+
+    assert remove_override_fields(701, 702, ("ha_entity_type",), data_dir)
+    assert list_overrides(data_dir)["701:702"]["publication_override"] == "exclude"
+    assert remove_override_fields(701, 702, ("publication_override",), data_dir)
+    assert "701:702" not in list_overrides(data_dir)
+
+
+def test_story_20_2_remove_equipment_field_keeps_the_other_override(tmp_path):
+    data_dir = str(tmp_path)
+    save_equipment_override(701, {"ha_entity_type": "switch"}, data_dir)
+    save_equipment_override(701, {"publication_override": "exclude"}, data_dir)
+
+    assert remove_equipment_override_fields(701, ("ha_entity_type",), data_dir)
+    assert list_equipment_overrides(data_dir)["701"]["publication_override"] == "exclude"
+    assert remove_equipment_override_fields(701, ("publication_override",), data_dir)
+    assert "701" not in list_equipment_overrides(data_dir)
+
+
 def test_equipment_overrides_et_overrides_sont_des_sections_separees(tmp_path):
     """SCP 2026-07-07 : pas de mélange de clés — `overrides` reste `eq_id:cmd_id`."""
     data_dir = str(tmp_path)
@@ -199,6 +224,31 @@ def test_resolve_publication_override_force_publish_equipement_par_defaut():
     assert resolve_publication_override(553, 9999, {}, equipment_overrides) == "force_publish"
 
 
+def test_mapping_exclusion_wins_over_force_independent_of_command_order():
+    """20-2: a multi-command entity never depends on its command iteration order."""
+    mapping = MappingResult(
+        ha_entity_type="switch", confidence="ambiguous", reason_code="test",
+        jeedom_eq_id=553, ha_unique_id="test", ha_name="test", commands={},
+        capabilities=SwitchCapabilities(),
+    )
+    mapping.reason_details = {"cmd_id": 10}
+    # A second command is represented by a minimal command-like object.
+    mapping.commands = {"ENERGY_ON": type("Cmd", (), {"id": 11})()}
+    overrides = {
+        "553:10": {"publication_override": "force_publish"},
+        "553:11": {"publication_override": "exclude"},
+    }
+    assert _resolve_publication_override_for_mapping(mapping, overrides, {}) == "exclude_command"
+
+
+def test_save_override_merges_type_and_publication_fields(tmp_path):
+    save_override(553, 5138, {"ha_entity_type": "switch"}, str(tmp_path))
+    save_override(553, 5138, {"publication_override": "exclude"}, str(tmp_path))
+    assert list_overrides(str(tmp_path))["553:5138"] == {
+        "ha_entity_type": "switch", "publication_override": "exclude", "source": "user"
+    }
+
+
 def test_resolve_publication_override_precedence_exclusion_equipement_bat_force_publish_commande():
     """Précédence tranchée par le SCP : veto exclusion-équipement (1) > override-commande (2)."""
     overrides = {"553:5138": {"publication_override": "force_publish"}}
@@ -268,6 +318,31 @@ def test_decide_publication_force_publish_debloque_un_probable_sous_sure_only():
     assert result.reason_details["override_source"] == "user"
 
 
+def test_force_ambiguous_valid_is_published_with_forced_reason():
+    result = decide_publication(
+        _make_mapping(confidence="ambiguous"), publication_override="force_publish"
+    )
+    assert (result.should_publish, result.reason) == (True, "publication_forced")
+
+
+def test_force_ambiguous_keeps_projection_and_scope_refusals():
+    invalid = decide_publication(_make_mapping(
+        confidence="ambiguous", projection_validity=_invalid_pv("ha_missing_command_topic"),
+    ), publication_override="force_publish")
+    out_of_scope = decide_publication(
+        _make_mapping(confidence="ambiguous"), product_scope=[], publication_override="force_publish",
+    )
+    assert (invalid.should_publish, invalid.reason) == (False, "ha_missing_command_topic")
+    assert (out_of_scope.should_publish, out_of_scope.reason) == (False, "ha_component_not_in_product_scope")
+
+
+def test_force_no_mapping_refused_and_exclusion_beats_force():
+    no_mapping = decide_publication(_make_mapping(confidence="no_mapping"), publication_override="force_publish")
+    excluded = decide_publication(_make_mapping(confidence="ambiguous"), publication_override="exclude_command")
+    assert (no_mapping.should_publish, no_mapping.reason) == (False, "no_mapping")
+    assert (excluded.should_publish, excluded.reason) == (False, "publication_excluded_command")
+
+
 def test_decide_publication_absence_override_comportement_identique_existant():
     """Non-régression : `publication_override=None` (défaut) = comportement natif inchangé."""
     mapping = _make_mapping(confidence="sure")
@@ -296,9 +371,8 @@ def test_i2_force_publish_ne_bypass_jamais_une_projection_invalide():
     assert result.reason == "ha_missing_state_topic"  # cause amont (étape 3) préservée, I4
 
 
-def test_i2_exclude_eqlogic_evalue_apres_projection_invalide_i4():
-    """I4 : une projection invalide (étape 3) reste la cause retenue — l'exclusion utilisateur
-    (étape 4) ne doit jamais masquer un échec amont."""
+def test_i4_exclude_eqlogic_evalue_avant_projection_invalide():
+    """20-2 : l'exclusion utilisateur est visible même si la projection est invalide."""
     mapping = _make_mapping(
         confidence="sure", projection_validity=_invalid_pv("ha_component_unknown")
     )
@@ -306,7 +380,7 @@ def test_i2_exclude_eqlogic_evalue_apres_projection_invalide_i4():
     result = decide_publication(mapping, publication_override="exclude_eqlogic")
 
     assert result.should_publish is False
-    assert result.reason == "ha_component_unknown"
+    assert result.reason == "publication_excluded_eqlogic"
 
 
 def test_force_publish_ne_bypass_pas_le_niveau_3_product_scope():

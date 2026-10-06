@@ -186,19 +186,6 @@ class CoverMapper:
                 "[MAPPING] eq_id=%d name='%s': name contains non-cover keyword '%s' → ambiguous",
                 eq.id, eq.name, matched_kw,
             )
-            capabilities = CoverCapabilities()
-            return MappingResult(
-                ha_entity_type="cover",
-                confidence="ambiguous",
-                reason_code="name_heuristic_rejection",
-                jeedom_eq_id=eq.id,
-                ha_unique_id=f"jeedom2ha_eq_{eq.id}",
-                ha_name=eq.name,
-                suggested_area=snapshot.get_suggested_area(eq.id),
-                commands=flap_cmds,
-                capabilities=capabilities,
-                reason_details={"matched_keyword": matched_kw},
-            )
 
         # Phase 1: Detect Open/Close capability
         has_open_close, oc_confidence, oc_reason = self._detect_open_close(flap_cmds)
@@ -229,7 +216,10 @@ class CoverMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=flap_cmds,
                 capabilities=capabilities,
-                reason_details={"available_types": list(flap_cmds.keys())},
+                reason_details={
+                    "available_types": list(flap_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Build capabilities
@@ -267,12 +257,18 @@ class CoverMapper:
             parts.append("bso")
         reason_code = "cover_" + "_".join(parts) if parts else "cover_unknown"
 
+        if matched_kw:
+            global_confidence = "ambiguous"
+            reason_code = "name_heuristic_rejection"
+
         # Build reason details
         reason_details = {}
         if oc_reason:
             reason_details["open_close"] = oc_reason
         if pos_reason:
             reason_details["position"] = pos_reason
+        if matched_kw:
+            reason_details["matched_keyword"] = matched_kw
         # Enrich with dedup metadata (Story 2.6) — last event wins if multiple
         if _dedup_events:
             reason_details.update(_dedup_events[-1])

@@ -284,7 +284,8 @@ def save_override(jeedom_eq_id: int, jeedom_cmd_id: int, override: dict, data_di
             f"fichier d'overrides existant invalide ou schema_version non supportée"
         )
 
-    entry = dict(override)
+    entry = dict(raw["overrides"].get(_override_key(jeedom_eq_id, jeedom_cmd_id)) or {})
+    entry.update(dict(override))
     entry.setdefault("source", "user")
     raw["overrides"][_override_key(jeedom_eq_id, jeedom_cmd_id)] = entry
     raw["schema_version"] = _SCHEMA_VERSION  # migration transparente v1 → v2 au premier write
@@ -327,7 +328,8 @@ def save_equipment_override(jeedom_eq_id: int, override: dict, data_dir: str) ->
             f"fichier d'overrides existant invalide ou schema_version non supportée"
         )
 
-    entry = dict(override)
+    entry = dict(raw["equipment_overrides"].get(str(jeedom_eq_id)) or {})
+    entry.update(dict(override))
     entry.setdefault("source", "user")
     raw["equipment_overrides"][str(jeedom_eq_id)] = entry
     raw["schema_version"] = _SCHEMA_VERSION  # migration transparente v1 → v2 au premier write
@@ -465,6 +467,34 @@ def remove_override(jeedom_eq_id: int, jeedom_cmd_id: int, data_dir: str) -> boo
     return True
 
 
+def _remove_entry_fields(raw: Dict, section: str, key: str, fields: tuple, data_dir: str) -> bool:
+    """Remove selected semantic fields and delete an entry only once it is empty."""
+    entry = raw[section].get(key)
+    if not entry:
+        return False
+    changed = any(field in entry for field in fields)
+    for field in fields:
+        entry.pop(field, None)
+    if not changed:
+        return False
+    if not any(field in entry for field in ("ha_entity_type", "publication_override")):
+        del raw[section][key]
+    raw["schema_version"] = _SCHEMA_VERSION
+    if not os.path.isdir(data_dir):
+        return True
+    try:
+        _write_raw_atomically(_overrides_path(data_dir), raw)
+    except OSError as exc:
+        _LOGGER.error("[OVERRIDES] Échec sauvegarde après retrait partiel : %s", exc)
+    return True
+
+
+def remove_override_fields(jeedom_eq_id: int, jeedom_cmd_id: int, fields: tuple, data_dir: str) -> bool:
+    """Remove only requested fields from a command override (Story 20.2 AC5)."""
+    raw = _load_raw(data_dir)
+    return bool(raw and _remove_entry_fields(raw, "overrides", _override_key(jeedom_eq_id, jeedom_cmd_id), fields, data_dir))
+
+
 def remove_equipment_override(jeedom_eq_id: int, data_dir: str) -> bool:
     """Remove a single equipment-level override entry if present (Story 16.3).
 
@@ -496,6 +526,12 @@ def remove_equipment_override(jeedom_eq_id: int, data_dir: str) -> bool:
     return True
 
 
+def remove_equipment_override_fields(jeedom_eq_id: int, fields: tuple, data_dir: str) -> bool:
+    """Remove only requested fields from an equipment override (Story 20.2 AC5)."""
+    raw = _load_raw(data_dir)
+    return bool(raw and _remove_entry_fields(raw, "equipment_overrides", str(jeedom_eq_id), fields, data_dir))
+
+
 def resolve_publication_override(
     jeedom_eq_id: int,
     jeedom_cmd_id: int,
@@ -523,8 +559,9 @@ def resolve_publication_override(
     disambiguated into `"exclude_eqlogic"` / `"exclude_command"` so the caller (`decide_publication`)
     can select the correct dedicated `reason` (`publication_excluded_eqlogic` vs.
     `publication_excluded_command`, Task 4) without re-inspecting the override dicts itself.
-    `"force_publish"` is returned as-is (equipment-level only, no command-level `force_publish`
-    per the precedence rule above).
+    `"force_publish"` is returned as-is at either scope. The mapping-level resolver
+    scans every command and gives any exclusion priority over a force, independently of
+    command order.
     """
     equipment_entry = equipment_overrides.get(str(jeedom_eq_id))
     if equipment_entry and equipment_entry.get("publication_override") == "exclude":

@@ -76,9 +76,255 @@
       jeedom_eq_id: p.jeedom_eq_id != null ? p.jeedom_eq_id : null,
       eq_name: typeof p.eq_name === 'string' ? p.eq_name : '',
       mapped: p.mapped === true,
+      equipment_decision: p.equipment_decision || null,
+      entities: (Array.isArray(p.entities) ? p.entities : []).map(function (entity) {
+        var e = entity || {};
+        return {
+          ha_entity_type: typeof e.ha_entity_type === 'string' ? e.ha_entity_type : null,
+          command_ids: Array.isArray(e.command_ids) ? e.command_ids.slice() : [],
+          decision: e.decision || null,
+          // Story 20-2 (P1, relecture ClaudeBox) : le démon résout un override de publication
+          // en 'exclude_eqlogic', 'exclude_command' ou 'force_publish' (jamais le littéral
+          // 'exclude' — celui-ci n'existe que côté action demandée par l'utilisateur). Garder
+          // les 3 valeurs réelles ici : les aplatir vers 'exclude'/'force_publish' faisait
+          // disparaître toute exclusion à la lecture (publicationActionState la voyait comme
+          // absente), rendant « Exclure » actif et « Revenir au mode automatique » grisé sur
+          // une entité pourtant déjà exclue.
+          publication_override: e.publication_override === 'exclude_eqlogic'
+            || e.publication_override === 'exclude_command'
+            || e.publication_override === 'force_publish'
+            ? e.publication_override : null,
+          reason_details: e.reason_details && typeof e.reason_details === 'object' ? e.reason_details : {},
+          override_command_id: Number.isInteger(e.override_command_id) ? e.override_command_id : null,
+          override_pending: e.override_pending === true,
+        };
+      }),
       // Ordre natif préservé strictement (AC3 : pas de tri/regroupement front).
       commands: commands.map(normalizeCommandRow),
       sync_status: normalizeSyncStatus(p.sync_status),
+    };
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox) : résout les identifiants de commande en noms
+  // lus dans `commands[]` (ordre natif GET arbre), sans aucun appel réseau supplémentaire.
+  // Identifiant introuvable (commande hors arbre courant) : fallback `#id`, jamais vide.
+  function resolveCommandNames(commands, commandIds) {
+    var cmds = Array.isArray(commands) ? commands : [];
+    var ids = Array.isArray(commandIds) ? commandIds : [];
+    return ids.map(function (id) {
+      for (var i = 0; i < cmds.length; i++) {
+        if (cmds[i] && cmds[i].jeedom_cmd_id === id && typeof cmds[i].cmd_name === 'string' && cmds[i].cmd_name) {
+          return cmds[i].cmd_name;
+        }
+      }
+      return '#' + id;
+    });
+  }
+
+  // Story 20-2 : données d'action lues telles quelles dans l'arbre, sans inférence sur
+  // les commandes ni recalcul de décision côté client. `commands` (arbre GET) est
+  // optionnel : sans lui, fallback sur les identifiants bruts (rétro-compat).
+  function entityCommandsLabel(entity, commands) {
+    var ids = entity && Array.isArray(entity.command_ids) ? entity.command_ids : [];
+    if (!ids.length) {
+      return 'Aucune commande regroupée';
+    }
+    return 'Commandes : ' + resolveCommandNames(commands, ids).join(', ');
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton porte sa propre cause de
+  // désactivation (pas une cause générique partagée), lue uniquement dans l'arbre déjà
+  // reçu — aucune décision n'est recalculée côté client.
+  function publicationActionState(target, equipment) {
+    var t = target || {};
+    var decision = t.decision || t;
+    var hasKey = equipment === true || Number.isInteger(t.override_command_id);
+    var policy = t.publication_override || null;
+    // Story 20-2 (P1) : les deux valeurs d'exclusion résolues par le démon désignent toutes
+    // deux une entité déjà exclue, qu'elle le soit via l'équipement ou via sa commande.
+    var excluded = policy === 'exclude_eqlogic' || policy === 'exclude_command';
+    var forced = policy === 'force_publish';
+    if (!hasKey) {
+      var noKeyReason = 'Aucune commande clé propre à cette entité.';
+      return {
+        can_exclude: false, can_force: false, can_revert: false,
+        exclude_reason: noKeyReason, force_reason: noKeyReason, revert_reason: noKeyReason,
+        reason: noKeyReason,
+      };
+    }
+    // Story 20-2 (P2, revue ClaudeBox X4 point 4) : une entité qui hérite du veto
+    // d'équipement ('exclude_eqlogic' sur une cible entité, pas la cible équipement elle-même)
+    // n'a NI « Forcer » NI « Revenir au mode automatique » qui aient un sens à sa propre
+    // portée — l'override vit sur l'équipement, pas sur cette commande. Les deux boutons
+    // renvoient vers l'équipement plutôt que de tenter une action sans effet ou trompeuse.
+    var inheritedEqExclusion = !equipment && policy === 'exclude_eqlogic';
+    var pv = decision.projection_validity || {};
+    var excludeReason = excluded ? 'Entité déjà exclue de Home Assistant.' : null;
+    if (inheritedEqExclusion) {
+      var inheritedReason = 'Exclusion posée sur l’équipement : la retirer depuis l’équipement.';
+      return {
+        can_exclude: false, can_force: false, can_revert: false,
+        exclude_reason: excludeReason, force_reason: inheritedReason, revert_reason: inheritedReason,
+        reason: excludeReason || inheritedReason,
+      };
+    }
+    var forceReason = null;
+    if (forced) {
+      forceReason = 'Publication déjà forcée sur cette entité.';
+    } else if (decision.should_publish === true) {
+      forceReason = 'Déjà publiée : forcer n’a pas d’effet.';
+    } else if (!decision.ha_entity_type) {
+      forceReason = 'Aucun mapping trouvé pour cette entité.';
+    } else if (HA_ENTITY_TYPE_OPTIONS.indexOf(decision.ha_entity_type) === -1) {
+      forceReason = 'Type HA hors périmètre de ce plugin.';
+    } else if (pv.is_valid === false) {
+      forceReason = 'Projection invalide pour ce type HA.';
+    }
+    var revertReason = (policy === null && t.has_publication_override !== true)
+      ? 'Aucun override de publication à retirer.' : null;
+    return {
+      can_exclude: !excluded,
+      can_force: forceReason === null,
+      can_revert: revertReason === null,
+      exclude_reason: excludeReason,
+      force_reason: forceReason,
+      revert_reason: revertReason,
+      // Rétro-compat : première cause non nulle, pour les appelants n'ayant pas encore
+      // adopté les champs par bouton.
+      reason: excludeReason || forceReason || revertReason,
+    };
+  }
+
+  function shouldConfirmPublication(policy, decision) {
+    return policy === 'exclude' && decision && decision.should_publish === true;
+  }
+
+  // Story 20-2 (P2, relecture indépendante PR #210) : `shouldConfirmPublication` ne regarde
+  // que la décision de l'équipement (entité principale) — un équipement dont l'entité
+  // principale est non publiée mais dont une entité secondaire l'est (ex. capteurs de
+  // conso) s'excluait donc sans confirmation. À la portée équipement, confirmer dès que
+  // l'équipement OU au moins une entité (principale ou secondaire, `entities[]` de l'arbre
+  // déjà reçu) est publiée.
+  function shouldConfirmEquipmentExclude(equipmentDecision, entities) {
+    if (equipmentDecision && equipmentDecision.should_publish === true) {
+      return true;
+    }
+    return (Array.isArray(entities) ? entities : []).some(function (entity) {
+      return entity && entity.decision && entity.decision.should_publish === true;
+    });
+  }
+
+  // Liste des entités (principale et secondaires) qui quitteraient Home Assistant si
+  // l'exclusion d'équipement était confirmée — pour l'affichage dans la modale (AC5).
+  // Lecture pure de l'arbre déjà reçu, aucune décision recalculée ici.
+  function entitiesLeavingHomeAssistant(entities, commands) {
+    return (Array.isArray(entities) ? entities : [])
+      .filter(function (entity) {
+        return entity && entity.decision && entity.decision.should_publish === true;
+      })
+      .map(function (entity) {
+        return {
+          ha_entity_type: entity.ha_entity_type,
+          command_names: resolveCommandNames(commands, entity.command_ids),
+        };
+      });
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox AC3) : contenu de l'aperçu de forçage, lu
+  // strictement dans la réponse du démon (`previewMappingOverride`) — type, validité de
+  // projection, et commandes qui recevront les ordres (`view.command_ids`, uniquement
+  // peuplé par le démon quand `proposed_policy === 'force_publish'`). Si le forçage serait
+  // refusé (projection invalide ou publication toujours non déclenchée), `can_confirm` est
+  // faux et `refusal_reason` porte la cause lisible — à l'appelant de désactiver la
+  // confirmation en conséquence.
+  function forcePreviewState(view, commands) {
+    var d = readDiagnosticView(view);
+    var ids = (view && Array.isArray(view.command_ids)) ? view.command_ids : [];
+    var commandNames = resolveCommandNames(commands, ids);
+    if (d === null) {
+      return {
+        ha_entity_type: null, is_valid: false, will_publish: false, command_names: commandNames,
+        can_confirm: false, refusal_reason: 'Aperçu indisponible — réponse du démon inattendue.',
+      };
+    }
+    var canConfirm = d.is_valid && d.should_publish;
+    return {
+      ha_entity_type: d.ha_entity_type,
+      is_valid: d.is_valid,
+      will_publish: d.should_publish,
+      command_names: commandNames,
+      can_confirm: canConfirm,
+      refusal_reason: canConfirm ? null : buildBlockingReason(view),
+    };
+  }
+
+  // Deux listes de command_ids désignent la même entité seulement si elles portent
+  // exactement le même ENSEMBLE d'identifiants (ordre indifférent) — un simple recoupement
+  // partiel (ex. une commande d'action partagée entre entité principale et secondaire)
+  // ne suffit pas et désignerait la mauvaise entité.
+  function sameCommandIdSet(idsA, idsB) {
+    if (idsA.length !== idsB.length) return false;
+    return idsA.every(function (id) { return idsB.indexOf(id) !== -1; });
+  }
+
+  // Trouve, dans l'arbre déjà reçu (jamais recalculé ici), l'entité courante correspondant
+  // à une entité de l'aperçu. Le démon rend les entités de l'arbre et de l'aperçu dans le
+  // même ordre (principale, puis secondaires) avec les mêmes command_ids par entité — on
+  // associe donc d'abord par ensemble de command_ids identique (robuste même si l'ordre
+  // diffère), puis, à défaut, par même position avec le même ha_entity_type (seul repère
+  // fiable quand deux entités partagent une commande d'action et n'ont donc pas de command_ids
+  // strictement égaux). Une entité qui ne correspond sur aucun des deux critères est traitée
+  // comme absente de l'arbre (non publiée), comme aujourd'hui.
+  function findCurrentEntity(currentEntities, commandIds, index, haEntityType) {
+    var ids = Array.isArray(commandIds) ? commandIds : [];
+    var pool = Array.isArray(currentEntities) ? currentEntities : [];
+    if (ids.length > 0) {
+      for (var i = 0; i < pool.length; i++) {
+        var currentIds = Array.isArray(pool[i].command_ids) ? pool[i].command_ids : [];
+        if (sameCommandIdSet(ids, currentIds)) {
+          return pool[i];
+        }
+      }
+    }
+    if (typeof index === 'number' && pool[index] && pool[index].ha_entity_type === haEntityType) {
+      return pool[index];
+    }
+    return null;
+  }
+
+  // Story 20-2 (P2, relecture indépendante PR #210 ; reprise X5d, P3) : à la portée
+  // équipement, le forçage s'étend à TOUTES les entités (`entities[]`, champ additif de
+  // l'aperçu démon). Une entité DÉJÀ publiée (lue dans `currentEntities`, l'arbre déjà
+  // reçu) et qui le resterait après forçage n'est pas un changement dû à CETTE action —
+  // « Confirmer » ne doit s'activer que si au moins une entité PASSE de non publiée à
+  // publiée. Chaque entité est donc classée « déjà publiée », « sera publiée » (ce
+  // changement) ou « ne sera pas publiée : cause » (buildPublishCellLabel, même libellé
+  // que la colonne diagnostic de l'arbre).
+  function equipmentForcePreviewEntities(view, commands, currentEntities) {
+    var entities = (view && Array.isArray(view.entities)) ? view.entities : [];
+    return entities.map(function (entity, index) {
+      var current = findCurrentEntity(currentEntities, entity.command_ids, index, entity.ha_entity_type);
+      var alreadyPublished = !!(current && current.decision && current.decision.should_publish === true);
+      var willPublish = isReadyDiagnostic(entity.decision);
+      return {
+        ha_entity_type: entity.ha_entity_type,
+        command_names: resolveCommandNames(commands, entity.command_ids),
+        already_published: alreadyPublished,
+        changes: !alreadyPublished && willPublish,
+        status_label: alreadyPublished ? 'Déjà publiée dans Home Assistant.'
+          : (willPublish ? 'Sera publiée dans Home Assistant.' : buildPublishCellLabel(entity.decision)),
+      };
+    });
+  }
+
+  function equipmentForcePreviewState(view, commands, currentEntities) {
+    var items = equipmentForcePreviewEntities(view, commands, currentEntities);
+    var canConfirm = items.some(function (item) { return item.changes; });
+    return {
+      items: items,
+      can_confirm: canConfirm,
+      refusal_reason: canConfirm
+        ? null : 'Aucune entité ne changerait d’état : déjà publiées ou toujours non publiées.',
     };
   }
 
@@ -86,6 +332,33 @@
   // (overrides actifs) diverge de la dernière décision synchronisée vers Home Assistant.
   function shouldShowOverridePendingBadge(tree) {
     return normalizeTree(tree).sync_status.override_pending === true;
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : badge « pas encore appliqué » par entité
+  // (miroir du badge équipement existant, porté par `sync_status`) — une entité dont
+  // l'override n'a pas encore été republié vers Home Assistant.
+  function shouldShowEntityPendingBadge(entity) {
+    return !!(entity && entity.override_pending === true);
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox) : lit une réponse AJAX `savePublicationOverride` /
+  // `revertPublicationOverride` / `previewMappingOverride` / `executeHaAction` et renvoie un
+  // message d'erreur lisible, ou `null` si la requête a réellement réussi. Le relais PHP
+  // (`jeedom2ha::callDaemon`) lit le corps de la réponse daemon quel que soit son code HTTP
+  // (y compris 409) : une erreur daemon (ex. commande partagée sans entité propre) remonte
+  // donc avec `data.state === 'ok'` mais `data.result.status === 'error'` — jamais comme un
+  // échec réseau jQuery. Ne JAMAIS recharger l'équipement sur ce chemin.
+  function readPublicationRequestError(data) {
+    if (!data || data.state !== 'ok') {
+      var top = data && typeof data.result === 'string' && data.result;
+      return top || 'La requête a échoué — réponse du serveur inattendue.';
+    }
+    var result = data.result;
+    if (result && typeof result === 'object' && result.status === 'error') {
+      return (typeof result.message === 'string' && result.message)
+        ? result.message : 'La requête a été refusée par le démon.';
+    }
+    return null;
   }
 
   // AC5 — état vide explicite : jamais un champ vide silencieux.
@@ -254,6 +527,9 @@
   // chercher un topic. Libellés courts alignés sur les messages produit du daemon.
   var REASON_LABELS = {
     ambiguous_skipped: 'mapping ambigu — précisez les types génériques dans Jeedom',
+    name_heuristic_rejection: 'un mot du nom de l’équipement écarte ce type',
+    duplicate_generic_types: 'types génériques en double',
+    switch_state_orphan: 'état sans ordre On/Off',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',
@@ -299,7 +575,12 @@
       return '';
     }
     // Priorité : cause de décision > cause de validité > symptôme brut.
-    var candidates = [d.publication_reason, d.reason_code, d.validity_reason_code];
+    // `ambiguous_skipped` est le résultat de publication générique ; la cause précise
+    // est portée par le mapping dans `reason_code` et doit donc passer avant lui.
+    var preciseAmbiguity = ['name_heuristic_rejection', 'duplicate_generic_types', 'switch_state_orphan'];
+    var candidates = d.publication_reason === 'ambiguous_skipped' && preciseAmbiguity.indexOf(d.reason_code) !== -1
+      ? [d.reason_code, d.publication_reason, d.validity_reason_code]
+      : [d.publication_reason, d.reason_code, d.validity_reason_code];
     for (var i = 0; i < candidates.length; i++) {
       var code = candidates[i];
       if (code && REASON_LABELS[code]) {
@@ -553,6 +834,14 @@
     getHaEntityTypeOptions: getHaEntityTypeOptions,
     normalizeCommandRow: normalizeCommandRow,
     normalizeTree: normalizeTree,
+    resolveCommandNames: resolveCommandNames,
+    entityCommandsLabel: entityCommandsLabel,
+    publicationActionState: publicationActionState,
+    shouldConfirmPublication: shouldConfirmPublication,
+    shouldConfirmEquipmentExclude: shouldConfirmEquipmentExclude,
+    entitiesLeavingHomeAssistant: entitiesLeavingHomeAssistant,
+    forcePreviewState: forcePreviewState,
+    equipmentForcePreviewState: equipmentForcePreviewState,
     buildEmptyStateLabel: buildEmptyStateLabel,
     readDiagnosticView: readDiagnosticView,
     readPreviewOverridden: readPreviewOverridden,
@@ -582,6 +871,8 @@
     buildPublicationSummaryLabel: buildPublicationSummaryLabel,
     publicationSummaryState: publicationSummaryState,
     shouldShowOverridePendingBadge: shouldShowOverridePendingBadge,
+    shouldShowEntityPendingBadge: shouldShowEntityPendingBadge,
+    readPublicationRequestError: readPublicationRequestError,
   };
 
   return api;

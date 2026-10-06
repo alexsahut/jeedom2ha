@@ -86,8 +86,8 @@
 |---|---|---|
 | I1 | Un eq inéligible (étape 1) sort du pipeline — aucun sous-bloc produit | `assert mapping_result.mapping is None and mapping_result.projection_validity is None and mapping_result.publication_decision_ref is None` pour tout eq exclu/désactivé |
 | I2 | Un eq avec `is_valid=False` a toujours `should_publish=False` | `for eq where projection_validity.is_valid == False: assert publication_decision.should_publish == False` |
-| I3 | Un eq avec `should_publish=True` a passé les 4 premières étapes positivement | `assert confidence in ("sure","probable","sure_mapping") and is_valid == True and ha_entity_type in PRODUCT_SCOPE` |
-| I4 | Cause décisionnelle = premier échec dans l'ordre pipeline (étapes 1-4) | Soumettre un eq avec mapping ambigu + composant hors scope → cause = `ambiguous_skipped` (étape 2), pas `ha_component_not_in_product_scope` (étape 4) |
+| I3 | Un eq avec `should_publish=True` a passé les 4 premières étapes positivement, ou est `ambiguous` avec forçage utilisateur | `assert (confidence in ("sure","probable","sure_mapping") or (confidence == "ambiguous" and publication_override == "force_publish")) and is_valid == True and ha_entity_type in PRODUCT_SCOPE` |
+| I4 | Cause décisionnelle = premier échec dans l'ordre pipeline, après le veto utilisateur | Soumettre un eq ambigu ou projection invalide avec exclusion → cause = `publication_excluded_*`; sans exclusion, le premier échec 1-4 reste la cause |
 | I5 | Tout eq éligible produit les 3 sous-blocs (traversée complète) | `for eq where eligible: assert mapping is not None and projection_validity is not None and publication_decision is not None` |
 | I6 | `reason_code` jamais absent dans `publication_decision` | `for all eligible eq: assert publication_decision.reason is not None` |
 | I7 | Cause décisionnelle et résultat technique sont indépendants | Soumettre un eq `should_publish=True` + broker down → cause décisionnelle = `sure` (étape 4 réussie), résultat technique = `discovery_publish_failed` (étape 5 échouée). Les deux coexistent dans le diagnostic. |

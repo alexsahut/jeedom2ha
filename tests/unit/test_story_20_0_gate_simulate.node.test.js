@@ -104,6 +104,26 @@ function realTreeResponse({ eqId = 1, commands = [commandRow()], syncStatus } = 
   };
 }
 
+function realEntityTreeResponse({ eqId = 1, entities } = {}) {
+  return {
+    state: 'ok',
+    result: {
+      status: 'ok',
+      payload: {
+        jeedom_eq_id: eqId,
+        eq_name: 'Salon',
+        mapped: true,
+        equipment_decision: { ha_entity_type: 'light', should_publish: true },
+        entities: entities || [
+          { ha_entity_type: 'light', command_ids: [21, 22], publication_override: null, override_command_id: 21 },
+          { ha_entity_type: 'switch', command_ids: [23], publication_override: null, override_command_id: 23 },
+        ],
+        sync_status: { synced_should_publish: true, current_should_publish: true, override_pending: false },
+      },
+    },
+  };
+}
+
 test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', async (t) => {
   const {
     createState,
@@ -116,6 +136,12 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     buildRevertResponse,
     hasActiveSimulation,
     deriveOverrideTree,
+    recordPublicationSave,
+    buildPublicationSaveResponse,
+    recordPublicationRevert,
+    buildPublicationRevertResponse,
+    hasActivePublicationSimulation,
+    derivePublicationOverrideTree,
   } = await loadSimulate();
 
   await t.test('changes simulé : datetime numérique et liste vide', () => {
@@ -355,5 +381,120 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     recordSave(state, { eqId: '1', cmdId: '99', type: 'switch' });
 
     assert.throws(() => deriveOverrideTree(state, '1', realTreeResponse()));
+  });
+
+  // --- Story 20-2 (point 7) : simulation des écritures de publication, visible à la relecture.
+
+  await t.test('exclusion équipement simulée : toutes les entités portent exclude_eqlogic', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'exclude' });
+    assert.equal(hasActivePublicationSimulation(state, '1'), true);
+
+    const real = realEntityTreeResponse();
+    const derived = derivePublicationOverrideTree(state, '1', real);
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_eqlogic');
+    assert.equal(derived.result.payload.entities[1].publication_override, 'exclude_eqlogic');
+    // equipment_decision/sync_status jamais recalculés (mêmes garde-fous que deriveOverrideTree).
+    assert.deepEqual(derived.result.payload.equipment_decision, real.result.payload.equipment_decision);
+
+    const saveResp = buildPublicationSaveResponse({ eqId: '1', cmdId: null, policy: 'exclude' });
+    assert.deepEqual(saveResp, {
+      state: 'ok',
+      result: { status: 'ok', payload: { jeedom_eq_id: 1, jeedom_cmd_id: null, publication_policy: 'exclude', override_applied: true } },
+    });
+  });
+
+  await t.test('forçage d\'une seule entité simulé : seule l\'entité ciblée change', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: '23', policy: 'force_publish' });
+
+    const real = realEntityTreeResponse();
+    const derived = derivePublicationOverrideTree(state, '1', real);
+    assert.equal(derived.result.payload.entities[0].publication_override, null);
+    assert.equal(derived.result.payload.entities[1].publication_override, 'force_publish');
+  });
+
+  await t.test('exclusion d\'une commande simulée : exclude_command, pas exclude_eqlogic', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: '21', policy: 'exclude' });
+
+    const derived = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_command');
+    assert.equal(derived.result.payload.entities[1].publication_override, null);
+  });
+
+  await t.test('retour d\'une entité, puis de l\'équipement entier', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: '21', policy: 'exclude' });
+    recordPublicationSave(state, { eqId: '1', cmdId: '23', policy: 'force_publish' });
+
+    const revertEntity = recordPublicationRevert(state, { eqId: '1', cmdId: '21' });
+    assert.deepEqual(revertEntity, { eqId: '1', cmdId: '21', scope: 'command', removed: true });
+    assert.equal(hasActivePublicationSimulation(state, '1'), true);
+
+    const afterEntityRevert = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(afterEntityRevert.result.payload.entities[0].publication_override, null);
+    assert.equal(afterEntityRevert.result.payload.entities[1].publication_override, 'force_publish');
+
+    const revertEquipment = recordPublicationRevert(state, { eqId: '1', cmdId: null });
+    assert.deepEqual(revertEquipment, { eqId: '1', cmdId: null, scope: 'equipment', removed: true });
+    assert.equal(hasActivePublicationSimulation(state, '1'), false);
+
+    const afterEqRevert = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.deepEqual(afterEqRevert, realEntityTreeResponse());
+
+    const revertResp = buildPublicationRevertResponse(revertEquipment);
+    assert.deepEqual(revertResp, {
+      state: 'ok',
+      result: { status: 'ok', payload: { jeedom_eq_id: 1, scope: 'equipment', removed: true } },
+    });
+  });
+
+  // Revue ClaudeBox X4 (point 8) : même ordre de précédence que le démon
+  // (resolve_publication_override, overrides.py l.540-581) — un veto d'équipement l'emporte
+  // TOUJOURS sur un override de commande, qui l'emporte à son tour sur un forçage
+  // d'équipement par défaut. L'ancien code appliquait l'override d'équipement (y compris un
+  // simple forçage) en premier et écrasait l'exclusion propre d'une commande.
+  await t.test('précédence : exclusion d\'équipement l\'emporte sur un forçage de commande', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: '23', policy: 'force_publish' });
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'exclude' });
+
+    const derived = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_eqlogic');
+    assert.equal(derived.result.payload.entities[1].publication_override, 'exclude_eqlogic');
+  });
+
+  await t.test('précédence : l\'exclusion propre d\'une commande l\'emporte sur le forçage d\'équipement par défaut', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'force_publish' });
+    recordPublicationSave(state, { eqId: '1', cmdId: '21', policy: 'exclude' });
+
+    const derived = derivePublicationOverrideTree(state, '1', realEntityTreeResponse());
+    assert.equal(derived.result.payload.entities[0].publication_override, 'exclude_command');
+    // Aucun override propre sur la seconde entité : le forçage d'équipement par défaut s'applique.
+    assert.equal(derived.result.payload.entities[1].publication_override, 'force_publish');
+  });
+
+  await t.test('aucune simulation de publication : réponse réelle inchangée', () => {
+    const state = createState();
+    const real = realEntityTreeResponse();
+    const realSnapshot = structuredClone(real);
+    assert.deepEqual(derivePublicationOverrideTree(state, '1', real), real);
+    assert.deepEqual(real, realSnapshot);
+    assert.equal(hasActivePublicationSimulation(state, '1'), false);
+
+    // Revert sur un équipement déjà vide : no-op explicite.
+    assert.deepEqual(
+      recordPublicationRevert(state, { eqId: '1', cmdId: null }),
+      { eqId: '1', cmdId: null, scope: 'equipment', removed: false },
+    );
+  });
+
+  await t.test('réponse sans entities[] : dérivation sans effet, pas d\'exception', () => {
+    const state = createState();
+    recordPublicationSave(state, { eqId: '1', cmdId: null, policy: 'exclude' });
+    const real = realTreeResponse();
+    assert.deepEqual(derivePublicationOverrideTree(state, '1', real), real);
   });
 });

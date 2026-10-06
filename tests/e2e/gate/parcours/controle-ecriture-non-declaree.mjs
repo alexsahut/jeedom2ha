@@ -4,6 +4,7 @@ export const name = 'controle-ecriture-non-declaree';
 export const declaredEquipments = {
   '579': { commands: ['5689', '5368', '5369', '5494', '5695', '5493'] },
 };
+export const declaredPublicationOverrides = {};
 export const declaredBascules = [];
 
 async function atStep(helpers, index, label, operation) {

@@ -14,7 +14,8 @@ Rôle :
 Invariants I1-I7 (portés de `decide_publication()`, Story 16.3) :
     I1 : équipement inéligible → décision refusée de niveau 1, sans mapping ni projection.
     I2 : projection invalide → jamais publié, même avec un override "force_publish".
-    I3 : should_publish=True ⇔ confidence publishable ET is_valid=True ET type dans PRODUCT_SCOPE.
+    I3 : should_publish=True ⇔ confiance publiable, ou `ambiguous` forcée par l'utilisateur,
+         ET projection valide ET type dans PRODUCT_SCOPE.
     I4 : le premier échec dans l'ordre 1→2→3→4 fait foi, jamais écrasé en aval.
     I5 : tout équipement éligible produit ses 3 sous-blocs (mapping → overrides → projection
          → décision) — jamais `None`, jamais une décision omise.
@@ -170,13 +171,16 @@ def _resolve_publication_override_for_mapping(
     """Résout l'override de publication effectif pour un mapping (mêmes règles que
     `transport/http_server.py:_resolve_publication_override_for_mapping`, répliquées ici en
     pur car ce module ne peut pas importer `transport/` — sens unique D8)."""
+    force_publish = None
     for cmd_id in mapping_cmd_ids(mapping) or [-1]:
         candidate = resolve_publication_override(
             mapping.jeedom_eq_id, cmd_id, overrides, equipment_overrides
         )
-        if candidate is not None:
+        if candidate in ("exclude_eqlogic", "exclude_command"):
             return candidate
-    return None
+        if candidate == "force_publish":
+            force_publish = candidate
+    return force_publish
 
 
 def _apply_type_override_with_proposed_priority(

@@ -16,9 +16,9 @@ Règle de cause canonique I4 :
     Une étape aval NE PEUT PAS écraser une cause amont.
 
     Ordre d'évaluation dans decide_publication() :
+      Niveau 0b — Override utilisateur d'exclusion (après éligibilité, avant 1/2) ?
       Niveau 1 — Cause étape 2 : mapping réussi ?
       Niveau 2 — Cause étape 3 : projection valide ?
-      Niveau 2b (Story 16.3) — Override utilisateur d'exclusion (AC1) ?
       Niveau 3 — Cause étape 4a : composant dans PRODUCT_SCOPE ?
       Niveau 4 — Cause étape 4b : confiance conforme à la politique (ou forçage override, AC2) ?
       Niveau 5 — Nominal : publication autorisée.
@@ -38,7 +38,8 @@ Story 16.3 — override de politique de publication (AC1/AC2) :
 
 Invariants critiques :
     I2 : is_valid=False → jamais publié (should_publish=False garanti, même avec un override)
-    I3 : should_publish=True → mapping publishable ET is_valid=True ET ha_entity_type in scope
+    I3 : should_publish=True → mapping publishable, ou `ambiguous` forcée par
+         l'utilisateur, ET is_valid=True ET ha_entity_type in scope
     I6 : reason toujours non-null et non-vide sur tous les chemins de retour
     I7 : aucune logique MQTT, broker, état de connexion, ni cache d'overrides dans ce module
 
@@ -91,8 +92,20 @@ def decide_publication(
     if product_scope is None:
         product_scope = PRODUCT_SCOPE
 
-    # Niveau 1 — Cause étape 2 : mapping réussi ?
-    if mapping.confidence not in _PUBLISHABLE_CONFIDENCES:
+    # Niveau 0b — L'exclusion explicite est un veto après l'éligibilité (gérée
+    # par l'appelant) mais avant les refus mapping/projection : elle reste visible.
+    if publication_override in ("exclude_eqlogic", "exclude_command"):
+        reason = (
+            "publication_excluded_eqlogic"
+            if publication_override == "exclude_eqlogic"
+            else "publication_excluded_command"
+        )
+        return PublicationDecision(should_publish=False, reason=reason,
+            reason_details={"publication_override_applied": True, "override_source": "user"})
+
+    # Niveau 1 — seul `ambiguous` peut être levé par un forçage explicite.
+    forced_ambiguous = publication_override == "force_publish" and mapping.confidence == "ambiguous"
+    if mapping.confidence not in _PUBLISHABLE_CONFIDENCES and not forced_ambiguous:
         reason = "ambiguous_skipped" if mapping.confidence == "ambiguous" else "no_mapping"
         return PublicationDecision(should_publish=False, reason=reason)
 
@@ -106,23 +119,6 @@ def decide_publication(
             else "skipped_no_mapping_candidate"
         )
         return PublicationDecision(should_publish=False, reason=reason)
-
-    # Niveau 2b (Story 16.3, AC1) — Override utilisateur d'exclusion explicite ?
-    # Évalué après I2 (projection valide obligatoire) mais avant les niveaux 3/4 natifs.
-    if publication_override in ("exclude_eqlogic", "exclude_command"):
-        reason = (
-            "publication_excluded_eqlogic"
-            if publication_override == "exclude_eqlogic"
-            else "publication_excluded_command"
-        )
-        return PublicationDecision(
-            should_publish=False,
-            reason=reason,
-            reason_details={
-                "publication_override_applied": True,
-                "override_source": "user",
-            },
-        )
 
     # Niveau 3 — Cause étape 4a : composant dans PRODUCT_SCOPE ? (force_publish ne bypass pas ce niveau)
     if mapping.ha_entity_type not in product_scope:

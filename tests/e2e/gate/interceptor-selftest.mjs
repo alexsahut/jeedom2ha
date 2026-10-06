@@ -20,6 +20,7 @@ const REDIRECT_PNG = '/redirect.png';
 const FORBIDDEN_ACTIONS = new Set([
   'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
   'saveMappingOverride', 'revertMappingOverride', 'login',
+  'savePublicationOverride', 'revertPublicationOverride',
 ]);
 
 /** CC-43 (reprise) : même ordre que le gate — neutraliser avant de couper le réseau. */
@@ -58,6 +59,9 @@ function mappingPayload() {
         effective_ha: 'light',
         override_applied: false,
       },
+    ],
+    entities: [
+      { ha_entity_type: 'light', command_ids: [2], publication_override: null, override_command_id: 2 },
     ],
   };
 }
@@ -116,6 +120,8 @@ function pageHtml(origin) {
     }
     await attempted(post('saveMappingOverride', { eqId: '9', cmdId: '2', haEntityType: 'switch' }));
     await attempted(post('revertMappingOverride', { eqId: '9', cmdId: '2' }));
+    await attempted(post('savePublicationOverride', { eqId: '9', publicationPolicy: 'exclude' }));
+    await attempted(post('revertPublicationOverride', { eqId: '9' }));
     await attempted(fetch(endpoint + '?action=scanTopology'));
     await xhr();
     navigator.sendBeacon(endpoint, form('executeHaAction'));
@@ -145,6 +151,9 @@ function pageHtml(origin) {
     const saved = await post('saveMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'switch' });
     const derived = await post('getMappingOverrides', { eqId: '1' });
     const reverted = await post('revertMappingOverride', { eqId: '1', cmdId: '2' });
+    const publicationSaved = await post('savePublicationOverride', { eqId: '1', publicationPolicy: 'exclude' });
+    const publicationDerived = await post('getMappingOverrides', { eqId: '1' });
+    const publicationReverted = await post('revertPublicationOverride', { eqId: '1' });
     const real = await post('getMappingOverrides', { eqId: '1' });
     const bascule = await post('previewMappingOverride', { eqId: '1', cmdId: '2', haEntityType: 'light' });
 
@@ -156,6 +165,9 @@ function pageHtml(origin) {
       saved,
       derived,
       reverted,
+      publicationSaved,
+      publicationDerived,
+      publicationReverted,
       real,
       bascule,
     };
@@ -269,6 +281,7 @@ async function main() {
       origin,
       loginAttempts: 0,
       declaredEquipments: { '1': { commands: ['2'] } },
+      declaredPublicationOverrides: { '1': { commands: [] } },
       lastPreviewType: simState.lastPreviewType,
     };
 
@@ -396,7 +409,7 @@ async function main() {
     report('aucune ecriture, effet de bord, connexion, core API ou WebSocket n atteint le serveur', !serverReceivedForbidden, failures);
     report('les lectures du flux ont atteint le serveur',
       requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'previewMappingOverride').length === 2
-        && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 2,
+        && requests.filter((request) => request.actions.length === 1 && request.actions[0] === 'getMappingOverrides').length === 3,
       failures);
     report('service worker : register retourne undefined', results.serviceWorkerRegistrationIsUndefined, failures);
     report('service worker : aucune inscription apres 500 ms', results.serviceWorkerRegistrationsCount === 0, failures);
@@ -426,7 +439,7 @@ async function main() {
       failures);
 
     const expectedFailures = [
-      ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride']
+      ...['scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection', 'saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride']
         .map((action) => ({ path: PLUGIN_AJAX, action, verdict: 'block-fail' })),
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
       { path: PLUGIN_AJAX, action: 'scanTopology', verdict: 'block-fail' },
@@ -465,6 +478,16 @@ async function main() {
     report('apercu de bascule declaree pret',
       results.bascule.result.payload.overridden.projection_validity.is_valid === true
         && results.bascule.result.payload.overridden.should_publish === true,
+      failures);
+    report('publication declaree : exclusion puis retrait simules',
+      results.publicationSaved?.result?.payload?.publication_policy === 'exclude'
+        && results.publicationReverted?.result?.payload?.scope === 'equipment'
+        && journal.entries.some((entry) => entry.action === 'savePublicationOverride' && entry.verdict === 'simulee')
+        && journal.entries.some((entry) => entry.action === 'revertPublicationOverride' && entry.verdict === 'simulee'),
+      failures);
+    report('publication simulee visible a la relecture, puis absente apres retrait',
+      results.publicationDerived?.result?.payload?.entities?.[0]?.publication_override === 'exclude_eqlogic'
+        && results.real?.result?.payload?.entities?.[0]?.publication_override === null,
       failures);
     report('reponses fulfill JSON lisibles malgre content-length reel',
       results.preview.state === 'ok'

@@ -226,6 +226,19 @@ async def test_revert_command_removes_override(cli, app, tmp_path):
     assert list_overrides(str(tmp_path)) == {}
 
 
+async def test_type_revert_keeps_publication_override(cli, app, tmp_path):
+    """AC10 : la route TYPE ne retire que le type, à la commande comme à l'équipement."""
+    from mapping.overrides import list_equipment_overrides, save_equipment_override, save_override
+    snapshot, _ = _light_snapshot()
+    app["topology"], app["data_dir"] = snapshot, str(tmp_path)
+    save_override(200, 2001, {"ha_entity_type": "switch", "publication_override": "exclude"}, str(tmp_path))
+    save_equipment_override(200, {"ha_entity_type": "light", "publication_override": "force_publish"}, str(tmp_path))
+    for payload in ({"jeedom_eq_id": 200, "jeedom_cmd_id": 2001}, {"jeedom_eq_id": 200}):
+        assert (await cli.post("/action/mapping_override_revert", headers=_headers(), json={"payload": payload})).status == 200
+    assert list_overrides(str(tmp_path))["200:2001"]["publication_override"] == "exclude"
+    assert list_equipment_overrides(str(tmp_path))["200"]["publication_override"] == "force_publish"
+
+
 async def test_revert_equipment_scope_when_no_cmd(cli, app, tmp_path):
     """AC10 — sans jeedom_cmd_id, le retour au mode auto porte sur l'équipement."""
     from mapping.overrides import save_equipment_override, list_equipment_overrides
@@ -235,7 +248,7 @@ async def test_revert_equipment_scope_when_no_cmd(cli, app, tmp_path):
     save_equipment_override(200, {"publication_override": "exclude"}, str(tmp_path))
 
     resp = await cli.post(
-        "/action/mapping_override_revert",
+        "/action/publication_override_revert",
         headers=_headers(),
         json={"payload": {"jeedom_eq_id": 200}},
     )

@@ -45,7 +45,16 @@ export function createState() {
     previews: Object.create(null),
     simulations: Object.create(null),
     lastPreviewType: Object.create(null),
+    publicationSimulations: Object.create(null),
   };
+}
+
+// Clé des simulations de publication (story 20-2, point 7) : une portée équipement
+// (cmdId absent, ex. "Exclure" dans la barre d'actions de l'équipement) partage l'espace
+// de clés avec les portées commande, sans jamais les confondre (suffixe "equipment" fixe,
+// jamais un id réel de commande).
+function publicationKey(eqId, cmdId) {
+  return `${eqId}:${cmdId || 'equipment'}`;
 }
 
 /** Construit la réponse AJAX vide du long-polling du cœur Jeedom, sans E/S. */
@@ -180,6 +189,106 @@ export function buildRevertResponse({ eqId, scope, removed, removedCommands }) {
 
 export function hasActiveSimulation(state, eqId) {
   return Object.values(state.simulations).some((sim) => sim.eqId === eqId);
+}
+
+// recordPublicationSave (story 20-2, point 7) : mémorise une politique de publication
+// simulée (exclude|force_publish), à la portée commande (cmdId fourni, cible une entité via
+// `override_command_id`) ou équipement (cmdId absent, s'applique à toutes les entités de
+// l'équipement). Jamais transmis au démon — comme pour les simulations de type.
+export function recordPublicationSave(state, { eqId, cmdId, policy }) {
+  const k = publicationKey(eqId, cmdId);
+  state.publicationSimulations[k] = { eqId, cmdId: cmdId || null, policy };
+}
+
+export function buildPublicationSaveResponse({ eqId, cmdId, policy }) {
+  return {
+    state: 'ok',
+    result: {
+      status: 'ok',
+      payload: {
+        jeedom_eq_id: Number(eqId),
+        jeedom_cmd_id: cmdId ? Number(cmdId) : null,
+        publication_policy: policy,
+        override_applied: true,
+      },
+    },
+  };
+}
+
+// recordPublicationRevert : retire la ou les simulations de publication ciblées, avec la
+// même sémantique de portée que recordRevert (cmdId absent => équipement entier).
+export function recordPublicationRevert(state, { eqId, cmdId }) {
+  if (cmdId) {
+    const k = publicationKey(eqId, cmdId);
+    const removed = hasOwnSafe(state.publicationSimulations, k);
+    if (removed) delete state.publicationSimulations[k];
+    return { eqId, cmdId, scope: 'command', removed };
+  }
+
+  let removed = false;
+  for (const k of Object.keys(state.publicationSimulations)) {
+    if (state.publicationSimulations[k].eqId === eqId) {
+      delete state.publicationSimulations[k];
+      removed = true;
+    }
+  }
+  return { eqId, cmdId: null, scope: 'equipment', removed };
+}
+
+export function buildPublicationRevertResponse({ eqId, scope, removed }) {
+  return {
+    state: 'ok',
+    result: {
+      status: 'ok',
+      payload: { jeedom_eq_id: Number(eqId), scope, removed },
+    },
+  };
+}
+
+export function hasActivePublicationSimulation(state, eqId) {
+  return Object.values(state.publicationSimulations).some((sim) => sim.eqId === eqId);
+}
+
+// derivePublicationOverrideTree (story 20-2, point 7) : copie profonde du dernier arbre réel
+// observé, transformée UNIQUEMENT sur `entities[].publication_override`, pour qu'une
+// exclusion/un forçage simulé reste visible à une relecture `getMappingOverrides` — sans
+// jamais toucher `equipment_decision`/`sync_status` (mêmes garde-fous que
+// deriveOverrideTree : ni devinette ni agrégation non prouvée par le moteur). Une simulation
+// à portée équipement (cmdId absent) s'applique à toutes les entités ; une simulation à
+// portée commande ne touche que l'entité dont `override_command_id` correspond.
+export function derivePublicationOverrideTree(state, eqId, realResponse) {
+  const copy = structuredClone(realResponse);
+  const payload = readPayload(copy.result);
+  if (!payload || !Array.isArray(payload.entities)) return copy;
+
+  const sims = Object.values(state.publicationSimulations).filter((sim) => sim.eqId === eqId);
+  if (sims.length === 0) return copy;
+
+  // Revue ClaudeBox X4 (point 8) : même ordre de précédence que le démon
+  // (resolve_publication_override, overrides.py l.540-581) — l'exclusion d'équipement est
+  // un VETO qui l'emporte sur tout override de commande ; seule l'absence d'exclusion
+  // d'équipement laisse l'override de commande s'appliquer ; seule l'absence des deux
+  // laisse le forçage d'équipement s'appliquer par défaut. L'ordre inverse (ancien code :
+  // tout override d'équipement, y compris un forçage, écrasait un override de commande)
+  // faisait simuler un forçage sur une entité pourtant exclue à sa propre commande.
+  const equipmentExclude = sims.find((sim) => !sim.cmdId && sim.policy === 'exclude');
+  const equipmentForce = sims.find((sim) => !sim.cmdId && sim.policy !== 'exclude');
+  for (const entity of payload.entities) {
+    if (equipmentExclude) {
+      entity.publication_override = 'exclude_eqlogic';
+      continue;
+    }
+    const commandSim = sims.find((candidate) => candidate.cmdId && String(candidate.cmdId) === String(entity.override_command_id));
+    if (commandSim) {
+      entity.publication_override = commandSim.policy === 'exclude' ? 'exclude_command' : 'force_publish';
+      continue;
+    }
+    if (equipmentForce) {
+      entity.publication_override = 'force_publish';
+    }
+  }
+
+  return copy;
 }
 
 // deriveOverrideTree (section 3 de la conception) : copie profonde du dernier arbre réel

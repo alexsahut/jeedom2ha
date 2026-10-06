@@ -1,6 +1,6 @@
 # Story 20.2 : Exclusion et forçage depuis la surface (CC-26)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -133,27 +133,27 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Relevés, lecture seule (AC: 2, 3, 4, 7, 11)**
-  - [ ] 0.1 Relire les 17 commandes ambiguës (F2) au SHA courant : pour les quatre équipements On/Off, confirmer les commandes On et Off ; pour 5369, le type qui validerait.
-  - [ ] 0.1b Relever les commandes partagées entre entités (principal et secondaires) sur les 8 équipements et sur l'eq 579 (AC1).
-  - [ ] 0.2 Confirmer ce que fait « Publier » par équipement sur une entité exclue (F8).
-  - [ ] 0.3 Lire la politique de confiance active ; relever les overrides de publication présents (nombre, portée, sans contenu) et ceux posés sur une entité ambiguë ou invalide (écarts attendus d'AC2).
-  - [ ] 0.4 Choisir un équipement non publié pour la preuve terrain.
-- [ ] **Task 1 — Décision et mapping (AC: 2, 3, 4, 10)**
-  - [ ] 1.1 Exclusion utilisateur avant les niveaux 1 et 2 ; amendement d'I4 (code, `pipeline-contract.md`, tests).
-  - [ ] 1.2 Selon Q1 : capacités calculées malgré l'heuristique de nom (switch, light, cover), commandes inchangées ; forçage qui lève le niveau 1 pour `ambiguous` seulement, niveaux 2 et 3 conservés ; amendement d'I3 (code, `pipeline-contract.md`, tests) ; aperçu du forçage.
-  - [ ] 1.3 Précédence dans une entité (exclusion avant forçage) ; docstring alignée.
-- [ ] **Task 2 — Persistance et routes (AC: 1, 3, 5, 6, 10)**
-  - [ ] 2.1 Fusion champ par champ des overrides de type et de publication.
-  - [ ] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
-  - [ ] 2.3 Purge par entité et par équipement (CC-19).
-- [ ] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
-  - [ ] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
-  - [ ] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
-  - [ ] 3.3 Libellés de l'ambiguïté par cause.
-- [ ] **Task 4 — Tests (AC: 1 à 10)** : Python (précédence, I2, I3 et I4 amendés, capacités, commandes inchangées, parité sans override, fusion, clé d'entité), PHP, Node (actions, libellés, absence de recalcul), non-régression TYPE.
+- [x] **Task 0 — Relevés, lecture seule (AC: 2, 3, 4, 7, 11)**
+  - [x] 0.1 Relire les 17 commandes ambiguës (F2) au SHA courant : pour les quatre équipements On/Off, confirmer les commandes On et Off ; pour 5369, le type qui validerait.
+  - [x] 0.1b Relever les commandes partagées entre entités (principal et secondaires) sur les 8 équipements et sur l'eq 579 (AC1).
+  - [x] 0.2 Confirmer ce que fait « Publier » par équipement sur une entité exclue (F8).
+  - [x] 0.3 Lire la politique de confiance active ; relever les overrides de publication présents (nombre, portée, sans contenu) et ceux posés sur une entité ambiguë ou invalide (écarts attendus d'AC2).
+  - [x] 0.4 Choisir un équipement non publié pour la preuve terrain.
+- [x] **Task 1 — Décision et mapping (AC: 2, 3, 4, 10)**
+  - [x] 1.1 Exclusion utilisateur avant les niveaux 1 et 2 ; amendement d'I4 (code, `pipeline-contract.md`, tests).
+  - [x] 1.2 Selon Q1 : capacités calculées malgré l'heuristique de nom (switch, light, cover), commandes inchangées ; forçage qui lève le niveau 1 pour `ambiguous` seulement, niveaux 2 et 3 conservés ; amendement d'I3 (code, `pipeline-contract.md`, tests) ; aperçu du forçage.
+  - [x] 1.3 Précédence dans une entité (exclusion avant forçage) ; docstring alignée.
+- [x] **Task 2 — Persistance et routes (AC: 1, 3, 5, 6, 10)**
+  - [x] 2.1 Fusion champ par champ des overrides de type et de publication.
+  - [x] 2.2 Routes démon dédiées (pose, retrait), sans détourner l'API TYPE ; actions AJAX PHP, validation stricte.
+  - [x] 2.3 Purge par entité et par équipement (CC-19).
+- [x] **Task 3 — Arbre et surface (AC: 1, 3, 6, 7, 8, 9)**
+- [x] 3.1 Arbre : décision d'équipement, override effectif par entité, `reason_details`, badge par entité.
+  - [x] 3.2 Actions selon Q2, confirmation, état pendant la requête ; badge et « Appliquer » selon Q3.
+  - [x] 3.3 Libellés de l'ambiguïté par cause.
+- [x] **Task 4 — Tests (AC: 1 à 10)** : Python (précédence, I2, I3 et I4 amendés, capacités, commandes inchangées, parité sans override, fusion, clé d'entité), PHP, Node (actions, libellés, absence de recalcul), non-régression TYPE.
 - [ ] **Task 5 — Gate et preuve (AC: 11)**
-  - [ ] 5.1 Gate : nouvelles écritures autorisées comme écritures simulées déclarées (F12), auto-test local, parcours de pose et de retrait d'une exclusion.
+  - [x] 5.1 Gate : nouvelles écritures autorisées comme écritures simulées déclarées (F12), auto-test local, parcours de pose et de retrait d'une exclusion.
   - [ ] 5.2 Après fusion : déploiement standard, relevés avant et après (parité : `changed_decisions` vide hors écarts listés en 0.3), gate sur `main`.
   - [ ] 5.3 Preuve terrain au clic réel (AC11), passage Chrome par ClaudeBox, `ready-for-UX-validation`, validation UX.
 
@@ -205,6 +205,64 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 
 ### Agent Model Used
 
+GPT-5 Codex
+
 ### Completion Notes List
 
+- 2026-10-05 — Task 0 relevée en lecture seule; Task 1 : veto d'exclusion précoce, forçage `ambiguous` validé, capacités conservées sous heuristique et précédence exclusion > forçage. Tests ciblés : 149 passés.
+- 2026-10-05 — Task 2 : fusion des deux champs d'override, routes de publication dédiées avec validation d'ID et refus des commandes partagées; purge CC-19 réutilisée. Tests Python ciblés : 28 passés; Node : 424 passés; flake8 et PHP lint OK.
+- 2026-10-05 — Reprise X2c : routes publication couvertes; arbre enrichi sans recalcul UI par `equipment_decision` et `entities[]` (`ha_entity_type`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`). Une commande partagée ne devient jamais clé d'action.
+- 2026-10-06 — Reprise X2d : garde-fou de parité amendé pour les ajouts additifs AC8; badge AC7 par entité. La dernière décision appliquée du principal vient de `app["publications"][eq_id]`; celle d'un secondaire vient de la `publication_decision_ref` du secondaire du mapping conservé dans cette même entrée (alimentée par sync et « Publier »). `entities[]` porte `ha_entity_type`, `decision`, `publication_override`, `reason_details`, `override_command_id`, `override_pending`; l'aperçu de forçage porte `command_ids`.
+- 2026-10-06 — Reprise X2d : tests AC3 (`ambiguous` forcée, projection/scope/no_mapping/exclusion), aperçu, routes 409 et retrait TYPE ajoutés; statut story conservé `in-progress` (surface, gate et preuve hors unité).
+- 2026-10-06 — Reprise X3b : l'arbre ajoute `entities[].command_ids`; la surface lit les entités, leurs commandes, leurs décisions et leur clé d'override depuis le démon. Actions exclusion/forçage/retour, aperçu forcé, badge et application ciblée sont couverts par tests Node; le retour de publication retire type et politique.
+- 2026-10-06 — Reprise X3b : le gate simule exclusivement les écritures de publication explicitement déclarées; les écritures non déclarées et « Appliquer » restent bloquées. Auto-test local PASS; 5.2 et 5.3 restent post-fusion et terrain.
+- 2026-10-06 — Correction d'attribution (Reprise X4) : les commits `93329f5` à `18e2ce6` (points 1-6, 02:36-02:51) listés ci-dessous comme « travail de X3b » sont en réalité de X3c ; X3b s'est arrêtée bloquée à 01:57 (voir rapport, section « Unité X3 bloquée »).
+- 2026-10-06 — Reprise X3c (modèle `claude-sonnet-5`) : 9 points de revue ClaudeBox sur X3b traités, un commit par point. Points 1-6 : exclusions du démon conservées à la lecture, modale Bootbox à la place de `window.confirm`, aperçu riche du forçage (AC3), cause de blocage propre à chaque bouton, libellés d'entités avec vrais noms de commande, badge par entité et erreurs lisibles (AC7). Points 7-9 (gate) : les overrides de publication simulés deviennent visibles à une relecture `getMappingOverrides` (`simulate.mjs`, `interceptor.mjs`, auto-test étendu) ; `declaredPublicationOverrides` devient optionnel dans un parcours (`isValidParcours` extrait et testé) ; test de non-régression prouvant que le sélecteur de type (route TYPE, 16-8) reste actif quel que soit l'override de publication posé. Vérification finale au SHA `cad3a02` : 442 tests Node (`tests/unit/*.node.test.js`), 2048 tests Python (`pytest -m "not load"`), auto-test gate local PASS ; aucun fichier Python/PHP touché par les points 7-9. Écart assumé : les comportements DOM/Bootbox propres à `jeedom2ha_mapping_surface.js` (confirmation, bouton Appliquer, retrait au clic) restent non couverts par un test automatisé faute de harnais DOM dans ce dépôt — vérifiés par lecture de code et par les parcours gate existants, à confirmer en preuve terrain (5.2/5.3).
+
+- 2026-10-06 — Reprise X4 (modèle `claude-sonnet-5`) : 8 points de revue ClaudeBox sur X3c traités, un commit par point, tests avant chaque commit. Points 1-2 déjà faits en amont de ce segment visible. Point 3 : exclusion d'équipement lue depuis l'arbre, deux boutons « Revenir au mode automatique » fusionnés en un (`49b8f60`). Point 4 : `publicationActionState` grise Forcer/Revenir pour une entité héritant du veto d'équipement, avec l'info-bulle dédiée (`e56471c`). Point 5 : capture/restauration exacte de l'état des boutons par `disableButtons`/`restoreButtons` (`.data()`), filet `hidden.bs.modal` sur `confirmPublicationDialog` (`d8ba4f0`). Point 6 : `requestPublication` route l'erreur d'aperçu via `readPublicationRequestError` avant toute lecture `readPreviewOverridden` (`8807542`). Point 7 : harnais `node:vm` dédiés (dialogue de confirmation, état des boutons) dans un nouveau fichier de test, modelés sur `loadConfirmationHarness` de la PR #209 (`876d607`). Point 8 : `derivePublicationOverrideTree` du gate suit l'ordre de précédence du démon — exclusion d'équipement, puis override de commande, puis forçage d'équipement par défaut (`e4c6468`). Fusion de `origin/main` (story 20-4, PR #209) : trois conflits résolus en gardant les deux côtés comme convenu (`interceptor.mjs`, `policy.mjs`, `run-gate.mjs`) — commit `b4fafd9`. Vérification finale à `b4fafd9` : 465 tests Node, 2057 tests Python (8 déselectionnés), auto-test gate local PASS, test PHP de relais 8/8. Statut conservé `review`.
+
+- 2026-10-06 — Reprise X5 (modèle `claude-sonnet-5`) : relecture indépendante de la PR #210, 5 points traités, tests avant chaque commit. Point 1 : le lien ↺ de ligne (`.mo-revert-cmd`) appelait `revertPublication` (retrait complet de publication de l'entité) au lieu de `revertCommand` (retrait du seul override de TYPE, route 16-8, AC5) — corrigé, nouveau harnais `node:vm` dédié à ce lien et au reste du comportement de confirmation (`tests/unit/test_story_20_2_p1_p2_comportement_surface.node.test.js`). Point 2 : `shouldConfirmPublication` ne regardait que l'entité principale pour l'exclusion d'équipement — une entité secondaire déjà publiée (ex. capteur de conso) s'excluait donc sans confirmation (AC5 non respecté) ; ajout de `shouldConfirmEquipmentExclude`/`entitiesLeavingHomeAssistant` (override.js) et de la modale dédiée listant les entités qui quitteraient Home Assistant (surface.js). Point 3 (backend) : l'aperçu de forçage à la portée équipement n'exposait que l'entité principale (`over_target`) — ajout du champ additif `entities[]` dans `_handle_overrides_preview`, même vue que l'arbre (`_decision_view`), consommé par `equipmentForcePreviewState`/`buildEquipmentForcePreviewContent` pour que la modale liste chaque entité touchée par le forçage. Point 5 (backend) : `_handle_mapping_override_revert` (portée commande) sur un équipement devenu inéligible (`evaluation.mapping is None`) construisait `mappings = [None]` puis plantait sur `mapping_cmd_ids(None)` (500) au lieu du 409 « Commande sans entité » attendu (CC-19) — parenthèse de garde corrigée. Nouveaux tests ciblés : `resources/daemon/tests/unit/test_story_20_2_relecture_independante_pr210.py` (3 cas, preview portée équipement/entité, revert 409). Parcours gate `exclusion-publication-non-publiee.mjs` élargi pour couvrir l'absence de confirmation sur équipement non publié puis le retrait (déjà en place, vérifié toujours valide avec ces changements). Vérification finale : 470 tests Node (`tests/unit/*.node.test.js`), 1442 tests Python (`pytest`, 8 déselectionnés). Statut conservé `review`.
+
+- 2026-10-06 — Reprise X5b (session détachée, non visible dans ce journal avant X5c) : a produit les commits `5aa1b16` (démon : `entities[]` dans l'aperçu équipement, 409 sur revert d'équipement inéligible, points 3 et 5 ci-dessus) et `0c9131b` (interface : lien ↺ de ligne sur `revertCommand`, confirmation d'exclusion d'équipement dès qu'une entité secondaire est publiée, points 1/2/4) sans les pousser, et sans écrire le rapport ni lancer la suite Python complète (1442/2060 tests). Ces deux commits sont ceux repris ci-dessus par X5c.
+- 2026-10-06 — Reprise X5c (modèle `claude-sonnet-5`, session détachée sans mémoire) : pousse immédiatement les 3 commits locaux laissés par X5b (`5aa1b16`, `0c9131b`, `faaf4a3`). Inventaire des 6 points de la relecture indépendante PR #210 : points 1, 2, 4, 5 entièrement faits par X5b (vérifiés par lecture de code et des tests existants) ; point 3 **en partie fait seulement** — le démon renvoyait bien `entities[]` (commit `5aa1b16`), mais `equipmentForcePreviewState`/`buildEquipmentForcePreviewContent` (override.js/surface.js) n'étaient jamais appelés : `requestPublication` utilisait toujours `forcePreviewState` (entité principale seule) même à la portée équipement, donc la modale de forçage d'équipement ne listait toujours qu'une entité — corrigé (commit `5879d2b`) en branchant les deux fonctions sur `equipment === true`. Point 6 **non fait** (aucun harnais `$.ajax`/`bootbox.dialog` ne couvrait Forcer, ni `applyEquipment`) : 6 nouveaux tests ajoutés dans `test_story_20_2_p1_p2_comportement_surface.node.test.js` (même commit `5879d2b`) — Forcer aux deux portées (paramètres AJAX, aperçu accepté/refusé/erreur démon 409/`.fail` réseau, clic Confirmer déclenchant la pose réelle), et `applyEquipment` (succès avec rechargement, erreur démon sans rechargement). Le test « portée équipement » a d'abord échoué contre le code non corrigé, prouvant le bug avant le fix. Puis fusion de `origin/main` (CC-43, PR #211, déjà fusionnée) : un seul conflit, dans `tests/e2e/gate/interceptor-selftest.mjs`, résolu en gardant `FORBIDDEN_ACTIONS` remontée en tête de fichier par `main` et en y ajoutant `savePublicationOverride`/`revertPublicationOverride` qu'une duplication locale du set portait (commit de fusion `5c67bcd`) ; `run-gate.mjs` et `test_story_20_0_gate_runner.node.test.js` ont fusionné sans conflit. Vérification finale à `5c67bcd` : 478 tests Node (`tests/unit/*.node.test.js`), 2060 tests Python (`pytest -m "not load"`, 8 déselectionnés), test PHP de relais 8/8, auto-test gate local **10/10 PASS (0 échec)**. Statut conservé `review`. Aucun déploiement, sync, « Publier » ni appel box/Jeedom/démon/HA effectué.
+- 2026-10-06 — Reprise X5d (modèle `claude-sonnet-5`, session détachée sans mémoire, à partir de `6458d7c`) : relecture indépendante de la PR #210, un dernier point 2 et deux points P3 traités, un commit par point, poussés immédiatement. Point 1 (`b19412d`) : le parcours gate `exclusion-publication-non-publiee.mjs` lisait l'état de l'interface (nombre d'entités, boutons, absence de modale) avant que la relecture asynchrone `getMappingOverrides` déclenchée par le dépliage/rechargement n'ait eu lieu — course contre la vraie page. Remplacé par une attente de la première ligne d'entité (bornée, 10s) puis par `waitForJournal` (séquence ordonnée écriture puis relecture dérivée/plate) et `waitForActionButtonState` (`page.waitForFunction` scopé par `data-eq-id`) avant toute assertion sur les boutons ou l'absence du bouton « Confirmer ». Point 2 (`0f6b158`) : le lien ↺ de ligne (`renderCommandRow` → `revertCommand`) devenait inerte après un échec — `.off('click')` sans jamais être réattaché, et aucun gestionnaire d'erreur sur la requête. Remplacé par `.one('click', ...)` réarmé par une fonction `attachRevertHandler` rappelée en cas d'échec (démon ou réseau), affichage de la cause via un nouveau slot `.mo-revert-error` (réutilise `readPublicationRequestError`), aucun rechargement en cas d'échec. Nouveau harnais `node:vm` dédié (`test_story_20_2_p3_revert_cmd_inerte.node.test.js`) chargeant l'extrait réel du fichier pour cliquer le vrai lien généré par `renderCommandRow` (jamais `revertCommand` appelé directement) — 3 tests : succès, erreur démon avec réessai réussi, erreur réseau. Point 3 (`9782632`) : à la portée équipement, l'aperçu de forçage (`equipmentForcePreviewState`) activait « Confirmer » dès qu'une entité était éligible dans l'aperçu démon, sans jamais comparer à son état déjà publié dans l'arbre reçu — une entité déjà publiée qui le resterait n'est pas un changement dû à CE forçage. Ajout de `findCurrentEntity` (appariement par `command_ids` partagés) ; chaque entité est désormais classée « déjà publiée », « sera publiée » (transition réelle) ou « ne sera pas publiée : cause » ; `can_confirm` n'est vrai que si au moins une entité transite de non publiée à publiée, sinon `refusal_reason` l'indique explicitement. 4 nouveaux tests dans `test_story_20_2_publication_surface.node.test.js` (déjà publiée sans changement, transition réelle, mix sans transition, entité absente de l'arbre courant traitée comme non publiée). Vérification finale à `9782632` : 485 tests Node (`tests/unit/*.node.test.js`), 2060 tests Python (`pytest -m "not load"`, 8 déselectionnés), test PHP de relais 8/8, auto-test gate local **5×5 PASS (0 échec)**. Statut conservé `review`. Aucun déploiement, sync, « Publier » ni appel box/Jeedom/démon/HA effectué.
+- 2026-10-06 — Reprise X5e (modèle `claude-sonnet-5`, session détachée sans mémoire, à partir de `3edde11`) : dernier point P3 de la PR #210 puis fusion de `main`. Point P3 (`1743e91`) : `findCurrentEntity` (override.js) associait une entité de l'aperçu de forçage équipement à la PREMIÈRE entité de l'arbre partageant AU MOINS UNE commande — une entité secondaire partageant une commande d'action avec la principale (même ensemble non strictement égal) pouvait donc être lue sur l'état publié de la principale (« sera publiée » affiché à tort, ou « Confirmer » grisé à tort). Appariement réécrit en deux temps : d'abord par ensemble complet de `command_ids` identique (`sameCommandIdSet`, ordre indifférent), puis à défaut par même position + même `ha_entity_type` (le démon rend arbre et aperçu dans le même ordre, principale puis secondaires) ; aucune correspondance sur ces deux critères → entité traitée comme absente de l'arbre (non publiée), comme avant. Nouveau test dans `test_story_20_2_publication_surface.node.test.js` avec une commande d'action partagée entre deux entités de types différents, prouvant l'absence de confusion. Fusion de `origin/main` (`4714216`, PR #212 déjà fusionnée dans `main`) : aucun conflit (la branche ne touche pas `rescan-page-principale.mjs`), aucun marqueur `<<<<<<<`/`>>>>>>>` résiduel. Vérification finale à `4714216` : 486 tests Node (`tests/unit/*.node.test.js`), 2060 tests Python (`pytest -m "not load"`, 8 déselectionnés, `220.35s`), test PHP de relais 8/8, auto-test gate local **5×5 PASS (0 échec)**. Statut conservé `review`. Aucun déploiement, sync, « Publier » ni appel box/Jeedom/démon/HA effectué.
+
 ### File List
+
+- tests/unit/test_story_20_2_publication_surface_ui.node.test.js
+- tests/unit/test_story_20_2_php_relay.php
+- resources/daemon/models/decide_publication.py
+- resources/daemon/models/evaluate_equipment.py
+- resources/daemon/mapping/switch.py
+- resources/daemon/mapping/light.py
+- resources/daemon/mapping/cover.py
+- resources/daemon/mapping/overrides.py
+- resources/daemon/tests/unit/test_story_16_3_publication_override.py
+- _bmad-output/planning-artifacts/pipeline-contract.md
+- resources/daemon/transport/http_server.py
+- core/ajax/jeedom2ha.ajax.php
+- resources/daemon/tests/unit/test_story_20_2_publication_routes.py
+- resources/daemon/tests/unit/test_story_19_3_p2_shared_command_priority.py
+- resources/daemon/tests/unit/test_story_19_3_ac6_sync_status.py
+- resources/daemon/tests/unit/test_story_19_3_guardrail_no_override_json_parity.py
+- resources/daemon/tests/unit/test_story_16_5_mapping_override_ui_endpoints.py
+- resources/daemon/tests/unit/test_story_16_6_preview_dry_run.py
+- desktop/js/jeedom2ha_mapping_override.js
+- desktop/js/jeedom2ha_mapping_surface.js
+- tests/unit/test_story_20_2_publication_surface.node.test.js
+- tests/e2e/gate/lib/policy.mjs
+- tests/e2e/gate/lib/interceptor.mjs
+- tests/e2e/gate/lib/simulate.mjs
+- tests/e2e/gate/interceptor-selftest.mjs
+- tests/e2e/gate/run-gate.mjs
+- tests/e2e/gate/parcours/decouverte-garage-enphase.mjs
+- tests/e2e/gate/parcours/reference-bascule-enphase.mjs
+- tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs
+- tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs
+- tests/unit/test_story_20_0_gate_policy.node.test.js
+- tests/unit/test_story_20_0_gate_runner.node.test.js
+- tests/unit/test_story_20_2_p1_p2_comportement_surface.node.test.js
+- resources/daemon/tests/unit/test_story_20_2_relecture_independante_pr210.py
+- tests/unit/test_story_20_0_gate_simulate.node.test.js
+- tests/unit/test_story_20_2_p3_revert_cmd_inerte.node.test.js

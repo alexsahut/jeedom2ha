@@ -3909,7 +3909,7 @@
           },
           "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
           "confidence": "Ambigu",
           "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
           "detected_generic_types": [
@@ -3925,7 +3925,7 @@
           "name": "Volet conflit switch 4002",
           "object_name": "Chambre",
           "perimetre": "inclus",
-          "pipeline_step_visible": 3,
+          "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
           "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
           "status": "Ambigu",
@@ -3955,14 +3955,10 @@
               }
             ],
             "projection_validity": {
-              "is_valid": false,
-              "missing_capabilities": [
-                "has_command"
-              ],
-              "missing_fields": [
-                "command_topic"
-              ],
-              "reason_code": "ha_missing_command_topic"
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
             },
             "publication_trace": {
               "last_discovery_publish_result": "not_attempted",
@@ -10206,7 +10202,7 @@
           },
           "cause_action": "Pr\u00e9ciser les types g\u00e9n\u00e9riques sur les commandes dans Jeedom pour lever l'ambigu\u00eft\u00e9",
           "cause_code": "ambiguous_skipped",
-          "cause_label": "Projection HA structurellement incompl\u00e8te \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
+          "cause_label": "Arbitrage de publication non automatique \u2014 ambigu\u00eft\u00e9 de mapping non r\u00e9solue",
           "confidence": "Ambigu",
           "detail": "Plusieurs types d'entit\u00e9s Home Assistant sont possibles pour cet \u00e9quipement. Le plugin ne publie pas en cas d'ambigu\u00eft\u00e9.",
           "detected_generic_types": [
@@ -10222,7 +10218,7 @@
           "name": "Volet conflit switch 4002",
           "object_name": "Chambre",
           "perimetre": "inclus",
-          "pipeline_step_visible": 3,
+          "pipeline_step_visible": 4,
           "reason_code": "ambiguous_skipped",
           "remediation": "Pr\u00e9cisez les types g\u00e9n\u00e9riques sur les commandes pour lever l'ambigu\u00eft\u00e9 et permettre une publication fiable.",
           "status": "Ambigu",
@@ -10252,14 +10248,10 @@
               }
             ],
             "projection_validity": {
-              "is_valid": false,
-              "missing_capabilities": [
-                "has_command"
-              ],
-              "missing_fields": [
-                "command_topic"
-              ],
-              "reason_code": "ha_missing_command_topic"
+              "is_valid": true,
+              "missing_capabilities": [],
+              "missing_fields": [],
+              "reason_code": null
             },
             "publication_trace": {
               "last_discovery_publish_result": "not_attempted",
@@ -14666,9 +14658,9 @@
       "4002": {
         "capabilities": {
           "device_class": null,
-          "has_on_off": false,
-          "has_state": false,
-          "on_off_confidence": "unknown"
+          "has_on_off": true,
+          "has_state": true,
+          "on_off_confidence": "sure"
         },
         "commands": {
           "ENERGY_OFF": {
@@ -14697,14 +14689,10 @@
         "jeedom_eq_id": 4002,
         "pipeline_step_reached": 5,
         "projection_validity": {
-          "is_valid": false,
-          "missing_capabilities": [
-            "has_command"
-          ],
-          "missing_fields": [
-            "command_topic"
-          ],
-          "reason_code": "ha_missing_command_topic"
+          "is_valid": true,
+          "missing_capabilities": [],
+          "missing_fields": [],
+          "reason_code": null
         },
         "publication_decision_ref": {
           "active_or_alive": false,
@@ -14725,6 +14713,7 @@
         },
         "reason_code": "name_heuristic_rejection",
         "reason_details": {
+          "device_class_source": "virtual",
           "matched_keyword": "volet"
         },
         "suggested_area": "Chambre"

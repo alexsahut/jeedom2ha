@@ -13,9 +13,15 @@ import {
   buildRevertResponse,
   buildSaveResponse,
   buildEmptyChangesResponse,
+  buildPublicationRevertResponse,
+  buildPublicationSaveResponse,
   deriveOverrideTree,
+  derivePublicationOverrideTree,
   hasActiveSimulation,
+  hasActivePublicationSimulation,
   recordPreview,
+  recordPublicationRevert,
+  recordPublicationSave,
   recordRevert,
   recordSave,
   simulatePreviewBascule,
@@ -235,10 +241,17 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           return;
         }
 
-        if (decision.action === 'getMappingOverrides' && hasActiveSimulation(simState, params.eqId)) {
+        if (
+          decision.action === 'getMappingOverrides'
+          && (hasActiveSimulation(simState, params.eqId) || hasActivePublicationSimulation(simState, params.eqId))
+        ) {
           const response = await fetchRead(route, journal, req, decision);
           if (!response) return;
-          const served = deriveOverrideTree(simState, params.eqId, await response.json());
+          let served = await response.json();
+          if (hasActiveSimulation(simState, params.eqId)) served = deriveOverrideTree(simState, params.eqId, served);
+          if (hasActivePublicationSimulation(simState, params.eqId)) {
+            served = derivePublicationOverrideTree(simState, params.eqId, served);
+          }
           await fulfillJson(route, response, served);
           appendEntry(journal, { ...req, ...decision, verdict: 'lecture-derivee' });
           return;
@@ -278,6 +291,12 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         let response;
         if (decision.action === 'scanTopology') {
           response = buildRescanResponse();
+        } else if (decision.action === 'savePublicationOverride') {
+          recordPublicationSave(simState, { eqId: params.eqId, cmdId: params.cmdId, policy: params.publicationPolicy });
+          response = buildPublicationSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, policy: params.publicationPolicy });
+        } else if (decision.action === 'revertPublicationOverride') {
+          const revert = recordPublicationRevert(simState, { eqId: params.eqId, cmdId: params.cmdId });
+          response = buildPublicationRevertResponse(revert);
         } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });

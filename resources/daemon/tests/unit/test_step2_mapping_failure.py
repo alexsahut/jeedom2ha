@@ -33,6 +33,48 @@ def _make_eq(id: int, name: str, cmds: list) -> JeedomEqLogic:
     return JeedomEqLogic(id=id, name=name, cmds=cmds)
 
 
+def test_story_20_2_name_rejection_keeps_capabilities_commands_and_policy():
+    """AC4: le doute de nom conserve les capacités et ne change pas la décision."""
+    cases = (
+        (SwitchMapper(), "_NON_SWITCH_KEYWORDS", "ENERGY", ("has_on_off", "has_state")),
+        (LightMapper(), "_NON_LIGHT_KEYWORDS", "LIGHT", ("has_on_off",)),
+        (CoverMapper(), "_NON_COVER_KEYWORDS", "FLAP", ("has_open_close",)),
+    )
+    for mapper, keywords_name, family, capability_names in cases:
+        keyword = next(iter(getattr(__import__(mapper.__module__, fromlist=[keywords_name]), keywords_name)))
+        cmds = [
+            _cmd(1, "cmd-1", f"{family}_ON" if family != "FLAP" else "FLAP_UP"),
+            _cmd(2, "cmd-2", f"{family}_OFF" if family != "FLAP" else "FLAP_DOWN"),
+            _cmd(3, "cmd-3", f"{family}_STATE", type_="info", sub_type="binary"),
+        ]
+        result = mapper.map(_make_eq(901, f"test {keyword}", cmds), _make_snapshot())
+        assert result.confidence == "ambiguous"
+        assert result.reason_code == "name_heuristic_rejection"
+        assert result.reason_details["matched_keyword"] == keyword
+        assert set(result.commands) == {cmd.generic_type for cmd in cmds}
+        assert all(getattr(result.capabilities, name) for name in capability_names)
+        decision = mapper.decide_publication(result)
+        assert (decision.should_publish, decision.reason) == (False, "ambiguous_skipped")
+
+
+def test_story_20_2_intermediate_rejections_keep_matched_keyword():
+    """AC4: les chemins intermédiaires gardent leur cause et le mot détecté."""
+    cases = (
+        (SwitchMapper(), "_NON_SWITCH_KEYWORDS", "ENERGY_STATE", "switch_state_orphan"),
+        (LightMapper(), "_NON_LIGHT_KEYWORDS", "LIGHT_STATE", "state_orphan"),
+        (CoverMapper(), "_NON_COVER_KEYWORDS", "FLAP_STATE", "state_orphan"),
+        (LightMapper(), "_NON_LIGHT_KEYWORDS", "LIGHT_SET_COLOR", "color_only_unsupported"),
+    )
+    for mapper, keywords_name, generic_type, reason_code in cases:
+        keyword = next(iter(getattr(__import__(mapper.__module__, fromlist=[keywords_name]), keywords_name)))
+        cmd = _cmd(1, "cmd-1", generic_type, type_="info" if generic_type.endswith("STATE") else "action")
+        result = mapper.map(_make_eq(902, f"test {keyword}", [cmd]), _make_snapshot())
+        assert result.reason_code == reason_code
+        assert result.reason_details["matched_keyword"] == keyword
+        decision = mapper.decide_publication(result)
+        assert (decision.should_publish, decision.reason) == (False, "ambiguous_skipped")
+
+
 # ---------------------------------------------------------------------------
 # Task 1.2 — Test AC1 — conflicting generic_types LightMapper (AC #1, #3)
 # ---------------------------------------------------------------------------

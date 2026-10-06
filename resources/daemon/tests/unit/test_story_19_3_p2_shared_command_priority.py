@@ -17,6 +17,10 @@ les deux sur le PRIMAIRE — jamais le secondaire — via la fonction unique
 
 import pytest
 
+from mapping.overrides import save_override
+from mapping.registry import MapperRegistry
+from models.evaluate_equipment import evaluate_equipment
+from models.topology import assess_eligibility
 from transport.http_server import create_app
 from models.topology import (
     TopologySnapshot, JeedomObject, JeedomEqLogic, JeedomCmd,
@@ -114,6 +118,11 @@ async def test_tree_resolves_shared_command_to_primary(cli, app, tmp_path, monke
     assert shared["attendu_ha"] == "switch"
     assert shared["effective_ha"] == "switch"
     assert shared["diagnostic"]["ha_entity_type"] == "switch"
+    assert payload["equipment_decision"]["should_publish"] is True
+    assert len(payload["entities"]) == 2
+    assert all("reason_details" in entity for entity in payload["entities"])
+    # La commande partagée ne peut devenir la clé d'action d'aucune entité.
+    assert all(entity["override_command_id"] != 133003 for entity in payload["entities"])
 
 
 async def test_preview_resolves_shared_command_to_primary(cli, app, monkeypatch):
@@ -143,3 +152,41 @@ async def test_preview_resolves_shared_command_to_primary(cli, app, monkeypatch)
 
     assert payload["auto"]["ha_entity_type"] == "switch"
     assert payload["overridden"]["ha_entity_type"] == "switch"
+
+
+async def test_tree_secondary_pending_uses_its_last_applied_decision(cli, app, tmp_path):
+    """AC7 : exclure seulement le secondaire le rend pending, pas le principal."""
+    snapshot, eq = _metering_plug()
+    app["topology"] = snapshot
+    app["data_dir"] = str(tmp_path)
+    previous = evaluate_equipment(
+        eq, snapshot, assess_eligibility(eq), mapper_registry=MapperRegistry(),
+    )
+    assert previous.mapping is not None
+    app["publications"] = {eq.id: previous.equipment_decision}
+
+    save_override(eq.id, 133004, {
+        "ha_entity_type": "sensor", "publication_override": "exclude",
+    }, str(tmp_path))
+    resp = await cli.get(f"/system/mapping_overrides/{eq.id}", headers=_headers())
+    payload = (await resp.json())["payload"]
+
+    primary, secondary = payload["entities"]
+    assert primary["ha_entity_type"] == "switch"
+    assert primary["override_pending"] is False
+    assert secondary["ha_entity_type"] == "sensor"
+    assert secondary["override_pending"] is True
+
+
+async def test_publication_route_refuses_shared_command(cli, app, monkeypatch):
+    """AC10 : une commande partagée n'est la clé d'aucune entité (409)."""
+    import transport.http_server as http_server_module
+    snapshot, _ = _metering_plug()
+    app["topology"] = snapshot
+    monkeypatch.setattr(http_server_module, "evaluate_equipment", _make_shared_command_evaluator(
+        http_server_module.evaluate_equipment,
+    ))
+    response = await cli.post("/action/publication_override", headers=_headers(), json={"payload": {
+        "jeedom_eq_id": 13300, "jeedom_cmd_id": 133003, "publication_policy": "exclude",
+    }})
+    assert response.status == 409

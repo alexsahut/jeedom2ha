@@ -168,21 +168,8 @@ class SwitchMapper:
         matched_kw = next((kw for kw in _NON_SWITCH_KEYWORDS if re.search(r'\b' + re.escape(kw) + r'\b', name_lower)), None)
         if matched_kw:
             _LOGGER.info(
-                "[MAPPING] eq_id=%d name='%s': name contains non-switch keyword '%s' → ambiguous",
+                "[MAPPING] eq_id=%d name='%s': name contains non-switch keyword '%s' → capabilities kept ambiguous",
                 eq.id, eq.name, matched_kw,
-            )
-            capabilities = SwitchCapabilities(device_class=None)
-            return MappingResult(
-                ha_entity_type="switch",
-                confidence="ambiguous",
-                reason_code="name_heuristic_rejection",
-                jeedom_eq_id=eq.id,
-                ha_unique_id=f"jeedom2ha_eq_{eq.id}",
-                ha_name=eq.name,
-                suggested_area=snapshot.get_suggested_area(eq.id),
-                commands=energy_cmds,
-                capabilities=capabilities,
-                reason_details={"matched_keyword": matched_kw},
             )
 
         # Phase 1: Detect On/Off capability
@@ -241,7 +228,10 @@ class SwitchMapper:
                 suggested_area=snapshot.get_suggested_area(eq.id),
                 commands=energy_cmds,
                 capabilities=capabilities,
-                reason_details={"available_types": list(energy_cmds.keys())},
+                reason_details={
+                    "available_types": list(energy_cmds.keys()),
+                    **({"matched_keyword": matched_kw} if matched_kw else {}),
+                },
             )
 
         # Phase 2: device_class — conservative rule based on eq_type_name only
@@ -258,6 +248,10 @@ class SwitchMapper:
             on_off_confidence=on_off_confidence,
             device_class=device_class,
         )
+
+        if matched_kw:
+            global_confidence = "ambiguous"
+            reason_code = "name_heuristic_rejection"
 
         _LOGGER.info(
             "[MAPPING] eq_id=%d name='%s': %s confidence=%s "
@@ -278,7 +272,10 @@ class SwitchMapper:
             suggested_area=snapshot.get_suggested_area(eq.id),
             commands=energy_cmds,
             capabilities=capabilities,
-            reason_details={"device_class_source": eq.eq_type_name or ""},
+            reason_details={
+                "device_class_source": eq.eq_type_name or "",
+                **({"matched_keyword": matched_kw} if matched_kw else {}),
+            },
         )
 
     def _map_cmd_group(

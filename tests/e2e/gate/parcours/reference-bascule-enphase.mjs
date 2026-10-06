@@ -4,6 +4,7 @@ export const name = 'reference-bascule-enphase';
 export const declaredEquipments = {
   '579': { commands: ['5689', '5368', '5369', '5494', '5695', '5493'] },
 };
+export const declaredPublicationOverrides = {};
 
 // La première bloquante est désignée dynamiquement par la synthèse. Les deux
 // candidats sont donc déclarés statiquement, mais un seul est utilisé à l'exécution.
