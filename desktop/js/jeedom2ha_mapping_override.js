@@ -76,6 +76,15 @@
       jeedom_eq_id: p.jeedom_eq_id != null ? p.jeedom_eq_id : null,
       eq_name: typeof p.eq_name === 'string' ? p.eq_name : '',
       mapped: p.mapped === true,
+      // X6b (P2, relecture indépendante PR #215) : `eligible` et
+      // `equipment_publication_override` sont deux champs additifs du démon (reprise AC8).
+      // Un démon plus ancien ne les envoie pas : `eligible` retombe alors sur `true`
+      // (comportement inchangé, jamais plus restrictif qu'avant), et l'override d'équipement
+      // reste lu uniquement via les entités/commandes comme avant.
+      eligible: p.eligible !== false,
+      equipment_publication_override: p.equipment_publication_override === 'exclude'
+        || p.equipment_publication_override === 'force_publish'
+        ? p.equipment_publication_override : null,
       equipment_decision: p.equipment_decision || null,
       entities: (Array.isArray(p.entities) ? p.entities : []).map(function (entity) {
         var e = entity || {};
@@ -152,6 +161,23 @@
         reason: noKeyReason,
       };
     }
+    // X6b (P2, relecture indépendante PR #215) : un équipement INÉLIGIBLE (ex. eq 588-591,
+    // `excluded_plugin`) n'a ni entité ni commande — `evaluate_equipment` refuse déjà toute
+    // exclusion pour lui, donc « Exclure »/« Forcer » n'auraient aucun effet. Seule la portée
+    // équipement est concernée (jamais l'entité, qui a sa propre éligibilité portée par
+    // `decision`/`projection_validity`). « Revenir au mode automatique » reste actif si un
+    // override d'équipement est déjà posé (AC1/AC6) — sinon il s'appliquerait en silence si
+    // l'équipement redevenait éligible, sans que l'utilisateur puisse jamais le retirer.
+    if (equipment === true && t.eligible === false) {
+      var ineligibleOverride = t.has_publication_override === true;
+      var ineligibleReason = 'Équipement non éligible : l’action serait sans effet.';
+      var ineligibleRevertReason = ineligibleOverride ? null : 'Aucun override de publication à retirer.';
+      return {
+        can_exclude: false, can_force: false, can_revert: ineligibleOverride,
+        exclude_reason: ineligibleReason, force_reason: ineligibleReason, revert_reason: ineligibleRevertReason,
+        reason: ineligibleReason,
+      };
+    }
     // Story 20-2 (P2, revue ClaudeBox X4 point 4) : une entité qui hérite du veto
     // d'équipement ('exclude_eqlogic' sur une cible entité, pas la cible équipement elle-même)
     // n'a NI « Forcer » NI « Revenir au mode automatique » qui aient un sens à sa propre
@@ -192,6 +218,37 @@
       // Rétro-compat : première cause non nulle, pour les appelants n'ayant pas encore
       // adopté les champs par bouton.
       reason: excludeReason || forceReason || revertReason,
+    };
+  }
+
+  // X6b (P2, relecture indépendante PR #215) : construit la cible équipement passée à
+  // `publicationActionState`, en lisant `eligible` et `equipment_publication_override` (tree
+  // déjà normalisé) en plus du veto porté par les entités/commandes — remplace la construction
+  // inline historique (surface) qui ignorait les deux champs additifs et laissait « Exclure »
+  // actif sans effet sur un équipement inéligible, et « Revenir » grisé sans recours.
+  function equipmentPublicationTarget(tree) {
+    var t = tree || {};
+    var entities = Array.isArray(t.entities) ? t.entities : [];
+    var commands = Array.isArray(t.commands) ? t.commands : [];
+    var eqExcludedViaEntity = entities.some(function (entity) {
+      return entity.publication_override === 'exclude_eqlogic';
+    });
+    var hasTypeOverride = commands.some(function (cmd) { return cmd.override_applied; });
+    var hasEntityPublicationOverride = entities.some(function (entity) {
+      return entity.publication_override !== null;
+    });
+    var equipmentOverride = t.equipment_publication_override || null;
+    var policy = null;
+    if (eqExcludedViaEntity || equipmentOverride === 'exclude') {
+      policy = 'exclude_eqlogic';
+    } else if (equipmentOverride === 'force_publish') {
+      policy = 'force_publish';
+    }
+    return {
+      decision: t.equipment_decision,
+      eligible: t.eligible !== false,
+      publication_override: policy,
+      has_publication_override: hasEntityPublicationOverride || hasTypeOverride || equipmentOverride !== null,
     };
   }
 
@@ -749,6 +806,17 @@
         unknown += 1;
       }
     }
+    // Story 20-2 (AC8, X6 — validation UX ClaudeBox 06/10, eq 588-591) : un équipement sans
+    // commande ne peut pas se résoudre par la boucle ci-dessus (rien à parcourir) ; la seule
+    // source pour « Exclu »/« Désactivé » est alors `equipment_decision`, déjà porté par le
+    // démon. Lecture pure, aucun recalcul ; n'affecte jamais un arbre qui a des commandes.
+    if (t.commands.length === 0) {
+      if (isExcludedDiagnostic(t.equipment_decision)) {
+        excluded = 1;
+      } else if (isDisabledDiagnostic(t.equipment_decision)) {
+        disabled = 1;
+      }
+    }
     return {
       total: t.commands.length,
       ready_count: ready,
@@ -837,6 +905,7 @@
     resolveCommandNames: resolveCommandNames,
     entityCommandsLabel: entityCommandsLabel,
     publicationActionState: publicationActionState,
+    equipmentPublicationTarget: equipmentPublicationTarget,
     shouldConfirmPublication: shouldConfirmPublication,
     shouldConfirmEquipmentExclude: shouldConfirmEquipmentExclude,
     entitiesLeavingHomeAssistant: entitiesLeavingHomeAssistant,

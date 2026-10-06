@@ -625,27 +625,19 @@
     renderSyncBadge($panel, normalized);
     renderEntities($panel, normalized);
 
-    // Story 20-2 (P2, revue ClaudeBox X4 point 3) : l'exclusion d'équipement est un VETO
-    // testé en premier par le démon (`resolve_publication_override`, overrides.py l.566-568)
-    // — toute entité dont `publication_override` vaut 'exclude_eqlogic' le doit à CET
-    // équipement, jamais à elle-même. Lecture pure de l'arbre déjà reçu, aucun recalcul.
-    var eqExcluded = normalized.entities.some(function (entity) {
-      return entity.publication_override === 'exclude_eqlogic';
-    });
-    var hasTypeOverride = normalized.commands.some(function (cmd) { return cmd.override_applied; });
-    var hasEntityPublicationOverride = normalized.entities.some(function (entity) {
-      return entity.publication_override !== null;
-    });
-
+    // X6b (P2, relecture indépendante PR #215) : la cible équipement est construite par
+    // `equipmentPublicationTarget` (lit `eligible` + `equipment_publication_override` de
+    // l'arbre, en plus du veto porté par les entités/commandes) — remplace la construction
+    // inline qui ignorait les deux champs additifs du démon sur un équipement inéligible ou
+    // sans entité (AC1/AC6).
+    //
     // Fusion des deux boutons « Revenir au mode automatique » de l'équipement (le lien CC-19
     // historique, affiché sur un override de type, et celui des actions de publication) :
     // un seul bouton, actif s'il existe un override de type OU de publication. Il appelle
     // `revertPublicationOverride` sans `cmdId` — cette route purge déjà les deux catégories
     // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
-    var $equipmentError = appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
-      publication_override: eqExcluded ? 'exclude_eqlogic' : null,
-      has_publication_override: hasEntityPublicationOverride || hasTypeOverride }, true, normalized.commands,
-      normalized.entities);
+    var $equipmentError = appendPublicationActions($actions, eqId, M.equipmentPublicationTarget(normalized),
+      true, normalized.commands, normalized.entities);
     if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
       var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
       $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
