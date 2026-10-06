@@ -233,6 +233,50 @@ async function closePages(context) {
   await Promise.all(context.pages().map((page) => page.close().catch(() => undefined)));
 }
 
+/**
+ * Mène chaque page (popups comprises) vers `about:blank` : un gestionnaire de
+ * dialogue accepte `beforeunload` (laisse partir la navigation) et rejette le
+ * reste, puis `page.goto('about:blank')` tue les scripts de la page pendant
+ * que l'intercepteur de route est encore actif. Une page qui ne finit pas sur
+ * `about:blank` (ex. formulaire soumis dans une iframe juste avant) n'est plus
+ * couverte par cette garantie : elle est consignée en échec.
+ */
+export async function neutralizeOpenPages(context, journal) {
+  if (!context) return;
+  const pages = context.pages();
+  for (const page of pages) {
+    page.on('dialog', (dialog) => {
+      const outcome = dialog.type() === 'beforeunload' ? dialog.accept() : dialog.dismiss();
+      outcome.catch(() => undefined);
+    });
+    await page.goto('about:blank', { timeout: 5000 }).catch(() => undefined);
+  }
+  let stuck = false;
+  for (const page of pages) {
+    if (page.url() !== 'about:blank') {
+      navigationFailure(journal, page.url());
+      stuck = true;
+    }
+  }
+  if (stuck) throw new Error('neutralisation-incomplete');
+}
+
+/**
+ * CC-43 (reprise) : neutralise les pages avant de cesser de collecter la
+ * console puis de couper le réseau du contexte, dans cet ordre précis. Chaque
+ * étape est bornée pour que l'échec d'une étape n'empêche jamais les
+ * suivantes de s'exécuter — en particulier `setOffline(true)`, seul rempart
+ * contre un `sendBeacon` qui survit à son document.
+ */
+export async function sealContext(context, { journal, stopCollecting } = {}) {
+  if (!context) return;
+  const state = { failure: undefined };
+  await captureFinallyFailure(state, () => neutralizeOpenPages(context, journal));
+  await captureFinallyFailure(state, () => stopCollecting?.());
+  await captureFinallyFailure(state, () => context.setOffline(true));
+  if (state.failure) throw state.failure;
+}
+
 const QUIET_WINDOW_MS = 90_000;
 
 /**
@@ -366,6 +410,7 @@ async function main() {
   let probeBefore;
   let probeAfter;
   let authenticated = false;
+  let stopConsoleCollection;
   try {
     const { chromium } = loadPlaywright();
     browser = await chromium.launch({ headless: true });
@@ -383,11 +428,17 @@ async function main() {
     context.on('request', (request) => {
       if (isRedirectedNonNavigationRequest(request)) redirectedRequestFailure(journal, request);
     });
-    context.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
-    context.on('weberror', (webError) => {
+    const onConsoleMessage = (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); };
+    const onWebError = (webError) => {
       const error = typeof webError?.error === 'function' ? webError.error() : webError;
       consoleErrors.push(error?.message ?? String(error));
-    });
+    };
+    context.on('console', onConsoleMessage);
+    context.on('weberror', onWebError);
+    stopConsoleCollection = () => {
+      context.off('console', onConsoleMessage);
+      context.off('weberror', onWebError);
+    };
     try {
       const login = await jsonPost(context.request, `${ORIGIN}/core/ajax/user.ajax.php`, {
         action: 'login',
@@ -415,11 +466,15 @@ async function main() {
     failure = error instanceof Error ? error : new Error(String(error));
   } finally {
     const finalization = { failure };
-    // CC-43 : couper le réseau du navigateur avant de fermer les pages, pour
-    // qu'une écriture lancée juste avant la fermeture (ex. enregistrement
-    // automatique après délai) ne puisse jamais atteindre la box en échappant
-    // au gestionnaire de route.
-    await captureFinallyFailure(finalization, () => context?.setOffline(true));
+    // CC-43 (reprise G43b) : neutraliser les pages (navigation vers about:blank,
+    // réseau encore ouvert) avant de couper le réseau du contexte, avant de
+    // fermer les pages. Une navigation (formulaire soumis dans une iframe) ou
+    // un sendBeacon lancés juste avant la fermeture ne doivent jamais pouvoir
+    // atteindre la box en échappant au gestionnaire de route.
+    await captureFinallyFailure(finalization, () => sealContext(context, {
+      journal,
+      stopCollecting: stopConsoleCollection,
+    }));
     await captureFinallyFailure(finalization, () => closePages(context));
     if (authenticated) {
       await captureFinallyFailure(finalization, () => waitForQuietWindow(journal));
