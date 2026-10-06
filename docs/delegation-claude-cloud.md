@@ -61,11 +61,9 @@ Note l'ID/URL de session dans `docs/operations/delegations.md`.
 - Signale toute délégation qui semble coûteuse avant de la lancer.
 ```
 
-## Point d'attention : nom de branche et CI de gouvernance
-Le workflow `.github/workflows/pr-governance.yml` n'accepte, pour une PR vers `main`, que les préfixes `story/`, `fix/`, `docs/`, `chore/`, `refactor/`, `ci/`, `test/`, `hotfix/`.
-Les sessions cloud créent par défaut des branches `claude/...`, qui seraient **refusées**. Deux solutions :
-- demander explicitement dans le prompt un nom de branche conforme (`story/...`) ; ou
-- ajouter `claude` à `allowed_prefixes` dans `pr-governance.yml` (modification de gouvernance, à valider par le mainteneur).
+## Nom de branche et CI de gouvernance
+Les sessions cloud créent par défaut des branches `claude/...`. Le préfixe `claude/` est autorisé dans `.github/workflows/pr-governance.yml` pour les PR de développement vers `main` (décision du mainteneur), au même titre que `story/`, `fix/`, `docs/`, `chore/`, `refactor/`, `ci/`, `test/`, `hotfix/`.
+Les autres règles de routage restent inchangées (cible `main`, titre en Conventional Commits).
 
 ## Suivi des délégations
 Voir `docs/operations/delegations.md`.

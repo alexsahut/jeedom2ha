@@ -65,12 +65,13 @@ jobs:
                       "ci",
                       "test",
                       "hotfix",
+                      "claude",
                   }
                   if prefix not in allowed_prefixes:
                       fail(
                           f"Branche source '{head}' invalide pour une PR vers main: "
                           "utilise une branche courte dédiée ou un prefixe parmi "
-                          "story/, fix/, docs/, chore/, refactor/, ci/, test/, hotfix/."
+                          "story/, fix/, docs/, chore/, refactor/, ci/, test/, hotfix/, claude/."
                       )
               elif not re.fullmatch(r"[A-Za-z0-9._-]+", normalized):
                   fail(
