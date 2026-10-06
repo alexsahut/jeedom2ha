@@ -2,9 +2,7 @@
 
 Status: backlog
 
-> **Statut : `create-story` terminé, `ready-for-dev` NON accordé (2026-10-06).** Deux blocages, détaillés en « Conditions de passage à `ready-for-dev` » :
-> 1. **Décisions produit Q1 à Q4 (dont Q2b) à prendre par Alex** (compteurs de remplacement, sort des actions et du contenu portés par la synthèse et la modale, sort de la page « gabarit »). L'epic demande à cette story de « décider puis livrer » le remplacement des compteurs, et la lecture du code montre que la synthèse et la modale portent bien plus que des compteurs (F2, F3). Les AC marqués **[Qx]** sont écrits sur la recommandation de ce brouillon et se figent à la réponse d'Alex.
-> 2. **20.2 n'est pas `done`** (`review` : code fusionné sur `main`, preuve post-fusion 5.2/5.3 et validation UX restantes). Aucun développement avant 20.2 `done`.
+> **Statut : `create-story` terminé, `ready-for-dev` NON accordé (2026-10-06).** Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Le seul blocage restant est **20.2 non `done`** (`review` : preuve post-fusion et validation UX restantes). Aucun développement avant 20.2 `done`.
 
 ## Story
 
@@ -48,26 +46,31 @@ afin de comprendre l'état de mon installation avec des mots d'usage, au même e
   Les tests des stories 4.6 et 6.1 à 6.3 importent `jeedom2ha_diagnostic_helpers.js` ou exigent le rendu de la modale : ils échoueront au retrait. Chacun est à retirer (fonction supprimée) ou à réaffecter (fonction conservée), jamais laissé rouge ni supprimé en silence.
 - **F7 — Tension à trancher en Q1 :** 20.1 (AC5, inchangé) interdit de charger les arbres de tout le parc ; des compteurs **par carte de pièce** en exigeraient la lecture, ou un nouveau point d'entrée du démon.
 
-## Décisions à prendre par Alex (blocantes pour `ready-for-dev`)
+## Décisions produit actées par Alexandre — 2026-10-06
 
-Recommandations de ce brouillon ; chaque question se répond par une lettre. Sans réponse, les AC **[Qx]** restent provisoires.
+Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc figés sur ces choix.
 
 - **Q1 — Que deviennent les compteurs de « Parc global » ?**
+  - **Décision : A.**
   - **A (recommandé) — compteurs dans la modale de la pièce ouverte, rien sur les cartes.** Entête de la pièce, lus dans l'arbre déjà chargé à l'ouverture : équipements publiés / exclus / désactivés / à corriger, et commandes prêtes / bloquantes / non couvertes. Unité dite dans le libellé (équipement ou commande), exclusions manuelles comptées comme exclues (elles viennent de la décision). Aucun nouveau point d'entrée, AC5 de 20.1 préservé. Contrepartie : plus de total du parc d'un coup d'œil.
   - **B — compteurs sur les cartes de pièces**, via un nouveau point d'entrée agrégé du démon appuyé sur `evaluate_equipment()`. Plus fidèle à l'ancienne synthèse, mais hors de la règle « aucun nouveau point d'entrée » de l'epic et du chargement borné de 20.1.
   - **C — un total unique** (« N équipements publiés ») sur la page, sans détail par pièce ; source à choisir (nouveau point d'entrée ou témoin existant).
 - **Q2 — Que deviennent Republier et Supprimer puis recréer par pièce et par équipement (F2) ?**
+  - **Décision : A.**
   - **A (recommandé) — conservés, déplacés dans la surface** : « Appliquer » (20.2) couvre déjà « Publier » par équipement ; ajouter « Republier la pièce » dans la modale de pièce, et « Supprimer puis recréer » par équipement et par pièce avec la confirmation forte actuelle, sur les gestionnaires existants (`executeHaAction`). Les boutons globaux restent sur la page, leurs confirmations dérivent leurs nombres du parc sans la synthèse (à préciser au cadrage : relevé simple ou point d'entrée existant, voir Q2b : par défaut sans nombre, jamais un recalcul).
   - **B — retirés** : seuls les boutons globaux subsistent ; l'utilisateur perd la republication et la suppression ciblées. À assumer explicitement.
 - **Q2b — D'où viennent les nombres des confirmations des boutons globaux (« N équipements inclus », « N publiés ») ?** Aujourd'hui : `published_scope` via la synthèse ; `getBridgeStatus` ne fournit aucun décompte, et la surface ne charge que les pièces ouvertes.
+  - **Décision : A.**
   - **A (recommandé) — retirer les nombres** : « Republier tous les équipements inclus ? » / « Supprimer puis recréer tout le parc publié ? », avec la mise en garde forte actuelle. Aucune source nouvelle, AC7 tenu tel quel.
   - **B — nommer une source globale autorisée** : lecture limitée de `published_scope` par ces seules confirmations (AC7 amendé pour cette exception unique).
   - **C — nouveau point d'entrée agrégé** appuyé sur `evaluate_equipment()`.
 - **Q3 — Que reprend-on de la modale Diagnostic (F3, F4) ?**
+  - **Décision : A**, y compris le retrait des badges streaming et parité FAN de l'interface ; l'export de diagnostic support est conservé.
   - **A (recommandé) — rien d'autre que ce que l'arbre porte déjà** (cause par commande et par entité, 20.2) ; l'échec technique de publication (étape 5), la trace du pipeline et le badge « Écart » disparaissent de l'interface ; « Télécharger le diagnostic support » reste l'outil de support. Liste des pertes écrite dans la story et confirmée.
   - **B — reprendre en plus un signal d'échec de publication par équipement** dans la surface (nécessite que l'arbre le porte : nouveau champ additif du démon).
   - Dans les deux cas : le badge streaming global (15.2) et la parité FAN (15.3) sont-ils retirés (recommandé : oui, aucun ne figure dans la surface) ou repris ?
 - **Q4 — Que devient la page « gabarit » (F5) ?**
+  - **Décision : A.**
   - **A (recommandé) — retrait de la section « Mes templates » et des champs sans usage** (paramètre n°1, mot de passe, auto-actualisation, assistant cron) ; le squelette de page requis par le cœur Jeedom (conteneurs `eqLogic`, `eqLogicThumbnailDisplay`, onglets Équipement / Commandes) est conservé, ses libellés réécrits en français d'usage ; « Ajouter » conservé tant que le cœur l'exige (Task 1.3 le vérifie).
   - **B — retirer aussi la création d'équipement `jeedom2ha`** (« Ajouter », page d'édition) : plus net, mais touche le contrat de page du cœur Jeedom et les crochets de la classe ; à n'envisager qu'avec la preuve de la Task 1.3.
 
@@ -217,15 +220,14 @@ Recommandations de ce brouillon ; chaque question se répond par une lettre. San
 
 `desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_scope_summary.js` (supprimé), `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé ou réduit), `desktop/css/jeedom2ha.css`, `core/ajax/jeedom2ha.ajax.php` et `core/class/jeedom2ha.class.php` (relais ou crochets de gabarit, selon Q2 et Q4), tests Node/PHP issus de la recherche de F6 (Task 1.5), `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`, `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`.
 
-### Pertes assumées (à confirmer par Alex, recommandation A de Q2/Q3)
+### Pertes assumées (décisions Q2=A et Q3=A)
 
 Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et navigation vers la modale ; trace du pipeline, cause canonique et résultat technique d'un échec de publication ; badges streaming global et parité FAN ; (si Q2 = B) republication et suppression ciblées par pièce et par équipement. Voie de remplacement : surface unique (cause par commande), « Télécharger le diagnostic support », boutons globaux.
 
 ## Conditions de passage à `ready-for-dev`
 
-1. Alex répond à Q1, Q2, Q2b, Q3 et Q4 (format « 1A 2A 2bA 3A 4A ») ; les AC **[Qx]**, la section « Pertes assumées » et la Task 3 sont alors figés.
-2. 20.2 est `done` (preuve post-fusion, preuve terrain au clic réel, validation UX).
-3. Task 1.1 est refaite au SHA de ce moment si le code de 20.2 a bougé ; la table de libellés de la Task 1.2 est validée.
+1. 20.2 est `done` (preuve post-fusion, preuve terrain au clic réel, validation UX).
+2. Task 1.1 est refaite au SHA de ce moment si le code de 20.2 a bougé ; la table de libellés de la Task 1.2 est validée.
 
 ## Définition de done
 
@@ -242,6 +244,7 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 - 2026-10-01 — Décision d'Alex (SCP, décision 1) : synthèse « Parc global » et modale diagnostic supprimées au profit de la surface unique.
 - 2026-10-05, 10:43 — Décision d'Alex (« 1A 2A 3C 4A » sur 20.1) : pas de compteurs en 20.1 ; le remplacement des compteurs est décidé et livré par 20.3. Faits à reprendre : la lecture de « Parc global » charge le diagnostic de tout le parc ; ses compteurs comptent des équipements et ignorent les exclusions manuelles.
 - 2026-10-06 — `create-story` de 20.3 (session cloud déléguée, lecture seule, aucun accès box/HA) : faits F1 à F7 relevés dans le code de `main` `df6bb51` ; constat que la synthèse et la modale portent des capacités autres que des compteurs (actions ciblées, nombres des confirmations globales, échec technique de publication) ; questions Q1 à Q4 posées avec recommandation A. **`ready-for-dev` non accordé.**
+- 2026-10-06 — Alexandre valide les arbitrages **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Les AC et tâches conditionnelles sont figés sur ces choix ; 20.2 reste l'unique dépendance de statut avant le développement.
 
 ## References
 
