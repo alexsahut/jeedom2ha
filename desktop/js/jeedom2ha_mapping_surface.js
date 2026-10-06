@@ -500,10 +500,27 @@
 
     renderSyncBadge($panel, normalized);
     renderEntities($panel, normalized);
+
+    // Story 20-2 (P2, revue ClaudeBox X4 point 3) : l'exclusion d'équipement est un VETO
+    // testé en premier par le démon (`resolve_publication_override`, overrides.py l.566-568)
+    // — toute entité dont `publication_override` vaut 'exclude_eqlogic' le doit à CET
+    // équipement, jamais à elle-même. Lecture pure de l'arbre déjà reçu, aucun recalcul.
+    var eqExcluded = normalized.entities.some(function (entity) {
+      return entity.publication_override === 'exclude_eqlogic';
+    });
+    var hasTypeOverride = normalized.commands.some(function (cmd) { return cmd.override_applied; });
+    var hasEntityPublicationOverride = normalized.entities.some(function (entity) {
+      return entity.publication_override !== null;
+    });
+
+    // Fusion des deux boutons « Revenir au mode automatique » de l'équipement (le lien CC-19
+    // historique, affiché sur un override de type, et celui des actions de publication) :
+    // un seul bouton, actif s'il existe un override de type OU de publication. Il appelle
+    // `revertPublicationOverride` sans `cmdId` — cette route purge déjà les deux catégories
+    // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
     var $equipmentError = appendPublicationActions($actions, eqId, { decision: normalized.equipment_decision,
-      publication_override: null, has_publication_override: normalized.entities.some(function (entity) {
-        return entity.publication_override !== null;
-      }) }, true, normalized.commands);
+      publication_override: eqExcluded ? 'exclude_eqlogic' : null,
+      has_publication_override: hasEntityPublicationOverride || hasTypeOverride }, true, normalized.commands);
     if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
       var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
       $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
@@ -515,22 +532,6 @@
         .text('{{Aucune commande à configurer pour cet équipement.}}'));
       renderSummary($panel, normalized);
       return;
-    }
-
-    var hasOverride = false;
-    for (var k = 0; k < normalized.commands.length; k++) {
-      if (normalized.commands[k].override_applied) {
-        hasOverride = true;
-        break;
-      }
-    }
-    if (hasOverride) {
-      var $revertEq = $('<a class="mo-revert-eq cursor btn btn-default btn-xs"><i class="fas fa-undo"></i> ' +
-        '{{Revenir au mode automatique (tout l’équipement)}}</a>');
-      $revertEq.on('click', function () {
-        revertPublication(eqId, null, $revertEq);
-      });
-      $actions.append($revertEq);
     }
 
     var $table = $('<table class="table table-condensed j2ha-cmd-table"></table>');

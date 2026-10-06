@@ -163,3 +163,26 @@ test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', 
     assert.match(M.buildPublishCellLabel({ ...blocked, reason_code: code }), new RegExp(phrase));
   }
 });
+
+test('20-2 — revue X4 (point 3) : exclusion posée sur l\'équipement vue au niveau équipement', () => {
+  // renderEquipmentTree calcule désormais `publication_override: 'exclude_eqlogic'` pour la
+  // cible équipement dès qu'une entité porte ce veto — même lecture que publicationActionState
+  // ferait pour une entité déjà exclue : « Exclure » devient sans effet.
+  const state = M.publicationActionState({ publication_override: 'exclude_eqlogic', has_publication_override: true }, true);
+  assert.equal(state.can_exclude, false);
+  assert.match(state.exclude_reason, /déjà exclue/);
+});
+
+test('20-2 — revue X4 (point 3) : bouton équipement « Revenir au mode automatique » fusionné', () => {
+  // Le bouton unique doit s'activer que l'override en attente d'un retrait soit de type
+  // (has_publication_override vrai sans policy de publication) ou de publication (policy posée).
+  const fromTypeOverrideOnly = M.publicationActionState({ publication_override: null, has_publication_override: true }, true);
+  assert.equal(fromTypeOverrideOnly.can_revert, true);
+
+  const fromPublicationOverride = M.publicationActionState({ publication_override: 'force_publish', has_publication_override: true }, true);
+  assert.equal(fromPublicationOverride.can_revert, true);
+
+  const withoutAnyOverride = M.publicationActionState({ publication_override: null, has_publication_override: false }, true);
+  assert.equal(withoutAnyOverride.can_revert, false);
+  assert.match(withoutAnyOverride.revert_reason, /[Aa]ucun override/);
+});
