@@ -72,7 +72,9 @@ _EXPECTED_COMMAND_DIAGNOSTIC = {
 
 async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status(cli, app, tmp_path):
     """La parité pré-story est conservée, sauf `sync_status` et les ajouts additifs
-    de Story 20-2 (`equipment_decision`, `entities`) dont la forme est vérifiée ici."""
+    de Story 20-2 (`equipment_decision`, `entities`, puis `eligible` et
+    `equipment_publication_override` — reprise X6b, P2 relecture indépendante PR #215)
+    dont la forme est vérifiée ici."""
     snapshot, eq = _plain_light()
     app["topology"] = snapshot
     app["data_dir"] = str(tmp_path)
@@ -83,9 +85,11 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
     assert payload["mapped"] is True
     assert payload["eq_name"] == "Lampe garde-fou"
     assert set(payload.keys()) == {
-        "jeedom_eq_id", "eq_name", "mapped", "equipment_decision", "entities",
-        "sync_status", "commands",
+        "jeedom_eq_id", "eq_name", "mapped", "eligible", "equipment_publication_override",
+        "equipment_decision", "entities", "sync_status", "commands",
     }
+    assert payload["eligible"] is True
+    assert payload["equipment_publication_override"] is None
     assert payload["equipment_decision"] == _EXPECTED_COMMAND_DIAGNOSTIC
     assert payload["entities"] == [{
         "ha_entity_type": "light", "decision": _EXPECTED_COMMAND_DIAGNOSTIC,

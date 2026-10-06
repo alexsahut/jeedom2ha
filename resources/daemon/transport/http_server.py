@@ -3076,6 +3076,15 @@ def _build_mapping_override_tree(
         "jeedom_eq_id": eq.id,
         "eq_name": eq.name,
         "mapped": mapped,
+        # Story 20-2 (P2, relecture indépendante PR #215, reprise X6b) : champs additifs
+        # à la racine, lus dans la MÊME source que `evaluate_equipment` (jamais recalculés)
+        # — un équipement inéligible n'a ni entité ni commande couverte dans l'arbre, donc
+        # la surface ne peut sinon jamais savoir qu'il est inéligible, ni lire un override
+        # de publication équipement déjà posé pour proposer « Revenir au mode automatique ».
+        "eligible": eligibility.is_eligible,
+        "equipment_publication_override": (
+            equipment_overrides_cache.get(str(eq.id), {}).get("publication_override")
+        ),
         "equipment_decision": _decision_view(evaluation.equipment_decision, evaluation.mapping),
         "entities": entity_rows,
         "sync_status": {
