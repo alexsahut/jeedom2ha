@@ -116,8 +116,10 @@
     $tdOverride.append($select);
     var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
     $tdOverride.append($spinner);
+    var $revertError = $('<span class="mo-revert-error text-danger" style="display:none;margin-left:6px;"></span>');
     if (row.override_applied) {
       $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au type automatique}}"><i class="fas fa-undo"></i></a>'));
+      $tdOverride.append($revertError);
     }
     $tr.append($tdOverride);
 
@@ -147,11 +149,20 @@
     // TYPE de cette seule commande (route TYPE, 16-8) — jamais sur l'override de publication de
     // toute l'entité. `revertPublication` (revertPublicationOverride) retirerait exclusion et
     // forçage de l'entité entière sans confirmation, ce que ce lien ne doit jamais faire (AC5).
-    $tr.find('.mo-revert-cmd').on('click', function () {
-      var $link = $(this);
-      $link.prop('disabled', true).off('click');
-      revertCommand(eqId, cmdId);
-    });
+    // Reprise X5d (P3, relecture indépendante PR #210) : en cas d'échec (démon en erreur ou
+    // requête réseau), le lien restait inerte pour le reste de la session (`.off('click')` sans
+    // jamais être réattaché). On réaffiche une cause lisible dans `$revertError` et on réattache
+    // le gestionnaire pour permettre un nouvel essai ; en cas de succès, on recharge l'équipement
+    // comme avant.
+    var $revertLink = $tr.find('.mo-revert-cmd');
+    function attachRevertHandler() {
+      $revertLink.one('click', function () {
+        clearRequestError($revertError);
+        $revertLink.prop('disabled', true);
+        revertCommand(eqId, cmdId, $revertLink, $revertError, attachRevertHandler);
+      });
+    }
+    attachRevertHandler();
 
     return $tr;
   }
@@ -205,14 +216,29 @@
     });
   }
 
-  function revertCommand(eqId, cmdId) {
+  // `$link`/`$errorSlot`/`onFailure` : reprise X5d (P3) — en cas d'échec, réaffiche une cause
+  // lisible et réattache le gestionnaire de clic (`onFailure`) plutôt que de laisser le lien
+  // inerte ; en cas de succès, recharge l'équipement comme avant la correction.
+  function revertCommand(eqId, cmdId, $link, $errorSlot, onFailure) {
     $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'revertMappingOverride', eqId: eqId, cmdId: cmdId },
       dataType: 'json',
-      success: function () {
+      success: function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        if (error) {
+          showRequestError($errorSlot, error);
+          if ($link) $link.prop('disabled', false);
+          if (onFailure) onFailure();
+          return;
+        }
         reloadEquipment(eqId);
+      },
+      error: function () {
+        showRequestError($errorSlot, '{{Le démon ne répond pas.}}');
+        if ($link) $link.prop('disabled', false);
+        if (onFailure) onFailure();
       },
     });
   }
