@@ -395,7 +395,7 @@
       var entity = tree.entities[i];
       var $row = $('<div class="j2ha-entity-row"></div>');
       $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
-      $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity)));
+      $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity, tree.commands)));
       appendPublicationActions($row, tree.jeedom_eq_id, entity, false);
       $host.append($row);
     }

@@ -48,6 +48,18 @@ test('20-2 — P1 revue : exclude_eqlogic/exclude_command du démon restent lisi
   assert.equal(stateCommand.can_revert, true);
 });
 
+test('20-2 — P2 revue : libellé entité avec noms de commande réels (commands[])', () => {
+  const commands = [
+    { jeedom_cmd_id: 21, cmd_name: 'Allumer' },
+    { jeedom_cmd_id: 22, cmd_name: 'Variateur' },
+  ];
+  const entity = { command_ids: [21, 22] };
+  assert.deepEqual(M.resolveCommandNames(commands, [21, 22]), ['Allumer', 'Variateur']);
+  assert.equal(M.entityCommandsLabel(entity, commands), 'Commandes : Allumer, Variateur');
+  // Commande absente de l'arbre courant : fallback #id, jamais vide.
+  assert.equal(M.entityCommandsLabel({ command_ids: [99] }, commands), 'Commandes : #99');
+});
+
 test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', () => {
   for (const [code, phrase] of [
     ['name_heuristic_rejection', 'mot du nom'],

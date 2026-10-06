@@ -105,11 +105,31 @@
     };
   }
 
+  // Story 20-2 (P2, relecture ClaudeBox) : résout les identifiants de commande en noms
+  // lus dans `commands[]` (ordre natif GET arbre), sans aucun appel réseau supplémentaire.
+  // Identifiant introuvable (commande hors arbre courant) : fallback `#id`, jamais vide.
+  function resolveCommandNames(commands, commandIds) {
+    var cmds = Array.isArray(commands) ? commands : [];
+    var ids = Array.isArray(commandIds) ? commandIds : [];
+    return ids.map(function (id) {
+      for (var i = 0; i < cmds.length; i++) {
+        if (cmds[i] && cmds[i].jeedom_cmd_id === id && typeof cmds[i].cmd_name === 'string' && cmds[i].cmd_name) {
+          return cmds[i].cmd_name;
+        }
+      }
+      return '#' + id;
+    });
+  }
+
   // Story 20-2 : données d'action lues telles quelles dans l'arbre, sans inférence sur
-  // les commandes ni recalcul de décision côté client.
-  function entityCommandsLabel(entity) {
+  // les commandes ni recalcul de décision côté client. `commands` (arbre GET) est
+  // optionnel : sans lui, fallback sur les identifiants bruts (rétro-compat).
+  function entityCommandsLabel(entity, commands) {
     var ids = entity && Array.isArray(entity.command_ids) ? entity.command_ids : [];
-    return ids.length ? 'Commandes : ' + ids.map(function (id) { return '#' + id; }).join(', ') : 'Aucune commande regroupée';
+    if (!ids.length) {
+      return 'Aucune commande regroupée';
+    }
+    return 'Commandes : ' + resolveCommandNames(commands, ids).join(', ');
   }
 
   function publicationActionState(target, equipment) {
@@ -612,6 +632,7 @@
     getHaEntityTypeOptions: getHaEntityTypeOptions,
     normalizeCommandRow: normalizeCommandRow,
     normalizeTree: normalizeTree,
+    resolveCommandNames: resolveCommandNames,
     entityCommandsLabel: entityCommandsLabel,
     publicationActionState: publicationActionState,
     shouldConfirmPublication: shouldConfirmPublication,
