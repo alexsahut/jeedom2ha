@@ -2879,6 +2879,33 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
         # AC3 : un forçage doit exposer les commandes réellement portées par
         # l'entité afin que la surface puisse montrer les ordres concernés.
         over_view["command_ids"] = mapping_cmd_ids(over_target)
+    if (
+        proposed_cmd_id is None
+        and proposed_policy is not None
+        and over_evaluation.mapping is not None
+    ):
+        # Story 20-2 (P2, relecture indépendante PR #210) : un forçage (ou une exclusion) à
+        # la portée équipement vaut pour TOUTES les entités du mapping (principale et
+        # secondaires, `evaluate_equipment`), mais l'aperçu ne montrait jusqu'ici que
+        # l'entité principale (`over_target`) — AC3 impose de montrer l'aperçu de chaque
+        # entité. Champ additif `entities[]`, même vue que l'arbre (`_decision_view`),
+        # jamais une décision recalculée ici.
+        over_mappings = [over_evaluation.mapping] + list(
+            over_evaluation.mapping.additional_mappings or []
+        )
+        over_view["entities"] = [
+            {
+                "ha_entity_type": mapping.ha_entity_type,
+                "command_ids": mapping_cmd_ids(mapping),
+                "decision": _decision_view(
+                    over_evaluation.equipment_decision
+                    if mapping is over_evaluation.mapping
+                    else mapping.publication_decision_ref,
+                    mapping,
+                ),
+            }
+            for mapping in over_mappings
+        ]
 
     # 4. Export support (AC4, Story 16.6) : trace de preview + raisons de refus (aucun nouveau
     # reason_code — les codes viennent tous d'`evaluate_equipment`/`decide_publication`).
@@ -3275,8 +3302,14 @@ async def _handle_mapping_override_revert(
                 persisted_overrides=list_overrides(data_dir),
                 persisted_equipment_overrides=list_equipment_overrides(data_dir),
             )
-            mappings = [evaluation.mapping] + list(
-                (evaluation.mapping.additional_mappings or []) if evaluation.mapping else []
+            # Story 20-2 (P3, relecture indépendante PR #210) : l'ancienne parenthèse ne
+            # conditionnait QUE la liste des mappings secondaires, pas `[evaluation.mapping]`
+            # lui-même — un équipement inéligible (`evaluation.mapping is None`) produisait
+            # `mappings = [None]`, puis `mapping_cmd_ids(None)` plantait (500) au lieu du 409
+            # attendu « Commande sans entité ».
+            mappings = (
+                [evaluation.mapping] + list(evaluation.mapping.additional_mappings or [])
+                if evaluation.mapping is not None else []
             )
             owner = next((item for item in mappings if cmd_id in mapping_cmd_ids(item)), None)
             if owner is None:
