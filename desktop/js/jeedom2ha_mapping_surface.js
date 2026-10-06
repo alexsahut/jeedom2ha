@@ -374,16 +374,19 @@
   function appendPublicationActions($host, eqId, target, equipment) {
     var state = M.publicationActionState(target, equipment);
     var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
-    function button(label, policy, enabled) {
+    // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton grisé porte SA cause propre
+    // (déjà publiée, déjà forcée, projection invalide, type hors périmètre, pas de mapping,
+    // pas de commande clé) — plus de tooltip générique partagé entre boutons.
+    function button(label, policy, enabled, reason) {
       var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
-      if (!enabled) $button.prop('disabled', true).attr('title', state.reason || '{{Cette action est sans effet dans l’état courant.}}');
+      if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
       $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button')); });
       $group.append($button);
     }
-    button('{{Exclure}}', 'exclude', state.can_exclude);
-    button('{{Forcer}}', 'force_publish', state.can_force);
+    button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
+    button('{{Forcer}}', 'force_publish', state.can_force, state.force_reason);
     var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>').text('{{Revenir au mode automatique}}');
-    if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.reason || '{{Aucun override de publication à retirer.}}');
+    if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
     $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button')); });
     $group.append($revert);
     $host.append($group);

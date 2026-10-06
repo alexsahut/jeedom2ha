@@ -28,6 +28,46 @@ test('20-2 — actions : clé absente grisée, automatique retire publication et
   assert.equal(M.shouldConfirmPublication('force_publish', ready), false);
 });
 
+test('20-2 — P2 revue : chaque bouton porte sa propre cause de blocage', () => {
+  const alreadyPublished = M.publicationActionState({ decision: ready, override_command_id: 8, publication_override: null });
+  assert.equal(alreadyPublished.can_force, false);
+  assert.match(alreadyPublished.force_reason, /Déjà publiée/);
+
+  const alreadyForced = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: 'force_publish' });
+  assert.equal(alreadyForced.can_force, false);
+  assert.match(alreadyForced.force_reason, /déjà forcée|Publication déjà forcée/i);
+
+  const noMapping = M.publicationActionState({ decision: { ha_entity_type: null, should_publish: false }, override_command_id: 8, publication_override: null });
+  assert.equal(noMapping.can_force, false);
+  assert.match(noMapping.force_reason, /mapping/);
+
+  const outOfScope = M.publicationActionState({ decision: { ha_entity_type: 'vacuum', should_publish: false }, override_command_id: 8, publication_override: null });
+  assert.equal(outOfScope.can_force, false);
+  assert.match(outOfScope.force_reason, /hors périmètre/);
+
+  const invalidProjection = M.publicationActionState({
+    decision: { ha_entity_type: 'light', should_publish: false, projection_validity: { is_valid: false } },
+    override_command_id: 8, publication_override: null,
+  });
+  assert.equal(invalidProjection.can_force, false);
+  assert.match(invalidProjection.force_reason, /invalide/);
+
+  const forceable = M.publicationActionState({
+    decision: { ha_entity_type: 'light', should_publish: false, projection_validity: { is_valid: true } },
+    override_command_id: 8, publication_override: null,
+  });
+  assert.equal(forceable.can_force, true);
+  assert.equal(forceable.force_reason, null);
+
+  const alreadyExcluded = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: 'exclude_command' });
+  assert.equal(alreadyExcluded.can_exclude, false);
+  assert.match(alreadyExcluded.exclude_reason, /déjà exclue/i);
+
+  const nothingToRevert = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: null });
+  assert.equal(nothingToRevert.can_revert, false);
+  assert.match(nothingToRevert.revert_reason, /Aucun override/);
+});
+
 test('20-2 — P1 revue : exclude_eqlogic/exclude_command du démon restent lisibles après normalizeTree', () => {
   const treeEqlogic = M.normalizeTree({ entities: [{
     ha_entity_type: 'light', command_ids: [9], decision: blocked,

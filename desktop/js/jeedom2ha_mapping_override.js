@@ -132,6 +132,9 @@
     return 'Commandes : ' + resolveCommandNames(commands, ids).join(', ');
   }
 
+  // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton porte sa propre cause de
+  // désactivation (pas une cause générique partagée), lue uniquement dans l'arbre déjà
+  // reçu — aucune décision n'est recalculée côté client.
   function publicationActionState(target, equipment) {
     var t = target || {};
     var decision = t.decision || t;
@@ -140,12 +143,41 @@
     // Story 20-2 (P1) : les deux valeurs d'exclusion résolues par le démon désignent toutes
     // deux une entité déjà exclue, qu'elle le soit via l'équipement ou via sa commande.
     var excluded = policy === 'exclude_eqlogic' || policy === 'exclude_command';
-    if (!hasKey) return { can_exclude: false, can_force: false, can_revert: false, reason: 'Aucune commande clé propre à cette entité.' };
+    var forced = policy === 'force_publish';
+    if (!hasKey) {
+      var noKeyReason = 'Aucune commande clé propre à cette entité.';
+      return {
+        can_exclude: false, can_force: false, can_revert: false,
+        exclude_reason: noKeyReason, force_reason: noKeyReason, revert_reason: noKeyReason,
+        reason: noKeyReason,
+      };
+    }
+    var pv = decision.projection_validity || {};
+    var excludeReason = excluded ? 'Entité déjà exclue de Home Assistant.' : null;
+    var forceReason = null;
+    if (forced) {
+      forceReason = 'Publication déjà forcée sur cette entité.';
+    } else if (decision.should_publish === true) {
+      forceReason = 'Déjà publiée : forcer n’a pas d’effet.';
+    } else if (!decision.ha_entity_type) {
+      forceReason = 'Aucun mapping trouvé pour cette entité.';
+    } else if (HA_ENTITY_TYPE_OPTIONS.indexOf(decision.ha_entity_type) === -1) {
+      forceReason = 'Type HA hors périmètre de ce plugin.';
+    } else if (pv.is_valid === false) {
+      forceReason = 'Projection invalide pour ce type HA.';
+    }
+    var revertReason = (policy === null && t.has_publication_override !== true)
+      ? 'Aucun override de publication à retirer.' : null;
     return {
       can_exclude: !excluded,
-      can_force: policy !== 'force_publish' && decision.should_publish !== true,
-      can_revert: policy !== null || t.has_publication_override === true,
-      reason: null,
+      can_force: forceReason === null,
+      can_revert: revertReason === null,
+      exclude_reason: excludeReason,
+      force_reason: forceReason,
+      revert_reason: revertReason,
+      // Rétro-compat : première cause non nulle, pour les appelants n'ayant pas encore
+      // adopté les champs par bouton.
+      reason: excludeReason || forceReason || revertReason,
     };
   }
 
