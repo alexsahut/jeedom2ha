@@ -13,7 +13,7 @@ Exécution par clawcode, relecture de chaque étape par ClaudeBox ; clic réel e
 | Élément | Valeur |
 |---|---|
 | SHA déployé | `80f7a05eb0e8f21a98b614c7e1ec2d1b23a6caf0` : fusion de la PR #209 (`ae9bbbb`), puis de la PR #211 (CC-43, outillage du gate, `tests/` seulement, non livré) |
-| CI de `main` sur ce SHA | verte : 10 succès, 1 `skipped` |
+| CI de `main` sur ce SHA | verte : 10 succès, 1 `skipped` (check-runs relus par ClaudeBox) |
 | SHA précédent sur la box | `51bc9d9` (déployé le 05/10 à 13:32:57Z) |
 | Fichiers livrés qui changent | `core/ajax/jeedom2ha.ajax.php`, `core/class/jeedom2ha.class.php`, `desktop/js/jeedom2ha.js`, `desktop/php/jeedom2ha.php`, `plugin_info/configuration.php`, `resources/daemon/transport/http_server.py` |
 | Déploiement | standard (`--restart-daemon`), depuis un worktree neuf détaché sur `origin/main`, à 06:06:12Z ; dry-run préalable sans erreur |
@@ -41,10 +41,10 @@ Les relevés avant ont été refaits juste avant le déploiement (06:05Z) : ceux
 | 08:15:48 | découverte, lecture seule | `80f7a05` | PASS | 5 critères PASS, témoin et sonde sans différence, console 0. |
 | 08:18:05 | référence (bascule) | `80f7a05` | PASS | Écritures simulées seulement (`saveMappingOverride`, `revertMappingOverride`) ; témoin et sonde sans différence. |
 | 08:20:42 | rescan de la page principale | `80f7a05` | FAIL | Défaut du parcours, pas du plugin : il attendait « Synchronisation terminée. » dans `#div_alert`, alors que Jeedom 4.4 affiche les alertes en notification (`jeeDialog.toast`, `#jeeToastContainer`). Les 5 critères étaient PASS ; `scanTopology` simulé, jamais transmis. |
-| 08:23:14 | contrôle négatif | `80f7a05` | FAIL attendu | `saveMappingOverride` non déclaré bloqué (`block-fail`) ; témoin et sonde sans différence. |
-| 08:46 | rescan de la page principale | `cbad379` | PASS | Après la PR #212 (le parcours lit la notification Jeedom ou `#div_alert`) : `confirmation_ouverte: true`, `retour_rescan_zone: toast`, `retour_rescan: succes-simule` ; `scanTopology` simulé (`rescan-declare`, 06:46:15Z), jamais transmis ; fenêtre du démon sans `[TOPOLOGY] Received sync request` ; 0 erreur ; témoin et sonde sans différence. |
+| 08:23:14 | contrôle négatif | `80f7a05` | FAIL attendu | `saveMappingOverride` non déclaré bloqué (`block-fail`) ; critères interception et console en FAIL attendu (la page reçoit `net::ERR_FAILED`) ; témoin et sonde sans différence. |
+| 08:47:49 | rescan de la page principale | `cbad379` | PASS | Après la PR #212 (le parcours lit la notification Jeedom ou `#div_alert`) : `confirmation_ouverte: true`, `retour_rescan_zone: toast`, `retour_rescan: succes-simule` ; `scanTopology` simulé (`rescan-declare`, 06:46:15Z), jamais transmis ; fenêtre du démon sans `[TOPOLOGY] Received sync request` ; 0 erreur ; témoin et sonde sans différence. |
 
-Entre `80f7a05` et `cbad379`, seul le parcours `rescan-page-principale.mjs` change : le code servi est celui de la box. Le parcours note que le badge « pas encore appliqué » n'est pas prouvé par le gate. La recherche générique de secrets ne trouve rien dans les journaux et les rapports.
+Entre `80f7a05` et `cbad379`, seul le parcours `rescan-page-principale.mjs` change : le code servi est celui de la box. Le rapport du gate rappelle que le badge « pas encore appliqué » n'est pas prouvé par le gate. La recherche générique de secrets ne trouve rien dans les journaux et les rapports des cinq exécutions (relevée par clawcode pour les quatre premières, par ClaudeBox pour le rescan relancé).
 
 ## Rescan au clic réel (ClaudeBox, Chrome, 09:27-09:28)
 
@@ -70,16 +70,16 @@ Relevés après le rescan :
 Gestes faits : un clic réel sur le rescan, la lecture de la page principale et de la page de configuration. Gestes exclus : aucun « Republier », aucun « Supprimer puis recréer », aucun clic sur « Appliquer les filtres et rescanner ».
 
 **Conforme :**
-- AC1 : « Rescanner la topologie Jeedom » est dans le bloc « Actions Home Assistant », entre « Republier dans Home Assistant » et « Supprimer puis recréer dans Home Assistant » ; bridge actif et MQTT connecté, il est actif ; la surface par pièce ne change pas.
+- AC1 : « Rescanner la topologie Jeedom » est dans le bloc « Actions Home Assistant », entre « Republier dans Home Assistant » et « Supprimer puis recréer dans Home Assistant » ; bridge actif et MQTT connecté, il est actif ; la surface par pièce ne change pas. L'état inactif (démon arrêté ou MQTT déconnecté) n'a pas été provoqué sur la box : il est couvert par les tests Node.
 - AC2 : la confirmation s'intitule « Rescanner la topologie Jeedom » et dit « Un sync complet peut publier ou retirer des entités Home Assistant et applique les overrides persistés. Confirmer ? » ; bouton « Rescanner ». L'annulation (croix, Échap, Annuler) est couverte par les tests Node.
-- AC3 et AC4 : le sync passe par `scanTopology` ; succès lisible, puis bandeau santé rafraîchi (« Dernière synchro », « Dernière opération »). L'état « Rescan en cours… » dure moins d'une seconde sur la box ; il est couvert par les tests Node.
+- AC3 et AC4 : le sync passe par `scanTopology` ; succès lisible, puis bandeau santé rafraîchi (« Dernière synchro », « Dernière opération »). L'état « Rescan en cours… » dure moins d'une seconde sur la box ; il est couvert par les tests Node, comme les retours d'échec, d'expiration, de résultat partiel et de 409, qui n'ont pas été provoqués sur la box.
 - AC5 : la page de configuration affiche « Appliquer les filtres et rescanner ».
 - AC6 : topologie complète relue, décisions, publications, cache, résumé ; écouteurs réalignés après la réponse (227).
 - AC7 : rescan déclaré et simulé par le gate (PASS), puis clic réel prouvé à part, parité identique.
 - AC8 : le verrou du sync est prouvé par les tests Python (les deux sens, l'attente bornée et son expiration, `shield`). Sur la box, les syncs du démarrage et du déploiement de 08:06 sont passés sans 409.
 
 **Constats non bloquants, reportés :**
-- **Scénarios désactivés, boutons gardés dans HA (CC-44, antérieur à 20-4).** Les scénarios 72 et 2 ont été désactivés dans Jeedom (`isActive=0`) entre 08:45 et 09:28. Le rescan ne les publie plus et les retire de `scenario_publications` (« Purged stale scenario_id »), mais en mémoire seulement : leurs topics de discovery retenus `homeassistant/button/jeedom2ha_scenario_72/config` et `…_2/config` restent sur le broker, et HA garde les deux boutons. À traiter dans une story ultérieure.
+- **Scénarios désactivés, boutons gardés dans HA (CC-44, antérieur à 20-4).** Les scénarios 72 et 2 étaient désactivés dans Jeedom (`isActive=0`, relevé par clawbox) au moment du rescan de 09:28. Le rescan ne les publie plus et les retire de `scenario_publications` (« Purged stale scenario_id »), mais en mémoire seulement : leurs topics de discovery retenus `homeassistant/button/jeedom2ha_scenario_72/config` et `…_2/config` restent sur le broker, et HA garde les deux boutons. À traiter dans une story ultérieure.
 - **Autres actions HA sous la confirmation (P3 de relecture).** Pendant que la confirmation du rescan est ouverte, « Republier » et « Supprimer puis recréer » ne sont pas encore désactivés ; ils le sont après la confirmation (AC3). Si l'une partait entre-temps, le verrou du démon (AC8) répondrait au rescan par un 409 lisible.
 
 ## Verdict

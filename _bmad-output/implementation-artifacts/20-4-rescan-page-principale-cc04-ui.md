@@ -268,7 +268,7 @@ Réponse « R1A, R2A, R3A », sur recommandation de ClaudeBox.
 - 2026-10-06 — Preuve terrain : déploiement standard de `80f7a05` (06:06:12Z), relevés
   box et HA sans écart ; gate 20-0 : découverte et référence PASS ; le parcours du
   rescan échoue sur sa propre lecture du message (Jeedom 4.4 affiche les alertes en
-  notification), corrigé par la PR #212 (fusion `cbad379`), puis PASS à 08:46. Story
+  notification), corrigé par la PR #212 (fusion `cbad379`), puis PASS (rapport à 08:47:49). Story
   `ready-for-UX-validation`.
 - 2026-10-06, 09:28 — Rescan au clic réel par ClaudeBox, puis validation UX dans
   Chrome sur le go d'Alex de 08:01 : conforme. Deux constats non bloquants reportés :
