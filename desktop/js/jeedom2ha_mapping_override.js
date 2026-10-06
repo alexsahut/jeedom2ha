@@ -258,18 +258,36 @@
     };
   }
 
+  // Deux listes de command_ids désignent la même entité seulement si elles portent
+  // exactement le même ENSEMBLE d'identifiants (ordre indifférent) — un simple recoupement
+  // partiel (ex. une commande d'action partagée entre entité principale et secondaire)
+  // ne suffit pas et désignerait la mauvaise entité.
+  function sameCommandIdSet(idsA, idsB) {
+    if (idsA.length !== idsB.length) return false;
+    return idsA.every(function (id) { return idsB.indexOf(id) !== -1; });
+  }
+
   // Trouve, dans l'arbre déjà reçu (jamais recalculé ici), l'entité courante correspondant
-  // à une entité de l'aperçu — même entité si elle partage au moins une commande (les deux
-  // listes portent les mêmes command_ids pour une même entité, principale ou secondaire).
-  function findCurrentEntity(currentEntities, commandIds) {
+  // à une entité de l'aperçu. Le démon rend les entités de l'arbre et de l'aperçu dans le
+  // même ordre (principale, puis secondaires) avec les mêmes command_ids par entité — on
+  // associe donc d'abord par ensemble de command_ids identique (robuste même si l'ordre
+  // diffère), puis, à défaut, par même position avec le même ha_entity_type (seul repère
+  // fiable quand deux entités partagent une commande d'action et n'ont donc pas de command_ids
+  // strictement égaux). Une entité qui ne correspond sur aucun des deux critères est traitée
+  // comme absente de l'arbre (non publiée), comme aujourd'hui.
+  function findCurrentEntity(currentEntities, commandIds, index, haEntityType) {
     var ids = Array.isArray(commandIds) ? commandIds : [];
-    if (ids.length === 0) return null;
     var pool = Array.isArray(currentEntities) ? currentEntities : [];
-    for (var i = 0; i < pool.length; i++) {
-      var currentIds = Array.isArray(pool[i].command_ids) ? pool[i].command_ids : [];
-      if (ids.some(function (id) { return currentIds.indexOf(id) !== -1; })) {
-        return pool[i];
+    if (ids.length > 0) {
+      for (var i = 0; i < pool.length; i++) {
+        var currentIds = Array.isArray(pool[i].command_ids) ? pool[i].command_ids : [];
+        if (sameCommandIdSet(ids, currentIds)) {
+          return pool[i];
+        }
       }
+    }
+    if (typeof index === 'number' && pool[index] && pool[index].ha_entity_type === haEntityType) {
+      return pool[index];
     }
     return null;
   }
@@ -284,8 +302,8 @@
   // que la colonne diagnostic de l'arbre).
   function equipmentForcePreviewEntities(view, commands, currentEntities) {
     var entities = (view && Array.isArray(view.entities)) ? view.entities : [];
-    return entities.map(function (entity) {
-      var current = findCurrentEntity(currentEntities, entity.command_ids);
+    return entities.map(function (entity, index) {
+      var current = findCurrentEntity(currentEntities, entity.command_ids, index, entity.ha_entity_type);
       var alreadyPublished = !!(current && current.decision && current.decision.should_publish === true);
       var willPublish = isReadyDiagnostic(entity.decision);
       return {

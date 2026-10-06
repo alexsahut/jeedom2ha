@@ -267,3 +267,31 @@ test('20-2 — P3 (reprise X5d) : entité absente de l\'arbre courant (jamais vu
   assert.equal(state.items[0].changes, true);
   assert.equal(state.can_confirm, true);
 });
+
+// Story 20-2 (P3, reprise X5e) : une entité secondaire qui partage UNE commande d'action
+// avec l'entité principale (ex. commande 2) ne doit pas être associée à l'entité principale
+// — sinon son aperçu est lu sur l'état de l'autre entité (ici : secondaire lue à tort comme
+// déjà publiée, alors qu'elle ne l'est pas). L'association se fait par ensemble complet de
+// command_ids, puis par position + ha_entity_type, jamais par simple recoupement partiel.
+test('20-2 — P3 (reprise X5e) : entités avec commande d\'action partagée, pas de confusion principale/secondaire', () => {
+  const commands = [
+    { jeedom_cmd_id: 1, cmd_name: 'Monter' },
+    { jeedom_cmd_id: 2, cmd_name: 'Stop' },
+    { jeedom_cmd_id: 3, cmd_name: 'Descendre' },
+  ];
+  const currentEntities = [
+    { ha_entity_type: 'cover', command_ids: [1, 2], decision: ready },
+    { ha_entity_type: 'binary_sensor', command_ids: [2, 3], decision: blocked },
+  ];
+  const view = { entities: [
+    { ha_entity_type: 'cover', command_ids: [1, 2], decision: ready },
+    { ha_entity_type: 'binary_sensor', command_ids: [2, 3], decision: ready },
+  ] };
+  const state = M.equipmentForcePreviewState(view, commands, currentEntities);
+  assert.equal(state.items[0].already_published, true);
+  assert.equal(state.items[0].changes, false);
+  assert.equal(state.items[1].already_published, false);
+  assert.equal(state.items[1].changes, true);
+  assert.match(state.items[1].status_label, /Sera publiée/);
+  assert.equal(state.can_confirm, true);
+});
