@@ -383,6 +383,7 @@ async function main() {
       loginAttempts: 0,
       declaredEquipments: parcours.declaredEquipments,
       declaredPublicationOverrides: parcours.declaredPublicationOverrides || {},
+      declaredRescan: parcours.declaredRescan === true,
       lastPreviewType: simState.lastPreviewType,
     };
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });

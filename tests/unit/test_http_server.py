@@ -4,8 +4,11 @@ test_http_server.py — Unit tests for the daemon's local HTTP API server.
 Tests the /system/status endpoint, local_secret authentication,
 and server lifecycle (start/stop).
 """
+import asyncio
+import json
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
 from aiohttp import web
 
 _FAKE_CLI_ARGS = [
@@ -129,6 +132,108 @@ class TestSyncAction:
     async def test_sync_no_secret_returns_401(self, http_client):
         resp = await http_client.post("/action/sync", json={})
         assert resp.status == 401
+
+    async def test_sync_secret_is_checked_before_lock(self, http_client, http_app):
+        """Une requête non authentifiée ne voit pas le verrou détenu (AC8)."""
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/sync", json={})
+            assert resp.status == 401
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_rescan_refuses_immediately_when_action_is_running(self, http_client, http_app):
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/sync", headers={
+                "X-Local-Secret": LOCAL_SECRET, "X-Jeedom2ha-Sync-Mode": "rescan",
+            }, json={})
+            assert resp.status == 409
+            assert (await resp.json())["code"] == "action_in_progress"
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_action_refuses_while_sync_holds_lock(self, http_client, http_app):
+        await http_app["action_lock"].acquire()
+        try:
+            resp = await http_client.post("/action/execute", headers={"X-Local-Secret": LOCAL_SECRET}, json={
+                "intention": "publier", "portee": "global", "selection": ["1"],
+            })
+            assert resp.status == 409
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_service_sync_waits_for_action_then_runs(self, http_app):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        http_app["action_lock"] = asyncio.Lock()
+        await http_app["action_lock"].acquire()
+        request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+        release = asyncio.create_task(asyncio.sleep(0.01))
+        release.add_done_callback(lambda _: http_app["action_lock"].release())
+        with patch("resources.daemon.transport.http_server._do_handle_action_sync_body", new=AsyncMock(return_value=web.Response())):
+            resp = await _do_handle_action_sync(request)
+        assert resp.status == 200
+
+    async def test_service_sync_timeout_returns_409(self, http_app, monkeypatch):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        import resources.daemon.transport.http_server as server
+        monkeypatch.setattr(server, "_SYNC_ACTION_LOCK_WAIT_SECONDS", 0.01)
+        http_app["action_lock"] = asyncio.Lock()
+        await http_app["action_lock"].acquire()
+        try:
+            request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+            resp = await _do_handle_action_sync(request)
+            assert resp.status == 409
+            assert json.loads(resp.body)["code"] == "action_in_progress"
+        finally:
+            http_app["action_lock"].release()
+
+    async def test_sync_completes_after_client_cancellation(self, http_app):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        http_app["action_lock"] = asyncio.Lock()
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def body(request):  # noqa: ARG001
+            started.set()
+            await release.wait()
+            return web.Response()
+
+        request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+        with patch("resources.daemon.transport.http_server._do_handle_action_sync_body", new=body):
+            handler = asyncio.create_task(_do_handle_action_sync(request))
+            await started.wait()
+            handler.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await handler
+            assert http_app["action_lock"].locked()
+            release.set()
+            while http_app["action_lock"].locked():
+                await asyncio.sleep(0)
+
+    async def test_sync_records_failure_after_client_cancellation(self, http_app):
+        from resources.daemon.transport.http_server import _do_handle_action_sync
+        http_app["action_lock"] = asyncio.Lock()
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def body(request):  # noqa: ARG001
+            started.set()
+            await release.wait()
+            raise RuntimeError("boom")
+
+        request = SimpleNamespace(app=http_app, headers={"X-Local-Secret": LOCAL_SECRET})
+        with patch("resources.daemon.transport.http_server._do_handle_action_sync_body", new=body):
+            handler = asyncio.create_task(_do_handle_action_sync(request))
+            await started.wait()
+            handler.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await handler
+            assert http_app["action_lock"].locked()
+            assert http_app["derniere_operation_resultat"]["resultat"] != "echec"
+            release.set()
+            while http_app["action_lock"].locked():
+                await asyncio.sleep(0)
+            assert http_app["derniere_operation_resultat"]["resultat"] == "echec"
+            assert http_app["derniere_synchro_terminee"] is not None
 
     async def test_sync_populates_runtime_gating_fields_for_switch(self, http_client, http_app, mock_mqtt):
         payload = {
@@ -1231,6 +1336,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
+        data = await resp.json()
+        assert data["operation_result"] == "succes"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "succes"
         assert http_app["derniere_synchro_terminee"] is not None
@@ -1282,6 +1390,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 200
+        data = await resp.json()
+        assert data["operation_result"] == "partiel"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "partiel"
 
@@ -1298,6 +1409,9 @@ class TestHealthCheckContract:
             json={"payload": payload},
         )
         assert resp.status == 500
+        data = await resp.json()
+        assert data["operation_result"] == "echec"
+        assert data["operation_message"]
         assert isinstance(http_app["derniere_operation_resultat"], dict)
         assert http_app["derniere_operation_resultat"]["resultat"] == "echec"
         assert http_app["derniere_synchro_terminee"] is not None
