@@ -264,10 +264,12 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 ### Completion Notes List
 
 - 2026-10-06 — `create-story` seulement : aucun code, test, script ni configuration modifié ; statut `backlog` conservé (voir l'encadré d'en-tête).
+- 2026-10-08 — Audit préparatoire local au SHA `9d8f2dc` : faits F1 à F7 revérifiés, inventaire des chaînes et plan de réaffectation des 22 références de tests/gate consignés dans `20-3-preparation-audit-2026-10-08.md`. Cet audit ne valide pas les Tasks 1.1–1.5 et ne change pas le statut : 20.2 reste `review`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md`
+- `_bmad-output/implementation-artifacts/20-3-preparation-audit-2026-10-08.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `docs/operations/delegations.md` (ligne de journal de délégation, commit `914110c` déjà présent sur la branche)
 
