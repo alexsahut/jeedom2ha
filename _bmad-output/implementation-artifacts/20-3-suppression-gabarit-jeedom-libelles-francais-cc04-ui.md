@@ -1,8 +1,8 @@
 # Story 20.3 : Suppression du gabarit Jeedom et libellés français d'usage (CC-04 volet UI)
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `create-story` terminé, `ready-for-dev` NON accordé (2026-10-06).** Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Le seul blocage restant est **20.2 non `done`** (`review` : preuve post-fusion et validation UX restantes). Aucun développement avant 20.2 `done`.
+> **Statut : `ready-for-dev` accordé (2026-10-08).** Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. La dépendance 20.2 est `done`; l'audit F1–F7 a été rejoué au SHA `b2a89df` et Alexandre a validé la table de libellés du 2026-10-08. Le développement peut commencer.
 
 ## Story
 
@@ -265,6 +265,7 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 
 - 2026-10-06 — `create-story` seulement : aucun code, test, script ni configuration modifié ; statut `backlog` conservé (voir l'encadré d'en-tête).
 - 2026-10-08 — Audit préparatoire local au SHA `9d8f2dc` : faits F1 à F7 revérifiés, inventaire des chaînes et plan de réaffectation des 22 références de tests/gate consignés dans `20-3-preparation-audit-2026-10-08.md`. Cet audit ne valide pas les Tasks 1.1–1.5 et ne change pas le statut : 20.2 reste `review`.
+- 2026-10-08 — Revalidation `ready-for-dev` au SHA `b2a89df` : F1–F7 et les 22 références tests/gate sont inchangés; aucun contenu CSS `content:` pertinent. Alexandre valide la table des libellés (message « table 20.3 OK »). 20.2 est `done`; statut 20.3 passé à `ready-for-dev`, sans code produit ni test exécuté.
 
 ### File List
 
@@ -276,3 +277,4 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 ### Change Log
 
 - 2026-10-06 — Création de la story (brouillon complet, `ready-for-dev` bloqué par Q1 à Q4 et par 20.2 non `done`).
+- 2026-10-08 — Prérequis levés : 20.2 `done`, audit F1–F7 au SHA courant et table de libellés validée par Alexandre; 20.3 passe `ready-for-dev`.

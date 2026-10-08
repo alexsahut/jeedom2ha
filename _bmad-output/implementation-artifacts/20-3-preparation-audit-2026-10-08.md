@@ -8,6 +8,28 @@
 
 Les faits F1 à F7 de la story sont toujours exacts au SHA lu. Le code de 20.2 est déjà intégré ; sa clôture terrain/UX reste le seul prérequis de statut avant `ready-for-dev`. Cet audit prépare le futur `dev-story` sans anticiper ce passage.
 
+## Revalidation après clôture 20.2
+
+**SHA relu :** `b2a89dfbc74c80901cfb2bf0292e108cfa3ac5d1` (`main`), le 2026-10-08.
+
+- F1 à F7 sont inchangés; les routes d'export/support et leurs relais backend restent hors retrait.
+- La recherche F6 retrouve les mêmes 22 références tests/gate; aucun texte CSS généré par `content:` n'est concerné.
+- Alexandre a validé la table de libellés proposée le 2026-10-08 (« table 20.3 OK »). Les formulations validées sont intégrées à la section suivante et l'inventaire exhaustif de code reste une tâche de développement, au SHA de la branche de réalisation.
+
+### Table de libellés validée
+
+| Chaîne actuelle | Traitement validé |
+| --- | --- |
+| `Configuration mapping Home Assistant par pièce` | `Configuration Home Assistant par pièce` |
+| `Mes templates` et le message d'absence Template | suppression |
+| `Paramètres spécifiques`, `Nom du paramètre n°1`, `Paramètre n°1`, `Mot de passe`, `Auto-actualisation` et assistant cron | suppression |
+| `Aucun mapping trouvé…` / `aucun mapping ne couvre…` | `Aucun type Home Assistant identifié…` / `Aucun type Home Assistant ne couvre…` |
+| `mapping ambigu` | `type Home Assistant ambigu` |
+| `mapping direct` | `type Home Assistant identifié` |
+| `commande non couverte par un mapping` | `commande sans type Home Assistant applicable` |
+
+Les identifiants techniques (`eq_id`, `reason_code`, noms de routes) restent internes et ne sont jamais rendus.
+
 ## Inventaire initial des libellés d'usage
 
 | Chaîne actuelle | Traitement 20.3 acté | Libellé/issue cible |
