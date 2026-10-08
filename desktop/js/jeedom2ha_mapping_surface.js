@@ -793,6 +793,11 @@
       $actions.append($apply);
     }
     appendEquipmentRecreateButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
+    // Le bouton vient d'être ajouté après l'ouverture de la modale : il suit le même gating que
+    // les boutons globaux (pont indisponible, rescan en cours), sinon il resterait actif.
+    if (typeof applyHAGating === 'function') {
+      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+    }
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -805,7 +810,7 @@
     var $thead = $('<thead></thead>');
     $thead.append($('<tr></tr>')
       .append($('<th class="mo-th-name"></th>').text('{{Commande}}'))
-      .append($('<th class="mo-th-generic"></th>').text('generic_type'))
+      .append($('<th class="mo-th-generic"></th>').text('{{Type Jeedom}}'))
       .append($('<th class="mo-th-override"></th>').text('{{Override HA}}'))
       .append($('<th class="mo-th-diag"></th>').text('{{Diagnostic}}')));
     $table.append($thead);

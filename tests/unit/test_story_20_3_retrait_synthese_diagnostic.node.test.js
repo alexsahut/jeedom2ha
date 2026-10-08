@@ -110,7 +110,7 @@ describe('20.3 / AC6 — libellés français d’usage', () => {
   const FORBIDDEN = [
     /mapping/i, /\bTemplate/i, /\bMes templates/i, /Paramètre n°1/, /Paramètres spécifiques/,
     /\bÉcart/, /\bEcart/, /\bConfiance/, /\beq_id\b/, /\breason_code\b/, /Parc global/,
-    /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/, /Mot de passe/, /Auto-actualisation/,
+    /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/, /generic_type/, /Mot de passe/, /Auto-actualisation/,
   ];
 
   // Textes visibles du PHP : tout ce qui passe par {{ }} (la traduction Jeedom).

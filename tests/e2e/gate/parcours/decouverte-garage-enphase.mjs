@@ -77,7 +77,7 @@ async function readEquipmentBadgeStates(page, modal) {
 const FORBIDDEN_TEXT = [
   /mapping/i, /Template/i, /Mes templates/, /Paramètre n°1/, /Paramètres spécifiques/,
   /Écart/, /Ecart/, /Confiance/, /\beq_id\b/, /\breason_code\b/, /Parc global/,
-  /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/,
+  /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/, /generic_type/,
 ];
 
 /** Lit le texte rendu d'un conteneur (jamais les scripts) et renvoie les rangs des motifs interdits trouvés. */

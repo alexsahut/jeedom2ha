@@ -173,6 +173,12 @@ describe('20.3 / AC4 — gating indépendant d’un rendu de synthèse', () => {
     assert.match(surface, /applyHAGating\(window\.jeedom2haLastBridgeStatus \|\| null\)/);
   });
 
+  it('le bouton « Supprimer puis recréer » ajouté après le chargement de l’arbre est soumis au gating', () => {
+    const render = surface.match(/function renderEquipmentTree[\s\S]*?\n  function loadEquipment/)[0];
+    const afterButton = render.slice(render.indexOf('appendEquipmentRecreateButton('));
+    assert.match(afterButton, /applyHAGating\(window\.jeedom2haLastBridgeStatus \|\| null\)/);
+  });
+
   it('les triggers globaux ne rafraîchissent plus de synthèse', () => {
     const publier = home.match(/function triggerPublierAction[\s\S]*?\n\}/)[0];
     const supprimer = home.match(/function triggerSupprimerAction[\s\S]*?\n\}/)[0];
