@@ -155,7 +155,7 @@ Réponse « 1A, 2A, 3A » aux questions posées vers 15:05, sur recommandation d
 - [ ] **Task 5 — Gate et preuve (AC: 11)**
   - [x] 5.1 Gate : nouvelles écritures autorisées comme écritures simulées déclarées (F12), auto-test local, parcours de pose et de retrait d'une exclusion.
   - [ ] 5.2 Après fusion : déploiement standard, relevés avant et après (parité : `changed_decisions` vide hors écarts listés en 0.3), gate sur `main`.
-  - [ ] 5.3 Preuve terrain au clic réel (AC11), passage Chrome par ClaudeBox, `ready-for-UX-validation`, validation UX.
+  - [x] 5.3 Preuve terrain au clic réel (AC11), passage Chrome par ClaudeBox, `ready-for-UX-validation`, validation UX.
 
 ## Dev Notes
 
@@ -232,6 +232,7 @@ GPT-5 Codex
 
 - 2026-10-08 — Task 5 terrain : déploiement standard du SHA `79127a5`, gate 20-0 PASS (parcours 20.2 avec écritures simulées) et parcours réel autorisé par Alexandre sur eq287 uniquement : Exclure → Appliquer → Revenir au mode automatique. Alexandre confirme l'affichage « Exclu », le badge « pas encore appliqué dans Home Assistant » et le second clic Appliquer après le retour. Parité finale strictement identique et fichier d'overrides revenu à son hash initial ; aucun effet HA/MQTT. Statut conservé `review` : le témoin littéral `getBridgeStatus` avant/après requis par AC11 n'a pas été capturé.
 - 2026-10-08 — Alexandre accepte explicitement le waiver du témoin `getBridgeStatus` avant/après : les relevés d'overrides, de parité, MQTT/HA, PID et journaux constituent la preuve substitutive. Statut `review` → `ready-for-UX-validation`; validation UX explicite restante avant `done`.
+- 2026-10-08 — Alexandre donne la validation UX explicite. Story `ready-for-UX-validation` → `done`.
 
 ### File List
 

@@ -2,7 +2,7 @@
 
 **Date :** 2026-10-08
 **SHA déployé :** `79127a5`
-**Statut :** `ready-for-UX-validation` après waiver explicite d'Alexandre ; validation UX explicite restante avant `done`.
+**Statut :** `done` après waiver explicite et validation UX explicite d'Alexandre.
 
 ## Éléments validés
 
@@ -20,7 +20,7 @@ Le diagnostic en lecture seule établit que ce message vient du coeur Jeedom lor
 
 ## Waiver AC11 accepté
 
-L'AC11 exige un témoin `getBridgeStatus` relevé avant et après le parcours réel. Cette lecture, disponible seulement dans une session navigateur authentifiée, n'a pas été capturée autour des clics. Les autres témoins (hash d'overrides, PID, journaux, écouteurs, parité et MQTT) sont conformes. Alexandre accepte explicitement leur usage comme preuve substitutive plutôt que de rejouer un parcours réel. La story passe donc à `ready-for-UX-validation`; elle ne passe pas `done` sans validation UX explicite.
+L'AC11 exige un témoin `getBridgeStatus` relevé avant et après le parcours réel. Cette lecture, disponible seulement dans une session navigateur authentifiée, n'a pas été capturée autour des clics. Les autres témoins (hash d'overrides, PID, journaux, écouteurs, parité et MQTT) sont conformes. Alexandre accepte explicitement leur usage comme preuve substitutive plutôt que de rejouer un parcours réel, puis donne sa validation UX explicite. La story passe à `done`.
 
 ## Références de preuve
 
