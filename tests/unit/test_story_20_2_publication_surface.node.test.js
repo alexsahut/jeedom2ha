@@ -39,7 +39,7 @@ test('20-2 — P2 revue : chaque bouton porte sa propre cause de blocage', () =>
 
   const noMapping = M.publicationActionState({ decision: { ha_entity_type: null, should_publish: false }, override_command_id: 8, publication_override: null });
   assert.equal(noMapping.can_force, false);
-  assert.match(noMapping.force_reason, /mapping/);
+  assert.match(noMapping.force_reason, /type Home Assistant identifié/);
 
   const outOfScope = M.publicationActionState({ decision: { ha_entity_type: 'vacuum', should_publish: false }, override_command_id: 8, publication_override: null });
   assert.equal(outOfScope.can_force, false);

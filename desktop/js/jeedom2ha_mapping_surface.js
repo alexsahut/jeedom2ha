@@ -18,7 +18,7 @@
   var DEBOUNCE_MS = 400;
 
   // État volatil de la surface courante (une modale pièce ouverte à la fois).
-  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {} };
+  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, room: null };
 
   function normalizedRooms() {
     return M.normalizeRoomsTree(window.j2haRoomsTree || []);
@@ -495,6 +495,152 @@
       .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
+  // --- Story 20.3 (Q1=A) — compteurs de la pièce ouverte ---
+  // Lus uniquement dans les arbres déjà chargés pour cette pièce (aucune autre lecture) ;
+  // le dénombrement vit dans le module pur (M.summarizeRoom), jamais de décision recalculée.
+
+  function renderRoomCounters() {
+    var $host = $('.modal-j2ha-room .j2ha-room-counters').first();
+    if ($host.length === 0 || !ctx.room) {
+      return;
+    }
+    var trees = [];
+    for (var i = 0; i < ctx.room.equipments.length; i++) {
+      var tree = ctx.trees[ctx.room.equipments[i].eq_id];
+      if (tree) {
+        trees.push(tree);
+      }
+    }
+    $host.empty();
+    if (trees.length === 0) {
+      $host.text('{{Chargement des compteurs…}}');
+      return;
+    }
+    var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length));
+    function line(items, extra) {
+      var $line = $('<div class="j2ha-room-counter-line"></div>');
+      items.forEach(function (item) {
+        $line.append($('<span class="label label-default j2ha-room-counter"></span>').text(item));
+      });
+      if (extra) {
+        $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(extra));
+      }
+      return $line;
+    }
+    $host.append(line(labels.equipments, labels.unread));
+    $host.append(line(labels.commands));
+  }
+
+  // --- Story 20.3 (Q2=A) — actions ciblées déplacées dans la surface ---
+  // Mêmes routes (executeHaAction) et mêmes confirmations fortes que l'ancienne synthèse ;
+  // les noms (texte libre Jeedom) sont échappés avant d'entrer dans le HTML de la confirmation.
+
+  function escapeHtml(value) {
+    return $('<span></span>').text(String(value)).html();
+  }
+
+  function showRoomFeedback(message, level) {
+    var $slot = $('.modal-j2ha-room .j2ha-room-feedback').first();
+    if ($slot.length === 0) {
+      return;
+    }
+    $slot.empty().append($('<div class="alert" role="status"></div>')
+      .addClass('alert-' + level).text(message)).show();
+  }
+
+  function reloadRoom() {
+    if (!ctx.room) {
+      return;
+    }
+    ctx.room.equipments.forEach(function (eq) { reloadEquipment(eq.eq_id); });
+  }
+
+  function runHaAction(intention, portee, selection, $button, pendingLabel, onSuccess) {
+    var pendingState = setHaActionPendingState($button, pendingLabel);
+    executeHaAction(intention, portee, selection, {
+      onSuccess: function (payload) {
+        showRoomFeedback(buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
+        if (shouldRefreshPublishedScopeAfterHaAction(payload) && onSuccess) {
+          onSuccess();
+        }
+        refreshBridgeStatus();
+      },
+      onError: function (message) {
+        showRoomFeedback(message, 'danger');
+      },
+      onComplete: function () {
+        restoreHaActionPendingState($button, pendingState);
+      },
+    });
+  }
+
+  var RECREATE_WARNING = '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}';
+
+  function appendEquipmentRecreateButton($host, eqId, eqName) {
+    var $button = $('<button type="button" class="btn btn-default btn-xs j2ha-eq-recreate" data-ha-action="supprimer"></button>')
+      .text('{{Supprimer puis recréer}}');
+    $button.on('click', function () {
+      if ($button.prop('disabled')) {
+        return;
+      }
+      confirmHaSupprimerAction(
+        '{{Supprimer puis recréer dans Home Assistant}}',
+        '{{Supprimer}} "' + escapeHtml(eqName) + '" {{de Home Assistant.}}' + RECREATE_WARNING,
+        '{{Supprimer 1 équipement}}',
+        function () {
+          runHaAction('supprimer', 'equipement', [eqId], $button, '{{Suppression...}}', function () {
+            reloadEquipment(eqId);
+          });
+        }
+      );
+    });
+    $host.append($button);
+  }
+
+  function buildRoomActions(room) {
+    var $wrap = $('<div class="j2ha-room-actions" style="margin:6px 0;"></div>');
+    // La convention daemon object_id=0 (« Sans pièce ») n'est pas une pièce adressable par la
+    // portée `piece` (le démon la refuse) : actions de pièce indisponibles, actions par
+    // équipement conservées.
+    if (room.object_id <= 0) {
+      $wrap.append($('<span class="text-muted"></span>')
+        .text('{{Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement.}}'));
+      return $wrap;
+    }
+    var $republish = $('<button type="button" class="btn btn-default btn-sm j2ha-room-republish" data-ha-action="republier"></button>')
+      .append('<i class="fas fa-upload"></i> ').append(document.createTextNode('{{Republier la pièce}}'));
+    $republish.on('click', function () {
+      if ($republish.prop('disabled')) {
+        return;
+      }
+      confirmHaPublishAction(
+        '{{Republier la pièce}}',
+        escapeHtml(room.object_name) + ' — {{republier les équipements inclus de cette pièce. Confirmer ?}}',
+        '{{Republier}}',
+        function () {
+          runHaAction('publier', 'piece', [room.object_id], $republish, '{{En cours...}}', reloadRoom);
+        }
+      );
+    });
+    var $recreate = $('<button type="button" class="btn btn-default btn-sm j2ha-room-recreate" data-ha-action="supprimer" style="margin-left:8px;"></button>')
+      .append('<i class="fas fa-recycle"></i> ').append(document.createTextNode('{{Supprimer puis recréer la pièce}}'));
+    $recreate.on('click', function () {
+      if ($recreate.prop('disabled')) {
+        return;
+      }
+      confirmHaSupprimerAction(
+        '{{Supprimer puis recréer dans Home Assistant}}',
+        '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + RECREATE_WARNING,
+        '{{Supprimer la pièce}}',
+        function () {
+          runHaAction('supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reloadRoom);
+        }
+      );
+    });
+    $wrap.append($republish).append($recreate);
+    return $wrap;
+  }
+
   // --- Synthèse de publication par équipement (Bloc C) ---
 
   function renderSummary($panel, tree) {
@@ -622,6 +768,9 @@
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
 
+    ctx.trees[eqId] = normalized;
+    renderRoomCounters();
+
     renderSyncBadge($panel, normalized);
     renderEntities($panel, normalized);
 
@@ -643,6 +792,7 @@
       $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
       $actions.append($apply);
     }
+    appendEquipmentRecreateButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -703,6 +853,10 @@
     $wrap.append($('<div id="j2haSurface_reassurance" class="alert alert-warning" role="status" aria-live="polite" style="display:none;">' +
       '<i class="fas fa-shield-alt"></i> {{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}</div>'));
 
+    $wrap.append($('<div class="j2ha-room-counters text-muted" role="status" aria-live="polite" style="margin:6px 0;"></div>'));
+    $wrap.append(buildRoomActions(room));
+    $wrap.append($('<div class="j2ha-room-feedback" role="status" style="display:none;margin:6px 0;"></div>'));
+
     var $accordion = $('<div class="panel-group j2ha-eq-accordion" role="tablist" aria-multiselectable="true"></div>');
     for (var i = 0; i < room.equipments.length; i++) {
       var eq = room.equipments[i];
@@ -755,6 +909,8 @@
     ctx.reassurance = M.initReassuranceState();
     ctx.timers = {};
     ctx.xhr = {};
+    ctx.trees = {};
+    ctx.room = room;
 
     var $content = buildRoomModalHtml(room);
 
@@ -767,6 +923,12 @@
       backdrop: true,
     });
     $('.modal-j2ha-room .modal-dialog').css('width', '90%').css('max-width', '1100px');
+    renderRoomCounters();
+    // Les boutons d'action créés après le chargement de la page suivent le même gating que
+    // les boutons globaux (pont indisponible, rescan en cours).
+    if (typeof applyHAGating === 'function') {
+      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+    }
 
     // Garde-fou dépliage : si un panneau n'a pas encore été chargé (ex. échec
     // réseau initial), on le charge à la première ouverture.

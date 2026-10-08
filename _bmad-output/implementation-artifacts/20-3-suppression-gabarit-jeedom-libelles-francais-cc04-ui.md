@@ -1,8 +1,8 @@
 # Story 20.3 : Suppression du gabarit Jeedom et libellés français d'usage (CC-04 volet UI)
 
-Status: ready-for-dev
+Status: review
 
-> **Statut : `ready-for-dev` accordé (2026-10-08).** Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. La dépendance 20.2 est `done`; l'audit F1–F7 a été rejoué au SHA `b2a89df` et Alexandre a validé la table de libellés du 2026-10-08. Le développement peut commencer.
+> **Statut : `review` (2026-10-08, implémentation locale livrée en session cloud déléguée ; preuve terrain AC10 et validation UX restantes).** Rappel — `ready-for-dev` accordé le 2026-10-08. Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. La dépendance 20.2 est `done`; l'audit F1–F7 a été rejoué au SHA `b2a89df` et Alexandre a validé la table de libellés du 2026-10-08. Le développement peut commencer.
 
 ## Story
 
@@ -154,7 +154,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)** *(exécuté par l'humain ou ClaudeBox ; jamais par une session cloud déléguée)*
+- [ ] **Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)** *(exécuté par l'humain ou ClaudeBox ; jamais par une session cloud déléguée — non exécuté en session cloud, reste à faire après fusion)*
   - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
@@ -162,26 +162,26 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
     - **Pour cette story : déploiement standard seulement** (voir « Interdits ») ; aucun mode de nettoyage.
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
 - [ ] **Task 1 — Relevés préalables, lecture seule (AC: 1-6)**
-  - [ ] 1.1 Relire F1 à F7 au SHA courant (20.2 `done` entre-temps modifie le code touché).
-  - [ ] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
-  - [ ] 1.3 Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
-  - [ ] 1.4 Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
-  - [ ] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
-- [ ] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
-  - [ ] 2.1 `jeedom2ha.php` : retirer `#div_scopeSummary` et l'action « Diagnostic » ; garder classes et attributs du bloc « Gestion » ; ne plus inclure `jeedom2ha_scope_summary.js`.
-  - [ ] 2.2 `jeedom2ha.js` : retirer `refreshPublishedScopeSummary`, les gestionnaires de synthèse, le gestionnaire `diagnostic` et la modale ; découpler `applyHAGating` et les confirmations globales de la synthèse (AC4).
-  - [ ] 2.3 Helpers de diagnostic sans consommateur retirés ; `exportDiagnostic` inchangé.
-- [ ] **Task 3 — Compteurs et capacités de remplacement (AC: 3, 4, 7) — selon Q1, Q2, Q3**
-  - [ ] 3.1 Module pur de dénombrement à partir de l'arbre (équipements et commandes), testé sans DOM ; aucun recalcul de décision.
-  - [ ] 3.2 Rendu de l'entête de pièce ; libellés d'unité.
-  - [ ] 3.3 Selon Q2 : actions déplacées sur les gestionnaires existants, confirmations conservées ; sinon, « Pertes assumées » renseignées.
-  - [ ] 3.4 Confirmations globales selon Q2b (AC4).
-- [ ] **Task 4 — Libellés d'usage (AC: 6) — selon Q4**
-  - [ ] 4.1 Retrait de « Mes templates » et des champs sans usage ; réécriture des libellés restants selon la table validée.
-  - [ ] 4.2 Test Node qui parcourt les chaînes rendues et échoue sur toute chaîne interdite.
-- [ ] **Task 5 — Tests (AC: 1-9)** : Node (module de dénombrement, absence de références à `published_scope` et co., chaînes interdites, non-régression 16.8 / 20.1 / 20.2 / 20.4), PHP (page sans synthèse, relais conservés), tests retirés ou réaffectés selon la Task 1.5 ; `flake8` si du Python est touché.
-- [ ] **Task 6 — Gate et preuve (AC: 10)**
-  - [ ] 6.1 Gate : parcours de découverte étendu, politique et inventaire de chargement mis à jour, auto-test local.
+  - [x] 1.1 Relire F1 à F7 au SHA courant (20.2 `done` entre-temps modifie le code touché).
+  - [x] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
+  - [ ] 1.3 *(non vérifié : le code du cœur Jeedom n'est pas disponible en session cloud ; Q4 = A ne modifie pas le squelette exigé — conteneurs `eqLogic`, `eqLogicThumbnailDisplay`, onglets, `plugin.template` — et conserve « Ajouter » et « Configuration » ; à confirmer lors du passage terrain)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
+  - [ ] 1.4 *(box Jeedom inaccessible depuis une session cloud : relevé des compteurs réels reporté au passage terrain, AC10)* Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
+  - [x] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
+- [x] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
+  - [x] 2.1 `jeedom2ha.php` : retirer `#div_scopeSummary` et l'action « Diagnostic » ; garder classes et attributs du bloc « Gestion » ; ne plus inclure `jeedom2ha_scope_summary.js`.
+  - [x] 2.2 `jeedom2ha.js` : retirer `refreshPublishedScopeSummary`, les gestionnaires de synthèse, le gestionnaire `diagnostic` et la modale ; découpler `applyHAGating` et les confirmations globales de la synthèse (AC4).
+  - [x] 2.3 Helpers de diagnostic sans consommateur retirés ; `exportDiagnostic` inchangé.
+- [x] **Task 3 — Compteurs et capacités de remplacement (AC: 3, 4, 7) — selon Q1, Q2, Q3**
+  - [x] 3.1 Module pur de dénombrement à partir de l'arbre (équipements et commandes), testé sans DOM ; aucun recalcul de décision.
+  - [x] 3.2 Rendu de l'entête de pièce ; libellés d'unité.
+  - [x] 3.3 Selon Q2 : actions déplacées sur les gestionnaires existants, confirmations conservées ; sinon, « Pertes assumées » renseignées.
+  - [x] 3.4 Confirmations globales selon Q2b (AC4).
+- [x] **Task 4 — Libellés d'usage (AC: 6) — selon Q4**
+  - [x] 4.1 Retrait de « Mes templates » et des champs sans usage ; réécriture des libellés restants selon la table validée.
+  - [x] 4.2 Test Node qui parcourt les chaînes rendues et échoue sur toute chaîne interdite.
+- [x] **Task 5 — Tests (AC: 1-9)** : Node (module de dénombrement, absence de références à `published_scope` et co., chaînes interdites, non-régression 16.8 / 20.1 / 20.2 / 20.4), PHP (page sans synthèse, relais conservés), tests retirés ou réaffectés selon la Task 1.5 ; `flake8` si du Python est touché.
+- [ ] **Task 6 — Gate et preuve (AC: 10)** *(6.1 livré ; 6.2 est une preuve terrain, hors session cloud)*
+  - [x] 6.1 Gate : parcours de découverte étendu, politique et inventaire de chargement mis à jour, auto-test local.
   - [ ] 6.2 Après fusion : déploiement standard, relevés avant et après, gate sur `main`, comparaison des compteurs, clic réel des actions déplacées si Q2 = A, passage Chrome ClaudeBox, `ready-for-UX-validation`, validation UX.
 
 ## Dev Notes
@@ -259,22 +259,87 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 
 ### Agent Model Used
 
-À renseigner au `dev-story`.
+Agent Claude Code, session cloud déléguée (sans accès box Jeedom, Home Assistant, secrets ni déploiement).
+
+### Debug Log References
+
+- Base de départ : suite Node 508/508 verte sur `main` `82dcd90` avant modification.
+- Fin : Node 394/394 (`node --test tests/unit/*.node.test.js`), pytest 609 passés / 1 ignoré, `flake8` propre, `php -l` sur tous les `.php`, tests PHP hors cœur Jeedom verts (dont `tests/unit/test_story_20_3_php_page.php`), auto-test local de l'intercepteur du gate 20-0 : 0 échec (`JEEDOM2HA_GATE_TOOLS=/opt/node-tools node tests/e2e/gate/interceptor-selftest.mjs`).
+
+### Implementation Plan
+
+1. **Retrait** : `#div_scopeSummary`, `#bt_refreshScopeSummary`, l'action « Diagnostic » et la section « Mes templates » (page d'accueil) ; champs « Paramètre n°1 », « Mot de passe », « Auto-actualisation » (+ assistant cron) de la page d'édition ; `jeedom2ha_scope_summary.js` et `jeedom2ha_diagnostic_helpers.js` supprimés ; gestionnaires de synthèse, navigation hiérarchique, badge Écart, modale Diagnostic retirés de `jeedom2ha.js` ; règles CSS de la synthèse retirées. Relais PHP (`getDiagnostics`, `getPublishedScopeForConsole`, `exportDiagnostic`), routes du démon, export support et squelette Jeedom (`eqLogicThumbnailContainer`, `eqLogicAction`, `eqLogic`, onglets, `plugin.template`) inchangés.
+2. **Compteurs (Q1 = A)** : `Jeedom2haMappingOverride.summarizeRoom` / `buildRoomCounterLabels` (module pur, sans DOM) dénombrent les arbres déjà lus par la modale de pièce ; entête de pièce rendu par `renderRoomCounters` dans `jeedom2ha_mapping_surface.js`. Un équipement « à corriger » est un équipement ayant au moins une commande bloquante : un équipement partiellement publié est donc compté à la fois « publié » et « à corriger ».
+3. **Actions déplacées (Q2 = A)** : « Republier la pièce » et « Supprimer puis recréer la pièce » dans l'entête de la modale ; « Supprimer puis recréer » par équipement dans ses actions ; routes `executeHaAction` (`publier`/`supprimer`, portées `piece`/`equipement`), mêmes confirmations fortes ; noms échappés ; retour de la modale (relecture des arbres de la pièce après succès) ; gating des boutons créés après chargement via `applyHAGating`.
+4. **Confirmations globales (Q2b = A)** : « Republier tous les équipements inclus ? » et « Supprimer puis recréer tout le parc publié ? » sans nombre, mise en garde forte conservée ; `data-scope-count` / `data-scope-publies` supprimés ; `applyHAGating` ne dépend plus d'aucun rendu de synthèse.
+5. **Libellés (Q4 = A)** : table validée du 2026-10-08 appliquée (« mapping » → « type Home Assistant … », titre « Configuration Home Assistant par pièce »).
+6. **Gate 20-0** : `getDiagnostics` et `getPublishedScopeForConsole` retirées des lectures autorisées (politique et inventaire de chargement) ; parcours de découverte étendu (absence de la synthèse, de l'action Diagnostic et des deux requêtes au chargement, chaînes interdites dans la page et dans la pièce ouverte, 7 compteurs de la pièce, présence des actions déplacées sans clic, pièce « Sans pièce » sans action de pièce).
+
+### Task 1.5 — classement des fichiers du grep F6 (rejoué au SHA `82dcd90`)
+
+Le grep F6 retrouve les mêmes 22 références ; il manquait trois fichiers qui dépendent des éléments retirés sans correspondre au motif (`test_story_15_1_energy_badge_console`, `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py`), traités ci-dessous.
+
+| Fichier | Décision | Justification / couverture de remplacement |
+| --- | --- | --- |
+| `test_scope_summary_presenter`, `test_story_3_4_ai5_frontend_passthrough`, `test_story_4_2_vocab_exclusion`, `test_story_4_3_diagnostic_in_scope`, `test_story_4_4_integration_ui_4d`, `test_story_4_5_home_landing` | retirés | testaient le rendu de la synthèse (module supprimé) ; absence couverte par `test_story_20_3_retrait_synthese_diagnostic` (DOM, JS, CSS, requêtes) et `test_story_20_3_php_page.php` ; contrats daemon (`published_scope`, compteurs) inchangés et non testés par ces fichiers |
+| `test_story_15_1_energy_badge_console`, `test_story_15_2_streaming_badge_console`, `test_story_15_3_fan_parity_badge_console` | retirés | badges Energy/Streaming/Parité FAN de la modale et de la synthèse, retirés par Q3 = A ; aucune couverture daemon n'était portée par ces fichiers |
+| `test_story_4_2_diagnostic_decision`, `test_story_4_6_diagnostic_modal`, `test_story_6_1_pipeline_step`, `test_story_6_2_frontend_backend_first`, `test_story_6_3_honest_cause_mapping` | retirés | testaient `jeedom2ha_diagnostic_helpers.js` et le rendu de la modale (supprimés par Q3 = A) ; l'export support reste l'outil de support ; la cause par commande de la surface reste couverte par les tests 16.8/19.3/20.1/20.2 |
+| `test_story_5_1_actions_ha_frontend`, `test_story_5_2_frontend`, `test_story_5_3_frontend`, `test_story_5_7_badge_suppr_harmonie` | retirés puis réaffectés | boutons et gestionnaires de la synthèse retirés ; assertions d'actions ciblées migrées dans `test_story_20_3_actions_deplacees` (routes, confirmations fortes, échappement, « Sans pièce », succès/échec, confirmations globales sans nombre, gating) |
+| `test_story_5_4_bandeau` | réaffecté | `readOperationSnapshot` déplacé dans `jeedom2ha_mapping_override.js`, test conservé tel quel sur le nouvel emplacement |
+| `test_story_16_8_mapping_surface`, `test_story_20_2_publication_surface` | adaptés | une assertion de libellé suit la table validée (« type Home Assistant … ») |
+| `test_story_20_0_gate_policy` | adapté | titre du sous-test des lectures ; nouveau sous-test : `getDiagnostics` et `getPublishedScopeForConsole` sont bloquées |
+| `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py` | réduits | contrôles liés à `getStatusLabel` et à `eq.cause_label` de la modale retirés ; gardés : taxonomie fermée à 5 statuts, absence de table locale `reasonLabels`, absence de `getStatusLabel` dans l'interface |
+| `tests/test_php_published_scope_relay.php`, `tests/unit/test_story_5_1_php_relay.php` | conservés | relais PHP conservés (AC7) ; aucun changement |
+| `tests/e2e/gate/lib/policy.mjs`, `page-load-request-inventory.mjs`, `parcours/decouverte-garage-enphase.mjs` | mis à jour | voir plan d'implémentation, point 6 |
+
+Tests ajoutés : `test_story_20_3_compteurs_piece`, `test_story_20_3_actions_deplacees`, `test_story_20_3_retrait_synthese_diagnostic`, `test_story_20_3_gate_parcours` (parcours étendu exécuté dans Chromium contre un DOM local ; ignoré sans Playwright), `tests/unit/test_story_20_3_php_page.php`.
+
+### Pertes assumées (confirmées, voir aussi la section dédiée)
+
+Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique, résultat technique d'un échec de publication de la modale ; badges Energy, Streaming et Parité FAN ; compteurs du parc entier d'un coup d'œil ; nombres dans les confirmations globales. Voie de remplacement : surface (cause par commande), compteurs de la pièce ouverte, « Télécharger le diagnostic support », boutons globaux.
+
+### Points à valider par Alexandre (écarts et limites constatés)
+
+1. **« Sans pièce » (`object_id = 0`)** : le démon refuse la portée `piece` pour cet identifiant (`Pièce inconnue`, déjà vrai dans l'ancienne synthèse qui l'ignorait avec `pieceId <= 0`). « Republier la pièce » et « Supprimer puis recréer la pièce » ne sont donc pas proposés pour « Sans pièce » (message explicatif) ; les actions par équipement y restent disponibles. Aucune route démon n'a été modifiée (hors périmètre).
+2. **En-têtes de colonnes** de la surface « generic_type », « Override HA » et « Diagnostic » sont conservés : ils ne figurent pas dans la table de libellés validée le 2026-10-08. À arbitrer si vous les jugez du jargon (AC6).
+3. **Traduction** : les libellés produits par les modules purs testés sous Node (`jeedom2ha_mapping_override.js`, dont les compteurs) ne passent pas par `{{ }}` (comme ceux de ce module avant la story) ; ceux de `jeedom2ha_mapping_surface.js`, `jeedom2ha.js` et de la page passent par `{{ }}`.
+4. **Classement des compteurs** : « à corriger » recouvre « publié » pour un équipement partiellement publié (au moins une commande bloquante).
+5. **Nom de branche** : la session cloud est assignée à la branche `claude/story-20-3-jeedom-template-removal-ln862i` (préfixe `claude/` accepté par la CI) ; la branche `story/20-3-*` demandée dans le prompt n'a pas été créée pour ne pas pousser hors de la branche assignée.
+6. **Task 1.3, Task 1.4, Task 0, Task 6.2 et AC10** (cœur Jeedom, relevé des compteurs réels, déploiement standard, clic réel des actions déplacées, passage Chrome ClaudeBox, validation UX) : non réalisables en session cloud ; à exécuter après fusion selon la story.
 
 ### Completion Notes List
 
 - 2026-10-06 — `create-story` seulement : aucun code, test, script ni configuration modifié ; statut `backlog` conservé (voir l'encadré d'en-tête).
 - 2026-10-08 — Audit préparatoire local au SHA `9d8f2dc` : faits F1 à F7 revérifiés, inventaire des chaînes et plan de réaffectation des 22 références de tests/gate consignés dans `20-3-preparation-audit-2026-10-08.md`. Cet audit ne valide pas les Tasks 1.1–1.5 et ne change pas le statut : 20.2 reste `review`.
 - 2026-10-08 — Revalidation `ready-for-dev` au SHA `b2a89df` : F1–F7 et les 22 références tests/gate sont inchangés; aucun contenu CSS `content:` pertinent. Alexandre valide la table des libellés (message « table 20.3 OK »). 20.2 est `done`; statut 20.3 passé à `ready-for-dev`, sans code produit ni test exécuté.
+- 2026-10-08 — `dev-story` (session cloud déléguée) : AC1 à AC9 implémentés et couverts par des tests Node, PHP et Python ; gate 20-0 mis à jour et auto-testé localement ; routes du démon, export support, `evaluate_equipment()` et contrats du démon inchangés ; aucun accès box/Home Assistant, aucun déploiement, aucun nettoyage ni rescan réel. Reste, pour `done` : AC10 (gate sur `main`, comparaison des compteurs réels, clic réel des actions déplacées, passage Chrome ClaudeBox, validation UX d'Alexandre).
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md`
 - `_bmad-output/implementation-artifacts/20-3-preparation-audit-2026-10-08.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
-- `docs/operations/delegations.md` (ligne de journal de délégation, commit `914110c` déjà présent sur la branche)
+- `docs/operations/delegations.md`
+- `desktop/php/jeedom2ha.php`
+- `desktop/css/jeedom2ha.css`
+- `desktop/js/jeedom2ha.js`
+- `desktop/js/jeedom2ha_mapping_override.js`
+- `desktop/js/jeedom2ha_mapping_surface.js`
+- `desktop/js/jeedom2ha_scope_summary.js` (supprimé)
+- `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé)
+- `tests/e2e/gate/lib/policy.mjs`
+- `tests/e2e/gate/page-load-request-inventory.mjs`
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
+- `tests/unit/test_story_20_3_compteurs_piece.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_actions_deplacees.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_retrait_synthese_diagnostic.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_gate_parcours.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_php_page.php` (nouveau)
+- `tests/unit/test_story_20_0_gate_policy.node.test.js`, `test_story_16_8_mapping_surface.node.test.js`, `test_story_20_2_publication_surface.node.test.js`, `test_story_5_4_bandeau.node.test.js`, `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py` (adaptés)
+- Tests supprimés (voir Task 1.5) : `test_scope_summary_presenter`, `test_story_15_1_energy_badge_console`, `test_story_15_2_streaming_badge_console`, `test_story_15_3_fan_parity_badge_console`, `test_story_3_4_ai5_frontend_passthrough`, `test_story_4_2_diagnostic_decision`, `test_story_4_2_vocab_exclusion`, `test_story_4_3_diagnostic_in_scope`, `test_story_4_4_integration_ui_4d`, `test_story_4_5_home_landing`, `test_story_4_6_diagnostic_modal`, `test_story_5_1_actions_ha_frontend`, `test_story_5_2_frontend`, `test_story_5_3_frontend`, `test_story_5_7_badge_suppr_harmonie`, `test_story_6_1_pipeline_step`, `test_story_6_2_frontend_backend_first`, `test_story_6_3_honest_cause_mapping` (tous `*.node.test.js` sous `tests/unit/`)
 
 ### Change Log
 
 - 2026-10-06 — Création de la story (brouillon complet, `ready-for-dev` bloqué par Q1 à Q4 et par 20.2 non `done`).
 - 2026-10-08 — Prérequis levés : 20.2 `done`, audit F1–F7 au SHA courant et table de libellés validée par Alexandre; 20.3 passe `ready-for-dev`.
+- 2026-10-08 — Implémentation (dev-story, session cloud déléguée) : synthèse « Parc global » et modale Diagnostic retirées, compteurs de la pièce ouverte, actions ciblées déplacées dans la modale de pièce, confirmations globales sans nombre, libellés d'usage, tests et gate 20-0 adaptés; 20.3 passe `review` (AC10 : preuve terrain restante).

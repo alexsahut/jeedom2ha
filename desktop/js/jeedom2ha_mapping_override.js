@@ -200,7 +200,7 @@
     } else if (decision.should_publish === true) {
       forceReason = 'Déjà publiée : forcer n’a pas d’effet.';
     } else if (!decision.ha_entity_type) {
-      forceReason = 'Aucun mapping trouvé pour cette entité.';
+      forceReason = 'Aucun type Home Assistant identifié pour cette entité.';
     } else if (HA_ENTITY_TYPE_OPTIONS.indexOf(decision.ha_entity_type) === -1) {
       forceReason = 'Type HA hors périmètre de ce plugin.';
     } else if (pv.is_valid === false) {
@@ -476,7 +476,7 @@
   // non couverte : elle n'a aucun mapping à projeter, donc rien ne sera publié. Message
   // factuel (jamais vide, jamais un flash vert trompeur, jamais un code HTTP).
   function buildUncoveredLabel() {
-    return 'Ne sera pas publié — commande non couverte par un mapping';
+    return 'Ne sera pas publié — commande sans type Home Assistant applicable';
   }
 
   // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) — décide si `covered:false` doit
@@ -583,7 +583,7 @@
   // aussi command_topic manquant, mais la vraie action est de lever l'ambiguïté, pas de
   // chercher un topic. Libellés courts alignés sur les messages produit du daemon.
   var REASON_LABELS = {
-    ambiguous_skipped: 'mapping ambigu — précisez les types génériques dans Jeedom',
+    ambiguous_skipped: 'type Home Assistant ambigu — précisez les types génériques dans Jeedom',
     name_heuristic_rejection: 'un mot du nom de l’équipement écarte ce type',
     duplicate_generic_types: 'types génériques en double',
     switch_state_orphan: 'état sans ordre On/Off',
@@ -598,17 +598,17 @@
     discovery_publish_failed: 'échec de publication MQTT au dernier sync',
     low_confidence: 'confiance insuffisante pour la politique active',
     // Story 19.3 (AC4) — raisons exposées par le branchement sur evaluate_equipment().
-    no_mapping: 'aucun mapping trouvé pour cette commande',
-    skipped_no_mapping_candidate: 'aucun candidat de mapping à valider',
+    no_mapping: 'aucun type Home Assistant identifié pour cette commande',
+    skipped_no_mapping_candidate: 'aucun type Home Assistant candidat à valider',
     ha_component_not_in_product_scope: 'type HA non ouvert par ce plugin',
-    sure_mapping: 'mapping direct — publication normale',
+    sure_mapping: 'type Home Assistant identifié — publication normale',
     publication_excluded_eqlogic: 'exclu manuellement (équipement)',
     publication_excluded_command: 'exclu manuellement (commande)',
     publication_forced: 'publication forcée manuellement',
     // Story 19.3 (AC1/AC7) — le branchement sur evaluate_equipment() fait aussi remonter
     // les raisons d'inéligibilité amont (Story 4.3) jusqu'au diagnostic par commande,
     // là où la surface ignorait jusqu'ici ces cas (CC-03).
-    command_not_covered: 'commande non couverte par ce mapping',
+    command_not_covered: 'commande sans type Home Assistant applicable',
     excluded_eqlogic: 'exclu de Jeedom2HA (équipement dans la liste d’exclusions)',
     excluded_plugin: 'exclu de Jeedom2HA (plugin source dans la liste d’exclusions)',
     excluded_object: 'exclu de Jeedom2HA (pièce dans la liste d’exclusions)',
@@ -699,7 +699,7 @@
       return { active: false, reason: 'Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici.' };
     }
     if (r.covered === false && shouldShowUncoveredLabel(r.diagnostic)) {
-      return { active: false, reason: 'Aucun mapping ne couvre cette commande : son type HA ne peut pas être réglé ici.' };
+      return { active: false, reason: 'Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici.' };
     }
     return { active: true, reason: null };
   }
@@ -897,6 +897,94 @@
     return ids;
   }
 
+  // --- Story 20.3 (Q1=A) — compteurs de la pièce ouverte ---
+  // Dénombrement pur des arbres déjà lus par la surface (`GET /system/mapping_overrides/{eq_id}`,
+  // alimenté par evaluate_equipment()) : aucune décision n'est recalculée ici. Une exclusion posée
+  // par l'utilisateur vient de la décision (publication_excluded_*) et est donc comptée « exclue » ;
+  // une commande non couverte n'est jamais bloquante, un équipement désactivé jamais « à corriger ».
+  // `trees` : arbres normalisés ou bruts des équipements dont la lecture a abouti ;
+  // `totalEquipments` : nombre d'équipements de la pièce (pour signaler les lectures manquantes).
+  function summarizeRoom(trees, totalEquipments) {
+    var list = Array.isArray(trees) ? trees : [];
+    var out = {
+      equipments_total: typeof totalEquipments === 'number' ? totalEquipments : list.length,
+      equipments_read: list.length,
+      equipments_published: 0,
+      equipments_excluded: 0,
+      equipments_disabled: 0,
+      equipments_to_fix: 0,
+      commands_ready: 0,
+      commands_blocking: 0,
+      commands_uncovered: 0,
+    };
+    for (var i = 0; i < list.length; i++) {
+      var summary = summarizePublication(list[i]);
+      var state = publicationSummaryState(summary);
+      if (state === 'publish' || state === 'partial') {
+        out.equipments_published += 1;
+      } else if (state === 'excluded') {
+        out.equipments_excluded += 1;
+      } else if (state === 'disabled') {
+        out.equipments_disabled += 1;
+      }
+      if (summary.blocking_count > 0) {
+        out.equipments_to_fix += 1;
+      }
+      out.commands_ready += summary.ready_count;
+      out.commands_blocking += summary.blocking_count;
+      out.commands_uncovered += summary.uncovered_count;
+    }
+    return out;
+  }
+
+  function pluralize(count, singular, plural) {
+    return count + ' ' + (count > 1 ? plural : singular);
+  }
+
+  // Libellés d'usage, unité dite dans chaque libellé (équipement ou commande).
+  function buildRoomCounterLabels(summary) {
+    var s = summary || {};
+    function n(key) { return typeof s[key] === 'number' ? s[key] : 0; }
+    return {
+      equipments: [
+        pluralize(n('equipments_published'), 'équipement publié', 'équipements publiés'),
+        pluralize(n('equipments_excluded'), 'équipement exclu', 'équipements exclus'),
+        pluralize(n('equipments_disabled'), 'équipement désactivé dans Jeedom', 'équipements désactivés dans Jeedom'),
+        pluralize(n('equipments_to_fix'), 'équipement à corriger', 'équipements à corriger'),
+      ],
+      commands: [
+        pluralize(n('commands_ready'), 'commande prête', 'commandes prêtes'),
+        pluralize(n('commands_blocking'), 'commande bloquante', 'commandes bloquantes'),
+        pluralize(n('commands_uncovered'), 'commande non couverte', 'commandes non couvertes'),
+      ],
+      unread: n('equipments_total') > n('equipments_read')
+        ? pluralize(n('equipments_total') - n('equipments_read'), 'équipement non lu', 'équipements non lus')
+        : '',
+    };
+  }
+
+  // Story 5.4 (déplacé en 20.3 hors de l'ancien module de synthèse) — normalisation du
+  // résultat de la dernière opération pour le bandeau de santé. Lecture seule du contrat
+  // backend (`derniere_operation_resultat`), aucune décision recalculée.
+  function readOperationSnapshot(raw) {
+    var VALID_RESULTATS = { succes: true, partiel: true, echec: true, aucun: true };
+    var empty = { resultat: 'aucun', intention: null, portee: null, message: null, volume: null, timestamp: null };
+    if (raw === null || raw === undefined) return empty;
+    if (typeof raw === 'string') {
+      return Object.assign({}, empty, { resultat: VALID_RESULTATS[raw] ? raw : 'aucun' });
+    }
+    if (typeof raw !== 'object') return empty;
+    var resultat = (typeof raw.resultat === 'string' && VALID_RESULTATS[raw.resultat]) ? raw.resultat : 'aucun';
+    return {
+      resultat: resultat,
+      intention: typeof raw.intention === 'string' ? raw.intention : null,
+      portee: typeof raw.portee === 'string' ? raw.portee : null,
+      message: (typeof raw.message === 'string' && raw.message !== '') ? raw.message : null,
+      volume: (typeof raw.volume === 'number' && Number.isFinite(raw.volume)) ? raw.volume : null,
+      timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : null,
+    };
+  }
+
   var api = {
     HA_ENTITY_TYPE_OPTIONS: HA_ENTITY_TYPE_OPTIONS,
     getHaEntityTypeOptions: getHaEntityTypeOptions,
@@ -935,6 +1023,9 @@
     shouldShowReassurance: shouldShowReassurance,
     markReassuranceShown: markReassuranceShown,
     collectBlockingCommandIds: collectBlockingCommandIds,
+    summarizeRoom: summarizeRoom,
+    readOperationSnapshot: readOperationSnapshot,
+    buildRoomCounterLabels: buildRoomCounterLabels,
     normalizeRoomsTree: normalizeRoomsTree,
     summarizePublication: summarizePublication,
     buildPublicationSummaryLabel: buildPublicationSummaryLabel,

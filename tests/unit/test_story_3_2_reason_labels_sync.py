@@ -1,5 +1,8 @@
 """Story 6.2 — Guardrail frontend backend-first.
 
+Story 20.3 : la modale Diagnostic (qui lisait eq.cause_label / eq.cause_action) est supprimée ;
+seul subsiste le garde-fou « pas de table locale reason_code -> libellé » dans jeedom2ha.js.
+
 Le diagnostic ne doit plus maintenir de mapping local reason_code -> libellé.
 La surface lit exclusivement cause_label/cause_action fournis par le backend.
 """
@@ -15,9 +18,3 @@ def test_no_reason_labels_mapping_in_diagnostic_js():
     assert "reasonLabels" not in source, (
         "Le diagnostic frontend ne doit plus contenir de table locale reason_code -> libellé."
     )
-
-
-def test_diagnostic_reads_backend_cause_fields():
-    source = _JS_FILE.read_text(encoding="utf-8")
-    assert "eq.cause_label" in source
-    assert "eq.cause_action" in source

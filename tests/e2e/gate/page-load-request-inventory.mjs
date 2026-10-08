@@ -171,7 +171,9 @@ function isPluginPageDocument(request, url) {
   return Object.entries(PLUGIN_PAGE_QUERY).every(([key, value]) => url.searchParams.get(key) === value);
 }
 
-/* Lectures autorisées (Task 1, seconde itération — validées par ClaudeBox le 2026-10-02) :
+/* Lectures autorisées (Task 1, seconde itération — validées par ClaudeBox le 2026-10-02 ; story 20.3 :
+ * `getDiagnostics` et `getPublishedScopeForConsole` retirées, l'interface ne les émet plus au chargement —
+ * toute réapparition de l'une d'elles est donc relevée « bloquée » dans ce relevé) :
  * POST seulement, même origine, correspondance exacte du chemin ET de la valeur
  * d'action (pas de préfixe, pas de motif). `exportDiagnostic` reste délibérément absent
  * (hors liste, donc bloqué). `event.ajax.php action=changes` est une attente longue du
@@ -183,8 +185,6 @@ const ALLOWED_READS = [
     actions: [
       'getMqttConfig',
       'getBridgeStatus',
-      'getDiagnostics',
-      'getPublishedScopeForConsole',
       'getMappingOverrides',
       'previewMappingOverride',
     ],
