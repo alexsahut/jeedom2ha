@@ -3,9 +3,9 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const Jeedom2haScopeSummary = require('../../desktop/js/jeedom2ha_scope_summary.js');
-
-const { readOperationSnapshot } = Jeedom2haScopeSummary;
+// Story 20.3 : readOperationSnapshot vit désormais dans le module pur jeedom2ha_mapping_override.js
+// (l'ancien module de synthèse « Parc global » est supprimé).
+const { readOperationSnapshot } = require('../../desktop/js/jeedom2ha_mapping_override.js');
 
 // ---------------------------------------------------------------------------
 // Export vérification
