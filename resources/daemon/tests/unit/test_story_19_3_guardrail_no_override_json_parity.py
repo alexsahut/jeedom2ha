@@ -116,6 +116,7 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
         "synced_should_publish": None,
         "current_should_publish": True,
         "override_pending": False,
+        "published_in_ha": False,
     }
 
 

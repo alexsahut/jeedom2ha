@@ -66,6 +66,8 @@
       synced_should_publish: typeof s.synced_should_publish === 'boolean' ? s.synced_should_publish : null,
       current_should_publish: typeof s.current_should_publish === 'boolean' ? s.current_should_publish : null,
       override_pending: s.override_pending === true,
+      // R2-1 : présence réelle dans HA (champ additif du démon) ; null = démon plus ancien.
+      published_in_ha: typeof s.published_in_ha === 'boolean' ? s.published_in_ha : null,
     };
   }
 
@@ -966,15 +968,16 @@
   // R1-B (story 20.3) — gating d'état des actions déplacées (Republier, Supprimer puis recréer).
   // Lecture pure de l'arbre déjà chargé : aucune décision recalculée, aucune route. Référence de
   // comportement : l'ancienne synthèse (« Republier » seulement si inclus, « Supprimer » seulement
-  // si publié). « Publié dans HA » = `sync_status.synced_should_publish === true`, la dernière
-  // décision SYNCHRONISÉE (null = jamais synchronisé, false = non publié).
+  // si publié). R2-1 : « publié dans HA » = `sync_status.published_in_ha` (présence réelle, calculée
+  // par le démon comme pour les actions ; couvre principal refusé / secondaires publiés et
+  // dépublication différée). `synced_should_publish` ne décrit que le principal et n'est PAS utilisé.
+  // Champ absent (démon plus ancien) : l'action reste active, le démon ignore les équipements sans objet.
   // Un arbre illisible (relais en erreur, 404 démon, `jeedom_eq_id` absent) ne propose aucune action.
   var ACTION_REASONS = {
     treeUnavailable: 'Configuration illisible : action indisponible.',
     republishDisabled: 'Équipement désactivé dans Jeedom : rien à republier.',
     republishExcluded: 'Équipement exclu : rien à republier.',
     recreateNotPublished: 'Équipement non publié dans Home Assistant : rien à supprimer.',
-    roomLoading: 'Lecture des équipements de la pièce en cours.',
     roomNothingToPublish: 'Aucun équipement à publier dans cette pièce.',
     roomNothingPublished: 'Aucun équipement publié dans cette pièce.',
   };
@@ -993,18 +996,20 @@
     var republishReason = '';
     if (state === 'disabled') republishReason = ACTION_REASONS.republishDisabled;
     if (state === 'excluded') republishReason = ACTION_REASONS.republishExcluded;
-    var published = normalized.sync_status.synced_should_publish === true;
+    var notPublished = normalized.sync_status.published_in_ha === false;
     return {
       readable: true,
       can_republish: republishReason === '',
-      can_recreate: published,
+      can_recreate: !notPublished,
       republish_reason: republishReason,
-      recreate_reason: published ? '' : ACTION_REASONS.recreateNotPublished,
+      recreate_reason: notPublished ? ACTION_REASONS.recreateNotPublished : '',
     };
   }
 
-  // `trees` : arbres lus (valides) de la pièce ; `settledCount` : arbres lus + arbres en erreur.
-  // Tant que la lecture n'est pas terminée, une action reste permise dès qu'un arbre la justifie.
+  // R2-3 — `trees` : arbres lus et valides de la pièce ; `settledCount` : arbres lus + arbres en
+  // erreur. Une action de pièce n'est grisée que si TOUTES les lectures ont abouti sans erreur et
+  // qu'aucun équipement ne la justifie ; pendant la lecture, ou si une lecture a échoué, elle reste
+  // active (le démon ignore les équipements sans objet).
   function roomActionState(trees, totalEquipments, settledCount) {
     var list = Array.isArray(trees) ? trees : [];
     var canRepublish = false;
@@ -1016,12 +1021,15 @@
     }
     var settled = typeof settledCount === 'number' ? settledCount : list.length;
     var complete = typeof totalEquipments === 'number' && settled >= totalEquipments;
+    var failedReads = settled - list.length;
+    var conclusive = complete && failedReads <= 0;
     return {
       complete: complete,
-      can_republish: canRepublish,
-      can_recreate: canRecreate,
-      republish_reason: canRepublish ? '' : (complete ? ACTION_REASONS.roomNothingToPublish : ACTION_REASONS.roomLoading),
-      recreate_reason: canRecreate ? '' : (complete ? ACTION_REASONS.roomNothingPublished : ACTION_REASONS.roomLoading),
+      conclusive: conclusive,
+      can_republish: canRepublish || !conclusive,
+      can_recreate: canRecreate || !conclusive,
+      republish_reason: canRepublish || !conclusive ? '' : ACTION_REASONS.roomNothingToPublish,
+      recreate_reason: canRecreate || !conclusive ? '' : ACTION_REASONS.roomNothingPublished,
     };
   }
 

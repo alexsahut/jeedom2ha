@@ -24,8 +24,8 @@ function panel(id, name, state, publish) {
       <table class="j2ha-cmd-table"><tbody><tr class="mapping-override-cmd" data-cmd-id="${id}1"><td class="mo-diag-cell ${state}">x</td></tr></tbody></table></div></div>`;
 }
 
-function html(withDiagnosticAction) {
-  const garage = `<div class="modal-j2ha-room"><div class="j2ha-room-counters">${counters()}</div>
+function html(withDiagnosticAction, titlePrefix = '') {
+  const garage = `<div class="modal-j2ha-room"><div class="modal-title">${titlePrefix}<span class="j2ha-free-name">Garage</span></div><div class="j2ha-room-counters">${counters()}</div>
     <div class="j2ha-room-actions"><button class="j2ha-room-republish">Republier la pièce</button><button class="j2ha-room-recreate">Supprimer</button></div>
     ${panel(100, 'Enphase', 'j2ha-diag-ready', 'j2ha-publish-ok')}${panel(514, 'Eq', 'j2ha-diag-disabled', 'j2ha-publish-disabled')}</div>`;
   const unassigned = `<div class="modal-j2ha-room"><div class="j2ha-room-counters">${counters()}</div>
@@ -34,7 +34,7 @@ function html(withDiagnosticAction) {
     <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
     ${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
     <div id="div_bridgeHealthBanner">Bridge</div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
-    <div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name j2ha-free-name">Sans pièce</span><span class="text-muted"> (1)</span></div>
+    <div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name">Sans pièce</span><span class="text-muted"> (1)</span></div>
     <div class="j2ha-room-card" data-object_id="3" id="garage"><span class="name j2ha-free-name">Garage</span><span class="text-muted"> (2)</span></div></div></div>
     <div class="eqLogic" style="display:none">Équipement</div></div>
     <script>
@@ -121,6 +121,14 @@ test('20.3 gate simulé (R1-H) — les noms libres ne sont pas soumis au gate de
 test('20.3 gate simulé (R1-H) — un libellé statique interdit dans la modale de pièce fait toujours échouer le parcours', async (t) => {
   const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
   const content = html(false).replace('Republier la pièce</button>', 'Confiance mapping</button>');
+  await withPage(t, content, [], async (page, helpers) => {
+    await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-piece/);
+  });
+});
+
+test('20.3 gate simulé (R2-6) — un libellé interdit dans le titre statique de la modale (hors nom de pièce) fait échouer le parcours', async (t) => {
+  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const content = html(false, 'Confiance ');
   await withPage(t, content, [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-piece/);
   });

@@ -19,8 +19,11 @@ const ROOM = {
 };
 const OTHER_ROOM = { object_id: 8, object_name: 'Pièce B', equipments: [{ eq_id: 3, eq_name: 'Équipement 3', enabled: true }] };
 const NO_ROOM = { object_id: 0, object_name: 'Sans pièce', equipments: [{ eq_id: 9, eq_name: 'Équipement 9', enabled: true }] };
-const UNSYNCED = { synced_should_publish: false, current_should_publish: true, override_pending: false };
-const NEVER_SYNCED = { synced_should_publish: null, current_should_publish: true, override_pending: false };
+const UNSYNCED = { synced_should_publish: false, current_should_publish: true, override_pending: false, published_in_ha: false };
+const NEVER_SYNCED = { synced_should_publish: null, current_should_publish: true, override_pending: false, published_in_ha: false };
+// R2-1 : principal refusé mais secondaire publié => dans HA malgré `synced_should_publish` false.
+const SECONDARY_PUBLISHED = { synced_should_publish: false, current_should_publish: false, override_pending: false, published_in_ha: true };
+const OLD_DAEMON = { synced_should_publish: false, current_should_publish: true, override_pending: false };
 const PENDING_ENTITY = [{ ha_entity_type: 'light', command_ids: [100], decision: null, override_pending: true }];
 
 /** Ouvre la pièce A avec le pont disponible ; `trees` : arbres renvoyés (ou null = en attente). */
@@ -82,6 +85,19 @@ describe('R1-B — gating d’état des actions par équipement', () => {
     }
   });
 
+  it('R2-1 — principal refusé mais secondaire publié (published_in_ha) : « Supprimer puis recréer » reste actif, équipement et pièce', () => {
+    const ui = openRoomWith([ok(tree(1, [READY], { sync: SECONDARY_PUBLISHED })), ok(tree(2, [READY], { sync: UNSYNCED }))]);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-recreate').prop('disabled'), true);
+    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
+  });
+
+  it('R2-1 — champ absent (démon plus ancien) : « Supprimer puis recréer » reste actif', () => {
+    const ui = openRoomWith([ok(tree(1, [READY], { sync: OLD_DAEMON })), ok(tree(2, [READY], { sync: OLD_DAEMON }))]);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
+    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
+  });
+
   it('« Republier » grisé pour un équipement désactivé ou exclu, actif sinon', () => {
     const ui = openRoomWith([ok(tree(1, [DISABLED])), ok(tree(2, [EXCLUDED]))]);
     for (const id of [1, 2]) {
@@ -117,20 +133,33 @@ describe('R1-B — gating d’état des actions par équipement', () => {
 });
 
 describe('R1-B — gating d’état des actions de pièce', () => {
-  it('grisées tant que les arbres de la pièce ne sont pas lus (infobulle « lecture en cours »)', () => {
+  it('R2-3 — pendant la lecture, les actions de pièce restent actives (le démon ignore les équipements sans objet)', () => {
     const ui = openRoomWith(null);
     for (const sel of ['.j2ha-room-republish', '.j2ha-room-recreate']) {
-      assert.equal(ui.$(sel).prop('disabled'), true, sel);
-      assert.match(ui.$(sel).attr('title'), /Lecture/);
+      assert.equal(ui.$(sel).prop('disabled'), false, sel);
+      assert.equal(ui.$(sel).attr('title'), undefined, sel);
+    }
+    ui.respond('getMappingOverrides', ok(tree(1, [EXCLUDED])));
+    assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false, 'lecture encore incomplète');
+  });
+
+  it('R2-3 — une lecture en échec ne conclut jamais à « rien à faire » : boutons actifs, sans infobulle « aucun équipement »', () => {
+    const ui = openRoomWith(null);
+    ui.respond('getMappingOverrides', ok(tree(1, [EXCLUDED], { sync: UNSYNCED })));
+    ui.fail('getMappingOverrides');
+    for (const sel of ['.j2ha-room-republish', '.j2ha-room-recreate']) {
+      assert.equal(ui.$(sel).prop('disabled'), false, sel);
+      assert.equal(ui.$(sel).attr('title'), undefined, sel);
     }
   });
 
   it('« Republier la pièce » actif dès qu’un équipement est à publier ; « Supprimer… la pièce » dès qu’un est publié', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED }))]);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
-    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true, 'aucun publié pour l’instant');
-    ui.respond('getMappingOverrides', ok(tree(2, [READY])));
-    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
+    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false, 'lecture encore incomplète');
+    ui.respond('getMappingOverrides', ok(tree(2, [READY], { sync: UNSYNCED })));
+    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true, 'tout lu, aucun publié');
+    assert.match(ui.$('.j2ha-room-recreate').attr('title'), /Aucun équipement publié/);
   });
 
   it('tous les arbres lus : aucun équipement à publier => « Republier la pièce » grisé', () => {
@@ -410,7 +439,7 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
   it('noms échappés dans la confirmation de pièce et d’équipement ; routes et périmètre corrects', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { name: 'Équipement <i>1</i>' })), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-republish');
-    assert.match(ui.lastConfirmation().options.message, /Pièce &lt;b&gt;&quot;A&quot;&lt;\/b&gt;/);
+    assert.match(ui.lastConfirmation().options.message, /Pièce &lt;b&gt;/);
     assert.doesNotMatch(ui.lastConfirmation().options.message, /<b>/);
     ui.lastConfirmation().options.buttons.cancel.callback();
 
@@ -495,5 +524,74 @@ describe('G — rendu de la modale de pièce (buildRoomModalHtml) et des compteu
       '1 équipement publié', '1 équipement exclu', '0 équipement désactivé dans Jeedom', '0 équipement à corriger',
       '2 commandes prêtes', '0 commande bloquante', '0 commande non couverte',
     ]);
+  });
+});
+
+describe('R2-2 / R2-4 — retour d’une action hors modale et par équipement', () => {
+  const NAMED = { state: 'ok', result: { payload: { resultat: 'succes', message: 'Fait.', perimetre_impacte: { nom: '<img src=x onerror=1>' } } } };
+
+  it('R2-2 — le message est échappé avant la zone d’alerte de la page (rendu HTML par le cœur)', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    ui.click('.j2ha-room-republish');
+    ui.lastConfirmation().options.buttons.confirm.callback();
+    ui.dom.dialogs.find((d) => !d.options.buttons).close();
+    ui.respond('executeHaAction', NAMED);
+    assert.equal(ui.dom.alerts.length, 1);
+    assert.doesNotMatch(ui.dom.alerts[0].message, /<img/);
+    assert.match(ui.dom.alerts[0].message, /&lt;img/);
+  });
+
+  it('R2-4 — « Republier » d’un équipement : échec du démon affiché en danger, aucun rechargement', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
+    ui.respond('executeHaAction', { state: 'ok', result: { payload: { resultat: 'echec', message: 'Refusé' } } });
+    assert.match(ui.$('.j2ha-room-feedback .alert-danger').text(), /Refusé/);
+    assert.equal(ui.pending('getMappingOverrides').length, 0);
+  });
+
+  it('R2-4 — succès partiel : avertissement, équipement relu et bandeau de santé rafraîchi', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
+    ui.respond('executeHaAction', { state: 'ok', result: { payload: { resultat: 'succes_partiel', message: 'Partiel' } } });
+    assert.ok(ui.$('.j2ha-room-feedback .alert-warning').length === 1);
+    assert.equal(ui.pending('getMappingOverrides')[0].data.eqId, 1);
+    assert.equal(ui.pending('getBridgeStatus').length, 1);
+  });
+
+  it('R2-4 — succès : message du périmètre dans la modale, relecture et bandeau', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
+    ui.respond('executeHaAction', ACTION_OK);
+    assert.match(ui.$('.j2ha-room-feedback').text(), /Périmètre X — Fait\./);
+    assert.equal(ui.pending('getMappingOverrides').length, 1);
+    assert.equal(ui.pending('getBridgeStatus').length, 1);
+  });
+});
+
+describe('R2-6 — libellés statiques de la modale (gate) : seuls les noms libres sont marqués', () => {
+  it('entité : « Commandes : » reste statique, seuls les noms de commande sont marqués', () => {
+    const entities = [{ ha_entity_type: 'light', command_ids: [100, 101], decision: null, override_pending: false },
+      { ha_entity_type: 'switch', command_ids: [], decision: null, override_pending: false }];
+    const ui = openRoomWith([ok(tree(1, [READY, READY], { entities })), ok(tree(2, [READY]))]);
+    const rows = ui.$('.j2ha-entity-row').list;
+    const first = ui.$(rows[0]);
+    assert.match(first.text(), /\{\{Commandes : \}\}Commande 0, Commande 1/);
+    assert.equal(first.find('.j2ha-free-name').text(), 'Commande 0, Commande 1');
+    const second = ui.$(rows[1]);
+    assert.match(second.text(), /\{\{Aucune commande regroupée\}\}/);
+    assert.equal(second.find('.j2ha-free-name').length, 0);
+  });
+
+  it('titre de la modale : nom de pièce marqué, « Sans pièce » reste un libellé statique', () => {
+    const ui = openRoomWith(null);
+    const name = ui.$('.modal-j2ha-room .modal-title .j2ha-free-name');
+    assert.equal(name.length, 1);
+    assert.match(name.text(), /&lt;b&gt;/, 'nom échappé dans le HTML du titre');
+    assert.equal(name.find('b').length, 0);
+    const noRoom = createUi([NO_ROOM]);
+    noRoom.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
+    noRoom.openRoom(0);
+    assert.equal(noRoom.$('.modal-j2ha-room .modal-title .j2ha-free-name').length, 0);
+    assert.match(noRoom.$('.modal-j2ha-room .modal-title').text(), /Sans pièce/);
   });
 });

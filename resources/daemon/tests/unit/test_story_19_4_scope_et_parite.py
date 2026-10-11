@@ -157,6 +157,7 @@ async def test_q5_surface_hors_perimetre_sans_faux_pas_encore_applique(aiohttp_c
         "synced_should_publish": False,
         "current_should_publish": False,
         "override_pending": False,
+        "published_in_ha": False,
     }
 
 

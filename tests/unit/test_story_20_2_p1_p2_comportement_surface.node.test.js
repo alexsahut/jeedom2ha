@@ -138,6 +138,7 @@ function loadHarness(ajax) {
     M: M,
     AJAX_URL: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     reloadCalls: [],
+    ctx: { room: null },
   };
   sandbox.reloadEquipment = function (eqId) { sandbox.reloadCalls.push(eqId); };
   vm.createContext(sandbox);

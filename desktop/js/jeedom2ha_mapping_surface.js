@@ -482,11 +482,13 @@
   }
 
   // « Appliquer » / « Republier » d'un équipement : même route (executeHaAction publier/equipement),
-  // même rechargement. Le bouton est réservé pendant l'appel (R1-C).
+  // même rechargement. Le bouton est réservé pendant l'appel (R1-C). Un résultat `echec` ou
+  // `succes_partiel` du démon (HTTP 200) est affiché comme pour les actions de pièce (R2-4).
   function applyEquipment(eqId, $button, $errorSlot) {
     if (eqId === null || eqId === undefined || $button.prop('disabled')) {
       return;
     }
+    var room = ctx.room;
     var reservation = setHaActionPendingState($button, '{{En cours...}}');
     clearRequestError($errorSlot);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
@@ -495,6 +497,15 @@
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
         if (error) { showRequestError($errorSlot, error); return; }
+        var payload = resp && resp.result && typeof resp.result === 'object' ? resp.result.payload : null;
+        if (payload && typeof payload === 'object') {
+          showActionFeedback(room, buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
+          if (shouldRefreshPublishedScopeAfterHaAction(payload)) {
+            reloadEquipment(eqId);
+            refreshBridgeStatus();
+          }
+          return;
+        }
         reloadEquipment(eqId);
       })
       .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
@@ -620,7 +631,8 @@
       showRoomFeedback(message, level);
       return;
     }
-    $('#div_alert').showAlert({ message: message, level: level });
+    // `showAlert` rend du HTML (jeeDialog.toast) et le message cite des noms libres : échappé (R2-2).
+    $('#div_alert').showAlert({ message: escapeHtml(message), level: level });
   }
 
   function reloadRoom(room) {
@@ -745,9 +757,8 @@
         }
       );
     });
-    // Grisés tant que l'arbre de la pièce n'a pas montré qu'ils ont un objet (R1-B).
-    setStateGate($republish, false, M.roomActionState([], room.equipments.length, 0).republish_reason);
-    setStateGate($recreate, false, M.roomActionState([], room.equipments.length, 0).recreate_reason);
+    // Actifs par défaut (R2-3) : grisés seulement quand toutes les lectures ont abouti sans erreur
+    // et qu'aucun équipement ne justifie l'action (voir updateRoomActionsGating).
     $wrap.append($republish).append($recreate);
     return $wrap;
   }
@@ -864,7 +875,14 @@
       var entity = tree.entities[i];
       var $row = $('<div class="j2ha-entity-row"></div>');
       $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
-      $row.append($('<span class="j2ha-entity-cmds"></span>').text(' — ' + M.entityCommandsLabel(entity, tree.commands)));
+      // Libellé statique ; seuls les noms de commande (texte libre Jeedom) sont marqués `j2ha-free-name`.
+      var commandIds = Array.isArray(entity.command_ids) ? entity.command_ids : [];
+      if (commandIds.length === 0) {
+        $row.append(document.createTextNode(' — {{Aucune commande regroupée}}'));
+      } else {
+        $row.append(document.createTextNode(' — {{Commandes : }}'));
+        $row.append($('<span class="j2ha-free-name"></span>').text(M.resolveCommandNames(tree.commands, commandIds).join(', ')));
+      }
       appendEntityPendingBadge($row, entity);
       appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
       $host.append($row);
@@ -1081,7 +1099,10 @@
     var $content = buildRoomModalHtml(room);
 
     bootbox.dialog({
-      title: '<i class="fas fa-home"></i> ' + $('<span>').text(room.object_name).html(),
+      // « Sans pièce » est un libellé statique ; le nom d'une vraie pièce est un nom libre.
+      title: '<i class="fas fa-home"></i> ' + (room.object_id > 0
+        ? '<span class="j2ha-free-name">' + escapeHtml(room.object_name) + '</span>'
+        : escapeHtml(room.object_name)),
       message: $content,
       size: 'large',
       className: 'modal-j2ha-room',

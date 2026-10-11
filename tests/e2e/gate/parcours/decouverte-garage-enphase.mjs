@@ -83,7 +83,7 @@ const FORBIDDEN_TEXT = [
 // Story 20.3 (R1-H) : noms libres saisis par l'utilisateur (pièces, équipements, commandes) et retours
 // d'action qui les citent. Ils sont exclus du gate : seuls les libellés statiques (titres, entêtes,
 // boutons, badges) sont contrôlés.
-const FREE_TEXT_SELECTOR = '.j2ha-free-name, .j2ha-eq-name, .mo-td-name, .j2ha-entity-cmds, .j2ha-room-feedback, .modal-title';
+const FREE_TEXT_SELECTOR = '.j2ha-free-name, .j2ha-eq-name, .mo-td-name, .j2ha-room-feedback';
 
 /** Lit le texte statique rendu d'un conteneur (jamais les scripts ni les noms libres) et renvoie les rangs des motifs interdits trouvés. */
 async function forbiddenTextRanks(page, selector) {
