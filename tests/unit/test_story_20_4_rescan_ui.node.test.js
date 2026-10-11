@@ -42,8 +42,8 @@ test('20.4: la page de configuration affiche aussi le message du 409 en priorit�
   assert.match(config, /\$status\.addClass\('label-warning'\)\.text\(r\.message \|\| r\.operation_message \|\| '\{\{Résultat inconnu, relire Dernière opération\}\}'\);/);
 });
 
-test('20.4: le rescan a un délai de 20s et affiche le résultat chaîne du démon injoignable', () => {
-  assert.match(source, /data: \{action: 'scanTopology'\}, dataType: 'json', timeout: 20000,/);
+test('20.4: le rescan a le délai client du budget relais (A1, ex-20s) et affiche le résultat chaîne du démon injoignable', () => {
+  assert.match(source, /data: \{action: 'scanTopology'\}, dataType: 'json',\s*timeout: \(typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget\.CLIENT_TIMEOUT_MS\) \|\| 90000,/);
   assert.match(source, /if \(data\.state !== 'ok'\) \{\s*\$\('#div_alert'\)\.showAlert\(\{message: \(typeof result === 'string' && result\) \|\| '\{\{Une opération est déjà en cours ou le rescan a échoué\.\}\}', level: 'danger'\}\);\s*return;\s*\}/);
 });
 

@@ -396,3 +396,6 @@ development_status:
   # ==============================================================
   pe-epic-21: in-progress  # ouvert 2026-10-11 (Q0 A, decision Alexandre) ; solde CC-44 (scenario desactive garde son bouton dans HA) et CC-47 (affichage et decompte de la commande 5369, etat deja publie en binary_sensor, defaut d'affichage et non de publication) ; epics-projection-engine.md#Epic-21
   21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off: ready-for-dev  # story creee 2026-10-11, relue R1/R2 par ClaudeBox ; decisions Alexandre 2026-10-11 ~20:35 : Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A ; ready-for-dev accorde par ClaudeBox au nom de cette decision ; bloc A = CC-44 (retrait des boutons de scenario, le broker fait foi) ; bloc B = CC-47 (affichage et decompte, aucune publication ne change)
+
+  # Chantier publication Market 2026-10 (cadrage PR #239) — gate terrain Jeedom vierge execute par ClawBox, hors story.
+  a1-limite-de-performance-relais-15s: review  # dev cloud termine : budget fixe R=60s + delais clients 90s pour scanTopology/getDiagnostics/exportDiagnostic (aucune pause de lissage cote demon => pas de deadline_s) ; budget court 15s conserve pour testMqttConnection/getMappingOverrides ; gate terrain (T5) a executer par ClawBox avant done
