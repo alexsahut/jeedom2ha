@@ -13,6 +13,14 @@
 
 ---
 
+# 2026-10-11 — Scénario désactivé : son bouton disparaît de Home Assistant
+
+- Un scénario Jeedom désactivé n'a plus de bouton dans Home Assistant : il est retiré au prochain rescan ou redémarrage du démon, et revient avec le même identifiant à la réactivation
+- Les boutons de scénarios déjà orphelins (désactivés ou supprimés avant cette version) sont retirés au premier rescan
+- Le bouton d'un scénario ne reprend plus la disponibilité ni le type d'un équipement qui porterait le même numéro : il suit uniquement l'état du pont
+
+---
+
 # 2026-10-11 — Nouvelle interface par pièce et documentation réécrite
 
 - Nouvelle page principale : un bandeau de santé (Bridge, MQTT, Dernière synchro, Dernière opération), la zone « Actions Home Assistant » et une carte par pièce (plus une carte « Sans pièce »)

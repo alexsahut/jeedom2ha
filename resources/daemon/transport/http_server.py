@@ -13,7 +13,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 import paho.mqtt.client as mqtt
 from aiohttp import web
@@ -2079,8 +2079,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     # Story 10.1 — Publish Jeedom scenarios as HA button entities
     scenario_mapper = ScenarioButtonMapper()
     scenario_publications: Dict[int, PublicationDecision] = {}
+    broker_ready = bool(publisher and mqtt_bridge and mqtt_bridge.is_connected)
+    unpublished_scenario_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
         if not scenario.is_active:
+            # Story 21.1 (CC-44) — un scénario inactif n'a plus de bouton dans HA.
+            # Pas de report si le broker est injoignable : la purge « le broker fait foi »
+            # ci-dessous reprend au sync suivant (aucun passage par pending_discovery_unpublish,
+            # indexé par eq_id).
+            if broker_ready and await publisher.unpublish(f"jeedom2ha_scenario_{scenario_id}"):
+                unpublished_scenario_ids.add(scenario_id)
             continue
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
@@ -2104,6 +2112,32 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         request.app["scenario_publications"].pop(stale_id, None)
         _LOGGER.info("[SCENARIO] Purged stale scenario_id=%d from scenario_publications", stale_id)
     request.app["scenario_publications"].update(scenario_publications)
+
+    # Story 21.1 (CC-44, Q2b C) — le broker fait foi : vider les boutons de scénario retenus
+    # qui ne sont pas actifs (inactifs, supprimés, fantômes déjà présents). Garde-fou : la
+    # section `scenarios` doit être une liste, lue en entier côté démon et déclarée complète
+    # par le producteur PHP (`scenarios_complete`), sinon le défaut « liste vide » ou un
+    # scénario illisible ferait vider des boutons encore actifs.
+    raw_scenarios = payload.get("scenarios")
+    scenarios_section_complete = (
+        isinstance(raw_scenarios, list)
+        and payload.get("scenarios_complete") is True
+        and len(raw_scenarios) == len(snapshot.scenarios)
+    )
+    purged_ids: list = []
+    if broker_ready and scenarios_section_complete:
+        result = await publisher.purge_orphan_scenario_buttons(
+            set(scenario_publications), unpublished_scenario_ids
+        )
+        purged_ids = result if isinstance(result, list) else []
+    elif broker_ready:
+        _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
+    emptied_ids = sorted(unpublished_scenario_ids | set(purged_ids))
+    if emptied_ids:
+        _LOGGER.info(
+            "[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker): ids=%s",
+            len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,
+        )
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
