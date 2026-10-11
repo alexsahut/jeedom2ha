@@ -12,7 +12,7 @@ jeedom2ha est un plugin Jeedom avec démon Python qui expose automatiquement vos
 - **Synchronisation des états en temps réel** : les changements d'état Jeedom (allumage, position volet, état switch…) remontent dans HA en continu, sur le périmètre publié (lumières, volets, prises).
 - **Pilotage bidirectionnel** : les commandes HA (allumer une lumière, fermer un volet, activer une prise) sont exécutées dans Jeedom avec retour d'état honnête.
 - **Capteurs et énergie HA** : publie les capteurs `sensor` / `binary_sensor`, les mesures de puissance et d'énergie, et les métadonnées Home Assistant utiles aux statistiques (`device_class`, `unit_of_measurement`, `state_class`).
-- **Diagnostic intégré** : l'interface explique pourquoi un équipement est publié, non publié, ou ambigu — avec des pistes de remédiation.
+- **Diagnostic intégré** : la configuration par pièce explique, équipement par équipement et commande par commande, ce qui sera publié ou non dans Home Assistant et pourquoi — avec des pistes de remédiation. Un export de diagnostic (« Télécharger le diagnostic support ») est disponible pour l'assistance.
 - **Filtrage et exclusions** : excluez des plugins entiers, des pièces Jeedom, ou des équipements individuels. Politique de confiance configurable (sûr uniquement / sûr + probable).
 - **Auto-détection MQTT Manager** : si le plugin MQTT Manager (mqtt2) est installé, la configuration broker est pré-remplie automatiquement.
 
@@ -39,11 +39,8 @@ Les capteurs d'énergie exposent les métadonnées Home Assistant quand elles so
 - jeedom2ha ne modifie pas les équipements, commandes ou scénarios Jeedom pendant la publication.
 
 **Ce que le plugin ne fait pas encore :**
-- Thermostats / climate
-- Scénarios Jeedom → HA
-- Équipements sans `generic_type` assigné (non publiés, signalés dans le diagnostic)
+- Équipements sans `generic_type` assigné (non publiés, signalés dans la configuration par pièce)
 - Republication automatique si le broker MQTT est redémarré (les messages retain sont perdus — rescan manuel nécessaire)
-- Export de diagnostic
 
 ---
 
@@ -113,7 +110,7 @@ Sans MQTT Manager, renseignez manuellement :
   - *Sûr + Probable* (recommandé) : publie les équipements bien identifiés et ceux probablement bien typés
   - *Sûr uniquement* : plus restrictif, ne publie que les mappings certains
 
-Cliquez **"Appliquer et Rescanner"** après chaque modification pour propager les changements vers Home Assistant.
+Cliquez **"Appliquer les filtres et rescanner"** après chaque modification des filtres pour propager les changements vers Home Assistant. Pour la connexion au broker, cliquez sur **"Sauvegarder"** puis redémarrez le démon (il ne lit les réglages MQTT qu'à son démarrage).
 
 ---
 
@@ -121,22 +118,24 @@ Cliquez **"Appliquer et Rescanner"** après chaque modification pour propager le
 
 1. Configurez le broker MQTT et testez la connexion.
 2. Ajustez les filtres si nécessaire.
-3. Cliquez **"Appliquer et Rescanner"** sur la page de configuration.
+3. Cliquez **"Appliquer les filtres et rescanner"** sur la page de configuration, ou **"Rescanner la topologie Jeedom"** sur la page principale du plugin.
 4. Ouvrez Home Assistant → Paramètres → Appareils & Services → MQTT.
 5. Vos équipements Jeedom apparaissent comme appareils natifs HA, avec les pièces Jeedom comme `suggested_area`.
 
-Si des équipements n'apparaissent pas, consultez le **Diagnostic** depuis la page principale du plugin.
+Si des équipements n'apparaissent pas, ouvrez leur pièce dans la section **"Configuration Home Assistant par pièce"** de la page principale du plugin : l'écran indique s'ils seront publiés et, sinon, pourquoi.
 
 ---
 
 ## Diagnostic & Troubleshooting
 
-### Interface de diagnostic
+### Comprendre l'état d'un équipement
 
-Depuis la page principale du plugin, cliquez **"Diagnostic"** pour afficher :
-- La liste de vos équipements avec leur statut de publication (publié / non publié / ambigu)
-- La raison précise en cas de non-publication (generic_type manquant, structure incomplète, exclu manuellement…)
-- Des suggestions de remédiation
+Depuis la page principale du plugin, ouvrez une pièce dans **"Configuration Home Assistant par pièce"** pour afficher :
+- La liste de ses équipements, avec un badge qui dit s'ils seront publiés dans Home Assistant
+- La cause précise en cas de non-publication, dans la colonne "Diagnostic" de chaque commande
+- Les actions possibles : exclure, forcer, revenir au mode automatique, appliquer, republier
+
+Le détail de chaque libellé est dans la [documentation](docs/fr_FR/index.md).
 
 ### Logs
 
@@ -152,7 +151,7 @@ Niveaux utiles :
 |---|---|---|
 | Daemon ne démarre pas | Dépendances Python manquantes | Relancer l'installation des dépendances |
 | Broker MQTT non joignable | Mauvaise adresse / port / credentials | Tester la connexion depuis la configuration |
-| Équipements absents dans HA | `generic_type` non assigné dans Jeedom | Consulter le diagnostic → colonne "Raison" |
+| Équipements absents dans HA | `generic_type` non assigné dans Jeedom, ou autre cause | Ouvrir la pièce et lire la colonne "Diagnostic" |
 | États non mis à jour | Daemon stoppé ou broker coupé | Vérifier statut daemon + logs |
 | Entités dupliquées dans HA | Rescan après changement d'ID | Supprimer les entités orphelines dans HA puis rescanner |
 
@@ -163,13 +162,13 @@ Niveaux utiles :
 | Dimension | État |
 |---|---|
 | Jeedom Core | v4.4.9+ (PHP 8.x) |
-| Debian | 12+ |
+| Debian | 11 et 12 |
 | Python | 3.9+ |
 | Licence | AGPL |
 | Statut | Beta — fonctionnel sur périmètre V1, en développement actif |
 | Auteur | Alexandre SAHUT |
 
-Le plugin est en développement actif. Le périmètre V1 couvre les entités principales, les capteurs `sensor` / `binary_sensor`, le state streaming et les métadonnées HA Energy pour les mesures power/energy. L'export de diagnostic et la republication automatique après redémarrage broker restent prévus dans les prochaines versions.
+Le plugin est en développement actif. Le périmètre V1 couvre les entités principales, les capteurs `sensor` / `binary_sensor`, le state streaming et les métadonnées HA Energy pour les mesures power/energy. La republication automatique après redémarrage broker reste prévue dans une prochaine version.
 
 > **Note restart** : après un redémarrage du démon jeedom2ha (sans redémarrage de Jeedom), les entités redeviennent pilotables automatiquement. Après un redémarrage du broker MQTT, le comportement dépend de la configuration de persistance du broker : si les messages retained sont conservés, Home Assistant retrouve les entités sans action ; sinon, un rescan manuel depuis la configuration est nécessaire.
 

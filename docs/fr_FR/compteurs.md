@@ -5,10 +5,10 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Bandeau d'obsolescence : « Cette section décrit la sémantique des compteurs avant la story compteurs. »
 - Libellés d'interface décrits ici : ceux produits par buildRoomCounterLabels (desktop/js/jeedom2ha_mapping_override.js),
   alimentés par summarizeRoom (même fichier), affichés par renderRoomCounters (desktop/js/jeedom2ha_mapping_surface.js).
-- Tests Node correspondants : tests/unit/test_story_20_3_compteurs_piece.node.test.js.
+- Tests Node correspondants : tests/unit/test_story_20_3_compteurs_piece.node.test.js (10 tests, tous passés avec `node --test` au moment de la rédaction).
 - Règle de cloisonnement : aucun libellé de compteur (ligne équipements, ligne commandes, « non lu »,
   messages de chargement/indisponibilité) ne doit apparaître ailleurs que dans ce fichier. index.md renvoie
-  ici par un simple lien. Vérification : voir la commande grep consignée dans la story 20.5 (tâche 4.3).
+  ici par un simple lien. Vérification : le motif de grep retenu est consigné dans la section « R1 » du Dev Agent Record de la story 20.5 (AC6). Les libellés de badge d'équipement « N commande(s) prête(s) / bloquante(s) » restent acceptés dans index.md (ce sont des libellés de badge, pas de compteur).
 - Quand la sémantique change (« publiés » = présents dans Home Assistant, « en attente d'application »,
   « non pris en charge »), remplacer tout ce fichier ; rien d'autre dans la documentation n'est à modifier.
 -->
@@ -39,7 +39,7 @@ Elle comporte quatre compteurs, toujours dans cet ordre. Le libellé est au sing
 | **équipement(s) désactivé(s) dans Jeedom** | Les équipements dont le badge indique « Désactivé dans Jeedom… ». |
 | **équipement(s) à corriger** | Les équipements qui ont **au moins une commande bloquante**. |
 
-Si certains équipements de la pièce n'ont pas pu être lus, la ligne se termine par « N équipement(s) non lu(s) » : leurs chiffres ne sont pas comptés.
+Tant que certains équipements de la pièce ne sont pas lus — pendant le chargement, ou parce que leur lecture a échoué — la ligne se termine par « N équipement(s) non lu(s) » : leurs chiffres ne sont pas comptés, et s'ajoutent à mesure que les lectures aboutissent.
 
 **Deux précisions importantes :**
 
@@ -53,7 +53,7 @@ Elle comporte trois compteurs :
 | Compteur affiché | Ce qu'il compte |
 |---|---|
 | **commande(s) prête(s)** | Les commandes dont la colonne « Diagnostic » indique « Sera publié : … ». |
-| **commande(s) bloquante(s)** | Les commandes dont la colonne « Diagnostic » indique « Ne sera pas publié — … » pour une cause à corriger. |
+| **commande(s) bloquante(s)** | Les commandes dont la colonne « Diagnostic » indique « Ne sera pas publié — … », hors commandes exclues, désactivées ou non couvertes. Ce compteur réunit des causes que vous pouvez corriger et d'autres que vous ne pouvez pas corriger vous-même. |
 | **commande(s) non couverte(s)** | Les commandes qu'aucun type Home Assistant ne prend en charge. Elles ne sont jamais comptées comme bloquantes. |
 
 Les commandes exclues, ou celles d'un équipement désactivé, ne figurent dans aucun de ces trois compteurs.

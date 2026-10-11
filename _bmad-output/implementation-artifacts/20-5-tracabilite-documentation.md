@@ -102,7 +102,8 @@ Annexe de `20-5-documentation-utilisateur-reecrite-cc07d.md` (AC1, Task 4.1). El
 | Aperçu d'équipement : « Entités concernées par ce forçage : … », « Au moins une entité sera publiée dans Home Assistant. » | SURF:387-404 |
 | « Le forçage serait refusé : <raison> » ; « Confirmer » grisé | SURF:370-376, 401, 474-476, 347-349 |
 | « Aperçu indisponible — le démon ne répond pas. » | SURF:480 |
-| « Revenir au mode automatique » (équipement) retire types et publication ; (entité) retire la publication de l'entité ; pas de confirmation | SURF:854, 935-941 ; HTTP:3338-3348 ; OVR:231-255 |
+| « Revenir au mode automatique » (équipement) retire les types des commandes et la publication de l'équipement ; pas de confirmation | SURF:854, 935-941 ; AJAX:981-991 ; HTTP:3339-3350 (branche sans `cmdId` : purge des types par commande puis de l'équipement), HTTP:3373-3375 (`fields=("ha_entity_type","publication_override")`) |
+| « Revenir au mode automatique » (entité) retire l'exclusion ou le forçage de l'entité **et** les types choisis pour ses commandes | HTTP:3314-3337 (`entity_scope=True` : `cmd_ids = mapping_cmd_ids(owner)` l. 3333, puis `remove_override_fields(..., fields)` sur chacune l. 3334-3336) ; HTTP:3373-3375 (`fields` = type + publication) ; SURF:854 (`target.override_command_id`) |
 | « Appliquer » (orange) si réglage en attente, « Republier » sinon ; sans confirmation | SURF:945-950, 487-512 |
 | « Appliquer » reste actif avec un réglage en attente (y compris une exclusion) | SURF:951-953 |
 | « Supprimer puis recréer » (équipement) : « Supprimer "<nom>" de Home Assistant. » + avertissement, bouton « Supprimer 1 équipement », confirmation rouge | SURF:679-694 |
@@ -182,3 +183,29 @@ Annexe de `20-5-documentation-utilisateur-reecrite-cc07d.md` (AC1, Task 4.1). El
 | « À corriger » = au moins une commande bloquante ; un équipement partiellement publié compte dans les deux | OVR:925-934 |
 | Les commandes exclues ou d'un équipement désactivé ne sont comptées dans aucun des trois compteurs de commandes | OVR:787-798, 935-937 |
 | Les compteurs se recalculent à chaque équipement lu ou rechargé | SURF:896-924 |
+
+## 8. Corrections R1 (relecture ClaudeBox)
+
+| Affirmation de la documentation | Source |
+|---|---|
+| Seuls « Republier », « Appliquer » et « Supprimer puis recréer » (et « Rescanner ») sont grisés quand le pont est indisponible ou pendant un rescan ; « Exclure », « Forcer », « Revenir au mode automatique » et la liste « Override HA » restent actifs | PAGE:136-162 (`applyHAGating` ne vise que `[data-ha-action]`) ; `data-ha-action` posé sur les boutons globaux PHP:97, 104, 111 et sur SURF:682, 718, 739, 947 ; absent de SURF:844-855 (Exclure/Forcer/Revenir) et de la liste SURF:41-53 |
+| Le bandeau est relu après Republier, Appliquer, Supprimer puis recréer et le rescan, pas après Exclure/Forcer/Revenir | PAGE:370, 375, 395, 414 ; SURF:505, 668 ; absent de SURF:283-311 (`publicationRequest`, `revertPublication`) |
+| « Override en attente… » (équipement) n'apparaît que si la décision de publier ou non change ; « pas encore appliqué » (entité) compare aussi la raison | HTTP:3036 (`synced_should_publish != current_should_publish`), HTTP:3073-3077 (entité : `should_publish` ou `reason` différents) |
+| Le bouton « Republier » devient « Appliquer » dès qu'une entité est en attente | SURF:946-949 |
+| « Republier » ne relit pas Jeedom (topologie du dernier rescan) et applique les réglages enregistrés | HTTP:3889 (`topology = request.app.get("topology")`), HTTP:4252-4262 (`persisted_overrides=overrides_cache`) |
+| Seule « commande sans type Home Assistant applicable » est non couverte ; les trois autres causes de l'ancienne famille 5 sont bloquantes | OVR:771-774 (`isUncoveredDiagnostic` : `command_not_covered` seulement), OVR:513-520 (`diagnosticState`), OVR:603-605 (libellés), SURF:63-67 (icône d'interdiction) et SURF:80-84 (triangle pour l'état bloquant) |
+| « Voir la première commande bloquante » cible ces causes | OVR:799-809 ; SURF:799-816 |
+| Exclusion « équipement dans la liste d'exclusions » : réglage propre à l'équipement (clé `jeedom2ha_excluded`), pas de la page de configuration | `core/class/jeedom2ha.class.php:746` (seul endroit où cette clé est lue) ; aucun écran du plugin ne l'écrit (`grep -rn jeedom2ha_excluded` : une seule occurrence hors tests) |
+| Exclusions « plugin » et « pièce » : champs « Plugins exclus » / « Pièces exclues » ; la pièce est comparée à l'identifiant direct de l'objet (pas de sous-pièces) | `jeedom2ha.class.php:673-674, 749-753` |
+| Le démon ne reçoit les réglages MQTT qu'au démarrage | `jeedom2ha.class.php:245-262` |
+| « Récupérer depuis MQTT Manager » enregistre aussitôt | AJAX:541-572 (`config::save` dans l'action `forceMqttManagerImport`) |
+| « Tester la connexion » utilise les valeurs saisies | CONF:359-420 ; AJAX:576-600 |
+| « Appliquer les filtres et rescanner » n'enregistre que les trois filtres | CONF:292-315 (`saveFilteringConfig` avec excludedPlugins, excludedObjects, confidencePolicy) ; AJAX:790 |
+| « Configuration manuelle » seulement si un hôte est enregistré ; avertissement « Aucun broker… » seulement si le champ hôte est vide | AJAX:529-538 (`source: manual` si `mqttHost` non vide) ; CONF:196-209 |
+| « Sûr » / « probable » : la politique « sûrs uniquement » ne retire que les « probables » | `resources/daemon/models/decide_publication.py:141` |
+| Le grisé de « Supprimer puis recréer » reflète la présence réelle dans Home Assistant | OVR:971-1006 (`published_in_ha`) ; HTTP:3040 |
+| « Commande clé » = commande propre à une seule entité | HTTP:3047-3053 (`unique_cmd_id`) ; OVR:152, 158-165 |
+| `switch` couvre aussi les familles « SWITCH » et « FAN » | `resources/daemon/mapping/switch.py:60-64` |
+| La couleur d'une lumière n'est pas reprise (seule la luminosité est publiée) | `resources/daemon/discovery/publisher.py:412-419` ; `resources/daemon/mapping/light.py:32, 210` |
+| Libellés avec apostrophe typographique (’) repris tels que dans l'écran | OVR:175, 193, 203, 589, 598-599, 614-616 ; SURF:846 ; contrôle automatisé de tous les libellés entre « » (voir Dev Agent Record, R1) |
+
