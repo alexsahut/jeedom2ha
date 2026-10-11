@@ -43,7 +43,7 @@ Durée : du 2026-10-01 au 2026-10-11.
 
 ## Risques résiduels
 
-- **CC-51 / story « compteurs »** : la sémantique actuelle des compteurs (« publiés », « en attente d'application », « non pris en charge ») doit être revue ; décidée par Alex comme prochaine priorité après 20-5, avant CC-44, CC-47, CC-36 et l'epic de parité HomeKit CC-33. Le bloc `compteurs` de la documentation de 20.5 est isolé et porte un bandeau d'obsolescence en attendant cette story.
+- **CC-51 / story « compteurs »** : la sémantique actuelle des compteurs (« publiés », « en attente d'application », « non pris en charge ») doit être revue ; prévue avec CC-36 et CC-51, après CC-44 et CC-47 (ordre décidé par Alex le 2026-10-11 à 15:48). Le bloc `compteurs` de la documentation de 20.5 est isolé et porte un bandeau d'obsolescence en attendant cette story.
 - **Réserve 20-2 (commande 5369)** : état sans ordre On/Off, ni un type seul ni le forçage ne la publient dans l'état actuel ; à traiter par une story dédiée (suivi CC-47).
 - **Réserve 20-4 (AC6)** : un scénario désactivé garde son bouton dans Home Assistant (CC-44, défaut antérieur à cet epic).
 - **Écarts relevés par la relecture de 20-5, non corrigés dans cette story** (à traiter avec la story compteurs ou une story dédiée) : le libellé « Supprimer puis recréer » ne fait que dépublier (la recréation suppose un « Republier » ou un rescan ensuite) ; le cloisonnement des compteurs (AC6) laisse passer deux libellés proches des compteurs hors de la modale.
