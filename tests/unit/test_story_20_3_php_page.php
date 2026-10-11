@@ -31,10 +31,14 @@ foreach (array('div_scopeSummary', 'bt_refreshScopeSummary', 'Parc global', 'Syn
 
 echo "AC2 — action Diagnostic supprimée, squelette Jeedom et export conservés\n";
 check('aucune action data-action="diagnostic"', strpos($rendered, 'data-action="diagnostic"') === false);
-check('« Ajouter » garde eqLogicAction et data-action="add"', preg_match('/eqLogicAction[^>]*data-action="add"/', $rendered) === 1);
+check('« Ajouter » est retiré de la page principale (décision d\'Alex du 2026-10-11)', preg_match('/eqLogicAction[^>]*data-action="add"/', $rendered) === 0 && strpos($rendered, '{{Ajouter}}') === false);
 check('« Configuration » garde eqLogicAction et data-action="gotoPluginConf"', preg_match('/eqLogicAction[^>]*data-action="gotoPluginConf"/', $rendered) === 1);
 check('le conteneur eqLogicThumbnailContainer est conservé', strpos($rendered, 'eqLogicThumbnailContainer') !== false);
 check('« Télécharger le diagnostic support » est conservé', strpos($rendered, 'bt_exportDiagnostic') !== false);
+
+echo "R1-I — nom de pièce échappé\n";
+check('object_name est rendu via htmlspecialchars', strpos($rendered, 'htmlspecialchars($room[\'object_name\']') !== false);
+check('object_name n\'est jamais écrit brut', preg_match('/echo[^;]*\\.\\s*\\$room\\[\'object_name\'\\]\\s*\\./', $rendered) === 0);
 
 echo "AC6 — vocabulaire de gabarit retiré\n";
 foreach (array('Mes templates', 'Équipement Template', 'Paramètre n°1', 'Paramètres spécifiques', 'Mot de passe', 'Auto-actualisation', 'Configuration mapping') as $needle) {

@@ -64,8 +64,9 @@ describe('20.3 / AC2 — modale Diagnostic supprimée, export support conservé'
     assert.doesNotMatch(code, /data-action=diagnostic|Diagnostic de Couverture|modal-diagnostic|Jeedom2haDiagnosticHelpers/);
   });
 
-  it('« Ajouter » et « Configuration » gardent eqLogicThumbnailContainer / eqLogicAction / data-action', () => {
-    assert.match(page, /<div class="eqLogicThumbnailContainer">\s*<div class="cursor eqLogicAction logoPrimary" data-action="add">/);
+  it('« Configuration » garde eqLogicThumbnailContainer / eqLogicAction / data-action ; « Ajouter » est retiré (décision d’Alex du 2026-10-11)', () => {
+    assert.doesNotMatch(page, /eqLogicAction[^>]*data-action="add"/);
+    assert.match(page, /<div class="eqLogicThumbnailContainer">\s*<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"/);
     assert.match(page, /eqLogicAction logoSecondary" data-action="gotoPluginConf"/);
   });
 

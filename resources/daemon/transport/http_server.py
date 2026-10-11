@@ -2953,6 +2953,7 @@ def _build_mapping_override_tree(
     confidence_policy=_DEFAULT_CONFIDENCE_POLICY,
     synced_decision=None,
     scope_included=True,
+    pending_discovery_unpublish=None,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -3033,6 +3034,10 @@ def _build_mapping_override_tree(
     )
     synced_should_publish = synced_decision.should_publish if synced_decision is not None else None
     override_pending = synced_should_publish is not None and synced_should_publish != current_should_publish
+    # Story 20.3 (R2-1) — présence réelle dans HA, lue avec la même fonction que les actions
+    # publier/supprimer (principal publié, secondaires publiés, dépublication différée). Lecture
+    # seule, aucune décision recalculée. `synced_should_publish` ne décrit que le principal.
+    published_in_ha = _is_currently_published_in_ha(eq.id, synced_decision, pending_discovery_unpublish or {})
 
     mappings = []
     if evaluation.mapping is not None:
@@ -3091,6 +3096,7 @@ def _build_mapping_override_tree(
             "synced_should_publish": synced_should_publish,
             "current_should_publish": current_should_publish,
             "override_pending": override_pending,
+            "published_in_ha": published_in_ha,
         },
         "commands": commands,
     }
@@ -3135,7 +3141,8 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
         )
         scope_included = _scope_entry_is_included(eq_id, scope_entry, request.app.get("eligibility"))
     payload = _build_mapping_override_tree(
-        eq, snapshot, data_dir, confidence_policy, synced_decision, scope_included=scope_included
+        eq, snapshot, data_dir, confidence_policy, synced_decision, scope_included=scope_included,
+        pending_discovery_unpublish=request.app.get("pending_discovery_unpublish") or {},
     )
     return web.json_response({"status": "ok", "payload": payload})
 

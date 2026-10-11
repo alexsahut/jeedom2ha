@@ -61,7 +61,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
 		<div class="eqLogicThumbnailContainer">
-			<div class="cursor eqLogicAction logoPrimary" data-action="add"><i class="fas fa-plus-circle"></i><br><span>{{Ajouter}}</span></div>
 			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
 		</div>
 
@@ -151,7 +150,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 				echo '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $room['object_id'] . '" onclick="j2haOpenRoom(' . $room['object_id'] . ')">';
 				echo '<i class="fas fa-door-open" style="font-size:3em; margin-top:10px;"></i>';
 				echo '<br>';
-				echo '<span class="name">' . $room['object_name'] . '</span>';
+				echo '<span class="name' . ($room['object_id'] > 0 ? ' j2ha-free-name' : '') . '">' . htmlspecialchars($room['object_name'], ENT_QUOTES, 'UTF-8') . '</span>';
 				echo '<span class="text-muted"> (' . count($room['equipments']) . ')</span>';
 				echo '</div>';
 			}

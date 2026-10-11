@@ -89,7 +89,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 **Given** le bloc « Gestion »
 **When** il s'affiche
 **Then** l'action « Diagnostic » (`data-action="diagnostic"`) et la modale « Diagnostic de Couverture » n'existent plus, et aucune requête `getDiagnostics` n'est émise
-**And** « Ajouter » et « Configuration » gardent la classe `eqLogicThumbnailContainer` et les attributs `eqLogicAction` / `data-action` dont dépend le cœur Jeedom
+**And** « Configuration » garde la classe `eqLogicThumbnailContainer` et les attributs `eqLogicAction` / `data-action` dont dépend le cœur Jeedom ; « Ajouter » est retiré (décision d'Alex du 2026-10-11, Q4 complétée : rien dans le cœur Jeedom n'exige le bouton)
 **And** « Télécharger le diagnostic support » (`exportDiagnostic`) est conservé et inchangé **[Q3]**.
 
 **AC3 — Compteurs de remplacement [Q1]**
@@ -164,7 +164,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 - [ ] **Task 1 — Relevés préalables, lecture seule (AC: 1-6)**
   - [x] 1.1 Relire F1 à F7 au SHA courant (20.2 `done` entre-temps modifie le code touché).
   - [x] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
-  - [ ] 1.3 *(non vérifié : le code du cœur Jeedom n'est pas disponible en session cloud ; Q4 = A ne modifie pas le squelette exigé — conteneurs `eqLogic`, `eqLogicThumbnailDisplay`, onglets, `plugin.template` — et conserve « Ajouter » et « Configuration » ; à confirmer lors du passage terrain)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
+  - [x] 1.3 *(vérifiée en lecture seule par ClaudeBox sur le cœur Jeedom de la box, 2026-10-11 : `core/js/plugin.template.js` gère « Ajouter » par délégation d'évènement (l. 672) et ouvre un équipement par son id sans carte (l. 26-27) ; rien n'exige le bouton « Ajouter », retiré par décision d'Alex ; « Configuration », le conteneur `eqLogicThumbnailContainer` et le squelette de page sont conservés)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
   - [ ] 1.4 *(box Jeedom inaccessible depuis une session cloud : relevé des compteurs réels reporté au passage terrain, AC10)* Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
   - [x] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
 - [x] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
@@ -245,6 +245,47 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 - 2026-10-05, 10:43 — Décision d'Alex (« 1A 2A 3C 4A » sur 20.1) : pas de compteurs en 20.1 ; le remplacement des compteurs est décidé et livré par 20.3. Faits à reprendre : la lecture de « Parc global » charge le diagnostic de tout le parc ; ses compteurs comptent des équipements et ignorent les exclusions manuelles.
 - 2026-10-06 — `create-story` de 20.3 (session cloud déléguée, lecture seule, aucun accès box/HA) : faits F1 à F7 relevés dans le code de `main` `df6bb51` ; constat que la synthèse et la modale portent des capacités autres que des compteurs (actions ciblées, nombres des confirmations globales, échec technique de publication) ; questions Q1 à Q4 posées avec recommandation A. **`ready-for-dev` non accordé.**
 - 2026-10-06 — Alexandre valide les arbitrages **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Les AC et tâches conditionnelles sont figés sur ces choix ; 20.2 reste l'unique dépendance de statut avant le développement.
+- 2026-10-11 — Décision d'Alex (Q4 complétée, après la vérification de la Task 1.3 par ClaudeBox) : « Ajouter » (`.eqLogicAction[data-action=add]`) est retiré de la page principale ; « Configuration », `eqLogicThumbnailContainer` et le squelette de page sont conservés. La ligne d'AC2 qui exigeait que « Ajouter » garde ses attributs est amendée ; test PHP et gate adaptés.
+
+## Correctifs de revue post-fusion (R1, ClaudeBox 11/10)
+
+Contexte : la preuve terrain AC10 de 20.3 est faite le 2026-10-11 au matin (passage Chrome, compteurs recomptés, clics réels sur les trois actions déplacées à 12:00, rescan, parité avant/après sans écart). La relecture a posteriori de la PR #225 par ClaudeBox, avec une relecture indépendante, ne trouve aucun P1 mais des écarts à corriger avant de clore 20.3. Aucune décision produit nouvelle : il s'agit de restaurer des comportements que l'ancienne synthèse portait et que Q2=A disait conservés. La story reste `review`. Session déléguée sans accès box ni Home Assistant.
+
+A. AC4/Q2=A, « Publier par équipement » : aujourd'hui « Appliquer » (`surface.js` vers 790) n'apparaît que si une entité a `override_pending`, donc un équipement synchronisé n'a plus de republication ciblée (et un équipement « Sans pièce » n'a que le Republier global). Correctif sans bouton de plus (cf. CC-51, Alex trouve déjà les boutons redondants) : ce bouton est toujours présent ; libellé « Appliquer » (style warning) s'il y a un override en attente, sinon « Republier » (style default) ; même route `executeHaAction` publier/equipement, même rechargement.
+
+B. Gating d'état des actions déplacées, par lecture de l'arbre déjà chargé (aucune décision recalculée, aucune nouvelle route) : « Supprimer puis recréer » d'un équipement grisé avec infobulle quand l'arbre dit l'équipement non publié dans HA (champ de `sync_status` à confirmer dans le démon) ; « Republier » grisé pour un équipement désactivé ou exclu ; « Republier la pièce » grisé si, tous les arbres de la pièce étant lus, aucun équipement n'est à publier ; « Supprimer puis recréer la pièce » grisé si aucun n'est publié. Arbre en erreur (relais en erreur ou 404 démon, `jeedom_eq_id` absent) : aucune action proposée, jamais d'envoi `[null]`. Référence : l'ancienne synthèse (scope_summary.js:562, :573, :588 sur `82dcd90`).
+
+C. `applyHAGating` (`jeedom2ha.js` vers 145) réactive tous les `[data-ha-action]`, y compris un bouton dont l'action est en cours : marquer le bouton en attente et l'exclure, comme pour le rescan ; réserver le bouton dès l'ouverture de la confirmation (pas deux boîtes sur un double-clic).
+
+D. Retour d'une action de pièce : capturer la pièce dans la closure (pas `ctx.room` au retour) ; si la modale a été fermée ou une autre pièce ouverte, afficher le résultat dans la zone d'alerte de la page, et ne recharger que la pièce concernée.
+
+E. Compteurs : si aucune lecture d'arbre n'aboutit, message d'erreur au lieu de « Chargement des compteurs… » sans fin ; purger l'arbre en cache quand un rechargement échoue.
+
+F. Boutons « Supprimer puis recréer » (équipement et pièce) en `btn-danger`, comme l'exigeaient 5.3 et 5.7.
+
+G. Tests : les tests 20_3 des actions déplacées remplacent `setHaActionPendingState`, `restoreHaActionPendingState`, `buildHaActionUserMessage` et `confirmHaSupprimerAction` par des faux. Ajouter des tests sur le vrai code : chemin d'erreur, état en cours, gating de B et C, `renderRoomCounters` / `buildRoomModalHtml`, et la couverture perdue avec 5.2/5.3 (bouton rouge de la confirmation, message avec le périmètre, attente). Tests devenus vides : `test_story_2_4_visual_separation.node.test.js` et `test_story_3_1_status_labels.node.test.js` testent des copies locales de fonctions supprimées (à retirer, en le disant dans la PR) ; `test_story_3_2_reason_labels_sync.py` à recibler sur la table de `mapping_override.js` ou à retirer.
+
+H. Gate : `FORBIDDEN_TEXT` (`decouverte-garage-enphase.mjs` vers 77) est appliqué à tout le texte de la modale, noms libres compris ; ne le vérifier que sur les libellés statiques (titres, entêtes, boutons, badges).
+
+I. `desktop/php/jeedom2ha.php` vers 154 : `htmlspecialchars` sur `object_name` (préexistant).
+
+J. Décision d'Alex du 2026-10-11 (Q4 complétée, après la vérification de la Task 1.3 par ClaudeBox) : retrait du bouton « Ajouter » de la page principale ; « Configuration », `eqLogicThumbnailContainer` et le squelette de page sont conservés.
+
+Hors périmètre de la ronde R1 initiale, ne pas toucher : la sémantique des compteurs (dénombrement de la décision, conforme à AC3). Le bouton « Ajouter », d'abord réservé à une décision séparée d'Alex, est traité par J.
+
+Critères de clôture : tests Node, PHP et Python verts en CI ; `git diff --stat` limité au front, aux tests, au gate et à la story ; aucun nom d'équipement ni de pièce. PR vers `main`, pas de fusion automatique — relecture ClaudeBox requise.
+
+## Correctifs de revue (R2, ClaudeBox, PR #228)
+
+Relecture ClaudeBox de la PR #228 : A à J conformes sauf ce qui suit.
+
+- **R2-1 (P1, régression).** `sync_status.synced_should_publish` ne décrit que la dernière décision du principal : un équipement dont le principal est refusé mais dont les secondaires sont publiés (forme 579/585), ou dont la dépublication est différée (`pending_discovery_unpublish`), est bien dans Home Assistant alors que « Supprimer puis recréer » était grisé avec une infobulle fausse. Correctif : le démon expose dans `sync_status` de `GET /system/mapping_overrides/{eq_id}` un champ additif `published_in_ha`, calculé par `_is_currently_published_in_ha(eq_id, synced_decision, pending_discovery_unpublish)` (la fonction que les actions publier/supprimer utilisent) ; lecture seule, aucune décision recalculée, aucune nouvelle route. Le front grise « Supprimer puis recréer » seulement si `published_in_ha === false` ; champ absent (démon plus ancien) : bouton actif. **Exception justifiée au périmètre « front seulement » de la ronde R1** : le signal de présence réelle n'existait pas dans l'arbre et ne pouvait être lu côté front sans enfreindre AC7. Tests Python : principal publié, principal refusé + secondaire publié, secondaire non publié, dépublication en attente, jamais publié ; les égalités exactes de `sync_status` des tests 19.3 / 19.4 sont mises à jour (champ additif).
+- **R2-2 (P2).** Le retour d'une action affiché dans `#div_alert` (modale fermée ou autre pièce ouverte) passe par `showAlert`, qui rend du HTML : le message, qui cite un nom libre, est échappé.
+- **R2-3 (P2).** Les actions de pièce ne sont grisées que si toutes les lectures ont abouti sans erreur et qu'aucun équipement ne justifie l'action ; pendant la lecture, ou si une lecture a échoué, elles restent actives (le démon ignore les équipements sans objet), sans infobulle « aucun équipement ».
+- **R2-4 (P3).** « Republier » / « Appliquer » par équipement : un résultat `echec` ou `succes_partiel` (HTTP 200) est affiché comme pour les actions de pièce ; après succès, l'équipement est relu et le bandeau de santé rafraîchi.
+- **R2-5 (P3, test).** Le test d'échappement n'asserte plus `&quot;` (le vrai jQuery laisse `"`).
+- **R2-6 (P3, gate).** `.modal-title` n'est plus exclu en bloc : seul le nom d'une vraie pièce est entouré d'un `.j2ha-free-name` (« Sans pièce », libellé statique, ne l'est pas, dans le titre comme sur la carte) ; « Commandes : » et « Aucune commande regroupée » restent dans la zone contrôlée, seuls les noms de commande sont marqués.
+- **R2-7 (story).** Section R1 corrigée (J ajouté, mention « Ajouter » mise à jour), Change Log remis dans l'ordre chronologique, cette section et la File List ajoutées.
 
 ## References
 
@@ -339,8 +380,34 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `tests/unit/test_story_20_0_gate_policy.node.test.js`, `test_story_16_8_mapping_surface.node.test.js`, `test_story_20_2_publication_surface.node.test.js`, `test_story_5_4_bandeau.node.test.js`, `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py` (adaptés)
 - Tests supprimés (voir Task 1.5) : `test_scope_summary_presenter`, `test_story_15_1_energy_badge_console`, `test_story_15_2_streaming_badge_console`, `test_story_15_3_fan_parity_badge_console`, `test_story_3_4_ai5_frontend_passthrough`, `test_story_4_2_diagnostic_decision`, `test_story_4_2_vocab_exclusion`, `test_story_4_3_diagnostic_in_scope`, `test_story_4_4_integration_ui_4d`, `test_story_4_5_home_landing`, `test_story_4_6_diagnostic_modal`, `test_story_5_1_actions_ha_frontend`, `test_story_5_2_frontend`, `test_story_5_3_frontend`, `test_story_5_7_badge_suppr_harmonie`, `test_story_6_1_pipeline_step`, `test_story_6_2_frontend_backend_first`, `test_story_6_3_honest_cause_mapping` (tous `*.node.test.js` sous `tests/unit/`)
 
+#### File List — ronde R1 (correctifs de revue post-fusion A à I)
+
+- `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md` (File List et Change Log de cette ronde)
+- `desktop/js/jeedom2ha.js` (C : `applyHAGating`, état « en cours », réservation dès la confirmation, confirmation forte `btn-danger` partagée)
+- `desktop/js/jeedom2ha_mapping_override.js` (B : `equipmentActionState`, `roomActionState`, lecture pure de l'arbre)
+- `desktop/js/jeedom2ha_mapping_surface.js` (A, B, C, D, E, F)
+- `desktop/php/jeedom2ha.php` (I : `htmlspecialchars` sur `object_name`, classe `j2ha-free-name` ; retrait du bouton « Ajouter », décision d'Alex du 2026-10-11)
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (H : gate de chaînes interdites limité aux libellés statiques)
+- `tests/unit/helpers/fake_dom.js` (nouveau), `tests/unit/helpers/ui_harness.js` (nouveau) : faux DOM/jQuery exécutant le vrai code de l'interface
+- `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_3_php_page.php`, `test_story_20_3_retrait_synthese_diagnostic.node.test.js`, `test_story_20_2_p1_p2_comportement_surface.node.test.js`, `test_story_20_4_rescan_ui.node.test.js`, `test_story_3_2_reason_labels_sync.py` (adaptés)
+- Tests supprimés : `tests/unit/test_story_2_4_visual_separation.node.test.js`, `tests/unit/test_story_3_1_status_labels.node.test.js` (copies locales de fonctions supprimées)
+
+#### File List — ronde R2 (relecture ClaudeBox de la PR #228)
+
+- `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md`
+- `resources/daemon/transport/http_server.py` (R2-1 : `sync_status.published_in_ha`, exception justifiée au périmètre front seul)
+- `resources/daemon/tests/unit/test_story_20_3_published_in_ha.py` (nouveau), `test_story_19_3_ac6_sync_status.py`, `test_story_19_3_guardrail_no_override_json_parity.py`, `test_story_19_4_scope_et_parite.py` (champ additif)
+- `desktop/js/jeedom2ha_mapping_override.js` (R2-1, R2-3), `desktop/js/jeedom2ha_mapping_surface.js` (R2-2, R2-3, R2-4, R2-6), `desktop/php/jeedom2ha.php` (R2-6 : carte « Sans pièce » non marquée)
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (R2-6)
+- `tests/unit/helpers/ui_harness.js`, `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_2_p1_p2_comportement_surface.node.test.js` (R2-1 à R2-6)
+
 ### Change Log
 
 - 2026-10-06 — Création de la story (brouillon complet, `ready-for-dev` bloqué par Q1 à Q4 et par 20.2 non `done`).
 - 2026-10-08 — Prérequis levés : 20.2 `done`, audit F1–F7 au SHA courant et table de libellés validée par Alexandre; 20.3 passe `ready-for-dev`.
 - 2026-10-08 — Implémentation (dev-story, session cloud déléguée) : synthèse « Parc global » et modale Diagnostic retirées, compteurs de la pièce ouverte, actions ciblées déplacées dans la modale de pièce, confirmations globales sans nombre, libellés d'usage, tests et gate 20-0 adaptés; 20.3 passe `review` (AC10 : preuve terrain restante).
+- 2026-10-11 — Correctifs de revue post-fusion (R1, ClaudeBox) consignés après la preuve terrain AC10 ; story restée `review` ; délégation à une session cloud (voir `docs/operations/delegations.md`). File List de cette ronde à compléter par la session déléguée.
+- 2026-10-11 — Ronde R1 (session cloud déléguée) : A à I appliqués sans décision produit nouvelle. A : « Appliquer »/« Republier » toujours présent (un seul bouton). B : gating d'état par lecture de l'arbre (`sync_status.synced_should_publish === true` = publié dans HA ; « Republier » grisé pour désactivé/exclu sauf override en attente, qui reste « Appliquer » ; actions de pièce grisées selon tous les arbres lus ; arbre illisible = aucune action). C : bouton en attente exclu de la réactivation, réservé dès la confirmation. D : pièce capturée au lancement, résultat en alerte de page si la modale n'est plus sur cette pièce. E : message d'erreur des compteurs, cache purgé à l'échec. F : `btn-danger`. G : tests sur le vrai code (faux DOM), 2 tests vides retirés, test 3.2 recentré sur `REASON_LABELS`. H : gate de chaînes interdites sur les seuls libellés statiques. I : `htmlspecialchars` sur `object_name`. Story restée `review`.
+- 2026-10-11 — Décision d'Alex : retrait du bouton « Ajouter » de la page principale (Task 1.3 cochée sur le constat de ClaudeBox, AC2 amendée, journal des décisions complété) ; test PHP, test de retrait et gate adaptés.
+- 2026-10-11 — Ronde R2 (relecture ClaudeBox de la PR #228, session cloud déléguée) : R2-1 champ additif `sync_status.published_in_ha` côté démon (exception justifiée au périmètre front seul) remplaçant la lecture de `synced_should_publish` pour le gating de « Supprimer puis recréer » (champ absent : bouton actif) ; R2-2 message échappé dans l'alerte de page ; R2-3 actions de pièce actives tant qu'une lecture n'a pas conclu sans erreur ; R2-4 résultat `echec`/`succes_partiel` affiché par « Republier »/« Appliquer » ; R2-5 test d'échappement ; R2-6 gate : seuls les noms libres exclus ; R2-7 story. Story restée `review`.

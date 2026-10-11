@@ -18,7 +18,7 @@
   var DEBOUNCE_MS = 400;
 
   // État volatil de la surface courante (une modale pièce ouverte à la fois).
-  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, room: null };
+  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null };
 
   function normalizedRooms() {
     return M.normalizeRoomsTree(window.j2haRoomsTree || []);
@@ -481,15 +481,31 @@
       });
   }
 
+  // « Appliquer » / « Republier » d'un équipement : même route (executeHaAction publier/equipement),
+  // même rechargement. Le bouton est réservé pendant l'appel (R1-C). Un résultat `echec` ou
+  // `succes_partiel` du démon (HTTP 200) est affiché comme pour les actions de pièce (R2-4).
   function applyEquipment(eqId, $button, $errorSlot) {
-    $button.prop('disabled', true);
+    if (eqId === null || eqId === undefined || $button.prop('disabled')) {
+      return;
+    }
+    var room = ctx.room;
+    var reservation = setHaActionPendingState($button, '{{En cours...}}');
     clearRequestError($errorSlot);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
       portee: 'equipement', selection: JSON.stringify([eqId]) }, dataType: 'json' })
-      .always(function () { $button.prop('disabled', false); })
+      .always(function () { restoreHaActionPendingState($button, reservation); })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
         if (error) { showRequestError($errorSlot, error); return; }
+        var payload = resp && resp.result && typeof resp.result === 'object' ? resp.result.payload : null;
+        if (payload && typeof payload === 'object') {
+          showActionFeedback(room, buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
+          if (shouldRefreshPublishedScopeAfterHaAction(payload)) {
+            reloadEquipment(eqId);
+            refreshBridgeStatus();
+          }
+          return;
+        }
         reloadEquipment(eqId);
       })
       .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
@@ -499,21 +515,42 @@
   // Lus uniquement dans les arbres déjà chargés pour cette pièce (aucune autre lecture) ;
   // le dénombrement vit dans le module pur (M.summarizeRoom), jamais de décision recalculée.
 
+  function roomEquipmentCount() {
+    return ctx.room ? ctx.room.equipments.length : 0;
+  }
+
+  function readRoomTrees() {
+    var trees = [];
+    var errors = 0;
+    if (!ctx.room) {
+      return { trees: trees, errors: errors };
+    }
+    for (var i = 0; i < ctx.room.equipments.length; i++) {
+      var eqId = ctx.room.equipments[i].eq_id;
+      if (ctx.trees[eqId]) {
+        trees.push(ctx.trees[eqId]);
+      } else if (ctx.treeErrors[eqId]) {
+        errors += 1;
+      }
+    }
+    return { trees: trees, errors: errors };
+  }
+
   function renderRoomCounters() {
     var $host = $('.modal-j2ha-room .j2ha-room-counters').first();
     if ($host.length === 0 || !ctx.room) {
       return;
     }
-    var trees = [];
-    for (var i = 0; i < ctx.room.equipments.length; i++) {
-      var tree = ctx.trees[ctx.room.equipments[i].eq_id];
-      if (tree) {
-        trees.push(tree);
-      }
-    }
+    var read = readRoomTrees();
+    var trees = read.trees;
     $host.empty();
     if (trees.length === 0) {
-      $host.text('{{Chargement des compteurs…}}');
+      // R1-E : si plus aucune lecture ne peut aboutir, un message d'erreur remplace le chargement.
+      if (read.errors >= roomEquipmentCount() && read.errors > 0) {
+        $host.text('{{Compteurs indisponibles : la configuration des équipements de cette pièce n’a pas pu être lue.}}');
+      } else {
+        $host.text('{{Chargement des compteurs…}}');
+      }
       return;
     }
     var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length));
@@ -539,6 +576,45 @@
     return $('<span></span>').text(String(value)).html();
   }
 
+  // R1-B : grise (avec infobulle) un bouton dont l'action n'a pas de sens dans l'état lu de
+  // l'arbre. `data-ha-state-blocked` empêche applyHAGating de le réactiver avec le pont.
+  function setStateGate($button, allowed, reason) {
+    if (allowed) {
+      $button.removeAttr('data-ha-state-blocked').removeAttr('title');
+    } else {
+      $button.attr('data-ha-state-blocked', '1').attr('title', reason || '').prop('disabled', true);
+    }
+  }
+
+  function reapplyBridgeGating() {
+    if (typeof applyHAGating === 'function') {
+      applyHAGating(window.jeedom2haLastBridgeStatus || null);
+    }
+  }
+
+  function updateRoomActionsGating() {
+    var $republish = $('.modal-j2ha-room .j2ha-room-republish').first();
+    var $recreate = $('.modal-j2ha-room .j2ha-room-recreate').first();
+    if (!ctx.room || ($republish.length === 0 && $recreate.length === 0)) {
+      return;
+    }
+    var read = readRoomTrees();
+    var state = M.roomActionState(read.trees, roomEquipmentCount(), read.trees.length + read.errors);
+    if ($republish.length > 0) setStateGate($republish, state.can_republish, state.republish_reason);
+    if ($recreate.length > 0) setStateGate($recreate, state.can_recreate, state.recreate_reason);
+    reapplyBridgeGating();
+  }
+
+  function refreshRoomView() {
+    renderRoomCounters();
+    updateRoomActionsGating();
+  }
+
+  function isRoomOpen(room) {
+    return !!room && !!ctx.room && ctx.room.object_id === room.object_id
+      && $('.modal-j2ha-room .j2ha-room-surface').length > 0;
+  }
+
   function showRoomFeedback(message, level) {
     var $slot = $('.modal-j2ha-room .j2ha-room-feedback').first();
     if ($slot.length === 0) {
@@ -548,25 +624,51 @@
       .addClass('alert-' + level).text(message)).show();
   }
 
-  function reloadRoom() {
-    if (!ctx.room) {
+  // R1-D : le résultat d'une action est rendu dans la modale seulement si cette pièce y est
+  // toujours ouverte ; sinon (modale fermée, autre pièce ouverte), dans la zone d'alerte de la page.
+  function showActionFeedback(room, message, level) {
+    if (isRoomOpen(room)) {
+      showRoomFeedback(message, level);
       return;
     }
-    ctx.room.equipments.forEach(function (eq) { reloadEquipment(eq.eq_id); });
+    // `showAlert` rend du HTML (jeeDialog.toast) et le message cite des noms libres : échappé (R2-2).
+    $('#div_alert').showAlert({ message: escapeHtml(message), level: level });
   }
 
-  function runHaAction(intention, portee, selection, $button, pendingLabel, onSuccess) {
-    var pendingState = setHaActionPendingState($button, pendingLabel);
+  function reloadRoom(room) {
+    if (!isRoomOpen(room)) {
+      return;
+    }
+    room.equipments.forEach(function (eq) { reloadEquipment(eq.eq_id); });
+  }
+
+  function hasValidSelection(selection) {
+    return Array.isArray(selection) && selection.length > 0 && selection.every(function (id) {
+      return typeof id === 'number' && isFinite(id);
+    });
+  }
+
+  // `room` est capturée au lancement de l'action (jamais relue dans ctx au retour).
+  function runHaAction(room, intention, portee, selection, $button, pendingLabel, reservation, onSuccess) {
+    if (!hasValidSelection(selection)) {
+      showActionFeedback(room, '{{Action impossible : identifiant introuvable.}}', 'danger');
+      if (reservation) restoreHaActionPendingState($button, reservation);
+      return;
+    }
+    var pendingState = reservation || setHaActionPendingState($button, pendingLabel);
+    if (reservation) {
+      updateHaActionPendingLabel($button, pendingLabel);
+    }
     executeHaAction(intention, portee, selection, {
       onSuccess: function (payload) {
-        showRoomFeedback(buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
+        showActionFeedback(room, buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
         if (shouldRefreshPublishedScopeAfterHaAction(payload) && onSuccess) {
           onSuccess();
         }
         refreshBridgeStatus();
       },
       onError: function (message) {
-        showRoomFeedback(message, 'danger');
+        showActionFeedback(room, message, 'danger');
       },
       onComplete: function () {
         restoreHaActionPendingState($button, pendingState);
@@ -577,24 +679,30 @@
   var RECREATE_WARNING = '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}';
 
   function appendEquipmentRecreateButton($host, eqId, eqName) {
-    var $button = $('<button type="button" class="btn btn-default btn-xs j2ha-eq-recreate" data-ha-action="supprimer"></button>')
+    var $button = $('<button type="button" class="btn btn-danger btn-xs j2ha-eq-recreate" data-ha-action="supprimer"></button>')
       .text('{{Supprimer puis recréer}}');
     $button.on('click', function () {
       if ($button.prop('disabled')) {
         return;
       }
+      var room = ctx.room;
+      var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
       confirmHaSupprimerAction(
         '{{Supprimer puis recréer dans Home Assistant}}',
         '{{Supprimer}} "' + escapeHtml(eqName) + '" {{de Home Assistant.}}' + RECREATE_WARNING,
         '{{Supprimer 1 équipement}}',
         function () {
-          runHaAction('supprimer', 'equipement', [eqId], $button, '{{Suppression...}}', function () {
-            reloadEquipment(eqId);
+          runHaAction(room, 'supprimer', 'equipement', [eqId], $button, '{{Suppression...}}', reservation, function () {
+            if (isRoomOpen(room)) reloadEquipment(eqId);
           });
+        },
+        function () {
+          restoreHaActionPendingState($button, reservation);
         }
       );
     });
     $host.append($button);
+    return $button;
   }
 
   function buildRoomActions(room) {
@@ -613,30 +721,44 @@
       if ($republish.prop('disabled')) {
         return;
       }
+      var reservation = setHaActionPendingState($republish, '{{Confirmation en cours…}}');
       confirmHaPublishAction(
         '{{Republier la pièce}}',
         escapeHtml(room.object_name) + ' — {{republier les équipements inclus de cette pièce. Confirmer ?}}',
         '{{Republier}}',
         function () {
-          runHaAction('publier', 'piece', [room.object_id], $republish, '{{En cours...}}', reloadRoom);
+          runHaAction(room, 'publier', 'piece', [room.object_id], $republish, '{{En cours...}}', reservation, function () {
+            reloadRoom(room);
+          });
+        },
+        function () {
+          restoreHaActionPendingState($republish, reservation);
         }
       );
     });
-    var $recreate = $('<button type="button" class="btn btn-default btn-sm j2ha-room-recreate" data-ha-action="supprimer" style="margin-left:8px;"></button>')
+    var $recreate = $('<button type="button" class="btn btn-danger btn-sm j2ha-room-recreate" data-ha-action="supprimer" style="margin-left:8px;"></button>')
       .append('<i class="fas fa-recycle"></i> ').append(document.createTextNode('{{Supprimer puis recréer la pièce}}'));
     $recreate.on('click', function () {
       if ($recreate.prop('disabled')) {
         return;
       }
+      var reservation = setHaActionPendingState($recreate, '{{Confirmation en cours…}}');
       confirmHaSupprimerAction(
         '{{Supprimer puis recréer dans Home Assistant}}',
         '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + RECREATE_WARNING,
         '{{Supprimer la pièce}}',
         function () {
-          runHaAction('supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reloadRoom);
+          runHaAction(room, 'supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reservation, function () {
+            reloadRoom(room);
+          });
+        },
+        function () {
+          restoreHaActionPendingState($recreate, reservation);
         }
       );
     });
+    // Actifs par défaut (R2-3) : grisés seulement quand toutes les lectures ont abouti sans erreur
+    // et qu'aucun équipement ne justifie l'action (voir updateRoomActionsGating).
     $wrap.append($republish).append($recreate);
     return $wrap;
   }
@@ -753,7 +875,14 @@
       var entity = tree.entities[i];
       var $row = $('<div class="j2ha-entity-row"></div>');
       $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
-      $row.append(document.createTextNode(' — ' + M.entityCommandsLabel(entity, tree.commands)));
+      // Libellé statique ; seuls les noms de commande (texte libre Jeedom) sont marqués `j2ha-free-name`.
+      var commandIds = Array.isArray(entity.command_ids) ? entity.command_ids : [];
+      if (commandIds.length === 0) {
+        $row.append(document.createTextNode(' — {{Aucune commande regroupée}}'));
+      } else {
+        $row.append(document.createTextNode(' — {{Commandes : }}'));
+        $row.append($('<span class="j2ha-free-name"></span>').text(M.resolveCommandNames(tree.commands, commandIds).join(', ')));
+      }
       appendEntityPendingBadge($row, entity);
       appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
       $host.append($row);
@@ -762,14 +891,37 @@
 
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
 
+  // R1-B/E : un arbre illisible (relais en erreur, 404 démon, `jeedom_eq_id` absent) ne propose
+  // aucune action et est purgé du cache pour ne jamais servir une donnée périmée.
+  function markTreeError($panel, eqId, message) {
+    if (eqId !== null && eqId !== undefined && !isNaN(eqId)) {
+      delete ctx.trees[eqId];
+      ctx.treeErrors[eqId] = true;
+    }
+    $panel.find('.j2ha-eq-actions').first().empty();
+    $panel.find('.j2ha-eq-entities').first().empty();
+    $panel.find('.j2ha-eq-cmdlist').first().empty();
+    $panel.find('.j2ha-eq-sync-badge').first().empty();
+    $panel.find('.j2ha-eq-blocking-anchor').first().empty();
+    $panel.find('.j2ha-eq-publish-badge').first().empty();
+    $panel.find('.j2ha-eq-status').first().text(message);
+    refreshRoomView();
+  }
+
   function renderEquipmentTree($panel, tree) {
     var normalized = M.normalizeTree(tree);
     var eqId = normalized.jeedom_eq_id;
+    if (eqId === null || eqId === undefined) {
+      markTreeError($panel, parseInt($panel.attr('data-eq-id'), 10),
+        '{{Impossible de lire la configuration de cet équipement.}}');
+      return;
+    }
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
     var $actions = $panel.find('.j2ha-eq-actions').first().empty();
 
     ctx.trees[eqId] = normalized;
-    renderRoomCounters();
+    delete ctx.treeErrors[eqId];
+    refreshRoomView();
 
     renderSyncBadge($panel, normalized);
     renderEntities($panel, normalized);
@@ -787,17 +939,24 @@
     // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
     var $equipmentError = appendPublicationActions($actions, eqId, M.equipmentPublicationTarget(normalized),
       true, normalized.commands, normalized.entities);
-    if (normalized.entities.some(function (entity) { return entity.override_pending; })) {
-      var $apply = $('<button type="button" class="btn btn-warning btn-xs" style="margin-left:6px;">{{Appliquer}}</button>');
-      $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
-      $actions.append($apply);
-    }
-    appendEquipmentRecreateButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
-    // Le bouton vient d'être ajouté après l'ouverture de la modale : il suit le même gating que
-    // les boutons globaux (pont indisponible, rescan en cours), sinon il resterait actif.
-    if (typeof applyHAGating === 'function') {
-      applyHAGating(window.jeedom2haLastBridgeStatus || null);
-    }
+    // R1-A (AC4, Q2=A) : la publication ciblée d'un équipement reste toujours disponible, sans
+    // bouton de plus : « Appliquer » (warning) quand un override attend d'être appliqué,
+    // « Republier » (default) sinon. Même route, même rechargement.
+    var actionState = M.equipmentActionState(normalized);
+    var pending = normalized.entities.some(function (entity) { return entity.override_pending; });
+    var $apply = $('<button type="button" class="btn btn-xs j2ha-eq-republish" data-ha-action="republier" style="margin-left:6px;"></button>')
+      .addClass(pending ? 'btn-warning' : 'btn-default')
+      .text(pending ? '{{Appliquer}}' : '{{Republier}}');
+    $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
+    // Un override en attente (y compris une exclusion à appliquer) reste applicable ; hors de ce cas,
+    // un équipement désactivé ou exclu n'a rien à republier.
+    setStateGate($apply, pending || actionState.can_republish, actionState.republish_reason);
+    $actions.append($apply);
+    var $recreate = appendEquipmentRecreateButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
+    setStateGate($recreate, actionState.can_recreate, actionState.recreate_reason);
+    // Les boutons viennent d'être ajoutés après l'ouverture de la modale : ils suivent le même gating
+    // que les boutons globaux (pont indisponible, rescan en cours), sinon ils resteraient actifs.
+    reapplyBridgeGating();
 
     if (!normalized.mapped && normalized.commands.length === 0) {
       $list.append($('<div class="text-muted" style="padding:8px;"></div>')
@@ -824,6 +983,10 @@
     renderSummary($panel, normalized);
   }
 
+  function roomHasEquipment(eqId) {
+    return !!ctx.room && ctx.room.equipments.some(function (eq) { return eq.eq_id === eqId; });
+  }
+
   function loadEquipment($panel, eqId) {
     var $status = $panel.find('.j2ha-eq-status').first();
     $status.text('{{Chargement…}}');
@@ -833,12 +996,27 @@
       data: { action: 'getMappingOverrides', eqId: eqId },
       dataType: 'json',
       success: function (data) {
-        $status.text('');
+        // Réponse tardive d'une pièce refermée : ignorée (elle ne doit pas toucher le cache d'une autre pièce).
+        if (!roomHasEquipment(eqId)) {
+          return;
+        }
         var result = data && data.result ? data.result : data;
-        renderEquipmentTree($panel, result && result.payload ? result.payload : result);
+        var payload = result && result.payload ? result.payload : result;
+        var failed = (data && data.state && data.state !== 'ok')
+          || !M.equipmentActionState(payload).readable
+          || Number(M.normalizeTree(payload).jeedom_eq_id) !== Number(eqId);
+        if (failed) {
+          markTreeError($panel, eqId, '{{Impossible de lire la configuration de cet équipement.}}');
+          return;
+        }
+        $status.text('');
+        renderEquipmentTree($panel, payload);
       },
       error: function () {
-        $status.text('{{Impossible de charger la configuration HA (daemon indisponible).}}');
+        if (!roomHasEquipment(eqId)) {
+          return;
+        }
+        markTreeError($panel, eqId, '{{Impossible de charger la configuration HA (daemon indisponible).}}');
       },
     });
   }
@@ -915,12 +1093,16 @@
     ctx.timers = {};
     ctx.xhr = {};
     ctx.trees = {};
+    ctx.treeErrors = {};
     ctx.room = room;
 
     var $content = buildRoomModalHtml(room);
 
     bootbox.dialog({
-      title: '<i class="fas fa-home"></i> ' + $('<span>').text(room.object_name).html(),
+      // « Sans pièce » est un libellé statique ; le nom d'une vraie pièce est un nom libre.
+      title: '<i class="fas fa-home"></i> ' + (room.object_id > 0
+        ? '<span class="j2ha-free-name">' + escapeHtml(room.object_name) + '</span>'
+        : escapeHtml(room.object_name)),
       message: $content,
       size: 'large',
       className: 'modal-j2ha-room',
