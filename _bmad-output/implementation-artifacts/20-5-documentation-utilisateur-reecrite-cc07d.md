@@ -1,10 +1,10 @@
 # Story 20.5 : Documentation utilisateur réécrite (CC-07 d)
 
-Status: ready-for-dev
+Status: done
 
-> **Avancement (2026-10-11, session cloud `dev-story`) : Tasks 1 à 4 faites, Task 6.1 préparée.** Documentation livrée sous `docs/fr_FR/` ; table de traçabilité en annexe (`20-5-tracabilite-documentation.md`). Statut volontairement laissé à `ready-for-dev` : le passage à `review` / `done` attend la relecture ClaudeBox (Task 6.1).
+> **Avancement (2026-10-11) : Tasks 1 à 4, 6 et 6.1 faites.** Documentation livrée sous `docs/fr_FR/` ; table de traçabilité en annexe (`20-5-tracabilite-documentation.md`). Relecture ClaudeBox et relecture indépendante, deux rondes (PR #232), environ 150 affirmations vérifiées dans le code ; contrôle des noms réels par ClaudeBox.
 
-> **Statut : `ready-for-dev` (2026-10-11, 17:35).** Alexandre a tranché Q1=A, Q2=A, Q3=B, Q4=A (Journal des décisions) ; le plan de la Task 2.1 est retenu tel quel et les décisions de rédaction de la Task 2.4 sont prises. Les prérequis de statut sont tenus : 20.1, 20.2, 20.3 et 20.4 sont `done` ; la story « compteurs » n'est pas encore livrée, donc le bloc `compteurs` décrit la sémantique actuelle avec son bandeau d'obsolescence. Alexandre relira la documentation livrée. Aucune ligne de documentation n'est réécrite par ce `create-story`.
+> **Statut : `done` (2026-10-11).** Alexandre a tranché Q1=A, Q2=A, Q3=B, Q4=A (Journal des décisions) ; le plan de la Task 2.1 est retenu tel quel et les décisions de rédaction de la Task 2.4 sont prises. Documentation livrée sous `docs/fr_FR/` (PR #232), relue en deux rondes par ClaudeBox et par une relecture indépendante : environ 150 affirmations vérifiées dans le code, aucun nom réel (contrôle par empreintes), liens et ancres valides. Ferme CC-07 d. La story « compteurs » n'est pas encore livrée : le bloc `compteurs` décrit la sémantique actuelle avec son bandeau d'obsolescence.
 
 ## Story
 
@@ -295,16 +295,16 @@ Règles de rédaction (AC6) :
   - [x] 3.3 Sections conservées et corrigées : prérequis, installation, configuration MQTT et filtrage (libellés réels, P8, P9), dépannage (P10), suggested_area (P12), durée des actions (P11), nommage (1.4).
   - [x] 3.4 `docs/index.md` (P index), `docs/fr_FR/changelog.md` (entrée datée), `docs/fr_FR/changelog_beta.md` (intitulé et contenu hérités du gabarit, selon la décision prise).
   - [x] 3.5 *(sans objet : Q2=A, français seul, aucune version anglaise)*
-- [x] **Task 4 — Vérifications (AC: 1, 2, 4-6, 9)**
+- [x] **Task 4 — Vérifications (AC: 1, 2, 4-6, 9)** *(relecture ClaudeBox et relecture indépendante, deux rondes (PR #232), environ 150 affirmations vérifiées dans le code ; contrôle des noms réels par ClaudeBox)*
   - [x] 4.1 Table de traçabilité « affirmation → fichier:ligne » dans le Dev Agent Record.
   - [x] 4.2 *(fait ; le contrôle contre les noms réels reste à faire par ClaudeBox)* Recherches négatives dans `docs/` : « Diagnostic » (bouton), « HA / jeedom2ha », « deploy-to-box », `evaluate_equipment`, `CC-`, « Mes templates », adresses IP. **Le contrôle contre les noms réels de la maison est fait par ClaudeBox à la relecture, en lecture seule, sans jamais recopier ces noms** (la session de dev ne les connaît pas et ne les cherche pas).
   - [x] 4.3 Vérification de cloisonnement des compteurs (AC6).
   - [x] 4.4 Liens internes valides (Markdown) ; `git diff --stat` limité aux fichiers documentaires.
   - [x] 4.5 Aucun test existant ne casse (certains tests peuvent lire `docs/` ; lancer `make test`, voir Dev Notes).
 - [x] **Task 5 — Captures d'écran : sans objet (Q3=B) (AC: 7)** *(aucune capture dans cette réécriture ; seuls les commentaires d'emplacement invisibles sont posés en Task 3 ; captures après la story « compteurs », sur données génériques)*
-- [ ] **Task 6 — Relecture et clôture**
-  - [ ] 6.1 *(préparée : PR ouverte vers `main`, non fusionnée ; points d'attention listés dans « Completion Notes » ci-dessous)* Relecture ClaudeBox (fidélité au code, absence de jargon, aucune donnée réelle) avant fusion ; revue indépendante si Codex est indisponible.
-  - [ ] 6.2 Au `done` : SHA relevé, commandes de vérification, décisions Q1 à Q4 et fermeture de CC-07 d consignés.
+- [x] **Task 6 — Relecture et clôture** *(relecture ClaudeBox et relecture indépendante, deux rondes (PR #232), environ 150 affirmations vérifiées dans le code ; contrôle des noms réels par ClaudeBox)*
+  - [x] 6.1 *(fait : relecture ClaudeBox et relecture indépendante, deux rondes (PR #232), environ 150 affirmations vérifiées dans le code ; contrôle des noms réels par ClaudeBox)* Relecture ClaudeBox (fidélité au code, absence de jargon, aucune donnée réelle) avant fusion ; revue indépendante si Codex est indisponible.
+  - [x] 6.2 *(fait : SHA `main` `36eb156` (fusion PR #232) ; `make test` vert ; décisions Q1 à Q4 consignées au Journal ; CC-07 d fermé par cette clôture)* Au `done` : SHA relevé, commandes de vérification, décisions Q1 à Q4 et fermeture de CC-07 d consignés.
 
 ## Dev Notes
 
@@ -391,6 +391,7 @@ Lancer `make test` avant de pousser, par prudence : un test qui lit des fichiers
 - 2026-10-11 — `create-story` de 20.5 (session cloud déléguée, lecture seule, aucun accès box/HA) : inventaire de la documentation au SHA `3b120d3` (12 passages périmés, 10 manquants), faits F1 à F9 relevés dans le code, section compteurs isolée, questions Q1 à Q4 posées avec recommandation. **`ready-for-dev` non accordé** à ce stade ; aucune des quatre questions n'est tranchée par ce document.
 - 2026-10-11, 17:35 — Décisions d'Alexandre : Q1=A (utilisateur du Market), Q2=A (français seul), Q3=B (pas de captures dans cette réécriture ; emplacements prévus ; captures après la story « compteurs »), Q4=A (docs/fr_FR, bloc compteurs séparé).
 - 2026-10-11 — Décisions de rédaction (Task 2.4, ClaudeBox) : P6 retiré (fonction sans point d'entrée) ; P11 condensé en annexe courte ; plan de la Task 2.1 retenu tel quel. Conditions de passage remplies : story `ready-for-dev`.
+- 2026-10-11 — Clôture : documentation livrée (PR #232), relue en deux rondes par ClaudeBox et par une relecture indépendante ; story done ; ferme CC-07 d. Alexandre relira la documentation livrée.
 
 ## References
 
@@ -480,8 +481,14 @@ Chaque point a été revérifié dans le code avant d'être écrit ; la table de
 - `_bmad-output/implementation-artifacts/20-5-tracabilite-documentation.md` (nouveau, table de traçabilité)
 - `_bmad-output/implementation-artifacts/20-5-documentation-utilisateur-reecrite-cc07d.md` (cases cochées, Dev Agent Record)
 
+*Ajouts de la clôture :*
+
+- `_bmad-output/planning-artifacts/epics-projection-engine.md` (pe-epic-20 passé `done`)
+- `_bmad-output/implementation-artifacts/pe-epic-20-retro-2026-10-11.md` (nouveau, rétrospective)
+
 ### Change Log
 
 - 2026-10-11 — Création de la story 20.5 (`create-story`, statut `backlog`).
 - 2026-10-11 — R1 (relecture ClaudeBox, PR #232) : corrections P1 (Revenir au mode automatique sur une entité, famille « type non publiable », annexe zone suggérée), P2 (boutons grisés nommés, badge d'attente, exclusion d'équipement, MQTT « Sauvegarder » + démon, exemple neutre, anciennes entrées du changelog, README) et P3 ; voir « R1 » du Dev Agent Record. Statut inchangé.
 - 2026-10-11 — `dev-story` (session cloud déléguée) : Tasks 1 à 4 faites, documentation utilisateur réécrite sous `docs/fr_FR/`, table de traçabilité en annexe, écarts signalés ; Task 6.1 préparée (PR non fusionnée) ; statut inchangé (`ready-for-dev`) dans l'attente de la relecture ClaudeBox.
+- 2026-10-11 — Clôture : relecture ClaudeBox et relecture indépendante (PR #232, deux rondes) ; story `done` ; ferme CC-07 d ; `pe-epic-20` passé `done`, rétrospective `pe-epic-20-retro-2026-10-11.md`.
