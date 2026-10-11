@@ -2447,3 +2447,23 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - story 16.8 `done` avant la bascule effective sur la surface unique.
 - gate 20.0 vert avant chaque `done` d'interface de cet epic ; aucune écriture transmise à Jeedom ni au démon pendant les parcours du gate ; les preuves terrain qui écrivent réellement suivent la règle de la revue Codex du 2026-10-01 (`sprint-change-proposal-2026-10-01-etape-4-interface.md`, « Risques et suivi »).
 - documentation utilisateur réécrite et alignée sur l'interface livrée.
+
+### Epic 21 — Solde des réserves de l'étape 4 (CC-44, CC-47)
+
+**Statut :** `backlog` — **proposé** le 2026-10-11 (create-story, session cloud déléguée, lecture seule). **Numérotation et rattachement provisoires** : question Q0 de la story 21.1 en attente de décision d'Alexandre (nouvel epic recommandé ; l'epic 20 est clos et ne se rouvre pas). Cadrage documentaire à la demande directe du mainteneur, comme pe-epic-19 : pas de SCP dédié, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
+
+**Origine :** rétrospective `pe-epic-20-retro-2026-10-11.md` (risques résiduels) ; ordre décidé par Alexandre le 2026-10-11 à 15:48 : CC-44 + CC-47, puis CC-36 avec CC-51 et la story « compteurs », puis l'epic de parité HomeKit (CC-33).
+
+**Valeur utilisateur :** Home Assistant reflète fidèlement Jeedom : un scénario désactivé ne laisse pas de bouton fantôme, et une commande d'état seule est publiée sous un type qui lui correspond ou expliquée honnêtement.
+
+**Stories :**
+
+- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (état sans ordre On/Off).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `ready-for-dev` non accordé : décisions produit en attente (retrait ou indisponibilité du bouton, type HA cible de l'état seul, une ou deux stories).
+
+**Points visés :** CC-44 (réserve AC6 de 20-4), CC-47 (réserve de 20-2).
+
+### Gates epic-level pe-epic-21
+
+- un scénario désactivé n'a plus de bouton dans Home Assistant après le sync suivant (ou le traitement décidé en Q2), prouvé sur la box (inventaire avant/après, 0 erreur).
+- la commande 5369 (état sans ordre On/Off) est publiée sous le type décidé en Q3 ou expliquée honnêtement, sans régression du trio switch ni de la prise mesureuse (I11).
+- `PRODUCT_SCOPE` inchangé ; golden et contrat 4D verts.
