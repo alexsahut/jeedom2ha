@@ -31,7 +31,7 @@ function html(withDiagnosticAction) {
   const unassigned = `<div class="modal-j2ha-room"><div class="j2ha-room-counters">${counters()}</div>
     <div class="j2ha-room-actions"><span>Indisponible</span></div>${panel(7, 'Sans', 'j2ha-diag-ready', 'j2ha-publish-ok')}</div>`;
   return `<body><div class="row"><div class="eqLogicThumbnailDisplay">
-    <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="add">Ajouter</div><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
+    <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
     ${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
     <div id="div_bridgeHealthBanner">Bridge</div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
     <div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name j2ha-free-name">Sans pièce</span><span class="text-muted"> (1)</span></div>

@@ -145,7 +145,7 @@ async function waitAtStep(helpers, index, label, operation) {
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
-    const actions = nodes.find((node) => node.querySelector('[data-action="add"]') && node.querySelector('[data-action="gotoPluginConf"]'));
+    const actions = nodes.find((node) => node.querySelector('[data-action="gotoPluginConf"]'));
     const surface = document.querySelector('#j2ha_roomCards');
     const banner = document.querySelector('#div_bridgeHealthBanner');
     return {

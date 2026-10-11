@@ -89,7 +89,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 **Given** le bloc « Gestion »
 **When** il s'affiche
 **Then** l'action « Diagnostic » (`data-action="diagnostic"`) et la modale « Diagnostic de Couverture » n'existent plus, et aucune requête `getDiagnostics` n'est émise
-**And** « Ajouter » et « Configuration » gardent la classe `eqLogicThumbnailContainer` et les attributs `eqLogicAction` / `data-action` dont dépend le cœur Jeedom
+**And** « Configuration » garde la classe `eqLogicThumbnailContainer` et les attributs `eqLogicAction` / `data-action` dont dépend le cœur Jeedom ; « Ajouter » est retiré (décision d'Alex du 2026-10-11, Q4 complétée : rien dans le cœur Jeedom n'exige le bouton)
 **And** « Télécharger le diagnostic support » (`exportDiagnostic`) est conservé et inchangé **[Q3]**.
 
 **AC3 — Compteurs de remplacement [Q1]**
@@ -164,7 +164,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 - [ ] **Task 1 — Relevés préalables, lecture seule (AC: 1-6)**
   - [x] 1.1 Relire F1 à F7 au SHA courant (20.2 `done` entre-temps modifie le code touché).
   - [x] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
-  - [ ] 1.3 *(non vérifié : le code du cœur Jeedom n'est pas disponible en session cloud ; Q4 = A ne modifie pas le squelette exigé — conteneurs `eqLogic`, `eqLogicThumbnailDisplay`, onglets, `plugin.template` — et conserve « Ajouter » et « Configuration » ; à confirmer lors du passage terrain)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
+  - [x] 1.3 *(vérifiée en lecture seule par ClaudeBox sur le cœur Jeedom de la box, 2026-10-11 : `core/js/plugin.template.js` gère « Ajouter » par délégation d'évènement (l. 672) et ouvre un équipement par son id sans carte (l. 26-27) ; rien n'exige le bouton « Ajouter », retiré par décision d'Alex ; « Configuration », le conteneur `eqLogicThumbnailContainer` et le squelette de page sont conservés)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
   - [ ] 1.4 *(box Jeedom inaccessible depuis une session cloud : relevé des compteurs réels reporté au passage terrain, AC10)* Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
   - [x] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
 - [x] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
@@ -245,6 +245,7 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 - 2026-10-05, 10:43 — Décision d'Alex (« 1A 2A 3C 4A » sur 20.1) : pas de compteurs en 20.1 ; le remplacement des compteurs est décidé et livré par 20.3. Faits à reprendre : la lecture de « Parc global » charge le diagnostic de tout le parc ; ses compteurs comptent des équipements et ignorent les exclusions manuelles.
 - 2026-10-06 — `create-story` de 20.3 (session cloud déléguée, lecture seule, aucun accès box/HA) : faits F1 à F7 relevés dans le code de `main` `df6bb51` ; constat que la synthèse et la modale portent des capacités autres que des compteurs (actions ciblées, nombres des confirmations globales, échec technique de publication) ; questions Q1 à Q4 posées avec recommandation A. **`ready-for-dev` non accordé.**
 - 2026-10-06 — Alexandre valide les arbitrages **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Les AC et tâches conditionnelles sont figés sur ces choix ; 20.2 reste l'unique dépendance de statut avant le développement.
+- 2026-10-11 — Décision d'Alex (Q4 complétée, après la vérification de la Task 1.3 par ClaudeBox) : « Ajouter » (`.eqLogicAction[data-action=add]`) est retiré de la page principale ; « Configuration », `eqLogicThumbnailContainer` et le squelette de page sont conservés. La ligne d'AC2 qui exigeait que « Ajouter » garde ses attributs est amendée ; test PHP et gate adaptés.
 
 ## Correctifs de revue post-fusion (R1, ClaudeBox 11/10)
 
@@ -371,11 +372,11 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `desktop/js/jeedom2ha.js` (C : `applyHAGating`, état « en cours », réservation dès la confirmation, confirmation forte `btn-danger` partagée)
 - `desktop/js/jeedom2ha_mapping_override.js` (B : `equipmentActionState`, `roomActionState`, lecture pure de l'arbre)
 - `desktop/js/jeedom2ha_mapping_surface.js` (A, B, C, D, E, F)
-- `desktop/php/jeedom2ha.php` (I : `htmlspecialchars` sur `object_name`, classe `j2ha-free-name`)
+- `desktop/php/jeedom2ha.php` (I : `htmlspecialchars` sur `object_name`, classe `j2ha-free-name` ; retrait du bouton « Ajouter », décision d'Alex du 2026-10-11)
 - `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (H : gate de chaînes interdites limité aux libellés statiques)
 - `tests/unit/helpers/fake_dom.js` (nouveau), `tests/unit/helpers/ui_harness.js` (nouveau) : faux DOM/jQuery exécutant le vrai code de l'interface
 - `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js` (nouveau)
-- `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_3_php_page.php`, `test_story_20_2_p1_p2_comportement_surface.node.test.js`, `test_story_20_4_rescan_ui.node.test.js`, `test_story_3_2_reason_labels_sync.py` (adaptés)
+- `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_3_php_page.php`, `test_story_20_3_retrait_synthese_diagnostic.node.test.js`, `test_story_20_2_p1_p2_comportement_surface.node.test.js`, `test_story_20_4_rescan_ui.node.test.js`, `test_story_3_2_reason_labels_sync.py` (adaptés)
 - Tests supprimés : `tests/unit/test_story_2_4_visual_separation.node.test.js`, `tests/unit/test_story_3_1_status_labels.node.test.js` (copies locales de fonctions supprimées)
 
 ### Change Log
@@ -385,3 +386,4 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - 2026-10-11 — Correctifs de revue post-fusion (R1, ClaudeBox) consignés après la preuve terrain AC10 ; story restée `review` ; délégation à une session cloud (voir `docs/operations/delegations.md`). File List de cette ronde à compléter par la session déléguée.
 - 2026-10-08 — Implémentation (dev-story, session cloud déléguée) : synthèse « Parc global » et modale Diagnostic retirées, compteurs de la pièce ouverte, actions ciblées déplacées dans la modale de pièce, confirmations globales sans nombre, libellés d'usage, tests et gate 20-0 adaptés; 20.3 passe `review` (AC10 : preuve terrain restante).
 - 2026-10-11 — Ronde R1 (session cloud déléguée) : A à I appliqués sans décision produit nouvelle. A : « Appliquer »/« Republier » toujours présent (un seul bouton). B : gating d'état par lecture de l'arbre (`sync_status.synced_should_publish === true` = publié dans HA ; « Republier » grisé pour désactivé/exclu sauf override en attente, qui reste « Appliquer » ; actions de pièce grisées selon tous les arbres lus ; arbre illisible = aucune action). C : bouton en attente exclu de la réactivation, réservé dès la confirmation. D : pièce capturée au lancement, résultat en alerte de page si la modale n'est plus sur cette pièce. E : message d'erreur des compteurs, cache purgé à l'échec. F : `btn-danger`. G : tests sur le vrai code (faux DOM), 2 tests vides retirés, test 3.2 recentré sur `REASON_LABELS`. H : gate de chaînes interdites sur les seuls libellés statiques. I : `htmlspecialchars` sur `object_name`. Story restée `review`.
+- 2026-10-11 — Décision d'Alex : retrait du bouton « Ajouter » de la page principale (Task 1.3 cochée sur le constat de ClaudeBox, AC2 amendée, journal des décisions complété) ; test PHP, test de retrait et gate adaptés.
