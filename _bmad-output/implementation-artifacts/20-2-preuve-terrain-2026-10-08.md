@@ -8,7 +8,7 @@
 
 - Déploiement standard, sans cleanup ni rescan, terminé avec sauvegarde et rollback disponibles.
 - Gate 20-0 sur `main` : découverte, référence et parcours 20.2 (exclusion/retrait simulés) PASS ; contrôle d'écriture non déclarée bloqué comme attendu.
-- Cible terrain : eq287 `CHACON_porte-garage`, non publiée, sans override initial et sans topic HA/MQTT. Le périmètre autorisé par Alexandre était exclusivement l'exclusion de cette cible, sans forçage.
+- Cible terrain : eq287, non publiée, sans override initial et sans topic HA/MQTT. Le périmètre autorisé par Alexandre était exclusivement l'exclusion de cette cible, sans forçage.
 - Parcours réel réalisé dans Jeedom : **Exclure → Appliquer → Revenir au mode automatique**. Alexandre confirme avoir vu l'état `Exclu`, le badge `pas encore appliqué dans Home Assistant`, et confirme que le second clic `Appliquer` après le retour est bien le sien.
 - État final : override eq287 absent, décision revenue à `ambiguous_skipped`, équipement non publié. La parité avant/après est strictement identique : aucune décision, aucun topic MQTT/HA et aucun écouteur ne diffèrent.
 

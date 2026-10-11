@@ -1,6 +1,6 @@
 # Story 20.2 : Exclusion et forçage depuis la surface (CC-26)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -233,6 +233,9 @@ GPT-5 Codex
 - 2026-10-08 — Task 5 terrain : déploiement standard du SHA `79127a5`, gate 20-0 PASS (parcours 20.2 avec écritures simulées) et parcours réel autorisé par Alexandre sur eq287 uniquement : Exclure → Appliquer → Revenir au mode automatique. Alexandre confirme l'affichage « Exclu », le badge « pas encore appliqué dans Home Assistant » et le second clic Appliquer après le retour. Parité finale strictement identique et fichier d'overrides revenu à son hash initial ; aucun effet HA/MQTT. Statut conservé `review` : le témoin littéral `getBridgeStatus` avant/après requis par AC11 n'a pas été capturé.
 - 2026-10-08 — Alexandre accepte explicitement le waiver du témoin `getBridgeStatus` avant/après : les relevés d'overrides, de parité, MQTT/HA, PID et journaux constituent la preuve substitutive. Statut `review` → `ready-for-UX-validation`; validation UX explicite restante avant `done`.
 - 2026-10-08 — Alexandre donne la validation UX explicite. Story `ready-for-UX-validation` → `done`.
+- 2026-10-06, 11:59 — Go d'Alex : « go redéploiement 20-2 » et « oui tu peux forcer eq 463 » ; forçage réel de l'eq 463 par ClaudeBox à 14:02-14:03 (entité light publiée, seule décision changée à la parité).
+- 2026-10-06, vers 15:09 — Décision d'Alex : clore avec une réserve sur la commande 5369 (état sans ordre On/Off : ni un type seul ni le forçage ne la publient dans l'état actuel ; story dédiée à venir) et garder le forçage de l'eq 463.
+- 2026-10-11 — Mise en cohérence : nom d'équipement retiré de l'artefact du 08/10, en-tête corrigé, complément du 06/10 versé (20-2-preuve-complement-2026-10-06.md).
 
 ### File List
 
@@ -276,3 +279,4 @@ GPT-5 Codex
 - resources/daemon/tests/unit/test_story_20_2_x6b_eligible_equipment_override.py
 - tests/unit/test_story_20_2_x6b_equipment_eligibility.node.test.js
 - _bmad-output/implementation-artifacts/20-2-preuve-terrain-2026-10-08.md
+- _bmad-output/implementation-artifacts/20-2-preuve-complement-2026-10-06.md
