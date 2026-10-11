@@ -10,9 +10,11 @@ Uses single-component discovery (homeassistant/{entity_type}/...).
 """
 import json
 import logging
-from typing import Optional
+import re
+from typing import List, Optional, Set
 
 from models.availability import (
+    EntityAvailability,
     availability_from_snapshot,
     build_discovery_availability_fields,
 )
@@ -345,6 +347,51 @@ class DiscoveryPublisher:
                 _LOGGER.error("[DISCOVERY] Failed to unpublish %s (bridge unavailable)", topic)
         return all_ok
 
+    async def purge_orphan_scenario_buttons(
+        self, active_scenario_ids: Set[int], already_unpublished: Optional[Set[int]] = None
+    ) -> List[int]:
+        """Empty retained scenario button configs that are not active (Story 21.1, Q2b C).
+
+        The broker is the source of truth: read the retained button topics and keep only
+        those matching the strict pattern ``<prefix>/button/jeedom2ha_scenario_<int>/config``;
+        empty those whose id is not an active scenario of the snapshot. Nothing outside that
+        pattern is ever touched, and only what was actually read is emptied.
+        Returns the sorted ids emptied (empty when the collection is unavailable, empty or fails).
+        """
+        collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
+        if collect is None:
+            return []
+        try:
+            # MQTT forbids a partial-level wildcard (`jeedom2ha_scenario_+`): read every
+            # button config and keep only the strict scenario pattern below.
+            retained = await collect(f"{self._topic_prefix}/button/+/config")
+        except Exception:
+            _LOGGER.exception("[SCENARIO] Retained topics collection failed, no purge")
+            return []
+        if not isinstance(retained, list):
+            _LOGGER.info("[SCENARIO] Retained topics collection unavailable, no purge")
+            return []
+        pattern = re.compile(
+            rf"{re.escape(self._topic_prefix)}/button/(jeedom2ha_scenario_([0-9]+))/config"
+        )
+        skip = already_unpublished or set()
+        candidates = []
+        for topic in retained:
+            match = pattern.fullmatch(topic) if isinstance(topic, str) else None
+            if match:
+                candidates.append((match.group(1), int(match.group(2))))
+        _LOGGER.info(
+            "[SCENARIO] Retained button topics collected: %d (%d scenario button(s))",
+            len(retained), len(candidates),
+        )
+        purged: List[int] = []
+        for node_id, scenario_id in candidates:
+            if scenario_id in active_scenario_ids or scenario_id in skip:
+                continue
+            if await self.unpublish(node_id):
+                purged.append(scenario_id)
+        return sorted(set(purged))
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -357,14 +404,16 @@ class DiscoveryPublisher:
     def _build_device_block(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the common device block for discovery payloads."""
         eq_id = mapping.jeedom_eq_id
-        eq = snapshot.eq_logics.get(eq_id)
+        reason_details = mapping.reason_details or {}
+        source_kind = reason_details.get("source_kind", "eqlogic")
+        # Story 21.1 (C8) — un scénario n'est pas un équipement : l'id de scénario ne doit
+        # jamais résoudre un eqLogic homonyme (fabricant/modèle neutres).
+        eq = None if source_kind == "scenario" else snapshot.eq_logics.get(eq_id)
         eq_type_name = eq.eq_type_name if eq else ""
         manufacturer = f"Jeedom ({eq_type_name})" if eq_type_name else "Jeedom"
 
         # Scenario buttons use ha_unique_id as device identifier to avoid collision
         # with eqLogics that may share the same integer id (Story 10.1).
-        reason_details = mapping.reason_details or {}
-        source_kind = reason_details.get("source_kind", "eqlogic")
         device_id = mapping.ha_unique_id if source_kind == "scenario" else f"jeedom2ha_{eq_id}"
 
         device = {
@@ -382,6 +431,9 @@ class DiscoveryPublisher:
 
     def _build_availability_fields(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build availability payload fields (bridge-only or bridge+local)."""
+        if (mapping.reason_details or {}).get("source_kind") == "scenario":
+            # Story 21.1 (C8) — pont seul : jamais la disponibilité d'un eqLogic homonyme.
+            return build_discovery_availability_fields(EntityAvailability())
         entity_availability = availability_from_snapshot(mapping.jeedom_eq_id, snapshot)
         return build_discovery_availability_fields(entity_availability)
 
