@@ -80,9 +80,18 @@ const FORBIDDEN_TEXT = [
   /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/, /generic_type/,
 ];
 
-/** Lit le texte rendu d'un conteneur (jamais les scripts) et renvoie les rangs des motifs interdits trouvés. */
+// Story 20.3 (R1-H) : noms libres saisis par l'utilisateur (pièces, équipements, commandes) et retours
+// d'action qui les citent. Ils sont exclus du gate : seuls les libellés statiques (titres, entêtes,
+// boutons, badges) sont contrôlés.
+const FREE_TEXT_SELECTOR = '.j2ha-free-name, .j2ha-eq-name, .mo-td-name, .j2ha-entity-cmds, .j2ha-room-feedback, .modal-title';
+
+/** Lit le texte statique rendu d'un conteneur (jamais les scripts ni les noms libres) et renvoie les rangs des motifs interdits trouvés. */
 async function forbiddenTextRanks(page, selector) {
-  const text = await page.locator(selector).first().evaluate((node) => node.textContent ?? '');
+  const text = await page.locator(selector).first().evaluate((node, freeSelector) => {
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll(freeSelector).forEach((item) => item.remove());
+    return clone.textContent ?? '';
+  }, FREE_TEXT_SELECTOR);
   const ranks = [];
   FORBIDDEN_TEXT.forEach((pattern, rank) => { if (pattern.test(text)) ranks.push(rank + 1); });
   return ranks;

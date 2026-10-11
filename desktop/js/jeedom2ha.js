@@ -134,16 +134,20 @@ function isHABridgeAvailable(r) {
  * @param {Object} r - data.result de l'appel getBridgeStatus (peut être null si erreur)
  */
 function applyHAGating(r) {
+  // R1-C : un bouton dont l'action est en cours (`data-ha-pending`) garde son état tant que
+  // l'action n'est pas terminée ; un bouton grisé par l'état de l'arbre (`data-ha-state-blocked`,
+  // R1-B) n'est jamais réactivé par la seule santé du pont.
+  var $haActions = $('[data-ha-action]').not('[data-ha-pending="1"]');
   if (window.jeedom2haRescanInProgress === true) {
-    $('[data-ha-action]').prop('disabled', true);
+    $haActions.prop('disabled', true);
     return;
   }
   var available = r ? isHABridgeAvailable(r) : false;
-  var $haActions = $('[data-ha-action]');
   var $reason = $('#div_haGatingReason');
 
   if (available) {
-    $haActions.prop('disabled', false).removeClass('j2ha-ha-gated');
+    $haActions.not('[data-ha-state-blocked="1"]').prop('disabled', false).removeClass('j2ha-ha-gated');
+    $haActions.filter('[data-ha-state-blocked="1"]').removeClass('j2ha-ha-gated');
     $reason.hide();
   } else {
     $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
@@ -200,9 +204,15 @@ function setHaActionPendingState($button, pendingLabel) {
     html: $button.html(),
     disabled: $button.prop('disabled') === true,
   };
+  $button.attr('data-ha-pending', '1');
   $button.prop('disabled', true);
   $button.html('<i class="fas fa-spinner fa-spin"></i> ' + pendingLabel);
   return snapshot;
+}
+
+// Le bouton est déjà réservé (confirmation ouverte) : seul le libellé change quand l'action part.
+function updateHaActionPendingLabel($button, pendingLabel) {
+  $button.html('<i class="fas fa-spinner fa-spin"></i> ' + pendingLabel);
 }
 
 function restoreHaActionPendingState($button, snapshot) {
@@ -213,6 +223,15 @@ function restoreHaActionPendingState($button, snapshot) {
     $button.html(snapshot.html);
   }
   $button.prop('disabled', snapshot && snapshot.disabled === true);
+  $button.removeAttr('data-ha-pending');
+  // Le bouton reprend l'état du pont : il a pu changer pendant l'action.
+  if (typeof applyHAGating === 'function') {
+    applyHAGating(window.jeedom2haLastBridgeStatus || null);
+  }
+  // Un bouton grisé par l'état de l'arbre (R1-B) le reste, quel que soit le snapshot.
+  if ($button.attr('data-ha-state-blocked') === '1') {
+    $button.prop('disabled', true);
+  }
 }
 
 function showHaActionFeedback(payload) {
@@ -232,7 +251,7 @@ function releaseTopologyRescanReservation($button, snapshot, owner) {
   applyHAGating(window.jeedom2haLastBridgeStatus || null);
 }
 
-function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel) {
+function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel, confirmClass) {
   if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
     var confirmed = false;
     var cancelled = false;
@@ -257,7 +276,7 @@ function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCance
         },
         confirm: {
           label: confirmLabel,
-          className: 'btn-primary',
+          className: confirmClass || 'btn-primary',
           callback: function() {
             confirmed = true;
             onConfirm();
@@ -328,7 +347,7 @@ function executeHaAction(intention, portee, selection, handlers) {
 function triggerTopologyRescan($button, snapshot, owner) {
   if (window.jeedom2haRescanOwner !== owner) return;
   $button.html('<i class="fas fa-spinner fa-spin"></i> {{Rescan en cours…}}');
-  $('[data-ha-action]').prop('disabled', true);
+  $('[data-ha-action]').not('[data-ha-pending="1"]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     data: {action: 'scanTopology'}, dataType: 'json', timeout: 20000,
@@ -365,8 +384,11 @@ function triggerTopologyRescan($button, snapshot, owner) {
   });
 }
 
-function triggerPublierAction($button, portee, selection) {
-  var pendingState = setHaActionPendingState($button, '{{En cours...}}');
+function triggerPublierAction($button, portee, selection, reservation) {
+  var pendingState = reservation || setHaActionPendingState($button, '{{En cours...}}');
+  if (reservation) {
+    updateHaActionPendingLabel($button, '{{En cours...}}');
+  }
   executeHaAction('publier', portee, selection, {
     onSuccess: function(payload) {
       showHaActionFeedback(payload);
@@ -381,8 +403,11 @@ function triggerPublierAction($button, portee, selection) {
   });
 }
 
-function triggerSupprimerAction($button, portee, selection) {
-  var pendingState = setHaActionPendingState($button, '{{Suppression...}}');
+function triggerSupprimerAction($button, portee, selection, reservation) {
+  var pendingState = reservation || setHaActionPendingState($button, '{{Suppression...}}');
+  if (reservation) {
+    updateHaActionPendingLabel($button, '{{Suppression...}}');
+  }
   executeHaAction('supprimer', portee, selection, {
     onSuccess: function(payload) {
       showHaActionFeedback(payload);
@@ -397,30 +422,9 @@ function triggerSupprimerAction($button, portee, selection) {
   });
 }
 
-function confirmHaSupprimerAction(title, message, confirmLabel, onConfirm) {
-  if (typeof bootbox !== 'undefined' && bootbox && typeof bootbox.dialog === 'function') {
-    bootbox.dialog({
-      title: title,
-      message: '<div>' + message + '</div>',
-      buttons: {
-        cancel: {
-          label: '{{Annuler}}',
-          className: 'btn-default',
-        },
-        confirm: {
-          label: confirmLabel,
-          className: 'btn-danger',
-          callback: function() {
-            onConfirm();
-          },
-        },
-      },
-    });
-    return;
-  }
-  if (window.confirm(message)) {
-    onConfirm();
-  }
+// Confirmation forte (bouton rouge) ; `onCancel` libère le bouton réservé à l'ouverture (R1-C).
+function confirmHaSupprimerAction(title, message, confirmLabel, onConfirm, onCancel) {
+  confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel, 'btn-danger');
 }
 
 $(function() {
@@ -449,12 +453,17 @@ $(function() {
     if ($button.prop('disabled')) {
       return;
     }
+    // R1-C : le bouton est réservé dès l'ouverture de la confirmation (pas deux boîtes).
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
     confirmHaPublishAction(
       '{{Republier dans Home Assistant}}',
       '{{Republier tous les équipements inclus ?}}',
       '{{Republier}}',
       function() {
-        triggerPublierAction($button, 'global', ['all']);
+        triggerPublierAction($button, 'global', ['all'], reservation);
+      },
+      function() {
+        restoreHaActionPendingState($button, reservation);
       }
     );
   });
@@ -466,13 +475,17 @@ $(function() {
     if ($button.prop('disabled')) {
       return;
     }
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
     confirmHaSupprimerAction(
       '{{Supprimer puis recréer dans Home Assistant}}',
       '{{Supprimer puis recréer tout le parc publié ?}}'
         + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}',
       '{{Supprimer}}',
       function() {
-        triggerSupprimerAction($button, 'global', ['all']);
+        triggerSupprimerAction($button, 'global', ['all'], reservation);
+      },
+      function() {
+        restoreHaActionPendingState($button, reservation);
       }
     );
   });

@@ -14,6 +14,12 @@ const vm = require('node:vm');
 const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
 
 const source = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
+const homeSource = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
+// Le vrai code de l'état « action en cours » (jeedom2ha.js), partagé avec la surface.
+const pendingStateSource = homeSource.slice(
+  homeSource.indexOf('function setHaActionPendingState'),
+  homeSource.indexOf('function showHaActionFeedback')
+);
 
 function fakeButtons(n) {
   var list = [];
@@ -41,6 +47,20 @@ function fakeButtons(n) {
     return list;
   };
   return list;
+}
+
+// Bouton minimal avec l'API jQuery utilisée par le vrai état « action en cours ».
+function fakeActionButton() {
+  return {
+    length: 1,
+    _disabled: false,
+    _attrs: {},
+    _html: 'Appliquer',
+    prop(name, value) { if (value === undefined) return this._disabled; this._disabled = value; return this; },
+    attr(name, value) { if (value === undefined) return this._attrs[name]; this._attrs[name] = value; return this; },
+    removeAttr(name) { delete this._attrs[name]; return this; },
+    html(value) { if (value === undefined) return this._html; this._html = value; return this; },
+  };
 }
 
 function fakeErrorSlot() {
@@ -120,7 +140,9 @@ function loadHarness(ajax) {
     reloadCalls: [],
   };
   sandbox.reloadEquipment = function (eqId) { sandbox.reloadCalls.push(eqId); };
-  vm.runInNewContext(source.slice(start, end), sandbox);
+  vm.createContext(sandbox);
+  vm.runInContext(pendingStateSource, sandbox);
+  vm.runInContext(source.slice(start, end), sandbox);
   return { sandbox: sandbox, dialogs: dialogs };
 }
 
@@ -274,7 +296,7 @@ test('Forcer : le démon ne répond pas (.fail) affiche un message et libère le
 // Point 6 : applyEquipment (bouton « Appliquer ») — succès (recharge l'équipement) et
 // erreur démon relayée (message affiché, aucun rechargement).
 test('Appliquer : succès recharge l\'équipement, erreur démon affiche le message sans recharger', () => {
-  var okButton = { _disabled: false, prop(name, value) { if (value === undefined) return this._disabled; this._disabled = value; return this; } };
+  var okButton = fakeActionButton();
   var okAjax = fakeAjax([{ kind: 'done', body: { state: 'ok', result: null } }]);
   var h1 = loadHarness(okAjax);
   h1.sandbox.applyEquipment(20200, okButton, fakeErrorSlot());
@@ -283,7 +305,7 @@ test('Appliquer : succès recharge l\'équipement, erreur démon affiche le mess
   assert.equal(okButton.prop('disabled'), false, 'le bouton est réactivé après la requête');
 
   var errSlot = fakeErrorSlot();
-  var errButton = { _disabled: false, prop(name, value) { if (value === undefined) return this._disabled; this._disabled = value; return this; } };
+  var errButton = fakeActionButton();
   var errAjax = fakeAjax([{ kind: 'done', body: { state: 'ok', result: { status: 'error', message: 'Publication refusée' } } }]);
   var h2 = loadHarness(errAjax);
   h2.sandbox.applyEquipment(20200, errButton, errSlot);

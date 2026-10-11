@@ -365,9 +365,23 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `tests/unit/test_story_20_0_gate_policy.node.test.js`, `test_story_16_8_mapping_surface.node.test.js`, `test_story_20_2_publication_surface.node.test.js`, `test_story_5_4_bandeau.node.test.js`, `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py` (adaptés)
 - Tests supprimés (voir Task 1.5) : `test_scope_summary_presenter`, `test_story_15_1_energy_badge_console`, `test_story_15_2_streaming_badge_console`, `test_story_15_3_fan_parity_badge_console`, `test_story_3_4_ai5_frontend_passthrough`, `test_story_4_2_diagnostic_decision`, `test_story_4_2_vocab_exclusion`, `test_story_4_3_diagnostic_in_scope`, `test_story_4_4_integration_ui_4d`, `test_story_4_5_home_landing`, `test_story_4_6_diagnostic_modal`, `test_story_5_1_actions_ha_frontend`, `test_story_5_2_frontend`, `test_story_5_3_frontend`, `test_story_5_7_badge_suppr_harmonie`, `test_story_6_1_pipeline_step`, `test_story_6_2_frontend_backend_first`, `test_story_6_3_honest_cause_mapping` (tous `*.node.test.js` sous `tests/unit/`)
 
+#### File List — ronde R1 (correctifs de revue post-fusion A à I)
+
+- `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md` (File List et Change Log de cette ronde)
+- `desktop/js/jeedom2ha.js` (C : `applyHAGating`, état « en cours », réservation dès la confirmation, confirmation forte `btn-danger` partagée)
+- `desktop/js/jeedom2ha_mapping_override.js` (B : `equipmentActionState`, `roomActionState`, lecture pure de l'arbre)
+- `desktop/js/jeedom2ha_mapping_surface.js` (A, B, C, D, E, F)
+- `desktop/php/jeedom2ha.php` (I : `htmlspecialchars` sur `object_name`, classe `j2ha-free-name`)
+- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (H : gate de chaînes interdites limité aux libellés statiques)
+- `tests/unit/helpers/fake_dom.js` (nouveau), `tests/unit/helpers/ui_harness.js` (nouveau) : faux DOM/jQuery exécutant le vrai code de l'interface
+- `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js` (nouveau)
+- `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_3_php_page.php`, `test_story_20_2_p1_p2_comportement_surface.node.test.js`, `test_story_20_4_rescan_ui.node.test.js`, `test_story_3_2_reason_labels_sync.py` (adaptés)
+- Tests supprimés : `tests/unit/test_story_2_4_visual_separation.node.test.js`, `tests/unit/test_story_3_1_status_labels.node.test.js` (copies locales de fonctions supprimées)
+
 ### Change Log
 
 - 2026-10-06 — Création de la story (brouillon complet, `ready-for-dev` bloqué par Q1 à Q4 et par 20.2 non `done`).
 - 2026-10-08 — Prérequis levés : 20.2 `done`, audit F1–F7 au SHA courant et table de libellés validée par Alexandre; 20.3 passe `ready-for-dev`.
 - 2026-10-11 — Correctifs de revue post-fusion (R1, ClaudeBox) consignés après la preuve terrain AC10 ; story restée `review` ; délégation à une session cloud (voir `docs/operations/delegations.md`). File List de cette ronde à compléter par la session déléguée.
 - 2026-10-08 — Implémentation (dev-story, session cloud déléguée) : synthèse « Parc global » et modale Diagnostic retirées, compteurs de la pièce ouverte, actions ciblées déplacées dans la modale de pièce, confirmations globales sans nombre, libellés d'usage, tests et gate 20-0 adaptés; 20.3 passe `review` (AC10 : preuve terrain restante).
+- 2026-10-11 — Ronde R1 (session cloud déléguée) : A à I appliqués sans décision produit nouvelle. A : « Appliquer »/« Republier » toujours présent (un seul bouton). B : gating d'état par lecture de l'arbre (`sync_status.synced_should_publish === true` = publié dans HA ; « Republier » grisé pour désactivé/exclu sauf override en attente, qui reste « Appliquer » ; actions de pièce grisées selon tous les arbres lus ; arbre illisible = aucune action). C : bouton en attente exclu de la réactivation, réservé dès la confirmation. D : pièce capturée au lancement, résultat en alerte de page si la modale n'est plus sur cette pièce. E : message d'erreur des compteurs, cache purgé à l'échec. F : `btn-danger`. G : tests sur le vrai code (faux DOM), 2 tests vides retirés, test 3.2 recentré sur `REASON_LABELS`. H : gate de chaînes interdites sur les seuls libellés statiques. I : `htmlspecialchars` sur `object_name`. Story restée `review`.

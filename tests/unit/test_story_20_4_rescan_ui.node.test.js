@@ -16,7 +16,7 @@ test('20.4: le rescan garde le bouton dès la confirmation et ignore un second c
 });
 
 test('20.4: applyHAGating ne réactive pas les actions pendant le rescan', () => {
-  assert.match(source, /if \(window\.jeedom2haRescanInProgress === true\) \{\s*\$\('\[data-ha-action\]'\)\.prop\('disabled', true\);/);
+  assert.match(source, /var \$haActions = \$\('\[data-ha-action\]'\)\.not\('\[data-ha-pending="1"\]'\);\s*if \(window\.jeedom2haRescanInProgress === true\) \{\s*\$haActions\.prop\('disabled', true\);/);
 });
 
 test('20.4: les résultats UI distinguent succes, partiel, echec et champ absent', () => {
