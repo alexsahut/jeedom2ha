@@ -11,6 +11,7 @@
 
 ### fr_FR/
 
-- **[fr_FR/changelog.md](./fr_FR/changelog.md)** - Project changelog for stable versions.
-- **[fr_FR/changelog_beta.md](./fr_FR/changelog_beta.md)** - Project changelog for beta versions.
-- **[fr_FR/index.md](./fr_FR/index.md)** - Jeedom plugin template documentation.
+- **[fr_FR/index.md](./fr_FR/index.md)** - Documentation utilisateur du plugin jeedom2ha (installation, configuration, écran par pièce, causes de non-publication).
+- **[fr_FR/compteurs.md](./fr_FR/compteurs.md)** - Documentation utilisateur : compteurs de la fenêtre d'une pièce (page isolée).
+- **[fr_FR/changelog.md](./fr_FR/changelog.md)** - Changelog des versions stables.
+- **[fr_FR/changelog_beta.md](./fr_FR/changelog_beta.md)** - Changelog des versions beta.

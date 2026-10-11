@@ -2,6 +2,8 @@
 
 Status: ready-for-dev
 
+> **Avancement (2026-10-11, session cloud `dev-story`) : Tasks 1 à 4 faites, Task 6.1 préparée.** Documentation livrée sous `docs/fr_FR/` ; table de traçabilité en annexe (`20-5-tracabilite-documentation.md`). Statut volontairement laissé à `ready-for-dev` : le passage à `review` / `done` attend la relecture ClaudeBox (Task 6.1).
+
 > **Statut : `ready-for-dev` (2026-10-11, 17:35).** Alexandre a tranché Q1=A, Q2=A, Q3=B, Q4=A (Journal des décisions) ; le plan de la Task 2.1 est retenu tel quel et les décisions de rédaction de la Task 2.4 sont prises. Les prérequis de statut sont tenus : 20.1, 20.2, 20.3 et 20.4 sont `done` ; la story « compteurs » n'est pas encore livrée, donc le bloc `compteurs` décrit la sémantique actuelle avec son bandeau d'obsolescence. Alexandre relira la documentation livrée. Aucune ligne de documentation n'est réécrite par ce `create-story`.
 
 ## Story
@@ -273,34 +275,34 @@ Règles de rédaction (AC6) :
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Prérequis (bloquants)**
+- [x] **Task 0 — Prérequis (bloquants)**
   - [x] 0.1 *(fait le 2026-10-11, 17:35 : Q1=A, Q2=A, Q3=B, Q4=A, voir le Journal des décisions)* Alexandre a tranché **Q1, Q2, Q3, Q4** (section ci-dessous) ; réponses consignées dans le Journal des décisions.
-  - [ ] 0.2 20.1 à 20.4 `done` (tenu au 2026-10-11) ; **la story « compteurs » est connue** : si elle a déjà changé la sémantique avant ce `dev-story`, le bloc `compteurs` décrit la **nouvelle** sémantique (sinon l'ancienne, avec son bandeau d'obsolescence).
-- [ ] **Task 1 — Rejouer les relevés au SHA courant (lecture seule) (AC: 1)**
-  - [ ] 1.1 Rejouer F1 à F9 sur le `main` du moment ; consigner tout écart avec le présent relevé dans le Dev Agent Record (un écart signale qu'une story a modifié l'interface depuis le `create-story`).
-  - [ ] 1.2 Lire `README.md`, `docs/release-market.md` et `plugin_info/info.json` pour fixer où la documentation est lue (liens, version minimale, prérequis OS).
-  - [ ] 1.3 Établir la liste exacte des types Home Assistant publiés par le plugin et de leurs conditions (cf. P7), **à partir du code des mappers et de `PRODUCT_SCOPE`**, pas de l'ancien tableau.
-  - [ ] 1.4 Revérifier chaque ligne de la section « Nommage des équipements » contre le code (mots-clés bloquants) avant de la reprendre ou de la raccourcir.
-- [ ] **Task 2 — Plan et décisions de rédaction (AC: 2, 3, 8)**
+  - [x] 0.2 *(vérifié le 2026-10-11 dans `sprint-status.yaml` : 20-1 à 20-4 `done` ; story « compteurs » non livrée, le bloc décrit la sémantique actuelle)* 20.1 à 20.4 `done` (tenu au 2026-10-11) ; **la story « compteurs » est connue** : si elle a déjà changé la sémantique avant ce `dev-story`, le bloc `compteurs` décrit la **nouvelle** sémantique (sinon l'ancienne, avec son bandeau d'obsolescence).
+- [x] **Task 1 — Rejouer les relevés au SHA courant (lecture seule) (AC: 1)**
+  - [x] 1.1 Rejouer F1 à F9 sur le `main` du moment ; consigner tout écart avec le présent relevé dans le Dev Agent Record (un écart signale qu'une story a modifié l'interface depuis le `create-story`).
+  - [x] 1.2 Lire `README.md`, `docs/release-market.md` et `plugin_info/info.json` pour fixer où la documentation est lue (liens, version minimale, prérequis OS).
+  - [x] 1.3 Établir la liste exacte des types Home Assistant publiés par le plugin et de leurs conditions (cf. P7), **à partir du code des mappers et de `PRODUCT_SCOPE`**, pas de l'ancien tableau.
+  - [x] 1.4 Revérifier chaque ligne de la section « Nommage des équipements » contre le code (mots-clés bloquants) avant de la reprendre ou de la raccourcir.
+- [x] **Task 2 — Plan et décisions de rédaction (AC: 2, 3, 8)**
   - [x] 2.1 *(plan retenu tel quel ; Alexandre relira la documentation livrée)* Plan de la documentation : Présentation ; Prérequis et installation ; Configuration ; Première synchronisation ; La page principale (bandeau, actions, export) ; La configuration par pièce (cartes, modale, tableau, actions) ; **Ce que le plugin publie et pourquoi** ; Les compteurs *(bloc isolé)* ; Dépannage ; Annexes (suggested_area, nommage, durée des actions, changelog).
-  - [ ] 2.2 Fixer le niveau de détail selon Q1, la langue selon Q2, les emplacements de captures selon Q3, le dossier selon Q4.
-  - [ ] 2.3 Pour chaque entrée P1 à P12, noter « corrigé / retiré / déplacé en annexe » et la raison.
+  - [x] 2.2 Fixer le niveau de détail selon Q1, la langue selon Q2, les emplacements de captures selon Q3, le dossier selon Q4.
+  - [x] 2.3 Pour chaque entrée P1 à P12, noter « corrigé / retiré / déplacé en annexe » et la raison.
   - [x] 2.4 *(décisions de rédaction prises par ClaudeBox le 2026-10-11)* **P6 (profils d'overrides) : retiré**, conformément à l'interdit « ne pas décrire une fonction sans point d'entrée » ; **P11 (volumes chiffrés) : condensé dans une annexe courte** (les trois messages et la marche à suivre restent, les estimations par type d'équipement sont ramenées à une phrase).
-- [ ] **Task 3 — Rédaction (AC: 1-6)**
-  - [ ] 3.1 Sections « page principale », « configuration par pièce », « ce que le plugin publie et pourquoi » (F1 à F4, F6 à F8), libellés repris du code, sans jargon.
-  - [ ] 3.2 Bloc `compteurs` isolé (section dédiée, F5), avec en-tête de maintenance et bandeau d'obsolescence ; renvois depuis le reste du texte par lien ou ancre uniquement.
-  - [ ] 3.3 Sections conservées et corrigées : prérequis, installation, configuration MQTT et filtrage (libellés réels, P8, P9), dépannage (P10), suggested_area (P12), durée des actions (P11), nommage (1.4).
-  - [ ] 3.4 `docs/index.md` (P index), `docs/fr_FR/changelog.md` (entrée datée), `docs/fr_FR/changelog_beta.md` (intitulé et contenu hérités du gabarit, selon la décision prise).
+- [x] **Task 3 — Rédaction (AC: 1-6)**
+  - [x] 3.1 Sections « page principale », « configuration par pièce », « ce que le plugin publie et pourquoi » (F1 à F4, F6 à F8), libellés repris du code, sans jargon.
+  - [x] 3.2 Bloc `compteurs` isolé (section dédiée, F5), avec en-tête de maintenance et bandeau d'obsolescence ; renvois depuis le reste du texte par lien ou ancre uniquement.
+  - [x] 3.3 Sections conservées et corrigées : prérequis, installation, configuration MQTT et filtrage (libellés réels, P8, P9), dépannage (P10), suggested_area (P12), durée des actions (P11), nommage (1.4).
+  - [x] 3.4 `docs/index.md` (P index), `docs/fr_FR/changelog.md` (entrée datée), `docs/fr_FR/changelog_beta.md` (intitulé et contenu hérités du gabarit, selon la décision prise).
   - [x] 3.5 *(sans objet : Q2=A, français seul, aucune version anglaise)*
-- [ ] **Task 4 — Vérifications (AC: 1, 2, 4-6, 9)**
-  - [ ] 4.1 Table de traçabilité « affirmation → fichier:ligne » dans le Dev Agent Record.
-  - [ ] 4.2 Recherches négatives dans `docs/` : « Diagnostic » (bouton), « HA / jeedom2ha », « deploy-to-box », `evaluate_equipment`, `CC-`, « Mes templates », adresses IP. **Le contrôle contre les noms réels de la maison est fait par ClaudeBox à la relecture, en lecture seule, sans jamais recopier ces noms** (la session de dev ne les connaît pas et ne les cherche pas).
-  - [ ] 4.3 Vérification de cloisonnement des compteurs (AC6).
-  - [ ] 4.4 Liens internes valides (Markdown) ; `git diff --stat` limité aux fichiers documentaires.
-  - [ ] 4.5 Aucun test existant ne casse (certains tests peuvent lire `docs/` ; lancer `make test`, voir Dev Notes).
+- [x] **Task 4 — Vérifications (AC: 1, 2, 4-6, 9)**
+  - [x] 4.1 Table de traçabilité « affirmation → fichier:ligne » dans le Dev Agent Record.
+  - [x] 4.2 *(fait ; le contrôle contre les noms réels reste à faire par ClaudeBox)* Recherches négatives dans `docs/` : « Diagnostic » (bouton), « HA / jeedom2ha », « deploy-to-box », `evaluate_equipment`, `CC-`, « Mes templates », adresses IP. **Le contrôle contre les noms réels de la maison est fait par ClaudeBox à la relecture, en lecture seule, sans jamais recopier ces noms** (la session de dev ne les connaît pas et ne les cherche pas).
+  - [x] 4.3 Vérification de cloisonnement des compteurs (AC6).
+  - [x] 4.4 Liens internes valides (Markdown) ; `git diff --stat` limité aux fichiers documentaires.
+  - [x] 4.5 Aucun test existant ne casse (certains tests peuvent lire `docs/` ; lancer `make test`, voir Dev Notes).
 - [x] **Task 5 — Captures d'écran : sans objet (Q3=B) (AC: 7)** *(aucune capture dans cette réécriture ; seuls les commentaires d'emplacement invisibles sont posés en Task 3 ; captures après la story « compteurs », sur données génériques)*
 - [ ] **Task 6 — Relecture et clôture**
-  - [ ] 6.1 Relecture ClaudeBox (fidélité au code, absence de jargon, aucune donnée réelle) avant fusion ; revue indépendante si Codex est indisponible.
+  - [ ] 6.1 *(préparée : PR ouverte vers `main`, non fusionnée ; points d'attention listés dans « Completion Notes » ci-dessous)* Relecture ClaudeBox (fidélité au code, absence de jargon, aucune donnée réelle) avant fusion ; revue indépendante si Codex est indisponible.
   - [ ] 6.2 Au `done` : SHA relevé, commandes de vérification, décisions Q1 à Q4 et fermeture de CC-07 d consignés.
 
 ## Dev Notes
@@ -402,22 +404,55 @@ Lancer `make test` avant de pousser, par prudence : un test qui lit des fichiers
 
 ### Agent Model Used
 
-Agent Claude Code, session cloud déléguée (sans accès box Jeedom, Home Assistant, secrets ni déploiement). Phase `create-story` uniquement.
+Agent Claude Code, session cloud déléguée (sans accès box Jeedom, Home Assistant, secrets ni déploiement). Phases `create-story` puis `dev-story` (Tasks 1 à 4).
 
 ### Debug Log References
 
 - Relevé en lecture seule du code de `main` `3b120d3` ; aucune exécution de test, aucun changement de code.
+- `dev-story` (2026-10-11) : code rejoué au SHA `8a1d01b` (`git diff 3b120d3 8a1d01b` : uniquement la story et `sprint-status.yaml`, donc code d'interface inchangé). `pip install -e ".[test]"`, `make test` : 620 passed, 1 skipped ; `flake8` : sans sortie. Vérifications documentaires : liens internes Markdown valides, recherches négatives et cloisonnement des compteurs (voir ci-dessous).
 
 ### Completion Notes List
 
 - Story créée, statut `backlog` (`ready-for-dev` non accordé : Q1 à Q4 à trancher par Alexandre).
 - Aucun nom d'équipement ni de pièce réel dans cette story ; les exemples sont génériques.
 
+**`dev-story` (Tasks 1 à 4) — livré :**
+
+- `docs/fr_FR/index.md` réécrit (plan de la Task 2.1) ; `docs/fr_FR/compteurs.md` créé (bloc isolé, Q4=A, en-tête de maintenance et mention d'obsolescence en commentaire invisible + note visible) ; `docs/fr_FR/changelog.md` (entrée du 2026-10-11) ; `docs/fr_FR/changelog_beta.md` (intitulé et contenu hérités du gabarit remplacés) ; `docs/index.md` (ligne « template » corrigée). `plugin_info/info.json` vérifié, non modifié.
+- **Table de traçabilité (AC1, Task 4.1)** : `_bmad-output/implementation-artifacts/20-5-tracabilite-documentation.md` (annexe, hors documentation du Market). Chaque citation de ligne a été revérifiée par script (ligne contenant le texte attendu).
+- Captures : aucune ; commentaires invisibles `<!-- CAPTURE-A-PRENDRE: … -->` posés (Q3=B).
+- Décisions P1 à P12 : P1 corrigé (plus de bouton « Diagnostic », le mot ne désigne que la colonne du tableau et l'export) ; P2 retiré (onglet) ; P3 corrigé (quatre colonnes) ; P4 corrigé (réglage enregistré mais en attente) ; P5 corrigé (type vs publication) ; P6 retiré (aucun point d'entrée) ; P7 corrigé (huit types) ; P8 corrigé (libellés réels) ; P9 corrigé (deux chemins de rescan) ; P10 corrigé (dépannage réécrit) ; P11 condensé en annexe, volumes chiffrés retirés ; P12 corrigé (voie utilisateur « Supprimer puis recréer », plus aucune commande de développement). M1 à M10 couverts : page principale/bandeau (M1), cartes et fenêtre (M2), compteurs (M3), exclure/forcer/revenir/appliquer (M4), republier/supprimer puis recréer (M5), rescan (M6), export (M7), table publié/non publié (M8), états grisés et infobulles (M9), Homebridge (M10).
+- Vérifications : recherches négatives dans `docs/fr_FR/` : aucune occurrence de « HA / jeedom2ha », `deploy-to-box`, `evaluate_equipment`, « Mes templates », adresse IP, `generic_type`, identifiant de story dans `index.md`/`compteurs.md`/nouvelle entrée de changelog (les anciennes entrées du changelog, antérieures à cette story, citent encore des stories : non touchées). Cloisonnement des compteurs : `grep -nE "[0-9]+ (équipements? (publiés?|exclus?|désactivés? dans Jeedom|à corriger|non lus?)|commandes? (prêtes?|bloquantes?|non couvertes?))" docs/fr_FR/index.md docs/fr_FR/changelog.md docs/fr_FR/changelog_beta.md docs/index.md` : aucune occurrence (les libellés de compteur n'apparaissent que dans `docs/fr_FR/compteurs.md`).
+
+**Écarts entre la story-source et le code (à relire par ClaudeBox) :**
+
+1. **Nommage des équipements (Task 1.4)** : les listes de mots-clés sont identiques à l'ancienne documentation, mais la correspondance se fait **sur le mot entier** (`\b…\b`, `light.py:202`, `switch.py:168`, `cover.py:183`), pas par sous-chaîne. L'ancien « piège du matching par sous-chaîne » (exemple « bureau » / « eau ») est **faux** au SHA courant ; il est retiré, remplacé par la règle du mot entier.
+2. **« Supprimer puis recréer »** : la branche `supprimer` du démon ne fait que **dépublier** (`http_server.py:3993-4098`, drapeau `aucun_flux_supprimer_recree`). La recréation n'est pas faite par ce bouton ; elle suppose un « Republier » ou un rescan ensuite. La documentation le dit ainsi, au lieu de promettre une recréation automatique. Libellé d'interface potentiellement trompeur : à ajouter aux constats pour le backlog.
+3. **Scénarios** : les scénarios Jeedom **actifs** sont publiés comme `button` (`http_server.py:2079-2095`, `jeedom2ha.class.php:798-812`). L'ancienne documentation (« Hors périmètre V1 : … scénarios ») et la story-source (P7) ne le disaient pas. Documenté.
+4. **Causes « positives »** (F4) : « publication forcée manuellement » et « type Home Assistant identifié — publication normale » n'apparaissent dans la cellule « Diagnostic » que comme motif d'un état *bloquant* (`buildBlockingReason`, `OVR:631-657`, appelé seulement si l'état n'est pas « prêt », `OVR:661-672`). Une commande prête affiche « Sera publié : <type> ». Ces deux libellés ne sont donc **pas** documentés comme causes (pas de situation utilisateur vérifiée où ils s'affichent).
+5. **Confirmation de « Republier la pièce »** : texte exact lu dans le code, « <nom> — republier les équipements inclus de cette pièce. Confirmer ? » ; la story-source ne le citait pas. Le bouton « Appliquer »/« Republier » d'un équipement n'a **pas** de confirmation (`SURF:487-512`).
+6. **Prérequis** : « Python 3.9+ » et « PHP 8.x » (ancienne documentation) ne sont étayés par aucun fichier de code ou de configuration du plugin (seuls `info.json` : Jeedom 4.4, Debian 11 à 12.99, et la détection de Python 3 par Jeedom le sont) ; ils ont été retirés plutôt que reconduits. À confirmer avec Alexandre si ces versions doivent figurer.
+7. **Retraits de l'ancienne documentation non étayés par le code** : « après un redémarrage du démon, les entités redeviennent pilotables automatiquement », « entités dupliquées après changement d'identifiant » (dépannage) et la logique de persistance du broker : aucun élément vérifiable dans les fichiers lus, retirés ; remplacés par la recommandation « Republier dans Home Assistant ».
+8. **Cloisonnement des compteurs (AC6)** : les libellés par équipement du badge de synthèse (« … N commande(s) prête(s). », « … M bloquante(s). ») et le message du bouton « Appliquer les filtres et rescanner » de la configuration (« équipement(s) publié(s) ») utilisent des mots proches des compteurs. Ce ne sont pas des libellés de compteur de la modale (forme avec « (s) » et chiffre variable) ; le grep d'AC6 est donc défini sur la forme réellement affichée par les compteurs (chiffre + libellé). À trancher par ClaudeBox : accepter, ou demander que la story « compteurs » réconcilie aussi ces deux libellés.
+9. **Branche** : la story évoquait `story/20-5-dev-story` ; la session est contrainte à la branche `claude/user-documentation-rewrite-zlq19s`, utilisée à la place (préfixe `claude/` accepté par la CI).
+10. Constat déjà noté dans la story, confirmé : mots « démon » / « daemon » / « Bridge » pour une même chose ; « V1 » et « Jeedom2HA »/« jeedom2ha » dans les causes. La documentation reprend la formule de l'écran et la glose.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-5-documentation-utilisateur-reecrite-cc07d.md` (nouveau)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (ligne 20-5 et `last_updated`)
 
+*Ajouts du `dev-story` :*
+
+- `docs/fr_FR/index.md` (réécrit)
+- `docs/fr_FR/compteurs.md` (nouveau, bloc isolé)
+- `docs/fr_FR/changelog.md` (entrée du 2026-10-11)
+- `docs/fr_FR/changelog_beta.md` (réécrit)
+- `docs/index.md` (index des fichiers de `fr_FR`)
+- `_bmad-output/implementation-artifacts/20-5-tracabilite-documentation.md` (nouveau, table de traçabilité)
+- `_bmad-output/implementation-artifacts/20-5-documentation-utilisateur-reecrite-cc07d.md` (cases cochées, Dev Agent Record)
+
 ### Change Log
 
 - 2026-10-11 — Création de la story 20.5 (`create-story`, statut `backlog`).
+- 2026-10-11 — `dev-story` (session cloud déléguée) : Tasks 1 à 4 faites, documentation utilisateur réécrite sous `docs/fr_FR/`, table de traçabilité en annexe, écarts signalés ; Task 6.1 préparée (PR non fusionnée) ; statut inchangé (`ready-for-dev`) dans l'attente de la relecture ClaudeBox.
