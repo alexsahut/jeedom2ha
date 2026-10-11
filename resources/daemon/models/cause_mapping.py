@@ -178,7 +178,7 @@ CAUSE_MAPPING: dict = {
 _STATE_ONLY_MAPPING_REASON = "switch_state_orphan"
 _STATE_ONLY_CAUSE = {
     "label": "État sans ordre On/Off — rien à piloter, non publié en l'état",
-    "action": "Choisir le type binary_sensor pour cette commande puis « Forcer » la publication depuis l'onglet Mapping",
+    "action": "Choisir le type binary_sensor pour cette commande puis « Forcer » la publication depuis la configuration de la pièce de l'équipement (tableau des commandes)",
 }
 
 # Alias fermés provenant de la taxonomie decision_trace.reason_code.
