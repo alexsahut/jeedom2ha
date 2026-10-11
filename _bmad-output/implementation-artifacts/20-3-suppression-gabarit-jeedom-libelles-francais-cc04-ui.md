@@ -1,8 +1,8 @@
 # Story 20.3 : Suppression du gabarit Jeedom et libellés français d'usage (CC-04 volet UI)
 
-Status: review
+Status: done
 
-> **Statut : `review` (2026-10-08, implémentation locale livrée en session cloud déléguée ; preuve terrain AC10 et validation UX restantes).** Rappel — `ready-for-dev` accordé le 2026-10-08. Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. La dépendance 20.2 est `done`; l'audit F1–F7 a été rejoué au SHA `b2a89df` et Alexandre a validé la table de libellés du 2026-10-08. Le développement peut commencer.
+> **Statut : `done` (2026-10-11) ; preuve terrain, gate et validation UX : `20-3-preuve-validation-ux-2026-10-11.md`.** Rappel — `ready-for-dev` accordé le 2026-10-08. Les arbitrages produit sont actés par Alexandre : **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. La dépendance 20.2 est `done`; l'audit F1–F7 a été rejoué au SHA `b2a89df` et Alexandre a validé la table de libellés du 2026-10-08. Le développement peut commencer.
 
 ## Story
 
@@ -154,18 +154,18 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)** *(exécuté par l'humain ou ClaudeBox ; jamais par une session cloud déléguée — non exécuté en session cloud, reste à faire après fusion)*
-  - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
-  - [ ] Sélectionner le mode selon l'objectif de la story :
+- [x] **Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market)** *(fait : déploiement standard par clawcode le 2026-10-09 (`0226b87`) et le 2026-10-11 (`f10c4478`), sans mode de nettoyage)*
+  - [x] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
+  - [x] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
     - **Pour cette story : déploiement standard seulement** (voir « Interdits ») ; aucun mode de nettoyage.
-  - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
-- [ ] **Task 1 — Relevés préalables, lecture seule (AC: 1-6)**
+  - [x] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
+- [x] **Task 1 — Relevés préalables, lecture seule (AC: 1-6)**
   - [x] 1.1 Relire F1 à F7 au SHA courant (20.2 `done` entre-temps modifie le code touché).
   - [x] 1.2 Inventaire exhaustif des libellés visibles (PHP, `desktop/js/*.js`, CSS `content:`), classés : gabarit Jeedom / jargon d'infrastructure / libellé d'usage correct ; table « ancien → nouveau → emplacement » soumise à Alex.
   - [x] 1.3 *(vérifiée en lecture seule par ClaudeBox sur le cœur Jeedom de la box, 2026-10-11 : `core/js/plugin.template.js` gère « Ajouter » par délégation d'évènement (l. 672) et ouvre un équipement par son id sans carte (l. 26-27) ; rien n'exige le bouton « Ajouter », retiré par décision d'Alex ; « Configuration », le conteneur `eqLogicThumbnailContainer` et le squelette de page sont conservés)* Lire ce que le cœur Jeedom exige de la page de plugin (`plugin.template`, `eqLogicAction`, conteneurs) pour trancher Q4 A/B sans casser « Ajouter », « Configuration » et la page d'équipement.
-  - [ ] 1.4 *(box Jeedom inaccessible depuis une session cloud : relevé des compteurs réels reporté au passage terrain, AC10)* Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
+  - [x] 1.4 *(fait le 2026-10-11 par ClaudeBox : recomptage indépendant de la pièce 25 et de « Sans pièce », égal aux compteurs affichés ; voir l'artefact)* Relever, par pièce réelle (Garage, bureau, extérieur, « Sans pièce »), les compteurs de l'arbre et de l'ancienne synthèse, pour la comparaison d'AC10 ; relever aussi qui d'autre consomme `getPublishedScopeForConsole`, `getDiagnostics`, `jeedom2ha_diagnostic_helpers.js` (AC5, AC7).
   - [x] 1.5 Rejouer la recherche de F6 au SHA courant et classer **chaque** fichier trouvé (pas seulement la liste de F6, état au 2026-10-06) : retirer / réaffecter / conserver, avec justification.
 - [x] **Task 2 — Retrait de la synthèse et de la modale (AC: 1, 2, 5, 7)**
   - [x] 2.1 `jeedom2ha.php` : retirer `#div_scopeSummary` et l'action « Diagnostic » ; garder classes et attributs du bloc « Gestion » ; ne plus inclure `jeedom2ha_scope_summary.js`.
@@ -180,9 +180,9 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
   - [x] 4.1 Retrait de « Mes templates » et des champs sans usage ; réécriture des libellés restants selon la table validée.
   - [x] 4.2 Test Node qui parcourt les chaînes rendues et échoue sur toute chaîne interdite.
 - [x] **Task 5 — Tests (AC: 1-9)** : Node (module de dénombrement, absence de références à `published_scope` et co., chaînes interdites, non-régression 16.8 / 20.1 / 20.2 / 20.4), PHP (page sans synthèse, relais conservés), tests retirés ou réaffectés selon la Task 1.5 ; `flake8` si du Python est touché.
-- [ ] **Task 6 — Gate et preuve (AC: 10)** *(6.1 livré ; 6.2 est une preuve terrain, hors session cloud)*
+- [x] **Task 6 — Gate et preuve (AC: 10)** *(fait les 2026-10-09 et 2026-10-11 ; voir l'artefact)*
   - [x] 6.1 Gate : parcours de découverte étendu, politique et inventaire de chargement mis à jour, auto-test local.
-  - [ ] 6.2 Après fusion : déploiement standard, relevés avant et après, gate sur `main`, comparaison des compteurs, clic réel des actions déplacées si Q2 = A, passage Chrome ClaudeBox, `ready-for-UX-validation`, validation UX.
+  - [x] 6.2 *(fait les 2026-10-09 et 2026-10-11 ; voir l'artefact)* Après fusion : déploiement standard, relevés avant et après, gate sur `main`, comparaison des compteurs, clic réel des actions déplacées si Q2 = A, passage Chrome ClaudeBox, `ready-for-UX-validation`, validation UX.
 
 ## Dev Notes
 
@@ -246,6 +246,8 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 - 2026-10-06 — `create-story` de 20.3 (session cloud déléguée, lecture seule, aucun accès box/HA) : faits F1 à F7 relevés dans le code de `main` `df6bb51` ; constat que la synthèse et la modale portent des capacités autres que des compteurs (actions ciblées, nombres des confirmations globales, échec technique de publication) ; questions Q1 à Q4 posées avec recommandation A. **`ready-for-dev` non accordé.**
 - 2026-10-06 — Alexandre valide les arbitrages **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Les AC et tâches conditionnelles sont figés sur ces choix ; 20.2 reste l'unique dépendance de statut avant le développement.
 - 2026-10-11 — Décision d'Alex (Q4 complétée, après la vérification de la Task 1.3 par ClaudeBox) : « Ajouter » (`.eqLogicAction[data-action=add]`) est retiré de la page principale ; « Configuration », `eqLogicThumbnailContainer` et le squelette de page sont conservés. La ligne d'AC2 qui exigeait que « Ajouter » garde ses attributs est amendée ; test PHP et gate adaptés.
+- 2026-10-09, 20:25 — Validation UX d'Alexandre sur `0226b87`.
+- 2026-10-11 — Preuve terrain AC10 (ClaudeBox) : passage Chrome, compteurs égaux au recomptage, clics réels des trois actions déplacées (volume 0), rescan correctif, parité vide. Relecture a posteriori de la PR #225 : correctifs R1 et R2 (PR #228, `f10c447`), dont le champ additif `published_in_ha` du démon et le retrait de « Ajouter » (décision d'Alex). Déploiement de `f10c4478`, gate PASS, contrôle Chrome et clic réel « Republier » sur l'eq 287 (volume 0), parité vide. Story `done`. Ferme le volet UI de CC-04. Artefact `20-3-preuve-validation-ux-2026-10-11.md`.
 
 ## Correctifs de revue post-fusion (R1, ClaudeBox 11/10)
 
@@ -355,11 +357,13 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - 2026-10-08 — Revalidation `ready-for-dev` au SHA `b2a89df` : F1–F7 et les 22 références tests/gate sont inchangés; aucun contenu CSS `content:` pertinent. Alexandre valide la table des libellés (message « table 20.3 OK »). 20.2 est `done`; statut 20.3 passé à `ready-for-dev`, sans code produit ni test exécuté.
 - 2026-10-08 — `dev-story` (session cloud déléguée) : AC1 à AC9 implémentés et couverts par des tests Node, PHP et Python ; gate 20-0 mis à jour et auto-testé localement ; routes du démon, export support, `evaluate_equipment()` et contrats du démon inchangés ; aucun accès box/Home Assistant, aucun déploiement, aucun nettoyage ni rescan réel. Reste, pour `done` : AC10 (gate sur `main`, comparaison des compteurs réels, clic réel des actions déplacées, passage Chrome ClaudeBox, validation UX d'Alexandre).
 - 2026-10-09 — Revue locale : les deux P2 Codex sont vérifiés (gating du bouton ajouté tardivement et détection gate de `generic_type`), suite Node complète 395/395 et tests ciblés PHP verts. Alexandre accepte « Type Jeedom » et les valeurs de type Jeedom visibles ; fils Codex résolus après vérification.
+- 2026-10-11 — Clôture : preuve terrain AC10, correctifs R1/R2 (PR #228, `f10c447`) et gate 20-0 PASS sur `main` (`0226b87` puis `f10c4478`) consignés dans `20-3-preuve-validation-ux-2026-10-11.md`, validation UX d'Alexandre (09/10) et contrôle de ClaudeBox (11/10) confirmés ; story passée `done`, fermant le volet UI de CC-04.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-3-suppression-gabarit-jeedom-libelles-francais-cc04-ui.md`
 - `_bmad-output/implementation-artifacts/20-3-preparation-audit-2026-10-08.md`
+- `_bmad-output/implementation-artifacts/20-3-preuve-validation-ux-2026-10-11.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `docs/operations/delegations.md`
 - `desktop/php/jeedom2ha.php`
@@ -411,3 +415,4 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - 2026-10-11 — Ronde R1 (session cloud déléguée) : A à I appliqués sans décision produit nouvelle. A : « Appliquer »/« Republier » toujours présent (un seul bouton). B : gating d'état par lecture de l'arbre (`sync_status.synced_should_publish === true` = publié dans HA ; « Republier » grisé pour désactivé/exclu sauf override en attente, qui reste « Appliquer » ; actions de pièce grisées selon tous les arbres lus ; arbre illisible = aucune action). C : bouton en attente exclu de la réactivation, réservé dès la confirmation. D : pièce capturée au lancement, résultat en alerte de page si la modale n'est plus sur cette pièce. E : message d'erreur des compteurs, cache purgé à l'échec. F : `btn-danger`. G : tests sur le vrai code (faux DOM), 2 tests vides retirés, test 3.2 recentré sur `REASON_LABELS`. H : gate de chaînes interdites sur les seuls libellés statiques. I : `htmlspecialchars` sur `object_name`. Story restée `review`.
 - 2026-10-11 — Décision d'Alex : retrait du bouton « Ajouter » de la page principale (Task 1.3 cochée sur le constat de ClaudeBox, AC2 amendée, journal des décisions complété) ; test PHP, test de retrait et gate adaptés.
 - 2026-10-11 — Ronde R2 (relecture ClaudeBox de la PR #228, session cloud déléguée) : R2-1 champ additif `sync_status.published_in_ha` côté démon (exception justifiée au périmètre front seul) remplaçant la lecture de `synced_should_publish` pour le gating de « Supprimer puis recréer » (champ absent : bouton actif) ; R2-2 message échappé dans l'alerte de page ; R2-3 actions de pièce actives tant qu'une lecture n'a pas conclu sans erreur ; R2-4 résultat `echec`/`succes_partiel` affiché par « Republier »/« Appliquer » ; R2-5 test d'échappement ; R2-6 gate : seuls les noms libres exclus ; R2-7 story. Story restée `review`.
+- 2026-10-11 — Preuve terrain, gate sur `main` et clôture ; statut `done`.
