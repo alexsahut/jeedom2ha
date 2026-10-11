@@ -36,8 +36,20 @@ Depuis le clone du dépôt, sur une branche **propre et poussée** sur GitHub (l
 
 (`--remote` fonctionne encore comme alias déprécié de `--cloud`.)
 La commande affiche « Created cloud session », l'URL `https://claude.ai/code/session_...` et la commande `claude --teleport <id>`. Note l'ID/URL dans `docs/operations/delegations.md`.
-Le lancement affiche un suivi en direct : exécute-le avec un timeout et récupère l'ID dans la sortie. Pour envoyer un complément à une session existante : `claude -p --cloud <session-id> "message"`.
-`--cloud` refuse un appel sans terminal (TTY) : depuis un contexte non interactif (agent, script), passe par un pseudo-terminal, ex. `timeout 180 script -q -e -c 'claude --cloud "<PROMPT>"' <journal.log>`, puis relève l'ID dans `<journal.log>`.
+Le lancement affiche un suivi en direct : exécute-le avec un timeout et récupère l'ID dans la sortie. Pour envoyer un complément à une session existante, écris d'abord le message dans un fichier puis relis-le : `claude -p --cloud <session-id> "$(cat <fichier>)"`.
+`--cloud` refuse un appel sans terminal (TTY) : depuis un contexte non interactif (agent, script), passe par un pseudo-terminal **en lisant le prompt depuis un fichier**, ex. `timeout 180 script -q -e -c 'claude --cloud "$(cat <fichier>)"' <journal.log>`, puis relève l'ID dans `<journal.log>`.
+
+**Ne jamais insérer le texte d'un prompt directement dans la chaîne `-c` de `script`** (ni ailleurs sous forme littérale) : cette chaîne est relue par un shell interne à `script`, qui ré-exécute toute substitution de commande présente dans le prompt (par exemple des accents graves ``` ` ``` ou `$(...)`). Toujours écrire le prompt dans un fichier d'abord, puis le relire via `$(cat <fichier>)` comme dans les deux commandes ci-dessus.
+
+Avant d'envoyer, vérifie que le contenu du fichier traverse `script` sans être altéré en comparant deux empreintes :
+```bash
+printf %s "$(cat <fichier>)" | sha256sum
+script -q -e -c 'printf %s "$(cat <fichier>)" | sha256sum' /dev/null
+```
+Les deux empreintes doivent être identiques ; sinon, n'envoie pas le lancement réel et investigue l'écart avant de réessayer.
+
+Après lancement, vérifie l'identifiant `session_01…` obtenu en croisant trois sources concordantes — le journal de lancement (`<journal.log>`), `docs/operations/delegations.md`, et la PR GitHub ouverte par la session — car une session cloud reste invisible à `sessions_list`/`ListAgents` par conception.
+
 Ne lance jamais `claude` en `sudo`.
 
 Si le lancement est refusé, relève le message exact avant de conclure à une « procédure obsolète » : `Unable to get organization UUID` (connexion par clé API : `claude auth login`, pas de `ANTHROPIC_API_KEY`), fournisseur tiers configuré (`CLAUDE_CODE_USE_*`), GitHub non connecté (app Claude ou `/web-setup`), CLI trop ancienne. Un dépôt sans remote GitHub n'est pas un refus systématique : la CLI peut empaqueter et téléverser le dépôt local (`CCR_FORCE_BUNDLE=1`, limites de taille documentées), les échecs viennent alors de cet empaquetage.
