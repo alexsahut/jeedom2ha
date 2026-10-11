@@ -588,7 +588,7 @@
     ambiguous_skipped: 'type Home Assistant ambigu — précisez les types génériques dans Jeedom',
     name_heuristic_rejection: 'un mot du nom de l’équipement écarte ce type',
     duplicate_generic_types: 'types génériques en double',
-    switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor puis « Forcer »',
+    switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Override HA », puis « Forcer »',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',

@@ -373,7 +373,7 @@ Quand une commande ne sera pas publiée, la cellule affiche « Ne sera pas publi
 | types génériques en conflit — précisez-les dans Jeedom | Idem. |
 | types génériques en double | Deux commandes portent le même type : retirez le doublon. |
 | un mot du nom de l’équipement écarte ce type | Renommez l'équipement (voir [Nommage des équipements](#annexe--nommage-des-équipements)). |
-| état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor puis « Forcer » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Choisissez le type `binary_sensor` pour cette commande, puis « Forcer » la publication. |
+| état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Override HA », puis « Forcer » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Dans la liste « Override HA » de cette commande, choisissez `binary_sensor`, puis cliquez sur « Forcer ». |
 
 **2. Rien à publier, tel que l'équipement est configuré**
 
