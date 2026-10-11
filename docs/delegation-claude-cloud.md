@@ -37,6 +37,7 @@ Depuis le clone du dépôt, sur une branche **propre et poussée** sur GitHub (l
 (`--remote` fonctionne encore comme alias déprécié de `--cloud`.)
 La commande affiche « Created cloud session », l'URL `https://claude.ai/code/session_...` et la commande `claude --teleport <id>`. Note l'ID/URL dans `docs/operations/delegations.md`.
 Le lancement affiche un suivi en direct : exécute-le avec un timeout et récupère l'ID dans la sortie. Pour envoyer un complément à une session existante : `claude -p --cloud <session-id> "message"`.
+`--cloud` refuse un appel sans terminal (TTY) : depuis un contexte non interactif (agent, script), passe par un pseudo-terminal, ex. `timeout 180 script -q -e -c 'claude --cloud "<PROMPT>"' <journal.log>`, puis relève l'ID dans `<journal.log>`.
 Ne lance jamais `claude` en `sudo`.
 
 Si le lancement est refusé, relève le message exact avant de conclure à une « procédure obsolète » : `Unable to get organization UUID` (connexion par clé API : `claude auth login`, pas de `ANTHROPIC_API_KEY`), fournisseur tiers configuré (`CLAUDE_CODE_USE_*`), GitHub non connecté (app Claude ou `/web-setup`), CLI trop ancienne. Un dépôt sans remote GitHub n'est pas un refus systématique : la CLI peut empaqueter et téléverser le dépôt local (`CCR_FORCE_BUNDLE=1`, limites de taille documentées), les échecs viennent alors de cet empaquetage.
