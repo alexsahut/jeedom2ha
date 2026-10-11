@@ -21,6 +21,63 @@ VERSION_FILE_LIB="${SCRIPT_DIR}/deploy-version-file.sh"
 ROLLBACK_LIB="${SCRIPT_DIR}/deploy-rollback-lib.sh"
 INVENTORY_DIFF_LIB="${SCRIPT_DIR}/deploy-inventory-diff.sh"
 
+_fail() { echo "ERROR: $*" >&2; exit 1; }
+
+DRY_RUN=false
+RESTART_DAEMON=false
+CLEANUP_DISCOVERY=false
+SKIP_POST_DEPLOY=false
+STOP_DAEMON_CLEANUP=false
+ROLLBACK_ARCHIVE=""
+REQUESTED_SHA=""
+
+# --- Parse args ---
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --sha)
+       [[ "$#" -ge 2 && -n "$2" && "${2:0:2}" != "--" ]] || {
+         echo "ERROR: --sha requires a value." >&2; exit 1;
+       }
+       REQUESTED_SHA="$2"
+       shift ;;
+    --dry-run)            DRY_RUN=true ;;
+    --restart-daemon)     RESTART_DAEMON=true ;;
+    --cleanup-discovery)  CLEANUP_DISCOVERY=true ;;
+    --skip-post-deploy)    SKIP_POST_DEPLOY=true ;;
+    --stop-daemon-cleanup) STOP_DAEMON_CLEANUP=true ;;
+    --rollback)
+       [[ "$#" -ge 2 && -n "$2" && "${2:0:2}" != "--" ]] || {
+         echo "ERROR: --rollback requires a remote .tar.gz archive path." >&2; exit 1;
+       }
+       ROLLBACK_ARCHIVE="$2"
+       shift ;;
+    *) echo "ERROR: Unknown argument: $1" >&2
+       echo "Usage: $0 --sha <sha> [--dry-run] [--restart-daemon] [--cleanup-discovery] [--skip-post-deploy]" >&2
+       echo "       $0 --sha <sha> --rollback <remote-archive.tar.gz>" >&2
+       echo "       $0 --sha <sha> --stop-daemon-cleanup  (mode dédié — incompatible avec les autres options)" >&2
+       exit 1 ;;
+  esac
+  shift
+done
+
+# =============================================================================
+# GARDE-FOU SHA (CC-56) — littéralement la première action du script après le
+# parsing des arguments : avant le sourcing des libs, avant le chargement de
+# .env (donc avant toute lecture de secret) et avant les guardrails CI
+# ci-dessous. Un lancement accidentel (ex. incident du 2026-10-11 19:20, où un
+# prompt corrompu a fait exécuter ce script sans argument par un shell
+# interne) ne doit produire aucun effet, quel que soit le mode demandé et
+# même si --sha n'est pas reconnu par la boucle ci-dessus. S'applique à tous
+# les modes (déploiement standard, --dry-run, --rollback,
+# --stop-daemon-cleanup, --cleanup-discovery) : aucune raison identifiée de
+# dispenser un mode plutôt qu'un autre d'une confirmation explicite du SHA.
+# =============================================================================
+[[ -n "${REQUESTED_SHA}" ]] \
+  || _fail "--sha <sha> est obligatoire (garde-fou CC-56) : passez explicitement \$(git rev-parse HEAD), y compris pour --dry-run/--rollback/--stop-daemon-cleanup."
+_actual_head=$(git -C "${REPO_ROOT}" rev-parse HEAD)
+[[ "${REQUESTED_SHA}" == "${_actual_head}" ]] \
+  || _fail "--sha ${REQUESTED_SHA} ne correspond pas à HEAD (${_actual_head}) ; refus (garde-fou CC-56)."
+
 # jeedom2ha_render_version_content / jeedom2ha_write_version_file_atomic —
 # testées sans ssh dans tests/unit/test_deploy_version_file.py.
 # jeedom2ha_diff_topic_lists (diff d'inventaire MQTT, point 8) — testée sans
@@ -86,41 +143,9 @@ INVENTORY_AFTER_FILE=""
 # place (point 7, rollback réversible) — initialisée par jeedom2ha_rollback_archive.
 PRE_ROLLBACK_BACKUP_ARCHIVE=""
 
-DRY_RUN=false
-RESTART_DAEMON=false
-CLEANUP_DISCOVERY=false
-SKIP_POST_DEPLOY=false
-STOP_DAEMON_CLEANUP=false
-ROLLBACK_ARCHIVE=""
-
-# --- Parse args ---
-while [[ "$#" -gt 0 ]]; do
-  case "$1" in
-    --dry-run)            DRY_RUN=true ;;
-    --restart-daemon)     RESTART_DAEMON=true ;;
-    --cleanup-discovery)  CLEANUP_DISCOVERY=true ;;
-    --skip-post-deploy)    SKIP_POST_DEPLOY=true ;;
-    --stop-daemon-cleanup) STOP_DAEMON_CLEANUP=true ;;
-    --rollback)
-       [[ "$#" -ge 2 && -n "$2" && "${2:0:2}" != "--" ]] || {
-         echo "ERROR: --rollback requires a remote .tar.gz archive path." >&2; exit 1;
-       }
-       ROLLBACK_ARCHIVE="$2"
-       shift ;;
-    *) echo "ERROR: Unknown argument: $1" >&2
-       echo "Usage: $0 [--dry-run] [--restart-daemon] [--cleanup-discovery] [--skip-post-deploy]" >&2
-       echo "       $0 --rollback <remote-archive.tar.gz>" >&2
-       echo "       $0 --stop-daemon-cleanup  (mode dédié — incompatible avec les autres options)" >&2
-       exit 1 ;;
-  esac
-  shift
-done
-
 # =============================================================================
 # GUARDRAILS
 # =============================================================================
-
-_fail() { echo "ERROR: $*" >&2; exit 1; }
 
 # Normal deploys must be reproducible from a committed, CI-validated SHA.  We
 # query the GitHub check-runs endpoint directly rather than `gh pr checks`:
@@ -425,7 +450,7 @@ REMOTE
   if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
     echo ""
     echo "  Ce rollback est lui-même réversible :"
-    printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
+    printf '    ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
   fi
   if [[ "${_remote_status}" -ne 0 ]]; then
     echo "ERROR: rollback distant échoué (code ${_remote_status})." >&2
@@ -585,7 +610,7 @@ REMOTE
   echo ""
   echo "======================================================================="
   echo "  Stop+cleanup terminé. Les entités jeedom2ha devraient disparaître de HA."
-  echo "  Pour republier : ./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon"
+  echo '  Pour republier : ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --cleanup-discovery --restart-daemon'
   echo "======================================================================="
   exit 0
 fi
@@ -927,7 +952,7 @@ else
 fi
 echo ""
 echo "  Commande de rollback prête :"
-printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${BACKUP_ARCHIVE}"
+printf '    ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --rollback %q\n' "${BACKUP_ARCHIVE}"
 echo "======================================================================="
 echo "  Deploy complete."
 echo "======================================================================="

@@ -47,15 +47,25 @@ cp .env.example .env
 
 ## Usage pas à pas
 
+> **Garde-fou CC-56** : tout appel direct à `scripts/deploy-to-box.sh` exige
+> `--sha "$(git rev-parse HEAD)"` en premier argument, pour tous les modes
+> (y compris `--dry-run`, `--rollback`, `--stop-daemon-cleanup`). Le script
+> refuse immédiatement si `--sha` est absent ou ne correspond pas au HEAD
+> local, avant toute connexion SSH. Les cibles `make deploy*` exigent elles
+> aussi `SHA=` en argument explicite (`make deploy SHA=$(git rev-parse HEAD)`)
+> et refusent sans lancer le script si `SHA` est vide — un `make deploy` nu
+> (par exemple cité tel quel dans un prompt) ne calcule plus le SHA tout
+> seul et ne déploie rien.
+
 ### 1. Simulation
 ```bash
-make deploy-dry
+make deploy-dry SHA=$(git rev-parse HEAD)
 ```
 Montre les fichiers qui seraient transférés. Aucun accès daemon.
 
 ### 2. Déploiement simple
 ```bash
-make deploy
+make deploy SHA=$(git rev-parse HEAD)
 ```
 1. `rsync` avec filtre → `${JEEDOM_BOX_PATH}/`
 2. `chown -R www-data:www-data` + `chmod 755/644` + `chmod +x main.py`
@@ -66,8 +76,8 @@ make deploy
 
 ### 3. Nettoyage HA discovery avant test
 ```bash
-make deploy-clean
-# ou: ./scripts/deploy-to-box.sh --cleanup-discovery
+make deploy-clean SHA=$(git rev-parse HEAD)
+# ou: ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --cleanup-discovery
 ```
 - Lit les credentials MQTT depuis la config `mqtt2` sur la box (source terrain prouvée)
 - `mosquitto_sub -W 2` sur `homeassistant/{light,cover,switch}/jeedom2ha_+/config`
@@ -79,8 +89,8 @@ par couverture code uniquement — non encore validé sur box réelle.
 
 ### 4. Redémarrage daemon + vérification readiness
 ```bash
-make deploy-restart
-# ou: ./scripts/deploy-to-box.sh --restart-daemon
+make deploy-restart SHA=$(git rev-parse HEAD)
+# ou: ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --restart-daemon
 ```
 - `jeedom::startDaemon("jeedom2ha")` via PHP CLI — chemin terrain prouvé (protocole 3.2b-A)
 - Lit `localSecret` après le démarrage (généré si absent)
@@ -88,13 +98,13 @@ make deploy-restart
 
 ### 5. Cycle complet (déploiement frais avec reset HA) — mode nominal
 ```bash
-./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon
+./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --cleanup-discovery --restart-daemon
 ```
 Ordre d'exécution : cleanup → restart → healthcheck → sync → vérification topics.
 
 ### 6. Vérification « HA propre » sans republier
 ```bash
-./scripts/deploy-to-box.sh --stop-daemon-cleanup
+./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --stop-daemon-cleanup
 ```
 Arrête explicitement le daemon, attend qu'il soit bien arrêté, puis nettoie les topics retained.
 Permet de vérifier visuellement dans HA que les entités jeedom2ha ont disparu, sans republication automatique.
@@ -103,7 +113,7 @@ Ordre d'exécution : arrêt daemon → attente arrêt (max 30s) → cleanup MQTT
 
 Pour republier après vérification :
 ```bash
-./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon
+./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --cleanup-discovery --restart-daemon
 ```
 
 ---

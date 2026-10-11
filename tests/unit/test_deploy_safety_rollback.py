@@ -14,6 +14,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "deploy-to-box.sh"
 ROLLBACK_LIB = REPO_ROOT / "scripts" / "deploy-rollback-lib.sh"
 
+# Matches the mocked `git rev-parse HEAD` below — the value every test that
+# is not specifically exercising the CC-56 gate passes as --sha, so that
+# gate does not have to be re-asserted in every unrelated test.
+MOCK_HEAD_SHA = "0123456789abcdef0123456789abcdef01234567"
+
 
 def _write_mock_tools(tmp_path: Path) -> Path:
     bin_dir = tmp_path / "bin"
@@ -73,7 +78,11 @@ esac
 
 
 def _run(
-    tmp_path: Path, *args: str, timeout: Optional[float] = None, **env_overrides: str
+    tmp_path: Path,
+    *args: str,
+    timeout: Optional[float] = None,
+    sha: Optional[str] = MOCK_HEAD_SHA,
+    **env_overrides: str,
 ) -> subprocess.CompletedProcess:
     bin_dir = _write_mock_tools(tmp_path)
     env = os.environ | {
@@ -85,7 +94,13 @@ def _run(
         "MOCK_SSH_LOG": str(tmp_path / "ssh.log"),
         "MOCK_SSH_STDIN": str(tmp_path / "ssh.stdin"),
     } | env_overrides
-    cmd = [str(SCRIPT), *args]
+    # Every test not specifically exercising the CC-56 gate (test_refuses_*_sha*
+    # below) gets a valid --sha injected automatically, matching the mocked
+    # `git rev-parse HEAD` above, so that gate never has to be re-asserted in
+    # unrelated tests. Pass sha=None to omit --sha entirely, or an explicit
+    # mismatched value, to exercise the gate itself.
+    sha_args = ["--sha", sha] if sha is not None else []
+    cmd = [str(SCRIPT), *sha_args, *args]
     # Popen + start_new_session=True puts deploy-to-box.sh in its own
     # process group, so that on a timeout the *whole* group (including any
     # grandchildren such as rsync's ssh transport) can be killed via
@@ -109,6 +124,38 @@ def _run(
         # already been captured, so no zombie/orphan process is left behind.
         stdout, stderr = proc.communicate()
         return subprocess.CompletedProcess(cmd, returncode=None, stdout=stdout, stderr=stderr)
+
+
+# CC-56 — garde-fou --sha : avant tout (y compris le chargement de .env /
+# les secrets et les autres guardrails), un lancement doit fournir --sha et
+# qu'il corresponde au HEAD réel, pour qu'un lancement accidentel (incident
+# du 2026-10-11 19:20) ne produise jamais d'effet.
+def test_refuses_without_sha_before_any_ssh(tmp_path):
+    result = _run(tmp_path, sha=None)
+
+    assert result.returncode != 0
+    assert "--sha <sha> est obligatoire" in result.stderr
+    assert not (tmp_path / "ssh.log").exists()
+
+
+def test_refuses_sha_mismatch_with_head_before_any_ssh(tmp_path):
+    result = _run(tmp_path, sha="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+
+    assert result.returncode != 0
+    assert "ne correspond pas à HEAD" in result.stderr
+    assert not (tmp_path / "ssh.log").exists()
+
+
+def test_accepts_sha_matching_head_and_proceeds_to_next_guardrail(tmp_path):
+    # Correct --sha, but a dirty tree: the failure must come from the dirty-
+    # tree guardrail, not from the CC-56 gate, proving the gate let the run
+    # through to "the next guardrail" rather than masking a later failure.
+    result = _run(tmp_path, sha=MOCK_HEAD_SHA, MOCK_GIT_STATE="dirty")
+
+    assert result.returncode != 0
+    assert "--sha" not in result.stderr
+    assert "arbre Git local est sale" in result.stderr
+    assert not (tmp_path / "ssh.log").exists()
 
 
 def test_refuses_dirty_tree_before_any_ssh(tmp_path):
