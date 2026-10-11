@@ -1,4 +1,4 @@
-# Story A3 : Conformité Market — E3, E5
+# Story A3 : Conformité `info.json` au Market Jeedom (E3, E5)
 
 Status: ready-for-dev
 
@@ -9,146 +9,123 @@ Story Key (sprint-status): `a3-conformite-market`
 ## Story
 
 En tant que mainteneur,  
-je veux vérifier et corriger l'absence de conformité du plugin aux exigences du Market Jeedom (info.json, version, description, changelogs),  
-afin que la première publication soit acceptée et que les mises à jour utilisateurs fonctionnent correctement.
+je veux corriger `plugin_info/info.json` pour respecter les champs obligatoires du Market Jeedom et verrouiller cette conformité par un test CI,  
+afin que la première publication soit acceptée et que les mises à jour futures restent conformes.
 
 ## Description
 
-Écarts constatés (main @7dd0120) :
+Référence officielle : `doc.jeedom.com/fr_FR/dev/structure_info_json`. Champs obligatoires : `id`, `name`, `description` (≥ 80 caractères par langue), `licence`, `author`, `require`, `category`, `changelog`, `documentation`, `changelog_beta`, `documentation_beta`.
 
-### E3 — info.json incomplet
-- **description** : 60 caractères (< 80 exigés par le Market)
-- **changelog_beta**, **documentation_beta** : absents (obligatoires par le Market)
-- **changelog**, **documentation** : pointent sur blob/main (risque de 404 après publication)
-- **link.forum** : vide
-- **issue** : absent
-- **language** : annonce `en_US` alors que seule la doc fr existe
-- **compatibility luna/atlas** : non testée
-- **plugin_info/template_icon.png** : fichier à supprimer (non conforme Market, remplacer par icon officiellement acceptée)
+### État actuel de `plugin_info/info.json` (vérifié, main @7dd0120)
 
-### E5 — Version incohérente
-- **pluginVersion** (info.json) : `0.3.0`
-- **Tag Git versionnel** : `v1.1.0`
-- **Cible D6** : version `1.2.0`
-- Incohérence à résoudre avant publication
+```json
+{
+  "pluginVersion": "0.3.0",
+  "description": { "fr_FR": "...60 car...", "en_US": "..." },
+  "changelog": ".../blob/main/docs/fr_FR/changelog.md",
+  "documentation": ".../blob/main/docs/fr_FR/index.md",
+  "link": { "forum": "" },
+  "language": ["fr_FR", "en_US"],
+  "compatibility": ["smart", "luna", "atlas", "rpi", "docker", "diy"]
+}
+```
 
-### Livrable
-1. **Correction info.json** :
-   - Description : >= 80 car, claire et en français ou bilingue
-   - changelog_beta, documentation_beta : ajouter avec contenu réel (ou renvois vers fichiers versionnés)
-   - link.forum : remplir si existe, sinon documenter l'absence
-   - issue : ajouter le lien de support (GitHub issues ou équivalent)
-   - language : corriger selon la doc réelle (en_US si doc existe, sinon `fr_FR` si doc fr seule)
-   - Tester compatibilité luna/atlas (ou documenter pourquoi non applicable)
-   - template_icon.png : supprimer, fournir une icône conforme Market
+### Corrections exactes à appliquer
 
-2. **pluginVersion** : aligner sur `1.2.0` (D6)
+1. **`description.fr_FR`** : réécrire à ≥ 80 caractères, **sans nom d'équipement ni de pièce de la maison** (règle CC-48 — fuite de noms réels dans le dépôt public).
+2. **`description.en_US`** : à retirer ou laisser cohérent avec `language` — voir point 6.
+3. **`changelog_beta`**, **`documentation_beta`** : à ajouter, pointant vers `blob/beta/docs/fr_FR/...` (cohérent avec le paquet épuré de A2 qui inclut `docs/fr_FR/`).
+4. **`changelog`**, **`documentation`** : passer de `blob/main/...` à `blob/stable/docs/fr_FR/...` (le lien `stable` doit rester valide après chaque promotion, contrairement à `main` qui évolue en continu).
+5. **`link.forum`** : remplir si une URL de forum existe, sinon documenter explicitement l'absence et laisser vide en connaissance de cause (pas un oubli).
+6. **`language`** : `["fr_FR"]` seul (doc française uniquement, décision story 20-5) — retirer `en_US` du tableau et de `description` par cohérence, ou garder `description.en_US` seulement si `language` contient `en_US` (à trancher en dev selon l'état réel de la doc anglaise, mais la décision 20-5 pointe vers `fr_FR` seul).
+7. **`compatibility`** : retirer `luna` et `atlas` (jamais testées) — ne pas les tester dans le cadre de cette story, simplement ne pas les déclarer.
+8. **`plugin_info/template_icon.png`** : supprimer purement et simplement. L'icône officielle `plugin_info/jeedom2ha_icon.png` (+ `.svg`) existe déjà et est utilisée — aucun remplacement à produire, juste une suppression de fichier parasite.
+9. **`issue`** : ajouter le lien vers les issues GitHub du projet.
+10. **`pluginVersion`** : passer à `1.2.0` (D6), cohérent avec le prochain tag Git `v1.2.0`.
 
-3. **README utilisateur** : créer ou compléter pour la doc de première lecture utilisateur
+### Parcours retenu
 
-4. **CI de validation** :
-   - À chaque PR, vérifier la conformité info.json contre les règles Jeedom (anti-régression E3/E5)
-   - Rejeter si description < 80 car, changelogs absents, ou version incohérente
-
-### Parcours rapide
-1. Lire le fichier `plugin_info/info.json` actuel et les exigences Market officielles
-2. Corriger manuellement : description (80+ car), version 1.2.0, description_beta/changelog_beta, language, icon
-3. Ajouter une brève validation en CI (shell script, 10 lignes)
-
-### Parcours complet (recommandé pour prod)
-1. Même corrections que parcours rapide
-2. Créer un test CI Python : parser info.json, valider chaque champ contre un schéma Jeedom (min/max, types, champs obligatoires)
-3. Implémenter un manifest de champs obligatoires pour le Market (version, description min 80 car, changelogs, etc.)
-4. Ajouter un test de synthaxe JSON + test de présence des clés obligatoires
-5. Documenter la procédure de maintien de conformité dans `docs/release-market.md`
-6. Tester en Jeedom vierge (Debian 11/12, LXC à côté ClawBox) que le plugin s'installe sans erreur
+**Parcours rapide + test CI** (règle CC-10 — la méthode a déjà tranché, pas de choix laissé à l'implémentation ; pas de refonte lourde nécessaire, les corrections sont ponctuelles et le risque se couvre par un test de non-régression) :
+1. Appliquer les 10 corrections ci-dessus directement dans `plugin_info/info.json`
+2. Supprimer `template_icon.png`
+3. Ajouter un test CI de conformité (pas de valeur codée en dur type `pluginVersion contient "1.2.0"` — voir AC7)
+4. Créer un README utilisateur minimal
 
 ## Acceptance Criteria
 
-1. **Given** le fichier `plugin_info/info.json`  
-   **When** la description est lue  
-   **Then** elle contient >= 80 caractères et décrit clairement le plugin.
+1. **Given** `plugin_info/info.json`  
+   **When** il est parsé  
+   **Then** `description.fr_FR` fait ≥ 80 caractères et ne contient aucun nom d'équipement ni de pièce réelle (CC-48).
 
 2. **Given** les champs `changelog_beta` et `documentation_beta`  
-   **When** info.json est parsé  
-   **Then** ces deux champs existent et contiennent du contenu réel (pas placeholder).
+   **When** `info.json` est vérifié  
+   **Then** ils existent et pointent vers `blob/beta/docs/fr_FR/...`.
 
-3. **Given** les URLs de changelog et documentation  
-   **When** elles sont converties de blob/main en URLs stables (releases, tags, ou doc statique)  
-   **Then** aucune URL ne pointe sur `blob/main` directement.
+3. **Given** les champs `changelog` et `documentation`  
+   **When** `info.json` est vérifié  
+   **Then** ils pointent vers `blob/stable/docs/fr_FR/...`, jamais vers `blob/main/...`.
 
 4. **Given** le champ `language`  
-   **When** info.json est vérifié  
-   **Then** il correspond à la langue réelle de la documentation disponible (en_US si doc en + fr, sinon fr_FR).
+   **When** `info.json` est vérifié  
+   **Then** il reflète exactement la documentation réellement disponible (décision 20-5 : `fr_FR` seul, sauf si une doc anglaise réelle existe — à confirmer en dev).
 
-5. **Given** la version dans info.json  
-   **When** la plugin est publiée  
-   **Then** `pluginVersion` = `1.2.0` (D6) et correspond au tag Git versionnel.
+5. **Given** le champ `compatibility`  
+   **When** `info.json` est vérifié  
+   **Then** `luna` et `atlas` n'y figurent pas (non testées, non déclarées).
 
-6. **Given** l'icône du plugin  
-   **When** elle est vérifiée  
-   **Then** `template_icon.png` est supprimé, remplacé par une icône conforme Market (format, taille, visibilité).
+6. **Given** `plugin_info/template_icon.png`  
+   **When** le dépôt est audité après la story  
+   **Then** ce fichier n'existe plus, et `jeedom2ha_icon.png`/`jeedom2ha_icon.svg` restent inchangés et référencés.
 
-7. **Given** la CI de validation conformité  
-   **When** une PR est créée vers `main`  
-   **Then** un job valide que info.json respecte le schéma Jeedom (anti-régression E3/E5).
+7. **Given** le test CI de conformité  
+   **When** il s'exécute sur une PR modifiant `info.json`  
+   **Then** il valide les règles structurelles Jeedom (présence des champs obligatoires, longueur de description) **et** la cohérence `pluginVersion` / dernier tag Git `v*` / présence d'une entrée correspondante dans le changelog — sans valeur de version codée en dur dans le test.
 
-8. **Given** un README utilisateur  
-   **When** le plugin est installé pour la première fois  
-   **Then** l'utilisateur dispose d'une doc claire sur installation, configuration, utilisation (liens vers docs détaillées).
+8. **Given** `pluginVersion`  
+   **When** `info.json` est vérifié  
+   **Then** sa valeur est `1.2.0` et correspond au tag Git `v1.2.0` au moment de la release (D6).
+
+9. **Given** un README utilisateur  
+   **When** un nouvel utilisateur consulte le dépôt  
+   **Then** il trouve une vue d'ensemble claire, les prérequis, et un lien vers la documentation détaillée (`docs/fr_FR/index.md`).
 
 ## Tasks / Subtasks
 
-### Parcours rapide
-- [ ] T1 — Corriger info.json
-  - [ ] Augmenter description à >= 80 car
-  - [ ] Ajouter `changelog_beta` et `documentation_beta` (contenu réel ou renvoi)
-  - [ ] Corriger `language` (en_US ou fr_FR selon doc)
-  - [ ] Ajouter/compléter `issue`
-  - [ ] Remplacer/supprimer template_icon.png
-  - [ ] Changer `pluginVersion` en `1.2.0`
+- [ ] T1 — Corriger `plugin_info/info.json`
+  - [ ] Réécrire `description.fr_FR` ≥ 80 caractères, sans nom d'équipement/pièce réelle (CC-48)
+  - [ ] Trancher `description.en_US`/`language` selon l'état réel de la doc anglaise (décision 20-5 : français seul par défaut)
+  - [ ] Ajouter `changelog_beta`, `documentation_beta` (`blob/beta/docs/fr_FR/...`)
+  - [ ] Corriger `changelog`, `documentation` (`blob/stable/docs/fr_FR/...`)
+  - [ ] Retirer `luna`, `atlas` de `compatibility`
+  - [ ] Ajouter `issue` (lien GitHub issues)
+  - [ ] Passer `pluginVersion` à `1.2.0`
+  - [ ] Documenter `link.forum` (vide assumé ou rempli)
 
-- [ ] T2 — Ajouter validation en CI (basique)
-  - [ ] Créer un script shell simple : vérifier que description >= 80 car, pluginVersion contient "1.2.0"
-  - [ ] Ajouter un step de validation à `.github/workflows/` ou tests existants
+- [ ] T2 — Supprimer l'icône parasite
+  - [ ] Supprimer `plugin_info/template_icon.png`
+  - [ ] Vérifier qu'aucune référence au fichier supprimé ne subsiste dans le code/doc
 
-- [ ] T3 — Créer README utilisateur basique
-  - [ ] Vue d'ensemble du plugin (1–2 paragraphes)
-  - [ ] Prérequis d'installation
-  - [ ] Lien vers la doc détaillée
+- [ ] T3 — Test CI de conformité
+  - [ ] Créer un test qui valide la structure `info.json` contre les champs obligatoires Jeedom (`doc.jeedom.com/fr_FR/dev/structure_info_json`)
+  - [ ] Valider la cohérence dynamique `pluginVersion` / dernier tag `v*` / entrée changelog correspondante (pas de valeur en dur)
+  - [ ] Valider `description` ≥ 80 caractères par langue déclarée dans `language`
 
-### Parcours complet (recommandé)
-- [ ] T4 — Implémenter test de conformité Jeedom
-  - [ ] Créer `resources/daemon/tests/unit/test_info_json_compliance.py` ou équivalent
-  - [ ] Parser info.json avec un schéma (JSON Schema ou validateur custom)
-  - [ ] Vérifier champs obligatoires : name, description >= 80, pluginVersion, changelog, documentation, etc.
-  - [ ] Tester les URLs (changelog, doc) en tant que liens valides (ou au moins bien formés)
-
-- [ ] T5 — Tester en Jeedom vierge (parcours clawbox, isolé)
-  - [ ] LXC Debian 11 vierge + Jeedom + installer le plugin depuis le paquet local
-  - [ ] Vérifier qu'aucune erreur d'installation n'apparaît
-  - [ ] Tester la première activation du daemon
-
-- [ ] T6 — Documenter procédure conformité
-  - [ ] `docs/release-market.md` : ajouter une section "Avant publication : checklist conformité"
-  - [ ] Lister tous les champs info.json obligatoires
-  - [ ] Ajouter des exemples de valeurs conformes
+- [ ] T4 — README utilisateur
+  - [ ] Créer/compléter un README minimal : vue d'ensemble, prérequis, lien vers `docs/fr_FR/index.md`
 
 ## Impact Produit
 
-- **Si non fait** : première publication Market sera rejetée (description trop courte, changelogs manquants) ; utilisateurs ne verront pas de mise à jour proposée.
-- **Si parcours rapide** : conformité minimale atteinte ; publication possible mais sans garantie de maintien de conformité future.
-- **Si parcours complet** : conformité garantie par CI anti-régression, test en Jeedom vierge, procédure documentée ; publication Market stable et fiable.
+- **Si non fait** : rejet probable de la première soumission Market (description trop courte, changelogs beta manquants), ou alerte de mise à jour trompeuse pour les utilisateurs (`compatibility` non vérifiée, version incohérente).
+- **Si fait** : `info.json` conforme, test CI empêchant toute régression future (E3/E5), publication fiable.
 
 ## Rollback / Plan de Retour Arrière
 
-- **Corrections info.json** : revert du commit modifiant `plugin_info/info.json` ; restaurer les valeurs antérieures.
-- **CI check** : supprimer le job de validation ; conformité redevient manuelle.
-- **Icon** : restaurer `template_icon.png` d'une branche antérieure si besoin.
+- Revert du commit modifiant `plugin_info/info.json` et supprimant `template_icon.png`.
+- Revert du job CI de conformité si besoin (conformité redevient manuelle).
 
 ## Notes
 
-- Cette story a une dépendance douce avec A2 : A2 dépend d'un info.json stable pour définir la version du paquet (donc A3 doit être terminée avant A2 en prod, mais elles peuvent démarrer en parallèle).
+- Aucun parcours alternatif : **parcours rapide + test CI uniquement** (CC-10 — déjà tranché).
+- Dépendance : A2 (construction du paquet) a besoin de cette story terminée pour fixer les liens `blob/beta|stable/docs/fr_FR/...` dans le manifeste et dans `info.json` de façon cohérente.
 - Ordre proposé : **A1 et A3 en parallèle, puis A2**.
-- Consulter la doc officielle Jeedom Market (https://doc.jeedom.com/fr_FR/plugins/market/) pour les champs exactement obligatoires (peut avoir changé depuis oct 2026).
-- Les URLs de documentation peuvent rester sur `blob/main` si elles sont versionnées (ex: `blob/v1.2.0/docs/...`) — à valider avec ClaudeBox.
+- Référence officielle à utiliser en dev : `doc.jeedom.com/fr_FR/dev/structure_info_json` (pas la page `/plugins/market/` citée par erreur dans la version précédente de cette fiche).

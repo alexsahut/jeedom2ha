@@ -1,4 +1,4 @@
-# Story A2 : Paquet distribuable et promotion épurée — D2
+# Story A2 : Paquet distribuable et promotion épurée via branches `release/vX.Y.Z` (D2)
 
 Status: ready-for-dev
 
@@ -9,124 +9,107 @@ Story Key (sprint-status): `a2-paquet-distribuable-promotion-epuree`
 ## Story
 
 En tant que mainteneur,  
-je veux disposer d'un script de construction de paquet épuré (excluant _bmad, tests, scripts de dev) et d'une CI de contrôle anti-régression,  
-afin de publier un artefact stable sur les branches `beta` et `stable` et garantir que seuls les fichiers de production y sont inclus.
+je veux un script de construction de paquet épuré et un mécanisme de promotion par branche intermédiaire `release/vX.Y.Z` + PR + merge commit,  
+afin de publier sur `beta`/`stable` un artefact Market conforme sans jamais fusionner l'arbre complet de `main` ni utiliser de fast-forward.
 
 ## Description
 
-Décision validée (D2) : les branches `beta` et `stable` doivent contenir un paquet épuré produit depuis un SHA de `main` par un script versionné.
+Décision validée (D2) : les branches `beta` et `stable` reçoivent un paquet épuré produit depuis un SHA de `main` par un script versionné — **jamais** de fast-forward, **jamais** de push direct. `docs/git-strategy.md` impose : promotion `main -> beta` et `beta -> stable` par **merge commit de promotion**, jamais squash, jamais cherry-pick comme méthode normale, et une story ne doit jamais être mergée directement vers `beta`/`stable`.
 
-### Base existante
-- Fichier de filtrage : `.rsync-plugin-deploy.filter` (présent à la racine, liste les exclusions)
-- Git strategy : `docs/git-strategy.md` (politique Git et branches)
-- Release marker : `docs/release-market.md` (procédure de publication Market — à amender)
+### Mécanisme réel retenu
 
-### Livrable
-1. **Script de construction** : shell ou Python, deterministique, basé sur `.rsync-plugin-deploy.filter`
-   - Entrée : SHA de main (ex: `7dd0120`)
-   - Sortie : paquet zipé ou tree épuré prêt pour `beta`/`stable`
-   - Exclusions : `_bmad*`, `tests`, `scripts`, `.claude`, `.agent(s)`, `CLAUDE.md`, `.github`
-   - Vérification : liste des fichiers inclus figée et vérifiable
+1. Script de construction : part d'un SHA de `main` déjà déployé et validé sur la box (portant un tag `deploy-...`), produit un **arbre épuré** filtré par un manifeste (base : `.rsync-plugin-deploy.filter`, actuellement : `.git`, `.env*`, `.github/`, `.agent(s)/`, `.claude/`, `tests/`, `scripts/`, `_bmad*`, `docs/` en entier, fichiers de dev).
+2. **Correctif obligatoire** : le filtre actuel exclut `docs/` en entier. Or `plugin_info/info.json` référence `changelog`/`documentation`/`changelog_beta`/`documentation_beta` sous forme de liens `blob/<branche>/docs/fr_FR/...` (story A3). Si `docs/` est totalement exclu du paquet publié sur `beta`/`stable`, ces liens renvoient une 404 une fois le repo réellement épuré sur ces branches. **Le manifeste doit inclure `docs/fr_FR/`** (changelog, documentation utilisateur) dans le paquet épuré.
+3. Le script écrit cet arbre épuré sur une **branche `release/vX.Y.Z` créée depuis l'état courant de `beta`** (pas depuis main), avec un commit unique : `release vX.Y.Z (source <sha>)`.
+4. Ouverture d'une **PR `release/vX.Y.Z -> beta`**, mergée par **merge commit** (jamais fast-forward, jamais squash) — conforme à la politique existante.
+5. Une fois `beta` validée, même mécanisme pour `beta -> stable` : branche `release/vX.Y.Z` (ou équivalent) basée sur `stable`, PR, merge commit.
+6. **Aucune fusion de l'arbre complet de `main`** : seul l'arbre épuré transite, via la branche intermédiaire — ce n'est pas un merge Git classique de `main` dans `beta`, c'est une construction + remplacement contrôlé du contenu, committé comme un seul commit de release.
 
-2. **Test CI de contrôle anti-régression** : 
-   - À chaque PR, vérifier que le paquet construit contient bien et seulement les fichiers attendus
-   - Bloquer si un fichier interdit (ex: `.github`, `_bmad`) se retrouve dans le paquet
-   - Rapporter la list des fichiers inclus pour audit
+### Point ouvert — protection de branche (décision à soumettre, pas tranchée ici)
 
-3. **Amendments documentation** :
-   - `docs/git-strategy.md` §1.3 (ou nouvelle section) : documenter le script de construction et son invocation
-   - `docs/release-market.md` §3 : préciser comment promouvoir un SHA déployé en `beta` sans pousser directement
-   - Ajouter un schéma ou pseudo-code pour la promotion : tag vX.Y.Z → beta (fast-forward) → stable (fast-forward)
+`beta`/`stable` sont probablement protégées par des checks requis (`PR Routing Policy`, suite de tests) qui dépendent de `.github/workflows/`. Si `.github/` est exclu du paquet épuré, une PR `release/vX.Y.Z -> beta` ne pourra jamais satisfaire ces checks et ne sera jamais mergeable.
 
-### Parcours rapide
-1. Écrire le script de construction (50 lignes shell max) basé sur rsync + `.rsync-plugin-deploy.filter`
-2. Tester manuellement : `./build-package.sh 7dd0120` produit un paquet valide
-3. Ajouter une section brève à `docs/git-strategy.md` avec la commande de lancement
-4. Documenter la liste d'exclusion figée (celle du `.rsync-plugin-deploy.filter` actuel)
+Deux options possibles, **à soumettre à Alex/ClaudeBox, pas tranchées par cette story** :
+- **Option 1** : conserver sur `beta`/`stable` un sous-ensemble minimal de `.github/workflows/` (ex. un seul workflow de validation du paquet/manifeste), distinct du paquet plugin lui-même — c'est-à-dire que le manifeste d'exclusion appliqué au paquet *livré sur le Market* n'est pas forcément identique à ce qui reste committé sur la branche `beta`/`stable` elle-même.
+- **Option 2** : ajuster les règles de protection de branche sur `beta`/`stable` pour n'exiger qu'un check spécifique à la release (ex. validation du manifeste), distinct des checks complets de `main`.
 
-### Parcours complet (recommandé pour prod)
-1. Même script que parcours rapide
-2. Ajouter une CI check : créer un job GitHub Actions qui, à chaque PR vers `main`, construit le paquet et valide le contenu
-3. Définir une "liste de fichiers attendus" (manifest) figée en CI, rejetant toute régression d'exclusion
-4. Implémenter un test de reconstruction de `beta` depuis le paquet à blanc, **SANS pousser sur beta**
-   - Vérifie que le paquet binaire peut être dépakcé et utilisé comme source pour `beta`
-   - Compare le hash du contenu (arbre `git`) avec le SHA source de `main`
-5. Complèter les amendments à `git-strategy.md` et `release-market.md` avec exemples concrets
-6. Ajouter un diagramme Mermaid dans `release-market.md` montrant : SHA deployé → tag vX.Y.Z → beta (fast-forward) → stable (fast-forward)
+Cette story documente le problème et propose les deux options ; elle ne modifie pas la protection de branche sans validation explicite.
+
+### Parcours
+
+**Parcours complet uniquement** (règle CC-10 — pas de choix laissé ici, la story touche directement au mécanisme de publication Market, enjeu fort) :
+1. Script de construction déterministe (SHA → paquet épuré, incluant `docs/fr_FR/`)
+2. CI anti-régression du manifeste d'exclusion (bloque toute régression de la liste)
+3. Mécanisme de branche `release/vX.Y.Z` + PR + merge commit documenté et testé à blanc
+4. Amendements `docs/git-strategy.md` et `docs/release-market.md`
+5. Proposition documentée (non tranchée) sur la protection de branche
 
 ## Acceptance Criteria
 
-1. **Given** le script de construction  
-   **When** exécuté sur un SHA valide de `main` (ex: `7dd0120`)  
-   **Then** un paquet épuré est produit, sans aucun fichier des exclusions.
+1. **Given** le script de construction et un SHA de `main`  
+   **When** il s'exécute  
+   **Then** l'arbre produit respecte le manifeste : chaque fichier/dossier exclu (`.git`, `.github/`, `.agent(s)/`, `.claude/`, `tests/`, `scripts/`, `_bmad*`) est absent, et `docs/fr_FR/` est présent.
 
-2. **Given** les exclusions listées dans `.rsync-plugin-deploy.filter`  
-   **When** le script s'exécute  
-   **Then** chaque fichier/dossier exclu est bien absent du paquet final.
+2. **Given** un manifeste de fichiers attendus (figé, versionné)  
+   **When** une PR touchant le script ou le manifeste est créée  
+   **Then** la CI valide le contenu produit contre ce manifeste et rejette toute régression (fichier interdit présent, ou fichier requis absent).
 
-3. **Given** une liste de fichiers attendus (manifest)  
-   **When** une PR est créée  
-   **Then** la CI valide que le paquet construit respecte le manifest (anti-régression).
+3. **Given** l'arbre épuré produit par le script pour un SHA donné  
+   **When** il est comparé au SHA source filtré par le même manifeste (appliqué directement sur l'arbre de `main`)  
+   **Then** les deux sont identiques — **pas** « identique au SHA source » brut (contradiction avec l'épuration), mais « identique au SHA source filtré par le manifeste ».
 
-4. **Given** le paquet binaire produit  
-   **When** il est décompressé sur une branche `beta` vierge  
-   **Then** le contenu du tree est identique au SHA source de `main` (excepté `.git`, `.gitignore`, etc.).
+4. **Given** une branche `release/vX.Y.Z` construite depuis `beta` avec l'arbre épuré  
+   **When** la reconstruction est testée à blanc (local ou CI)  
+   **Then** elle réussit, produit un commit `release vX.Y.Z (source <sha>)`, et **aucun push n'est effectué vers `beta` ni `stable` réelles**.
 
-5. **Given** la reconstruction de `beta` à partir du paquet  
-   **When** elle s'exécute en CI  
-   **Then** elle réussit SANS pousser sur `beta` (preuve locale uniquement).
-
-6. **Given** les amendments à `git-strategy.md` et `release-market.md`  
+5. **Given** les amendements à `docs/git-strategy.md` (règles de merge / politique de promotion) et `docs/release-market.md`  
    **When** la PR est créée  
-   **Then** le processus complet de promotion (tag → beta → stable) est documenté avec exemples.
+   **Then** le mécanisme réel (branche `release/vX.Y.Z` + PR + merge commit, jamais fast-forward) est documenté avec un exemple concret de commandes.
+
+6. **Given** le problème de protection de branche  
+   **When** la fiche est relue  
+   **Then** les deux options sont présentées comme décision ouverte à soumettre à Alex, sans que la story ne les tranche ni ne les implémente.
 
 ## Tasks / Subtasks
 
-### Parcours rapide
-- [ ] T1 — Écrire le script de construction
-  - [ ] Créer `scripts/build-package-for-market.sh` (ou équivalent)
-  - [ ] Parser `.rsync-plugin-deploy.filter` ou l'utiliser directement avec rsync
-  - [ ] Accepter un SHA en argument, construire le paquet
-  - [ ] Tester manuellement sur `7dd0120`
-  - [ ] Vérifier qu'aucun `_bmad`, `tests`, `scripts`, `.claude` ne figure dans le paquet
+- [ ] T1 — Écrire le script de construction du paquet épuré
+  - [ ] Créer `scripts/build-market-package.sh` (ou équivalent), argument = SHA source
+  - [ ] Baser le manifeste sur `.rsync-plugin-deploy.filter`, **en retirant `docs/` de l'exclusion et en ajoutant une inclusion explicite de `docs/fr_FR/`**
+  - [ ] Produire un arbre/tarball épuré, déterministe (même SHA en entrée → même sortie)
+  - [ ] Tester manuellement sur un SHA réel (ex. `7dd0120`)
 
-- [ ] T2 — Documenter brièvement dans `git-strategy.md`
-  - [ ] Ajouter une section "Construction du paquet" avec la commande d'invocation
-  - [ ] Lister les exclusions (copie simple du `.rsync-plugin-deploy.filter`)
+- [ ] T2 — CI anti-régression du manifeste
+  - [ ] Figer la liste de fichiers/dossiers attendus (manifeste versionné, distinct du `.rsync-plugin-deploy.filter` si besoin de divergence documentée)
+  - [ ] Ajouter un job CI qui construit le paquet sur chaque PR touchant le script/manifeste et valide le contenu
 
-### Parcours complet (recommandé)
-- [ ] T3 — Ajouter CI check GitHub Actions
-  - [ ] Créer un job `.github/workflows/validate-package.yml`
-  - [ ] À chaque PR vers `main`, construire le paquet et valider le contenu
-  - [ ] Rejeter si un fichier interdit est présent (fail la PR)
+- [ ] T3 — Mécanisme de branche `release/vX.Y.Z`
+  - [ ] Implémenter la création de branche `release/vX.Y.Z` depuis `beta` (ou `stable`), remplacement de l'arbre par le paquet épuré, commit unique de release
+  - [ ] Tester la reconstruction à blanc, sans push vers `beta`/`stable` réelles
+  - [ ] Documenter la commande exacte de création de la PR de promotion (`release/vX.Y.Z -> beta`, merge commit, jamais fast-forward/squash)
 
-- [ ] T4 — Implémenter test de reconstruction
-  - [ ] Ajouter un step CI qui dépacque le paquet sur une branche `beta` de test
-  - [ ] Comparer le hash du tree avec le SHA source
-  - [ ] Loger "reconstruction OK" ou signaler une différence
-  - [ ] **NE PAS pousser sur `beta` réelle** — test local uniquement
+- [ ] T4 — Amendements documentation
+  - [ ] `docs/git-strategy.md` : section dédiée au script de construction et au flux `release/vX.Y.Z` (sans contredire les règles de merge existantes — les renforcer/préciser)
+  - [ ] `docs/release-market.md` : détailler la procédure complète avec exemples de commandes git réels
+  - [ ] Documenter explicitement l'inclusion de `docs/fr_FR/` dans le paquet et pourquoi (liens info.json)
 
-- [ ] T5 — Complèter les amendments documentation
-  - [ ] `docs/git-strategy.md` §1.3 : détailler la construction et l'invocation du script
-  - [ ] `docs/release-market.md` §3 : préciser le flow promotion (tag → beta → stable)
-  - [ ] Ajouter un diagramme Mermaid ou pseudo-code
-  - [ ] Ajouter des exemples concrets de commandes git (push force interdites, fast-forward obligatoire)
+- [ ] T5 — Documenter le point ouvert protection de branche
+  - [ ] Décrire les deux options (workflow minimal conservé sur beta/stable, ou ajustement des checks requis)
+  - [ ] Ne pas trancher ni implémenter — signaler comme décision à soumettre à Alex/ClaudeBox
 
 ## Impact Produit
 
-- **Si non fait** : promotion manuelle vers `beta`/`stable` risque d'inclure des fichiers non pertinents (_bmad, tests, etc.), dégradant la maintenabilité et augmentant la taille du paquet Market.
-- **Si parcours rapide** : script basique qui fonctionne mais sans CI ; dépend de l'humain pour valider l'absence de régression.
-- **Si parcours complet** : CI automatisée anti-régression, test de reconstruction, documentation précise ; promotion devient safe et reproductible.
+- **Si non fait** : toute promotion `main -> beta -> stable` reste manuelle et risque d'inclure des fichiers de dev, ou de casser les liens changelog/doc de `info.json` si `docs/` reste totalement exclu.
+- **Si fait** : promotion reproductible, traçable (un commit = une release), conforme à `docs/git-strategy.md`, liens `info.json` valides sur `beta`/`stable`.
 
 ## Rollback / Plan de Retour Arrière
 
-- **Script** : git revert du commit contenant le script ; reprendre la construction manuelle (non recommandé).
-- **CI check** : supprimer le job `.github/workflows/validate-package.yml` ; CI redevient permissive.
-- **Reconstruction de beta** : revenir à promotion manuelle (git push direct sur `beta`).
+- **Script/CI** : revert du commit introduisant le script et le job CI ; retour à une construction manuelle du paquet (non recommandé, mais sans impact sur l'état existant de `beta`/`stable`).
+- **Branche `release/vX.Y.Z`** : supprimer la branche locale/distante si créée par erreur ; aucune PR mergée vers `beta`/`stable` tant que la décision protection de branche n'est pas prise — donc aucun rollback de promotion réelle n'est nécessaire au stade de cette story.
+- **Amendements doc** : revert des commits sur `git-strategy.md`/`release-market.md`.
 
 ## Notes
 
-- Cette story dépend d'une `info.json` stable et vérifiée (story A3) pour définir la version d'export.
-- L'ordre d'exécution proposé : **A1 et A3 en parallèle (indépendants), puis A2** (dépend d'un info.json clarifié par A3).
-- Le script DOIT être déterministique (même SHA en entrée → même paquet en sortie, bit-for-bit si possible).
-- Exclusions supplémentaires éventuelles : consulter ClawBox pour les spécificités Jeedom.
+- Aucun parcours alternatif : **parcours complet uniquement** (CC-10 — enjeu fort sur le mécanisme de publication).
+- Dépendance douce avec A3 : A2 a besoin d'un `info.json` stabilisé (version, liens) pour définir le contenu exact du paquet — **A3 doit être terminée avant que A2 ne soit déclarée `done`**, même si les deux démarrent en parallèle.
+- Ordre proposé : **A1 et A3 en parallèle, puis A2**.
+- Ce document ne modifie ni ne pousse sur `beta`/`stable` — toute exécution réelle de promotion reste soumise au go d'Alex.
