@@ -42,10 +42,11 @@ def _fake_bridge(connected=True, retained=None):
     return bridge
 
 
-def _sync_body(scenarios=None, eq_logics=None, with_scenarios_key=True):
+def _sync_body(scenarios=None, eq_logics=None, with_scenarios_key=True, complete=True):
     payload = {"objects": [], "eq_logics": eq_logics or []}
     if with_scenarios_key:
         payload["scenarios"] = scenarios or []
+        payload["scenarios_complete"] = complete
     return {
         "action": "sync",
         "payload": payload,
@@ -216,6 +217,23 @@ async def test_unparsable_scenario_entry_triggers_no_purge(aiohttp_client):
         {"id": 20, "name": "S20", "is_active": True},
         {"id": "not-an-int", "name": "?", "is_active": True},
     ])
+
+    assert _empties(bridge) == []
+    bridge.collect_retained_topics.assert_not_awaited()
+
+
+@pytest.mark.parametrize("complete", [False, None])
+async def test_scenarios_not_declared_complete_triggers_no_purge(aiohttp_client, complete):
+    """Le producteur PHP a ignoré un scénario illisible (ou ne déclare rien) : pas de purge."""
+    bridge = _fake_bridge(retained=[_topic(20), _topic(129)])
+    app, cli = await _client(aiohttp_client, bridge)
+    body = _sync_body(scenarios=[{"id": 21, "name": "S21", "is_active": True}])
+    if complete is None:
+        del body["payload"]["scenarios_complete"]
+    else:
+        body["payload"]["scenarios_complete"] = complete
+    resp = await cli.post("/action/sync", json=body, headers={"X-Local-Secret": SECRET})
+    assert resp.status == 200
 
     assert _empties(bridge) == []
     bridge.collect_retained_topics.assert_not_awaited()

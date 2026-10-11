@@ -2114,11 +2114,14 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     # Story 21.1 (CC-44, Q2b C) — le broker fait foi : vider les boutons de scénario retenus
     # qui ne sont pas actifs (inactifs, supprimés, fantômes déjà présents). Garde-fou : la
-    # section `scenarios` doit être une liste présente dans la charge utile et lisible en
-    # entier, sinon le défaut « liste vide » viderait tous les boutons.
+    # section `scenarios` doit être une liste, lue en entier côté démon et déclarée complète
+    # par le producteur PHP (`scenarios_complete`), sinon le défaut « liste vide » ou un
+    # scénario illisible ferait vider des boutons encore actifs.
     raw_scenarios = payload.get("scenarios")
-    scenarios_section_complete = isinstance(raw_scenarios, list) and len(raw_scenarios) == len(
-        snapshot.scenarios
+    scenarios_section_complete = (
+        isinstance(raw_scenarios, list)
+        and payload.get("scenarios_complete") is True
+        and len(raw_scenarios) == len(snapshot.scenarios)
     )
     if broker_ready and scenarios_section_complete:
         purged = await publisher.purge_orphan_scenario_buttons(

@@ -798,7 +798,10 @@ class jeedom2ha extends eqLogic {
 
     // 3. Scenarios Jeedom (Story 10.1 — publiés comme HA button)
     $result['scenarios'] = array();
+    // Story 21.1 — le démon ne purge les boutons de scénarios que si la lecture est complète.
+    $result['scenarios_complete'] = false;
     if (class_exists('scenario')) {
+      $result['scenarios_complete'] = true;
       foreach (scenario::all() as $sc) {
         try {
           $result['scenarios'][] = array(
@@ -807,7 +810,8 @@ class jeedom2ha extends eqLogic {
             'is_active' => (bool)$sc->getIsActive(),
           );
         } catch (Exception $e) {
-          // Scénario non lisible — ignorer
+          // Scénario non lisible — ignorer, mais la liste n'est plus complète
+          $result['scenarios_complete'] = false;
         }
       }
     }
