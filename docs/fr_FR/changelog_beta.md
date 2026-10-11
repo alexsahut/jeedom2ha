@@ -6,6 +6,13 @@
 
 ---
 
+# 2026-10-11 — Affichage d'une commande publiée par une entité secondaire
+
+- Une commande d'état portée à la fois par une entité principale refusée et par une entité secondaire déjà publiée (par exemple un capteur binaire) s'affiche désormais « Sera publié : binary_sensor » et est comptée « prête » dans la synthèse de l'équipement et les compteurs de la pièce (auparavant « Ne sera pas publié » et « bloquante » à tort). Correction d'affichage uniquement : rien de ce qui est publié dans Home Assistant ne change
+- Cause « état sans ordre On/Off » reformulée pour un équipement dont l'état est la seule commande : rien à piloter ; choisir le type `binary_sensor` puis « Forcer »
+
+---
+
 # 2026-10-11 — Nouvelle interface par pièce et documentation réécrite
 
 - Nouvelle page principale : un bandeau de santé (Bridge, MQTT, Dernière synchro, Dernière opération), la zone « Actions Home Assistant » et une carte par pièce (plus une carte « Sans pièce »)
