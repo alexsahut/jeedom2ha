@@ -36,6 +36,7 @@ from models.decide_publication import (
 from models.evaluate_equipment import (
     _resolve_publication_override_for_mapping,
     evaluate_equipment,
+    select_covering_decision,
     merge_override_layer,
 )
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
@@ -2601,26 +2602,25 @@ def _build_publication_override_diag(reason_code, pub_decision):
     }
 
 
-def _secondary_mapping_by_cmd(primary_mapping):
-    """Index {cmd_id: MappingResult} des capteurs/interrupteurs secondaires (Story 11.1
-    multi-sensor), TOUTES les commandes qu'ils couvrent confondues.
+def _mappings_covering_cmd(primary_mapping, cmd_id):
+    """Liste ordonnée (primaire d'abord, puis secondaires dans l'ordre natif) des
+    `MappingResult` qui couvrent `cmd_id`, TOUTES leurs commandes confondues.
 
     Un secondaire couvre non seulement sa commande d'état (`reason_details["cmd_id"]`) mais
     aussi, pour un interrupteur secondaire, ses commandes d'action (On/Off) présentes dans
     `secondary.commands` — routées et prouvées par la Story 19.2. Utilise `mapping_cmd_ids()`
-    (même extraction que le primaire, `mapping/overrides.py`) pour ne PAS dupliquer une
-    seconde définition de « quelles commandes appartiennent à ce mapping » (Story 19.3,
-    correction relecture ClaudeBox PR #176, P1-b) : c'est la même fonction que celle utilisée
-    par `covered`, le diagnostic de l'arbre et la cible de l'aperçu (`_resolve_command_mapping`).
-    Premier gagnant si collision (setdefault), ordre natif préservé.
+    (même extraction que `evaluate_equipment()`) pour ne PAS dupliquer une seconde définition
+    de « quelles commandes appartiennent à ce mapping » (Story 19.3, P1-b).
     """
-    index: Dict[int, object] = {}
     if primary_mapping is None:
-        return index
+        return []
+    covering = []
+    if cmd_id in set(mapping_cmd_ids(primary_mapping)):
+        covering.append(primary_mapping)
     for secondary in (primary_mapping.additional_mappings or []):
-        for cmd_id in mapping_cmd_ids(secondary):
-            index.setdefault(cmd_id, secondary)
-    return index
+        if cmd_id in set(mapping_cmd_ids(secondary)):
+            covering.append(secondary)
+    return covering
 
 
 def _resolve_command_mapping(evaluation, cmd_id):
@@ -2628,15 +2628,13 @@ def _resolve_command_mapping(evaluation, cmd_id):
     d'une `EquipmentEvaluation` déjà décidée — `None` si l'équipement n'a pas de mapping
     (inéligible ou `no_mapping`) ou si `cmd_id` n'est couvert par AUCUN des deux.
 
-    Priorité EXACTEMENT celle du contrat (`evaluate_equipment()`, AC1, `covered.setdefault`
-    primaire PUIS secondaires dans l'ordre) : le primaire gagne toujours sur un secondaire
-    pour une commande partagée. Source UNIQUE utilisée par l'arbre (`covered`, `diag_mapping`,
-    `attendu_ha`, `effective_ha`) ET par l'aperçu — Story 19.3, correction relecture ClaudeBox
-    PR #176 tour 2 (P2). Avant ce correctif, l'aperçu (`_target_mapping_for_cmd`) résolvait
-    SECONDAIRE d'abord, à l'inverse du contrat et de l'arbre (qui, eux, dupliquaient chacun
-    leur propre logique primaire-d'abord) : un piège pour toute commande partagée entre le
-    primaire et un secondaire, latent depuis que l'index des secondaires couvre TOUTES leurs
-    commandes (P1-b). Sans effet sur le corpus doré (aucune commande partagée).
+    Priorité EXACTEMENT celle du contrat (`evaluate_equipment()`, AC1, via
+    `select_covering_decision`) : la première entité PUBLIÉE qui porte la commande (primaire
+    d'abord, puis secondaires dans l'ordre) ; si aucune n'est publiée, le primaire (sa cause
+    est alors affichée). Story 21.1 (CC-47) : un principal refusé ne masque plus un secondaire
+    publié sur la même commande ; quand les deux sont publiés, le primaire garde la priorité
+    (Story 19.3, P2). Source UNIQUE utilisée par l'arbre (`covered`, `diag_mapping`,
+    `attendu_ha`, `effective_ha`) ET par l'aperçu.
 
     `cmd_id=None` cible toujours le mapping primaire (vue équipement).
     """
@@ -2644,9 +2642,13 @@ def _resolve_command_mapping(evaluation, cmd_id):
     if primary_mapping is None:
         return None
     if isinstance(cmd_id, int):
-        if cmd_id in set(mapping_cmd_ids(primary_mapping)):
-            return primary_mapping
-        return _secondary_mapping_by_cmd(primary_mapping).get(cmd_id)
+        covering = _mappings_covering_cmd(primary_mapping, cmd_id)
+        if not covering:
+            return None
+        return select_covering_decision(
+            covering,
+            lambda mapping: mapping.publication_decision_ref or evaluation.equipment_decision,
+        )
     return primary_mapping
 
 
@@ -3597,7 +3599,11 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         ecart = compute_ecart(perimetre, statut)
         if ecart and perimetre == "inclus":
             cause_code, _, _ = reason_code_to_cause(reason_code)
-            cause_ux = resolve_cause_ux(decision_reason_code, pipeline_step_visible)
+            cause_ux = resolve_cause_ux(
+                decision_reason_code,
+                pipeline_step_visible,
+                mapping_reason_code=getattr(map_result, "reason_code", None),
+            )
             cause_label = cause_ux["cause_label"]
             cause_action = cause_ux["cause_action"]
         elif ecart and perimetre.startswith("exclu_"):

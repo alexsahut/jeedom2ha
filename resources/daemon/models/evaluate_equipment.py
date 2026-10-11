@@ -292,6 +292,20 @@ def _finalize_cross_reference(
     working_mapping.publication_decision_ref = decision
 
 
+def select_covering_decision(candidates, decision_of):
+    """Story 21.1 (CC-47) — résolution par commande : parmi les entités qui portent une
+    même commande (ordre natif : primaire, puis secondaires), retient la première dont la
+    décision est « publiée » (`should_publish=True`), sinon la première (le primaire, dont la
+    cause est alors affichée). Fonction unique partagée par `evaluate_equipment()` et par
+    l'arbre/l'aperçu (`http_server._resolve_command_mapping`) : aucune recomposition côté UI.
+    `candidates` ne doit pas être vide.
+    """
+    for candidate in candidates:
+        if decision_of(candidate).should_publish:
+            return candidate
+    return candidates[0]
+
+
 def evaluate_equipment(
     eq: JeedomEqLogic,
     snapshot: TopologySnapshot,
@@ -445,12 +459,24 @@ def evaluate_equipment(
     )
 
     # AC1 — une CommandDecision par cmd_id connu de l'équipement, y compris non couvertes.
-    covered: Dict[int, "tuple[PublicationDecision, str]"] = {}
+    # Story 21.1 (CC-47) — une commande portée par plusieurs entités prend la décision de la
+    # première entité PUBLIÉE (primaire d'abord, puis secondaires dans l'ordre) ; si aucune
+    # n'est publiée, celle du primaire (comportement antérieur). Ne change rien à ce que le
+    # sync publie : `command_decisions` n'est lu que par l'arbre et l'aperçu.
+    candidates: Dict[int, List["tuple[PublicationDecision, str]"]] = {}
     for cmd_id in mapping_cmd_ids(primary_mapping):
-        covered.setdefault(cmd_id, (primary_decision, _step_for_decision(primary_decision)))
+        candidates.setdefault(cmd_id, []).append(
+            (primary_decision, _step_for_decision(primary_decision))
+        )
     for secondary, secondary_decision in zip(updated_secondaries, secondary_decisions):
         for cmd_id in mapping_cmd_ids(secondary):
-            covered.setdefault(cmd_id, (secondary_decision, _step_for_decision(secondary_decision)))
+            candidates.setdefault(cmd_id, []).append(
+                (secondary_decision, _step_for_decision(secondary_decision))
+            )
+    covered: Dict[int, "tuple[PublicationDecision, str]"] = {
+        cmd_id: select_covering_decision(entries, lambda entry: entry[0])
+        for cmd_id, entries in candidates.items()
+    }
 
     command_decisions: List[CommandDecision] = []
     for cmd_id in known_cmd_ids:
