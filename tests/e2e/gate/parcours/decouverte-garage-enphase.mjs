@@ -1,4 +1,5 @@
-/** Parcours de découverte lecture seule : Garage puis équipement Enphase. */
+/** Parcours de découverte lecture seule : Garage puis équipement Enphase (étendu en 20.3 :
+ * absence de la synthèse et de la modale Diagnostic, chaînes interdites, compteurs de la pièce). */
 
 export const name = 'decouverte-garage-enphase';
 export const declaredEquipments = {};
@@ -71,6 +72,56 @@ async function readEquipmentBadgeStates(page, modal) {
   }));
 }
 
+// Story 20.3 (AC6, AC10) : chaînes interdites dans le texte rendu (gabarit Jeedom et jargon
+// d'infrastructure). Les motifs sont repris de la table validée par Alexandre le 2026-10-08.
+const FORBIDDEN_TEXT = [
+  /mapping/i, /Template/i, /Mes templates/, /Paramètre n°1/, /Paramètres spécifiques/,
+  /Écart/, /Ecart/, /Confiance/, /\beq_id\b/, /\breason_code\b/, /Parc global/,
+  /Synthèse du périmètre/, /Diagnostic de Couverture/, /Parité FAN/, /generic_type/,
+];
+
+/** Lit le texte rendu d'un conteneur (jamais les scripts) et renvoie les rangs des motifs interdits trouvés. */
+async function forbiddenTextRanks(page, selector) {
+  const text = await page.locator(selector).first().evaluate((node) => node.textContent ?? '');
+  const ranks = [];
+  FORBIDDEN_TEXT.forEach((pattern, rank) => { if (pattern.test(text)) ranks.push(rank + 1); });
+  return ranks;
+}
+
+/** Story 20.3 (AC1, AC2, AC10) : la synthèse et l'action Diagnostic n'existent plus dans le DOM. */
+async function checkRemovedElements(page, helpers) {
+  const dom = await page.evaluate(() => ({
+    synthese: Boolean(document.querySelector('#div_scopeSummary')),
+    boutonSynthese: Boolean(document.querySelector('#bt_refreshScopeSummary')),
+    parcGlobal: (document.querySelector('.eqLogicThumbnailDisplay')?.textContent ?? '').includes('Parc global'),
+    actionDiagnostic: Boolean(document.querySelector('[data-action="diagnostic"]')),
+    exportSupport: Boolean(document.querySelector('#bt_exportDiagnostic')),
+  }));
+  if (dom.synthese) throw new Error('synthese-presente');
+  if (dom.boutonSynthese) throw new Error('bouton-synthese-present');
+  if (dom.parcGlobal) throw new Error('parc-global-present');
+  if (dom.actionDiagnostic) throw new Error('action-diagnostic-presente');
+  if (!dom.exportSupport) throw new Error('export-support-absent');
+  helpers.record('absence_synthese', true);
+  helpers.record('absence_action_diagnostic', true);
+  helpers.record('export_support_present', true);
+  const loadRequests = helpers.journalEntries().filter((entry) => (
+    entry.action === 'getPublishedScopeForConsole' || entry.action === 'getDiagnostics'
+  )).length;
+  if (loadRequests !== 0) throw new Error('lecture-synthese-ou-diagnostic');
+  helpers.record('lectures_synthese_diagnostic', loadRequests);
+}
+
+/** Relève les compteurs de la pièce ouverte : 4 d'équipements puis 3 de commandes. */
+async function readRoomCounters(modal, helpers, prefix) {
+  const counters = await modal.locator('.j2ha-room-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+  if (counters.length !== 7) throw new Error('compteurs-piece-incomplets');
+  counters.forEach((text, index) => {
+    if (!/^\d+ (équipements?|commandes?) /.test(text)) throw new Error('compteur-piece-illisible');
+    helpers.record(`${prefix}_compteur_${index + 1}`, text);
+  });
+}
+
 /** Consigne une étape avant son attente et préfixe toute erreur avec son nom. */
 async function waitAtStep(helpers, index, label, operation) {
   helpers.record(`etape_${index}`, label);
@@ -85,7 +136,7 @@ async function waitAtStep(helpers, index, label, operation) {
 /** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
-    const actions = nodes.find((node) => node.querySelector('[data-action="add"]') && node.querySelector('[data-action="gotoPluginConf"]') && node.querySelector('[data-action="diagnostic"]'));
+    const actions = nodes.find((node) => node.querySelector('[data-action="add"]') && node.querySelector('[data-action="gotoPluginConf"]'));
     const surface = document.querySelector('#j2ha_roomCards');
     const banner = document.querySelector('#div_bridgeHealthBanner');
     return {
@@ -97,6 +148,11 @@ export async function run(page, { helpers }) {
   if (!managementOrder.beforeBanner) throw new Error('gestion-apres-bandeau');
   helpers.record('gestion_avant_surface', true);
   helpers.record('gestion_avant_bandeau', true);
+  await waitAtStep(helpers, 0, 'elements-retires', () => checkRemovedElements(page, helpers));
+  const pageRanks = await forbiddenTextRanks(page, '.eqLogicThumbnailDisplay');
+  const editRanks = await forbiddenTextRanks(page, '.eqLogic');
+  if (pageRanks.length || editRanks.length) throw new Error(`chaine-interdite-page-${[...pageRanks, ...editRanks].join('-')}`);
+  helpers.record('chaines_interdites_page', 0);
   const journalBeforeRoom = helpers.journalEntries().filter((entry) => entry.action === 'getMappingOverrides').length;
   if (journalBeforeRoom !== 0) throw new Error('lecture-mapping-avant-piece');
   helpers.record('mapping_avant_piece', 0);
@@ -155,5 +211,46 @@ export async function run(page, { helpers }) {
   for (const command of await readCommandStates(disabledPanel)) {
     if (command.state !== 'desactive') throw new Error('cellule-eq-514-non-desactive');
     helpers.record(`eq_514_cmd_${command.id}_etat`, command.state);
+  }
+
+  // Story 20.3 : compteurs de la pièce ouverte, chaînes interdites dans la modale, actions déplacées présentes
+  // (jamais cliquées par le gate : le clic réel est une preuve terrain séparée, avec GO d'Alexandre).
+  await waitAtStep(helpers, 8, 'compteurs-garage', () => readRoomCounters(modal, helpers, 'garage'));
+  const roomRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
+  if (roomRanks.length) throw new Error(`chaine-interdite-piece-${roomRanks.join('-')}`);
+  helpers.record('chaines_interdites_piece', 0);
+  const actionsPresent = await modal.evaluate((node) => ({
+    republish: node.querySelectorAll('.j2ha-room-republish').length,
+    recreate: node.querySelectorAll('.j2ha-room-recreate').length,
+    perEquipment: node.querySelectorAll('.j2ha-eq-recreate').length,
+  }));
+  if (actionsPresent.republish !== 1 || actionsPresent.recreate !== 1 || actionsPresent.perEquipment < 1) {
+    throw new Error('actions-deplacees-absentes');
+  }
+  helpers.record('actions_piece_presentes', true);
+
+  // « Sans pièce » (quand la carte existe) : compteurs lus, aucune action de pièce.
+  if (unassignedCount === 1) {
+    await page.keyboard.press('Escape');
+    await waitAtStep(helpers, 9, 'fermeture-garage', () => modal.waitFor({ state: 'detached' }));
+    await waitAtStep(helpers, 10, 'carte-sans-piece', () => unassigned.click());
+    const unassignedModal = page.locator('.modal-j2ha-room');
+    await waitAtStep(helpers, 11, 'modale-sans-piece', () => unassignedModal.waitFor({ state: 'visible' }));
+    await waitAtStep(helpers, 12, 'compteurs-sans-piece', async () => {
+      await unassignedModal.locator('.j2ha-room-counter').first().waitFor({ state: 'visible' });
+      await page.waitForFunction(() => {
+        const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
+        return panels.length > 0 && panels.every((item) => {
+          const badge = item.querySelector('.j2ha-eq-publish-badge');
+          return badge && badge.textContent.trim() !== '';
+        });
+      });
+      await readRoomCounters(unassignedModal, helpers, 'sans_piece');
+    });
+    const unassignedRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
+    if (unassignedRanks.length) throw new Error(`chaine-interdite-sans-piece-${unassignedRanks.join('-')}`);
+    const roomActions = await unassignedModal.locator('.j2ha-room-republish, .j2ha-room-recreate').count();
+    if (roomActions !== 0) throw new Error('actions-piece-sans-piece');
+    helpers.record('sans_piece_sans_action_piece', true);
   }
 }

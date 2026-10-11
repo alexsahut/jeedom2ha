@@ -40,7 +40,7 @@ const LOGIN_ACTION = 'login';
 
 const PLUGIN_AJAX_PATH = '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
 
-// Lectures inscrites en Task 1 (6 du plugin, 2 du cœur) — voir la story, section
+// Lectures inscrites en Task 1 (4 du plugin depuis la story 20.3, qui retire getDiagnostics et getPublishedScopeForConsole, 2 du cœur) — voir la story, section
 // « Mécanisme d'interception des écritures ».
 export const ALLOWED_READS = [
   {
@@ -48,8 +48,6 @@ export const ALLOWED_READS = [
     actions: [
       'getMqttConfig',
       'getBridgeStatus',
-      'getDiagnostics',
-      'getPublishedScopeForConsole',
       'getMappingOverrides',
       'previewMappingOverride',
     ],

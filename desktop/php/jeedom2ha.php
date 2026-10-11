@@ -5,7 +5,6 @@ if (!isConnect('admin')) {
 // Déclaration des variables obligatoires
 $plugin = plugin::byId('jeedom2ha');
 sendVarToJS('eqType', $plugin->getId());
-$eqLogics = eqLogic::byType($plugin->getId());
 
 // Story 16.8 — Arbre pièce -> équipement pour la surface de mapping HA (modèle Homebridge).
 // Consommé côté front (data Jeedom, aucune route daemon ajoutée). Les eqLogics de type
@@ -64,7 +63,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 		<div class="eqLogicThumbnailContainer">
 			<div class="cursor eqLogicAction logoPrimary" data-action="add"><i class="fas fa-plus-circle"></i><br><span>{{Ajouter}}</span></div>
 			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="diagnostic"><i class="fas fa-stethoscope"></i><br><span>{{Diagnostic}}</span></div>
 		</div>
 
 		<!-- Bandeau global de santé toujours visible (Story 2.2) -->
@@ -86,22 +84,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 				<i class="fas fa-tasks" style="margin-right:5px;"></i> <strong>{{Dernière opération}}</strong> :
 				<span id="span_healthOp" class="label label-default" style="margin-left:5px;">{{...}}</span>
 				<span id="span_healthOpMsg" style="margin-left:8px; color:#666; font-size:0.9em;"></span>
-			</div>
-		</div>
-
-		<div id="div_scopeSummary" class="well well-sm" style="margin:10px 5px;">
-			<div class="clearfix">
-				<div class="pull-left">
-					<i class="fas fa-layer-group"></i> <strong>{{Synthèse du périmètre publié}}</strong>
-				</div>
-				<div class="pull-right">
-					<button id="bt_refreshScopeSummary" class="btn btn-default btn-xs">
-						<i class="fas fa-sync-alt"></i> {{Rafraîchir}}
-					</button>
-				</div>
-			</div>
-			<div id="div_scopeSummaryContent" style="margin-top:10px;">
-				<div class="text-muted">{{Chargement de la synthèse backend...}}</div>
 			</div>
 		</div>
 
@@ -155,7 +137,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 
 		<!-- Story 16.8 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
 		     Point d'entrée dédié, supersède l'onglet inatteignable de la 16.5. -->
-		<legend><i class="fas fa-home"></i> {{Configuration mapping Home Assistant par pièce}}</legend>
+		<legend><i class="fas fa-home"></i> {{Configuration Home Assistant par pièce}}</legend>
 		<div class="alert alert-info" style="margin:10px 5px;">
 			<i class="fas fa-info-circle"></i>
 			{{Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle répond aux prérequis Home Assistant (prêt / bloquant + pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
@@ -177,35 +159,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 		}
 		?>
 
-		<legend><i class="fas fa-table"></i> {{Mes templates}}</legend>
-		<?php
-		if (count($eqLogics) == 0) {
-			echo '<br><div class="text-center" style="font-size:1.2em;font-weight:bold;">{{Aucun équipement Template trouvé, cliquer sur "Ajouter" pour commencer}}</div>';
-		} else {
-			// Champ de recherche
-			echo '<div class="input-group" style="margin:5px;">';
-			echo '<input class="form-control roundedLeft" placeholder="{{Rechercher}}" id="in_searchEqlogic">';
-			echo '<div class="input-group-btn">';
-			echo '<a id="bt_resetSearch" class="btn" style="width:30px"><i class="fas fa-times"></i></a>';
-			echo '<a class="btn roundedRight hidden" id="bt_pluginDisplayAsTable" data-coreSupport="1" data-state="0"><i class="fas fa-grip-lines"></i></a>';
-			echo '</div>';
-			echo '</div>';
-			// Liste des équipements du plugin
-			echo '<div class="eqLogicThumbnailContainer">';
-			foreach ($eqLogics as $eqLogic) {
-				$opacity = ($eqLogic->getIsEnable()) ? '' : 'disableCard';
-				echo '<div class="eqLogicDisplayCard cursor ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '">';
-				echo '<img src="' . $eqLogic->getImage() . '"/>';
-				echo '<br>';
-				echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
-				echo '<span class="hiddenAsCard displayTableRight hidden">';
-				echo ($eqLogic->getIsVisible() == 1) ? '<i class="fas fa-eye" title="{{Equipement visible}}"></i>' : '<i class="fas fa-eye-slash" title="{{Equipement non visible}}"></i>';
-				echo '</span>';
-				echo '</div>';
-			}
-			echo '</div>';
-		}
-		?>
 	</div> <!-- /.eqLogicThumbnailDisplay -->
 
 	<!-- Page de présentation de l'équipement -->
@@ -277,41 +230,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 									<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="isVisible" checked>{{Visible}}</label>
 								</div>
 							</div>
-
-							<legend><i class="fas fa-cogs"></i> {{Paramètres spécifiques}}</legend>
-							<div class="form-group">
-								<label class="col-sm-4 control-label">{{Nom du paramètre n°1}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le paramètre n°1 de l'équipement}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="param1" placeholder="{{Paramètre n°1}}">
-								</div>
-							</div>
-							<div class="form-group">
-								<label class="col-sm-4 control-label"> {{Mot de passe}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le mot de passe}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<input type="text" class="eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
-								</div>
-							</div>
-							<!-- Exemple de champ de saisie du cron d'auto-actualisation avec assistant -->
-							<!-- La fonction cron de la classe du plugin doit contenir le code prévu pour que ce champ soit fonctionnel -->
-							<div class="form-group">
-								<label class="col-sm-4 control-label">{{Auto-actualisation}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Fréquence de rafraîchissement des commandes infos de l'équipement}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<div class="input-group">
-										<input type="text" class="eqLogicAttr form-control roundedLeft" data-l1key="configuration" data-l2key="autorefresh" placeholder="{{Cliquer sur ? pour afficher l'assistant cron}}">
-										<span class="input-group-btn">
-											<a class="btn btn-default cursor jeeHelper roundedRight" data-helper="cron" title="Assistant cron">
-												<i class="fas fa-question-circle"></i>
-											</a>
-										</span>
-									</div>
-								</div>
-							</div>
 						</div>
 
 						<!-- Partie droite de l'onglet "Équipement" -->
@@ -353,7 +271,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 
 			<!-- Story 16.8 — L'onglet override par commande (16.5) est retiré : point d'entrée
 			     inatteignable (0 eqLogic jeedom2ha). Le triptyque + diagnostic vivent désormais
-			     dans la surface « Configuration mapping HA par pièce » (modale par pièce). -->
+			     dans la surface « Configuration Home Assistant par pièce » (modale par pièce). -->
 
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
@@ -362,8 +280,6 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 <!-- Inclusion du fichier CSS du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha', 'css', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
-<?php include_file('desktop', 'jeedom2ha_scope_summary', 'js', 'jeedom2ha'); ?>
-<?php include_file('desktop', 'jeedom2ha_diagnostic_helpers', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_mapping_override', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_mapping_surface', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_action_budget', 'js', 'jeedom2ha'); ?>

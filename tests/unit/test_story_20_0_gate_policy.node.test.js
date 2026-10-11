@@ -188,7 +188,7 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     assert.equal(result.verdict, 'block');
   });
 
-  await t.test('8 lectures inscrites -> read', () => {
+  await t.test('lectures inscrites (4 du plugin, 2 du cœur) -> read', () => {
     for (const entry of ALLOWED_READS) {
       for (const action of entry.actions) {
         const result = classifyRequest(
@@ -197,6 +197,17 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
         );
         assert.equal(result.verdict, 'read', `${entry.pathname} action=${action}`);
       }
+    }
+  });
+
+  await t.test('20.3 — getDiagnostics et getPublishedScopeForConsole ne sont plus des lectures autorisées -> block', () => {
+    for (const action of ['getDiagnostics', 'getPublishedScopeForConsole']) {
+      const result = classifyRequest(
+        req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: `action=${action}` }),
+        baseCtx()
+      );
+      assert.equal(result.verdict, 'block', `action=${action}`);
+      assert.equal(ALLOWED_READS.some((entry) => entry.actions.includes(action)), false, action);
     }
   });
 

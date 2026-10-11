@@ -295,7 +295,7 @@ describe('20.1 / AC7 — sélecteur de type HA', () => {
   });
 
   it('est désactivé avec une raison factuelle pour non couverte, exclue et désactivée', () => {
-    assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: uncoveredView() }).reason, /Aucun mapping ne couvre/);
+    assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: uncoveredView() }).reason, /Aucun type Home Assistant ne couvre/);
     assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: Object.assign({}, disabledView(), { publication_reason: 'excluded_plugin' }) }).reason, /exclue/);
     assert.match(M.getOverrideSelectorState({ covered: false, diagnostic: disabledView() }).reason, /désactivé/);
     assert.strictEqual(M.getOverrideSelectorState({ covered: false, diagnostic: disabledView() }).active, false);
@@ -372,8 +372,8 @@ describe('16.8 / AC12 « jamais vide » — commande non couverte', () => {
     assert.strictEqual(M.readPreviewCovered({ covered: false }), false);
   });
 
-  it('buildUncoveredLabel → message factuel « non couverte »', () => {
-    assert.match(M.buildUncoveredLabel(), /non couverte/i);
+  it('buildUncoveredLabel → message factuel « sans type Home Assistant applicable »', () => {
+    assert.match(M.buildUncoveredLabel(), /sans type Home Assistant applicable/i);
     assert.match(M.buildUncoveredLabel(), /ne sera pas publié/i);
   });
 });
