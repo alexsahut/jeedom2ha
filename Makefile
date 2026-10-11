@@ -14,14 +14,16 @@ test-cov:
 	python3 -m pytest --cov=resources/daemon --cov-report=term-missing tests/
 
 # DEV/TEST ONLY — deploy to local test box (not a release procedure)
+# --sha is mandatory (CC-56 guardrail): always the current HEAD, computed
+# here so an accidental bare invocation of the script itself still refuses.
 deploy:
-	./scripts/deploy-to-box.sh
+	./scripts/deploy-to-box.sh --sha "$$(git rev-parse HEAD)"
 
 deploy-dry:
-	./scripts/deploy-to-box.sh --dry-run
+	./scripts/deploy-to-box.sh --sha "$$(git rev-parse HEAD)" --dry-run
 
 deploy-restart:
-	./scripts/deploy-to-box.sh --restart-daemon
+	./scripts/deploy-to-box.sh --sha "$$(git rev-parse HEAD)" --restart-daemon
 
 deploy-clean:
-	./scripts/deploy-to-box.sh --cleanup-discovery
+	./scripts/deploy-to-box.sh --sha "$$(git rev-parse HEAD)" --cleanup-discovery

@@ -65,6 +65,10 @@ Si le lancement est refusé, relève le message exact avant de conclure à une �
 - Une session = une tâche. Pas de prompts fourre-tout.
 - Si une session dérive ou boucle, interromps-la et préviens l'utilisateur.
 - Signale toute délégation qui semble coûteuse avant de la lancer.
+- `scripts/deploy-to-box.sh` exige toujours `--sha "$(git rev-parse HEAD)"`
+  (garde-fou CC-56) ; comme ce script reste hors périmètre cloud (cf.
+  « Quand NE PAS déléguer » ci-dessus), cette forme ne concerne que les
+  exécutions locales, jamais un prompt de délégation.
 ```
 
 ## Nom de branche et CI de gouvernance
