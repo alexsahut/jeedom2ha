@@ -156,6 +156,7 @@ Pendant un rescan, ces mêmes boutons sont aussi grisés. Les boutons « Exclure
 
 - **Ce qu'il fait** : relit tous les équipements de Jeedom, publie ou retire des entités Home Assistant en conséquence, et **applique d'un coup tous les réglages en attente** (les « overrides » : types Home Assistant choisis, exclusions, forçages) de tous les équipements.
 - **Ce qu'il ne fait pas** : il ne modifie rien dans Jeedom.
+- **Scénarios** : le bouton Home Assistant d'un scénario Jeedom désactivé (ou supprimé) disparaît au prochain rescan ou redémarrage du démon, et revient à la réactivation.
 - **Pendant l'opération** : le bouton affiche « Rescan en cours… » et les autres boutons d'action sont grisés.
 - **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou le rescan a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. Le bandeau de santé est ensuite relu.
 
