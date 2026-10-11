@@ -191,7 +191,8 @@ class TopologySnapshot:
                 continue
                 
         scenarios: Dict[int, JeedomScenario] = {}
-        for sc_raw in payload.get("scenarios", []):
+        scenarios_raw = payload.get("scenarios")
+        for sc_raw in scenarios_raw if isinstance(scenarios_raw, list) else []:
             try:
                 sc_id = int(sc_raw.get("id"))
                 scenarios[sc_id] = JeedomScenario(
