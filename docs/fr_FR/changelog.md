@@ -6,7 +6,7 @@
 
 ---
 
-# 2026-10-11 — Nouvelle interface par pièce et documentation réécrite
+# 2026-10-11 — v1.2.0 — Nouvelle interface par pièce et documentation réécrite
 
 - Nouvelle page principale : un bandeau de santé (Bridge, MQTT, Dernière synchro, Dernière opération), la zone « Actions Home Assistant » et une carte par pièce (plus une carte « Sans pièce »)
 - Configuration par pièce : la fenêtre d'une pièce liste ses équipements, dit pour chacun s'il sera publié dans Home Assistant et, sinon, pourquoi, avec les mots de l'écran
