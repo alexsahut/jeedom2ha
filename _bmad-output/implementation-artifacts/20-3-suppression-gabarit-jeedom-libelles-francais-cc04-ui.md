@@ -246,6 +246,32 @@ Tableau global du parc et ses compteurs d'équipements ; badge « Écart » et n
 - 2026-10-06 — `create-story` de 20.3 (session cloud déléguée, lecture seule, aucun accès box/HA) : faits F1 à F7 relevés dans le code de `main` `df6bb51` ; constat que la synthèse et la modale portent des capacités autres que des compteurs (actions ciblées, nombres des confirmations globales, échec technique de publication) ; questions Q1 à Q4 posées avec recommandation A. **`ready-for-dev` non accordé.**
 - 2026-10-06 — Alexandre valide les arbitrages **Q1=A, Q2=A, Q2b=A, Q3=A, Q4=A**. Les AC et tâches conditionnelles sont figés sur ces choix ; 20.2 reste l'unique dépendance de statut avant le développement.
 
+## Correctifs de revue post-fusion (R1, ClaudeBox 11/10)
+
+Contexte : la preuve terrain AC10 de 20.3 est faite le 2026-10-11 au matin (passage Chrome, compteurs recomptés, clics réels sur les trois actions déplacées à 12:00, rescan, parité avant/après sans écart). La relecture a posteriori de la PR #225 par ClaudeBox, avec une relecture indépendante, ne trouve aucun P1 mais des écarts à corriger avant de clore 20.3. Aucune décision produit nouvelle : il s'agit de restaurer des comportements que l'ancienne synthèse portait et que Q2=A disait conservés. La story reste `review`. Session déléguée sans accès box ni Home Assistant.
+
+A. AC4/Q2=A, « Publier par équipement » : aujourd'hui « Appliquer » (`surface.js` vers 790) n'apparaît que si une entité a `override_pending`, donc un équipement synchronisé n'a plus de republication ciblée (et un équipement « Sans pièce » n'a que le Republier global). Correctif sans bouton de plus (cf. CC-51, Alex trouve déjà les boutons redondants) : ce bouton est toujours présent ; libellé « Appliquer » (style warning) s'il y a un override en attente, sinon « Republier » (style default) ; même route `executeHaAction` publier/equipement, même rechargement.
+
+B. Gating d'état des actions déplacées, par lecture de l'arbre déjà chargé (aucune décision recalculée, aucune nouvelle route) : « Supprimer puis recréer » d'un équipement grisé avec infobulle quand l'arbre dit l'équipement non publié dans HA (champ de `sync_status` à confirmer dans le démon) ; « Republier » grisé pour un équipement désactivé ou exclu ; « Republier la pièce » grisé si, tous les arbres de la pièce étant lus, aucun équipement n'est à publier ; « Supprimer puis recréer la pièce » grisé si aucun n'est publié. Arbre en erreur (relais en erreur ou 404 démon, `jeedom_eq_id` absent) : aucune action proposée, jamais d'envoi `[null]`. Référence : l'ancienne synthèse (scope_summary.js:562, :573, :588 sur `82dcd90`).
+
+C. `applyHAGating` (`jeedom2ha.js` vers 145) réactive tous les `[data-ha-action]`, y compris un bouton dont l'action est en cours : marquer le bouton en attente et l'exclure, comme pour le rescan ; réserver le bouton dès l'ouverture de la confirmation (pas deux boîtes sur un double-clic).
+
+D. Retour d'une action de pièce : capturer la pièce dans la closure (pas `ctx.room` au retour) ; si la modale a été fermée ou une autre pièce ouverte, afficher le résultat dans la zone d'alerte de la page, et ne recharger que la pièce concernée.
+
+E. Compteurs : si aucune lecture d'arbre n'aboutit, message d'erreur au lieu de « Chargement des compteurs… » sans fin ; purger l'arbre en cache quand un rechargement échoue.
+
+F. Boutons « Supprimer puis recréer » (équipement et pièce) en `btn-danger`, comme l'exigeaient 5.3 et 5.7.
+
+G. Tests : les tests 20_3 des actions déplacées remplacent `setHaActionPendingState`, `restoreHaActionPendingState`, `buildHaActionUserMessage` et `confirmHaSupprimerAction` par des faux. Ajouter des tests sur le vrai code : chemin d'erreur, état en cours, gating de B et C, `renderRoomCounters` / `buildRoomModalHtml`, et la couverture perdue avec 5.2/5.3 (bouton rouge de la confirmation, message avec le périmètre, attente). Tests devenus vides : `test_story_2_4_visual_separation.node.test.js` et `test_story_3_1_status_labels.node.test.js` testent des copies locales de fonctions supprimées (à retirer, en le disant dans la PR) ; `test_story_3_2_reason_labels_sync.py` à recibler sur la table de `mapping_override.js` ou à retirer.
+
+H. Gate : `FORBIDDEN_TEXT` (`decouverte-garage-enphase.mjs` vers 77) est appliqué à tout le texte de la modale, noms libres compris ; ne le vérifier que sur les libellés statiques (titres, entêtes, boutons, badges).
+
+I. `desktop/php/jeedom2ha.php` vers 154 : `htmlspecialchars` sur `object_name` (préexistant).
+
+Hors périmètre, ne pas toucher : le bouton « Ajouter » (soumis à Alex séparément), la sémantique des compteurs (dénombrement de la décision, conforme à AC3).
+
+Critères de clôture : tests Node, PHP et Python verts en CI ; `git diff --stat` limité au front, aux tests, au gate et à la story ; aucun nom d'équipement ni de pièce. PR vers `main`, pas de fusion automatique — relecture ClaudeBox requise.
+
 ## References
 
 - `_bmad-output/planning-artifacts/epics-projection-engine.md`, Epic 20, Story 20.3 et gates epic-level pe-epic-20.
@@ -343,4 +369,5 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 
 - 2026-10-06 — Création de la story (brouillon complet, `ready-for-dev` bloqué par Q1 à Q4 et par 20.2 non `done`).
 - 2026-10-08 — Prérequis levés : 20.2 `done`, audit F1–F7 au SHA courant et table de libellés validée par Alexandre; 20.3 passe `ready-for-dev`.
+- 2026-10-11 — Correctifs de revue post-fusion (R1, ClaudeBox) consignés après la preuve terrain AC10 ; story restée `review` ; délégation à une session cloud (voir `docs/operations/delegations.md`). File List de cette ronde à compléter par la session déléguée.
 - 2026-10-08 — Implémentation (dev-story, session cloud déléguée) : synthèse « Parc global » et modale Diagnostic retirées, compteurs de la pièce ouverte, actions ciblées déplacées dans la modale de pièce, confirmations globales sans nombre, libellés d'usage, tests et gate 20-0 adaptés; 20.3 passe `review` (AC10 : preuve terrain restante).
