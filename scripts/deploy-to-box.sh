@@ -450,7 +450,7 @@ REMOTE
   if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
     echo ""
     echo "  Ce rollback est lui-même réversible :"
-    printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
+    printf '    ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --rollback %q\n' "${PRE_ROLLBACK_BACKUP_ARCHIVE}"
   fi
   if [[ "${_remote_status}" -ne 0 ]]; then
     echo "ERROR: rollback distant échoué (code ${_remote_status})." >&2
@@ -610,7 +610,7 @@ REMOTE
   echo ""
   echo "======================================================================="
   echo "  Stop+cleanup terminé. Les entités jeedom2ha devraient disparaître de HA."
-  echo "  Pour republier : ./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon"
+  echo '  Pour republier : ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --cleanup-discovery --restart-daemon'
   echo "======================================================================="
   exit 0
 fi
@@ -952,7 +952,7 @@ else
 fi
 echo ""
 echo "  Commande de rollback prête :"
-printf '    ./scripts/deploy-to-box.sh --rollback %q\n' "${BACKUP_ARCHIVE}"
+printf '    ./scripts/deploy-to-box.sh --sha "$(git rev-parse HEAD)" --rollback %q\n' "${BACKUP_ARCHIVE}"
 echo "======================================================================="
 echo "  Deploy complete."
 echo "======================================================================="
