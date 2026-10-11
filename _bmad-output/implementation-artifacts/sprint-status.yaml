@@ -394,5 +394,5 @@ development_status:
   # a confirmer par Alexandre (question Q0 de la story 21-1). Aucune ouverture PRODUCT_SCOPE, aucun nouveau FR/NFR.
   # Ordre decide par Alexandre le 2026-10-11 15:48 : CC-44 + CC-47 avant CC-36/CC-51/compteurs, puis parite HomeKit (CC-33)
   # ==============================================================
-  pe-epic-21: backlog  # propose 2026-10-11 (provisoire, Q0 en attente) ; solde CC-44 (scenario desactive garde son bouton dans HA) et CC-47 (commande 5369, etat sans ordre On/Off) ; epics-projection-engine.md#Epic-21
-  21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off: backlog  # story creee 2026-10-11, ready-for-dev NON accorde : questions Q0 a Q4 en attente d'Alexandre (rattachement epic, une ou deux stories, scenario desactive retire/indisponible, type HA de l'etat seul, libelles)
+  pe-epic-21: backlog  # propose 2026-10-11 (provisoire, Q0 en attente) ; solde CC-44 (scenario desactive garde son bouton dans HA) et CC-47 (affichage et decompte de la commande 5369, etat deja publie en binary_sensor, defaut d'affichage et non de publication) ; epics-projection-engine.md#Epic-21
+  21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off: backlog  # story creee 2026-10-11, ready-for-dev NON accorde : questions Q0 a Q4 en attente d'Alexandre (rattachement epic, une ou deux stories, scenario desactive retire/indisponible et sort des fantomes deja presents, etat seul d'un equipement a une seule entite, libelle) ; relue R1 et R2 par ClaudeBox

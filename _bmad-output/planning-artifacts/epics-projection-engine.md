@@ -2454,16 +2454,16 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Origine :** rétrospective `pe-epic-20-retro-2026-10-11.md` (risques résiduels) ; ordre décidé par Alexandre le 2026-10-11 à 15:48 : CC-44 + CC-47, puis CC-36 avec CC-51 et la story « compteurs », puis l'epic de parité HomeKit (CC-33).
 
-**Valeur utilisateur :** Home Assistant reflète fidèlement Jeedom : un scénario désactivé ne laisse pas de bouton fantôme, et une commande d'état seule est publiée sous un type qui lui correspond ou expliquée honnêtement.
+**Valeur utilisateur :** Home Assistant reflète fidèlement Jeedom : un scénario désactivé ne laisse pas de bouton fantôme, et l'écran dit vrai sur une commande d'état déjà publiée par une entité secondaire (au lieu de l'annoncer « non publiée » et de la compter bloquante).
 
 **Stories :**
 
-- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (état sans ordre On/Off).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `ready-for-dev` non accordé : décisions produit en attente (retrait ou indisponibilité du bouton, type HA cible de l'état seul, une ou deux stories).
+- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (affichage d'un état sans ordre On/Off déjà publié).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `ready-for-dev` non accordé : décisions produit en attente (retrait ou indisponibilité du bouton et sort des fantômes déjà présents, cas de l'équipement à une seule entité dont l'état est seul, une ou deux stories).
 
 **Points visés :** CC-44 (réserve AC6 de 20-4), CC-47 (réserve de 20-2).
 
 ### Gates epic-level pe-epic-21
 
 - un scénario désactivé n'a plus de bouton dans Home Assistant après le sync suivant (ou le traitement décidé en Q2), prouvé sur la box (inventaire avant/après, 0 erreur).
-- la commande 5369 (état sans ordre On/Off) est publiée sous le type décidé en Q3 ou expliquée honnêtement, sans régression du trio switch ni de la prise mesureuse (I11).
+- la ligne, la synthèse et les totaux d'une commande portée par un principal refusé et par une entité secondaire publiée (5369 de l'équipement 579) disent qu'elle est publiée ; l'inventaire MQTT et le registre HA sont strictement identiques avant/après (aucune publication ne change).
 - `PRODUCT_SCOPE` inchangé ; golden et contrat 4D verts.
