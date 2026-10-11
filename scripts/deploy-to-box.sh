@@ -29,6 +29,10 @@ INVENTORY_DIFF_LIB="${SCRIPT_DIR}/deploy-inventory-diff.sh"
 # touche à aucune box).
 # shellcheck disable=SC1090
 source "${VERSION_FILE_LIB}"
+# jeedom2ha_verify_ci_green (garde-fou CI, CC-50) — testée dans
+# tests/unit/test_deploy_ci_gate_lib.py avec `gh` mocké.
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/deploy-ci-gate-lib.sh"
 # shellcheck disable=SC1090
 source "${INVENTORY_DIFF_LIB}"
 # Read-only SSH configuration primitives shared with parity-snapshot.sh.
@@ -131,25 +135,8 @@ jeedom2ha_verify_deploy_source() {
   _github_repo=$(sed -E -n 's#^(git@github\.com:|https://github\.com/)([^/]+/[^/.]+)(\.git)?$#\2#p' <<< "${_origin_url}")
   [[ -n "${_github_repo}" ]] || _fail "Impossible de déterminer le dépôt GitHub depuis origin (${_origin_url:-absent})."
 
-  _check_runs=$(gh api --paginate -H "Accept: application/vnd.github+json" \
-    "repos/${_github_repo}/commits/${_deploy_sha}/check-runs?per_page=100") \
-    || _fail "Impossible de lire les check-runs GitHub pour ${_deploy_sha}."
-  _check_lines=$(printf '%s' "${_check_runs}" | jq -r '.check_runs[]? | [.status, .conclusion] | @tsv')
-  [[ -n "${_check_lines}" ]] || _fail "Refus de déployer ${_deploy_sha} : aucun check-run GitHub trouvé."
-  # Un check-run encore en cours (in_progress/queued) doit être un refus, pas
-  # un succès implicite — on ne l'accepte donc que si status="completed".
-  # Une fois "completed", seules success/skipped/neutral sont des conclusions
-  # valides (ex: Burn-In "skipped" hors planning burn-in) ; tout le reste
-  # (failure, cancelled, timed_out, action_required, stale, ...) est refusé.
-  while IFS=$'\t' read -r _check_status _check_conclusion; do
-    [[ "${_check_status}" == "completed" ]] \
-      || _fail "Refus de déployer ${_deploy_sha} : check-run non terminé (${_check_status}/${_check_conclusion})."
-    case "${_check_conclusion}" in
-      success|skipped|neutral) ;;
-      *) _fail "Refus de déployer ${_deploy_sha} : CI non verte (${_check_status}/${_check_conclusion})." ;;
-    esac
-  done <<< "${_check_lines}"
-  echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts)."
+  jeedom2ha_verify_ci_green "${_github_repo}" "${_deploy_sha}" || exit 1
+  echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts, runs push/PR/dispatch)."
 }
 
 # Point 9 — un tag resté local ne sert à rien pour la traçabilité partagée :
