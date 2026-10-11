@@ -1,8 +1,8 @@
 # Story 20.5 : Documentation utilisateur réécrite (CC-07 d)
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` — story créée le 2026-10-11, `ready-for-dev` NON accordé.** Les quatre questions produit de la section « Questions ouvertes pour Alexandre » (public, langue, captures d'écran, emplacement) doivent être tranchées par Alexandre avant tout développement. Les prérequis de statut sont tenus : 20.1, 20.2, 20.3 et 20.4 sont `done` (`sprint-status.yaml`). Aucune ligne de documentation n'est réécrite par ce `create-story`.
+> **Statut : `ready-for-dev` (2026-10-11, 17:35).** Alexandre a tranché Q1=A, Q2=A, Q3=B, Q4=A (Journal des décisions) ; le plan de la Task 2.1 est retenu tel quel et les décisions de rédaction de la Task 2.4 sont prises. Les prérequis de statut sont tenus : 20.1, 20.2, 20.3 et 20.4 sont `done` ; la story « compteurs » n'est pas encore livrée, donc le bloc `compteurs` décrit la sémantique actuelle avec son bandeau d'obsolescence. Alexandre relira la documentation livrée. Aucune ligne de documentation n'est réécrite par ce `create-story`.
 
 ## Story
 
@@ -249,20 +249,19 @@ Règles de rédaction (AC6) :
 **And** le bloc porte son en-tête de maintenance et son bandeau d'obsolescence (règles de la section isolée)
 **And** une vérification (grep documenté ou test) établit que les libellés « équipement(s) publié(s) », « à corriger », « commande(s) prête(s)/bloquante(s)/non couverte(s) » n'apparaissent qu'à cet endroit.
 
-**AC7 — Captures d'écran (conditionnel à Q3)**
+**AC7 — Pas de captures dans cette réécriture (décision Q3=B)**
 
-**Given** la réponse d'Alexandre à Q3
-**When** la réponse est « oui »
-**Then** les emplacements de captures prévus au plan sont renseignés avec des **données d'exemple génériques uniquement** (une installation de démonstration ou un gabarit maquetté ; jamais la box d'Alexandre), sans nom réel d'équipement, de pièce ni d'adresse, et leur prise est une tâche séparée soumise à validation d'Alexandre avant d'être commitée
-**When** la réponse est « non »
-**Then** le texte est autoportant (chaque écran décrit en mots) et aucun emplacement de capture ne reste dans la version finale.
-**Dans les deux cas, cette story ne produit aucune capture.**
+**Given** la décision d'Alexandre (Q3=B)
+**When** la documentation est livrée
+**Then** elle ne contient aucune image ni fichier de capture ; le texte est autoportant (chaque écran est décrit en mots)
+**And** un emplacement de capture est prévu par écran sous forme d'un commentaire Markdown invisible d'une ligne (par exemple `<!-- CAPTURE-A-PRENDRE: modale de pièce -->`), pour que la story « compteurs » ou une story ultérieure puisse les ajouter ; les captures seront alors prises **après** la story « compteurs », sur données d'exemple génériques uniquement (installation de démonstration ou maquette, jamais la box d'Alexandre), sans nom réel d'équipement, de pièce ni d'adresse
+**And** cette story ne produit aucune capture.
 
 **AC8 — Emplacement, langue et public conformes aux décisions**
 
-**Given** les réponses à Q1, Q2 et Q4
+**Given** les décisions d'Alexandre Q1=A, Q2=A et Q4=A
 **When** la documentation est livrée
-**Then** son niveau de langage et de détail correspond au public décidé (Q1), sa ou ses langues à Q2, et son emplacement à Q4 ; `plugin_info/info.json` (liens `documentation` et `changelog`) est vérifié, et seulement modifié si l'emplacement change (Q4) et que la décision l'exige
+**Then** elle s'adresse à l'utilisateur du Market (français courant, aucun jargon, termes Jeedom et Home Assistant glosés), est rédigée **en français seul** (aucun fichier `docs/en_US`), et se trouve sous `docs/fr_FR/` avec le bloc `compteurs` dans un **fichier séparé** (`docs/fr_FR/compteurs.md`) ; `plugin_info/info.json` (liens `documentation` et `changelog`) est vérifié et **n'est pas modifié** (l'emplacement ne change pas)
 **And** le changelog stable reçoit une entrée datée décrivant ce que l'utilisateur voit de nouveau (surface par pièce, exclusion et forçage, retour au mode automatique, rescan sur la page principale, retrait de la synthèse globale et du Diagnostic), rédigée pour l'utilisateur, sans numéros de stories.
 
 **AC9 — Aucun périmètre voisin touché**
@@ -275,7 +274,7 @@ Règles de rédaction (AC6) :
 ## Tasks / Subtasks
 
 - [ ] **Task 0 — Prérequis (bloquants)**
-  - [ ] 0.1 Alexandre a tranché **Q1, Q2, Q3, Q4** (section ci-dessous) ; réponses consignées dans le Journal des décisions.
+  - [x] 0.1 *(fait le 2026-10-11, 17:35 : Q1=A, Q2=A, Q3=B, Q4=A, voir le Journal des décisions)* Alexandre a tranché **Q1, Q2, Q3, Q4** (section ci-dessous) ; réponses consignées dans le Journal des décisions.
   - [ ] 0.2 20.1 à 20.4 `done` (tenu au 2026-10-11) ; **la story « compteurs » est connue** : si elle a déjà changé la sémantique avant ce `dev-story`, le bloc `compteurs` décrit la **nouvelle** sémantique (sinon l'ancienne, avec son bandeau d'obsolescence).
 - [ ] **Task 1 — Rejouer les relevés au SHA courant (lecture seule) (AC: 1)**
   - [ ] 1.1 Rejouer F1 à F9 sur le `main` du moment ; consigner tout écart avec le présent relevé dans le Dev Agent Record (un écart signale qu'une story a modifié l'interface depuis le `create-story`).
@@ -283,25 +282,23 @@ Règles de rédaction (AC6) :
   - [ ] 1.3 Établir la liste exacte des types Home Assistant publiés par le plugin et de leurs conditions (cf. P7), **à partir du code des mappers et de `PRODUCT_SCOPE`**, pas de l'ancien tableau.
   - [ ] 1.4 Revérifier chaque ligne de la section « Nommage des équipements » contre le code (mots-clés bloquants) avant de la reprendre ou de la raccourcir.
 - [ ] **Task 2 — Plan et décisions de rédaction (AC: 2, 3, 8)**
-  - [ ] 2.1 Plan de la documentation (proposition à valider par Alexandre avant rédaction complète) : Présentation ; Prérequis et installation ; Configuration ; Première synchronisation ; La page principale (bandeau, actions, export) ; La configuration par pièce (cartes, modale, tableau, actions) ; **Ce que le plugin publie et pourquoi** ; Les compteurs *(bloc isolé)* ; Dépannage ; Annexes (suggested_area, nommage, durée des actions, changelog).
+  - [x] 2.1 *(plan retenu tel quel ; Alexandre relira la documentation livrée)* Plan de la documentation : Présentation ; Prérequis et installation ; Configuration ; Première synchronisation ; La page principale (bandeau, actions, export) ; La configuration par pièce (cartes, modale, tableau, actions) ; **Ce que le plugin publie et pourquoi** ; Les compteurs *(bloc isolé)* ; Dépannage ; Annexes (suggested_area, nommage, durée des actions, changelog).
   - [ ] 2.2 Fixer le niveau de détail selon Q1, la langue selon Q2, les emplacements de captures selon Q3, le dossier selon Q4.
   - [ ] 2.3 Pour chaque entrée P1 à P12, noter « corrigé / retiré / déplacé en annexe » et la raison.
-  - [ ] 2.4 Trancher en rédaction (à soumettre à Alexandre) : P6 (profils : retirer ou mentionner comme non disponible), P11 (volumes chiffrés : annexe ou condensé).
+  - [x] 2.4 *(décisions de rédaction prises par ClaudeBox le 2026-10-11)* **P6 (profils d'overrides) : retiré**, conformément à l'interdit « ne pas décrire une fonction sans point d'entrée » ; **P11 (volumes chiffrés) : condensé dans une annexe courte** (les trois messages et la marche à suivre restent, les estimations par type d'équipement sont ramenées à une phrase).
 - [ ] **Task 3 — Rédaction (AC: 1-6)**
   - [ ] 3.1 Sections « page principale », « configuration par pièce », « ce que le plugin publie et pourquoi » (F1 à F4, F6 à F8), libellés repris du code, sans jargon.
   - [ ] 3.2 Bloc `compteurs` isolé (section dédiée, F5), avec en-tête de maintenance et bandeau d'obsolescence ; renvois depuis le reste du texte par lien ou ancre uniquement.
   - [ ] 3.3 Sections conservées et corrigées : prérequis, installation, configuration MQTT et filtrage (libellés réels, P8, P9), dépannage (P10), suggested_area (P12), durée des actions (P11), nommage (1.4).
   - [ ] 3.4 `docs/index.md` (P index), `docs/fr_FR/changelog.md` (entrée datée), `docs/fr_FR/changelog_beta.md` (intitulé et contenu hérités du gabarit, selon la décision prise).
-  - [ ] 3.5 Si Q2 = français + anglais : version anglaise relue contre la version française (mêmes faits, libellés d'interface laissés en français entre guillemets).
+  - [x] 3.5 *(sans objet : Q2=A, français seul, aucune version anglaise)*
 - [ ] **Task 4 — Vérifications (AC: 1, 2, 4-6, 9)**
   - [ ] 4.1 Table de traçabilité « affirmation → fichier:ligne » dans le Dev Agent Record.
-  - [ ] 4.2 Recherches négatives dans `docs/` : « Diagnostic » (bouton), « HA / jeedom2ha », « deploy-to-box », `evaluate_equipment`, `CC-`, « Mes templates », noms réels de pièces/équipements (liste fournie par Alexandre ou relevée via l'historique de preuve), adresses IP.
+  - [ ] 4.2 Recherches négatives dans `docs/` : « Diagnostic » (bouton), « HA / jeedom2ha », « deploy-to-box », `evaluate_equipment`, `CC-`, « Mes templates », adresses IP. **Le contrôle contre les noms réels de la maison est fait par ClaudeBox à la relecture, en lecture seule, sans jamais recopier ces noms** (la session de dev ne les connaît pas et ne les cherche pas).
   - [ ] 4.3 Vérification de cloisonnement des compteurs (AC6).
   - [ ] 4.4 Liens internes valides (Markdown) ; `git diff --stat` limité aux fichiers documentaires.
   - [ ] 4.5 Aucun test existant ne casse (certains tests peuvent lire `docs/` ; lancer `make test`, voir Dev Notes).
-- [ ] **Task 5 — Captures d'écran (conditionnel à Q3 = oui) (AC: 7)**
-  - [ ] 5.1 Définir la liste des écrans et la maquette générique (données d'exemple) ; soumission à Alexandre avant toute prise.
-  - [ ] 5.2 Prendre et intégrer les captures **sur une installation de démonstration ou une maquette**, jamais sur la box réelle ; relecture visuelle de chaque image avant commit (aucun nom réel).
+- [x] **Task 5 — Captures d'écran : sans objet (Q3=B) (AC: 7)** *(aucune capture dans cette réécriture ; seuls les commentaires d'emplacement invisibles sont posés en Task 3 ; captures après la story « compteurs », sur données génériques)*
 - [ ] **Task 6 — Relecture et clôture**
   - [ ] 6.1 Relecture ClaudeBox (fidélité au code, absence de jargon, aucune donnée réelle) avant fusion ; revue indépendante si Codex est indisponible.
   - [ ] 6.2 Au `done` : SHA relevé, commandes de vérification, décisions Q1 à Q4 et fermeture de CC-07 d consignés.
@@ -340,9 +337,9 @@ Les recommandations ci-dessous sont des propositions ; aucune n'est actée par c
 
 À valider ou rejeter par Alexandre ; la documentation décrit l'écran tel quel et n'attend pas ces corrections.
 
-1. Les messages « Daemon arrêté — actions Home Assistant bloquées. » (`jeedom2ha.js:156`) et « daemon indisponible » emploient « daemon » alors que le bandeau dit « Bridge » ; l'utilisateur lit trois mots (démon, daemon, bridge) pour une même chose. Hors du périmètre de 20.3 ?
-2. « type non couvert par la V1 du plugin » (`jeedom2ha_mapping_override.js:595`) : « V1 » est un jargon de version, et le périmètre réel compte huit types (P7).
-3. « Jeedom2HA » (exclusions) et « jeedom2ha » (plugin) : deux graphies dans l'écran.
+1. Les messages « Daemon arrêté — actions Home Assistant bloquées. » (`jeedom2ha.js:156`) et « daemon indisponible » emploient « daemon » alors que le bandeau dit « Bridge » ; l'utilisateur lit trois mots (démon, daemon, bridge) pour une même chose. Hors du périmètre de 20.3 ? — à regrouper avec la story compteurs / CC-51 (décision d'ordre d'Alex du 11/10).
+2. « type non couvert par la V1 du plugin » (`jeedom2ha_mapping_override.js:595`) : « V1 » est un jargon de version, et le périmètre réel compte huit types (P7) — à regrouper avec la story compteurs / CC-51 (décision d'ordre d'Alex du 11/10).
+3. « Jeedom2HA » (exclusions) et « jeedom2ha » (plugin) : deux graphies dans l'écran — à regrouper avec la story compteurs / CC-51 (décision d'ordre d'Alex du 11/10).
 4. La page d'édition d'équipement du gabarit (`jeedom2ha.php:163-266`) reste dans le fichier alors que rien ne l'atteint (aucune vignette d'équipement) : à confirmer par le cœur Jeedom ; non documentée.
 5. La route `GET /system/published_scope` du démon n'est plus appelée par la page (conservée par décision).
 6. Un équipement partiellement publié compte à la fois « publié » et « à corriger » (limite connue de 20.3) : à traiter par la story « compteurs ».
@@ -365,17 +362,17 @@ Les recommandations ci-dessous sont des propositions ; aucune n'est actée par c
 
 ### Fichiers probablement touchés (pour le `dev-story`)
 
-`docs/fr_FR/index.md` (réécriture), `docs/fr_FR/compteurs.md` ou bloc balisé (isolé, selon Q4), `docs/fr_FR/changelog.md`, `docs/fr_FR/changelog_beta.md`, `docs/index.md`, éventuellement `README.md` et `plugin_info/info.json` (liens, seulement si Q4 = B), éventuellement `docs/en_US/*` (si Q2 = B), éventuellement `docs/images/*` (si Q3 = oui, sur données génériques). Aucun fichier de code.
+`docs/fr_FR/index.md` (réécriture), `docs/fr_FR/compteurs.md` (isolé, Q4=A), `docs/fr_FR/changelog.md`, `docs/fr_FR/changelog_beta.md`, `docs/index.md`, éventuellement `README.md` et `plugin_info/info.json` (liens, seulement si Q4 = B), aucun `docs/en_US/*` (Q2=A) ni `docs/images/*` (Q3=B). Aucun fichier de code.
 
 ### Tests existants à surveiller
 
 Lancer `make test` avant de pousser, par prudence : un test qui lit des fichiers sous `docs/` (liens, libellés) ou le changelog doit rester vert ; aucun test n'est attendu en échec pour un changement de documentation seule.
 
-## Conditions de passage à `ready-for-dev`
+## Conditions de passage à `ready-for-dev` (toutes remplies le 2026-10-11, 17:35)
 
-1. Alexandre a répondu à **Q1, Q2, Q3 et Q4** ; ses réponses sont consignées dans le Journal des décisions et les AC conditionnels (AC7, AC8) sont figés dessus.
-2. Le plan de documentation (Task 2.1) est validé, ou Alexandre délègue sa validation.
-3. L'état de la story « compteurs » est connu : livrée (le bloc décrit la nouvelle sémantique) ou pas encore livrée (le bloc décrit l'actuelle, avec bandeau d'obsolescence).
+1. [x] Alexandre a répondu à **Q1, Q2, Q3 et Q4** (Q1=A, Q2=A, Q3=B, Q4=A) ; consigné dans le Journal des décisions, AC7 et AC8 figés dessus.
+2. [x] Le plan de documentation (Task 2.1) est retenu tel quel ; Alexandre relira la documentation livrée.
+3. [x] L'état de la story « compteurs » est connu : **pas encore livrée**, le bloc `compteurs` décrit la sémantique actuelle avec son bandeau d'obsolescence.
 
 ## Définition de done
 
@@ -388,7 +385,9 @@ Lancer `make test` avant de pousser, par prudence : un test qui lit des fichiers
 ## Journal des décisions
 
 - 2026-10-01 — Sprint change proposal : story 20-5 « Documentation utilisateur réécrite (CC-07 d) », dépend de 20-1 à 20-4, décrit l'interface finale.
-- 2026-10-11 — `create-story` de 20.5 (session cloud déléguée, lecture seule, aucun accès box/HA) : inventaire de la documentation au SHA `3b120d3` (12 passages périmés, 10 manquants), faits F1 à F9 relevés dans le code, section compteurs isolée, questions Q1 à Q4 posées avec recommandation. **`ready-for-dev` non accordé.** Aucune des quatre questions n'est tranchée par ce document.
+- 2026-10-11 — `create-story` de 20.5 (session cloud déléguée, lecture seule, aucun accès box/HA) : inventaire de la documentation au SHA `3b120d3` (12 passages périmés, 10 manquants), faits F1 à F9 relevés dans le code, section compteurs isolée, questions Q1 à Q4 posées avec recommandation. **`ready-for-dev` non accordé** à ce stade ; aucune des quatre questions n'est tranchée par ce document.
+- 2026-10-11, 17:35 — Décisions d'Alexandre : Q1=A (utilisateur du Market), Q2=A (français seul), Q3=B (pas de captures dans cette réécriture ; emplacements prévus ; captures après la story « compteurs »), Q4=A (docs/fr_FR, bloc compteurs séparé).
+- 2026-10-11 — Décisions de rédaction (Task 2.4, ClaudeBox) : P6 retiré (fonction sans point d'entrée) ; P11 condensé en annexe courte ; plan de la Task 2.1 retenu tel quel. Conditions de passage remplies : story `ready-for-dev`.
 
 ## References
 
