@@ -11,7 +11,7 @@ Uses single-component discovery (homeassistant/{entity_type}/...).
 import json
 import logging
 import re
-from typing import Optional, Set
+from typing import List, Optional, Set
 
 from models.availability import (
     EntityAvailability,
@@ -349,42 +349,48 @@ class DiscoveryPublisher:
 
     async def purge_orphan_scenario_buttons(
         self, active_scenario_ids: Set[int], already_unpublished: Optional[Set[int]] = None
-    ) -> int:
+    ) -> List[int]:
         """Empty retained scenario button configs that are not active (Story 21.1, Q2b C).
 
-        The broker is the source of truth: read the retained topics matching the strict
-        pattern ``<prefix>/button/jeedom2ha_scenario_<int>/config`` and empty those whose
-        id is not an active scenario of the snapshot. Nothing outside that pattern is
-        ever touched, and only what was actually read is emptied. Returns the number of
-        topics emptied (0 when the collection is unavailable, empty or fails).
+        The broker is the source of truth: read the retained button topics and keep only
+        those matching the strict pattern ``<prefix>/button/jeedom2ha_scenario_<int>/config``;
+        empty those whose id is not an active scenario of the snapshot. Nothing outside that
+        pattern is ever touched, and only what was actually read is emptied.
+        Returns the sorted ids emptied (empty when the collection is unavailable, empty or fails).
         """
         collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
         if collect is None:
-            return 0
+            return []
         try:
             # MQTT forbids a partial-level wildcard (`jeedom2ha_scenario_+`): read every
             # button config and keep only the strict scenario pattern below.
             retained = await collect(f"{self._topic_prefix}/button/+/config")
         except Exception:
             _LOGGER.exception("[SCENARIO] Retained topics collection failed, no purge")
-            return 0
+            return []
         if not isinstance(retained, list):
-            return 0
+            _LOGGER.info("[SCENARIO] Retained topics collection unavailable, no purge")
+            return []
         pattern = re.compile(
-            rf"^{re.escape(self._topic_prefix)}/button/(jeedom2ha_scenario_([0-9]+))/config$"
+            rf"{re.escape(self._topic_prefix)}/button/(jeedom2ha_scenario_([0-9]+))/config"
         )
         skip = already_unpublished or set()
-        purged = 0
+        candidates = []
         for topic in retained:
-            match = pattern.match(topic) if isinstance(topic, str) else None
-            if not match:
-                continue
-            scenario_id = int(match.group(2))
+            match = pattern.fullmatch(topic) if isinstance(topic, str) else None
+            if match:
+                candidates.append((match.group(1), int(match.group(2))))
+        _LOGGER.info(
+            "[SCENARIO] Retained button topics collected: %d (%d scenario button(s))",
+            len(retained), len(candidates),
+        )
+        purged: List[int] = []
+        for node_id, scenario_id in candidates:
             if scenario_id in active_scenario_ids or scenario_id in skip:
                 continue
-            if await self.unpublish(match.group(1)):
-                purged += 1
-        return purged
+            if await self.unpublish(node_id):
+                purged.append(scenario_id)
+        return sorted(set(purged))
 
     # ------------------------------------------------------------------
     # Private helpers

@@ -155,6 +155,7 @@ async def test_purge_never_touches_topics_outside_strict_pattern(aiohttp_client)
         "homeassistant/button/jeedom2ha_scenario_9/extra/config",
         "homeassistant/button/other_scenario_9/config",
         "homeassistant/button/jeedom2ha_scenario_-3/config",
+        "homeassistant/button/jeedom2ha_scenario_9/config\n",  # `$` l'aurait accepté
     ]
     bridge = _fake_bridge(retained=junk + [_topic(129)])
     app, cli = await _client(aiohttp_client, bridge)
@@ -249,6 +250,58 @@ async def test_present_but_empty_scenarios_section_purges_ghosts(aiohttp_client)
     assert _empties(bridge) == [_topic(129)]
 
 
+async def test_active_scenario_whose_publication_fails_is_never_purged(aiohttp_client):
+    bridge = _fake_bridge(retained=[_topic(20), _topic(129)])
+
+    def _publish(topic, payload, qos=1, retain=False):
+        bridge.published.append((topic, payload, qos, retain))
+        return payload == ""  # la publication d'une config échoue, les vidages passent
+
+    bridge.publish_message.side_effect = _publish
+    app, cli = await _client(aiohttp_client, bridge)
+
+    await _sync(cli, scenarios=[{"id": 20, "name": "S20", "is_active": True}])
+
+    assert _topic(20) not in _empties(bridge)
+    assert _empties(bridge) == [_topic(129)]
+    assert app["scenario_publications"][20].discovery_published is False
+
+
+async def test_logs_report_collected_count_and_emptied_ids_only(aiohttp_client, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    bridge = _fake_bridge(retained=[_topic(20), _topic(72), _topic(129), "homeassistant/button/jeedom2ha_eq_5/config"])
+    app, cli = await _client(aiohttp_client, bridge)
+
+    await _sync(cli, scenarios=[
+        {"id": 20, "name": "NomReelSecret", "is_active": True},
+        {"id": 72, "name": "AutreNomReel", "is_active": False},
+    ])
+
+    # Seules les lignes `[SCENARIO]` / retrait sont concernées (le log de publication
+    # existant `[DISCOVERY] Publishing button config` affiche déjà le nom, hors périmètre).
+    text = "\n".join(
+        r.getMessage() for r in caplog.records
+        if "[SCENARIO]" in r.getMessage() or "Unpublishing" in r.getMessage()
+    )
+    assert "Retained button topics collected: 4 (3 scenario button(s))" in text
+    assert "ids=[72, 129]" in text
+    assert "NomReelSecret" not in text and "AutreNomReel" not in text
+
+
+async def test_logs_report_zero_collected_topics(aiohttp_client, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+    bridge = _fake_bridge(retained=[])
+    app, cli = await _client(aiohttp_client, bridge)
+
+    await _sync(cli, scenarios=[{"id": 20, "name": "S20", "is_active": True}])
+
+    assert "Retained button topics collected: 0 (0 scenario button(s))" in caplog.text
+
+
 # ---------------------------------------------------------------------------
 # AC 4 — broker déconnecté, pas de report, collision d'id
 # ---------------------------------------------------------------------------
@@ -339,11 +392,36 @@ def test_scenario_button_ignores_homonym_equipment_availability_and_device():
     assert with_eq["device"]["identifiers"] == ["jeedom2ha_scenario_110"]
 
 
-def test_scenario_button_payload_identical_without_homonym():
-    """Sans équipement homonyme, la charge utile reste celle d'avant (golden)."""
-    assert _button_payload(_snapshot(with_homonym=True)) == _button_payload(
-        _snapshot(with_homonym=False)
-    )
+# Charge utile d'un bouton de scénario sans équipement homonyme, figée AVANT cette PR
+# (générée depuis `main` 078416a) : elle ne doit pas bouger, hors cas de collision d'id.
+def _frozen_pre_pr_scenario_button_payload() -> dict:
+    from discovery.publisher import _SW_VERSION
+
+    return {
+        "availability_topic": "jeedom2ha/bridge/status",
+        "command_topic": "jeedom2ha/scenario_110/cmd",
+        "device": {
+            "identifiers": ["jeedom2ha_scenario_110"],
+            "manufacturer": "Jeedom",
+            "model": "Unknown",
+            "name": "S110",
+            "via_device": "jeedom2ha_bridge",
+        },
+        "name": "S110",
+        "object_id": "jeedom2ha_scenario_110",
+        "origin": {"name": "jeedom2ha", "sw_version": _SW_VERSION},
+        "platform": "mqtt",
+        "unique_id": "jeedom2ha_scenario_110",
+    }
+
+
+def test_scenario_button_payload_matches_frozen_pre_pr_reference_without_homonym():
+    assert _button_payload(_snapshot(with_homonym=False)) == _frozen_pre_pr_scenario_button_payload()
+
+
+def test_scenario_button_payload_with_homonym_equals_the_same_reference():
+    """Avec un homonyme, le bouton retombe sur la même charge de référence (pont seul)."""
+    assert _button_payload(_snapshot(with_homonym=True)) == _frozen_pre_pr_scenario_button_payload()
 
 
 def test_equipment_button_still_uses_local_availability():
@@ -396,12 +474,86 @@ async def test_collect_retained_gathers_matching_retained_messages_only():
     task = asyncio.create_task(_deliver())
     topics = await bridge.collect_retained_topics(flt, 0.1)
     await task
+    await asyncio.sleep(0)  # laisse passer le dispatch call_soon_threadsafe
 
     assert topics == [_topic(72)]
     client.subscribe.assert_called_once_with(flt, qos=1)
     client.unsubscribe.assert_called_once_with(flt)
-    # Le message de commande a bien suivi son chemin normal ; pas le topic de config.
     assert bridge._retained_collector is None
+
+
+async def test_command_message_keeps_its_normal_path_outside_and_during_collection():
+    import asyncio
+
+    bridge = MqttBridge()
+    bridge._state = "connected"
+    bridge._loop = asyncio.get_running_loop()
+    handler = MagicMock(return_value=None)
+    bridge.set_command_handler(handler)
+    client = MagicMock()
+    client.subscribe.return_value = (0, 1)
+    bridge._client = client
+
+    # Hors collecte : le chemin normal est inchangé.
+    bridge._on_message(client, None, _msg("jeedom2ha/scenario_20/cmd", payload=b"press", retain=False))
+    await asyncio.sleep(0)
+    handler.assert_called_once_with("jeedom2ha/scenario_20/cmd", "press")
+
+    # Pendant la collecte : un topic de config n'est jamais transmis au gestionnaire de commandes.
+    handler.reset_mock()
+
+    async def _deliver():
+        await asyncio.sleep(0.01)
+        bridge._on_message(client, None, _msg(_topic(72)))
+
+    task = asyncio.create_task(_deliver())
+    assert await bridge.collect_retained_topics("homeassistant/button/+/config", 0.05) == [_topic(72)]
+    await task
+    await asyncio.sleep(0)
+    handler.assert_not_called()
+
+
+async def test_collect_retained_unsubscribes_even_when_an_exception_occurs(monkeypatch):
+    import asyncio
+
+    bridge = MqttBridge()
+    bridge._state = "connected"
+    bridge._loop = asyncio.get_running_loop()
+    client = MagicMock()
+    client.subscribe.return_value = (0, 1)
+    bridge._client = client
+
+    async def _boom(_delay):
+        raise RuntimeError("boom during window")
+
+    monkeypatch.setattr("transport.mqtt_client.asyncio.sleep", _boom)
+    with pytest.raises(RuntimeError):
+        await bridge.collect_retained_topics("homeassistant/button/+/config", 1.0)
+
+    client.unsubscribe.assert_called_once_with("homeassistant/button/+/config")
+    assert bridge._retained_collector is None
+
+
+async def test_concurrent_collection_returns_none_and_purges_nothing():
+    import asyncio
+
+    bridge = MqttBridge()
+    bridge._state = "connected"
+    bridge._loop = asyncio.get_running_loop()
+    client = MagicMock()
+    client.subscribe.return_value = (0, 1)
+    bridge._client = client
+
+    first = asyncio.create_task(bridge.collect_retained_topics("homeassistant/button/+/config", 0.1))
+    await asyncio.sleep(0.01)  # la première collecte est en cours
+    assert await bridge.collect_retained_topics("homeassistant/button/+/config", 0.01) is None
+    purged = await DiscoveryPublisher(bridge).purge_orphan_scenario_buttons({20})
+    assert purged == []
+    client.publish.assert_not_called()
+    assert await first == []
+    # Un seul abonnement / désabonnement : le second appel n'a rien touché.
+    client.subscribe.assert_called_once()
+    client.unsubscribe.assert_called_once()
 
 
 async def test_collect_retained_subscribe_failure_returns_none():

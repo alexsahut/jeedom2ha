@@ -2123,19 +2123,20 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         and payload.get("scenarios_complete") is True
         and len(raw_scenarios) == len(snapshot.scenarios)
     )
+    purged_ids: list = []
     if broker_ready and scenarios_section_complete:
-        purged = await publisher.purge_orphan_scenario_buttons(
+        result = await publisher.purge_orphan_scenario_buttons(
             set(scenario_publications), unpublished_scenario_ids
         )
-        purged = purged if isinstance(purged, int) else 0
-        total = len(unpublished_scenario_ids) + purged
-        if total:
-            _LOGGER.info(
-                "[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker)",
-                total, len(unpublished_scenario_ids), purged,
-            )
+        purged_ids = result if isinstance(result, list) else []
     elif broker_ready:
         _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
+    emptied_ids = sorted(unpublished_scenario_ids | set(purged_ids))
+    if emptied_ids:
+        _LOGGER.info(
+            "[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker): ids=%s",
+            len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,
+        )
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)

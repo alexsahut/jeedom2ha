@@ -306,6 +306,17 @@ Périmètre : AC 1 à 6 et 6 bis, démon seul. Aucun fichier du bloc B touché ;
 
 **Reste pour l'humain (AC 13, bloc A)** : preuve terrain (7 fantômes retirés, réactivation, 109/110/113 sans disponibilité locale, réglages HA conservés ou écart consigné).
 
+#### Bloc A — R1 (relecture ClaudeBox + relecture indépendante, PR #237, tête `4df8c95`)
+
+Aucun P1. Points repris sur la même PR, sans toucher au bloc B :
+1. **Test PHP du drapeau `scenarios_complete`** : la logique est extraite dans `jeedom2ha::buildScenariosPayload($scenarios)` (`null` = classe `scenario` absente), appelée par `getFullTopology()`. `tests/test_php_topology_extraction.php` couvre : `true` (liste entière, y compris vide), `false` (un scénario lève une exception ; les lisibles restent listés), `false` (classe absente), et la présence du booléen dans le payload de `getFullTopology()`. Le capture `catch` passe de `Exception` à `Throwable`. **Limite** : ce fichier exige le vrai noyau Jeedom (ignoré en CI, convention du dépôt) ; la session l'a seulement vérifié par `php -l` et par un harnais jetable exécutant la section `buildScenariosPayload` sans noyau (8 assertions vertes). La section `getFullTopology()` reste à exécuter sur une box par l'humain.
+2. **Documentation** : `docs/fr_FR/index.md` (point « Scénarios » du rescan) dit qu'il ne faut qu'une seule installation jeedom2ha par broker MQTT.
+3. **Regex de purge** : `fullmatch` (un `\n` final n'est plus accepté) ; test ajouté.
+4. **Traces** : INFO `[SCENARIO] Retained button topics collected: N (M scenario button(s))` à chaque purge tentée, y compris 0 ; INFO `[SCENARIO] Unpublished N scenario button(s) (a inactive, b from broker): ids=[…]` (ids seulement). `purge_orphan_scenario_buttons` renvoie maintenant la liste triée des ids vidés. Observation hors périmètre : le log existant `[DISCOVERY] Publishing button config … name='…'` affiche le nom du scénario ; je ne l'ai pas modifié, et le test des traces ne regarde que les lignes `[SCENARIO]` et de retrait.
+5. **Tests** (30 au total dans le fichier) : scénario actif dont la publication échoue jamais purgé ; désabonnement même si une exception survient pendant la collecte ; second appel concurrent à `collect_retained_topics` ⇒ `None`, aucune purge, un seul abonnement ; traces. Tests corrigés : la vérification du « chemin normal de la commande » vérifie maintenant réellement que le gestionnaire reçoit une commande hors collecte et jamais un topic de config pendant la collecte ; la charge utile d'un bouton de scénario sans homonyme est comparée à une **référence figée** générée depuis `main` `078416a` (pas à une seconde charge du nouveau code), avec un second test pour le cas avec homonyme.
+
+Vérifications : `python3 -m pytest` complet 2104 passés, 1 ignoré ; `flake8` propre ; tests Node verts. Statut de la story inchangé (`ready-for-dev`).
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md` (nouveau)

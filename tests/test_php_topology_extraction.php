@@ -103,6 +103,53 @@ function restoreTopologyProducerConfig(array $snapshot) {
     }
 }
 
+echo "Testing scenarios_complete producer flag (Story 21.1)..." . PHP_EOL;
+
+function makeScenarioStub($id, $name, $active, $throws = false) {
+    return new class($id, $name, $active, $throws) {
+        private $id;
+        private $name;
+        private $active;
+        private $throws;
+        public function __construct($id, $name, $active, $throws) {
+            $this->id = $id;
+            $this->name = $name;
+            $this->active = $active;
+            $this->throws = $throws;
+        }
+        public function getId() {
+            if ($this->throws) {
+                throw new Exception('unreadable scenario');
+            }
+            return $this->id;
+        }
+        public function getName() { return $this->name; }
+        public function getIsActive() { return $this->active; }
+    };
+}
+
+$fullRead = jeedom2ha::buildScenariosPayload(array(
+    makeScenarioStub(20, 'S20', 1),
+    makeScenarioStub(72, 'S72', 0),
+));
+assertSameTopology(true, $fullRead['complete'], 'scenarios_complete is true when the whole list is read');
+assertSameTopology(2, count($fullRead['scenarios']), 'all scenarios are listed when the whole list is read');
+assertSameTopology(false, $fullRead['scenarios'][1]['is_active'], 'is_active is cast to bool');
+
+$partialRead = jeedom2ha::buildScenariosPayload(array(
+    makeScenarioStub(20, 'S20', 1),
+    makeScenarioStub(21, 'S21', 1, true),
+));
+assertSameTopology(false, $partialRead['complete'], 'scenarios_complete is false when one scenario throws');
+assertSameTopology(1, count($partialRead['scenarios']), 'readable scenarios are still listed when one throws');
+
+$noClass = jeedom2ha::buildScenariosPayload(null);
+assertSameTopology(false, $noClass['complete'], 'scenarios_complete is false when the scenario class is absent');
+assertSameTopology(array(), $noClass['scenarios'], 'no scenarios when the scenario class is absent');
+
+$emptyRead = jeedom2ha::buildScenariosPayload(array());
+assertSameTopology(true, $emptyRead['complete'], 'scenarios_complete is true for a fully read empty list');
+
 echo "Testing getFullTopology() producer chain..." . PHP_EOL;
 
 $configSnapshot = array(
@@ -123,6 +170,7 @@ try {
 
     $topologyBefore = jeedom2ha::getFullTopology();
     assertTrueTopology(is_array($topologyBefore), 'getFullTopology returns an array');
+    assertTrueTopology(array_key_exists('scenarios_complete', $topologyBefore) && is_bool($topologyBefore['scenarios_complete']), 'scenarios_complete is a boolean in the topology payload');
     assertTrueTopology(isset($topologyBefore['published_scope']) && is_array($topologyBefore['published_scope']), 'published_scope exists in topology payload');
 
     $scopeBefore = $topologyBefore['published_scope'] ?? array();
