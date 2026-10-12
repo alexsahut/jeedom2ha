@@ -47,6 +47,14 @@ cp .env.example .env
 
 ## Usage pas à pas
 
+> **Garde-fou CI (CC-50 / CC-59)** : avant tout déploiement, le script vérifie
+> la CI GitHub du SHA, en ne jugeant que les workflow runs (push,
+> pull_request, workflow_dispatch) de la **branche déployée** : `main` par
+> défaut, modifiable via `JEEDOM2HA_DEPLOY_CI_BRANCH`. Pour chaque workflow,
+> seule la dernière tentative compte. Refus si un run de cette branche est en
+> cours ou non vert, ou s'il n'existe aucun run terminé et vert pour ce SHA ;
+> les runs d'autres branches portant le même SHA sont ignorés.
+
 > **Garde-fou CC-56** : tout appel direct à `scripts/deploy-to-box.sh` exige
 > `--sha "$(git rev-parse HEAD)"` en premier argument, pour tous les modes
 > (y compris `--dry-run`, `--rollback`, `--stop-daemon-cleanup`). Le script
