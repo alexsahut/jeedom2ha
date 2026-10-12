@@ -1,0 +1,34 @@
+# Home Assistant de DÉMONSTRATION — VM 122 uniquement (Story 23.1).
+# Aucun secret ici (CC-48) : le broker Mosquitto local (127.0.0.1:1883) et ses
+# identifiants éventuels se configurent dans l'UI HA (Réglages > Appareils >
+# Ajouter > MQTT), pas dans ce fichier.
+#
+# Usage (par clawcode, après GO d'Alex à clawbox) :
+#   cd /opt/ha-demo && docker compose -f docker-compose.ha.yml up -d
+#
+# Variables optionnelles (valeurs par défaut sûres) :
+#   HA_IMAGE_TAG   tag de l'image ; ÉPINGLER une version (ex. 2025.x.y) pour un
+#                  environnement rejouable plutôt que "stable"
+#   HA_CONFIG_DIR  dossier de config persistant sur la VM
+#   TZ             fuseau horaire
+services:
+  homeassistant:
+    container_name: ha-demo
+    image: ghcr.io/home-assistant/home-assistant:${HA_IMAGE_TAG:-stable}
+    # network_mode host : HA joint Mosquitto sur 127.0.0.1:1883 et l'UI sur :8123,
+    # sans publication de ports ni dépendance au réseau de la maison.
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ${HA_CONFIG_DIR:-/opt/ha-demo/config}:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    # VM 122 : 2 Go de RAM. Plafond pour ne pas affamer Jeedom/Mosquitto.
+    # Si insuffisant, proposer 3 Go à clawbox/Alex AVANT toute action.
+    mem_limit: 1280m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
