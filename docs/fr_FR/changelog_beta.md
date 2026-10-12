@@ -6,6 +6,15 @@
 
 ---
 
+# 2026-10-12 — Noms Jeedom dans Home Assistant et entity_id stable
+
+- Chaque appareil prend le nom de l'équipement Jeedom, identique pour toutes ses entités (avant, un appareil pouvait porter le nom d'une de ses commandes). Un équipement à une seule entité affiche le nom de l'équipement ; un équipement à plusieurs entités affiche le nom de chaque commande à la suite du nom de l'appareil
+- Un renommage dans Jeedom atteint Home Assistant au prochain rescan, redémarrage du démon ou « Republier »
+- Les entités nouvelles ou recréées reçoivent un `entity_id` technique stable (`<domaine>.jeedom2ha_…`) : une entité supprimée puis recréée reprend son `entity_id` technique, et les automatisations, scripts et cartes qui le citent survivent à la recréation
+- Les `entity_id`, noms et pièces déjà présents dans Home Assistant, y compris ceux que vous avez choisis à la main, ne sont pas modifiés
+
+---
+
 # 2026-10-11 — Affichage d'une commande publiée par une entité secondaire
 
 - Une commande d'état portée à la fois par une entité principale refusée et par une entité secondaire déjà publiée (par exemple un capteur binaire) s'affiche désormais « Sera publié : binary_sensor » et est comptée « prête » dans la synthèse de l'équipement et les compteurs de la pièce (auparavant « Ne sera pas publié » et « bloquante » à tort). Correction d'affichage uniquement : rien de ce qui est publié dans Home Assistant ne change
