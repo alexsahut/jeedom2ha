@@ -1,8 +1,8 @@
 # Story 22.1 : Noms Home Assistant = noms Jeedom (CC-36)
 
-Status: draft
+Status: ready-for-dev
 
-> **Statut : `draft` (2026-10-12).** Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret ; aucun code touché). **Rien n'est `ready-for-dev`** : Alexandre tranche les questions Q1 à Q7 via ClaudeBox. Les pointeurs `fichier:ligne` sont pris sur `main` à `ab3a854`. **R1 (ClaudeBox, 2026-10-12, relevé de terrain en lecture seule vers 04:30)** : F4 et H6 passent de l'hypothèse au fait (HA 2026.9.4) ; Q7 devient une question produit de cette story. Aucun nom réel d'équipement, de pièce, de scénario ou de personne dans ce fichier (CC-48) : seuls des identifiants.
+> **Statut : `ready-for-dev` (2026-10-12).** Alexandre a tranché les questions le 2026-10-12 vers 05:50, relayé par ClaudeBox : **Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, Q7 B, QD deux stories** (voir « Décisions d'Alexandre »). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret). Les pointeurs `fichier:ligne` sont pris sur `main` à `ab3a854`. **R1 (ClaudeBox, 2026-10-12, relevé de terrain en lecture seule vers 04:30)** : F4 et H6 sont des faits (HA 2026.9.4). Aucun nom réel d'équipement, de pièce, de scénario ou de personne dans ce fichier (CC-48) : seuls des identifiants.
 
 ## Story
 
@@ -11,6 +11,19 @@ je veux que chaque appareil porte le nom de l'équipement Jeedom et que la pièc
 afin que « le nom et la pièce Jeedom font foi partout » (décision d'Alexandre, 2026-10-01 18:21) et qu'Assist reconnaisse les noms que je connais.
 
 **Parcours : démon uniquement** (discovery MQTT). Aucun écran ne change. Preuve terrain obligatoire par l'humain : inventaire des registres HA avant/après.
+
+## Décisions d'Alexandre (2026-10-12, vers 05:50, relayées par ClaudeBox)
+
+Toutes les recommandations sont retenues, avec **Q7 B**. `ready-for-dev` est accordé par ClaudeBox au nom de cette décision.
+
+- **Q1 A** — `device.name` = nom de l'équipement Jeedom (accents compris), identique pour toutes les entités de l'équipement.
+- **Q2 A** — entité unique : nom de l'équipement ; plusieurs entités : nom de la commande.
+- **Q3 A** — un renommage Jeedom atteint HA au sync suivant (rescan, redémarrage du démon, « Republier ») ; documenté ; aucun hook `postSave`.
+- **Q4 A** — `suggested_area` envoyée à chaque sync ; documenté que HA ne l'applique qu'à la création de l'appareil.
+- **Q5 A** — noms et pièces choisis à la main dans HA font foi ; aucun rapport, aucune détection.
+- **Q6 A** — les `entity_id` et noms existants ne sont pas touchés ; pas de recréation proposée par cette story.
+- **Q7 B** — pour toute entité **nouvelle ou recréée**, `entity_id` technique stable fixé par `default_entity_id`, dont la valeur est **exactement** celle d'`object_id` que le démon envoie aujourd'hui (F10) pour cette entité, préfixée du domaine : `<domaine>.<object_id actuel>`. C'est la forme des 41 entités d'avant le 2026-05-06. Les `entity_id` existants ne changent pas. Conséquence : les cartes de tableau de bord citent l'`entity_id`, pas le nom affiché ; seule la voix (Assist) s'appuie sur le nom. Avec B, automatisations, scripts et cartes survivent à une recréation ; une entité actuellement à `entity_id` dérivé des noms (les 306 créées depuis le 2026-05-06) qui serait recréée prendrait, une fois, la forme technique.
+- **QD** — deux stories, 22-1 puis 22-2.
 
 ## Contexte
 
@@ -54,71 +67,71 @@ La documentation officielle de HA n'était pas accessible depuis la session (ré
 - **`entity_id` des entités nouvelles ou recréées : ils suivent les noms** (H6, fait de terrain). Après 22.1, une entité créée (nouvel équipement, ou recréation) prendra un `entity_id` tiré des **noms Jeedom** ; l'`entity_id` d'une entité recréée peut donc changer par rapport à aujourd'hui (voir Q6 B et Q7).
 - **Boutons de scénario (84) :** inchangés (F5).
 
-## Critères d'acceptation provisoires
+## Critères d'acceptation (figés sur les décisions)
 
-- **AC1.** Pour un équipement Jeedom, `device.name` est identique dans les payloads de **toutes** ses entités (principale et secondaires) : le nom de l'équipement, accents compris [Q1].
-- **AC2.** Le nom d'entité suit la règle choisie en Q2 (provisoire : entité unique = nom de l'équipement ; plusieurs entités = nom de la commande).
-- **AC3.** Après renommage d'un équipement dans Jeedom, le nom d'appareil publié change au sync ou rescan suivant [Q3]. Test démon : renommage → payload re-publié avec le nouveau nom.
-- **AC4.** La pièce Jeedom est envoyée à chaque sync dans `suggested_area` (inchangé) ; la limite « HA ne l'applique qu'à la création de l'appareil » est écrite dans la documentation utilisateur [Q4].
-- **AC5.** Aucune entité **existante** ne change d'`entity_id` ni d'`unique_id` (vérifié par l'inventaire avant/après) ; aucun nom/pièce choisi à la main n'est écrasé [Q5, Q6]. Pour une entité **nouvelle ou recréée**, l'`entity_id` suit la règle choisie en Q7 (dérivé des noms, ou stable par `default_entity_id`), documentée et testée [Q7].
-- **AC6.** Golden et contrat de sync mis à jour **uniquement** pour le champ `device.name` des équipements concernés ; aucune autre différence.
+- **AC1.** Pour un équipement Jeedom, `device.name` est identique dans les payloads de **toutes** ses entités (principale et secondaires) : le nom de l'équipement, accents compris [Q1 A].
+- **AC2.** Le nom d'entité est le nom de l'équipement pour un équipement à une seule entité, et le nom de la commande pour un équipement à plusieurs entités [Q2 A].
+- **AC3.** Après renommage d'un équipement dans Jeedom, le nom d'appareil publié change au sync ou rescan suivant, sans hook d'enregistrement [Q3 A]. Test démon : renommage → payload re-publié avec le nouveau nom.
+- **AC4.** La pièce Jeedom est envoyée à chaque sync dans `suggested_area` (inchangé) ; la limite « HA ne l'applique qu'à la création de l'appareil » est écrite dans la documentation utilisateur [Q4 A].
+- **AC5.** Aucune entité **existante** ne change d'`entity_id` ni d'`unique_id` (vérifié par l'inventaire avant/après) ; aucun nom/pièce choisi à la main n'est écrasé [Q5 A, Q6 A]. Pour une entité **nouvelle ou recréée**, chaque payload porte `default_entity_id` = `<domaine>.<object_id>`, où `<object_id>` est **exactement** la valeur d'`object_id` envoyée aujourd'hui dans le même payload (F10), pour tous les types d'entité (lumière, volet, switch, capteur, capteur binaire, bouton d'équipement et de scénario, climat, alarme) [Q7 B]. Test unitaire du payload de chaque publisher : `default_entity_id` égal à `<domaine>.<object_id>`, y compris pour les entités à `node_id`/`object_id` propres (secondaires, boutons de scénario). `object_id` reste envoyé (aucun changement d'`unique_id` ni de topic).
+- **AC6.** Golden et contrat de sync mis à jour **uniquement** pour le champ `device.name` des équipements concernés et le champ additif `default_entity_id` ; aucune autre différence.
 - **AC7.** Gate 20-0 vert avant `done` (aucune écriture transmise à la box) ; preuve terrain par l'humain : inventaire avant/après des registres appareils et entités de HA (nom, `name_by_user`, `entity_id`, pièce), rapproché de la liste des 29.
 - **AC8.** Aucun nom réel dans le code de test, les fixtures, la story, la PR (CC-48).
 
 ## Tâches
 
-- **Task 0 — Vérifier H1 à H5 et la cause de H6 sur la documentation officielle de HA** (pourquoi `object_id` n'est plus appliqué en 2026.9.4 ; ce que `default_entity_id` garantit) (si l'accès est possible) ; sinon, protocole terrain de la Task 5 sur un équipement de test.
+- **Task 0 — Vérifier H1 à H5 et que `default_entity_id` est bien appliqué par HA 2026.9.4** (et pourquoi `object_id` ne l'est plus), sur la documentation officielle de HA si l'accès est possible, sinon sur un **équipement de test** (création d'une entité neuve, relevé de son `entity_id`). **Si `default_entity_id` n'est pas appliqué comme décrit, s'arrêter et revenir vers ClaudeBox avant de généraliser.**
 - **Task 1 — Inventaire « avant » (humain, lecture seule)** : pour les 91 appareils et leurs entités, relever nom affiché, `name_by_user`, `original_name`, `entity_id`, pièce ; comparer au nom Jeedom ; comptes par appareil (entités, dont celles renommées à la main). Sans nom réel dans le dépôt (identifiants seuls).
-- **Task 2 — Démon : un seul nom d'appareil par équipement** (`publisher.py:_build_device_block`) selon Q1 ; ne plus dériver `device.name` du `ha_name` d'une entité secondaire.
-- **Task 3 — Démon : règle du nom d'entité** selon Q2 (mappers F2/F3 ou publisher).
-- **Task 3b — Démon : `entity_id` des entités nouvelles ou recréées** selon Q7 (ajout éventuel de `default_entity_id` dans les payloads ; sort de `object_id`).
+- **Task 2 — Démon : un seul nom d'appareil par équipement** (`publisher.py:_build_device_block`) selon Q1 A ; ne plus dériver `device.name` du `ha_name` d'une entité secondaire.
+- **Task 3 — Démon : règle du nom d'entité** selon Q2 A (mappers F2/F3 ou publisher).
+- **Task 3b — Démon : `default_entity_id` pour les entités nouvelles ou recréées** (Q7 B) : ajouter `default_entity_id` = `<domaine>.<object_id>` dans chaque payload de découverte, en reprenant la valeur d'`object_id` déjà calculée pour le payload (F10) ; ne pas modifier `object_id`, `unique_id` ni topic. Test du payload de chaque publisher (AC5).
 - **Task 4 — Tests** : unitaires (device identique sur toutes les entités d'un équipement multi-entités ; forme de l'équipement 579 ; renommage → republication au sync), golden mis à jour, fixtures anonymisées. `make test` et `flake8` verts.
 - **Task 5 — Gate 20-0 + déploiement standard (humain) + inventaire « après »** ; rapprochement avec la liste des 29 ; protocole H2/H3/H4 sur un équipement de test.
-- **Task 6 — Documentation** : `docs/fr_FR` (nom = nom Jeedom, pièce appliquée à la création seulement, comment renommer à la main, comment forcer la pièce via recréation) selon Q3 à Q6.
+- **Task 6 — Documentation** : `docs/fr_FR` (nom = nom Jeedom, pièce appliquée à la création seulement, comment renommer à la main, comment forcer la pièce via recréation ; `entity_id` technique stable des entités créées) selon Q3 A, Q4 A, Q5 A, Q6 A, Q7 B.
 
 ## Garde-fous
 
 - Gate 20-0 vert avant tout `done` ; aucune écriture transmise à la box par le gate.
 - Preuve terrain avec inventaire avant/après ; `scripts/deploy-to-box.sh` jamais lancé par une session cloud.
-- Aucun `entity_id`, `unique_id` ni topic **existant** ne change (AC5) ; seuls les champs de nom changent, plus `default_entity_id` si Q7 B est retenue (AC6 mis à jour en conséquence).
+- Aucun `entity_id`, `unique_id` ni topic **existant** ne change (AC5) ; seuls les champs de nom changent, plus le champ additif `default_entity_id` (Q7 B, AC5-AC6).
 - Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) ; ni secret ni IP privée.
 - Une PR = un sujet : les noms et l'`entity_id` des entités créées sont un seul sujet (les deux dérivent des mêmes champs de nom, H6).
 
-## Questions pour Alexandre
+## Questions pour Alexandre (tranchées le 2026-10-12 : options non retenues marquées « écartée »)
 
 **Q1 — Quel nom d'appareil dans HA ?**
-- **A (recommandé).** Toujours le nom de l'équipement Jeedom, identique pour toutes les entités de l'équipement. Conséquence : 29 appareils sur 91 prennent le nom Jeedom ; la voix reconnaît les noms Jeedom ; les noms affichés des entités de ces 29 appareils changent (les `entity_id` non). Les automatisations par `entity_id` ne bougent pas ; les tableaux de bord affichent le nouveau nom.
-- **B.** Ne rien changer. Les 29 gardent un nom venu d'une commande ; la décision du 2026-10-01 n'est pas tenue.
+- **A (retenue).** Toujours le nom de l'équipement Jeedom, identique pour toutes les entités de l'équipement. Conséquence : 29 appareils sur 91 prennent le nom Jeedom ; la voix reconnaît les noms Jeedom ; les noms affichés des entités de ces 29 appareils changent (les `entity_id` non). Les automatisations par `entity_id` ne bougent pas ; les tableaux de bord affichent le nouveau nom.
+- **B (écartée).** Ne rien changer. Les 29 gardent un nom venu d'une commande ; la décision du 2026-10-01 n'est pas tenue.
 
 **Q2 — Quel nom d'entité ?**
-- **A (recommandé).** Équipement à une seule entité : nom de l'équipement (HA l'affiche comme l'appareil). Équipement à plusieurs entités : nom de la commande. Conséquence : lecture naturelle (« <équipement> <commande> »), pas de doublon ; certains noms d'entités changent d'affichage.
-- **B.** Toujours le nom de l'équipement pour l'entité principale, nom de commande pour les autres. Conséquence : proche de A, mais l'entité principale d'un équipement multi-entités s'affiche avec le seul nom d'appareil.
-- **C.** Ne pas toucher aux noms d'entité. Conséquence : le nom affiché reste hétérogène ; moins de changements visibles.
+- **A (retenue).** Équipement à une seule entité : nom de l'équipement (HA l'affiche comme l'appareil). Équipement à plusieurs entités : nom de la commande. Conséquence : lecture naturelle (« <équipement> <commande> »), pas de doublon ; certains noms d'entités changent d'affichage.
+- **B (écartée).** Toujours le nom de l'équipement pour l'entité principale, nom de commande pour les autres. Conséquence : proche de A, mais l'entité principale d'un équipement multi-entités s'affiche avec le seul nom d'appareil.
+- **C (écartée).** Ne pas toucher aux noms d'entité. Conséquence : le nom affiché reste hétérogène ; moins de changements visibles.
 
 **Q3 — Quand un renommage Jeedom atteint-il HA ?**
-- **A (recommandé).** Au sync suivant (rescan, redémarrage du démon, « Republier ») : c'est déjà le comportement du code (F7) ; on corrige les noms et on **documente** qu'il faut un rescan. Aucun nouveau code PHP.
-- **B.** Déclencher une republication de l'équipement à chaque enregistrement dans Jeedom (hook `postSave`). Conséquence : HA suit en direct, mais nouveau code PHP/démon, risque de rafale lors d'éditions en série, preuve terrain plus lourde.
+- **A (retenue).** Au sync suivant (rescan, redémarrage du démon, « Republier ») : c'est déjà le comportement du code (F7) ; on corrige les noms et on **documente** qu'il faut un rescan. Aucun nouveau code PHP.
+- **B (écartée).** Déclencher une republication de l'équipement à chaque enregistrement dans Jeedom (hook `postSave`). Conséquence : HA suit en direct, mais nouveau code PHP/démon, risque de rafale lors d'éditions en série, preuve terrain plus lourde.
 
 **Q4 — La pièce Jeedom.**
-- **A (recommandé).** Envoyer la pièce à chaque sync (déjà le cas) et documenter que HA ne l'applique qu'à la création de l'appareil (H4). Les 23 pièces choisies à la main ne sont pas touchées. Un appareil existant ne change de pièce que si l'utilisateur le fait dans HA ou le recrée.
-- **B.** Ne rien documenter ni promettre. Conséquence : confusion probable quand une pièce modifiée dans Jeedom ne suit pas.
+- **A (retenue).** Envoyer la pièce à chaque sync (déjà le cas) et documenter que HA ne l'applique qu'à la création de l'appareil (H4). Les 23 pièces choisies à la main ne sont pas touchées. Un appareil existant ne change de pièce que si l'utilisateur le fait dans HA ou le recrée.
+- **B (écartée).** Ne rien documenter ni promettre. Conséquence : confusion probable quand une pièce modifiée dans Jeedom ne suit pas.
 
 **Q5 — Noms et pièces choisis à la main dans HA (1 appareil, 37 entités, 23 pièces).**
-- **A (recommandé).** Ils font foi côté HA : le plugin n'y touche pas, aucune détection ni rapport. Conséquence : la règle « Jeedom fait foi » vaut pour ce que l'utilisateur n'a pas personnalisé.
-- **B.** Fournir un rapport en lecture seule listant les noms manuels qui divergent de Jeedom. Conséquence : utile pour un grand ménage, mais le plugin n'a pas d'accès aux registres HA (MQTT seul) : nécessite un outil externe, hors périmètre.
+- **A (retenue).** Ils font foi côté HA : le plugin n'y touche pas, aucune détection ni rapport. Conséquence : la règle « Jeedom fait foi » vaut pour ce que l'utilisateur n'a pas personnalisé.
+- **B (écartée).** Fournir un rapport en lecture seule listant les noms manuels qui divergent de Jeedom. Conséquence : utile pour un grand ménage, mais le plugin n'a pas d'accès aux registres HA (MQTT seul) : nécessite un outil externe, hors périmètre.
 
 **Q6 — Les `entity_id` et noms existants des 29 appareils.**
-- **A (recommandé).** Ne pas y toucher : seuls les noms affichés changent (H3). Aucun risque pour les automatisations par `entity_id`.
-- **B.** Proposer ensuite une recréation (« Supprimer puis recréer ») pour les aligner aussi sur les nouveaux noms. Conséquence : une entité recréée reçoit un `entity_id` **tiré des noms du moment** (H6) : il change pour toutes celles dont il dérivait d'un nom ; historique perdu, noms et pièces manuels perdus (37 entités, 23 pièces) : à éviter sans accord explicite et sans liste préalable des automatisations touchées.
+- **A (retenue).** Ne pas y toucher : seuls les noms affichés changent (H3). Aucun risque pour les automatisations par `entity_id`.
+- **B (écartée).** Proposer ensuite une recréation (« Supprimer puis recréer ») pour les aligner aussi sur les nouveaux noms. Conséquence : une entité recréée reçoit un `entity_id` **tiré des noms du moment** (H6) : il change pour toutes celles dont il dérivait d'un nom ; historique perdu, noms et pièces manuels perdus (37 entités, 23 pièces) : à éviter sans accord explicite et sans liste préalable des automatisations touchées.
 
 **Q7 — `entity_id` des entités nouvelles ou recréées (H6 : `object_id` n'est plus appliqué par HA 2026.9.4).**
 Les 41 entités d'avant le 2026-05-06 ont un `entity_id` technique `<domaine>.jeedom2ha_…` ; les 306 suivantes (dont les 84 boutons de scénario) en ont un tiré des noms. Pour toute entité créée ou recréée à partir de 22.1 :
-- **A.** `entity_id` dérivé des noms (comportement actuel de fait ; le démon cesse d'envoyer `object_id`, devenu inutile). Conséquence : identifiants lisibles qui suivent les noms Jeedom **à la création**, mais un renommage ultérieur dans Jeedom ne les change pas, et deux équipements de même nom reçoivent un suffixe numérique ; une recréation change l'`entity_id` d'une entité dont il dérive d'un nom, donc casse les automatisations, tableaux de bord et phrases vocales qui le citent.
-- **B (recommandé).** Identifiant technique stable via `default_entity_id` (par exemple `<domaine>.jeedom2ha_<eq>_<cmd>`, cohérent avec les 41 anciennes). Conséquence : `entity_id` prévisibles, identiques après une recréation, insensibles aux renommages (les automatisations survivent à une recréation) ; en revanche illisibles, et à partir de 22.1 les entités créées reprennent la forme technique, donc une recréation d'une des 306 entités actuelles à `entity_id` lisible le **changerait** vers la forme technique (une fois). Les voix et tableaux de bord s'appuient sur le nom affiché, pas sur l'`entity_id`, donc la voix n'est pas touchée.
-- **C.** Ne rien décider ici : conserver le comportement de fait sans le maîtriser. Conséquence : un futur changement de HA peut modifier les `entity_id` sans que le plugin le sache : non recommandé.
-Recommandation : **B**, sous réserve de Task 0 (garantie réelle de `default_entity_id` sur 2026.9.4) et d'un test sur un équipement de test avant toute généralisation.
+- **A (écartée).** `entity_id` dérivé des noms (comportement actuel de fait ; le démon cesse d'envoyer `object_id`, devenu inutile). Conséquence : identifiants lisibles qui suivent les noms Jeedom **à la création**, mais un renommage ultérieur dans Jeedom ne les change pas, et deux équipements de même nom reçoivent un suffixe numérique ; une recréation change l'`entity_id` d'une entité dont il dérive d'un nom, donc casse les automatisations, tableaux de bord et phrases vocales qui le citent.
+- **B (retenue).** Identifiant technique stable via `default_entity_id` = `<domaine>.<object_id actuel>` (cohérent avec les 41 anciennes). Conséquence : `entity_id` prévisibles, identiques après une recréation, insensibles aux renommages (les automatisations survivent à une recréation) ; en revanche illisibles, et à partir de 22.1 les entités créées reprennent la forme technique, donc une recréation d'une des 306 entités actuelles à `entity_id` lisible le **changerait** vers la forme technique (une fois). **Correction (décision d'Alexandre) :** les cartes de tableau de bord citent l'`entity_id`, pas le nom affiché ; seule la voix (Assist) s'appuie sur le nom. Avec B, automatisations, scripts et cartes survivent à une recréation.
+- **C (écartée).** Ne rien décider ici : conserver le comportement de fait sans le maîtriser. Conséquence : un futur changement de HA peut modifier les `entity_id` sans que le plugin le sache : non recommandé.
+**Retenue : B**, sous réserve de la Task 0 (`default_entity_id` effectivement appliqué par HA 2026.9.4, vérifié sur la documentation ou sur un équipement de test avant toute généralisation).
 
-**QD — Découpage.** Recommandé : deux stories (22.1 noms, 22.2 compteurs et lisibilité). Alternatives : une seule story (une seule preuve terrain mais deux domaines : démon seul / interface) ; ou trois stories avec 22.2 scindée en compteurs/CC-51 puis CC-55, CC-58, CC-60 et P3 (voir 22.2).
+**QD — Découpage (tranchée : deux stories, 22-1 puis 22-2).** Deux stories (22.1 noms, 22.2 compteurs et lisibilité). Alternatives : une seule story (une seule preuve terrain mais deux domaines : démon seul / interface) ; ou trois stories avec 22.2 scindée en compteurs/CC-51 puis CC-55, CC-58, CC-60 et P3 (voir 22.2).
 
 ## Vérifications non faites par cette session
 
@@ -130,10 +143,11 @@ H1 à H5 (comportement de HA) et la cause de H6 (le fait de terrain est établi,
 - 2026-10-11 15:48 — Alexandre : ordre de la suite = CC-44 + CC-47, puis CC-36 avec CC-51 et « compteurs », puis parité HomeKit (CC-33).
 - 2026-10-12 — Cadrage documentaire (cette session) : story en `draft`, décisions Q1 à Q7 attendues.
 - 2026-10-12 — R1 (ClaudeBox, relevé de terrain vers 04:30) : F4 et H6 confirmés (HA 2026.9.4 ; 41 entités à `entity_id` technique, 306 à `entity_id` dérivé des noms depuis le 2026-05-06 ; 29 appareils, 149 entités) ; Q7 refaite en question produit ; hors-périmètre `object_id` retiré.
+- 2026-10-12, vers 05:50 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, **Q7 B** (`default_entity_id` = `<domaine>.<object_id actuel>` pour les entités nouvelles ou recréées), QD deux stories ; conséquence de Q7 corrigée (cartes de tableau de bord = `entity_id`, voix = nom). **`ready-for-dev` accordé** par ClaudeBox au nom de cette décision ; AC figés, options écartées retirées des AC et tâches.
 
 ## Dev Agent Record
 
-(à remplir après `ready-for-dev`)
+(à remplir par `dev-story`)
 
 ### File List
 
