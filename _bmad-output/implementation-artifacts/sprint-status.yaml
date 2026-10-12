@@ -406,3 +406,10 @@ development_status:
   pe-epic-22: in-progress  # decisions d'Alexandre du 2026-10-12 ~05:50 (via ClaudeBox) ; 22-1 d'abord, puis 22-2
   22-1-noms-home-assistant-egaux-noms-jeedom-cc36: ready-for-dev  # decisions d'Alexandre du 2026-10-12 ~05:50 : Q1-Q6 A, Q7 B (default_entity_id), QD deux stories ; ready-for-dev accorde par ClaudeBox ; a faire en premier
   22-2-compteurs-et-lisibilite-de-la-surface-cc51-cc55-cc58-cc60: ready-for-dev  # decisions d'Alexandre du 2026-10-12 ~05:50 : Q1-Q3 A, Q4 B, Q5 A, Q6 C, Q7 A (sous reserve Task 0 a), Q8 A ; ready-for-dev accorde par ClaudeBox ; apres 22-1
+  # Epic 23 — promotion et beta Market; tout est draft jusqu'à relecture ClaudeBox.
+  pe-epic-23: backlog
+  23-1-environnement-de-demonstration-rejouable: draft
+  23-2-captures-et-video-de-promotion-rejouables: draft
+  23-3-remontee-d-etat-lumieres-et-volets: draft
+  23-4-installation-hors-market-depuis-github: draft
+  23-5-choix-et-coherence-de-la-licence: draft

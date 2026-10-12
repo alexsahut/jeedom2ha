@@ -27,3 +27,10 @@ citer ce script sans ce flag dans une entrée de ce journal.
 ## Incidents
 
 - **2026-10-11 19:20** — lancement d'une délégation effectué en interpolant directement le texte du prompt dans une chaîne entre guillemets doubles, `script -c "claude --cloud \"$PROMPT\""` (au lieu de l'écrire dans un fichier et de le relire via `$(cat <fichier>)`, cf. `docs/delegation-claude-cloud.md`) ; avec des guillemets simples, cette interpolation n'aurait provoqué aucun incident. Le shell interne de `script` a ré-exécuté une substitution de commande présente dans le prompt, provoquant un appel à `scripts/deploy-to-box.sh` **sans aucun argument**. Le refus n'est pas venu d'un garde-fou CC-56 (qui n'existait pas encore à cette date) mais du garde-fou CI de CC-50 (`jeedom2ha_verify_ci_green`) : la CI de `15576cf` était encore en cours (check-run non terminé) au moment de l'appel, avant toute connexion SSH. Avec une CI verte, le script aurait déployé — c'est la raison d'être de la PR #235. ClaudeBox a vérifié la box après l'incident : `VERSION` inchangé (contrôle à 16:20:30). Les autres lancements du même jour ont utilisé la forme sûre (fichier + `$(cat <fichier>)`) sans incident. Revue ClaudeBox le 2026-10-11 sur PR #235 (CC-56) : correctifs apportés à `docs/delegation-claude-cloud.md` (forme fichier obligatoire, contrôle d'empreinte, vérification croisée de l'identifiant `session_01…`) et au `Makefile` (`SHA=` désormais explicite, plus de calcul automatique).
+# 2026-10-12 — Epic 23 : Prêt pour le Market et la promotion
+
+- **Demandeur :** Alexandre, relayé par ClaudeBox (session cbx légitime).
+- **Périmètre :** création documentaire de l'epic 23 et des stories 23.1 à 23.5, toutes `draft`; aucun développement ni accès VM.
+- **Branche / PR :** `docs/epic-23-market-promotion` → `main` (PR à créer).
+- **Décision de workflow :** ClaudeBox relit chaque story avant tout passage à `ready-for-dev`.
+- **Prérequis externes consignés :** snapshot vierge de l'unité `a66-reprise-diagnostic`, VM 122; Mosquitto local; HA Docker local; branche `main` jusqu'à C1; décision de licence Alexandre.

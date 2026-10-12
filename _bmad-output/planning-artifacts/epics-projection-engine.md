@@ -2501,3 +2501,21 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - les compteurs affichés sont égaux au recomptage manuel d'une pièce réelle ; « publiés » vient de `published_in_ha`.
 - `PRODUCT_SCOPE` inchangé ; golden et contrat 4D verts, sauf champs additifs justifiés.
 - aucun nom réel dans le dépôt (CC-48).
+
+### Epic 23 — Prêt pour le Market et la promotion
+
+**Statut :** `backlog` — créé le 2026-10-12 à la demande d'Alexandre, relayée par ClaudeBox. Les cinq stories sont `draft`: relecture ClaudeBox obligatoire avant tout `ready-for-dev`; ce cadrage n'autorise aucun développement.
+
+**Valeur :** un plugin démontrable, installable et honnêtement documenté avant promotion et bêta Market, sans donnée de la maison.
+
+**Faits à revalider au démarrage :** main `070da70` ne streame que sensor/binary_sensor/switch; lumières optimistes et volets sans position; `LICENSE` GPL-2.0 contre AGPL dans info/README; `beta` est ancienne et l'installation GitHub n'est pas documentée.
+
+**Ordre :** A1/A2/A3 et 22.1/22.2 restent inchangés et prioritaires (22.1 puis 22.2). 23.1 attend le snapshot vierge VM 122; 23.3 peut être préparée en parallèle mais sa preuve utilise 23.1. 23.2 dépend de 23.1 et 22.2 `done`, après les compteurs. 23.4 attend le snapshot vierge et la branche maintenue décidée par A2/C1. 23.5 commence par une décision d'Alexandre et bloque seulement la soumission Market payante.
+
+**Garde-fous :** CC-48; VM/snapshots/Chrome par ClaudeBox; aucune donnée ou accès maison dans Git; une story = une PR; après approbation, workflow `create-story → dev-story → code-review`.
+
+- **23.1** démo synthétique Jeedom/Mosquitto/HA rejouable et snapshot `demo`.
+- **23.2** captures et vidéo Playwright rejouables depuis 23.1.
+- **23.3** streaming `LIGHT_STATE`/luminosité et `FLAP_STATE`/position, avec parité et limites.
+- **23.4** installation GitHub testée sur VM vierge, alignée sur la branche réellement maintenue.
+- **23.5** fiche licence, puis alignement après décision écrite d'Alexandre.
