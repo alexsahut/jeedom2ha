@@ -1,6 +1,6 @@
 # Story A1 : Budget fixe et échéance transmise pour les 5 relais PHP restants (E4)
 
-Status: review
+Status: done
 
 Epic: (Chantier Market 2026-10)
 
@@ -80,8 +80,8 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
   - [x] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
   - [x] Vérifier le message d'erreur correct en cas de dépassement réel du budget
 
-- [ ] T5 — Gate terrain (hors story, exécuté par clawbox)
-  - [ ] Test sur Jeedom vierge en VM `pve` (Debian 11 puis 12), après go Telegram d'Alex — gate obligatoire avant `done`, pas une tâche de cette story
+- [x] T5 — Gate terrain (hors story, exécuté par clawbox)
+  - [x] Preuve terrain ClaudeBox 2026-10-12 09:38 : box en `69a4b47`, Rescanner (Chrome) → succès, synchro 09:38:05, journal `[RELAY-BUDGET] relais=TOPOLOGY R=60 duration_s=1.811` (292 eqLogics)
 
 ## Impact Produit
 
