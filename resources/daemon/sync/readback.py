@@ -30,7 +30,8 @@ STATE_KEYS: Dict[str, Tuple[str, ...]] = {
     "cover": ("FLAP_STATE", "FLAP_BSO_STATE"),
 }
 BRIGHTNESS_KEYS: Tuple[str, ...] = ("LIGHT_BRIGHTNESS",)
-# A numeric FLAP_STATE is the cover position (``_detect_position`` in mapping/cover.py).
+# LIGHT_BRIGHTNESS feeds the brightness; a numeric LIGHT_STATE is the fallback (see
+# ``readback_commands``). A numeric FLAP_STATE is the cover position (``_detect_position`` in mapping/cover.py).
 POSITION_KEYS: Tuple[str, ...] = ("FLAP_STATE",)
 
 
@@ -71,6 +72,11 @@ def readback_commands(ha_type: Any, mapping: Any) -> List[Tuple[str, Any]]:
 
     if ha_type == "light" and getattr(caps, "has_brightness", False):
         brightness_cmd = _first_info(commands, BRIGHTNESS_KEYS)
+        if brightness_cmd is None and state_cmd is not None and _is_numeric(state_cmd):
+            # A numeric LIGHT_STATE is the dimmer level (mapping/light.py
+            # ``state_numeric_as_brightness``): it feeds the brightness topic too, like a
+            # numeric FLAP_STATE feeds the cover position. A binary one never does.
+            brightness_cmd = state_cmd
         if brightness_cmd is not None:
             channels.append((CHANNEL_BRIGHTNESS, brightness_cmd))
 

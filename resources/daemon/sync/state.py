@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import logging
 import time
+import json
 import math
+import os
 import re
 from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Set, Tuple
 
@@ -74,6 +76,8 @@ _READBACK_KEYS = {
 # Strict shape of the retained channel topics this module may empty (never anything else).
 _CHANNEL_TOPIC_RE = re.compile(r"jeedom2ha/\d+/(?:state|brightness|position)")
 
+_RETAINED_CHANNELS_FILENAME = "jeedom2ha_retained_channels.json"
+
 # Retained channel topics a type may have published; purged when the channel loses its
 # readback (Story 23.3, Q7).
 _PURGEABLE_CHANNELS = {
@@ -110,6 +114,7 @@ class StateSynchronizer:
         self,
         app: Mapping[str, Any],
         mqtt_bridge: Any,
+        data_dir: Optional[str] = None,
     ) -> None:
         self._app = app
         self._mqtt_bridge = mqtt_bridge
@@ -118,11 +123,13 @@ class StateSynchronizer:
         # rejected (state_target_not_found), so a click's fresh read never wins over
         # a more recent Jeedom event received while the click was in flight.
         self._pending_click_values: Dict[Tuple[int, int], Tuple[float, Any]] = {}
-        # Story 23.3 (Q7) — retained light/cover channel topics known to exist at the
-        # broker: read once per process (``_ensure_retained_scan``) then kept up to date
-        # with our own retained publishes. A stale one is emptied only if it is in here.
-        self._retained_channel_topics: Set[str] = set()
-        self._retained_scan_done = False
+        # Story 23.3 (Q7) — retained light/cover channel topics WE published, persisted in
+        # ``data_dir`` so they survive a restart without any broker read. A stale one is
+        # emptied only if it is in here; no subscription to our own state topics is needed.
+        self._retained_channels_path = (
+            os.path.join(data_dir, _RETAINED_CHANNELS_FILENAME) if data_dir else None
+        )
+        self._retained_channel_topics: Set[str] = self._load_retained_channels()
 
     @property
     def is_active(self) -> bool:
@@ -335,11 +342,6 @@ class StateSynchronizer:
         eq_id = getattr(mapping, "jeedom_eq_id", None)
         published = 0
         failed = 0
-        if any(
-            getattr(c, "ha_entity_type", None) in _PURGEABLE_CHANNELS
-            for c in self._iter_streamed_candidates(mapping)
-        ):
-            await self._ensure_retained_scan()
         for candidate in self._iter_streamed_candidates(mapping):
             # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
             cand_decision = (
@@ -382,36 +384,40 @@ class StateSynchronizer:
                                   state_topic=binding.topic)
         return published, failed
 
-    async def _ensure_retained_scan(self) -> None:
-        """Read once per process which light/cover channel topics are retained.
-
-        Story 23.3 (Q7). The broker is the source of truth (same approach as the
-        scenario button purge): only what was actually read can be emptied, so the
-        steady state costs no MQTT publish per equipment. A short window only
-        under-reports; a bridge without collection (or one busy) leaves the scan
-        undone and it is retried at the next publication.
-        """
-        if self._retained_scan_done:
-            return
-        collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
-        if collect is None:
-            return
+    def _load_retained_channels(self) -> Set[str]:
+        """Restore the retained channel topics published by a previous run (best effort)."""
+        path = self._retained_channels_path
+        if not path:
+            return set()
         try:
-            retained = await collect("jeedom2ha/#")
-        except Exception:
-            _LOGGER.exception("[SYNC-STATE] Retained channel scan failed, no stale purge")
+            with open(path, encoding="utf-8") as handle:
+                raw = json.load(handle)
+        except FileNotFoundError:
+            return set()
+        except (OSError, ValueError):
+            _LOGGER.warning("[SYNC-STATE] Retained channel registry unreadable, starting empty")
+            return set()
+        if not isinstance(raw, list):
+            return set()
+        return {t for t in raw if isinstance(t, str) and _CHANNEL_TOPIC_RE.fullmatch(t)}
+
+    def _save_retained_channels(self) -> None:
+        path = self._retained_channels_path
+        if not path:
             return
-        if not isinstance(retained, list):
-            return
-        self._retained_scan_done = True
-        for topic in retained:
-            if isinstance(topic, str) and _CHANNEL_TOPIC_RE.fullmatch(topic):
-                self._retained_channel_topics.add(topic)
+        tmp_path = f"{path}.tmp"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as handle:
+                json.dump(sorted(self._retained_channel_topics), handle)
+            os.replace(tmp_path, path)
+        except OSError:
+            _LOGGER.warning("[SYNC-STATE] Retained channel registry not saved: %s", path)
 
     def _remember_retained(self, topic: str) -> None:
         """Track a retained channel topic we just published (real state -> purgeable)."""
-        if _CHANNEL_TOPIC_RE.fullmatch(topic):
+        if _CHANNEL_TOPIC_RE.fullmatch(topic) and topic not in self._retained_channel_topics:
             self._retained_channel_topics.add(topic)
+            self._save_retained_channels()
 
     def _purge_invalid_retained(
         self,
@@ -426,8 +432,9 @@ class StateSynchronizer:
         real state would otherwise get that stale value back from the broker. Runs at
         (re)publication and rescan only (never on a state event), strictly on
         ``jeedom2ha/<eq>/state|brightness|position`` topics derived from the registry
-        state topic, and only for topics known to be retained (scan + our own
-        publishes), so an entity that keeps its readback or never had one costs nothing.
+        state topic, and only for topics known to be retained (our own
+        publishes, persisted across restarts), so an entity that keeps its readback or never
+        had one costs nothing.
         Returns the number of failed purge publications (counted as failed republication
         so the caller does not report success while a stale state stays at the broker).
         """
@@ -444,6 +451,7 @@ class StateSynchronizer:
                 continue
             if self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True):
                 self._retained_channel_topics.discard(topic)
+                self._save_retained_channels()
                 self._log(logging.INFO, eq_id=eq_id, cmd_id=None,
                           reason_code="stale_retained_state_purged", action="purge_state",
                           state_topic=topic)

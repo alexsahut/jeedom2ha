@@ -8,6 +8,7 @@ discovery, retained purge on republication, and the /action/state_update route.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -196,6 +197,95 @@ async def test_light_initial_states_publish_state_and_brightness():
     assert await sync.publish_initial_states(decision) == 2
     assert ("jeedom2ha/300/state", "ON", 1, True) in bridge.published
     assert ("jeedom2ha/300/brightness", "75", 1, True) in bridge.published
+
+
+# --- one command feeding two channels (§2.2) --------------------------------
+
+def test_numeric_light_state_feeds_state_and_brightness_with_one_listener():
+    decision = _light(300, brightness=False, has_brightness=True, state_sub="numeric", state_value="60")
+    assert _sync([decision]).list_state_targets() == [
+        {"eq_id": 300, "cmd_id": 3003, "ha_type": "light", "state_topic": "jeedom2ha/300/state"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_numeric_light_state_publishes_on_off_and_level():
+    bridge = _FakeBridge()
+    decision = _light(300, brightness=True, state_sub="numeric", state_value="60")
+    decision.mapping_result.commands.pop("LIGHT_BRIGHTNESS")   # LIGHT_STATE only
+    sync = _sync([decision], bridge)
+    assert await sync.handle_state_message(300, 3003, "60") is True
+    assert bridge.published == [
+        ("jeedom2ha/300/state", "ON", 1, True),
+        ("jeedom2ha/300/brightness", "60", 1, True),
+    ]
+    bridge.published.clear()
+    await sync.handle_state_message(300, 3003, "0")
+    assert bridge.published == [
+        ("jeedom2ha/300/state", "OFF", 1, True),
+        ("jeedom2ha/300/brightness", "0", 1, True),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_numeric_light_state_over_100_publishes_on_but_no_brightness():
+    bridge = _FakeBridge()
+    decision = _light(300, brightness=True, state_sub="numeric", state_value="255")
+    decision.mapping_result.commands.pop("LIGHT_BRIGHTNESS")
+    await _sync([decision], bridge).handle_state_message(300, 3003, "255")
+    assert bridge.published == [("jeedom2ha/300/state", "ON", 1, True)]
+
+
+def test_binary_light_state_never_feeds_brightness():
+    decision = _light(300, brightness=True, state_sub="binary")
+    decision.mapping_result.commands.pop("LIGHT_BRIGHTNESS")
+    assert readback.has_reliable_channel("light", decision.mapping_result, "brightness") is False
+    assert readback.has_reliable_channel("light", decision.mapping_result, "state") is True
+
+
+def test_brightness_info_wins_over_numeric_state_for_the_brightness_channel():
+    decision = _light(300, state_sub="numeric")
+    channels = dict(readback.readback_commands("light", decision.mapping_result))
+    assert channels["brightness"].generic_type == "LIGHT_BRIGHTNESS"
+    assert channels["state"].generic_type == "LIGHT_STATE"
+
+
+@pytest.mark.asyncio
+async def test_light_with_both_keys_on_one_command_has_a_single_initial_state_per_topic():
+    bridge = _FakeBridge()
+    decision = _light(300, brightness=False, has_brightness=True, state_sub="numeric", state_value="30")
+    assert await _sync([decision], bridge).publish_initial_states(decision) == 2
+    assert sorted(p[0] for p in bridge.published) == [
+        "jeedom2ha/300/brightness", "jeedom2ha/300/state"]
+
+
+# --- golden corpus lights 457 / 1009 / 1004 (discovery payloads) --------------
+
+_GOLDEN = (Path(__file__).resolve().parents[1] / "fixtures" / "story_19_4_guard"
+           / "s1_sync_corpus_dore_mqtt.json")
+
+
+def _golden_light(eq_id):
+    topic = f"homeassistant/light/jeedom2ha_{eq_id}/config"
+    return next(c["payload"] for c in json.loads(_GOLDEN.read_text())
+                if c.get("topic") == topic and isinstance(c.get("payload"), dict))
+
+
+def test_golden_457_binary_state_with_slider_has_optimistic_brightness():
+    payload = _golden_light(457)
+    assert payload["optimistic"] is False                  # real LIGHT_STATE
+    assert "brightness_state_topic" not in payload         # no brightness readback
+    assert payload["brightness_command_topic"] == "jeedom2ha/457/brightness/set"
+
+
+def test_golden_1009_numeric_state_with_slider_reports_brightness():
+    payload = _golden_light(1009)
+    assert payload["optimistic"] is False
+    assert payload["brightness_state_topic"] == "jeedom2ha/1009/brightness"
+
+
+def test_golden_1005_brightness_info_reports_brightness():
+    assert _golden_light(1005)["brightness_state_topic"] == "jeedom2ha/1005/brightness"
 
 
 # --- cover: open/closed + position ------------------------------------------
@@ -391,76 +481,33 @@ async def test_cover_discovery_optimistic_only_without_real_state(snapshot, kwar
 
 # --- retained purge at (re)publication (Q7) ---------------------------------
 
-class _ScanBridge(_FakeBridge):
-    """Bridge able to read the retained topics (``collect_retained_topics``)."""
+def _persisting_sync(decisions, bridge, data_dir):
+    publications = {d.mapping_result.jeedom_eq_id: d for d in decisions}
+    return StateSynchronizer(app={"publications": publications}, mqtt_bridge=bridge,
+                             data_dir=str(data_dir))
 
-    def __init__(self, retained, **kwargs):
-        super().__init__(**kwargs)
-        self._retained = retained
-        self.collect_calls = 0
 
-    async def collect_retained_topics(self, topic_filter, window_s=1.5):
-        self.collect_calls += 1
-        return list(self._retained)
+def _registry(data_dir):
+    path = data_dir / "jeedom2ha_retained_channels.json"
+    return sorted(json.loads(path.read_text())) if path.exists() else None
 
 
 @pytest.mark.asyncio
-async def test_stale_retained_found_at_broker_is_emptied_once():
-    bridge = _ScanBridge(["jeedom2ha/300/state", "jeedom2ha/300/brightness"])
-    decision = _light(300, state=False, brightness=False)
-    sync = _sync([decision], bridge)
-    await sync.publish_initial_states(decision)
-    assert sorted(bridge.published) == [
-        ("jeedom2ha/300/brightness", "", 1, True),
-        ("jeedom2ha/300/state", "", 1, True),
-    ]
-    await sync.publish_initial_states(decision)
-    assert len(bridge.published) == 2          # emptied once, not at every sync
-    assert bridge.collect_calls == 1           # broker read once per process
-
-
-@pytest.mark.asyncio
-async def test_nothing_retained_means_no_purge_publication():
-    bridge = _ScanBridge([])
-    decision = _light(300, state=False, brightness=False)
-    await _sync([decision], bridge).publish_initial_states(decision)
-    assert bridge.published == []
-
-
-@pytest.mark.asyncio
-async def test_bridge_without_collection_costs_nothing():
+async def test_never_published_channels_cost_no_publication(tmp_path):
     bridge = _FakeBridge()
     decision = _light(300, state=False, brightness=False)
-    await _sync([decision], bridge).publish_initial_states(decision)
-    assert bridge.published == []
+    await _persisting_sync([decision], bridge, tmp_path).publish_initial_states(decision)
+    assert bridge.published == []              # no broker read, no blind tombstone
 
 
 @pytest.mark.asyncio
-async def test_entity_keeping_its_readback_is_never_purged():
-    bridge = _ScanBridge(["jeedom2ha/300/state", "jeedom2ha/300/brightness"])
-    decision = _light(300)
-    await _sync([decision], bridge).publish_initial_states(decision)
-    assert all(p[1] != "" for p in bridge.published)
-
-
-@pytest.mark.asyncio
-async def test_only_strict_jeedom2ha_channel_topics_are_ever_emptied():
-    bridge = _ScanBridge([
-        "other/300/state", "jeedom2ha/300/set", "jeedom2ha/300/brightness/set",
-        "jeedom2ha/300/availability", "jeedom2ha/300/5/state", "jeedom2ha/bridge/state",
-    ])
-    decision = _light(300, state=False, brightness=False)
-    await _sync([decision], bridge).publish_initial_states(decision)
-    assert bridge.published == []
-
-
-@pytest.mark.asyncio
-async def test_real_to_unreliable_transition_purges_what_we_published():
-    bridge = _FakeBridge()                                     # no broker read needed
+async def test_transition_purges_what_was_published_and_forgets_it(tmp_path):
+    bridge = _FakeBridge()
     decision = _cover(400)
-    sync = _sync([decision], bridge)
+    sync = _persisting_sync([decision], bridge, tmp_path)
     await sync.publish_initial_states(decision)               # real: state + position
     assert [p[1] for p in bridge.published] == ["open", "50"]
+    assert _registry(tmp_path) == ["jeedom2ha/400/position", "jeedom2ha/400/state"]
 
     del decision.mapping_result.commands["FLAP_STATE"]        # readback removed
     bridge.published.clear()
@@ -469,27 +516,99 @@ async def test_real_to_unreliable_transition_purges_what_we_published():
         ("jeedom2ha/400/position", "", 1, True),
         ("jeedom2ha/400/state", "", 1, True),
     ]
+    assert _registry(tmp_path) == []
+    bridge.published.clear()
+    await sync.publish_initial_states(decision)               # emptied once only
+    assert bridge.published == []
 
 
 @pytest.mark.asyncio
-async def test_failed_purge_is_retried_at_next_publication():
-    bridge = _ScanBridge(["jeedom2ha/300/state"], publish_ok=False)
-    decision = _light(300, state=False, brightness=False)
-    sync = _sync([decision], bridge)
+async def test_purge_survives_a_daemon_restart(tmp_path):
+    decision = _light(300)
+    await _persisting_sync([decision], _FakeBridge(), tmp_path).publish_initial_states(decision)
+
+    # new process: the readback is gone, the registry file is all it knows
+    gone = _light(300, state=False, brightness=False)
+    bridge = _FakeBridge()
+    await _persisting_sync([gone], bridge, tmp_path).publish_initial_states(gone)
+    assert sorted(bridge.published) == [
+        ("jeedom2ha/300/brightness", "", 1, True),
+        ("jeedom2ha/300/state", "", 1, True),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_state_event_registers_the_topic_but_never_purges(tmp_path):
+    bridge = _FakeBridge()
+    decision = _light(300)
+    sync = _persisting_sync([decision], bridge, tmp_path)
+    await sync.handle_state_message(300, 3003, "1")
+    assert _registry(tmp_path) == ["jeedom2ha/300/state"]
+    assert bridge.published == [("jeedom2ha/300/state", "ON", 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_entity_keeping_its_readback_is_never_purged(tmp_path):
+    bridge = _FakeBridge()
+    decision = _light(300)
+    sync = _persisting_sync([decision], bridge, tmp_path)
     await sync.publish_initial_states(decision)
+    await sync.publish_initial_states(decision)
+    assert all(p[1] != "" for p in bridge.published)
+
+
+@pytest.mark.asyncio
+async def test_only_strict_jeedom2ha_channel_topics_are_ever_emptied(tmp_path):
+    (tmp_path / "jeedom2ha_retained_channels.json").write_text(json.dumps([
+        "other/300/state", "jeedom2ha/300/set", "jeedom2ha/300/brightness/set",
+        "jeedom2ha/300/availability", "jeedom2ha/300/5/state", 42,
+    ]))
+    bridge = _FakeBridge()
+    decision = _light(300, state=False, brightness=False)
+    await _persisting_sync([decision], bridge, tmp_path).publish_initial_states(decision)
+    assert bridge.published == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", ["not json", "{}", "[1, 2]", ""])
+async def test_corrupted_registry_starts_empty(tmp_path, content):
+    (tmp_path / "jeedom2ha_retained_channels.json").write_text(content)
+    bridge = _FakeBridge()
+    decision = _light(300, state=False, brightness=False)
+    await _persisting_sync([decision], bridge, tmp_path).publish_initial_states(decision)
+    assert bridge.published == []
+
+
+@pytest.mark.asyncio
+async def test_unwritable_registry_never_breaks_state_streaming(tmp_path):
+    bridge = _FakeBridge()
+    decision = _light(300)
+    sync = _persisting_sync([decision], bridge, tmp_path / "missing_dir")
+    assert await sync.handle_state_message(300, 3003, "1") is True
+
+
+@pytest.mark.asyncio
+async def test_failed_purge_is_retried_and_counted(tmp_path):
+    bridge = _FakeBridge()
+    decision = _light(300, brightness=False)
+    sync = _persisting_sync([decision], bridge, tmp_path)
+    await sync.handle_state_message(300, 3003, "1")           # registers the state topic
+    decision.mapping_result.commands.pop("LIGHT_STATE")
+
+    bridge._publish_ok = False
+    published, failed = await sync.publish_click_states(decision, {}, 0.0)
+    assert (published, failed) == (0, 1)
+    assert _registry(tmp_path) == ["jeedom2ha/300/state"]     # still known: retried later
+
     bridge._publish_ok = True
     bridge.published.clear()
     await sync.publish_initial_states(decision)
     assert bridge.published == [("jeedom2ha/300/state", "", 1, True)]
 
 
-@pytest.mark.asyncio
-async def test_state_event_never_purges():
-    bridge = _ScanBridge(["jeedom2ha/300/state"])
-    decision = _light(300, state=False, brightness=False)
-    sync = _sync([decision], bridge)
-    await sync.handle_state_message(300, 3003, "1")
-    assert bridge.published == []
+def test_no_broker_read_is_ever_needed():
+    # §2.4: the daemon never subscribes to / reads its own state topics.
+    assert not hasattr(StateSynchronizer, "_ensure_retained_scan")
 
 
 # --- non-regression: sensors keep their own topics --------------------------
@@ -556,13 +675,3 @@ async def test_command_then_real_state_without_optimistic_publication():
     assert translation_policy == "real_state_confirmation"
     assert await app["state_synchronizer"].handle_state_message(300, 3003, "0") is True
     assert bridge.published == [("jeedom2ha/300/state", "OFF", 1, True)]
-
-
-
-@pytest.mark.asyncio
-async def test_failed_purge_is_counted_as_failed_republication():
-    bridge = _ScanBridge(["jeedom2ha/300/state"], publish_ok=False)
-    decision = _light(300, state=False, brightness=False)
-    sync = _sync([decision], bridge)
-    published, failed = await sync.publish_click_states(decision, {}, 0.0)
-    assert (published, failed) == (0, 1)

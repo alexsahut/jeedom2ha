@@ -352,11 +352,13 @@ Le plugin remonte l'état **réel** d'une lumière ou d'un volet seulement si l'
 | Équipement | Commande d'information Jeedom | Ce que Home Assistant affiche |
 |---|---|---|
 | Lumière | état (marche/arrêt) | l'état réel allumée/éteinte |
-| Lumière variable | état **et** luminosité | l'état réel et la luminosité réelle (0 à 100) |
+| Lumière variable | état **et** luminosité (ou un état numérique, qui donne alors aussi la luminosité) | l'état réel et la luminosité réelle (0 à 100) |
+| Lumière variable | état binaire seul, sans luminosité | l'état réel ; la luminosité reste supposée par Home Assistant |
 | Lumière variable | luminosité seule, sans état | l'état allumée/éteinte reste supposé : le plugin ne le déduit jamais de la luminosité |
 | Lumière sans commande d'état | aucune | état supposé |
 | Volet | état d'ouverture (binaire) | ouvert ou fermé réel |
 | Volet positionnable | état numérique (0 à 100) | ouvert/fermé et position réels ; une position intermédiaire s'affiche « ouvert » |
+| Volet avec curseur de position | état binaire seul | ouvert/fermé réel ; la **position n'est pas remontée** (pas de valeur numérique à lire) |
 | Volet sans commande d'état | aucune | état supposé |
 
 Autres limites à connaître :
@@ -364,7 +366,7 @@ Autres limites à connaître :
 - **Aucune inversion de position.** Le plugin reprend la valeur de Jeedom telle quelle (0 = fermé, 100 = ouvert). Si un plugin Jeedom inverse cette échelle, la position affichée est inversée.
 - **Pas d'état intermédiaire** « en ouverture », « en fermeture » ou « arrêté » : seuls ouvert et fermé sont remontés.
 - **Valeur illisible ou hors de 0 à 100 :** rien n'est publié, Home Assistant garde la dernière valeur connue.
-- **Retrait d'une commande d'information :** à la synchronisation ou à la republication suivante, le plugin efface l'ancien état mémorisé par le broker pour que Home Assistant ne le relise pas.
+- **Retrait d'une commande d'information :** le plugin garde la liste des états qu'il a lui-même publiés (fichier du démon). À la synchronisation ou à la republication suivante, il efface l'état mémorisé par le broker pour ce canal, afin que Home Assistant ne le relise pas. Un état publié par une version qui ne tenait pas cette liste ne peut pas être effacé automatiquement.
 - La couleur d'une lumière, les thermostats et les alarmes ne sont pas concernés par cette remontée d'état.
 
 ### Les badges de synthèse

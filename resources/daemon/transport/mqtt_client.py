@@ -183,9 +183,12 @@ class MqttBridge:
         # Story 21.1 — collecte de topics retenus : ces messages ne sont jamais des commandes
         collector = self._retained_collector
         if collector is not None and mqtt.topic_matches_sub(collector["filter"], topic):
-            if getattr(message, "retain", False) and payload != "":
-                collector["topics"].append(topic)
-            return
+            if getattr(message, "retain", False):
+                # Only retained messages are collection traffic; a live (non-retained)
+                # message on a matching topic is a real command and keeps its normal path.
+                if payload != "":
+                    collector["topics"].append(topic)
+                return
 
         # Story 5.1 — Task 3.2: détecter le birth message Home Assistant
         if topic == HA_STATUS_TOPIC and payload == "online":

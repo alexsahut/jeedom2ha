@@ -236,6 +236,7 @@ class Jeedom2haDaemon(BaseDaemon):
         self._app["state_synchronizer"] = StateSynchronizer(
             app=self._app,
             mqtt_bridge=self._app.get("mqtt_bridge"),
+            data_dir=_DAEMON_DATA_DIR,
         )
         mqtt_bridge = self._app.get("mqtt_bridge")
         if mqtt_bridge is not None:
