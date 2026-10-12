@@ -55,7 +55,8 @@ def fixture_repo(tmp_path):
                 "docs/fr_FR/changelog.md", "docs/fr_FR/changelog_beta.md", "docs/fr_FR/index.md",
                 "docs/git-strategy.md", "docs/ci.md", "docs/index.md", ".github/ci.yml",
                 ".claude/x.md", ".agent/x.md", ".agents/x.md", "_bmad/x.md", "_bmad-output/x.md",
-                "tests/test_a.py", "scripts/s.sh", ".env", ".env.local", "README.md", "Makefile",
+                "tests/test_a.py", "scripts/s.sh", ".env", ".env.local", "README.md", "CLAUDE.md",
+                ".gitignore", ".rsync-plugin-deploy.filter", "LICENSE", "Makefile",
                 "3rdparty/README.md", "a/__pycache__/x.pyc"]:
         write(repo, rel)
     for rel in mp.load_manifest()["retain"]:
@@ -71,12 +72,31 @@ def test_manifest_loads_and_keeps_docs_fr_fr():
     assert not mp.is_included(m["rules"], "docs/git-strategy.md")
 
 
+DEV_FILES = ["CLAUDE.md", ".gitignore", ".rsync-plugin-deploy.filter"]
+
+
 def test_exclusions_aligned_with_deploy_filter():
-    """Seule divergence autorisée vs .rsync-plugin-deploy.filter : docs/fr_FR/ inclus."""
+    """Le manifeste exclut tout ce qu'exclut le filtre de déploiement, plus les seuls fichiers de dev."""
     deploy = [ln.strip()[2:] for ln in (REPO / ".rsync-plugin-deploy.filter").read_text().splitlines()
               if ln.startswith("- ")]
     mine = [p for k, p in mp.load_manifest()["rules"] if k == "exclude"]
-    assert sorted(deploy) == sorted(mine)
+    assert sorted(set(mine) - set(deploy)) == sorted(DEV_FILES)
+    assert set(deploy) - set(mine) == set()
+
+
+def test_dev_files_forbidden_in_manifest():
+    m = mp.load_manifest()
+    for name in DEV_FILES:
+        assert name in m["forbid"], name
+
+
+def test_real_repo_package_has_no_dev_files(tmp_path):
+    """Paquet construit sur le vrai dépôt (HEAD) : aucun fichier de dev ne doit réapparaître."""
+    out = tmp_path / "pkg"
+    sh("build", "HEAD", "--output", str(out))
+    for name in DEV_FILES:
+        assert not (out / name).exists(), name
+    assert (out / "docs/fr_FR/index.md").exists()
 
 
 def test_ac1_ac3_build_matches_filtered_source(fixture_repo, tmp_path):
@@ -92,6 +112,7 @@ def test_ac1_ac3_build_matches_filtered_source(fixture_repo, tmp_path):
     assert "docs/fr_FR/index.md" in expected
     for forbidden in [".github/ci.yml", ".claude/x.md", ".agent/x.md", ".agents/x.md",
                       "_bmad/x.md", "tests/test_a.py", "scripts/s.sh", "docs/git-strategy.md",
+                      "CLAUDE.md", ".gitignore", ".rsync-plugin-deploy.filter",
                       "resources/daemon/tests/t.py", ".env", "README.md"]:
         assert not (out / forbidden).exists(), forbidden
     for rel in expected:  # contenu identique à celui du SHA source

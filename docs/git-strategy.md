@@ -123,7 +123,7 @@ Une exception ne doit exister que si elle est explicitement justifiée et docume
 déjà déployé et validé sur la box (SHA portant un tag `deploy-...`).
 
 - Le manifeste d'exclusion est `.github/market-package/manifest.txt` (dérivé de
-  `.rsync-plugin-deploy.filter`). Seule divergence : `docs/fr_FR/` est **inclus**, car
+  `.rsync-plugin-deploy.filter`). Divergences : `CLAUDE.md`, `.gitignore` et `.rsync-plugin-deploy.filter` sont exclus ; `docs/fr_FR/` est **inclus**, car
   `plugin_info/info.json` référence `docs/fr_FR/changelog*.md` et `docs/fr_FR/index.md`.
 - Le script écrit le paquet sur une branche `release/vX.Y.Z` créée depuis l'état courant de
   `beta` (ou `stable`), en **un seul commit** : `release vX.Y.Z (source <sha>)`.

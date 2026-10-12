@@ -1094,10 +1094,10 @@ et tout `docs/` **sauf `docs/fr_FR/`**.
 **Pourquoi `docs/fr_FR/` est inclus** : `plugin_info/info.json` référence `changelog`,
 `documentation`, `changelog_beta`, `documentation_beta` sous forme de liens
 `blob/<branche>/docs/fr_FR/...`. Sans ce dossier sur `beta`/`stable` épurées, ces liens
-renverraient une 404. (`.rsync-plugin-deploy.filter`, utilisé par `deploy-to-box.sh`, n'est pas
-modifié et exclut toujours `docs/` : un test garantit que les deux filtres ne divergent que sur
-ce point.) À noter : comme dans le filtre de déploiement, `CLAUDE.md`, `LICENSE`, `.gitignore`
-et `.rsync-plugin-deploy.filter` ne sont pas exclus.
+renverraient une 404. (`.rsync-plugin-deploy.filter`, utilisé par `deploy-to-box.sh`, n'est pas modifié et exclut
+toujours `docs/` : un test garantit que le manifeste exclut au moins tout ce qu'exclut ce filtre.)
+Deuxième divergence : `CLAUDE.md`, `.gitignore` et `.rsync-plugin-deploy.filter` (fichiers de dev)
+sont exclus du paquet et figés en `forbid`. `LICENSE` reste livré.
 
 ### 7.2 Construire et vérifier le paquet (sans effet sur Git)
 

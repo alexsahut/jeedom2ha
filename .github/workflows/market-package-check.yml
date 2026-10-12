@@ -1,7 +1,7 @@
 name: Market Package Check
 
 # Story A2 — validation du paquet Market épuré.
-#   - PR vers main touchant le script / le manifeste : construit le paquet depuis HEAD et le
+#   - PR vers main : construit le paquet depuis HEAD et le
 #     valide contre .github/market-package/manifest.txt (anti-régression).
 #   - PR vers beta/stable (branche release/vX.Y.Z) : valide l'arbre de release lui-même.
 # Ce workflow (avec manifest.txt et market_package.py) est le seul fichier .github/ conservé
@@ -10,14 +10,8 @@ name: Market Package Check
 on:
   pull_request:
     branches: [main, beta, stable]
-    paths:
-      - '.github/market-package/**'
-      - '.github/workflows/market-package-check.yml'
-      - 'scripts/build-market-package.sh'
-      - '.rsync-plugin-deploy.filter'
-      - 'plugin_info/**'
-      - 'docs/fr_FR/**'
-      - 'tests/test_market_package.py'
+  # Pas de filtre paths: le check est REQUIS sur beta/stable (option 1) et doit toujours se
+  # déclencher, y compris pour une release ne touchant que core/ ou resources/ ; il est léger.
 
 permissions:
   contents: read

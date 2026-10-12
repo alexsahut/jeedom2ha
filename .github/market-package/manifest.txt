@@ -10,9 +10,10 @@
 #                          avec "/" : ancré à la racine).
 #   motif sans "/" final : fnmatch sur le nom de fichier (sans "/") ou sur le chemin complet.
 #
-# Dérivé de .rsync-plugin-deploy.filter (déploiement box) avec UNE divergence documentée :
-# docs/fr_FR/ est INCLUS (changelog + documentation référencés par plugin_info/info.json).
-# tests/test_market_package.py vérifie que les autres exclusions restent alignées.
+# Dérivé de .rsync-plugin-deploy.filter (déploiement box) avec des divergences documentées :
+#   1. docs/fr_FR/ est INCLUS (changelog + documentation référencés par plugin_info/info.json) ;
+#   2. CLAUDE.md, .gitignore, .rsync-plugin-deploy.filter sont EXCLUS (fichiers de dev).
+# tests/test_market_package.py vérifie que le reste reste aligné.
 
 # --- Divergence : docs/fr_FR/ est livré, le reste de docs/ non ---
 include docs/fr_FR/
@@ -47,6 +48,11 @@ exclude pyproject.toml
 exclude Makefile
 exclude README.md
 
+# --- Fichiers de dev exclus du paquet (divergence #2 vs .rsync-plugin-deploy.filter) ---
+exclude CLAUDE.md
+exclude .gitignore
+exclude .rsync-plugin-deploy.filter
+
 # --- Garde-fous figés (indépendants des règles ci-dessus : une régression des
 #     règles include/exclude est détectée ici). ---
 forbid .git/
@@ -60,6 +66,9 @@ forbid _bmad/
 forbid _bmad-output/
 forbid .env
 forbid .env.*
+forbid CLAUDE.md
+forbid .gitignore
+forbid .rsync-plugin-deploy.filter
 forbid docs/git-strategy.md
 forbid docs/release-market.md
 forbid docs/ci.md
