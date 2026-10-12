@@ -6,6 +6,12 @@
 
 ---
 
+# 2026-10-12 — Plus de nom doublé dans Home Assistant
+
+- Quand une entité porte exactement le nom de son appareil (boutons de scénario, équipements à une entité), Home Assistant affichait le nom deux fois (« X X »). Le nom n'est plus doublé et l'assistant vocal retrouve l'entité sous son nom. Seul le nom affiché change : aucun identifiant d'entité n'est modifié.
+
+---
+
 # 2026-10-12 — Compteurs fondés sur la présence dans Home Assistant et actions plus lisibles
 
 - Les compteurs d'une pièce disent maintenant ce qui est **réellement dans Home Assistant** : équipements et commandes publiés, en attente d'application, non pris en charge (les équipements exclus ou désactivés restent comptés à part). Un équipement déplié affiche aussi ses propres compteurs. Voir la page « Les compteurs »
