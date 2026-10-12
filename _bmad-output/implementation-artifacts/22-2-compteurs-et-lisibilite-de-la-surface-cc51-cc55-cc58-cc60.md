@@ -1,8 +1,8 @@
 # Story 22.2 : Compteurs et lisibilité de la surface (compteurs, CC-51, CC-55, CC-58, CC-60, P3 de 20-3)
 
-Status: review
+Status: ready-for-UX-validation
 
-> **Statut : `review` (2026-10-12, dev-story par une session cloud déléguée ; AC6 en attente de décision, Tasks 0 c et 9 pour ClaudeBox).** Historique : `ready-for-dev` (2026-10-12). Alexandre a tranché les questions le 2026-10-12 vers 05:50, relayé par ClaudeBox : **Q1 A, Q2 A, Q3 A, Q4 B, Q5 A, Q6 C, Q7 A (sous réserve de la Task 0 a), Q8 A, QD une seule story** (voir « Décisions d'Alexandre »). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. **Ordre : après 22-1.** Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret). Pointeurs pris sur `main` à `ab3a854`. R1 (ClaudeBox) : C9 reformulé (cause non affirmée). Aucun nom réel (CC-48) : identifiants seuls.
+> **Statut : `ready-for-UX-validation` (2026-10-12).** Code fusionné (#255 `09817f9`, correctif du gate #258 `9319784`), déployé et prouvé sur la box (voir « Preuve terrain (2026-10-12) » et `22-2-preuve-terrain-2026-10-12.md`) ; reste la validation UX d'Alexandre avant `done`. Historique : `review` (dev-story, session cloud déléguée), `ready-for-dev` (2026-10-12). Alexandre a tranché les questions le 2026-10-12 vers 05:50, relayé par ClaudeBox : **Q1 A, Q2 A, Q3 A, Q4 B, Q5 A, Q6 C, Q7 A (sous réserve de la Task 0 a), Q8 A, QD une seule story** (voir « Décisions d'Alexandre »). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. **Ordre : après 22-1.** Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret). Pointeurs pris sur `main` à `ab3a854`. R1 (ClaudeBox) : C9 reformulé (cause non affirmée). Aucun nom réel (CC-48) : identifiants seuls.
 
 ## Story
 
@@ -67,7 +67,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 ## Tâches
 
-- [x] **Task 0 — Établir (lecture seule)** : (a) **fait** : cause de CC-60 établie et débloquage possible (voir Dev Agent Record) ⇒ **AC6 : décision d'Alexandre = option A (R2)** ; (b) **fait** : cas non équivalents listés (Dev Agent Record) ; (c) relevé « avant » sur la box : **ClaudeBox** (non fait par la session cloud).
+- [x] **Task 0 — Établir (lecture seule)** : (a) **fait** : cause de CC-60 établie et débloquage possible (voir Dev Agent Record) ⇒ **AC6 : décision d'Alexandre = option A (R2)** ; (b) **fait** : cas non équivalents listés (Dev Agent Record) ; (c) relevé « avant » sur la box : **fait par ClaudeBox** (voir « Preuve terrain »).
 - [x] **Task 1 — Démon (champ additif)** : `entities[].present_in_ha` et `commands[].published_in_ha` dans l'arbre `GET /system/mapping_overrides/{eq_id}` ; lecture seule de l'état d'exécution, mêmes prédicats que `_is_currently_published_in_ha`.
 - [x] **Task 2 — Interface : compteurs** (`summarizeRoom`, `summarizeEquipmentCounters`, `buildRoomCounterLabels`, `buildEquipmentCounterLabels`, `renderRoomCounters`, `renderEquipmentCounters`) selon Q1 A, Q2 A, Q3 A.
 - [x] **Task 3 — Interface : portées et doublons** (`appendPublicationActions`, `renderEntities`, `entityActionsDuplicateEquipment`) selon Q4 B.
@@ -76,7 +76,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 - [x] **Task 6 — P3 de 20-3** selon Q8 A (bandeau relu après toute issue de « Republier » ; faux DOM : le texte analysé depuis du HTML est décodé comme dans un navigateur, assertion corrigée).
 - [x] **Task 7 — Tests** : Node (faux DOM), Python, parcours du gate 20-0 écrits ou adaptés (287, 579, 380), **non lancés contre une box**.
 - [x] **Task 8 — Documentation** : `compteurs.md` réécrit, `index.md` ajusté, `changelog_beta.md` ; **captures par l'humain** après la story.
-- [ ] **Task 9 — Preuve terrain (humain)** : inventaire avant/après (aucune publication ne doit changer), recomptage des compteurs sur au moins une pièce, clic réel des actions touchées. **ClaudeBox.**
+- [x] **Task 9 — Preuve terrain (humain)** : inventaire avant/après (aucune publication ne change), recomptage des compteurs sur la pièce 25, clic réel (annulé dans sa confirmation) de « Supprimer de Home Assistant », gate 20-0 : **faite par ClaudeBox le 2026-10-12** (voir « Preuve terrain (2026-10-12) »). Reste la validation UX d'Alexandre.
 
 ## Garde-fous
 
@@ -136,6 +136,28 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 **Q7 : option A confirmée, option C écartée.** Alexandre a tranché après la Task 0 a : la liste « Override HA » est filtrée par le démon (champ additif) ; ni la projection ni ce qui est publié ne changent. Voir « R2 » du Dev Agent Record.
 
+## Preuve terrain (2026-10-12)
+
+Détail dans `22-2-preuve-terrain-2026-10-12.md` (ClaudeBox, lecture seule, identifiants seulement).
+
+- **SHA déployé** : `09817f91195344fa9391ad12d5d438c4e641934e` (`main` après #255), `--restart-daemon`, démon redémarré à 11:11, 0 ligne `ERROR`, sync `total_eq=292 eligible=96 published=263`.
+- **Gate 20-0** (11:18 à 11:26, sur `09817f9`) : découverte **PASS** ; exclusion (287) **PASS** ; contrôle négatif **FAIL attendu** (écriture non déclarée bloquée, box inchangée) ; référence (380) FAIL (`parcours-record-valeur-invalide`) puis **PASS** à 11:53 après le correctif #258 (`9319784`, tests seulement, aucun déploiement). Aucune écriture transmise.
+
+| AC | État sur la box |
+|---|---|
+| AC1 | Tenu : pièce 25, 9 équipements publiés dans HA, 0 en attente, 1 non pris en charge (287), 7 exclus, 1 désactivé ; 94 commandes publiées, 0 en attente, 103 non prises en charge |
+| AC2 | Tenu : compteurs lus sur l'équipement déplié (287 : 0/0/3 ; 579 : 5/0/1) |
+| AC3 | Tenu : libellés « équipement entier » / « cette entité » ; 287 (une entité) sans bouton d'entité, 579 (plusieurs entités) avec trois actions « cette entité » par ligne |
+| AC4 | Tenu : « Supprimer de Home Assistant » avec rappel de « Republier » ; clic réel annulé dans sa confirmation (équipement 592), rien supprimé |
+| AC5 | Tenu : sélecteur de la commande 5369 grisé avec l'explication « portée par plusieurs entités » (579) |
+| AC6 | Tenu (R2, option A) : liste de 2971 = « mode automatique » + `cover` ; `sensor` et `binary_sensor` retirés ; cause « précisez les types génériques dans Jeedom » lisible |
+| AC7 | Tenu en tests (bandeau relu après tout résultat de « Republier ») ; non rejoué sur la box, aucun échec provoqué |
+| AC8 | Tenu : recomptage de la pièce 25 identique au registre de HA (9 équipements, 90 entités présentes, 94 commandes publiées) |
+| AC9 | Tenu : `compteurs.md` réécrit (fusionné avec #255) |
+| AC10 | Tenu : gate vert (voir ci-dessus), inventaire et registres de HA sans changement dû à 22-2 (349 → 348 : bouton d'un scénario désactivé dans Jeedom, hors 22-2), 0 entité et 0 appareil modifiés |
+
+Suivi : le coût de la liste filtrée croît avec le nombre d'entités d'un équipement (pièce 4 : 1 200 → 1 739 ms en série, plus longue lecture 385 ms pour 24 entités) ; à suivre (CC-62) si un équipement plus gros apparaît.
+
 ## Journal des décisions
 
 - 2026-10-11 15:48 — Alexandre : story « compteurs » regroupée avec CC-51 ; « publiés » = `published_in_ha`, plus « en attente d'application » et « non pris en charge ».
@@ -146,6 +168,11 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 - 2026-10-12 — dev-story (session cloud déléguée) : Tasks 0 a, 0 b, 1 à 8 faites ; AC6 d'abord en attente de décision (Task 0 a : une projection corrigée ferait aboutir `sensor`/`binary_sensor`) ; statut `review`.
 - 2026-10-12, vers 10:30 — **Décision d'Alexandre sur l'AC6 (CC-60), relayée par ClaudeBox : option A, filtrer la liste « Override HA ».** La correction de la projection (option C) est écartée : on ne touche ni à la projection ni à ce qui est publié. Implémentée en R2.
+
+- 2026-10-12, 11:11 — **Déploiement** de `09817f9` (`main` après #255) sur la box par clawcode, démon redémarré, sync `total_eq=292 eligible=96 published=263`.
+- 2026-10-12, 11:13 à 11:26 — **Preuve terrain** par ClaudeBox (lecture seule) : inventaire MQTT 349 → 348 (retrait du bouton d'un scénario désactivé dans Jeedom, hors 22-2), registres de HA sans entité ni appareil modifié, recomptage de la pièce 25 identique au registre de HA (AC8), équipements 287, 579 et 380 conformes, confirmation de « Supprimer de Home Assistant » annulée sans effet ; gate 20-0 : découverte PASS, exclusion PASS, contrôle négatif FAIL attendu, référence FAIL puis PASS. Voir `22-2-preuve-terrain-2026-10-12.md`.
+- 2026-10-12 — **#258** (`9319784`, tests seulement, aucun déploiement) : le parcours de référence 380 enregistre `etape_a_cause_lisible` à `true` au lieu du texte de la cause (environ 90 caractères, limite de 80 du rapport) ; repassé PASS à 11:53.
+- 2026-10-12 — Clôture, étape 1 (documentation seulement) : statut `ready-for-UX-validation`, preuve versée au dépôt ; la validation UX d'Alexandre reste à faire avant `done`.
 
 ## Dev Agent Record
 
@@ -230,3 +257,4 @@ Exécutées comme la CI (`.github/workflows/test.yml`), Python 3.13 local : `fla
 - `tests/e2e/gate/parcours/reference-bascule-eq-380.mjs` (R2 : bascule sur `cover`, liste filtrée vérifiée)
 - `docs/fr_FR/compteurs.md`, `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`
 - `docs/operations/delegations.md`
+- `_bmad-output/implementation-artifacts/22-2-preuve-terrain-2026-10-12.md` (nouveau, clôture étape 1)
