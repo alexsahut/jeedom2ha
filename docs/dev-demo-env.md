@@ -4,7 +4,8 @@ Jeu de démonstration **synthétique** (aucune donnée de la maison, CC-48) serv
 et preuves Market. Cible : VM 122 (Debian 12, unité A66), jamais la box de production.
 
 > **Statut** : livrables de code uniquement. **Aucune exécution sur VM tant que clawbox n'a pas
-> reçu le GO d'Alex.** Le contrat JSON-RPC d'écriture ci-dessous est **non démontré terrain**.
+> reçu le GO d'Alex.** Le contrat JSON-RPC d'écriture ci-dessous est vérifié dans les
+> sources Jeedom, mais reste à prouver sur la VM 122.
 
 ## Responsabilités
 
@@ -20,7 +21,8 @@ et preuves Market. Cible : VM 122 (Debian 12, unité A66), jamais la box de prod
 1. **Snapshot `vierge`** pris par clawbox (prérequis A66 ; ne rien créer avant sa confirmation).
 2. **Plugin déployé** : `scripts/deploy-to-box.sh` avec `JEEDOM_BOX_HOST` / `JEEDOM_BOX_USER`
    de la VM 122 dans un `.env` hors dépôt (voir `docs/dev-deploy.md`). Le plugin Virtuel
-   doit être installé et activé dans Jeedom.
+   doit être installé et activé dans Jeedom. Utiliser la branche `master` du plugin Virtuel :
+   il n'existe pas de branche `stable`.
 3. **Home Assistant** : copier `scripts/demo/docker-compose.ha.yml` sur la VM, puis
    `HA_IMAGE_TAG=<version-épinglée> docker compose -f docker-compose.ha.yml up -d`
    (`HA_IMAGE_TAG` est obligatoire, jamais `stable`). Dans HA, ajouter l'intégration MQTT vers
@@ -75,10 +77,11 @@ Tout est isolé dans `JsonRpcContract` / `JeedomAdapter` (`populate_demo.py`).
 | --- | --- |
 | Transport `POST core/api/jeeApi.php`, JSON-RPC 2.0, `params.apikey` | Prouvé par le projet (`event::changes`, `cmd::execCmd`) |
 | Clé requise : clé **core** (la clé plugin est refusée pour `cmd::execCmd`) | Prouvé sur la box testée ; supposé identique pour les écritures |
-| Méthodes de lecture/écriture `jeeObject::all/save`, `eqLogic::all/save`, `cmd::byEqLogicId/save`, `scenario::all/save` | **Non démontrées** (documentation Jeedom 4.x, de mémoire) |
-| Noms de champs (`eqType_name`, `object_id`, `eqLogic_id`, `generic_type`, `configuration.jeedom2ha_excluded`) | **Non démontrés** par appel réel |
-| Création d'un scénario vierge (sans éléments) via `scenario::save` | **Incertain** : la méthode peut ne pas exister selon la version |
-| Action Virtuel liée à son info via `configuration.infoName` + valeur `configuration.value` (1/0) | **Incertain** (selon la version : `value` = id de la commande info, valeur à poser à la main) |
+| Méthodes de lecture/écriture `jeeObject::all/save`, `eqLogic::all/save`, `cmd::byEqLogicId`, `scenario::all/save` | **Vérifiées dans les sources** `jeeApi.php`/`virtual.class.php` `master`, 12/10 — à prouver sur VM 122 (Jeedom 4.6.1) |
+| Création Virtuel et commandes | `eqLogic::save` avec `eqType_name=virtual` et la liste `cmd` complète. Les commandes existantes sont relues par nom et renvoyées avec leur `id`, sinon Jeedom les retire ; `Rafraichir` est conservée par `dontRemoveCmd`. **Vérifié dans les sources**, à prouver sur VM 122. |
+| Noms de champs (`eqType_name`, `object_id`, `eqLogic_id`, `generic_type`, `configuration.jeedom2ha_excluded`) | **Vérifiés dans les sources** — à prouver sur VM 122. |
+| Création d'un scénario vierge (sans éléments) via `scenario::save` | **Vérifiée dans les sources**, à prouver sur VM 122. |
+| Action Virtuel liée à son info | `configuration.infoName` est le nom d'une info du même équipement ; `configuration.value` est l'expression/valeur à lui appliquer ; `virtualCmd::preSave()` renseigne `infoId`. **Vérifié dans les sources**, à prouver sur VM 122. |
 
 Les tests unitaires utilisent un faux serveur qui implémente **ce contrat présumé** : ils
 prouvent l'idempotence et le dry-run, pas la compatibilité avec Jeedom. Sur écart constaté à la

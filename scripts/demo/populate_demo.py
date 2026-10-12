@@ -86,7 +86,8 @@ def _dimmer():
 def _cover():
     return [_info("Position", "FLAP_STATE", "numeric", "%"),
             _act("Positionner", "FLAP_SLIDER", "slider", info="Position"),
-            _act("Monter", "FLAP_UP"), _act("Descendre", "FLAP_DOWN"), _act("Stop", "FLAP_STOP")]
+            _act("Monter", "FLAP_UP", info="Position", value="100"),
+            _act("Descendre", "FLAP_DOWN", info="Position", value="0")]
 
 
 def _plug():
@@ -121,7 +122,8 @@ EQUIPMENTS: List[Dict[str, Any]] = [
     {"key": "bureau-prise", "room": "Bureau", "name": "Prise Bureau", "cmds": _plug()},
     # Sans aucun type générique : « Ne sera pas publié — et pourquoi ».
     {"key": "bureau-sans-type", "room": "Bureau", "name": "Equipement Libre Bureau",
-     "cmds": [_info("Mesure libre", "", "numeric"), _act("Action libre", "")]},
+     "cmds": [_info("Mesure libre", "", "numeric"),
+              _act("Action libre", "", info="Mesure libre", value="1")]},
     {"key": "garage-porte", "room": "Garage", "name": "Porte Garage",
      "cmds": [_info("Ouverture", "OPENING")]},
     # Exclu côté jeedom2ha : « Exclu ».
@@ -142,18 +144,18 @@ SCENARIO_GROUP = "Demo"
 # ---------------------------------------------------------------------------
 
 class JsonRpcContract:
-    """Noms de méthodes JSON-RPC. NON DÉMONTRÉS terrain : à valider sur la VM 122.
+    """Noms de méthodes JSON-RPC. À prouver sur la VM 122.
 
     Seuls `cmd::execCmd` et `event::changes` sont prouvés par le projet
     (cf. jeedom2ha-test-context-jeedom-reel.md) ; les méthodes ci-dessous sont
-    issues de la documentation publique Jeedom 4.x et peuvent varier.
+    vérifiées dans les sources Jeedom 4.6.1 / Virtuel ``master``. La VM 122
+    reste la preuve de compatibilité d'exécution.
     """
     ROOM_ALL = "jeeObject::all"
     ROOM_SAVE = "jeeObject::save"
     EQ_ALL = "eqLogic::all"
     EQ_SAVE = "eqLogic::save"
     CMD_BY_EQ = "cmd::byEqLogicId"
-    CMD_SAVE = "cmd::save"
     SCENARIO_ALL = "scenario::all"
     SCENARIO_SAVE = "scenario::save"
 
@@ -213,9 +215,6 @@ class JeedomAdapter:
     def cmds(self, eq_id: Any) -> List[Dict[str, Any]]:
         return self.rpc.call(self.c.CMD_BY_EQ, eqLogic_id=eq_id) or []
 
-    def save_cmd(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
-        return self.rpc.call(self.c.CMD_SAVE, **cmd)
-
     def scenarios(self) -> List[Dict[str, Any]]:
         return self.rpc.call(self.c.SCENARIO_ALL) or []
 
@@ -248,6 +247,32 @@ def _cmd_drift(existing: Dict[str, Any], wanted: Dict[str, Any]) -> bool:
         if str(existing.get(field) or "") != str(wanted.get(field) or ""):
             return True
     return str(existing.get("generic_type") or "") != str(wanted.get("generic_type") or "")
+
+
+def _eqlogic_payload(spec: Dict[str, Any], room_id: Any, existing: Optional[Dict[str, Any]],
+                     existing_cmds: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Construit le contrat ``eqLogic::save`` complet d'un Virtuel.
+
+    Jeedom retire les commandes absentes de ``cmd``. Chaque sauvegarde transmet donc
+    toutes les commandes, avec leur identifiant relu par nom, afin que les identifiants
+    (et par conséquent les unique_id MQTT/HA) restent stables au second passage.
+    """
+    payload: Dict[str, Any] = {
+        "eqType_name": EQ_TYPE, "name": spec["name"], "object_id": room_id,
+        "isEnable": 1, "isVisible": 1,
+        "configuration": {"jeedom2ha_excluded": 1 if spec.get("excluded") else 0,
+                          OWNER_MARKER: spec["key"]},
+        "cmd": [],
+    }
+    if existing:
+        payload["id"] = existing.get("id")
+    for wanted in spec["cmds"]:
+        cmd = dict(wanted, eqLogic_id=existing.get("id") if existing else None, isVisible=1)
+        previous = existing_cmds.get(wanted["name"])
+        if previous:
+            cmd["id"] = previous.get("id")
+        payload["cmd"].append(cmd)
+    return payload
 
 
 def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
@@ -306,34 +331,28 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
         changed = existing is not None and (_eq_excluded(existing) != excluded
                                             or not _bool(existing.get("isEnable", 1)))
         eq_id = existing.get("id") if existing else None
-        if write and (existing is None or changed):
-            payload = {"eqType_name": EQ_TYPE, "name": spec["name"], "object_id": room_id,
-                       "isEnable": 1, "isVisible": 1,
-                       "configuration": {"jeedom2ha_excluded": 1 if excluded else 0,
-                                         OWNER_MARKER: spec["key"]}}
-            if existing:
-                payload["id"] = eq_id
-            saved = adapter.save_eqlogic(payload)
-            eq_id = (saved or {}).get("id", eq_id)
-
         existing_cmds = {}
         if live and existing is not None:
             existing_cmds = {c.get("name"): c for c in adapter.cmds(eq_id)}
+        command_changed = any(
+            cmd["name"] not in existing_cmds or _cmd_drift(existing_cmds[cmd["name"]], cmd)
+            for cmd in spec["cmds"]
+        )
+        if write and (existing is None or changed or command_changed):
+            payload = _eqlogic_payload(spec, room_id, existing, existing_cmds)
+            saved = adapter.save_eqlogic(payload)
+            eq_id = (saved or {}).get("id", eq_id)
         cmd_report = []
         for cmd in spec["cmds"]:
             ex = existing_cmds.get(cmd["name"])
             drift = ex is not None and _cmd_drift(ex, cmd)
-            if write and (ex is None or drift):
-                payload = dict(cmd, eqLogic_id=eq_id, isVisible=1)
-                if ex:
-                    payload["id"] = ex.get("id")
-                adapter.save_cmd(payload)
             cmd_report.append({"name": cmd["name"], "type": cmd["type"], "subType": cmd["subType"],
                                "generic_type": cmd["generic_type"] or None,
                                "status": _status(ex is not None, drift)})
         inventory["equipments"].append({
             "key": spec["key"], "room": spec["room"], "name": spec["name"],
             "excluded": excluded, "status": _status(existing is not None, changed),
+            "write_plan": {"method": JsonRpcContract.EQ_SAVE, "cmd_count": len(spec["cmds"])},
             "cmds": cmd_report})
 
     for spec in SCENARIOS:

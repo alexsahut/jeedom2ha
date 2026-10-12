@@ -51,11 +51,30 @@ class FakeJeedom:
         if method == c.EQ_ALL:
             return self.eqs
         if method == c.EQ_SAVE:
-            return self._upsert(self.eqs, p)
+            if p.get("eqType_name") != "virtual":
+                raise KeyError("eqType_name virtual required")
+            params = {k: v for k, v in p.items() if k not in ("apikey", "cmd")}
+            eq = self._upsert(self.eqs, params)
+            requested = p.get("cmd", [])
+            names = set()
+            for command in requested:
+                if command.get("type") == "action" and not command.get("configuration", {}).get("infoName"):
+                    raise KeyError("infoName required for virtual action")
+                cmd = dict(command, eqLogic_id=eq["id"])
+                names.add(cmd["name"])
+                self._upsert(self.cmds, cmd)
+            # virtual::postSave creates Rafraichir; eqLogic::save must retain it even
+            # though the client need not include it in every complete command list.
+            if not any(cmd["eqLogic_id"] == eq["id"] and cmd.get("logicalId") == "refresh"
+                       for cmd in self.cmds):
+                self.cmds.append({"id": self._id(), "eqLogic_id": eq["id"], "name": "Rafraichir",
+                                  "logicalId": "refresh", "type": "action", "subType": "other"})
+            self.cmds[:] = [cmd for cmd in self.cmds
+                            if cmd["eqLogic_id"] != eq["id"] or cmd.get("logicalId") == "refresh"
+                            or cmd.get("name") in names]
+            return eq
         if method == c.CMD_BY_EQ:
             return [x for x in self.cmds if x["eqLogic_id"] == p["eqLogic_id"]]
-        if method == c.CMD_SAVE:
-            return self._upsert(self.cmds, p)
         if method == c.SCENARIO_ALL:
             return self.scenarios
         if method == c.SCENARIO_SAVE:
@@ -120,25 +139,27 @@ def test_dataset_covers_acceptance_criteria():
 def test_populate_creates_everything(server):
     inv = pd.populate(adapter_for(server), dry_run=False)
     assert len(server.rooms) == 5 and len(server.eqs) == 16 and len(server.scenarios) == 3
-    assert len(server.cmds) == inv["summary"]["cmds"]
+    assert len(server.cmds) == inv["summary"]["cmds"] + len(server.eqs)  # Rafraichir
     assert all(e["eqType_name"] == "virtual" and e["object_id"] for e in server.eqs)
     assert sum(1 for e in server.eqs if e["configuration"]["jeedom2ha_excluded"] == 1) == 1
-    assert inv["summary"]["by_status"] == {"created": 71}
+    assert inv["summary"]["by_status"] == {"created": 69}
 
 
 def test_rerun_is_idempotent(server):
     pd.populate(adapter_for(server), dry_run=False)
     before = (len(server.rooms), len(server.eqs), len(server.cmds), len(server.scenarios))
+    ids_before = {cmd["name"] + ":" + str(cmd["eqLogic_id"]): cmd["id"] for cmd in server.cmds}
     server.calls.clear()
     inv = pd.populate(adapter_for(server), dry_run=False)
     assert (len(server.rooms), len(server.eqs), len(server.cmds), len(server.scenarios)) == before
     assert server.writes == []
+    assert {cmd["name"] + ":" + str(cmd["eqLogic_id"]): cmd["id"] for cmd in server.cmds} == ids_before
     assert set(inv["summary"]["by_status"]) == {"exists"}
 
 
 def test_rerun_repairs_drift_without_duplicates(server):
     pd.populate(adapter_for(server), dry_run=False)
-    cmd = next(c for c in server.cmds if c["generic_type"] == "POWER")
+    cmd = next(c for c in server.cmds if c.get("generic_type") == "POWER")
     cmd["generic_type"] = ""
     n = len(server.cmds)
     inv = pd.populate(adapter_for(server), dry_run=False)
@@ -163,6 +184,9 @@ def test_dry_run_after_populate_reports_exists(server):
 def test_offline_dry_run_makes_no_call():
     inv = pd.populate(None, dry_run=True)
     assert inv["connected"] is False and set(inv["summary"]["by_status"]) == {"planned"}
+    assert all(item["write_plan"]["method"] == pd.JsonRpcContract.EQ_SAVE
+               and item["write_plan"]["cmd_count"] == len(spec["cmds"])
+               for item, spec in zip(inv["equipments"], pd.EQUIPMENTS))
 
 
 def test_refuses_non_empty_box(server):
@@ -246,9 +270,9 @@ def test_main_end_to_end(server, tmp_path, capsys):
     env = _env(tmp_path, JEEDOM_API_URL=server.url, JEEDOM_API_KEY=API_KEY)
     assert pd.main(["--env-file", str(env)]) == 0
     first = json.loads(capsys.readouterr().out)
-    assert first["summary"]["by_status"] == {"created": 71}
+    assert first["summary"]["by_status"] == {"created": 69}
     assert pd.main(["--env-file", str(env)]) == 0
-    assert json.loads(capsys.readouterr().out)["summary"]["by_status"] == {"exists": 71}
+    assert json.loads(capsys.readouterr().out)["summary"]["by_status"] == {"exists": 69}
     assert len(server.eqs) == 16
 
 
@@ -271,6 +295,20 @@ def test_on_off_actions_carry_distinct_values():
             for e in pd.EQUIPMENTS for c in e["cmds"] if c["generic_type"] == "LIGHT_ON" or
             c["generic_type"] == "LIGHT_OFF" for c in [c]}
     assert acts == {"On": "1", "Off": "0"}
+
+
+def test_cover_actions_are_all_linked_to_position():
+    actions = [cmd for equipment in pd.EQUIPMENTS for cmd in equipment["cmds"]
+               if cmd["generic_type"] in {"FLAP_UP", "FLAP_DOWN"}]
+    assert [(cmd["configuration"]["infoName"], cmd["configuration"]["value"]) for cmd in actions] == [
+        ("Position", "100"), ("Position", "0"), ("Position", "100"), ("Position", "0")]
+
+
+def test_equipment_save_is_the_only_command_creation_path(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    assert "cmd::save" not in server.calls
+    saves = [call for call in server.calls if call == pd.JsonRpcContract.EQ_SAVE]
+    assert len(saves) == len(pd.EQUIPMENTS)
 
 
 def test_compose_requires_pinned_tag():
