@@ -71,6 +71,9 @@ class MapperRegistry:
         plusieurs entités pour le même eqLogic (multi-switch et/ou multi-domaine),
         on agrège ces résultats au lieu d'utiliser une allowlist d'IDs.
         """
+        return self._apply_entity_name_rule(eq, self._map_all_raw(eq, snapshot))
+
+    def _map_all_raw(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         structural_results = self._map_structural_multi_entity(eq, snapshot)
         if len(structural_results) > 1:
             return structural_results
@@ -80,6 +83,19 @@ class MapperRegistry:
             if results:
                 return results
         return []
+
+    @staticmethod
+    def _apply_entity_name_rule(
+        eq: JeedomEqLogic, results: List[MappingResult]
+    ) -> List[MappingResult]:
+        """Story 22.1 (Q2 A) — règle du nom d'entité.
+
+        Équipement à une seule entité : nom de l'équipement Jeedom (HA l'affiche comme
+        l'appareil). Plusieurs entités : chaque entité garde le nom de sa commande.
+        """
+        if len(results) == 1 and eq.name:
+            results[0].ha_name = eq.name
+        return results
 
     def _map_structural_multi_entity(
         self, eq: JeedomEqLogic, snapshot: TopologySnapshot

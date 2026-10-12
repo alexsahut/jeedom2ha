@@ -1,6 +1,6 @@
 # Story A3 : Conformité `info.json` au Market Jeedom (E3, E5)
 
-Status: review
+Status: ready-for-dev
 
 Epic: (Chantier Market 2026-10)
 
@@ -91,27 +91,27 @@ Référence officielle : `doc.jeedom.com/fr_FR/dev/structure_info_json`. Champs 
 
 ## Tasks / Subtasks
 
-- [x] T1 — Corriger `plugin_info/info.json`
-  - [x] Réécrire `description.fr_FR` ≥ 80 caractères, sans nom d'équipement/pièce réelle (CC-48)
-  - [x] Trancher `description.en_US`/`language` selon l'état réel de la doc anglaise (décision 20-5 : français seul par défaut)
-  - [x] Ajouter `changelog_beta`, `documentation_beta` (`blob/beta/docs/fr_FR/...`)
-  - [x] Corriger `changelog`, `documentation` (`blob/stable/docs/fr_FR/...`)
-  - [x] Retirer `luna`, `atlas` de `compatibility`
-  - [x] Ajouter `issue` (lien GitHub issues)
-  - [x] Passer `pluginVersion` à `1.2.0`
-  - [x] Documenter `link.forum` (vide assumé : aucun forum dédié n'existe)
+- [ ] T1 — Corriger `plugin_info/info.json`
+  - [ ] Réécrire `description.fr_FR` ≥ 80 caractères, sans nom d'équipement/pièce réelle (CC-48)
+  - [ ] Trancher `description.en_US`/`language` selon l'état réel de la doc anglaise (décision 20-5 : français seul par défaut)
+  - [ ] Ajouter `changelog_beta`, `documentation_beta` (`blob/beta/docs/fr_FR/...`)
+  - [ ] Corriger `changelog`, `documentation` (`blob/stable/docs/fr_FR/...`)
+  - [ ] Retirer `luna`, `atlas` de `compatibility`
+  - [ ] Ajouter `issue` (lien GitHub issues)
+  - [ ] Passer `pluginVersion` à `1.2.0`
+  - [ ] Documenter `link.forum` (vide assumé ou rempli)
 
-- [x] T2 — Supprimer l'icône parasite
-  - [x] Supprimer `plugin_info/template_icon.png`
-  - [x] Vérifier qu'aucune référence au fichier supprimé ne subsiste dans le code/doc
+- [ ] T2 — Supprimer l'icône parasite
+  - [ ] Supprimer `plugin_info/template_icon.png`
+  - [ ] Vérifier qu'aucune référence au fichier supprimé ne subsiste dans le code/doc
 
-- [x] T3 — Test CI de conformité
-  - [x] Créer un test qui valide la structure `info.json` contre les champs obligatoires Jeedom (`doc.jeedom.com/fr_FR/dev/structure_info_json`)
-  - [x] Valider la cohérence dynamique `pluginVersion` / dernier tag `v*` / entrée changelog correspondante (pas de valeur en dur)
-  - [x] Valider `description` ≥ 80 caractères par langue déclarée dans `language`
+- [ ] T3 — Test CI de conformité
+  - [ ] Créer un test qui valide la structure `info.json` contre les champs obligatoires Jeedom (`doc.jeedom.com/fr_FR/dev/structure_info_json`)
+  - [ ] Valider la cohérence dynamique `pluginVersion` / dernier tag `v*` / entrée changelog correspondante (pas de valeur en dur)
+  - [ ] Valider `description` ≥ 80 caractères par langue déclarée dans `language`
 
-- [x] T4 — README utilisateur
-  - [x] Créer/compléter un README minimal : vue d'ensemble, prérequis, lien vers `docs/fr_FR/index.md`
+- [ ] T4 — README utilisateur
+  - [ ] Créer/compléter un README minimal : vue d'ensemble, prérequis, lien vers `docs/fr_FR/index.md`
 
 ## Impact Produit
 
@@ -130,10 +130,10 @@ Référence officielle : `doc.jeedom.com/fr_FR/dev/structure_info_json`. Champs 
 - Ordre proposé : **A1 et A3 en parallèle, puis A2**.
 - Référence officielle à utiliser en dev : `doc.jeedom.com/fr_FR/dev/structure_info_json` (pas la page `/plugins/market/` citée par erreur dans la version précédente de cette fiche).
 
-## Dev Agent Record
+## Dev Agent Record (session cloud 11/10)
 
 - `pluginVersion` 1.2.0 (dernier tag `v1.1.0`) ; le test exige `pluginVersion >= dernier tag v*` (`=` si HEAD est taggé) et une entrée de changelog dont l'en-tête cite la version ; en-tête `v1.2.0` ajouté à l'entrée du 2026-10-11 de `docs/fr_FR/changelog.md`.
 - Liens `blob/stable/...` : 404 attendu tant que `stable` n'a pas reçu sa première release Market.
 - `link.forum` laissé vide en connaissance de cause (aucun forum dédié).
-- README existant déjà conforme à l'AC9 (vue d'ensemble, prérequis, lien vers `docs/fr_FR/index.md`) : inchangé.
+- README utilisateur (AC9) : réécrit par la session cloud le 2026-10-12 (commit `95bec8d`, consigne envoyée après revue ClaudeBox ayant constaté l'absence du livrable) — remplace l'ancien README orienté développeur par une version vue d'ensemble/prérequis (Jeedom 4.4+, Debian 11-12, broker MQTT, HA + intégration MQTT)/lien `docs/fr_FR/index.md`, sans nom d'équipement/pièce réel. Relu et approuvé par ClaudeBox le 2026-10-12 07:45, avec la précision qu'au passage en stable `os.min` sera fixé à `12` seul (décision Alex 07:19), pas avant.
 - Test : `tests/unit/test_info_json_market_conformity.py` (sous-test de tags ignoré si le clone n'a pas de tags).

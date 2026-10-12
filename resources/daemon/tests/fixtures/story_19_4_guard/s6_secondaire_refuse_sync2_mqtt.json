@@ -11,13 +11,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/5977/set",
+      "default_entity_id": "switch.jeedom2ha_628_5977",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Filtration piscine",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Energie",
         "via_device": "jeedom2ha_bridge"
       },
@@ -51,13 +52,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/5983/set",
+      "default_entity_id": "switch.jeedom2ha_628_5983",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Chauffage SPA",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Energie",
         "via_device": "jeedom2ha_bridge"
       },
@@ -91,13 +93,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/6004/set",
+      "default_entity_id": "switch.jeedom2ha_628_6004",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Charge voiture",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Energie",
         "via_device": "jeedom2ha_bridge"
       },
