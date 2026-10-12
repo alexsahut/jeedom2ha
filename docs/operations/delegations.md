@@ -31,6 +31,6 @@ citer ce script sans ce flag dans une entrée de ce journal.
 
 - **Demandeur :** Alexandre, relayé par ClaudeBox (session cbx légitime).
 - **Périmètre :** création documentaire de l'epic 23 et des stories 23.1 à 23.5, toutes `draft`; aucun développement ni accès VM.
-- **Branche / PR :** `docs/epic-23-market-promotion` → `main` (PR à créer).
+- **Branche / PR :** `docs/epic-23-market-promotion` → `main` (PR #250).
 - **Décision de workflow :** ClaudeBox relit chaque story avant tout passage à `ready-for-dev`.
 - **Prérequis externes consignés :** snapshot vierge de l'unité `a66-reprise-diagnostic`, VM 122; Mosquitto local; HA Docker local; branche `main` jusqu'à C1; décision de licence Alexandre.

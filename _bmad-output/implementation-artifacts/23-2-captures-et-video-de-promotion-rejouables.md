@@ -15,6 +15,7 @@ En tant que mainteneur, je veux générer les visuels depuis la démo synthétiq
 3. Médias, métadonnées et commande de régénération sont versionnés sans rendre accessibles secrets ou données maison.
 4. Marqueurs remplacés seulement après validation que média, version et documentation concordent.
 5. CC-48: seuls contenus synthétiques de 23.1 visibles.
+6. La vidéo est en mp4 ou webm, 1280×720, interface française, et exploitable comme lien « vidéo » de la fiche Market (hébergement choisi par Alexandre); les captures sont rangées dans `docs/fr_FR/images/`.
 
 ## Tâches proposées
 

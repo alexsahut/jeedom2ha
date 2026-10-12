@@ -15,6 +15,7 @@ En tant qu'utilisateur HA, je veux voir l'état réel des lumières et la positi
 3. Tests unitaires/intégration/parité: changement d'état, luminosité, position, commandes absentes et golden.
 4. Preuve 23.1: lumière variable et volet positionnable, inventaire MQTT/HA avant-après.
 5. README et `docs/fr_FR/index.md` « Limites » distinguent couverture et limites restantes.
+6. Une lumière ou un volet sans commande d'état Jeedom reste optimiste; la discovery n'envoie `optimistic: false` que lorsqu'un état réel existe, et cette règle figure dans « Limites ».
 
 ## Tâches proposées
 

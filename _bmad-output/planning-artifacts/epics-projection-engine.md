@@ -2512,7 +2512,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Ordre :** A1/A2/A3 et 22.1/22.2 restent inchangés et prioritaires (22.1 puis 22.2). 23.1 attend le snapshot vierge VM 122; 23.3 peut être préparée en parallèle mais sa preuve utilise 23.1. 23.2 dépend de 23.1 et 22.2 `done`, après les compteurs. 23.4 attend le snapshot vierge et la branche maintenue décidée par A2/C1. 23.5 commence par une décision d'Alexandre et bloque seulement la soumission Market payante.
 
-**Garde-fous :** CC-48; VM/snapshots/Chrome par ClaudeBox; aucune donnée ou accès maison dans Git; une story = une PR; après approbation, workflow `create-story → dev-story → code-review`.
+**Garde-fous :** CC-48; VM et snapshots par clawbox (unité A66), Chrome par ClaudeBox; aucune donnée ou accès maison dans Git; une story = une PR; après approbation, workflow `create-story → dev-story → code-review`.
 
 - **23.1** démo synthétique Jeedom/Mosquitto/HA rejouable et snapshot `demo`.
 - **23.2** captures et vidéo Playwright rejouables depuis 23.1.
