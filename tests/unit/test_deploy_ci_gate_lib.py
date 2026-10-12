@@ -3,7 +3,8 @@ test_deploy_ci_gate_lib.py — CC-50 : preuve unitaire, SANS réseau, du garde-f
 CI de scripts/deploy-to-box.sh (scripts/deploy-ci-gate-lib.sh).
 
 `gh` est remplacé par une fonction shell qui répond depuis des fixtures JSON ;
-les runs d'événement `schedule` doivent être ignorés.
+les runs d'événement `schedule` doivent être ignorés (CC-50) et seuls les
+runs de la branche déployée (main) comptent (CC-59).
 
 Rejouer :
     pytest tests/unit/test_deploy_ci_gate_lib.py -v
@@ -37,8 +38,9 @@ def _run(workflow_runs, check_runs, tmp_path, runs_pages=None):
     )
 
 
-def _run_ev(event, suite):
-    return {"event": event, "check_suite_id": suite}
+def _run_ev(event, suite, branch="main", workflow=1, **extra):
+    return {"event": event, "check_suite_id": suite, "head_branch": branch,
+            "workflow_id": workflow, **extra}
 
 
 def _cr(suite, status="completed", conclusion="success"):
@@ -102,3 +104,64 @@ def test_paginated_runs_are_all_considered(tmp_path):
              runs_pages=[[_run_ev("schedule", 1)], [_run_ev("push", 2)]])
     assert r.returncode == 1
     assert "CI non verte" in r.stderr
+
+
+# --- CC-59 : seule la branche déployée compte --------------------------------
+
+def test_cancelled_run_on_other_branch_ignored_when_main_green(tmp_path):
+    r = _run([_run_ev("push", 1, branch="claude/x", status="completed", conclusion="cancelled"),
+              _run_ev("push", 2, branch="main", status="completed", conclusion="success")],
+             [_cr(1, conclusion="cancelled"), _cr(2)], tmp_path)
+    assert r.returncode == 0, r.stderr
+
+
+def test_cancelled_run_on_main_is_refused(tmp_path):
+    r = _run([_run_ev("push", 2)], [_cr(2, conclusion="cancelled")], tmp_path)
+    assert r.returncode == 1
+    assert "CI non verte" in r.stderr
+
+
+def test_in_progress_run_on_main_is_refused(tmp_path):
+    r = _run([_run_ev("push", 2, status="in_progress", conclusion=None)],
+             [_cr(2, "in_progress", None)], tmp_path)
+    assert r.returncode == 1
+    assert "non terminé" in r.stderr
+
+
+def test_no_run_on_main_is_refused_even_if_other_branch_green(tmp_path):
+    r = _run([_run_ev("push", 1, branch="claude/x")], [_cr(1)], tmp_path)
+    assert r.returncode == 1
+    assert "branche main" in r.stderr
+
+
+def test_second_attempt_green_after_cancelled_first_is_accepted(tmp_path):
+    r = _run([_run_ev("push", 2, id=10, run_number=5, run_attempt=1,
+                      status="completed", conclusion="cancelled"),
+              _run_ev("push", 3, id=10, run_number=5, run_attempt=2,
+                      status="completed", conclusion="success")],
+             [_cr(2, conclusion="cancelled"), _cr(3)], tmp_path)
+    assert r.returncode == 0, r.stderr
+
+
+def test_latest_attempt_failing_after_green_first_is_refused(tmp_path):
+    r = _run([_run_ev("push", 2, id=10, run_number=5, run_attempt=1),
+              _run_ev("push", 3, id=10, run_number=5, run_attempt=2,
+                      status="completed", conclusion="failure")],
+             [_cr(2), _cr(3, conclusion="failure")], tmp_path)
+    assert r.returncode == 1
+
+
+def test_branch_overridable_by_env(tmp_path):
+    runs_file = tmp_path / "r.json"
+    checks_file = tmp_path / "c.json"
+    runs_file.write_text(json.dumps({"workflow_runs": [_run_ev("push", 1, branch="beta")]}))
+    checks_file.write_text(json.dumps({"check_runs": [_cr(1)]}))
+    mock = (f'gh() {{ case "$*" in *actions/runs*) cat "{runs_file}";; '
+            f'*check-runs*) cat "{checks_file}";; esac; }}; ')
+    base = f"set -euo pipefail; {mock}source '{LIB}'; "
+    ok = subprocess.run(["bash", "-c", base + f"JEEDOM2HA_DEPLOY_CI_BRANCH=beta "
+                         f"jeedom2ha_verify_ci_green o/r {SHA}"], capture_output=True, text=True)
+    ko = subprocess.run(["bash", "-c", base + f"jeedom2ha_verify_ci_green o/r {SHA}"],
+                        capture_output=True, text=True)
+    assert ok.returncode == 0, ok.stderr
+    assert ko.returncode == 1
