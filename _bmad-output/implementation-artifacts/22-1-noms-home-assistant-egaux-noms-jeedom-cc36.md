@@ -1,6 +1,6 @@
 # Story 22.1 : Noms Home Assistant = noms Jeedom (CC-36)
 
-Status: ready-for-dev
+Status: review
 
 > **Statut : `ready-for-dev` (2026-10-12).** Alexandre a tranché les questions le 2026-10-12 vers 05:50, relayé par ClaudeBox : **Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, Q7 B, QD deux stories** (voir « Décisions d'Alexandre »). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret). Les pointeurs `fichier:ligne` sont pris sur `main` à `ab3a854`. **R1 (ClaudeBox, 2026-10-12, relevé de terrain en lecture seule vers 04:30)** : F4 et H6 sont des faits (HA 2026.9.4). Aucun nom réel d'équipement, de pièce, de scénario ou de personne dans ce fichier (CC-48) : seuls des identifiants.
 
@@ -17,7 +17,7 @@ afin que « le nom et la pièce Jeedom font foi partout » (décision d'Alexandr
 Toutes les recommandations sont retenues, avec **Q7 B**. `ready-for-dev` est accordé par ClaudeBox au nom de cette décision.
 
 - **Q1 A** — `device.name` = nom de l'équipement Jeedom (accents compris), identique pour toutes les entités de l'équipement.
-- **Q2 A** — entité unique : nom de l'équipement ; plusieurs entités : nom de la commande.
+- **Q2 A** — entité unique : nom de l'équipement ; plusieurs entités : nom de la commande. **Précision d'Alexandre (2026-10-12, vers 06:50, relayée par ClaudeBox)** : dans un équipement à plusieurs entités, l'**entité principale garde le nom de l'équipement** (chez lui : 12 entités, 7 interrupteurs et 5 lumières) ; seules les autres entités prennent le nom de leur commande.
 - **Q3 A** — un renommage Jeedom atteint HA au sync suivant (rescan, redémarrage du démon, « Republier ») ; documenté ; aucun hook `postSave`.
 - **Q4 A** — `suggested_area` envoyée à chaque sync ; documenté que HA ne l'applique qu'à la création de l'appareil.
 - **Q5 A** — noms et pièces choisis à la main dans HA font foi ; aucun rapport, aucune détection.
@@ -57,6 +57,13 @@ La documentation officielle de HA n'était pas accessible depuis la session (ré
 - **H5 (hypothèse).** Une redécouverte met à jour `device.name` si l'appareil n'a pas de `name_by_user`. Vérification : relevé avant/après sur un des 29 appareils.
 - **H6 (fait de terrain, R1).** La box tourne **HA 2026.9.4**. Les **41** entités jeedom2ha créées jusqu'au 2026-05-05 ont un `entity_id` de la forme `<domaine>.jeedom2ha_…` (issu d'`object_id`). Les **306** créées depuis le 2026-05-06, dont les **84** boutons de scénario, ont un `entity_id` dérivé des **noms** (appareil puis entité). La coupure est nette et vaut pour tous les domaines (light, switch, sensor, climate, button…). Depuis cette date, `object_id` n'est donc plus appliqué alors que le démon l'envoie toujours (F10). La cause probable est côté HA (retrait de `object_id` au profit de `default_entity_id`, annoncé par des sources secondaires) : **à confirmer en Task 0** sur la documentation officielle. Conséquence : toute entité **nouvelle ou recréée** reçoit un `entity_id` tiré de ses noms à la création, donc des noms que cette story change (voir Q7).
 
+### Faits de la documentation officielle (ClaudeBox, 2026-10-12, page de l'intégration MQTT `device_tracker.mqtt`) — Task 0
+
+- `default_entity_id` est une option **documentée** de la découverte MQTT. Avec un `unique_id`, il n'est utilisé **qu'à la première création** de l'entité. S'il est défini, il **remplace un `entity_id` personnalisé par l'utilisateur** quand l'entité est supprimée puis recréée.
+- Il doit être **complet**, domaine compris (`sensor.…`, `binary_sensor.…`) : une valeur sans domaine donne un `entity_id` inattendu (signalement public dans le dépôt de HA, issue 157241). Le démon l'envoie donc toujours sous la forme `<domaine>.<object_id>`.
+- Sur la box (HA 2026.9.4), `object_id` n'est plus appliqué depuis le 2026-05-06 (H6) ; il reste envoyé par le démon.
+- La vérification sur un équipement de test (création d'une entité neuve, relevé de l'`entity_id`) sera faite par ClaudeBox à la preuve terrain ; elle n'est pas faisable depuis la session cloud.
+
 ## Effet attendu (mesure à partir des faits du 2026-10-12)
 
 - **Appareils :** **29 sur 91 changeraient de nom** (32 %), pour prendre le nom de l'équipement Jeedom ; **62 inchangés**. Si l'appareil renommé à la main (1) fait partie des 29, il n'est pas touché (H2) ; sinon, aucun impact. Pour chacun des 29, le nom actuel est le nom d'une commande (F4 confirmé) : 16 appareils à une seule entité, 13 à plusieurs.
@@ -70,7 +77,7 @@ La documentation officielle de HA n'était pas accessible depuis la session (ré
 ## Critères d'acceptation (figés sur les décisions)
 
 - **AC1.** Pour un équipement Jeedom, `device.name` est identique dans les payloads de **toutes** ses entités (principale et secondaires) : le nom de l'équipement, accents compris [Q1 A].
-- **AC2.** Le nom d'entité est le nom de l'équipement pour un équipement à une seule entité, et le nom de la commande pour un équipement à plusieurs entités [Q2 A].
+- **AC2.** Le nom d'entité est le nom de l'équipement pour un équipement à une seule entité. Pour un équipement à plusieurs entités, l'entité principale garde le nom de l'équipement et les autres entités prennent le nom de leur commande [Q2 A, précisé le 2026-10-12 vers 06:50].
 - **AC3.** Après renommage d'un équipement dans Jeedom, le nom d'appareil publié change au sync ou rescan suivant, sans hook d'enregistrement [Q3 A]. Test démon : renommage → payload re-publié avec le nouveau nom.
 - **AC4.** La pièce Jeedom est envoyée à chaque sync dans `suggested_area` (inchangé) ; la limite « HA ne l'applique qu'à la création de l'appareil » est écrite dans la documentation utilisateur [Q4 A].
 - **AC5.** Aucune entité **existante** ne change d'`entity_id` ni d'`unique_id` (vérifié par l'inventaire avant/après) ; aucun nom/pièce choisi à la main n'est écrasé [Q5 A, Q6 A]. Pour une entité **nouvelle ou recréée**, chaque payload porte `default_entity_id` = `<domaine>.<object_id>`, où `<object_id>` est **exactement** la valeur d'`object_id` envoyée aujourd'hui dans le même payload (F10), pour tous les types d'entité (lumière, volet, switch, capteur, capteur binaire, bouton d'équipement et de scénario, climat, alarme) [Q7 B]. Test unitaire du payload de chaque publisher : `default_entity_id` égal à `<domaine>.<object_id>`, y compris pour les entités à `node_id`/`object_id` propres (secondaires, boutons de scénario). `object_id` reste envoyé (aucun changement d'`unique_id` ni de topic).
@@ -82,12 +89,12 @@ La documentation officielle de HA n'était pas accessible depuis la session (ré
 
 - **Task 0 — Vérifier H1 à H5 et que `default_entity_id` est bien appliqué par HA 2026.9.4** (et pourquoi `object_id` ne l'est plus), sur la documentation officielle de HA si l'accès est possible, sinon sur un **équipement de test** (création d'une entité neuve, relevé de son `entity_id`). **Si `default_entity_id` n'est pas appliqué comme décrit, s'arrêter et revenir vers ClaudeBox avant de généraliser.**
 - **Task 1 — Inventaire « avant » (humain, lecture seule)** : pour les 91 appareils et leurs entités, relever nom affiché, `name_by_user`, `original_name`, `entity_id`, pièce ; comparer au nom Jeedom ; comptes par appareil (entités, dont celles renommées à la main). Sans nom réel dans le dépôt (identifiants seuls).
-- **Task 2 — Démon : un seul nom d'appareil par équipement** (`publisher.py:_build_device_block`) selon Q1 A ; ne plus dériver `device.name` du `ha_name` d'une entité secondaire.
-- **Task 3 — Démon : règle du nom d'entité** selon Q2 A (mappers F2/F3 ou publisher).
-- **Task 3b — Démon : `default_entity_id` pour les entités nouvelles ou recréées** (Q7 B) : ajouter `default_entity_id` = `<domaine>.<object_id>` dans chaque payload de découverte, en reprenant la valeur d'`object_id` déjà calculée pour le payload (F10) ; ne pas modifier `object_id`, `unique_id` ni topic. Test du payload de chaque publisher (AC5).
-- **Task 4 — Tests** : unitaires (device identique sur toutes les entités d'un équipement multi-entités ; forme de l'équipement 579 ; renommage → republication au sync), golden mis à jour, fixtures anonymisées. `make test` et `flake8` verts.
+- [x] **Task 2 — Démon : un seul nom d'appareil par équipement** (`publisher.py:_build_device_block`) selon Q1 A ; ne plus dériver `device.name` du `ha_name` d'une entité secondaire.
+- [x] **Task 3 — Démon : règle du nom d'entité** selon Q2 A (mappers F2/F3 ou publisher).
+- [x] **Task 3b — Démon : `default_entity_id` pour les entités nouvelles ou recréées** (Q7 B) : ajouter `default_entity_id` = `<domaine>.<object_id>` dans chaque payload de découverte, en reprenant la valeur d'`object_id` déjà calculée pour le payload (F10) ; ne pas modifier `object_id`, `unique_id` ni topic. Test du payload de chaque publisher (AC5).
+- [x] **Task 4 — Tests** : unitaires (device identique sur toutes les entités d'un équipement multi-entités ; forme de l'équipement 579 ; renommage → republication au sync), golden mis à jour, fixtures anonymisées. `make test` et `flake8` verts.
 - **Task 5 — Gate 20-0 + déploiement standard (humain) + inventaire « après »** ; rapprochement avec la liste des 29 ; protocole H2/H3/H4 sur un équipement de test.
-- **Task 6 — Documentation** : `docs/fr_FR` (nom = nom Jeedom, pièce appliquée à la création seulement, comment renommer à la main, comment forcer la pièce via recréation ; `entity_id` technique stable des entités créées) selon Q3 A, Q4 A, Q5 A, Q6 A, Q7 B.
+- [x] **Task 6 — Documentation** : `docs/fr_FR` (nom = nom Jeedom, pièce appliquée à la création seulement, comment renommer à la main, comment forcer la pièce via recréation ; `entity_id` technique stable des entités créées) selon Q3 A, Q4 A, Q5 A, Q6 A, Q7 B.
 
 ## Garde-fous
 
@@ -144,11 +151,53 @@ H1 à H5 (comportement de HA) et la cause de H6 (le fait de terrain est établi,
 - 2026-10-12 — Cadrage documentaire (cette session) : story en `draft`, décisions Q1 à Q7 attendues.
 - 2026-10-12 — R1 (ClaudeBox, relevé de terrain vers 04:30) : F4 et H6 confirmés (HA 2026.9.4 ; 41 entités à `entity_id` technique, 306 à `entity_id` dérivé des noms depuis le 2026-05-06 ; 29 appareils, 149 entités) ; Q7 refaite en question produit ; hors-périmètre `object_id` retiré.
 - 2026-10-12, vers 05:50 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, **Q7 B** (`default_entity_id` = `<domaine>.<object_id actuel>` pour les entités nouvelles ou recréées), QD deux stories ; conséquence de Q7 corrigée (cartes de tableau de bord = `entity_id`, voix = nom). **`ready-for-dev` accordé** par ClaudeBox au nom de cette décision ; AC figés, options écartées retirées des AC et tâches.
+- 2026-10-12, vers 06:50 — **Précision d'Alexandre sur Q2 A** (relayée par ClaudeBox, relecture R2) : l'entité principale d'un équipement à plusieurs entités garde le nom de l'équipement (12 entités chez lui : 7 interrupteurs, 5 lumières) ; les autres entités prennent le nom de leur commande. Tranche la question laissée ouverte dans la PR #249 ; le code de `29882ca` fait déjà cela.
 
 ## Dev Agent Record
 
-(à remplir par `dev-story`)
+### Implementation Plan / notes
+
+- **Task 0** : faits de la documentation officielle consignés (section dédiée ci-dessus, H6, documentation utilisateur). Vérification terrain sur équipement de test laissée à ClaudeBox (aucun accès HA/box ici).
+- **Task 2** (`publisher._build_device_block`) : `device.name` = nom de l'équipement Jeedom lu dans le snapshot (`eq.name`) pour tout équipement ; le bouton de scénario garde le nom du scénario (`ha_name`) ; repli sur `ha_name` si l'équipement est absent du snapshot.
+- **Task 3** (`mapping/registry.MapperRegistry.map_all`) : règle Q2 A appliquée à un seul endroit (`_apply_entity_name_rule`) : un seul mapping pour l'équipement → `ha_name = eq.name` ; plusieurs → chaque entité porte le nom de sa commande, l'entité principale (switch, light, cover) garde le nom de l'équipement (voir R1 : essai de la revue Codex P1 retiré). Les mappers ne changent pas.
+- **Task 3b** (`publisher._add_default_entity_id`) : `default_entity_id = <domaine>.<object_id>` calculé depuis l'`object_id` déjà présent dans le payload (identique par construction) pour les 8 publishers (light, cover, switch, sensor, binary_sensor, button — équipement et scénario —, climate, alarm_control_panel). `object_id`, `unique_id`, topics et disponibilité inchangés.
+- **Task 4** : `tests/unit/test_story_22_1_noms_jeedom.py` (17 tests : `device.name` unique sur la forme 579 multi-entités, règle du nom d'entité, accents, bouton de scénario, `default_entity_id` par domaine et pour les entités secondaires, `unique_id`/`object_id`/topic inchangés, renommage → republication avec nouveau `device.name`). Golden réaligné : seule la référence figée du bouton de scénario (`test_story_21_1_cc44_scenario_lifecycle.py`) gagne `default_entity_id` ; aucune autre différence. Noms génériques uniquement (CC-48).
+- **Task 6** : `docs/fr_FR/index.md` (annexe « noms et identifiants dans Home Assistant », dont la recréation qui reprend l'`entity_id` technique) et `docs/fr_FR/changelog_beta.md` (entrée du 2026-10-12).
+- Tasks 1 et 5 : humain / ClaudeBox (inventaires avant/après, gate 20-0, déploiement, preuve terrain) — non réalisables ici, non cochées.
+- Vérifications locales : `make test` 678 passed ; `flake8` propre ; `node --test tests/unit/*.node.test.js` 421 pass.
+
+### Changements de payload (liste pour la PR)
+
+- `device.name` : nom de l'équipement Jeedom pour toutes les entités (changement visible pour les équipements dont une entité portait un nom de commande).
+- Champ additif `default_entity_id` sur tous les payloads de découverte.
+- `name` d'une entité unique nommée d'après une commande (F3) : devient le nom de l'équipement (Q2 A).
+
+### R1 (relecture ClaudeBox de la PR #249, tête `1867c4b`, 2026-10-12)
+
+- **P1 CI.** `make test` ne couvre que `tests/` ; la CI lance `python -m pytest` (`testpaths = tests, resources/daemon/tests`, plus de 2100 tests). La suite complète a été lancée localement comme la CI : 6 tests de `resources/daemon/tests/unit/test_story_19_4_guard_publisher_calls.py` échouaient (traces MQTT figées).
+- **Fixtures réalignées** (régénérées avec `JEEDOM2HA_GUARD_REGEN=1`, après suppression des références), `resources/daemon/tests/fixtures/story_19_4_guard/` : 8 fichiers `*_mqtt.json` (s1, s2, s3, s4 publier/sync1/sync2, s5, s6 sync2). Différences vérifiées champ par champ contre les anciennes : **uniquement** `device.name` (145 occurrences, nom d'équipement à la place du nom d'une commande) et le champ additif `default_entity_id` (309 occurrences). Aucun changement de `name` d'entité dans ce corpus, ni de topic, `retain`, `unique_id`, `object_id` ou disponibilité. Les fixtures sémantiques (`s*.json`) et de disponibilité (`*_avail.json`) sont inchangées. `golden_corpus/` inchangé.
+- **Retrait de l'essai Codex P1** (`deb862a`) : renommer l'entité principale d'un équipement multi-entités d'après sa commande d'état produisait, sur le corpus doré, des noms comme « Etat » ou « active » pour un switch ou une lumière, au-delà de ce que la relecture R1 avait validé. Le registre est revenu à la règle de `1867c4b` (l'entité principale garde le nom de l'équipement). Point laissé à décision : voir la PR.
+- **P3.** Branche mise à jour sur `main` (`5105c0f`) ; seul conflit : `sprint-status.yaml`, lignes 21-1/epic 21 de `main` conservées, ligne de 22-1 gardée, commentaires `last_updated` fusionnés.
+- Suite complète du démon : voir la description de la PR pour le résultat final.
+
+### R2 (relecture ClaudeBox de la PR #249, tête `29882ca`, 2026-10-12)
+
+- CI verte ; fixtures conformes (`device.name` et `default_entity_id` seulement).
+- **Décision d'Alexandre** (vers 06:50) : l'entité principale d'un équipement à plusieurs entités garde le nom de l'équipement ; seules les autres entités prennent le nom de leur commande. Le code actuel le fait déjà : **aucun changement de code ni de test**.
+- **Documentation seulement** : précision ajoutée à « Décisions d'Alexandre » (Q2 A), à AC2 et au journal des décisions ; `docs/fr_FR/index.md` (annexe) et `docs/fr_FR/changelog_beta.md` reformulés (entité principale = nom de l'équipement, affichée sous le nom de l'appareil ; autres entités = nom de leur commande, à la suite du nom de l'appareil).
+- Fils Codex : P1 (`registry.py`, ligne 97) répondu en citant la décision, puis résolu ; P2 (`changelog_beta.md`) déjà corrigé en `deb862a`, résolu.
+
+### Change Log
+
+- 2026-10-12 : implémentation Tasks 2, 3, 3b, 4, 6 ; statut `review`.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/22-1-noms-home-assistant-egaux-noms-jeedom-cc36.md` (nouveau)
+- `_bmad-output/implementation-artifacts/22-1-noms-home-assistant-egaux-noms-jeedom-cc36.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `resources/daemon/discovery/publisher.py`
+- `resources/daemon/mapping/registry.py`
+- `tests/unit/test_story_22_1_noms_jeedom.py` (nouveau)
+- `tests/unit/test_story_21_1_cc44_scenario_lifecycle.py`
+- `docs/fr_FR/index.md`
+- `docs/fr_FR/changelog_beta.md`

@@ -401,6 +401,16 @@ class DiscoveryPublisher:
         path_part = node_id if node_id else f"jeedom2ha_{eq_id}"
         return f"{self._topic_prefix}/{entity_type}/{path_part}/config"
 
+    @staticmethod
+    def _add_default_entity_id(payload: dict, domain: str) -> None:
+        """Story 22.1 (Q7 B) — ``entity_id`` technique stable des entités créées/recréées.
+
+        ``default_entity_id`` = ``<domaine>.<object_id>`` avec exactement l'``object_id``
+        déjà présent dans le payload (HA 2026.9.4 n'applique plus ``object_id``). Doit
+        être complet (domaine compris). HA ne l'utilise qu'à la création de l'entité.
+        """
+        payload["default_entity_id"] = f"{domain}.{payload['object_id']}"
+
     def _build_device_block(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the common device block for discovery payloads."""
         eq_id = mapping.jeedom_eq_id
@@ -416,9 +426,13 @@ class DiscoveryPublisher:
         # with eqLogics that may share the same integer id (Story 10.1).
         device_id = mapping.ha_unique_id if source_kind == "scenario" else f"jeedom2ha_{eq_id}"
 
+        # Story 22.1 (Q1 A) — un seul nom d'appareil par équipement : le nom Jeedom,
+        # identique pour toutes ses entités. Un scénario garde le nom du scénario.
+        device_name = eq.name if eq is not None and eq.name else mapping.ha_name
+
         device = {
             "identifiers": [device_id],
-            "name": mapping.ha_name,
+            "name": device_name,
             "manufacturer": manufacturer,
             "model": eq_type_name or "Unknown",
             "via_device": "jeedom2ha_bridge",
@@ -459,6 +473,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "light")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Add brightness fields if capability detected.
@@ -505,6 +520,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "cover")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Conditional: Stop
@@ -551,6 +567,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "switch")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch".
@@ -588,6 +605,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "sensor")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         if device_class is not None:
@@ -625,6 +643,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "binary_sensor")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         if device_class is not None:
@@ -660,6 +679,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "climate")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         current_temperature_topic = reason_details.get("current_temperature_topic")
@@ -694,6 +714,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "alarm_control_panel")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         return payload
@@ -723,6 +744,7 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        self._add_default_entity_id(payload, "button")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
         return payload
