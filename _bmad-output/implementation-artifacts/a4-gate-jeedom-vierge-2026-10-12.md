@@ -35,6 +35,6 @@
 
 Ce gate ferme en `done` : A2 (paquet distribuable) et A3 (conformité Market). Voir `sprint-status.yaml` et les fichiers de story correspondants.
 
-## Hors portée
+## AC5 d'A1
 
-Hors portée : la charge réelle d'A1 (AC5) n'a pas été testée sur Jeedom vierge ; A1 reste en `review`.
+AC5 amendé par décision Alex 2026-10-12 15:17 (D8 = a) : la charge réelle sur Jeedom vierge n'a pas été testée par ce gate, mais la charge réelle est prouvée sur la box (292 équipements réels, box en `69a4b47`, `[RELAY-BUDGET] relais=TOPOLOGY R=60 duration_s=1.811`) et en CI par `test_story_a1_parc_300_load.py` (300 équipements, vrai serveur HTTP). Le présent gate A4 sur Jeedom vierge couvre l'installation, les dépendances et le démon. A1 est `done` — voir `sprint-status.yaml` et la story correspondante.
