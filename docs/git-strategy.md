@@ -101,6 +101,7 @@ Une exception ne doit exister que si elle est explicitement justifiée et docume
 - Une story ne doit jamais être mergée directement vers `beta`.
 - Une story ne doit jamais être mergée directement vers `stable`.
 - `stable` ne doit jamais être promue directement depuis `main`.
+- La promotion vers `beta`/`stable` transite par une branche `release/vX.Y.Z` contenant le paquet épuré (voir section dédiée ci-dessous) ; le merge reste un merge commit.
 
 ## Politique de promotion `main -> beta -> stable`
 
@@ -114,6 +115,46 @@ Une exception ne doit exister que si elle est explicitement justifiée et docume
 - Cette correction doit revenir dans `main` avant toute nouvelle promotion vers `beta`.
 - Cette correction doit passer par `beta` avant toute promotion vers `stable`.
 - `beta` et `stable` ne doivent pas recevoir de correctif direct hors de ce flux.
+
+## Paquet Market épuré et branches `release/vX.Y.Z` (story A2, décision D2)
+
+`beta` et `stable` ne reçoivent **jamais** l'arbre complet de `main` : elles reçoivent un
+**paquet épuré** produit par `scripts/build-market-package.sh` à partir d'un SHA de `main`
+déjà déployé et validé sur la box (SHA portant un tag `deploy-...`).
+
+- Le manifeste d'exclusion est `.github/market-package/manifest.txt` (dérivé de
+  `.rsync-plugin-deploy.filter`). Divergences : `CLAUDE.md`, `.gitignore` et `.rsync-plugin-deploy.filter` sont exclus ; `docs/fr_FR/` est **inclus**, car
+  `plugin_info/info.json` référence `docs/fr_FR/changelog*.md` et `docs/fr_FR/index.md`.
+- Le script écrit le paquet sur une branche `release/vX.Y.Z` créée depuis l'état courant de
+  `beta` (ou `stable`), en **un seul commit** : `release vX.Y.Z (source <sha>)`.
+- La promotion se fait par PR `release/vX.Y.Z -> beta` (puis `-> stable`), fusionnée par
+  **merge commit** : jamais fast-forward, jamais squash, jamais push direct.
+- Le script ne pousse jamais lui-même ; push et PR sont des actions humaines explicites.
+- Une story ne cible toujours jamais `beta`/`stable` : seules les branches `release/vX.Y.Z`
+  produites par ce script le font.
+- La CI (`Market Package Check`) rejette toute régression du manifeste.
+
+### Décision retenue pour la protection de branche (Option 1)
+
+`beta`/`stable` sont probablement protégées par des checks requis issus de
+`.github/workflows/`. Or `.github/` est exclu du paquet. Deux options existaient :
+
+- **Option 1 (retenue pour cette story)** : conserver sur `beta`/`stable` un sous-ensemble
+  minimal de `.github/` — le seul workflow `market-package-check.yml` et les deux fichiers
+  qu'il utilise (`.github/market-package/manifest.txt`, `market_package.py`), listés `retain`
+  dans le manifeste. Le manifeste appliqué au **paquet livré** reste strict : ces fichiers ne
+  sont ajoutés que sur la branche de release, pas dans le paquet plugin.
+- **Option 2 (non retenue)** : ajuster les règles de protection de `beta`/`stable` pour
+  n'exiger qu'un check propre aux releases.
+
+**Statut : proposition documentaire.** Cette story ne modifie ni la configuration réelle de
+protection de branche GitHub, ni les branches `beta`/`stable`. Points à traiter par Alex avant
+la première promotion réelle :
+1. `PR Routing Policy` (`pr-governance.yml`) n'autorise aujourd'hui que `main -> beta` et
+   `beta -> stable` : une PR `release/vX.Y.Z -> beta` serait refusée. Le routage devra être
+   amendé séparément (hors périmètre A2).
+2. Les checks requis sur `beta`/`stable` doivent se limiter à `Market Package Check` (les autres
+   workflows n'existent pas sur ces branches épurées).
 
 ## Règles spécifiques pour les agents IA multi-IDE
 

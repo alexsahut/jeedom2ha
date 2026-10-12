@@ -1,0 +1,41 @@
+name: Market Package Check
+
+# Story A2 — validation du paquet Market épuré.
+#   - PR vers main : construit le paquet depuis HEAD et le
+#     valide contre .github/market-package/manifest.txt (anti-régression).
+#   - PR vers beta/stable (branche release/vX.Y.Z) : valide l'arbre de release lui-même.
+# Ce workflow (avec manifest.txt et market_package.py) est le seul fichier .github/ conservé
+# sur beta/stable (décision : option 1, voir docs/git-strategy.md).
+
+on:
+  pull_request:
+    branches: [main, beta, stable]
+  # Pas de filtre paths: le check est REQUIS sur beta/stable (option 1) et doit toujours se
+  # déclencher, y compris pour une release ne touchant que core/ ou resources/ ; il est léger.
+
+permissions:
+  contents: read
+
+jobs:
+  market-package-check:
+    name: Market Package Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Valider le paquet (PR vers main)
+        if: github.base_ref == 'main'
+        run: |
+          set -euo pipefail
+          bash scripts/build-market-package.sh build "$(git rev-parse HEAD)" --output "${RUNNER_TEMP}/market-package"
+          find "${RUNNER_TEMP}/market-package" -maxdepth 2 | sort | head -50
+          test -d "${RUNNER_TEMP}/market-package/docs/fr_FR"
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/test_market_package.py -q -p no:cacheprovider --rootdir=. -c /dev/null
+
+      - name: Valider l'arbre de release (PR vers beta/stable)
+        if: github.base_ref != 'main'
+        run: python3 .github/market-package/market_package.py check . --release-tree
