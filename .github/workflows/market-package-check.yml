@@ -39,7 +39,8 @@ jobs:
           bash scripts/build-market-package.sh build "$(git rev-parse HEAD)" --output "${RUNNER_TEMP}/market-package"
           find "${RUNNER_TEMP}/market-package" -maxdepth 2 | sort | head -50
           test -d "${RUNNER_TEMP}/market-package/docs/fr_FR"
-          python3 -m pytest tests/test_market_package.py -q
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/test_market_package.py -q -p no:cacheprovider --rootdir=. -c /dev/null
 
       - name: Valider l'arbre de release (PR vers beta/stable)
         if: github.base_ref != 'main'
