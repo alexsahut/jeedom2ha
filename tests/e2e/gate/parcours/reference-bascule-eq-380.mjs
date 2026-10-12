@@ -1,16 +1,14 @@
 /** Parcours de référence : bascule simulée puis retour réel au mode automatique. */
 
-export const name = 'reference-bascule-enphase';
+export const name = 'reference-bascule-eq-380';
 export const declaredEquipments = {
-  '579': { commands: ['5689', '5368', '5369', '5494', '5695', '5493'] },
+  '380': { commands: ['2971', '2968', '2969', '2970'] },
 };
 export const declaredPublicationOverrides = {};
 
-// La première bloquante est désignée dynamiquement par la synthèse. Les deux
-// candidats sont donc déclarés statiquement, mais un seul est utilisé à l'exécution.
+// La seule commande bloquante de l'équipement 380 est la cible de l'ancre.
 export const declaredBascules = [
-  { eqId: '579', cmdId: '5368', haEntityType: 'binary_sensor' },
-  { eqId: '579', cmdId: '5369', haEntityType: 'binary_sensor' },
+  { eqId: '380', cmdId: '2971', haEntityType: 'binary_sensor' },
 ];
 
 async function atStep(helpers, index, label, operation) {
@@ -23,17 +21,13 @@ async function atStep(helpers, index, label, operation) {
   }
 }
 
-async function openEnphase(page, helpers) {
-  const room = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
-    has: page.locator('.name', { hasText: /^Garage$/ }),
-  });
-  await atStep(helpers, 1, 'carte-garage', () => room.click());
+async function openEq380(page, helpers) {
+  const room = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]');
+  await atStep(helpers, 1, 'carte-piece-4', () => room.click());
   const modal = page.locator('.modal-j2ha-room');
   await atStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel').filter({
-    has: page.locator('.j2ha-eq-name', { hasText: /^\s*Enphase\s*$/ }),
-  });
-  await atStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
+  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="380"]');
+  await atStep(helpers, 3, 'panneau-eq-380', () => panel.waitFor({ state: 'visible' }));
   await atStep(helpers, 4, 'depliage', async () => {
     await panel.locator('.j2ha-eq-toggle').click();
     await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
@@ -51,7 +45,7 @@ async function waitForTarget(page, panel) {
   });
   const cmdId = await targetHandle.jsonValue();
   await targetHandle.dispose();
-  if (!['5368', '5369'].includes(cmdId ?? '')) throw new Error('cmd-cible-inattendue');
+  if (cmdId !== '2971') throw new Error('cmd-cible-inattendue');
   return { target: panel.locator(`tr.mapping-override-cmd[data-cmd-id="${cmdId}"]`), cmdId };
 }
 
@@ -95,7 +89,7 @@ async function waitForJournal(journalEntries, start, expected) {
 }
 
 export async function run(page, { helpers }) {
-  const panel = await openEnphase(page, helpers);
+  const panel = await openEq380(page, helpers);
   const initialSummary = await atStep(helpers, 7, 'synthese-initiale', () => summary(panel));
   helpers.record('synthese_initiale', initialSummary);
 

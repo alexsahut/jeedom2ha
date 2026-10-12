@@ -94,7 +94,7 @@ describe('CC-38 — exclusions volontaires', () => {
     assert.strictEqual(M.buildPublicationSummaryLabel(summary), 'Ne sera pas publié dans Home Assistant : 1 commande(s) bloquante(s).');
   });
 
-  it('eq 579 Enphase : les vrais blocages gardent leur synthèse et leur ancre', () => {
+  it('eq 579 : les vrais blocages gardent leur synthèse et leur ancre', () => {
     const summary = M.summarizePublication({ commands: [
       command(1, readyView()), command(2, readyView()), command(3, readyView()), command(4, readyView()),
       command(5, decisionView('command_not_covered')),
