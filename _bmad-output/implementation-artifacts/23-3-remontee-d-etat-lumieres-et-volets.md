@@ -76,6 +76,7 @@ Les topics de commande (`…/set`, `…/brightness/set`, `…/position/set`) ne 
 - **cover / position** : valeur numérique bornée [0, 100] sur `…/position`. **Inversion** (certains plugins Jeedom inversent 0/100) : hors périmètre de 23.3, signalée comme limite (voir §6, Q2).
 - **cover / état** : `open`/`closed` dérivé de l'état binaire si `FLAP_STATE` est binaire ; si `FLAP_STATE` est numérique, `closed` si position = 0, `open` sinon (état intermédiaire = `open`, `opening`/`closing`/`stopped` non gérés).
 - **Plusieurs topics par commande.** Une même commande (`FLAP_STATE` numérique) alimente `…/state` **et** `…/position`. Le contrat impose donc qu'une cible d'état puisse produire **plusieurs publications** ; la clé de déduplication de `list_state_targets()` reste `(eq_id, cmd_id)` pour les listeners PHP (un listener par commande), mais `handle_state_message` publie sur tous les topics rattachés à la commande.
+- **Plusieurs commandes par entité (cas inverse).** Une lumière variable normale porte `LIGHT_STATE` **et** `LIGHT_BRIGHTNESS` (deux commandes, deux topics). Aujourd'hui `_candidate_cmd_id()` ne renvoie que la première clé trouvée et `_iter_streamed_candidates()` ne produit qu'un candidat par mapping : seule `LIGHT_STATE` aurait un listener et un état initial, la luminosité ne serait jamais publiée. Le contrat impose donc d'énumérer, pour une même entité, **tous les couples (commande de lecture → topic)** : `LIGHT_STATE → state`, `LIGHT_BRIGHTNESS → brightness`, `FLAP_STATE`/`FLAP_BSO_STATE → state` (+ `position` si numérique). `list_state_targets()` renvoie un listener par commande distincte ; `_resolve_state_target`, `publish_initial_states` et `publish_click_states` parcourent la même énumération. Tests dédiés : lumière avec les deux commandes (deux listeners, deux états initiaux), avec une seule des deux, et cas où les deux clés pointent la même commande.
 
 ### 2.3 Élargissement du périmètre streamé
 
@@ -83,7 +84,7 @@ Sont ajoutés à `_STREAMED_TYPES` : `light` et `cover`. Les trois points suivan
 
 1. `_STREAMED_TYPES` / `_VAGUE2_ACTIONABLE`-équivalent + `streams_actionable_type`.
 2. `_READBACK_KEYS` : ajout des clés luminosité/position ; `_candidate_cmd_id` / `_candidate_current_value` / `publish_initial_states` / `publish_click_states` / `list_state_targets` doivent les résoudre.
-3. `CommandSynchronizer._has_reliable_state` : même liste de clés, avec la règle de §3.
+3. `CommandSynchronizer._has_reliable_state` : même liste de clés, avec la règle de §3. **La fiabilité s'évalue par canal, pas globalement.** Le prédicat qui décide de supprimer l'optimiste **ON/OFF** reste limité aux clés ON/OFF (`LIGHT_STATE`, `ENERGY_STATE`, `SWITCH_STATE`, `PRESENCE`, `FLAP_STATE`, `FLAP_BSO_STATE`) : `LIGHT_BRIGHTNESS` seule ne rend **pas** l'ON/OFF fiable (sinon une lumière avec luminosité mais sans `LIGHT_STATE` passerait en `real_state_confirmation` sans qu'aucun retour ON/OFF puisse arriver, contre l'AC6 et Q4). La luminosité et la position ont leur propre prédicat de fiabilité (commande `info` présente), utilisé pour `optimistic` du canal luminosité/position en discovery. Le test de dérive de §5 compare donc `_READBACK_KEYS` ↔ prédicats **par canal**.
 
 ### 2.4 Convergence action ↔ retour (pas de boucle, pas d'état périmé)
 
@@ -105,6 +106,8 @@ Règle : **`optimistic: false` est déclaré uniquement si un état réel est ef
 | Volet **sans** commande d'état | pas de `state_topic`/`position_topic`, `optimistic: true` | `stateless` → à remplacer par un optimiste cover explicite **ou** conservation de `stateless` (Q1) | état supposé ou inconnu, assumé |
 | Commande d'état présente mais valeur absente/illisible | inchangé | rien publié, dernier état retenu conservé | dernier état connu |
 | Commande d'état non `info` | traitée comme absente | idem « sans commande d'état » | idem |
+
+**Transition état réel → sans commande d'état (retained).** Les états réels sont publiés `retain=True`, les optimistes `retain=False` : si une lumière ou un volet perd sa commande de lecture (retrait de la commande, changement de type générique) après avoir publié un état réel, ce dernier reste au broker et serait relu par HA après reconnexion ou redémarrage, en plus du chemin optimiste — ce qui contredit « jamais mélangé ». Le contrat impose, lors d'une (re)publication où l'entité n'a plus de lecture fiable, d'**effacer les retained devenus invalides** (publication vide retain sur `state`, `brightness`, `position` concernés), avec le même garde-fou « uniquement `jeedom2ha/…` » que les autres purges. Tests : transition réel → sans lecture (retained effacés), sans lecture → réel (état initial publié), absence de purge sur une entité qui garde sa lecture.
 
 La règle et ces cas figureront dans « Limites » (README et `docs/fr_FR/index.md`) en langage utilisateur.
 
@@ -132,7 +135,8 @@ La règle et ces cas figureront dans « Limites » (README et `docs/fr_FR/index.
 
 **PHP** : aucun changement attendu ; les tests `tests/unit/test_story_19_5_php_relay.php` doivent rester verts (pas de modification de `core/`).
 
-**Parité** (outil existant `scripts/parity-snapshot.sh`, 19.1) : relevé avant/après sur l'environnement 23.1 ; seuls écarts autorisés = champs `optimistic` des discovery light/cover concernés + nouveaux topics d'état retenus ; aucun écart sur sensor/binary_sensor/switch (topics discovery, état, écouteurs).
+**Parité** (outil 19.1 `scripts/parity-snapshot.sh` / `tools/parity_snapshot.py`) : relevé avant/après sur l'environnement 23.1 ; seuls écarts autorisés = champs `optimistic` des discovery light/cover concernés + nouveaux topics d'état retenus + nouveaux écouteurs ; aucun écart sur sensor/binary_sensor/switch (topics discovery, état, écouteurs).
+**Limite de l'outil actuel (à traiter dans l'implémentation, vérifiée sur `main`).** Le script ne souscrit qu'à `jeedom2ha/+/+/state` (`scripts/parity-snapshot.sh:74-75`), alors que les topics de 23.3 sont `jeedom2ha/{eq}/state`, `jeedom2ha/{eq}/brightness` et `jeedom2ha/{eq}/position` ; et `diff_snapshots()` compare les décisions, les topics discovery et les écouteurs, **pas** `state_topics`. Sans extension, la parité ne peut ni inventorier ni différencier les états introduits par 23.3. L'implémentation doit soit étendre l'outil (souscription `jeedom2ha/#` filtrée sur `state|brightness|position`, comparaison de `state_topics` dans le diff, lecture seule conservée), soit prévoir un relevé MQTT séparé, décidé avant la preuve (Q6). Les valeurs retenues relevées restent des identifiants/valeurs synthétiques (CC-48).
 
 ## 6. Preuve prévue sur l'environnement 23.1
 
@@ -151,6 +155,9 @@ Prérequis : VM 122, Mosquitto local et HA de test fournis par 23.1 (équipement
 - **Q3 — état `open`/`closed` d'un volet à position intermédiaire.** `open` proposé ; `opening`/`closing`/`stopped` hors périmètre.
 - **Q4 — luminosité sans `LIGHT_STATE`.** Déduire ON/OFF de la luminosité (>0) ou rester optimiste ? Proposition : rester optimiste (aucune valeur inventée).
 - **Q5 — publication multiple par commande.** Confirmer que l'extension de `handle_state_message` (plusieurs topics par `(eq_id, cmd_id)`) est préférée à une seconde commande dédiée.
+
+- **Q6 — outil de parité.** Étendre `parity-snapshot.sh` / `diff_snapshots()` aux topics `state`, `brightness`, `position` (changement d'outil, donc de code, à porter par l'implémentation) ou relevé MQTT séparé pour la preuve 23.1 ?
+- **Q7 — purge des retained.** Confirmer l'effacement des retained d'état réel quand l'entité perd sa lecture (§3), et à quel moment (republication, rescan).
 
 ## 8. Hors périmètre (rappel)
 

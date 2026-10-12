@@ -40,4 +40,4 @@ citer ce script sans ce flag dans une entrée de ce journal.
 - **Demandeur :** Alexandre, relayé par ClaudeBox.
 - **Périmètre :** revalidation en lecture seule du code de `main` (`_STREAMED_TYPES`, listeners, publishers light/cover, payloads, `optimistic`) et contrat proposé état/luminosité/position, ajoutés à la story 23.3 (toujours `draft`); aucun code, test, fixture, accès VM/Jeedom/HA (CC-48); A1/A2/A3 et 22.2 non touchés.
 - **Branche / PR :** `docs/23-3-cadrage-streaming` → `main`.
-- **Décision de workflow :** relecture ClaudeBox avant tout passage à `ready-for-dev`; cinq questions ouvertes consignées dans la story (§7).
+- **Décision de workflow :** relecture ClaudeBox avant tout passage à `ready-for-dev`; sept questions ouvertes consignées dans la story (§7).
