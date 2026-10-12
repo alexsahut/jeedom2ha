@@ -71,7 +71,7 @@ from mapping.overrides import (
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
-from validation.ha_component_registry import validate_projection
+from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
 
 # Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
 _HTTP_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -853,6 +853,56 @@ def _last_applied_candidate_decision(current_primary, candidate, synced_decision
                 else getattr(previous, "publication_decision_ref", None)
             )
     return None
+
+
+def _candidate_present_in_ha(
+    current_primary,
+    candidate,
+    synced_decision,
+    eq_pending_unpublish: bool = False,
+) -> bool:
+    """Story 22.2 (Q1 A) — True si CETTE entité est présente dans Home Assistant.
+
+    Lecture seule de l'état d'exécution déjà enregistré par le sync ou une action, avec les
+    mêmes prédicats que `_is_currently_published_in_ha` (principal : `active_or_alive` ou
+    `discovery_published` ; secondaire : `discovery_published`), de sorte qu'un équipement est
+    `published_in_ha` exactement quand au moins une de ses entités l'est (ou qu'une
+    dépublication est différée). Aucune décision n'est recalculée.
+    """
+    applied = _last_applied_candidate_decision(current_primary, candidate, synced_decision)
+    if applied is None:
+        return False
+    if getattr(applied, "discovery_published", False):
+        return True
+    if applied is synced_decision and getattr(applied, "active_or_alive", False):
+        return True
+    # Dépublication différée : les topics sont encore dans HA pour ce qui avait été publié.
+    return bool(eq_pending_unpublish and getattr(applied, "should_publish", False))
+
+
+def _previous_present_cmd_ids(synced_decision, eq_pending_unpublish: bool) -> set:
+    """Story 22.2 — commandes portées par une entité DÉJÀ dans HA mais absente du mapping courant.
+
+    Une entité supprimée ou retypée dont la dépublication MQTT est différée reste dans Home Assistant
+    alors que l'évaluation courante ne la contient plus : on la retrouve dans le mapping de la
+    dernière synchronisation (mêmes prédicats que `_candidate_present_in_ha`). Lecture seule.
+    """
+    previous = getattr(synced_decision, "mapping_result", None)
+    if previous is None:
+        return set()
+    out: set = set()
+    for candidate in [previous, *(previous.additional_mappings or [])]:
+        decision = synced_decision if candidate is previous else getattr(candidate, "publication_decision_ref", None)
+        if decision is None:
+            continue
+        present = bool(
+            getattr(decision, "discovery_published", False)
+            or (candidate is previous and getattr(decision, "active_or_alive", False))
+            or (eq_pending_unpublish and getattr(decision, "should_publish", False))
+        )
+        if present:
+            out.update(mapping_cmd_ids(candidate))
+    return out
 
 
 def _published_candidates(mapping_result, principal_decision) -> dict:
@@ -2982,6 +3032,45 @@ def _resolve_data_dir(request: web.Request) -> str:
     return request.app.get("data_dir") or _DATA_DIR
 
 
+def _projection_valid_override_types(
+    eq,
+    snapshot,
+    eligibility,
+    mapper_registry,
+    confidence_policy,
+    persisted_overrides,
+    persisted_equipment_overrides,
+    cmd_id,
+):
+    """Story 22.2 (R2, AC6, option A) — types « Override HA » qui peuvent aboutir pour `cmd_id`.
+
+    Pour chaque type proposable (`PRODUCT_SCOPE`, ordre alphabétique = ordre de la liste de
+    l'interface), rejoue EXACTEMENT ce que fait l'aperçu : `evaluate_equipment` avec l'override de
+    type PROPOSÉ sur cette commande, puis lit la validation de projection de l'entité qui porte la
+    commande. Un type dont la projection est invalide n'aboutit jamais, même forcé (le forçage ne
+    contourne pas `validate_projection`) : il est retiré. Un type valide mais refusé seulement par
+    l'ambiguïté ou la confiance reste proposé, puisque « Forcer » peut le faire aboutir. Lecture
+    seule : aucune décision n'est recalculée en dehors de ce que fait déjà l'aperçu.
+    Une validité absente (étape non exécutée) ne retire rien.
+    """
+    allowed = []
+    for ha_type in sorted(PRODUCT_SCOPE):
+        evaluation = evaluate_equipment(
+            eq, snapshot, eligibility,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=persisted_overrides,
+            persisted_equipment_overrides=persisted_equipment_overrides,
+            proposed_overrides={f"{eq.id}:{cmd_id}": {"ha_entity_type": ha_type, "source": "preview"}},
+        )
+        target = _resolve_command_mapping(evaluation, cmd_id)
+        validity = getattr(target, "projection_validity", None) if target is not None else None
+        if validity is not None and validity.is_valid is False:
+            continue
+        allowed.append(ha_type)
+    return allowed
+
+
 def _build_mapping_override_tree(
     eq,
     snapshot,
@@ -3035,6 +3124,7 @@ def _build_mapping_override_tree(
     command_decision_by_cmd = {d.cmd_id: d for d in evaluation.command_decisions}
 
     commands = []
+    allowed_by_mapping: Dict[int, list] = {}
     for cmd in eq.cmds:
         key = f"{eq.id}:{cmd.id}"
         entry = overrides_cache.get(key) or {}
@@ -3063,6 +3153,17 @@ def _build_mapping_override_tree(
         if override_applied:
             row["override_source"] = entry.get("source", "user")
         row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
+        # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
+        # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
+        # commandes dont l'entité est évaluable ; absent sinon (le sélecteur y est de toute façon grisé).
+        if diag_mapping is not None:
+            group = id(diag_mapping)
+            if group not in allowed_by_mapping:
+                allowed_by_mapping[group] = _projection_valid_override_types(
+                    eq, snapshot, eligibility, MapperRegistry(), confidence_policy,
+                    overrides_cache, equipment_overrides_cache, cmd.id,
+                )
+            row["override_types_allowed"] = list(allowed_by_mapping[group])
         commands.append(row)
 
     current_should_publish = bool(
@@ -3102,6 +3203,11 @@ def _build_mapping_override_tree(
             # Contrat surface 20-2 : l'UI affiche les commandes regroupées sans
             # reconstruire l'appartenance d'une entité côté navigateur.
             "command_ids": cmd_ids,
+            # Story 22.2 (champ additif) : présence réelle de CETTE entité dans HA.
+            "present_in_ha": _candidate_present_in_ha(
+                evaluation.mapping, mapping, synced_decision,
+                eq_pending_unpublish=eq.id in (pending_discovery_unpublish or {}),
+            ),
             "decision": _decision_view(current_decision, mapping),
             "publication_override": publication_override,
             "reason_details": dict(mapping.reason_details or {}),
@@ -3112,6 +3218,21 @@ def _build_mapping_override_tree(
                 or applied_decision.reason != current_decision.reason
             ),
         })
+
+    # Story 22.2 (Q1 A, champ additif) : une commande est « publiée » quand au moins une entité
+    # présente dans HA la porte (forme 579 : principal refusé, secondaire publié).
+    present_cmd_ids = {
+        cid
+        for entity_row in entity_rows if entity_row["present_in_ha"]
+        for cid in entity_row["command_ids"]
+    }
+    # Entité encore dans HA (dépublication différée) mais absente du mapping courant : ses commandes
+    # restent « publiées » tant qu'elle y est (cohérence avec `sync_status.published_in_ha`).
+    present_cmd_ids |= _previous_present_cmd_ids(
+        synced_decision, eq.id in (pending_discovery_unpublish or {}),
+    )
+    for command_row in commands:
+        command_row["published_in_ha"] = command_row["jeedom_cmd_id"] in present_cmd_ids
 
     return {
         "jeedom_eq_id": eq.id,

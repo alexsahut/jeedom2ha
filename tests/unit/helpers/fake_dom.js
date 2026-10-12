@@ -10,6 +10,15 @@ function escapeText(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Comme un vrai navigateur : le texte analysé depuis du HTML est décodé (`&lt;` => `<`), si bien
+// que `.text()` rend le texte d'origine et non son échappement. Story 22.2 (P3 de 20-3) : une
+// assertion s'appuyait sur le texte encore échappé, comportement propre au faux DOM.
+function decodeEntities(value) {
+  return String(value)
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 class TextNode {
   constructor(text) { this.text = String(text); this.parent = null; }
 }
@@ -48,7 +57,7 @@ function parseHtml(html) {
     if (stack.length) { node.parent = stack[stack.length - 1]; stack[stack.length - 1].children.push(node); } else roots.push(node);
   }
   while ((match = re.exec(html))) {
-    if (match[3] !== undefined) { add(new TextNode(match[3])); continue; }
+    if (match[3] !== undefined) { add(new TextNode(decodeEntities(match[3]))); continue; }
     const whole = match[0];
     if (whole.startsWith('</')) { stack.pop(); continue; }
     const el = new El(match[1].toLowerCase());

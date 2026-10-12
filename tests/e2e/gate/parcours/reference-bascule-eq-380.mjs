@@ -7,8 +7,11 @@ export const declaredEquipments = {
 export const declaredPublicationOverrides = {};
 
 // La seule commande bloquante de l'équipement 380 est la cible de l'ancre.
+// Story 22.2 (R2) : `cover` est le seul type encore proposé pour 2971 (sensor et binary_sensor sont
+// retirés, refusés par la validation de projection) ; son aperçu réel reste bloquant (ambiguïté).
+const BASCULE_TYPE = 'cover';
 export const declaredBascules = [
-  { eqId: '380', cmdId: '2971', haEntityType: 'binary_sensor' },
+  { eqId: '380', cmdId: '2971', haEntityType: BASCULE_TYPE },
 ];
 
 async function atStep(helpers, index, label, operation) {
@@ -64,6 +67,11 @@ async function summary(panel) {
   return (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
 }
 
+/** Story 22.2 (AC2) : compteurs de l'équipement déplié (texte rendu, identifiants seulement). */
+async function counters(panel) {
+  return panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+}
+
 function writesSince(journalEntries, start) {
   return journalEntries().slice(start).filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action));
 }
@@ -93,32 +101,42 @@ export async function run(page, { helpers }) {
   const initialSummary = await atStep(helpers, 7, 'synthese-initiale', () => summary(panel));
   helpers.record('synthese_initiale', initialSummary);
 
+  const initialCounters = await atStep(helpers, '7a', 'compteurs-initiaux', () => counters(panel));
+  if (initialCounters.length < 3 || !initialCounters.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+    throw new Error('compteurs-eq-380-illisibles');
+  }
+  initialCounters.forEach((text, index) => helpers.record(`compteur_initial_${index + 1}`, text));
+
   const { target, cmdId } = await atStep(helpers, 8, 'premiere-bloquante', () => waitForTarget(page, panel));
   helpers.record('cmd_cible_id', Number(cmdId));
   helpers.record('cmd_cible_initial', await diagnosticState(target));
 
+  // Story 22.2 (R2, AC6 option A) : la liste « Override HA » ne propose plus que les types dont la
+  // projection peut aboutir. Pour 2971 (état d'un cover orphelin) `sensor` et `binary_sensor` sont
+  // refusés par la validation même forcés : ils ne sont plus proposés, seul `cover` (type
+  // automatique, valide mais refusé pour ambiguïté) reste. Plus d'aperçu réel d'un type refusé :
+  // le parcours vérifie la liste et la cause lisible, puis bascule simulée sur `cover`.
   const journalA = helpers.journalEntries().length;
-  await atStep(helpers, 9, 'apercu-reel-bloquant', async () => {
-    await target.locator('select').selectOption('sensor');
-    await waitForJournal(helpers.journalEntries, journalA, [
-      { action: 'previewMappingOverride', verdict: 'lecture-reelle' },
-    ]);
-    await page.waitForFunction((id) => {
-      const row = document.querySelector(`tr.mapping-override-cmd[data-cmd-id="${id}"]`);
-      return row?.querySelector('.mo-diag-cell')?.classList.contains('j2ha-diag-blocking')
-        && row.querySelector('.mo-spinner')?.getAttribute('style')?.includes('display: none');
-    }, cmdId);
-  });
+  const offered = await atStep(helpers, 9, 'liste-types-filtree', () => target.locator('select option')
+    .evaluateAll((options) => options.map((option) => option.getAttribute('value') ?? '')));
+  helpers.record('etape_a_types_proposes', offered.filter(Boolean).join(','));
+  if (offered[0] !== '') throw new Error('mode-automatique-absent');
+  if (offered.includes('sensor') || offered.includes('binary_sensor')) throw new Error('type-refuse-encore-propose');
+  if (JSON.stringify(offered.filter(Boolean)) !== JSON.stringify([BASCULE_TYPE])) throw new Error('liste-types-inattendue');
+  // Cause lisible du refus : la voie normale reste de préciser les types génériques dans Jeedom.
   const stateA = await diagnosticState(target);
-  if (stateA !== 'bloquante') throw new Error('apercu-reel-non-bloquant');
-  if (writesSince(helpers.journalEntries, journalA).length !== 0) throw new Error('ecriture-apres-apercu-reel');
+  if (stateA !== 'bloquante') throw new Error('cmd-cible-non-bloquante');
+  const causeA = (await target.locator('.mo-diag-cell').innerText()).trim();
+  if (!/précisez les types génériques dans Jeedom/.test(causeA)) throw new Error('cause-refus-illisible');
+  helpers.record('etape_a_cause', causeA);
+  if (writesSince(helpers.journalEntries, journalA).length !== 0) throw new Error('ecriture-avant-bascule');
   helpers.record('etape_a_cellule', stateA);
   helpers.record('etape_a_ecriture', false);
   helpers.record('etape_a_entrees_journal', helpers.journalEntries().length - journalA);
 
   const journalB = helpers.journalEntries().length;
   await atStep(helpers, 10, 'bascule-simulee', async () => {
-    await target.locator('select').selectOption('binary_sensor');
+    await target.locator('select').selectOption(BASCULE_TYPE);
     await waitForJournal(helpers.journalEntries, journalB, [
       { action: 'previewMappingOverride', verdict: 'apercu-simule' },
       { action: 'saveMappingOverride', verdict: 'simulee' },
@@ -157,6 +175,10 @@ export async function run(page, { helpers }) {
   const summaryC = await summary(panel);
   helpers.record('etape_c_synthese', summaryC);
   if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
+  // Story 22.2 : le retour au mode automatique restitue aussi les compteurs de l'équipement.
+  const finalCounters = await atStep(helpers, '11a', 'compteurs-finaux', () => counters(panel));
+  if (JSON.stringify(finalCounters) !== JSON.stringify(initialCounters)) throw new Error('compteurs-non-restitues');
+  helpers.record('compteurs_restitues', true);
   helpers.record('etape_c_cellule', stateC);
   helpers.record('etape_c_entrees_journal', helpers.journalEntries().length - journalC);
 }
