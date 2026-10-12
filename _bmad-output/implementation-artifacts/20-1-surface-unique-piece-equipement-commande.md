@@ -175,7 +175,7 @@ Décidées par Alex le 2026-10-05 à 10:43 (« 1A 2A 3C 4A »), sur recommandati
 
 ### Fichiers probablement touchés
 
-`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/css/jeedom2ha.css`, tests node (16-8 et nouveaux), `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs` (et `reference-bascule-eq-380.mjs` si le DOM change).
+`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/css/jeedom2ha.css`, tests node (16-8 et nouveaux), `tests/e2e/gate/parcours/decouverte-piece-25-eq-579.mjs` (et `reference-bascule-eq-380.mjs` si le DOM change).
 
 ## Définition de done
 
@@ -225,7 +225,7 @@ GPT-5 Codex
 - `desktop/js/jeedom2ha_mapping_surface.js`
 - `desktop/css/jeedom2ha.css`
 - `tests/unit/test_story_16_8_mapping_surface.node.test.js`
-- `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs`
+- `tests/e2e/gate/parcours/decouverte-piece-25-eq-579.mjs`
 - `_bmad-output/implementation-artifacts/20-1-surface-unique-piece-equipement-commande.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/20-1-preuve-validation-ux-2026-10-05.md`

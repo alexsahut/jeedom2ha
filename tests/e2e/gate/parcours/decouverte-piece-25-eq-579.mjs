@@ -1,7 +1,7 @@
-/** Parcours de découverte lecture seule : pièce 3 puis équipement 579 (étendu en 20.3 :
+/** Parcours de découverte lecture seule : pièce 25 puis équipement 579 (étendu en 20.3 :
  * absence de la synthèse et de la modale Diagnostic, chaînes interdites, compteurs de la pièce). */
 
-export const name = 'decouverte-piece-3-eq-579';
+export const name = 'decouverte-piece-25-eq-579';
 export const declaredEquipments = {};
 export const declaredPublicationOverrides = {};
 export const declaredBascules = [];
@@ -142,7 +142,7 @@ async function waitAtStep(helpers, index, label, operation) {
   }
 }
 
-/** Ouvre la pièce 3, déplie l'équipement 579 et consigne les constats DOM non sensibles. */
+/** Ouvre la pièce 25, déplie l'équipement 579 et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
     const actions = nodes.find((node) => node.querySelector('[data-action="gotoPluginConf"]'));
@@ -175,8 +175,8 @@ export async function run(page, { helpers }) {
     if (!Number.isInteger(count) || count < 1) throw new Error('compte-sans-piece-illisible');
     helpers.record('sans_piece_equipements', count);
   }
-  const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]');
-  await waitAtStep(helpers, 1, 'carte-piece-3', () => roomCard.click());
+  const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
+  await waitAtStep(helpers, 1, 'carte-piece-25', () => roomCard.click());
 
   const modal = page.locator('.modal-j2ha-room');
   await waitAtStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
@@ -220,7 +220,7 @@ export async function run(page, { helpers }) {
 
   // Story 20.3 : compteurs de la pièce ouverte, chaînes interdites dans la modale, actions déplacées présentes
   // (jamais cliquées par le gate : le clic réel est une preuve terrain séparée, avec GO d'Alexandre).
-  await waitAtStep(helpers, 8, 'compteurs-piece-3', () => readRoomCounters(modal, helpers, 'piece_3'));
+  await waitAtStep(helpers, 8, 'compteurs-piece-25', () => readRoomCounters(modal, helpers, 'piece_25'));
   const roomRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
   if (roomRanks.length) throw new Error(`chaine-interdite-piece-${roomRanks.join('-')}`);
   helpers.record('chaines_interdites_piece', 0);
@@ -237,7 +237,7 @@ export async function run(page, { helpers }) {
   // « Sans pièce » (quand la carte existe) : compteurs lus, aucune action de pièce.
   if (unassignedCount === 1) {
     await page.keyboard.press('Escape');
-    await waitAtStep(helpers, 9, 'fermeture-piece-3', () => modal.waitFor({ state: 'detached' }));
+    await waitAtStep(helpers, 9, 'fermeture-piece-25', () => modal.waitFor({ state: 'detached' }));
     await waitAtStep(helpers, 10, 'carte-sans-piece', () => unassigned.click());
     const unassignedModal = page.locator('.modal-j2ha-room');
     await waitAtStep(helpers, 11, 'modale-sans-piece', () => unassignedModal.waitFor({ state: 'visible' }));
