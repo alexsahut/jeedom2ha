@@ -3,7 +3,7 @@
 ## Contexte
 
 - Exécuté par clawbox (agent infra) sous le go d'Alex (Telegram, msg-id 11558), supervisé par ClaudeBox.
-- Objet : valider le paquet de distribution Market (A2) et la conformité d'activation sur Jeedom vierge (A1 T5, A3).
+- Objet : valider le paquet de distribution Market (A2) et la conformité d'activation sur Jeedom vierge (A3).
 
 ## Construction du paquet
 
@@ -33,4 +33,8 @@
 
 ## Portée
 
-Ce gate ferme en `done` : A1 (tâche T5, gate terrain), A2 (paquet distribuable) et A3 (conformité Market). Voir `sprint-status.yaml` et les fichiers de story correspondants.
+Ce gate ferme en `done` : A2 (paquet distribuable) et A3 (conformité Market). Voir `sprint-status.yaml` et les fichiers de story correspondants.
+
+## Hors portée
+
+Hors portée : la charge réelle d'A1 (AC5) n'a pas été testée sur Jeedom vierge ; A1 reste en `review`.
