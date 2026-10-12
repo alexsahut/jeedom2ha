@@ -191,10 +191,24 @@ describe('22.2 / AC5 (CC-58) — sélecteur « Override HA » d’une commande p
     const ui = openRoomWith([ok(tree579()), ok(tree(2, [READY]))]);
     const shared = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select');
     assert.equal(shared.prop('disabled'), true);
-    assert.match(shared.attr('title'), /portée par deux entités/);
-    assert.match(shared.attr('title'), /entité principale/);
+    // Formulation toujours vraie, y compris quand l'entité principale est elle-même publiée.
+    assert.equal(shared.attr('title'), 'Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici.');
+    assert.doesNotMatch(shared.attr('title'), /celle qui est publiée/);
     const own = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select');
     assert.notEqual(own.prop('disabled'), true);
+  });
+
+  it('R1 : désactivé aussi quand l’entité principale est elle-même publiée, avec la même explication', () => {
+    const t = tree(1, [READY], { entities: [
+      entity('switch', [105], { present_in_ha: true }),
+      entity('binary_sensor', [105], { present_in_ha: true }),
+    ] });
+    t.commands = [{ jeedom_cmd_id: 105, cmd_name: 'Etat', covered: true, diagnostic: READY, published_in_ha: true }];
+    const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
+    const shared = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select');
+    assert.equal(shared.prop('disabled'), true);
+    assert.match(shared.attr('title'), /portée par plusieurs entités/);
+    assert.doesNotMatch(shared.attr('title'), /pas à celle qui est publiée/);
   });
 
   it('aucun aperçu ni enregistrement n’est émis depuis le sélecteur désactivé', () => {

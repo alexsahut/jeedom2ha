@@ -705,8 +705,8 @@
     }).length;
   }
 
-  var SHARED_COMMAND_SELECTOR_REASON = 'Cette commande est portée par deux entités : le type Home Assistant choisi '
-    + 's’appliquerait à l’entité principale, pas à celle qui est publiée. Réglage indisponible ici.';
+  var SHARED_COMMAND_SELECTOR_REASON = 'Cette commande est portée par plusieurs entités : le type Home Assistant choisi '
+    + 'ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici.';
 
   // `entities` (optionnel, arbre déjà normalisé) : sans lui, comportement d'avant 22.2.
   function getOverrideSelectorState(row, entities) {

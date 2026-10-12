@@ -198,6 +198,12 @@ Forme simulée (identifiants numériques seulement, fixture anonymisée : `resou
 
 Exécutées comme la CI (`.github/workflows/test.yml`), Python 3.13 local : `flake8 resources/daemon tests` 0 ; `python -m pytest --cov=resources/daemon` **2156 réussis**, 1 ignoré (tests du démon inclus, `make test` ne les couvre pas) ; `python -m pytest -m load` 8 réussis ; `node --test tests/unit/*.node.test.js` **458 réussis** (dont gate simulé Playwright) ; PHP : lint de tous les fichiers + 7 tests réussis (3 ignorés comme en CI) ; `bash -n scripts/*.sh` OK. Golden inchangé. Gate 20-0 contre la box : non lancé (ClaudeBox).
 
+### R1 (ClaudeBox, tête `4164356`) — libellé exact du sélecteur désactivé (CC-58)
+
+- **(P2, libellé exact).** L'explication affirmait que le type « s'appliquerait à l'entité principale, pas à celle qui est publiée », faux quand l'entité principale est elle-même publiée alors que le sélecteur est désactivé sur toute commande portée par plusieurs entités. Nouvelle formulation, toujours vraie : « Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici. »
+- Alignés : `desktop/js/jeedom2ha_mapping_override.js` (`SHARED_COMMAND_SELECTOR_REASON`), test Node (titre exact + cas « principal publié »), page simulée et expression régulière du parcours `decouverte-piece-25-eq-579.mjs` (« portée par plusieurs entités »), `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`, ligne de `delegations.md`.
+- AC6 : **non touchée** (en attente de la décision d'Alexandre portée par ClaudeBox). Aucun nom réel.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/22-2-compteurs-et-lisibilite-de-la-surface-cc51-cc55-cc58-cc60.md` (modifié)

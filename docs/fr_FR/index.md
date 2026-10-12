@@ -235,7 +235,7 @@ La liste est **grisée avec une infobulle** quand elle n'a pas de sens :
 - « Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici. »
 - « Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici. »
 - « Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici. »
-- « Cette commande est portée par deux entités : le type Home Assistant choisi s’appliquerait à l’entité principale, pas à celle qui est publiée. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Revenir au type automatique » reste disponible.
+- « Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Revenir au type automatique » reste disponible.
 
 Quand une vérification fait apparaître une commande bloquante, un bandeau d'avertissement rappelle, une fois par ouverture de pièce : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
 

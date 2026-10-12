@@ -30,7 +30,7 @@ function multiEntityBody(id) {
     <div class="j2ha-entity-row"><strong>binary_sensor</strong><span class="j2ha-publication-actions">${entityActions}</span></div></div>
     <table class="j2ha-cmd-table"><tbody>
       <tr class="mapping-override-cmd" data-cmd-id="${id}1"><td class="mo-diag-cell j2ha-diag-ready">x</td></tr>
-      <tr class="mapping-override-cmd" data-cmd-id="5369"><td class="mo-td-override"><select disabled title="Cette commande est portée par deux entités : réglage indisponible ici."></select></td><td class="mo-diag-cell j2ha-diag-ready">x</td></tr>
+      <tr class="mapping-override-cmd" data-cmd-id="5369"><td class="mo-td-override"><select disabled title="Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici."></select></td><td class="mo-diag-cell j2ha-diag-ready">x</td></tr>
     </tbody></table>`;
 }
 

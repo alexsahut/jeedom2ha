@@ -132,7 +132,7 @@ async function readRoomCounters(modal, helpers, prefix) {
   });
 }
 
-/** Story 22.2 (AC2, AC3, AC5) : équipement 579 (plusieurs entités, commande 5369 portée par deux
+/** Story 22.2 (AC2, AC3, AC5) : équipement 579 (plusieurs entités, commande 5369 portée par plusieurs
  * entités). Lecture seule : aucun clic sur une action, aucun choix dans un sélecteur. */
 async function checkMultiEntityEquipment(panel, helpers) {
   await panel.locator('.j2ha-eq-counter').first().waitFor({ state: 'visible' });
@@ -156,12 +156,12 @@ async function checkMultiEntityEquipment(panel, helpers) {
     throw new Error('actions-equipement-579-inattendues');
   }
   helpers.record('eq_579_actions_equipement', equipmentLabels.length);
-  // Commande 5369 : portée par deux entités, sélecteur « Override HA » désactivé et expliqué (CC-58).
+  // Commande 5369 : portée par plusieurs entités, sélecteur « Override HA » désactivé et expliqué (CC-58).
   const shared = panel.locator('tr.mapping-override-cmd[data-cmd-id="5369"] select');
   if (await shared.count() !== 1) throw new Error('cmd-5369-absente');
   if (!(await shared.isDisabled())) throw new Error('selecteur-5369-actif');
   const title = (await shared.getAttribute('title')) ?? '';
-  if (!/portée par deux entités/.test(title)) throw new Error('selecteur-5369-sans-explication');
+  if (!/portée par plusieurs entités/.test(title)) throw new Error('selecteur-5369-sans-explication');
   helpers.record('selecteur_5369_desactive', true);
 }
 

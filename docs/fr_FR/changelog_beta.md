@@ -11,7 +11,7 @@
 - Les compteurs d'une pièce disent maintenant ce qui est **réellement dans Home Assistant** : équipements et commandes publiés, en attente d'application, non pris en charge (les équipements exclus ou désactivés restent comptés à part). Un équipement déplié affiche aussi ses propres compteurs. Voir la page « Les compteurs »
 - Les boutons disent leur portée : « Exclure l’équipement » / « Exclure cette entité » (idem pour « Forcer » et « Revenir au mode automatique »). Sur un équipement qui n'a qu'une seule entité, les boutons d'entité qui faisaient la même chose que ceux de l'équipement ne sont plus affichés
 - « Supprimer puis recréer » devient « Supprimer de Home Assistant » (équipement, pièce, parc) : l'action supprime seulement, elle ne recrée rien ; la confirmation rappelle que « Republier » remet l'équipement. Le comportement n'a pas changé
-- Le sélecteur « Override HA » est désactivé, avec une explication, sur une commande portée par deux entités (le type choisi ne s'appliquerait pas à l'entité qui est publiée)
+- Le sélecteur « Override HA » est désactivé, avec une explication, sur une commande portée par plusieurs entités (le type choisi ne s'appliquerait qu'à l'entité principale de l'équipement)
 - Le bandeau de santé est relu aussi quand « Republier » (ou une action de pièce) échoue
 - Rien de ce qui est publié dans Home Assistant ne change : mêmes topics, mêmes `unique_id`, mêmes payloads
 
