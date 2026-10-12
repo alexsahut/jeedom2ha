@@ -9,6 +9,7 @@ Les fichiers de configuration se trouvent dans :
 
 - `.github/workflows/test.yml` pour les checks d'intégration et de promotion
 - `.github/workflows/pr-governance.yml` pour les contrôles de cible de PR, de promotion et de métadonnées
+- `.github/workflows/market-package-check.yml` : job `Market Package Check` (anti-régression du paquet Market épuré, story A2 ; voir `docs/release-market.md` §7)
 - `.github/workflows/work.yml` pour le workflow Jeedom aligné sur les branches de release `beta` et `stable`
 
 ### Étapes de la Pipeline

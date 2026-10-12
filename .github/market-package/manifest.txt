@@ -1,0 +1,83 @@
+# Manifeste du paquet Market épuré de jeedom2ha (story A2, décision D2).
+#
+# Source de vérité unique, versionnée, lue par market_package.py :
+#   - build : applique les règles include/exclude à l'arbre d'un SHA de main ;
+#   - check : valide un arbre contre les listes figées forbid / require / retain.
+#
+# Règles include/exclude : ORDONNÉES, première règle qui matche gagne, défaut = inclus.
+#   motif "dir/"        : tout fichier situé sous un dossier de ce nom
+#                         (sans autre "/" : à n'importe quelle profondeur ;
+#                          avec "/" : ancré à la racine).
+#   motif sans "/" final : fnmatch sur le nom de fichier (sans "/") ou sur le chemin complet.
+#
+# Dérivé de .rsync-plugin-deploy.filter (déploiement box) avec UNE divergence documentée :
+# docs/fr_FR/ est INCLUS (changelog + documentation référencés par plugin_info/info.json).
+# tests/test_market_package.py vérifie que les autres exclusions restent alignées.
+
+# --- Divergence : docs/fr_FR/ est livré, le reste de docs/ non ---
+include docs/fr_FR/
+exclude docs/
+
+# --- Exclusions alignées sur .rsync-plugin-deploy.filter ---
+exclude .git/
+exclude .git
+exclude .DS_Store
+exclude .env
+exclude .env.*
+exclude .flake8
+exclude .python-version
+exclude .pytest_cache/
+exclude .github/
+exclude .githooks/
+exclude .agent/
+exclude .agents/
+exclude .claude/
+exclude tests/
+exclude scripts/
+exclude _bmad/
+exclude _bmad-output/
+exclude .vscode/
+exclude .venv/
+exclude *.egg-info/
+exclude node_modules/
+exclude __pycache__/
+exclude .coverage
+exclude coverage.xml
+exclude pyproject.toml
+exclude Makefile
+exclude README.md
+
+# --- Garde-fous figés (indépendants des règles ci-dessus : une régression des
+#     règles include/exclude est détectée ici). ---
+forbid .git/
+forbid .github/
+forbid .agent/
+forbid .agents/
+forbid .claude/
+forbid tests/
+forbid scripts/
+forbid _bmad/
+forbid _bmad-output/
+forbid .env
+forbid .env.*
+forbid docs/git-strategy.md
+forbid docs/release-market.md
+forbid docs/ci.md
+forbid docs/index.md
+
+# --- Fichiers/dossiers obligatoires dans le paquet ---
+require plugin_info/info.json
+require plugin_info/install.php
+require core/
+require desktop/
+require resources/daemon/main.py
+require docs/fr_FR/changelog.md
+require docs/fr_FR/changelog_beta.md
+require docs/fr_FR/index.md
+
+# --- Option 1 (protection de branche) : fichiers conservés sur beta/stable EN PLUS du
+#     paquet, pour que la PR release/vX.Y.Z -> beta puisse satisfaire un check requis.
+#     Ils ne font PAS partie du paquet plugin livré (arbre "build" sans --with-retained). ---
+retain .github/workflows/market-package-check.yml
+retain .github/market-package/manifest.txt
+retain .github/market-package/market_package.py

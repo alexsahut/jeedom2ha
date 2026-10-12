@@ -1079,3 +1079,80 @@ déploiement. Aucune commande de ce script n'écrit quoi que ce soit : ni tag,
 ni branche, ni Market, ni box (une seule commande SSH, en lecture seule, et
 un binaire `ssh` mocké — jamais de connexion réelle — pour le troisième
 cas).
+
+## 7. Paquet épuré et promotion par branche `release/vX.Y.Z` (story A2)
+
+Cette section décrit le mécanisme réel de promotion retenu (décision D2). Elle **ne déclenche
+aucune action** : le script ne pousse jamais, le push et la PR sont manuels et soumis au go d'Alex.
+
+### 7.1 Contenu du paquet
+
+Le paquet = arbre d'un SHA de `main` filtré par `.github/market-package/manifest.txt`. Il exclut
+`.git`, `.github/`, `.agent(s)/`, `.claude/`, `tests/`, `scripts/`, `_bmad*`, les fichiers de dev
+et tout `docs/` **sauf `docs/fr_FR/`**.
+
+**Pourquoi `docs/fr_FR/` est inclus** : `plugin_info/info.json` référence `changelog`,
+`documentation`, `changelog_beta`, `documentation_beta` sous forme de liens
+`blob/<branche>/docs/fr_FR/...`. Sans ce dossier sur `beta`/`stable` épurées, ces liens
+renverraient une 404. (`.rsync-plugin-deploy.filter`, utilisé par `deploy-to-box.sh`, n'est pas
+modifié et exclut toujours `docs/` : un test garantit que les deux filtres ne divergent que sur
+ce point.) À noter : comme dans le filtre de déploiement, `CLAUDE.md`, `LICENSE`, `.gitignore`
+et `.rsync-plugin-deploy.filter` ne sont pas exclus.
+
+### 7.2 Construire et vérifier le paquet (sans effet sur Git)
+
+```
+$ SHA=$(git rev-parse --short origin/main)      # SHA portant un tag deploy-*
+$ git tag --points-at "$SHA" 'deploy-*'
+$ bash scripts/build-market-package.sh build "$SHA" --output /tmp/market-pkg --tarball /tmp/jeedom2ha.tgz
+paquet épuré: 78 fichiers -> /tmp/market-pkg
+manifeste respecté: /tmp/market-pkg
+```
+
+Le build est déterministe (même SHA + même manifeste => mêmes fichiers, tarball identique à
+l'octet près). La commande `python3 .github/market-package/market_package.py check <dir>`
+revalide n'importe quel arbre.
+
+### 7.3 Construire la branche `release/vX.Y.Z` (local, à blanc)
+
+```
+$ git fetch origin
+$ bash scripts/build-market-package.sh release v0.3.0 --source "$SHA" --base-ref origin/beta
+Branche locale release/v0.3.0 créée: <commit>
+  base : origin/beta (<sha>)
+  commit : release v0.3.0 (source <sha-complet>)
+Aucun push effectué. Étapes suivantes (HUMAINES, après go explicite) : ...
+```
+
+Le script refuse : une version hors format `vX.Y.Z`, un SHA sans tag `deploy-*`
+(`--allow-untagged` réservé aux tests à blanc), une branche existante, les noms
+`main`/`beta`/`stable`. Il travaille dans un worktree temporaire et supprime la branche locale
+en cas d'échec. Il crée un commit unique `release vX.Y.Z (source <sha>)` dont l'arbre est le
+paquet épuré **plus** les fichiers `retain` du manifeste (option 1, voir `docs/git-strategy.md`).
+Pour `beta -> stable`, utiliser `--base-ref origin/stable` avec le même `--source`.
+
+### 7.4 Promotion réelle (actions humaines, hors périmètre de la story)
+
+```
+$ git push -u origin release/v0.3.0
+$ gh pr create --base beta --head release/v0.3.0 --title "release v0.3.0 (source ${SHA})"
+$ gh pr merge --merge          # merge commit : jamais --squash, jamais --rebase / fast-forward
+```
+
+Prérequis non résolus (voir `docs/git-strategy.md`, « Décision retenue pour la protection de
+branche ») : `PR Routing Policy` refuse aujourd'hui toute PR vers `beta` dont la source n'est pas
+`main`, et les checks requis de `beta`/`stable` doivent être ramenés à `Market Package Check`.
+Option 1 retenue ; Option 2 (ajuster seulement les règles de protection) documentée, non retenue.
+Rien n'a été modifié côté GitHub.
+
+### 7.5 CI anti-régression
+
+Le workflow `Market Package Check` construit le paquet sur toute PR vers `main` touchant le script,
+le manifeste, `plugin_info/` ou `docs/fr_FR/`, le valide (fichier interdit présent ou requis absent
+=> échec) et lance `tests/test_market_package.py`. Sur une PR vers `beta`/`stable`, il valide
+l'arbre de la branche de release (`check . --release-tree`).
+
+### 7.6 Retour arrière
+
+Supprimer la branche locale/distante `release/vX.Y.Z` (`git branch -D`, `git push origin --delete`) ;
+tant qu'aucune PR n'est mergée, `beta`/`stable` ne sont pas affectées.
