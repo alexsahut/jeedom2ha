@@ -1,6 +1,6 @@
 # Story A3 : Conformité `info.json` au Market Jeedom (E3, E5)
 
-Status: ready-for-dev
+Status: done
 
 Epic: (Chantier Market 2026-10)
 
