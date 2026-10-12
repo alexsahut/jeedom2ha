@@ -264,3 +264,26 @@ def test_cc60_constat_une_projection_corrigee_ferait_aboutir_type_puis_forcage(h
 def test_cc60_publication_decision_importable():
     # Garde-fou d'import : le test de présence ci-dessus s'appuie sur `PublicationDecision`.
     assert PublicationDecision is not None
+
+
+async def test_depublication_differee_d_une_entite_absente_du_mapping_courant(cli, app):
+    """Relecture Codex : une entité retirée du mapping mais encore dans HA (dépublication
+    différée) garde ses commandes « publiées » ; l'équipement et ses commandes restent cohérents."""
+    eq = _multi_entity_eq()
+    synced = _synced(eq, published_secondary_types=("binary_sensor", "sensor"))
+    # Le capteur de la commande 9003 disparaît du mapping courant (plus d'unité) : la commande reste lue.
+    current = _multi_entity_eq()
+    current.cmds[2] = _cmd(9003, "Autre", "info", "string", None)
+    payload = await _tree(cli, app, current, synced, pending={eq.id: "sensor"})
+    assert 9003 not in {cid for e in payload["entities"] for cid in e["command_ids"]}
+    assert payload["sync_status"]["published_in_ha"] is True
+    assert _row(payload, 9003)["published_in_ha"] is True
+
+
+async def test_sans_depublication_differee_une_commande_retiree_n_est_pas_publiee(cli, app):
+    eq = _multi_entity_eq()
+    synced = _synced(eq, published_secondary_types=())
+    current = _multi_entity_eq()
+    current.cmds[2] = _cmd(9003, "Autre", "info", "string", None)
+    payload = await _tree(cli, app, current, synced)
+    assert _row(payload, 9003)["published_in_ha"] is False

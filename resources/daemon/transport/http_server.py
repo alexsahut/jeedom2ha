@@ -880,6 +880,31 @@ def _candidate_present_in_ha(
     return bool(eq_pending_unpublish and getattr(applied, "should_publish", False))
 
 
+def _previous_present_cmd_ids(synced_decision, eq_pending_unpublish: bool) -> set:
+    """Story 22.2 — commandes portées par une entité DÉJÀ dans HA mais absente du mapping courant.
+
+    Une entité supprimée ou retypée dont la dépublication MQTT est différée reste dans Home Assistant
+    alors que l'évaluation courante ne la contient plus : on la retrouve dans le mapping de la
+    dernière synchronisation (mêmes prédicats que `_candidate_present_in_ha`). Lecture seule.
+    """
+    previous = getattr(synced_decision, "mapping_result", None)
+    if previous is None:
+        return set()
+    out: set = set()
+    for candidate in [previous, *(previous.additional_mappings or [])]:
+        decision = synced_decision if candidate is previous else getattr(candidate, "publication_decision_ref", None)
+        if decision is None:
+            continue
+        present = bool(
+            getattr(decision, "discovery_published", False)
+            or (candidate is previous and getattr(decision, "active_or_alive", False))
+            or (eq_pending_unpublish and getattr(decision, "should_publish", False))
+        )
+        if present:
+            out.update(mapping_cmd_ids(candidate))
+    return out
+
+
 def _published_candidates(mapping_result, principal_decision) -> dict:
     """Candidates whose step-4 verdict allows publication, keyed by `_candidate_key`."""
     candidates: dict = {}
@@ -3150,6 +3175,11 @@ def _build_mapping_override_tree(
         for entity_row in entity_rows if entity_row["present_in_ha"]
         for cid in entity_row["command_ids"]
     }
+    # Entité encore dans HA (dépublication différée) mais absente du mapping courant : ses commandes
+    # restent « publiées » tant qu'elle y est (cohérence avec `sync_status.published_in_ha`).
+    present_cmd_ids |= _previous_present_cmd_ids(
+        synced_decision, eq.id in (pending_discovery_unpublish or {}),
+    )
     for command_row in commands:
         command_row["published_in_ha"] = command_row["jeedom_cmd_id"] in present_cmd_ids
 

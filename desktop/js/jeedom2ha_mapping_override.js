@@ -953,7 +953,12 @@
     var summary = summarizePublication(t);
     var state = publicationSummaryState(summary);
     var presence = t.sync_status.published_in_ha;
-    var pending = t.sync_status.override_pending === true || t.entities.some(entityIsPending);
+    // Jamais synchronisé (`synced_should_publish` null) : le démon marque alors chaque entité
+    // `override_pending` faute de décision appliquée, ce qui n'est pas un réglage posé par
+    // l'utilisateur : rien n'est « en attente d'application ».
+    var neverSynced = t.sync_status.synced_should_publish === null;
+    var pendingEntities = neverSynced ? [] : t.entities;
+    var pending = t.sync_status.override_pending === true || pendingEntities.some(entityIsPending);
     var excluded = state === 'excluded';
     var disabled = state === 'disabled';
     var commands = { published: 0, pending: 0, unsupported: 0, presence_unknown: 0 };
@@ -970,7 +975,7 @@
       } else if (kind === 'blocking' || kind === 'uncovered') {
         commands.unsupported += 1;
       }
-      if (commandIsPending(t.entities, row.jeedom_cmd_id)) {
+      if (commandIsPending(pendingEntities, row.jeedom_cmd_id)) {
         commands.pending += 1;
       }
     }

@@ -283,3 +283,24 @@ describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380
     ]);
   });
 });
+
+describe('22.2 / AC7 — actions globales du bandeau (relecture Codex)', () => {
+  const fs = require('node:fs');
+  it('« Republier » et « Supprimer » globaux relisent le bandeau aussi en cas d’erreur', () => {
+    const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
+    for (const fn of ['triggerPublierAction', 'triggerSupprimerAction']) {
+      const body = home.match(new RegExp('function ' + fn + '[\\s\\S]*?\\n\\}'))[0];
+      const onError = body.match(/onError: function\(message\) \{[\s\S]*?\n    \},/)[0];
+      assert.match(onError, /refreshBridgeStatus\(\)/, fn);
+    }
+  });
+
+  it('exécution réelle : erreur réseau de « Republier dans Home Assistant » → bandeau relu', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const before = ui.calls.filter((c) => c.action === 'getBridgeStatus').length;
+    ui.click('.j2ha-ha-action[data-ha-action="republier"]');
+    ui.lastConfirmation().options.buttons.confirm.callback();
+    ui.fail('executeHaAction');
+    assert.equal(ui.calls.filter((c) => c.action === 'getBridgeStatus').length, before + 1);
+  });
+});

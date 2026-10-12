@@ -396,6 +396,8 @@ function triggerPublierAction($button, portee, selection, reservation) {
     },
     onError: function(message) {
       $('#div_alert').showAlert({message: message, level: 'danger'});
+      // Story 22.2 (Q8 A) : un échec change aussi le dernier résultat affiché par le bandeau.
+      refreshBridgeStatus();
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
@@ -415,6 +417,8 @@ function triggerSupprimerAction($button, portee, selection, reservation) {
     },
     onError: function(message) {
       $('#div_alert').showAlert({message: message, level: 'danger'});
+      // Story 22.2 (Q8 A) : un échec change aussi le dernier résultat affiché par le bandeau.
+      refreshBridgeStatus();
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);

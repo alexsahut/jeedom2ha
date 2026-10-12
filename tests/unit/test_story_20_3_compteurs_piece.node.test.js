@@ -32,7 +32,7 @@ function tree(id, diags, opts) {
     mapped: true,
     equipment_decision: o.decision || null,
     entities: o.entities || [],
-    sync_status: { published_in_ha: present, override_pending: o.pending === true },
+    sync_status: { synced_should_publish: o.neverSynced ? null : true, published_in_ha: present, override_pending: o.pending === true },
     commands: diags.map((d, i) => ({
       jeedom_cmd_id: id * 100 + i, cmd_name: 'C' + i, diagnostic: d,
       published_in_ha: o.cmdPresent === undefined ? present : o.cmdPresent[i],
@@ -66,6 +66,15 @@ describe('22.2 / AC1 — summarizeRoom : publiés / en attente / non pris en cha
     ], 2);
     assert.equal(s.equipments_pending, 2);
     assert.equal(s.equipments_unsupported, 0);
+  });
+
+  it('jamais synchronisé : les entités marquées en attente faute de décision ne comptent pas comme réglage en attente', () => {
+    const pendingEntity = { ha_entity_type: 'light', command_ids: [100], override_pending: true };
+    const s = M.summarizeRoom([tree(1, [BLOCKING], { present: false, neverSynced: true, entities: [pendingEntity] })], 1);
+    assert.equal(s.equipments_pending, 0);
+    assert.equal(s.commands_pending, 0);
+    assert.equal(s.equipments_unsupported, 1);
+    assert.equal(s.commands_unsupported, 1);
   });
 
   it('un équipement publié peut aussi avoir une modification en attente (notions indépendantes)', () => {
