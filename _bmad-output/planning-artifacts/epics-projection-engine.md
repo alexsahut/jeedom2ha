@@ -2450,7 +2450,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ### Epic 21 — Solde des réserves de l'étape 4 (CC-44, CC-47)
 
-**Statut :** `in-progress` — ouvert le 2026-10-11 (create-story, session cloud déléguée, lecture seule). Numérotation et rattachement confirmés par Alexandre (décision Q0 A de la story 21.1, 2026-10-11 vers 20:35 : nouvel epic, l'epic 20 est clos et ne se rouvre pas). Cadrage documentaire à la demande directe du mainteneur, comme pe-epic-19 : pas de SCP dédié, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
+**Statut :** `done` — clos le 2026-10-12 (story 21.1 `done`, réserve sur l'AC 13 a par décision d'Alexandre ; preuve : `21-1-preuve-terrain-2026-10-11.md` ; rétrospective : `pe-epic-21-retro-2026-10-12.md`). Ouvert le 2026-10-11 (create-story, session cloud déléguée, lecture seule). Numérotation et rattachement confirmés par Alexandre (décision Q0 A de la story 21.1, 2026-10-11 vers 20:35 : nouvel epic, l'epic 20 est clos et ne se rouvre pas). Cadrage documentaire à la demande directe du mainteneur, comme pe-epic-19 : pas de SCP dédié, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
 
 **Origine :** rétrospective `pe-epic-20-retro-2026-10-11.md` (risques résiduels) ; ordre décidé par Alexandre le 2026-10-11 à 15:48 : CC-44 + CC-47, puis CC-36 avec CC-51 et la story « compteurs », puis l'epic de parité HomeKit (CC-33).
 
@@ -2458,7 +2458,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Stories :**
 
-- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (affichage d'un état sans ordre On/Off déjà publié).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `ready-for-dev` (accordé par ClaudeBox au nom des décisions d'Alexandre du 2026-10-11 : Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A) : retrait des boutons de scénario désactivés, supprimés ou déjà fantômes (le broker fait foi) ; affichage et décompte d'une commande portée par un principal refusé et une entité publiée ; aucune publication ne change côté bloc B.
+- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (affichage d'un état sans ordre On/Off déjà publié).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `done` le 2026-10-12 (preuve terrain `21-1-preuve-terrain-2026-10-11.md`, déployé `30e6c80`, gate 20-0 réancré PASS). Historique : `ready-for-dev` (accordé par ClaudeBox au nom des décisions d'Alexandre du 2026-10-11 : Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A) : retrait des boutons de scénario désactivés, supprimés ou déjà fantômes (le broker fait foi) ; affichage et décompte d'une commande portée par un principal refusé et une entité publiée ; aucune publication ne change côté bloc B.
 
 **Points visés :** CC-44 (réserve AC6 de 20-4), CC-47 (réserve de 20-2).
 
@@ -2470,7 +2470,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ### Epic 22 — Noms Jeedom dans Home Assistant et compteurs lisibles (CC-36, CC-51)
 
-**Statut :** `backlog` — cadrage documentaire du 2026-10-12 (session cloud déléguée, lecture seule). **Rien n'est `ready-for-dev`** : en attente des décisions d'Alexandre, via ClaudeBox. Aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
+**Statut :** `in-progress` — cadrage documentaire du 2026-10-12 (session cloud déléguée, lecture seule) ; **décisions d'Alexandre du 2026-10-12 vers 05:50** (relayées par ClaudeBox) : 22.1 Q1 à Q6 A, **Q7 B** (`default_entity_id` = `<domaine>.<object_id actuel>` pour les entités nouvelles ou recréées) ; 22.2 Q1 A, Q2 A, Q3 A, Q4 B, Q5 A, Q6 C, Q7 A (sous réserve de la Task 0 a), Q8 A ; une story par sujet, **22.1 puis 22.2** ; les deux stories sont `ready-for-dev`. Aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
 
 **Origine :** ordre décidé par Alexandre le 2026-10-11 à 15:48 (CC-44 + CC-47 faits en epic 21, puis CC-36 avec CC-51 et la story « compteurs », puis parité HomeKit CC-33) ; décision du 2026-10-01 à 18:21 : « le nom et la pièce Jeedom font foi partout » ; audit de parité du 2026-10-02 (44 noms sur 94 différents du nom Jeedom) ; mesure du 2026-10-12 (91 appareils, 29 à un autre nom que l'équipement Jeedom, 149 entités concernées ; relevé de terrain R1 de ClaudeBox) ; retour d'Alexandre du 2026-10-09 sur l'équipement 287 (CC-51).
 
@@ -2484,11 +2484,11 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Hors périmètre :** parité HomeKit (CC-33, epic suivant) ; chantier Market ; tout changement d'`entity_id` ou d'`unique_id` des entités **existantes** ; captures d'écran de la documentation (après 22.2, par l'humain).
 
-**Stories (brouillons `draft`, décisions d'Alexandre attendues) :**
-- **Story 22.1 — Noms Home Assistant = noms Jeedom (CC-36).** Fichier `22-1-noms-home-assistant-egaux-noms-jeedom-cc36.md`. Démon seul. Questions Q1 à Q7 et QD.
-- **Story 22.2 — Compteurs et lisibilité de la surface (compteurs, CC-51, CC-55, CC-58, CC-60, P3 de 20-3).** Fichier `22-2-compteurs-et-lisibilite-de-la-surface-cc51-cc55-cc58-cc60.md`. Démon + interface, `ready-for-UX-validation` avant `done`. Questions Q1 à Q8 et QD.
+**Stories (`ready-for-dev`, décisions d'Alexandre du 2026-10-12) :**
+- **Story 22.1 — Noms Home Assistant = noms Jeedom (CC-36).** Fichier `22-1-noms-home-assistant-egaux-noms-jeedom-cc36.md`. Démon seul. `ready-for-dev`.
+- **Story 22.2 — Compteurs et lisibilité de la surface (compteurs, CC-51, CC-55, CC-58, CC-60, P3 de 20-3).** Fichier `22-2-compteurs-et-lisibilite-de-la-surface-cc51-cc55-cc58-cc60.md`. Démon + interface, `ready-for-UX-validation` avant `done`. `ready-for-dev`, après 22.1. Libellé « Supprimer de Home Assistant » (CC-55), compteurs publiés / en attente / non pris en charge.
 
-**Ordre proposé :** 22.1 puis 22.2 — 22.1 change ce qui est publié et décide si la recréation est le moyen d'appliquer noms et pièces, dont dépend le libellé de CC-55 ; 22.2 ne touche que l'écran. Découpage alternatif possible (une story, ou trois avec 22.2 scindée) : voir QD des stories.
+**Ordre retenu :** 22.1 puis 22.2 — 22.1 change ce qui est publié et décide si la recréation est le moyen d'appliquer noms et pièces, dont dépend le libellé de CC-55 ; 22.2 ne touche que l'écran. Découpage retenu : deux stories (QD).
 
 **Points visés :** CC-36, CC-51, CC-55, CC-58, CC-60 (selon décisions) ; compteurs (décision du 2026-10-11 15:48).
 
