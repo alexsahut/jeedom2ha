@@ -124,6 +124,8 @@ def write_tarball(outdir, tarball, mtime):
 def list_files(root):
     out = []
     for dirpath, dirnames, filenames in os.walk(root):
+        if dirpath == root and ".git" in dirnames:
+            dirnames.remove(".git")  # métadonnées Git d'un checkout : pas du contenu versionné
         dirnames.sort()
         for name in sorted(filenames + [d for d in dirnames if os.path.islink(os.path.join(dirpath, d))]):
             full = os.path.join(dirpath, name)

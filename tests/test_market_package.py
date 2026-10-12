@@ -184,3 +184,20 @@ def test_script_never_pushes():
     text = SCRIPT.read_text()
     executable = text.split("cat <<MSG")[0]
     assert "push" not in "\n".join(ln for ln in executable.splitlines() if not ln.lstrip().startswith("#"))
+
+
+def test_check_ignores_git_metadata_of_a_checkout(fixture_repo, tmp_path):
+    sha = git(fixture_repo, "rev-parse", "main")
+    out = tmp_path / "tree"
+    mp.build(sha, str(out), repo=str(fixture_repo), with_retained=True)
+    write(out, ".git/HEAD", "ref: refs/heads/beta\n")
+    assert mp.check(str(out), release_tree=True) == []
+
+
+def test_release_pr_target_follows_base_ref(fixture_repo):
+    sha = git(fixture_repo, "rev-parse", "main")
+    git(fixture_repo, "branch", "stable", "beta")
+    r = sh("release", "v1.2.3", "--source", sha, "--base-ref", "stable", "--allow-untagged",
+           repo=fixture_repo)
+    assert "--base stable --head release/v1.2.3" in r.stdout
+    assert "--base beta" not in r.stdout

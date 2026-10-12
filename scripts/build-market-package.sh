@@ -108,12 +108,14 @@ case "${MODE}" in
     echo "Branche locale ${BRANCH} créée: ${NEW}"
     echo "  base : ${BASE_REF} (${BASE_SHA})"
     echo "  commit : release ${VERSION} (source ${SHA})"
+    TARGET="${BASE_REF#origin/}"
+    case "${TARGET}" in beta|stable) ;; *) TARGET="<beta|stable>" ;; esac
     cat <<MSG
 
 Aucun push effectué. Étapes suivantes (HUMAINES, après go explicite) :
   git push -u origin ${BRANCH}
-  # PR ${BRANCH} -> beta, à fusionner par MERGE COMMIT (jamais squash, jamais fast-forward) :
-  #   gh pr create --base beta --head ${BRANCH} --title "release ${VERSION} (source ${SHA:0:7})"
+  # PR ${BRANCH} -> ${TARGET}, à fusionner par MERGE COMMIT (jamais squash, jamais fast-forward) :
+  #   gh pr create --base ${TARGET} --head ${BRANCH} --title "release ${VERSION} (source ${SHA:0:7})"
   #   gh pr merge --merge
 MSG
     ;;
