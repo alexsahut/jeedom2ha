@@ -128,7 +128,9 @@ export async function run(page, { helpers }) {
   if (stateA !== 'bloquante') throw new Error('cmd-cible-non-bloquante');
   const causeA = (await target.locator('.mo-diag-cell').innerText()).trim();
   if (!/précisez les types génériques dans Jeedom/.test(causeA)) throw new Error('cause-refus-illisible');
-  helpers.record('etape_a_cause', causeA);
+  // Le texte complet de la cause (environ 90 caractères) dépasse la limite des observations
+  // (80 caractères, `normalizeParcoursRecord`) : on n'enregistre que le constat.
+  helpers.record('etape_a_cause_lisible', true);
   if (writesSince(helpers.journalEntries, journalA).length !== 0) throw new Error('ecriture-avant-bascule');
   helpers.record('etape_a_cellule', stateA);
   helpers.record('etape_a_ecriture', false);

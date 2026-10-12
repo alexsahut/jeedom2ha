@@ -82,8 +82,15 @@ async function withPage(t, content, journal, fn) {
     const page = await browser.newPage();
     await page.setContent(content);
     const recorded = {};
+    const { normalizeParcoursRecord } = await import(gate('lib', 'report.mjs'));
     const helpers = {
-      record: (key, value) => { assert.equal(Object.hasOwn(recorded, key), false, `clé dupliquée ${key}`); recorded[key] = value; },
+      // Story 22.2 : chaque observation passe par la validation du vrai rapport du gate (clé, type,
+      // 80 caractères au plus), pour détecter sans la box une valeur que le rapport refuserait.
+      record: (key, value) => {
+        const [safeKey, safeValue] = normalizeParcoursRecord(key, value);
+        assert.equal(Object.hasOwn(recorded, safeKey), false, `clé dupliquée ${safeKey}`);
+        recorded[safeKey] = safeValue;
+      },
       journalEntries: () => journal,
     };
     await fn(page, helpers, recorded);
@@ -201,4 +208,110 @@ test('22.2 R2 — le parcours 380 bascule sur le seul type encore proposé pour 
   assert.match(source, /haEntityType: BASCULE_TYPE/);
   assert.doesNotMatch(source, /selectOption\('(sensor|binary_sensor)'\)/);
   assert.match(source, /type-refuse-encore-propose/);
+});
+
+
+// --- Parcours de référence 380 sur une page simulée (22.2, fix du gate) ---
+// La cause d'un type refusé fait environ 90 caractères, comme sur la box : le parcours ne doit en
+// enregistrer que le constat. Le journal de l'intercepteur est simulé par les gestionnaires de la page.
+
+const LONG_CAUSE = 'Ne sera pas publié — type Home Assistant ambigu — précisez les types génériques dans Jeedom';
+const INITIAL_BADGE = 'Ne sera pas publié dans Home Assistant : 1 commande(s) bloquante(s).';
+const READY_BADGE = 'Sera publié dans Home Assistant : 1 commande(s) prête(s).';
+
+function html380(journal, { sensorOffered = false } = {}) {
+  const options = `<option value="">— mode automatique —</option>${sensorOffered ? '<option value="sensor">sensor</option><option value="binary_sensor">binary_sensor</option>' : ''}<option value="cover">cover</option>`;
+  const modal = `<div class="modal-j2ha-room"><div class="j2ha-eq-panel" data-eq-id="380">
+    <a class="j2ha-eq-toggle" href="#" onclick="document.querySelector('.panel-collapse').style.display='block';return false;"><span class="j2ha-eq-name">Eq</span>
+      <span class="j2ha-eq-publish-badge label">${INITIAL_BADGE}</span></a>
+    <div class="panel-collapse" style="display:none">
+      <div class="j2ha-eq-counters"><div class="j2ha-eq-counter-line">
+        <span class="label j2ha-eq-counter">0 commande publiée dans Home Assistant</span>
+        <span class="label j2ha-eq-counter">0 commande en attente d’application</span>
+        <span class="label j2ha-eq-counter">1 commande non prise en charge</span></div></div>
+      <a class="j2ha-goto-blocking" href="#" onclick="document.querySelector('tr[data-cmd-id=&quot;2971&quot;]').classList.add('j2ha-diag-target-highlight');return false;">Voir la première commande bloquante</a>
+      <table class="j2ha-cmd-table"><tbody>
+        <tr class="mapping-override-cmd" data-cmd-id="2968"><td class="mo-diag-cell j2ha-diag-uncovered">Non couverte</td></tr>
+        <tr class="mapping-override-cmd" data-cmd-id="2971"><td class="mo-td-override"><select id="sel2971">${options}</select><span class="mo-spinner" style="display: none;"></span><span id="rev2971"></span></td>
+          <td class="mo-diag-cell j2ha-diag-blocking" id="diag2971">${LONG_CAUSE}</td></tr>
+      </tbody></table></div></div></div>`;
+  return `<body><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="4" id="piece-4">Pièce</div></div>
+    <script>
+      window.__push = function (action, verdict) { window.__pushNode(action, verdict); };
+      document.getElementById('piece-4').onclick = function () { document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(modal)}); wire(); };
+      function setReady(on) {
+        var cell = document.getElementById('diag2971');
+        cell.className = 'mo-diag-cell ' + (on ? 'j2ha-diag-ready' : 'j2ha-diag-blocking');
+        cell.textContent = on ? 'Sera publié : cover' : ${JSON.stringify(LONG_CAUSE)};
+        document.querySelector('.j2ha-eq-publish-badge').textContent = on ? ${JSON.stringify(READY_BADGE)} : ${JSON.stringify(INITIAL_BADGE)};
+        document.getElementById('rev2971').innerHTML = on ? '<a class="mo-revert-cmd" href="#">↺</a>' : '';
+        if (on) document.querySelector('.mo-revert-cmd').onclick = function () {
+          window.__push('revertMappingOverride', 'simulee'); window.__push('getMappingOverrides', 'read'); setReady(false); return false;
+        };
+      }
+      function wire() {
+        document.getElementById('sel2971').onchange = function () {
+          window.__push('previewMappingOverride', 'apercu-simule'); window.__push('saveMappingOverride', 'simulee');
+          window.__push('getMappingOverrides', 'lecture-derivee'); setReady(true);
+        };
+      }
+    </script></body>`;
+}
+
+async function with380Page(t, fn, options) {
+  const journal = [];
+  let playwright;
+  try {
+    const { loadPlaywright } = await import(gate('lib', 'playwright.mjs'));
+    playwright = loadPlaywright();
+  } catch {
+    t.skip('Playwright indisponible : gate simulé ignoré');
+    return;
+  }
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.exposeFunction('__pushNode', (action, verdict) => { journal.push({ action, verdict }); });
+    await page.setContent(html380(journal, options));
+    const recorded = {};
+    const { normalizeParcoursRecord } = await import(gate('lib', 'report.mjs'));
+    const helpers = {
+      record: (key, value) => {
+        const [safeKey, safeValue] = normalizeParcoursRecord(key, value);
+        assert.equal(Object.hasOwn(recorded, safeKey), false, `clé dupliquée ${safeKey}`);
+        recorded[safeKey] = safeValue;
+      },
+      journalEntries: () => journal,
+    };
+    await fn(page, helpers, recorded);
+  } finally {
+    await browser.close();
+  }
+}
+
+test('22.2 gate simulé — le parcours de référence 380 passe et n’enregistre aucune valeur que le rapport refuserait', async (t) => {
+  assert.ok(LONG_CAUSE.length > 80, 'la cause simulée est aussi longue que la vraie');
+  const parcours = await import(gate('parcours', 'reference-bascule-eq-380.mjs'));
+  await with380Page(t, async (page, helpers, recorded) => {
+    await parcours.run(page, { helpers });
+    assert.equal(recorded.etape_a_cause_lisible, true);
+    assert.equal(Object.hasOwn(recorded, 'etape_a_cause'), false);
+    assert.equal(recorded.etape_a_types_proposes, 'cover');
+    assert.equal(recorded.etape_b_cellule, 'prete');
+    assert.equal(recorded.etape_c_cellule, 'bloquante');
+    assert.equal(recorded.compteurs_restitues, true);
+  });
+});
+
+test('22.2 gate simulé — un type refusé encore proposé fait échouer le parcours 380', async (t) => {
+  const parcours = await import(gate('parcours', 'reference-bascule-eq-380.mjs'));
+  await with380Page(t, async (page, helpers) => {
+    await assert.rejects(() => parcours.run(page, { helpers }), /type-refuse-encore-propose/);
+  }, { sensorOffered: true });
+});
+
+test('22.2 gate simulé — le rapport refuse bien une observation de plus de 80 caractères (garde-fou du test)', async () => {
+  const { normalizeParcoursRecord } = await import(gate('lib', 'report.mjs'));
+  assert.throws(() => normalizeParcoursRecord('etape_a_cause', LONG_CAUSE), /parcours-record-valeur-invalide/);
+  assert.deepEqual(normalizeParcoursRecord('etape_a_cause_lisible', true), ['etape_a_cause_lisible', true]);
 });
