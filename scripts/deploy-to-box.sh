@@ -161,7 +161,7 @@ jeedom2ha_verify_deploy_source() {
   [[ -n "${_github_repo}" ]] || _fail "Impossible de déterminer le dépôt GitHub depuis origin (${_origin_url:-absent})."
 
   jeedom2ha_verify_ci_green "${_github_repo}" "${_deploy_sha}" || exit 1
-  echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts, runs push/PR/dispatch)."
+  echo "  Source Git validée : ${_deploy_sha} (arbre propre, check-runs GitHub verts, runs push/PR/dispatch de la branche ${JEEDOM2HA_DEPLOY_CI_BRANCH:-main})."
 }
 
 # Point 9 — un tag resté local ne sert à rien pour la traçabilité partagée :

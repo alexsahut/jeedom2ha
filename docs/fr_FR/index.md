@@ -156,6 +156,7 @@ Pendant un rescan, ces mêmes boutons sont aussi grisés. Les boutons « Exclure
 
 - **Ce qu'il fait** : relit tous les équipements de Jeedom, publie ou retire des entités Home Assistant en conséquence, et **applique d'un coup tous les réglages en attente** (les « overrides » : types Home Assistant choisis, exclusions, forçages) de tous les équipements.
 - **Ce qu'il ne fait pas** : il ne modifie rien dans Jeedom.
+- **Scénarios** : le bouton Home Assistant d'un scénario Jeedom désactivé (ou supprimé) disparaît au prochain rescan ou redémarrage du démon, et revient à la réactivation. **Une seule installation jeedom2ha par broker MQTT** : le plugin considère le broker comme la référence des boutons de scénario, donc une deuxième instance (box de test, clone restauré) qui y serait connectée verrait ses boutons de scénario retirés par l'autre, et inversement.
 - **Pendant l'opération** : le bouton affiche « Rescan en cours… » et les autres boutons d'action sont grisés.
 - **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou le rescan a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. Le bandeau de santé est ensuite relu.
 
@@ -373,7 +374,7 @@ Quand une commande ne sera pas publiée, la cellule affiche « Ne sera pas publi
 | types génériques en conflit — précisez-les dans Jeedom | Idem. |
 | types génériques en double | Deux commandes portent le même type : retirez le doublon. |
 | un mot du nom de l’équipement écarte ce type | Renommez l'équipement (voir [Nommage des équipements](#annexe--nommage-des-équipements)). |
-| état sans ordre On/Off | L'équipement a une commande d'état mais pas de commandes On/Off. |
+| état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Override HA », puis « Forcer » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Dans la liste « Override HA » de cette commande, choisissez `binary_sensor`, puis cliquez sur « Forcer ». |
 
 **2. Rien à publier, tel que l'équipement est configuré**
 

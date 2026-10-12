@@ -265,8 +265,8 @@ GPT-5 Codex
 - tests/e2e/gate/lib/simulate.mjs
 - tests/e2e/gate/interceptor-selftest.mjs
 - tests/e2e/gate/run-gate.mjs
-- tests/e2e/gate/parcours/decouverte-garage-enphase.mjs
-- tests/e2e/gate/parcours/reference-bascule-enphase.mjs
+- tests/e2e/gate/parcours/decouverte-piece-25-eq-579.mjs
+- tests/e2e/gate/parcours/reference-bascule-eq-380.mjs
 - tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs
 - tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs
 - tests/unit/test_story_20_0_gate_policy.node.test.js

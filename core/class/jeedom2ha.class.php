@@ -651,6 +651,35 @@ class jeedom2ha extends eqLogic {
     return $result;
   }
 
+
+  /**
+   * Story 21.1 — normalise les scénarios Jeedom et dit si la lecture est complète.
+   *
+   * @param iterable|null $_scenarios scénarios (scenario::all()), null si la classe scenario est absente
+   * @return array{scenarios: array, complete: bool} complete=false si la source est absente
+   *         ou si au moins un scénario n'a pas pu être lu.
+   */
+  public static function buildScenariosPayload($_scenarios): array {
+    $payload = array('scenarios' => array(), 'complete' => false);
+    if ($_scenarios === null) {
+      return $payload;
+    }
+    $payload['complete'] = true;
+    foreach ($_scenarios as $sc) {
+      try {
+        $payload['scenarios'][] = array(
+          'id'        => intval($sc->getId()),
+          'name'      => $sc->getName(),
+          'is_active' => (bool)$sc->getIsActive(),
+        );
+      } catch (Throwable $e) {
+        // Scénario non lisible — ignoré, mais la liste n'est plus complète
+        $payload['complete'] = false;
+      }
+    }
+    return $payload;
+  }
+
   /**
    * Extrait la topologie complète de Jeedom pour synchronisation daemon.
    * Strictement Read-Only : utilise le cache pour les valeurs, jamais execCmd.
@@ -797,20 +826,10 @@ class jeedom2ha extends eqLogic {
     }
 
     // 3. Scenarios Jeedom (Story 10.1 — publiés comme HA button)
-    $result['scenarios'] = array();
-    if (class_exists('scenario')) {
-      foreach (scenario::all() as $sc) {
-        try {
-          $result['scenarios'][] = array(
-            'id'        => intval($sc->getId()),
-            'name'      => $sc->getName(),
-            'is_active' => (bool)$sc->getIsActive(),
-          );
-        } catch (Exception $e) {
-          // Scénario non lisible — ignorer
-        }
-      }
-    }
+    $scenariosPayload = self::buildScenariosPayload(class_exists('scenario') ? scenario::all() : null);
+    $result['scenarios'] = $scenariosPayload['scenarios'];
+    // Story 21.1 — le démon ne purge les boutons de scénarios que si la lecture est complète.
+    $result['scenarios_complete'] = $scenariosPayload['complete'];
 
     // Ajout de sync_config pour la politique de confiance (Story 4.3)
     $result['sync_config'] = array('confidence_policy' => $confidencePolicy);

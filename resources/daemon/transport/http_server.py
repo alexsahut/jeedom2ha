@@ -13,7 +13,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 import paho.mqtt.client as mqtt
 from aiohttp import web
@@ -36,6 +36,7 @@ from models.decide_publication import (
 from models.evaluate_equipment import (
     _resolve_publication_override_for_mapping,
     evaluate_equipment,
+    select_covering_decision,
     merge_override_layer,
 )
 from models.mapping import MappingResult, PublicationDecision, PublicationResult
@@ -2078,8 +2079,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     # Story 10.1 — Publish Jeedom scenarios as HA button entities
     scenario_mapper = ScenarioButtonMapper()
     scenario_publications: Dict[int, PublicationDecision] = {}
+    broker_ready = bool(publisher and mqtt_bridge and mqtt_bridge.is_connected)
+    unpublished_scenario_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
         if not scenario.is_active:
+            # Story 21.1 (CC-44) — un scénario inactif n'a plus de bouton dans HA.
+            # Pas de report si le broker est injoignable : la purge « le broker fait foi »
+            # ci-dessous reprend au sync suivant (aucun passage par pending_discovery_unpublish,
+            # indexé par eq_id).
+            if broker_ready and await publisher.unpublish(f"jeedom2ha_scenario_{scenario_id}"):
+                unpublished_scenario_ids.add(scenario_id)
             continue
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
@@ -2103,6 +2112,32 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         request.app["scenario_publications"].pop(stale_id, None)
         _LOGGER.info("[SCENARIO] Purged stale scenario_id=%d from scenario_publications", stale_id)
     request.app["scenario_publications"].update(scenario_publications)
+
+    # Story 21.1 (CC-44, Q2b C) — le broker fait foi : vider les boutons de scénario retenus
+    # qui ne sont pas actifs (inactifs, supprimés, fantômes déjà présents). Garde-fou : la
+    # section `scenarios` doit être une liste, lue en entier côté démon et déclarée complète
+    # par le producteur PHP (`scenarios_complete`), sinon le défaut « liste vide » ou un
+    # scénario illisible ferait vider des boutons encore actifs.
+    raw_scenarios = payload.get("scenarios")
+    scenarios_section_complete = (
+        isinstance(raw_scenarios, list)
+        and payload.get("scenarios_complete") is True
+        and len(raw_scenarios) == len(snapshot.scenarios)
+    )
+    purged_ids: list = []
+    if broker_ready and scenarios_section_complete:
+        result = await publisher.purge_orphan_scenario_buttons(
+            set(scenario_publications), unpublished_scenario_ids
+        )
+        purged_ids = result if isinstance(result, list) else []
+    elif broker_ready:
+        _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
+    emptied_ids = sorted(unpublished_scenario_ids | set(purged_ids))
+    if emptied_ids:
+        _LOGGER.info(
+            "[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker): ids=%s",
+            len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,
+        )
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
@@ -2567,26 +2602,25 @@ def _build_publication_override_diag(reason_code, pub_decision):
     }
 
 
-def _secondary_mapping_by_cmd(primary_mapping):
-    """Index {cmd_id: MappingResult} des capteurs/interrupteurs secondaires (Story 11.1
-    multi-sensor), TOUTES les commandes qu'ils couvrent confondues.
+def _mappings_covering_cmd(primary_mapping, cmd_id):
+    """Liste ordonnée (primaire d'abord, puis secondaires dans l'ordre natif) des
+    `MappingResult` qui couvrent `cmd_id`, TOUTES leurs commandes confondues.
 
     Un secondaire couvre non seulement sa commande d'état (`reason_details["cmd_id"]`) mais
     aussi, pour un interrupteur secondaire, ses commandes d'action (On/Off) présentes dans
     `secondary.commands` — routées et prouvées par la Story 19.2. Utilise `mapping_cmd_ids()`
-    (même extraction que le primaire, `mapping/overrides.py`) pour ne PAS dupliquer une
-    seconde définition de « quelles commandes appartiennent à ce mapping » (Story 19.3,
-    correction relecture ClaudeBox PR #176, P1-b) : c'est la même fonction que celle utilisée
-    par `covered`, le diagnostic de l'arbre et la cible de l'aperçu (`_resolve_command_mapping`).
-    Premier gagnant si collision (setdefault), ordre natif préservé.
+    (même extraction que `evaluate_equipment()`) pour ne PAS dupliquer une seconde définition
+    de « quelles commandes appartiennent à ce mapping » (Story 19.3, P1-b).
     """
-    index: Dict[int, object] = {}
     if primary_mapping is None:
-        return index
+        return []
+    covering = []
+    if cmd_id in set(mapping_cmd_ids(primary_mapping)):
+        covering.append(primary_mapping)
     for secondary in (primary_mapping.additional_mappings or []):
-        for cmd_id in mapping_cmd_ids(secondary):
-            index.setdefault(cmd_id, secondary)
-    return index
+        if cmd_id in set(mapping_cmd_ids(secondary)):
+            covering.append(secondary)
+    return covering
 
 
 def _resolve_command_mapping(evaluation, cmd_id):
@@ -2594,15 +2628,13 @@ def _resolve_command_mapping(evaluation, cmd_id):
     d'une `EquipmentEvaluation` déjà décidée — `None` si l'équipement n'a pas de mapping
     (inéligible ou `no_mapping`) ou si `cmd_id` n'est couvert par AUCUN des deux.
 
-    Priorité EXACTEMENT celle du contrat (`evaluate_equipment()`, AC1, `covered.setdefault`
-    primaire PUIS secondaires dans l'ordre) : le primaire gagne toujours sur un secondaire
-    pour une commande partagée. Source UNIQUE utilisée par l'arbre (`covered`, `diag_mapping`,
-    `attendu_ha`, `effective_ha`) ET par l'aperçu — Story 19.3, correction relecture ClaudeBox
-    PR #176 tour 2 (P2). Avant ce correctif, l'aperçu (`_target_mapping_for_cmd`) résolvait
-    SECONDAIRE d'abord, à l'inverse du contrat et de l'arbre (qui, eux, dupliquaient chacun
-    leur propre logique primaire-d'abord) : un piège pour toute commande partagée entre le
-    primaire et un secondaire, latent depuis que l'index des secondaires couvre TOUTES leurs
-    commandes (P1-b). Sans effet sur le corpus doré (aucune commande partagée).
+    Priorité EXACTEMENT celle du contrat (`evaluate_equipment()`, AC1, via
+    `select_covering_decision`) : la première entité PUBLIÉE qui porte la commande (primaire
+    d'abord, puis secondaires dans l'ordre) ; si aucune n'est publiée, le primaire (sa cause
+    est alors affichée). Story 21.1 (CC-47) : un principal refusé ne masque plus un secondaire
+    publié sur la même commande ; quand les deux sont publiés, le primaire garde la priorité
+    (Story 19.3, P2). Source UNIQUE utilisée par l'arbre (`covered`, `diag_mapping`,
+    `attendu_ha`, `effective_ha`) ET par l'aperçu.
 
     `cmd_id=None` cible toujours le mapping primaire (vue équipement).
     """
@@ -2610,9 +2642,13 @@ def _resolve_command_mapping(evaluation, cmd_id):
     if primary_mapping is None:
         return None
     if isinstance(cmd_id, int):
-        if cmd_id in set(mapping_cmd_ids(primary_mapping)):
-            return primary_mapping
-        return _secondary_mapping_by_cmd(primary_mapping).get(cmd_id)
+        covering = _mappings_covering_cmd(primary_mapping, cmd_id)
+        if not covering:
+            return None
+        return select_covering_decision(
+            covering,
+            lambda mapping: mapping.publication_decision_ref or evaluation.equipment_decision,
+        )
     return primary_mapping
 
 
@@ -3563,7 +3599,11 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
         ecart = compute_ecart(perimetre, statut)
         if ecart and perimetre == "inclus":
             cause_code, _, _ = reason_code_to_cause(reason_code)
-            cause_ux = resolve_cause_ux(decision_reason_code, pipeline_step_visible)
+            cause_ux = resolve_cause_ux(
+                decision_reason_code,
+                pipeline_step_visible,
+                mapping_reason_code=getattr(map_result, "reason_code", None),
+            )
             cause_label = cause_ux["cause_label"]
             cause_action = cause_ux["cause_action"]
         elif ecart and perimetre.startswith("exclu_"):
