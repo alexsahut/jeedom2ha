@@ -250,3 +250,29 @@ def test_main_end_to_end(server, tmp_path, capsys):
     assert pd.main(["--env-file", str(env)]) == 0
     assert json.loads(capsys.readouterr().out)["summary"]["by_status"] == {"exists": 71}
     assert len(server.eqs) == 16
+
+
+def test_name_collision_with_foreign_equipment_is_refused_even_with_allow(server):
+    room = server.dispatch(pd.JsonRpcContract.ROOM_SAVE, {"name": "Salon"})
+    server.eqs.append({"id": 1, "name": "Lumiere Salon", "object_id": room["id"],
+                       "eqType_name": "zwave", "configuration": {}})
+    with pytest.raises(pd.DemoError, match="aucune réutilisation"):
+        pd.populate(adapter_for(server), dry_run=False, allow_non_empty=True)
+    assert "eqLogic::save" not in server.writes
+
+
+def test_created_equipments_carry_owner_marker(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    assert all(e["configuration"][pd.OWNER_MARKER] for e in server.eqs)
+
+
+def test_on_off_actions_carry_distinct_values():
+    acts = {c["name"]: c["configuration"].get("value")
+            for e in pd.EQUIPMENTS for c in e["cmds"] if c["generic_type"] == "LIGHT_ON" or
+            c["generic_type"] == "LIGHT_OFF" for c in [c]}
+    assert acts == {"On": "1", "Off": "0"}
+
+
+def test_compose_requires_pinned_tag():
+    text = (SCRIPT.parent / "docker-compose.ha.yml").read_text()
+    assert "${HA_IMAGE_TAG:?" in text and ":-stable" not in text

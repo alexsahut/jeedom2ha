@@ -39,6 +39,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EQ_TYPE = "virtual"
 DEMO_TARGET_VALUE = "demo"
 INVENTORY_SCHEMA = 1
+OWNER_MARKER = "jeedom2ha_demo_key"  # marque les équipements créés par ce script
 
 
 class DemoError(Exception):
@@ -57,18 +58,24 @@ def _info(name, generic, sub="binary", unit="", history=False):
             "isHistorized": 1 if history else 0}
 
 
-def _act(name, generic, sub="other", info=None):
+def _act(name, generic, sub="other", info=None, value=None):
+    """Action Virtuel ; `value` = valeur écrite dans l'info liée (on/off).
+
+    Lien info + valeur : NON DÉMONTRÉ (cf. docs/dev-demo-env.md, « Contrat API »).
+    """
     cmd = {"name": name, "type": "action", "subType": sub, "generic_type": generic, "unit": "",
            "isHistorized": 0}
     if info:
         cmd["configuration"] = {"infoName": info}
+        if value is not None:
+            cmd["configuration"]["value"] = value
     return cmd
 
 
 def _light(on_off_state="Etat"):
     return [_info(on_off_state, "LIGHT_STATE"),
-            _act("On", "LIGHT_ON", info=on_off_state),
-            _act("Off", "LIGHT_OFF", info=on_off_state)]
+            _act("On", "LIGHT_ON", info=on_off_state, value="1"),
+            _act("Off", "LIGHT_OFF", info=on_off_state, value="0")]
 
 
 def _dimmer():
@@ -84,8 +91,8 @@ def _cover():
 
 def _plug():
     return [_info("Etat", "ENERGY_STATE"),
-            _act("On", "ENERGY_ON", info="Etat"),
-            _act("Off", "ENERGY_OFF", info="Etat"),
+            _act("On", "ENERGY_ON", info="Etat", value="1"),
+            _act("Off", "ENERGY_OFF", info="Etat", value="0"),
             _info("Puissance", "POWER", "numeric", "W", history=True)]
 
 
@@ -224,6 +231,13 @@ def _bool(value: Any) -> bool:
     return str(value).lower() in ("1", "true")
 
 
+def _owner_key(eq: Dict[str, Any]) -> str:
+    cfg = eq.get("configuration")
+    if not isinstance(cfg, dict) or str(eq.get("eqType_name", EQ_TYPE)) != EQ_TYPE:
+        return ""
+    return str(cfg.get(OWNER_MARKER) or "")
+
+
 def _eq_excluded(eq: Dict[str, Any]) -> bool:
     cfg = eq.get("configuration")
     return isinstance(cfg, dict) and _bool(cfg.get("jeedom2ha_excluded", 0))
@@ -253,12 +267,18 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
         for r in adapter.rooms():
             rooms_by_name[r.get("name")] = r.get("id")
         existing_eqs = adapter.eqlogics()
-        foreign = [e for e in existing_eqs if e.get("name") not in demo_names]
+        owned = [e for e in existing_eqs if _owner_key(e)]
+        foreign = [e for e in existing_eqs if not _owner_key(e)]
+        collisions = [e for e in foreign if e.get("name") in demo_names]
+        if collisions:
+            raise DemoError("%d équipement(s) existant(s) portent un nom du jeu de démo sans "
+                            "être des équipements de démo : abandon (aucune réutilisation)."
+                            % len(collisions))
         if foreign and not allow_non_empty:
             raise DemoError("%d équipement(s) hors jeu de démo détecté(s) : cette box n'est pas "
                             "vierge. Abandon (--allow-non-empty pour forcer)." % len(foreign))
-        for e in existing_eqs:
-            eq_by_key[(str(e.get("object_id")), e.get("name"))] = e
+        for e in owned:
+            eq_by_key[(str(e.get("object_id")), _owner_key(e))] = e
         for s in adapter.scenarios():
             scen_by_name[s.get("name")] = s
 
@@ -281,7 +301,7 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
 
     for spec in EQUIPMENTS:
         room_id = rooms_by_name.get(spec["room"])
-        existing = eq_by_key.get((str(room_id), spec["name"])) if room_id is not None else None
+        existing = eq_by_key.get((str(room_id), spec["key"])) if room_id is not None else None
         excluded = bool(spec.get("excluded"))
         changed = existing is not None and (_eq_excluded(existing) != excluded
                                             or not _bool(existing.get("isEnable", 1)))
@@ -289,7 +309,8 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
         if write and (existing is None or changed):
             payload = {"eqType_name": EQ_TYPE, "name": spec["name"], "object_id": room_id,
                        "isEnable": 1, "isVisible": 1,
-                       "configuration": {"jeedom2ha_excluded": 1 if excluded else 0}}
+                       "configuration": {"jeedom2ha_excluded": 1 if excluded else 0,
+                                         OWNER_MARKER: spec["key"]}}
             if existing:
                 payload["id"] = eq_id
             saved = adapter.save_eqlogic(payload)

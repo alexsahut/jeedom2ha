@@ -6,15 +6,15 @@
 # Usage (par clawcode, après GO d'Alex à clawbox) :
 #   cd /opt/ha-demo && docker compose -f docker-compose.ha.yml up -d
 #
-# Variables optionnelles (valeurs par défaut sûres) :
-#   HA_IMAGE_TAG   tag de l'image ; ÉPINGLER une version (ex. 2025.x.y) pour un
-#                  environnement rejouable plutôt que "stable"
+# Variables :
+#   HA_IMAGE_TAG   OBLIGATOIRE : version précise de l'image (environnement rejouable,
+#                  jamais "stable"/"latest") ; à fixer par clawcode/ClaudeBox
 #   HA_CONFIG_DIR  dossier de config persistant sur la VM
 #   TZ             fuseau horaire
 services:
   homeassistant:
     container_name: ha-demo
-    image: ghcr.io/home-assistant/home-assistant:${HA_IMAGE_TAG:-stable}
+    image: ghcr.io/home-assistant/home-assistant:${HA_IMAGE_TAG:?HA_IMAGE_TAG obligatoire - version epinglee}
     # network_mode host : HA joint Mosquitto sur 127.0.0.1:1883 et l'UI sur :8123,
     # sans publication de ports ni dépendance au réseau de la maison.
     network_mode: host

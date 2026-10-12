@@ -22,7 +22,8 @@ et preuves Market. Cible : VM 122 (Debian 12, unité A66), jamais la box de prod
    de la VM 122 dans un `.env` hors dépôt (voir `docs/dev-deploy.md`). Le plugin Virtuel
    doit être installé et activé dans Jeedom.
 3. **Home Assistant** : copier `scripts/demo/docker-compose.ha.yml` sur la VM, puis
-   `docker compose -f docker-compose.ha.yml up -d`. Dans HA, ajouter l'intégration MQTT vers
+   `HA_IMAGE_TAG=<version-épinglée> docker compose -f docker-compose.ha.yml up -d`
+   (`HA_IMAGE_TAG` est obligatoire, jamais `stable`). Dans HA, ajouter l'intégration MQTT vers
    le Mosquitto local (`127.0.0.1:1883`) ; identifiants saisis dans l'UI uniquement.
    Si 2 Go de RAM ne suffisent pas : proposer 3 Go à clawbox/Alex avant d'agir.
 4. **Populate** (voir ci-dessous) : d'abord `--dry-run`, puis exécution réelle, puis relance
@@ -48,7 +49,7 @@ python3 scripts/demo/populate_demo.py --env-file ~/.jeedom2ha-demo.env          
 ```
 
 - **Idempotent** : pièces/scénarios retrouvés par nom, équipements par (pièce, nom), commandes
-  par (équipement, nom) ; une dérive de type/sous-type/unité/type générique est réparée, jamais
+  par (équipement, nom) ; les équipements créés portent un marqueur de propriété (`configuration.jeedom2ha_demo_key`), un équipement existant au nom du jeu mais sans marqueur est refusé, jamais réutilisé ; une dérive de type/sous-type/unité/type générique est réparée, jamais
   dupliquée.
 - **Garde-fous** : `JEEDOM_DEMO_TARGET=demo` obligatoire ; abandon si la box contient des
   équipements hors jeu de démo (`--allow-non-empty` pour forcer) ; aucune URL, clé ni
@@ -77,7 +78,7 @@ Tout est isolé dans `JsonRpcContract` / `JeedomAdapter` (`populate_demo.py`).
 | Méthodes de lecture/écriture `jeeObject::all/save`, `eqLogic::all/save`, `cmd::byEqLogicId/save`, `scenario::all/save` | **Non démontrées** (documentation Jeedom 4.x, de mémoire) |
 | Noms de champs (`eqType_name`, `object_id`, `eqLogic_id`, `generic_type`, `configuration.jeedom2ha_excluded`) | **Non démontrés** par appel réel |
 | Création d'un scénario vierge (sans éléments) via `scenario::save` | **Incertain** : la méthode peut ne pas exister selon la version |
-| Action Virtuel liée à son info via `configuration.infoName` | **Incertain** (peut être `value` = id de la commande info selon la version) |
+| Action Virtuel liée à son info via `configuration.infoName` + valeur `configuration.value` (1/0) | **Incertain** (selon la version : `value` = id de la commande info, valeur à poser à la main) |
 
 Les tests unitaires utilisent un faux serveur qui implémente **ce contrat présumé** : ils
 prouvent l'idempotence et le dry-run, pas la compatibilité avec Jeedom. Sur écart constaté à la
