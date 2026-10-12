@@ -73,12 +73,19 @@ describe('21.1 / AC8 — ligne d’une commande publiée par une entité seconda
     assert.doesNotMatch(M.buildPublicationSummaryLabel(s), /bloquante/);
   });
 
-  it('les totaux de pièce comptent la commande prête et aucune bloquante', () => {
-    const s = M.summarizeRoom([tree579()], 1);
-    assert.equal(s.commands_ready, 5);
-    assert.equal(s.commands_blocking, 0);
-    assert.equal(s.commands_uncovered, 1);
-    assert.equal(s.equipments_to_fix, 0);
+  it('les totaux de pièce comptent la commande d’état comme publiée (présente via le secondaire) et aucune non prise en charge', () => {
+    // Story 22.2 (Q1 A) : « publié » = présence dans HA, plus le diagnostic de commande. Le démon
+    // marque la commande d'état publiée (portée par le secondaire présent) ; la commande
+    // non couverte reste hors de HA et est la seule « non prise en charge ».
+    const t = tree579();
+    t.sync_status = { published_in_ha: true, override_pending: false };
+    t.commands.forEach((c) => { c.published_in_ha = c.jeedom_cmd_id !== 5368; });
+    t.entities[0].present_in_ha = false;
+    t.entities[1].present_in_ha = true;
+    const s = M.summarizeRoom([t], 1);
+    assert.equal(s.commands_published, 5);
+    assert.equal(s.commands_unsupported, 1);
+    assert.equal(s.equipments_unsupported, 0);
     assert.equal(s.equipments_published, 1);
   });
 

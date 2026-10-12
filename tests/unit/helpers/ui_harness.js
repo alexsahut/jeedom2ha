@@ -62,6 +62,11 @@ const DISABLED = view('disabled_eqlogic', false, false);
 
 function tree(id, diagnostics, extra) {
   const options = extra || {};
+  // Story 22.2 : présence dans HA (`sync_status.published_in_ha`, `commands[].published_in_ha`).
+  // Par défaut l'équipement est présent ; un `sync` explicite sans le champ simule un démon plus ancien.
+  let present = true;
+  if (options.present !== undefined) present = options.present;
+  else if (options.sync) present = typeof options.sync.published_in_ha === 'boolean' ? options.sync.published_in_ha : null;
   return {
     jeedom_eq_id: id,
     eq_name: options.name || ('Équipement ' + id),
@@ -69,8 +74,8 @@ function tree(id, diagnostics, extra) {
     eligible: true,
     equipment_decision: options.decision || null,
     entities: options.entities || [],
-    sync_status: options.sync || { synced_should_publish: true, current_should_publish: true, override_pending: false },
-    commands: diagnostics.map((d, i) => ({ jeedom_cmd_id: id * 100 + i, cmd_name: 'Commande ' + i, diagnostic: d })),
+    sync_status: options.sync || { synced_should_publish: true, current_should_publish: true, override_pending: false, published_in_ha: present },
+    commands: diagnostics.map((d, i) => ({ jeedom_cmd_id: id * 100 + i, cmd_name: 'Commande ' + i, diagnostic: d, published_in_ha: present })),
   };
 }
 const ok = (payload) => ({ state: 'ok', result: { payload } });

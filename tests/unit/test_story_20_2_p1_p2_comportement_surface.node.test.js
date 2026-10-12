@@ -138,9 +138,11 @@ function loadHarness(ajax) {
     M: M,
     AJAX_URL: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     reloadCalls: [],
+    bridgeRefreshCalls: 0,
     ctx: { room: null },
   };
   sandbox.reloadEquipment = function (eqId) { sandbox.reloadCalls.push(eqId); };
+  sandbox.refreshBridgeStatus = function () { sandbox.bridgeRefreshCalls += 1; };
   vm.createContext(sandbox);
   vm.runInContext(pendingStateSource, sandbox);
   vm.runInContext(source.slice(start, end), sandbox);
@@ -304,6 +306,7 @@ test('Appliquer : succès recharge l\'équipement, erreur démon affiche le mess
   assert.deepEqual(okAjax.calls[0], { action: 'executeHaAction', intention: 'publier', portee: 'equipement', selection: JSON.stringify([20200]) });
   assert.deepEqual(h1.sandbox.reloadCalls, [20200]);
   assert.equal(okButton.prop('disabled'), false, 'le bouton est réactivé après la requête');
+  assert.equal(h1.sandbox.bridgeRefreshCalls, 1, 'le bandeau de santé est relu après un succès');
 
   var errSlot = fakeErrorSlot();
   var errButton = fakeActionButton();
@@ -312,4 +315,16 @@ test('Appliquer : succès recharge l\'équipement, erreur démon affiche le mess
   h2.sandbox.applyEquipment(20200, errButton, errSlot);
   assert.deepEqual(h2.sandbox.reloadCalls, [], 'une erreur démon ne doit jamais recharger l\'équipement');
   assert.equal(errSlot._text, 'Publication refusée');
+  // Story 22.2 (Q8 A, P3 de 20-3) : le bandeau est relu aussi après un échec.
+  assert.equal(h2.sandbox.bridgeRefreshCalls, 1, 'le bandeau de santé est relu après une réponse refusée');
+});
+
+test('Appliquer : échec réseau — message affiché, bandeau de santé relu (P3 de 20-3)', () => {
+  var slot = fakeErrorSlot();
+  var ajax = fakeAjax([{ kind: 'fail' }]);
+  var h = loadHarness(ajax);
+  h.sandbox.applyEquipment(20200, fakeActionButton(), slot);
+  assert.deepEqual(h.sandbox.reloadCalls, []);
+  assert.match(slot._text, /ne répond pas/);
+  assert.equal(h.sandbox.bridgeRefreshCalls, 1);
 });

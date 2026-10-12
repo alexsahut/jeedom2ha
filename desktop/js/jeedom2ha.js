@@ -397,6 +397,8 @@ function triggerPublierAction($button, portee, selection, reservation) {
     },
     onError: function(message) {
       $('#div_alert').showAlert({message: message, level: 'danger'});
+      // Story 22.2 (Q8 A) : un échec change aussi le dernier résultat affiché par le bandeau.
+      refreshBridgeStatus();
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
@@ -416,6 +418,8 @@ function triggerSupprimerAction($button, portee, selection, reservation) {
     },
     onError: function(message) {
       $('#div_alert').showAlert({message: message, level: 'danger'});
+      // Story 22.2 (Q8 A) : un échec change aussi le dernier résultat affiché par le bandeau.
+      refreshBridgeStatus();
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
@@ -478,9 +482,10 @@ $(function() {
     }
     var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
     confirmHaSupprimerAction(
-      '{{Supprimer puis recréer dans Home Assistant}}',
-      '{{Supprimer puis recréer tout le parc publié ?}}'
-        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}',
+      '{{Supprimer de Home Assistant}}',
+      '{{Supprimer de Home Assistant tout le parc publié ?}}'
+        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}'
+        + '<br>{{Rien n\'est recréé automatiquement : utilisez « Republier » pour remettre les équipements dans Home Assistant.}}',
       '{{Supprimer}}',
       function() {
         triggerSupprimerAction($button, 'global', ['all'], reservation);

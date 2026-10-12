@@ -6,6 +6,18 @@
 
 ---
 
+# 2026-10-12 — Compteurs fondés sur la présence dans Home Assistant et actions plus lisibles
+
+- Les compteurs d'une pièce disent maintenant ce qui est **réellement dans Home Assistant** : équipements et commandes publiés, en attente d'application, non pris en charge (les équipements exclus ou désactivés restent comptés à part). Un équipement déplié affiche aussi ses propres compteurs. Voir la page « Les compteurs »
+- Les boutons disent leur portée : « Exclure l’équipement » / « Exclure cette entité » (idem pour « Forcer » et « Revenir au mode automatique »). Sur un équipement qui n'a qu'une seule entité, les boutons d'entité qui faisaient la même chose que ceux de l'équipement ne sont plus affichés
+- « Supprimer puis recréer » devient « Supprimer de Home Assistant » (équipement, pièce, parc) : l'action supprime seulement, elle ne recrée rien ; la confirmation rappelle que « Republier » remet l'équipement. Le comportement n'a pas changé
+- Le sélecteur « Override HA » est désactivé, avec une explication, sur une commande portée par plusieurs entités (le type choisi ne s'appliquerait qu'à l'entité principale de l'équipement)
+- La liste « Override HA » ne propose plus que les types qui peuvent aboutir pour la commande : un type que Home Assistant refuserait toujours (même avec « Forcer ») n'est plus proposé, et le sélecteur est grisé, avec une explication, quand aucun type ne reste (la voie normale est alors de préciser les types génériques dans Jeedom)
+- Le bandeau de santé est relu aussi quand « Republier » (ou une action de pièce) échoue
+- Rien de ce qui est publié dans Home Assistant ne change : mêmes topics, mêmes `unique_id`, mêmes payloads
+
+---
+
 # 2026-10-12 — Noms Jeedom dans Home Assistant et entity_id stable
 
 - Chaque appareil prend le nom de l'équipement Jeedom, identique pour toutes ses entités (avant, un appareil pouvait porter le nom d'une de ses commandes). Un équipement à une seule entité affiche le nom de l'équipement ; pour un équipement à plusieurs entités, l'entité principale (lumière, interrupteur, volet…) porte le nom de l'équipement et s'affiche sous le nom de l'appareil, tandis que les autres entités portent le nom de leur commande, affiché à la suite du nom de l'appareil
