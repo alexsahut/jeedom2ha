@@ -708,11 +708,18 @@ class jeedom2ha extends eqLogic {
     if (!class_exists('plugin')) {
       return $ctx;
     }
+    $homebridge = null;
     try {
       $homebridge = plugin::byId('homebridge');
-      $ctx['homebridge'] = (is_object($homebridge) && intval($homebridge->isActive()) === 1) ? 'present' : 'absent';
     } catch (Throwable $e) {
       $ctx['homebridge'] = 'absent'; // plugin::byId lève une exception si le plugin n'est pas installé
+    }
+    if (is_object($homebridge)) {
+      try {
+        $ctx['homebridge'] = (intval($homebridge->isActive()) === 1) ? 'present' : 'absent';
+      } catch (Throwable $e) {
+        $ctx['homebridge'] = 'unreadable'; // plugin installé mais état illisible : jamais « absent »
+      }
     }
     if ($ctx['homebridge'] !== 'present') {
       return $ctx;
