@@ -58,6 +58,8 @@ class FakeJeedom:
             requested = p.get("cmd", [])
             names = set()
             for command in requested:
+                if "eqLogic_id" in command or any(value is None for value in command.values()):
+                    raise KeyError("cmd must not override eqLogic_id or contain null")
                 if command.get("type") == "action" and not command.get("configuration", {}).get("infoName"):
                     raise KeyError("infoName required for virtual action")
                 cmd = dict(command, eqLogic_id=eq["id"])
@@ -309,6 +311,13 @@ def test_equipment_save_is_the_only_command_creation_path(server):
     assert "cmd::save" not in server.calls
     saves = [call for call in server.calls if call == pd.JsonRpcContract.EQ_SAVE]
     assert len(saves) == len(pd.EQUIPMENTS)
+
+
+def test_new_equipment_command_payload_has_no_parent_override_or_null():
+    spec = pd.EQUIPMENTS[0]
+    payload = pd._eqlogic_payload(spec, room_id=101, existing=None, existing_cmds={})
+    assert all("eqLogic_id" not in cmd and all(value is not None for value in cmd.values())
+               for cmd in payload["cmd"])
 
 
 def test_compose_requires_pinned_tag():

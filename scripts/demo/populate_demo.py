@@ -249,6 +249,15 @@ def _cmd_drift(existing: Dict[str, Any], wanted: Dict[str, Any]) -> bool:
     return str(existing.get("generic_type") or "") != str(wanted.get("generic_type") or "")
 
 
+def _without_none(value: Any) -> Any:
+    """Ne laisse jamais ``utils::a2o`` appliquer une clé JSON ``null``."""
+    if isinstance(value, dict):
+        return {key: _without_none(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [_without_none(item) for item in value]
+    return value
+
+
 def _eqlogic_payload(spec: Dict[str, Any], room_id: Any, existing: Optional[Dict[str, Any]],
                      existing_cmds: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """Construit le contrat ``eqLogic::save`` complet d'un Virtuel.
@@ -267,12 +276,14 @@ def _eqlogic_payload(spec: Dict[str, Any], room_id: Any, existing: Optional[Dict
     if existing:
         payload["id"] = existing.get("id")
     for wanted in spec["cmds"]:
-        cmd = dict(wanted, eqLogic_id=existing.get("id") if existing else None, isVisible=1)
+        # jeeApi.php rattache lui-même chaque virtualCmd au nouvel eqLogic avant a2o().
+        # Envoyer eqLogic_id=null le réinitialiserait ensuite via utils::a2o().
+        cmd = dict(wanted, isVisible=1)
         previous = existing_cmds.get(wanted["name"])
         if previous:
             cmd["id"] = previous.get("id")
         payload["cmd"].append(cmd)
-    return payload
+    return _without_none(payload)
 
 
 def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
