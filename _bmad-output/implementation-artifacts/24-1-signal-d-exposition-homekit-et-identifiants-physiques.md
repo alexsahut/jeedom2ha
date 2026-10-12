@@ -1,6 +1,6 @@
 # Story 24.1 : Signal d'exposition HomeKit et identifiants physiques
 
-Status: review
+Status: done
 
 > **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Task 0 faite, Q5 tranchée). Brouillon de cadrage initial (2026-10-12) : Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). **R1 (ClaudeBox, 12/10) intégrée** : la Task 0 est faite (règle d'exposition de Homebridge établie en lecture seule) ; deux cas restent à confirmer (Task 0 bis). Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (T3, Q5, D1). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`, sauf mention du plugin Homebridge. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
 
@@ -67,6 +67,19 @@ Source : `plugins/homebridge/core/class/homebridge.class.php:2680-2710` (`discov
 - [x] **Task 3 — Tests** : `tests/unit/test_story_24_1_php_homekit_exposure.php` (40 assertions), `tests/unit/test_story_24_1_homekit_signal.py` (36 tests) ; golden et contrat 4D inchangés (suite complète verte).
 - [x] **Task 4 — Documentation de développement** : `docs/dev-homekit-exposure.md` (contrat des champs et règle de Homebridge, date et source).
 
+## Preuve terrain (2026-10-12)
+
+Preuve de non-régression par ClaudeBox : [`24-1-preuve-terrain-2026-10-12.md`](24-1-preuve-terrain-2026-10-12.md). PR #261 fusionnée (`a64b924`, tête `867eec6`), **SHA déployé `45ab5d7`** (contient #261), inventaire MQTT 348 → 348, registres HA inchangés (0 entité ni appareil modifié), démon sain, 0 `ERROR`.
+
+- **AC1** : prouvé — `getFullTopology()` transporte `homekit_exposed`, sa provenance et `logical_id` ; topologie acceptée par le démon (292 eqLogics, 120 scénarios) ; aucune écriture.
+- **AC2** : règle relue sur la box et alignée en R1 (`867eec6`) ; sa vérification sur données réelles est portée par l'AC11 bis de 24-2.
+- **AC3** : prouvé — champs additifs et normalisation à trois états testés en CI ; payload ancien inchangé.
+- **AC4** : prouvé — inventaire MQTT et registres HA inchangés, golden et contrat 4D verts en CI.
+- **AC5** : prouvé — 0 occurrence de `logical_id`, `logicalId` ou `homekit` dans les journaux du démon, du plugin et `http.error`.
+- **AC6** : alignée en R1 (scénario sans clé = non exposé) ; tests en CI ; comparaison au cache de Homebridge (5 scénarios) portée par l'AC11 bis de 24-2.
+- **AC7** : prouvé — 50 assertions PHP et tests Python verts en CI ; recherche d'écriture dans le diff citée dans la PR.
+- **AC8** : prouvé — aucun nom réel dans le code, les fixtures, la story, la PR.
+
 ## Garde-fous
 
 - **Le plugin n'écrit jamais** la configuration Homebridge, les types génériques Jeedom ni l'exposition à Assist (exigence 5).
@@ -85,6 +98,10 @@ Les deux cas de la Task 0 bis ; la stabilité de la règle de Homebridge entre s
 - 2026-10-12, 13:22 — Décisions d'Alexandre (relayées par ClaudeBox) : Q5 A ; Q1 : « exclu par plugin » conservé. `ready-for-dev` accordé par ClaudeBox.
 - 2026-10-12 — R1 ClaudeBox intégrée (B1 scénarios absent = non exposé, B2 lecture brute à l'identique, B3 liste des plugins actifs seule).
 - 2026-10-12 — Dev-story (session cloud déléguée) : Tasks 0 bis à 4 faites, statut `review`. Précision de ClaudeBox sur la Task 0 bis intégrée (sans pièce et pièce sans clé : `false`, provenance `piece`).
+- 2026-10-12 — R1 de la PR #261 (ClaudeBox, lecture seule du code de Homebridge et du cœur sur la box) : B1, B2, B3 intégrés dans `867eec6`.
+- 2026-10-12 — PR #261 fusionnée en squash (`a64b924`), CI verte.
+- 2026-10-12, 13:33Z — Déploiement par clawcode du SHA `45ab5d7` (contient #261), code de sortie 0.
+- 2026-10-12, vers 15:40 — Preuve de non-régression par ClaudeBox (`24-1-preuve-terrain-2026-10-12.md`) : story `done`.
 
 ## Dev Agent Record
 
@@ -111,6 +128,9 @@ Session cloud déléguée (dev-story), sans accès box, Home Assistant ni secret
 - `docs/operations/delegations.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - cette story
+- `_bmad-output/implementation-artifacts/24-1-preuve-terrain-2026-10-12.md` (nouveau, clôture)
+- `_bmad-output/implementation-artifacts/24-2-export-json-versionne-du-contrat-de-decision.md` (AC11 bis, R1)
+- `_bmad-output/planning-artifacts/sprint-change-proposal-2026-10-12-parite-homekit.md` (scénarios, R1)
 
 ### R1 ClaudeBox intégrée (PR #261, tête `9f3e21d`)
 
