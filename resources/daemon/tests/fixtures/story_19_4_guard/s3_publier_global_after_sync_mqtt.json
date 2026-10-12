@@ -3,6 +3,7 @@
     "payload": {
       "availability_topic": "jeedom2ha/bridge/status",
       "command_topic": "jeedom2ha/230/alarm/set",
+      "default_entity_id": "alarm_control_panel.jeedom2ha_230",
       "device": {
         "identifiers": [
           "jeedom2ha_230"
@@ -41,13 +42,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5138",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Puissance panneaux",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -80,13 +82,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5137",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Puissance reseau",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -119,13 +122,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5139",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Routage cumulus",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -156,13 +160,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5140",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Routage radiateur",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -193,13 +198,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5177",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Etat sortie 1 (CE %)",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -230,13 +236,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5171",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Production panneaux journaliere",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -269,13 +276,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5170",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Production injectee journaliere",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -308,13 +316,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_553_5169",
       "device": {
         "identifiers": [
           "jeedom2ha_553"
         ],
         "manufacturer": "Jeedom (msunpv)",
         "model": "msunpv",
-        "name": "Consommation reseau journaliere",
+        "name": "MSunPV / RouteurSolaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -348,6 +357,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/554/set",
+      "default_entity_id": "switch.jeedom2ha_554",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
@@ -387,13 +397,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5205",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Routage",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -424,13 +435,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5530",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Routage reel",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -461,13 +473,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5206",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Puissance",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -500,13 +513,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5531",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Routage chauffe complete",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -537,13 +551,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5535",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "CE Kwh chauffe complete",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -576,13 +591,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5532",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Routage 24H jusqua 22H36 hier",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -613,13 +629,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5533",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Routage aujourdhui",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -650,13 +667,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5534",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "CE kWh 24H jusqua 22H36 hier",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -689,13 +707,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5527",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "CE kWh depuis 22H36 hier",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -728,13 +747,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5542",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "eq H de chauffe hier",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -765,13 +785,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5538",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "eq H de chauffe aujourdhui",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -802,13 +823,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_554_5543",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "mediane chauffe complete sur 7 jours",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -839,13 +861,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_554_5510",
       "device": {
         "identifiers": [
           "jeedom2ha_554"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "chauffe complete dans la journee",
+        "name": "Chauffe-eau",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -876,13 +899,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/583/5987/set",
+      "default_entity_id": "switch.jeedom2ha_583_5987",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Charge",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -916,13 +940,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/583/6009/set",
+      "default_entity_id": "switch.jeedom2ha_583_6009",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Charge solaire",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -956,13 +981,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/583/6010/set",
+      "default_entity_id": "switch.jeedom2ha_583_6010",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Charge manuelle",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -995,13 +1021,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_583_5991",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Puissance",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1034,13 +1061,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_583_5992",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Energie session",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1073,13 +1101,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_583_5993",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Energie jour",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1112,13 +1141,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_583_5986",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Branche",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1148,13 +1178,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_583_5988",
       "device": {
         "identifiers": [
           "jeedom2ha_583"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Connecte",
+        "name": "IQ EV Charger",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1185,13 +1216,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/5977/set",
+      "default_entity_id": "switch.jeedom2ha_628_5977",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Filtration piscine",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1225,13 +1257,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/5980/set",
+      "default_entity_id": "switch.jeedom2ha_628_5980",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Chauffage piscine",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1265,13 +1298,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/5983/set",
+      "default_entity_id": "switch.jeedom2ha_628_5983",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Chauffage SPA",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1305,13 +1339,14 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/628/6004/set",
+      "default_entity_id": "switch.jeedom2ha_628_6004",
       "device": {
         "identifiers": [
           "jeedom2ha_628"
         ],
         "manufacturer": "Jeedom (virtual)",
         "model": "virtual",
-        "name": "Charge voiture",
+        "name": "Pilotage priorisation solaire",
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
@@ -1345,6 +1380,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1000/set",
+      "default_entity_id": "light.jeedom2ha_1000",
       "device": {
         "identifiers": [
           "jeedom2ha_1000"
@@ -1383,6 +1419,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1001/set",
+      "default_entity_id": "light.jeedom2ha_1001",
       "device": {
         "identifiers": [
           "jeedom2ha_1001"
@@ -1421,6 +1458,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1002/set",
+      "default_entity_id": "light.jeedom2ha_1002",
       "device": {
         "identifiers": [
           "jeedom2ha_1002"
@@ -1463,6 +1501,7 @@
       "brightness_state_topic": "jeedom2ha/1003/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/1003/set",
+      "default_entity_id": "light.jeedom2ha_1003",
       "device": {
         "identifiers": [
           "jeedom2ha_1003"
@@ -1508,6 +1547,7 @@
       "brightness_state_topic": "jeedom2ha/1004/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/1004/set",
+      "default_entity_id": "light.jeedom2ha_1004",
       "device": {
         "identifiers": [
           "jeedom2ha_1004"
@@ -1553,6 +1593,7 @@
       "brightness_state_topic": "jeedom2ha/1005/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/1005/set",
+      "default_entity_id": "light.jeedom2ha_1005",
       "device": {
         "identifiers": [
           "jeedom2ha_1005"
@@ -1594,6 +1635,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1006/set",
+      "default_entity_id": "light.jeedom2ha_1006",
       "device": {
         "identifiers": [
           "jeedom2ha_1006"
@@ -1632,6 +1674,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1007/set",
+      "default_entity_id": "light.jeedom2ha_1007",
       "device": {
         "identifiers": [
           "jeedom2ha_1007"
@@ -1670,6 +1713,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/1008/set",
+      "default_entity_id": "light.jeedom2ha_1008",
       "device": {
         "identifiers": [
           "jeedom2ha_1008"
@@ -1712,6 +1756,7 @@
       "brightness_state_topic": "jeedom2ha/1009/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/1009/set",
+      "default_entity_id": "light.jeedom2ha_1009",
       "device": {
         "identifiers": [
           "jeedom2ha_1009"
@@ -1753,6 +1798,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2000/set",
+      "default_entity_id": "cover.jeedom2ha_2000",
       "device": {
         "identifiers": [
           "jeedom2ha_2000"
@@ -1794,6 +1840,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2001/set",
+      "default_entity_id": "cover.jeedom2ha_2001",
       "device": {
         "identifiers": [
           "jeedom2ha_2001"
@@ -1835,6 +1882,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2002/set",
+      "default_entity_id": "cover.jeedom2ha_2002",
       "device": {
         "identifiers": [
           "jeedom2ha_2002"
@@ -1880,6 +1928,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2003/set",
+      "default_entity_id": "cover.jeedom2ha_2003",
       "device": {
         "identifiers": [
           "jeedom2ha_2003"
@@ -1922,6 +1971,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2004/set",
+      "default_entity_id": "cover.jeedom2ha_2004",
       "device": {
         "identifiers": [
           "jeedom2ha_2004"
@@ -1963,6 +2013,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2005/set",
+      "default_entity_id": "cover.jeedom2ha_2005",
       "device": {
         "identifiers": [
           "jeedom2ha_2005"
@@ -2004,6 +2055,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2006/set",
+      "default_entity_id": "cover.jeedom2ha_2006",
       "device": {
         "identifiers": [
           "jeedom2ha_2006"
@@ -2049,6 +2101,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/2007/set",
+      "default_entity_id": "cover.jeedom2ha_2007",
       "device": {
         "identifiers": [
           "jeedom2ha_2007"
@@ -2094,6 +2147,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/3000/set",
+      "default_entity_id": "switch.jeedom2ha_3000",
       "device": {
         "identifiers": [
           "jeedom2ha_3000"
@@ -2135,6 +2189,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/3001/set",
+      "default_entity_id": "switch.jeedom2ha_3001",
       "device": {
         "identifiers": [
           "jeedom2ha_3001"
@@ -2175,6 +2230,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/3002/set",
+      "default_entity_id": "switch.jeedom2ha_3002",
       "device": {
         "identifiers": [
           "jeedom2ha_3002"
@@ -2215,6 +2271,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/3003/set",
+      "default_entity_id": "switch.jeedom2ha_3003",
       "device": {
         "identifiers": [
           "jeedom2ha_3003"
@@ -2255,6 +2312,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/3004/set",
+      "default_entity_id": "switch.jeedom2ha_3004",
       "device": {
         "identifiers": [
           "jeedom2ha_3004"
@@ -2296,6 +2354,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/6001/set",
+      "default_entity_id": "light.jeedom2ha_6001",
       "device": {
         "identifiers": [
           "jeedom2ha_6001"
@@ -2333,6 +2392,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_7000",
       "device": {
         "identifiers": [
           "jeedom2ha_7000"
@@ -2371,6 +2431,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_7001",
       "device": {
         "identifiers": [
           "jeedom2ha_7001"
@@ -2409,6 +2470,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_7002",
       "device": {
         "identifiers": [
           "jeedom2ha_7002"
@@ -2448,6 +2510,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_7003",
       "device": {
         "identifiers": [
           "jeedom2ha_7003"
@@ -2486,6 +2549,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_7004",
       "device": {
         "identifiers": [
           "jeedom2ha_7004"
@@ -2524,6 +2588,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_8000",
       "device": {
         "identifiers": [
           "jeedom2ha_8000"
@@ -2561,6 +2626,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_8001",
       "device": {
         "identifiers": [
           "jeedom2ha_8001"
@@ -2598,6 +2664,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_8002",
       "device": {
         "identifiers": [
           "jeedom2ha_8002"
@@ -2635,6 +2702,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_8003",
       "device": {
         "identifiers": [
           "jeedom2ha_8003"
@@ -2672,6 +2740,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "binary_sensor.jeedom2ha_8004",
       "device": {
         "identifiers": [
           "jeedom2ha_8004"
@@ -2710,6 +2779,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/9000/cmd",
+      "default_entity_id": "button.jeedom2ha_9000",
       "device": {
         "identifiers": [
           "jeedom2ha_9000"
@@ -2746,6 +2816,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/9001/cmd",
+      "default_entity_id": "button.jeedom2ha_9001",
       "device": {
         "identifiers": [
           "jeedom2ha_9001"
@@ -2782,6 +2853,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/9002/cmd",
+      "default_entity_id": "button.jeedom2ha_9002",
       "device": {
         "identifiers": [
           "jeedom2ha_9002"
@@ -2818,6 +2890,7 @@
       ],
       "availability_mode": "all",
       "command_topic": "jeedom2ha/9700/set",
+      "default_entity_id": "switch.jeedom2ha_9700",
       "device": {
         "identifiers": [
           "jeedom2ha_9700"
@@ -2858,6 +2931,7 @@
       ],
       "availability_mode": "all",
       "current_temperature_topic": "jeedom2ha/11000/current_temperature",
+      "default_entity_id": "climate.jeedom2ha_11000",
       "device": {
         "identifiers": [
           "jeedom2ha_11000"
@@ -2899,6 +2973,7 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "climate.jeedom2ha_11001",
       "device": {
         "identifiers": [
           "jeedom2ha_11001"
@@ -2941,6 +3016,7 @@
       ],
       "availability_mode": "all",
       "current_temperature_topic": "jeedom2ha/11002/current_temperature",
+      "default_entity_id": "climate.jeedom2ha_11002",
       "device": {
         "identifiers": [
           "jeedom2ha_11002"
@@ -2975,6 +3051,7 @@
     "payload": {
       "availability_topic": "jeedom2ha/bridge/status",
       "command_topic": "jeedom2ha/12000/alarm/set",
+      "default_entity_id": "alarm_control_panel.jeedom2ha_12000",
       "device": {
         "identifiers": [
           "jeedom2ha_12000"
@@ -3018,6 +3095,7 @@
       "brightness_state_topic": "jeedom2ha/457/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/457/set",
+      "default_entity_id": "light.jeedom2ha_457",
       "device": {
         "identifiers": [
           "jeedom2ha_457"
@@ -3058,13 +3136,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_457_45705",
       "device": {
         "identifiers": [
           "jeedom2ha_457"
         ],
         "manufacturer": "Jeedom (zwave)",
         "model": "zwave",
-        "name": "Puissance",
+        "name": "Chambre parents",
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
@@ -3097,13 +3176,14 @@
         }
       ],
       "availability_mode": "all",
+      "default_entity_id": "sensor.jeedom2ha_457_45706",
       "device": {
         "identifiers": [
           "jeedom2ha_457"
         ],
         "manufacturer": "Jeedom (zwave)",
         "model": "zwave",
-        "name": "Consommation",
+        "name": "Chambre parents",
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
