@@ -172,6 +172,15 @@ CAUSE_MAPPING: dict = {
     },
 }
 
+# Story 21.1 (CC-47, Q4 A) — cause précise « état sans ordre On/Off » (`switch_state_orphan`,
+# mapping `ambiguous`) : aucun type générique ne manque, il n'y a simplement rien à piloter.
+# Les actions citées existent réellement à l'écran (sélecteur de type, puis « Forcer »).
+_STATE_ONLY_MAPPING_REASON = "switch_state_orphan"
+_STATE_ONLY_CAUSE = {
+    "label": "État sans ordre On/Off — rien à piloter, non publié en l'état",
+    "action": "Choisir le type binary_sensor dans la liste « Override HA » de la commande, puis « Forcer » la publication.",
+}
+
 # Alias fermés provenant de la taxonomie decision_trace.reason_code.
 _CAUSE_UX_REASON_ALIASES: dict = {
     "confidence_policy_skipped": "probable_skipped",
@@ -192,15 +201,29 @@ def reason_code_to_cause(reason_code: str) -> Tuple[Optional[str], Optional[str]
     return _REASON_CODE_TO_CAUSE.get(reason_code, (None, None, None))
 
 
-def resolve_cause_ux(reason_code: str, pipeline_step: int) -> Dict[str, Optional[str]]:
+def resolve_cause_ux(
+    reason_code: str,
+    pipeline_step: int,
+    mapping_reason_code: Optional[str] = None,
+) -> Dict[str, Optional[str]]:
     """Résout (cause_label, cause_action) depuis reason_code + étape visible.
 
     Règles :
     - lecture pure depuis des mappings backend (aucune logique métier)
     - fallback explicite si mapping absent
     - cause_action = None si aucune remédiation utilisateur directe n'existe (Story 6.3)
+    - Story 21.1 : `mapping_reason_code` (cause précise du mapping) est facultatif ; seul
+      `switch_state_orphan` sous une décision `ambiguous`/`ambiguous_skipped` change le libellé
     """
     normalized_reason = str(reason_code or "").strip()
+    if (
+        mapping_reason_code == _STATE_ONLY_MAPPING_REASON
+        and normalized_reason in ("ambiguous", "ambiguous_skipped")
+    ):
+        return {
+            "cause_label": _STATE_ONLY_CAUSE["label"],
+            "cause_action": _STATE_ONLY_CAUSE["action"],
+        }
     step_key = f"step_{pipeline_step}" if isinstance(pipeline_step, int) else ""
 
     contextual = CAUSE_MAPPING.get(normalized_reason, {}).get(step_key)

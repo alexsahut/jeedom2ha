@@ -12,7 +12,7 @@ thread-unsafe structures from a non-async context.
 import asyncio
 import logging
 import ssl
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import paho.mqtt.client as mqtt
 from models.availability import (
@@ -55,6 +55,8 @@ class MqttBridge:
         # Called via call_soon_threadsafe → run in asyncio thread → can use asyncio.create_task()
         self._on_reconnect_cb: Optional[Callable[[], Any]] = None
         self._on_ha_birth_cb: Optional[Callable[[], Any]] = None
+        # Story 21.1 — collecte bornée de topics retenus (un seul collecteur à la fois)
+        self._retained_collector: Optional[Dict[str, Any]] = None
 
     # ------------------------------------------------------------------
     # Public async API
@@ -177,6 +179,13 @@ class MqttBridge:
             payload = payload_raw.decode("utf-8", errors="ignore")
         else:
             payload = str(payload_raw)
+
+        # Story 21.1 — collecte de topics retenus : ces messages ne sont jamais des commandes
+        collector = self._retained_collector
+        if collector is not None and mqtt.topic_matches_sub(collector["filter"], topic):
+            if getattr(message, "retain", False) and payload != "":
+                collector["topics"].append(topic)
+            return
 
         # Story 5.1 — Task 3.2: détecter le birth message Home Assistant
         if topic == HA_STATUS_TOPIC and payload == "online":
@@ -328,6 +337,37 @@ class MqttBridge:
         except Exception as e:
             _LOGGER.error("[MQTT] publish_message failed on topic=%s: %s", topic, e)
             return False
+
+    async def collect_retained_topics(
+        self, topic_filter: str, window_s: float = 1.5
+    ) -> Optional[List[str]]:
+        """Read the retained topics matching ``topic_filter`` (bounded window).
+
+        Retained messages arrive after the subscription with no end-of-batch signal,
+        hence the bounded window. Only non-empty retained messages are reported.
+        Returns the topics read (possibly empty), or None when the collection could
+        not run (bridge not connected, collection already running, subscribe failure).
+        A short window only under-reports; it never invents topics.
+        """
+        if self._client is None or not self.is_connected or self._retained_collector is not None:
+            return None
+        collector: Dict[str, Any] = {"filter": topic_filter, "topics": []}
+        self._retained_collector = collector
+        client = self._client
+        try:
+            result = client.subscribe(topic_filter, qos=1)
+            code = result[0] if isinstance(result, tuple) else result
+            if isinstance(code, int) and code != mqtt.MQTT_ERR_SUCCESS:
+                _LOGGER.warning("[MQTT] Retained collection subscribe failed: filter=%s rc=%s", topic_filter, code)
+                return None
+            await asyncio.sleep(window_s)
+            return list(dict.fromkeys(collector["topics"]))
+        finally:
+            try:
+                client.unsubscribe(topic_filter)
+            except Exception:
+                _LOGGER.debug("[MQTT] Retained collection unsubscribe failed: filter=%s", topic_filter)
+            self._retained_collector = None
 
     def set_command_handler(self, handler: Optional[Callable[[str, str], Any]]) -> None:
         """Register a command message handler called for subscribed command topics."""

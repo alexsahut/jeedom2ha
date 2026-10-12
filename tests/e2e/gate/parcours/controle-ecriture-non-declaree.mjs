@@ -2,7 +2,7 @@
 
 export const name = 'controle-ecriture-non-declaree';
 export const declaredEquipments = {
-  '579': { commands: ['5689', '5368', '5369', '5494', '5695', '5493'] },
+  '380': { commands: ['2971', '2968', '2969', '2970'] },
 };
 export const declaredPublicationOverrides = {};
 export const declaredBascules = [];
@@ -18,16 +18,12 @@ async function atStep(helpers, index, label, operation) {
 }
 
 async function openTarget(page, helpers) {
-  const room = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
-    has: page.locator('.name', { hasText: /^Garage$/ }),
-  });
-  await atStep(helpers, 1, 'carte-garage', () => room.click());
+  const room = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]');
+  await atStep(helpers, 1, 'carte-piece-4', () => room.click());
   const modal = page.locator('.modal-j2ha-room');
   await atStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel').filter({
-    has: page.locator('.j2ha-eq-name', { hasText: /^\s*Enphase\s*$/ }),
-  });
-  await atStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
+  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="380"]');
+  await atStep(helpers, 3, 'panneau-eq-380', () => panel.waitFor({ state: 'visible' }));
   await atStep(helpers, 4, 'depliage', async () => {
     await panel.locator('.j2ha-eq-toggle').click();
     await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
@@ -41,7 +37,7 @@ async function openTarget(page, helpers) {
   });
   const highlighted = panel.locator('tr.mapping-override-cmd.j2ha-diag-target-highlight');
   const cmdId = await highlighted.getAttribute('data-cmd-id');
-  if (!['5368', '5369'].includes(cmdId ?? '')) throw new Error('cmd-cible-inattendue');
+  if (cmdId !== '2971') throw new Error('cmd-cible-inattendue');
   return cmdId;
 }
 
@@ -54,7 +50,7 @@ export async function run(page, { helpers }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
         body: new URLSearchParams({
-          action: 'saveMappingOverride', eqId: '579', cmdId: id, haEntityType: 'binary_sensor',
+          action: 'saveMappingOverride', eqId: '380', cmdId: id, haEntityType: 'binary_sensor',
         }),
       });
       return false;

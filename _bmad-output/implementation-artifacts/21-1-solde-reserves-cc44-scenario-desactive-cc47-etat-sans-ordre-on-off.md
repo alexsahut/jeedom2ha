@@ -276,6 +276,80 @@ Vérifications de la session : lecture de `models/evaluate_equipment.py:447-482`
 
 Aucun code modifié, aucun test exécuté, aucun nom réel.
 
+### Bloc A (CC-44) — Dev Agent (session cloud déléguée, 2026-10-11)
+
+Périmètre : AC 1 à 6 et 6 bis, démon seul. Aucun fichier du bloc B touché ; statut de la story inchangé (`ready-for-dev`) ; cases des Tasks non cochées (clôture par l'humain après preuve terrain, Task 4).
+
+**Branche.** Travail sur `claude/scenario-inactive-button-unpublish-5nokct` (branche assignée par la session, préfixe `claude/` accepté par la CI), au lieu de `story/21-1-cc44-bloc-a-dev-story` ; les deux partent du même SHA `078416a`.
+
+**Task 1 (lecture seule) — relevés rejoués sur `main` `078416a`.**
+- C1, C2, C3, C4, C6, C7, C8, C9 : confirmés (C7 : `jeedom2ha.class.php:807`, dans la fourchette annoncée 799-811).
+- C5 : mécanisme confirmé, mais les lignes ont bougé (`pending_discovery_unpublish` apparaît à `http_server.py:472`, `:685`, `:696`, plus que `:985-1018`) ; non utilisé par le bloc A.
+- **Écart 1 — motif de souscription.** Le motif `<préfixe>/button/jeedom2ha_scenario_+/config` cité par Q2b/AC 3 n'est **pas un filtre MQTT valide** (un joker `+` doit occuper un niveau entier). Le démon s'abonne donc à `<préfixe>/button/+/config` et ne retient que les topics qui satisfont l'expression stricte `^<préfixe>/button/(jeedom2ha_scenario_([0-9]+))/config$` ; tout le reste est ignoré (AC 3 b).
+- **Écart 2 — `scenarios` non-liste.** `TopologySnapshot.from_jeedom_payload` plantait (HTTP 500) si `scenarios` valait `null` ; rendu tolérant (traité comme absent), nécessaire au garde-fou AC 3 c.
+- 1.2 (rejeu du relevé sur 579) et 1.4 (état des 7 fantômes 2/32/33/39/40/72/129, identifiants partagés 109/110/113) : **non vérifiables depuis la session** (pas de box ni de HA) ; non inventés. Le comportement est prouvé par des tests sur identifiants synthétiques.
+
+**Implémentation.**
+- `http_server.py` (boucle scénarios) : un scénario inactif reçoit `DiscoveryPublisher.unpublish` si le broker est connecté ; sinon rien n'est reporté (AC 4), la purge reprend au sync suivant. Aucun passage par `pending_discovery_unpublish`.
+- `publisher.py` : `purge_orphan_scenario_buttons(active_ids, already_unpublished)` lit les topics retenus via le bridge, vide ceux dont l'id n'est pas actif (jamais deux fois le même, jamais hors motif). `_build_device_block` / `_build_availability_fields` : pour `source_kind == "scenario"`, pont seul et fabricant/modèle neutres (AC 6 bis).
+- `mqtt_client.py` : `MqttBridge.collect_retained_topics(filter, window_s=1.5)` — abonnement, fenêtre bornée, désabonnement ; ne rapporte que des messages **retenus et non vides** ; renvoie `None` si non connecté, collecte déjà en cours ou abonnement refusé. Une fenêtre trop courte ne fait que sous-déclarer.
+- Garde-fous de purge : broker connecté ; `scenarios` présent **et** liste **et** toutes les entrées lues (sinon aucune purge, journalisé) ; exception ou résultat invalide de la collecte ⇒ aucune purge. Section présente mais vide ⇒ les fantômes sont retirés (plus aucun scénario).
+- Journal : `[SCENARIO] Unpublished N scenario button(s) (a inactive, b from broker)` — compteurs seulement, aucun nom.
+
+**Revue Codex (PR #237) — scan PHP partiel.** `core/class/jeedom2ha.class.php` ignorait silencieusement un scénario illisible tout en envoyant une liste valide ; la comparaison de longueurs côté démon ne suffisait donc pas. Le PHP envoie maintenant `scenarios_complete` (faux si la classe `scenario` est absente ou si un scénario a été ignoré) et le démon n'autorise la purge que si `scenarios_complete is True` (un payload sans ce drapeau ne purge pas). Écart ajouté à la story : AC 3 c étendu par ce drapeau, 2 tests de plus (23 au total).
+
+**Tests ajoutés** : `tests/unit/test_story_21_1_cc44_scenario_lifecycle.py` (21 tests, écrits rouges avant le code) : inactif dépublié / actif publié / réactivation (même `unique_id` et `command_topic`) ; purge fantômes avec actif conservé et pas de double vidage ; topics hors motif intacts (9 variantes) ; collecte vide / `None` / invalide / en exception ; `scenarios` absent, non-liste, entrée illisible ⇒ aucune purge ; section vide ⇒ purge ; broker déconnecté ⇒ rien publié ni reporté ; collision d'id scénario/équipement 10 (le report de l'équipement est rejoué indépendamment) ; appui actif accepté / inactif absent de `scenario_publications` ; AC 6 bis avec collision d'id 110 (ni `jeedom2ha/110/availability` ni le type de l'équipement) ; charge utile identique sans homonyme ; bouton d'équipement inchangé ; `collect_retained_topics` (déconnecté, filtrage retenu/non vide, échec d'abonnement).
+
+**Vérifications** : `python3 -m pytest` (suite complète `tests/` + `resources/daemon/tests`) 2095 passés, 1 ignoré ; `make test` 645 passés ; `flake8` propre ; 28 fichiers `tests/unit/*.node.test.js` verts. Golden corpus **non modifié** (aucun scénario inactif ni homonyme dans le corpus).
+
+**Docs (AC 14, part bloc A)** : entrée `changelog_beta.md` et une phrase dans `docs/fr_FR/index.md` (section « Rescanner la topologie Jeedom »).
+
+**Reste pour l'humain (AC 13, bloc A)** : preuve terrain (7 fantômes retirés, réactivation, 109/110/113 sans disponibilité locale, réglages HA conservés ou écart consigné).
+
+#### Bloc A — R1 (relecture ClaudeBox + relecture indépendante, PR #237, tête `4df8c95`)
+
+Aucun P1. Points repris sur la même PR, sans toucher au bloc B :
+1. **Test PHP du drapeau `scenarios_complete`** : la logique est extraite dans `jeedom2ha::buildScenariosPayload($scenarios)` (`null` = classe `scenario` absente), appelée par `getFullTopology()`. `tests/test_php_topology_extraction.php` couvre : `true` (liste entière, y compris vide), `false` (un scénario lève une exception ; les lisibles restent listés), `false` (classe absente), et la présence du booléen dans le payload de `getFullTopology()`. Le capture `catch` passe de `Exception` à `Throwable`. **Limite** : ce fichier exige le vrai noyau Jeedom (ignoré en CI, convention du dépôt) ; la session l'a seulement vérifié par `php -l` et par un harnais jetable exécutant la section `buildScenariosPayload` sans noyau (8 assertions vertes). La section `getFullTopology()` reste à exécuter sur une box par l'humain.
+2. **Documentation** : `docs/fr_FR/index.md` (point « Scénarios » du rescan) dit qu'il ne faut qu'une seule installation jeedom2ha par broker MQTT.
+3. **Regex de purge** : `fullmatch` (un `\n` final n'est plus accepté) ; test ajouté.
+4. **Traces** : INFO `[SCENARIO] Retained button topics collected: N (M scenario button(s))` à chaque purge tentée, y compris 0 ; INFO `[SCENARIO] Unpublished N scenario button(s) (a inactive, b from broker): ids=[…]` (ids seulement). `purge_orphan_scenario_buttons` renvoie maintenant la liste triée des ids vidés. Observation hors périmètre : le log existant `[DISCOVERY] Publishing button config … name='…'` affiche le nom du scénario ; je ne l'ai pas modifié, et le test des traces ne regarde que les lignes `[SCENARIO]` et de retrait.
+5. **Tests** (30 au total dans le fichier) : scénario actif dont la publication échoue jamais purgé ; désabonnement même si une exception survient pendant la collecte ; second appel concurrent à `collect_retained_topics` ⇒ `None`, aucune purge, un seul abonnement ; traces. Tests corrigés : la vérification du « chemin normal de la commande » vérifie maintenant réellement que le gestionnaire reçoit une commande hors collecte et jamais un topic de config pendant la collecte ; la charge utile d'un bouton de scénario sans homonyme est comparée à une **référence figée** générée depuis `main` `078416a` (pas à une seconde charge du nouveau code), avec un second test pour le cas avec homonyme.
+
+Vérifications : `python3 -m pytest` complet 2104 passés, 1 ignoré ; `flake8` propre ; tests Node verts. Statut de la story inchangé (`ready-for-dev`).
+
+### Bloc B (CC-47) — Dev Agent Record (session cloud déléguée, 2026-10-11)
+
+> Sous-section propre au bloc B ; R1/R2/R3 et le bloc A ne sont pas modifiés. Le statut de la story reste `ready-for-dev` (preuve terrain humaine, Task 4, hors de portée de cette session ; le bloc B passe par le gate 20-0 puis `ready-for-UX-validation` avant `done`). Aucun accès box / HA / secret ; `deploy-to-box.sh` jamais lancé.
+
+**Task 1 — relevés (lecture seule, `main` `078416a`)**
+
+- **1.2 — C10 à C17 rejoués dans le code.** Pointeurs confirmés, lignes décalées : `covered.setdefault` primaire d'abord (`evaluate_equipment.py` ~l. 447-453 avant correction) ; `_resolve_command_mapping` / `_secondary_mapping_by_cmd` (`http_server.py` ~2570-2616) ; arbre `command_decision_by_cmd`, `diag_mapping` (~2999-3025), `entities[]` (~3064-3092). **C12 vérifié par grep** : `command_decisions` n'est lu que par l'arbre (`_build_mapping_override_tree`) et l'aperçu (`_view_for_ineligible_or_unmapped`, `_view_from_evaluation`) ; le sync publie à partir de `equipment_decision` et `secondary_decisions`. Aucun écart notable. Le relevé terrain de 579 n'est pas rejoué (pas d'accès) ; la **forme** « principal refusé + secondaire publié sur la même commande » est confirmée par le code sur un équipement synthétique (état `ENERGY_STATE` seul + capteurs numériques) : principal `switch` `ambiguous_skipped` (`switch_state_orphan`), secondaire `binary_sensor` `sure` publié sur la commande d'état (cf. C14).
+- **1.3 — mesure.** Sur le corpus doré (`golden_corpus/sync_payload.json`, 59 équipements, politiques `sure_probable` et `sure_only`) : **0 arbre** où un principal refusé et un secondaire publié partagent une commande. Les fixtures `story_19_4_guard` sont des journaux d'appels dérivés de ce corpus (pas d'autres topologies). Conséquence : **golden et fixtures inchangés** (aucun réalignement), suite complète verte avant et après le changement. Seule la forme synthétique des tests 21.1 est concernée.
+- **1.4** — hors bloc B (scénarios, bloc A).
+- **1.5 — rendu de l'entité principale refusée et du sélecteur de type (C15).** (a) La ligne de commande de l'arbre ne lit que `row.diagnostic` ; l'entité principale refusée n'apparaît que dans `entities[]`, consommé par les aperçus de forçage/exclusion (`equipmentForcePreviewEntities`, `entitiesLeavingHomeAssistant`) où elle garde son propre libellé « Ne sera pas publiée — … » : correct pour **cette entité**, sans effet sur la commande ni sur la synthèse. (b) **Sélecteur de type sur la ligne d'une commande partagée — vérifié sur l'évaluation** : un override `binary_sensor` sur la clé `eq:cmd` s'applique à la **première** entité qui la porte (le principal : il devient `binary_sensor`, toujours refusé `ambiguous_skipped`) ; le secondaire qui publie n'est pas touché. Le sélecteur reste donc actif sur la ligne « Sera publié : binary_sensor » mais **ne règle pas l'entité qui publie** ; sans effet sur ce qui est publié. Décision R1 : voir « Limite connue » ci-dessous.
+
+**Task 3 — implémentation**
+
+- Démon : nouvelle fonction unique `select_covering_decision()` (`models/evaluate_equipment.py`) = première décision **publiée** parmi les entités qui portent la commande (primaire d'abord, secondaires dans l'ordre), sinon le primaire. Utilisée par `evaluate_equipment()` (construction de `command_decisions`) et par `_resolve_command_mapping()` (`http_server.py`, via le nouvel helper `_mappings_covering_cmd`, qui remplace `_secondary_mapping_by_cmd`) : arbre (`covered`, `attendu_ha`, `effective_ha`, `diagnostic`) et aperçu restent sur la même source. `equipment_decision`, `secondary_decisions` et `mapping` ne sont pas touchés : aucune publication ne change.
+- Écran : **aucune logique ajoutée** — `diagnosticState`, `buildBlockingReason`, `buildPublishCellLabel`, la synthèse (`summarizePublication`) et les totaux de pièce (`summarizeRoom`) consomment `row.diagnostic` ; ils sont justes dès que le démon l'est (prouvé par les tests Node sur un arbre de la forme visée). Seul changement d'écran : libellé `switch_state_orphan` dans `REASON_LABELS` (Q4 A) : « état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Override HA », puis « Forcer » », sans invitation aux types génériques. Le libellé générique `ambiguous_skipped` (autres causes, F10) est inchangé.
+- Démon, libellé (AC 11) : `resolve_cause_ux()` (`models/cause_mapping.py`) accepte `mapping_reason_code` (facultatif) ; sous une décision `ambiguous`/`ambiguous_skipped`, `switch_state_orphan` donne la cause « État sans ordre On/Off — rien à piloter… » et l'action « Choisir le type binary_sensor pour cette commande puis « Forcer »… » (actions réellement présentes à l'écran, pas de faux CTA). `http_server.py` passe `map_result.reason_code`. Aucun nouveau `reason_code` (taxonomie inchangée) ; `PRODUCT_SCOPE` inchangé.
+- Écart avec la story : `cause_mapping.py:159`/`:169` désignent les entrées `ambiguous`/`ambiguous_skipped` de `CAUSE_MAPPING`, conservées telles quelles pour les autres ambiguïtés ; la cause d'état seul est traitée par une entrée distincte (pas de nouvelle clé de `CAUSE_MAPPING`).
+- Documentation : `docs/fr_FR/changelog_beta.md` (entrée datée) et ligne « état sans ordre On/Off » de `docs/fr_FR/index.md`. Bloc `compteurs` non touché (CC-51).
+
+**Tests ajoutés (rouge avant vert vérifié : sur le code d'origine le module démon 21.1 échoue à l'import de `select_covering_decision`)**
+
+- `resources/daemon/tests/unit/test_story_21_1_cc47_command_resolution.py` : forme de 579 (décision de commande publiée, type du secondaire), décisions d'équipement/secondaires inchangées, aucune entité publiée (cause du principal), commande non couverte, priorité (`select_covering_decision`), arbre (ligne `binary_sensor`, principal toujours refusé), équipement à une seule entité inchangé, aperçu, libellés `resolve_cause_ux`.
+- `resources/daemon/tests/unit/test_story_21_1_type_then_force_characterization.py` (AC 10) : automatique refusé, forçage seul refusé (`ha_missing_command_topic`), type seul refusé (`ambiguous_skipped`), type puis forçage publié (`publication_forced`) avec payload `binary_sensor` complet.
+- `tests/unit/test_story_21_1_cc47_command_published_by_secondary.node.test.js` : ligne « Sera publié : binary_sensor », synthèse « 5 commande(s) prête(s) », totaux de pièce, entité principale refusée sans effet sur la commande, régressions (entité unique, non couverte / exclue / désactivée / forcée), libellé Q4.
+
+**R1 — Relecture ClaudeBox de la PR #238 (tête `1f22513`)**
+
+1. (P2) Action de la cause d'état seul : l'« onglet Mapping » n'existe plus. Libellé aligné sur les contrôles réels dans `cause_mapping.py`, `REASON_LABELS` (`switch_state_orphan`) et la ligne correspondante de `docs/fr_FR/index.md` : « Choisir le type binary_sensor dans la liste « Override HA » de la commande, puis « Forcer » la publication. »
+2. **Limite connue (décision ClaudeBox sur 1.5 b).** Le sélecteur de type d'une ligne de commande partagée reste en l'état dans cette story : le type choisi s'applique à l'entité principale, pas à l'entité qui publie, et rien de ce qui est publié ne change. Renvoyé à la story des compteurs (CC-51), qui revoit la sémantique des lignes. Aucun champ ajouté au démon.
+3. (P3) Mise à jour sur `main` après la fusion de la PR #237 (bloc A) : à faire une fois celle-ci fusionnée ; conflits attendus dans `changelog_beta.md` et la story (garder les deux entrées / sous-sections).
+
+**Reste à faire (humain, hors de cette session)** : Task 4 (gate 20-0, déploiement du SHA exact, inventaire MQTT et registre HA identiques avant/après, ligne de 5369 « Sera publié : binary_sensor », synthèse de 579 sans bloquante), puis `ready-for-UX-validation`.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md` (nouveau)
