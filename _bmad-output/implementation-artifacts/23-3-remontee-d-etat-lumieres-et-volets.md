@@ -1,6 +1,6 @@
 # Story 23.3 : Remontée d'état des lumières et volets
 
-Status: draft
+Status: review
 
 > Brouillon. Relecture ClaudeBox obligatoire avant `ready-for-dev`.
 
@@ -172,3 +172,15 @@ Prérequis : VM 122, Mosquitto local et HA de test fournis par 23.1 (équipement
 ## 8. Hors périmètre (rappel)
 
 `climate`, `alarm_control_panel`, `button`, couleur RGB (`LIGHT_COLOR`), état `opening`/`closing`, inversion de position, A1/A2/A3, 22.2 et tout changement de `core/` PHP. Cadrage documentaire uniquement : aucune implémentation dans cette PR.
+
+## Dev Agent Record (implémentation, 12/10)
+
+Implémentation sans accès VM/Jeedom/HA ni modification de `core/`, `models/topology.py`, `models/evaluate_equipment.py`, `transport/http_server.py`. Preuve terrain 23.1 restant à faire par l'humain (tâche « prouver sur 23.1 » non cochée).
+
+- `sync/readback.py` (nouveau) : source unique « commande info → canal (`state`, `brightness`, `position`) » ; fiabilité **par canal**, partagée par la discovery, `StateSynchronizer` et `CommandSynchronizer` (fin de la duplication des listes de clés ; `LIGHT_BRIGHTNESS` seule ne rend pas l'ON/OFF fiable, Q4).
+- `sync/state.py` : `light` et `cover` dans `_STREAMED_TYPES` ; plusieurs topics par commande (`FLAP_STATE` numérique → `state` + `position`) et plusieurs commandes par entité (`LIGHT_STATE` + `LIGHT_BRIGHTNESS`) ; traductions ON/OFF, luminosité/position entières 0-100 (hors bornes ou illisible : rien publié), cover `open`/`closed` (position intermédiaire = `open`, Q3) ; `LIGHT_STATE` numérique : > 0 = ON ; purge des retained invalides (publication vide, strictement `jeedom2ha/…`) à la (re)publication uniquement, une fois par process et par canal sans lecture, ré-armée si la lecture revient (Q7).
+- `sync/command.py` : `_has_reliable_state` délègue à `sync.readback` (canal `state`).
+- `discovery/publisher.py` : `optimistic` explicite pour light et cover (`false` seulement avec un état réel streamé, sinon `true`, `state_topic` conservé — Q1 b). `brightness_state_topic` / `position_topic` **inchangés** : leur retrait quand le canal n'a pas de commande n'est pas couvert par les décisions Q1-Q7.
+- Parité (Q6) : `parity-snapshot.sh` s'abonne (lecture seule) à `jeedom2ha/#`, `parity_snapshot.py` filtre `state|brightness|position` et `diff` expose `state_topics_added/removed` (informatif, `is_empty_diff` inchangé).
+- Golden `story_19_4_guard/*_mqtt.json` (s1, s2, s3, s5) : diff relu, uniquement l'ajout du champ `optimistic` sur les discovery light/cover (53 `false`, 15 `true`, 0 autre ligne modifiée) ; les `true` correspondent aux équipements sans commande d'état (light 1003 slider seul ; cover 2001, 2002, 2004, 2007).
+- Docs : section « Limites : état réel des lumières et des volets » (`docs/fr_FR/index.md`) + ligne README.

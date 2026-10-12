@@ -334,8 +334,8 @@ Le plugin publie huit types d'entités Home Assistant. Le type est choisi à par
 
 | Type Home Assistant | Ce que le plugin en fait |
 |---|---|
-| `light` | Lumières : allumer/éteindre et variation de luminosité. La couleur n'est pas reprise, et une lumière qui n'a que des commandes de couleur n'est pas prise en charge. |
-| `cover` | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent. |
+| `light` | Lumières : allumer/éteindre et variation de luminosité, avec l'état réel quand Jeedom le fournit (voir [Limites](#limites--état-réel-des-lumières-et-des-volets)). La couleur n'est pas reprise, et une lumière qui n'a que des commandes de couleur n'est pas prise en charge. |
+| `cover` | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent, avec l'état et la position réels quand Jeedom les fournit. |
 | `switch` | Prises et interrupteurs (commandes d'énergie On/Off, familles « interrupteur » et « ventilateur » de Jeedom), ainsi que les équipements de présence actionnables (information de présence + actions pour l'activer et la désactiver). |
 | `sensor` | Informations numériques. |
 | `binary_sensor` | Informations binaires. |
@@ -344,6 +344,28 @@ Le plugin publie huit types d'entités Home Assistant. Le type est choisi à par
 | `alarm_control_panel` | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
 
 Le plugin ne publie pas les équipements sans type Jeedom reconnu : il l'indique alors dans la colonne « Diagnostic ».
+
+### Limites : état réel des lumières et des volets
+
+Le plugin remonte l'état **réel** d'une lumière ou d'un volet seulement si l'équipement Jeedom a une **commande d'information** correspondante. Sans elle, Home Assistant affiche un état **supposé** : celui de la dernière commande envoyée, qui peut différer de la réalité.
+
+| Équipement | Commande d'information Jeedom | Ce que Home Assistant affiche |
+|---|---|---|
+| Lumière | état (marche/arrêt) | l'état réel allumée/éteinte |
+| Lumière variable | état **et** luminosité | l'état réel et la luminosité réelle (0 à 100) |
+| Lumière variable | luminosité seule, sans état | l'état allumée/éteinte reste supposé : le plugin ne le déduit jamais de la luminosité |
+| Lumière sans commande d'état | aucune | état supposé |
+| Volet | état d'ouverture (binaire) | ouvert ou fermé réel |
+| Volet positionnable | état numérique (0 à 100) | ouvert/fermé et position réels ; une position intermédiaire s'affiche « ouvert » |
+| Volet sans commande d'état | aucune | état supposé |
+
+Autres limites à connaître :
+
+- **Aucune inversion de position.** Le plugin reprend la valeur de Jeedom telle quelle (0 = fermé, 100 = ouvert). Si un plugin Jeedom inverse cette échelle, la position affichée est inversée.
+- **Pas d'état intermédiaire** « en ouverture », « en fermeture » ou « arrêté » : seuls ouvert et fermé sont remontés.
+- **Valeur illisible ou hors de 0 à 100 :** rien n'est publié, Home Assistant garde la dernière valeur connue.
+- **Retrait d'une commande d'information :** à la synchronisation ou à la republication suivante, le plugin efface l'ancien état mémorisé par le broker pour que Home Assistant ne le relise pas.
+- La couleur d'une lumière, les thermostats et les alarmes ne sont pas concernés par cette remontée d'état.
 
 ### Les badges de synthèse
 

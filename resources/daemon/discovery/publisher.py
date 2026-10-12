@@ -20,6 +20,10 @@ from models.availability import (
 )
 from models.mapping import MappingResult
 from models.topology import TopologySnapshot
+from sync.readback import (
+    CHANNEL_STATE,
+    has_reliable_channel,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -475,6 +479,9 @@ class DiscoveryPublisher:
         }
         self._add_default_entity_id(payload, "light")
         payload.update(self._build_availability_fields(mapping, snapshot))
+        # Story 23.3 (Q1 b) — ``optimistic: false`` only when a real ON/OFF state is
+        # streamed (LIGHT_STATE info); otherwise the assumed state is explicit.
+        payload["optimistic"] = not has_reliable_channel("light", mapping, CHANNEL_STATE)
 
         # Add brightness fields if capability detected.
         # getattr: a type override (D11) may keep non-Light detected capabilities.
@@ -522,6 +529,9 @@ class DiscoveryPublisher:
         }
         self._add_default_entity_id(payload, "cover")
         payload.update(self._build_availability_fields(mapping, snapshot))
+        # Story 23.3 (Q1 b) — ``optimistic: false`` only when a real open/closed state
+        # is streamed (FLAP_STATE / FLAP_BSO_STATE info); otherwise it is explicit.
+        payload["optimistic"] = not has_reliable_channel("cover", mapping, CHANNEL_STATE)
 
         # Conditional: Stop
         if getattr(caps, "has_stop", False):

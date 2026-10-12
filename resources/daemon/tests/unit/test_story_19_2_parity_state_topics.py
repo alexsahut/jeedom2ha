@@ -284,3 +284,60 @@ def test_cli_omits_mqtt_state_inventory_file_by_default(tmp_path):
         "--label", "before", "--output", str(tmp_path / "out.json"),
     ])
     assert args.mqtt_state_inventory_file is None
+
+
+# --- Story 23.3 (Q6) : topics light/cover `state|brightness|position`, lecture seule ---
+
+def test_state_inventory_keeps_only_streamed_state_topics(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        pt, "fetch_diagnostics",
+        lambda *a, **k: _diagnostics_payload([_eq(579, reason_code="no_mapping", statut="non_publie")]),
+    )
+    monkeypatch.setattr(pt, "fetch_published_scope", lambda *a, **k: {"payload": {}})
+    monkeypatch.setattr(pt, "fetch_state_listeners", lambda *a, **k: {"status": "ok", "listeners": []})
+    discovery_file = tmp_path / "topics"
+    discovery_file.write_text("homeassistant/light/jeedom2ha_300/config\n")
+    state_file = tmp_path / "state_topics"
+    state_file.write_text("\n".join([
+        "jeedom2ha/300/state", "jeedom2ha/300/brightness", "jeedom2ha/400/position",
+        "jeedom2ha/579/5369/state",
+        "jeedom2ha/300/set", "jeedom2ha/300/brightness/set", "jeedom2ha/400/position/set",
+        "jeedom2ha/300/availability", "jeedom2ha/bridge/status", "other/300/state",
+    ]) + "\n")
+
+    snapshot = pt.capture_snapshot(
+        base_url="http://x", local_secret=SECRET, mqtt_host="x", mqtt_port=1883,
+        label="before", mqtt_inventory_file=str(discovery_file),
+        mqtt_state_inventory_file=str(state_file),
+    )
+
+    assert snapshot.state_topics == [
+        "jeedom2ha/300/brightness", "jeedom2ha/300/state",
+        "jeedom2ha/400/position", "jeedom2ha/579/5369/state",
+    ]
+
+
+def _snap(state_topics=None):
+    snap = {
+        "decisions": [{"eq_id": 1}],
+        "mqtt_topics": ["homeassistant/light/jeedom2ha_1/config"],
+    }
+    if state_topics is not None:
+        snap["state_topics"] = state_topics
+    return snap
+
+
+def test_diff_reports_state_topics_without_breaking_parity_semantics():
+    diff = pt.diff_snapshots(
+        _snap(["jeedom2ha/1/state"]),
+        _snap(["jeedom2ha/1/state", "jeedom2ha/1/brightness", "jeedom2ha/2/position"]),
+    )
+    assert diff["state_topics_added"] == ["jeedom2ha/1/brightness", "jeedom2ha/2/position"]
+    assert diff["state_topics_removed"] == []
+    assert diff["is_empty_diff"] is True  # informational, like the listeners
+
+
+def test_diff_accepts_snapshots_captured_before_the_field_existed():
+    diff = pt.diff_snapshots(_snap(), _snap(["jeedom2ha/1/state"]))
+    assert diff["state_topics_added"] == ["jeedom2ha/1/state"]
+    assert diff["state_topics_removed"] == []

@@ -64,6 +64,8 @@ REMOTE
 # Story 19.2 — second read-only subscription, retained STATE topics this time
 # (jeedom2ha/<eq_id>/<cmd_id>/state), used only as I11 field-proof evidence
 # (parity_snapshot.py correlates it with the discovery-based I11 candidates).
+# Story 23.3 (Q6) — subscribed on jeedom2ha/# and filtered by parity_snapshot.py on
+# state|brightness|position (light/cover topics have no command level).
 # Same auth/cleanup mechanism as the discovery capture above; never mosquitto_pub.
 {
   echo 'set +x; set -euo pipefail; umask 077'
@@ -72,7 +74,7 @@ REMOTE
   cat <<'REMOTE'
 rc=0
 jeedom2ha_mqtt_run mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" \
-  -W 2 -t 'jeedom2ha/+/+/state' -F '%t' || rc=$?
+  -W 2 -t 'jeedom2ha/#' -F '%t' || rc=$?
 # mosquitto_sub 2.0.x returns 27 when the bounded subscription ends.
 [[ "$rc" == 0 || "$rc" == 27 ]] || exit "$rc"
 REMOTE

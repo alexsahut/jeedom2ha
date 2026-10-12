@@ -203,15 +203,16 @@ async def test_binary_sensor_translates_on_off(raw, expected):
 # --- Borne vague 1 (AC#4) ---
 
 @pytest.mark.asyncio
-async def test_actionable_light_is_not_fed_by_state_sync():
+async def test_actionable_light_is_fed_by_state_sync_since_vague3():
+    """Story 23.3: light joined the streamed scope (it was excluded in vague 1)."""
     decision = _light_decision(eq_id=300, cmd_id=7004)
     bridge = _FakeBridge()
     sync = _sync({300: decision}, bridge)
 
     ok = await sync.handle_state_message(eq_id=300, cmd_id=7004, value="1")
 
-    assert ok is False
-    assert bridge.published == []
+    assert ok is True
+    assert bridge.published == [("jeedom2ha/300/state", "ON", 1, True)]
 
 
 # --- state ⊆ discovery (AC#5) ---
@@ -354,7 +355,7 @@ def test_list_state_targets_multi_sensor_yields_one_entry_per_cmd():
     ]
 
 
-def test_list_state_targets_includes_mono_and_binary_excludes_light():
+def test_list_state_targets_includes_mono_binary_and_light():
     sync = _sync({
         100: _mono_sensor_decision(eq_id=100, cmd_id=4001),
         200: _binary_decision(eq_id=200, cmd_id=6001),
@@ -366,8 +367,7 @@ def test_list_state_targets_includes_mono_and_binary_excludes_light():
     keys = {(t["eq_id"], t["cmd_id"], t["ha_type"]) for t in targets}
     assert (100, 4001, "sensor") in keys
     assert (200, 6001, "binary_sensor") in keys
-    assert all(t["ha_type"] in ("sensor", "binary_sensor") for t in targets)
-    assert not any(t["eq_id"] == 300 for t in targets)
+    assert (300, 7004, "light") in keys
 
 
 def test_list_state_targets_excludes_unpublished_entities():
