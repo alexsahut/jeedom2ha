@@ -11,7 +11,7 @@
 - Chaque appareil prend le nom de l'équipement Jeedom, identique pour toutes ses entités (avant, un appareil pouvait porter le nom d'une de ses commandes). Un équipement à une seule entité affiche le nom de l'équipement ; un équipement à plusieurs entités affiche le nom de chaque commande à la suite du nom de l'appareil
 - Un renommage dans Jeedom atteint Home Assistant au prochain rescan, redémarrage du démon ou « Republier »
 - Les entités nouvelles ou recréées reçoivent un `entity_id` technique stable (`<domaine>.jeedom2ha_…`) : une entité supprimée puis recréée reprend son `entity_id` technique, et les automatisations, scripts et cartes qui le citent survivent à la recréation
-- Les `entity_id`, noms et pièces déjà présents dans Home Assistant, y compris ceux que vous avez choisis à la main, ne sont pas modifiés
+- Les `entity_id` déjà présents dans Home Assistant ne changent pas. Les noms affichés des appareils et entités non personnalisés sont mis à jour au prochain rescan ; les noms et pièces que vous avez choisis à la main dans Home Assistant sont conservés
 
 ---
 
