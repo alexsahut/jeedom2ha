@@ -96,7 +96,8 @@ class TestDeviceNameAndEntityNameRule:
         mappings = _all_mappings(eq, snap)
         assert len(mappings) == 1
         payload = _payload_of(publisher, mappings[0], snap)
-        assert payload["name"] == "Equip-67"
+        # Story 22.3 : nom d'entité = nom d'appareil -> null (HA affiche le nom de l'appareil).
+        assert payload["name"] is None
         assert payload["device"]["name"] == "Equip-67"
 
     def test_accents_are_kept(self, publisher):
@@ -104,7 +105,7 @@ class TestDeviceNameAndEntityNameRule:
         snap = _snapshot(eq)
         payload = _payload_of(publisher, _all_mappings(eq, snap)[0], snap)
         assert payload["device"]["name"] == "Équipement été"
-        assert payload["name"] == "Équipement été"
+        assert payload["name"] is None
 
     def test_scenario_button_keeps_scenario_name_for_device(self, publisher):
         from mapping.button import ScenarioButtonMapper
@@ -117,7 +118,7 @@ class TestDeviceNameAndEntityNameRule:
         mapping = ScenarioButtonMapper().map(sc)
         payload = publisher._build_button_payload(mapping, snap)
         assert payload["device"]["name"] == "S110"
-        assert payload["name"] == "S110"
+        assert payload["name"] is None
 
 
 class TestDefaultEntityId:

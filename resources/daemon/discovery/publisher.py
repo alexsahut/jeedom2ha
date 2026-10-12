@@ -448,6 +448,24 @@ class DiscoveryPublisher:
 
         return device
 
+    @staticmethod
+    def _normalize_name(name: object) -> str:
+        """Normalise un nom pour la comparaison (espaces repliés, casse ignorée)."""
+        return " ".join(str(name or "").split()).casefold()
+
+    @classmethod
+    def _entity_name_for_payload(cls, mapping: MappingResult, device: dict):
+        """Story 22.3 — nom d'entité publié, ``None`` s'il double le nom de l'appareil.
+
+        HA concatène nom d'appareil et nom d'entité (« X X »). Quand ils sont égaux
+        (après normalisation des espaces et de la casse), ``"name": null`` est la
+        convention de HA pour que l'entité prenne seulement le nom de l'appareil.
+        """
+        entity_name = mapping.ha_name
+        if cls._normalize_name(entity_name) == cls._normalize_name(device.get("name")):
+            return None
+        return entity_name
+
     def _build_availability_fields(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build availability payload fields (bridge-only or bridge+local)."""
         if (mapping.reason_details or {}).get("source_kind") == "scenario":
@@ -465,7 +483,7 @@ class DiscoveryPublisher:
         device = self._build_device_block(mapping, snapshot)
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": f"jeedom2ha_{eq_id}",
             "state_topic": f"jeedom2ha/{eq_id}/state",
@@ -516,7 +534,7 @@ class DiscoveryPublisher:
         device_class = "blind" if getattr(caps, "is_bso", False) else "shutter"
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": f"jeedom2ha_{eq_id}",
             "command_topic": f"jeedom2ha/{eq_id}/set",
@@ -567,7 +585,7 @@ class DiscoveryPublisher:
         state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": object_id,
             "command_topic": command_topic,
@@ -609,7 +627,7 @@ class DiscoveryPublisher:
         state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": object_id,
             "state_topic": state_topic,
@@ -647,7 +665,7 @@ class DiscoveryPublisher:
         state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": object_id,
             "state_topic": state_topic,
@@ -677,7 +695,7 @@ class DiscoveryPublisher:
         reason_details = mapping.reason_details or {}
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": f"jeedom2ha_{eq_id}",
             "temperature_command_topic": reason_details.get(
@@ -713,7 +731,7 @@ class DiscoveryPublisher:
         device = self._build_device_block(mapping, snapshot)
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": f"jeedom2ha_{eq_id}",
             "state_topic": f"jeedom2ha/{eq_id}/alarm/state",
@@ -748,7 +766,7 @@ class DiscoveryPublisher:
         object_id = reason_details.get("node_id") or f"jeedom2ha_{eq_id}"
 
         payload = {
-            "name": mapping.ha_name,
+            "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": object_id,
             "command_topic": command_topic,
