@@ -1,6 +1,6 @@
 # Story A2 : Paquet distribuable et promotion épurée via branches `release/vX.Y.Z` (D2)
 
-Status: ready-for-dev
+Status: done
 
 Epic: (Chantier Market 2026-10)
 

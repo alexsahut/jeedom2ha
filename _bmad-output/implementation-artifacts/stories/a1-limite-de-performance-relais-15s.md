@@ -1,6 +1,6 @@
 # Story A1 : Budget fixe et échéance transmise pour les 5 relais PHP restants (E4)
 
-Status: review
+Status: done
 
 Epic: (Chantier Market 2026-10)
 
@@ -60,6 +60,8 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
    **When** clawbox l'exécute en VM sur `pve` (décision Alex 2026-10-11 21:12, pas en LXC) après son go Telegram  
    **Then** le comportement observé en charge réelle confirme les AC1-AC4 avant passage à `done`.
 
+   Amendé par décision Alex 2026-10-12 15:17 (D8 = a) : la charge réelle est prouvée sur la box (292 équipements réels, box en `69a4b47`, `[RELAY-BUDGET] relais=TOPOLOGY R=60 duration_s=1.811`) et en CI par `test_story_a1_parc_300_load.py` (300 équipements, vrai serveur HTTP). Le gate A4 sur Jeedom vierge couvre l'installation, les dépendances et le démon.
+
 ## Tasks / Subtasks
 
 - [x] T1 — Auditer précisément chacun des 5 relais (confirmer/corriger le tableau ci-dessus)
@@ -80,8 +82,8 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
   - [x] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
   - [x] Vérifier le message d'erreur correct en cas de dépassement réel du budget
 
-- [ ] T5 — Gate terrain (hors story, exécuté par clawbox)
-  - [ ] Test sur Jeedom vierge en VM `pve` (Debian 11 puis 12), après go Telegram d'Alex — gate obligatoire avant `done`, pas une tâche de cette story
+- [x] T5 — Gate terrain (hors story, exécuté par clawbox)
+  - [x] Preuve terrain du 2026-10-12 09:38 (box en `69a4b47`, Rescanner (Chrome) → succès, synchro 09:38:05, journal `[RELAY-BUDGET] relais=TOPOLOGY R=60 duration_s=1.811`, 292 eqLogics) + AC5 amendé par décision Alex 2026-10-12 15:17 (D8 = a) : charge réelle acceptée sur la box de production et en CI (`test_story_a1_parc_300_load.py`, 300 équipements), le gate A4 Jeedom vierge couvrant installation/dépendances/démon
 
 ## Impact Produit
 
