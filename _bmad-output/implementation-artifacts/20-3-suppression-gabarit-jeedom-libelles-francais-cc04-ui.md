@@ -199,7 +199,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 - Modale : `desktop/js/jeedom2ha.js:872-1354`, `desktop/js/jeedom2ha_diagnostic_helpers.js`.
 - Relais PHP : `core/ajax/jeedom2ha.ajax.php:646-725`, `core/class/jeedom2ha.class.php:578`.
 - Arbre : `resources/daemon/transport/http_server.py:2860-3130` (inchangé par cette story).
-- Gate : `tests/e2e/gate/lib/policy.mjs:51-52`, `tests/e2e/gate/page-load-request-inventory.mjs:186-187`, `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`.
+- Gate : `tests/e2e/gate/lib/policy.mjs:51-52`, `tests/e2e/gate/page-load-request-inventory.mjs:186-187`, `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs`.
 
 ### Interdits
 
@@ -218,7 +218,7 @@ Alexandre a validé le paquet **`1A 2A 2bA 3A 4A`**. Les AC **[Qx]** sont donc f
 
 ### Fichiers probablement touchés
 
-`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_scope_summary.js` (supprimé), `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé ou réduit), `desktop/css/jeedom2ha.css`, `core/ajax/jeedom2ha.ajax.php` et `core/class/jeedom2ha.class.php` (relais ou crochets de gabarit, selon Q2 et Q4), tests Node/PHP issus de la recherche de F6 (Task 1.5), `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`, `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`.
+`desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_scope_summary.js` (supprimé), `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé ou réduit), `desktop/css/jeedom2ha.css`, `core/ajax/jeedom2ha.ajax.php` et `core/class/jeedom2ha.class.php` (relais ou crochets de gabarit, selon Q2 et Q4), tests Node/PHP issus de la recherche de F6 (Task 1.5), `tests/e2e/gate/lib/policy.mjs`, `tests/e2e/gate/page-load-request-inventory.mjs`, `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs`.
 
 ### Pertes assumées (décisions Q2=A et Q3=A)
 
@@ -267,7 +267,7 @@ F. Boutons « Supprimer puis recréer » (équipement et pièce) en `btn-danger`
 
 G. Tests : les tests 20_3 des actions déplacées remplacent `setHaActionPendingState`, `restoreHaActionPendingState`, `buildHaActionUserMessage` et `confirmHaSupprimerAction` par des faux. Ajouter des tests sur le vrai code : chemin d'erreur, état en cours, gating de B et C, `renderRoomCounters` / `buildRoomModalHtml`, et la couverture perdue avec 5.2/5.3 (bouton rouge de la confirmation, message avec le périmètre, attente). Tests devenus vides : `test_story_2_4_visual_separation.node.test.js` et `test_story_3_1_status_labels.node.test.js` testent des copies locales de fonctions supprimées (à retirer, en le disant dans la PR) ; `test_story_3_2_reason_labels_sync.py` à recibler sur la table de `mapping_override.js` ou à retirer.
 
-H. Gate : `FORBIDDEN_TEXT` (`decouverte-garage-enphase.mjs` vers 77) est appliqué à tout le texte de la modale, noms libres compris ; ne le vérifier que sur les libellés statiques (titres, entêtes, boutons, badges).
+H. Gate : `FORBIDDEN_TEXT` (`decouverte-piece-3-eq-579.mjs` vers 77) est appliqué à tout le texte de la modale, noms libres compris ; ne le vérifier que sur les libellés statiques (titres, entêtes, boutons, badges).
 
 I. `desktop/php/jeedom2ha.php` vers 154 : `htmlspecialchars` sur `object_name` (préexistant).
 
@@ -333,7 +333,7 @@ Le grep F6 retrouve les mêmes 22 références ; il manquait trois fichiers qui 
 | `test_story_20_0_gate_policy` | adapté | titre du sous-test des lectures ; nouveau sous-test : `getDiagnostics` et `getPublishedScopeForConsole` sont bloquées |
 | `test_story_3_1_taxonomy_sync.py`, `test_story_3_2_reason_labels_sync.py` | réduits | contrôles liés à `getStatusLabel` et à `eq.cause_label` de la modale retirés ; gardés : taxonomie fermée à 5 statuts, absence de table locale `reasonLabels`, absence de `getStatusLabel` dans l'interface |
 | `tests/test_php_published_scope_relay.php`, `tests/unit/test_story_5_1_php_relay.php` | conservés | relais PHP conservés (AC7) ; aucun changement |
-| `tests/e2e/gate/lib/policy.mjs`, `page-load-request-inventory.mjs`, `parcours/decouverte-garage-enphase.mjs` | mis à jour | voir plan d'implémentation, point 6 |
+| `tests/e2e/gate/lib/policy.mjs`, `page-load-request-inventory.mjs`, `parcours/decouverte-piece-3-eq-579.mjs` | mis à jour | voir plan d'implémentation, point 6 |
 
 Tests ajoutés : `test_story_20_3_compteurs_piece`, `test_story_20_3_actions_deplacees`, `test_story_20_3_retrait_synthese_diagnostic`, `test_story_20_3_gate_parcours` (parcours étendu exécuté dans Chromium contre un DOM local ; ignoré sans Playwright), `tests/unit/test_story_20_3_php_page.php`.
 
@@ -375,7 +375,7 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `desktop/js/jeedom2ha_diagnostic_helpers.js` (supprimé)
 - `tests/e2e/gate/lib/policy.mjs`
 - `tests/e2e/gate/page-load-request-inventory.mjs`
-- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
+- `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs`
 - `tests/unit/test_story_20_3_compteurs_piece.node.test.js` (nouveau)
 - `tests/unit/test_story_20_3_actions_deplacees.node.test.js` (nouveau)
 - `tests/unit/test_story_20_3_retrait_synthese_diagnostic.node.test.js` (nouveau)
@@ -391,7 +391,7 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `desktop/js/jeedom2ha_mapping_override.js` (B : `equipmentActionState`, `roomActionState`, lecture pure de l'arbre)
 - `desktop/js/jeedom2ha_mapping_surface.js` (A, B, C, D, E, F)
 - `desktop/php/jeedom2ha.php` (I : `htmlspecialchars` sur `object_name`, classe `j2ha-free-name` ; retrait du bouton « Ajouter », décision d'Alex du 2026-10-11)
-- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (H : gate de chaînes interdites limité aux libellés statiques)
+- `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs` (H : gate de chaînes interdites limité aux libellés statiques)
 - `tests/unit/helpers/fake_dom.js` (nouveau), `tests/unit/helpers/ui_harness.js` (nouveau) : faux DOM/jQuery exécutant le vrai code de l'interface
 - `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js` (nouveau)
 - `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_3_php_page.php`, `test_story_20_3_retrait_synthese_diagnostic.node.test.js`, `test_story_20_2_p1_p2_comportement_surface.node.test.js`, `test_story_20_4_rescan_ui.node.test.js`, `test_story_3_2_reason_labels_sync.py` (adaptés)
@@ -403,7 +403,7 @@ Tableau global du parc ; badge « Écart » ; trace du pipeline, cause canonique
 - `resources/daemon/transport/http_server.py` (R2-1 : `sync_status.published_in_ha`, exception justifiée au périmètre front seul)
 - `resources/daemon/tests/unit/test_story_20_3_published_in_ha.py` (nouveau), `test_story_19_3_ac6_sync_status.py`, `test_story_19_3_guardrail_no_override_json_parity.py`, `test_story_19_4_scope_et_parite.py` (champ additif)
 - `desktop/js/jeedom2ha_mapping_override.js` (R2-1, R2-3), `desktop/js/jeedom2ha_mapping_surface.js` (R2-2, R2-3, R2-4, R2-6), `desktop/php/jeedom2ha.php` (R2-6 : carte « Sans pièce » non marquée)
-- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs` (R2-6)
+- `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs` (R2-6)
 - `tests/unit/helpers/ui_harness.js`, `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js`, `test_story_20_3_gate_parcours.node.test.js`, `test_story_20_2_p1_p2_comportement_surface.node.test.js` (R2-1 à R2-6)
 
 ### Change Log

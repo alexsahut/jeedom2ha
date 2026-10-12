@@ -176,8 +176,8 @@ Aucun CC-xx fermé par cette story : elle est le préalable outillé des stories
 - `tests/e2e/gate/lib/simulate.mjs`
 - `tests/e2e/gate/page-load-request-inventory.mjs`
 - `tests/e2e/gate/parcours/controle-ecriture-non-declaree.mjs`
-- `tests/e2e/gate/parcours/decouverte-garage-enphase.mjs`
-- `tests/e2e/gate/parcours/reference-bascule-enphase.mjs`
+- `tests/e2e/gate/parcours/decouverte-piece-3-eq-579.mjs`
+- `tests/e2e/gate/parcours/reference-bascule-eq-380.mjs`
 - `tests/e2e/gate/run-gate.mjs`
 - `tests/unit/test_story_20_0_gate_policy.node.test.js`
 - `tests/unit/test_story_20_0_gate_runner.node.test.js`

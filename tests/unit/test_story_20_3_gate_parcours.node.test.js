@@ -27,7 +27,7 @@ function panel(id, name, state, publish) {
 function html(withDiagnosticAction, titlePrefix = '') {
   const garage = `<div class="modal-j2ha-room"><div class="modal-title">${titlePrefix}<span class="j2ha-free-name">Garage</span></div><div class="j2ha-room-counters">${counters()}</div>
     <div class="j2ha-room-actions"><button class="j2ha-room-republish">Republier la pièce</button><button class="j2ha-room-recreate">Supprimer</button></div>
-    ${panel(100, 'Enphase', 'j2ha-diag-ready', 'j2ha-publish-ok')}${panel(514, 'Eq', 'j2ha-diag-disabled', 'j2ha-publish-disabled')}</div>`;
+    ${panel(579, 'Eq-579', 'j2ha-diag-ready', 'j2ha-publish-ok')}${panel(514, 'Eq', 'j2ha-diag-disabled', 'j2ha-publish-disabled')}</div>`;
   const unassigned = `<div class="modal-j2ha-room"><div class="j2ha-room-counters">${counters()}</div>
     <div class="j2ha-room-actions"><span>Indisponible</span></div>${panel(7, 'Sans', 'j2ha-diag-ready', 'j2ha-publish-ok')}</div>`;
   return `<body><div class="row"><div class="eqLogicThumbnailDisplay">
@@ -69,7 +69,7 @@ async function withPage(t, content, journal, fn) {
 }
 
 test('20.3 gate simulé — le parcours étendu passe sur la page livrée et relève les compteurs', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   await withPage(t, html(false), [], async (page, helpers, recorded) => {
     await parcours.run(page, { helpers });
     assert.equal(recorded.absence_synthese, true);
@@ -77,8 +77,8 @@ test('20.3 gate simulé — le parcours étendu passe sur la page livrée et rel
     assert.equal(recorded.export_support_present, true);
     assert.equal(recorded.lectures_synthese_diagnostic, 0);
     assert.equal(recorded.chaines_interdites_page, 0);
-    assert.equal(recorded.garage_compteur_1, '2 équipements publiés');
-    assert.equal(recorded.garage_compteur_7, '3 commandes non couvertes');
+    assert.equal(recorded.piece_3_compteur_1, '2 équipements publiés');
+    assert.equal(recorded.piece_3_compteur_7, '3 commandes non couvertes');
     assert.equal(recorded.actions_piece_presentes, true);
     assert.equal(recorded.sans_piece_sans_action_piece, true);
     assert.equal(recorded.sans_piece_compteur_5, '5 commandes prêtes');
@@ -86,28 +86,28 @@ test('20.3 gate simulé — le parcours étendu passe sur la page livrée et rel
 });
 
 test('20.3 gate simulé — l’action Diagnostic encore présente fait échouer le parcours', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   await withPage(t, html(true), [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /action-diagnostic-presente/);
   });
 });
 
 test('20.3 gate simulé — une lecture de synthèse ou de diagnostic au chargement fait échouer le parcours', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   await withPage(t, html(false), [{ action: 'getPublishedScopeForConsole' }], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /lecture-synthese-ou-diagnostic/);
   });
 });
 
 test('20.3 gate simulé — une chaîne interdite dans la page fait échouer le parcours', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   await withPage(t, html(false).replace('Configuration</div>', 'Mes templates</div>'), [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-page/);
   });
 });
 
 test('20.3 gate simulé (R1-H) — les noms libres ne sont pas soumis au gate de chaînes interdites', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   const content = html(false)
     .replace('>Sans</span>', '>Mapping Template Écart</span>')
     .replace('>Eq</span>', '>Diagnostic de Couverture</span>');
@@ -119,7 +119,7 @@ test('20.3 gate simulé (R1-H) — les noms libres ne sont pas soumis au gate de
 });
 
 test('20.3 gate simulé (R1-H) — un libellé statique interdit dans la modale de pièce fait toujours échouer le parcours', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   const content = html(false).replace('Republier la pièce</button>', 'Confiance mapping</button>');
   await withPage(t, content, [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-piece/);
@@ -127,7 +127,7 @@ test('20.3 gate simulé (R1-H) — un libellé statique interdit dans la modale 
 });
 
 test('20.3 gate simulé (R2-6) — un libellé interdit dans le titre statique de la modale (hors nom de pièce) fait échouer le parcours', async (t) => {
-  const parcours = await import(gate('parcours', 'decouverte-garage-enphase.mjs'));
+  const parcours = await import(gate('parcours', 'decouverte-piece-3-eq-579.mjs'));
   const content = html(false, 'Confiance ');
   await withPage(t, content, [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-piece/);
