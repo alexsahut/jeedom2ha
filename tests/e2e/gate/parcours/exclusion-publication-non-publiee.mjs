@@ -28,6 +28,12 @@
  */
 
 export const name = 'exclusion-publication-non-publiee';
+
+// Story 22.2 (CC-51) : les libellés disent la portée (« l’équipement » / « équipement entier »).
+// L'équipement 287 n'a qu'une entité : ses actions d'entité, qui doublaient celles de
+// l'équipement, ne sont plus affichées ; seules les actions d'équipement restent.
+const EXCLUDE_LABEL = 'Exclure l’équipement';
+const REVERT_LABEL = 'Revenir au mode automatique (équipement entier)';
 export const declaredEquipments = { '287': { commands: [] } };
 export const declaredBascules = [];
 export const declaredPublicationOverrides = { '287': { commands: [] } };
@@ -136,12 +142,24 @@ export async function run(page, { helpers }) {
     throw new Error('eq-sans-entite');
   }
 
+  // Story 22.2 (AC2, AC3) : équipement à une seule entité — ligne d'entité sans bouton, trois
+  // actions d'équipement, compteurs de l'équipement lus (trois notions en commandes).
+  if (entityRowCount !== 1) throw new Error('eq-287-plusieurs-entites');
+  if (await panel.locator('.j2ha-entity-row button').count() !== 0) throw new Error('actions-entite-doublons-visibles');
+  helpers.record('actions_entite_masquees', true);
+  await waitAtStep(helpers, '6a', 'compteurs-equipement', () => panel.locator('.j2ha-eq-counter').first().waitFor({ state: 'visible' }));
+  const counterTexts = await panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+  if (counterTexts.length < 3 || !counterTexts.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+    throw new Error('compteurs-eq-287-illisibles');
+  }
+  counterTexts.forEach((text, index) => helpers.record(`eq_287_compteur_${index + 1}`, text));
+
   const actions = panel.locator('.j2ha-eq-actions');
   // La modale de pièce de Jeedom reste `aria-hidden="true"` une fois ouverte,
   // donc un `getByRole` par défaut n'y trouve rien : `includeHidden: true` est
   // nécessaire pour la localisation ; `click()` continue d'exiger la visibilité réelle.
-  const excludeButton = actions.getByRole('button', { name: 'Exclure', exact: true, includeHidden: true });
-  const revertButton = actions.getByRole('button', { name: 'Revenir au mode automatique', exact: true, includeHidden: true });
+  const excludeButton = actions.getByRole('button', { name: EXCLUDE_LABEL, exact: true, includeHidden: true });
+  const revertButton = actions.getByRole('button', { name: REVERT_LABEL, exact: true, includeHidden: true });
 
   const start = helpers.journalEntries().length;
   // Équipement non publié : aucune confirmation attendue (shouldConfirmPublication
@@ -173,8 +191,8 @@ export async function run(page, { helpers }) {
   // l'équipement : « Exclure » devient sans effet (déjà exclu), « Revenir au
   // mode automatique » devient le seul moyen de retirer l'exclusion (point 3).
   await waitAtStep(helpers, 9, 'etat-boutons-apres-exclusion', async () => {
-    await waitForActionButtonState(page, '287', 'Exclure', true);
-    await waitForActionButtonState(page, '287', 'Revenir au mode automatique', false);
+    await waitForActionButtonState(page, '287', EXCLUDE_LABEL, true);
+    await waitForActionButtonState(page, '287', REVERT_LABEL, false);
   });
 
   const afterSave = helpers.journalEntries().length;
@@ -187,5 +205,5 @@ export async function run(page, { helpers }) {
     { action: 'getMappingOverrides', verdict: 'read' },
   ]));
   // Après le retrait : « Exclure » redevient actif.
-  await waitAtStep(helpers, 12, 'etat-bouton-final', () => waitForActionButtonState(page, '287', 'Exclure', false));
+  await waitAtStep(helpers, 12, 'etat-bouton-final', () => waitForActionButtonState(page, '287', EXCLUDE_LABEL, false));
 }

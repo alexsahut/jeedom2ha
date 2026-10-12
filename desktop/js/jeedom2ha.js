@@ -477,9 +477,10 @@ $(function() {
     }
     var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
     confirmHaSupprimerAction(
-      '{{Supprimer puis recréer dans Home Assistant}}',
-      '{{Supprimer puis recréer tout le parc publié ?}}'
-        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}',
+      '{{Supprimer de Home Assistant}}',
+      '{{Supprimer de Home Assistant tout le parc publié ?}}'
+        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}'
+        + '<br>{{Rien n\'est recréé automatiquement : utilisez « Republier » pour remettre les équipements dans Home Assistant.}}',
       '{{Supprimer}}',
       function() {
         triggerSupprimerAction($button, 'global', ['all'], reservation);

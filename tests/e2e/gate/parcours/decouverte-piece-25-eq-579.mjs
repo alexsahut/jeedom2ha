@@ -121,14 +121,48 @@ async function checkRemovedElements(page, helpers) {
   helpers.record('lectures_synthese_diagnostic', loadRequests);
 }
 
-/** Relève les compteurs de la pièce ouverte : 4 d'équipements puis 3 de commandes. */
+/** Relève les compteurs de la pièce ouverte : 5 d'équipements (publiés, en attente, non pris en
+ * charge, exclus, désactivés) puis 3 de commandes (publiées, en attente, non prises en charge). */
 async function readRoomCounters(modal, helpers, prefix) {
   const counters = await modal.locator('.j2ha-room-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  if (counters.length !== 7) throw new Error('compteurs-piece-incomplets');
+  if (counters.length !== 8) throw new Error('compteurs-piece-incomplets');
   counters.forEach((text, index) => {
     if (!/^\d+ (équipements?|commandes?) /.test(text)) throw new Error('compteur-piece-illisible');
     helpers.record(`${prefix}_compteur_${index + 1}`, text);
   });
+}
+
+/** Story 22.2 (AC2, AC3, AC5) : équipement 579 (plusieurs entités, commande 5369 portée par deux
+ * entités). Lecture seule : aucun clic sur une action, aucun choix dans un sélecteur. */
+async function checkMultiEntityEquipment(panel, helpers) {
+  await panel.locator('.j2ha-eq-counter').first().waitFor({ state: 'visible' });
+  const counters = await panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+  if (counters.length < 3 || !counters.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+    throw new Error('compteurs-eq-579-illisibles');
+  }
+  counters.forEach((text, index) => helpers.record(`eq_579_compteur_${index + 1}`, text));
+  // Plusieurs entités : chaque ligne garde ses trois actions, libellées « cette entité ».
+  const rows = await panel.locator('.j2ha-entity-row').evaluateAll((nodes) => nodes.map((node) => (
+    [...node.querySelectorAll('button')].map((button) => (button.textContent ?? '').trim())
+  )));
+  if (rows.length < 2) throw new Error('eq-579-moins-de-deux-entites');
+  rows.forEach((labels, index) => {
+    if (labels.length !== 3 || !labels.every((label) => /cette entité/.test(label))) throw new Error('actions-entite-579-inattendues');
+    helpers.record(`eq_579_entite_${index + 1}_actions`, labels.length);
+  });
+  const equipmentLabels = await panel.locator('.j2ha-eq-actions .j2ha-publication-actions button')
+    .evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+  if (!equipmentLabels.every((label) => /équipement/.test(label)) || equipmentLabels.length !== 3) {
+    throw new Error('actions-equipement-579-inattendues');
+  }
+  helpers.record('eq_579_actions_equipement', equipmentLabels.length);
+  // Commande 5369 : portée par deux entités, sélecteur « Override HA » désactivé et expliqué (CC-58).
+  const shared = panel.locator('tr.mapping-override-cmd[data-cmd-id="5369"] select');
+  if (await shared.count() !== 1) throw new Error('cmd-5369-absente');
+  if (!(await shared.isDisabled())) throw new Error('selecteur-5369-actif');
+  const title = (await shared.getAttribute('title')) ?? '';
+  if (!/portée par deux entités/.test(title)) throw new Error('selecteur-5369-sans-explication');
+  helpers.record('selecteur_5369_desactive', true);
 }
 
 /** Consigne une étape avant son attente et préfixe toute erreur avec son nom. */
@@ -195,6 +229,7 @@ export async function run(page, { helpers }) {
   await waitAtStep(helpers, 6, 'diagnostics', () => waitForDiagnostics(page, eqId));
 
   helpers.record('eq_id', Number(eqId));
+  await waitAtStep(helpers, '6a', 'multi-entites-eq-579', () => checkMultiEntityEquipment(panel, helpers));
   for (const command of await readCommandStates(panel)) {
     if (!/^\d+$/.test(command.id ?? '')) throw new Error('cmdid-eq-579-illisible');
     helpers.record(`cmd_${command.id}_id`, Number(command.id));

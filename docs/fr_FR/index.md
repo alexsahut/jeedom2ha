@@ -124,7 +124,7 @@ La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « 
 
 ### Le bandeau de santé
 
-Le bandeau est lu **à l'ouverture de la page**, puis relu après « Republier », « Appliquer » et « Supprimer puis recréer » (à toutes les portées) et après un rescan. Il n'est pas relu après « Exclure », « Forcer » ni « Revenir au mode automatique », et il ne se rafraîchit pas tout seul : rechargez la page pour l'actualiser. Il comporte quatre indicateurs.
+Le bandeau est lu **à l'ouverture de la page**, puis relu après « Republier », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après un rescan. Il n'est pas relu après les boutons d'exclusion, de forçage ni de retour au mode automatique, et il ne se rafraîchit pas tout seul : rechargez la page pour l'actualiser. Il comporte quatre indicateurs.
 
 | Indicateur | Valeurs possibles |
 |---|---|
@@ -141,15 +141,15 @@ Trois boutons agissent sur **l'ensemble du parc** :
 |---|---|
 | **« Republier dans Home Assistant »** | Après confirmation (« Republier tous les équipements inclus ? »), republie dans Home Assistant les équipements inclus et applique leurs réglages en attente. Les équipements « inclus » sont ceux que le plugin ne met pas d'office de côté (par exemple par une exclusion de la configuration ou parce qu'ils sont désactivés). « Republier » travaille sur ce que le dernier rescan a lu : il ne relit pas Jeedom. |
 | **« Rescanner la topologie Jeedom »** | Relit tout Jeedom. Voir [Rescanner](#rescanner-la-topologie-jeedom). |
-| **« Supprimer puis recréer dans Home Assistant »** | Retire de Home Assistant tout le parc publié, après une confirmation forte. Voir [Les actions de publication](#les-actions-de-publication). |
+| **« Supprimer de Home Assistant »** | Retire de Home Assistant tout le parc publié, après une confirmation forte. Rien n'est recréé ensuite : « Republier » remet les équipements. Voir [Les actions de publication](#les-actions-de-publication). |
 
-**Quand certains boutons sont grisés.** Les trois boutons ci-dessus, ainsi que « Republier la pièce », « Supprimer puis recréer la pièce » et, pour chaque équipement, « Appliquer » / « Republier » et « Supprimer puis recréer », ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
+**Quand certains boutons sont grisés.** Les trois boutons ci-dessus, ainsi que « Republier la pièce », « Supprimer la pièce de Home Assistant » et, pour chaque équipement, « Appliquer » / « Republier » et « Supprimer de Home Assistant », ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
 
 - « Daemon arrêté — actions Home Assistant bloquées. » (le démon est arrêté ; le mot « Daemon » est celui de l'écran) ;
 - « MQTT déconnecté — actions Home Assistant bloquées. » ;
 - « Bridge ou MQTT indisponible — actions Home Assistant bloquées. » (état impossible à lire).
 
-Pendant un rescan, ces mêmes boutons sont aussi grisés. Les boutons « Exclure », « Forcer » et « Revenir au mode automatique » et la liste « Override HA » ne sont **pas** concernés : ils restent actifs, mais si le démon ne répond pas, leur action échoue avec un message d'erreur.
+Pendant un rescan, ces mêmes boutons sont aussi grisés. Les boutons d'exclusion, de forçage et de retour au mode automatique et la liste « Override HA » ne sont **pas** concernés : ils restent actifs, mais si le démon ne répond pas, leur action échoue avec un message d'erreur.
 
 ### Rescanner la topologie Jeedom
 
@@ -185,8 +185,8 @@ Chaque pièce qui contient au moins un équipement a une carte portant son nom e
 
 Cliquer sur une carte ouvre une fenêtre qui porte le nom de la pièce. Elle contient :
 
-1. **Les compteurs** de la pièce : voir [Les compteurs](compteurs.md).
-2. **Les actions de la pièce** : « Republier la pièce » et « Supprimer puis recréer la pièce ». Pour « Sans pièce », elles n'existent pas : la fenêtre indique « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. »
+1. **Les compteurs** de la pièce : combien d'éléments sont réellement dans Home Assistant, lesquels attendent une application, lesquels ne sont pas pris en charge. Voir [Les compteurs](compteurs.md).
+2. **Les actions de la pièce** : « Republier la pièce » et « Supprimer la pièce de Home Assistant ». Pour « Sans pièce », elles n'existent pas : la fenêtre indique « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. »
 3. **Une zone de résultat**, où s'affiche le message de la dernière action (vert : succès ; orange : succès partiel ; rouge : échec).
 4. **La liste des équipements de la pièce**, un panneau par équipement. Chaque panneau montre le nom de l'équipement, la mention « (désactivé dans Jeedom) » le cas échéant, et un **badge de synthèse** qui dit si l'équipement sera publié (voir [Les badges de synthèse](#les-badges-de-synthèse)).
 
@@ -199,8 +199,9 @@ Dépliez un équipement pour voir, de haut en bas :
 
 - **Le badge « Override en attente — pas encore republié vers Home Assistant »**, quand la décision de publier ou non l'équipement a changé depuis la dernière publication (voir [Réglages en attente](#réglages-en-attente-et-appliquer)).
 - **Le lien « Voir la première commande bloquante »**, s'il y a une commande bloquante : il fait défiler la liste jusqu'à elle et la met en évidence quelques secondes.
-- **Les boutons de l'équipement** : « Exclure », « Forcer », « Revenir au mode automatique », puis « Appliquer » ou « Republier », puis « Supprimer puis recréer ».
-- **Les entités Home Assistant** de l'équipement : une ligne par entité, avec son type (« light », « switch »…, ou « Entité HA » si le type est inconnu), la mention « Commandes : … » (ou « Aucune commande regroupée »), éventuellement le badge **« pas encore appliqué »**, et ses propres boutons « Exclure », « Forcer » et « Revenir au mode automatique ».
+- **Les compteurs de l'équipement** : une ligne qui compte ses commandes publiées dans Home Assistant, en attente d'application et non prises en charge. Voir [Les compteurs](compteurs.md).
+- **Les boutons de l'équipement** (portée **équipement entier**) : « Exclure l’équipement », « Forcer l’équipement », « Revenir au mode automatique (équipement entier) », puis « Appliquer » ou « Republier », puis « Supprimer de Home Assistant ».
+- **Les entités Home Assistant** de l'équipement : une ligne par entité, avec son type (« light », « switch »…, ou « Entité HA » si le type est inconnu), la mention « Commandes : … » (ou « Aucune commande regroupée »), éventuellement le badge **« pas encore appliqué »**, et ses propres boutons de portée **cette entité** : « Exclure cette entité », « Forcer cette entité » et « Revenir au mode automatique (cette entité) ». **Sur un équipement qui n'a qu'une seule entité, ces boutons ne sont pas affichés** : ils feraient la même chose que ceux de l'équipement. Ils restent affichés dès que l'équipement a plusieurs entités, ou quand une exclusion ou un forçage a été posé sur la commande de cette seule entité (le « Revenir au mode automatique » de l'équipement retire les réglages de **toutes** ses commandes et son réglage d'équipement, celui d'une entité ne touche que les commandes de cette entité).
 - **Le tableau des commandes**.
 
 Un équipement sans commande affiche « Aucune commande à configurer pour cet équipement. »
@@ -234,6 +235,7 @@ La liste est **grisée avec une infobulle** quand elle n'a pas de sens :
 - « Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici. »
 - « Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici. »
 - « Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici. »
+- « Cette commande est portée par deux entités : le type Home Assistant choisi s’appliquerait à l’entité principale, pas à celle qui est publiée. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Revenir au type automatique » reste disponible.
 
 Quand une vérification fait apparaître une commande bloquante, un bandeau d'avertissement rappelle, une fois par ouverture de pièce : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
 
@@ -262,7 +264,7 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 
 ### Les actions de publication
 
-Chaque bouton ci-dessous existe à la portée de l'**équipement** et, pour les trois premiers, de chaque **entité** Home Assistant.
+Chaque bouton ci-dessous existe à la portée de l'**équipement entier** et, pour les trois premiers, de **cette entité** Home Assistant : le libellé dit toujours la portée (« Exclure l’équipement » / « Exclure cette entité », « Forcer l’équipement » / « Forcer cette entité », « Revenir au mode automatique (équipement entier) » / « Revenir au mode automatique (cette entité) »). Dans les paragraphes ci-dessous, « Exclure », « Forcer » et « Revenir au mode automatique » désignent ces boutons, quelle que soit leur portée.
 
 **Exclure**
 
@@ -289,12 +291,12 @@ Chaque bouton ci-dessous existe à la portée de l'**équipement** et, pour les 
 - *Dans tous les cas*, « Republier » ne relit pas Jeedom : il travaille sur ce que le dernier rescan a lu.
 - *Parc* : voir [la page principale](#la-zone--actions-home-assistant-).
 
-**Supprimer puis recréer**
+**Supprimer de Home Assistant**
 
 - *Ce que ça fait* : retire de Home Assistant les entités **publiées** de l'équipement, de la pièce ou du parc.
 - *Ce que ça ne fait pas* : cette action **supprime seulement** ; elle ne republie pas. Pour recréer les entités, utilisez ensuite « Republier » à la même portée, ou lancez un rescan.
-- *Confirmation forte* (bouton rouge), intitulée « Supprimer puis recréer dans Home Assistant ». Son texte annonce ce qui sera supprimé : « Supprimer "<nom>" de Home Assistant. » (équipement), « … de Home Assistant : tous les équipements publiés de cette pièce. » (pièce) ou « Supprimer puis recréer tout le parc publié ? » (parc).
-- *Mise en garde* : **« Attention : l'historique, les dashboards, les automatisations et l'entity_id liés à ces entités peuvent être impactés. »** (l'`entity_id` est l'identifiant de l'entité dans Home Assistant).
+- *Confirmation forte* (bouton rouge), intitulée « Supprimer de Home Assistant ». Son texte annonce ce qui sera supprimé : « Supprimer "<nom>" de Home Assistant. » (équipement), « … de Home Assistant : tous les équipements publiés de cette pièce. » (pièce) ou « Supprimer de Home Assistant tout le parc publié ? » (parc).
+- *Mise en garde* : **« Attention : l'historique, les dashboards, les automatisations et l'entity_id liés à ces entités peuvent être impactés. »** (l'`entity_id` est l'identifiant de l'entité dans Home Assistant). Elle rappelle aussi : **« Rien n'est recréé automatiquement : utilisez « Republier » pour remettre dans Home Assistant ce qui a été supprimé. »** (pour le parc : « … pour remettre les équipements dans Home Assistant. »)
 - *Boutons* : « Supprimer 1 équipement », « Supprimer la pièce » ou « Supprimer ».
 - *Résultat* : un message tel que « N équipement(s) supprimé(s) de Home Assistant. » ou « Configuration déjà à jour dans Home Assistant. ».
 
@@ -306,14 +308,14 @@ Un bouton grisé affiche **son propre motif** dans une infobulle (survolez-le). 
 
 | Bouton | Motifs affichés |
 |---|---|
-| Republier, Appliquer, Supprimer puis recréer (toutes portées) et Rescanner | Voir [la zone « Actions Home Assistant »](#la-zone--actions-home-assistant-) (démon arrêté, MQTT déconnecté, rescan en cours). « Exclure », « Forcer » et « Revenir au mode automatique » ne sont pas concernés. |
+| Republier, Appliquer, Supprimer de Home Assistant (toutes portées) et Rescanner | Voir [la zone « Actions Home Assistant »](#la-zone--actions-home-assistant-) (démon arrêté, MQTT déconnecté, rescan en cours). « Exclure », « Forcer » et « Revenir au mode automatique » ne sont pas concernés. |
 | Exclure | « Entité déjà exclue de Home Assistant. » ; « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
 | Forcer | « Publication déjà forcée sur cette entité. » ; « Déjà publiée : forcer n’a pas d’effet. » ; « Aucun type Home Assistant identifié pour cette entité. » ; « Type HA hors périmètre de ce plugin. » ; « Projection invalide pour ce type HA. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
 | Revenir au mode automatique | « Aucun override de publication à retirer. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » |
 | Republier / Appliquer (équipement) | « Équipement désactivé dans Jeedom : rien à republier. » ; « Équipement exclu : rien à republier. » (sauf si un réglage est en attente) |
-| Supprimer puis recréer (équipement) | « Équipement non publié dans Home Assistant : rien à supprimer. » Ce grisé reflète la présence **réelle** dans Home Assistant, pas le badge de synthèse : un équipement peut afficher « Sera publié… » et avoir ce bouton grisé tant qu'il n'a pas été publié. |
+| Supprimer de Home Assistant (équipement) | « Équipement non publié dans Home Assistant : rien à supprimer. » Ce grisé reflète la présence **réelle** dans Home Assistant, pas le badge de synthèse : un équipement peut afficher « Sera publié… » et avoir ce bouton grisé tant qu'il n'a pas été publié. |
 | Republier la pièce | « Aucun équipement à publier dans cette pièce. » |
-| Supprimer puis recréer la pièce | « Aucun équipement publié dans cette pièce. » (même logique : présence réelle dans Home Assistant) |
+| Supprimer la pièce de Home Assistant | « Aucun équipement publié dans cette pièce. » (même logique : présence réelle dans Home Assistant) |
 
 Un bouton grisé sans motif particulier affiche « Cette action est sans effet dans l’état courant. »
 
@@ -470,7 +472,7 @@ Home Assistant n'utilise cette zone suggérée **qu'à la création** de l'appar
 
 Pour le déplacer :
 
-- **Option 1 — Supprimer puis recréer.** Utilisez « Supprimer puis recréer » sur l'équipement, la pièce ou le parc, puis « Rescanner la topologie Jeedom » : le rescan relit la pièce actuelle et recrée les entités. (« Republier » seul ne suffit pas : il travaille sur ce que le dernier rescan a lu et ne relit pas Jeedom ; si vous venez de déplacer l'équipement, rescannez d'abord.) Les personnalisations faites dans Home Assistant (icônes, alias, historique, automatisations) peuvent être perdues : lisez l'avertissement de la confirmation.
+- **Option 1 — Supprimer de Home Assistant, puis rescanner.** Utilisez « Supprimer de Home Assistant » sur l'équipement, la pièce ou le parc, puis « Rescanner la topologie Jeedom » : le rescan relit la pièce actuelle et recrée les entités. (« Republier » seul ne suffit pas : il travaille sur ce que le dernier rescan a lu et ne relit pas Jeedom ; si vous venez de déplacer l'équipement, rescannez d'abord.) Les personnalisations faites dans Home Assistant (icônes, alias, historique, automatisations) peuvent être perdues : lisez l'avertissement de la confirmation.
 - **Option 2 — Déplacement manuel.** Dans Home Assistant : **Paramètres → Appareils et services**, trouvez l'appareil et modifiez sa zone.
 
 ### Annexe : noms et identifiants dans Home Assistant
@@ -510,7 +512,7 @@ Que faire : renommez l'équipement dans Jeedom puis lancez un rescan, ou essayez
 
 ### Annexe : durée des actions
 
-Les actions « Republier » et « Supprimer puis recréer » peuvent demander du temps sur un grand parc. Le démon ne s'arrête jamais en cours de route : c'est l'écran qui cesse d'attendre.
+Les actions « Republier » et « Supprimer de Home Assistant » peuvent demander du temps sur un grand parc. Le démon ne s'arrête jamais en cours de route : c'est l'écran qui cesse d'attendre.
 
 - Si l'action dépasse environ 60 secondes, le message suivant s'affiche : « L'action Home Assistant dure plus longtemps que prévu (plus de 60 s). Elle peut se poursuivre côté démon : actualisez la page dans un instant pour voir le résultat. » Attendez quelques secondes, rechargez la page : le bandeau et la pièce reflètent alors le résultat réel.
 - Si le démon répond par une erreur immédiate : « Le démon a renvoyé une erreur pendant l'action Home Assistant — consultez les logs du plugin ». Consultez alors le journal `jeedom2ha`.

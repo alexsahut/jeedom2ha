@@ -855,6 +855,31 @@ def _last_applied_candidate_decision(current_primary, candidate, synced_decision
     return None
 
 
+def _candidate_present_in_ha(
+    current_primary,
+    candidate,
+    synced_decision,
+    eq_pending_unpublish: bool = False,
+) -> bool:
+    """Story 22.2 (Q1 A) — True si CETTE entité est présente dans Home Assistant.
+
+    Lecture seule de l'état d'exécution déjà enregistré par le sync ou une action, avec les
+    mêmes prédicats que `_is_currently_published_in_ha` (principal : `active_or_alive` ou
+    `discovery_published` ; secondaire : `discovery_published`), de sorte qu'un équipement est
+    `published_in_ha` exactement quand au moins une de ses entités l'est (ou qu'une
+    dépublication est différée). Aucune décision n'est recalculée.
+    """
+    applied = _last_applied_candidate_decision(current_primary, candidate, synced_decision)
+    if applied is None:
+        return False
+    if getattr(applied, "discovery_published", False):
+        return True
+    if applied is synced_decision and getattr(applied, "active_or_alive", False):
+        return True
+    # Dépublication différée : les topics sont encore dans HA pour ce qui avait été publié.
+    return bool(eq_pending_unpublish and getattr(applied, "should_publish", False))
+
+
 def _published_candidates(mapping_result, principal_decision) -> dict:
     """Candidates whose step-4 verdict allows publication, keyed by `_candidate_key`."""
     candidates: dict = {}
@@ -3102,6 +3127,11 @@ def _build_mapping_override_tree(
             # Contrat surface 20-2 : l'UI affiche les commandes regroupées sans
             # reconstruire l'appartenance d'une entité côté navigateur.
             "command_ids": cmd_ids,
+            # Story 22.2 (champ additif) : présence réelle de CETTE entité dans HA.
+            "present_in_ha": _candidate_present_in_ha(
+                evaluation.mapping, mapping, synced_decision,
+                eq_pending_unpublish=eq.id in (pending_discovery_unpublish or {}),
+            ),
             "decision": _decision_view(current_decision, mapping),
             "publication_override": publication_override,
             "reason_details": dict(mapping.reason_details or {}),
@@ -3112,6 +3142,16 @@ def _build_mapping_override_tree(
                 or applied_decision.reason != current_decision.reason
             ),
         })
+
+    # Story 22.2 (Q1 A, champ additif) : une commande est « publiée » quand au moins une entité
+    # présente dans HA la porte (forme 579 : principal refusé, secondaire publié).
+    present_cmd_ids = {
+        cid
+        for entity_row in entity_rows if entity_row["present_in_ha"]
+        for cid in entity_row["command_ids"]
+    }
+    for command_row in commands:
+        command_row["published_in_ha"] = command_row["jeedom_cmd_id"] in present_cmd_ids
 
     return {
         "jeedom_eq_id": eq.id,

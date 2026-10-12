@@ -64,6 +64,11 @@ async function summary(panel) {
   return (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
 }
 
+/** Story 22.2 (AC2) : compteurs de l'équipement déplié (texte rendu, identifiants seulement). */
+async function counters(panel) {
+  return panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+}
+
 function writesSince(journalEntries, start) {
   return journalEntries().slice(start).filter((entry) => ['saveMappingOverride', 'revertMappingOverride'].includes(entry.action));
 }
@@ -93,6 +98,12 @@ export async function run(page, { helpers }) {
   const initialSummary = await atStep(helpers, 7, 'synthese-initiale', () => summary(panel));
   helpers.record('synthese_initiale', initialSummary);
 
+  const initialCounters = await atStep(helpers, '7a', 'compteurs-initiaux', () => counters(panel));
+  if (initialCounters.length < 3 || !initialCounters.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+    throw new Error('compteurs-eq-380-illisibles');
+  }
+  initialCounters.forEach((text, index) => helpers.record(`compteur_initial_${index + 1}`, text));
+
   const { target, cmdId } = await atStep(helpers, 8, 'premiere-bloquante', () => waitForTarget(page, panel));
   helpers.record('cmd_cible_id', Number(cmdId));
   helpers.record('cmd_cible_initial', await diagnosticState(target));
@@ -111,6 +122,11 @@ export async function run(page, { helpers }) {
   });
   const stateA = await diagnosticState(target);
   if (stateA !== 'bloquante') throw new Error('apercu-reel-non-bloquant');
+  // Story 22.2 (CC-60) : le type refusé garde sa cause lisible — la voie normale est de préciser
+  // les types génériques dans Jeedom (la liste « Override HA » n'est pas filtrée dans cette story).
+  const causeA = (await target.locator('.mo-diag-cell').innerText()).trim();
+  if (!/précisez les types génériques dans Jeedom/.test(causeA)) throw new Error('cause-refus-illisible');
+  helpers.record('etape_a_cause', causeA);
   if (writesSince(helpers.journalEntries, journalA).length !== 0) throw new Error('ecriture-apres-apercu-reel');
   helpers.record('etape_a_cellule', stateA);
   helpers.record('etape_a_ecriture', false);
@@ -157,6 +173,10 @@ export async function run(page, { helpers }) {
   const summaryC = await summary(panel);
   helpers.record('etape_c_synthese', summaryC);
   if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
+  // Story 22.2 : le retour au mode automatique restitue aussi les compteurs de l'équipement.
+  const finalCounters = await atStep(helpers, '11a', 'compteurs-finaux', () => counters(panel));
+  if (JSON.stringify(finalCounters) !== JSON.stringify(initialCounters)) throw new Error('compteurs-non-restitues');
+  helpers.record('compteurs_restitues', true);
   helpers.record('etape_c_cellule', stateC);
   helpers.record('etape_c_entrees_journal', helpers.journalEntries().length - journalC);
 }

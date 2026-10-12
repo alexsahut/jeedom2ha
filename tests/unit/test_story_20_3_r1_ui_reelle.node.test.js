@@ -74,7 +74,7 @@ describe('R1-A — publication ciblée d’un équipement toujours présente (AC
 });
 
 describe('R1-B — gating d’état des actions par équipement', () => {
-  it('« Supprimer puis recréer » grisé avec infobulle si l’équipement n’est pas publié dans HA (non synchronisé ou jamais synchronisé)', () => {
+  it('« Supprimer de Home Assistant » grisé avec infobulle si l’équipement n’est pas publié dans HA (non synchronisé ou jamais synchronisé)', () => {
     for (const sync of [UNSYNCED, NEVER_SYNCED]) {
       const ui = openRoomWith([ok(tree(1, [READY], { sync })), ok(tree(2, [READY]))]);
       const unpublished = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate');
@@ -85,14 +85,14 @@ describe('R1-B — gating d’état des actions par équipement', () => {
     }
   });
 
-  it('R2-1 — principal refusé mais secondaire publié (published_in_ha) : « Supprimer puis recréer » reste actif, équipement et pièce', () => {
+  it('R2-1 — principal refusé mais secondaire publié (published_in_ha) : « Supprimer de Home Assistant » reste actif, équipement et pièce', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: SECONDARY_PUBLISHED })), ok(tree(2, [READY], { sync: UNSYNCED }))]);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-recreate').prop('disabled'), true);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
   });
 
-  it('R2-1 — champ absent (démon plus ancien) : « Supprimer puis recréer » reste actif', () => {
+  it('R2-1 — champ absent (démon plus ancien) : « Supprimer de Home Assistant » reste actif', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: OLD_DAEMON })), ok(tree(2, [READY], { sync: OLD_DAEMON }))]);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
@@ -168,7 +168,7 @@ describe('R1-B — gating d’état des actions de pièce', () => {
     assert.match(ui.$('.j2ha-room-republish').attr('title'), /Aucun équipement à publier/);
   });
 
-  it('tous les arbres lus : aucun équipement publié => « Supprimer puis recréer la pièce » grisé', () => {
+  it('tous les arbres lus : aucun équipement publié => « Supprimer la pièce de Home Assistant » grisé', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), ok(tree(2, [READY], { sync: NEVER_SYNCED }))]);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true);
     assert.match(ui.$('.j2ha-room-recreate').attr('title'), /Aucun équipement publié/);
@@ -260,7 +260,7 @@ describe('R1-C — action en cours : réservation du bouton (applyHAGating, doub
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
   });
 
-  it('un équipement : même réservation (supprimer puis recréer) et libération à l’annulation', () => {
+  it('un équipement : même réservation (supprimer de Home Assistant) et libération à l’annulation', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate');
     const button = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate');
@@ -374,8 +374,8 @@ describe('R1-E — compteurs : lecture en échec et cache purgé', () => {
     ui.respond('getMappingOverrides', ok(tree(1, [READY, READY])));
     ui.fail('getMappingOverrides');
     const text = ui.$('.j2ha-room-counters').text();
-    assert.match(text, /1 équipement publié/);
-    assert.match(text, /2 commandes prêtes/);
+    assert.match(text, /1 équipement publié dans Home Assistant/);
+    assert.match(text, /2 commandes publiées dans Home Assistant/);
     assert.match(text, /1 équipement non lu/);
   });
 
@@ -386,7 +386,7 @@ describe('R1-E — compteurs : lecture en échec et cache purgé', () => {
     ui.respond('executeHaAction', { state: 'ok', result: null });
     ui.fail('getMappingOverrides'); // la relecture de l'équipement 1 échoue
     const text = ui.$('.j2ha-room-counters').text();
-    assert.match(text, /1 équipement publié/);
+    assert.match(text, /1 équipement publié dans Home Assistant/);
     assert.match(text, /1 équipement non lu/);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').length, 0, 'plus d’action sur un arbre périmé');
   });
@@ -401,7 +401,7 @@ describe('R1-E — compteurs : lecture en échec et cache purgé', () => {
 });
 
 describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attente', () => {
-  it('« Supprimer puis recréer » (équipement et pièce) : boutons btn-danger', () => {
+  it('« Supprimer de Home Assistant » (équipement et pièce) : boutons btn-danger', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     assert.ok(ui.$('.j2ha-room-recreate').hasClass('btn-danger'));
     ui.$('.j2ha-eq-recreate').list.forEach((b) => assert.ok(b.classes.has('btn-danger')));
@@ -429,7 +429,7 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     ui.click('.j2ha-ha-action[data-ha-action="supprimer-recreer"]');
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
-    assert.match(options.message, /Supprimer puis recréer tout le parc publié \?/);
+    assert.match(options.message, /Supprimer de Home Assistant tout le parc publié \?/);
     assert.doesNotMatch(options.message, /\d/);
     options.buttons.confirm.callback();
     const call = ui.pending('executeHaAction')[0];
@@ -517,12 +517,14 @@ describe('G — rendu de la modale de pièce (buildRoomModalHtml) et des compteu
     assert.match(ui.$('.j2ha-eq-panel').text(), /désactivé dans Jeedom/);
   });
 
-  it('compteurs : sept libellés avec leur unité, issus du dénombrement de l’arbre', () => {
-    const ui = openRoomWith([ok(tree(1, [READY, READY])), ok(tree(2, [EXCLUDED]))]);
+  it('compteurs : huit libellés avec leur unité, issus du dénombrement de l’arbre', () => {
+    const ui = openRoomWith([ok(tree(1, [READY, READY])), ok(tree(2, [EXCLUDED], { present: false }))]);
     const labels = ui.$('.j2ha-room-counter').list.map((el) => ui.$(el).text());
     assert.deepEqual(labels, [
-      '1 équipement publié', '1 équipement exclu', '0 équipement désactivé dans Jeedom', '0 équipement à corriger',
-      '2 commandes prêtes', '0 commande bloquante', '0 commande non couverte',
+      '1 équipement publié dans Home Assistant', '0 équipement en attente d’application',
+      '0 équipement non pris en charge', '1 équipement exclu', '0 équipement désactivé dans Jeedom',
+      '2 commandes publiées dans Home Assistant', '0 commande en attente d’application',
+      '0 commande non prise en charge',
     ]);
   });
 });
@@ -586,7 +588,8 @@ describe('R2-6 — libellés statiques de la modale (gate) : seuls les noms libr
     const ui = openRoomWith(null);
     const name = ui.$('.modal-j2ha-room .modal-title .j2ha-free-name');
     assert.equal(name.length, 1);
-    assert.match(name.text(), /&lt;b&gt;/, 'nom échappé dans le HTML du titre');
+    // Le vrai jQuery rend le texte d'origine (entités décodées), jamais une balise : le nom reste du texte.
+    assert.equal(name.text(), 'Pièce <b>"A"</b>', 'nom rendu comme texte, pas comme balise');
     assert.equal(name.find('b').length, 0);
     const noRoom = createUi([NO_ROOM]);
     noRoom.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });

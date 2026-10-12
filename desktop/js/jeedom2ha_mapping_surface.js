@@ -94,7 +94,7 @@
     }
   }
 
-  function renderCommandRow(eqId, row) {
+  function renderCommandRow(eqId, row, entities) {
     var cmdId = row.jeedom_cmd_id;
     var $tr = $('<tr class="mapping-override-cmd"></tr>').attr('data-cmd-id', cmdId);
 
@@ -108,7 +108,7 @@
     // Colonne 3 : override HA — menu déroulant inline + spinner + retour auto.
     var $tdOverride = $('<td class="mo-td-override"></td>');
     var $select = buildOptions(row.override_applied ? row.effective_ha : '');
-    var selectorState = M.getOverrideSelectorState(row);
+    var selectorState = M.getOverrideSelectorState(row, entities);
     if (!selectorState.active) {
       $select.prop('disabled', true).attr('title', selectorState.reason);
       $tdOverride.attr('title', selectorState.reason);
@@ -493,7 +493,12 @@
     clearRequestError($errorSlot);
     $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier',
       portee: 'equipement', selection: JSON.stringify([eqId]) }, dataType: 'json' })
-      .always(function () { restoreHaActionPendingState($button, reservation); })
+      .always(function () {
+        restoreHaActionPendingState($button, reservation);
+        // Story 22.2 (Q8 A, P3 de 20-3) : le bandeau de santé est relu quelle que soit l'issue
+        // (succès, échec ou réponse refusée) — une opération ratée change le dernier résultat affiché.
+        refreshBridgeStatus();
+      })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
         if (error) { showRequestError($errorSlot, error); return; }
@@ -502,7 +507,6 @@
           showActionFeedback(room, buildHaActionUserMessage(payload), getHaActionAlertLevel(payload));
           if (shouldRefreshPublishedScopeAfterHaAction(payload)) {
             reloadEquipment(eqId);
-            refreshBridgeStatus();
           }
           return;
         }
@@ -554,18 +558,32 @@
       return;
     }
     var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length));
-    function line(items, extra) {
-      var $line = $('<div class="j2ha-room-counter-line"></div>');
-      items.forEach(function (item) {
-        $line.append($('<span class="label label-default j2ha-room-counter"></span>').text(item));
-      });
-      if (extra) {
-        $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(extra));
+    $host.append(counterLine(labels.equipments, [labels.unread, labels.presence_unknown]));
+    $host.append(counterLine(labels.commands));
+  }
+
+  // `extras` : textes neutres ajoutés après les pastilles (lectures manquantes, présence inconnue).
+  function counterLine(items, extras, lineClass, itemClass) {
+    var $line = $('<div></div>').addClass(lineClass || 'j2ha-room-counter-line');
+    items.forEach(function (item) {
+      $line.append($('<span class="label label-default"></span>').addClass(itemClass || 'j2ha-room-counter').text(item));
+    });
+    (extras || []).forEach(function (text) {
+      if (text) {
+        $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(text));
       }
-      return $line;
+    });
+    return $line;
+  }
+
+  // Story 22.2 (Q3 A) : ligne de compteurs de l'équipement déplié, lue dans son propre arbre.
+  function renderEquipmentCounters($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-counters').first().empty();
+    if (!tree) {
+      return;
     }
-    $host.append(line(labels.equipments, labels.unread));
-    $host.append(line(labels.commands));
+    var labels = M.buildEquipmentCounterLabels(tree);
+    $host.append(counterLine(labels.items, [labels.presence_unknown], 'j2ha-eq-counter-line', 'j2ha-eq-counter'));
   }
 
   // --- Story 20.3 (Q2=A) — actions ciblées déplacées dans la surface ---
@@ -669,6 +687,8 @@
       },
       onError: function (message) {
         showActionFeedback(room, message, 'danger');
+        // Story 22.2 (Q8 A, P3 de 20-3) : une action de pièce en échec rafraîchit aussi le bandeau.
+        refreshBridgeStatus();
       },
       onComplete: function () {
         restoreHaActionPendingState($button, pendingState);
@@ -676,11 +696,14 @@
     });
   }
 
-  var RECREATE_WARNING = '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}';
+  // Story 22.2 (Q5 A, CC-55) : « Supprimer de Home Assistant » retire seulement ; rien n'est recréé
+  // ensuite. « Republier » remet l'équipement (ou le prochain rescan s'il est publiable).
+  var DELETE_WARNING = '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}'
+    + '<br>{{Rien n\'est recréé automatiquement : utilisez « Republier » pour remettre dans Home Assistant ce qui a été supprimé.}}';
 
-  function appendEquipmentRecreateButton($host, eqId, eqName) {
+  function appendEquipmentDeleteButton($host, eqId, eqName) {
     var $button = $('<button type="button" class="btn btn-danger btn-xs j2ha-eq-recreate" data-ha-action="supprimer"></button>')
-      .text('{{Supprimer puis recréer}}');
+      .text('{{Supprimer de Home Assistant}}');
     $button.on('click', function () {
       if ($button.prop('disabled')) {
         return;
@@ -688,8 +711,8 @@
       var room = ctx.room;
       var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
       confirmHaSupprimerAction(
-        '{{Supprimer puis recréer dans Home Assistant}}',
-        '{{Supprimer}} "' + escapeHtml(eqName) + '" {{de Home Assistant.}}' + RECREATE_WARNING,
+        '{{Supprimer de Home Assistant}}',
+        '{{Supprimer}} "' + escapeHtml(eqName) + '" {{de Home Assistant.}}' + DELETE_WARNING,
         '{{Supprimer 1 équipement}}',
         function () {
           runHaAction(room, 'supprimer', 'equipement', [eqId], $button, '{{Suppression...}}', reservation, function () {
@@ -737,15 +760,15 @@
       );
     });
     var $recreate = $('<button type="button" class="btn btn-danger btn-sm j2ha-room-recreate" data-ha-action="supprimer" style="margin-left:8px;"></button>')
-      .append('<i class="fas fa-recycle"></i> ').append(document.createTextNode('{{Supprimer puis recréer la pièce}}'));
+      .append('<i class="fas fa-trash"></i> ').append(document.createTextNode('{{Supprimer la pièce de Home Assistant}}'));
     $recreate.on('click', function () {
       if ($recreate.prop('disabled')) {
         return;
       }
       var reservation = setHaActionPendingState($recreate, '{{Confirmation en cours…}}');
       confirmHaSupprimerAction(
-        '{{Supprimer puis recréer dans Home Assistant}}',
-        '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + RECREATE_WARNING,
+        '{{Supprimer de Home Assistant}}',
+        '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + DELETE_WARNING,
         '{{Supprimer la pièce}}',
         function () {
           runHaAction(room, 'supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reservation, function () {
@@ -847,10 +870,24 @@
       $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error, entities); });
       $group.append($button);
     }
-    button('{{Exclure}}', 'exclude', state.can_exclude, state.exclude_reason);
-    button('{{Forcer}}', 'force_publish', state.can_force, state.force_reason);
-    var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>').text('{{Revenir au mode automatique}}');
-    if (!state.can_revert) $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
+    // Story 22.2 (Q4 B, CC-51) : la portée est dite dans chaque libellé — « équipement entier »
+    // ou « cette entité » — et rappelée par l'infobulle du bouton « Revenir ».
+    if (equipment) {
+      button('{{Exclure l’équipement}}', 'exclude', state.can_exclude, state.exclude_reason);
+      button('{{Forcer l’équipement}}', 'force_publish', state.can_force, state.force_reason);
+    } else {
+      button('{{Exclure cette entité}}', 'exclude', state.can_exclude, state.exclude_reason);
+      button('{{Forcer cette entité}}', 'force_publish', state.can_force, state.force_reason);
+    }
+    var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>')
+      .text(equipment ? '{{Revenir au mode automatique (équipement entier)}}' : '{{Revenir au mode automatique (cette entité)}}');
+    if (!state.can_revert) {
+      $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
+    } else {
+      $revert.attr('title', equipment
+        ? '{{Retire tous les réglages de cet équipement : exclusion, forçage et types Home Assistant des commandes.}}'
+        : '{{Retire l’exclusion, le forçage et les types Home Assistant choisis pour les commandes de cette entité.}}');
+    }
     $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button'), $error); });
     $group.append($revert);
     $host.append($group);
@@ -884,7 +921,11 @@
         $row.append($('<span class="j2ha-free-name"></span>').text(M.resolveCommandNames(tree.commands, commandIds).join(', ')));
       }
       appendEntityPendingBadge($row, entity);
-      appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
+      // Story 22.2 (Q4 B) : sur un équipement à une seule entité, les actions d'entité qui
+      // doublent celles de l'équipement ne sont pas affichées (mêmes routes, aucune fonction perdue).
+      if (!M.entityActionsDuplicateEquipment(tree, entity)) {
+        appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
+      }
       $host.append($row);
     }
   }
@@ -902,6 +943,7 @@
     $panel.find('.j2ha-eq-entities').first().empty();
     $panel.find('.j2ha-eq-cmdlist').first().empty();
     $panel.find('.j2ha-eq-sync-badge').first().empty();
+    $panel.find('.j2ha-eq-counters').first().empty();
     $panel.find('.j2ha-eq-blocking-anchor').first().empty();
     $panel.find('.j2ha-eq-publish-badge').first().empty();
     $panel.find('.j2ha-eq-status').first().text(message);
@@ -924,6 +966,7 @@
     refreshRoomView();
 
     renderSyncBadge($panel, normalized);
+    renderEquipmentCounters($panel, normalized);
     renderEntities($panel, normalized);
 
     // X6b (P2, relecture indépendante PR #215) : la cible équipement est construite par
@@ -952,7 +995,7 @@
     // un équipement désactivé ou exclu n'a rien à republier.
     setStateGate($apply, pending || actionState.can_republish, actionState.republish_reason);
     $actions.append($apply);
-    var $recreate = appendEquipmentRecreateButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
+    var $recreate = appendEquipmentDeleteButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
     setStateGate($recreate, actionState.can_recreate, actionState.recreate_reason);
     // Les boutons viennent d'être ajoutés après l'ouverture de la modale : ils suivent le même gating
     // que les boutons globaux (pont indisponible, rescan en cours), sinon ils resteraient actifs.
@@ -975,7 +1018,7 @@
     $table.append($thead);
     var $tbody = $('<tbody></tbody>');
     for (var i = 0; i < normalized.commands.length; i++) {
-      $tbody.append(renderCommandRow(eqId, normalized.commands[i]));
+      $tbody.append(renderCommandRow(eqId, normalized.commands[i], normalized.entities));
     }
     $table.append($tbody);
     $list.append($table);
@@ -1071,6 +1114,7 @@
       var $body = $('<div class="panel-body"></div>');
       $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
       $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
+      $body.append($('<div class="j2ha-eq-counters text-muted" role="status" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
       $body.append($('<div class="j2ha-eq-entities" style="margin:4px 0;"></div>'));

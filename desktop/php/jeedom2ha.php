@@ -111,7 +111,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 				        data-ha-action="supprimer-recreer"
 				        disabled
 				        style="margin-left:8px;">
-					<i class="fas fa-recycle"></i> {{Supprimer puis recréer dans Home Assistant}}
+					<i class="fas fa-trash"></i> {{Supprimer de Home Assistant}}
 				</button>
 			</div>
 			<div id="div_haGatingReason"
