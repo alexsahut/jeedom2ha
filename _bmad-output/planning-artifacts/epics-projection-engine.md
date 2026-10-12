@@ -2450,7 +2450,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 ### Epic 21 — Solde des réserves de l'étape 4 (CC-44, CC-47)
 
-**Statut :** `in-progress` — ouvert le 2026-10-11 (create-story, session cloud déléguée, lecture seule). Numérotation et rattachement confirmés par Alexandre (décision Q0 A de la story 21.1, 2026-10-11 vers 20:35 : nouvel epic, l'epic 20 est clos et ne se rouvre pas). Cadrage documentaire à la demande directe du mainteneur, comme pe-epic-19 : pas de SCP dédié, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
+**Statut :** `done` — clos le 2026-10-12 (story 21.1 `done`, réserve sur l'AC 13 a par décision d'Alexandre ; preuve : `21-1-preuve-terrain-2026-10-11.md` ; rétrospective : `pe-epic-21-retro-2026-10-12.md`). Ouvert le 2026-10-11 (create-story, session cloud déléguée, lecture seule). Numérotation et rattachement confirmés par Alexandre (décision Q0 A de la story 21.1, 2026-10-11 vers 20:35 : nouvel epic, l'epic 20 est clos et ne se rouvre pas). Cadrage documentaire à la demande directe du mainteneur, comme pe-epic-19 : pas de SCP dédié, aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
 
 **Origine :** rétrospective `pe-epic-20-retro-2026-10-11.md` (risques résiduels) ; ordre décidé par Alexandre le 2026-10-11 à 15:48 : CC-44 + CC-47, puis CC-36 avec CC-51 et la story « compteurs », puis l'epic de parité HomeKit (CC-33).
 
@@ -2458,7 +2458,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Stories :**
 
-- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (affichage d'un état sans ordre On/Off déjà publié).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `ready-for-dev` (accordé par ClaudeBox au nom des décisions d'Alexandre du 2026-10-11 : Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A) : retrait des boutons de scénario désactivés, supprimés ou déjà fantômes (le broker fait foi) ; affichage et décompte d'une commande portée par un principal refusé et une entité publiée ; aucune publication ne change côté bloc B.
+- **Story 21.1 — Solde des réserves CC-44 (scénario désactivé) et CC-47 (affichage d'un état sans ordre On/Off déjà publié).** Fichier `21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md`. `done` le 2026-10-12 (preuve terrain `21-1-preuve-terrain-2026-10-11.md`, déployé `30e6c80`, gate 20-0 réancré PASS). Historique : `ready-for-dev` (accordé par ClaudeBox au nom des décisions d'Alexandre du 2026-10-11 : Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A) : retrait des boutons de scénario désactivés, supprimés ou déjà fantômes (le broker fait foi) ; affichage et décompte d'une commande portée par un principal refusé et une entité publiée ; aucune publication ne change côté bloc B.
 
 **Points visés :** CC-44 (réserve AC6 de 20-4), CC-47 (réserve de 20-2).
 
