@@ -2,7 +2,7 @@
 
 Status: draft
 
-> **Statut : `draft` (2026-10-12).** Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret ; aucun code touché). **Rien n'est `ready-for-dev`** : Alexandre tranche Q1 à Q8 via ClaudeBox. Pointeurs pris sur `main` à `ab3a854`. Aucun nom réel (CC-48) : identifiants seuls.
+> **Statut : `draft` (2026-10-12).** Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret ; aucun code touché). **Rien n'est `ready-for-dev`** : Alexandre tranche Q1 à Q8 via ClaudeBox. Pointeurs pris sur `main` à `ab3a854`. **R1 (ClaudeBox, 2026-10-12)** : C9 reformulé (cause non affirmée) ; conséquence de H6 ajoutée à Q5 B. Aucun nom réel (CC-48) : identifiants seuls.
 
 ## Story
 
@@ -35,7 +35,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 | C6 | La cible « équipement » est construite par `equipmentPublicationTarget` : elle lit aussi des overrides qui passent par les entités (`exclude_eqlogic`). Les deux portées ne sont donc pas toujours équivalentes : à vérifier cas par cas (Task 0). | `override.js:231-258` |
 | C7 | « Supprimer puis recréer » (équipement, pièce, parc) : confirmation, puis action démon `supprimer` qui dépublie sans republier ; la recréation n'a lieu qu'au « Republier » ou au rescan suivant. Libellés : « Supprimer puis recréer », « Supprimer puis recréer la pièce », titre « Supprimer puis recréer dans Home Assistant ». | `surface.js:680-700,740-760` ; démon : `http_server.py:4034-4075` |
 | C8 | Le sélecteur « Override HA » (liste des types) est construit côté interface à partir des types connus du registre de publication, sans filtrer ceux qui seront refusés ; l'aperçu (dry-run) dit ensuite oui/non. | `surface.js:41` (`buildOptions`), `:97-140` (ligne de commande) ; `override.js:695` (`getOverrideSelectorState`) ; registre : `http_server.py:288-305` |
-| C9 | Refus `ha_missing_state_topic` : le registre exige un topic d'état pour `sensor`/`binary_sensor` ; une commande sans état lisible ne peut pas en fournir. | `validation/ha_component_registry.py:82-93`, `models/cause_mapping.py:110` |
+| C9 | Refus `ha_missing_state_topic` : le registre exige un topic d'état pour `sensor`/`binary_sensor`. 2971 est pourtant une commande info d'état (`FLAP_STATE`) : la cause n'est donc **pas** une « commande sans état lisible ». Elle vient probablement de la projection que construit l'override (aucun topic d'état repris de l'entité `cover`). **À établir en Task 0 a**, non affirmé ici. | `validation/ha_component_registry.py:82-93`, `models/cause_mapping.py:110` |
 | C10 | Dans la forme 579, l'override de type est clé `eq:cmd` : il atteint l'entité principale, pas le secondaire qui publie. | `mapping/overrides.py:376` (`apply_type_override`) ; limite consignée dans la story 21-1 |
 
 ## Critères d'acceptation provisoires
@@ -53,7 +53,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 ## Tâches
 
-- **Task 0 — Établir (lecture seule)** : (a) pour CC-60, si `sensor`/`binary_sensor` sur 2971 peuvent aboutir avec un forçage (C9 indique que non, faute de topic d'état : à prouver par test sur l'équipement 380 simulé) ; (b) pour C6, la liste des cas où les actions d'équipement et d'entité ne sont **pas** équivalentes ; (c) relevé « avant » : compteurs affichés d'une pièce test.
+- **Task 0 — Établir (lecture seule)** : (a) pour CC-60, **la cause exacte** du refus `ha_missing_state_topic` de 2971 (projection de l'override sans topic d'état repris de l'entité `cover` ?) et si `sensor`/`binary_sensor` peuvent aboutir avec un forçage ou une projection corrigée (test sur l'équipement 380 simulé) ; (b) pour C6, la liste des cas où les actions d'équipement et d'entité ne sont **pas** équivalentes ; (c) relevé « avant » : compteurs affichés d'une pièce test.
 - **Task 1 — Démon (si besoin, champ additif)** : exposer ce que Q2 exige (par exemple la présence par entité et la liste des commandes non prises en charge) sans nouveau recalcul de décision ; lecture seule.
 - **Task 2 — Interface : compteurs** (`summarizeRoom`, `buildRoomCounterLabels`, `renderRoomCounters`, nouvelle ligne par équipement) selon Q1 à Q3.
 - **Task 3 — Interface : portées et doublons** (`appendPublicationActions`, `renderEntities`) selon Q4.
@@ -92,7 +92,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 **Q5 — « Supprimer puis recréer » (CC-55).**
 - **A (recommandé).** Libellé fidèle : « Supprimer de Home Assistant » (équipement, pièce, parc), avec rappel que « Republier » le remet. Conséquence : changement de texte et de confirmations seulement ; aucun risque pour la maison ; un bouton de moins qui promet trop.
-- **B.** Recréation enchaînée : supprimer puis republier dans la même action. Conséquence : le libellé devient vrai, mais l'action est plus longue sur un parc (lissage, échéance 19.6), et **recrée réellement** les entités : `entity_id` éventuellement modifiés, historique, noms et pièces manuels perdus (37 entités, 23 pièces, 1 appareil aujourd'hui) ; à prouver sur la box. Utile si on veut appliquer les nouveaux noms/pièces de 22.1.
+- **B.** Recréation enchaînée : supprimer puis republier dans la même action. Conséquence : le libellé devient vrai, mais l'action est plus longue sur un parc (lissage, échéance 19.6), et **recrée réellement** les entités : historique, noms et pièces manuels perdus (37 entités, 23 pièces, 1 appareil aujourd'hui). **Un `entity_id` tiré des noms du moment** (HA 2026.9.4 n'applique plus `object_id`, constat de terrain R1) est donné aux entités recréées : il change pour toutes celles dont il dérivait d'un nom, avec les conséquences sur automatisations et tableaux de bord ; la règle de Q7 de 22.1 décide si c'est une forme lisible ou technique stable. À prouver sur la box. Utile si on veut appliquer les nouveaux noms/pièces de 22.1.
 
 **Q6 — Type d'override sur une commande portée par deux entités (CC-58).**
 - **A.** Laisser la limite (déjà consignée en 21-1) et l'expliquer dans l'aide. Conséquence : zéro risque, mais le comportement reste surprenant.
@@ -100,9 +100,9 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 - **C (recommandé).** Désactiver le sélecteur sur ces commandes avec une explication claire. Conséquence : petite correction d'interface, aucun changement de publication.
 
 **Q7 — Liste « Override HA » refusée à l'aperçu (CC-60).**
-- **A (recommandé).** Ne proposer que les types qui peuvent aboutir (liste filtrée par le démon ou par l'aperçu) ; si Task 0 montre qu'aucun forçage ne les débloque (C9). Conséquence : plus de choix voué à l'échec ; la cause « précisez les types génériques dans Jeedom » reste la voie normale.
+- **A (recommandé).** Ne proposer que les types qui peuvent aboutir (liste filtrée par le démon ou par l'aperçu), si Task 0 a montre qu'aucun forçage ni correction de projection ne les débloque. Conséquence : plus de choix voué à l'échec ; la cause « précisez les types génériques dans Jeedom » reste la voie normale.
 - **B.** Garder la liste et expliquer le refus avant le choix. Conséquence : moins de code, l'utilisateur voit encore des types inutiles.
-- **C.** Permettre au forçage de les faire aboutir. Conséquence : seulement si Task 0 le montre possible ; sinon impossible sans topic d'état ; risque d'entités sans état dans HA.
+- **C.** Permettre au forçage (ou à une projection corrigée) de les faire aboutir. Conséquence : seulement si Task 0 a le montre possible ; risque d'entités sans état fiable dans HA.
 
 **Q8 — P3 de 20-3 (bandeau, assertion de faux DOM).**
 - **A (recommandé).** Les inclure : correctifs minimes, même fichiers que cette story.
@@ -116,13 +116,14 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 ## Vérifications non faites par cette session
 
-Équivalence exacte des actions d'équipement et d'entité (C6) ; faisabilité d'un forçage `sensor`/`binary_sensor` sur 2971 (C9 à prouver) ; valeurs réelles des compteurs sur la box ; comportement de HA à la suppression d'une découverte (perte du registre d'entité, hypothèse à confirmer pour Q5 B).
+Équivalence exacte des actions d'équipement et d'entité (C6) ; cause du refus `ha_missing_state_topic` sur 2971 et faisabilité d'un forçage `sensor`/`binary_sensor` (C9 à établir) ; valeurs réelles des compteurs sur la box ; comportement de HA à la suppression d'une découverte (perte du registre d'entité, hypothèse à confirmer pour Q5 B).
 
 ## Journal des décisions
 
 - 2026-10-11 15:48 — Alexandre : story « compteurs » regroupée avec CC-51 ; « publiés » = `published_in_ha`, plus « en attente d'application » et « non pris en charge ».
 - 2026-10-11 17:35 — Alexandre : captures de la documentation après cette story.
 - 2026-10-12 — Cadrage documentaire (cette session) : story en `draft`, décisions Q1 à Q8 attendues.
+- 2026-10-12 — R1 (ClaudeBox) : C9 reformulé, conséquence de H6 ajoutée à Q5 B.
 
 ## Dev Agent Record
 

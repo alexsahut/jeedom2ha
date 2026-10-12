@@ -2472,17 +2472,17 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 **Statut :** `backlog` — cadrage documentaire du 2026-10-12 (session cloud déléguée, lecture seule). **Rien n'est `ready-for-dev`** : en attente des décisions d'Alexandre, via ClaudeBox. Aucune ouverture `PRODUCT_SCOPE`, aucun nouveau FR/NFR.
 
-**Origine :** ordre décidé par Alexandre le 2026-10-11 à 15:48 (CC-44 + CC-47 faits en epic 21, puis CC-36 avec CC-51 et la story « compteurs », puis parité HomeKit CC-33) ; décision du 2026-10-01 à 18:21 : « le nom et la pièce Jeedom font foi partout » ; audit de parité du 2026-10-02 (44 noms sur 94 différents du nom Jeedom) ; mesure du 2026-10-12 (91 appareils, 29 à un autre nom que l'équipement Jeedom) ; retour d'Alexandre du 2026-10-09 sur l'équipement 287 (CC-51).
+**Origine :** ordre décidé par Alexandre le 2026-10-11 à 15:48 (CC-44 + CC-47 faits en epic 21, puis CC-36 avec CC-51 et la story « compteurs », puis parité HomeKit CC-33) ; décision du 2026-10-01 à 18:21 : « le nom et la pièce Jeedom font foi partout » ; audit de parité du 2026-10-02 (44 noms sur 94 différents du nom Jeedom) ; mesure du 2026-10-12 (91 appareils, 29 à un autre nom que l'équipement Jeedom, 149 entités concernées ; relevé de terrain R1 de ClaudeBox) ; retour d'Alexandre du 2026-10-09 sur l'équipement 287 (CC-51).
 
 **Valeur utilisateur :** Home Assistant et la voix (Assist) parlent le langage de Jeedom ; l'écran du plugin dit combien d'éléments sont réellement dans Home Assistant et ses boutons tiennent leur promesse.
 
 **Objectif :** (1) un nom d'appareil unique par équipement, égal au nom Jeedom, la pièce Jeedom proposée à la création, un renommage Jeedom republié au sync suivant ; (2) des compteurs fondés sur la présence réelle dans HA (« publiés », « en attente d'application », « non pris en charge »), des libellés de portée clairs, la fin du libellé trompeur « Supprimer puis recréer » (CC-55), et deux limites de l'override de type (CC-58, CC-60).
 
 **Périmètre :**
-- noms d'appareil et d'entité dans la découverte MQTT, pièce suggérée, déclenchement de la republication (22.1) ;
+- noms d'appareil et d'entité dans la découverte MQTT, pièce suggérée, déclenchement de la republication, et `entity_id` des entités nouvelles ou recréées : HA 2026.9.4 n'applique plus `object_id` (41 entités d'avant le 2026-05-06 à `entity_id` technique, 306 depuis à `entity_id` dérivé des noms), donc `object_id`/`default_entity_id` fait partie de 22.1 (Q7) ;
 - compteurs, actions d'équipement/entité, CC-55, CC-58, CC-60, reports P3 de 20-3, réécriture du bloc `compteurs` de `docs/fr_FR` (22.2).
 
-**Hors périmètre :** parité HomeKit (CC-33, epic suivant) ; chantier Market ; migration de `object_id` vers `default_entity_id` (chore séparé, voir Q7 de 22.1) ; tout changement d'`entity_id` ou d'`unique_id` des entités existantes ; captures d'écran de la documentation (après 22.2, par l'humain).
+**Hors périmètre :** parité HomeKit (CC-33, epic suivant) ; chantier Market ; tout changement d'`entity_id` ou d'`unique_id` des entités **existantes** ; captures d'écran de la documentation (après 22.2, par l'humain).
 
 **Stories (brouillons `draft`, décisions d'Alexandre attendues) :**
 - **Story 22.1 — Noms Home Assistant = noms Jeedom (CC-36).** Fichier `22-1-noms-home-assistant-egaux-noms-jeedom-cc36.md`. Démon seul. Questions Q1 à Q7 et QD.
@@ -2497,7 +2497,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 ### Gates epic-level pe-epic-22
 
 - gate 20-0 vert avant chaque `done` touchant l'interface ; aucune écriture transmise à la box par le gate.
-- preuve terrain avec inventaire avant/après (registres appareils et entités de HA) : aucun `entity_id` ni `unique_id` existant ne change ; aucun nom ou pièce choisi à la main n'est écrasé ; les appareils qui changent de nom sont rapprochés de la liste des 29 mesurée le 2026-10-12.
+- preuve terrain avec inventaire avant/après (registres appareils et entités de HA) : aucun `entity_id` ni `unique_id` d'entité existante ne change ; l'`entity_id` d'une entité nouvelle ou recréée suit la règle décidée en Q7 de 22.1 ; aucun nom ou pièce choisi à la main n'est écrasé ; les appareils qui changent de nom sont rapprochés de la liste des 29 mesurée le 2026-10-12.
 - les compteurs affichés sont égaux au recomptage manuel d'une pièce réelle ; « publiés » vient de `published_in_ha`.
 - `PRODUCT_SCOPE` inchangé ; golden et contrat 4D verts, sauf champs additifs justifiés.
 - aucun nom réel dans le dépôt (CC-48).
