@@ -1,8 +1,14 @@
 # Story 24.1 : Signal d'exposition HomeKit et identifiants physiques
 
-Status: draft
+Status: ready-for-dev
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). **R1 (ClaudeBox, 12/10) intégrée** : la Task 0 est faite (règle d'exposition de Homebridge établie en lecture seule) ; deux cas restent à confirmer (Task 0 bis). Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (T3, Q5, D1). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`, sauf mention du plugin Homebridge. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
+> **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Task 0 faite, Q5 tranchée). Brouillon de cadrage initial (2026-10-12) : Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). **R1 (ClaudeBox, 12/10) intégrée** : la Task 0 est faite (règle d'exposition de Homebridge établie en lecture seule) ; deux cas restent à confirmer (Task 0 bis). Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (T3, Q5, D1). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`, sauf mention du plugin Homebridge. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
+
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q5 A** : l'export (24.2) porte des identifiants seulement, aucun nom ; les champs de cette story sont portés tels quels.
+- **Q1** : la sémantique « exclu par plugin » est conservée ; aucune raison `voie_native`. Le signal d'exposition ne change **pas** la priorité des exclusions.
+- `ready-for-dev` accordé par ClaudeBox au nom de ces décisions.
 
 ## Story
 
@@ -16,7 +22,7 @@ afin que les stories suivantes décident, exportent et alignent sans jamais modi
 
 - Ne dépend plus d'aucune vérification préalable (Task 0 faite) ; les deux cas de la Task 0 bis se confirment pendant le `create-story`.
 - Peut démarrer avant le `done` de 22-2 (ne touche ni `http_server.py` ni `desktop/`).
-- Q5 de la proposition (contenu de l'export) ne change rien ici : les champs sont portés tels quels, sans nom.
+- Q5 A (tranchée) : les champs sont portés tels quels, sans nom.
 
 ## Établi par ClaudeBox le 12/10 (lecture seule, plugin Homebridge)
 
@@ -69,3 +75,9 @@ Source : `plugins/homebridge/core/class/homebridge.class.php:2680-2710` (`discov
 ## Vérifications non faites par cette session
 
 Les deux cas de la Task 0 bis ; la stabilité de la règle de Homebridge entre ses versions ; la lecture effective de `config::byKey('sendToHomebridgeDefault', 'homebridge')` depuis le plugin (droits, nom de classe).
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, midi — R1 (ClaudeBox) : Task 0 faite (règle d'exposition de Homebridge).
+- 2026-10-12, 13:22 — Décisions d'Alexandre (relayées par ClaudeBox) : Q5 A ; Q1 : « exclu par plugin » conservé. `ready-for-dev` accordé par ClaudeBox.

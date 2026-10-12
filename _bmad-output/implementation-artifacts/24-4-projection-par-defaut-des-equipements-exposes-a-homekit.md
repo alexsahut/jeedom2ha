@@ -2,9 +2,16 @@
 
 Status: draft
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production** : des équipements aujourd'hui exclus par leur pièce seront publiés au sync suivant. Décisions attendues d'Alexandre : **Q3** (la pièce n'écarte plus) et **Q4** (mapping ambigu ou probable) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+> **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story` après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production** : des équipements aujourd'hui exclus par leur pièce seront publiés au sync suivant. Décisions d'Alexandre (12/10 à 13:22) : **Q3 A** et **Q4 A** ; ex-décisions attendues **Q3** (la pièce n'écarte plus) et **Q4** (mapping ambigu ou probable) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
 > **R1 (ClaudeBox, 12/10) intégrée** : *établi par ClaudeBox le 12/10*, d'après la configuration actuelle du plugin (inchangée depuis le 04/10) et le référentiel du 10/10, **3 équipements** (virtuels, dans deux pièces exclues) seraient nouvellement publiés. Le risque de publication de masse est faible ; l'option C de Q3 ne se justifie plus. Le signal d'exposition suit la règle de Homebridge (24-1) : pièce + équipement + valeur par défaut.
+
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q3 A** : un équipement exposé à HomeKit n'est jamais écarté par sa pièce (`excludedObjects` et état de pièce hérité) ; l'exclusion explicite de l'équipement et l'état global « exclure » restent respectés. Options B et C **écartées**.
+- **Q4 A** : l'exposition HomeKit ne change pas la politique de confiance ; option B **écartée**.
+- **Q1** : « exclu par plugin » conservé : `excluded_plugin` garde sa priorité (équipement > plugin > pièce) sur le signal HomeKit ; **pas de `voie_native`**.
+- Cette story reste `draft` jusqu'à son `create-story`, après la baseline de 24.2.
 
 ## Story
 
@@ -16,14 +23,14 @@ afin que ce qui se pilote ou se consulte par la voix le soit aussi par Assist, s
 
 ## Dépendances et décisions
 
-- Dépend de **24.1** (signal), **24.2** (mesure) et **24.3** (`voie_native`, mêmes fonctions).
+- Dépend de **24.1** (signal) et **24.2** (mesure + baseline). Si 24.3 (mode « plugins en test ») est maintenue, elle passe avant (mêmes fonctions de configuration) ; sinon 24.4 suit directement la baseline.
 - **Q3** : A recommandée (la pièce n'écarte plus ; exclusion explicite et état global respectés) ; C (derrière une clé de configuration, désactivée au premier déploiement) si Alexandre veut un déclenchement manuel. **Q4** : A recommandée (la politique de confiance reste).
 
 ## Raisons légitimes d'écart pour un équipement exposé (liste à valider)
 
 Seuls ces cas écartent un équipement `homekit_exposed = true`, chacun avec sa raison canonique dans l'export et l'écran :
 - exclusion explicite : `excluded_eqlogic`, `publication_excluded_eqlogic`, état d'équipement « exclure » du périmètre publié ;
-- plugin natif : `voie_native` (24.3), qui prime sur le signal HomeKit ;
+- exclusion par plugin : `excluded_plugin` (plugins natifs compris, Q1), qui prime sur le signal HomeKit comme avant ;
 - impossibilité technique : `disabled_eqlogic`, `no_commands`, `no_generic_type_configured` / `no_supported_generic_type`, `no_mapping`, `ambiguous_skipped` / `probable_skipped` (Q4 A), échec de validation `ha_*`, `ha_component_not_in_product_scope`.
 
 L'état global « exclure » reste respecté (Q3 A, ce n'est pas une exclusion de pièce).
@@ -39,7 +46,7 @@ L'état global « exclure » reste respecté (Q3 A, ce n'est pas une exclusion d
 | F5 | La configuration « Pièces exclues » et sa documentation décrivent une exclusion sans exception. | `plugin_info/configuration.php:124-132` ; `docs/fr_FR/index.md:97,432` |
 | F6 | `evaluate_equipment()` produit déjà une décision par commande avec une raison non vide (I6) ; une commande non couverte porte `command_not_covered`. | `models/evaluate_equipment.py:38-48,113-130` |
 
-## Critères d'acceptation proposés (à figer selon Q3 et Q4)
+## Critères d'acceptation proposés (figés sur Q3 A et Q4 A)
 
 - **AC1.** Un équipement `homekit_exposed = true` n'est jamais écarté par `excludedObjects` ni par un état de pièce « exclure » hérité. À l'éligibilité (`assess_eligibility`), la source `object` est ignorée pour lui ; dans le résolveur de périmètre, la pièce exclue ne s'applique pas à lui sauf état d'équipement explicite (même règle que le sync, « Publier », l'aperçu et le diagnostic : un seul calcul).
 - **AC2.** Le périmètre publié signale ces équipements comme exceptions (`is_exception`, `decision_source` additive, par exemple `exception_homekit`) pour que les compteurs de pièce et le bandeau restent cohérents ; contrat additif, aucun champ existant modifié.
@@ -69,3 +76,8 @@ L'état global « exclure » reste respecté (Q3 A, ce n'est pas une exclusion d
 ## Vérifications non faites par cette session
 
 Combien d'équipements exposés sont écartés par leur pièce aujourd'hui ; si l'état global « exclure » est réellement utilisé ; l'effet exact de la nouvelle source de décision sur les compteurs de pièce de 22-2 et sur le gate 20-0.
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q3 A, Q4 A ; Q1 « exclu par plugin » conservé (pas de `voie_native`). Reste `draft` jusqu'au `create-story` après la baseline.

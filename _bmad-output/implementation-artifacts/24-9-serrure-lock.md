@@ -2,7 +2,7 @@
 
 Status: draft
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+> **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
 > **R1 (ClaudeBox, 12/10) intégrée** : types génériques de la serrure établis (section suivante).
 
@@ -18,12 +18,18 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 
 - Dépend de **24.4**. Une seule story de type en cours à la fois.
 - **23.3** : même règle que 24.6 pour l'état.
-- **Q9** : A recommandée. **Q10** : A recommandée.
+- **Q9 A** et **Q10 A** (tranchées).
+
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q9 A** (version ajustée R1) : l'epic 24 absorbe 18-2 (`lock`).
+- **Q10 A** : remplacement du `binary_sensor` `lock` existant, une seule voie ; inventaire des références avant/après.
+- **Q1** : « exclu par plugin » conservé (pas de `voie_native`).
 
 ## Établi par ClaudeBox le 12/10 (mesure du 10/10)
 
 - **Une serrure** porte `LOCK_OPEN`, `LOCK_CLOSE`, `LOCK_STATE` : état + deux ordres, donc l'AC3 est satisfaite sur le cas réel.
-- Reste à établir (Task 0) : la polarité de `LOCK_STATE` ; le plugin d'origine (si c'est un plugin natif de la liste de 24.3, l'équipement relève de `voie_native`, pas de cette story).
+- Reste à établir (Task 0) : la polarité de `LOCK_STATE` ; le plugin d'origine (si c'est un plugin de la liste `excludedPlugins`, l'équipement est « exclu par plugin » et sort de cette story).
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -60,3 +66,8 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 ## Vérifications non faites par cette session
 
 La polarité réelle de `LOCK_STATE` sur les équipements mesurés ; les champs de `lock` dans HA 2026.9.4 ; la présence de commandes `LOCK_OPEN` / `LOCK_CLOSE` sur les équipements concernés.
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q9 A (absorbe 18-2), Q10 A ; Q1 « exclu par plugin » conservé.

@@ -2,7 +2,7 @@
 
 Status: draft
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **La portée n'est pas fixée** : elle dépend de la baseline de 24.2 et des stories 24.4 à 24.9. Ne passe pas à `ready-for-dev` avant que ClaudeBox ait classé chaque écart restant. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+> **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **La portée n'est pas fixée** : elle dépend de la baseline de 24.2 et des stories 24.4 à 24.9. Ne passe pas à `ready-for-dev` avant que ClaudeBox ait classé chaque écart restant. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
 > **R1 (ClaudeBox, 12/10) intégrée** : types génériques des deux équipements établis ; une hypothèse de cause, fondée sur le code, est posée pour le capteur (à confirmer par l'export).
 
@@ -48,3 +48,8 @@ afin de refermer la liste des 15 écarts de type sans deviner leur cause.
 ## Vérifications non faites par cette session
 
 Tout ce qui est « Inconnue » ci-dessus ; le nombre d'écarts restants après 24.4 à 24.9.
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : aucune question ne porte sur cette story ; elle reste `draft`, portée à fixer sur la baseline.

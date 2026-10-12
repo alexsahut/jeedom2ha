@@ -1,10 +1,18 @@
 # Story 24.2 : Export JSON versionné du contrat de décision
 
-Status: draft
+Status: ready-for-dev
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Décisions attendues : Q5 (contenu et confidentialité) et Q6 (lecture sans SSH) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
+> **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Q5 A et Q6 A tranchées). Brouillon de cadrage initial rédigé par une session cloud déléguée, documentaire ; décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
 >
 > **R1 (ClaudeBox, 12/10) intégrée** : les scénarios portent `homekit_exposed` (règle de Homebridge établie, voir 24-1) ; l'outil de parité de ClaudeBox ne lit pas les boutons de scénario, l'export les rend donc visibles ; `logicalId` est vide pour 65 accessoires sur 123 (*établi par ClaudeBox le 12/10*) : il ne sert jamais de clé unique.
+
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q5 A** : identifiants seulement (aucun nom), tous les équipements et tous les scénarios.
+- **Q6 A** : action AJAX d'administrateur `getDecisionExport` + bouton de téléchargement ; la route du démon reste interne.
+- **Q1** : « exclu par plugin » conservé, **pas de raison `voie_native`** : l'export porte `reason: excluded_plugin`, `exclusion_source: plugin` et les `logicalId`, ce qui suffit à l'alignement hors plugin.
+- **Q11** : les 5 boutons de scénario sont exposés à Assist (ClaudeBox, 13:30) ; ils sont dans l'export.
+- `ready-for-dev` accordé par ClaudeBox au nom de ces décisions.
 
 ## Story
 
@@ -18,8 +26,8 @@ afin que ClaudeBox mesure la parité avec Apple Maison et Assist sans SSH, avant
 
 - Dépend de **24.1** (`homekit_exposed`, `logicalId`).
 - Démarre après **22.2 `done`** (mêmes fichiers `http_server.py` et `desktop/`).
-- **Q5** : identifiants seulement, tous les équipements et tous les scénarios (recommandation A). **Q6** : relais PHP d'administrateur + bouton (recommandation A).
-- Son déploiement suivi d'une **capture « avant » (baseline)** par ClaudeBox, conservée hors du dépôt, conditionne 24.3, 24.4 et 24.5.
+- **Q5 A** et **Q6 A** (tranchées, voir plus haut).
+- Son déploiement suivi d'une **capture « avant » (baseline)** par ClaudeBox, conservée hors du dépôt, conditionne 24.4 (et 24.3 si elle est maintenue) et 24.5.
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -46,14 +54,14 @@ Le schéma exact est figé au `create-story` avec ClaudeBox ; la forme ci-dessou
   "generated_at": "2026-10-12T10:00:00Z",
   "sync_at": "2026-10-12T09:58:11Z",
   "producer": { "plugin_version": "x.y.z", "confidence_policy": "sure_probable" },
-  "config": { "native_plugins": ["<plugin>"], "native_plugins_in_test": [], "excluded_piece_ids": [12] },
+  "config": { "excluded_plugins": ["<plugin>"], "excluded_piece_ids": [12] },
   "totals": { "equipments": 0, "commands": 0, "scenarios": 0 },
   "equipments": [{
     "kind": "equipment", "key": "eq:67", "eq_id": 67, "logical_id": "<id|null>",
     "plugin": "<eq_type>", "piece_id": 12, "enabled": true, "generic_type": null,
     "homekit_exposed": true, "homekit_exposed_source": "<provenance|null>",
     "decision": "published", "reason": "<code canonique>", "step": "4",
-    "exclusion_source": null, "native_test_mode": false,
+    "exclusion_source": null,
     "overrides": { "publication": null, "types": {} },
     "pending_changes": false,
     "entities": [{ "unique_id": "<…>", "ha_type": "switch", "role": "primary",
@@ -78,7 +86,7 @@ Choix de conception à confirmer :
 - `entity_id_expected` = valeur attendue **à la création** (22-1) ; ce n'est pas l'`entity_id` du registre.
 - `state_source` ∈ `streamed` / `optimistic` / `none`, lu sur le streaming effectif : la couverture de 23.3 devient mesurable sans code de plus.
 - Horodatage : `generated_at` et `sync_at` en tête, pas par ligne (redondant). Si ClaudeBox le veut par ligne, c'est un champ additif (pas de changement de version).
-- `reason` est le code canonique tel que produit (`voie_native`, `excluded_eqlogic`, `command_not_covered`…), sans traduction.
+- `reason` est le code canonique tel que produit (`excluded_plugin`, `excluded_eqlogic`, `command_not_covered`…), sans traduction. Un champ `native_test_mode` serait un champ additif si le mode « plugins en test » de 24.3 est maintenu : pas de changement de version.
 - Politique de version : un champ ajouté ne change pas `schema_version` ; un champ renommé, retiré ou de sens changé le porte à 2.
 
 ## Critères d'acceptation proposés
@@ -116,3 +124,9 @@ Choix de conception à confirmer :
 ## Vérifications non faites par cette session
 
 Taille réelle du document sur 292 équipements ; coût de mémorisation des décisions par commande ; contenu exact de la baseline (nombre d'équipements exposés écartés par la pièce, par plugin, par absence de type).
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, midi — R1 (ClaudeBox) : règle d'exposition de Homebridge, scénarios dans l'export, `logicalId` vide pour 65 accessoires sur 123.
+- 2026-10-12, 13:22 — Décisions d'Alexandre (relayées par ClaudeBox) : Q5 A, Q6 A, Q1 « exclu par plugin » conservé (pas de `voie_native`), Q11 oui. `ready-for-dev` accordé par ClaudeBox ; démarrage après 22.2 `done` conservé, ClaudeBox peut le lever.

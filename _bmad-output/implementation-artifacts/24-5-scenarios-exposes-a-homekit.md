@@ -4,6 +4,12 @@ Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **R1 (ClaudeBox, 12/10) intégrée : la cause de l'écart est établie, la story se réduit à documenter et à vérifier que les scénarios sont dans l'export (24.2).** Aucun changement de production. Décision d'Alexandre : **Q8 A** (garder `button`) est confirmée par les faits ; B et C ne sont plus à l'ordre du jour. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel de scénario (CC-48) : identifiants seulement.
 
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q8 A** : garder `button` ; options B et C **écartées**.
+- **Q11** (ajoutée par ClaudeBox) : exposer à Assist les 5 boutons de scénario (20, 38, 50, 57, 150), geste côté HA hors plugin : **oui, fait par ClaudeBox à 13:30**.
+- Cette story reste `draft` jusqu'à son `create-story`.
+
 ## Story
 
 En tant que mainteneur de la parité,
@@ -15,11 +21,11 @@ afin que la mesure ne les compte plus « non projetés » à tort et que l'expos
 ## Dépendances et décisions
 
 - Dépend de **24.2** (les scénarios sont dans l'export avec `homekit_exposed`, issu de 24.1).
-- **Q8 A** : garder `button` (84 boutons existants inchangés).
+- **Q8 A** : garder `button` (84 boutons existants inchangés) ; **Q11** : les 5 boutons sont exposés à Assist depuis 13:30.
 
 ## Établi par ClaudeBox le 12/10 (lecture seule)
 
-Les cinq scénarios 20, 38, 50, 57 et 150 sont **actifs** dans Jeedom et **leurs boutons existent dans le registre de HA**, mais ils sont **non exposés à Assist** (`should_expose: false`) ; l'outil de parité de ClaudeBox **ne lit pas les boutons de scénario**. Hypothèses de la proposition (section 6) : **H-a et H-d confirmées** ; H-b (inactifs), H-c (type attendu) et H-e (jointure par numéro) écartées. L'exposition à Assist est un geste côté HA, hors plugin (exigence 5).
+Les cinq scénarios 20, 38, 50, 57 et 150 sont **actifs** dans Jeedom et **leurs boutons existent dans le registre de HA**, mais ils sont **non exposés à Assist** (`should_expose: false`) ; l'outil de parité de ClaudeBox **ne lit pas les boutons de scénario**. Hypothèses de la proposition (section 6) : **H-a et H-d confirmées** ; H-b (inactifs), H-c (type attendu) et H-e (jointure par numéro) écartées. L'exposition à Assist est un geste côté HA, hors plugin (exigence 5) : **exécuté par ClaudeBox à 13:30 (Q11, décision d'Alexandre)**. Cette story n'a plus qu'à vérifier que les cinq scénarios sont dans l'export et à documenter la cause.
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -50,3 +56,8 @@ Les cinq scénarios 20, 38, 50, 57 et 150 sont **actifs** dans Jeedom et **leurs
 ## Vérifications non faites par cette session
 
 Le traitement par Assist d'un `button` (D4) : seulement utile si B ou C est un jour envisagée.
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q8 A ; Q11 oui (les 5 boutons exposés à Assist, fait par ClaudeBox à 13:30).

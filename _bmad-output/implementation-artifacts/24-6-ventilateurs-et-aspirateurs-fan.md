@@ -4,6 +4,12 @@ Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **R1 (ClaudeBox, 12/10) intégrée : story réduite.** *Établi par ClaudeBox le 12/10* : 8 équipements exposés à HomeKit portent `FAN_*` (marche, arrêt, état ; 5 aspirateurs compris), **aucun n'a de commande de vitesse**. Avec **Q7 A**, aucun ne change de type : la story devient un classement « équivalents fonctionnels » dans l'export. **`fan` n'est plus ouvert ici**, sauf apparition d'un ventilateur à vitesse. Décisions : **Q7** et **Q9** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 
+## Décisions d'Alexandre (12/10 à 13:22, relayées par ClaudeBox)
+
+- **Q7 A** : `fan` seulement quand un ordre de vitesse existe ; options B et C **écartées**.
+- **Q9 A** (version ajustée par la R1) : l'epic 24 absorbe 18-2 et 18-4 ; **l'epic 18 garde 18-1 (`fan`)**.
+- Cette story reste `draft` jusqu'à son `create-story`.
+
 ## Story
 
 En tant que mainteneur de la parité,
@@ -15,7 +21,7 @@ afin de ne pas changer le domaine d'entités qui fonctionnent par la voix, et d'
 ## Dépendances et décisions
 
 - Dépend de **24.2** (export) et **24.4**.
-- **Q7 A** (recommandée) : `fan` seulement quand un ordre de vitesse existe. **Q9** : l'epic 18 garde 18-1 (`fan`) ; cette story ne l'absorbe plus.
+- **Q7 A** (tranchée) : `fan` seulement quand un ordre de vitesse existe. **Q9 A** (tranchée) : l'epic 18 garde 18-1 (`fan`) ; cette story ne l'absorbe pas.
 
 ## Établi par ClaudeBox le 12/10
 
@@ -52,3 +58,8 @@ afin de ne pas changer le domaine d'entités qui fonctionnent par la voix, et d'
 ## Vérifications non faites par cette session
 
 Que la mesure du 12/10 (aucune vitesse) reste vraie sur l'export ; la forme exacte du marqueur de classement.
+
+## Journal des décisions
+
+- 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
+- 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q7 A, Q9 A (ajustée R1 : l'epic 18 garde 18-1).
