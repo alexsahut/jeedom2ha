@@ -1,6 +1,6 @@
 # Story 24.1 : Signal d'exposition HomeKit et identifiants physiques
 
-Status: ready-for-dev
+Status: review
 
 > **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Task 0 faite, Q5 tranchée). Brouillon de cadrage initial (2026-10-12) : Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). **R1 (ClaudeBox, 12/10) intégrée** : la Task 0 est faite (règle d'exposition de Homebridge établie en lecture seule) ; deux cas restent à confirmer (Task 0 bis). Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (T3, Q5, D1). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`, sauf mention du plugin Homebridge. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
 
@@ -59,11 +59,11 @@ Source : `plugins/homebridge/core/class/homebridge.class.php:2680-2710` (`discov
 ## Tâches proposées
 
 - [x] **Task 0 — Établie par ClaudeBox le 12/10** (voir plus haut) : règle d'exposition, valeur par défaut, scénarios, absence de drapeau par commande, état des `logicalId`.
-- [ ] **Task 0 bis — Confirmer (ClaudeBox, lecture seule)** : (a) comportement de Homebridge pour un **équipement sans pièce** ; (b) comportement pour une **pièce sans clé `sendToHomebridge`** (défaut de pièce ?). **Tant que (a) et (b) ne sont pas confirmés, les deux cas donnent `null` avec la provenance `illisible`** ; ne pas deviner.
-- [ ] **Task 1 — PHP** : lecture des trois niveaux, provenance, `logical_id` d'équipement et de commande, champ d'exposition des scénarios ; tri-état strict.
-- [ ] **Task 2 — Démon** : champs additifs, normalisation à trois états, sans toucher à l'éligibilité.
-- [ ] **Task 3 — Tests** : voir AC7 ; golden et contrat 4D inchangés.
-- [ ] **Task 4 — Documentation de développement** : ajouter le contrat des champs et la règle de Homebridge à la documentation interne (pas à `docs/fr_FR`, aucune visibilité utilisateur).
+- [x] **Task 0 bis — Établie par ClaudeBox (lecture seule du code du plugin Homebridge sur la box)** : la règle exige un identifiant de pièce non nul, différent de -1, une pièce existante et la clé `sendToHomebridge` égale à 1 (lue avec la valeur par défaut 0) sur la pièce. Donc (a) un équipement **sans pièce** n'est pas exposé, et (b) une pièce **sans clé** `sendToHomebridge` vaut 0 : ses équipements ne sont pas exposés. Dans les deux cas : `homekit_exposed = false` avec la provenance `piece` (et non `null`). Implémenté et testé (`jeedom2ha_homekit_eq_exposure`, cas « Task 0 bis » du test PHP).
+- [x] **Task 1 — PHP** : `core/php/jeedom2ha_homekit_exposure.php` (règle pure) ; `buildHomekitExposureContext` (lecture de l'installation/activation de `homebridge`, `sendToHomebridgeDefault`, `plugin::listPlugin(true, false, true, true)`) ; `getFullTopology()` ajoute `homekit_exposed`, `homekit_exposed_source`, `logical_id` (équipement et commande) ; `buildScenariosPayload` ajoute le signal des scénarios.
+- [x] **Task 2 — Démon** : champs additifs `None` par défaut sur `JeedomEqLogic`, `JeedomCmd`, `JeedomScenario` ; `_to_tristate`, `_normalize_logical_id` ; éligibilité et décisions non touchées.
+- [x] **Task 3 — Tests** : `tests/unit/test_story_24_1_php_homekit_exposure.php` (40 assertions), `tests/unit/test_story_24_1_homekit_signal.py` (36 tests) ; golden et contrat 4D inchangés (suite complète verte).
+- [x] **Task 4 — Documentation de développement** : `docs/dev-homekit-exposure.md` (contrat des champs et règle de Homebridge, date et source).
 
 ## Garde-fous
 
@@ -81,3 +81,30 @@ Les deux cas de la Task 0 bis ; la stabilité de la règle de Homebridge entre s
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, midi — R1 (ClaudeBox) : Task 0 faite (règle d'exposition de Homebridge).
 - 2026-10-12, 13:22 — Décisions d'Alexandre (relayées par ClaudeBox) : Q5 A ; Q1 : « exclu par plugin » conservé. `ready-for-dev` accordé par ClaudeBox.
+- 2026-10-12 — Dev-story (session cloud déléguée) : Tasks 0 bis à 4 faites, statut `review`. Précision de ClaudeBox sur la Task 0 bis intégrée (sans pièce et pièce sans clé : `false`, provenance `piece`).
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Session cloud déléguée (dev-story), sans accès box, Home Assistant ni secret.
+
+### Completion Notes
+
+- Règle pure dans `core/php/jeedom2ha_homekit_exposure.php` (sans cœur Jeedom, donc testée en CI) ; la lecture du contexte (`plugin::byId('homebridge')`, `config::byKey('sendToHomebridgeDefault', 'homebridge', 1)`, `plugin::listPlugin(true, false, true, true)`, `jeeObject::getConfiguration`) est dans `jeedom2ha::buildHomekitExposureContext`. Le plugin Homebridge n'est jamais appelé.
+- Ordre d'évaluation : Homebridge absent/inactif (`null`, `homebridge_absent`) → plugin (`false`, `plugin_excluded`) → pièce (`false`, `piece`) → équipement (`equipement`) → défaut (`defaut_homebridge`). Toute valeur illisible : `null`, `illisible`.
+- **Point à confirmer par la preuve (ClaudeBox)** : la forme exacte de la liste rendue par `plugin::listPlugin(true, false, true, true)` n'est pas vérifiable depuis la session. Le code accepte identifiants, tableau indexé ou objets, et se replie sur `plugin::byId($type)->isActive()` pour un plugin absent de la liste ; en cas d'échec de lecture : `null`. Même remarque pour `config::byKey(..., 'homebridge')` (droits, nom de classe).
+- Aucun changement de topic, d'`unique_id`, de payload de découverte, d'éligibilité, de contrat d'override ; aucune dépendance ; `transport/http_server.py` et `desktop/` non touchés ; `exportDiagnostic` inchangé.
+- Absence d'écriture : recherche dans le diff (`setConfiguration|setLogicalId|->save(|config::save|config::remove`) sans résultat sur les lignes ajoutées, doublée par `test_php_additions_are_read_only`.
+
+### File List
+
+- `core/php/jeedom2ha_homekit_exposure.php` (nouveau)
+- `core/class/jeedom2ha.class.php`
+- `resources/daemon/models/topology.py`
+- `tests/unit/test_story_24_1_php_homekit_exposure.php` (nouveau)
+- `tests/unit/test_story_24_1_homekit_signal.py` (nouveau)
+- `docs/dev-homekit-exposure.md` (nouveau)
+- `docs/operations/delegations.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- cette story
