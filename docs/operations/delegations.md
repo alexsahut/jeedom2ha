@@ -39,3 +39,10 @@ citer ce script sans ce flag dans une entrée de ce journal.
 - **Branche / PR :** `docs/epic-23-market-promotion` → `main` (PR #250).
 - **Décision de workflow :** ClaudeBox relit chaque story avant tout passage à `ready-for-dev`.
 - **Prérequis externes consignés :** snapshot vierge de l'unité `a66-reprise-diagnostic`, VM 122; Mosquitto local; HA Docker local; branche `main` jusqu'à C1; décision de licence Alexandre.
+
+# 2026-10-12 — Story 23.3 : cadrage documentaire du streaming lumières et volets
+
+- **Demandeur :** Alexandre, relayé par ClaudeBox.
+- **Périmètre :** revalidation en lecture seule du code de `main` (`_STREAMED_TYPES`, listeners, publishers light/cover, payloads, `optimistic`) et contrat proposé état/luminosité/position, ajoutés à la story 23.3 (toujours `draft`); aucun code, test, fixture, accès VM/Jeedom/HA (CC-48); A1/A2/A3 et 22.2 non touchés.
+- **Branche / PR :** `docs/23-3-cadrage-streaming` → `main`.
+- **Décision de workflow :** relecture ClaudeBox avant tout passage à `ready-for-dev`; sept questions ouvertes consignées dans la story (§7).
