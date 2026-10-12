@@ -40,6 +40,7 @@ printf '{"check_runs":[{"status":"%s","conclusion":"%s"}]}\n' "$MOCK_CI_STATUS" 
     (bin_dir / "jq").write_text(
         """#!/bin/sh
 case "$*" in
+  *'.conclusion // "success"'*) printf 'completed\tsuccess\n' ;;
   *check_runs*) printf '%s\t%s\n' "$MOCK_CI_STATUS" "$MOCK_CI_CONCLUSION" ;;
   *) printf 'ok\n' ;;
 esac

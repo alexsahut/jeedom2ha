@@ -1,8 +1,8 @@
 # Story 21.1 : Solde des réserves de l'étape 4 — scénario désactivé (CC-44) et affichage d'un état sans ordre On/Off (CC-47)
 
-Status: ready-for-dev
+Status: done
 
-> **Statut : `ready-for-dev`** (2026-10-11). Alexandre a tranché les questions Q0 à Q4 le 2026-10-11 vers 20:35, relayé par ClaudeBox : **Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A** — toutes les recommandations sont retenues (voir « Décisions d'Alexandre » et le Journal des décisions). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. Créée par une session cloud déléguée (lecture seule), relue trois fois par ClaudeBox (R1, R2, puis consignation des décisions). Numérotation retenue : `pe-epic-21` / story `21-1`.
+> **Statut : `done`** (clôture du 2026-10-12, voir « Clôture (2026-10-12) »). Historique : `ready-for-dev` (2026-10-11). Alexandre a tranché les questions Q0 à Q4 le 2026-10-11 vers 20:35, relayé par ClaudeBox : **Q0 A, Q1 A, Q2 A, Q2b C, Q3 C, Q4 A** — toutes les recommandations sont retenues (voir « Décisions d'Alexandre » et le Journal des décisions). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. Créée par une session cloud déléguée (lecture seule), relue trois fois par ClaudeBox (R1, R2, puis consignation des décisions). Numérotation retenue : `pe-epic-21` / story `21-1`.
 >
 > **Nature du bloc B (R2).** Un relevé de terrain du 2026-10-11 montre que **la commande 5369 est déjà publiée dans Home Assistant**. CC-47 n'est donc **pas un défaut de publication** mais un **défaut d'affichage et de décompte** : l'écran dit « Ne sera pas publié » et compte 5369 « bloquante » alors qu'une entité la publie. Le bloc B corrige cet affichage ; il ne change **aucune publication**.
 
@@ -222,6 +222,46 @@ Pointeurs revérifiés dans le code au moment de l'écriture (les lignes ont bou
 - 2026-10-11 — Relecture R2 (ClaudeBox, PR #234, tête `91ebf4a`) : relevé de terrain montrant que 5369 est **déjà publiée** en `binary_sensor` (CC-47 = défaut d'affichage et de décompte, pas de publication). Story recadrée : bloc B refait (résolution par commande, ligne, synthèse, totaux), erratum sur le verdict du 06/10, Q3 réduite à l'équipement à une seule entité (recommandation C), Q4 réduite au libellé de ce cas, section « Questions » réécrite pour se lire seule. Rien n'est tranché par ce document.
 - 2026-10-11, vers 20:35 — **Décisions d'Alexandre** (relayées par ClaudeBox) : **Q0 A** (nouvel `pe-epic-21`, story `21-1`), **Q1 A** (une story, deux blocs, deux PR), **Q2 A** (retirer le bouton HA d'un scénario désactivé), **Q2b C** (le broker fait foi), **Q3 C** (pas de changement de mapper ; le chemin « type puis forçage » reste couvert par un test), **Q4 A** (libellé de la cause d'état seul). Toutes les recommandations sont retenues.
 - 2026-10-11 — **`ready-for-dev` accordé** par ClaudeBox au nom de cette décision. AC [Qx] figés, variantes non retenues retirées, `sprint-status.yaml` mis en cohérence (`pe-epic-21: in-progress`, story `ready-for-dev`). Faits ajoutés : réglages des entités supprimées conservés dans `deleted_entities` du registre HA (encadré de Q2, à vérifier en AC 13) ; commande de dry-run avec `--sha` (Task 0).
+- 2026-10-12, vers 05:50 — **Décision d'Alexandre : clôture de 21-1 avec une réserve sur l'AC 13 a** (essai de réactivation par un humain non fait ; couvert par les tests de #237 et par `deleted_entities` de HA ; vérification à la prochaine réactivation naturelle d'un scénario, suivi CC-61). Validation UX du bloc B donnée par ClaudeBox au nom d'Alexandre (délégation du 11/10 vers 22:50). Story `done`, `pe-epic-21` clos.
+
+## Clôture (2026-10-12)
+
+**Statut : `done`, avec une réserve sur l'AC 13 a.** Preuve de terrain : `21-1-preuve-terrain-2026-10-11.md` (déploiement, journal du démon, registres de HA, gate 20-0). Aucun nom réel dans la preuve (CC-48).
+
+### État des AC
+
+| AC | État | Preuve ou test |
+|---|---|---|
+| 1 | tenu | tests unitaires de #237 (inactif : `unpublish`, actif : publié) ; terrain : 36 inactifs vidés, 8 boutons retirés (355 → 347 topics) |
+| 2 | tenu par tests, non observé sur le terrain | tests unitaires de #237 (même `unique_id`, même `command_topic`) ; essai humain non fait, voir la réserve ci-dessous |
+| 3 | tenu | tests unitaires de #237 (a à d) ; terrain : 7 fantômes (2, 32, 33, 39, 40, 72, 129) retirés au premier sync, 0 retiré d'après le broker |
+| 4 | tenu par tests | tests unitaires de #237 (broker injoignable : pas de purge ; pas de collision `eq_id`) |
+| 5 | tenu | #237 et #238 fusionnées avec CI verte ; `make test` et `flake8` verts |
+| 6 | tenu | journal du démon : `[SCENARIO] Retained button topics collected: 98 …` et `[SCENARIO] Unpublished 36 scenario button(s) …` |
+| 6 bis | tenu | tests de #237 ; terrain : 15 appareils de bouton modifiés à 20:39:51Z (valeurs neutres), 69 autres inchangés |
+| 7 | tenu | tests démon de #238 (forme de 579) |
+| 8 | tenu | tests Node de #238 ; terrain : ligne de 5369 « Sera publié : binary_sensor », synthèse « 5 commande(s) prête(s) », pièce 94 prêtes / 2 bloquantes |
+| 9 | tenu | terrain : 579 garde ses 5 entités ; seuls 8 topics de boutons de scénario retirés, aucun autre ajouté ni modifié |
+| 10 | tenu | test de caractérisation de #238 (forçage seul refusé, type seul refusé, type puis forçage publié) |
+| 11 | tenu | test Node sur le libellé (#238) |
+| 12 | tenu | gate 20-0 du 12/10 : découverte PASS, référence PASS, contrôle négatif FAIL attendu, aucune écriture |
+| 13 | tenu, **réserve sur a** | preuve terrain ; a : réactivation par un humain non faite (décision d'Alexandre) ; b : tenu |
+| 14 | tenu | `docs/fr_FR/changelog_beta.md` et `docs/fr_FR/index.md` (moment où le bouton disparaît) |
+| 15 | tenu | deux PR (#237, #238) vers `main`, Conventional Commits ; fichiers de preuve de 20-x non modifiés |
+
+### Réserve sur l'AC 13 a
+
+**Décision d'Alexandre du 2026-10-12 vers 05:50 : clôture avec une réserve.** L'essai de réactivation d'un scénario par un humain (le bouton revient dans HA avec nom, identifiant d'entité, pièce et icône) n'a pas été fait. Il est couvert par les tests unitaires de #237, et HA garde dans `deleted_entities` les réglages des entités retirées (les 8 boutons retirés y figurent avec leur `entity_id`, sans réglage personnalisé). La vérification se fera à la prochaine réactivation naturelle d'un scénario (suivi ClaudeBox CC-61).
+
+### Autres éléments de clôture
+
+- **Validation UX du bloc B** : donnée par ClaudeBox au nom d'Alexandre, sur sa délégation du 2026-10-11 vers 22:50.
+- **Gate 20-0** : premier passage FAIL le 11/10 (ancre de 579 disparue, effet voulu du bloc B) ; gate réancré par #245 (`ab3a854`) ; second passage le 12/10 : découverte PASS, référence PASS, contrôle négatif FAIL attendu, aucune écriture.
+- **SHA déployé** : `30e6c80` (démon redémarré le 2026-10-11 à 20:39:47Z).
+- **Points fermés** : CC-44 (bloc A, #237 `d293a65`), CC-47 (bloc B, #238 `30e6c80`), CC-57 (disponibilité et appareil des boutons de scénario homonymes, AC 6 bis, prouvé le 12/10).
+- **Points renvoyés** : CC-58 et CC-60 vers la story 22-2 ; CC-61 (vérification de la réactivation, AC 13 a) suivi par ClaudeBox.
+- **Nés pendant la story, hors périmètre** : CC-59 (garde-fou CI par branche), corrigé par #244 (`f6acf0f`).
+- **Rétrospective** : `pe-epic-21-retro-2026-10-12.md`.
 
 ## Dev Agent Record
 
@@ -355,3 +395,6 @@ Vérifications : `python3 -m pytest` complet 2104 passés, 1 ignoré ; `flake8` 
 - `_bmad-output/implementation-artifacts/21-1-solde-reserves-cc44-scenario-desactive-cc47-etat-sans-ordre-on-off.md` (nouveau)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (inscription provisoire)
 - `_bmad-output/planning-artifacts/epics-projection-engine.md` (Epic 21 proposé)
+- `_bmad-output/implementation-artifacts/21-1-preuve-terrain-2026-10-11.md` (nouveau, clôture)
+- `_bmad-output/implementation-artifacts/pe-epic-21-retro-2026-10-12.md` (nouveau, clôture)
+- `docs/operations/delegations.md` (sessions de la nuit du 11 au 12/10)

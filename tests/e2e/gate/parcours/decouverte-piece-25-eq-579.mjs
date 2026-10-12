@@ -1,7 +1,7 @@
-/** Parcours de découverte lecture seule : Garage puis équipement Enphase (étendu en 20.3 :
+/** Parcours de découverte lecture seule : pièce 25 puis équipement 579 (étendu en 20.3 :
  * absence de la synthèse et de la modale Diagnostic, chaînes interdites, compteurs de la pièce). */
 
-export const name = 'decouverte-garage-enphase';
+export const name = 'decouverte-piece-25-eq-579';
 export const declaredEquipments = {};
 export const declaredPublicationOverrides = {};
 export const declaredBascules = [];
@@ -142,7 +142,7 @@ async function waitAtStep(helpers, index, label, operation) {
   }
 }
 
-/** Ouvre Garage, déplie Enphase et consigne les constats DOM non sensibles. */
+/** Ouvre la pièce 25, déplie l'équipement 579 et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
   const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
     const actions = nodes.find((node) => node.querySelector('[data-action="gotoPluginConf"]'));
@@ -175,20 +175,16 @@ export async function run(page, { helpers }) {
     if (!Number.isInteger(count) || count < 1) throw new Error('compte-sans-piece-illisible');
     helpers.record('sans_piece_equipements', count);
   }
-  const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card').filter({
-    has: page.locator('.name', { hasText: /^Garage$/ }),
-  });
-  await waitAtStep(helpers, 1, 'carte-garage', () => roomCard.click());
+  const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
+  await waitAtStep(helpers, 1, 'carte-piece-25', () => roomCard.click());
 
   const modal = page.locator('.modal-j2ha-room');
   await waitAtStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel').filter({
-    has: page.locator('.j2ha-eq-name', { hasText: /^\s*Enphase\s*$/ }),
-  });
-  await waitAtStep(helpers, 3, 'panneau-enphase', () => panel.waitFor({ state: 'visible' }));
+  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="579"]');
+  await waitAtStep(helpers, 3, 'panneau-eq-579', () => panel.waitFor({ state: 'visible' }));
 
   const eqId = await panel.getAttribute('data-eq-id');
-  if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-enphase-illisible');
+  if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-eq-579-illisible');
   await waitAtStep(helpers, 4, 'depliage', async () => {
     await panel.locator('.j2ha-eq-toggle').click();
     await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
@@ -200,12 +196,12 @@ export async function run(page, { helpers }) {
 
   helpers.record('eq_id', Number(eqId));
   for (const command of await readCommandStates(panel)) {
-    if (!/^\d+$/.test(command.id ?? '')) throw new Error('cmdid-enphase-illisible');
+    if (!/^\d+$/.test(command.id ?? '')) throw new Error('cmdid-eq-579-illisible');
     helpers.record(`cmd_${command.id}_id`, Number(command.id));
     helpers.record(`cmd_${command.id}_etat`, command.state);
   }
   const summary = (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
-  if (!summary) throw new Error('synthese-enphase-illisible');
+  if (!summary) throw new Error('synthese-eq-579-illisible');
   helpers.record('synthese', summary);
   for (const equipment of await readEquipmentBadgeStates(page, modal)) {
     if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
@@ -224,7 +220,7 @@ export async function run(page, { helpers }) {
 
   // Story 20.3 : compteurs de la pièce ouverte, chaînes interdites dans la modale, actions déplacées présentes
   // (jamais cliquées par le gate : le clic réel est une preuve terrain séparée, avec GO d'Alexandre).
-  await waitAtStep(helpers, 8, 'compteurs-garage', () => readRoomCounters(modal, helpers, 'garage'));
+  await waitAtStep(helpers, 8, 'compteurs-piece-25', () => readRoomCounters(modal, helpers, 'piece_25'));
   const roomRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
   if (roomRanks.length) throw new Error(`chaine-interdite-piece-${roomRanks.join('-')}`);
   helpers.record('chaines_interdites_piece', 0);
@@ -241,7 +237,7 @@ export async function run(page, { helpers }) {
   // « Sans pièce » (quand la carte existe) : compteurs lus, aucune action de pièce.
   if (unassignedCount === 1) {
     await page.keyboard.press('Escape');
-    await waitAtStep(helpers, 9, 'fermeture-garage', () => modal.waitFor({ state: 'detached' }));
+    await waitAtStep(helpers, 9, 'fermeture-piece-25', () => modal.waitFor({ state: 'detached' }));
     await waitAtStep(helpers, 10, 'carte-sans-piece', () => unassigned.click());
     const unassignedModal = page.locator('.modal-j2ha-room');
     await waitAtStep(helpers, 11, 'modale-sans-piece', () => unassignedModal.waitFor({ state: 'visible' }));
