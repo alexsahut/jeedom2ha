@@ -540,11 +540,14 @@ async def test_state_listeners_route_lists_light_and_cover_commands(cli):
     assert pairs == {(300, 3003), (300, 3005), (400, 4003)}
 
 
-async def test_command_then_real_state_without_optimistic_publication(app, route_bridge):
+async def test_command_then_real_state_without_optimistic_publication():
     # With a real LIGHT_STATE the command sync must not publish an optimistic state:
     # the only state publication is the one produced by the Jeedom event.
-    decision = app["publications"][300]
-    cmd_sync = CommandSynchronizer(app=app, mqtt_bridge=route_bridge,
+    bridge = _FakeBridge()
+    decision = _light(300)
+    app = {"publications": {300: decision}}
+    app["state_synchronizer"] = StateSynchronizer(app=app, mqtt_bridge=bridge)
+    cmd_sync = CommandSynchronizer(app=app, mqtt_bridge=bridge,
                                    jeedom_api_endpoint="http://x/api")
     translation_policy = cmd_sync._select_confirmation_policy(
         decision.mapping_result, decision,
@@ -552,7 +555,8 @@ async def test_command_then_real_state_without_optimistic_publication(app, route
     )
     assert translation_policy == "real_state_confirmation"
     assert await app["state_synchronizer"].handle_state_message(300, 3003, "0") is True
-    assert route_bridge.published == [("jeedom2ha/300/state", "OFF", 1, True)]
+    assert bridge.published == [("jeedom2ha/300/state", "OFF", 1, True)]
+
 
 
 @pytest.mark.asyncio
