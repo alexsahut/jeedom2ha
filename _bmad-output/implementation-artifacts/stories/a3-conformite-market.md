@@ -129,3 +129,11 @@ Référence officielle : `doc.jeedom.com/fr_FR/dev/structure_info_json`. Champs 
 - Dépendance : A2 (construction du paquet) a besoin de cette story terminée pour fixer les liens `blob/beta|stable/docs/fr_FR/...` dans le manifeste et dans `info.json` de façon cohérente.
 - Ordre proposé : **A1 et A3 en parallèle, puis A2**.
 - Référence officielle à utiliser en dev : `doc.jeedom.com/fr_FR/dev/structure_info_json` (pas la page `/plugins/market/` citée par erreur dans la version précédente de cette fiche).
+
+## Dev Agent Record (session cloud 11/10)
+
+- `pluginVersion` 1.2.0 (dernier tag `v1.1.0`) ; le test exige `pluginVersion >= dernier tag v*` (`=` si HEAD est taggé) et une entrée de changelog dont l'en-tête cite la version ; en-tête `v1.2.0` ajouté à l'entrée du 2026-10-11 de `docs/fr_FR/changelog.md`.
+- Liens `blob/stable/...` : 404 attendu tant que `stable` n'a pas reçu sa première release Market.
+- `link.forum` laissé vide en connaissance de cause (aucun forum dédié).
+- README utilisateur (AC9) : réécrit par la session cloud le 2026-10-12 (commit `95bec8d`, consigne envoyée après revue ClaudeBox ayant constaté l'absence du livrable) — remplace l'ancien README orienté développeur par une version vue d'ensemble/prérequis (Jeedom 4.4+, Debian 11-12, broker MQTT, HA + intégration MQTT)/lien `docs/fr_FR/index.md`, sans nom d'équipement/pièce réel. Relu et approuvé par ClaudeBox le 2026-10-12 07:45, avec la précision qu'au passage en stable `os.min` sera fixé à `12` seul (décision Alex 07:19), pas avant.
+- Test : `tests/unit/test_info_json_market_conformity.py` (sous-test de tags ignoré si le clone n'a pas de tags).
