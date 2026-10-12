@@ -391,9 +391,22 @@ async def test_cover_discovery_optimistic_only_without_real_state(snapshot, kwar
 
 # --- retained purge at (re)publication (Q7) ---------------------------------
 
+class _ScanBridge(_FakeBridge):
+    """Bridge able to read the retained topics (``collect_retained_topics``)."""
+
+    def __init__(self, retained, **kwargs):
+        super().__init__(**kwargs)
+        self._retained = retained
+        self.collect_calls = 0
+
+    async def collect_retained_topics(self, topic_filter, window_s=1.5):
+        self.collect_calls += 1
+        return list(self._retained)
+
+
 @pytest.mark.asyncio
-async def test_light_without_readback_purges_stale_retained_once():
-    bridge = _FakeBridge()
+async def test_stale_retained_found_at_broker_is_emptied_once():
+    bridge = _ScanBridge(["jeedom2ha/300/state", "jeedom2ha/300/brightness"])
     decision = _light(300, state=False, brightness=False)
     sync = _sync([decision], bridge)
     await sync.publish_initial_states(decision)
@@ -402,21 +415,48 @@ async def test_light_without_readback_purges_stale_retained_once():
         ("jeedom2ha/300/state", "", 1, True),
     ]
     await sync.publish_initial_states(decision)
-    assert len(bridge.published) == 2  # once per process, not at every sync
+    assert len(bridge.published) == 2          # emptied once, not at every sync
+    assert bridge.collect_calls == 1           # broker read once per process
+
+
+@pytest.mark.asyncio
+async def test_nothing_retained_means_no_purge_publication():
+    bridge = _ScanBridge([])
+    decision = _light(300, state=False, brightness=False)
+    await _sync([decision], bridge).publish_initial_states(decision)
+    assert bridge.published == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_without_collection_costs_nothing():
+    bridge = _FakeBridge()
+    decision = _light(300, state=False, brightness=False)
+    await _sync([decision], bridge).publish_initial_states(decision)
+    assert bridge.published == []
 
 
 @pytest.mark.asyncio
 async def test_entity_keeping_its_readback_is_never_purged():
-    bridge = _FakeBridge()
+    bridge = _ScanBridge(["jeedom2ha/300/state", "jeedom2ha/300/brightness"])
     decision = _light(300)
-    sync = _sync([decision], bridge)
-    await sync.publish_initial_states(decision)
+    await _sync([decision], bridge).publish_initial_states(decision)
     assert all(p[1] != "" for p in bridge.published)
 
 
 @pytest.mark.asyncio
-async def test_real_to_unreliable_transition_purges_and_rearms():
-    bridge = _FakeBridge()
+async def test_only_strict_jeedom2ha_channel_topics_are_ever_emptied():
+    bridge = _ScanBridge([
+        "other/300/state", "jeedom2ha/300/set", "jeedom2ha/300/brightness/set",
+        "jeedom2ha/300/availability", "jeedom2ha/300/5/state", "jeedom2ha/bridge/state",
+    ])
+    decision = _light(300, state=False, brightness=False)
+    await _sync([decision], bridge).publish_initial_states(decision)
+    assert bridge.published == []
+
+
+@pytest.mark.asyncio
+async def test_real_to_unreliable_transition_purges_what_we_published():
+    bridge = _FakeBridge()                                     # no broker read needed
     decision = _cover(400)
     sync = _sync([decision], bridge)
     await sync.publish_initial_states(decision)               # real: state + position
@@ -432,30 +472,20 @@ async def test_real_to_unreliable_transition_purges_and_rearms():
 
 
 @pytest.mark.asyncio
-async def test_purge_only_touches_jeedom2ha_topics():
-    bridge = _FakeBridge()
-    decision = _light(300, state=False, brightness=False)
-    decision.mapping_result.reason_details = {"state_topic": "other/300/state"}
-    sync = _sync([decision], bridge)
-    await sync.publish_initial_states(decision)
-    assert bridge.published == []
-
-
-@pytest.mark.asyncio
 async def test_failed_purge_is_retried_at_next_publication():
-    bridge = _FakeBridge(publish_ok=False)
+    bridge = _ScanBridge(["jeedom2ha/300/state"], publish_ok=False)
     decision = _light(300, state=False, brightness=False)
     sync = _sync([decision], bridge)
     await sync.publish_initial_states(decision)
     bridge._publish_ok = True
     bridge.published.clear()
     await sync.publish_initial_states(decision)
-    assert len(bridge.published) == 2
+    assert bridge.published == [("jeedom2ha/300/state", "", 1, True)]
 
 
 @pytest.mark.asyncio
 async def test_state_event_never_purges():
-    bridge = _FakeBridge()
+    bridge = _ScanBridge(["jeedom2ha/300/state"])
     decision = _light(300, state=False, brightness=False)
     sync = _sync([decision], bridge)
     await sync.handle_state_message(300, 3003, "1")

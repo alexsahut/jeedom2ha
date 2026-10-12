@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import time
 import math
+import re
 from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Set, Tuple
 
 from models.mapping import MappingResult, PublicationDecision
@@ -69,6 +70,9 @@ _READBACK_KEYS = {
     "light": STATE_KEYS["light"] + BRIGHTNESS_KEYS,
     "cover": STATE_KEYS["cover"],
 }
+
+# Strict shape of the retained channel topics this module may empty (never anything else).
+_CHANNEL_TOPIC_RE = re.compile(r"jeedom2ha/\d+/(?:state|brightness|position)")
 
 # Retained channel topics a type may have published; purged when the channel loses its
 # readback (Story 23.3, Q7).
@@ -114,8 +118,11 @@ class StateSynchronizer:
         # rejected (state_target_not_found), so a click's fresh read never wins over
         # a more recent Jeedom event received while the click was in flight.
         self._pending_click_values: Dict[Tuple[int, int], Tuple[float, Any]] = {}
-        # Story 23.3 (Q7) — (eq_id, channel) whose stale retained state was already emptied.
-        self._purged_channels: Set[Tuple[Any, str]] = set()
+        # Story 23.3 (Q7) — retained light/cover channel topics known to exist at the
+        # broker: read once per process (``_ensure_retained_scan``) then kept up to date
+        # with our own retained publishes. A stale one is emptied only if it is in here.
+        self._retained_channel_topics: Set[str] = set()
+        self._retained_scan_done = False
 
     @property
     def is_active(self) -> bool:
@@ -191,6 +198,7 @@ class StateSynchronizer:
                 continue
 
             published += 1
+            self._remember_retained(binding.topic)
             self._log(logging.INFO, eq_id=eq_id_int, cmd_id=cmd_id_int,
                       reason_code="state_published", action="publish_state",
                       state_topic=binding.topic, ha_type=mapping.ha_entity_type)
@@ -327,6 +335,11 @@ class StateSynchronizer:
         eq_id = getattr(mapping, "jeedom_eq_id", None)
         published = 0
         failed = 0
+        if any(
+            getattr(c, "ha_entity_type", None) in _PURGEABLE_CHANNELS
+            for c in self._iter_streamed_candidates(mapping)
+        ):
+            await self._ensure_retained_scan()
         for candidate in self._iter_streamed_candidates(mapping):
             # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
             cand_decision = (
@@ -357,6 +370,7 @@ class StateSynchronizer:
                     continue
                 if self._mqtt_bridge.publish_message(binding.topic, payload, qos=1, retain=True):
                     published += 1
+                    self._remember_retained(binding.topic)
                     self._log(logging.INFO, eq_id=eq_id, cmd_id=binding.cmd_id,
                               reason_code="initial_state_published", action="publish_snapshot",
                               state_topic=binding.topic, ha_type=candidate.ha_entity_type)
@@ -367,6 +381,37 @@ class StateSynchronizer:
                                   reason_code=failure_reason_code, action="publish_snapshot",
                                   state_topic=binding.topic)
         return published, failed
+
+    async def _ensure_retained_scan(self) -> None:
+        """Read once per process which light/cover channel topics are retained.
+
+        Story 23.3 (Q7). The broker is the source of truth (same approach as the
+        scenario button purge): only what was actually read can be emptied, so the
+        steady state costs no MQTT publish per equipment. A short window only
+        under-reports; a bridge without collection (or one busy) leaves the scan
+        undone and it is retried at the next publication.
+        """
+        if self._retained_scan_done:
+            return
+        collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
+        if collect is None:
+            return
+        try:
+            retained = await collect("jeedom2ha/#")
+        except Exception:
+            _LOGGER.exception("[SYNC-STATE] Retained channel scan failed, no stale purge")
+            return
+        if not isinstance(retained, list):
+            return
+        self._retained_scan_done = True
+        for topic in retained:
+            if isinstance(topic, str) and _CHANNEL_TOPIC_RE.fullmatch(topic):
+                self._retained_channel_topics.add(topic)
+
+    def _remember_retained(self, topic: str) -> None:
+        """Track a retained channel topic we just published (real state -> purgeable)."""
+        if _CHANNEL_TOPIC_RE.fullmatch(topic):
+            self._retained_channel_topics.add(topic)
 
     def _purge_invalid_retained(
         self,
@@ -380,26 +425,22 @@ class StateSynchronizer:
         ``retain=False``: an entity that lost its readback command after publishing a
         real state would otherwise get that stale value back from the broker. Runs at
         (re)publication and rescan only (never on a state event), strictly on
-        ``jeedom2ha/…`` topics derived from the registry state topic. Once per process
-        and channel while the channel stays without readback; a channel that regains a
-        readback is re-armed so a later loss purges again.
+        ``jeedom2ha/<eq>/state|brightness|position`` topics derived from the registry
+        state topic, and only for topics known to be retained (scan + our own
+        publishes), so an entity that keeps its readback or never had one costs nothing.
         """
         channels = _PURGEABLE_CHANNELS.get(getattr(candidate, "ha_entity_type", None))
         if not channels or not state_topic.startswith("jeedom2ha/"):
             return
         live = {name for name, _cmd in readback_commands(candidate.ha_entity_type, candidate)}
         for channel in channels:
-            key = (eq_id, channel)
             if channel in live:
-                self._purged_channels.discard(key)
-                continue
-            if key in self._purged_channels:
                 continue
             topic = channel_topic(state_topic, channel)
-            if not topic.startswith("jeedom2ha/"):
+            if topic not in self._retained_channel_topics:
                 continue
             if self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True):
-                self._purged_channels.add(key)
+                self._retained_channel_topics.discard(topic)
                 self._log(logging.INFO, eq_id=eq_id, cmd_id=None,
                           reason_code="stale_retained_state_purged", action="purge_state",
                           state_topic=topic)
