@@ -1393,6 +1393,7 @@
       },
       "name": "Light reference 1000",
       "object_id": "jeedom2ha_1000",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1432,6 +1433,7 @@
       },
       "name": "Light reference 1001",
       "object_id": "jeedom2ha_1001",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1471,6 +1473,7 @@
       },
       "name": "Light reference 1002",
       "object_id": "jeedom2ha_1002",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1498,7 +1501,6 @@
       "availability_mode": "all",
       "brightness_command_topic": "jeedom2ha/1003/brightness/set",
       "brightness_scale": 100,
-      "brightness_state_topic": "jeedom2ha/1003/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/1003/set",
       "default_entity_id": "light.jeedom2ha_1003",
@@ -1514,6 +1516,7 @@
       },
       "name": "Light reference 1003",
       "object_id": "jeedom2ha_1003",
+      "optimistic": true,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1560,6 +1563,7 @@
       },
       "name": "Light reference 1004",
       "object_id": "jeedom2ha_1004",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1606,6 +1610,7 @@
       },
       "name": "Light reference 1005",
       "object_id": "jeedom2ha_1005",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1648,6 +1653,7 @@
       },
       "name": "Light reference 1006",
       "object_id": "jeedom2ha_1006",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1687,6 +1693,7 @@
       },
       "name": "Light reference 1007",
       "object_id": "jeedom2ha_1007",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1726,6 +1733,7 @@
       },
       "name": "Light reference 1008",
       "object_id": "jeedom2ha_1008",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1769,6 +1777,7 @@
       },
       "name": "Light reference 1009",
       "object_id": "jeedom2ha_1009",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1812,6 +1821,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2000",
       "object_id": "jeedom2ha_2000",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1854,6 +1864,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2001",
       "object_id": "jeedom2ha_2001",
+      "optimistic": true,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1896,6 +1907,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2002",
       "object_id": "jeedom2ha_2002",
+      "optimistic": true,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1942,6 +1954,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2003",
       "object_id": "jeedom2ha_2003",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1985,6 +1998,7 @@
       "device_class": "blind",
       "name": "Cover reference 2004",
       "object_id": "jeedom2ha_2004",
+      "optimistic": true,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2027,6 +2041,7 @@
       "device_class": "blind",
       "name": "Cover reference 2005",
       "object_id": "jeedom2ha_2005",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2069,6 +2084,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2006",
       "object_id": "jeedom2ha_2006",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2115,6 +2131,7 @@
       "device_class": "shutter",
       "name": "Cover reference 2007",
       "object_id": "jeedom2ha_2007",
+      "optimistic": true,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2367,6 +2384,7 @@
       },
       "name": "Blocked product_scope climate 6001",
       "object_id": "jeedom2ha_6001",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -3092,7 +3110,6 @@
       "availability_mode": "all",
       "brightness_command_topic": "jeedom2ha/457/brightness/set",
       "brightness_scale": 100,
-      "brightness_state_topic": "jeedom2ha/457/brightness",
       "color_mode": true,
       "command_topic": "jeedom2ha/457/set",
       "default_entity_id": "light.jeedom2ha_457",
@@ -3108,6 +3125,7 @@
       },
       "name": "Chambre parents",
       "object_id": "jeedom2ha_457",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"

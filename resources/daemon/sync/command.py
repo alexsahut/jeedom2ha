@@ -12,6 +12,7 @@ import aiohttp
 
 from models.availability import AVAILABILITY_OFFLINE
 from models.mapping import MappingResult, PublicationDecision
+from sync.readback import CHANNEL_STATE, has_reliable_channel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -410,26 +411,15 @@ class CommandSynchronizer:
 
         # Scope-aware (Story 12.2): a type the synchronizer does NOT stream must not
         # be treated as reliable, else its optimistic publish is suppressed while no
-        # real state ever arrives (regression). vague 2 streams switch only.
+        # real state ever arrives (regression). Streamed: switch, light, cover.
         if not self._state_sync_streams_type(state_sync, mapping.ha_entity_type):
             return False
 
-        commands = mapping.commands or {}
-        if mapping.ha_entity_type in ("light", "switch"):
-            for key in ("LIGHT_STATE", "ENERGY_STATE", "SWITCH_STATE", "PRESENCE"):
-                cmd = commands.get(key)
-                if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
-                    return True
-            return False
-
-        if mapping.ha_entity_type == "cover":
-            for key in ("FLAP_STATE", "FLAP_BSO_STATE"):
-                cmd = commands.get(key)
-                if cmd is not None and str(getattr(cmd, "type", "info")).lower() == "info":
-                    return True
-            return False
-
-        return False
+        # Story 23.3 — reliability is evaluated per channel and shared with discovery
+        # (``optimistic``) and StateSynchronizer through ``sync.readback``. Only the ON/OFF
+        # (open/closed) channel decides whether the optimistic publish is suppressed:
+        # a brightness / position info command alone never makes it reliable (Q4).
+        return has_reliable_channel(mapping.ha_entity_type, mapping, CHANNEL_STATE)
 
     @staticmethod
     def _state_sync_streams_type(state_sync: Any, ha_type: Any) -> bool:

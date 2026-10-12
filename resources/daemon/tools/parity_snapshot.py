@@ -103,8 +103,12 @@ _MQTT_DISCOVERY_SUBSTRING = "jeedom2ha_"
 # Story 19.2 — topics d'état retenus (jamais discovery), même convention de
 # nommage que discovery/publisher.py::_build_topic pour les secondaires
 # (`jeedom2ha/<eq_id>/<cmd_id>/state`).
-_STATE_TOPIC_FILTER = "jeedom2ha/+/+/state"
-_STATE_TOPIC_SUBSTRING = "/state"
+# Story 23.3 (Q6) — l'abonnement lecture seule est élargi à `jeedom2ha/#` (les topics de
+# 23.3 sont `jeedom2ha/<eq_id>/state|brightness|position`, sans niveau commande) puis
+# filtré ici : seuls les topics d'état streamés sont conservés (jamais availability,
+# commandes `…/set`, etc.).
+_STATE_TOPIC_FILTER = "jeedom2ha/#"
+_STATE_TOPIC_RE = re.compile(r"jeedom2ha/\d+(?:/\d+)?/(?:state|brightness|position)")
 
 # Extrait (eq_id, cmd_id) d'un node_id discovery de secondaire
 # (`jeedom2ha_<eq_id>_<cmd_id>`, cf. mapping/switch.py) pour corréler avec
@@ -568,7 +572,7 @@ def capture_snapshot(
         with open(mqtt_state_inventory_file, encoding="utf-8") as inventory:
             state_topics = sorted({
                 line.strip() for line in inventory
-                if _STATE_TOPIC_SUBSTRING in line and line.strip()
+                if _STATE_TOPIC_RE.fullmatch(line.strip())
             })
         i11_candidates = _detect_i11_state_coverage(i11_candidates, state_topics)
 
@@ -634,8 +638,16 @@ def diff_snapshots(before: dict, after: dict) -> dict:
         {"eq_id": eq_id, "cmd_id": cmd_id} for eq_id, cmd_id in sorted(before_listeners - after_listeners)
     ]
 
+    # Story 23.3 (Q6) — topics d'état retenus (`state|brightness|position`) comparés
+    # comme les écouteurs : preuve terrain complémentaire, jamais un critère de
+    # `is_empty_diff` (23.3 en ajoute volontairement). Clé absente = liste vide.
+    before_state_topics = set(before.get("state_topics") or [])
+    after_state_topics = set(after.get("state_topics") or [])
+
     return {
         "changed_decisions": changed_decisions,
+        "state_topics_added": sorted(after_state_topics - before_state_topics),
+        "state_topics_removed": sorted(before_state_topics - after_state_topics),
         "topics_added": sorted(after_topics - before_topics),
         "topics_removed": sorted(before_topics - after_topics),
         "topic_count_before": len(before_topics),

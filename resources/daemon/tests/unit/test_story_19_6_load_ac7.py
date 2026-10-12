@@ -51,10 +51,14 @@ MACHINE_FACTOR = 3.0  # box de terrain présumée <= 3x plus lente que la VM de 
 MARGE_MESURE = 1.5  # marge explicite au-dessus du maximum observé (bruit de mesure).
 LATENCE_MQTT_S = 0.005  # borne prudente d'un aller-retour loopback (paho ne fait que publier en file).
 MEASURE_ITERATIONS = 20
-# Capacité annoncée dans docs/fr_FR/index.md (« environ 250 équipements typiques ») : seuil
-# protégé par la CI, en retrait de `n_max` mesuré (~300) pour rester stable sur des runners
-# plus lents (revue Codex P1, PR #189, 5e tour).
-CAPACITE_DOCUMENTEE = 250
+# Capacité protégée par la CI (« environ 250 équipements typiques » dans la story 19.6), en
+# retrait de `n_max` mesuré pour rester stable sur des runners plus lents (revue Codex P1,
+# PR #189, 5e tour : ~17 % de marge, 250 pour ~300). Story 23.3 : le light principal étant
+# streamé, le parc typique coûte 6 appels MQTT par équipement au lieu de 5 (état ON/OFF
+# initial, incompressible) ; `n_max` mesuré tombe à ~245 en CI (241-251 selon la machine),
+# soit moins que 250. Seuil recalé à 200 (~18 % de marge, comme avant) ; le travail réel du
+# démon mesuré sur la box (~2,5 ms/équipement) reste très en dessous de ce modèle prudent.
+CAPACITE_DOCUMENTEE = 200
 
 
 def _cmd(cmd_id, name, cmd_type, sub_type, generic_type=None, unit=None, value=None):
@@ -283,12 +287,12 @@ async def test_ac7_couts_mesures_et_enveloppe_respectee(cli_factory, tmp_path):
 
     # Revue Codex P1 (PR #189, 2e tour) : le vrai « Publier » exécute aussi
     # `publish_click_states()` (état au clic) pour chaque candidat streamé (les 2 sensors
-    # secondaires du dimmer multi-capteurs ; le light principal n'est pas streamé, cf.
-    # `StateSynchronizer.streams_actionable_type`). Appels MQTT par équipement mesurés
-    # (test_ac7_parc_typique_90_pct_enveloppe_sous_deadline, faux pont MQTT réel) = 3
-    # discovery + 2 état = 5 (la disponibilité locale n'ajoute aucun appel ici : fixture
-    # sans `local_availability_supported`).
-    APPELS_MQTT_PAR_EQUIPEMENT = 5
+    # secondaires du dimmer multi-capteurs ; depuis la story 23.3 le light principal l'est
+    # aussi : +1 état ON/OFF ; la purge des retained invalides ne coûte aucun appel ici, le
+    # faux pont ne lit aucun retained). Appels MQTT par équipement mesurés (faux pont
+    # MQTT réel) = 3 discovery + 2 état secondaires + 1 état light = 6 (la disponibilité locale n'ajoute aucun appel ici : fixture sans
+    # `local_availability_supported`).
+    APPELS_MQTT_PAR_EQUIPEMENT = 6
 
     # Scénario mixte à la frontière : portée courante (30/09 : 94 évalués sur 292, 3 entités
     # HA par équipement multi-capteurs) + un grand parc (1000) dont 1 seul équipement cible.
@@ -368,11 +372,11 @@ async def test_ac7_parc_typique_90_pct_enveloppe_sous_deadline(cli_factory, tmp_
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
     budget_travail = action_pacing.budget_travail(55.0)
     # Revue Codex P1 (PR #189, 2e tour) : appels MQTT par équipement multi-capteurs = 3
-    # discovery (light + 2 sensors) + 2 état au clic (les 2 sensors streamés ; le light
-    # n'est pas streamé, cf. StateSynchronizer.streams_actionable_type) ; la disponibilité
+    # discovery (light + 2 sensors) + 2 état au clic (les 2 sensors) + 1 état du light
+    # (streamé depuis la story 23.3, cf. StateSynchronizer.streams_actionable_type) ; la disponibilité
     # locale n'est pas publiée ici (`local_availability_supported` absent du fixture, comme
     # en discovery seule) et n'ajoute donc aucun appel supplémentaire mesuré.
-    APPELS_MQTT_PAR_EQUIPEMENT = 5
+    APPELS_MQTT_PAR_EQUIPEMENT = 6
     n_max = int((0.90 * budget_travail) / (APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt + c_eq + c_parc))
     assert n_max >= CAPACITE_DOCUMENTEE, (
         f"n_max mesuré ({n_max}) sous la capacité documentée ({CAPACITE_DOCUMENTEE})"
@@ -403,7 +407,7 @@ async def test_ac7_petite_portee_grand_inventaire_frontiere_sous_deadline(cli_fa
     c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
     budget_travail = action_pacing.budget_travail(55.0)
-    APPELS_MQTT_PAR_EQUIPEMENT = 5
+    APPELS_MQTT_PAR_EQUIPEMENT = 6
 
     n_parc = int((0.90 * budget_travail - APPELS_MQTT_PAR_EQUIPEMENT * c_mqtt - c_eq) / c_parc)
     n_parc_plafonne = min(n_parc, 50_000)
@@ -505,8 +509,9 @@ async def test_ac7_publier_retypage_sous_deadline(cli_factory, tmp_path):
     # Revue Codex P2 (PR #189, 8e tour) : compte figé au lieu d'un simple print (mesuré = 10
     # appels/équipement : dépublication de l'ancien type (3 node_ids) + republication sous le
     # nouveau type (3 discoveries + 2 état au clic, comme APPELS_MQTT_PAR_EQUIPEMENT) + 2
-    # appels supplémentaires propres au retypage).
-    assert bridge.call_count == n * 10
+    # appels supplémentaires propres au retypage). Story 23.3 : +1 par équipement (état
+    # ON/OFF du light désormais streamé), soit 11.
+    assert bridge.call_count == n * 11
 
     # Revue Codex P2 (PR #189, 8e tour) : n_max de ce chemin (10 appels MQTT/équipement),
     # recalculé avec les coûts unitaires mesurés — pour situer la marge réelle au-delà de n=94.
@@ -514,6 +519,6 @@ async def test_ac7_publier_retypage_sous_deadline(cli_factory, tmp_path):
     c_parc = await _measure_c_parc_e2e(cli_factory, tmp_path) * MARGE_MESURE * MACHINE_FACTOR
     c_mqtt = LATENCE_MQTT_S * MARGE_MESURE * MACHINE_FACTOR
     budget_travail = action_pacing.budget_travail(55.0)
-    n_max_retypage = int((0.90 * budget_travail) / (10 * c_mqtt + c_eq + c_parc))
-    print(f"[AC7] n_max (publier retypage, 10 appels/équipement, 90% enveloppe) = {n_max_retypage}")
+    n_max_retypage = int((0.90 * budget_travail) / (11 * c_mqtt + c_eq + c_parc))
+    print(f"[AC7] n_max (publier retypage, 11 appels/équipement, 90% enveloppe) = {n_max_retypage}")
     assert n_max_retypage >= n

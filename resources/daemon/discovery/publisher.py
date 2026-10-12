@@ -20,6 +20,11 @@ from models.availability import (
 )
 from models.mapping import MappingResult
 from models.topology import TopologySnapshot
+from sync.readback import (
+    CHANNEL_BRIGHTNESS,
+    CHANNEL_STATE,
+    has_reliable_channel,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -475,11 +480,18 @@ class DiscoveryPublisher:
         }
         self._add_default_entity_id(payload, "light")
         payload.update(self._build_availability_fields(mapping, snapshot))
+        # Story 23.3 (Q1 b) — ``optimistic: false`` only when a real ON/OFF state is
+        # streamed (LIGHT_STATE info); otherwise the assumed state is explicit.
+        payload["optimistic"] = not has_reliable_channel("light", mapping, CHANNEL_STATE)
 
         # Add brightness fields if capability detected.
         # getattr: a type override (D11) may keep non-Light detected capabilities.
         if getattr(mapping.capabilities, "has_brightness", False):
-            payload["brightness_state_topic"] = f"jeedom2ha/{eq_id}/brightness"
+            # Story 23.3 (R1-2) — declared only when a real info command feeds it
+            # (LIGHT_BRIGHTNESS, or a numeric LIGHT_STATE); with a binary state only, HA
+            # keeps the brightness optimistic instead of waiting for a value nothing sends.
+            if has_reliable_channel("light", mapping, CHANNEL_BRIGHTNESS):
+                payload["brightness_state_topic"] = f"jeedom2ha/{eq_id}/brightness"
             payload["brightness_command_topic"] = f"jeedom2ha/{eq_id}/brightness/set"
             payload["brightness_scale"] = 100
             payload["supported_color_modes"] = ["brightness"]
@@ -522,6 +534,9 @@ class DiscoveryPublisher:
         }
         self._add_default_entity_id(payload, "cover")
         payload.update(self._build_availability_fields(mapping, snapshot))
+        # Story 23.3 (Q1 b) — ``optimistic: false`` only when a real open/closed state
+        # is streamed (FLAP_STATE / FLAP_BSO_STATE info); otherwise it is explicit.
+        payload["optimistic"] = not has_reliable_channel("cover", mapping, CHANNEL_STATE)
 
         # Conditional: Stop
         if getattr(caps, "has_stop", False):

@@ -396,14 +396,14 @@ def test_is_active_is_true_in_vague2():
 
 @pytest.mark.parametrize("ha_type,streamed", [
     ("switch", True),
-    ("light", False),
-    ("cover", False),
+    ("light", True),   # Story 23.3 (vague 3)
+    ("cover", True),   # Story 23.3 (vague 3)
     ("button", False),
     ("sensor", False),
     ("binary_sensor", False),
 ])
 def test_streams_actionable_type_scope(ha_type, streamed):
-    """Only the actionable types actually streamed (vague 2 = switch) return True.
+    """Only the actionable types actually streamed (switch, light, cover) return True.
     sensor/binary_sensor are streamed but are NOT actionable, so they are False
     here — this gate is exclusively about suppressing the optimistic command path."""
     assert _sync({}, _FakeBridge()).streams_actionable_type(ha_type) is streamed
@@ -420,21 +420,45 @@ def test_command_sync_switch_has_reliable_state():
     assert cmd_sync._has_reliable_state(decision.mapping_result, decision) is True
 
 
-def test_command_sync_light_keeps_optimistic_path():
-    """light is not streamed in vague 2 -> not reliable -> optimistic publish kept."""
+def test_command_sync_light_with_readback_is_reliable():
+    """Story 23.3: light is streamed; with a LIGHT_STATE info it is reliable."""
     state_sync = _sync({}, _FakeBridge())
     cmd_sync = _cmd_sync()
     cmd_sync._app = {"state_synchronizer": state_sync}
     decision = _light_decision(eq_id=300, cmd_id=7004)
 
+    assert cmd_sync._has_reliable_state(decision.mapping_result, decision) is True
+
+
+def test_command_sync_light_without_readback_keeps_optimistic_path():
+    state_sync = _sync({}, _FakeBridge())
+    cmd_sync = _cmd_sync()
+    cmd_sync._app = {"state_synchronizer": state_sync}
+    decision = _light_decision(eq_id=300, cmd_id=7004)
+    decision.mapping_result.commands = {}
+
     assert cmd_sync._has_reliable_state(decision.mapping_result, decision) is False
 
 
-def test_command_sync_cover_keeps_optimistic_path():
+def test_command_sync_cover_with_readback_is_reliable():
     state_sync = _sync({}, _FakeBridge())
     cmd_sync = _cmd_sync()
     cmd_sync._app = {"state_synchronizer": state_sync}
     mapping = _cover_mapping(eq_id=400, cmd_id=4005)
+    decision = PublicationDecision(
+        should_publish=True, reason="sure", mapping_result=mapping,
+        state_topic="jeedom2ha/400/state", discovery_published=True,
+    )
+
+    assert cmd_sync._has_reliable_state(mapping, decision) is True
+
+
+def test_command_sync_cover_without_readback_stays_stateless():
+    state_sync = _sync({}, _FakeBridge())
+    cmd_sync = _cmd_sync()
+    cmd_sync._app = {"state_synchronizer": state_sync}
+    mapping = _cover_mapping(eq_id=400, cmd_id=4005)
+    del mapping.commands["FLAP_STATE"]
     decision = PublicationDecision(
         should_publish=True, reason="sure", mapping_result=mapping,
         state_topic="jeedom2ha/400/state", discovery_published=True,
