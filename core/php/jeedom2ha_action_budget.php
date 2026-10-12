@@ -31,6 +31,14 @@ if (!defined('JEEDOM2HA_ACTION_BUDGET_R')) {
     define('JEEDOM2HA_ACTION_BUDGET_REALIGN_TIMEOUT_S', 3);
 }
 
+// Story A1 — relais dont la durée suit la taille du parc (scanTopology, exportDiagnostic,
+// getDiagnostics) : même budget fixe R que les actions Publier/Supprimer (motif (b') de 19-6).
+// Relais indépendants de la taille du parc (testMqttConnection, getMappingOverrides) : budget
+// court fixe, inchangé depuis l'origine.
+if (!defined('JEEDOM2HA_RELAY_BUDGET_SHORT_S')) {
+    define('JEEDOM2HA_RELAY_BUDGET_SHORT_S', 15);
+}
+
 function jeedom2ha_action_deadline_s(): int {
     return JEEDOM2HA_ACTION_BUDGET_R - JEEDOM2HA_ACTION_BUDGET_RESERVE_S;
 }
@@ -175,4 +183,71 @@ function jeedom2ha_dispatch_action_relay(
     $realign($result);
 
     return $result;
+}
+
+/**
+ * Story A1 — ligne de journal (info) du budget d'un relais dépendant de la taille du parc.
+ * Pas de deadline_s : ces relais côté démon ne font aucune pause de lissage (voir ci-dessous).
+ */
+function jeedom2ha_build_relay_budget_log_line(string $relais, int $r, float $durationS): string {
+    return sprintf('[RELAY-BUDGET] relais=%s R=%d duration_s=%.3f', $relais, $r, $durationS);
+}
+
+/** Story A1 — dépassement réel du budget R par un relais lecture/synchronisation (démon joignable). */
+function jeedom2ha_relay_timeout_message(): string {
+    return 'Le démon met plus longtemps que prévu à répondre (plus de ' . JEEDOM2HA_ACTION_BUDGET_R . ' s). '
+        . 'Il est toujours actif : actualisez la page dans un instant pour voir le résultat.';
+}
+
+/**
+ * Story A1 — orchestration pure d'un relais dont la durée dépend de la taille du parc
+ * (scanTopology → /action/sync, exportDiagnostic et getDiagnostics → /system/diagnostics).
+ *
+ * Décision d'audit (A1/T1) : /action/sync et /system/diagnostics ne contiennent aucune pause de
+ * lissage côté démon (les seules pauses d'`asyncio.sleep` sont celles de /action/execute et du
+ * republish broker/HA, déclenché hors de ces relais). Il n'y a donc rien à plafonner :
+ * `deadline_s` n'est PAS transmis (le démon l'ignorerait) et `action_pacing.py` n'est pas
+ * modifié. Seul le budget fixe R (indépendant du parc) remplace l'ancien timeout de 15 s.
+ *
+ * Le message « injoignable » n'est émis que si une sonde de statut échoue après un échec ;
+ * le message de dépassement n'est émis que si l'appel a réellement consommé le budget R.
+ *
+ * @param string   $relais      nom du relais (journal)
+ * @param callable $call        function(int $timeoutS): ?array — appel démon, borné à R
+ * @param callable $probeStatus function(int $timeoutS, int $maxAttempts): ?array — GET /system/status
+ * @param callable $log         function(string $level, string $message): void
+ * @param callable $now         function(): float — horloge injectable
+ * @return array résultat du démon
+ * @throws Exception message destiné à l'UI
+ */
+function jeedom2ha_dispatch_parc_relay(
+    string $relais,
+    callable $call,
+    callable $probeStatus,
+    callable $log,
+    callable $now
+): array {
+    $r = JEEDOM2HA_ACTION_BUDGET_R;
+
+    $start    = $now();
+    $result   = $call($r);
+    $duration = $now() - $start;
+
+    $log('info', jeedom2ha_build_relay_budget_log_line($relais, $r, $duration));
+
+    if ($result !== null) {
+        return $result;
+    }
+
+    $status = $probeStatus(JEEDOM2HA_ACTION_BUDGET_STATUS_TIMEOUT_S, 1);
+    if ($status === null) {
+        $log('error', '[' . $relais . '] ' . jeedom2ha_action_daemon_unreachable_message());
+        throw new Exception(jeedom2ha_action_daemon_unreachable_message());
+    }
+    if ($duration < ($r - 1)) {
+        $log('error', '[' . $relais . '] ' . jeedom2ha_action_daemon_error_message());
+        throw new Exception(jeedom2ha_action_daemon_error_message());
+    }
+    $log('warning', '[' . $relais . '] ' . jeedom2ha_relay_timeout_message());
+    throw new Exception(jeedom2ha_relay_timeout_message());
 }
