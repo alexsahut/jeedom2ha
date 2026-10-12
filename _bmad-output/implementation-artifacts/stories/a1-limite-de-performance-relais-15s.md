@@ -1,6 +1,6 @@
 # Story A1 : Budget fixe et échéance transmise pour les 5 relais PHP restants (E4)
 
-Status: ready-for-dev
+Status: review
 
 Epic: (Chantier Market 2026-10)
 
@@ -62,23 +62,23 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
 
 ## Tasks / Subtasks
 
-- [ ] T1 — Auditer précisément chacun des 5 relais (confirmer/corriger le tableau ci-dessus)
-  - [ ] Vérifier si `scanTopology` publie en boucle (nécessitant un plafond de lissage) ou fait un appel unique (budget seul suffit)
-  - [ ] Idem pour `getDiagnostics` et `exportDiagnostic`
-  - [ ] Confirmer que `testMqttConnection` et `getMappingOverrides` n'ont aucune dépendance au nombre d'équipements
+- [x] T1 — Auditer précisément chacun des 5 relais (confirmer/corriger le tableau ci-dessus)
+  - [x] Vérifier si `scanTopology` publie en boucle (nécessitant un plafond de lissage) ou fait un appel unique (budget seul suffit)
+  - [x] Idem pour `getDiagnostics` et `exportDiagnostic`
+  - [x] Confirmer que `testMqttConnection` et `getMappingOverrides` n'ont aucune dépendance au nombre d'équipements
 
-- [ ] T2 — Implémenter le motif (b′) pour les relais dépendants de la taille du parc
-  - [ ] Réutiliser/étendre `core/php/jeedom2ha_action_budget.php` (budget R, reserve_s, deadline_s) pour ces relais, ou créer un budget dédié par relais si R=60s ne convient pas
-  - [ ] Transmettre `deadline_s` au démon via le payload de la requête
-  - [ ] Côté démon, réutiliser `resources/daemon/transport/action_pacing.py` (`plafond_pauses`, `budget_travail`) si le relais publie en boucle MQTT
+- [x] T2 — Implémenter le motif (b′) pour les relais dépendants de la taille du parc
+  - [x] Réutiliser/étendre `core/php/jeedom2ha_action_budget.php` (budget R, reserve_s, deadline_s) pour ces relais, ou créer un budget dédié par relais si R=60s ne convient pas
+  - [x] Transmettre `deadline_s` au démon via le payload de la requête
+  - [x] Côté démon, réutiliser `resources/daemon/transport/action_pacing.py` (`plafond_pauses`, `budget_travail`) si le relais publie en boucle MQTT
 
-- [ ] T3 — Conserver/ajuster le budget fixe des relais non dépendants
-  - [ ] `testMqttConnection`, `getMappingOverrides` : documenter la décision inline (pas de changement de mécanisme, timeout éventuellement ajusté)
+- [x] T3 — Conserver/ajuster le budget fixe des relais non dépendants
+  - [x] `testMqttConnection`, `getMappingOverrides` : documenter la décision inline (pas de changement de mécanisme, timeout éventuellement ajusté)
 
-- [ ] T4 — Tests réels (pas de simulation du relais)
-  - [ ] Ajouter/étendre des tests PHP sur le modèle `test_story_19_6_php_relay.php` pour chaque relais modifié
-  - [ ] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
-  - [ ] Vérifier le message d'erreur correct en cas de dépassement réel du budget
+- [x] T4 — Tests réels (pas de simulation du relais)
+  - [x] Ajouter/étendre des tests PHP sur le modèle `test_story_19_6_php_relay.php` pour chaque relais modifié
+  - [x] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
+  - [x] Vérifier le message d'erreur correct en cas de dépassement réel du budget
 
 - [ ] T5 — Gate terrain (hors story, exécuté par clawbox)
   - [ ] Test sur Jeedom vierge en VM `pve` (Debian 11 puis 12), après go Telegram d'Alex — gate obligatoire avant `done`, pas une tâche de cette story
