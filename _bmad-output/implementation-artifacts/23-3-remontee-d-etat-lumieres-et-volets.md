@@ -1,14 +1,14 @@
 # Story 23.3 : Remontée d'état des lumières et volets
 
-Status: draft
+Status: review
 
-> Brouillon. Relecture ClaudeBox obligatoire avant `ready-for-dev`.
+> Implémentée (PR #265) sur la base du cadrage ci-dessous et des décisions ClaudeBox Q1-Q7. Seule la preuve terrain sur l'environnement 23.1 (humain) reste à faire.
 
 ## Story
 
 En tant qu'utilisateur HA, je veux voir l'état réel des lumières et la position des volets, afin d'éviter les états optimistes ou absents avant la bêta Market.
 
-## Critères d'acceptation proposés
+## Critères d'acceptation
 
 1. La vague streaming inclut `LIGHT_STATE`/luminosité et `FLAP_STATE`/position sans régression sensor, binary_sensor, switch.
 2. Les payloads MQTT publient états compatibles; action et retour convergent sans boucle ni état périmé.
@@ -17,19 +17,20 @@ En tant qu'utilisateur HA, je veux voir l'état réel des lumières et la positi
 5. README et `docs/fr_FR/index.md` « Limites » distinguent couverture et limites restantes.
 6. Une lumière ou un volet sans commande d'état Jeedom reste optimiste; la discovery n'envoie `optimistic: false` que lorsqu'un état réel existe, et cette règle figure dans « Limites ».
 
-## Tâches proposées
+## Tâches
 
-- [ ] **Prérequis :** 23.1 fournit lumière variable et volet positionnable synthétiques; CC-48 s'applique aux fixtures, preuves et PR.
-- [ ] Revalider `_STREAMED_TYPES`, publishers et types génériques actuels.
-- [ ] Définir contrat état/brightness/position et dégradations.
-- [ ] Implémenter listener, routage, publication et tests/parité; prouver sur 23.1.
-- [ ] Mettre à jour Limites; ne pas ouvrir climate/alarm.
+- [x] **Prérequis :** fixtures et tests synthétiques uniquement; CC-48 respecté (aucun identifiant ni nom réel). La lumière variable et le volet positionnable de l'environnement 23.1 ne servent qu'à la preuve terrain, ci-dessous.
+- [x] Revalider `_STREAMED_TYPES`, publishers et types génériques actuels.
+- [x] Définir contrat état/brightness/position et dégradations.
+- [x] Implémenter listener, routage, publication et tests/parité.
+- [ ] **Preuve terrain sur 23.1** (inventaire MQTT/HA avant/après avec `parity-snapshot.sh`) : à réaliser par l'humain, jamais depuis une session cloud.
+- [x] Mettre à jour Limites; ne pas ouvrir climate/alarm.
 
 ---
 
 # Cadrage documentaire (revalidation du code de `main`, 2026-10-12)
 
-> **Nature.** Préparation documentaire en lecture seule du code de `main` (`78cf903`). Aucun code, test, fixture, accès VM/Jeedom/HA ni donnée réelle (CC-48 : identifiants numériques et noms synthétiques seulement). La story reste `draft` : ce cadrage prépare la relecture ClaudeBox, il ne la remplace pas. Rien ici ne touche A1, A2, A3 ni 22.2, qui restent prioritaires.
+> **Nature.** Préparation documentaire en lecture seule du code de `main` (`78cf903`). Aucun code, test, fixture, accès VM/Jeedom/HA ni donnée réelle (CC-48 : identifiants numériques et noms synthétiques seulement). Ce cadrage a préparé la relecture ClaudeBox (décisions Q1-Q7 ci-dessous) ; le code de la PR #265 l'implémente. Rien ici ne touche A1, A2, A3 ni 22.2, qui restent prioritaires.
 > **Références de lignes** : état de `main` à `78cf903` ; à revérifier au passage en `ready-for-dev`.
 
 ## 1. État exact du streaming runtime (revalidation)
@@ -171,4 +172,19 @@ Prérequis : VM 122, Mosquitto local et HA de test fournis par 23.1 (équipement
 
 ## 8. Hors périmètre (rappel)
 
-`climate`, `alarm_control_panel`, `button`, couleur RGB (`LIGHT_COLOR`), état `opening`/`closing`, inversion de position, A1/A2/A3, 22.2 et tout changement de `core/` PHP. Cadrage documentaire uniquement : aucune implémentation dans cette PR.
+`climate`, `alarm_control_panel`, `button`, couleur RGB (`LIGHT_COLOR`), état `opening`/`closing`, inversion de position, A1/A2/A3, 22.2 et tout changement de `core/` PHP. Ces exclusions restent valables pour l'implémentation.
+
+## Dev Agent Record (implémentation, 12/10)
+
+Implémentation sans accès VM/Jeedom/HA ni modification de `core/`, `models/topology.py`, `models/evaluate_equipment.py`, `transport/http_server.py`. Preuve terrain 23.1 restant à faire par l'humain.
+
+- `sync/readback.py` (nouveau) : source unique « commande info → canal (`state`, `brightness`, `position`) » ; fiabilité **par canal**, partagée par la discovery, `StateSynchronizer` et `CommandSynchronizer`. `LIGHT_BRIGHTNESS` seule ne rend pas l'ON/OFF fiable (Q4). Un `LIGHT_STATE` **numérique** alimente aussi la luminosité (comme un `FLAP_STATE` numérique alimente la position) ; un état binaire jamais.
+- `sync/state.py` : `light` et `cover` streamés ; plusieurs topics par commande et plusieurs commandes par entité ; traductions ON/OFF, luminosité/position entières 0-100 (hors bornes ou illisible : rien publié), volet `open`/`closed` (position intermédiaire = `open`, Q3) ; `LIGHT_STATE` numérique : > 0 = ON.
+- **Purge des retained (Q7)** : le démon persiste dans son répertoire de données (`jeedom2ha_retained_channels.json`) les topics `jeedom2ha/<eq>/state|brightness|position` qu'il a publiés en retained. À la (re)publication, un canal sans lecture dont le topic figure dans ce registre est vidé (publication vide) puis retiré du registre ; un échec est compté comme échec de republication et retenté. Aucune lecture du broker, aucune souscription à ses propres topics d'état (§2.4), aucun appel MQTT par équipement en régime normal. Limite : un retained publié par une version sans registre n'est pas connu (light/cover n'étaient pas streamés avant 23.3).
+- `transport/mqtt_client.py` : pendant une collecte de retained, seuls les messages retained sont absorbés ; un message live (commande) sur un topic correspondant au filtre reste dispatché (test dédié).
+- `sync/command.py` : `_has_reliable_state` délègue à `sync.readback` (canal `state`).
+- `discovery/publisher.py` : `optimistic` explicite pour light et cover (`false` seulement avec un état réel streamé, sinon `true`, `state_topic` conservé — Q1 b). `brightness_state_topic` n'est déclaré que si une commande info l'alimente (sinon la luminosité reste optimiste côté HA). `position_topic` inchangé : un volet à état binaire avec curseur ne remonte pas sa position (documenté).
+- Parité (Q6) : `parity-snapshot.sh` s'abonne (lecture seule) à `jeedom2ha/#`, `parity_snapshot.py` filtre `state|brightness|position` et `diff` expose `state_topics_added/removed` (informatif, `is_empty_diff` inchangé).
+- Golden `story_19_4_guard/*_mqtt.json` (s1, s2, s3, s5) : diff relu par rapport à `main` ; ajout du champ `optimistic` sur toutes les discovery light/cover, et retrait de `brightness_state_topic` pour les lumières sans commande de luminosité lisible (457 : état binaire + curseur ; 1003 : curseur seul). 1009 (curseur + état numérique), 1004 (état numérique) et 1005 (`LIGHT_BRIGHTNESS`) gardent leur topic.
+- Charge 19.6 : le light principal étant streamé, le parc typique passe à 6 appels MQTT par équipement (11 pour le retypage) ; `n_max` mesuré ~245 (241-251) < 250, seuil de test `CAPACITE_DOCUMENTEE` recalé à 200 (même marge relative qu'avant). Le registre des retained s'écrit en différé groupé (2 s) et à l'arrêt du démon.
+- Docs : section « Limites : état réel des lumières et des volets » (`docs/fr_FR/index.md`) + ligne README.

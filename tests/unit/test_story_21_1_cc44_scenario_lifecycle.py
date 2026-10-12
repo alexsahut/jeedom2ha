@@ -516,6 +516,41 @@ async def test_command_message_keeps_its_normal_path_outside_and_during_collecti
     handler.assert_not_called()
 
 
+async def test_live_command_matching_the_collection_filter_is_still_dispatched():
+    """Story 23.3 (R1-1): only RETAINED messages are collection traffic; a live
+    (non-retained) command on a topic matching the filter must reach the handler."""
+    import asyncio
+
+    bridge = MqttBridge()
+    bridge._state = "connected"
+    bridge._loop = asyncio.get_running_loop()
+    handler = MagicMock(return_value=None)
+    bridge.set_command_handler(handler)
+    client = MagicMock()
+    client.subscribe.return_value = (0, 1)
+    client.unsubscribe.return_value = (0, 2)
+    bridge._client = client
+
+    async def _deliver():
+        await asyncio.sleep(0.01)
+        bridge._on_message(client, None, _msg("jeedom2ha/1/set", payload=b"ON", retain=False))
+        bridge._on_message(client, None, _msg("jeedom2ha/1/brightness/set", payload=b"40", retain=False))
+        bridge._on_message(client, None, _msg("jeedom2ha/1/position/set", payload=b"10", retain=False))
+        bridge._on_message(client, None, _msg("jeedom2ha/1/state", payload=b"ON", retain=True))
+
+    task = asyncio.create_task(_deliver())
+    topics = await bridge.collect_retained_topics("jeedom2ha/#", 0.1)
+    await task
+    await asyncio.sleep(0)
+
+    assert topics == ["jeedom2ha/1/state"]
+    assert [c.args for c in handler.call_args_list] == [
+        ("jeedom2ha/1/set", "ON"),
+        ("jeedom2ha/1/brightness/set", "40"),
+        ("jeedom2ha/1/position/set", "10"),
+    ]
+
+
 async def test_collect_retained_unsubscribes_even_when_an_exception_occurs(monkeypatch):
     import asyncio
 

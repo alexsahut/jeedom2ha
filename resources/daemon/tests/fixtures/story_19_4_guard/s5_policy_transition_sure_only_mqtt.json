@@ -1106,6 +1106,7 @@
       },
       "name": null,
       "object_id": "jeedom2ha_1000",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1149,6 +1150,7 @@
       },
       "name": null,
       "object_id": "jeedom2ha_1005",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1191,6 +1193,7 @@
       },
       "name": null,
       "object_id": "jeedom2ha_1006",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1231,6 +1234,7 @@
       "device_class": "shutter",
       "name": null,
       "object_id": "jeedom2ha_2000",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1273,6 +1277,7 @@
       "device_class": "shutter",
       "name": null,
       "object_id": "jeedom2ha_2003",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1316,6 +1321,7 @@
       "device_class": "blind",
       "name": null,
       "object_id": "jeedom2ha_2005",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1358,6 +1364,7 @@
       "device_class": "shutter",
       "name": null,
       "object_id": "jeedom2ha_2006",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -1445,6 +1452,7 @@
       },
       "name": null,
       "object_id": "jeedom2ha_6001",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"

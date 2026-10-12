@@ -50,7 +50,7 @@ elif role == "mosquitto_sub":
     (root / "auth_dir").write_text(str(directory))
     # Story 19.2 — second read-only subscription (retained state topics),
     # distinguished from the discovery one by its -t filter.
-    if args[args.index("-t") + 1] == "jeedom2ha/+/+/state":
+    if args[args.index("-t") + 1] == "jeedom2ha/#":
         print("jeedom2ha/1/1/state")
     else:
         print("homeassistant/light/jeedom2ha_1/config")

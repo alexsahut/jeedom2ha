@@ -170,6 +170,10 @@ class TestBrightnessPayload:
     async def test_brightness_payload_has_all_fields(self, publisher, snapshot, mock_mqtt_bridge):
         """Payload On/Off+Brightness contient les champs brightness."""
         mapping = _make_mapping(has_brightness=True)
+        # Story 23.3: the brightness state topic needs a real info command behind it.
+        mapping.commands = {"LIGHT_BRIGHTNESS": JeedomCmd(
+            id=4205, name="Luminosite", generic_type="LIGHT_BRIGHTNESS",
+            type="info", sub_type="numeric")}
         await publisher.publish_light(mapping, snapshot)
 
         payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
@@ -178,6 +182,20 @@ class TestBrightnessPayload:
         assert payload["brightness_scale"] == 100
         assert payload["supported_color_modes"] == ["brightness"]
         assert payload["color_mode"] is True
+
+
+class TestBrightnessWithoutReadback:
+    @pytest.mark.asyncio
+    async def test_no_brightness_state_topic_without_info_command(
+        self, publisher, snapshot, mock_mqtt_bridge
+    ):
+        """Story 23.3: without a brightness readback HA keeps the brightness optimistic."""
+        mapping = _make_mapping(has_brightness=True)
+        await publisher.publish_light(mapping, snapshot)
+
+        payload = json.loads(mock_mqtt_bridge.publish_message.call_args[0][1])
+        assert "brightness_state_topic" not in payload
+        assert payload["brightness_command_topic"] == "jeedom2ha/42/brightness/set"
 
 
 # ==============================================================================
