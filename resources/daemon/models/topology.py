@@ -25,6 +25,44 @@ def _to_bool(value: Union[bool, str, int, None], default: bool = True) -> bool:
     return bool(value)
 
 
+def _to_tristate(value: Any) -> Optional[bool]:
+    """Story 24.1 — normalise un drapeau 0/1 à trois états (True / False / None = inconnu).
+
+    Contrairement à `_to_bool`, None (ou une valeur illisible) n'est jamais transformé en False :
+    "inconnu" reste "inconnu".
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return bool(value) if value in (0, 1) else None
+    if isinstance(value, float):
+        return bool(int(value)) if value in (0.0, 1.0) else None
+    if isinstance(value, str):
+        clean = value.strip().lower()
+        if clean in ("0", "false"):
+            return False
+        if clean in ("1", "true"):
+            return True
+    return None
+
+
+def _normalize_logical_id(value: Any) -> Optional[str]:
+    """Story 24.1 — identifiant physique : chaîne non vide, sinon None (jamais "").
+
+    Ne jamais écrire cette valeur dans un journal de niveau info ou supérieur.
+    """
+    if value is None or isinstance(value, (bool, dict, list, tuple)):
+        return None
+    clean = str(value).strip()
+    return clean or None
+
+
+def _normalize_homekit_source(value: Any) -> Optional[str]:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
 def _normalize_timeout(value: Any) -> Optional[int]:
     """Normalize Jeedom timeout status to 0/1 when reliable."""
     if value is None:
@@ -81,6 +119,8 @@ class JeedomCmd:
     unit: Optional[str] = None
     is_visible: bool = True
     is_historized: bool = False
+    # Story 24.1 — identifiant physique (jamais dans un journal info+ ni dans le repr)
+    logical_id: Optional[str] = field(default=None, repr=False)
 
 @dataclass
 class JeedomEqLogic:
@@ -98,6 +138,10 @@ class JeedomEqLogic:
     local_availability_reason: str = "timeout_missing"
     last_communication: Optional[str] = None
     cmds: List[JeedomCmd] = field(default_factory=list)
+    # Story 24.1 — signal d'exposition HomeKit (lecture seule, tri-état, sans effet sur les décisions)
+    homekit_exposed: Optional[bool] = None
+    homekit_exposed_source: Optional[str] = None
+    logical_id: Optional[str] = field(default=None, repr=False)
 
 @dataclass
 class JeedomScenario:
@@ -105,6 +149,9 @@ class JeedomScenario:
     id: int
     name: str
     is_active: bool = True
+    # Story 24.1 — signal d'exposition HomeKit du scénario (lecture seule, tri-état)
+    homekit_exposed: Optional[bool] = None
+    homekit_exposed_source: Optional[str] = None
 
 @dataclass
 class EligibilityResult:
@@ -159,7 +206,8 @@ class TopologySnapshot:
                             current_value=cmd_raw.get("current_value"),
                             unit=cmd_raw.get("unit") or None,
                             is_visible=_to_bool(cmd_raw.get("is_visible"), default=True),
-                            is_historized=_to_bool(cmd_raw.get("is_historized"), default=False)
+                            is_historized=_to_bool(cmd_raw.get("is_historized"), default=False),
+                            logical_id=_normalize_logical_id(cmd_raw.get("logical_id")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue
@@ -185,7 +233,10 @@ class TopologySnapshot:
                     local_availability_state=local_state,
                     local_availability_reason=local_reason,
                     last_communication=last_communication,
-                    cmds=cmds
+                    cmds=cmds,
+                    homekit_exposed=_to_tristate(eq_raw.get("homekit_exposed")),
+                    homekit_exposed_source=_normalize_homekit_source(eq_raw.get("homekit_exposed_source")),
+                    logical_id=_normalize_logical_id(eq_raw.get("logical_id")),
                 )
             except (ValueError, TypeError, KeyError):
                 continue
@@ -199,6 +250,8 @@ class TopologySnapshot:
                     id=sc_id,
                     name=str(sc_raw.get("name", f"Scenario {sc_id}")),
                     is_active=_to_bool(sc_raw.get("is_active"), default=True),
+                    homekit_exposed=_to_tristate(sc_raw.get("homekit_exposed")),
+                    homekit_exposed_source=_normalize_homekit_source(sc_raw.get("homekit_exposed_source")),
                 )
             except (ValueError, TypeError, KeyError):
                 continue
