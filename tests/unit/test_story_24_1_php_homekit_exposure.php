@@ -1,5 +1,6 @@
 <?php
 // Story 24.1 — signal d'exposition HomeKit : règle pure (lecture seule), sans cœur Jeedom.
+// Reproduit à l'identique les tests de Homebridge (isset sur le tableau brut, intval, comparaisons souples).
 // Exécution : php tests/unit/test_story_24_1_php_homekit_exposure.php
 // Identifiants numériques/génériques uniquement (CC-48).
 
@@ -19,63 +20,73 @@ function check($label, $expected, $actual) {
     }
 }
 
-// Contexte nominal : Homebridge présent, plugins actifs, pièce 10 à 1, pièce 11 à 0, pièce 12 sans clé.
+// Contexte nominal : Homebridge présent ; pièces : 10 = 1, 11 = 0, 12 = "" (ou sans clé : lue 0), 13 = "1", 14 illisible.
 function ctx(array $over = array()) {
     return array_merge(array(
         'homebridge'     => 'present',
-        'default'        => null,
+        'default'        => 1,
         'active_plugins' => array('virtual' => true, 'zwave' => true, 'mobile' => true, 'homebridge' => true),
-        'rooms'          => array(10 => 1, 11 => 0, 12 => null, 13 => '1', 14 => JEEDOM2HA_HOMEKIT_UNREADABLE, 15 => 'x'),
+        'rooms'          => array(10 => 1, 11 => 0, 12 => '', 13 => '1', 14 => JEEDOM2HA_HOMEKIT_UNREADABLE, 15 => '0'),
     ), $over);
 }
 
-function expo($type, $obj, $eq, $ctx) {
-    $r = jeedom2ha_homekit_eq_exposure($type, $obj, $eq, $ctx);
+function expo($type, $obj, $eqConf, $ctx) {
+    $r = jeedom2ha_homekit_eq_exposure($type, $obj, $eqConf, $ctx);
     return array($r['exposed'], $r['source']);
 }
 
-echo "Équipement exposé / règle à trois niveaux\n";
-check('équipement exposé (pièce 1, équipement 1)', array(true, 'equipement'), expo('virtual', 10, 1, ctx()));
-check('valeurs en chaîne "1"', array(true, 'equipement'), expo('virtual', 13, '1', ctx()));
-check('pièce à 0 → false, provenance piece', array(false, 'piece'), expo('virtual', 11, 1, ctx()));
-check('équipement à 0 → false, provenance equipement', array(false, 'equipement'), expo('virtual', 10, 0, ctx()));
-check('clé absente, défaut Homebridge absent (=1) → true', array(true, 'defaut_homebridge'), expo('virtual', 10, null, ctx()));
-check('clé absente, défaut Homebridge 1 → true', array(true, 'defaut_homebridge'), expo('virtual', 10, null, ctx(array('default' => '1'))));
-check('clé absente, défaut Homebridge 0 → false', array(false, 'defaut_homebridge'), expo('virtual', 10, null, ctx(array('default' => 0))));
-check('clé vide (chaîne) = absente', array(true, 'defaut_homebridge'), expo('virtual', 10, '', ctx()));
-check('défaut Homebridge illisible → null', array(null, 'illisible'), expo('virtual', 10, null, ctx(array('default' => JEEDOM2HA_HOMEKIT_UNREADABLE))));
+function conf($v) { return array('sendToHomebridge' => $v); }
 
-echo "Task 0 bis — pièce absente et pièce sans clé\n";
-check('équipement sans pièce (null) → false, provenance piece', array(false, 'piece'), expo('virtual', null, 1, ctx()));
-check('équipement sans pièce (-1) → false, provenance piece', array(false, 'piece'), expo('virtual', -1, 1, ctx()));
-check('pièce inexistante → false, provenance piece', array(false, 'piece'), expo('virtual', 99, 1, ctx()));
-check('pièce sans clé sendToHomebridge (= 0) → false, provenance piece', array(false, 'piece'), expo('virtual', 12, 1, ctx()));
+echo "Équipement : règle à trois niveaux\n";
+check('équipement à 1 → exposé', array(true, 'equipement'), expo('virtual', 10, conf(1), ctx()));
+check('équipement à "1" → exposé', array(true, 'equipement'), expo('virtual', 10, conf('1'), ctx()));
+check('équipement à 0 → false, equipement', array(false, 'equipement'), expo('virtual', 10, conf(0), ctx()));
+check('équipement à "0" → false, equipement', array(false, 'equipement'), expo('virtual', 10, conf('0'), ctx()));
+check('équipement à "" (isset vrai, intval 0) → false, equipement', array(false, 'equipement'), expo('virtual', 10, conf(''), ctx()));
+check('équipement à "2" → exposé (différent de 0)', array(true, 'equipement'), expo('virtual', 10, conf('2'), ctx()));
+check('équipement valeur texte (intval 0) → false', array(false, 'equipement'), expo('virtual', 10, conf('abc'), ctx()));
+check('clé absente, défaut 1 → exposé, defaut_homebridge', array(true, 'defaut_homebridge'), expo('virtual', 10, array(), ctx()));
+check('clé absente, défaut "1" → exposé', array(true, 'defaut_homebridge'), expo('virtual', 10, array('autre' => 1), ctx(array('default' => '1'))));
+check('clé absente, défaut "0" → false, defaut_homebridge', array(false, 'defaut_homebridge'), expo('virtual', 10, array(), ctx(array('default' => '0'))));
+check('clé absente, défaut 0 → false', array(false, 'defaut_homebridge'), expo('virtual', 10, array(), ctx(array('default' => 0))));
+check('clé null (isset faux) → défaut', array(true, 'defaut_homebridge'), expo('virtual', 10, conf(null), ctx()));
+check('configuration non tableau → défaut', array(true, 'defaut_homebridge'), expo('virtual', 10, '', ctx()));
+check('défaut illisible (exception) → null', array(null, 'illisible'), expo('virtual', 10, array(), ctx(array('default' => JEEDOM2HA_HOMEKIT_UNREADABLE))));
+check('configuration d\'équipement illisible (exception) → null', array(null, 'illisible'), expo('virtual', 10, JEEDOM2HA_HOMEKIT_UNREADABLE, ctx()));
 
-echo "Plugins\n";
-check('plugin mobile → false, plugin_excluded', array(false, 'plugin_excluded'), expo('mobile', 10, 1, ctx()));
-check('plugin homebridge → false, plugin_excluded', array(false, 'plugin_excluded'), expo('homebridge', 10, 1, ctx()));
-check('plugin inactif (absent de la liste active) → false, plugin_excluded', array(false, 'plugin_excluded'), expo('zigbee', 10, 1, ctx()));
-$probeActive = ctx(array('active_plugins' => array(), 'plugin_active_probe' => function ($id) { return $id === 'zigbee'; }));
-check('repli de sonde : plugin actif hors liste', array(true, 'equipement'), expo('zigbee', 10, 1, $probeActive));
-check('repli de sonde : plugin inactif', array(false, 'plugin_excluded'), expo('other', 10, 1, $probeActive));
-$probeThrows = ctx(array('active_plugins' => array(), 'plugin_active_probe' => function ($id) { throw new Exception('x'); }));
-check('sonde illisible → null', array(null, 'illisible'), expo('zigbee', 10, 1, $probeThrows));
-check('liste des plugins actifs illisible (null) et sans sonde → null', array(null, 'illisible'), expo('virtual', 10, 1, ctx(array('active_plugins' => null))));
+echo "Pièce (Task 0 bis)\n";
+check('pièce à 1 → exposée', array(true, 'equipement'), expo('virtual', 10, conf(1), ctx()));
+check('pièce à "1" → exposée', array(true, 'equipement'), expo('virtual', 13, conf(1), ctx()));
+check('pièce à 0 → false, piece', array(false, 'piece'), expo('virtual', 11, conf(1), ctx()));
+check('pièce à "0" → false, piece', array(false, 'piece'), expo('virtual', 15, conf(1), ctx()));
+check('pièce à "" → false, piece', array(false, 'piece'), expo('virtual', 12, conf(1), ctx()));
+check('pièce sans clé (lue 0) → false, piece', array(false, 'piece'), expo('virtual', 11, conf(1), ctx(array('rooms' => array(11 => 0)))));
+check('équipement sans pièce (null) → false, piece', array(false, 'piece'), expo('virtual', null, conf(1), ctx()));
+check('équipement sans pièce (-1) → false, piece', array(false, 'piece'), expo('virtual', -1, conf(1), ctx()));
+check('pièce inexistante → false, piece', array(false, 'piece'), expo('virtual', 99, conf(1), ctx()));
+check('pièce illisible (exception) → null', array(null, 'illisible'), expo('virtual', 14, conf(1), ctx()));
 
-echo "Homebridge absent / valeurs illisibles — jamais false par défaut\n";
-check('Homebridge absent ou inactif → null, homebridge_absent', array(null, 'homebridge_absent'), expo('virtual', 10, 1, ctx(array('homebridge' => 'absent'))));
-check('état de Homebridge illisible → null, illisible', array(null, 'illisible'), expo('virtual', 10, 1, ctx(array('homebridge' => 'unreadable'))));
-check('pièce illisible → null', array(null, 'illisible'), expo('virtual', 14, 1, ctx()));
-check('valeur de pièce non numérique → null', array(null, 'illisible'), expo('virtual', 15, 1, ctx()));
-check('valeur d\'équipement non numérique → null', array(null, 'illisible'), expo('virtual', 10, 'abc', ctx()));
-check('valeur d\'équipement hors 0/1 → null', array(null, 'illisible'), expo('virtual', 10, 7, ctx()));
+echo "Plugins : la liste des plugins actifs fait foi\n";
+check('plugin mobile → false, plugin_excluded', array(false, 'plugin_excluded'), expo('mobile', 10, conf(1), ctx()));
+check('plugin homebridge → false, plugin_excluded', array(false, 'plugin_excluded'), expo('homebridge', 10, conf(1), ctx()));
+check('plugin hors liste (inactif ou désinstallé) → false, plugin_excluded', array(false, 'plugin_excluded'), expo('zigbee', 10, conf(1), ctx()));
+check('plugin hors liste, pièce à 0 : le plugin décide d\'abord', array(false, 'plugin_excluded'), expo('zigbee', 11, conf(1), ctx()));
+check('liste des plugins illisible (null) → null', array(null, 'illisible'), expo('virtual', 10, conf(1), ctx(array('active_plugins' => null))));
 
-echo "Scénarios\n";
-$sc = function ($raw) { $r = jeedom2ha_homekit_scenario_exposure(function () use ($raw) { return $raw; }); return array($r['exposed'], $r['source']); };
-check('scénario clé absente → exposé', array(true, 'scenario_configuration'), $sc(null));
-check('scénario "1" → exposé', array(true, 'scenario_configuration'), $sc('1'));
-check('scénario "0" → non exposé', array(false, 'scenario_configuration'), $sc('0'));
-check('scénario 0 (entier) → non exposé', array(false, 'scenario_configuration'), $sc(0));
+echo "Homebridge absent / illisible\n";
+check('Homebridge absent ou inactif → null, homebridge_absent', array(null, 'homebridge_absent'), expo('virtual', 10, conf(1), ctx(array('homebridge' => 'absent'))));
+check('état de Homebridge illisible → null, illisible', array(null, 'illisible'), expo('virtual', 10, conf(1), ctx(array('homebridge' => 'unreadable'))));
+
+echo "Scénarios (clé absente = NON exposé)\n";
+$sc = function ($conf) { $r = jeedom2ha_homekit_scenario_exposure(function () use ($conf) { return $conf; }); return array($r['exposed'], $r['source']); };
+check('scénario sans clé → false', array(false, 'scenario_configuration'), $sc(array()));
+check('scénario clé null → false', array(false, 'scenario_configuration'), $sc(conf(null)));
+check('scénario "0" → false', array(false, 'scenario_configuration'), $sc(conf('0')));
+check('scénario 0 → false', array(false, 'scenario_configuration'), $sc(conf(0)));
+check('scénario "1" → true', array(true, 'scenario_configuration'), $sc(conf('1')));
+check('scénario 1 → true', array(true, 'scenario_configuration'), $sc(conf(1)));
+check('scénario "" (tableau brut) → true', array(true, 'scenario_configuration'), $sc(conf('')));
+check('configuration non tableau → false', array(false, 'scenario_configuration'), $sc(''));
 check('scénario lecture en échec → null', array(null, 'illisible'), (function () {
     $r = jeedom2ha_homekit_scenario_exposure(function () { throw new Exception('x'); });
     return array($r['exposed'], $r['source']);
@@ -91,7 +102,7 @@ check('logical_id chaîne conservé', 'ab:01', jeedom2ha_normalize_logical_id('a
 
 echo "Liste des plugins actifs\n";
 check('liste d\'identifiants', array('a' => true, 'b' => true), jeedom2ha_homekit_normalize_active_plugins(array('a', 'b')));
-check('tableau indexé par identifiant', true, isset(jeedom2ha_homekit_normalize_active_plugins(array('a' => 'Nom A'))['a']));
+check('liste vide → tableau vide (aucun plugin actif)', array(), jeedom2ha_homekit_normalize_active_plugins(array()));
 check('non exploitable → null', null, jeedom2ha_homekit_normalize_active_plugins('x'));
 
 echo "\n{$passed} passed, {$failed} failed\n";

@@ -20,11 +20,11 @@ Source : plugin Homebridge, `core/class/homebridge.class.php:2680-2710` (`discov
 Dans l'ordre, pour un équipement :
 
 1. Plugin Homebridge absent ou inactif → `null`, `homebridge_absent`.
-2. Plugin de l'équipement inactif (liste `plugin::listPlugin(true, false, true, true)`), ou `mobile` ou `homebridge` → `false`, `plugin_excluded`.
-3. Pièce : identifiant non nul, différent de -1, pièce existante, et `sendToHomebridge` = 1 lu avec la valeur par défaut 0. **Équipement sans pièce** ou **pièce sans clé** (= 0) → `false`, `piece` (et non `null`) — établi par ClaudeBox le 2026-10-12 (Task 0 bis).
-4. `configuration.sendToHomebridge` de l'équipement = 1 → `true`/`false`, `equipement` ; clé absente → `sendToHomebridgeDefault` du plugin `homebridge` (`config::byKey`, défaut 1), `defaut_homebridge`.
+2. Plugin de l'équipement absent de la liste `plugin::listPlugin(true, false, true, true)` (liste simple d'identifiants lue en base, même source que Homebridge ; fait foi, sans repli), ou `mobile` ou `homebridge` → `false`, `plugin_excluded`.
+3. Pièce : identifiant non nul, différent de -1, pièce existante, et `getConfiguration('sendToHomebridge', 0) == 1` (comparaison souple, comme Homebridge). **Équipement sans pièce** ou **pièce sans clé** (= 0) → `false`, `piece` (et non `null`) — établi par ClaudeBox le 2026-10-12 (Task 0 bis).
+4. Tableau brut de configuration (`getConfiguration()` sans argument ; `getConfiguration('cle', defaut)` rendrait le défaut aussi pour une chaîne vide) : si `isset(['sendToHomebridge'])`, `intval` de la valeur, provenance `equipement` ; sinon `intval(config::byKey('sendToHomebridgeDefault', 'homebridge', 1, true))`, provenance `defaut_homebridge` ; exposé si la valeur est différente de 0 (`""` → non exposé, `"2"` → exposé).
 
-Aucun drapeau par commande : les commandes héritent de l'équipement. Scénario : exposé si `configuration.sendToHomebridge` est différent de « 0 » (absent = exposé). Toute valeur illisible donne `null` avec la provenance `illisible`.
+Aucun drapeau par commande : les commandes héritent de l'équipement. Scénario : exposé si la clé `sendToHomebridge` est **présente** dans la configuration et que sa valeur n'est pas `== "0"` ; **clé absente = non exposé** (corrigé par ClaudeBox le 12/10, R1 de #261). `null` avec la provenance `illisible` seulement si une lecture lève une exception ; une valeur inattendue ne donne jamais `null` (Homebridge en décide).
 
 ## Garde-fous
 

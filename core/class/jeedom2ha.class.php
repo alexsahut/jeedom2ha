@@ -673,7 +673,7 @@ class jeedom2ha extends eqLogic {
           if (!method_exists($sc, 'getConfiguration')) {
             throw new RuntimeException('configuration illisible');
           }
-          return $sc->getConfiguration('sendToHomebridge', null);
+          return $sc->getConfiguration();
         });
         $payload['scenarios'][] = array(
           'id'        => intval($sc->getId()),
@@ -702,7 +702,6 @@ class jeedom2ha extends eqLogic {
       'homebridge'          => 'unreadable',
       'default'             => null,
       'active_plugins'      => null,
-      'plugin_active_probe' => null,
       'rooms'               => $_roomRaw,
     );
     if (!class_exists('plugin')) {
@@ -725,7 +724,7 @@ class jeedom2ha extends eqLogic {
       return $ctx;
     }
     try {
-      $ctx['default'] = config::byKey('sendToHomebridgeDefault', 'homebridge', 1);
+      $ctx['default'] = config::byKey('sendToHomebridgeDefault', 'homebridge', 1, true);
     } catch (Throwable $e) {
       $ctx['default'] = JEEDOM2HA_HOMEKIT_UNREADABLE; // illisible : jamais false par défaut
     }
@@ -734,9 +733,6 @@ class jeedom2ha extends eqLogic {
     } catch (Throwable $e) {
       $ctx['active_plugins'] = null;
     }
-    $ctx['plugin_active_probe'] = function ($_pluginId) {
-      return intval(plugin::byId($_pluginId)->isActive()) === 1;
-    };
     return $ctx;
   }
 
@@ -751,7 +747,7 @@ class jeedom2ha extends eqLogic {
     $homekitRoomRaw = array(); // Story 24.1 — configuration.sendToHomebridge brute par pièce (lecture seule)
     foreach (jeeObject::all() as $obj) {
       try {
-        $homekitRoomRaw[intval($obj->getId())] = $obj->getConfiguration('sendToHomebridge', null);
+        $homekitRoomRaw[intval($obj->getId())] = $obj->getConfiguration('sendToHomebridge', 0);
       } catch (Throwable $e) {
         $homekitRoomRaw[intval($obj->getId())] = JEEDOM2HA_HOMEKIT_UNREADABLE;
       }
@@ -854,11 +850,17 @@ class jeedom2ha extends eqLogic {
       }
 
       // Story 24.1 — signal d'exposition HomeKit (tri-état, lecture seule, sans effet sur les décisions)
+      // Tableau brut de configuration, comme Homebridge (isset sur la clé, pas de valeur par défaut).
+      try {
+        $homekitEqConf = method_exists($eq, 'getConfiguration') ? $eq->getConfiguration() : array();
+      } catch (Throwable $e) {
+        $homekitEqConf = JEEDOM2HA_HOMEKIT_UNREADABLE;
+      }
       try {
         $homekit = jeedom2ha_homekit_eq_exposure(
           method_exists($eq, 'getEqType_name') ? strval($eq->getEqType_name()) : '',
           method_exists($eq, 'getObject_id') ? $eq->getObject_id() : null,
-          method_exists($eq, 'getConfiguration') ? $eq->getConfiguration('sendToHomebridge', null) : null,
+          $homekitEqConf,
           $homekitContext
         );
       } catch (Throwable $e) {
