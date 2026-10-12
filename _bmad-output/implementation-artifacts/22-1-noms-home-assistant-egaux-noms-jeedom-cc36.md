@@ -1,6 +1,6 @@
 # Story 22.1 : Noms Home Assistant = noms Jeedom (CC-36)
 
-Status: review
+Status: done
 
 > **Statut : `ready-for-dev` (2026-10-12).** Alexandre a tranché les questions le 2026-10-12 vers 05:50, relayé par ClaudeBox : **Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, Q7 B, QD deux stories** (voir « Décisions d'Alexandre »). `ready-for-dev` est accordé par ClaudeBox au nom de cette décision. Brouillon de cadrage rédigé par une session cloud déléguée (documentaire, lecture seule : aucun accès box, Home Assistant ni secret). Les pointeurs `fichier:ligne` sont pris sur `main` à `ab3a854`. **R1 (ClaudeBox, 2026-10-12, relevé de terrain en lecture seule vers 04:30)** : F4 et H6 sont des faits (HA 2026.9.4). Aucun nom réel d'équipement, de pièce, de scénario ou de personne dans ce fichier (CC-48) : seuls des identifiants.
 
@@ -87,13 +87,13 @@ La documentation officielle de HA n'était pas accessible depuis la session (ré
 
 ## Tâches
 
-- **Task 0 — Vérifier H1 à H5 et que `default_entity_id` est bien appliqué par HA 2026.9.4** (et pourquoi `object_id` ne l'est plus), sur la documentation officielle de HA si l'accès est possible, sinon sur un **équipement de test** (création d'une entité neuve, relevé de son `entity_id`). **Si `default_entity_id` n'est pas appliqué comme décrit, s'arrêter et revenir vers ClaudeBox avant de généraliser.**
-- **Task 1 — Inventaire « avant » (humain, lecture seule)** : pour les 91 appareils et leurs entités, relever nom affiché, `name_by_user`, `original_name`, `entity_id`, pièce ; comparer au nom Jeedom ; comptes par appareil (entités, dont celles renommées à la main). Sans nom réel dans le dépôt (identifiants seuls).
+- [x] **Task 0 — Vérifier H1 à H5 et que `default_entity_id` est bien appliqué par HA 2026.9.4** (et pourquoi `object_id` ne l'est plus), sur la documentation officielle de HA si l'accès est possible, sinon sur un **équipement de test** (création d'une entité neuve, relevé de son `entity_id`). **Si `default_entity_id` n'est pas appliqué comme décrit, s'arrêter et revenir vers ClaudeBox avant de généraliser.**
+- [x] **Task 1 — Inventaire « avant » (humain, lecture seule)** : pour les 91 appareils et leurs entités, relever nom affiché, `name_by_user`, `original_name`, `entity_id`, pièce ; comparer au nom Jeedom ; comptes par appareil (entités, dont celles renommées à la main). Sans nom réel dans le dépôt (identifiants seuls).
 - [x] **Task 2 — Démon : un seul nom d'appareil par équipement** (`publisher.py:_build_device_block`) selon Q1 A ; ne plus dériver `device.name` du `ha_name` d'une entité secondaire.
 - [x] **Task 3 — Démon : règle du nom d'entité** selon Q2 A (mappers F2/F3 ou publisher).
 - [x] **Task 3b — Démon : `default_entity_id` pour les entités nouvelles ou recréées** (Q7 B) : ajouter `default_entity_id` = `<domaine>.<object_id>` dans chaque payload de découverte, en reprenant la valeur d'`object_id` déjà calculée pour le payload (F10) ; ne pas modifier `object_id`, `unique_id` ni topic. Test du payload de chaque publisher (AC5).
 - [x] **Task 4 — Tests** : unitaires (device identique sur toutes les entités d'un équipement multi-entités ; forme de l'équipement 579 ; renommage → republication au sync), golden mis à jour, fixtures anonymisées. `make test` et `flake8` verts.
-- **Task 5 — Gate 20-0 + déploiement standard (humain) + inventaire « après »** ; rapprochement avec la liste des 29 ; protocole H2/H3/H4 sur un équipement de test.
+- [x] **Task 5 — Gate 20-0 + déploiement standard (humain) + inventaire « après »** ; rapprochement avec la liste des 29 ; protocole H2/H3/H4 sur un équipement de test.
 - [x] **Task 6 — Documentation** : `docs/fr_FR` (nom = nom Jeedom, pièce appliquée à la création seulement, comment renommer à la main, comment forcer la pièce via recréation ; `entity_id` technique stable des entités créées) selon Q3 A, Q4 A, Q5 A, Q6 A, Q7 B.
 
 ## Garde-fous
@@ -152,6 +152,22 @@ H1 à H5 (comportement de HA) et la cause de H6 (le fait de terrain est établi,
 - 2026-10-12 — R1 (ClaudeBox, relevé de terrain vers 04:30) : F4 et H6 confirmés (HA 2026.9.4 ; 41 entités à `entity_id` technique, 306 à `entity_id` dérivé des noms depuis le 2026-05-06 ; 29 appareils, 149 entités) ; Q7 refaite en question produit ; hors-périmètre `object_id` retiré.
 - 2026-10-12, vers 05:50 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, **Q7 B** (`default_entity_id` = `<domaine>.<object_id actuel>` pour les entités nouvelles ou recréées), QD deux stories ; conséquence de Q7 corrigée (cartes de tableau de bord = `entity_id`, voix = nom). **`ready-for-dev` accordé** par ClaudeBox au nom de cette décision ; AC figés, options écartées retirées des AC et tâches.
 - 2026-10-12, vers 06:50 — **Précision d'Alexandre sur Q2 A** (relayée par ClaudeBox, relecture R2) : l'entité principale d'un équipement à plusieurs entités garde le nom de l'équipement (12 entités chez lui : 7 interrupteurs, 5 lumières) ; les autres entités prennent le nom de leur commande. Tranche la question laissée ouverte dans la PR #249 ; le code de `29882ca` fait déjà cela.
+- 2026-10-12, vers 07:40 — **Clôture** (ClaudeBox) : PR #249 fusionnée (`6a74e58`), déployée sur la box et prouvée (voir `22-1-preuve-terrain-2026-10-12.md`) ; gate 20-0 PASS/PASS, contrôle négatif FAIL attendu ; Task 0 vérifiée sur le terrain (bouton du scénario 147, `default_entity_id` appliqué par HA 2026.9.4). Statut `done`.
+
+## Clôture (2026-10-12)
+
+Preuve complète : `22-1-preuve-terrain-2026-10-12.md`. Déployé : `6a74e58596953925751e70559f8536153b7ed506` (`main` après #249), `VERSION` de la box à `deployed_at=2026-10-12T05:18:58Z`, `git_status=clean`. Verdict du gate 20-0 : découverte PASS, référence PASS, contrôle négatif FAIL attendu (une requête non déclarée bloquée), aucune écriture transmise.
+
+- **AC1** — `device.name` unique : tests `test_story_22_1_noms_jeedom.py` ; terrain : 91 appareils sur 91 au nom exact de l'équipement (62 → 91), exactement les 29 attendus modifiés.
+- **AC2** — règle du nom d'entité : tests (forme 579, entité unique, accents) ; terrain : 16 `original_name` modifiés (entités uniques des 16 appareils à une seule entité), entité principale des équipements multi-entités inchangée (12 entités : 7 interrupteurs, 5 lumières).
+- **AC3** — renommage → republication : test de renommage puis republication ; terrain : les 29 appareils republiés au premier sync après déploiement.
+- **AC4** — `suggested_area` envoyée à chaque sync, limite documentée (annexe `docs/fr_FR/index.md`) ; terrain : 0 pièce modifiée.
+- **AC5** — 0 `entity_id` existant modifié sur les 347 entités, 0 nom choisi à la main modifié (37), 0 pièce choisie à la main modifiée (23) ; `default_entity_id` = `<domaine>.<object_id>` testé par domaine et pour les entités secondaires ; `unique_id`, `object_id` et topics inchangés.
+- **AC6** — fixtures réalignées uniquement sur `device.name` (145) et `default_entity_id` (309) : 8 traces `*_mqtt.json` de `story_19_4_guard` et la référence figée du bouton de scénario.
+- **AC7** — gate 20-0 PASS/PASS, contrôle négatif FAIL attendu ; inventaire avant/après rapproché de la liste des 29.
+- **AC8** — aucun nom réel dans le code, les fixtures, la story ni les PR (CC-48).
+- **Task 0** — vérifiée sur le terrain par le bouton du scénario 147, première entité recréée depuis le déploiement : HA 2026.9.4 applique `default_entity_id` (`button.jeedom2ha_scenario_147`) et remplace l'`entity_id` précédent quand l'entité revient après une suppression.
+- **Précision d'Alexandre** (12/10 vers 06:50) : l'entité principale d'un équipement à plusieurs entités garde le nom de l'équipement ; seules les autres entités prennent le nom de leur commande.
 
 ## Dev Agent Record
 
@@ -201,3 +217,6 @@ H1 à H5 (comportement de HA) et la cause de H6 (le fait de terrain est établi,
 - `tests/unit/test_story_21_1_cc44_scenario_lifecycle.py`
 - `docs/fr_FR/index.md`
 - `docs/fr_FR/changelog_beta.md`
+- `resources/daemon/tests/fixtures/story_19_4_guard/*_mqtt.json` (8 fichiers, réalignés en R1)
+- `_bmad-output/implementation-artifacts/22-1-preuve-terrain-2026-10-12.md` (nouveau, clôture)
+- `docs/operations/delegations.md` (clôture)
