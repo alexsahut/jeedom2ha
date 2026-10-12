@@ -553,3 +553,12 @@ async def test_command_then_real_state_without_optimistic_publication(app, route
     assert translation_policy == "real_state_confirmation"
     assert await app["state_synchronizer"].handle_state_message(300, 3003, "0") is True
     assert route_bridge.published == [("jeedom2ha/300/state", "OFF", 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_failed_purge_is_counted_as_failed_republication():
+    bridge = _ScanBridge(["jeedom2ha/300/state"], publish_ok=False)
+    decision = _light(300, state=False, brightness=False)
+    sync = _sync([decision], bridge)
+    published, failed = await sync.publish_click_states(decision, {}, 0.0)
+    assert (published, failed) == (0, 1)

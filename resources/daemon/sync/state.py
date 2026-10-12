@@ -354,7 +354,7 @@ class StateSynchronizer:
                 continue
             # Story 23.3 (Q7): a light/cover channel that lost its readback must not
             # keep a stale retained real state next to the optimistic path.
-            self._purge_invalid_retained(candidate, str(state_topic), eq_id)
+            failed += self._purge_invalid_retained(candidate, str(state_topic), eq_id)
             for binding in self._candidate_bindings(candidate, cand_decision, eq_id):
                 raw_value = value_resolver(eq_id, binding)
                 if raw_value is None:
@@ -418,7 +418,7 @@ class StateSynchronizer:
         candidate: MappingResult,
         state_topic: str,
         eq_id: Any,
-    ) -> None:
+    ) -> int:
         """Empty the retained topics of light/cover channels that have no real readback.
 
         Story 23.3 (Q7). Real states are published ``retain=True``, optimistic ones
@@ -428,10 +428,13 @@ class StateSynchronizer:
         ``jeedom2ha/<eq>/state|brightness|position`` topics derived from the registry
         state topic, and only for topics known to be retained (scan + our own
         publishes), so an entity that keeps its readback or never had one costs nothing.
+        Returns the number of failed purge publications (counted as failed republication
+        so the caller does not report success while a stale state stays at the broker).
         """
         channels = _PURGEABLE_CHANNELS.get(getattr(candidate, "ha_entity_type", None))
         if not channels or not state_topic.startswith("jeedom2ha/"):
-            return
+            return 0
+        failures = 0
         live = {name for name, _cmd in readback_commands(candidate.ha_entity_type, candidate)}
         for channel in channels:
             if channel in live:
@@ -445,9 +448,11 @@ class StateSynchronizer:
                           reason_code="stale_retained_state_purged", action="purge_state",
                           state_topic=topic)
             else:
+                failures += 1
                 self._log(logging.WARNING, eq_id=eq_id, cmd_id=None,
                           reason_code="stale_retained_state_purge_failed", action="purge_state",
                           state_topic=topic)
+        return failures
 
     @staticmethod
     def _candidate_current_value(candidate: MappingResult) -> Any:
