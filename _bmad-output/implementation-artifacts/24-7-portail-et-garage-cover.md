@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production** (des entités `button` ou `binary_sensor` deviennent un `cover`). Ne rouvre pas `PRODUCT_SCOPE` (`cover` y est déjà). Décision attendue d'Alexandre : **Q10** (remplacement d'entités existantes, option C pour un `cover` optimiste) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : types génériques des deux équipements concernés établis (section suivante) ; le cas du garage est la vérification de l'AC2.
 
 ## Story
 
@@ -17,6 +19,12 @@ afin de les consulter et de les piloter par Assist.
 - Dépend de **24.4**. Une seule story de type en cours à la fois.
 - **Dépend de 23.3 pour l'état d'un `cover`** : cette story ajoute `BARRIER_STATE` / `GARAGE_STATE` comme clé de relecture du `cover` ; elle ne réimplémente pas le streaming et ne touche pas aux lignes `light`/`cover` de `sync/state.py`. Si Alexandre ne veut pas attendre 23.3 (Q10 C), elle livre un `cover` **optimiste**, documenté dans « Limites », avec `optimistic` conservé (règle de 23.3 : `optimistic: false` seulement avec un état réel).
 - **Q10** : A recommandée (remplacement, inventaire des références).
+
+## Établi par ClaudeBox le 12/10 (mesure du 10/10, types génériques par équipement)
+
+- **Portail** : `GB_OPEN`, `GB_CLOSE`, `GB_TOGGLE`, `BARRIER_STATE`. Ouvrir et fermer existent : branche directe de l'AC1, bascule inutile.
+- **Garage** : `GB_TOGGLE`, `GARAGE_STATE`. **Bascule seule + état** : c'est exactement le cas que l'AC2 doit trancher (un `cover` n'est publié que si la bascule est pilotée par un état binaire fiable). Ni `GB_OPEN` ni `GB_CLOSE`.
+- Reste à établir (ClaudeBox, Task 0) : la polarité de `BARRIER_STATE` et `GARAGE_STATE`, et le chemin actuel de chacun (`binary_sensor` ou `button`).
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -33,6 +41,7 @@ afin de les consulter et de les piloter par Assist.
 ## Critères d'acceptation proposés (à figer selon Q10)
 
 - **AC1.** Un équipement qui porte `GB_OPEN` et `GB_CLOSE` (ou `GB_TOGGLE`) est projeté en `cover` de classe portail ou garage (valeurs exactes lues dans la documentation de HA, D4), avec ses commandes d'ouverture et de fermeture traduites par `sync/command.py`.
+- **AC1 bis.** Cas de référence : le portail (`GB_OPEN`, `GB_CLOSE`, `GB_TOGGLE`, `BARRIER_STATE`) donne un `cover` avec ordres d'ouverture et de fermeture directs, `GB_TOGGLE` non utilisé pour l'ouverture ; le garage (`GB_TOGGLE`, `GARAGE_STATE`) donne un `cover` dont l'ordre d'ouverture envoie la bascule **seulement si** l'état dit fermé, et inversement, jamais en aveugle.
 - **AC2.** **Aucun état menteur.** Un `cover` n'est publié que s'il a soit `GB_OPEN` et `GB_CLOSE`, soit `GB_TOGGLE` **et** une information d'état binaire fiable (`BARRIER_STATE` / `GARAGE_STATE`) permettant de ne basculer que dans le bon sens. Sinon, l'équipement garde son comportement actuel avec une raison canonique explicite (impossibilité technique), jamais un `cover` à deux sens inventés.
 - **AC3.** `BARRIER_STATE` / `GARAGE_STATE` consommés par le `cover` ne sont plus publiés en `binary_sensor` doublon ; les autres commandes de l'équipement gardent leur mapping.
 - **AC4.** Le payload porte `default_entity_id = cover.<object_id>` (22-1) ; `unique_id` et `object_id` suivent les conventions.

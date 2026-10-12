@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production et ouvre un composant** (`valve`, FR40/NFR10). Décisions attendues d'Alexandre : **Q9** (relation avec l'epic 18) et **Q10** (remplacement d'entités existantes) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : deux vannes concernées, types génériques établis ; **l'une relève d'un plugin Z-Wave** : voir ci-dessous.
 
 ## Story
 
@@ -17,6 +19,12 @@ afin de la piloter par Assist.
 - Dépend de **24.4**. Une seule story de type en cours à la fois.
 - **23.3** : même règle que 24.6 (une entrée de streaming après sa fusion, sinon optimiste documenté).
 - **Q9** : A recommandée. **Q10** : A recommandée.
+
+## Établi par ClaudeBox le 12/10 (mesure du 10/10)
+
+- **Deux vannes** portent `IRRIG_ON`, `IRRIG_OFF`, `IRRIG_STATE` (trio complet : ordres + état), dont **une appartient à un plugin Z-Wave**.
+- **Point à trancher avant le `create-story`** : si ce plugin Z-Wave figure dans la liste des plugins natifs (24.3, `voie_native`), cette vanne **n'est pas publiée par jeedom2ha** et sort de cette story (sa voie est l'intégration native de HA) ; seule l'autre vanne la concerne. À confirmer par ClaudeBox à partir de l'export (champ `plugin` et `reason`).
+- `IRRIG_*` n'est pas un type du core (famille Homebridge) : le gel du référentiel (Task 0) reste nécessaire.
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 

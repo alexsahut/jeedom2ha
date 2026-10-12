@@ -2,21 +2,31 @@
 
 Status: draft
 
-> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). Relecture de ClaudeBox obligatoire, Task 0 faite par ClaudeBox, avant tout `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (Q5). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
+> **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire (aucun accès box, Home Assistant ni secret). **R1 (ClaudeBox, 12/10) intégrée** : la Task 0 est faite (règle d'exposition de Homebridge établie en lecture seule) ; deux cas restent à confirmer (Task 0 bis). Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Contexte et décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md` (T3, Q5, D1). Pointeurs `fichier:ligne` pris sur `main` à `b1acad7`, sauf mention du plugin Homebridge. Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
 
 ## Story
 
 En tant que mainteneur de la parité entre Apple Maison et Assist,
-je veux que le démon sache quels équipements Jeedom sont exposés à HomeKit et connaisse les identifiants physiques (`logicalId`) des équipements et des commandes,
+je veux que le démon sache quels équipements et quels scénarios Jeedom sont exposés à HomeKit et connaisse les identifiants physiques (`logicalId`) des équipements et des commandes,
 afin que les stories suivantes décident, exportent et alignent sans jamais modifier la configuration Homebridge, les types génériques Jeedom ni l'exposition à Assist.
 
 **Parcours : PHP + démon, lecture seule. Aucun changement de comportement, aucun écran.**
 
 ## Dépendances et décisions
 
-- Dépend de la **Task 0 de ClaudeBox** (où Homebridge stocke l'exposition). Ne dépend d'aucune autre story.
+- Ne dépend plus d'aucune vérification préalable (Task 0 faite) ; les deux cas de la Task 0 bis se confirment pendant le `create-story`.
 - Peut démarrer avant le `done` de 22-2 (ne touche ni `http_server.py` ni `desktop/`).
 - Q5 de la proposition (contenu de l'export) ne change rien ici : les champs sont portés tels quels, sans nom.
+
+## Établi par ClaudeBox le 12/10 (lecture seule, plugin Homebridge)
+
+Source : `plugins/homebridge/core/class/homebridge.class.php:2680-2710` (`discovery_cmd_eqlogics`), `core/api/homebridge.api.php:44`, `homebridge.class.php:3119-3122`. Ce code n'est pas dans ce dépôt.
+
+- **Équipement exposé** si : (1) il appartient à un plugin **actif**, sauf `mobile` et `homebridge` ; (2) il est **dans une pièce dont `configuration.sendToHomebridge` vaut 1** ; (3) sa propre `configuration.sendToHomebridge` (entier) vaut 1.
+- **Valeur par défaut** : si la clé est absente sur l'équipement, la valeur par défaut est celle de la configuration du plugin Homebridge (`config::byKey`, clé `sendToHomebridgeDefault`, défaut 1). L'API de Homebridge écarte `sendToHomebridge == 0`.
+- **Scénario** exposé si `configuration.sendToHomebridge` du scénario est **différent de « 0 »** (absent = exposé).
+- **Aucun drapeau par commande** : les commandes héritent de l'équipement.
+- **Cache Homebridge** (mesure du 12/10) : 123 accessoires, tous à 1 ; `logicalId` non vide pour **58**, **vide pour 65** : un `logicalId` vide est normal et donne `null`, il ne sert donc jamais de clé unique (l'export porte aussi `eq_id` et `cmd_id`).
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -26,34 +36,36 @@ afin que les stories suivantes décident, exportent et alignent sans jamais modi
 | F2 | Le PHP lit les commandes (id, nom, type générique, type, sous-type, valeur, unité, visibilité, historisation) puis construit l'équipement (id, nom, pièce, activation, visibilité, plugin, type générique, exclusion, statut). | `core/class/jeedom2ha.class.php:759-769`, `:786-796` |
 | F3 | Le démon normalise ce payload avec des `.get()` tolérants ; les dataclasses portent des valeurs par défaut, donc un champ optionnel ajouté ne casse aucun payload existant. | `resources/daemon/models/topology.py:74-100`, `:124-190` |
 | F4 | `_to_bool(None, default)` renvoie `default` : il ne convient **pas** à un champ à trois états (vrai / faux / inconnu). | `models/topology.py:11-23` |
-| F5 | Les scénarios sont lus à part (id, nom, actif) et n'ont aucun attribut d'exposition. | `class.php:661-680`, `models/topology.py:103-108` |
+| F5 | Les scénarios sont lus à part (id, nom, actif) par `buildScenariosPayload` ; `scenarios_complete` y est déjà calculé. | `class.php:661-680`, `:832` ; `models/topology.py:103-108` |
 | F6 | Priorité d'exclusion : équipement > plugin > pièce ; `exclusion_source` est déjà transmis. | `class.php:775-784` |
 
 ## Critères d'acceptation proposés
 
-- **AC1.** `getFullTopology()` ajoute à chaque équipement `logical_id` (chaîne ou `null`), `homekit_exposed` (`true`, `false` ou `null`) et `homekit_exposed_source` (chaîne ou `null`), et à chaque commande `logical_id`. Lecture seule : `getLogicalId()` et `getConfiguration()` ; aucun `setConfiguration`, `save()` ni écriture sur un équipement, une commande ou un scénario.
-- **AC2.** Une valeur absente, vide ou illisible donne `null`, **jamais `false` par défaut**. `homekit_exposed_source` dit d'où vient la valeur (forme proposée : `eqlogic_configuration:<clé>`, `absent`, `unreadable`) ; la clé exacte est fixée par la Task 0.
+- **AC1.** `getFullTopology()` ajoute à chaque équipement `homekit_exposed` (`true`, `false` ou `null`) et `homekit_exposed_source`, et un `logical_id` (chaîne ou `null`) à chaque équipement et à chaque commande. Lecture seule : `getLogicalId()`, `getConfiguration()`, `config::byKey()`, `jeeObject` ; aucun `setConfiguration`, `save()` ni écriture sur un équipement, une pièce, une commande, un scénario ou la configuration de Homebridge.
+- **AC2.** `homekit_exposed` **reproduit la règle de Homebridge établie ci-dessus**, en lecture seule : plugin de l'équipement actif et ni `mobile` ni `homebridge`, **et** pièce à 1, **et** valeur d'équipement à 1 (à défaut, `sendToHomebridgeDefault`, défaut 1). `homekit_exposed_source` dit **lequel des trois a décidé** (valeurs proposées : `plugin_excluded`, `piece`, `equipement`, `defaut_homebridge`) ; `null` avec la provenance `homebridge_absent` si le plugin Homebridge est absent ou inactif, ou `illisible` si une valeur est illisible. **Jamais `false` par défaut** pour une valeur inconnue.
 - **AC3.** Le démon porte ces champs en optionnels additifs (`None` par défaut) sur `JeedomEqLogic` et `JeedomCmd`. `from_jeedom_payload` normalise `0`/`1`/`"0"`/`"1"`/`true`/`false` sans transformer `None` en `False`. Un payload ancien, sans ces champs, produit exactement le même snapshot qu'avant.
 - **AC4.** Aucun changement d'éligibilité, de mapping, de décision, de publication, de diagnostic, de cache ni de contrat 4D : golden et contrat 4D **identiques octet pour octet** ; `PRODUCT_SCOPE` inchangé ; `exportDiagnostic` (allowlist) inchangé.
-- **AC5.** Les `logicalId` ne sont écrits dans aucun journal de niveau `info` ou supérieur, ni dans le diagnostic existant ni dans son export (ils peuvent contenir des adresses d'appareil).
-- **AC6.** Scénarios : aucun champ d'exposition tant que la Task 0 n'a pas trouvé une source ; si elle en trouve une, un AC dédié est écrit avant `ready-for-dev`.
-- **AC7.** Tests : extraction PHP de la topologie (cas exposé, non exposé, valeur absente, valeur illisible) ; normalisation Python (trois états, payload ancien) ; recherche dans le diff prouvant l'absence d'écriture sur la configuration Jeedom.
+- **AC5.** Un `logicalId` vide ou absent est transporté comme `null` (jamais comme chaîne vide) ; les `logicalId` ne sont écrits dans aucun journal de niveau `info` ou supérieur, ni dans le diagnostic existant ni dans son export (ils peuvent contenir des adresses d'appareil).
+- **AC6.** **Scénarios** : `buildScenariosPayload` ajoute `homekit_exposed` (vrai si `configuration.sendToHomebridge` du scénario est différent de « 0 », absent compris) avec la provenance `scenario_configuration` ; le démon le porte sur `JeedomScenario` de la même manière additive ; sans effet sur la publication des boutons (21-1 inchangée).
+- **AC7.** Tests : extraction PHP de la topologie (équipement exposé, pièce à 0, équipement à 0, clé absente avec défaut 1 puis 0, plugin `mobile` / `homebridge`, plugin inactif, Homebridge absent, valeur illisible, scénario) ; normalisation Python (trois états, payload ancien) ; recherche dans le diff prouvant l'absence d'écriture sur la configuration Jeedom ou Homebridge.
 - **AC8.** Aucun nom réel dans le code de test, les fixtures, la story, la PR (CC-48).
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Établir (ClaudeBox, lecture seule sur la box)** : sur quatre identifiants (un équipement exposé à HomeKit, un non exposé, un équipement qui produit plusieurs accessoires, un scénario exposé), relever **les clés de configuration liées à Homebridge** (clés et formats seulement, pas de noms) : confirmer `sendToHomebridge`, son niveau (équipement ou commande), ses valeurs (`0`/`1`, vide) ; relever si `logicalId` est vide pour les équipements virtuels et non vide pour les plugins natifs. **Si la clé n'est pas lisible par `getConfiguration()` ou diffère de `sendToHomebridge`, s'arrêter et revenir vers Alexandre avant de coder.**
-- [ ] **Task 1 — PHP** : lecture des trois champs d'équipement et du `logical_id` de commande dans `getFullTopology()`, tri-état strict.
+- [x] **Task 0 — Établie par ClaudeBox le 12/10** (voir plus haut) : règle d'exposition, valeur par défaut, scénarios, absence de drapeau par commande, état des `logicalId`.
+- [ ] **Task 0 bis — Confirmer (ClaudeBox, lecture seule)** : (a) comportement de Homebridge pour un **équipement sans pièce** ; (b) comportement pour une **pièce sans clé `sendToHomebridge`** (défaut de pièce ?). **Tant que (a) et (b) ne sont pas confirmés, les deux cas donnent `null` avec la provenance `illisible`** ; ne pas deviner.
+- [ ] **Task 1 — PHP** : lecture des trois niveaux, provenance, `logical_id` d'équipement et de commande, champ d'exposition des scénarios ; tri-état strict.
 - [ ] **Task 2 — Démon** : champs additifs, normalisation à trois états, sans toucher à l'éligibilité.
 - [ ] **Task 3 — Tests** : voir AC7 ; golden et contrat 4D inchangés.
-- [ ] **Task 4 — Documentation de développement** : ajouter le contrat des champs à la documentation interne (pas à `docs/fr_FR`, aucune visibilité utilisateur).
+- [ ] **Task 4 — Documentation de développement** : ajouter le contrat des champs et la règle de Homebridge à la documentation interne (pas à `docs/fr_FR`, aucune visibilité utilisateur).
 
 ## Garde-fous
 
 - **Le plugin n'écrit jamais** la configuration Homebridge, les types génériques Jeedom ni l'exposition à Assist (exigence 5).
+- La règle d'exposition est celle d'un autre plugin : elle est documentée avec sa date et sa source ; un écart futur de Homebridge se corrige ici, pas dans les stories suivantes.
 - Aucun changement de ce qui est publié ; si le golden bouge, la story est refusée.
 - Aucun accès SSH, box ou Home Assistant depuis la session cloud ; `scripts/deploy-to-box.sh` jamais lancé par une session cloud.
 
 ## Vérifications non faites par cette session
 
-La clé réelle, son niveau et son format (D1) ; la présence d'un `logicalId` selon les plugins ; l'exposition des scénarios.
+Les deux cas de la Task 0 bis ; la stabilité de la règle de Homebridge entre ses versions ; la lecture effective de `config::byKey('sendToHomebridgeDefault', 'homebridge')` depuis le plugin (droits, nom de classe).

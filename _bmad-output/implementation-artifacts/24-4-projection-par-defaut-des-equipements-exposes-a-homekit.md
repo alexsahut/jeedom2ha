@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production** : des équipements aujourd'hui exclus par leur pièce seront publiés au sync suivant. Décisions attendues d'Alexandre : **Q3** (la pièce n'écarte plus) et **Q4** (mapping ambigu ou probable) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : *établi par ClaudeBox le 12/10*, d'après la configuration actuelle du plugin (inchangée depuis le 04/10) et le référentiel du 10/10, **3 équipements** (virtuels, dans deux pièces exclues) seraient nouvellement publiés. Le risque de publication de masse est faible ; l'option C de Q3 ne se justifie plus. Le signal d'exposition suit la règle de Homebridge (24-1) : pièce + équipement + valeur par défaut.
 
 ## Story
 
@@ -52,7 +54,7 @@ L'état global « exclure » reste respecté (Q3 A, ce n'est pas une exclusion d
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Mesure préalable (ClaudeBox, à partir de l'export de 24.2)** : nombre et identifiants des équipements exposés écartés par la pièce (`exclusion_source = object` ou état de pièce) ; si le nombre est élevé, proposer à Alexandre l'option C de Q3.
+- [ ] **Task 0 — Confirmation préalable (ClaudeBox, à partir de l'export de 24.2)** : les identifiants des équipements exposés écartés par la pièce (attendu : 3, *établi par ClaudeBox le 12/10*) ; si l'export en donne nettement plus, revenir vers Alexandre (option C de Q3) avant de coder.
 - [ ] **Task 1 — Démon** : règle dans `assess_eligibility` et dans `resolve_published_scope` ; source de décision additive ; un seul point de calcul partagé par sync, « Publier », aperçu, diagnostic.
 - [ ] **Task 2 — Libellés** (configuration, écran, `docs/fr_FR`).
 - [ ] **Task 3 — Tests** : exposé / non exposé / inconnu × pièce exclue × exclusion explicite × état global ; parité sync / « Publier » / aperçu ; golden ; export.

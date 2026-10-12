@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : types génériques de la serrure établis (section suivante).
 
 ## Story
 
@@ -17,6 +19,11 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 - Dépend de **24.4**. Une seule story de type en cours à la fois.
 - **23.3** : même règle que 24.6 pour l'état.
 - **Q9** : A recommandée. **Q10** : A recommandée.
+
+## Établi par ClaudeBox le 12/10 (mesure du 10/10)
+
+- **Une serrure** porte `LOCK_OPEN`, `LOCK_CLOSE`, `LOCK_STATE` : état + deux ordres, donc l'AC3 est satisfaite sur le cas réel.
+- Reste à établir (Task 0) : la polarité de `LOCK_STATE` ; le plugin d'origine (si c'est un plugin natif de la liste de 24.3, l'équipement relève de `voie_native`, pas de cette story).
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 

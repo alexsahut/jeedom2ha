@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **La portée n'est pas fixée** : elle dépend de la baseline de 24.2 et des stories 24.4 à 24.9. Ne passe pas à `ready-for-dev` avant que ClaudeBox ait classé chaque écart restant. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : types génériques des deux équipements établis ; une hypothèse de cause, fondée sur le code, est posée pour le capteur (à confirmer par l'export).
 
 ## Story
 
@@ -21,8 +23,8 @@ afin de refermer la liste des 15 écarts de type sans deviner leur cause.
 
 | Écart | Fait établi dans le code | Cause |
 |---|---|---|
-| Prise dont les commandes sont `ENERGY_ON/OFF` | `SwitchMapper` traite `ENERGY_ON` seul, `ENERGY_OFF` seul, ou le trio avec `ENERGY_STATE` (`mapping/switch.py:121-200`) ; sans état, le switch est optimiste. | **Inconnue** : le type attendu par le référentiel et le type publié ne sont pas donnés. L'export les donnera. |
-| Capteur sans température ni humidité | La température et l'humidité sont mappées par type générique, plus par unité fiable pour W/Wh/kWh (`mapping/sensor.py`, `models/topology.py:269-295`) ; un capteur sans ces types tombe sur le repli `sensor` ambigu (`mapping/fallback.py`). | **Inconnue** : quel type est attendu, quel signal Jeedom existe (unité, nom, type générique absent). |
+| Prise `ENERGY_ON`, `ENERGY_OFF`, `ENERGY_STATE` (*établi par ClaudeBox le 12/10*) | Trio complet : `SwitchMapper` le traite comme un `switch` avec état réel relu (`mapping/switch.py:121-200`, `sync/state.py:35-48`). Le mapping nominal existe déjà. | **Inconnue** : le trio étant complet, l'écart ne vient pas d'un type manquant du mapping ; type attendu par le référentiel et type publié ne sont pas donnés (jointure ? entité absente ? multi-entité ?). L'export les donnera. |
+| Capteur `WEATHER_TEMPERATURE`, `WEATHER_HUMIDITY`, `WEATHER_PRESSURE`, `SIREN_STATE` (*établi par ClaudeBox le 12/10*) | Les trois types `WEATHER_*` **sont mappés** en `sensor` (`mapping/sensor.py:40-42`). Mais la chaîne de mappers s'arrête au premier mapper qui reconnaît l'équipement (`mapping/registry.py:24-35,80-86`) et `BinarySensorMapper` passe avant `SensorMapper` : `SIREN_STATE` donne un `binary_sensor` (`mapping/binary_sensor.py:46`), et le cas multi-domaine n'existe que pour une forme `switch` (`:69-87`). | **Hypothèse (non vérifiée)** : l'équipement serait publié comme simple `binary_sensor` de sirène, **sans** ses mesures de température, d'humidité et de pression. À confirmer par l'export (`ha_type`, commandes `covered: false`). Si confirmée, la correction est un cas multi-domaine borné (sensor + binary_sensor), sans nouveau composant. |
 
 ## Critères d'acceptation proposés (conditionnels)
 

@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **Change la production** (relibellé de tous les équipements « exclus par plugin », mode test). Décisions attendues d'Alexandre : **Q1** (la liste et son vocabulaire) et **Q2** (le mode test) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : *établi par ClaudeBox le 12/10*, **42 équipements exposés à HomeKit** passent par des plugins natifs et **ne sont pas publiés aujourd'hui** : pour eux la story est un relibellé (`excluded_plugin` → `voie_native`), pas une nouvelle exclusion. Le mode test (Q2 B) est la seule partie qui peut créer des entités.
 
 ## Story
 

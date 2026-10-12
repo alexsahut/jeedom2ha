@@ -28,6 +28,8 @@ references:
 # Sprint Change Proposal 2026-10-12 : parité HomeKit (CC-33), epic 24
 
 > **Statut : proposition, rien n'est décidé.** Cette proposition, la section de l'epic 24 et les dix brouillons de story sont **documentaires**. Toutes les stories sont `draft` ; aucune n'est `ready-for-dev`. Chaque décision de comportement en production est posée en question à Alexandre (section 8), avec options, conséquences et recommandation. Les pointeurs `fichier:ligne` sont pris sur `main` à `b1acad7` (12/10/2026). Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
+>
+> **R1 intégrée (ClaudeBox, 12/10).** Les vérifications en lecture seule faites par ClaudeBox le 12/10 sont intégrées et marquées « *établi par ClaudeBox le 12/10* » : règle d'exposition de Homebridge (T3, 24-1), cause des 5 scénarios (section 6), chiffrage de Q3 et de Q7, types génériques des équipements restants (24-6 à 24-10). Le détail est en section 13.
 
 ## 1. Déclencheur
 
@@ -47,8 +49,8 @@ Ordre d'Alexandre du 11/10 à 15:48 : CC-44 + CC-47 (epic 21, `done`), puis CC-3
 
 | Écart mesuré | Nombre | Traité par | Remarque |
 |---|---|---|---|
-| Scénarios non projetés | 5 | 24-2 (mesure), 24-5 | Le plugin publie déjà un bouton par scénario actif : voir section 6 |
-| Types manquants ou remplacés | 15 | 24-6 à 24-10 | Ventilateurs/aspirateurs en `switch` (24-6), portail/garage `GB_*`/`BARRIER_STATE` en `button` (24-7), vanne (24-8), serrure (24-9), prise `ENERGY_ON/OFF` et capteur sans température ni humidité (24-10, cause à établir) |
+| Scénarios non projetés | 5 | 24-2 (mesure), 24-5 | Le plugin publie déjà un bouton par scénario actif. *Établi par ClaudeBox le 12/10* : les cinq boutons existent dans HA mais ne sont pas exposés à Assist ; l'écart est un artefact de mesure et un geste côté HA (section 6) |
+| Types manquants ou remplacés | 15 | 24-6 à 24-10 | Ventilateurs/aspirateurs en `switch` (24-6, *établi par ClaudeBox le 12/10* : 8 équipements `FAN_*`, aucune vitesse, donc équivalents fonctionnels), portail/garage `GB_*`/`BARRIER_STATE`/`GARAGE_STATE` en `button` (24-7), deux vannes `IRRIG_*` (24-8), serrure `LOCK_*` (24-9), prise `ENERGY_*` et capteur `WEATHER_*` + `SIREN_STATE` (24-10) |
 | Sous-accessoires Homebridge sans eqLogic propre | 2 | Hors plugin | Aucun eqLogic Jeedom à projeter : à classer par le référentiel (D7) |
 | Alignement et exposition à Assist | ≈ 11 + | Hors plugin | « Le reste se règle côté HA » ; le plugin ne touche jamais à l'exposition (exigence 5) |
 | Équipements exposés écartés par la pièce, par plugin ou par absence de type | inconnu | 24-3, 24-4 | La baseline de 24-2 donnera le nombre exact ; il n'est pas dérivable du dépôt |
@@ -61,7 +63,7 @@ Verdict : **C** = confirmé, **N** = nuancé, **M** = modifié depuis les répon
 |---|---|---|---|
 | T1 | Le plugin ne lit ni `sendToHomebridge` ni les `logicalId`. | **C** | Aucune occurrence de `sendToHomebridge`, `logicalId` ni `getLogicalId` dans `core/`, `desktop/`, `plugin_info/`, `resources/daemon/` hors tests, et aucune lecture d'un attribut « HomeKit » (seule mention : le docstring de `mapping/button.py:45`). La lecture des commandes se fait en `core/class/jeedom2ha.class.php:759-769` (id, nom, type générique, type, sous-type, valeur, unité, visibilité, historisation) ; celle de l'équipement en `:786-796`. |
 | T2 | Ajout de bout en bout `getFullTopology()` → `models/topology.py` → éligibilité → `evaluate_equipment()`, champs optionnels additifs. | **C** | `getFullTopology()` `core/class/jeedom2ha.class.php:687` ; `JeedomCmd` `models/topology.py:74`, `JeedomEqLogic` `:86`, `from_jeedom_payload` `:124` (lecture tolérante par `.get`, valeurs par défaut sur les dataclasses) ; `assess_eligibility` `:301` ; `evaluate_equipment` `models/evaluate_equipment.py:309` (reçoit l'éligibilité déjà calculée, ne la recalcule jamais). **Ajout** : `resolve_published_scope` (`models/published_scope.py:93-122`) et `_scope_entry_is_included` (`transport/http_server.py:419`) relisent aussi `is_excluded`/`exclusion_source` : toute règle « la pièce n'écarte pas » doit y être répercutée (24-4). |
-| T3 | `homekit_exposed` : attribut d'équipement hérité par ses commandes. | **C** (conception) | N'existe pas encore. Le découpage de 24-1 le porte sur l'équipement ; l'export (24-2) le recopie sur chaque commande avec sa provenance. **Non vérifié** : où Homebridge stocke l'exposition (clé exacte, niveau équipement ou commande, format, cas des scénarios) : la clé `sendToHomebridge` vient des réponses de clawcode, pas du code. Task 0 de 24-1, lecture seule par ClaudeBox (D1). |
+| T3 | `homekit_exposed` : attribut d'équipement hérité par ses commandes. | **C** (conception), règle **établie** | *Établi par ClaudeBox le 12/10 (lecture du plugin Homebridge, `plugins/homebridge/core/class/homebridge.class.php:2680-2710`, `discovery_cmd_eqlogics`)* : un équipement est exposé s'il appartient à un plugin actif (sauf `mobile` et `homebridge`), **dans une pièce dont `configuration.sendToHomebridge` vaut 1**, et si `configuration.sendToHomebridge` (entier) de l'équipement vaut 1 ; clé absente sur l'équipement : valeur par défaut du plugin Homebridge (`config::byKey`, clé `sendToHomebridgeDefault`, défaut 1) ; l'API écarte `sendToHomebridge == 0` (`core/api/homebridge.api.php:44`). **Scénarios** : `configuration.sendToHomebridge` du scénario différent de « 0 » (`homebridge.class.php:3119-3122`). **Aucun drapeau par commande** : les commandes héritent de l'équipement. Cache Homebridge : 123 accessoires, tous à 1 ; `logicalId` non vide pour 58, **vide pour 65** (l'export porte donc aussi `eq_id` et `cmd_id`). 24-1 combine pièce, équipement et valeur par défaut, en lecture seule ; `null` si le plugin Homebridge est absent ou une valeur illisible ; la provenance dit laquelle des trois a décidé. Deux cas restent à confirmer (D1) : équipement sans pièce, pièce sans clé. |
 | T4 | Le démon n'a aucun client HA ; un indicateur « Assist » ne peut être que déclaratif. | **C**, **N** sur `published_in_ha` | Seul `transport/mqtt_client.py` parle au broker. `published_in_ha` (`transport/http_server.py:470-482`, exposé `:3177`/`:3256`) signifie « publié par le plugin et non en attente de dépublication », **pas** « présent dans le registre de HA » : l'export ne doit jamais l'appeler « présent dans HA » (champ `discovery_published`). Aucun champ Assist dans l'export : l'exposition à Assist reste celle du référentiel (exigence 5). |
 | T5 | `jeedom2ha_cache.json` est conservé ; l'export va dans `data/jeedom2ha_decision_export.json` (`schema_version: 1`). | **C**, **N** sur la forme | Le cache (`cache/disk_cache.py:29,107-152`) est indexé par `eq_id`, ne contient que les équipements présents dans `publications` (ni inéligibles, ni commandes, ni scénarios) et s'écrit **sans écriture atomique** (`open(…, "w")`, `:148`). Le motif atomique existe (`mapping/overrides.py:64`, `_write_raw_atomically`, CC-34) : l'export doit l'employer. Le cache n'est donc pas extensible à ce besoin ; second fichier confirmé. |
 | T6 | `models/cause_mapping.py` et `models/ui_contract_4d.py` sont figés. | **C** et **M** | Les deux sont figés (`cause_mapping.py:1`, `ui_contract_4d.py:1`). **`models/taxonomy.py` l'est aussi** (« ARTEFACT FIGÉ — Story 3.1 », `:1`) et n'était pas cité : un code inconnu y tombe en « Non supporté » (`get_primary_status`, `:34-40`), ce qui afficherait `voie_native` comme un équipement non supporté. Trois tables non figées doivent aussi suivre : `_DIAGNOSTIC_MESSAGES` (`http_server.py:2274`), `_CLOSED_REASON_MAP` (`:2410`), libellés de `desktop/js/jeedom2ha_mapping_override.js:640-650`. Un code absent de `_EXCLUSION_REASON_TO_PERIMETRE` (`ui_contract_4d.py:15-19`) devient **« inclus »**, donc un faux écart de direction 1 (`compute_ecart`, `:32-44`) : 24-3 doit le traiter. |
@@ -89,15 +91,19 @@ Verdict : **C** = confirmé, **N** = nuancé, **M** = modifié depuis les répon
 
 Fait établi par le code : depuis la story 10-1, tout scénario **actif** reçoit un bouton `homeassistant/button/jeedom2ha_scenario_<id>/config` (`http_server.py:2134-2158`, `mapping/button.py:44-65`). Les cinq scénarios HomeKit sont les identifiants 20, 38, 50, 57 et 150 (story 10-1) ; aucun ne figure parmi les 15 identifiants qui recoupent un équipement (preuve 21-1 : 15, 18, 21, 81, 82, 83, 85, 109, 110, 112, 113, 120, 160, 179, 180). Le relevé du 12/10 compte **84 boutons de scénario** dans HA.
 
-Je ne peux **pas** conclure sans la box ; voici les causes plausibles, de la plus probable à la moins probable, et la vérification de chacune.
+Cette session ne pouvait pas conclure sans la box ; voici les causes plausibles qu'elle avait classées, avec la vérification de chacune (le verdict de ClaudeBox est en 6.1).
 
 | Rang | Hypothèse | Fondement dans le code | Vérification (ClaudeBox, lecture seule) |
 |---|---|---|---|
-| H-a | **Artefact de mesure** : les scénarios n'existent dans aucune sortie que le référentiel sait lire (diagnostic, périmètre publié, cache, outil de parité) ; seule la souscription MQTT les montre | T10 | Chercher `unique_id = jeedom2ha_scenario_20 / _38 / _50 / _57 / _150` dans le registre des entités de HA et `homeassistant/button/jeedom2ha_scenario_<id>/config` dans l'inventaire MQTT |
-| H-b | Un ou plusieurs des cinq sont **inactifs** : pas de bouton (10-1) et, depuis 21-1, un bouton existant est retiré | `http_server.py:2135-2142` | État `is_active` des cinq dans Jeedom |
-| H-c | Les accessoires HomeKit de scénario sont des **interrupteurs** (« HomeKit switches », delta du 07/06) et le référentiel attend un `switch`/`scene` ; un `button` ne compte pas comme projection du même objet | décision 10-1 AC2/AC4 : `button` | Règle du référentiel pour le type attendu ; question 8 |
-| H-d | Les cinq sont projetés, mais **non exposés à Assist** (côté HA, hors plugin) et comptés « non projetés » faute de distinction | exigence 5 | Exposition Assist des cinq boutons dans HA |
-| H-e | Jointure par numéro seul : un identifiant de scénario est pris pour un identifiant d'équipement | 15 collisions mesurées, **aucune** sur les cinq | Clé de jointure du référentiel (le champ `kind` de l'export la supprime) |
+| H-a | **Confirmée.** Artefact de mesure : les scénarios n'existent dans aucune sortie que le référentiel sait lire (diagnostic, périmètre publié, cache, outil de parité) ; seule la souscription MQTT les montre | T10 | Chercher `unique_id = jeedom2ha_scenario_20 / _38 / _50 / _57 / _150` dans le registre des entités de HA et `homeassistant/button/jeedom2ha_scenario_<id>/config` dans l'inventaire MQTT |
+| H-b | **Écartée.** Un ou plusieurs des cinq sont **inactifs** : pas de bouton (10-1) et, depuis 21-1, un bouton existant est retiré | `http_server.py:2135-2142` | État `is_active` des cinq dans Jeedom |
+| H-c | **Écartée.** Les accessoires HomeKit de scénario sont des **interrupteurs** (« HomeKit switches », delta du 07/06) et le référentiel attend un `switch`/`scene` ; un `button` ne compte pas comme projection du même objet | décision 10-1 AC2/AC4 : `button` | Règle du référentiel pour le type attendu ; question 8 |
+| H-d | **Confirmée.** Les cinq sont projetés, mais **non exposés à Assist** (côté HA, hors plugin) et comptés « non projetés » faute de distinction | exigence 5 | Exposition Assist des cinq boutons dans HA |
+| H-e | **Écartée.** Jointure par numéro seul : un identifiant de scénario est pris pour un identifiant d'équipement | 15 collisions mesurées, **aucune** sur les cinq | Clé de jointure du référentiel (le champ `kind` de l'export la supprime) |
+
+### 6.1 Cause établie (*établi par ClaudeBox le 12/10*)
+
+Les cinq scénarios 20, 38, 50, 57 et 150 sont **actifs** dans Jeedom et **leurs boutons existent dans le registre de HA**, mais ils sont **non exposés à Assist** (`should_expose: false`) ; l'outil de parité de ClaudeBox ne lit pas les boutons de scénario. Verdict : **H-a et H-d confirmées** ; **H-b, H-c et H-e écartées**. L'exposition à Assist est un geste côté HA, hors plugin (exigence 5). Q8 A est confirmée par les faits. Le reste de cette section est conservé comme historique du raisonnement.
 
 Ce que l'epic en tire : le premier gain n'est pas un type, c'est **faire entrer les scénarios dans le contrat de décision et dans l'export** (24-2), puis seulement décider d'un éventuel changement de type (24-5, question 8).
 
@@ -107,13 +113,13 @@ Tailles : **S** = une PR, un module, preuve légère ; **M** = une PR, plusieurs
 
 | Story | Objet | Taille | Dépend de | Change la production ? | Décisions |
 |---|---|---|---|---|---|
-| **24-1** | Signal `homekit_exposed` (+ provenance) et `logicalId` d'équipement/commande, de bout en bout, additif | S à M | Task 0 ClaudeBox (clé Homebridge) | Non | Q5 (contenu) |
+| **24-1** | Signal `homekit_exposed` (pièce + équipement + valeur par défaut de Homebridge, provenance) et `logicalId` d'équipement/commande/scénario, de bout en bout, additif | S à M | Task 0 **faite** par ClaudeBox le 12/10 (deux cas à confirmer) | Non | Q5 (contenu) |
 | **24-2** | Export JSON versionné `schema_version: 1`, fichier `data/jeedom2ha_decision_export.json`, route du démon, relais PHP, scénarios compris | L | 24-1 | Non | Q5, Q6 |
 | *Baseline* | Capture « avant » par ClaudeBox (sans SSH), hors dépôt | — | 24-2 déployée | Non | — |
 | **24-3** | Raison canonique `voie_native` dans le contrat figé, plugins natifs non publiés, mode « test du plugin » | M | 24-2 + baseline | **Oui** (relibellé de `excluded_plugin`, mode test) | Q1, Q2 |
 | **24-4** | Projection par défaut des équipements exposés à HomeKit : la pièce n'écarte plus ; raison pour chaque commande | M à L | 24-3, 24-1 | **Oui** (équipements nouvellement publiés) | Q3, Q4 |
-| **24-5** | Scénarios : écart des 5 établi par l'export, éventuel changement de type | S à M | 24-2 + baseline | Selon Q8 | Q8 |
-| **24-6** | Ventilateurs (et aspirateurs) : `fan` | M à L | 24-4 ; recoupe 18-1 | **Oui** (changement de domaine d'entités existantes) | Q7, Q9, Q10 |
+| **24-5** | Scénarios : se réduit aux scénarios dans l'export (24-2) ; cause de l'écart établie (section 6.1), pas de changement de type | S (documentaire) | 24-2 | Non (Q8 A) | Q8 |
+| **24-6** | Ventilateurs (et aspirateurs) : classés « équivalents fonctionnels » dans l'export ; `fan` n'est ouvert que si un ventilateur à vitesse apparaît (aucun parmi les 8 mesurés) | S (documentaire) | 24-2 ; 24-4 | Non (Q7 A) | Q7, Q9 |
 | **24-7** | Portail et garage : `cover` (`GB_*`, `BARRIER_STATE`) | M à L | 24-4 ; **23-3** pour l'état | **Oui** (`button`/`binary_sensor` → `cover`) | Q10 |
 | **24-8** | Vanne d'arrosage : `valve` | M | 24-4 ; recoupe 18-4 | **Oui** | Q9, Q10 |
 | **24-9** | Serrure : `lock` | M | 24-4 ; recoupe 18-2 | **Oui** | Q9, Q10 |
@@ -146,7 +152,7 @@ Tailles : **S** = une PR, un module, preuve légère ; **M** = une PR, plusieurs
 
 ### 7.2 Recoupement avec l'epic 18 (backlog depuis le 17/07)
 
-L'epic 18 prévoit déjà `fan` (18-1), `lock` (18-2), `siren` (18-3), `valve` (18-4) et `event` (18-5). Les stories 24-6, 24-8 et 24-9 recouvrent 18-1, 18-4 et 18-2. Ouvrir les deux ferait des doublons sur les mêmes fichiers. **Recommandation** (question 9) : l'epic 24 absorbe 18-1, 18-2 et 18-4 (mêmes gates FR40/NFR10, mêmes sources `ha-projection-reference`) ; l'epic 18 garde 18-0, 18-3 et 18-5. Le rattachement est noté dans `sprint-status.yaml` par un commentaire, sans changer le statut des entrées de l'epic 18 tant qu'Alexandre n'a pas tranché.
+L'epic 18 prévoit déjà `fan` (18-1), `lock` (18-2), `siren` (18-3), `valve` (18-4) et `event` (18-5). Les stories 24-8 et 24-9 recouvrent 18-4 et 18-2 ; 24-6 recouvrait 18-1, mais depuis la R1 elle n'ouvre plus `fan` (aucune vitesse mesurée). Ouvrir les deux ferait des doublons sur les mêmes fichiers. **Recommandation** (question 9) : l'epic 24 absorbe 18-2 et 18-4 (mêmes gates FR40/NFR10, mêmes sources `ha-projection-reference`) ; l'epic 18 garde 18-0, 18-1, 18-3 et 18-5. Le rattachement est noté dans `sprint-status.yaml` par un commentaire, sans changer le statut des entrées de l'epic 18 tant qu'Alexandre n'a pas tranché.
 
 ## 8. Décisions d'Alexandre : questions
 
@@ -168,7 +174,7 @@ Chaque question donne les options, leurs conséquences et une recommandation. **
 
 Visée : `excludedObjects` (`excluded_object`) **et** l'état « exclure » hérité d'une pièce dans le périmètre publié. Non visé : l'exclusion explicite de l'équipement (T8), l'état global « exclure ».
 
-- **A (recommandée).** Un équipement `homekit_exposed = true` n'est jamais écarté par sa pièce ; l'exclusion explicite de l'équipement l'emporte toujours. L'état global « exclure » reste respecté (ce n'est pas une exclusion de pièce). La configuration « Pièces exclues » dit « sauf équipements exposés à HomeKit ». Conséquence : des équipements aujourd'hui `excluded_object` seront **publiés au sync suivant**, donc des entités nouvelles dans HA ; leur nombre est inconnu avant la baseline (24-2) ; gate : liste préalable des équipements concernés par ClaudeBox, inventaire avant/après, retour arrière par « Supprimer de Home Assistant » (22-2) puis exclusion explicite.
+- **A (recommandée).** Un équipement `homekit_exposed = true` n'est jamais écarté par sa pièce ; l'exclusion explicite de l'équipement l'emporte toujours. L'état global « exclure » reste respecté (ce n'est pas une exclusion de pièce). La configuration « Pièces exclues » dit « sauf équipements exposés à HomeKit ». Conséquence : des équipements aujourd'hui `excluded_object` seront **publiés au sync suivant**, donc des entités nouvelles dans HA ; leur nombre est **établi par ClaudeBox le 12/10 : 3 équipements** (virtuels, dans deux pièces exclues), d'après la configuration actuelle du plugin (inchangée depuis le 04/10) et le référentiel du 10/10 ; les 42 équipements exposés des plugins natifs ne sont pas publiés aujourd'hui (ils relèvent de 24-3, relibellé seul). L'effet est donc faible et l'option C ne se justifie plus ; la baseline de 24-2 le confirmera ; gate : liste préalable des équipements concernés par ClaudeBox, inventaire avant/après, retour arrière par « Supprimer de Home Assistant » (22-2) puis exclusion explicite.
 - **B.** Ne rien changer, signaler l'écart : l'export garde `reason = excluded_object` pour ces équipements. Conséquence : exigence 3 non tenue ; zéro risque de production.
 - **C.** A, mais derrière une clé de configuration « projection HomeKit par défaut », désactivée au premier déploiement et activée après relecture de la baseline. Conséquence : montée en charge maîtrisée ; une option de configuration de plus (à retirer après).
 
@@ -197,11 +203,11 @@ La route HTTP du démon n'est ouverte qu'en local (`127.0.0.1`, règle de sécur
 
 `FAN_*` est projeté en `switch` depuis 14-1 : l'allumage/extinction fonctionne déjà par la voix. Passer en `fan` change le **domaine** des entités déjà publiées (donc leur `entity_id`, ex. `switch.…` → `fan.…`), mais seul `fan` porte une vitesse.
 
-- **A (recommandée).** `fan` seulement quand un ordre de vitesse existe (`FAN_SPEED`/`ROTATION`) ; un `FAN_*` marche/arrêt seul reste `switch`. Conséquence : pas de changement de domaine inutile ; l'export classe ces cas « équivalents fonctionnels » plutôt qu'« écart de type ». À confirmer par la baseline : combien des ventilateurs mesurés ont une vitesse.
+- **A (recommandée).** `fan` seulement quand un ordre de vitesse existe (`FAN_SPEED`/`ROTATION`) ; un `FAN_*` marche/arrêt seul reste `switch`. Conséquence : pas de changement de domaine inutile ; l'export classe ces cas « équivalents fonctionnels » plutôt qu'« écart de type ». *Établi par ClaudeBox le 12/10* : 8 équipements exposés portent `FAN_*` (marche, arrêt, état ; 5 aspirateurs compris), **aucun** n'a de commande de vitesse. Avec A, aucun ne change de type : 24-6 se réduit à un classement « équivalent fonctionnel » dans l'export, sauf apparition d'un ventilateur à vitesse.
 - **B.** Tout `FAN_*` en `fan` (comportement prévu par 18-1). Conséquence : parité de type complète, tous les `entity_id` concernés changent, automatisations et cartes à retoucher.
 - **C.** Ne rien changer. Conséquence : écart de type maintenu dans la mesure.
 
-Aspirateurs : le code ne les distingue pas des `FAN_*` ; la famille « Robot » (`DOCK_STATE`, `DOCK`) n'est mappée nulle part. Si leurs types génériques sont `FAN_*`, ils suivent la réponse choisie ; sinon `vacuum` est hors de cet epic (D6).
+Aspirateurs : *établi par ClaudeBox le 12/10*, les 5 aspirateurs exposés portent des types `FAN_*` (marche, arrêt, état) : ils suivent la réponse choisie ; la famille « Robot » (`DOCK_STATE`, `DOCK`), mappée nulle part, n'est pas en cause et `vacuum` reste hors de cet epic.
 
 ### Q8 : type Home Assistant des scénarios
 
@@ -209,11 +215,11 @@ Aspirateurs : le code ne les distingue pas des `FAN_*` ; la famille « Robot » 
 - **B.** `scene` (composant MQTT documenté, `ha-projection-reference.md`) pour les scénarios exposés à HomeKit. Conséquence : ouverture de `scene` dans `PRODUCT_SCOPE` (FR40/NFR10), nouvelle entité en plus du bouton, donc deux voies pour un scénario (contraire à « une seule voie ») sauf remplacement.
 - **C.** `scene` pour tous les scénarios, en remplacement du bouton. Conséquence : 84 entités changent de domaine, `entity_id` modifiés.
 
-Non vérifié : la manière dont Assist traite un `button` ou une `scene` (D4). À établir par ClaudeBox avant de choisir B ou C.
+*Établi par ClaudeBox le 12/10* : les cinq boutons existent et ne sont simplement pas exposés à Assist ; A est confirmée par les faits (section 6.1). Non vérifié : la manière dont Assist traite un `button` ou une `scene` (D4), seulement utile si B ou C est un jour envisagée.
 
 ### Q9 : l'epic 18 (fan, lock, valve)
 
-- **A (recommandée).** L'epic 24 absorbe 18-1, 18-2 et 18-4 ; 18 garde 18-0, 18-3 et 18-5. Conséquence : une seule implémentation par domaine, l'ordre de 24 s'applique ; `sprint-status.yaml` annoté.
+- **A (recommandée, ajustée par la R1).** L'epic 24 absorbe 18-2 (`lock`) et 18-4 (`valve`) ; 18 garde 18-0, 18-1 (`fan`, sans demande réelle aujourd'hui), 18-3 et 18-5. Conséquence : une seule implémentation par domaine, l'ordre de 24 s'applique ; `sprint-status.yaml` annoté.
 - **B.** Terminer 18-x avant 24-x. Conséquence : contredit l'ordre voulu (parité d'abord) et ouvre des domaines sans lien avec HomeKit.
 - **C.** Deux voies parallèles. Conséquence : conflits garantis, déconseillé.
 
@@ -232,7 +238,7 @@ Le changement de domaine remplace l'entité : l'ancienne est dépubliée, la nou
 - Les 2 sous-accessoires Homebridge sans eqLogic et l'alignement/exposition côté HA : hors plugin.
 - `media_player`, `siren`, `event`, `vacuum` : hors de cet epic (reports de l'epic 18 et décision du 17/07).
 - Rendre atomique `jeedom2ha_cache.json` : signalé (D8), pas traité.
-- Toute modification du code, des tests, de `PRODUCT_SCOPE` : cette PR est documentaire. Les ouvertures `fan`, `valve`, `lock` (et éventuellement `scene`) se feront sous FR40/NFR10 dans les stories 24-6, 24-8, 24-9 (et 24-5 si Q8 B ou C), jamais ici.
+- Toute modification du code, des tests, de `PRODUCT_SCOPE` : cette PR est documentaire. Les ouvertures `valve` et `lock` se feront sous FR40/NFR10 dans les stories 24-8 et 24-9 (`fan` seulement si un ventilateur à vitesse apparaît, `scene` seulement si Q8 B ou C est un jour retenue), jamais ici.
 
 ## 10. Risques et suivi
 
@@ -246,12 +252,12 @@ Le changement de domaine remplace l'entité : l'ancienne est dépubliée, la nou
 
 ## 11. Doutes et points non vérifiés par cette session
 
-- **D1.** La clé et le niveau de stockage de l'exposition Homebridge (`sendToHomebridge`, équipement ou commande, format, scénarios) ne sont pas dans le dépôt : tout vient des réponses de clawcode. Task 0 de 24-1.
-- **D2.** L'explication des 5 scénarios est une hypothèse (section 6), pas un constat.
-- **D3.** Le nombre d'équipements nouvellement publiés par 24-4, le nombre de `voie_native`, le détail des 196 équipements inéligibles (292 − 96) ne sont pas dérivables du dépôt.
+- **D1.** *Levé en grande partie par ClaudeBox le 12/10* (T3). Restent deux cas à confirmer : le comportement de Homebridge pour un **équipement sans pièce** et pour une **pièce sans clé `sendToHomebridge`** ; Task 0 bis de 24-1. La provenance de l'exposition est lue sur un autre plugin : son comportement peut changer avec ses versions.
+- **D2.** *Levé par ClaudeBox le 12/10* : cause des 5 scénarios établie (section 6.1).
+- **D3.** *Partiellement levé le 12/10* : 3 équipements nouvellement publiés par 24-4 (Q3), 42 équipements exposés de plugins natifs déjà non publiés (24-3). Restent inconnus : le détail des 196 équipements inéligibles (292 − 96) par cause et la liste exacte des plugins saisis ; la baseline de 24-2 les donnera.
 - **D4.** Le traitement par Assist d'un `button` ou d'une `scene`, et les champs exacts de découverte MQTT de HA 2026.9.4 pour `fan`, `valve`, `lock`, `cover` (`gate`, `garage`) : à lire dans la documentation officielle au début de chaque story de type (Task 0), en s'appuyant sur `ha-projection-reference.md` qui donne les champs obligatoires mais pas le comportement d'Assist.
-- **D5.** Les chemins exacts de mappage actuels des équipements de portail et de garage (`binary_sensor` ou `button`) dépendent de leurs commandes réelles ; l'export les donnera.
-- **D6.** Les types génériques réels des aspirateurs.
+- **D5.** *Partiellement levé le 12/10* : types génériques connus (24-7) ; le chemin de mappage actuel de chaque équipement (`binary_sensor` ou `button`) reste à lire dans l'export. La polarité de `BARRIER_STATE` / `GARAGE_STATE` reste à établir.
+- **D6.** *Levé par ClaudeBox le 12/10* : les aspirateurs portent des types `FAN_*` sans vitesse.
 - **D7.** Ce que sont exactement les « 2 sous-accessoires Homebridge sans eqLogic propre ».
 - **D8.** `disk_cache.py:148` n'est pas atomique : un arrêt pendant l'écriture peut laisser un cache tronqué (lu comme « cold start », `disk_cache.py:155-205`). Ni nouveau, ni traité ici.
 - **D9.** La proposition n'ajoute aucun FR/NFR au PRD. Si Alexandre veut que « voie native », « projection par défaut » et « export de décision » soient des exigences numérotées (FR40/NFR10 jouent pour l'ouverture de composants), il faudra une modification de PRD distincte.
@@ -267,6 +273,21 @@ Le changement de domaine remplace l'entité : l'ancienne est dépubliée, la nou
 - Pour chaque type ouvert : entrée de registre, mapper, cas nominal et d'échec de `validate_projection()`, contrat 4D non régressé, inventaire avant/après, liste des références à l'ancien `entity_id` (Q10).
 - Gate 20-0 vert avant chaque `done` qui touche l'écran ; golden et contrat 4D verts (champs additifs justifiés) ; aucun nom réel dans le dépôt (CC-48).
 - Parité mesurée par l'export sur les mêmes 118 équipements et 5 scénarios, écarts restants classés : plugin / HA / hors périmètre.
+
+## 13. R1 (ClaudeBox, 12/10) : ce qui a été établi et intégré
+
+Relecture R1 de la PR #260 (tête `87e480f`) : cadrage jugé de grande qualité, pas de fusion. Vérifications en lecture seule faites par ClaudeBox le 12/10 vers midi, intégrées ci-dessus et dans les stories.
+
+| # | Établi par ClaudeBox le 12/10 | Intégré dans |
+|---|---|---|
+| 1 | Règle d'exposition de Homebridge (pièce + équipement + valeur par défaut `sendToHomebridgeDefault`, scénarios `!= "0"`, aucun drapeau par commande) ; cache Homebridge de 123 accessoires, `logicalId` vide pour 65 | T3, §7, D1 ; 24-1 (AC1, AC2, AC6, Task 0), 24-2 |
+| 2 | Cause des 5 scénarios : boutons présents dans HA, non exposés à Assist, outil de parité aveugle aux boutons de scénario | §3, §6.1, Q8, D2 ; 24-5 |
+| 3 | Q3 : 3 équipements virtuels nouvellement publiés ; 42 équipements exposés de plugins natifs non publiés aujourd'hui | Q3, D3 ; 24-3, 24-4 |
+| 4 | Q7 : 8 équipements `FAN_*` (5 aspirateurs), aucune vitesse | §3, §7, §7.2, Q7, Q9, D6 ; 24-6 réduite |
+| 5 | Types génériques des équipements restants (portail, garage, vannes, serrure, prise, capteur) | §3, D5 ; 24-7 à 24-10 |
+| 6 | Doutes mis à jour, section R1 ajoutée | §11, présente section, description de la PR |
+
+Conséquences sur le découpage : 24-5 et 24-6 deviennent des stories documentaires (S) ; l'epic 18 garde 18-1 ; 24-7 se vérifie sur le cas « garage = bascule seule + état » ; 24-8 doit trancher le cas de la vanne d'un plugin Z-Wave (voir 24-8) ; 24-10 a une hypothèse de cause pour le capteur.
 
 ## Notes
 

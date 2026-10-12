@@ -3,6 +3,8 @@
 Status: draft
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Décisions attendues : Q5 (contenu et confidentialité) et Q6 (lecture sans SSH) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
+>
+> **R1 (ClaudeBox, 12/10) intégrée** : les scénarios portent `homekit_exposed` (règle de Homebridge établie, voir 24-1) ; l'outil de parité de ClaudeBox ne lit pas les boutons de scénario, l'export les rend donc visibles ; `logicalId` est vide pour 65 accessoires sur 123 (*établi par ClaudeBox le 12/10*) : il ne sert jamais de clé unique.
 
 ## Story
 
@@ -63,7 +65,8 @@ Le schéma exact est figé au `create-story` avec ClaudeBox ; la forme ci-dessou
                    "entity_unique_id": "<…|null>", "ha_type": "switch", "override": null }]
   }],
   "scenarios": [{ "kind": "scenario", "key": "scenario:20", "scenario_id": 20, "active": true,
-                  "homekit_exposed": null, "decision": "published", "reason": "scenario_button",
+                  "homekit_exposed": true, "homekit_exposed_source": "scenario_configuration",
+                  "decision": "published", "reason": "scenario_button",
                   "entity": { "unique_id": "jeedom2ha_scenario_20", "ha_type": "button",
                               "entity_id_expected": "button.jeedom2ha_scenario_20",
                               "discovery_published": true, "state_source": "none" } }]
@@ -83,7 +86,7 @@ Choix de conception à confirmer :
 - **AC1.** Le démon écrit `data/jeedom2ha_decision_export.json` après chaque sync complet et chaque « Publier » (mêmes points que le cache), **atomiquement** (fichier temporaire + `os.replace`), mode 600 ; `jeedom2ha_cache.json` est inchangé (format et écriture).
 - **AC2.** `GET /system/decision_export` (secret requis, comme les autres routes) renvoie le même document, construit depuis la mémoire ; sans sync préalable, il répond une erreur explicite (même motif que `/system/diagnostics`).
 - **AC3.** Une action AJAX d'administrateur (`getDecisionExport`) relaie la route avec un budget fixe (motif A1) et renvoie le JSON ; un bouton « Télécharger l'export de décision » est ajouté à la page du plugin (Q6 A). Aucun libellé ne parle de « présent dans HA ».
-- **AC4.** Le document couvre **tous** les équipements du snapshot (éligibles ou non), **chaque commande** de chacun (y compris les non couvertes : `reason` non vide) et **tous les scénarios**, avec `kind` et `key` uniques (aucune collision entre équipement et scénario de même numéro).
+- **AC4.** Le document couvre **tous** les équipements du snapshot (éligibles ou non), **chaque commande** de chacun (y compris les non couvertes : `reason` non vide) et **tous les scénarios** (actifs et inactifs, avec `homekit_exposed` issu de 24.1), avec `kind` et `key` uniques (aucune collision entre équipement et scénario de même numéro). Un `logical_id` vide est écrit `null` ; la jointure du référentiel se fait sur `eq_id`/`cmd_id`/`scenario_id` et `unique_id`, jamais sur `logical_id` seul.
 - **AC5.** Confidentialité (Q5 A) : **aucun nom** d'équipement, de pièce, de commande ni de scénario ; **aucun secret** (clé API, secret local, identifiants MQTT, jeton) ; test sur des fixtures dont les noms sont des sentinelles reconnaissables, absentes du document.
 - **AC6.** `entities[].unique_id` est exactement celui du payload de découverte ; `entity_id_expected` est exactement `<domaine>.<object_id>` du même payload (`default_entity_id`).
 - **AC7.** Les décisions de l'export égalent celles du diagnostic et de l'aperçu pour les mêmes entrées (un seul résolveur : `evaluate_equipment()` et `select_covering_decision`), prouvé par un test de parité sur le corpus golden existant.
