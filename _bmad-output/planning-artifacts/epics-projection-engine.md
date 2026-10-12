@@ -2519,3 +2519,55 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - **23.3** streaming `LIGHT_STATE`/luminosité et `FLAP_STATE`/position, avec parité et limites.
 - **23.4** installation GitHub testée sur VM vierge, alignée sur la branche réellement maintenue.
 - **23.5** fiche licence, puis alignement après décision écrite d'Alexandre.
+
+### Epic 24 — Parité HomeKit : ce qui est piloté par la voix dans Apple Maison l'est par Assist dans HA (CC-33)
+
+**Statut :** `backlog` — cadrage documentaire du 2026-10-12 (session cloud déléguée, sans accès box, Home Assistant ni secret), à la demande d'Alexandre (ordre du 2026-10-11 à 15:48 : après les epics 21 et 22, la parité HomeKit ; l'epic 23 est pris par le chantier Market). Proposition : `sprint-change-proposal-2026-10-12-parite-homekit.md`, **statut `proposed`**. Les dix stories sont `draft` ; aucune n'est `ready-for-dev` tant qu'Alexandre n'a pas tranché les questions Q1 à Q10 de la proposition et que ClaudeBox ne les a pas relues. Aucune ouverture `PRODUCT_SCOPE` n'est décidée par ce cadrage.
+
+**Origine :** décision d'Alexandre du 2026-10-01 (amendée le même jour) ; mesure du 2026-10-10 par le référentiel de ClaudeBox (118 équipements exposés à HomeKit plus 5 accessoires de scénario ; 110 dans HA par une voie ou l'autre, soit 93 % ; 99 exposés à Assist, soit 84 % ; 68 par jeedom2ha ; écarts : 5 scénarios, 15 équipements à type manquant ou remplacé, 2 sous-accessoires sans eqLogic, le reste côté HA).
+
+**Valeur utilisateur :** la maison n'est configurée qu'une fois, dans Jeedom. Ce qui se pilote ou se consulte par la voix dans Apple Maison se pilote ou se consulte par Assist dans HA, par une seule voie par équipement : l'intégration native de HA quand elle existe (le plugin s'efface et le dit), jeedom2ha pour tout le reste.
+
+**Objectif :** (1) savoir, par un signal lu dans Jeedom, quels équipements sont exposés à HomeKit, sans jamais modifier la configuration Homebridge, les types génériques ni l'exposition Assist ; (2) rendre la décision mesurable par un export JSON versionné, sans SSH ; (3) ne plus publier les plugins que HA intègre nativement (raison canonique `voie_native`, mode « test du plugin » désactivé par défaut) ; (4) projeter par défaut tout équipement exposé à HomeKit, la pièce n'écartant plus ; (5) combler les types manquants (scénarios, ventilateur, portail et garage, vanne, serrure, résiduels).
+
+**Périmètre :**
+- champs additifs `homekit_exposed`, `homekit_exposed_source`, `logicalId` (équipement et commande) de `getFullTopology()` à `evaluate_equipment()` ;
+- fichier `data/jeedom2ha_decision_export.json` (`schema_version: 1`), route du démon, relais PHP d'administrateur ; `jeedom2ha_cache.json` conservé tel quel ;
+- raison `voie_native` dans les artefacts figés (`models/taxonomy.py`, `models/cause_mapping.py`, `models/ui_contract_4d.py`), dans les tables de diagnostic et dans l'écran ;
+- projection par défaut des équipements exposés ; ouvertures gouvernées de `fan`, `valve`, `lock` (FR40/NFR10) et changement de type d'un `cover` pour le portail et le garage ; éventuellement `scene` (Q8).
+
+**Hors périmètre :** toute écriture dans la configuration Homebridge, les types génériques Jeedom ou l'exposition à Assist ; un indicateur Assist dans le plugin ; les sous-accessoires sans eqLogic et l'alignement côté HA (référentiel de ClaudeBox) ; `media_player`, `siren`, `event`, `vacuum` ; la remontée d'état des lumières et des volets (story 23.3) ; le chantier Market.
+
+**Recoupements :**
+- **23.3** (remontée d'état des lumières et volets) : propriétaire du mécanisme de streaming et des lignes `light` et `cover` de `sync/state.py` ; les stories 24 n'y touchent pas et n'ajoutent qu'une entrée par nouveau domaine, après sa fusion ; 24.7 en dépend pour l'état d'un `cover` ; l'export reflète le streaming sans le construire (voir la section 7.1 de la proposition).
+- **Epic 18** (backlog) : 24.6, 24.8 et 24.9 recouvrent 18.1 (`fan`), 18.4 (`valve`) et 18.2 (`lock`) ; recommandation (Q9) : l'epic 24 les absorbe, l'epic 18 garde 18.0, 18.3, 18.5.
+- **22.2** : mêmes fichiers (`http_server.py`, `desktop/js`, compteurs) : 24.2 et suivantes attendent 22.2 `done`.
+
+**Stories (toutes `draft`) :**
+
+- **Story 24.1 — Signal d'exposition HomeKit et identifiants physiques.** `homekit_exposed` (+ provenance) et `logicalId` d'équipement et de commande, de bout en bout, additifs, sans changement de comportement. Task 0 par ClaudeBox (lecture seule) : où Homebridge stocke l'exposition. Fichier `24-1-signal-d-exposition-homekit-et-identifiants-physiques.md`. Taille S à M.
+- **Story 24.2 — Export JSON versionné du contrat de décision.** Fichier `data/jeedom2ha_decision_export.json`, `schema_version: 1`, par équipement, par commande et par scénario ; route du démon et relais PHP d'administrateur ; écriture atomique ; aucun nom, aucun secret. Dépend de 24.1. Fichier `24-2-export-json-versionne-du-contrat-de-decision.md`. Taille L. Une capture « avant » (baseline) par ClaudeBox suit son déploiement.
+- **Story 24.3 — `voie_native` : plugins natifs non publiés et mode test.** Raison canonique dans les artefacts figés ; la liste de plugins natifs (Q1) ; le mode « test du plugin » (Q2). Change la production. Dépend de 24.2 et de la baseline. Fichier `24-3-voie-native-plugins-natifs-non-publies-et-mode-test.md`. Taille M.
+- **Story 24.4 — Projection par défaut des équipements exposés à HomeKit.** La pièce n'écarte plus ; seules l'exclusion explicite de l'équipement et une impossibilité technique écartent ; une raison canonique pour chaque commande (Q3, Q4). Change la production. Dépend de 24.3 et 24.1. Fichier `24-4-projection-par-defaut-des-equipements-exposes-a-homekit.md`. Taille M à L.
+- **Story 24.5 — Scénarios exposés à HomeKit.** Établir l'écart des 5 accessoires à partir de l'export, corriger la mesure ou le type (Q8). Dépend de 24.2 et de la baseline. Fichier `24-5-scenarios-exposes-a-homekit.md`. Taille S à M.
+- **Story 24.6 — Ventilateurs (et aspirateurs) : `fan`.** Ouverture gouvernée du composant, selon Q7, Q9, Q10. Recoupe 18.1. Fichier `24-6-ventilateurs-et-aspirateurs-fan.md`. Taille M à L.
+- **Story 24.7 — Portail et garage : `cover`.** `GB_*`, `BARRIER_STATE`, `GARAGE_STATE` ; dépend de 23.3 pour l'état (ou `cover` optimiste, Q10 C). Fichier `24-7-portail-et-garage-cover.md`. Taille M à L.
+- **Story 24.8 — Vanne d'arrosage : `valve`.** Ouverture gouvernée. Recoupe 18.4. Fichier `24-8-vanne-d-arrosage-valve.md`. Taille M.
+- **Story 24.9 — Serrure : `lock`.** Ouverture gouvernée, risque de sécurité documenté. Recoupe 18.2. Fichier `24-9-serrure-lock.md`. Taille M.
+- **Story 24.10 — Écarts résiduels après mesure.** Prise `ENERGY_ON/OFF` et capteur sans température ni humidité ; portée à fixer sur la baseline. Fichier `24-10-ecarts-residuels-apres-mesure.md`. Taille S à M.
+
+**Ordre retenu (proposé) :** `24.1` → `24.2` → baseline (ClaudeBox) → `24.3` → `24.4` → `24.5` → types un par un `24.6` → `24.7` → `24.8` → `24.9` → `24.10`. L'export précède tout changement de comportement pour que le gate de chaque story ait un « avant ».
+
+**Points visés :** CC-33 ; ne ferme aucun autre point ouvert.
+
+**Dev notes :** workflow BMAD complet (`create-story -> dev-story -> code-review`) ; toute story qui touche l'écran passe en plus par `ready-for-UX-validation` et le gate 20-0 ; preuve terrain par ClaudeBox (inventaire des registres avant/après, comparaison d'exports) ; une session cloud n'a ni box ni HA ; aucun nom réel d'équipement, de pièce, de scénario ou de personne dans le dépôt (CC-48) ; une story = une PR.
+
+### Gates epic-level pe-epic-24
+
+- l'export `schema_version: 1` est lisible sans SSH ; une capture « avant » et une capture « après » encadrent chaque story qui change la production (conservées hors dépôt) ;
+- tout équipement exposé à HomeKit a une décision et une raison canonique ; chaque commande d'un tel équipement a une ligne avec sa raison dans l'export ;
+- `voie_native` est cohérente dans le statut, la cause, le libellé, l'écran et la documentation, sans faux écart (`compute_ecart`) ; le mode test est désactivé par défaut et marqué dans l'export ;
+- un équipement exposé à HomeKit n'est jamais écarté par sa pièce ; seules l'exclusion explicite de l'équipement et une impossibilité technique l'écartent ;
+- le plugin n'écrit ni la configuration Homebridge, ni un type générique Jeedom, ni une exposition Assist ;
+- pour chaque type ouvert : entrée `HA_COMPONENT_REGISTRY`, mapper, cas nominal et d'échec de `validate_projection()`, contrat 4D non régressé, `SWITCH_*`/`ENERGY_*` non régressés, inventaire avant/après et liste des références à l'ancien `entity_id` ;
+- gate 20-0 vert avant chaque `done` qui touche l'écran ; golden et contrat 4D verts (champs additifs justifiés) ; aucun nom réel dans le dépôt (CC-48).
