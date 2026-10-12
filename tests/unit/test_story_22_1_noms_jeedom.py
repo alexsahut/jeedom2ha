@@ -90,14 +90,6 @@ class TestDeviceNameAndEntityNameRule:
         }
         assert sorted(names.values()) == ["Energie-Y", "Puissance-X"]
 
-    def test_multi_entity_primary_switch_takes_its_state_command_name(self, publisher):
-        eq = _multi_entity_eq()
-        snap = _snapshot(eq)
-        primary = _all_mappings(eq, snap)[0]
-        assert primary.ha_entity_type == "switch"
-        assert _payload_of(publisher, primary, snap)["name"] == "Etat"
-        assert _payload_of(publisher, primary, snap)["device"]["name"] == "Equip-579"
-
     def test_single_entity_takes_equipment_name_not_command_name(self, publisher):
         eq = _single_cmd_sensor_eq()
         snap = _snapshot(eq)

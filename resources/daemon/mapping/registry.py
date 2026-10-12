@@ -95,23 +95,7 @@ class MapperRegistry:
         """
         if len(results) == 1 and eq.name:
             results[0].ha_name = eq.name
-            return results
-        for result in results:
-            # Entité principale d'un équipement multi-entités (switch, light, cover) :
-            # elle prend aussi le nom de sa commande, de préférence la commande d'état.
-            if result.ha_name == eq.name:
-                cmd = MapperRegistry._representative_cmd(result)
-                if cmd is not None and cmd.name:
-                    result.ha_name = cmd.name
         return results
-
-    @staticmethod
-    def _representative_cmd(result: MappingResult) -> Optional[JeedomCmd]:
-        commands = result.commands or {}
-        for key, cmd in commands.items():
-            if key.endswith("_STATE"):
-                return cmd
-        return next(iter(commands.values()), None)
 
     def _map_structural_multi_entity(
         self, eq: JeedomEqLogic, snapshot: TopologySnapshot
