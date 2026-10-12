@@ -20,6 +20,7 @@ Cette documentation décrit l'écran du plugin tel que vous le voyez, avec les m
 - [Les compteurs de la fenêtre d'une pièce](compteurs.md)
 - [Dépannage](#dépannage)
 - [Annexes](#annexes)
+  - [Noms et identifiants dans Home Assistant](#annexe--noms-et-identifiants-dans-home-assistant)
 - [Changelog](changelog.md)
 
 ---
@@ -471,6 +472,27 @@ Pour le déplacer :
 
 - **Option 1 — Supprimer puis recréer.** Utilisez « Supprimer puis recréer » sur l'équipement, la pièce ou le parc, puis « Rescanner la topologie Jeedom » : le rescan relit la pièce actuelle et recrée les entités. (« Republier » seul ne suffit pas : il travaille sur ce que le dernier rescan a lu et ne relit pas Jeedom ; si vous venez de déplacer l'équipement, rescannez d'abord.) Les personnalisations faites dans Home Assistant (icônes, alias, historique, automatisations) peuvent être perdues : lisez l'avertissement de la confirmation.
 - **Option 2 — Déplacement manuel.** Dans Home Assistant : **Paramètres → Appareils et services**, trouvez l'appareil et modifiez sa zone.
+
+### Annexe : noms et identifiants dans Home Assistant
+
+**Le nom de l'appareil est le nom de l'équipement Jeedom**, accents compris, identique pour toutes les entités de cet équipement. Le nom d'une entité suit une règle simple :
+
+- **équipement à une seule entité** : l'entité porte le nom de l'équipement (Home Assistant l'affiche comme l'appareil) ;
+- **équipement à plusieurs entités** (par exemple une prise avec des mesures de puissance et d'énergie) : l'**entité principale** (lumière, interrupteur, volet…) porte le **nom de l'équipement**, et Home Assistant l'affiche sous le nom de l'appareil ; les **autres entités** portent le nom de leur **commande**, que Home Assistant affiche à la suite du nom de l'appareil.
+
+Un bouton de scénario porte le nom du scénario.
+
+**Renommer dans Jeedom.** Le nouveau nom atteint Home Assistant au **prochain rescan**, au redémarrage du démon ou avec « Republier » : le plugin n'agit pas à l'enregistrement de l'équipement dans Jeedom. Pensez à rescanner après un renommage.
+
+**Ce que le plugin ne touche pas.** Un nom d'appareil ou d'entité, ou une pièce, que vous avez choisis vous-même dans Home Assistant font foi : le plugin ne les écrase pas. Les `entity_id` et noms des entités déjà créées ne changent pas non plus : la mise à jour ne fait évoluer que les noms affichés par défaut. Pour la pièce, voir l'annexe précédente : Home Assistant ne l'applique qu'à la création de l'appareil.
+
+**`entity_id` des entités créées ou recréées.** Le `entity_id` est l'identifiant technique cité par les automatisations, scripts et cartes de tableau de bord. Pour toute entité **nouvelle ou recréée**, le plugin demande à Home Assistant un `entity_id` technique et stable, de la forme `<domaine>.jeedom2ha_<numéro de l'équipement>` (suivi du numéro de la commande pour les entités propres à une commande), par exemple `sensor.jeedom2ha_579_5795`. Home Assistant ne l'utilise qu'**à la création** de l'entité, et il remplace alors un `entity_id` que vous auriez personnalisé avant de supprimer l'entité.
+
+Conséquences :
+
+- une entité **supprimée puis recréée reprend son `entity_id` technique** : les automatisations, scripts et cartes qui le citent continuent de fonctionner, même si vous avez renommé l'équipement ;
+- une entité dont l'`entity_id` actuel est issu d'un nom lisible le **change une fois** vers la forme technique si vous la recréez ;
+- les cartes de tableau de bord citent l'`entity_id`, pas le nom affiché : seule la voix (Assist) s'appuie sur le nom.
 
 ### Annexe : nommage des équipements
 

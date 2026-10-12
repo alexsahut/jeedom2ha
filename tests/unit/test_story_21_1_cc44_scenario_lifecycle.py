@@ -400,6 +400,8 @@ def _frozen_pre_pr_scenario_button_payload() -> dict:
     return {
         "availability_topic": "jeedom2ha/bridge/status",
         "command_topic": "jeedom2ha/scenario_110/cmd",
+        # Story 22.1 (Q7 B) : seul champ additif réaligné, avec device.name des équipements.
+        "default_entity_id": "button.jeedom2ha_scenario_110",
         "device": {
             "identifiers": ["jeedom2ha_scenario_110"],
             "manufacturer": "Jeedom",
