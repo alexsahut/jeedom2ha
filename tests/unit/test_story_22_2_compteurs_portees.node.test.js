@@ -277,7 +277,7 @@ describe('22.2 — fausse DOM : le texte analysé depuis du HTML est décodé co
   });
 });
 
-describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380 » (liste non filtrée dans cette story)', () => {
+describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380 »', () => {
   // Vue `overridden` rendue par le démon pour `sensor`/`binary_sensor` sur une commande d'état d'un
   // cover orphelin : projection invalide (`ha_missing_state_topic`), publication `ambiguous_skipped`.
   const refusedByProjection = {
@@ -291,7 +291,7 @@ describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380
       'Ne sera pas publié — type Home Assistant ambigu — précisez les types génériques dans Jeedom');
   });
 
-  it('AC6 en attente de décision : la liste « Override HA » n’est pas modifiée par cette story', () => {
+  it('la liste complète de l’interface reste celle du registre (le filtre est fait par le démon)', () => {
     assert.deepEqual(M.getHaEntityTypeOptions(), [
       'alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'sensor', 'switch',
     ]);
@@ -316,5 +316,58 @@ describe('22.2 / AC7 — actions globales du bandeau (relecture Codex)', () => {
     ui.lastConfirmation().options.buttons.confirm.callback();
     ui.fail('executeHaAction');
     assert.equal(ui.calls.filter((c) => c.action === 'getBridgeStatus').length, before + 1);
+  });
+});
+
+describe('22.2 R2 / AC6 — liste « Override HA » filtrée par le démon', () => {
+  const FULL = ['alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'sensor', 'switch'];
+  const row = (extra) => Object.assign({
+    jeedom_cmd_id: 2971, cmd_name: 'Etat', covered: true, diagnostic: REFUSED, generic_type: 'FLAP_STATE',
+  }, extra || {});
+  const optionValues = (ui, cmdId) => ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] option`)
+    .list.map((o) => o.attrs.value);
+
+  it('pur : seuls les types annoncés sont proposés, dans l’ordre de la liste d’interface', () => {
+    assert.deepEqual(M.getOverrideTypeOptions(row({ override_types_allowed: ['sensor', 'cover', 'light'] })), ['cover', 'light', 'sensor']);
+    assert.deepEqual(M.getOverrideTypeOptions(row({ override_types_allowed: ['cover'] })), ['cover']);
+  });
+
+  it('pur : champ absent (démon plus ancien) → liste complète d’avant', () => {
+    assert.deepEqual(M.getOverrideTypeOptions(row()), FULL);
+    assert.equal(M.getOverrideSelectorState(row()).active, true);
+  });
+
+  it('pur : un type déjà posé reste affiché même s’il ne peut plus aboutir', () => {
+    const r = row({ override_types_allowed: ['cover'], override_applied: true, effective_ha: 'sensor' });
+    assert.deepEqual(M.getOverrideTypeOptions(r), ['cover', 'sensor']);
+    assert.equal(M.getOverrideSelectorState(r).active, true);
+  });
+
+  it('pur : aucun type → sélecteur désactivé, explication qui renvoie à Jeedom ; actif si un type est posé', () => {
+    const none = M.getOverrideSelectorState(row({ override_types_allowed: [] }));
+    assert.equal(none.active, false);
+    assert.match(none.reason, /précisez les types génériques dans Jeedom/);
+    const posed = M.getOverrideSelectorState(row({ override_types_allowed: [], override_applied: true, effective_ha: 'sensor' }));
+    assert.equal(posed.active, true);
+  });
+
+  it('rendu : le sélecteur de la commande 2971 ne propose ni sensor ni binary_sensor, mais « mode automatique » et cover', () => {
+    const t = tree(1, [REFUSED, READY]);
+    t.commands[0] = row({ jeedom_cmd_id: 100, override_types_allowed: ['cover'] });
+    t.commands[1].override_types_allowed = FULL.slice();
+    const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
+    assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
+    assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
+    assert.notEqual(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select').prop('disabled'), true);
+  });
+
+  it('rendu : liste vide → sélecteur désactivé avec l’explication ; champ absent → liste d’avant', () => {
+    const t = tree(1, [REFUSED, REFUSED]);
+    t.commands[0].override_types_allowed = [];
+    const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
+    const disabled = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select');
+    assert.equal(disabled.prop('disabled'), true);
+    assert.match(disabled.attr('title'), /précisez les types génériques dans Jeedom/);
+    assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });
 });

@@ -214,7 +214,7 @@ Le tableau a **quatre colonnes**, une ligne par commande, dans l'ordre de Jeedom
 |---|---|
 | **Commande** | Le nom de la commande. |
 | **Type Jeedom** | Le type générique de la commande dans Jeedom. Lecture seule : il n'est jamais modifié. |
-| **Override HA** | Une liste pour choisir le type Home Assistant de cette commande : « — mode automatique — », `alarm_control_panel`, `binary_sensor`, `button`, `climate`, `cover`, `light`, `sensor`, `switch`. |
+| **Override HA** | Une liste pour choisir le type Home Assistant de cette commande : « — mode automatique — », puis **uniquement les types qui peuvent aboutir** pour cette commande parmi `alarm_control_panel`, `binary_sensor`, `button`, `climate`, `cover`, `light`, `sensor`, `switch`. Un type que Home Assistant ne pourrait jamais recevoir pour cette commande (même avec « Forcer ») n'est pas proposé. |
 | **Diagnostic** | Ce qui sera publié (« Sera publié : <type> ») ou non (« Ne sera pas publié — <cause> »). Voir [les causes](#les-causes-affichées-dans-la-colonne-diagnostic). |
 
 Les commandes **non couvertes** (qu'aucun type Home Assistant ne prend en charge) restent visibles, sans jamais être comptées comme bloquantes : leur cellule affiche une icône d'interdiction et la mention « Ne sera pas publié — commande sans type Home Assistant applicable ».
@@ -230,12 +230,15 @@ Par défaut le plugin choisit seul le type Home Assistant d'une commande (« —
 4. Un choix enregistré **n'est pas publié tout de suite**. Le signe fiable est le badge « pas encore appliqué » sur l'entité concernée, et le bouton « Republier » de l'équipement qui devient « Appliquer ». Cliquez sur « Appliquer » ou lancez un rescan.
 5. Pour annuler le choix d'une commande, sélectionnez « — mode automatique — » dans la liste, ou cliquez sur l'icône « Revenir au type automatique » à côté de la liste. Cette icône ne retire que le choix de **type** de cette commande.
 
+**La liste ne propose que des types qui peuvent aboutir.** Le plugin vérifie, pour chaque type, si Home Assistant pourrait recevoir cette commande sous ce type ; un type qui échouerait toujours (par exemple `sensor` pour la commande d'état d'un volet sans commande d'ouverture) est retiré, car « Forcer » ne peut pas le faire aboutir. Un type valide mais refusé seulement parce que le choix automatique est ambigu reste proposé : c'est le cas où « Forcer » peut aider. Un type déjà choisi pour la commande reste affiché, pour que vous puissiez revenir au mode automatique. Pour qu'un type de plus soit proposé, précisez les types génériques de l'équipement dans Jeedom.
+
 La liste est **grisée avec une infobulle** quand elle n'a pas de sens :
 
 - « Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici. »
 - « Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici. »
 - « Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici. »
 - « Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Revenir au type automatique » reste disponible.
+- « Aucun type Home Assistant ne peut aboutir pour cette commande en l’état : précisez les types génériques dans Jeedom. » (aucun type n'est valide pour cette commande ; la voie normale est de préciser les types génériques dans Jeedom)
 
 Quand une vérification fait apparaître une commande bloquante, un bandeau d'avertissement rappelle, une fois par ouverture de pièce : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
 

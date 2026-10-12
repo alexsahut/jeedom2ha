@@ -30,6 +30,22 @@
     return HA_ENTITY_TYPE_OPTIONS.slice();
   }
 
+  // Story 22.2 (R2, AC6) — types proposés dans le sélecteur d'une commande : ceux que le démon dit
+  // pouvoir aboutir, dans l'ordre de la liste d'interface ; un type DÉJÀ posé sur la commande reste
+  // affiché (pour pouvoir revenir au mode automatique). Champ absent : liste complète d'avant.
+  function getOverrideTypeOptions(row) {
+    var r = normalizeCommandRow(row);
+    if (r.override_types_allowed === null) {
+      return HA_ENTITY_TYPE_OPTIONS.slice();
+    }
+    var options = HA_ENTITY_TYPE_OPTIONS.filter(function (t) { return r.override_types_allowed.indexOf(t) !== -1; });
+    var current = r.override_applied ? r.effective_ha : null;
+    if (current && options.indexOf(current) === -1) {
+      options.push(current);
+    }
+    return options;
+  }
+
   // --- Normalisation de l'arbre GET (une ligne par commande, ordre natif Jeedom) ---
 
   function normalizeCommandRow(row) {
@@ -55,6 +71,10 @@
       // Story 22.2 (Q1 A) : commande portée par au moins une entité présente dans HA (champ
       // additif du démon) ; null = démon plus ancien (présence inconnue, jamais déduite).
       published_in_ha: typeof r.published_in_ha === 'boolean' ? r.published_in_ha : null,
+      // Story 22.2 (R2, AC6) : types « Override HA » dont la projection est valide (champ additif du
+      // démon). null = champ absent (démon plus ancien, ou commande non évaluable) : liste complète.
+      override_types_allowed: Array.isArray(r.override_types_allowed)
+        ? r.override_types_allowed.filter(function (t) { return typeof t === 'string'; }) : null,
     };
   }
 
@@ -708,6 +728,9 @@
   var SHARED_COMMAND_SELECTOR_REASON = 'Cette commande est portée par plusieurs entités : le type Home Assistant choisi '
     + 'ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici.';
 
+  var NO_TYPE_SELECTOR_REASON = 'Aucun type Home Assistant ne peut aboutir pour cette commande en l’état : '
+    + 'précisez les types génériques dans Jeedom.';
+
   // `entities` (optionnel, arbre déjà normalisé) : sans lui, comportement d'avant 22.2.
   function getOverrideSelectorState(row, entities) {
     var r = normalizeCommandRow(row);
@@ -722,6 +745,11 @@
     }
     if (r.jeedom_cmd_id !== null && countEntitiesCarryingCommand(entities, r.jeedom_cmd_id) > 1) {
       return { active: false, reason: SHARED_COMMAND_SELECTOR_REASON };
+    }
+    // Story 22.2 (R2, AC6) : aucun type ne peut aboutir. Un type déjà posé garde le sélecteur actif
+    // (retour au mode automatique).
+    if (r.override_types_allowed !== null && getOverrideTypeOptions(r).length === 0) {
+      return { active: false, reason: NO_TYPE_SELECTOR_REASON };
     }
     return { active: true, reason: null };
   }
@@ -1191,6 +1219,7 @@
   var api = {
     HA_ENTITY_TYPE_OPTIONS: HA_ENTITY_TYPE_OPTIONS,
     getHaEntityTypeOptions: getHaEntityTypeOptions,
+    getOverrideTypeOptions: getOverrideTypeOptions,
     normalizeCommandRow: normalizeCommandRow,
     normalizeTree: normalizeTree,
     resolveCommandNames: resolveCommandNames,

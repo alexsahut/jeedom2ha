@@ -106,7 +106,10 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
             "jeedom_cmd_id", "cmd_name", "generic_type", "coverable", "covered",
             "attendu_ha", "effective_ha", "override_applied", "diagnostic",
             "published_in_ha",  # Story 22.2 (champ additif)
+            "override_types_allowed",  # Story 22.2 R2 (champ additif)
         }
+        assert row["override_types_allowed"] == sorted(row["override_types_allowed"])
+        assert "light" in row["override_types_allowed"]
         assert row["jeedom_cmd_id"] == cmd.id
         assert row["published_in_ha"] is False
         assert row["covered"] is True

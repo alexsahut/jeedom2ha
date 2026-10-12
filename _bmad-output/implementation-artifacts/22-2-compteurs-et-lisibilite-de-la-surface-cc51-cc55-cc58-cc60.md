@@ -59,7 +59,7 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 - **AC3.** Les libellés de portée distinguent « équipement entier » et « cette entité » ; sur un équipement à une seule entité, les actions d'entité qui doublent celles de l'équipement sont masquées (mêmes routes, aucune fonction perdue) ; les équipements multi-entités gardent leurs actions par entité [Q4 B].
 - **AC4.** Le libellé « Supprimer puis recréer » devient « Supprimer de Home Assistant » partout (équipement, pièce, parc, confirmations, infobulles, aide, documentation) et rappelle que « Republier » remet l'équipement ; aucune recréation enchaînée, aucun changement de comportement du démon [Q5 A].
 - **AC5.** CC-58 : sur une commande portée par deux entités (forme de l'équipement 579, commande 5369), le sélecteur « Override HA » est désactivé avec une explication claire ; aucun changement de publication ni de contrat d'override [Q6 C].
-- **AC6 — NON IMPLÉMENTÉE, EN ATTENTE DE DÉCISION (Task 0 a).** CC-60 : la liste « Override HA » ne propose que des types qui peuvent aboutir ; sur l'équipement 380, les types refusés (`sensor`, `binary_sensor`) de la commande 2971 ne sont plus proposés, la cause « précisez les types génériques dans Jeedom » restant la voie normale [Q7 A, sous réserve de la Task 0 a].
+- **AC6 — FAITE (R2, décision d'Alexandre du 12/10 vers 10:30 : option A).** CC-60 : la liste « Override HA » ne propose que des types qui peuvent aboutir ; sur l'équipement 380, les types refusés (`sensor`, `binary_sensor`) de la commande 2971 ne sont plus proposés, la cause « précisez les types génériques dans Jeedom » restant la voie normale [Q7 A, sous réserve de la Task 0 a].
 - **AC7.** P3 : le bandeau de santé est rafraîchi après un échec de « Republier » ; l'assertion de test liée au faux DOM est corrigée [Q8 A].
 - **AC8.** Les compteurs d'une pièce sont égaux au recomptage manuel de la pièce (preuve par l'humain, comme en 20-3).
 - **AC9.** `docs/fr_FR/compteurs.md` entièrement réécrit (bloc isolé, bandeau d'obsolescence retiré) ; emplacements de captures conservés.
@@ -67,12 +67,12 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 ## Tâches
 
-- [x] **Task 0 — Établir (lecture seule)** : (a) **fait** : cause de CC-60 établie et débloquage possible (voir Dev Agent Record) ⇒ **AC6 non implémentée, en attente de décision** ; (b) **fait** : cas non équivalents listés (Dev Agent Record) ; (c) relevé « avant » sur la box : **ClaudeBox** (non fait par la session cloud).
+- [x] **Task 0 — Établir (lecture seule)** : (a) **fait** : cause de CC-60 établie et débloquage possible (voir Dev Agent Record) ⇒ **AC6 : décision d'Alexandre = option A (R2)** ; (b) **fait** : cas non équivalents listés (Dev Agent Record) ; (c) relevé « avant » sur la box : **ClaudeBox** (non fait par la session cloud).
 - [x] **Task 1 — Démon (champ additif)** : `entities[].present_in_ha` et `commands[].published_in_ha` dans l'arbre `GET /system/mapping_overrides/{eq_id}` ; lecture seule de l'état d'exécution, mêmes prédicats que `_is_currently_published_in_ha`.
 - [x] **Task 2 — Interface : compteurs** (`summarizeRoom`, `summarizeEquipmentCounters`, `buildRoomCounterLabels`, `buildEquipmentCounterLabels`, `renderRoomCounters`, `renderEquipmentCounters`) selon Q1 A, Q2 A, Q3 A.
 - [x] **Task 3 — Interface : portées et doublons** (`appendPublicationActions`, `renderEntities`, `entityActionsDuplicateEquipment`) selon Q4 B.
 - [x] **Task 4 — Libellé « Supprimer de Home Assistant »** (équipement, pièce, parc, confirmations, aide, documentation) selon Q5 A.
-- [x] **Task 5 — CC-58 (sélecteur désactivé, Q6 C)** ; **CC-60 (liste filtrée, Q7 A) : non faite** (réserve de la Task 0 a : un forçage ou une projection corrigée peut faire aboutir ces types ⇒ retour vers ClaudeBox/Alexandre avant de coder).
+- [x] **Task 5 — CC-58 (sélecteur désactivé, Q6 C)** ; **CC-60 (liste filtrée, Q7 A) : faite en R2** (décision d'Alexandre : option A, filtrer la liste par le démon ; option C, corriger la projection, écartée).
 - [x] **Task 6 — P3 de 20-3** selon Q8 A (bandeau relu après toute issue de « Republier » ; faux DOM : le texte analysé depuis du HTML est décodé comme dans un navigateur, assertion corrigée).
 - [x] **Task 7 — Tests** : Node (faux DOM), Python, parcours du gate 20-0 écrits ou adaptés (287, 579, 380), **non lancés contre une box**.
 - [x] **Task 8 — Documentation** : `compteurs.md` réécrit, `index.md` ajusté, `changelog_beta.md` ; **captures par l'humain** après la story.
@@ -132,6 +132,10 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 
 Équivalence exacte des actions d'équipement et d'entité (C6) ; cause du refus `ha_missing_state_topic` sur 2971 et faisabilité d'un forçage `sensor`/`binary_sensor` (C9 à établir) ; valeurs réelles des compteurs sur la box ; comportement de HA à la suppression d'une découverte (perte du registre d'entité, hypothèse à confirmer pour Q5 B).
 
+## Décision complémentaire sur l'AC6 (2026-10-12, vers 10:30, relayée par ClaudeBox)
+
+**Q7 : option A confirmée, option C écartée.** Alexandre a tranché après la Task 0 a : la liste « Override HA » est filtrée par le démon (champ additif) ; ni la projection ni ce qui est publié ne changent. Voir « R2 » du Dev Agent Record.
+
 ## Journal des décisions
 
 - 2026-10-11 15:48 — Alexandre : story « compteurs » regroupée avec CC-51 ; « publiés » = `published_in_ha`, plus « en attente d'application » et « non pris en charge ».
@@ -140,7 +144,8 @@ afin de ne plus me demander si un bouton double un autre, si « recréer » recr
 - 2026-10-12 — R1 (ClaudeBox) : C9 reformulé, conséquence de H6 ajoutée à Q5 B.
 - 2026-10-12, vers 05:50 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q1 A, Q2 A, Q3 A, Q4 B, Q5 A, Q6 C, Q7 A (sous réserve de la Task 0 a : retour vers ClaudeBox si un forçage ou une projection corrigée débloque ces types), Q8 A, QD une seule story. **`ready-for-dev` accordé** par ClaudeBox au nom de cette décision ; AC figés, options écartées retirées des AC et tâches ; ordre : après 22-1.
 
-- 2026-10-12 — dev-story (session cloud déléguée) : Tasks 0 a, 0 b, 1 à 8 faites ; **AC6 en attente de décision** (Task 0 a : une projection corrigée ferait aboutir `sensor`/`binary_sensor`) ; statut `review`.
+- 2026-10-12 — dev-story (session cloud déléguée) : Tasks 0 a, 0 b, 1 à 8 faites ; AC6 d'abord en attente de décision (Task 0 a : une projection corrigée ferait aboutir `sensor`/`binary_sensor`) ; statut `review`.
+- 2026-10-12, vers 10:30 — **Décision d'Alexandre sur l'AC6 (CC-60), relayée par ClaudeBox : option A, filtrer la liste « Override HA ».** La correction de la projection (option C) est écartée : on ne touche ni à la projection ni à ce qui est publié. Implémentée en R2.
 
 ## Dev Agent Record
 
@@ -155,7 +160,7 @@ Forme simulée (identifiants numériques seulement, fixture anonymisée : `resou
 - **Cause (lecture du code + test).** `apply_type_override` (`mapping/overrides.py`) ne change que `ha_entity_type` sur une copie du mapping ; ses `capabilities` restent le `CoverCapabilities()` du mapper (`mapping/cover.py`, branche `state_orphan`), qui n'a **aucun** attribut `has_state`. `validate_projection('sensor' | 'binary_sensor', capabilities)` exige `has_state` (`validation/ha_component_registry.py`, `_resolve_capability`) ⇒ `ha_missing_state_topic`, **quel que soit l'état réel de la commande 2971**. Ce n'est donc pas une « commande sans état lisible » : c'est la projection de l'override qui ne reprend pas l'état de la commande.
 - **Type seul** : validité fausse (`ha_missing_state_topic`), publication `ambiguous_skipped` (l'ambiguïté `state_orphan` bloque en plus). **Type + « Forcer »** : le forçage ne contourne pas la validation de projection ⇒ `ha_missing_state_topic`.
 - **Un forçage ou une projection corrigée peut-il faire aboutir `sensor`/`binary_sensor` ?** **Oui, avec une projection corrigée.** En simulant que les capacités du cover reprennent un état (`has_state`), « type + Forcer » donne `publication_forced`, et `publish_sensor` / `publish_binary_sensor` produisent un payload de découverte avec `state_topic = jeedom2ha/380/state` (test `test_cc60_constat_une_projection_corrigee_ferait_aboutir_type_puis_forcage`, qui ne modifie aucun code de production). Réserve non levée par cette session : la valeur réellement publiée sur ce topic d'état pour une entité issue d'un `cover` n'a pas été établie (risque « entité sans état fiable dans HA » de la Q7 C).
-- **Conséquence (réserve de Q7 A).** **AC6 n'est pas implémentée** : la liste « Override HA » est inchangée (test `AC6 en attente de décision`) et aucun code de projection n'a été touché. **AC6 en attente de décision** : ClaudeBox la porte à Alexandre (option A : filtrer la liste par le démon, champ additif ; ou option C : corriger la projection pour que `sensor`/`binary_sensor` aboutissent). La cause affichée « précisez les types génériques dans Jeedom » reste la voie normale (test de libellé + parcours 380).
+- **Conséquence (réserve de Q7 A) — levée en R2 par la décision d'Alexandre (option A).** À l'époque de la dev-story initiale, **AC6 n'était pas implémentée** : la liste « Override HA » est inchangée (test `AC6 en attente de décision`) et aucun code de projection n'a été touché. **AC6 en attente de décision** : ClaudeBox la porte à Alexandre (option A : filtrer la liste par le démon, champ additif ; ou option C : corriger la projection pour que `sensor`/`binary_sensor` aboutissent). La cause affichée « précisez les types génériques dans Jeedom » reste la voie normale (test de libellé + parcours 380).
 
 ### Task 0 b — actions d'équipement et d'entité : équivalences
 
@@ -184,7 +189,7 @@ Forme simulée (identifiants numériques seulement, fixture anonymisée : `resou
 
 ### Champs additifs du démon (liste demandée pour la PR)
 
-`GET /system/mapping_overrides/{eq_id}` : `entities[].present_in_ha` (bool), `commands[].published_in_ha` (bool). Garde-fou `test_story_19_3_guardrail_no_override_json_parity.py` mis à jour en conséquence. Aucun autre contrat modifié.
+`GET /system/mapping_overrides/{eq_id}` : `entities[].present_in_ha` (bool), `commands[].published_in_ha` (bool), `commands[].override_types_allowed` (liste de types, R2). Garde-fou `test_story_19_3_guardrail_no_override_json_parity.py` mis à jour en conséquence. Aucun autre contrat modifié.
 
 ### À contrôler par la preuve terrain (ClaudeBox, Tasks 0 c et 9)
 
@@ -204,14 +209,24 @@ Exécutées comme la CI (`.github/workflows/test.yml`), Python 3.13 local : `fla
 - Alignés : `desktop/js/jeedom2ha_mapping_override.js` (`SHARED_COMMAND_SELECTOR_REASON`), test Node (titre exact + cas « principal publié »), page simulée et expression régulière du parcours `decouverte-piece-25-eq-579.mjs` (« portée par plusieurs entités »), `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`, ligne de `delegations.md`.
 - AC6 : **non touchée** (en attente de la décision d'Alexandre portée par ClaudeBox). Aucun nom réel.
 
+### R2 (ClaudeBox, tête `5e6018c`) — AC6 : liste « Override HA » filtrée (option A)
+
+- **Démon (champ additif, lecture seule).** `commands[].override_types_allowed` dans `GET /system/mapping_overrides/{eq_id}` : pour chaque commande couverte, les types de `PRODUCT_SCOPE` (ordre alphabétique = ordre de la liste d'interface) dont la **validation de projection** (`validate_projection`) est valide pour la projection que produirait l'override de ce type, calculée **exactement comme l'aperçu** (`evaluate_equipment` avec l'override proposé, puis validité de l'entité qui porte la commande ; `_projection_valid_override_types`). Un type refusé par cette validation n'aboutit jamais, même forcé : retiré. Un type valide mais refusé seulement pour l'ambiguïté ou la confiance reste proposé (« Forcer » peut le faire aboutir). Calcul fait une fois par entité porteuse. Absent pour une commande non couverte (le sélecteur y est grisé). Aucune décision recalculée, aucun topic, `unique_id`, payload de découverte ni contrat d'override modifié.
+- **Interface.** `getOverrideTypeOptions(row)` : seuls les types annoncés, plus « mode automatique » ; un type déjà posé reste affiché (retour au mode automatique) ; si aucun type ne reste et qu'aucun n'est posé, le sélecteur est désactivé avec « Aucun type Home Assistant ne peut aboutir pour cette commande en l’état : précisez les types génériques dans Jeedom. » ; champ absent (démon plus ancien) : liste complète d'avant.
+- **Types encore proposés pour 2971 (forme 380 simulée).** `cover` **seul** (son type automatique, valide pour la validation, refusé à l'aperçu pour ambiguïté `state_orphan` ⇒ aperçu réel bloquant). `sensor` et `binary_sensor` sont retirés, comme les autres types (`light`, `switch`, `button`, `climate`, `alarm_control_panel`), tous invalides pour cette projection.
+- **Gate 20-0 (écrit, non lancé).** `reference-bascule-eq-380.mjs` : un type reste proposé pour 2971 (`cover`), le parcours est donc adapté : constante `BASCULE_TYPE = 'cover'` (bascule déclarée et sélectionnée), vérification que la liste est exactement « mode automatique » + `cover` et que `sensor`/`binary_sensor` ne sont plus proposés, cause lisible « précisez les types génériques dans Jeedom » lue sur la cellule initiale. Le second aperçu **réel** d'un type refusé disparaît (il n'existe plus de type refusé sélectionnable) ; la bascule simulée (aperçu simulé, enregistrement simulé, relecture dérivée, retour au mode automatique) est conservée sur `cover`. Les identifiants ne sont pas à réancrer.
+- **Tests.** Démon : forme 380 (2971 ⇒ `['cover']`, `sensor`/`binary_sensor` retirés, commandes non couvertes sans liste), cohérence type par type avec l'aperçu, commande ordinaire (liste = types valides, identique pour les commandes de l'entité), type valide mais ambigu conservé (`binary_sensor` d'un état seul), lecture seule ; garde de parité mise à jour. Node : liste filtrée, type posé conservé, sélecteur désactivé (liste vide) et actif (type posé), champ absent, rendu DOM des options.
+- **Documentation.** `index.md` (colonne « Override HA », liste filtrée, nouveau motif de grisé), `changelog_beta.md`. `compteurs.md` : sans objet.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/22-2-compteurs-et-lisibilite-de-la-surface-cc51-cc55-cc58-cc60.md` (modifié)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié)
-- `resources/daemon/transport/http_server.py` (champs additifs de l'arbre)
+- `resources/daemon/transport/http_server.py` (champs additifs de l'arbre : `present_in_ha`, `published_in_ha`, `override_types_allowed`)
 - `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha.js`, `desktop/php/jeedom2ha.php`
 - `resources/daemon/tests/unit/test_story_22_2_presence_et_cc60.py` (nouveau), `resources/daemon/tests/unit/test_story_19_3_guardrail_no_override_json_parity.py`
 - `tests/unit/test_story_22_2_compteurs_portees.node.test.js` (nouveau), `tests/unit/test_story_22_2_documentation.node.test.js` (nouveau), `tests/unit/test_story_20_3_compteurs_piece.node.test.js`, `tests/unit/test_story_20_3_actions_deplacees.node.test.js`, `tests/unit/test_story_20_3_r1_ui_reelle.node.test.js`, `tests/unit/test_story_20_3_gate_parcours.node.test.js`, `tests/unit/test_story_20_2_p1_p2_comportement_surface.node.test.js`, `tests/unit/test_story_21_1_cc47_command_published_by_secondary.node.test.js`, `tests/unit/helpers/fake_dom.js`, `tests/unit/helpers/ui_harness.js`
 - `tests/e2e/gate/parcours/decouverte-piece-25-eq-579.mjs`, `tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs`, `tests/e2e/gate/parcours/reference-bascule-eq-380.mjs`
+- `tests/e2e/gate/parcours/reference-bascule-eq-380.mjs` (R2 : bascule sur `cover`, liste filtrée vérifiée)
 - `docs/fr_FR/compteurs.md`, `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`
 - `docs/operations/delegations.md`

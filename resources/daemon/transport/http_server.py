@@ -71,7 +71,7 @@ from mapping.overrides import (
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
-from validation.ha_component_registry import validate_projection
+from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
 
 # Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
 _HTTP_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -3032,6 +3032,45 @@ def _resolve_data_dir(request: web.Request) -> str:
     return request.app.get("data_dir") or _DATA_DIR
 
 
+def _projection_valid_override_types(
+    eq,
+    snapshot,
+    eligibility,
+    mapper_registry,
+    confidence_policy,
+    persisted_overrides,
+    persisted_equipment_overrides,
+    cmd_id,
+):
+    """Story 22.2 (R2, AC6, option A) — types « Override HA » qui peuvent aboutir pour `cmd_id`.
+
+    Pour chaque type proposable (`PRODUCT_SCOPE`, ordre alphabétique = ordre de la liste de
+    l'interface), rejoue EXACTEMENT ce que fait l'aperçu : `evaluate_equipment` avec l'override de
+    type PROPOSÉ sur cette commande, puis lit la validation de projection de l'entité qui porte la
+    commande. Un type dont la projection est invalide n'aboutit jamais, même forcé (le forçage ne
+    contourne pas `validate_projection`) : il est retiré. Un type valide mais refusé seulement par
+    l'ambiguïté ou la confiance reste proposé, puisque « Forcer » peut le faire aboutir. Lecture
+    seule : aucune décision n'est recalculée en dehors de ce que fait déjà l'aperçu.
+    Une validité absente (étape non exécutée) ne retire rien.
+    """
+    allowed = []
+    for ha_type in sorted(PRODUCT_SCOPE):
+        evaluation = evaluate_equipment(
+            eq, snapshot, eligibility,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=persisted_overrides,
+            persisted_equipment_overrides=persisted_equipment_overrides,
+            proposed_overrides={f"{eq.id}:{cmd_id}": {"ha_entity_type": ha_type, "source": "preview"}},
+        )
+        target = _resolve_command_mapping(evaluation, cmd_id)
+        validity = getattr(target, "projection_validity", None) if target is not None else None
+        if validity is not None and validity.is_valid is False:
+            continue
+        allowed.append(ha_type)
+    return allowed
+
+
 def _build_mapping_override_tree(
     eq,
     snapshot,
@@ -3085,6 +3124,7 @@ def _build_mapping_override_tree(
     command_decision_by_cmd = {d.cmd_id: d for d in evaluation.command_decisions}
 
     commands = []
+    allowed_by_mapping: Dict[int, list] = {}
     for cmd in eq.cmds:
         key = f"{eq.id}:{cmd.id}"
         entry = overrides_cache.get(key) or {}
@@ -3113,6 +3153,17 @@ def _build_mapping_override_tree(
         if override_applied:
             row["override_source"] = entry.get("source", "user")
         row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
+        # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
+        # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
+        # commandes dont l'entité est évaluable ; absent sinon (le sélecteur y est de toute façon grisé).
+        if diag_mapping is not None:
+            group = id(diag_mapping)
+            if group not in allowed_by_mapping:
+                allowed_by_mapping[group] = _projection_valid_override_types(
+                    eq, snapshot, eligibility, MapperRegistry(), confidence_policy,
+                    overrides_cache, equipment_overrides_cache, cmd.id,
+                )
+            row["override_types_allowed"] = list(allowed_by_mapping[group])
         commands.append(row)
 
     current_should_publish = bool(

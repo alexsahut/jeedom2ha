@@ -38,8 +38,9 @@
   //     Commande | generic_type | Override HA | Diagnostic. Plus d'accordéon par
   //     commande : toute l'info utile est directement sur la ligne. ---
 
-  function buildOptions(selected) {
-    var opts = M.getHaEntityTypeOptions();
+  // `row` : la ligne de commande (types proposés filtrés par le démon, AC6) ; sans lui, liste complète.
+  function buildOptions(selected, row) {
+    var opts = row ? M.getOverrideTypeOptions(row) : M.getHaEntityTypeOptions();
     var $sel = $('<select class="form-control input-sm mapping-override-select"></select>');
     $sel.append($('<option value="">{{— mode automatique —}}</option>'));
     for (var i = 0; i < opts.length; i++) {
@@ -107,7 +108,7 @@
 
     // Colonne 3 : override HA — menu déroulant inline + spinner + retour auto.
     var $tdOverride = $('<td class="mo-td-override"></td>');
-    var $select = buildOptions(row.override_applied ? row.effective_ha : '');
+    var $select = buildOptions(row.override_applied ? row.effective_ha : '', row);
     var selectorState = M.getOverrideSelectorState(row, entities);
     if (!selectorState.active) {
       $select.prop('disabled', true).attr('title', selectorState.reason);

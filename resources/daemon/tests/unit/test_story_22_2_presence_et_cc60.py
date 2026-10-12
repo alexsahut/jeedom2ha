@@ -287,3 +287,93 @@ async def test_sans_depublication_differee_une_commande_retiree_n_est_pas_publie
     current.cmds[2] = _cmd(9003, "Autre", "info", "string", None)
     payload = await _tree(cli, app, current, synced)
     assert _row(payload, 9003)["published_in_ha"] is False
+
+
+# ---------------------------------------------------------------------------
+# R2 (AC6, option A) — `commands[].override_types_allowed` : types « Override HA » qui peuvent aboutir
+# ---------------------------------------------------------------------------
+
+def _allowed(payload, cmd_id):
+    return _row(payload, cmd_id).get("override_types_allowed")
+
+
+async def _preview_validity(cli, eq_id, cmd_id, ha_type):
+    resp = await cli.post(
+        "/system/overrides/preview", headers=HEADERS,
+        json={"payload": {"jeedom_eq_id": eq_id, "jeedom_cmd_id": cmd_id, "ha_entity_type": ha_type}},
+    )
+    assert resp.status == 200
+    return (await resp.json())["payload"]["overridden"]["projection_validity"]["is_valid"]
+
+
+async def test_r2_forme_380_sensor_et_binary_sensor_retires(cli, app):
+    """Commande 2971 : `sensor` et `binary_sensor` (refusés par la validation, même forcés) ne sont plus
+    proposés ; seul `cover` (son type automatique, valide) reste."""
+    payload = await _tree(cli, app, _eq_forme_380())
+    allowed = _allowed(payload, CMD_FLAP_STATE)
+    assert allowed == ["cover"]
+    assert "sensor" not in allowed and "binary_sensor" not in allowed
+    # Commandes non couvertes : pas de liste (le sélecteur y est de toute façon grisé).
+    for uncovered in (2968, 2969, 2970):
+        assert "override_types_allowed" not in _row(payload, uncovered)
+
+
+async def test_r2_le_filtre_est_celui_de_l_apercu(cli, app):
+    """Critère : exactement la validité de projection que rend l'aperçu pour chaque type."""
+    eq = _eq_forme_380()
+    payload = await _tree(cli, app, eq)
+    allowed = _allowed(payload, CMD_FLAP_STATE)
+    for ha_type in ["alarm_control_panel", "binary_sensor", "button", "climate", "cover", "light", "sensor", "switch"]:
+        valid = await _preview_validity(cli, EQ_380, CMD_FLAP_STATE, ha_type)
+        assert (ha_type in allowed) is valid, ha_type
+
+
+async def test_r2_commande_ordinaire_liste_inchangee(cli, app):
+    """Un éclairage ordinaire (On/Off/État) : tous les types dont la validation passe restent proposés,
+    dans l'ordre alphabétique de la liste de l'interface ; liste identique pour toutes ses commandes."""
+    eq = JeedomEqLogic(
+        id=910, name="eq", object_id=1, eq_type_name="light",
+        cmds=[
+            _cmd(9101, "On", "action", "other", "LIGHT_ON"),
+            _cmd(9102, "Off", "action", "other", "LIGHT_OFF"),
+            _cmd(9103, "Etat", "info", "binary", "LIGHT_STATE"),
+        ],
+    )
+    payload = await _tree(cli, app, eq)
+    lists = [_allowed(payload, cid) for cid in (9101, 9102, 9103)]
+    assert lists[0] == lists[1] == lists[2]
+    assert lists[0] == sorted(lists[0])
+    assert "light" in lists[0]
+    for ha_type in ["alarm_control_panel", "binary_sensor", "button", "climate", "cover", "light", "sensor", "switch"]:
+        valid = await _preview_validity(cli, 910, 9101, ha_type)
+        assert (ha_type in lists[0]) is valid, ha_type
+
+
+async def test_r2_type_valide_mais_ambigu_reste_propose(cli, app):
+    """Forme « état seul » (switch orphelin, ambigu) : `binary_sensor` est valide mais refusé seulement
+    pour l'ambiguïté ; « Forcer » peut le faire aboutir, donc il reste proposé."""
+    eq = JeedomEqLogic(
+        id=901, name="eq", object_id=1, eq_type_name="type",
+        cmds=[_cmd(9101, "Etat", "info", "binary", "ENERGY_STATE", value="1")],
+    )
+    payload = await _tree(cli, app, eq)
+    allowed = _allowed(payload, 9101)
+    assert "binary_sensor" in allowed
+    resp = await cli.post(
+        "/system/overrides/preview", headers=HEADERS,
+        json={"payload": {"jeedom_eq_id": 901, "jeedom_cmd_id": 9101, "ha_entity_type": "binary_sensor"}},
+    )
+    over = (await resp.json())["payload"]["overridden"]
+    assert over["projection_validity"]["is_valid"] is True
+    assert over["publication_reason"] == "ambiguous_skipped"
+    assert over["should_publish"] is False
+
+
+async def test_r2_champ_additif_aucune_publication_ni_decision_modifiee(cli, app):
+    """Lecture seule : l'arbre de la forme 380 garde sa décision et ne crée aucun override."""
+    eq = _eq_forme_380()
+    evaluation, _ = _evaluate(eq)
+    payload = await _tree(cli, app, eq)
+    assert payload["equipment_decision"]["publication_reason"] == evaluation.equipment_decision.reason
+    assert payload["equipment_decision"]["should_publish"] is False
+    assert all(c["override_applied"] is False for c in payload["commands"])

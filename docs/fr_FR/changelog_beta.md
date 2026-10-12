@@ -12,6 +12,7 @@
 - Les boutons disent leur portée : « Exclure l’équipement » / « Exclure cette entité » (idem pour « Forcer » et « Revenir au mode automatique »). Sur un équipement qui n'a qu'une seule entité, les boutons d'entité qui faisaient la même chose que ceux de l'équipement ne sont plus affichés
 - « Supprimer puis recréer » devient « Supprimer de Home Assistant » (équipement, pièce, parc) : l'action supprime seulement, elle ne recrée rien ; la confirmation rappelle que « Republier » remet l'équipement. Le comportement n'a pas changé
 - Le sélecteur « Override HA » est désactivé, avec une explication, sur une commande portée par plusieurs entités (le type choisi ne s'appliquerait qu'à l'entité principale de l'équipement)
+- La liste « Override HA » ne propose plus que les types qui peuvent aboutir pour la commande : un type que Home Assistant refuserait toujours (même avec « Forcer ») n'est plus proposé, et le sélecteur est grisé, avec une explication, quand aucun type ne reste (la voie normale est alors de préciser les types génériques dans Jeedom)
 - Le bandeau de santé est relu aussi quand « Republier » (ou une action de pièce) échoue
 - Rien de ce qui est publié dans Home Assistant ne change : mêmes topics, mêmes `unique_id`, mêmes payloads
 

@@ -193,3 +193,12 @@ test('22.2 — les libellés attendus par les parcours 287 et 579 sont ceux que 
   assert.ok(source.includes(`EXCLUDE_LABEL = '${rendered[0]}'`), rendered[0]);
   assert.ok(source.includes(`REVERT_LABEL = '${rendered[2]}'`), rendered[2]);
 });
+
+test('22.2 R2 — le parcours 380 bascule sur le seul type encore proposé pour 2971, jamais sur un type retiré', () => {
+  const fs = require('node:fs');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'e2e', 'gate', 'parcours', 'reference-bascule-eq-380.mjs'), 'utf8');
+  assert.match(source, /const BASCULE_TYPE = 'cover';/);
+  assert.match(source, /haEntityType: BASCULE_TYPE/);
+  assert.doesNotMatch(source, /selectOption\('(sensor|binary_sensor)'\)/);
+  assert.match(source, /type-refuse-encore-propose/);
+});
