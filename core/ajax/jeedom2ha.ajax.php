@@ -21,6 +21,26 @@ require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
 require_once __DIR__ . '/../php/jeedom2ha_action_budget.php';
 
 /**
+ * Story A1 — branche le relais borné sur le vrai callDaemon et le journal Jeedom.
+ * $call : function(int $timeoutS): ?array
+ */
+function _jeedom2ha_run_parc_relay(string $relais, callable $call): array {
+  return jeedom2ha_dispatch_parc_relay(
+    $relais,
+    $call,
+    function (int $timeoutS, int $maxAttempts) {
+      return jeedom2ha::callDaemon('/system/status', null, 'GET', $timeoutS, $maxAttempts);
+    },
+    function (string $level, string $message) {
+      log::add('jeedom2ha', $level, $message);
+    },
+    function () {
+      return microtime(true);
+    }
+  );
+}
+
+/**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
  * Story 15.1/15.2 — passthrough additif de state_class/unit_of_measurement et
@@ -591,7 +611,10 @@ try {
         'tls'        => (init('tls', '0') === '1'),
         'tls_verify' => (init('tls_verify', '1') === '1'),
       );
-      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST', 15);
+      // Story A1 (audit) : test de connexion au broker, indépendant de la taille du parc
+      // (le démon borne lui-même la connexion à 5 s) → budget court fixe conservé, pas de
+      // deadline_s ni de plafond de lissage.
+      $result = jeedom2ha::callDaemon('/action/mqtt_test', $params, 'POST', JEEDOM2HA_RELAY_BUDGET_SHORT_S);
       if ($result === null) {
         log::add('jeedom2ha', 'error', '[MQTT] Le démon n\'a pas répondu au test de connexion (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré dans l\'onglet Santé', __FILE__));
@@ -627,11 +650,11 @@ try {
     }
     else if ($action == 'scanTopology') {
       $topology = jeedom2ha::getFullTopology();
-      $result = jeedom2ha::callDaemon('/action/sync', $topology, 'POST', 15, null, array('X-Jeedom2ha-Sync-Mode' => 'rescan'));
-      if ($result === null) {
-        log::add('jeedom2ha', 'error', '[TOPOLOGY] Le démon n\'a pas répondu au scan de topologie (timeout 15s)');
-        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
-      }
+      // Story A1 : durée proportionnelle au parc → budget fixe R (motif (b') de 19-6).
+      // Le sync démon ne fait aucune pause de lissage : pas de deadline_s à transmettre.
+      $result = _jeedom2ha_run_parc_relay('TOPOLOGY', function (int $timeoutS) use ($topology) {
+        return jeedom2ha::callDaemon('/action/sync', $topology, 'POST', $timeoutS, null, array('X-Jeedom2ha-Sync-Mode' => 'rescan'));
+      });
       if (isset($result['status']) && $result['status'] === 'ok') {
         // Un résultat partiel a pu publier : réaligner dès que le sync est terminé.
         try {
@@ -643,11 +666,11 @@ try {
       ajax::success($result);
     }
     else if ($action == 'getDiagnostics') {
-      $result = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 15);
-      if ($result === null) {
-        log::add('jeedom2ha', 'error', '[DIAGNOSTICS] Le démon n\'a pas répondu (timeout 15s)');
-        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
-      }
+      // Story A1 : payload proportionnel au parc → budget fixe R, une seule tentative
+      // (le retry GET par défaut doublerait le budget).
+      $result = _jeedom2ha_run_parc_relay('DIAGNOSTICS', function (int $timeoutS) {
+        return jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', $timeoutS, 1);
+      });
       ajax::success($result);
     }
     else if ($action == 'getPublishedScopeForConsole') {
@@ -721,12 +744,11 @@ try {
     else if ($action == 'exportDiagnostic') {
       $pseudonymize = (init('pseudonymize', '0') === '1');
 
-      // 1. Diagnostics (timeout 15s — source principale de l'export)
-      $diagResult = jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', 15);
-      if ($diagResult === null) {
-        log::add('jeedom2ha', 'error', '[EXPORT] Le démon n\'a pas répondu (timeout 15s)');
-        ajax::error(__('Démon indisponible ou timeout — relancez le démon et réessayez.', __FILE__));
-      }
+      // 1. Diagnostics (budget fixe R, story A1 — source principale de l'export, mêmes données
+      // que le scan : proportionnelles au parc ; une seule tentative).
+      $diagResult = _jeedom2ha_run_parc_relay('EXPORT', function (int $timeoutS) {
+        return jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', $timeoutS, 1);
+      });
       $rawEquipments = $diagResult['payload']['equipments'] ?? [];
 
       // 2. Statut daemon (timeout 5s — info version/broker, non bloquant)
@@ -905,7 +927,9 @@ try {
       if ($eqId === '' || !ctype_digit((string)$eqId)) {
         throw new Exception(__('eqId invalide', __FILE__));
       }
-      $result = jeedom2ha::callDaemon('/system/mapping_overrides/' . (int)$eqId, null, 'GET', 15);
+      // Story A1 (audit) : lecture d'un seul eqId, indépendante de la taille du parc → budget
+      // court fixe conservé (une seule tentative n'est pas imposée : comportement d'origine).
+      $result = jeedom2ha::callDaemon('/system/mapping_overrides/' . (int)$eqId, null, 'GET', JEEDOM2HA_RELAY_BUDGET_SHORT_S);
       if ($result === null) {
         log::add('jeedom2ha', 'error', '[MAPPING-OVERRIDE] Le démon n\'a pas répondu (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));

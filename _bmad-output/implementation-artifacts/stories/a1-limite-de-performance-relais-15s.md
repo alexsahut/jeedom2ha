@@ -1,6 +1,6 @@
 # Story A1 : Budget fixe et échéance transmise pour les 5 relais PHP restants (E4)
 
-Status: ready-for-dev
+Status: review
 
 Epic: (Chantier Market 2026-10)
 
@@ -62,23 +62,23 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
 
 ## Tasks / Subtasks
 
-- [ ] T1 — Auditer précisément chacun des 5 relais (confirmer/corriger le tableau ci-dessus)
-  - [ ] Vérifier si `scanTopology` publie en boucle (nécessitant un plafond de lissage) ou fait un appel unique (budget seul suffit)
-  - [ ] Idem pour `getDiagnostics` et `exportDiagnostic`
-  - [ ] Confirmer que `testMqttConnection` et `getMappingOverrides` n'ont aucune dépendance au nombre d'équipements
+- [x] T1 — Auditer précisément chacun des 5 relais (confirmer/corriger le tableau ci-dessus)
+  - [x] Vérifier si `scanTopology` publie en boucle (nécessitant un plafond de lissage) ou fait un appel unique (budget seul suffit)
+  - [x] Idem pour `getDiagnostics` et `exportDiagnostic`
+  - [x] Confirmer que `testMqttConnection` et `getMappingOverrides` n'ont aucune dépendance au nombre d'équipements
 
-- [ ] T2 — Implémenter le motif (b′) pour les relais dépendants de la taille du parc
-  - [ ] Réutiliser/étendre `core/php/jeedom2ha_action_budget.php` (budget R, reserve_s, deadline_s) pour ces relais, ou créer un budget dédié par relais si R=60s ne convient pas
-  - [ ] Transmettre `deadline_s` au démon via le payload de la requête
-  - [ ] Côté démon, réutiliser `resources/daemon/transport/action_pacing.py` (`plafond_pauses`, `budget_travail`) si le relais publie en boucle MQTT
+- [x] T2 — Implémenter le motif (b′) pour les relais dépendants de la taille du parc
+  - [x] Réutiliser/étendre `core/php/jeedom2ha_action_budget.php` (budget R, reserve_s, deadline_s) pour ces relais, ou créer un budget dédié par relais si R=60s ne convient pas
+  - [x] Transmettre `deadline_s` au démon via le payload de la requête
+  - [x] Côté démon, réutiliser `resources/daemon/transport/action_pacing.py` (`plafond_pauses`, `budget_travail`) si le relais publie en boucle MQTT
 
-- [ ] T3 — Conserver/ajuster le budget fixe des relais non dépendants
-  - [ ] `testMqttConnection`, `getMappingOverrides` : documenter la décision inline (pas de changement de mécanisme, timeout éventuellement ajusté)
+- [x] T3 — Conserver/ajuster le budget fixe des relais non dépendants
+  - [x] `testMqttConnection`, `getMappingOverrides` : documenter la décision inline (pas de changement de mécanisme, timeout éventuellement ajusté)
 
-- [ ] T4 — Tests réels (pas de simulation du relais)
-  - [ ] Ajouter/étendre des tests PHP sur le modèle `test_story_19_6_php_relay.php` pour chaque relais modifié
-  - [ ] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
-  - [ ] Vérifier le message d'erreur correct en cas de dépassement réel du budget
+- [x] T4 — Tests réels (pas de simulation du relais)
+  - [x] Ajouter/étendre des tests PHP sur le modèle `test_story_19_6_php_relay.php` pour chaque relais modifié
+  - [x] Ajouter un test de charge à N équipements (ex. 300) reproduisant le comportement réel du démon
+  - [x] Vérifier le message d'erreur correct en cas de dépassement réel du budget
 
 - [ ] T5 — Gate terrain (hors story, exécuté par clawbox)
   - [ ] Test sur Jeedom vierge en VM `pve` (Debian 11 puis 12), après go Telegram d'Alex — gate obligatoire avant `done`, pas une tâche de cette story
@@ -100,3 +100,20 @@ Cette analyse est une hypothèse de départ basée sur une lecture du code — *
 - Aucun parcours alternatif : cette story est en **parcours complet uniquement** (règle CC-10 — la méthode proportionnée à l'enjeu a déjà tranché, pas de choix rapide/complet laissé à l'implémentation).
 - Source de référence obligatoire avant tout code : `core/php/jeedom2ha_action_budget.php`, `resources/daemon/transport/action_pacing.py`, `tests/unit/test_story_19_6_php_relay.php`, commit `95d3059` (PR #189), `challenges/2026-09-30-tri-cc32.md` (côté ClawBox, à demander si inaccessible).
 - Ordre / parallélisme : **A1 peut être menée en parallèle de A3** (conformité Market), aucune dépendance dure entre les deux.
+
+## Dev Agent Record (session cloud 11/10)
+
+Audit confirmé/affiné par lecture du code démon (`resources/daemon/transport/http_server.py`) :
+
+| Relais | Dépend du parc ? | Pauses de lissage côté démon ? | Décision |
+|---|---|---|---|
+| `testMqttConnection` | Non (connexion broker, borne démon 5 s) | Non | Budget court fixe 15 s conservé (`JEEDOM2HA_RELAY_BUDGET_SHORT_S`), décision inline |
+| `scanTopology` | Oui (`/action/sync`) | **Non** : aucun `asyncio.sleep` dans le sync ; les pauses n'existent que dans `/action/execute` et le republish broker/HA (hors relais) | Budget fixe R = 60 s via `jeedom2ha_dispatch_parc_relay`, 1 tentative ; `deadline_s` **non transmis** (le démon l'ignorerait), `action_pacing.py` inchangé |
+| `getDiagnostics` | Oui (payload ∝ parc) | Non | Idem scan (aucun appelant JS aujourd'hui, relais traité par cohérence) |
+| `exportDiagnostic` | Oui (mêmes données) | Non | Idem scan |
+| `getMappingOverrides` | Non (un seul `eqId`) | Non | Budget court fixe 15 s conservé, décision inline |
+
+Le faux « ne répond pas » avait une 2ᵉ cause côté client : délais JS de 20 s (rescan console + configuration) et 30 s (export). Alignés sur `CLIENT_TIMEOUT_MS` (90 s > R + sonde).
+Messages : démon injoignable (sonde de statut en échec) / erreur démon immédiate (durée < R − 1) / dépassement réel de R (`jeedom2ha_relay_timeout_message()`).
+
+Tests : `tests/unit/test_story_a1_php_relay.php`, `test_story_a1_client_timeout.node.test.js`, `test_story_a1_parc_300_load.py` (vrai serveur HTTP, 300 équipements, zéro pause de lissage) ; `test_story_20_4_rescan_ui.node.test.js` mis à jour (délai 20 s → budget relais).

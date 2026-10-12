@@ -319,7 +319,7 @@ $(function() {
           url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
           data: {action: 'scanTopology'},
           dataType: 'json',
-          timeout: 20000,
+          timeout: 90000, // Story A1 : > budget relais R=60 s + sonde (cf. jeedom2ha_action_budget.js)
           success: function(scanData) {
             $btn.prop('disabled', false);
             if (scanData.state !== 'ok') {
