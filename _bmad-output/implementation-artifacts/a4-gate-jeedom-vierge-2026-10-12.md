@@ -2,7 +2,7 @@
 
 ## Contexte
 
-- Exécuté par ClaudeBox sous le go d'Alex (Telegram, msg-id 11558).
+- Exécuté par clawbox (agent infra) sous le go d'Alex (Telegram, msg-id 11558), supervisé par ClaudeBox.
 - Objet : valider le paquet de distribution Market (A2) et la conformité d'activation sur Jeedom vierge (A1 T5, A3).
 
 ## Construction du paquet
