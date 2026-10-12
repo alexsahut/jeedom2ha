@@ -196,7 +196,7 @@ Forme simulée (identifiants numériques seulement, fixture anonymisée : `resou
 
 ### Tests et suites
 
-RESULTATS_A_REMPLIR
+Exécutées comme la CI (`.github/workflows/test.yml`), Python 3.13 local : `flake8 resources/daemon tests` 0 ; `python -m pytest --cov=resources/daemon` **2156 réussis**, 1 ignoré (tests du démon inclus, `make test` ne les couvre pas) ; `python -m pytest -m load` 8 réussis ; `node --test tests/unit/*.node.test.js` **458 réussis** (dont gate simulé Playwright) ; PHP : lint de tous les fichiers + 7 tests réussis (3 ignorés comme en CI) ; `bash -n scripts/*.sh` OK. Golden inchangé. Gate 20-0 contre la box : non lancé (ClaudeBox).
 
 ### File List
 
