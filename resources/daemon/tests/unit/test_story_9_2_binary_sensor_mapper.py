@@ -197,7 +197,9 @@ async def test_publish_binary_sensor_payload_contains_required_fields_and_topic(
     assert kwargs == {"qos": 1, "retain": True}
 
     payload = json.loads(payload_json)
-    assert payload["name"] == "Detecteur presence salon"
+    # Story 22.3 : nom d'entité = nom d'appareil -> null
+    assert payload["name"] is None
+    assert payload["device"]["name"] == "Detecteur presence salon"
     assert payload["unique_id"] == "jeedom2ha_eq_8000"
     assert payload["object_id"] == "jeedom2ha_8000"
     assert payload["state_topic"] == "jeedom2ha/8000/state"

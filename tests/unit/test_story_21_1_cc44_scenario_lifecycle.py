@@ -409,7 +409,8 @@ def _frozen_pre_pr_scenario_button_payload() -> dict:
             "name": "S110",
             "via_device": "jeedom2ha_bridge",
         },
-        "name": "S110",
+        # Story 22.3 : nom d'entité identique au nom d'appareil -> null (convention HA).
+        "name": None,
         "object_id": "jeedom2ha_scenario_110",
         "origin": {"name": "jeedom2ha", "sw_version": _SW_VERSION},
         "platform": "mqtt",

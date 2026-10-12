@@ -14,7 +14,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Alarme maison",
+      "name": null,
       "object_id": "jeedom2ha_230",
       "origin": {
         "name": "jeedom2ha",
@@ -368,7 +368,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Chauffe-eau",
+      "name": null,
       "object_id": "jeedom2ha_554",
       "origin": {
         "name": "jeedom2ha",
@@ -1104,7 +1104,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Light reference 1000",
+      "name": null,
       "object_id": "jeedom2ha_1000",
       "origin": {
         "name": "jeedom2ha",
@@ -1147,7 +1147,7 @@
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Light reference 1005",
+      "name": null,
       "object_id": "jeedom2ha_1005",
       "origin": {
         "name": "jeedom2ha",
@@ -1189,7 +1189,7 @@
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Light reference 1006",
+      "name": null,
       "object_id": "jeedom2ha_1006",
       "origin": {
         "name": "jeedom2ha",
@@ -1229,7 +1229,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "shutter",
-      "name": "Cover reference 2000",
+      "name": null,
       "object_id": "jeedom2ha_2000",
       "origin": {
         "name": "jeedom2ha",
@@ -1271,7 +1271,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "shutter",
-      "name": "Cover reference 2003",
+      "name": null,
       "object_id": "jeedom2ha_2003",
       "origin": {
         "name": "jeedom2ha",
@@ -1314,7 +1314,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "blind",
-      "name": "Cover reference 2005",
+      "name": null,
       "object_id": "jeedom2ha_2005",
       "origin": {
         "name": "jeedom2ha",
@@ -1356,7 +1356,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "shutter",
-      "name": "Cover reference 2006",
+      "name": null,
       "object_id": "jeedom2ha_2006",
       "origin": {
         "name": "jeedom2ha",
@@ -1402,7 +1402,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "outlet",
-      "name": "Switch reference 3000",
+      "name": null,
       "object_id": "jeedom2ha_3000",
       "origin": {
         "name": "jeedom2ha",
@@ -1443,7 +1443,7 @@
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Blocked product_scope climate 6001",
+      "name": null,
       "object_id": "jeedom2ha_6001",
       "origin": {
         "name": "jeedom2ha",
@@ -1482,7 +1482,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "temperature",
-      "name": "Sensor temperature salon 7000",
+      "name": null,
       "object_id": "jeedom2ha_7000",
       "origin": {
         "name": "jeedom2ha",
@@ -1521,7 +1521,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "humidity",
-      "name": "Sensor humidite sdb 7001",
+      "name": null,
       "object_id": "jeedom2ha_7001",
       "origin": {
         "name": "jeedom2ha",
@@ -1560,7 +1560,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "power",
-      "name": "Compteur puissance elec 7002",
+      "name": null,
       "object_id": "jeedom2ha_7002",
       "origin": {
         "name": "jeedom2ha",
@@ -1600,7 +1600,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "carbon_dioxide",
-      "name": "Sensor qualite air 7003",
+      "name": null,
       "object_id": "jeedom2ha_7003",
       "origin": {
         "name": "jeedom2ha",
@@ -1639,7 +1639,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "illuminance",
-      "name": "Sensor luminosite 7004",
+      "name": null,
       "object_id": "jeedom2ha_7004",
       "origin": {
         "name": "jeedom2ha",
@@ -1678,7 +1678,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "occupancy",
-      "name": "Detecteur presence salon 8000",
+      "name": null,
       "object_id": "jeedom2ha_8000",
       "origin": {
         "name": "jeedom2ha",
@@ -1716,7 +1716,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "door",
-      "name": "Capteur ouverture porte entree 8001",
+      "name": null,
       "object_id": "jeedom2ha_8001",
       "origin": {
         "name": "jeedom2ha",
@@ -1754,7 +1754,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "smoke",
-      "name": "Detecteur fumee cuisine 8002",
+      "name": null,
       "object_id": "jeedom2ha_8002",
       "origin": {
         "name": "jeedom2ha",
@@ -1792,7 +1792,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "moisture",
-      "name": "Capteur inondation cave 8003",
+      "name": null,
       "object_id": "jeedom2ha_8003",
       "origin": {
         "name": "jeedom2ha",
@@ -1830,7 +1830,7 @@
         "via_device": "jeedom2ha_bridge"
       },
       "device_class": "lock",
-      "name": "Serrure connectee 8004",
+      "name": null,
       "object_id": "jeedom2ha_8004",
       "origin": {
         "name": "jeedom2ha",
@@ -1868,7 +1868,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Scenario alarme securite 9000",
+      "name": null,
       "object_id": "jeedom2ha_9000",
       "origin": {
         "name": "jeedom2ha",
@@ -1905,7 +1905,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Lecteur salon 9001",
+      "name": null,
       "object_id": "jeedom2ha_9001",
       "origin": {
         "name": "jeedom2ha",
@@ -1942,7 +1942,7 @@
         "suggested_area": "Garage",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Sirene garage 9002",
+      "name": null,
       "object_id": "jeedom2ha_9002",
       "origin": {
         "name": "jeedom2ha",
@@ -1979,7 +1979,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "iPhone Alex 9700",
+      "name": null,
       "object_id": "jeedom2ha_9700",
       "origin": {
         "name": "jeedom2ha",
@@ -2024,7 +2024,7 @@
         "heat",
         "off"
       ],
-      "name": "Thermostat RDC",
+      "name": null,
       "object_id": "jeedom2ha_11000",
       "origin": {
         "name": "jeedom2ha",
@@ -2066,7 +2066,7 @@
         "heat",
         "off"
       ],
-      "name": "Thermostat Galerie",
+      "name": null,
       "object_id": "jeedom2ha_11001",
       "origin": {
         "name": "jeedom2ha",
@@ -2109,7 +2109,7 @@
         "heat",
         "off"
       ],
-      "name": "Thermostat chambre Arthur",
+      "name": null,
       "object_id": "jeedom2ha_11002",
       "origin": {
         "name": "jeedom2ha",
@@ -2140,7 +2140,7 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
-      "name": "Alarme maison 12000",
+      "name": null,
       "object_id": "jeedom2ha_12000",
       "origin": {
         "name": "jeedom2ha",
