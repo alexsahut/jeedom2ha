@@ -159,6 +159,16 @@ Prérequis : VM 122, Mosquitto local et HA de test fournis par 23.1 (équipement
 - **Q6 — outil de parité.** Étendre `parity-snapshot.sh` / `diff_snapshots()` aux topics `state`, `brightness`, `position` (changement d'outil, donc de code, à porter par l'implémentation) ou relevé MQTT séparé pour la preuve 23.1 ?
 - **Q7 — purge des retained.** Confirmer l'effacement des retained d'état réel quand l'entité perd sa lecture (§3), et à quel moment (republication, rescan).
 
+## Décisions ClaudeBox, 12/10 15:40
+
+- **Q1 — retenu (b).** Une lumière sans état conserve `state_topic` et reçoit `optimistic: true` explicite. Un volet sans état reçoit aussi `optimistic: true` en discovery; la politique démon `stateless` est conservée.
+- **Q2 — retenu.** Aucune inversion 0/100 : cette limite reste documentée.
+- **Q3 — retenu.** Une position intermédiaire de volet publie l'état `open`.
+- **Q4 — retenu.** Une luminosité sans `LIGHT_STATE` reste optimiste; aucune valeur ON/OFF n'est inventée.
+- **Q5 — retenu.** `handle_state_message` publie plusieurs topics pour un même `(eq_id, cmd_id)` lorsque le contrat le requiert.
+- **Q6 — retenu.** L'implémentation étend l'outil de parité : souscription lecture seule à `jeedom2ha/#`, filtrée sur `state|brightness|position`, et comparaison de `state_topics` dans le diff.
+- **Q7 — retenu.** Les retained invalides sont purgés à la republication et au rescan, avec garde-fou strict sur le préfixe `jeedom2ha/…` uniquement.
+
 ## 8. Hors périmètre (rappel)
 
 `climate`, `alarm_control_panel`, `button`, couleur RGB (`LIGHT_COLOR`), état `opening`/`closing`, inversion de position, A1/A2/A3, 22.2 et tout changement de `core/` PHP. Cadrage documentaire uniquement : aucune implémentation dans cette PR.
