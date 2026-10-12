@@ -478,7 +478,7 @@ Pour le déplacer :
 **Le nom de l'appareil est le nom de l'équipement Jeedom**, accents compris, identique pour toutes les entités de cet équipement. Le nom d'une entité suit une règle simple :
 
 - **équipement à une seule entité** : l'entité porte le nom de l'équipement (Home Assistant l'affiche comme l'appareil) ;
-- **équipement à plusieurs entités** (par exemple une prise avec des mesures de puissance et d'énergie) : chaque entité porte le nom de sa **commande**, Home Assistant l'affiche à la suite du nom de l'appareil.
+- **équipement à plusieurs entités** (par exemple une prise avec des mesures de puissance et d'énergie) : l'**entité principale** (lumière, interrupteur, volet…) porte le **nom de l'équipement**, et Home Assistant l'affiche sous le nom de l'appareil ; les **autres entités** portent le nom de leur **commande**, que Home Assistant affiche à la suite du nom de l'appareil.
 
 Un bouton de scénario porte le nom du scénario.
 
