@@ -350,7 +350,8 @@ function triggerTopologyRescan($button, snapshot, owner) {
   $('[data-ha-action]').not('[data-ha-pending="1"]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
-    data: {action: 'scanTopology'}, dataType: 'json', timeout: 20000,
+    data: {action: 'scanTopology'}, dataType: 'json',
+    timeout: (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
     success: function(data) {
       var result = data && data.result;
       if (data.state !== 'ok') {
@@ -510,7 +511,7 @@ $(function() {
         pseudonymize: $('#cb_pseudonymize').is(':checked') ? '1' : '0'
       },
       dataType: 'json',
-      timeout:  30000,
+      timeout:  (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
       success: function (data) {
         $btn.prop('disabled', false);
         if (data.state !== 'ok') {
