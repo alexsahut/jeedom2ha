@@ -101,6 +101,7 @@ Choix de conception à confirmer :
 - **AC8.** Le document est déterministe : deux exports du même état sont identiques à `generated_at` près.
 - **AC9.** Le fichier d'export est absent du paquet Market (test de composition du paquet complété) et du dépôt ; `PRODUCT_SCOPE`, contrat 4D, golden et comportement de publication **inchangés**.
 - **AC10.** Le schéma est documenté (`docs/`, développeur) avec sa politique de version.
+- **AC11 bis (R1 ClaudeBox, #261).** `homekit_exposed` n'est visible nulle part avant cet export : le premier export de 24.2 est comparé, pour quelques identifiants, au **cache de Homebridge** (123 accessoires, 5 scénarios) ; cet écart est un critère de la baseline « avant ».
 - **AC11.** Gate 20-0 vert (bouton) ; preuve terrain par ClaudeBox : baseline « avant » capturée sans SSH, comptes cohérents avec le sync (`total_eq`, éligibles, publiés), 0 erreur, inventaire MQTT et registres de HA inchangés.
 - **AC12.** Aucun nom réel dans le code de test, les fixtures, la story, la PR (CC-48).
 

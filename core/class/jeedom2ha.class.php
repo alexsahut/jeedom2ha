@@ -18,6 +18,7 @@
 /* * ***************************Includes********************************* */
 require_once __DIR__  . '/../../../../core/php/core.inc.php';
 require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
+require_once __DIR__  . '/../php/jeedom2ha_homekit_exposure.php';
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -667,10 +668,19 @@ class jeedom2ha extends eqLogic {
     $payload['complete'] = true;
     foreach ($_scenarios as $sc) {
       try {
+        // Story 24.1 AC6 — signal d'exposition HomeKit du scénario (lecture seule).
+        $homekit = jeedom2ha_homekit_scenario_exposure(function () use ($sc) {
+          if (!method_exists($sc, 'getConfiguration')) {
+            throw new RuntimeException('configuration illisible');
+          }
+          return $sc->getConfiguration();
+        });
         $payload['scenarios'][] = array(
           'id'        => intval($sc->getId()),
           'name'      => $sc->getName(),
           'is_active' => (bool)$sc->getIsActive(),
+          'homekit_exposed'        => $homekit['exposed'],
+          'homekit_exposed_source' => $homekit['source'],
         );
       } catch (Throwable $e) {
         // Scénario non lisible — ignoré, mais la liste n'est plus complète
@@ -681,6 +691,52 @@ class jeedom2ha extends eqLogic {
   }
 
   /**
+   * Story 24.1 — contexte de lecture (LECTURE SEULE) de la règle d'exposition HomeKit.
+   * N'appelle jamais le plugin Homebridge : lit l'installation/activation du plugin, sa clé
+   * `sendToHomebridgeDefault` (config::byKey) et la liste des plugins actifs.
+   *
+   * @param array $_roomRaw [id de pièce => valeur brute de configuration.sendToHomebridge]
+   */
+  public static function buildHomekitExposureContext(array $_roomRaw): array {
+    $ctx = array(
+      'homebridge'          => 'unreadable',
+      'default'             => null,
+      'active_plugins'      => null,
+      'rooms'               => $_roomRaw,
+    );
+    if (!class_exists('plugin')) {
+      return $ctx;
+    }
+    $homebridge = null;
+    try {
+      $homebridge = plugin::byId('homebridge');
+    } catch (Throwable $e) {
+      $ctx['homebridge'] = 'absent'; // plugin::byId lève une exception si le plugin n'est pas installé
+    }
+    if (is_object($homebridge)) {
+      try {
+        $ctx['homebridge'] = (intval($homebridge->isActive()) === 1) ? 'present' : 'absent';
+      } catch (Throwable $e) {
+        $ctx['homebridge'] = 'unreadable'; // plugin installé mais état illisible : jamais « absent »
+      }
+    }
+    if ($ctx['homebridge'] !== 'present') {
+      return $ctx;
+    }
+    try {
+      $ctx['default'] = config::byKey('sendToHomebridgeDefault', 'homebridge', 1, true);
+    } catch (Throwable $e) {
+      $ctx['default'] = JEEDOM2HA_HOMEKIT_UNREADABLE; // illisible : jamais false par défaut
+    }
+    try {
+      $ctx['active_plugins'] = jeedom2ha_homekit_normalize_active_plugins(plugin::listPlugin(true, false, true, true));
+    } catch (Throwable $e) {
+      $ctx['active_plugins'] = null;
+    }
+    return $ctx;
+  }
+
+  /**
    * Extrait la topologie complète de Jeedom pour synchronisation daemon.
    * Strictement Read-Only : utilise le cache pour les valeurs, jamais execCmd.
    */
@@ -688,7 +744,13 @@ class jeedom2ha extends eqLogic {
     $result = array('objects' => array(), 'eq_logics' => array());
 
     // 1. Objects Jeedom (contexte spatial / suggested_area)
+    $homekitRoomRaw = array(); // Story 24.1 — configuration.sendToHomebridge brute par pièce (lecture seule)
     foreach (jeeObject::all() as $obj) {
+      try {
+        $homekitRoomRaw[intval($obj->getId())] = $obj->getConfiguration('sendToHomebridge', 0);
+      } catch (Throwable $e) {
+        $homekitRoomRaw[intval($obj->getId())] = JEEDOM2HA_HOMEKIT_UNREADABLE;
+      }
       $result['objects'][] = array(
         'id'        => intval($obj->getId()),
         'name'      => $obj->getName(),
@@ -734,6 +796,9 @@ class jeedom2ha extends eqLogic {
       );
     }
 
+    // Story 24.1 — contexte de la règle d'exposition HomeKit (lu une fois, lecture seule)
+    $homekitContext = self::buildHomekitExposureContext($homekitRoomRaw);
+
     // 2. EqLogics (équipements)
     foreach (eqLogic::all() as $eq) {
       // Exclure les équipements de ce plugin
@@ -766,6 +831,7 @@ class jeedom2ha extends eqLogic {
           'unit'          => $cmd->getUnite() ?: null,
           'is_visible'    => (bool)$cmd->getIsVisible(),
           'is_historized' => (bool)$cmd->getIsHistorized(),
+          'logical_id'    => jeedom2ha_normalize_logical_id(method_exists($cmd, 'getLogicalId') ? $cmd->getLogicalId() : null),
         );
       }
 
@@ -783,6 +849,24 @@ class jeedom2ha extends eqLogic {
         $exclusionSource = 'object'; // Priorité 3 — exclusion par pièce
       }
 
+      // Story 24.1 — signal d'exposition HomeKit (tri-état, lecture seule, sans effet sur les décisions)
+      // Tableau brut de configuration, comme Homebridge (isset sur la clé, pas de valeur par défaut).
+      try {
+        $homekitEqConf = method_exists($eq, 'getConfiguration') ? $eq->getConfiguration() : array();
+      } catch (Throwable $e) {
+        $homekitEqConf = JEEDOM2HA_HOMEKIT_UNREADABLE;
+      }
+      try {
+        $homekit = jeedom2ha_homekit_eq_exposure(
+          method_exists($eq, 'getEqType_name') ? strval($eq->getEqType_name()) : '',
+          method_exists($eq, 'getObject_id') ? $eq->getObject_id() : null,
+          $homekitEqConf,
+          $homekitContext
+        );
+      } catch (Throwable $e) {
+        $homekit = jeedom2ha_homekit_result(null, 'illisible');
+      }
+
       $eqData = array(
         'id'           => intval($eq->getId()),
         'name'         => $eq->getName(),
@@ -794,6 +878,9 @@ class jeedom2ha extends eqLogic {
         'is_excluded'  => $isExcluded,
         'status'       => $status,
         'cmds'         => $cmds,
+        'logical_id'   => jeedom2ha_normalize_logical_id(method_exists($eq, 'getLogicalId') ? $eq->getLogicalId() : null),
+        'homekit_exposed'        => $homekit['exposed'],
+        'homekit_exposed_source' => $homekit['source'],
       );
       // Ajouter exclusion_source uniquement si exclu (ne pas polluer le payload)
       if ($isExcluded) {
