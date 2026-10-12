@@ -51,10 +51,14 @@ MACHINE_FACTOR = 3.0  # box de terrain présumée <= 3x plus lente que la VM de 
 MARGE_MESURE = 1.5  # marge explicite au-dessus du maximum observé (bruit de mesure).
 LATENCE_MQTT_S = 0.005  # borne prudente d'un aller-retour loopback (paho ne fait que publier en file).
 MEASURE_ITERATIONS = 20
-# Capacité annoncée dans docs/fr_FR/index.md (« environ 250 équipements typiques ») : seuil
-# protégé par la CI, en retrait de `n_max` mesuré (~300) pour rester stable sur des runners
-# plus lents (revue Codex P1, PR #189, 5e tour).
-CAPACITE_DOCUMENTEE = 250
+# Capacité protégée par la CI (« environ 250 équipements typiques » dans la story 19.6), en
+# retrait de `n_max` mesuré pour rester stable sur des runners plus lents (revue Codex P1,
+# PR #189, 5e tour : ~17 % de marge, 250 pour ~300). Story 23.3 : le light principal étant
+# streamé, le parc typique coûte 6 appels MQTT par équipement au lieu de 5 (état ON/OFF
+# initial, incompressible) ; `n_max` mesuré tombe à ~245 en CI (241-251 selon la machine),
+# soit moins que 250. Seuil recalé à 200 (~18 % de marge, comme avant) ; le travail réel du
+# démon mesuré sur la box (~2,5 ms/équipement) reste très en dessous de ce modèle prudent.
+CAPACITE_DOCUMENTEE = 200
 
 
 def _cmd(cmd_id, name, cmd_type, sub_type, generic_type=None, unit=None, value=None):

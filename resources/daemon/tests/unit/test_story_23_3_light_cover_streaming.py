@@ -8,6 +8,7 @@ discovery, retained purge on republication, and the /action/state_update route.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -487,7 +488,9 @@ def _persisting_sync(decisions, bridge, data_dir):
                              data_dir=str(data_dir))
 
 
-def _registry(data_dir):
+def _registry(data_dir, sync=None):
+    if sync is not None:
+        sync.flush_retained_channels()
     path = data_dir / "jeedom2ha_retained_channels.json"
     return sorted(json.loads(path.read_text())) if path.exists() else None
 
@@ -507,7 +510,7 @@ async def test_transition_purges_what_was_published_and_forgets_it(tmp_path):
     sync = _persisting_sync([decision], bridge, tmp_path)
     await sync.publish_initial_states(decision)               # real: state + position
     assert [p[1] for p in bridge.published] == ["open", "50"]
-    assert _registry(tmp_path) == ["jeedom2ha/400/position", "jeedom2ha/400/state"]
+    assert _registry(tmp_path, sync) == ["jeedom2ha/400/position", "jeedom2ha/400/state"]
 
     del decision.mapping_result.commands["FLAP_STATE"]        # readback removed
     bridge.published.clear()
@@ -516,7 +519,7 @@ async def test_transition_purges_what_was_published_and_forgets_it(tmp_path):
         ("jeedom2ha/400/position", "", 1, True),
         ("jeedom2ha/400/state", "", 1, True),
     ]
-    assert _registry(tmp_path) == []
+    assert _registry(tmp_path, sync) == []
     bridge.published.clear()
     await sync.publish_initial_states(decision)               # emptied once only
     assert bridge.published == []
@@ -525,7 +528,9 @@ async def test_transition_purges_what_was_published_and_forgets_it(tmp_path):
 @pytest.mark.asyncio
 async def test_purge_survives_a_daemon_restart(tmp_path):
     decision = _light(300)
-    await _persisting_sync([decision], _FakeBridge(), tmp_path).publish_initial_states(decision)
+    first = _persisting_sync([decision], _FakeBridge(), tmp_path)
+    await first.publish_initial_states(decision)
+    first.flush_retained_channels()                          # what on_stop does
 
     # new process: the readback is gone, the registry file is all it knows
     gone = _light(300, state=False, brightness=False)
@@ -543,7 +548,7 @@ async def test_state_event_registers_the_topic_but_never_purges(tmp_path):
     decision = _light(300)
     sync = _persisting_sync([decision], bridge, tmp_path)
     await sync.handle_state_message(300, 3003, "1")
-    assert _registry(tmp_path) == ["jeedom2ha/300/state"]
+    assert _registry(tmp_path, sync) == ["jeedom2ha/300/state"]
     assert bridge.published == [("jeedom2ha/300/state", "ON", 1, True)]
 
 
@@ -598,12 +603,30 @@ async def test_failed_purge_is_retried_and_counted(tmp_path):
     bridge._publish_ok = False
     published, failed = await sync.publish_click_states(decision, {}, 0.0)
     assert (published, failed) == (0, 1)
-    assert _registry(tmp_path) == ["jeedom2ha/300/state"]     # still known: retried later
+    assert _registry(tmp_path, sync) == ["jeedom2ha/300/state"]     # still known: retried later
 
     bridge._publish_ok = True
     bridge.published.clear()
     await sync.publish_initial_states(decision)
     assert bridge.published == [("jeedom2ha/300/state", "", 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_registry_writes_are_coalesced(tmp_path, monkeypatch):
+    writes = []
+    real_replace = os.replace
+    monkeypatch.setattr(os, "replace", lambda a, b: (writes.append(b), real_replace(a, b))[1])
+    bridge = _FakeBridge()
+    decisions = [_light(300 + i) for i in range(20)]            # 40 distinct retained topics
+    sync = _persisting_sync(decisions, bridge, tmp_path)
+    for decision in decisions:
+        await sync.publish_initial_states(decision)
+    assert writes == []                                        # nothing written inside the window
+    sync.flush_retained_channels()
+    assert len(writes) == 1
+    assert len(_registry(tmp_path)) == 40
+    sync.flush_retained_channels()
+    assert len(writes) == 1                                    # clean registry: no rewrite
 
 
 def test_no_broker_read_is_ever_needed():

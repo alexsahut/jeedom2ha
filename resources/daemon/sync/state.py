@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import time
+import asyncio
 import json
 import math
 import os
@@ -77,6 +78,9 @@ _READBACK_KEYS = {
 _CHANNEL_TOPIC_RE = re.compile(r"jeedom2ha/\d+/(?:state|brightness|position)")
 
 _RETAINED_CHANNELS_FILENAME = "jeedom2ha_retained_channels.json"
+# Registry writes are coalesced: one disk write per window, not one per new topic
+# (a first sync of N equipments would otherwise rewrite a growing file ~2N times).
+_REGISTRY_SAVE_DELAY_S = 2.0
 
 # Retained channel topics a type may have published; purged when the channel loses its
 # readback (Story 23.3, Q7).
@@ -130,6 +134,8 @@ class StateSynchronizer:
             os.path.join(data_dir, _RETAINED_CHANNELS_FILENAME) if data_dir else None
         )
         self._retained_channel_topics: Set[str] = self._load_retained_channels()
+        self._registry_dirty = False
+        self._registry_timer: Optional[asyncio.TimerHandle] = None
 
     @property
     def is_active(self) -> bool:
@@ -402,9 +408,28 @@ class StateSynchronizer:
         return {t for t in raw if isinstance(t, str) and _CHANNEL_TOPIC_RE.fullmatch(t)}
 
     def _save_retained_channels(self) -> None:
-        path = self._retained_channels_path
-        if not path:
+        """Mark the registry dirty and write it once per window (immediately without a loop)."""
+        if not self._retained_channels_path:
             return
+        self._registry_dirty = True
+        if self._registry_timer is not None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.flush_retained_channels()
+            return
+        self._registry_timer = loop.call_later(_REGISTRY_SAVE_DELAY_S, self.flush_retained_channels)
+
+    def flush_retained_channels(self) -> None:
+        """Write the registry now if it changed (also called at daemon shutdown)."""
+        if self._registry_timer is not None:
+            self._registry_timer.cancel()
+            self._registry_timer = None
+        path = self._retained_channels_path
+        if not path or not self._registry_dirty:
+            return
+        self._registry_dirty = False
         tmp_path = f"{path}.tmp"
         try:
             with open(tmp_path, "w", encoding="utf-8") as handle:

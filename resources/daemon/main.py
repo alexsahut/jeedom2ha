@@ -281,6 +281,9 @@ class Jeedom2haDaemon(BaseDaemon):
             if command_sync is not None:
                 await command_sync.stop()
                 self._command_synchronizer = None
+            state_sync = self._app.get("state_synchronizer")
+            if state_sync is not None:
+                state_sync.flush_retained_channels()
             mqtt_bridge = self._app.get("mqtt_bridge")
             if mqtt_bridge is not None:
                 mqtt_bridge.set_command_handler(None)
