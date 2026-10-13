@@ -1,8 +1,8 @@
 # Story 23.3 : Remontée d'état des lumières et volets
 
-Status: review
+Status: done
 
-> Implémentée (PR #265) sur la base du cadrage ci-dessous et des décisions ClaudeBox Q1-Q7. Seule la preuve terrain sur l'environnement 23.1 (humain) reste à faire.
+> Implémentée (PR #265) sur la base du cadrage ci-dessous et des décisions ClaudeBox Q1-Q7 ; preuve terrain 23.1 validée le 2026-10-13.
 
 ## Story
 
@@ -23,7 +23,7 @@ En tant qu'utilisateur HA, je veux voir l'état réel des lumières et la positi
 - [x] Revalider `_STREAMED_TYPES`, publishers et types génériques actuels.
 - [x] Définir contrat état/brightness/position et dégradations.
 - [x] Implémenter listener, routage, publication et tests/parité.
-- [ ] **Preuve terrain sur 23.1** (inventaire MQTT/HA avant/après avec `parity-snapshot.sh`) : à réaliser par l'humain, jamais depuis une session cloud.
+- [x] **Preuve terrain sur 23.1** : relevé MQTT séparé réalisé par l'humain (pas par `parity-snapshot.sh`), sans session cloud ; artefact CC-48 ci-dessous.
 - [x] Mettre à jour Limites; ne pas ouvrir climate/alarm.
 
 ---
@@ -188,3 +188,11 @@ Implémentation sans accès VM/Jeedom/HA ni modification de `core/`, `models/top
 - Golden `story_19_4_guard/*_mqtt.json` (s1, s2, s3, s5) : diff relu par rapport à `main` ; ajout du champ `optimistic` sur toutes les discovery light/cover, et retrait de `brightness_state_topic` pour les lumières sans commande de luminosité lisible (457 : état binaire + curseur ; 1003 : curseur seul). 1009 (curseur + état numérique), 1004 (état numérique) et 1005 (`LIGHT_BRIGHTNESS`) gardent leur topic.
 - Charge 19.6 : le light principal étant streamé, le parc typique passe à 6 appels MQTT par équipement (11 pour le retypage) ; `n_max` mesuré ~245 (241-251) < 250, seuil de test `CAPACITE_DOCUMENTEE` recalé à 200 (même marge relative qu'avant). Le registre des retained s'écrit en différé groupé (2 s) et à l'arrêt du démon.
 - Docs : section « Limites : état réel des lumières et des volets » (`docs/fr_FR/index.md`) + ligne README.
+
+## Dev Agent Record — preuve terrain (2026-10-13)
+
+- **Discovery HA :** `homeassistant/light/jeedom2ha_1/config` et `homeassistant/light/jeedom2ha_2/config` annoncent `optimistic: false` et `state_topic` `jeedom2ha/{1,2}/state`. La seconde annonce aussi `brightness_state_topic` `jeedom2ha/2/brightness`, avec `brightness_scale` 100.
+- **Actions HA (ClaudeBox, Chrome, 09:00) :** lumière 1 allumée, lumière 2 réglée à 60 %, volet 3 positionné à 75 %.
+- **Retained MQTT (relevé clawbox) :** `jeedom2ha/1/state` = `ON`, `jeedom2ha/2/state` = `ON`, `jeedom2ha/2/brightness` = `60`, `jeedom2ha/3/state` = `open`, `jeedom2ha/3/position` = `75`.
+- **Retour Jeedom :** info Etat = 1 (équipement 1) ; Etat = 1 et Luminosite = 60 (équipement 2) ; Position = 75 (équipement 3).
+- **Verdict :** AC4 satisfait ; les états constatés proviennent des remontées réelles et ne sont pas optimistes. La preuve terrain a utilisé un relevé MQTT séparé (option Q6), pas `parity-snapshot.sh`.
