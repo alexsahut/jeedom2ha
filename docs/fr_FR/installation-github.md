@@ -78,7 +78,15 @@ sudo cp -a /var/www/html/plugins/jeedom2ha /var/www/html/plugins/jeedom2ha.sauve
 
 Placez cette copie **en dehors** de `/var/www/html/plugins/` (par exemple dans votre dossier personnel) pour que Jeedom ne la prenne pas pour un plugin.
 
-**Mise à niveau** : retéléchargez l'archive et refaites l'extraction par-dessus l'installation existante, avec les mêmes étapes que l'installation initiale (extraction, renommage, `chown`). Relancez les dépendances si Jeedom le demande, puis redémarrez le démon.
+**Mise à niveau** : retéléchargez l'archive, extrayez-la, puis copiez son contenu **par-dessus** le dossier existant. N'utilisez pas `mv` vers un dossier qui existe déjà : le nouveau dossier se retrouverait imbriqué dans l'ancien et Jeedom continuerait d'exécuter l'ancienne version.
+
+```bash
+unzip main.zip
+sudo cp -a jeedom2ha-main/. /var/www/html/plugins/jeedom2ha/
+sudo chown -R www-data:www-data /var/www/html/plugins/jeedom2ha
+```
+
+Relancez ensuite les dépendances si Jeedom le demande, puis redémarrez le démon. Les fichiers de l'ancienne version qui n'existent plus dans la nouvelle ne sont pas supprimés par cette copie ; en cas de doute, repartez d'une installation propre (retour arrière ci-dessous, puis installation initiale).
 
 **Retour arrière** : restaurez l'archive ou le dossier précédemment conservé à la place du dossier `plugins/jeedom2ha`, rétablissez les droits (`chown -R www-data:www-data`) puis redémarrez le démon.
 
