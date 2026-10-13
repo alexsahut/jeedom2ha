@@ -40,6 +40,7 @@ En tant que mainteneur, je veux une démo synthétique, rejouable et isolée, af
 - **Jeu de démo :** `populate_demo.py`, après les correctifs #268 et #269, a produit 69 `would_create` au dry-run puis `created: 69` au peuplement réel (5 pièces, 16 équipements, 45 commandes, 3 scénarios).
 - **Validation applicative :** plugin activé, Mosquitto local sur loopback, bridge en ligne ; HA onboardé par Alex et intégration MQTT réalisée par ClaudeBox. 17 découvertes LAN ont été ignorées ; HA a exposé 19 entités MQTT (17 appareils et le broker).
 - **Clôture environnement :** snapshot `demo` pris à 08:47 ; VM laissée allumée.
+- **Idempotence (fil P2 #270) :** cause = champ Jeedom `unite` ignoré sous la clé `unit` (correctif #271) ; après #271, 1er passage `exists: 58, updated: 11` (pose des unités manquantes), 2e passage `exists: 69`, aucune création.
 
 ### Notes de suivi (hors correction dans cette story)
 
