@@ -41,6 +41,8 @@ sudo chown -R www-data:www-data /var/www/html/plugins/jeedom2ha
 
 Le nom du dossier compte : Jeedom ne reconnaît le plugin que s'il se trouve dans `plugins/jeedom2ha`.
 
+L'archive contient aussi des dossiers de développement (`tests/`, `scripts/`, `_bmad-output/`, `docs/`) qui n'ont aucun effet sur Jeedom : vous pouvez les laisser en place. Un paquet épuré de ces dossiers sera fourni par les releases.
+
 ### 3. Activer le plugin
 
 Dans Jeedom : **Plugins → Gestion des plugins → jeedom2ha → Activer**.
@@ -70,13 +72,11 @@ L'installation est réussie lorsque la page du plugin dans Jeedom **liste les é
 
 > Cette procédure est décrite ici ; elle n'a pas fait l'objet d'un test sur une installation réelle à la date de rédaction.
 
-**Avant toute mise à niveau, conservez une copie de l'ancien dossier**, par exemple :
+**Avant toute mise à niveau, conservez une copie de l'ancien dossier en dehors de `/var/www/html/plugins/`** (par exemple dans votre dossier personnel), pour que Jeedom ne la prenne pas pour un plugin :
 
 ```bash
-sudo cp -a /var/www/html/plugins/jeedom2ha /var/www/html/plugins/jeedom2ha.sauvegarde
+sudo cp -a /var/www/html/plugins/jeedom2ha ~/jeedom2ha.sauvegarde
 ```
-
-Placez cette copie **en dehors** de `/var/www/html/plugins/` (par exemple dans votre dossier personnel) pour que Jeedom ne la prenne pas pour un plugin.
 
 **Mise à niveau** : retéléchargez l'archive, extrayez-la, puis copiez son contenu **par-dessus** le dossier existant. N'utilisez pas `mv` vers un dossier qui existe déjà : le nouveau dossier se retrouverait imbriqué dans l'ancien et Jeedom continuerait d'exécuter l'ancienne version.
 
