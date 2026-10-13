@@ -200,26 +200,40 @@ class JeedomAdapter:
         self.rpc = rpc
         self.c = contract
 
+    @staticmethod
+    def _list_result(result: Any) -> List[Dict[str, Any]]:
+        """Normalise le ``\"ok\"`` de jsonrpc::makeSuccess() pour les lectures."""
+        return result if isinstance(result, list) else []
+
+    @staticmethod
+    def _saved_result(result: Any, method: str) -> Dict[str, Any]:
+        """Les sauvegardes doivent renvoyer l'objet créé/mis à jour, jamais ``\"ok\"``."""
+        if not isinstance(result, dict):
+            raise DemoError("réponse inattendue pour %s" % method)
+        return result
+
     def rooms(self) -> List[Dict[str, Any]]:
-        return self.rpc.call(self.c.ROOM_ALL) or []
+        return self._list_result(self.rpc.call(self.c.ROOM_ALL))
 
     def save_room(self, name: str) -> Dict[str, Any]:
-        return self.rpc.call(self.c.ROOM_SAVE, name=name, isVisible=1)
+        return self._saved_result(self.rpc.call(self.c.ROOM_SAVE, name=name, isVisible=1),
+                                  self.c.ROOM_SAVE)
 
     def eqlogics(self) -> List[Dict[str, Any]]:
-        return self.rpc.call(self.c.EQ_ALL) or []
+        return self._list_result(self.rpc.call(self.c.EQ_ALL))
 
     def save_eqlogic(self, eq: Dict[str, Any]) -> Dict[str, Any]:
-        return self.rpc.call(self.c.EQ_SAVE, **eq)
+        return self._saved_result(self.rpc.call(self.c.EQ_SAVE, **eq), self.c.EQ_SAVE)
 
     def cmds(self, eq_id: Any) -> List[Dict[str, Any]]:
-        return self.rpc.call(self.c.CMD_BY_EQ, eqLogic_id=eq_id) or []
+        return self._list_result(self.rpc.call(self.c.CMD_BY_EQ, eqLogic_id=eq_id))
 
     def scenarios(self) -> List[Dict[str, Any]]:
-        return self.rpc.call(self.c.SCENARIO_ALL) or []
+        return self._list_result(self.rpc.call(self.c.SCENARIO_ALL))
 
     def save_scenario(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
-        return self.rpc.call(self.c.SCENARIO_SAVE, **scenario)
+        return self._saved_result(self.rpc.call(self.c.SCENARIO_SAVE, **scenario),
+                                  self.c.SCENARIO_SAVE)
 
 
 # ---------------------------------------------------------------------------
