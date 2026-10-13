@@ -53,8 +53,8 @@ class DemoError(Exception):
 ROOMS = ["Salon", "Cuisine", "Chambre", "Bureau", "Garage"]
 
 
-def _info(name, generic, sub="binary", unit="", history=False):
-    return {"name": name, "type": "info", "subType": sub, "generic_type": generic, "unit": unit,
+def _info(name, generic, sub="binary", unite="", history=False):
+    return {"name": name, "type": "info", "subType": sub, "generic_type": generic, "unite": unite,
             "isHistorized": 1 if history else 0}
 
 
@@ -63,7 +63,7 @@ def _act(name, generic, sub="other", info=None, value=None):
 
     Lien info + valeur : NON DÉMONTRÉ (cf. docs/dev-demo-env.md, « Contrat API »).
     """
-    cmd = {"name": name, "type": "action", "subType": sub, "generic_type": generic, "unit": "",
+    cmd = {"name": name, "type": "action", "subType": sub, "generic_type": generic, "unite": "",
            "isHistorized": 0}
     if info:
         cmd["configuration"] = {"infoName": info}
@@ -257,7 +257,7 @@ def _eq_excluded(eq: Dict[str, Any]) -> bool:
 
 
 def _cmd_drift(existing: Dict[str, Any], wanted: Dict[str, Any]) -> bool:
-    for field in ("type", "subType", "unit"):
+    for field in ("type", "subType", "unite"):
         if str(existing.get(field) or "") != str(wanted.get(field) or ""):
             return True
     return str(existing.get("generic_type") or "") != str(wanted.get("generic_type") or "")

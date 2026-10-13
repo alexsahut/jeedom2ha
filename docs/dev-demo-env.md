@@ -81,6 +81,7 @@ Tout est isolé dans `JsonRpcContract` / `JeedomAdapter` (`populate_demo.py`).
 | Réponse vide | Chaîne `ok` produite par `jsonrpc.class.php` `makeSuccess()` ; normalisée en liste vide par l'adaptateur pour les lectures. |
 | Création Virtuel et commandes | `eqLogic::save` avec `eqType_name=virtual` et la liste `cmd` complète. Les commandes existantes sont relues par nom et renvoyées avec leur `id`, sinon Jeedom les retire ; `Rafraichir` est conservée par `dontRemoveCmd`. **Vérifié dans les sources**, à prouver sur VM 122. |
 | Noms de champs (`eqType_name`, `object_id`, `eqLogic_id`, `generic_type`, `configuration.jeedom2ha_excluded`) | **Vérifiés dans les sources** — à prouver sur VM 122. |
+| Champ Jeedom `unite` (pas `unit`) | `cmd.class.php` déclare `protected $unite` (`getUnite()`/`setUnite()`) ; l'ancienne clé `unit` était silencieusement ignorée par `utils::a2o`, cause du fil P2 de la PR #270 (2e passage non idempotent). Sans lien avec `models/topology.py` : la traduction côté plugin (`jeedom2ha.class.php`) expose déjà `unite` sous la clé `unit` pour le snapshot démon, qui reste correct. |
 | Création d'un scénario vierge (sans éléments) via `scenario::save` | **Vérifiée dans les sources**, à prouver sur VM 122. |
 | Action Virtuel liée à son info | `configuration.infoName` est le nom d'une info du même équipement ; `configuration.value` est l'expression/valeur à lui appliquer ; `virtualCmd::preSave()` renseigne `infoId`. **Vérifié dans les sources**, à prouver sur VM 122. |
 
