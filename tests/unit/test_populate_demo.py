@@ -102,8 +102,12 @@ def server():
                 body = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32001, "message": "denied"}}
             else:
                 try:
+                    result = state.dispatch(req["method"], req["params"])
+                    # jsonrpc::makeSuccess() converts every empty PHP result to "ok".
+                    if not result:
+                        result = "ok"
                     body = {"jsonrpc": "2.0", "id": req["id"],
-                            "result": state.dispatch(req["method"], req["params"])}
+                            "result": result}
                 except KeyError:
                     body = {"jsonrpc": "2.0", "id": req["id"],
                             "error": {"code": -32601, "message": "Method not found"}}
@@ -144,6 +148,14 @@ def test_populate_creates_everything(server):
     assert len(server.cmds) == inv["summary"]["cmds"] + len(server.eqs)  # Rafraichir
     assert all(e["eqType_name"] == "virtual" and e["object_id"] for e in server.eqs)
     assert sum(1 for e in server.eqs if e["configuration"]["jeedom2ha_excluded"] == 1) == 1
+    assert inv["summary"]["by_status"] == {"created": 69}
+
+
+def test_empty_jeedom_lists_are_ok_and_fresh_box_creates_everything(server):
+    """Jeedom 4.6 jsonrpc::makeSuccess() renvoie la chaîne ``ok`` pour []."""
+    assert server.dispatch(pd.JsonRpcContract.ROOM_ALL, {}) == []
+    assert pd.JeedomAdapter._list_result("ok") == []
+    inv = pd.populate(adapter_for(server), dry_run=False)
     assert inv["summary"]["by_status"] == {"created": 69}
 
 

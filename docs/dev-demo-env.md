@@ -78,6 +78,7 @@ Tout est isolé dans `JsonRpcContract` / `JeedomAdapter` (`populate_demo.py`).
 | Transport `POST core/api/jeeApi.php`, JSON-RPC 2.0, `params.apikey` | Prouvé par le projet (`event::changes`, `cmd::execCmd`) |
 | Clé requise : clé **core** (la clé plugin est refusée pour `cmd::execCmd`) | Prouvé sur la box testée ; supposé identique pour les écritures |
 | Méthodes de lecture/écriture `jeeObject::all/save`, `eqLogic::all/save`, `cmd::byEqLogicId`, `scenario::all/save` | **Vérifiées dans les sources** `jeeApi.php`/`virtual.class.php` `master`, 12/10 — à prouver sur VM 122 (Jeedom 4.6.1) |
+| Réponse vide | Chaîne `ok` produite par `jsonrpc.class.php` `makeSuccess()` ; normalisée en liste vide par l'adaptateur pour les lectures. |
 | Création Virtuel et commandes | `eqLogic::save` avec `eqType_name=virtual` et la liste `cmd` complète. Les commandes existantes sont relues par nom et renvoyées avec leur `id`, sinon Jeedom les retire ; `Rafraichir` est conservée par `dontRemoveCmd`. **Vérifié dans les sources**, à prouver sur VM 122. |
 | Noms de champs (`eqType_name`, `object_id`, `eqLogic_id`, `generic_type`, `configuration.jeedom2ha_excluded`) | **Vérifiés dans les sources** — à prouver sur VM 122. |
 | Création d'un scénario vierge (sans éléments) via `scenario::save` | **Vérifiée dans les sources**, à prouver sur VM 122. |
@@ -87,3 +88,7 @@ Les tests unitaires utilisent un faux serveur qui implémente **ce contrat prés
 prouvent l'idempotence et le dry-run, pas la compatibilité avec Jeedom. Sur écart constaté à la
 première exécution (après GO), corriger uniquement l'adaptateur ; si `scenario::save` est absent,
 créer les 3 scénarios (vides) via l'UI avant relance — le script les reconnaît par nom.
+
+> **Erratum v1.7** — lors d'une exécution sur VM, conserver la profondeur
+> `<racine>/scripts/demo/` ; la racine calculée par le script ne doit pas contenir le fichier
+> `.env` hors dépôt.
