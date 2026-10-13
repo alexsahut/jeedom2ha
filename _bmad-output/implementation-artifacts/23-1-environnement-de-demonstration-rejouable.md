@@ -43,6 +43,6 @@ En tant que mainteneur, je veux une démo synthétique, rejouable et isolée, af
 
 ### Notes de suivi (hors correction dans cette story)
 
-- Un équipement à deux capteurs (Climat) ne produit qu'une entité : règle mono-capteur hors MSunPV à traiter dans la story 11.1.
+- Un équipement à deux capteurs (Climat) ne produit qu'une entité : nouvelle story à cadrer pour le multi-capteur hors MSunPV.
 - Les scénarios sans pièce ne sont pas placés dans une zone HA.
 - Les états initiaux restent inconnus lorsque les infos Virtuel n'ont pas de valeur ; suivre l'idée d'initialiser des valeurs synthétiques via `cmd::event` dans le peuplement.
