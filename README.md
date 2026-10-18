@@ -16,7 +16,7 @@ Jeedom2HA est un plugin Jeedom qui publie vos équipements dans Home Assistant p
 ## Prérequis
 
 - Jeedom en version **4.4 ou supérieure**.
-- Un système **Debian 11 ou 12**.
+- Un système **Debian 12**.
 - Un **broker MQTT** accessible depuis Jeedom : le plugin MQTT Manager (recommandé) ou un broker externe (Mosquitto, par exemple).
 - **Home Assistant** avec l'intégration **MQTT** en service et la découverte automatique (*discovery*) activée.
 

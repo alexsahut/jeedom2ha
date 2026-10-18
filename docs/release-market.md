@@ -615,9 +615,9 @@ $ gh api repos/alexsahut/jeedom2ha/branches/main/protection --jq '.required_stat
      dans les dépendances déclarées n'a été détecté que sur une VM neuve,
      `pip install` ayant réussi ailleurs à cause d'un module déjà présent
      pour un autre plugin).
-  2. `jeedom2ha` déclare `"os": {"min": 11, "max": 12.99}` (voir 1.4) : ce
-     test d'installation vierge doit donc être fait sur **Debian 11 ET
-     Debian 12** (les deux bornes de compatibilité annoncées), pas une seule.
+  2. `jeedom2ha` déclare `"os": {"min": 12, "max": 12.99}` (voir 1.4) : ce
+     test d'installation vierge se fait sur **Debian 12** (décision du
+     12/10/2026 : Debian 11 en fin de vie).
   3. Le délai de validation par l'équipe Jeedom **n'est pas garanti** ("quand
      notre emploi du temps nous le permet") — à budgéter comme un délai
      inconnu et non négociable dans la planification d'une première

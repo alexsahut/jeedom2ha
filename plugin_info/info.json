@@ -10,7 +10,7 @@
 	"author": "Alexandre SAHUT",
 	"require": "4.4",
 	"os" : {
-		"min" : 11,
+		"min" : 12,
 		"max" : 12.99
 	},
 	"category": "home automation protocol",
