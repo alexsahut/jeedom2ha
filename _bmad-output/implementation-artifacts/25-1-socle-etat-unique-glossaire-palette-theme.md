@@ -44,7 +44,7 @@ Ces définitions font foi pour les AC. Toute ambiguïté résiduelle est listée
 
 ### D1 — Fonction d'état d'équipement
 
-`resolveEquipmentState(tree)` — **pure** (aucun DOM, aucune E/S, aucun état global, ne mute pas son entrée), déterministe, exportée par `jeedom2ha_mapping_override.js` à côté de `summarizePublication`. Elle prend l'arbre déjà lu (`GET /system/mapping_overrides/{eq_id}`) et ne recalcule **aucune décision** : elle lit `sync_status.published_in_ha` (présence réelle, `true|false|null`), `sync_status.override_pending` / `entities[].override_pending` (divergence plan ↔ réalité, déjà calculée par le démon), `sync_status.synced_should_publish` (`null` = jamais synchronisé : l'`override_pending` du démon n'est alors pas un réglage posé, comme en 22-2), le résumé des commandes de `summarizePublication`, et `equipment_decision`.
+`resolveEquipmentState(tree)` — **pure** (aucun DOM, aucune E/S, aucun état global, ne mute pas son entrée), déterministe, exportée par `jeedom2ha_mapping_override.js` à côté de `summarizePublication`. Elle prend l'arbre déjà lu (`GET /system/mapping_overrides/{eq_id}`) et ne recalcule **aucune décision** : elle lit `sync_status.published_in_ha` (présence réelle, `true|false|null`), `sync_status.current_should_publish` (le plan courant demande-t-il la publication ; `null` = champ absent), `sync_status.override_pending` / `entities[].override_pending` (divergence plan ↔ réalité, déjà calculée par le démon), `sync_status.synced_should_publish` (`null` = jamais synchronisé : l'`override_pending` du démon n'est alors pas un réglage posé, comme en 22-2), le résumé des commandes de `summarizePublication`, et `equipment_decision`.
 
 Elle retourne `{ state, blocked_mention }` où `state ∈ { 'published', 'to_apply', 'blocked', 'excluded', 'disabled', 'nothing_to_publish' }` (affichés Publié / À appliquer / Bloqué / Exclu / Désactivé / Rien à publier) et `blocked_mention` = nombre de commandes bloquées (entier ≥ 0) affiché en mention orange « N bloquée(s) » quand `state ∈ { published, to_apply }`. **Il n'existe pas d'état « partiel ».**
 
@@ -56,9 +56,11 @@ Règles, **évaluées dans cet ordre, la première qui s'applique l'emporte** (P
 | R2 | P = `true` | `published` |
 | R3 | équipement désactivé dans Jeedom | `disabled` |
 | R4 | équipement exclu (décision d'équipement ou toutes les commandes exclues) | `excluded` |
-| R5 | P = `false` **et** r > 0 (la publication est due mais n'a pas eu lieu) | `to_apply` |
-| R6 | P = `null` **et** r > 0 (démon plus ancien, présence inconnue) | `to_apply` (jamais `published`, comme en 22-2) |
+| R5 | P = `false` **et** r > 0 **et** `current_should_publish` = `true` (la publication est due mais n'a pas eu lieu) | `to_apply` |
+| R6 | P = `null` **et** r > 0 **et** `current_should_publish` ≠ `false` (démon plus ancien, présence inconnue) | `to_apply` (jamais `published`, comme en 22-2) |
 | R7 | b > 0 | `blocked` |
+
+_Cas de R5/R6 non satisfaits (P `false`/`null`, r > 0, `current_should_publish` = `false`) : équipement hors périmètre de publication (le contrat renvoie `published_in_ha` `false`, `current_should_publish` `false`, `override_pending` `false` tout en gardant des commandes projetables). Il ne doit jamais être « À appliquer » (le bouton « Appliquer » ne pourrait pas le publier) : il tombe en R7 si b > 0, sinon R8. Q11 demande à Alexandre quel mot afficher si cet état doit être distingué de « Rien à publier »._
 | R8 | sinon (aucune commande publiable, rien de bloqué : commandes toutes ignorées, ou sans commande) | `nothing_to_publish` |
 
 « Désactivé » l'emporte sur « Exclu » quand les deux s'appliquent (R3 avant R4). Les règles R1/R5/R6 sont à confirmer (Q1, Q2).
@@ -77,7 +79,8 @@ Règles, **évaluées dans cet ordre, la première qui s'applique l'emporte** (P
 Source : `REASON_LABELS` (`jeedom2ha_mapping_override.js:612+`), lue sans modifier `models/cause_mapping.py`.
 - **Ignorée** : `command_not_covered`, `no_supported_generic_type`.
 - **Bloquée** : `ambiguous_skipped`, `name_heuristic_rejection`, `duplicate_generic_types`, `conflicting_generic_types`, `switch_state_orphan`, `probable_skipped`, `low_confidence`, `no_generic_type_configured`, `no_mapping`, `skipped_no_mapping_candidate`, `ha_missing_command_topic`, `ha_missing_state_topic`, `discovery_publish_failed`, `ha_component_not_in_product_scope`, `no_projection_possible`.
-- Codes d'état (ni bloquée ni ignorée) : `disabled_eqlogic`, `excluded_eqlogic`, `excluded_plugin`, `publication_excluded_eqlogic`, `publication_excluded_command`, `publication_forced`, `sure_mapping`.
+- Codes d'état (ni bloquée ni ignorée) : `disabled_eqlogic`, `excluded_eqlogic`, `excluded_plugin`, `excluded_object` (pièce exclue : catégorie **Exclue**, cf. `EXCLUDED_PUBLICATION_REASONS`), `publication_excluded_eqlogic`, `publication_excluded_command`, `publication_forced`, `sure_mapping`.
+- `no_commands` (« aucune commande configurée dans Jeedom ») : état d'équipement, jamais un défaut → l'équipement est « Rien à publier » (R8) ; aucune commande à classer.
 - Tout code inconnu (démon plus récent) : catégorie **Bloquée** (jamais masqué), avec le code brut en infobulle.
 
 ### D4 — Glossaire (un mot = une notion)
@@ -114,7 +117,7 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
 **AC2 — Table de vérité testée, pureté vérifiée**
 **Given** un test Node `test_story_25_1_etat_unique.node.test.js`
 **When** il exécute les règles R1 à R8 de D1
-**Then** chaque règle est couverte par au moins un cas, **plus** les croisements suivants, avec l'état attendu écrit en dur dans le test : désactivé+exclu → `disabled` ; désactivé+exclu+P `false` → `disabled` ; P `true`+b>0 → `published` avec `blocked_mention`=b ; P `true`+réglage en attente → `to_apply` ; P `false`+r>0 sans attente → `to_apply` ; P `null`+r>0 → `to_apply` et jamais `published` ; jamais synchronisé (`synced_should_publish` `null`) avec `override_pending` `true` du démon → pas de `to_apply` par R1 ; seul un capteur secondaire publié (principal refusé, P `true`) → `published` ; équipement sans commande exclu → `excluded` ; sans commande désactivé → `disabled` ; commandes toutes ignorées → `nothing_to_publish`
+**Then** chaque règle est couverte par au moins un cas, **plus** les croisements suivants, avec l'état attendu écrit en dur dans le test : désactivé+exclu → `disabled` ; désactivé+exclu+P `false` → `disabled` ; P `true`+b>0 → `published` avec `blocked_mention`=b ; P `true`+réglage en attente → `to_apply` ; P `false`+r>0 sans attente → `to_apply` ; P `null`+r>0 → `to_apply` et jamais `published` ; jamais synchronisé (`synced_should_publish` `null`) avec `override_pending` `true` du démon → pas de `to_apply` par R1 ; P `false`+r>0+`current_should_publish` `false` → jamais `to_apply` (R7 ou R8) ; `excluded_object` → catégorie Exclue ; `no_commands` → `nothing_to_publish` ; seul un capteur secondaire publié (principal refusé, P `true`) → `published` ; équipement sans commande exclu → `excluded` ; sans commande désactivé → `disabled` ; commandes toutes ignorées → `nothing_to_publish`
 **And** la fonction ne mute pas l'arbre passé (test par `Object.freeze` profond) et, appelée deux fois sur la même entrée, rend des résultats `deepEqual`
 **And** aucun état hors de `{published, to_apply, blocked, excluded, disabled, nothing_to_publish}` n'est jamais retourné (test sur un jeu d'entrées généré couvrant le produit cartésien des booléens et de P ∈ {true,false,null}).
 
@@ -414,7 +417,7 @@ _(à renseigner par le dev-story)_
 
 ## Questions ouvertes pour Alexandre
 
-Adressées à **Alexandre** (relayées par ClaudeBox). Aucune n'est tranchée par cette rédaction ; chaque question donne une recommandation, qui sert de valeur par défaut au `dev-story` **seulement si Alexandre l'accepte**. `ready-for-dev` reste bloqué tant que Q1 à Q7 ne sont pas répondues.
+Adressées à **Alexandre** (relayées par ClaudeBox). Aucune n'est tranchée par cette rédaction ; chaque question donne une recommandation, qui sert de valeur par défaut au `dev-story` **seulement si Alexandre l'accepte**. `ready-for-dev` reste bloqué tant que Q1 à Q7 et Q11 ne sont pas répondues.
 
 **Q1 — Un équipement jamais synchronisé, publiable mais absent de Home Assistant, est-il « À appliquer » ?** (règle R5)
 - A. Oui, « À appliquer » (le bouton « Appliquer »/la synchro est le geste qui le règle). *(recommandé : cohérent avec « plan ≠ réalité → À appliquer »)*
@@ -439,8 +442,11 @@ Impact : sur une installation neuve, A affiche beaucoup de bleu avant la premiè
 
 **Q9 — Libellé de la demande.** La demande d'origine parle de « contrôle de republication à 3 états ». J'ai compris le *réglage de publication* Automatique / Toujours / Jamais (qui remplace Exclure / Forcer / Revenir), pas une nouvelle option de « Republier ». Merci de confirmer.
 
+**Q11 — Équipement hors périmètre de publication** (r > 0 mais `current_should_publish` = `false`, sans exclusion ni désactivation). Par défaut, « Rien à publier » (ou « Bloqué » si b > 0). Veux-tu un mot distinct ? *(recommandé : non, pas de 7ᵉ état)*
+
 **Q10 — Gate 20-0 et VM 4.4.** La preuve de compatibilité 4.4 (AC25) suppose une VM Jeedom 4.4 disponible pour ClaudeBox (la démo VM 122 est-elle en 4.4 ou 4.6 ?). Sinon, la compatibilité 4.4 ne sera démontrée que par les replis CSS testés, pas par un rendu réel.
 
 ## Change Log
 
-- 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 27 AC, 10 questions ouvertes pour Alexandre.
+- 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 27 AC, 11 questions ouvertes pour Alexandre.
+- 2026-10-18 — Revue Codex (P1 ×2) : partition D3 complétée (`excluded_object`, `no_commands`) ; R5/R6 conditionnées à `current_should_publish` ; Q11 ajoutée.
