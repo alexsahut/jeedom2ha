@@ -6,6 +6,12 @@
 
 ---
 
+# 2026-10-18 — Debian 12 seulement
+
+- Le plugin est désormais annoncé pour Debian 12 seulement (Debian 11 est en fin de vie).
+
+---
+
 # 2026-10-18 — Licence AGPL-3.0-or-later
 
 - À partir de la version 1.2.0, le plugin est publié sous AGPL-3.0-or-later. Les versions
