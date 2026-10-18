@@ -24,12 +24,12 @@ test('20.4: les résultats UI distinguent succes, partiel, echec et champ absent
   assert.match(source, /operation_result === 'echec'[\s\S]*level: 'danger'/);
   assert.match(source, /typeof result\.operation_result === 'string'[\s\S]*level: 'warning'/);
   assert.match(source, /Résultat inconnu, relire Dernière opération/);
-  assert.match(source, /Une opération est déjà en cours ou le rescan a échoué/);
+  assert.match(source, /Une opération est déjà en cours ou la relecture a échoué/);
   assert.match(source, /Erreur de communication : relire Dernière synchro/);
 });
 
 test('20.4: une erreur terminale du démon affiche operation_message et rafraîchit la santé', () => {
-  assert.match(source, /\(result && \(result\.message \|\| result\.operation_message\)\) \|\| '\{\{Une opération est déjà en cours ou le rescan a échoué\.\}\}'/);
+  assert.match(source, /\(result && \(result\.message \|\| result\.operation_message\)\) \|\| '\{\{Une opération est déjà en cours ou la relecture a échoué\.\}\}'/);
   assert.match(source, /if \(result && typeof result\.operation_result === 'string'\) \{\s*refreshBridgeStatus\(\);\s*\}/);
 });
 
@@ -44,7 +44,7 @@ test('20.4: la page de configuration affiche aussi le message du 409 en priorit�
 
 test('20.4: le rescan a le délai client du budget relais (A1, ex-20s) et affiche le résultat chaîne du démon injoignable', () => {
   assert.match(source, /data: \{action: 'scanTopology'\}, dataType: 'json',\s*timeout: \(typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget\.CLIENT_TIMEOUT_MS\) \|\| 90000,/);
-  assert.match(source, /if \(data\.state !== 'ok'\) \{\s*\$\('#div_alert'\)\.showAlert\(\{message: \(typeof result === 'string' && result\) \|\| '\{\{Une opération est déjà en cours ou le rescan a échoué\.\}\}', level: 'danger'\}\);\s*return;\s*\}/);
+  assert.match(source, /if \(data\.state !== 'ok'\) \{\s*\$\('#div_alert'\)\.showAlert\(\{message: \(typeof result === 'string' && result\) \|\| '\{\{Une opération est déjà en cours ou la relecture a échoué\.\}\}', level: 'danger'\}\);\s*return;\s*\}/);
 });
 
 function loadConfirmationHarness() {
@@ -81,9 +81,9 @@ test('20.4: croix, Échap et Annuler libèrent une réservation de confirmation 
   for (const close of ['hidden.bs.modal', 'onEscape', 'cancel']) {
     const harness = loadConfirmationHarness();
     const state = reservation();
-    harness.confirm('titre', 'message', 'Rescanner', () => { state.requests += 1; }, () => {
+    harness.confirm('titre', 'message', 'Relire', () => { state.requests += 1; }, () => {
       state.inProgress = false;
-      state.button = 'Rescanner la topologie Jeedom';
+      state.button = 'Relire Jeedom';
     });
     if (close === 'cancel') {
       harness.options.buttons.cancel.callback();
@@ -93,7 +93,7 @@ test('20.4: croix, Échap et Annuler libèrent une réservation de confirmation 
       harness.handlers[close]();
     }
     assert.equal(state.inProgress, false, close);
-    assert.equal(state.button, 'Rescanner la topologie Jeedom', close);
+    assert.equal(state.button, 'Relire Jeedom', close);
     assert.equal(state.requests, 0, close);
   }
 });
@@ -101,9 +101,9 @@ test('20.4: croix, Échap et Annuler libèrent une réservation de confirmation 
 test('20.4: fermeture après confirmation ne libère pas le rescan avant la fin de requête', () => {
   const harness = loadConfirmationHarness();
   const state = reservation();
-  harness.confirm('titre', 'message', 'Rescanner', () => { state.requests += 1; }, () => {
+  harness.confirm('titre', 'message', 'Relire', () => { state.requests += 1; }, () => {
     state.inProgress = false;
-    state.button = 'Rescanner la topologie Jeedom';
+    state.button = 'Relire Jeedom';
   });
   harness.options.buttons.confirm.callback();
   harness.handlers['hidden.bs.modal']();

@@ -1,8 +1,8 @@
 # Story 25.1 : Socle A — état unique, glossaire, palette et thème
 
-Status: ready-for-dev
+Status: review
 
-> **Statut : `ready-for-dev` (2026-10-18, 19:20).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48), relue et approuvée par ClaudeBox (PR #277, R1 éditoriale appliquée), puis les 11 questions tranchées par décision d'Alexandre (« je valide toutes les recommandations ») et les relevés terrain de ClaudeBox (Q5, Q10) — voir § Décisions. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `review` (2026-10-18) — implémentation livrée par une session cloud déléguée (hors Task 0 et Task 8, réservées à l'humain / ClaudeBox).** Historique : `ready-for-dev` (2026-10-18, 19:20). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48), relue et approuvée par ClaudeBox (PR #277, R1 éditoriale appliquée), puis les 11 questions tranchées par décision d'Alexandre (« je valide toutes les recommandations ») et les relevés terrain de ClaudeBox (Q5, Q10) — voir § Décisions. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -312,34 +312,34 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
   - [ ] Relever sur VM Jeedom 4.4 et 4.6.1 : valeur de `--bg-color` clair et sombre, présence de chaque variable du core utilisée, attribut `data-theme` (alimente AC19, AC21, AC25).
-- [ ] Task 1 — Fonction d'état unique (AC: 1, 2, 3, 4)
-  - [ ] 1.1 Écrire `test_story_25_1_etat_unique.node.test.js` (table de vérité D1) **avant** le code.
-  - [ ] 1.2 Implémenter `resolveEquipmentState` ; supprimer `publicationSummaryState` et `buildPublicationSummaryLabel` ; migrer `renderSummary`, `summarizeEquipmentCounters`, `summarizeRoom`.
-  - [ ] 1.3 Test d'invariant badge = compteur = tableau (AC3).
-- [ ] Task 2 — Catégories de commande (AC: 5, 6, 15)
-  - [ ] 2.1 Partition D3 table-driven sur `REASON_LABELS` ; Ignorée hors défauts.
-  - [ ] 2.2 Réécrire `buildRoomCounterLabels` / `buildEquipmentCounterLabels` (zéros masqués, pluriels accordés).
-  - [ ] 2.3 Ligne repliée des ignorées.
-- [ ] Task 3 — Glossaire (AC: 7, 8, 9)
-  - [ ] 3.1 Appliquer D4 dans `desktop/js/*.js`, `desktop/php/jeedom2ha.php` (« Bridge » → « Démon », « Rescanner la topologie Jeedom » → « Relire Jeedom »), `REASON_LABELS`.
-  - [ ] 3.2 `test_story_25_1_glossaire.node.test.js` ; mise à jour des tests existants sans affaiblissement.
-- [ ] Task 4 — Réorganisation de la fenêtre (AC: 10 à 16, 26)
-  - [ ] 4.1 Contrôle segmenté + « Appliquer » conditionnel.
-  - [ ] 4.2 Menu « ⋯ » (équipement et pièce).
-  - [ ] 4.3 Tableau regroupé par entité, colonnes de l'AC13.
-  - [ ] 4.4 Encart de cause unique + bouton « Ouvrir les types génériques » (cible `index.php?v=d&p=types`, Q5 tranchée ; recontrôler sur Jeedom 4.4 en Task 8).
-  - [ ] 4.5 Un seul équipement déplié, en-tête collant, suppression du défilement imbriqué.
-- [ ] Task 5 — Palette et thème (AC: 17 à 21, 25)
-  - [ ] 5.1 Définir `--j2ha-*` sous `body[data-theme*="Dark"|"Light"]` + repli sans thème.
-  - [ ] 5.2 Remplacer toutes les couleurs en dur (CSS) et les `style=` colorés (PHP/JS) ; classe de largeur de modale.
-  - [ ] 5.3 `test_story_25_1_palette_theme.node.test.js` (littéraux, replis, contrastes, préfixes).
-- [ ] Task 6 — Documentation (AC: 23)
-  - [ ] 6.1 Réécrire le bloc `compteurs.md` seul ; réaligner `index.md` ; entrée `changelog_beta.md`.
-  - [ ] 6.2 `test_story_25_1_documentation.node.test.js` (successeur de 22-2).
-- [ ] Task 7 — Gate 20-0 et non-régression (AC: 22, 24, 25, 27)
-  - [ ] 7.1 Adapter les 5 parcours aux nouveaux libellés sans retirer d'assertion ; lancer les suites simulées.
-  - [ ] 7.2 `git diff --stat main...HEAD -- resources/daemon …` vide ; tests golden verts.
-  - [ ] 7.3 `make test`, `node --test tests/unit/*.node.test.js`, `flake8`, tests PHP, `scripts/ci-local.sh`.
+- [x] Task 1 — Fonction d'état unique (AC: 1, 2, 3, 4)
+  - [x] 1.1 Écrire `test_story_25_1_etat_unique.node.test.js` (table de vérité D1) **avant** le code.
+  - [x] 1.2 Implémenter `resolveEquipmentState` ; supprimer `publicationSummaryState` et `buildPublicationSummaryLabel` ; migrer `renderSummary`, `summarizeEquipmentCounters`, `summarizeRoom`.
+  - [x] 1.3 Test d'invariant badge = compteur = tableau (AC3).
+- [x] Task 2 — Catégories de commande (AC: 5, 6, 15)
+  - [x] 2.1 Partition D3 table-driven sur `REASON_LABELS` ; Ignorée hors défauts.
+  - [x] 2.2 Réécrire `buildRoomCounterLabels` / `buildEquipmentCounterLabels` (zéros masqués, pluriels accordés).
+  - [x] 2.3 Ligne repliée des ignorées.
+- [x] Task 3 — Glossaire (AC: 7, 8, 9)
+  - [x] 3.1 Appliquer D4 dans `desktop/js/*.js`, `desktop/php/jeedom2ha.php` (« Bridge » → « Démon », « Rescanner la topologie Jeedom » → « Relire Jeedom »), `REASON_LABELS`.
+  - [x] 3.2 `test_story_25_1_glossaire.node.test.js` ; mise à jour des tests existants sans affaiblissement.
+- [x] Task 4 — Réorganisation de la fenêtre (AC: 10 à 16, 26)
+  - [x] 4.1 Contrôle segmenté + « Appliquer » conditionnel.
+  - [x] 4.2 Menu « ⋯ » (équipement et pièce).
+  - [x] 4.3 Tableau regroupé par entité, colonnes de l'AC13.
+  - [x] 4.4 Encart de cause unique + bouton « Ouvrir les types génériques » (cible `index.php?v=d&p=types`, Q5 tranchée ; recontrôler sur Jeedom 4.4 en Task 8).
+  - [x] 4.5 Un seul équipement déplié, en-tête collant, suppression du défilement imbriqué.
+- [x] Task 5 — Palette et thème (AC: 17 à 21, 25)
+  - [x] 5.1 Définir `--j2ha-*` sous `body[data-theme*="Dark"|"Light"]` + repli sans thème.
+  - [x] 5.2 Remplacer toutes les couleurs en dur (CSS) et les `style=` colorés (PHP/JS) ; classe de largeur de modale.
+  - [x] 5.3 `test_story_25_1_palette_theme.node.test.js` (littéraux, replis, contrastes, préfixes).
+- [x] Task 6 — Documentation (AC: 23)
+  - [x] 6.1 Réécrire le bloc `compteurs.md` seul ; réaligner `index.md` ; entrée `changelog_beta.md`.
+  - [x] 6.2 `test_story_25_1_documentation.node.test.js` (successeur de 22-2).
+- [x] Task 7 — Gate 20-0 et non-régression (AC: 22, 24, 25, 27)
+  - [x] 7.1 Adapter les 5 parcours aux nouveaux libellés sans retirer d'assertion ; lancer les suites simulées.
+  - [x] 7.2 `git diff --stat main...HEAD -- resources/daemon …` vide ; tests golden verts.
+  - [x] 7.3 `make test`, `node --test tests/unit/*.node.test.js`, `flake8`, tests PHP, `scripts/ci-local.sh`.
 - [ ] Task 8 — Preuve terrain (humain / ClaudeBox, après fusion ; CC-48)
   - [ ] 8.1 Gate 20-0 contre la box ; rendu clair + sombre ; Jeedom 4.4 et 4.6.1 ; consigner dans `25-1-preuve-terrain-<date>.md`.
   - [ ] 8.2 Bascule de 22-2 à `done` (superseded) par ClaudeBox ; story à `ready-for-UX-validation`, validation finale transférée à 25.5.
@@ -404,17 +404,30 @@ AC1 à AC27 tenus ; suites locales vertes ; PR revue par ClaudeBox ; preuve terr
 
 ### Agent Model Used
 
-_(à renseigner par le dev-story)_
+Session cloud déléguée Claude Code (`dev-story`), 2026-10-18.
 
 ### Debug Log References
 
 ### Completion Notes List
 
 - Rédaction `create-story` (session cloud déléguée, 2026-10-18) : documentaire seulement ; aucun fichier de code, de test ou de doc utilisateur modifié ; `sprint-status.yaml` non modifié (statut `backlog` conservé, `ready-for-dev` non accordé).
+- Implémentation `dev-story` (session cloud déléguée, 2026-10-18), **TDD** : tests d'abord (`test_story_25_1_etat_unique`, `_compteurs`), puis le code, puis les tests de surface, de glossaire, de palette et de documentation.
+  - **Task 0 et Task 8 sautées** (CC-48 : aucun accès box, SSH, VM ni Home Assistant) : pré-vol terrain, gate 20-0 contre la box, rendu 4.4 / 4.6.1 et valeur de `--bg-color` clair sont à faire par ClaudeBox. Conséquences : la valeur de fond du thème clair n'est pas relevée (AC19 contrôle le blanc **et** un gris `#f5f5f5`, voir le test) ; la cible `index.php?v=d&p=types` (Q5) est celle relevée par ClaudeBox sur 4.6.1, à recontrôler sur 4.4 si une VM existe.
+  - Statut final : `review` (pas `ready-for-UX-validation` : la preuve terrain et la bascule de 22-2 restent faites par ClaudeBox après fusion).
+  - `resolveEquipmentState` (D1) lit uniquement des champs déjà portés par le démon ; aucune route ni aucune requête ajoutée (`resources/daemon/`, `models/*` inchangés, `git diff --stat origin/main...HEAD -- resources/daemon` vide).
+  - Écarts d'interprétation, tous dans la section Décisions : (1) un équipement à **une seule** entité qui porte un réglage posé sur la **commande** de cette entité (`exclude_command` / `force_publish` sans forçage d'équipement) garde son en-tête de groupe avec son contrôle segmenté (comportement 22.2 AC3 « actions non équivalentes ») ; l'AC13 ne supprime l'en-tête que pour l'entité unique sans réglage propre ; (2) une commande prête mais pas encore dans Home Assistant porte la catégorie interne `to_apply` (« À appliquer → … ») : D2 ne la nomme pas, la ligne de commandes de l'équipement la compte « à appliquer » ; (3) la cause d'une commande bloquée n'est qu'**une** fois dans le DOM (encart), jamais sur la ligne (AC14), l'AC13 « Bloquée → cause courte » est donc rendu par « Bloquée » + encart ; (4) le libellé du bouton de la page de **configuration** « Appliquer les filtres et rescanner » (`plugin_info/configuration.php`, hors périmètre) n'est pas renommé : la documentation le désigne sans le citer.
+  - Tests existants adaptés (voir File List) : libellés, structure (menu « ⋯ », contrôle segmenté, groupes, lien « Type HA ») et sémantique d'état (« Désactivé » prime sur « Exclu » ; plus d'état « partiel » ; compteurs de commandes retirés de la pièce). Aucune assertion supprimée sans équivalent ; les assertions de comptage 22.2 sont réécrites sur le modèle à état unique.
+  - Vérification en vrai navigateur (Chromium, jQuery 3 réel, CSS livré, thèmes clair / sombre / inconnu) hors dépôt : sticky effectif, menu « ⋯ » (Échap, clic extérieur), un seul défilement, couleurs de thème, repli clair — aucune erreur JavaScript.
 
 ### File List
 
-_(à renseigner par le dev-story)_
+- Interface : `desktop/js/jeedom2ha_mapping_override.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha.js`, `desktop/php/jeedom2ha.php`, `desktop/css/jeedom2ha.css`.
+- Documentation : `docs/fr_FR/index.md`, `docs/fr_FR/compteurs.md`, `docs/fr_FR/changelog_beta.md`.
+- Nouveaux tests : `tests/unit/test_story_25_1_etat_unique.node.test.js`, `test_story_25_1_compteurs.node.test.js`, `test_story_25_1_surface.node.test.js`, `test_story_25_1_glossaire.node.test.js`, `test_story_25_1_palette_theme.node.test.js`, `test_story_25_1_documentation.node.test.js`.
+- Helpers : `tests/unit/helpers/fake_dom.js`, `tests/unit/helpers/ui_harness.js`.
+- Tests existants adaptés : `test_ha_gating`, `test_story_16_5_mapping_override_ui`, `test_story_16_8_cc38_excluded`, `test_story_16_8_mapping_surface`, `test_story_20_2_ac8_exclu_sans_commande`, `test_story_20_2_p1_p2_comportement_surface`, `test_story_20_2_p3_revert_cmd_inerte`, `test_story_20_2_publication_surface`, `test_story_20_2_x6b_equipment_eligibility`, `test_story_20_3_actions_deplacees`, `test_story_20_3_compteurs_piece`, `test_story_20_3_gate_parcours`, `test_story_20_3_r1_ui_reelle`, `test_story_20_3_retrait_synthese_diagnostic`, `test_story_20_4_rescan_ui`, `test_story_21_1_cc47_command_published_by_secondary`, `test_story_22_2_compteurs_portees`, `test_story_22_2_documentation` (`.node.test.js`).
+- Parcours du gate 20-0 : `tests/e2e/gate/parcours/decouverte-piece-25-eq-579.mjs`, `exclusion-publication-non-publiee.mjs`, `reference-bascule-eq-380.mjs`, `rescan-page-principale.mjs`.
+- Story : ce fichier.
 
 ## Questions ouvertes pour Alexandre
 
@@ -469,4 +482,5 @@ Alexandre : « je valide toutes les recommandations. » Toutes les questions de 
 
 - 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 27 AC, 11 questions ouvertes pour Alexandre.
 - 2026-10-18 — Revue Codex (P1 ×2) : partition D3 complétée (`excluded_object`, `no_commands`) ; R5/R6 conditionnées à `current_should_publish` ; Q11 ajoutée.
+- 2026-10-18 — Implémentation (`dev-story`, session cloud déléguée) : Tasks 1 à 7 faites, Tasks 0 et 8 réservées à ClaudeBox ; statut `ready-for-dev` → `review`.
 - 2026-10-18, 19:20 — Décisions d'Alexandre (« je valide toutes les recommandations ») et relevés terrain ClaudeBox (Q5, Q10) : 11 questions tranchées ; D3/AC5 modifiés (Q3 : `ha_component_not_in_product_scope` → Ignorée, mention « non pris en charge par le plugin ») ; AC14 et Task 4.4 précisées (Q5 : cible `index.php?v=d&p=types`) ; AC25 amendée (Q10 : pas de VM 4.4 disponible, compatibilité démontrée par les replis CSS) ; note R5/R6 de D1 déplacée sous le tableau complet (R1 éditoriale ClaudeBox, rendu Markdown cassé entre R7 et R8) ; statut `backlog` → `ready-for-dev`.

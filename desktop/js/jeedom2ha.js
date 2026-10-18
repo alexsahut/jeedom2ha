@@ -39,7 +39,7 @@ function refreshBridgeStatus() {
       var $op = $('#span_healthOp');
       var $opMsg = $('#span_healthOpMsg');
 
-      // 1. Bridge (Démon)
+      // 1. Démon
       if (!r.daemon) {
         // Incident d'infrastructure -> ROUGE
         $bridge.removeClass().addClass('label label-danger').text('{{Arrêté}}');
@@ -92,11 +92,11 @@ function refreshBridgeStatus() {
           break;
         case 'partiel':
           // Problème de configuration -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').text('{{Partiel}}').css('background-color', '#e67e22');
+          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Partiel}}');
           break;
         case 'echec':
           // Problème de configuration complet -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').text('{{Échec}}').css('background-color', '#e67e22');
+          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Échec}}');
           break;
         case 'aucun':
           $op.removeClass().addClass('label label-default').text('{{Aucune}}');
@@ -152,9 +152,9 @@ function applyHAGating(r) {
     $reason.hide();
   } else {
     $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
-    var reason = '{{Bridge ou MQTT indisponible — actions Home Assistant bloquées.}}';
+    var reason = '{{Démon ou MQTT indisponible — actions Home Assistant bloquées.}}';
     if (r && !r.daemon) {
-      reason = '{{Daemon arrêté — actions Home Assistant bloquées.}}';
+      reason = '{{Démon arrêté — actions Home Assistant bloquées.}}';
     } else if (r) {
       reason = '{{MQTT déconnecté — actions Home Assistant bloquées.}}';
     }
@@ -164,9 +164,9 @@ function applyHAGating(r) {
 
 function confirmTopologyRescan(onConfirm, onCancel) {
   confirmHaPublishAction(
-    '{{Rescanner la topologie Jeedom}}',
-    '{{Un sync complet peut publier ou retirer des entités Home Assistant et applique les overrides persistés. Confirmer ?}}',
-    '{{Rescanner}}',
+    '{{Relire Jeedom}}',
+    '{{Une relecture complète peut publier ou retirer des entités Home Assistant et applique les réglages enregistrés. Confirmer ?}}',
+    '{{Relire}}',
     onConfirm,
     onCancel
   );
@@ -347,7 +347,7 @@ function executeHaAction(intention, portee, selection, handlers) {
 
 function triggerTopologyRescan($button, snapshot, owner) {
   if (window.jeedom2haRescanOwner !== owner) return;
-  $button.html('<i class="fas fa-spinner fa-spin"></i> {{Rescan en cours…}}');
+  $button.html('<i class="fas fa-spinner fa-spin"></i> {{Relecture en cours…}}');
   $('[data-ha-action]').not('[data-ha-pending="1"]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -356,7 +356,7 @@ function triggerTopologyRescan($button, snapshot, owner) {
     success: function(data) {
       var result = data && data.result;
       if (data.state !== 'ok') {
-        $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+        $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou la relecture a échoué.}}', level: 'danger'});
         return;
       }
       if (result && result.status === 'ok') {
@@ -372,7 +372,7 @@ function triggerTopologyRescan($button, snapshot, owner) {
         refreshBridgeStatus();
         return;
       }
-      $('#div_alert').showAlert({message: (result && (result.message || result.operation_message)) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+      $('#div_alert').showAlert({message: (result && (result.message || result.operation_message)) || '{{Une opération est déjà en cours ou la relecture a échoué.}}', level: 'danger'});
       if (result && typeof result.operation_result === 'string') {
         refreshBridgeStatus();
       }

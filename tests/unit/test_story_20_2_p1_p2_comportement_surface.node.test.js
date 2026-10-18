@@ -117,7 +117,7 @@ function fakeAjax(responses) {
 // espionné (la vraie fonction vit plus loin dans le fichier, hors de cet extrait).
 function loadHarness(ajax) {
   var start = source.indexOf('function revertCommand');
-  var end = source.indexOf('function renderSummary');
+  var end = source.indexOf('// --- Story 20.3 (Q1=A) — compteurs de la pièce ouverte ---');
   var dialogs = [];
   var sandbox = {
     // `$(this)` sur un bouton du faux `.each` reçoit déjà un objet jQuery-like

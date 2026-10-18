@@ -95,13 +95,13 @@ describe('16.5 / AC3-AC4 — normalizeTree', () => {
 describe('16.5 / AC5 — état vide', () => {
   it('affiche l’attendu par défaut, jamais un champ vide silencieux', () => {
     const label = M.buildEmptyStateLabel({ jeedom_cmd_id: 1, attendu_ha: 'sensor', override_applied: false });
-    assert.match(label, /Aucun override configuré/);
+    assert.match(label, /Aucun type imposé/);
     assert.match(label, /sensor/);
   });
 
   it('sans attendu → message explicite « aucun type par défaut »', () => {
     const label = M.buildEmptyStateLabel({ jeedom_cmd_id: 1, override_applied: false });
-    assert.match(label, /aucun type HA par défaut/);
+    assert.match(label, /aucun type HA automatique/);
   });
 });
 
@@ -155,12 +155,12 @@ describe('16.5 / AC8-AC9 — état diagnostic', () => {
   // après passage par readPreviewOverridden. Le bug historique aplatissait deux fois la
   // vue (readPreviewOverridden PUIS diagnosticState), perdant projection_validity et
   // forçant is_valid=false → « ne sera pas publié » quel que soit l'override.
-  it('readPreviewOverridden(ready) reste ready et « Sera publié » (régression #869)', () => {
+  it('readPreviewOverridden(ready) reste ready et « À appliquer » (régression #869)', () => {
     const resp = { status: 'ok', payload: { jeedom_eq_id: 543, mapped: true, auto: readyView('binary_sensor'), overridden: readyView('binary_sensor') } };
     const v = M.readPreviewOverridden(resp);
     assert.strictEqual(M.diagnosticState(v), 'ready');
     assert.strictEqual(M.isReadyDiagnostic(v), true);
-    assert.match(M.buildPublishCellLabel(v), /Sera publié/);
+    assert.match(M.buildPublishCellLabel(v), /À appliquer → Capteur binaire \(binary_sensor\)/);
     assert.strictEqual(M.shouldAutoValidate(v), true);
   });
 });
@@ -168,13 +168,13 @@ describe('16.5 / AC8-AC9 — état diagnostic', () => {
 describe('16.5 / AC12 — message actionnable, jamais une erreur réseau', () => {
   it('vert → détail de ce qui a été validé', () => {
     const msg = M.buildDiagnosticMessage(readyView('light'));
-    assert.match(msg, /Prêt/);
-    assert.match(msg, /light/);
+    assert.match(msg, /Publiable/);
+    assert.match(msg, /Publiable en Lumière \(light\)/);
   });
 
   it('capacité manquante → message factuel actionnable', () => {
     const msg = M.buildDiagnosticMessage(blockingView());
-    assert.match(msg, /Capacité\(s\) manquante\(s\)/);
+    assert.match(msg, /Capacité manquante/);
     assert.match(msg, /position/);
   });
 
@@ -182,7 +182,7 @@ describe('16.5 / AC12 — message actionnable, jamais une erreur réseau', () =>
     const v = blockingView();
     v.projection_validity.missing_capabilities = [];
     v.projection_validity.missing_fields = ['unit_of_measurement'];
-    assert.match(M.buildDiagnosticMessage(v), /Champ\(s\) requis manquant\(s\)/);
+    assert.match(M.buildDiagnosticMessage(v), /Champ requis manquant/);
   });
 
   it('refus publication sans capacité manquante → code de raison affiché', () => {
@@ -244,5 +244,14 @@ describe('16.5 / AC3.4 — commandes bloquantes plafonnées', () => {
   it('défaut = 4 si aucune limite valide', () => {
     const ids = M.collectBlockingCommandIds(treeWith(10));
     assert.strictEqual(ids.length, 4);
+  });
+});
+
+describe('25.1 / AC9 — le mot d’état rendu accompagne les messages (assertions rétablies)', () => {
+  it('les libellés de diagnostic et les mots d’état du glossaire sont ceux de l’interface', () => {
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.to_apply, 'À appliquer');
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.blocked, 'Bloqué');
+    assert.match(M.buildPublishCellLabel(readyView('light')), /^À appliquer → Lumière/);
+    assert.match(M.buildDiagnosticMessage(readyView('light')), /type Home Assistant validé/);
   });
 });
