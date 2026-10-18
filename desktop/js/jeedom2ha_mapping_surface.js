@@ -216,15 +216,29 @@
         .append('<i class="fas fa-undo"></i>');
       $td.append($revertLink).append($revertError);
       var attachRevertHandler = function () {
-        $revertLink.one('click', function () {
+        var run = function () {
           clearRequestError($revertError);
           $revertLink.prop('disabled', true);
           revertCommand(eqId, cmdId, $revertLink, $revertError, attachRevertHandler);
-        });
+        };
+        $revertLink.one('click', run);
+        $revertLink.off('keydown');
+        onActivationKey($revertLink, function () { if (!$revertLink.prop('disabled')) run(); });
       };
       attachRevertHandler();
     }
     return $td;
+  }
+
+  // Éléments `role=button` non natifs : Entrée et Espace valent un clic.
+  function onActivationKey($el, handler) {
+    $el.on('keydown', function (event) {
+      var key = event && event.key;
+      if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+        if (event.preventDefault) event.preventDefault();
+        handler();
+      }
+    });
   }
 
   function renderCommandRow(eqId, row, entities) {
@@ -447,7 +461,7 @@
       ? '{{Commandes qui recevront les ordres : }}' + state.command_names.join(', ')
       : '{{Aucune commande ne recevra d’ordre.}}'));
     if (state.can_confirm) {
-      $wrap.append($('<p></p>').text('{{Cette entité sera publiée dans Home Assistant.}}'));
+      $wrap.append($('<p></p>').text('{{Le forçage publie cette entité dans Home Assistant.}}'));
     } else {
       $wrap.append($('<p class="text-danger"></p>')
         .text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
@@ -475,7 +489,7 @@
     });
     $wrap.append($ul);
     if (state.can_confirm) {
-      $wrap.append($('<p></p>').text('{{Au moins une entité sera publiée dans Home Assistant.}}'));
+      $wrap.append($('<p></p>').text('{{Le forçage publie au moins une entité dans Home Assistant.}}'));
     } else {
       $wrap.append($('<p class="text-danger"></p>').text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
     }
@@ -1018,10 +1032,11 @@
   function scrollToCommand($panel, cmdId) {
     var $target = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + cmdId + '"]');
     if ($target.length > 0) {
-      var $scroll = $target.closest('.j2ha-eq-cmdlist');
-      if ($scroll.length > 0) {
-        var top = $target.position() ? $target.position().top : 0;
-        $scroll.scrollTop($scroll.scrollTop() + top - 10);
+      // Le seul défilement est celui de la fenêtre (AC16) ; `scroll-margin-top` (CSS) réserve la place
+      // de l'en-tête collant.
+      var node = $target.get(0);
+      if (node && typeof node.scrollIntoView === 'function') {
+        node.scrollIntoView({ block: 'center' });
       }
       $target.addClass('j2ha-diag-target-highlight');
       setTimeout(function () { $target.removeClass('j2ha-diag-target-highlight'); }, 2000);
@@ -1053,6 +1068,7 @@
           .append('<i class="fas fa-arrow-down"></i>')
           .append(document.createTextNode('{{Voir la première commande bloquée}}'));
         $anchor.on('click', function () { scrollToCommand($panel, summary.first_blocking_cmd_id); });
+        onActivationKey($anchor, function () { scrollToCommand($panel, summary.first_blocking_cmd_id); });
         $notice.append($anchor);
       }
       $host.append($notice);
@@ -1127,18 +1143,15 @@
       if (isActive) {
         $button.addClass('j2ha-seg-active');
       }
-      // Le segment actif reste actif ; « Automatique » actif reste utilisable s'il y a des types HA
-      // imposés à retirer (même route : retour au mode automatique de tout l'équipement).
-      var usable = isActive ? (segment.key === 'auto' && availability.auto.allowed) : availability[segment.key].allowed;
+      // Le segment actif n'écrit jamais : le retour en automatique de tout l'équipement est dans le menu
+      // « ⋯ » (« Tout remettre en automatique… »), avec confirmation.
+      var usable = !isActive && availability[segment.key].allowed;
       if (!isActive && !usable) {
         $button.prop('disabled', true).addClass('j2ha-seg-disabled').attr('aria-disabled', 'true')
           .attr('title', availability[segment.key].reason || '{{Cette action est sans effet dans l’état courant.}}');
       }
-      if (isActive && usable) {
-        $button.attr('title', '{{Retire aussi les types Home Assistant imposés sur les commandes.}}');
-      }
       $button.on('click', function () {
-        if ($button.prop('disabled') || (isActive && !usable)) {
+        if ($button.prop('disabled') || isActive) {
           return;
         }
         onSelect(segment.key, $group.find('button'));
@@ -1292,6 +1305,36 @@
     $list.append($table);
   }
 
+  // « Tout remettre en automatique… » : même route que l'ancien clic sur « Automatique » actif
+  // (revertPublicationOverride sans commande), désormais derrière une confirmation qui liste ce qui
+  // sera retiré : exclusions, forçages, types Home Assistant imposés.
+  function revertAllHandler(eqId, normalized, $button, $error) {
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var entities = normalized.entities || [];
+    var exclusions = entities.filter(function (e) { return e.publication_override === 'exclude_eqlogic' || e.publication_override === 'exclude_command'; }).length;
+    var forcings = entities.filter(function (e) { return e.publication_override === 'force_publish'; }).length;
+    var types = normalized.commands.filter(function (c) { return c.override_applied; }).length;
+    var eqOverride = normalized.equipment_publication_override || null;
+    var $content = $('<div></div>');
+    $content.append($('<p></p>').text('{{Tout remettre en automatique : les réglages manuels de cet équipement seront retirés.}}'));
+    var $list = $('<ul></ul>');
+    if (eqOverride === 'exclude') $list.append($('<li></li>').text('{{Exclusion de l’équipement}}'));
+    if (eqOverride === 'force_publish') $list.append($('<li></li>').text('{{Forçage de l’équipement}}'));
+    if (exclusions > 0) $list.append($('<li></li>').text('{{Exclusions d’entités}} : ' + exclusions));
+    if (forcings > 0) $list.append($('<li></li>').text('{{Forçages d’entités}} : ' + forcings));
+    if (types > 0) $list.append($('<li></li>').text('{{Types Home Assistant imposés}} : ' + types));
+    $content.append($list);
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    confirmPublicationDialog($content, function () {
+      restoreHaActionPendingState($button, reservation);
+      revertPublication(eqId, null, $button, $error);
+    }, function () {
+      restoreHaActionPendingState($button, reservation);
+    });
+  }
+
   // En-tête collant de l'équipement déplié : réglage de publication (contrôle segmenté), « Appliquer »
   // seulement quand un réglage attend, menu « ⋯ » (Republier, Supprimer de Home Assistant…).
   function renderControls($panel, eqId, normalized, resolved) {
@@ -1317,6 +1360,10 @@
         key: 'republish', className: 'j2ha-eq-republish', icon: 'fa-upload', label: '{{Republier}}', haAction: 'republier',
         onClick: function ($button) { applyEquipment(eqId, $button, $error); },
       },
+      {
+        key: 'revert', className: 'j2ha-eq-revert-all', icon: 'fa-undo', label: '{{Tout remettre en automatique…}}',
+        haAction: 'revert', onClick: function ($button) { revertAllHandler(eqId, normalized, $button, $error); },
+      },
       { separator: true },
       {
         key: 'recreate', className: 'j2ha-eq-recreate j2ha-menu-danger', icon: 'fa-trash',
@@ -1327,6 +1374,8 @@
     // un équipement désactivé ou exclu n'a rien à republier.
     setStateGate(menu.buttons.republish, resolved.state === 'to_apply' || actionState.can_republish, actionState.republish_reason);
     setStateGate(menu.buttons.recreate, actionState.can_recreate, actionState.recreate_reason);
+    var revertState = M.publicationActionState(target, true);
+    setStateGate(menu.buttons.revert, revertState.can_revert, revertState.revert_reason);
     $host.append(menu.$wrap);
     $host.append($error);
     // Les boutons viennent d'être ajoutés après l'ouverture de la modale : ils suivent le même gating
@@ -1396,7 +1445,7 @@
         if (!roomHasEquipment(eqId)) {
           return;
         }
-        markTreeError($panel, eqId, '{{Impossible de charger la configuration HA (daemon indisponible).}}');
+        markTreeError($panel, eqId, '{{Impossible de charger la configuration HA (démon indisponible).}}');
       },
     });
   }

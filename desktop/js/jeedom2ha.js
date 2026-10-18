@@ -154,7 +154,7 @@ function applyHAGating(r) {
     $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
     var reason = '{{Démon ou MQTT indisponible — actions Home Assistant bloquées.}}';
     if (r && !r.daemon) {
-      reason = '{{Daemon arrêté — actions Home Assistant bloquées.}}';
+      reason = '{{Démon arrêté — actions Home Assistant bloquées.}}';
     } else if (r) {
       reason = '{{MQTT déconnecté — actions Home Assistant bloquées.}}';
     }

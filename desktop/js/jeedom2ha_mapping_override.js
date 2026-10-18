@@ -925,18 +925,18 @@
         firstBlockedCmdId = row.jeedom_cmd_id;
       }
     }
-    // Un équipement sans commande ne se résout pas par la boucle : `equipment_decision` (déjà porté par
-    // le démon, lecture pure) dit alors « Exclu » / « Désactivé » (story 20-2, AC8). « Désactivé » prime
-    // sur « Exclu » (D1 : R3 avant R4).
-    var nothingElse = ready === 0 && counts.blocked === 0;
+    // « Désactivé » / « Exclu » (D1 : R3 avant R4) s'appliquent dès que `equipment_decision` (lecture pure
+    // du démon) le dit, quelles que soient les commandes (story 20-2, AC8). Par les commandes : toutes
+    // les commandes doivent être désactivées ou exclues (D1 R4 : « toutes les commandes exclues »).
+    var allOff = t.commands.length > 0 && counts.excluded + counts.disabled === t.commands.length;
     return {
       counts: counts,
       ready: ready,
       blocked: counts.blocked,
       presence_unknown: presenceUnknown,
       first_blocked_cmd_id: firstBlockedCmdId,
-      disabled: nothingElse && (isDisabledDiagnostic(t.equipment_decision) || counts.disabled > 0),
-      excluded: nothingElse && (isExcludedDiagnostic(t.equipment_decision) || counts.excluded > 0),
+      disabled: isDisabledDiagnostic(t.equipment_decision) || (allOff && counts.disabled > 0),
+      excluded: isExcludedDiagnostic(t.equipment_decision) || (allOff && counts.excluded > 0),
     };
   }
 
@@ -986,8 +986,8 @@
     var disabled = a.counts.disabled;
     // Story 20-2 (AC8, X6) : sans commande, `equipment_decision` est la seule source (voir analyzeEquipment).
     if (t.commands.length === 0) {
-      excluded = isExcludedDiagnostic(t.equipment_decision) ? 1 : 0;
-      disabled = excluded === 0 && isDisabledDiagnostic(t.equipment_decision) ? 1 : 0;
+      disabled = isDisabledDiagnostic(t.equipment_decision) ? 1 : 0;
+      excluded = disabled === 0 && isExcludedDiagnostic(t.equipment_decision) ? 1 : 0;
     }
     return {
       total: t.commands.length,

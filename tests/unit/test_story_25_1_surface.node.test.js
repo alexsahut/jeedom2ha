@@ -170,6 +170,55 @@ describe('25.1 / AC10 — réglage de publication segmenté', () => {
     assert.equal(ui.pending('revertPublicationOverride')[0].data.cmdId, undefined);
   });
 
+  it('« Toujours » appelle la route de forçage (savePublicationOverride force_publish)', () => {
+    const t = tree(1, [BLOCKED], { decision: view('no_generic_type_configured', true, false), present: false });
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    ui.click(EQ + ' .j2ha-seg-always');
+    assert.equal(ui.pending('previewMappingOverride')[0].data.publicationPolicy, 'force_publish');
+    ui.respond('previewMappingOverride', { state: 'ok', result: { payload: { overridden: {
+      ha_entity_type: 'light', projection_validity: { is_valid: true }, should_publish: true, command_ids: [100],
+      entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY }],
+    } } } });
+    ui.lastConfirmation().options.buttons.confirm.callback();
+    const call = ui.pending('savePublicationOverride')[0];
+    assert.ok(call, 'écriture attendue après confirmation');
+    assert.deepEqual([call.data.eqId, call.data.publicationPolicy], [1, 'force_publish']);
+  });
+
+  it('le segment actif n’écrit jamais (clic et clavier) ; « Tout remettre en automatique… » demande confirmation', () => {
+    const t = tree(1, [READY], { present: true });
+    t.commands[0].override_applied = true;
+    t.commands[0].effective_ha = 'light';
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    const auto = EQ + ' .j2ha-seg-auto';
+    assert.equal(ui.$(auto).attr('aria-checked'), 'true');
+    const before = ui.calls.length;
+    ui.click(auto);
+    ui.key(auto, ' ');
+    assert.equal(ui.calls.length, before, 'aucune écriture depuis le segment actif');
+    assert.equal(ui.pending('revertPublicationOverride').length, 0);
+    // Le menu porte l'action, avec confirmation avant toute écriture.
+    const item = EQ + ' .j2ha-eq-revert-all';
+    assert.match(plain(ui.$(item).text()), /Tout remettre en automatique…/);
+    ui.click(item);
+    assert.equal(ui.pending('revertPublicationOverride').length, 0, 'rien n’est écrit avant la confirmation');
+    const dialog = ui.lastConfirmation();
+    assert.ok(dialog, 'confirmation ouverte');
+    dialog.options.buttons.confirm.callback();
+    const call = ui.pending('revertPublicationOverride')[0];
+    assert.equal(call.data.eqId, 1);
+    assert.equal(call.data.cmdId, undefined);
+  });
+
+  it('« Tout remettre en automatique… » annulé : aucune écriture', () => {
+    const t = tree(1, [READY], { present: true });
+    t.equipment_publication_override = 'exclude';
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    ui.click(EQ + ' .j2ha-eq-revert-all');
+    ui.lastConfirmation().options.buttons.cancel.callback();
+    assert.equal(ui.pending('revertPublicationOverride').length, 0);
+  });
+
   it('les anciens boutons Exclure / Forcer / Revenir au mode automatique n’existent plus', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
     const text = ui.$('.modal-j2ha-room').text();
@@ -273,6 +322,7 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
     }));
     assert.deepEqual(entries, [
       { role: 'none', text: 'Republier', danger: false },
+      { role: 'none', text: 'Tout remettre en automatique…', danger: false },
       { role: 'separator', text: '', danger: false },
       { role: 'none', text: 'Supprimer de Home Assistant…', danger: true },
     ]);
@@ -433,6 +483,42 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(mixed)]);
     assert.equal(ui.$(PANEL + '.j2ha-goto-blocking').length, 1);
     assert.match(ui.$(PANEL + '.j2ha-goto-blocking').text(), /Voir la première commande bloquée/);
+  });
+});
+
+describe('25.1 / R1 — « Voir la première commande bloquée » et clavier', () => {
+  const PANEL = '.j2ha-eq-panel[data-eq-id="1"] ';
+
+  function mixedUi() {
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY, BLOCKED], { present: true }))]);
+    ui.sandbox.setTimeout = () => 0; // le surlignage temporaire n'est pas l'objet du test
+    return ui;
+  }
+
+  it('le lien fait défiler la fenêtre jusqu’à la ligne (scrollIntoView centré) et la surligne', () => {
+    const ui = mixedUi();
+    const row = ui.$(PANEL + 'tr.mapping-override-cmd[data-cmd-id="101"]').list[0];
+    const seen = [];
+    row.scrollIntoView = (options) => { seen.push(options); };
+    ui.click(PANEL + '.j2ha-goto-blocking');
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].block, 'center');
+    assert.ok(ui.$(row).hasClass('j2ha-diag-target-highlight'));
+  });
+
+  it('le CSS réserve la place de l’en-tête collant (scroll-margin-top) sur les lignes de commande', () => {
+    assert.match(fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8'), /tr\.mapping-override-cmd\s*\{[^}]*scroll-margin-top/);
+  });
+
+  it('Entrée et Espace sur « Voir la première commande bloquée » valent un clic', () => {
+    for (const key of ['Enter', ' ']) {
+      const ui = mixedUi();
+      const row = ui.$(PANEL + 'tr.mapping-override-cmd[data-cmd-id="101"]').list[0];
+      let count = 0;
+      row.scrollIntoView = () => { count += 1; };
+      ui.key(PANEL + '.j2ha-goto-blocking', key);
+      assert.equal(count, 1, JSON.stringify(key));
+    }
   });
 });
 

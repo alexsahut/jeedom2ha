@@ -211,7 +211,7 @@ describe('R1-B/E — arbre en erreur : aucune action, jamais [null]', () => {
     const ui = openRoomWith(null);
     ui.fail('getMappingOverrides');
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').length, 0);
-    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-status').text(), /daemon indisponible/);
+    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-status').text(), /démon indisponible/);
   });
 
   it('une pièce dont l’identifiant n’est pas un nombre n’est jamais lue ni adressée (pas de [null])', () => {

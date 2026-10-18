@@ -106,6 +106,19 @@ describe('25.1 / AC2 — table de vérité D1', () => {
     assert.equal(stateOf(eq({ commands: [cmd(1, DISABLED), cmd(2, EXCLUDED)] })), 'disabled');
   });
 
+  it('R3/R4 sans condition « rien d’autre » : la décision d’équipement l’emporte sur les commandes prêtes ou bloquées', () => {
+    const hors = { published_in_ha: false, current_should_publish: false };
+    assert.equal(stateOf(eq({ decision: EXCLUDED, commands: [cmd(1, READY)], sync: hors })), 'excluded');
+    assert.equal(stateOf(eq({ decision: EXCLUDED, commands: [cmd(1, BLOCKED)], sync: hors })), 'excluded');
+    assert.equal(stateOf(eq({ decision: DISABLED, commands: [cmd(1, BLOCKED)], sync: hors })), 'disabled');
+  });
+
+  it('R4 par les commandes : toutes les commandes doivent être exclues (une exclue + des ignorées ne suffit pas)', () => {
+    const hors = { published_in_ha: false, current_should_publish: false };
+    assert.equal(stateOf(eq({ commands: [cmd(1, EXCLUDED), cmd(2, IGNORED)], sync: hors })), 'nothing_to_publish');
+    assert.equal(stateOf(eq({ commands: [cmd(1, EXCLUDED), cmd(2, BLOCKED)], sync: hors })), 'blocked');
+  });
+
   it('croisements : P true + commandes bloquées → published avec la mention du nombre de bloquées', () => {
     const result = M.resolveEquipmentState(eq({
       commands: [cmd(1, READY, true), cmd(2, BLOCKED), cmd(3, BLOCKED), cmd(4, IGNORED)], sync: { published_in_ha: true },
