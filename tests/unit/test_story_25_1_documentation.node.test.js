@@ -68,7 +68,7 @@ describe('25.1 / AC23 — libellés cités = libellés du code', () => {
   const LABELS = ['Publié', 'À appliquer', 'Bloqué', 'Exclu', 'Désactivé', 'Rien à publier', 'Publiée', 'Bloquée', 'Exclue',
     'Automatique', 'Toujours', 'Jamais', 'Appliquer', 'Republier', 'Supprimer de Home Assistant…', 'Relire Jeedom', 'Démon',
     'Ouvrir les types génériques', 'Voir la première commande bloquée', 'Retirer le type imposé', 'Type HA', 'Dans Home Assistant',
-    'Type Jeedom', 'Publication dans Home Assistant', 'Relire'];
+    'Type Jeedom', 'Publication dans Home Assistant', 'Relire', 'Tout remettre en automatique…'];
 
   it('chaque libellé du glossaire cité entre « » dans la documentation existe tel quel dans desktop/ ou core/', () => {
     const text = index + compteurs;

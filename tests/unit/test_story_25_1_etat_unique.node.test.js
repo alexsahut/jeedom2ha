@@ -154,6 +154,29 @@ describe('25.1 / AC2 — table de vérité D1', () => {
     assert.equal(stateOf(eq({ decision: DISABLED, commands: [] })), 'disabled');
   });
 
+  it('revue P2-1 : une décision d’équipement « Exclu » / « Désactivé » s’applique malgré les commandes prêtes ou bloquées', () => {
+    // Décision d'équipement exclu + 1 commande prête + P false → excluded (R4 avant R5).
+    assert.equal(stateOf(eq({ decision: EXCLUDED, commands: [cmd(1, READY)] })), 'excluded');
+    // Même décision + 1 commande bloquée → excluded (R4 avant R7).
+    assert.equal(stateOf(eq({ decision: EXCLUDED, commands: [cmd(1, BLOCKED)], sync: { current_should_publish: false } })), 'excluded');
+    // Désactivé + 1 commande bloquée → disabled (R3 avant R7).
+    assert.equal(stateOf(eq({ decision: DISABLED, commands: [cmd(1, BLOCKED)], sync: { current_should_publish: false } })), 'disabled');
+    // Désactivé + 1 commande prête + P false → disabled.
+    assert.equal(stateOf(eq({ decision: DISABLED, commands: [cmd(1, READY)] })), 'disabled');
+  });
+
+  it('revue P2-1 : par les commandes, toutes les commandes NON IGNORÉES doivent être exclues (ou désactivées)', () => {
+    const off = { current_should_publish: false };
+    // Une exclue et le reste ignoré : toutes les commandes non ignorées sont exclues → excluded.
+    assert.equal(stateOf(eq({ commands: [cmd(1, EXCLUDED), cmd(2, IGNORED)], sync: off })), 'excluded');
+    // Une exclue, une autre sans diagnostic (ni exclue ni ignorée) : pas toutes exclues → nothing_to_publish.
+    assert.equal(stateOf(eq({ commands: [cmd(1, EXCLUDED), cmd(2, null)], sync: off })), 'nothing_to_publish');
+    // Une exclue et une bloquée : bloqué.
+    assert.equal(stateOf(eq({ commands: [cmd(1, EXCLUDED), cmd(2, BLOCKED)], sync: off })), 'blocked');
+    // Désactivée et exclue, ignorées en plus : disabled prime.
+    assert.equal(stateOf(eq({ commands: [cmd(1, DISABLED), cmd(2, EXCLUDED), cmd(3, IGNORED)], sync: off })), 'disabled');
+  });
+
   it('croisements : commandes toutes ignorées → nothing_to_publish', () => {
     assert.equal(stateOf(eq({ commands: [cmd(1, IGNORED)], sync: { current_should_publish: null } })), 'nothing_to_publish');
   });

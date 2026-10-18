@@ -148,7 +148,7 @@ Trois boutons agissent sur **l'ensemble du parc** :
 
 **Quand certains boutons sont grisés.** Les trois boutons ci-dessus, ainsi que « Appliquer » et les entrées « Republier » et « Supprimer de Home Assistant… » des menus « ⋯ » (de la pièce et de chaque équipement), ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
 
-- « Daemon arrêté — actions Home Assistant bloquées. » (le démon est arrêté ; le mot « Daemon » est celui de l'écran) ;
+- « Démon arrêté — actions Home Assistant bloquées. » (le démon est arrêté) ;
 - « MQTT déconnecté — actions Home Assistant bloquées. » ;
 - « Démon ou MQTT indisponible — actions Home Assistant bloquées. » (état impossible à lire).
 
@@ -193,7 +193,7 @@ Cliquer sur une carte ouvre une fenêtre qui porte le nom de la pièce. Elle con
 3. **Une zone de résultat**, où s'affiche le message de la dernière action (vert : succès ; orange : succès partiel ; rouge : échec).
 4. **La liste des équipements de la pièce**, un panneau par équipement. **Un seul panneau est déplié à la fois** : en déplier un replie celui qui l'était. Chaque panneau montre le nom de l'équipement, la mention « (désactivé dans Jeedom) » le cas échéant, et un **badge d'état** (voir [Les badges de synthèse](#les-badges-de-synthèse)).
 
-À l'ouverture, le plugin lit **uniquement les équipements de cette pièce**, ce qui prend quelques instants (« Chargement… » s'affiche dans chaque panneau). Si la lecture d'un équipement échoue, son panneau indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (daemon indisponible). » et n'offre aucune action.
+À l'ouverture, le plugin lit **uniquement les équipements de cette pièce**, ce qui prend quelques instants (« Chargement… » s'affiche dans chaque panneau). Si la lecture d'un équipement échoue, son panneau indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). » et n'offre aucune action.
 
 La fenêtre n'a qu'**une seule barre de défilement**. L'en-tête de l'équipement déplié (nom, badge, réglage de publication, « Appliquer » et menu « ⋯ ») reste collé en haut pendant que vous faites défiler le tableau.
 <!-- CAPTURE-A-PRENDRE: fenêtre d'une pièce -->
@@ -205,7 +205,7 @@ L'en-tête de l'équipement déplié, qui reste visible, comporte :
 - **Le badge d'état** (« Publié », « À appliquer », « Bloqué », « Exclu », « Désactivé » ou « Rien à publier »), suivi, quand l'équipement est publié ou à appliquer, de la **mention orange** du nombre de commandes bloquées (« 2 bloquées »).
 - **Le réglage « Publication dans Home Assistant »**, un contrôle à trois positions **« Automatique », « Toujours », « Jamais »**. La position courante est toujours montrée : « Jamais » pour un équipement exclu, « Toujours » pour un équipement forcé, « Automatique » sinon. Choisir une position enregistre le réglage (voir [Les actions de publication](#les-actions-de-publication)) ; il n'est pas publié tout de suite. Une position indisponible est grisée et son infobulle dit pourquoi. Au clavier, les flèches déplacent le choix, Espace ou Entrée le valident.
 - **Le bouton « Appliquer »**, affiché **seulement quand l'état est « À appliquer »** (voir [Réglages en attente](#réglages-en-attente-et-appliquer)).
-- **Le menu « ⋯ »** (touche Échap pour le fermer) : « Republier », puis, séparée par un trait, « Supprimer de Home Assistant… » en rouge.
+- **Le menu « ⋯ »** (touche Échap pour le fermer) : « Republier », « Tout remettre en automatique… », puis, séparée par un trait, « Supprimer de Home Assistant… » en rouge.
 
 Dessous, de haut en bas :
 
@@ -292,12 +292,12 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 **Toujours**
 
 - *Ce que ça fait* : demande au plugin de publier une entité qu'il aurait refusé de publier.
-- *Confirmation* : toujours précédée d'un **aperçu** calculé par le démon, avant toute écriture. Il indique « Type HA : … », « Projection valide pour ce type. » ou « Projection invalide pour ce type. » (la « projection » est la transformation de l'équipement Jeedom en entité Home Assistant de ce type), « Commandes qui recevront les ordres : … » et « Cette entité sera publiée dans Home Assistant. ». À la portée équipement, l'aperçu liste « Entités concernées par ce forçage : … » et conclut « Au moins une entité sera publiée dans Home Assistant. ».
+- *Confirmation* : toujours précédée d'un **aperçu** calculé par le démon, avant toute écriture. Il indique « Type HA : … », « Projection valide pour ce type. » ou « Projection invalide pour ce type. » (la « projection » est la transformation de l'équipement Jeedom en entité Home Assistant de ce type), « Commandes qui recevront les ordres : … » et « Cette entité passe à « À appliquer » dans Home Assistant. ». À la portée équipement, l'aperçu liste « Entités concernées par ce forçage : … » et conclut « Au moins une entité passe à « À appliquer » dans Home Assistant. ».
 - *Si le réglage serait refusé* : l'aperçu affiche « Le forçage serait refusé : <raison> » et le bouton « Confirmer » est grisé. Si le démon ne répond pas : « Aperçu indisponible — le démon ne répond pas. »
 
 **Automatique**
 
-- *Équipement* : retire **les deux sortes** de réglages de l'équipement (types choisis pour ses commandes, « Jamais » ou « Toujours »). Quand « Automatique » est déjà la position courante mais que des types ont été imposés, cliquer dessus les retire aussi.
+- *Équipement* : choisir « Automatique » retire le réglage de publication de l'équipement. Cliquer sur la position déjà courante n'écrit rien. Pour retirer **d'un coup les deux sortes** de réglages de l'équipement (types choisis pour ses commandes, « Jamais » ou « Toujours » de l'équipement et de ses entités), utilisez « Tout remettre en automatique… » du menu « ⋯ » : une confirmation liste ce qui sera retiré.
 - *Entité* : retire « Jamais » ou « Toujours » de l'entité **et** les types Home Assistant choisis pour ses commandes.
 - Pas de confirmation.
 

@@ -143,3 +143,13 @@ describe('CC-38 — exclusions volontaires', () => {
     assert.deepStrictEqual(ids, [3]);
   });
 });
+
+describe('25.1 / AC9 — mots d’état des exclusions (assertions rétablies)', () => {
+  it('un équipement exclu se dit « Exclu », une commande exclue « Exclue », jamais « partiel » ni « prête »', () => {
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.excluded, 'Exclu');
+    assert.strictEqual(M.resolveEquipmentState(tree([command(1, decisionView('excluded_object'))], false)).state, 'excluded');
+    assert.strictEqual(M.classifyCommandCategory(command(1, decisionView('publication_excluded_command'))), 'excluded');
+    assert.strictEqual(M.buildExcludedLabel(decisionView('excluded_plugin')).startsWith('Exclue → '), true);
+    assert.ok(!Object.values(M.EQUIPMENT_STATE_LABELS).some((label) => /partiel|prêt/i.test(label)));
+  });
+});

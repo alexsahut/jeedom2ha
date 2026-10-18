@@ -167,7 +167,7 @@ describe('25.1 / AC18 — quatre teintes sémantiques, fonds translucides, repli
       if (isVariableBlock(rule)) continue;
       for (const d of declarations(rule.body)) {
         if (!/^background(-color)?$/.test(d.property)) continue;
-        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
+        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|var\(--bg-modal-color, var\(--j2ha-menu-bg\)\)|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
       }
     }
   });

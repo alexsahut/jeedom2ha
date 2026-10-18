@@ -97,6 +97,8 @@ function createUi(rooms) {
     bootbox: dom.bootbox,
     document: dom.document,
     Jeedom2haMappingOverride: M,
+    setTimeout,
+    clearTimeout,
     console,
   };
   sandbox.window = sandbox;

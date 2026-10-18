@@ -193,3 +193,17 @@ describe('25.1 / AC8 — libellés exacts du glossaire', () => {
     assert.deepEqual(ui.$('.j2ha-group-name .j2ha-tech').list.map((el) => ui.$(el).text()), ['light', 'alarm_control_panel']);
   });
 });
+
+describe('25.1 / revue R1 (P3-4) — glossaire résiduel', () => {
+  it('« Démon » partout : plus de « Daemon arrêté » ni de « daemon indisponible » ; formulations au présent', () => {
+    for (const file of jsFiles) {
+      for (const text of jsStrings(fs.readFileSync(path.join('desktop/js', file), 'utf8'))) {
+        assert.doesNotMatch(text, /Daemon arrêté|daemon indisponible|sera publiée/i, file + ' : ' + text);
+      }
+    }
+    const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
+    assert.match(home, /\{\{Démon arrêté — actions Home Assistant bloquées\.\}\}/);
+    const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
+    assert.match(surface, /\{\{Cette entité passe à « À appliquer » dans Home Assistant\.\}\}/);
+  });
+});

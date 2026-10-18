@@ -266,13 +266,14 @@ describe('25.1 / AC11 — « Appliquer » seulement quand un réglage attend', (
 describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
   const EQ = '.j2ha-eq-panel[data-eq-id="1"] ';
 
-  it('« Republier » puis un trait puis « Supprimer de Home Assistant… » (rouge dans le menu seulement)', () => {
+  it('« Republier », « Tout remettre en automatique… », un trait puis « Supprimer de Home Assistant… » (rouge dans le menu seulement)', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
     const entries = ui.$(EQ + '.j2ha-menu li').list.map((li) => ({
       role: li.attrs.role, text: plain(ui.$(li).text()), danger: ui.$(li).find('.j2ha-menu-danger').length === 1,
     }));
     assert.deepEqual(entries, [
       { role: 'none', text: 'Republier', danger: false },
+      { role: 'none', text: 'Tout remettre en automatique…', danger: false },
       { role: 'separator', text: '', danger: false },
       { role: 'none', text: 'Supprimer de Home Assistant…', danger: true },
     ]);
@@ -513,5 +514,94 @@ describe('25.1 / AC26 — accessibilité minimale', () => {
     });
     ui.$('.j2ha-menu-toggle').list.forEach((toggle) => assert.equal(toggle.attrs['aria-label'], '{{Autres actions}}'));
     ui.$('.j2ha-seg').list.forEach((group) => assert.ok(group.attrs['aria-label']));
+  });
+});
+
+describe('25.1 / revue R1 (ClaudeBox) — P2-2, P2-3, P3-2, P3-3', () => {
+  const PANEL = '.j2ha-eq-panel[data-eq-id="1"] ';
+  const EQ = PANEL + '.j2ha-eq-controls';
+  const refused = Object.assign(view('ambiguous_skipped', false, false), { ha_entity_type: 'light', projection_validity: { is_valid: true, missing_capabilities: [], missing_fields: [] } });
+  const writes = (ui) => ui.calls.filter((c) => /^(save|revert)|executeHaAction/.test(c.action || ''));
+
+  it('P2-2 : « Voir la première commande bloquée » fait défiler la fenêtre jusqu’à la ligne (scrollIntoView) et la surligne', () => {
+    const t = tree(1, [READY, BLOCKED], { present: true });
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    const row = ui.$(PANEL + 'tr.mapping-override-cmd[data-cmd-id="101"]');
+    const seen = [];
+    row.list[0].scrollIntoView = (options) => seen.push(options);
+    ui.click(PANEL + '.j2ha-goto-blocking');
+    assert.equal(JSON.stringify(seen), '[{"block":"center"}]');
+    assert.ok(row.hasClass('j2ha-diag-target-highlight'));
+    const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
+    assert.match(css, /\.j2ha-cmd-table tr\.mapping-override-cmd\s*\{[^}]*scroll-margin-top/);
+  });
+
+  it('P2-3 : un clic sur « Automatique » déjà actif n’écrit jamais, même avec des types HA imposés', () => {
+    const t = tree(1, [READY], { entities: [entity('light', [100])] });
+    t.commands[0].override_applied = true;
+    t.commands[0].effective_ha = 'light';
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    assert.ok(ui.$(EQ + ' .j2ha-seg-auto').hasClass('j2ha-seg-active'));
+    ui.click(EQ + ' .j2ha-seg-auto');
+    assert.equal(writes(ui).length, 0);
+    assert.equal(ui.pending('getMappingOverrides').length, 0);
+  });
+
+  it('P2-3 : « Tout remettre en automatique… » (menu ⋯) liste ce qui sera retiré, puis retire sur la route existante', () => {
+    const t = tree(1, [READY, READY], { entities: [entity('light', [100], { publication_override: 'exclude_command' }), entity('sensor', [101])] });
+    t.commands[1].override_applied = true;
+    t.commands[1].effective_ha = 'sensor';
+    t.equipment_publication_override = 'force_publish';
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    const reset = ui.$(PANEL + '.j2ha-eq-reset');
+    assert.equal(plain(reset.text()), 'Tout remettre en automatique…');
+    assert.notEqual(reset.prop('disabled'), true);
+    ui.click(PANEL + '.j2ha-eq-reset');
+    assert.equal(writes(ui).length, 0, 'rien n’est écrit avant la confirmation');
+    const message = plain(ui.$(ui.lastConfirmation().options.message).text());
+    assert.match(message, /réglage « Toujours » de l’équipement/);
+    assert.match(message, /1 réglage « Jamais » ou « Toujours » d’entité/);
+    assert.match(message, /1 type Home Assistant imposé/);
+    ui.lastConfirmation().options.buttons.confirm.callback();
+    const call = ui.pending('revertPublicationOverride')[0];
+    assert.deepEqual([call.data.eqId, call.data.cmdId], [1, undefined]);
+  });
+
+  it('P2-3 : annuler la confirmation n’écrit rien ; l’entrée est grisée sans réglage à retirer', () => {
+    const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(tree(1, [READY], { entities: [entity('light', [100], { publication_override: 'force_publish' })] })), ok(tree(2, [READY]))]);
+    ui.click(PANEL + '.j2ha-eq-reset');
+    ui.lastConfirmation().options.buttons.cancel.callback();
+    assert.equal(writes(ui).length, 0);
+    const none = ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-reset');
+    assert.equal(none.prop('disabled'), true);
+    assert.match(none.attr('title'), /Aucun réglage de publication à retirer/);
+  });
+
+  it('P3-2 : « Toujours » → aperçu du démon puis savePublicationOverride force_publish (équipement)', () => {
+    const t = tree(1, [refused], { decision: refused, present: false });
+    t.entities = [entity('light', [100], { decision: refused })];
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    ui.click(EQ + ' .j2ha-seg-always');
+    const preview = ui.pending('previewMappingOverride')[0];
+    assert.deepEqual([preview.data.eqId, preview.data.publicationPolicy, preview.data.cmdId], [1, 'force_publish', undefined]);
+    preview.respond({ state: 'ok', result: { payload: { overridden: { entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY }] } } } });
+    ui.lastConfirmation().options.buttons.confirm.callback();
+    const save = ui.pending('savePublicationOverride')[0];
+    assert.deepEqual([save.data.eqId, save.data.publicationPolicy, save.data.cmdId], [1, 'force_publish', undefined]);
+  });
+
+  it('P3-3 : « Voir la première commande bloquée » et l’icône « Retirer le type imposé » répondent à Entrée et Espace', () => {
+    const t = tree(1, [READY, BLOCKED], { present: true });
+    t.commands[0].override_applied = true;
+    t.commands[0].effective_ha = 'light';
+    const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
+    const seen = [];
+    ui.$(PANEL + 'tr.mapping-override-cmd[data-cmd-id="101"]').list[0].scrollIntoView = (o) => seen.push(o);
+    ui.key(PANEL + '.j2ha-goto-blocking', 'Enter');
+    ui.key(PANEL + '.j2ha-goto-blocking', ' ');
+    assert.equal(seen.length, 2);
+    ui.key(PANEL + '.mo-revert-cmd', ' ');
+    const call = ui.pending('revertMappingOverride')[0];
+    assert.deepEqual([call.data.eqId, call.data.cmdId], [1, 100]);
   });
 });

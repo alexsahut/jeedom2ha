@@ -183,3 +183,13 @@ describe('20.3 / AC7 — le dénombrement ne lit que l’arbre de la pièce ouve
     assert.doesNotMatch(override, /published_scope|diagnostic_equipments|home_signals/);
   });
 });
+
+describe('25.1 / AC9 — mots courts de la ligne des états (assertions rétablies)', () => {
+  it('un état non nul = un chiffre et son mot ; l’ordre est celui des états', () => {
+    const s = M.summarizeRoom([tree(1, [READY], { present: true }), tree(2, [DISABLED], { present: false })], 2);
+    const labels = M.buildRoomCounterLabels(s);
+    assert.deepEqual(labels.items.map((item) => item.text), ['1 publié', '1 désactivé']);
+    assert.deepEqual(labels.items.map((item) => item.state), ['published', 'disabled']);
+    assert.equal(labels.unread, '');
+  });
+});

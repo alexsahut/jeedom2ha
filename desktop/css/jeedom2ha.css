@@ -212,6 +212,11 @@ body[data-theme*="Dark"] {
   position: sticky;
   top: 0;
   z-index: 3;
+  /* Fond opaque : rien ne transparaît quand le tableau défile dessous. */
+  background-color: var(--bg-modal-color, var(--j2ha-menu-bg));
+}
+.j2ha-cmd-table tr.mapping-override-cmd {
+  scroll-margin-top: 90px;
 }
 .j2ha-eq-toggle {
   display: flex;

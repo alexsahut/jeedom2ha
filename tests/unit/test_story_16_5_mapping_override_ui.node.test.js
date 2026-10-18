@@ -245,3 +245,12 @@ describe('16.5 / AC3.4 — commandes bloquantes plafonnées', () => {
     assert.strictEqual(ids.length, 4);
   });
 });
+
+describe('25.1 / AC9 — le mot d’état rendu accompagne les messages (assertions rétablies)', () => {
+  it('les libellés de diagnostic et les mots d’état du glossaire sont ceux de l’interface', () => {
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.to_apply, 'À appliquer');
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.blocked, 'Bloqué');
+    assert.match(M.buildPublishCellLabel(readyView('light')), /^À appliquer → Lumière/);
+    assert.match(M.buildDiagnosticMessage(readyView('light')), /type Home Assistant validé/);
+  });
+});

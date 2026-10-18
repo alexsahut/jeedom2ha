@@ -99,3 +99,12 @@ describe('20-2 / AC8 — équipement exclu sans commande', () => {
     assert.strictEqual(M.resolveEquipmentState(treeWith([decisionView('excluded_eqlogic')], false)).state, 'excluded');
   });
 });
+
+describe('25.1 / AC9 — mot d’état d’un équipement sans commande (assertions rétablies)', () => {
+  it('exclu → « Exclu », désactivé → « Désactivé », rien → « Rien à publier »', () => {
+    const word = (reason) => M.EQUIPMENT_STATE_LABELS[M.resolveEquipmentState(treeNoCommands(reason)).state];
+    assert.strictEqual(word('excluded_eqlogic'), 'Exclu');
+    assert.strictEqual(word('disabled_eqlogic'), 'Désactivé');
+    assert.strictEqual(word(null), 'Rien à publier');
+  });
+});

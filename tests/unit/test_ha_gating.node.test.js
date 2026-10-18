@@ -80,7 +80,7 @@ function applyHAGatingWith$(r, $) {
     $haActions.prop("disabled", true).addClass("j2ha-ha-gated");
     var reason = "Démon ou MQTT indisponible — actions Home Assistant bloquées.";
     if (r && !r.daemon) {
-      reason = "Daemon arrêté — actions Home Assistant bloquées.";
+      reason = "Démon arrêté — actions Home Assistant bloquées.";
     } else if (r) {
       reason = "MQTT déconnecté — actions Home Assistant bloquées.";
     }
@@ -150,11 +150,11 @@ test("story-2.3: applyHAGating(null) → boutons disabled, classe j2ha-ha-gated 
   assert.match(mock.reasonElem._state.text, /indisponible/);
 });
 
-test("story-2.3: applyHAGating — daemon arrêté → message mentionne Daemon arrêté", () => {
+test("story-2.3: applyHAGating — daemon arrêté → message mentionne Démon arrêté", () => {
   var mock = makeJQueryMock();
   applyHAGatingWith$({ daemon: false }, mock.$);
   assert.equal(mock.haActionsElem._state.disabled, true);
-  assert.match(mock.reasonElem._state.text, /Daemon arrêté/);
+  assert.match(mock.reasonElem._state.text, /Démon arrêté/);
 });
 
 test("story-2.3: applyHAGating — MQTT déconnecté → message mentionne MQTT déconnecté", () => {
