@@ -2579,3 +2579,46 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - le plugin n'écrit ni la configuration Homebridge, ni un type générique Jeedom, ni une exposition Assist ;
 - pour chaque type ouvert : entrée `HA_COMPONENT_REGISTRY`, mapper, cas nominal et d'échec de `validate_projection()`, contrat 4D non régressé, `SWITCH_*`/`ENERGY_*` non régressés, inventaire avant/après et liste des références à l'ancien `entity_id` ;
 - gate 20-0 vert avant chaque `done` qui touche l'écran ; golden et contrat 4D verts (champs additifs justifiés) ; aucun nom réel dans le dépôt (CC-48).
+
+### Epic 25 — Refonte de la surface de configuration (A+B+C)
+
+**Statut :** `backlog` — cadrage documentaire du 2026-10-18 (ClaudeBox, relais des décisions d'Alexandre), issu du refus de validation UX de 22-2 le 2026-10-18 à 17:58 (« pas clair, brouillon, pas très joli ») et d'un diagnostic UX/UI indépendant (`diagnostic-ux.md`, 15 problèmes) avec maquettes de trois directions (`maquettes.html`). Les cinq stories sont `backlog` : relecture ClaudeBox obligatoire sur chaque story avant tout `ready-for-dev` ; ce cadrage n'autorise aucun développement ni fusion. Cadrage complet : `_bmad-output/planning-artifacts/ux/2026-10-18-refonte-surface/CADRAGE.md`.
+
+**Origine :** 22-2 déployée et prouvée le 2026-10-12, restée `ready-for-UX-validation` ; refus UX d'Alexandre le 2026-10-18 17:58 ; diagnostic UX/UI indépendant (captures réelles du 18/10, code de la surface) et maquettes à données fictives (CC-48) ; **décision d'Alexandre du 2026-10-18 18:15 : les trois directions A + B + C**, après validation de faisabilité Jeedom par ClaudeBox.
+
+**Valeur utilisateur :** une surface de configuration par pièce cohérente (une seule grammaire visuelle, un seul vocabulaire), lisible en vue d'ensemble (page principale) et exploitable pour un travail fin (vue maître-détail), sur les deux thèmes Jeedom, sans régression de performance.
+
+**Objectif :** (1) une fonction d'état unique (plan + réalité → état) qui remplace les trois sources de vérité contradictoires actuelles ; (2) le glossaire unique imposé partout (équipement : Publié / À appliquer / Bloqué / Exclu / Désactivé / Rien à publier ; commande : Publiée / Bloquée / Ignorée / Exclue ; réglage : Automatique / Toujours / Jamais), sans « override » ni franglais résiduel ; (3) la palette sémantique sur les variables de thème Jeedom (clair/sombre), sans couleur en dur ; (4) une vue d'ensemble actionnable sur la page principale (barre de santé, jauge maison filtrante, cartes de pièce) ; (5) une vue maître-détail pleine hauteur qui remplace la modale (arbre pièces → équipements, détail à droite), repliable sous un seuil de largeur ; (6) une route agrégée côté démon qui sert B et C sans explosion du nombre de requêtes à l'ouverture.
+
+**Périmètre :** `desktop/js` et `desktop/php` de la surface de configuration par pièce (fenêtre de pièce, page principale, nouvelle vue maître-détail) ; une route agrégée côté démon (lecture seule, dérivée de la fonction d'état, pas de nouveau champ de décision) ; variables CSS `--j2ha-*` sous les deux thèmes ; libellés i18n et leurs tests Node ; `index.md`/`compteurs.md` réécrits pour le nouveau vocabulaire.
+
+**Hors périmètre :** le contrat de décision (`evaluate_equipment()`, `CommandDecision`), les artefacts figés (`models/taxonomy.py`, `models/cause_mapping.py`, `models/ui_contract_4d.py`) et les tables de mapping ; toute donnée ou capture de la maison réelle (CC-48 ; démo VM 122 et box pour la preuve terrain, identifiants seuls) ; les epics 23 (Market) et 24 (parité HomeKit), sauf dépendance de planning sur 22-2.
+
+**Décisions de cadrage (ClaudeBox, 2026-10-18 18:22, dans le cadre validé par Alexandre) :**
+- **Q1 (clôture de 22-2) :** 22-2 passe à `done` (superseded par 25.1) au moment de la preuve terrain de 25.1 ; sa validation UX est transférée à 25.5.
+- **Q2 (fraîcheur des jauges B) :** premier incrément sans temps réel poussé — jauges calculées à l'ouverture de la page, après chaque action, à chaque fin de synchro, plus un bouton « Actualiser ».
+- **Q3 (seuil de repli du panneau C) :** à mesurer pendant 25.4, valeur par défaut 1024 px ; la preuve inclut l'iPad mural en mode desktop.
+- **Q4 (retrait de l'ancienne modale) :** inclus dans 25.4, pas de story séparée.
+
+**Contraintes à tenir (détail : `CADRAGE.md`, section « Contraintes Jeedom », vérifiées sur la box Jeedom 4.6.1 le 2026-10-18) :** thème via `<body data-theme>` et variables du core (`--bg-color`, `--al-success-color`, etc.) ; jQuery 3.6 / Bootstrap 3 / bootbox / jeeDialog / jeedomUtils / Font Awesome 5 local uniquement, aucune bibliothèque externe ; CSS préfixé `.j2ha-…` ; tester clair/sombre + bascule auto et Jeedom 4.4 ; libellés via `{{…}}`/`__()` avec tests Node de libellés alignés (modèle 20-3, 22-2) ; route agrégée obligatoire pour éviter les requêtes multiples à l'ouverture.
+
+**Stories (`backlog`, relecture ClaudeBox obligatoire avant tout `ready-for-dev`) :**
+- **Story 25.1 — Socle A : état unique, glossaire, palette de thème.** Fonction d'état unique, glossaire imposé, palette `--j2ha-*` sur les deux thèmes, réorganisation de la fenêtre de pièce sans changer la structure grille + modale. Doc et tests de libellés réalignés. Clôt 22-2 (`done`, superseded) à la preuve terrain.
+- **Story 25.2 — Route agrégée côté démon.** États par pièce et par équipement en un appel, cache, invalidation à la synchro. Prérequis de performance pour 25.3 et 25.4.
+- **Story 25.3 — Page principale B.** Barre de santé, jauge maison filtrante (ouverture, après action, fin de synchro, bouton Actualiser — Q2), cartes de pièce segmentées. Dépend de 25.1 et 25.2.
+- **Story 25.4 — Vue maître-détail C.** Remplace la modale (retrait inclus — Q4) par une vue pleine hauteur : arbre pièces → équipements, détail à droite, panneau repliable sous un seuil mesuré pendant la story (défaut 1024 px — Q3), preuve incluant l'iPad mural en mode desktop. Dépend de 25.1 à 25.3.
+- **Story 25.5 — Recette UX finale et preuve terrain.** Validation UX finale d'Alexandre sur A+B+C (reprend la validation UX transférée de 22-2 — Q1) ; captures pour 23-2 sur la démo VM 122 ; preuve terrain CC-48. Clôture l'epic.
+
+**Ordre retenu :** 25.1 → 25.2 → 25.3 → 25.4 → 25.5.
+
+**Points visés :** clôture UX de 22-2 (CC-36/CC-51 restent acquis côté démon, seule la surface change) ; aucune ouverture `PRODUCT_SCOPE`.
+
+**Dev notes :** workflow BMAD complet (`create-story -> dev-story -> code-review`) ; chaque story qui touche l'écran passe par `ready-for-UX-validation` et le gate 20-0 avant `done` ; sessions cloud déléguées sans accès box/HA ; aucun nom réel d'équipement, de pièce, de scénario ou de personne dans le dépôt (CC-48) ; une story = une PR.
+
+### Gates epic-level pe-epic-25
+
+- une seule fonction d'état (plan + réalité → état) pilote la fenêtre de pièce, la page principale et la vue maître-détail ; aucune des trois vérités contradictoires actuelles ne subsiste.
+- le glossaire du `CADRAGE.md` est respecté à l'écran et dans les tests de libellés ; aucun « override » ni terme franglais résiduel.
+- aucune couleur en dur : toutes les teintes d'état viennent des variables `--j2ha-*`, correctes en clair et en sombre (bascule auto comprise) et sur Jeedom 4.4 et 4.6.1.
+- B et C sont servis par la route agrégée de 25.2 ; pas de régression du nombre de requêtes à l'ouverture de la page.
+- gate 20-0 vert avant chaque `done` qui touche l'écran ; validation UX d'Alexandre avant le `done` de 25.5 ; aucun nom réel dans le dépôt (CC-48).
