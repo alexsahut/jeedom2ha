@@ -1,6 +1,6 @@
 # Story 25.2 : Route agrégée côté démon — états par pièce et par équipement en un appel
 
-Status: ready-for-dev
+Status: review
 
 > **Statut : `ready-for-dev` (2026-10-19 00:35, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — voir § Décisions).** Précédemment : `backlog` (2026-10-18). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
@@ -241,31 +241,31 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
+- [ ] Task 0 (SAUTÉE par la session cloud : réservée à l'humain / ClaudeBox) — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
   - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
-- [ ] Task 1 — Filet de non-régression **avant tout code** (AC: 3, 17)
-  - [ ] 1.1 Corpus fictif d'équipements couvrant R1-R8 / D3 (fixtures partagées pytest + JSON pour Node).
-  - [ ] 1.2 Test d'instantané de `GET /system/mapping_overrides/{eq_id}` sur ce corpus (octet pour octet), écrit et vert **avant** de toucher le builder.
-- [ ] Task 2 — Parité (tests d'abord) (AC: 2, 3, 4, 5)
-  - [ ] 2.1 `test_story_25_2_route_agregee.py` : forme, liste blanche, égalité avec la projection de l'arbre unitaire, clés interdites, absence de la partition D3 dans le démon.
-  - [ ] 2.2 `test_story_25_2_parite_etat.node.test.js` : `resolveEquipmentState` / `summarizeEquipmentCounters` identiques sur arbre complet et entrée agrégée.
-- [ ] Task 3 — Builder réutilisable, additif (AC: 9, 17)
-  - [ ] 3.1 `_build_mapping_override_tree` : paramètres optionnels (dictionnaires d'overrides déjà chargés ; omission du calcul `override_types_allowed`) ; valeurs par défaut = comportement actuel.
-  - [ ] 3.2 Instantané de la Task 1.2 toujours vert.
-- [ ] Task 4 — Route et cache (AC: 1, 2, 6, 7, 8, 10, 14)
-  - [ ] 4.1 Handler `GET` + enregistrement dans `create_app` ; état du cache sous une clé `app[…]` unique initialisée dans `create_app`.
-  - [ ] 4.2 Construction en une passe, isolation des erreurs (`unread`), single-flight, comparaison de génération, signature du fichier d'overrides, plafond (Q8), `refresh=1`, journal `[AGGREGATE]`.
-- [ ] Task 5 — Invalidation (AC: 11, 12, 13)
-  - [ ] 5.1 Fin de synchro (toutes sorties) ; 4 handlers d'override ; `/action/execute` et `_republish_all_from_cache` (selon Q5).
-  - [ ] 5.2 Tests GET → écriture → GET, GET → synchro → GET, test d'énumération des chemins d'écriture de l'état.
-- [ ] Task 6 — Charge et non-régression (AC: 15, 17, 18, 19)
-  - [ ] 6.1 `test_story_25_2_load.py` (`load`), 292 équipements fictifs, comparaison avec la boucle actuelle.
-  - [ ] 6.2 `make test`, `pytest`, `flake8`, `node --test tests/unit/*.node.test.js`, `scripts/ci-local.sh` ; `git diff --stat` des AC6 / AC18 vides comme attendu.
-- [ ] Task 7 — Preuve terrain (humain / ClaudeBox, après fusion ; CC-48)
+- [x] Task 1 — Filet de non-régression **avant tout code** (AC: 3, 17)
+  - [x] 1.1 Corpus fictif d'équipements couvrant R1-R8 / D3 (fixtures partagées pytest + JSON pour Node).
+  - [x] 1.2 Test d'instantané de `GET /system/mapping_overrides/{eq_id}` sur ce corpus (octet pour octet), écrit et vert **avant** de toucher le builder.
+- [x] Task 2 — Parité (tests d'abord) (AC: 2, 3, 4, 5)
+  - [x] 2.1 `test_story_25_2_route_agregee.py` : forme, liste blanche, égalité avec la projection de l'arbre unitaire, clés interdites, absence de la partition D3 dans le démon.
+  - [x] 2.2 `test_story_25_2_parite_etat.node.test.js` : `resolveEquipmentState` / `summarizeEquipmentCounters` identiques sur arbre complet et entrée agrégée.
+- [x] Task 3 — Builder réutilisable, additif (AC: 9, 17)
+  - [x] 3.1 `_build_mapping_override_tree` : paramètres optionnels (dictionnaires d'overrides déjà chargés ; omission du calcul `override_types_allowed`) ; valeurs par défaut = comportement actuel.
+  - [x] 3.2 Instantané de la Task 1.2 toujours vert.
+- [x] Task 4 — Route et cache (AC: 1, 2, 6, 7, 8, 10, 14)
+  - [x] 4.1 Handler `GET` + enregistrement dans `create_app` ; état du cache sous une clé `app[…]` unique initialisée dans `create_app`.
+  - [x] 4.2 Construction en une passe, isolation des erreurs (`unread`), single-flight, comparaison de génération, signature du fichier d'overrides, plafond (Q8), `refresh=1`, journal `[AGGREGATE]`.
+- [x] Task 5 — Invalidation (AC: 11, 12, 13)
+  - [x] 5.1 Fin de synchro (toutes sorties) ; 4 handlers d'override ; `/action/execute` et `_republish_all_from_cache` (selon Q5).
+  - [x] 5.2 Tests GET → écriture → GET, GET → synchro → GET, test d'énumération des chemins d'écriture de l'état.
+- [x] Task 6 — Charge et non-régression (AC: 15, 17, 18, 19)
+  - [x] 6.1 `test_story_25_2_load.py` (`load`), 292 équipements fictifs, comparaison avec la boucle actuelle.
+  - [x] 6.2 `make test`, `pytest`, `flake8`, `node --test tests/unit/*.node.test.js`, `scripts/ci-local.sh` ; `git diff --stat` des AC6 / AC18 vides comme attendu.
+- [ ] Task 7 (SAUTÉE par la session cloud : mesure sur la box réelle interdite, CC-48) — Preuve terrain (humain / ClaudeBox, après fusion ; CC-48)
   - [ ] 7.1 Relevé du budget sur le parc réel (AC16) dans `25-2-preuve-terrain-<date>.md`.
   - [ ] 7.2 Vérification qu'aucune publication HA ni inventaire MQTT n'a changé (gate d'inventaire identique) et 0 `ERROR` dans le journal du démon.
 
@@ -291,7 +291,23 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
 
 ### Contrat final
 
-*(à compléter au `dev-story` : copier ici la forme définitive de la réponse, après décisions Q1-Q3 et Q11-Q12.)*
+`GET /system/equipment_states[?refresh=1]` (`X-Local-Secret`, 401 sinon). Réponse 200 `{status:"ok", payload}` :
+
+```json
+{
+  "schema_version": 1,
+  "available": true,
+  "meta": { "generated_at": "…Z", "generation": 7, "cache": { "hit": false, "build_ms": 0 },
+            "equipments_total": 292, "equipments_read": 292, "action_in_progress": false },
+  "equipments": { "101": { "jeedom_eq_id": 101, "equipment_decision": {}, "entities": [ { "override_pending": false } ],
+                           "commands": [ { "jeedom_cmd_id": 1011, "covered": true, "published_in_ha": true, "diagnostic": {} } ],
+                           "sync_status": { "synced_should_publish": true, "current_should_publish": true,
+                                            "override_pending": false, "published_in_ha": true } } },
+  "unread": [ { "eq_id": 998, "reason": "build_error" } ]
+}
+```
+
+Amendements par rapport à la proposition initiale (décisions ClaudeBox) : **pas d'index `rooms`** (Q3 B), pas de `not_in_topology` (Q3 bis). Avant la première synchro : `available:false`, `equipments:{}`, `unread:[]` (Q12). Pendant `action_lock` : entrée valide servie avec `meta.action_in_progress:true`, sinon `available:false` + `reason:"action_in_progress"` (Q7 A). Relais PHP : action ajax `getEquipmentStates` (paramètre `refresh=1` optionnel, budget `JEEDOM2HA_RELAY_BUDGET_SHORT_S`) ; ligne de politique ajoutée dans `tests/e2e/gate/lib/policy.mjs` (Q9 A).
 
 ### Précédents et garde-fous réutilisables
 
@@ -330,7 +346,7 @@ AC1 à AC19 tenus ; suites locales vertes ; budgets de Q10 respectés en test de
 
 ### Agent Model Used
 
-Session cloud déléguée Claude Code (`create-story`, documentaire), 2026-10-18.
+Session cloud déléguée Claude Code — `create-story` (documentaire, 2026-10-18), puis `dev-story` (2026-10-18).
 
 ### Debug Log References
 
@@ -343,11 +359,18 @@ Session cloud déléguée Claude Code (`create-story`, documentaire), 2026-10-18
   3. Les écritures d'override et la synchro ne sont pas les seuls événements qui changent `published_in_ha` : `/action/execute` (Publier / Supprimer / Republier) et `_republish_all_from_cache` aussi (→ Q5).
   4. Sans relais `core/ajax`, la route n'est pas atteignable depuis le JS ; le périmètre transmis étant le démon, il est posé en question (→ Q9).
 - Aucune mesure de budget n'a été faite ni inventée (CC-48) ; la méthode est écrite (AC15-AC16).
+- **dev-story (session cloud)** : Tasks 1 à 6 faites ; **Task 0 et Task 7 sautées** (réservées à l'humain / ClaudeBox : pas d'accès box / SSH / Home Assistant en session cloud, CC-48). AC16 (mesure terrain) reste donc à exécuter ; la story ne passe pas à `done` sans elle.
+- Tests d'abord : `test_story_25_2_snapshot_unitaire.py` (instantané octet pour octet de `GET /system/mapping_overrides/{eq_id}`, 10 équipements, fixtures `resources/daemon/tests/fixtures/story_25_2_unit_tree/`) écrit et vert avant tout refactor ; toujours vert après (le builder n'a gagné que 3 paramètres additifs).
+- Mesure synthétique AC15 (`test_story_25_2_load.py`, marqueur `load`, 292 équipements, vrai `MapperRegistry`, VM de mesure ; projection ×1,5 ×3) : `c_eq` ≈ 3,5 ms ; construction à froid 226 ms brut → **≈ 1 016 ms projeté** (budget 4 000) ; appel à chaud 3 ms brut → **≈ 13,7 ms projeté** (budget 50) ; charge utile **913 266 octets** (budget 1 500 000) ; boucle actuelle (292 × builder historique) 8 770 ms brut, soit un gain d'environ **39×** à froid. Budgets tenus. Le corps volumineux est sérialisé une fois par entrée de cache.
+- Invalidation : fin de synchro et fin d'action (`finally`, avant la libération de `action_lock`), 3 handlers d'écriture d'override (les 2 reverts partagent un handler), `_republish_all_from_cache` (enveloppe). Plafond de sécurité 300 s (Q8), signature `os.stat` du fichier d'overrides, identité de la topologie, comparaison de génération.
+- Écart assumé : la comparaison de génération (AC11) est triviale en production car la construction est synchrone (aucun `await`) ; elle est testée par injection d'une invalidation pendant la construction.
 
 ### File List
 
 - Story : ce fichier.
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (commentaire de l'entrée 25-2 seulement).
+- `resources/daemon/transport/http_server.py` (route, cache, invalidations, paramètres additifs du builder).
+- `core/ajax/jeedom2ha.ajax.php` (relais `getEquipmentStates`), `tests/e2e/gate/lib/policy.mjs` (ligne de politique), `tests/unit/test_story_a1_php_relay.php` (test PHP).
+- Tests : `resources/daemon/tests/unit/{story_25_2_corpus,test_story_25_2_snapshot_unitaire,test_story_25_2_route_agregee,test_story_25_2_load}.py`, `tests/unit/test_story_25_2_parite_etat.node.test.js`, fixtures `tests/fixtures/story_25_2_parite_etat.json` et `resources/daemon/tests/fixtures/story_25_2_unit_tree/`.
 
 ## Décisions (ClaudeBox, 2026-10-19 00:35, par délégation d'Alexandre du 2026-10-18 23:50)
 
@@ -448,6 +471,8 @@ Proposition de forme, valeurs à fixer par ClaudeBox : un budget de **constructi
 **Q13 — Cohérence avec 25.3 sur la fraîcheur.** Le cadrage (Q2) calcule les jauges « à l'ouverture, après chaque action, à chaque fin de synchro, plus un bouton Actualiser ». Confirmer que 25.3 s'appuiera sur l'invalidation côté démon (AC11-AC13) et réservera `refresh=1` au bouton « Actualiser », plutôt que de forcer `refresh=1` à chaque ouverture (ce qui annulerait le cache). *(recommandé : oui)*
 
 ## Change Log
+
+- 2026-10-18 — `dev-story` (session cloud) : Tasks 1-6 implémentées, Task 0 et Task 7 sautées ; statut `review`.
 
 - 2026-10-19 00:35 — Relecture ClaudeBox : décisions Q1-Q13 (§ Décisions, par délégation d'Alexandre) ; `ready-for-dev`.
 

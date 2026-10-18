@@ -96,12 +96,19 @@ foreach (['scanTopology' => 'TOPOLOGY', 'getDiagnostics' => 'DIAGNOSTICS', 'expo
     ok("{$a} passe par le relais borné ({$label})", strpos($b, "_jeedom2ha_run_parc_relay('{$label}'") !== false);
     ok("{$a} n'a plus de timeout 15 littéral", !preg_match('/callDaemon\([^;]*,\s*15\b/', $b));
 }
-foreach (['testMqttConnection', 'getMappingOverrides'] as $a) {
+foreach (['testMqttConnection', 'getMappingOverrides', 'getEquipmentStates'] as $a) {
     $b = action_block($src, $a);
     ok("{$a} garde le budget court nommé", strpos($b, 'JEEDOM2HA_RELAY_BUDGET_SHORT_S') !== false);
     ok("{$a} n'utilise pas deadline_s", strpos($b, "['deadline_s']") === false && strpos($b, "'deadline_s' =>") === false);
     ok("{$a} documente sa décision inline", strpos($b, 'Story A1 (audit)') !== false);
 }
+
+echo "\nStory 25.2 / getEquipmentStates (lecture seule, relais de /system/equipment_states)\n";
+$b = action_block($src, 'getEquipmentStates');
+ok('getEquipmentStates relaie la route agrégée en GET', strpos($b, "'/system/equipment_states'") !== false && strpos($b, "'GET'") !== false);
+ok('getEquipmentStates transmet refresh=1 seulement sur demande', strpos($b, "'?refresh=1'") !== false && strpos($b, "init('refresh'") !== false);
+ok('getEquipmentStates ne fait aucune écriture', strpos($b, "'POST'") === false);
+ok('getEquipmentStates est une lecture autorisée du gate 20-0', strpos(file_get_contents(__DIR__ . '/../e2e/gate/lib/policy.mjs'), "'getEquipmentStates'") !== false);
 
 echo "\n{$passed} réussis, {$failed} échoués\n";
 exit($failed > 0 ? 1 : 0);
