@@ -82,6 +82,7 @@ describe('CC-38 — exclusions volontaires', () => {
       command(2, decisionView('excluded_plugin')),
       command(3, decisionView('excluded_plugin')),
     ], false)), { state: 'excluded', blocked_mention: 0 });
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS['excluded'], 'Exclu');
   });
 
   it('deux prêtes et une exclusion manuelle de commande restent publiées', () => {
@@ -93,6 +94,7 @@ describe('CC-38 — exclusions volontaires', () => {
       command(1, readyView()), command(2, readyView()),
       command(3, decisionView('publication_excluded_command')),
     ], true)), { state: 'published', blocked_mention: 0 });
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS['published'], 'Publié');
     assert.strictEqual(summary.first_blocking_cmd_id, null);
   });
 
@@ -109,6 +111,7 @@ describe('CC-38 — exclusions volontaires', () => {
       command(11, decisionView('excluded_object')),
       command(12, decisionView('excluded_object')),
     ], false)), { state: 'blocked', blocked_mention: 0 });
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS['blocked'], 'Bloqué');
   });
 
   it('eq 579 : les vrais blocages gardent leur synthèse et leur ancre', () => {
@@ -123,6 +126,7 @@ describe('CC-38 — exclusions volontaires', () => {
       command(5, decisionView('command_not_covered')),
       command(6, decisionView('ambiguous_skipped')),
     ], true)), { state: 'published', blocked_mention: 1 });
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS['published'], 'Publié');
     assert.strictEqual(summary.first_blocking_cmd_id, 6);
   });
 

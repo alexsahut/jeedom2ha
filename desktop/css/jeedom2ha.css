@@ -218,6 +218,9 @@ body[data-theme*="Dark"] {
 .j2ha-cmd-table tr.mapping-override-cmd {
   scroll-margin-top: 90px;
 }
+.modal-j2ha-room tr.mapping-override-cmd {
+  scroll-margin-top: 96px;
+}
 .j2ha-eq-toggle {
   display: flex;
   align-items: center;

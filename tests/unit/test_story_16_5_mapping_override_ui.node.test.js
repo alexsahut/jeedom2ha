@@ -168,6 +168,7 @@ describe('16.5 / AC8-AC9 — état diagnostic', () => {
 describe('16.5 / AC12 — message actionnable, jamais une erreur réseau', () => {
   it('vert → détail de ce qui a été validé', () => {
     const msg = M.buildDiagnosticMessage(readyView('light'));
+    assert.match(msg, /Publiable/);
     assert.match(msg, /Publiable en Lumière \(light\)/);
   });
 

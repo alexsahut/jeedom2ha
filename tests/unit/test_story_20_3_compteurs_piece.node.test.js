@@ -56,6 +56,7 @@ describe('22.2 / AC1 (25.1) — summarizeRoom : un état par équipement', () =>
       tree(6, [READY], { present: false }),                            // diagnostic prêt MAIS absent de HA : À appliquer
     ], 6);
     assert.deepEqual(s.by_state, { published: 2, to_apply: 1, blocked: 1, excluded: 1, disabled: 1, nothing_to_publish: 0 });
+    assert.deepEqual(M.buildRoomCounterLabels(s).items.map((item) => item.text), ['2 publiés', '1 à appliquer', '1 bloqué', '1 exclu', '1 désactivé']);
     assert.equal(s.equipments_read, 6);
     assert.equal(s.defects, 2, 'la bloquée de l’équipement publié et celle de l’équipement bloqué');
   });

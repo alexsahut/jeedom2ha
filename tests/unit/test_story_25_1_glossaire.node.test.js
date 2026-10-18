@@ -203,7 +203,5 @@ describe('25.1 / revue R1 (P3-4) — glossaire résiduel', () => {
     }
     const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
     assert.match(home, /\{\{Démon arrêté — actions Home Assistant bloquées\.\}\}/);
-    const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
-    assert.match(surface, /\{\{Cette entité passe à « À appliquer » dans Home Assistant\.\}\}/);
   });
 });

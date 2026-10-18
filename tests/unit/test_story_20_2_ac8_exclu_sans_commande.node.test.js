@@ -85,18 +85,21 @@ describe('20-2 / AC8 — équipement exclu sans commande', () => {
     const summary = M.summarizePublication(treeWith([readyView(), readyView()], true));
     assert.strictEqual(summary.ready_count, 2);
     assert.strictEqual(M.resolveEquipmentState(treeWith([readyView(), readyView()], true)).state, 'published');
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.published, 'Publié');
   });
 
   it('non-régression : arbre avec commande bloquante inchangé', () => {
     const summary = M.summarizePublication(treeWith([blockingView()], false));
     assert.strictEqual(summary.blocking_count, 1);
     assert.strictEqual(M.resolveEquipmentState(treeWith([blockingView()], false)).state, 'blocked');
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.blocked, 'Bloqué');
   });
 
   it('non-régression : exclusion par commande (arbre avec commandes) inchangée', () => {
     const summary = M.summarizePublication(treeWith([decisionView('excluded_eqlogic')], false));
     assert.strictEqual(summary.excluded_count, 1);
     assert.strictEqual(M.resolveEquipmentState(treeWith([decisionView('excluded_eqlogic')], false)).state, 'excluded');
+    assert.strictEqual(M.EQUIPMENT_STATE_LABELS.excluded, 'Exclu');
   });
 });
 

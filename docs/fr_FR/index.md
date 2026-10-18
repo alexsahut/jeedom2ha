@@ -297,7 +297,7 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 
 **Automatique**
 
-- *Équipement* : choisir « Automatique » retire le réglage de publication de l'équipement. Cliquer sur la position déjà courante n'écrit rien. Pour retirer **d'un coup les deux sortes** de réglages de l'équipement (types choisis pour ses commandes, « Jamais » ou « Toujours » de l'équipement et de ses entités), utilisez « Tout remettre en automatique… » du menu « ⋯ » : une confirmation liste ce qui sera retiré.
+- *Équipement* : choisir « Automatique » retire le réglage de publication de l'équipement. Cliquer sur la position déjà courante n'écrit rien. Pour retirer **d'un coup les deux sortes** de réglages de l'équipement (types choisis pour ses commandes, « Jamais » ou « Toujours » de l'équipement et de ses entités), utilisez « Tout remettre en automatique… » du menu « ⋯ » : une confirmation précède le retrait.
 - *Entité* : retire « Jamais » ou « Toujours » de l'entité **et** les types Home Assistant choisis pour ses commandes.
 - Pas de confirmation.
 

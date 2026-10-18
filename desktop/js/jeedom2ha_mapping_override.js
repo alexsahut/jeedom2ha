@@ -925,12 +925,10 @@
         firstBlockedCmdId = row.jeedom_cmd_id;
       }
     }
-    // `equipment_decision` (déjà porté par le démon, lecture pure) dit « Désactivé » / « Exclu » dès qu'elle
-    // s'applique, quelles que soient les commandes (D1, R3 et R4). Sans décision d'équipement, la voie par
-    // les commandes exige que TOUTES les commandes non ignorées soient exclues ou désactivées.
-    // « Désactivé » prime sur « Exclu » (R3 avant R4).
-    var nonIgnored = counts.published + counts.to_apply + counts.blocked + counts.excluded + counts.disabled + counts.unknown;
-    var allOff = nonIgnored > 0 && nonIgnored === counts.excluded + counts.disabled;
+    // « Désactivé » / « Exclu » (D1 : R3 avant R4) s'appliquent dès que `equipment_decision` (lecture pure
+    // du démon) le dit, quelles que soient les commandes (story 20-2, AC8). Par les commandes : toutes
+    // les commandes doivent être désactivées ou exclues (D1 R4 : « toutes les commandes exclues »).
+    var allOff = t.commands.length > 0 && counts.excluded + counts.disabled === t.commands.length;
     return {
       counts: counts,
       ready: ready,
@@ -987,7 +985,6 @@
     var excluded = a.counts.excluded;
     var disabled = a.counts.disabled;
     // Story 20-2 (AC8, X6) : sans commande, `equipment_decision` est la seule source (voir analyzeEquipment).
-    // « Désactivé » prime sur « Exclu » (D1).
     if (t.commands.length === 0) {
       disabled = isDisabledDiagnostic(t.equipment_decision) ? 1 : 0;
       excluded = disabled === 0 && isExcludedDiagnostic(t.equipment_decision) ? 1 : 0;
