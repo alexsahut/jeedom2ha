@@ -12,6 +12,7 @@ Cette documentation décrit l'écran du plugin tel que vous le voyez, avec les m
 
 - [Présentation](#présentation)
 - [Prérequis et installation](#prérequis-et-installation)
+- [Installer depuis GitHub (beta)](installation-github.md)
 - [Configuration](#configuration)
 - [Première synchronisation](#première-synchronisation)
 - [La page principale](#la-page-principale)
@@ -57,7 +58,7 @@ Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom.
 
 **Installation**
 
-1. Installez le plugin depuis le Market Jeedom.
+1. Installez le plugin depuis le Market Jeedom. Pour une installation hors Market à partir d'une archive GitHub, suivez plutôt [Installer depuis GitHub (beta)](installation-github.md).
 2. Sur la page du plugin, lancez l'installation des dépendances et attendez la fin de l'opération (suivie dans le journal `jeedom2ha`).
 3. Saisissez et sauvegardez la connexion au broker (voir [Configuration](#configuration)), puis démarrez le démon ou, s'il a déjà démarré, redémarrez-le : le démon ne lit les réglages MQTT qu'à son démarrage, et il peut démarrer dès la fin de l'installation, avant que vous ayez saisi le broker.
 

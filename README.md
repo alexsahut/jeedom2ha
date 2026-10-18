@@ -27,6 +27,10 @@ Jeedom2HA est un plugin Jeedom qui publie vos équipements dans Home Assistant p
 3. Saisissez et sauvegardez la connexion au broker MQTT, puis démarrez (ou redémarrez) le démon.
 4. Dans Home Assistant, ouvrez **Paramètres → Appareils et services → MQTT** : vos équipements apparaissent.
 
+## Installer depuis GitHub (beta)
+
+Vous préférez tester le plugin sans passer par le Market ? Une installation à partir d'une archive GitHub est possible. Pour l'instant, c'est la branche `main` qui sert de référence ; la branche `beta` ne le deviendra qu'une fois livrée. La procédure complète est ici : [docs/fr_FR/installation-github.md](docs/fr_FR/installation-github.md).
+
 ## Documentation détaillée
 
 Le guide complet (configuration, lecture de l'écran, causes de non-publication, dépannage) est ici : [docs/fr_FR/index.md](docs/fr_FR/index.md). L'historique des versions est dans le [changelog](docs/fr_FR/changelog.md).
