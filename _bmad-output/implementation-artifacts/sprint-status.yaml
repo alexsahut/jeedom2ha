@@ -463,7 +463,7 @@ development_status:
   # a sa preuve terrain ; validation UX transferee a 25-5 (Q1 ClaudeBox 18/10 18:22).
   # ==============================================================
   pe-epic-25: backlog  # cadrage ClaudeBox 2026-10-18 ; decisions Q1-Q4 consignees dans epics-projection-engine.md#Epic-25 ; stories backlog, relecture ClaudeBox requise avant ready-for-dev
-  25-1-socle-etat-unique-glossaire-palette-theme: backlog  # clot 22-2 (done, superseded) a la preuve terrain ; relecture ClaudeBox requise avant ready-for-dev
+  25-1-socle-etat-unique-glossaire-palette-theme: ready-for-dev  # decisions Alexandre 2026-10-18 19:20 (« je valide toutes les recommandations ») + relecture ClaudeBox (PR #277, R1 editoriale D1 appliquee) ; Q1-Q11 tranchees ; clot 22-2 (done, superseded) a la preuve terrain
   25-2-route-agregee-cote-demon: backlog  # etats par piece/equipement en un appel, cache, invalidation a la synchro ; apres 25-1
   25-3-page-principale-b: backlog  # barre de sante, jauge maison filtrante (ouverture/action/synchro/bouton Actualiser, Q2), cartes de piece ; apres 25-1, 25-2
   25-4-vue-maitre-detail-c: backlog  # remplace la modale (retrait inclus, Q4) ; seuil de repli a mesurer, defaut 1024px (Q3), preuve iPad mural mode desktop ; apres 25-1 a 25-3
