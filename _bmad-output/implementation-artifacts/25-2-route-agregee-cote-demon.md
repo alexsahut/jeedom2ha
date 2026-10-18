@@ -2,7 +2,7 @@
 
 Status: backlog
 
-> **Statut : `backlog` (2026-10-18).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `backlog` (2026-10-18).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -79,7 +79,7 @@ Consignées telles que transmises ; la session n'en a tranché aucune autre (voi
   "payload": {
     "schema_version": 1,
     "available": true,
-    "meta": { "generated_at": "2026-10-18T12:00:00Z", "generation": 7, "cache": { "hit": false, "build_ms": 0 }, "equipments_total": 292, "equipments_read": 292 },
+    "meta": { "generated_at": "2026-10-18T12:00:00Z", "generation": 7, "cache": { "hit": false, "build_ms": 0 }, "equipments_total": 292, "equipments_read": 291, "action_in_progress": false },
     "rooms": [ { "object_id": 3, "equipment_ids": [101, 102] }, { "object_id": 0, "equipment_ids": [205] } ],
     "equipments": {
       "101": {
@@ -90,7 +90,7 @@ Consignées telles que transmises ; la session n'en a tranché aucune autre (voi
         "sync_status": { "synced_should_publish": true, "current_should_publish": true, "override_pending": false, "published_in_ha": true }
       }
     },
-    "unread": [ { "eq_id": 999, "reason": "not_in_topology" } ]
+    "unread": [ { "eq_id": 998, "reason": "build_error" } ]
   }
 }
 ```
@@ -98,7 +98,8 @@ Consignées telles que transmises ; la session n'en a tranché aucune autre (voi
 - **`equipments[eq_id]` = l'arbre unitaire réduit à une liste blanche** des champs lus par `resolveEquipmentState` / `summarizeEquipmentCounters` (liste ci-dessus) ; les valeurs sont **celles que renverrait `GET /system/mapping_overrides/{eq_id}`** (même constructeur, AC3), jamais recalculées. Sont **exclus** : `override_types_allowed` (coût élevé, hors état), `attendu_ha`, `effective_ha`, `generic_type`, `cmd_name`, `eq_name`, `mapped`, `eligible`, `equipment_publication_override`, `entities[].decision` / `reason_details` / `publication_override` / `command_ids` / `present_in_ha` — rechargés par le GET unitaire quand l'utilisateur ouvre un équipement (25.4). *Hypothèse à confirmer : Q1.*
 - **Pas d'état résolu, pas de compteur par catégorie, pas de `enabled`** dans la réponse (AC5).
 - **`rooms`** : index **d'identifiants seulement** (`object_id` selon la convention du démon : `null`/`-1` → `0`, comme `j2haRoomsTree`), aucun nom, aucun compteur, **non autoritaire** (instantané de la dernière synchro) : la liste des pièces, leurs noms, leur ordre et `enabled` restent ceux de Jeedom (`j2haRoomsTree`). → Q3.
-- **`unread`** : équipement connu de l'appelant mais absent de la topologie du démon, ou dont la construction échoue (`not_in_topology`, `build_error`) — isolé, jamais fatal pour la réponse (AC7). Le JS le compte déjà comme « non lu » (`summarizeRoom`, `equipments_read` / `equipments_total`).
+- **`unread`** : équipement **connu du démon** dont la construction échoue (`build_error`) — isolé, jamais fatal pour la réponse (AC7). `equipments_total` = nombre d'équipements de la topologie du démon. **Le démon ne peut pas détecter un équipement connu seulement de `j2haRoomsTree`** (la route est un `GET` sans liste d'identifiants) : cette réconciliation appartient au **client** — un `eq_id` de `j2haRoomsTree` absent de `equipments` est « non lu » (`summarizeRoom`, déjà pourvu de `totalEquipments` côté appelant). La route n'émet donc jamais `not_in_topology` (revue Codex P2, PR #287 ; variante « le client transmet ses identifiants » → Q3 bis).
+- **Cohérence pendant une synchro ou une action** : la route ne construit jamais pendant que `app["action_lock"]` est pris (synchro et `/action/execute` le prennent, `:1787`, `:4129`), car ces handlers cèdent la boucle entre le remplacement de `app["topology"]` (`:1841`) et la mise à jour de `publications` / `published_scope` (`:2194-2199`) ; voir AC11 et Q7.
 - **Avant la première synchro** (`app["topology"]` est `None`) : `payload.available = false`, `equipments = {}`, `rooms = []` (→ Q12).
 
 ## Acceptance Criteria
@@ -147,9 +148,10 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
 **And** aucun champ de décision nouveau n'est ajouté à une route existante.
 
 **AC7 — Isolation des erreurs par équipement**
-**Given** un équipement dont la construction lève une exception (fixture : `cmds` incohérents, builder patché) et des identifiants absents de la topologie
+**Given** un équipement dont la construction lève une exception (fixture : `cmds` incohérents, builder patché)
 **When** la route est appelée
 **Then** la réponse reste 200, l'équipement fautif est dans `unread` (`reason:"build_error"`, **sans message d'exception ni nom** ; détail seulement dans le log du démon), les autres équipements sont complets, `equipments_read` = `equipments_total − len(unread)`
+**And** la route n'émet jamais `not_in_topology` et ne prétend pas connaître les équipements de `j2haRoomsTree` : `equipments_total` ne compte que la topologie du démon (test : un `eq_id` jamais synchronisé est simplement absent de `equipments`, sans entrée `unread`) ; la détection côté client est couverte par un test Node de 25.3, pas ici
 **And** un équipement fautif n'est pas mis en cache comme valide (il est reconstruit à la prochaine génération).
 
 **AC8 — Avant la première synchro**
@@ -178,7 +180,8 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
 **When** une synchro se termine (succès, succès partiel **ou échec** après avoir muté `topology` / `publications` / `published_scope`)
 **Then** le cache est invalidé sur **toutes** les sorties du handler de synchro (idéalement une seule fois, dans l'enveloppe `_handle_action_sync`, `try/finally`, à vérifier au dev-story contre `_do_handle_action_sync` `:1781+`) ; la requête suivante reconstruit et reflète le nouvel état (test : GET → synchro fictive qui change `published_in_ha` → GET)
 **And** une construction **démarrée avant la fin de la synchro** et terminée après ne remplace pas l'entrée (comparaison de génération : un résultat périmé est rendu à son appelant mais jamais stocké) (test déterministe par barrière)
-**And** un `GET` pendant une synchro ne bloque pas la synchro (le verrou `action_lock` n'est pas pris par la route).
+**And** **aucune construction n'a lieu, ni aucun stockage, tant que `action_lock` est pris** (synchro ou `/action/execute`), car l'absence d'`await` dans le builder ne le rend pas atomique vis-à-vis de ces handlers, qui cèdent la boucle entre la mutation de `topology` et celle de `publications` / `published_scope` (revue Codex P1, PR #287) : pendant le verrou, la route sert l'entrée de cache encore valide avec `meta.action_in_progress:true`, ou, s'il n'y en a pas, `available:false` et `reason:"action_in_progress"` (200) — jamais un mélange de nouvelle topologie et d'anciennes publications (test déterministe : synchro fictive suspendue à un `await` entre les deux mutations ; GET pendant la suspension → aucune construction, aucun état mixte en cache ; GET après la fin → état complet)
+**And** la route ne **prend** pas le verrou (elle ne bloque ni la synchro ni les actions) : elle lit seulement `action_lock.locked()`.
 
 **AC12 — Invalidation après chaque écriture d'override**
 **Given** un cache construit
@@ -295,7 +298,7 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
 - Test de charge : `resources/daemon/tests/unit/test_story_19_6_load_ac7.py` (marqueur `load`, coût unitaire = maximum × `MARGE_MESURE` × `MACHINE_FACTOR`, vrai `MapperRegistry`, écriture dans `tmp_path`).
 - Convention d'agrégat avant première synchro : `_handle_system_published_scope` (`:4748`).
 - Fixtures de topologie : `test_story_16_5_mapping_override_ui_endpoints.py` (`create_app`, `aiohttp_client`, `TopologySnapshot`, `JeedomEqLogic`).
-- Verrou d'actions : `app["action_lock"]` (`:1787`) — la route ne le prend pas (AC11).
+- Verrou d'actions : `app["action_lock"]` (`:1787` synchro, `:4129` `/action/execute`) — la route ne le prend pas mais refuse de construire tant qu'il est pris (AC11).
 
 ### Tests existants à surveiller
 
@@ -375,9 +378,10 @@ Chaque question porte une **recommandation** ; **aucune n'est tranchée par la s
 - A. **Paresseuse** (au premier appel après invalidation), single-flight. *(recommandé : n'allonge pas la synchro, dont la durée est bornée par le relais, cf. 19-6)*
 - B. Réchauffage en tâche de fond à la fin de la synchro : première lecture instantanée, mais travail inutile si personne n'ouvre la page et risque de contention avec la fin de synchro.
 
-**Q7 — Où s'exécute la construction : boucle d'événements ou `run_in_executor` ?**
-- A. **Synchrone dans la boucle, en une passe sans `await`** si le coût à froid mesuré tient dans le budget de Q10 : atomique par rapport à la synchro et aux actions (pas d'état mi-muté lu). *(recommandé)*
-- B. `run_in_executor` si la construction bloque trop longtemps la boucle (écouteurs MQTT, autres routes) : exige la comparaison de génération (AC11) pour écarter un résultat construit sur un état en cours de mutation.
+**Q7 — Cohérence de la lecture et lieu de la construction ?** *(amendée après la revue Codex P1 de la PR #287 : « sans `await` » ne suffit pas, la synchro cède la boucle entre ses mutations.)*
+- A. **Ne jamais construire pendant `action_lock`** ; servir l'entrée valide avec `meta.action_in_progress:true`, sinon `available:false` / `reason:"action_in_progress"` ; construction synchrone dans la boucle, en une passe sans `await`, hors verrou, si le coût à froid mesuré tient dans le budget de Q10. *(recommandé : simple, aucun état mixte, aucun nouveau verrou)* Contrepartie : 25.3 doit gérer « action en cours » (réessayer).
+- B. Prendre un **instantané cohérent** des dépendances (`topology`, `eligibility`, `publications`, `pending_discovery_unpublish`, `published_scope`) puis construire, éventuellement via `run_in_executor` si la boucle est trop bloquée (écouteurs MQTT, autres routes) ; exige la comparaison de génération (AC11) et un instantané réellement cohérent, difficile tant que la synchro mute en plusieurs temps.
+- C. Attendre la libération du verrou (avec délai borné) avant de construire : pas d'état « en cours » à gérer, mais peut dépasser le budget du relais (15 s) pendant une synchro longue.
 
 **Q8 — Plafond de durée de vie de sécurité et contournement (`refresh=1`) ?**
 - A. Plafond de sécurité (valeur à fixer par ClaudeBox, de l'ordre de quelques minutes) **et** `refresh=1` (utile au bouton « Actualiser » de 25.3). Le plafond ne remplace pas les invalidations : il borne l'effet d'un chemin d'écriture oublié. *(recommandé)*
@@ -390,6 +394,10 @@ Chaque question porte une **recommandation** ; **aucune n'est tranchée par la s
 **Q10 — Quels budgets chiffrés ?** (la session n'en invente aucun ; ils conditionnent AC15-AC16)
 Proposition de forme, valeurs à fixer par ClaudeBox : un budget de **construction à froid** et un budget **à chaud (cache)** au niveau du démon, un budget de **taille de charge utile**, et le **budget de bout en bout avec relais** à tenir sous `JEEDOM2HA_RELAY_BUDGET_SHORT_S` (15 s) avec marge. Méthode (recommandée) : test de charge synthétique (AC15, méthode de 19-6) pour la non-régression ; **mesure terrain unique** par ClaudeBox sur les 292 équipements (AC16) pour la valeur de référence ; les budgets sont arrêtés **après** cette première mesure terrain si besoin et le test de charge ajusté par décision explicite.
 
+**Q3 bis — Qui détecte les équipements de `j2haRoomsTree` absents du démon ?**
+- A. **Le client** (25.3) : un `eq_id` de `j2haRoomsTree` absent de `equipments` est « non lu » ; la route reste un `GET` sans paramètre. *(recommandé ; AC7 et le contrat sont écrits ainsi)*
+- B. Le client transmet les identifiants attendus (`?ids=…` ou `POST`) et le démon renvoie `not_in_topology` : charge de l'URL pour ~300 identifiants, une route qui n'est plus un simple `GET`, et un second contrat à maintenir.
+
 **Q11 — Nom de la route.** Recommandation : `GET /system/equipment_states` (cohérent avec `/system/…`, pas de collision avec `/system/mapping_overrides/{eq_id}`). Alternative : `/system/mapping_states`.
 
 **Q12 — Réponse avant la première synchro (`topology` à `None`).**
@@ -400,4 +408,5 @@ Proposition de forme, valeurs à fixer par ClaudeBox : un budget de **constructi
 
 ## Change Log
 
-- 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 19 AC, 13 questions ouvertes pour ClaudeBox / Alexandre ; décisions de ClaudeBox du 2026-10-18 23:50 (par délégation d'Alexandre) consignées ; `ready-for-dev` non accordé.
+- 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 19 AC, 14 questions ouvertes pour ClaudeBox / Alexandre ; décisions de ClaudeBox du 2026-10-18 23:50 (par délégation d'Alexandre) consignées ; `ready-for-dev` non accordé.
+- 2026-10-18 — Revue Codex de la PR #287 (P2, P1) : `not_in_topology` retiré du contrat serveur (réconciliation côté client, Q3 bis) ; AC11 et Q7 amendés (aucune construction tant que `action_lock` est pris, l'absence d'`await` du builder ne garantissant pas l'atomicité face à la synchro).
