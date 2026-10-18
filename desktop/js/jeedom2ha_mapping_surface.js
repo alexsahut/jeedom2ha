@@ -650,7 +650,7 @@
       }
       return;
     }
-    var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length));
+    var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length, roomEnabledById()));
     var $line = $('<div class="j2ha-room-counter-line"></div>');
     labels.items.forEach(function (item) {
       $line.append($('<span class="j2ha-chip j2ha-room-counter"></span>')
@@ -684,13 +684,22 @@
 
   // Ligne de l'équipement déplié : son état (le même mot que le badge) puis ses commandes
   // « 3 publiées · 1 bloquée · 5 ignorées », lues dans son propre arbre.
+  // { eq_id: enabled } lu dans `j2haRoomsTree` : « Désactivé » prime sur « Exclu » (R3).
+  function roomEnabledById() {
+    var map = {};
+    ((ctx.room && ctx.room.equipments) || []).forEach(function (eq) {
+      map[eq.eq_id] = eq.enabled;
+    });
+    return map;
+  }
+
   function renderEquipmentCounters($panel, tree) {
     var $host = $panel.find('.j2ha-eq-counters').first().empty();
     if (!tree) {
       return;
     }
-    var resolved = M.resolveEquipmentState(tree);
-    var labels = M.buildEquipmentCounterLabels(tree);
+    var resolved = M.resolveEquipmentState(tree, roomEnabledById()[tree.jeedom_eq_id]);
+    var labels = M.buildEquipmentCounterLabels(tree, roomEnabledById()[tree.jeedom_eq_id]);
     var $line = $('<div class="j2ha-eq-counter-line"></div>');
     $line.append(stateWord(resolved.state).addClass('j2ha-eq-head-state'));
     labels.items.forEach(function (item) {
@@ -1011,7 +1020,7 @@
   // Le même mot que les compteurs de la pièce et que la ligne de l'équipement déplié :
   // tous lisent `M.resolveEquipmentState` (aucune règle d'état n'est écrite ici).
   function renderSummary($panel, tree) {
-    var resolved = M.resolveEquipmentState(tree);
+    var resolved = M.resolveEquipmentState(tree, roomEnabledById()[tree.jeedom_eq_id]);
     $panel.removeClass(ALL_STATE_CLASSES).addClass('j2ha-state-' + resolved.state);
 
     var $badge = $panel.find('.j2ha-eq-publish-badge').first();
