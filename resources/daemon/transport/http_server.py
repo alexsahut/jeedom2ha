@@ -5,6 +5,7 @@ Listens on 127.0.0.1 only, protected by a local_secret shared with the PHP plugi
 
 import asyncio
 import dataclasses
+import json
 import logging
 import os
 import socket
@@ -3428,7 +3429,12 @@ def _build_equipment_states(app, data_dir: str) -> Dict[str, Any]:
 
 def _equipment_states_response(app, built, *, hit: bool, generation: int,
                                build_ms: float, action_in_progress: bool) -> web.Response:
-    return web.json_response({"status": "ok", "payload": {
+    # Le corps volumineux (`equipments`, `unread`) est sérialisé une seule fois par entrée de
+    # cache ; seul l'en-tête (`meta`) est recalculé à chaque appel (budget « à chaud », Q10).
+    if "equipments_json" not in built:
+        built["equipments_json"] = json.dumps(built["equipments"])
+        built["unread_json"] = json.dumps(built["unread"])
+    head = json.dumps({
         "schema_version": _EQUIPMENT_STATES_SCHEMA_VERSION,
         "available": True,
         "meta": {
@@ -3439,9 +3445,15 @@ def _equipment_states_response(app, built, *, hit: bool, generation: int,
             "equipments_read": built["total"] - len(built["unread"]),
             "action_in_progress": action_in_progress,
         },
-        "equipments": built["equipments"],
-        "unread": built["unread"],
-    }})
+    })
+    return web.Response(
+        text=(
+            '{"status": "ok", "payload": ' + head[:-1]
+            + ', "equipments": ' + built["equipments_json"]
+            + ', "unread": ' + built["unread_json"] + "}}"
+        ),
+        content_type="application/json",
+    )
 
 
 def _equipment_states_unavailable(reason: Optional[str] = None) -> web.Response:

@@ -937,6 +937,22 @@ try {
       }
       ajax::success($result);
     }
+    else if ($action == 'getEquipmentStates') {
+      // Story 25.2 — états de tous les équipements en un appel (lecture seule, cache côté démon).
+      // `refresh=1` est réservé au bouton « Actualiser » : le démon invalide son cache lui-même.
+      // Story A1 (audit) : lecture unique indépendante de la taille du parc (cache démon) → budget
+      // court fixe, comme getMappingOverrides.
+      $endpoint = '/system/equipment_states';
+      if (in_array((string)init('refresh', ''), array('1', 'true'), true)) {
+        $endpoint .= '?refresh=1';
+      }
+      $result = jeedom2ha::callDaemon($endpoint, null, 'GET', JEEDOM2HA_RELAY_BUDGET_SHORT_S);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[EQUIPMENT-STATES] Le démon n\'a pas répondu (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
     else if ($action == 'previewMappingOverride') {
       // Story 16.5 — dry-run instantané (lecture seule, aucune persistance) via 16.6.
       // callDaemon enveloppe déjà le payload dans une clé 'payload' : on passe donc

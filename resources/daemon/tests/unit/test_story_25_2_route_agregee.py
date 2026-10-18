@@ -81,7 +81,7 @@ async def test_ac1_auth_et_methode(cli):
     assert (await cli.get(URL, headers=H)).status == 200
 
 
-async def test_ac1_route_enregistree(app):
+async def test_ac1_route_enregistree(cli, app):
     assert any(r.resource.canonical == URL and r.method == "GET" for r in app.router.routes())
 
 
@@ -424,7 +424,7 @@ async def test_ac13_action_execute_invalide(cli, app):
     assert app["equipment_states_cache"]["entry"] is None
 
 
-async def test_ac13_republication_invalide(app):
+async def test_ac13_republication_invalide(cli, app):
     cache = app["equipment_states_cache"]
     cache["entry"] = {"stale": True}
     generation = cache["generation"]
@@ -453,3 +453,27 @@ def test_ac13_chemins_d_ecriture_de_l_etat_connus():
     src = (root / "transport/http_server.py").read_text(encoding="utf-8")
     assert src.count("_invalidate_equipment_states(request.app)") >= 5  # 1 synchro, 1 action, 3 overrides
     assert "_invalidate_equipment_states(app)" in src  # republication
+
+
+# --- AC4 : fixtures versionnées pour la parité JS ----------------------------
+
+PARITY_FIXTURE = Path(__file__).resolve().parents[4] / "tests" / "fixtures" / "story_25_2_parite_etat.json"
+
+
+async def test_ac4_fixtures_de_parite_a_jour(cli, app):
+    """Arbre unitaire complet / entrée agrégée de chaque équipement du corpus, consommés par
+    tests/unit/test_story_25_2_parite_etat.node.test.js. Régénérer :
+    JEEDOM2HA_UPDATE_SNAPSHOT=1 python3 -m pytest resources/daemon/tests/unit/test_story_25_2_route_agregee.py"""
+    payload = await _get(cli)
+    data = {}
+    for eq_id in EQ_IDS:
+        unit = (await (await cli.get(f"/system/mapping_overrides/{eq_id}", headers=H)).json())["payload"]
+        data[str(eq_id)] = {
+            "enabled": app["topology"].eq_logics[eq_id].is_enable,
+            "tree": unit,
+            "aggregated": payload["equipments"][str(eq_id)],
+        }
+    text = json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
+    if os.environ.get("JEEDOM2HA_UPDATE_SNAPSHOT") == "1":
+        PARITY_FIXTURE.write_text(text, encoding="utf-8")
+    assert PARITY_FIXTURE.read_text(encoding="utf-8") == text

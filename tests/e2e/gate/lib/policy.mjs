@@ -49,6 +49,7 @@ export const ALLOWED_READS = [
       'getMqttConfig',
       'getBridgeStatus',
       'getMappingOverrides',
+      'getEquipmentStates',
       'previewMappingOverride',
     ],
   },
