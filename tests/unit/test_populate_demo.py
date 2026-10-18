@@ -60,6 +60,8 @@ class FakeJeedom:
             for command in requested:
                 if "eqLogic_id" in command or any(value is None for value in command.values()):
                     raise KeyError("cmd must not override eqLogic_id or contain null")
+                if "unit" in command:
+                    raise KeyError("cmd must use Jeedom field 'unite', not 'unit'")
                 if command.get("type") == "action" and not command.get("configuration", {}).get("infoName"):
                     raise KeyError("infoName required for virtual action")
                 cmd = dict(command, eqLogic_id=eq["id"])
@@ -139,7 +141,7 @@ def test_dataset_covers_acceptance_criteria():
             "OPENING", "OPENING_WINDOW", "PRESENCE", "CONSUMPTION"} <= types
     assert s["untyped_equipments"] >= 1 and s["excluded_equipments"] >= 1
     kwh = [c for e in pd.EQUIPMENTS for c in e["cmds"] if c["generic_type"] == "CONSUMPTION"]
-    assert kwh and kwh[0]["unit"] == "kWh"
+    assert kwh and kwh[0]["unite"] == "kWh"
 
 
 def test_populate_creates_everything(server):

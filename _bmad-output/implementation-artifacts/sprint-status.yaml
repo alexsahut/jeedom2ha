@@ -420,9 +420,9 @@ development_status:
   a3-conformite-market: done  # gate A4 execute par clawbox, supervise par ClaudeBox, 2026-10-12 sur Jeedom vierge (go Telegram Alex, msg-id 11558) : activation Debian 12 / Jeedom 4.6.1 ok (demon ok, bridge online sur Mosquitto local, 0 ERROR), activation Debian 11.11 / Python 3.9.2 ok (demon ok, MQTT non teste faute de broker, decision ClaudeBox) ; dev cloud termine (PR #242) : info.json corrige, template_icon.png supprime, test CI de coherence pluginVersion/tag/changelog, README utilisateur ajoute (approuve ClaudeBox 07:45, 95bec8d) ; precedemment : cadrage PR #241, parcours rapide + test CI uniquement, correction info.json (description fr_FR >= 80 car sans nom reel, language fr_FR seul, changelogs beta/stable, pluginVersion 1.2.0), suppression template_icon.png, README utilisateur
   # Epic 23 — promotion et beta Market; tout est draft jusqu'à relecture ClaudeBox.
   pe-epic-23: backlog
-  23-1-environnement-de-demonstration-rejouable: ready-for-dev  # approuve ClaudeBox 2026-10-12; execution apres snapshot vierge clawbox/A66
+  23-1-environnement-de-demonstration-rejouable: done  # preuve terrain 2026-10-13 : VM demo, peuplement et snapshot demo verifies
   23-2-captures-et-video-de-promotion-rejouables: draft
-  23-3-remontee-d-etat-lumieres-et-volets: ready-for-dev  # approuve ClaudeBox 2026-10-12
+  23-3-remontee-d-etat-lumieres-et-volets: done  # preuve terrain 2026-10-13 : etat, luminosite et position verifies via HA/MQTT/Jeedom
   23-4-installation-hors-market-depuis-github: ready-for-dev  # approuve ClaudeBox 2026-10-12
   23-5-choix-et-coherence-de-la-licence: ready-for-dev  # fiche d'options seulement; aucun changement licence sans decision Alexandre
 
