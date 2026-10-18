@@ -172,7 +172,9 @@ async function checkMultiEntityEquipment(panel, helpers) {
   const shared = panel.locator('tr.mapping-override-cmd[data-cmd-id="5369"] .j2ha-type-link');
   if (await shared.count() !== 1) throw new Error('cmd-5369-absente');
   if (await shared.getAttribute('aria-disabled') !== 'true') throw new Error('selecteur-5369-actif');
-  const title = (await shared.getAttribute('title')) ?? '';
+  // Le cœur Jeedom (jeedomUtils.initTooltips) déplace `title` vers `data-title` quand il pose ses
+  // infobulles : selon le moment de la lecture, l'explication est dans l'un ou l'autre.
+  const title = (await shared.getAttribute('title')) ?? (await shared.getAttribute('data-title')) ?? '';
   if (!/portée par plusieurs entités/.test(title)) throw new Error('selecteur-5369-sans-explication');
   helpers.record('selecteur_5369_desactive', true);
 }
