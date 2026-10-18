@@ -20,12 +20,12 @@ En tant que responsable du plugin, je veux choisir une licence compatible avec l
 - [x] **Prérequis :** décision d'Alexandre reçue le 2026-10-12 à 19:21 : AGPL-3.0-or-later.
 - [x] Inventorier licences, tags/releases et conditions Market avec sources datées.
 - [x] Rédiger fiche d'arbitrage et demander décision Alexandre.
-- [x] Après décision, appliquer l'alignement minimal : LICENSE, en-têtes PHP, README et changelog beta.
+- [x] Après décision, appliquer l'alignement minimal : LICENSE, en-têtes PHP et JS, README et changelog beta.
 
 ## Décision Alexandre — 2026-10-12 19:21
 
 Le plugin est publié sous **AGPL-3.0-or-later**. `LICENSE` contient le texte intégral
-d'AGPL-3.0 et les en-têtes des 11 fichiers PHP du gabarit portent l'identifiant SPDX
+d'AGPL-3.0 et les en-têtes des 12 fichiers du gabarit (11 PHP + `desktop/js/jeedom2ha.js`) portent l'identifiant SPDX
 `AGPL-3.0-or-later`.
 
 Le Market Jeedom attend et a déjà validé la chaîne `AGPL` : `plugin_info/info.json` la
