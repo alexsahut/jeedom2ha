@@ -1,6 +1,6 @@
 # Story 25.1 : Socle A — état unique, glossaire, palette et thème
 
-Status: review
+Status: ready-for-UX-validation
 
 > **Statut : `ready-for-UX-validation` (2026-10-18, preuve terrain ClaudeBox : `25-1-preuve-terrain-2026-10-18.md` ; validation UX finale portée par 25.5).** Précédemment : `review` (2026-10-18) — implémentation livrée par une session cloud déléguée (hors Task 0 et Task 8, réservées à l'humain / ClaudeBox).** Historique : `ready-for-dev` (2026-10-18, 19:20). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48), relue et approuvée par ClaudeBox (PR #277, R1 éditoriale appliquée), puis les 11 questions tranchées par décision d'Alexandre (« je valide toutes les recommandations ») et les relevés terrain de ClaudeBox (Q5, Q10) — voir § Décisions. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
@@ -341,7 +341,8 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
   - [x] 7.2 `git diff --stat main...HEAD -- resources/daemon …` vide ; tests golden verts.
   - [x] 7.3 `make test`, `node --test tests/unit/*.node.test.js`, `flake8`, tests PHP, `scripts/ci-local.sh`.
 - [x] Task 8 — Preuve terrain (humain / ClaudeBox, après fusion ; CC-48) — *réalisée le 2026-10-18 par ClaudeBox : `25-1-preuve-terrain-2026-10-18.md`.*
-  - [x] 8.1 Gate 20-0 contre la box ; rendu clair + sombre ; Jeedom 4.4 et 4.6.1 ; consigner dans `25-1-preuve-terrain-<date>.md`. — *Gate vert sur `c940ac3` après le correctif de tests #283 (`d7450ea`) ; rendu sombre vérifié sur 4.6.1. Rendu clair réel et Jeedom 4.4 non prouvés (pas d'écriture de configuration Jeedom ; aucune instance 4.4) : reportés à 25.5.*
+  - [x] 8.1 Gate 20-0 contre la box ; rendu sombre sur Jeedom 4.6.1 ; consigner dans `25-1-preuve-terrain-<date>.md`. — *Gate vert sur `c940ac3` après le correctif de tests #283 (`d7450ea`) ; rendu sombre vérifié sur 4.6.1.*
+    *Périmètre amendé le 2026-10-18 par ClaudeBox (relecture Codex de #284) : le texte d'origine exigeait aussi « rendu clair » et « Jeedom 4.4 ». Ni l'un ni l'autre n'est prouvé ici — la box et le compte du gate sont en thème sombre, passer en clair écrirait la configuration Jeedom, et aucune instance 4.4 n'existe. Ces deux preuves sont **transférées à 25.5** (inscrites à son entrée de sprint-status), comme la validation UX (Q1 du cadrage) ; seuls les contrastes du thème clair sont couverts ici, par `test_story_25_1_palette_theme.node.test.js` (AC19).*
   - [x] 8.2 Bascule de 22-2 à `done` (superseded) par ClaudeBox ; story à `ready-for-UX-validation`, validation finale transférée à 25.5.
 
 ## Dev Notes

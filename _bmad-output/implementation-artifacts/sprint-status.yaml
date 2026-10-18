@@ -467,4 +467,4 @@ development_status:
   25-2-route-agregee-cote-demon: backlog  # etats par piece/equipement en un appel, cache, invalidation a la synchro ; apres 25-1
   25-3-page-principale-b: backlog  # barre de sante, jauge maison filtrante (ouverture/action/synchro/bouton Actualiser, Q2), cartes de piece ; apres 25-1, 25-2
   25-4-vue-maitre-detail-c: backlog  # remplace la modale (retrait inclus, Q4) ; seuil de repli a mesurer, defaut 1024px (Q3), preuve iPad mural mode desktop ; apres 25-1 a 25-3
-  25-5-recette-ux-finale-et-preuve-terrain: backlog  # validation UX finale Alexandre (reprend la validation transferee de 22-2, Q1) ; captures 23-2 ; preuve terrain CC-48 ; cloture l'epic
+  25-5-recette-ux-finale-et-preuve-terrain: backlog  # validation UX finale Alexandre (reprend la validation transferee de 22-2, Q1) ; preuves transferees de 25-1 le 2026-10-18 : rendu reel du theme clair sur la box et rendu sur Jeedom 4.4 (cible index.php?v=d&p=types, replis --j2ha-* des variables du core, AC25) ; captures 23-2 ; preuve terrain CC-48 ; cloture l'epic
