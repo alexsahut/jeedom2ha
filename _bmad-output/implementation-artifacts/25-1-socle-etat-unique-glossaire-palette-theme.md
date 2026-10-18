@@ -1,8 +1,8 @@
 # Story 25.1 : Socle A — état unique, glossaire, palette et thème
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-18).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est PAS accordé** : relecture ClaudeBox obligatoire, puis réponses d'Alexandre aux questions de la section « Questions ouvertes pour Alexandre » (en fin de fichier), avant tout passage à `ready-for-dev`. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-18, 19:20).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48), relue et approuvée par ClaudeBox (PR #277, R1 éditoriale appliquée), puis les 11 questions tranchées par décision d'Alexandre (« je valide toutes les recommandations ») et les relevés terrain de ClaudeBox (Q5, Q10) — voir § Décisions. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -59,11 +59,11 @@ Règles, **évaluées dans cet ordre, la première qui s'applique l'emporte** (P
 | R5 | P = `false` **et** r > 0 **et** `current_should_publish` = `true` (la publication est due mais n'a pas eu lieu) | `to_apply` |
 | R6 | P = `null` **et** r > 0 **et** `current_should_publish` ≠ `false` (démon plus ancien, présence inconnue) | `to_apply` (jamais `published`, comme en 22-2) |
 | R7 | b > 0 | `blocked` |
-
-_Cas de R5/R6 non satisfaits (P `false`/`null`, r > 0, `current_should_publish` = `false`) : équipement hors périmètre de publication (le contrat renvoie `published_in_ha` `false`, `current_should_publish` `false`, `override_pending` `false` tout en gardant des commandes projetables). Il ne doit jamais être « À appliquer » (le bouton « Appliquer » ne pourrait pas le publier) : il tombe en R7 si b > 0, sinon R8. Q11 demande à Alexandre quel mot afficher si cet état doit être distingué de « Rien à publier »._
 | R8 | sinon (aucune commande publiable, rien de bloqué : commandes toutes ignorées, ou sans commande) | `nothing_to_publish` |
 
-« Désactivé » l'emporte sur « Exclu » quand les deux s'appliquent (R3 avant R4). Les règles R1/R5/R6 sont à confirmer (Q1, Q2).
+_Cas de R5/R6 non satisfaits (P `false`/`null`, r > 0, `current_should_publish` = `false`) : équipement hors périmètre de publication (le contrat renvoie `published_in_ha` `false`, `current_should_publish` `false`, `override_pending` `false` tout en gardant des commandes projetables). Il ne doit jamais être « À appliquer » (le bouton « Appliquer » ne pourrait pas le publier) : il tombe en R7 si b > 0, sinon R8._
+
+« Désactivé » l'emporte sur « Exclu » quand les deux s'appliquent (R3 avant R4). Les règles R1, R2, R5 et R6 sont tranchées (Q1, Q2 — voir § Décisions) ; Q11 (mot distinct pour le cas R5/R6 non satisfait) est tranchée : pas de 7ᵉ état.
 
 ### D2 — Catégories de commande
 
@@ -74,11 +74,11 @@ _Cas de R5/R6 non satisfaits (P `false`/`null`, r > 0, `current_should_publish` 
 | **Ignorée** (gris, repliée) | absente de HA, **aucun équivalent HA**, rien à faire (D3) | **non** |
 | **Exclue** (gris) | exclue par l'utilisateur | non |
 
-### D3 — Partition des codes de cause (proposition à confirmer, Q3)
+### D3 — Partition des codes de cause (tranchée, Q3 — voir § Décisions)
 
 Source : `REASON_LABELS` (`jeedom2ha_mapping_override.js:612+`), lue sans modifier `models/cause_mapping.py`.
-- **Ignorée** : `command_not_covered`, `no_supported_generic_type`.
-- **Bloquée** : `ambiguous_skipped`, `name_heuristic_rejection`, `duplicate_generic_types`, `conflicting_generic_types`, `switch_state_orphan`, `probable_skipped`, `low_confidence`, `no_generic_type_configured`, `no_mapping`, `skipped_no_mapping_candidate`, `ha_missing_command_topic`, `ha_missing_state_topic`, `discovery_publish_failed`, `ha_component_not_in_product_scope`, `no_projection_possible`.
+- **Ignorée** : `command_not_covered`, `no_supported_generic_type`, `ha_component_not_in_product_scope` (non pris en charge par le plugin, non corrigeable par l'utilisateur — décision Alexandre/ClaudeBox du 2026-10-18, modifie la proposition initiale qui le classait Bloquée).
+- **Bloquée** : `ambiguous_skipped`, `name_heuristic_rejection`, `duplicate_generic_types`, `conflicting_generic_types`, `switch_state_orphan`, `probable_skipped`, `low_confidence`, `no_generic_type_configured`, `no_mapping`, `skipped_no_mapping_candidate`, `ha_missing_command_topic`, `ha_missing_state_topic`, `discovery_publish_failed`, `no_projection_possible`.
 - Codes d'état (ni bloquée ni ignorée) : `disabled_eqlogic`, `excluded_eqlogic`, `excluded_plugin`, `excluded_object` (pièce exclue : catégorie **Exclue**, cf. `EXCLUDED_PUBLICATION_REASONS`), `publication_excluded_eqlogic`, `publication_excluded_command`, `publication_forced`, `sure_mapping`.
 - `no_commands` (« aucune commande configurée dans Jeedom ») : état d'équipement, jamais un défaut → l'équipement est « Rien à publier » (R8) ; aucune commande à classer.
 - Tout code inconnu (démon plus récent) : catégorie **Bloquée** (jamais masqué), avec le code brut en infobulle.
@@ -137,7 +137,8 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
 **When** un équipement fictif porte 3 commandes publiées, 1 bloquée (`no_generic_type_configured`) et 5 ignorées (`command_not_covered`)
 **Then** sa ligne de compteurs de commandes affiche « 3 publiées · 1 bloquée · 5 ignorées » (zéros masqués, pluriels accordés) et le **compteur de défauts** de l'équipement vaut 1 (les ignorées n'y comptent pas)
 **And** pour un équipement dont toutes les commandes sont ignorées, l'état est « Rien à publier » et le compteur de défauts de la pièce n'augmente pas
-**And** un test table-driven parcourt **chaque code de `REASON_LABELS`** et exige qu'il appartienne à exactement une catégorie de D3 (échoue si un code est ajouté sans catégorie) ; un code inconnu est classé Bloquée.
+**And** une commande dont la cause est `ha_component_not_in_product_scope` est classée **Ignorée** (non corrigeable par l'utilisateur, décision Q3) et la ligne repliée des ignorées (AC15) porte, pour cette cause, la mention visible « non pris en charge par le plugin » (test dédié sur le texte rendu de la ligne repliée)
+**And** un test table-driven parcourt **chaque code de `REASON_LABELS`** et exige qu'il appartienne à exactement une catégorie de D3 (échoue si un code est ajouté sans catégorie), couvrant explicitement `ha_component_not_in_product_scope` (Ignorée) et `no_projection_possible` (Bloquée) ; un code inconnu est classé Bloquée.
 
 **AC6 — Compteurs de la pièce par état d'équipement, zéros masqués**
 **Given** une pièce fictive de 14 équipements
@@ -208,7 +209,7 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
 **And** les 11 lignes n'affichent plus la phrase de cause (seulement une icône ⚠ et le mot « Bloquée ») : le texte « types génériques non configurés dans Jeedom » apparaît **exactement 1 fois** dans le DOM de l'équipement (assertion sur le nombre d'occurrences)
 **And** si des commandes bloquées ont des causes différentes, un encart par cause distincte, jamais un encart par commande ; chaque encart nomme le nombre de commandes concernées
 **And** le lien « Voir la première commande bloquante » est supprimé quand toutes les commandes de l'équipement sont bloquées, conservé sinon
-**And** la cible du bouton « Ouvrir les types génériques » est vérifiée sur les versions cibles (Q5) ; elle ne modifie jamais un type générique (D10 : les types Jeedom natifs ne sont jamais écrits).
+**And** le bouton « Ouvrir les types génériques » ouvre `index.php?v=d&p=types` (Outils → Types d'équipement, page du core Jeedom), vérifié par ClaudeBox sur la box 4.6.1 (Q5 tranchée) ; la même cible est **à recontrôler sur Jeedom 4.4** lors de la preuve terrain (Task 8) ; elle ne modifie jamais un type générique (D10 : les types Jeedom natifs ne sont jamais écrits, aucune écriture envoyée par ce bouton).
 
 **AC15 — Commandes ignorées repliées**
 **Given** un équipement avec 5 commandes ignorées
@@ -288,7 +289,7 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
 **Given** `plugin_info/info.json` (`"require": "4.4"`)
 **When** la story est livrée
 **Then** le code n'utilise que jQuery 3.6, Bootstrap 3, bootbox, jeeDialog (`jeeDialog` n'est employé que si déjà employé aujourd'hui), jeedomUtils et Font Awesome 5 local, comme avant ; aucune API ni variable CSS propre à 4.6 n'est requise : chaque variable du core a un repli `--j2ha-*` (AC17) et un test CSS le vérifie
-**And** la preuve consigne, **sur une VM Jeedom 4.4** (démo ou VM vierge, par ClaudeBox ; pas par cette session) : les noms de variables du core effectivement présents, le rendu clair et sombre de la fenêtre d'une pièce, le menu « ⋯ », le contrôle segmenté et le sticky ; tout écart (variable absente) est couvert par le repli
+**And** si une VM Jeedom 4.4 est disponible au moment de la preuve terrain, elle consigne, **sur cette VM** (démo ou VM vierge, par ClaudeBox ; pas par cette session) : les noms de variables du core effectivement présents, le rendu clair et sombre de la fenêtre d'une pièce, le menu « ⋯ », le contrôle segmenté et le sticky ; tout écart (variable absente) est couvert par le repli. **À défaut de VM 4.4 disponible** (décision Q10, 2026-10-18 : la démo VM 122 est en Jeedom 4.6.1, aucune VM 4.4 identifiée), la compatibilité 4.4 est démontrée **uniquement** par les replis CSS testés (AC17, test `@supports not`) et par l'absence d'API/variable propre à 4.6 ; un rendu réel 4.4 redevient obligatoire si une VM 4.4 devient disponible avant la clôture de l'epic
 **And** `color-mix()` absent (vieux Safari / iPad mural) → le repli `rgba()` s'applique : test CSS `@supports not`.
 
 **AC26 — Accessibilité minimale**
@@ -326,7 +327,7 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP ou parcours
   - [ ] 4.1 Contrôle segmenté + « Appliquer » conditionnel.
   - [ ] 4.2 Menu « ⋯ » (équipement et pièce).
   - [ ] 4.3 Tableau regroupé par entité, colonnes de l'AC13.
-  - [ ] 4.4 Encart de cause unique + bouton « Ouvrir les types génériques » (après réponse à Q5).
+  - [ ] 4.4 Encart de cause unique + bouton « Ouvrir les types génériques » (cible `index.php?v=d&p=types`, Q5 tranchée ; recontrôler sur Jeedom 4.4 en Task 8).
   - [ ] 4.5 Un seul équipement déplié, en-tête collant, suppression du défilement imbriqué.
 - [ ] Task 5 — Palette et thème (AC: 17 à 21, 25)
   - [ ] 5.1 Définir `--j2ha-*` sous `body[data-theme*="Dark"|"Light"]` + repli sans thème.
@@ -417,36 +418,55 @@ _(à renseigner par le dev-story)_
 
 ## Questions ouvertes pour Alexandre
 
-Adressées à **Alexandre** (relayées par ClaudeBox). Aucune n'est tranchée par cette rédaction ; chaque question donne une recommandation, qui sert de valeur par défaut au `dev-story` **seulement si Alexandre l'accepte**. `ready-for-dev` reste bloqué tant que Q1 à Q7 et Q11 ne sont pas répondues.
+Adressées à **Alexandre** (relayées par ClaudeBox). **Toutes tranchées le 2026-10-18 à 19:20** (Alexandre : « je valide toutes les recommandations » ; Q5 et Q10 complétées par des relevés terrain de ClaudeBox) — voir « Décisions » ci-dessous pour le détail. Conservées ici pour la trace des recommandations initiales.
 
-**Q1 — Un équipement jamais synchronisé, publiable mais absent de Home Assistant, est-il « À appliquer » ?** (règle R5)
+**Q1 — Un équipement jamais synchronisé, publiable mais absent de Home Assistant, est-il « À appliquer » ?** (règle R5) — **Tranchée : A.**
 - A. Oui, « À appliquer » (le bouton « Appliquer »/la synchro est le geste qui le règle). *(recommandé : cohérent avec « plan ≠ réalité → À appliquer »)*
 - B. Non, un état distinct ou « Rien à publier » tant qu'aucune synchro n'a eu lieu (22-2 ne le comptait pas comme « en attente »).
 Impact : sur une installation neuve, A affiche beaucoup de bleu avant la première synchro.
 
-**Q2 — Démon plus ancien (présence inconnue, `published_in_ha` = `null`) : quel état ?** (règle R6)
+**Q2 — Démon plus ancien (présence inconnue, `published_in_ha` = `null`) : quel état ?** (règle R6) — **Tranchée : A.**
 - A. « À appliquer », jamais « Publié ». *(recommandé)*
 - B. Aucun état, mention « présence inconnue » en gris.
 
-**Q3 — Partition « Ignorée » / « Bloquée » (D3).** Je propose `command_not_covered` et `no_supported_generic_type` en « Ignorée », tout le reste corrigeable en « Bloquée ». Confirmes-tu cette liste, notamment `ha_component_not_in_product_scope` et `no_projection_possible` (classés « Bloquée » par prudence) ? Un code que tu juges non corrigeable doit passer en « Ignorée ».
+**Q3 — Partition « Ignorée » / « Bloquée » (D3).** — **Tranchée : recommandation avec une modification.** Je propose `command_not_covered` et `no_supported_generic_type` en « Ignorée », tout le reste corrigeable en « Bloquée ». Confirmes-tu cette liste, notamment `ha_component_not_in_product_scope` et `no_projection_possible` (classés « Bloquée » par prudence) ? Un code que tu juges non corrigeable doit passer en « Ignorée ». *(Décision : `ha_component_not_in_product_scope` passe en Ignorée avec la mention « non pris en charge par le plugin » ; `no_projection_possible` reste Bloquée.)*
 
-**Q4 — Compteurs de commandes au niveau de la pièce.** Le diagnostic (P7) propose de ne plus compter les commandes au niveau de la pièce (l'unité de décision est l'équipement). A. Les retirer de l'en-tête de la pièce, ne garder qu'une ligne « publiées · bloquées · ignorées » dans chaque équipement déplié. *(recommandé)* B. Garder une ligne de commandes dans l'en-tête de la pièce (publiées · bloquées · ignorées).
+**Q4 — Compteurs de commandes au niveau de la pièce.** — **Tranchée : A.** Le diagnostic (P7) propose de ne plus compter les commandes au niveau de la pièce (l'unité de décision est l'équipement). A. Les retirer de l'en-tête de la pièce, ne garder qu'une ligne « publiées · bloquées · ignorées » dans chaque équipement déplié. *(recommandé)* B. Garder une ligne de commandes dans l'en-tête de la pièce (publiées · bloquées · ignorées).
 
-**Q5 — Cible du bouton « Ouvrir les types génériques ».** Aucun écran Jeedom n'est référencé dans le dépôt pour cet usage et je n'ai pas pu le vérifier (CC-48 : pas d'accès à une instance). Quelle URL / quel écran Jeedom (4.4 **et** 4.6.1) faut-il ouvrir : l'écran de configuration des types génériques du core, la page de l'équipement concerné, ou un autre ? ClaudeBox doit le relever sur la VM avant la Task 4.4 ; à défaut, le bouton ouvre la page de l'équipement Jeedom concerné.
+**Q5 — Cible du bouton « Ouvrir les types génériques ».** — **Tranchée (relevé ClaudeBox) : `index.php?v=d&p=types`.** Aucun écran Jeedom n'est référencé dans le dépôt pour cet usage et je n'ai pas pu le vérifier (CC-48 : pas d'accès à une instance). Quelle URL / quel écran Jeedom (4.4 **et** 4.6.1) faut-il ouvrir : l'écran de configuration des types génériques du core, la page de l'équipement concerné, ou un autre ? ClaudeBox doit le relever sur la VM avant la Task 4.4 ; à défaut, le bouton ouvre la page de l'équipement Jeedom concerné.
 
-**Q6 — Thème inconnu.** Si `body[data-theme]` est absent ou inconnu (Jeedom 4.4 non vérifié), quel jeu appliquer ? A. Clair. *(recommandé : le repli le moins surprenant)* B. Sombre.
+**Q6 — Thème inconnu.** — **Tranchée : A.** Si `body[data-theme]` est absent ou inconnu (Jeedom 4.4 non vérifié), quel jeu appliquer ? A. Clair. *(recommandé : le repli le moins surprenant)* B. Sombre.
 
-**Q7 — Portée du « glossaire partout ».** Les libellés de la **page principale** (« Bridge » → « Démon », « Rescanner la topologie Jeedom » → « Relire Jeedom », « Supprimer de Home Assistant… ») sont renommés dans cette story, mais la **structure** de la page principale reste celle d'aujourd'hui (bandeau bleu, boutons) jusqu'à 25.3. A. Oui, libellés seulement ici. *(recommandé : évite deux passes de rédaction de la doc)* B. Reporter ces libellés à 25.3.
+**Q7 — Portée du « glossaire partout ».** — **Tranchée : A.** Les libellés de la **page principale** (« Bridge » → « Démon », « Rescanner la topologie Jeedom » → « Relire Jeedom », « Supprimer de Home Assistant… ») sont renommés dans cette story, mais la **structure** de la page principale reste celle d'aujourd'hui (bandeau bleu, boutons) jusqu'à 25.3. A. Oui, libellés seulement ici. *(recommandé : évite deux passes de rédaction de la doc)* B. Reporter ces libellés à 25.3.
 
-**Q8 (hors périmètre par défaut, à confirmer) — Icône/couleur Jeedom des objets et regroupement des cartes par objet parent.** Cité dans `CADRAGE.md` (« A — socle ») mais absent de la liste de 25.1 dans `epic-25-draft.md`, et les cartes sont refaites par 25.3. J'ai **exclu** ce point de 25.1 ; recommandation : le traiter en 25.3. Dis-moi si tu le veux dans 25.1.
+**Q8 (hors périmètre par défaut, à confirmer) — Icône/couleur Jeedom des objets et regroupement des cartes par objet parent.** — **Tranchée : traité en 25.3**, ajouté explicitement à la ligne 25.3 d'`epic-25-draft.md` et d'`epics-projection-engine.md#Epic-25`. Cité dans `CADRAGE.md` (« A — socle ») mais absent de la liste de 25.1 dans `epic-25-draft.md`, et les cartes sont refaites par 25.3. J'ai **exclu** ce point de 25.1 ; recommandation : le traiter en 25.3. Dis-moi si tu le veux dans 25.1.
 
-**Q9 — Libellé de la demande.** La demande d'origine parle de « contrôle de republication à 3 états ». J'ai compris le *réglage de publication* Automatique / Toujours / Jamais (qui remplace Exclure / Forcer / Revenir), pas une nouvelle option de « Republier ». Merci de confirmer.
+**Q9 — Libellé de la demande.** — **Tranchée : confirmé.** La demande d'origine parle de « contrôle de republication à 3 états ». J'ai compris le *réglage de publication* Automatique / Toujours / Jamais (qui remplace Exclure / Forcer / Revenir), pas une nouvelle option de « Republier ». Merci de confirmer.
 
-**Q11 — Équipement hors périmètre de publication** (r > 0 mais `current_should_publish` = `false`, sans exclusion ni désactivation). Par défaut, « Rien à publier » (ou « Bloqué » si b > 0). Veux-tu un mot distinct ? *(recommandé : non, pas de 7ᵉ état)*
+**Q11 — Équipement hors périmètre de publication** (r > 0 mais `current_should_publish` = `false`, sans exclusion ni désactivation). — **Tranchée : pas de 7ᵉ état.** Par défaut, « Rien à publier » (ou « Bloqué » si b > 0). Veux-tu un mot distinct ? *(recommandé : non, pas de 7ᵉ état)*
 
-**Q10 — Gate 20-0 et VM 4.4.** La preuve de compatibilité 4.4 (AC25) suppose une VM Jeedom 4.4 disponible pour ClaudeBox (la démo VM 122 est-elle en 4.4 ou 4.6 ?). Sinon, la compatibilité 4.4 ne sera démontrée que par les replis CSS testés, pas par un rendu réel.
+**Q10 — Gate 20-0 et VM 4.4.** — **Tranchée (relevé ClaudeBox) : pas de VM 4.4 disponible ; AC25 amendée.** La preuve de compatibilité 4.4 (AC25) suppose une VM Jeedom 4.4 disponible pour ClaudeBox (la démo VM 122 est-elle en 4.4 ou 4.6 ?). Sinon, la compatibilité 4.4 ne sera démontrée que par les replis CSS testés, pas par un rendu réel.
+
+## Décisions (2026-10-18, 19:20 — Alexandre, relayé par ClaudeBox)
+
+Alexandre : « je valide toutes les recommandations. » Toutes les questions de la section ci-dessus sont **tranchées** ; la story passe à `ready-for-dev` sous réserve des mises à jour listées ci-dessous (déjà appliquées dans ce fichier : D1, D3, AC5, AC14, AC25, Task 4.4) et dans le Change Log.
+
+- **Q1** = A — un équipement jamais synchronisé, publiable mais absent de HA, est « À appliquer » (R5).
+- **Q2** = A — démon plus ancien (présence inconnue) : « À appliquer », jamais « Publié » (R6).
+- **Q3** = recommandation **avec une modification** : `ha_component_not_in_product_scope` passe en catégorie **Ignorée** (non corrigeable par l'utilisateur), avec la mention visible « non pris en charge par le plugin » dans la ligne repliée des ignorées (AC15) ; `no_projection_possible` reste **Bloquée** ; le reste de D3 inchangé.
+- **Q4** = A — pas de compteurs de commandes au niveau de l'en-tête de pièce (déjà reflété dans AC6).
+- **Q5** (ClaudeBox, vérifié sur la box 4.6.1) : le bouton « Ouvrir les types génériques » ouvre `index.php?v=d&p=types` (Outils → Types d'équipement, page du core) ; à recontrôler sur Jeedom 4.4 lors de la preuve terrain (Task 8) ; aucune écriture.
+- **Q6** = A — thème inconnu : repli clair (déjà reflété dans AC21).
+- **Q7** = A — libellés de la page principale renommés dès 25.1 ; la structure de la page principale reste celle d'aujourd'hui jusqu'à 25.3.
+- **Q8** : traité en **25.3**, pas dans 25.1. Ajouté explicitement à la ligne 25.3 de `epic-25-draft.md` et d'`epics-projection-engine.md#Epic-25` (icône/couleur Jeedom des objets, regroupement des cartes par objet parent).
+- **Q9** = confirmé — il s'agit du réglage de publication Automatique / Toujours / Jamais (D4), pas d'une nouvelle option de « Republier ».
+- **Q10** (ClaudeBox, vérifié) : la VM 122 est en Jeedom 4.6.1, aucune VM 4.4 identifiée. AC25 amendée : la compatibilité 4.4 est démontrée par les replis CSS testés ; un rendu réel sur une VM 4.4 n'est exigé que si une telle VM existe au moment de la preuve.
+- **Q11** = pas de 7ᵉ état : le cas R5/R6 non satisfait tombe en « Bloqué » (b > 0) ou « Rien à publier » (sinon), comme écrit dans la note sous le tableau de D1.
+
+**R1 éditoriale (ClaudeBox) :** la note en italique sur les cas R5/R6 non satisfaits de D1 était insérée entre R7 et R8 et cassait le rendu Markdown du tableau ; déplacée sous le tableau complet (R1 à R8).
 
 ## Change Log
 
 - 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 27 AC, 11 questions ouvertes pour Alexandre.
 - 2026-10-18 — Revue Codex (P1 ×2) : partition D3 complétée (`excluded_object`, `no_commands`) ; R5/R6 conditionnées à `current_should_publish` ; Q11 ajoutée.
+- 2026-10-18, 19:20 — Décisions d'Alexandre (« je valide toutes les recommandations ») et relevés terrain ClaudeBox (Q5, Q10) : 11 questions tranchées ; D3/AC5 modifiés (Q3 : `ha_component_not_in_product_scope` → Ignorée, mention « non pris en charge par le plugin ») ; AC14 et Task 4.4 précisées (Q5 : cible `index.php?v=d&p=types`) ; AC25 amendée (Q10 : pas de VM 4.4 disponible, compatibilité démontrée par les replis CSS) ; note R5/R6 de D1 déplacée sous le tableau complet (R1 éditoriale ClaudeBox, rendu Markdown cassé entre R7 et R8) ; statut `backlog` → `ready-for-dev`.

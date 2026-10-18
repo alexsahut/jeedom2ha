@@ -2605,7 +2605,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 **Stories (`backlog`, relecture ClaudeBox obligatoire avant tout `ready-for-dev`) :**
 - **Story 25.1 — Socle A : état unique, glossaire, palette de thème.** Fonction d'état unique, glossaire imposé, palette `--j2ha-*` sur les deux thèmes, réorganisation de la fenêtre de pièce sans changer la structure grille + modale. Doc et tests de libellés réalignés. Clôt 22-2 (`done`, superseded) à la preuve terrain.
 - **Story 25.2 — Route agrégée côté démon.** États par pièce et par équipement en un appel, cache, invalidation à la synchro. Prérequis de performance pour 25.3 et 25.4.
-- **Story 25.3 — Page principale B.** Barre de santé, jauge maison filtrante (ouverture, après action, fin de synchro, bouton Actualiser — Q2), cartes de pièce segmentées. Dépend de 25.1 et 25.2.
+- **Story 25.3 — Page principale B.** Barre de santé, jauge maison filtrante (ouverture, après action, fin de synchro, bouton Actualiser — Q2), cartes de pièce segmentées ; icône/couleur Jeedom des objets et regroupement des cartes par objet parent (Q8 de 25.1, tranché le 2026-10-18 : exclu de 25.1, traité ici). Dépend de 25.1 et 25.2.
 - **Story 25.4 — Vue maître-détail C.** Remplace la modale (retrait inclus — Q4) par une vue pleine hauteur : arbre pièces → équipements, détail à droite, panneau repliable sous un seuil mesuré pendant la story (défaut 1024 px — Q3), preuve incluant l'iPad mural en mode desktop. Dépend de 25.1 à 25.3.
 - **Story 25.5 — Recette UX finale et preuve terrain.** Validation UX finale d'Alexandre sur A+B+C (reprend la validation UX transférée de 22-2 — Q1) ; captures pour 23-2 sur la démo VM 122 ; preuve terrain CC-48. Clôture l'epic.
 
