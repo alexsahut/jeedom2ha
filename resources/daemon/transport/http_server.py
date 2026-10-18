@@ -5,6 +5,7 @@ Listens on 127.0.0.1 only, protected by a local_secret shared with the PHP plugi
 
 import asyncio
 import dataclasses
+import json
 import logging
 import os
 import socket
@@ -60,6 +61,7 @@ from mapping.overrides import (
     apply_type_override,
     list_equipment_overrides,
     list_overrides,
+    overrides_file_signature,
     mapping_cmd_ids,
     parse_override_key,
     remove_equipment_override_fields,
@@ -1199,7 +1201,11 @@ async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
     # AC #11: rejouer les pending_discovery_unpublish AVANT la republication (reconnect uniquement)
     if reason == "broker_reconnect":
         pending_unpublish = app.get("pending_discovery_unpublish", {})
-        await _replay_deferred_discovery_unpublish(publisher, pending_unpublish)
+        try:
+            await _replay_deferred_discovery_unpublish(publisher, pending_unpublish)
+        finally:
+            # Story 25.2 (AC13) — le rejeu retire des dépublications différées (`published_in_ha`).
+            _invalidate_equipment_states_cache(app)
 
     topology = app.get("topology")
 
@@ -1801,6 +1807,9 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         except Exception:
             return _build_sync_failure_response(request)
         finally:
+            # Story 25.2 (AC11) — toutes les sorties de la synchro (succès, partiel, échec après
+            # mutation de topology / publications / published_scope) invalident la route agrégée.
+            _invalidate_equipment_states_cache(request.app)
             action_lock.release()
 
     task = asyncio.create_task(_run_sync())
@@ -3079,6 +3088,9 @@ def _build_mapping_override_tree(
     synced_decision=None,
     scope_included=True,
     pending_discovery_unpublish=None,
+    overrides_cache=None,
+    equipment_overrides_cache=None,
+    include_override_types_allowed=True,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -3107,9 +3119,17 @@ def _build_mapping_override_tree(
     l'aperçu — plus de logique `is_covered`/`is_secondary` dupliquée ici (qui coïncidait déjà
     avec la priorité primaire-d'abord du contrat, mais était une SECONDE implémentation à
     maintenir en cohérence avec l'aperçu).
+
+    Story 25.2 (AC9, additif — valeurs par défaut = comportement inchangé) : la route agrégée
+    réemploie CE constructeur pour tous les équipements en une passe ; elle fournit les
+    overrides déjà chargés (`overrides_cache`, `equipment_overrides_cache` : un seul chargement
+    du fichier pour toute la passe) et omet `override_types_allowed` (`include_override_types_allowed=False`),
+    coûteux et lu par aucune règle d'état.
     """
-    overrides_cache = list_overrides(data_dir)
-    equipment_overrides_cache = list_equipment_overrides(data_dir)
+    if overrides_cache is None:
+        overrides_cache = list_overrides(data_dir)
+    if equipment_overrides_cache is None:
+        equipment_overrides_cache = list_equipment_overrides(data_dir)
     proposed_eq = resolve_expected_ha(eq, snapshot).get("proposed_ha_entity_type")
 
     eligibility = assess_eligibility(eq)
@@ -3156,7 +3176,7 @@ def _build_mapping_override_tree(
         # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
         # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
         # commandes dont l'entité est évaluable ; absent sinon (le sélecteur y est de toute façon grisé).
-        if diag_mapping is not None:
+        if diag_mapping is not None and include_override_types_allowed:
             group = id(diag_mapping)
             if group not in allowed_by_mapping:
                 allowed_by_mapping[group] = _projection_valid_override_types(
@@ -3304,6 +3324,206 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok", "payload": payload})
 
 
+# ---------------------------------------------------------------------------
+# Story 25.2 — route agrégée en lecture seule : entrées de `resolveEquipmentState`
+# pour tous les équipements en un appel, avec cache mémoire invalidé explicitement.
+# ---------------------------------------------------------------------------
+
+_EQUIPMENT_STATES_CACHE_KEY = "equipment_states_cache"
+_EQUIPMENT_STATES_SCHEMA_VERSION = 1
+# Q8 : plafond de sécurité (borne l'effet d'un chemin d'écriture oublié) ; ne remplace pas les invalidations.
+_EQUIPMENT_STATES_TTL_SECONDS = 300.0
+
+
+def _new_equipment_states_cache() -> Dict[str, Any]:
+    # `epoch` avance à chaque invalidation, `build_seq` à chaque construction stockée ou non.
+    return {"entry": None, "epoch": 0, "build_seq": 0}
+
+
+def _invalidate_equipment_states_cache(app: web.Application) -> None:
+    """Invalidation totale (Q4 A) : la prochaine requête reconstruit (construction paresseuse, Q6 A)."""
+    cache = app.get(_EQUIPMENT_STATES_CACHE_KEY)
+    if cache is None:
+        return
+    cache["epoch"] += 1
+    cache["entry"] = None
+
+
+def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:
+    """Liste blanche des champs lus par `resolveEquipmentState` / `summarizeEquipmentCounters`.
+
+    Projection de l'arbre unitaire (mêmes valeurs, jamais recalculées) : aucun état résolu, aucun
+    compteur, aucun `enabled` (Q1 A, Q2 A).
+    """
+    sync = tree["sync_status"]
+    return {
+        "jeedom_eq_id": tree["jeedom_eq_id"],
+        "equipment_decision": tree["equipment_decision"],
+        "entities": [{"override_pending": entity["override_pending"]} for entity in tree["entities"]],
+        "commands": [
+            {
+                "jeedom_cmd_id": row["jeedom_cmd_id"],
+                "covered": row["covered"],
+                "published_in_ha": row["published_in_ha"],
+                "diagnostic": row["diagnostic"],
+            }
+            for row in tree["commands"]
+        ],
+        "sync_status": {
+            "synced_should_publish": sync["synced_should_publish"],
+            "current_should_publish": sync["current_should_publish"],
+            "override_pending": sync["override_pending"],
+            "published_in_ha": sync["published_in_ha"],
+        },
+    }
+
+
+def _build_equipment_states_entry(app: web.Application, data_dir: str) -> Dict[str, Any]:
+    """Une passe, sans `await` : un seul chargement des overrides, le même constructeur que le GET unitaire."""
+    topology = app["topology"]
+    confidence_policy = app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
+    publications = app.get("publications") or {}
+    pending_discovery_unpublish = app.get("pending_discovery_unpublish") or {}
+    eligibility = app.get("eligibility")
+    scope_entries: Dict[int, Dict[str, Any]] = {}
+    for entry in (app.get("published_scope") or {}).get("equipements", []):
+        scope_entries.setdefault(_to_int(entry.get("eq_id"), default=0), entry)
+    has_scope = bool(app.get("published_scope"))
+    overrides_cache = list_overrides(data_dir)
+    equipment_overrides_cache = list_equipment_overrides(data_dir)
+
+    equipments: Dict[str, Any] = {}
+    unread: list = []
+    for eq_id, eq in topology.eq_logics.items():
+        scope_included = (
+            _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility) if has_scope else True
+        )
+        try:
+            tree = _build_mapping_override_tree(
+                eq, topology, data_dir, confidence_policy, publications.get(eq_id),
+                scope_included=scope_included,
+                pending_discovery_unpublish=pending_discovery_unpublish,
+                overrides_cache=overrides_cache,
+                equipment_overrides_cache=equipment_overrides_cache,
+                include_override_types_allowed=False,
+            )
+            equipments[str(eq_id)] = _project_equipment_state(tree)
+        except Exception as exc:
+            # Isolé : jamais fatal pour la réponse ; ni nom ni message d'exception côté client.
+            _LOGGER.error("[AGGREGATE] build_error eq_id=%s: %s", eq_id, exc)
+            unread.append({"eq_id": eq_id, "reason": "build_error"})
+    return {"equipments": equipments, "unread": unread, "equipments_total": len(topology.eq_logics)}
+
+
+def _equipment_states_entry_is_valid(entry, topology, data_dir: str) -> bool:
+    """AC10 : (a) pas d'invalidation (l'entrée est alors retirée), (b) fichier d'overrides inchangé,
+    (c) même objet topologie, (d) plafond de sécurité."""
+    if entry is None:
+        return False
+    return (
+        entry["topology"] is topology
+        and entry["overrides_signature"] == overrides_file_signature(data_dir)
+        and (time.monotonic() - entry["built_at"]) < _EQUIPMENT_STATES_TTL_SECONDS
+    )
+
+
+def _equipment_states_payload(entry, *, hit: bool, action_in_progress: bool) -> Dict[str, Any]:
+    return {
+        "schema_version": _EQUIPMENT_STATES_SCHEMA_VERSION,
+        "available": True,
+        "meta": {
+            "generated_at": entry["generated_at"],
+            "generation": entry["generation"],
+            "cache": {"hit": hit, "build_ms": entry["build_ms"]},
+            "equipments_total": entry["equipments_total"],
+            "equipments_read": len(entry["equipments"]),
+            "action_in_progress": action_in_progress,
+        },
+        "equipments": entry["equipments"],
+        "unread": entry["unread"],
+    }
+
+
+def _equipment_states_unavailable(reason: str) -> web.Response:
+    return web.json_response({"status": "ok", "payload": {
+        "schema_version": _EQUIPMENT_STATES_SCHEMA_VERSION,
+        "available": False,
+        "reason": reason,
+        "equipments": {},
+        "unread": [],
+    }})
+
+
+async def _handle_equipment_states_get(request: web.Request) -> web.Response:
+    """GET /system/equipment_states[?refresh=1] — Story 25.2 : entrées d'état de tous les équipements.
+
+    Lecture seule stricte (aucune écriture, aucune publication, aucune décision nouvelle). Chaque
+    `payload.equipments["<eq_id>"]` est la projection, sur la liste blanche des champs lus par
+    `resolveEquipmentState`, de l'arbre de `GET /system/mapping_overrides/{eq_id}` (même
+    constructeur) : `jeedom_eq_id`, `equipment_decision`, `entities[].override_pending`,
+    `commands[].{jeedom_cmd_id, covered, published_in_ha, diagnostic}`, `sync_status`. Ni état résolu,
+    ni compteur, ni `enabled`, ni index par pièce (Q3 B : le regroupement reste côté JS avec
+    `j2haRoomsTree`).
+
+    Réponse 200 `{"status":"ok","payload":{schema_version, available, meta{generated_at, generation,
+    cache{hit, build_ms}, equipments_total, equipments_read, action_in_progress}, equipments, unread}}`.
+    `unread` : `[{eq_id, reason:"build_error"}]` pour un équipement connu du démon dont la construction
+    échoue. Avant la première synchro : `available:false`, collections vides. Pendant `action_lock`
+    (synchro, Publier / Supprimer) : jamais de construction ; entrée encore valide servie avec
+    `meta.action_in_progress:true`, sinon `available:false` / `reason:"action_in_progress"`.
+    `refresh=1` contourne le cache pour cet appel (réservé au bouton « Actualiser »). 401 sans secret.
+    """
+    app = request.app
+    if not _check_secret(request, app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+
+    topology = app.get("topology")
+    if topology is None:
+        return _equipment_states_unavailable("not_synced")
+
+    cache = app[_EQUIPMENT_STATES_CACHE_KEY]
+    data_dir = _resolve_data_dir(request)
+    entry = cache["entry"]
+    valid = _equipment_states_entry_is_valid(entry, topology, data_dir)
+    action_lock = app.get("action_lock")
+    if action_lock is not None and action_lock.locked():
+        if valid:
+            return web.json_response({"status": "ok", "payload": _equipment_states_payload(
+                entry, hit=True, action_in_progress=True)})
+        return _equipment_states_unavailable("action_in_progress")
+    if valid and request.query.get("refresh") != "1":
+        return web.json_response({"status": "ok", "payload": _equipment_states_payload(
+            entry, hit=True, action_in_progress=False)})
+
+    # Construction synchrone (pas d'await) : deux requêtes simultanées ne la lancent qu'une fois, la
+    # seconde trouve l'entrée stockée. La comparaison d'`epoch` garantit qu'un résultat périmé par
+    # une invalidation survenue pendant la construction est rendu à son appelant, jamais stocké.
+    epoch = cache["epoch"]
+    signature = overrides_file_signature(data_dir)
+    started = time.perf_counter()
+    built = _build_equipment_states_entry(app, data_dir)
+    build_ms = int((time.perf_counter() - started) * 1000)
+    cache["build_seq"] += 1
+    new_entry = dict(
+        built,
+        topology=topology,
+        overrides_signature=signature,
+        built_at=time.monotonic(),
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        generation=cache["build_seq"],
+        build_ms=build_ms,
+    )
+    if cache["epoch"] == epoch:
+        cache["entry"] = new_entry
+    payload = _equipment_states_payload(new_entry, hit=False, action_in_progress=False)
+    _LOGGER.info(
+        "[AGGREGATE] build equipments=%d unread=%d build_ms=%d bytes=%d generation=%d",
+        len(new_entry["equipments"]), len(new_entry["unread"]), build_ms,
+        len(json.dumps(payload, separators=(",", ":")).encode("utf-8")), new_entry["generation"],
+    )
+    return web.json_response({"status": "ok", "payload": payload})
+
+
 async def _handle_mapping_override_save(request: web.Request) -> web.Response:
     """POST /action/mapping_override — Story 16.5 (AC9) : persiste un override de type.
 
@@ -3358,6 +3578,7 @@ async def _handle_mapping_override_save(request: web.Request) -> web.Response:
             {"status": "error", "message": str(exc)}, status=500
         )
 
+    _invalidate_equipment_states_cache(request.app)
     _LOGGER.info(
         "[OVERRIDES] Override HA sauvegardé via UI eq_id=%d cmd_id=%d type=%s",
         eq_id, cmd_id, ha_entity_type,
@@ -3409,6 +3630,7 @@ async def _handle_publication_override_save(request: web.Request) -> web.Respons
             saved = save_override(eq_id, cmd_id, {"publication_override": policy}, data_dir)
     except ValueError as exc:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
+    _invalidate_equipment_states_cache(request.app)
     return web.json_response({"status": "ok", "payload": {"jeedom_eq_id": eq_id,
         "jeedom_cmd_id": cmd_id, "publication_policy": policy, "saved": saved}})
 
@@ -3506,6 +3728,7 @@ async def _handle_mapping_override_revert(
         removed = remove_equipment_override_fields(eq_id, fields, data_dir)
         scope = "equipment"
 
+    _invalidate_equipment_states_cache(request.app)
     _LOGGER.info(
         "[OVERRIDES] Retour mode auto via UI eq_id=%d scope=%s removed=%s removed_commands=%s",
         eq_id, scope, removed, removed_commands,
@@ -4145,6 +4368,8 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         try:
             return await _run_action_body()
         finally:
+            # Story 25.2 (AC13) — Publier / Supprimer / Republier changent `published_in_ha`.
+            _invalidate_equipment_states_cache(request.app)
             # Story 19.6 (AC8) — libéré ici (jamais dans le handler) : le verrou reste tenu
             # tant que l'action protégée tourne, y compris après une déconnexion client, et
             # il est libéré même en cas d'exception.
@@ -4728,6 +4953,7 @@ def create_app(local_secret: str) -> web.Application:
     # Story 19.6 (AC8) — verrou d'action HA : une seule action `publier`/`supprimer` à la
     # fois. Le sync périodique ne le prend pas (concurrence préexistante, résiduel déclaré).
     app["action_lock"] = asyncio.Lock()
+    app[_EQUIPMENT_STATES_CACHE_KEY] = _new_equipment_states_cache()  # Story 25.2
     # Story 19.6 — référence forte aux tâches d'action protégées (revue PR #189, tour 7,
     # Codex P1) : évite la collecte prématurée par le garbage collector d'une tâche
     # `asyncio.ensure_future` non référencée ailleurs si le handler est annulé.
@@ -4746,6 +4972,7 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/publication_override", _handle_publication_override_save)
     app.router.add_post("/action/publication_override_revert", _handle_publication_override_revert)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
+    app.router.add_get("/system/equipment_states", _handle_equipment_states_get)  # Story 25.2
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
     # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)

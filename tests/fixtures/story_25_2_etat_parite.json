@@ -1,0 +1,2068 @@
+{
+ "101": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1011,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1012,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1013,
+     "published_in_ha": true
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": false
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "jeedom_eq_id": 101,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1011,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1012,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1013,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1011,
+      1012,
+      1013
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "ha_entity_type": "light",
+     "override_command_id": 1011,
+     "override_pending": false,
+     "present_in_ha": true,
+     "publication_override": null,
+     "reason_details": {
+      "on_off": "state+on+off"
+     }
+    }
+   ],
+   "eq_name": "Eq A",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 101,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  }
+ },
+ "102": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1021,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1022,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1023,
+     "published_in_ha": true
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": true
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "publication_excluded_eqlogic",
+    "reason_code": "light_on_off_only",
+    "should_publish": false
+   },
+   "jeedom_eq_id": 102,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": true,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1021,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1022,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1023,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1021,
+      1022,
+      1023
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "publication_excluded_eqlogic",
+      "reason_code": "light_on_off_only",
+      "should_publish": false
+     },
+     "ha_entity_type": "light",
+     "override_command_id": 1021,
+     "override_pending": true,
+     "present_in_ha": true,
+     "publication_override": "exclude_eqlogic",
+     "reason_details": {
+      "on_off": "state+on+off"
+     }
+    }
+   ],
+   "eq_name": "Eq B",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "publication_excluded_eqlogic",
+    "reason_code": "light_on_off_only",
+    "should_publish": false
+   },
+   "equipment_publication_override": "exclude",
+   "jeedom_eq_id": 102,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": true,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  }
+ },
+ "103": {
+  "aggregate": {
+   "commands": [],
+   "entities": [],
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "no_commands"
+    },
+    "publication_reason": "no_commands",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "jeedom_eq_id": 103,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [],
+   "eligible": false,
+   "entities": [],
+   "eq_name": "Eq C",
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "no_commands"
+    },
+    "publication_reason": "no_commands",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 103,
+   "mapped": false,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "104": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1041,
+     "published_in_ha": false
+    },
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1042,
+     "published_in_ha": false
+    },
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1043,
+     "published_in_ha": false
+    }
+   ],
+   "entities": [],
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "disabled_eqlogic"
+    },
+    "publication_reason": "disabled_eqlogic",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "jeedom_eq_id": 104,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1041,
+     "override_applied": false,
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1042,
+     "override_applied": false,
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "disabled_eqlogic"
+      },
+      "publication_reason": "disabled_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1043,
+     "override_applied": false,
+     "published_in_ha": false
+    }
+   ],
+   "eligible": false,
+   "entities": [],
+   "eq_name": "Eq D",
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "disabled_eqlogic"
+    },
+    "publication_reason": "disabled_eqlogic",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 104,
+   "mapped": false,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "105": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1051,
+     "published_in_ha": false
+    },
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1052,
+     "published_in_ha": false
+    },
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1053,
+     "published_in_ha": false
+    }
+   ],
+   "entities": [],
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "excluded_eqlogic"
+    },
+    "publication_reason": "excluded_eqlogic",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "jeedom_eq_id": 105,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1051,
+     "override_applied": false,
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1052,
+     "override_applied": false,
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "excluded_eqlogic"
+      },
+      "publication_reason": "excluded_eqlogic",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1053,
+     "override_applied": false,
+     "published_in_ha": false
+    }
+   ],
+   "eligible": false,
+   "entities": [],
+   "eq_name": "Eq E",
+   "equipment_decision": {
+    "confidence": null,
+    "ha_entity_type": null,
+    "projection_validity": {
+     "is_valid": false,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": "excluded_eqlogic"
+    },
+    "publication_reason": "excluded_eqlogic",
+    "reason_code": null,
+    "should_publish": false
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 105,
+   "mapped": false,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "106": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "ambiguous",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "ambiguous_skipped",
+      "reason_code": "fallback_sensor_default",
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1061,
+     "published_in_ha": false
+    },
+    {
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "command_not_covered"
+      },
+      "publication_reason": "command_not_covered",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "jeedom_cmd_id": 1062,
+     "published_in_ha": false
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": true
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "ambiguous",
+    "ha_entity_type": "sensor",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "ambiguous_skipped",
+    "reason_code": "fallback_sensor_default",
+    "should_publish": false
+   },
+   "jeedom_eq_id": 106,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "sensor",
+     "cmd_name": "Brut",
+     "coverable": false,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "ambiguous",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "ambiguous_skipped",
+      "reason_code": "fallback_sensor_default",
+      "should_publish": false
+     },
+     "effective_ha": "sensor",
+     "generic_type": null,
+     "jeedom_cmd_id": 1061,
+     "override_applied": false,
+     "override_types_allowed": [
+      "binary_sensor",
+      "cover",
+      "sensor"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "sensor",
+     "cmd_name": "Inconnu",
+     "coverable": true,
+     "covered": false,
+     "diagnostic": {
+      "confidence": null,
+      "ha_entity_type": null,
+      "projection_validity": {
+       "is_valid": false,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": "command_not_covered"
+      },
+      "publication_reason": "command_not_covered",
+      "reason_code": null,
+      "should_publish": false
+     },
+     "effective_ha": "sensor",
+     "generic_type": "NO_SUCH_GENERIC_TYPE",
+     "jeedom_cmd_id": 1062,
+     "override_applied": false,
+     "published_in_ha": false
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1061
+     ],
+     "decision": {
+      "confidence": "ambiguous",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "ambiguous_skipped",
+      "reason_code": "fallback_sensor_default",
+      "should_publish": false
+     },
+     "ha_entity_type": "sensor",
+     "override_command_id": 1061,
+     "override_pending": true,
+     "present_in_ha": false,
+     "publication_override": null,
+     "reason_details": {}
+    }
+   ],
+   "eq_name": "Eq F",
+   "equipment_decision": {
+    "confidence": "ambiguous",
+    "ha_entity_type": "sensor",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "ambiguous_skipped",
+    "reason_code": "fallback_sensor_default",
+    "should_publish": false
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 106,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": false,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "107": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1071,
+     "published_in_ha": false
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1072,
+     "published_in_ha": false
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1073,
+     "published_in_ha": false
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "sensor_unit_power",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1074,
+     "published_in_ha": false
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": true
+    },
+    {
+     "override_pending": true
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "switch",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "switch_on_off_state",
+    "should_publish": true
+   },
+   "jeedom_eq_id": 107,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "ENERGY_ON",
+     "jeedom_cmd_id": 1071,
+     "override_applied": false,
+     "override_types_allowed": [
+      "alarm_control_panel",
+      "binary_sensor",
+      "button",
+      "light",
+      "sensor",
+      "switch"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "ENERGY_OFF",
+     "jeedom_cmd_id": 1072,
+     "override_applied": false,
+     "override_types_allowed": [
+      "alarm_control_panel",
+      "binary_sensor",
+      "button",
+      "light",
+      "sensor",
+      "switch"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "ENERGY_STATE",
+     "jeedom_cmd_id": 1073,
+     "override_applied": false,
+     "override_types_allowed": [
+      "alarm_control_panel",
+      "binary_sensor",
+      "button",
+      "light",
+      "sensor",
+      "switch"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "sensor",
+     "cmd_name": "Conso W",
+     "coverable": false,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "sensor_unit_power",
+      "should_publish": true
+     },
+     "effective_ha": "sensor",
+     "generic_type": null,
+     "jeedom_cmd_id": 1074,
+     "override_applied": false,
+     "override_types_allowed": [
+      "binary_sensor",
+      "cover",
+      "sensor"
+     ],
+     "published_in_ha": false
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1071,
+      1072,
+      1073
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "switch_on_off_state",
+      "should_publish": true
+     },
+     "ha_entity_type": "switch",
+     "override_command_id": 1071,
+     "override_pending": true,
+     "present_in_ha": false,
+     "publication_override": null,
+     "reason_details": {
+      "device_class_source": "prise"
+     }
+    },
+    {
+     "command_ids": [
+      1074
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "sensor",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "sensor_unit_power",
+      "should_publish": true
+     },
+     "ha_entity_type": "sensor",
+     "override_command_id": 1074,
+     "override_pending": true,
+     "present_in_ha": false,
+     "publication_override": null,
+     "reason_details": {
+      "cmd_id": 1074,
+      "device_class": "power",
+      "node_id": "jeedom2ha_107_1074",
+      "object_id": "jeedom2ha_107_1074",
+      "state_class": "measurement",
+      "state_topic": "jeedom2ha/107/1074/state",
+      "unit_of_measurement": "W"
+     }
+    }
+   ],
+   "eq_name": "Eq G",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "switch",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "switch_on_off_state",
+    "should_publish": true
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 107,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "108": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1081,
+     "published_in_ha": false
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1082,
+     "published_in_ha": false
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1083,
+     "published_in_ha": false
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": true
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "jeedom_eq_id": 108,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1081,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1082,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": false
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1083,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": false
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1081,
+      1082,
+      1083
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "ha_entity_type": "light",
+     "override_command_id": 1081,
+     "override_pending": true,
+     "present_in_ha": false,
+     "publication_override": null,
+     "reason_details": {
+      "on_off": "state+on+off"
+     }
+    }
+   ],
+   "eq_name": "Eq H",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 108,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": false,
+    "synced_should_publish": null
+   }
+  }
+ },
+ "109": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1091,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1092,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1093,
+     "published_in_ha": true
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": false
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "jeedom_eq_id": 109,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "light",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1091,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1092,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "light",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "light",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1093,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1091,
+      1092,
+      1093
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "light",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "ha_entity_type": "light",
+     "override_command_id": 1091,
+     "override_pending": false,
+     "present_in_ha": true,
+     "publication_override": null,
+     "reason_details": {
+      "on_off": "state+on+off"
+     }
+    }
+   ],
+   "eq_name": "Eq I",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "light",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 109,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  }
+ },
+ "110": {
+  "aggregate": {
+   "commands": [
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1101,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1102,
+     "published_in_ha": true
+    },
+    {
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "jeedom_cmd_id": 1103,
+     "published_in_ha": true
+    }
+   ],
+   "entities": [
+    {
+     "override_pending": false
+    }
+   ],
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "switch",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "jeedom_eq_id": 110,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  },
+  "tree": {
+   "commands": [
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "On",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "LIGHT_ON",
+     "jeedom_cmd_id": 1101,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "Off",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "LIGHT_OFF",
+     "jeedom_cmd_id": 1102,
+     "override_applied": false,
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    },
+    {
+     "attendu_ha": "switch",
+     "cmd_name": "Etat",
+     "coverable": true,
+     "covered": true,
+     "diagnostic": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "effective_ha": "switch",
+     "generic_type": "LIGHT_STATE",
+     "jeedom_cmd_id": 1103,
+     "override_applied": true,
+     "override_source": "user",
+     "override_types_allowed": [
+      "button",
+      "light",
+      "switch"
+     ],
+     "published_in_ha": true
+    }
+   ],
+   "eligible": true,
+   "entities": [
+    {
+     "command_ids": [
+      1101,
+      1102,
+      1103
+     ],
+     "decision": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "projection_validity": {
+       "is_valid": true,
+       "missing_capabilities": [],
+       "missing_fields": [],
+       "reason_code": null
+      },
+      "publication_reason": "sure",
+      "reason_code": "light_on_off_only",
+      "should_publish": true
+     },
+     "ha_entity_type": "switch",
+     "override_command_id": 1101,
+     "override_pending": false,
+     "present_in_ha": true,
+     "publication_override": null,
+     "reason_details": {
+      "on_off": "state+on+off",
+      "override_applied": true,
+      "override_source": "user"
+     }
+    }
+   ],
+   "eq_name": "Eq J",
+   "equipment_decision": {
+    "confidence": "sure",
+    "ha_entity_type": "switch",
+    "projection_validity": {
+     "is_valid": true,
+     "missing_capabilities": [],
+     "missing_fields": [],
+     "reason_code": null
+    },
+    "publication_reason": "sure",
+    "reason_code": "light_on_off_only",
+    "should_publish": true
+   },
+   "equipment_publication_override": null,
+   "jeedom_eq_id": 110,
+   "mapped": true,
+   "sync_status": {
+    "current_should_publish": true,
+    "override_pending": false,
+    "published_in_ha": true,
+    "synced_should_publish": true
+   }
+  }
+ }
+}

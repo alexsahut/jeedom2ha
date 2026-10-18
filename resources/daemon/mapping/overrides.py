@@ -57,6 +57,19 @@ def _overrides_path(data_dir: str) -> str:
     return os.path.join(data_dir, _OVERRIDES_FILENAME)
 
 
+def overrides_file_signature(data_dir: str) -> Optional[tuple]:
+    """Story 25.2 — signature `(st_mtime_ns, st_size)` du fichier d'overrides, `None` si absent.
+
+    Lecture seule (`os.stat`). Sert de filet de sécurité au cache de la route agrégée contre
+    une écriture hors des handlers qui invalident explicitement.
+    """
+    try:
+        stat = os.stat(_overrides_path(data_dir))
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
 def _override_key(jeedom_eq_id: int, jeedom_cmd_id: int) -> str:
     return f"{jeedom_eq_id}:{jeedom_cmd_id}"
 
