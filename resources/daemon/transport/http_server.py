@@ -3521,6 +3521,11 @@ async def _handle_equipment_states_get(request: web.Request) -> web.Response:
 
     # Construction synchrone (aucun `await`) : single-flight par construction sur la boucle ;
     # deux requêtes concurrentes ne reconstruisent donc pas, la seconde trouve l'entrée stockée.
+    if refresh:
+        # AC14 : un rafraîchissement forcé attribue une nouvelle génération (l'entrée remplacée
+        # n'est plus valide) ; la comparaison ci-dessous protège toujours contre une invalidation
+        # survenue pendant la construction.
+        cache["generation"] += 1
     generation = cache["generation"]
     started = time.perf_counter()
     built = _build_equipment_states(app, data_dir)

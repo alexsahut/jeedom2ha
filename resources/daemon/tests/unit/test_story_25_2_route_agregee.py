@@ -235,6 +235,8 @@ async def test_ac10_hit_apres_build_et_refresh(cli, caplog):
     caplog.set_level("INFO")
     third = await _get(cli, "?refresh=1")
     assert third["meta"]["cache"]["hit"] is False
+    assert third["meta"]["generation"] > second["meta"]["generation"]
+    assert (await _get(cli))["meta"]["generation"] == third["meta"]["generation"]
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("[AGGREGATE]")]
     assert len(lines) == 1
     assert re.fullmatch(
