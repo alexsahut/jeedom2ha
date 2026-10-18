@@ -29,11 +29,12 @@
 
 export const name = 'exclusion-publication-non-publiee';
 
-// Story 22.2 (CC-51) : les libellés disent la portée (« l’équipement » / « équipement entier »).
-// L'équipement 287 n'a qu'une entité : ses actions d'entité, qui doublaient celles de
-// l'équipement, ne sont plus affichées ; seules les actions d'équipement restent.
-const EXCLUDE_LABEL = 'Exclure l’équipement';
-const REVERT_LABEL = 'Revenir au mode automatique (équipement entier)';
+// Story 25.1 : le réglage de publication est un contrôle segmenté « Automatique | Toujours | Jamais »
+// (il remplace « Exclure », « Forcer » et « Revenir au mode automatique »). L'équipement 287 n'a
+// qu'une entité : pas d'en-tête de groupe, seul le contrôle d'équipement existe. Les positions sont des
+// radios ; la position active porte `aria-checked="true"`.
+const EXCLUDE_LABEL = 'Jamais';
+const REVERT_LABEL = 'Automatique';
 export const declaredEquipments = { '287': { commands: [] } };
 export const declaredBascules = [];
 export const declaredPublicationOverrides = { '287': { commands: [] } };
@@ -56,15 +57,17 @@ async function waitForJournal(journalEntries, start, expected) {
   throw new Error('journal-attendu-absent');
 }
 
-/** Attend que le bouton d'action d'équipement portant ce libellé ait l'état `disabled` attendu. */
-async function waitForActionButtonState(page, eqId, label, expectedDisabled) {
-  await page.waitForFunction(({ eqId, label, expectedDisabled }) => {
+/** Attend que la position du contrôle segmenté d'équipement portant ce libellé ait l'état attendu
+ * (`checked` : position courante ; `disabled` : position indisponible). */
+async function waitForSegmentState(page, eqId, label, expected) {
+  await page.waitForFunction(({ eqId, label, expected }) => {
     const panel = document.querySelector(`.j2ha-eq-panel[data-eq-id="${eqId}"]`);
     if (!panel) return false;
-    const buttons = panel.querySelectorAll('.j2ha-eq-actions button');
-    const button = Array.from(buttons).find((candidate) => candidate.textContent.trim() === label);
-    return Boolean(button) && button.disabled === expectedDisabled;
-  }, { eqId, label, expectedDisabled });
+    const segments = panel.querySelectorAll('.j2ha-eq-controls .j2ha-seg-btn');
+    const segment = Array.from(segments).find((candidate) => candidate.textContent.trim() === label);
+    return Boolean(segment) && segment.disabled === expected.disabled
+      && (segment.getAttribute('aria-checked') === 'true') === expected.checked;
+  }, { eqId, label, expected });
 }
 
 /** Attend l'étape nommée, journalise son libellé avant exécution pour un rapport diagnosticable. */
@@ -128,38 +131,40 @@ export async function run(page, { helpers }) {
     await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
   });
 
-  // Point P2 (reprise X5d) : les entités n'arrivent qu'après la relecture
-  // `getMappingOverrides` déclenchée par le dépliage — attendre la première ligne
-  // (délai borné) avant de compter, pour ne pas lire un arbre encore vide.
-  await panel.locator('.j2ha-entity-row').first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
+  // Point P2 (reprise X5d) : le contrôle de publication n'est rendu qu'après la relecture
+  // `getMappingOverrides` déclenchée par le dépliage — attendre sa présence (délai borné) avant de
+  // compter, pour ne pas lire un arbre encore vide.
+  await panel.locator('.j2ha-eq-controls .j2ha-seg-btn').first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
 
-  // Précondition : un équipement sans aucune entité ne peut rien prouver sur
-  // les boutons de publication (ils resteraient dans leur état par défaut,
-  // quel que soit le bug recherché) — échec explicite plutôt qu'une attente
-  // muette sur un bouton qui n'existera jamais dans l'état attendu.
-  const entityRowCount = await panel.locator('.j2ha-entity-row').count();
-  if (entityRowCount < 1) {
+  // Précondition : un équipement sans aucune entité ni commande ne peut rien prouver sur le réglage de
+  // publication (il resterait dans sa position par défaut, quel que soit le bug recherché) — échec
+  // explicite plutôt qu'une attente muette sur une position qui n'existera jamais dans l'état attendu.
+  // Story 25.1 : une entité unique n'a plus de ligne dédiée ; on exige donc au moins une commande
+  // rendue dans le tableau (donc un arbre lu avec son mapping).
+  const commandRowCount = await panel.locator('tr.mapping-override-cmd').count();
+  if (commandRowCount < 1) {
     throw new Error('eq-sans-entite');
   }
 
-  // Story 22.2 (AC2, AC3) : équipement à une seule entité — ligne d'entité sans bouton, trois
-  // actions d'équipement, compteurs de l'équipement lus (trois notions en commandes).
-  if (entityRowCount !== 1) throw new Error('eq-287-plusieurs-entites');
-  if (await panel.locator('.j2ha-entity-row button').count() !== 0) throw new Error('actions-entite-doublons-visibles');
+  // Story 22.2 / 25.1 (AC3) : équipement à une seule entité — aucun en-tête de groupe (donc aucun
+  // contrôle d'entité en doublon), les trois positions du contrôle d'équipement, compteurs de
+  // l'équipement lus (zéros masqués).
+  if (await panel.locator('.j2ha-group-head').count() !== 0) throw new Error('eq-287-plusieurs-entites');
+  if (await panel.locator('.j2ha-group-head button').count() !== 0) throw new Error('actions-entite-doublons-visibles');
   helpers.record('actions_entite_masquees', true);
   await waitAtStep(helpers, '6a', 'compteurs-equipement', () => panel.locator('.j2ha-eq-counter').first().waitFor({ state: 'visible' }));
   const counterTexts = await panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  if (counterTexts.length < 3 || !counterTexts.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+  if (counterTexts.length < 1 || !counterTexts.every((text) => /^\d+ (publiées?|à appliquer|bloquées?|ignorées?|exclues?)$/.test(text))) {
     throw new Error('compteurs-eq-287-illisibles');
   }
   counterTexts.forEach((text, index) => helpers.record(`eq_287_compteur_${index + 1}`, text));
 
-  const actions = panel.locator('.j2ha-eq-actions');
+  const controls = panel.locator('.j2ha-eq-controls');
   // La modale de pièce de Jeedom reste `aria-hidden="true"` une fois ouverte,
   // donc un `getByRole` par défaut n'y trouve rien : `includeHidden: true` est
   // nécessaire pour la localisation ; `click()` continue d'exiger la visibilité réelle.
-  const excludeButton = actions.getByRole('button', { name: EXCLUDE_LABEL, exact: true, includeHidden: true });
-  const revertButton = actions.getByRole('button', { name: REVERT_LABEL, exact: true, includeHidden: true });
+  const excludeButton = controls.getByRole('radio', { name: EXCLUDE_LABEL, exact: true, includeHidden: true });
+  const revertButton = controls.getByRole('radio', { name: REVERT_LABEL, exact: true, includeHidden: true });
 
   const start = helpers.journalEntries().length;
   // Équipement non publié : aucune confirmation attendue (shouldConfirmPublication
@@ -188,11 +193,11 @@ export async function run(page, { helpers }) {
     { action: 'getMappingOverrides', verdict: 'lecture-derivee' },
   ]));
   // Après la pose simulée et la relecture déclenchée par le rechargement de
-  // l'équipement : « Exclure » devient sans effet (déjà exclu), « Revenir au
-  // mode automatique » devient le seul moyen de retirer l'exclusion (point 3).
+  // l'équipement : « Jamais » devient la position courante (déjà exclu), « Automatique »
+  // reste le moyen de retirer l'exclusion (point 3).
   await waitAtStep(helpers, 9, 'etat-boutons-apres-exclusion', async () => {
-    await waitForActionButtonState(page, '287', EXCLUDE_LABEL, true);
-    await waitForActionButtonState(page, '287', REVERT_LABEL, false);
+    await waitForSegmentState(page, '287', EXCLUDE_LABEL, { checked: true, disabled: false });
+    await waitForSegmentState(page, '287', REVERT_LABEL, { checked: false, disabled: false });
   });
 
   const afterSave = helpers.journalEntries().length;
@@ -204,6 +209,9 @@ export async function run(page, { helpers }) {
     { action: 'revertPublicationOverride', verdict: 'simulee' },
     { action: 'getMappingOverrides', verdict: 'read' },
   ]));
-  // Après le retrait : « Exclure » redevient actif.
-  await waitAtStep(helpers, 12, 'etat-bouton-final', () => waitForActionButtonState(page, '287', EXCLUDE_LABEL, false));
+  // Après le retrait : « Jamais » n'est plus la position courante mais redevient choisissable.
+  await waitAtStep(helpers, 12, 'etat-bouton-final', async () => {
+    await waitForSegmentState(page, '287', EXCLUDE_LABEL, { checked: false, disabled: false });
+    await waitForSegmentState(page, '287', REVERT_LABEL, { checked: true, disabled: false });
+  });
 }

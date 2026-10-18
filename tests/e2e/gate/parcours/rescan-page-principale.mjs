@@ -1,4 +1,4 @@
-/** Story 20.4 : clic confirmé, rescan déclaré et retour simulé (à lancer après fusion). */
+/** Story 20.4 : clic confirmé, relecture de Jeedom déclarée et retour simulé (à lancer après fusion). */
 
 export const name = 'rescan-page-principale';
 export const declaredEquipments = {};
@@ -10,7 +10,7 @@ export async function run(page, { helpers }) {
   await button.waitFor({ state: 'visible' });
   await button.click();
   helpers.record('confirmation_ouverte', true);
-  const confirm = page.locator('.bootbox .btn-primary').filter({ hasText: /^Rescanner$/ }).first();
+  const confirm = page.locator('.bootbox .btn-primary').filter({ hasText: /^Relire$/ }).first();
   await confirm.click();
   const zone = await page.waitForFunction(() => {
     if (document.querySelector('#jeeToastContainer')?.textContent?.includes('Synchronisation terminée.')) {

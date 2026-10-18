@@ -122,7 +122,7 @@
           // 'exclude' — celui-ci n'existe que côté action demandée par l'utilisateur). Garder
           // les 3 valeurs réelles ici : les aplatir vers 'exclude'/'force_publish' faisait
           // disparaître toute exclusion à la lecture (publicationActionState la voyait comme
-          // absente), rendant « Exclure » actif et « Revenir au mode automatique » grisé sur
+          // absente), rendant « Jamais » actif et « Automatique » grisé sur
           // une entité pourtant déjà exclue.
           publication_override: e.publication_override === 'exclude_eqlogic'
             || e.publication_override === 'exclude_command'
@@ -190,15 +190,15 @@
     }
     // X6b (P2, relecture indépendante PR #215) : un équipement INÉLIGIBLE (ex. eq 588-591,
     // `excluded_plugin`) n'a ni entité ni commande — `evaluate_equipment` refuse déjà toute
-    // exclusion pour lui, donc « Exclure »/« Forcer » n'auraient aucun effet. Seule la portée
+    // exclusion pour lui, donc « Jamais »/« Toujours » n'auraient aucun effet. Seule la portée
     // équipement est concernée (jamais l'entité, qui a sa propre éligibilité portée par
-    // `decision`/`projection_validity`). « Revenir au mode automatique » reste actif si un
+    // `decision`/`projection_validity`). « Automatique » reste actif si un
     // override d'équipement est déjà posé (AC1/AC6) — sinon il s'appliquerait en silence si
     // l'équipement redevenait éligible, sans que l'utilisateur puisse jamais le retirer.
     if (equipment === true && t.eligible === false) {
       var ineligibleOverride = t.has_publication_override === true;
       var ineligibleReason = 'Équipement non éligible : l’action serait sans effet.';
-      var ineligibleRevertReason = ineligibleOverride ? null : 'Aucun override de publication à retirer.';
+      var ineligibleRevertReason = ineligibleOverride ? null : 'Aucun réglage de publication à retirer.';
       return {
         can_exclude: false, can_force: false, can_revert: ineligibleOverride,
         exclude_reason: ineligibleReason, force_reason: ineligibleReason, revert_reason: ineligibleRevertReason,
@@ -207,12 +207,12 @@
     }
     // Story 20-2 (P2, revue ClaudeBox X4 point 4) : une entité qui hérite du veto
     // d'équipement ('exclude_eqlogic' sur une cible entité, pas la cible équipement elle-même)
-    // n'a NI « Forcer » NI « Revenir au mode automatique » qui aient un sens à sa propre
+    // n'a NI « Toujours » NI « Automatique » qui aient un sens à sa propre
     // portée — l'override vit sur l'équipement, pas sur cette commande. Les deux boutons
     // renvoient vers l'équipement plutôt que de tenter une action sans effet ou trompeuse.
     var inheritedEqExclusion = !equipment && policy === 'exclude_eqlogic';
     var pv = decision.projection_validity || {};
-    var excludeReason = excluded ? 'Entité déjà exclue de Home Assistant.' : null;
+    var excludeReason = excluded ? 'Déjà réglé sur « Jamais ».' : null;
     if (inheritedEqExclusion) {
       var inheritedReason = 'Exclusion posée sur l’équipement : la retirer depuis l’équipement.';
       return {
@@ -223,9 +223,9 @@
     }
     var forceReason = null;
     if (forced) {
-      forceReason = 'Publication déjà forcée sur cette entité.';
+      forceReason = 'Déjà réglé sur « Toujours ».';
     } else if (decision.should_publish === true) {
-      forceReason = 'Déjà publiée : forcer n’a pas d’effet.';
+      forceReason = 'Déjà publiée : « Toujours » n’aurait pas d’effet.';
     } else if (!decision.ha_entity_type) {
       forceReason = 'Aucun type Home Assistant identifié pour cette entité.';
     } else if (HA_ENTITY_TYPE_OPTIONS.indexOf(decision.ha_entity_type) === -1) {
@@ -234,7 +234,7 @@
       forceReason = 'Projection invalide pour ce type HA.';
     }
     var revertReason = (policy === null && t.has_publication_override !== true)
-      ? 'Aucun override de publication à retirer.' : null;
+      ? 'Aucun réglage de publication à retirer.' : null;
     return {
       can_exclude: !excluded,
       can_force: forceReason === null,
@@ -251,7 +251,7 @@
   // X6b (P2, relecture indépendante PR #215) : construit la cible équipement passée à
   // `publicationActionState`, en lisant `eligible` et `equipment_publication_override` (tree
   // déjà normalisé) en plus du veto porté par les entités/commandes — remplace la construction
-  // inline historique (surface) qui ignorait les deux champs additifs et laissait « Exclure »
+  // inline historique (surface) qui ignorait les deux champs additifs et laissait « Jamais »
   // actif sans effet sur un équipement inéligible, et « Revenir » grisé sans recours.
   function equipmentPublicationTarget(tree) {
     var t = tree || {};
@@ -396,7 +396,7 @@
         already_published: alreadyPublished,
         changes: !alreadyPublished && willPublish,
         status_label: alreadyPublished ? 'Déjà publiée dans Home Assistant.'
-          : (willPublish ? 'Sera publiée dans Home Assistant.' : buildPublishCellLabel(entity.decision)),
+          : (willPublish ? 'À appliquer dans Home Assistant.' : buildPublishCellLabel(entity.decision)),
       };
     });
   }
@@ -450,9 +450,9 @@
     var r = normalizeCommandRow(row);
     var attendu = r.effective_ha || r.attendu_ha;
     if (!attendu) {
-      return 'Aucun override configuré — aucun type HA par défaut pour cette commande.';
+      return 'Aucun type imposé — aucun type HA automatique pour cette commande.';
     }
-    return 'Aucun override configuré — voici ce qui sera utilisé par défaut : ' + attendu + '.';
+    return 'Aucun type imposé — type HA automatique : ' + attendu + '.';
   }
 
   // --- Lecture stricte d'une vue diagnostic (contrat _preview_mapping_view) ---
@@ -503,7 +503,7 @@
   // non couverte : elle n'a aucun mapping à projeter, donc rien ne sera publié. Message
   // factuel (jamais vide, jamais un flash vert trompeur, jamais un code HTTP).
   function buildUncoveredLabel() {
-    return 'Ne sera pas publié — commande sans type Home Assistant applicable';
+    return 'Ignorée → sans équivalent dans Home Assistant';
   }
 
   // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) — décide si `covered:false` doit
@@ -586,16 +586,16 @@
       return '';
     }
     if (d.is_valid && d.should_publish) {
-      var t = d.ha_entity_type || 'ce type';
-      return 'Prêt : projetable en ' + t + ', publication Home Assistant validée.';
+      var t = d.ha_entity_type ? formatHaDomain(d.ha_entity_type) : 'ce type';
+      return 'Publiable en ' + t + ' : type Home Assistant validé.';
     }
     if (!d.is_valid && d.missing_capabilities.length > 0) {
       var caps = d.missing_capabilities.join(', ');
-      return 'Capacité(s) manquante(s) pour ce type HA : ' + caps + '.';
+      return (d.missing_capabilities.length > 1 ? 'Capacités manquantes' : 'Capacité manquante') + ' pour ce type HA : ' + caps + '.';
     }
     if (!d.is_valid && d.missing_fields.length > 0) {
       var fields = d.missing_fields.join(', ');
-      return 'Champ(s) requis manquant(s) pour ce type HA : ' + fields + '.';
+      return (d.missing_fields.length > 1 ? 'Champs requis manquants' : 'Champ requis manquant') + ' pour ce type HA : ' + fields + '.';
     }
     var codes = collectRefusalReasons(view);
     if (codes.length > 0) {
@@ -613,7 +613,7 @@
     ambiguous_skipped: 'type Home Assistant ambigu — précisez les types génériques dans Jeedom',
     name_heuristic_rejection: 'un mot du nom de l’équipement écarte ce type',
     duplicate_generic_types: 'types génériques en double',
-    switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Override HA », puis « Forcer »',
+    switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours »',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',
@@ -627,7 +627,7 @@
     // Story 19.3 (AC4) — raisons exposées par le branchement sur evaluate_equipment().
     no_mapping: 'aucun type Home Assistant identifié pour cette commande',
     skipped_no_mapping_candidate: 'aucun type Home Assistant candidat à valider',
-    ha_component_not_in_product_scope: 'type HA non ouvert par ce plugin',
+    ha_component_not_in_product_scope: 'non pris en charge par le plugin',
     sure_mapping: 'type Home Assistant identifié — publication normale',
     publication_excluded_eqlogic: 'exclu manuellement (équipement)',
     publication_excluded_command: 'exclu manuellement (commande)',
@@ -635,7 +635,7 @@
     // Story 19.3 (AC1/AC7) — le branchement sur evaluate_equipment() fait aussi remonter
     // les raisons d'inéligibilité amont (Story 4.3) jusqu'au diagnostic par commande,
     // là où la surface ignorait jusqu'ici ces cas (CC-03).
-    command_not_covered: 'commande sans type Home Assistant applicable',
+    command_not_covered: 'sans équivalent dans Home Assistant',
     excluded_eqlogic: 'exclu de Jeedom2HA (équipement dans la liste d’exclusions)',
     excluded_plugin: 'exclu de Jeedom2HA (plugin source dans la liste d’exclusions)',
     excluded_object: 'exclu de Jeedom2HA (pièce dans la liste d’exclusions)',
@@ -652,19 +652,23 @@
     'publication_excluded_command',
   ];
 
+  // Priorité : cause de décision > cause de validité > symptôme brut.
+  // `ambiguous_skipped` est le résultat de publication générique ; la cause précise
+  // est portée par le mapping dans `reason_code` et doit donc passer avant lui.
+  function causeCandidates(d) {
+    var preciseAmbiguity = ['name_heuristic_rejection', 'duplicate_generic_types', 'switch_state_orphan'];
+    return d.publication_reason === 'ambiguous_skipped' && preciseAmbiguity.indexOf(d.reason_code) !== -1
+      ? [d.reason_code, d.publication_reason, d.validity_reason_code]
+      : [d.publication_reason, d.reason_code, d.validity_reason_code];
+  }
+
   // Story 16.8 — raison de blocage concise pour la cellule diagnostic du tableau.
   function buildBlockingReason(view) {
     var d = readDiagnosticView(view);
     if (d === null) {
       return '';
     }
-    // Priorité : cause de décision > cause de validité > symptôme brut.
-    // `ambiguous_skipped` est le résultat de publication générique ; la cause précise
-    // est portée par le mapping dans `reason_code` et doit donc passer avant lui.
-    var preciseAmbiguity = ['name_heuristic_rejection', 'duplicate_generic_types', 'switch_state_orphan'];
-    var candidates = d.publication_reason === 'ambiguous_skipped' && preciseAmbiguity.indexOf(d.reason_code) !== -1
-      ? [d.reason_code, d.publication_reason, d.validity_reason_code]
-      : [d.publication_reason, d.reason_code, d.validity_reason_code];
+    var candidates = causeCandidates(d);
     for (var i = 0; i < candidates.length; i++) {
       var code = candidates[i];
       if (code && REASON_LABELS[code]) {
@@ -681,17 +685,17 @@
     return codes.length > 0 ? codes.join(', ') : '';
   }
 
-  // Story 16.8 — libellé compact de la colonne diagnostic : « ce qui sera publié ».
-  // Vert : « Sera publié : <type HA> ». Bloquant : « Ne sera pas publié — <raison> ».
+  // Story 16.8 / 25.1 — libellé compact de la colonne « Dans Home Assistant » d'un diagnostic (aperçu
+  // d'un type imposé). Prêt : « À appliquer → Lumière (light) ». Bloqué : « Bloquée → <cause> ».
   function buildPublishCellLabel(view) {
     var state = diagnosticState(view);
     if (state === 'ready') {
       var d = readDiagnosticView(view);
-      return 'Sera publié : ' + ((d && d.ha_entity_type) || 'ce type');
+      return 'À appliquer → ' + formatHaDomain(d && d.ha_entity_type);
     }
     if (state === 'blocking') {
       var reason = buildBlockingReason(view);
-      return reason ? 'Ne sera pas publié — ' + reason : 'Ne sera pas publié';
+      return reason ? 'Bloquée → ' + reason : 'Bloquée';
     }
     return '—';
   }
@@ -703,7 +707,7 @@
 
   function buildExcludedLabel(view) {
     var d = readDiagnosticView(view);
-    return 'Ne sera pas publié — ' + REASON_LABELS[d.publication_reason];
+    return 'Exclue → ' + REASON_LABELS[d.publication_reason];
   }
 
   // Story 20.1 : un équipement désactivé est un état neutre, distinct d'une
@@ -714,7 +718,7 @@
   }
 
   function buildDisabledLabel(view) {
-    return isDisabledDiagnostic(view) ? 'Ne sera pas publié — équipement désactivé dans Jeedom' : '—';
+    return isDisabledDiagnostic(view) ? 'Équipement désactivé dans Jeedom' : '—';
   }
 
   // Story 22.2 (CC-58, Q6 C) — nombre d'entités de l'arbre qui portent cette commande
@@ -806,22 +810,94 @@
     });
   }
 
-  // --- Story 16.8 / Bloc C — synthèse de publication par équipement ---
-  // Agrégation strictement front à partir des diagnostics par commande déjà portés
-  // par le GET arbre. « sera publié » = au moins une commande projetable+publiable.
+  // --- Story 25.1 — catégories de commande (D2/D3) et état unique d'équipement (D1) ---
+  // Agrégation strictement front à partir des diagnostics et de la présence déjà portés par le GET
+  // arbre : aucune décision n'est recalculée. Un seul état par équipement, lu par le badge, les
+  // compteurs et le tableau (`resolveEquipmentState`).
 
-  // Story 16.8 (AC9/AC10, parcours navigateur du 2026-10-01) — une commande non couverte
-  // par le mapping (`publication_reason === 'command_not_covered'`, décision propre à la
-  // commande) n'est ni prête ni bloquante : elle n'est simplement pas projetée, et rien
-  // n'est à corriger sur elle. Elle est comptée à part et ne reçoit jamais l'ancre
-  // « première commande bloquante ». Avant ce correctif, « Rafraichir » de l'eq 391 faisait
-  // afficher « Partiellement publié » à un équipement bel et bien publié.
+  // D3 — partition des codes de cause (REASON_LABELS). « Ignorée » : aucun équivalent HA, rien à faire
+  // pour l'utilisateur ; « Bloquée » : corrigeable ; « state » : codes d'état (ni l'une ni l'autre) ;
+  // `no_commands` est un état d'équipement. Tout code inconnu (démon plus récent) est Bloqué.
+  var COMMAND_CAUSE_CATEGORIES = {
+    ignored: ['command_not_covered', 'no_supported_generic_type', 'ha_component_not_in_product_scope'],
+    blocked: [
+      'ambiguous_skipped', 'name_heuristic_rejection', 'duplicate_generic_types', 'conflicting_generic_types',
+      'switch_state_orphan', 'probable_skipped', 'low_confidence', 'no_generic_type_configured', 'no_mapping',
+      'skipped_no_mapping_candidate', 'ha_missing_command_topic', 'ha_missing_state_topic', 'discovery_publish_failed',
+      'no_projection_possible',
+    ],
+    state: [
+      'disabled_eqlogic', 'excluded_eqlogic', 'excluded_plugin', 'excluded_object', 'publication_excluded_eqlogic',
+      'publication_excluded_command', 'publication_forced', 'sure_mapping',
+    ],
+    equipment_state: ['no_commands'],
+  };
+
+  function categoryOfCause(code) {
+    var names = Object.keys(COMMAND_CAUSE_CATEGORIES);
+    for (var i = 0; i < names.length; i++) {
+      if (COMMAND_CAUSE_CATEGORIES[names[i]].indexOf(code) !== -1) {
+        return names[i];
+      }
+    }
+    return 'blocked';
+  }
+
+  // Code de cause retenu pour une vue : même priorité que le libellé (cause de décision avant le
+  // symptôme de projection) ; un code connu l'emporte sur un code brut inconnu.
+  function resolveCauseCode(view) {
+    var d = readDiagnosticView(view);
+    if (d === null) {
+      return null;
+    }
+    var candidates = causeCandidates(d);
+    for (var i = 0; i < candidates.length; i++) {
+      if (candidates[i] && REASON_LABELS[candidates[i]]) {
+        return candidates[i];
+      }
+    }
+    for (var j = 0; j < candidates.length; j++) {
+      if (candidates[j]) {
+        return candidates[j];
+      }
+    }
+    return null;
+  }
+
+  // Catégorie D2 d'une ligne de commande : 'published' | 'to_apply' | 'blocked' | 'ignored' |
+  // 'excluded' | 'disabled' | 'unknown'. « Publiée » = présente dans HA (jamais déduite du diagnostic).
+  function classifyCommandCategory(row) {
+    var r = row || {};
+    if (r.published_in_ha === true) {
+      return 'published';
+    }
+    var view = r.diagnostic != null ? r.diagnostic : null;
+    if (isExcludedDiagnostic(view)) {
+      return 'excluded';
+    }
+    if (isDisabledDiagnostic(view)) {
+      return 'disabled';
+    }
+    if (r.covered === false && shouldShowUncoveredLabel(view)) {
+      return 'ignored';
+    }
+    var state = diagnosticState(view);
+    if (state === 'ready') {
+      return 'to_apply';
+    }
+    if (state === 'blocking') {
+      return categoryOfCause(resolveCauseCode(view)) === 'ignored' ? 'ignored' : 'blocked';
+    }
+    return 'unknown';
+  }
+
+  // Story 16.8 : classe un diagnostic de commande (conservé pour les appelants historiques) ;
+  // « uncovered » = commande non couverte, désormais la catégorie « Ignorée ».
   function isUncoveredDiagnostic(view) {
     var d = readDiagnosticView(view);
     return d !== null && d.publication_reason === 'command_not_covered';
   }
 
-  // Classe une ligne de commande de l'arbre (lecture du diagnostic déjà porté par le démon).
   function classifyCommandRow(row) {
     if (isUncoveredDiagnostic(row.diagnostic)) return 'uncovered';
     if (isExcludedDiagnostic(row.diagnostic)) return 'excluded';
@@ -829,194 +905,257 @@
     return diagnosticState(row.diagnostic);
   }
 
-  function summarizePublication(tree) {
-    var t = normalizeTree(tree);
+  // Lecture des catégories d'un arbre normalisé : base commune de l'état, des compteurs et du tableau.
+  function analyzeEquipment(t) {
+    var counts = { published: 0, to_apply: 0, blocked: 0, ignored: 0, excluded: 0, disabled: 0, unknown: 0 };
     var ready = 0;
-    var blocking = 0;
-    var unknown = 0;
-    var uncovered = 0;
-    var excluded = 0;
-    var disabled = 0;
-    var firstBlockingCmdId = null;
+    var presenceUnknown = 0;
+    var firstBlockedCmdId = null;
     for (var i = 0; i < t.commands.length; i++) {
       var row = t.commands[i];
-      var kind = classifyCommandRow(row);
-      if (kind === 'uncovered') {
-        uncovered += 1;
-      } else if (kind === 'excluded') {
-        excluded += 1;
-      } else if (kind === 'disabled') {
-        disabled += 1;
-      } else if (kind === 'ready') {
+      var category = classifyCommandCategory(row);
+      counts[category] += 1;
+      if (isReadyDiagnostic(row.diagnostic)) {
         ready += 1;
-      } else if (kind === 'blocking') {
-        blocking += 1;
-        if (firstBlockingCmdId === null) {
-          firstBlockingCmdId = row.jeedom_cmd_id;
-        }
-      } else {
-        unknown += 1;
+      }
+      if (row.published_in_ha === null) {
+        presenceUnknown += 1;
+      }
+      if (category === 'blocked' && firstBlockedCmdId === null) {
+        firstBlockedCmdId = row.jeedom_cmd_id;
       }
     }
-    // Story 20-2 (AC8, X6 — validation UX ClaudeBox 06/10, eq 588-591) : un équipement sans
-    // commande ne peut pas se résoudre par la boucle ci-dessus (rien à parcourir) ; la seule
-    // source pour « Exclu »/« Désactivé » est alors `equipment_decision`, déjà porté par le
-    // démon. Lecture pure, aucun recalcul ; n'affecte jamais un arbre qui a des commandes.
-    if (t.commands.length === 0) {
-      if (isExcludedDiagnostic(t.equipment_decision)) {
-        excluded = 1;
-      } else if (isDisabledDiagnostic(t.equipment_decision)) {
-        disabled = 1;
-      }
-    }
+    // Un équipement sans commande ne se résout pas par la boucle : `equipment_decision` (déjà porté par
+    // le démon, lecture pure) dit alors « Exclu » / « Désactivé » (story 20-2, AC8). « Désactivé » prime
+    // sur « Exclu » (D1 : R3 avant R4).
+    var nothingElse = ready === 0 && counts.blocked === 0;
     return {
-      total: t.commands.length,
-      ready_count: ready,
-      blocking_count: blocking,
-      unknown_count: unknown,
-      uncovered_count: uncovered,
-      excluded_count: excluded,
-      disabled_count: disabled,
-      will_publish: ready > 0,
-      first_blocking_cmd_id: firstBlockingCmdId,
+      counts: counts,
+      ready: ready,
+      blocked: counts.blocked,
+      presence_unknown: presenceUnknown,
+      first_blocked_cmd_id: firstBlockedCmdId,
+      disabled: nothingElse && (isDisabledDiagnostic(t.equipment_decision) || counts.disabled > 0),
+      excluded: nothingElse && (isExcludedDiagnostic(t.equipment_decision) || counts.excluded > 0),
     };
   }
-
-  // Libellé factuel « sera publié / ne sera pas publié » + compte prêtes/bloquantes (AC9/AC10).
-  function buildPublicationSummaryLabel(summary) {
-    var s = summary || {};
-    var ready = s.ready_count || 0;
-    var blocking = s.blocking_count || 0;
-    var excluded = s.excluded_count || 0;
-    var disabled = s.disabled_count || 0;
-    if (ready === 0 && blocking === 0 && excluded > 0) {
-      return 'Exclu : ne sera pas publié dans Home Assistant.';
-    }
-    if (ready === 0 && blocking === 0 && disabled > 0) {
-      return 'Désactivé dans Jeedom : ne sera pas publié dans Home Assistant.';
-    }
-    if (ready === 0 && blocking === 0) {
-      return 'Aucune commande projetable en Home Assistant pour cet équipement.';
-    }
-    if (s.will_publish && blocking === 0) {
-      return 'Sera publié dans Home Assistant : ' + ready + ' commande(s) prête(s).';
-    }
-    if (s.will_publish && blocking > 0) {
-      return 'Partiellement publié : ' + ready + ' prête(s), ' + blocking + ' bloquante(s).';
-    }
-    return 'Ne sera pas publié dans Home Assistant : ' + blocking + ' commande(s) bloquante(s).';
-  }
-
-  // État de synthèse pour le badge : 'publish', 'partial', 'blocked' (actionnable), 'empty'.
-  function publicationSummaryState(summary) {
-    var s = summary || {};
-    var ready = s.ready_count || 0;
-    var blocking = s.blocking_count || 0;
-    var excluded = s.excluded_count || 0;
-    var disabled = s.disabled_count || 0;
-    if (ready === 0 && blocking === 0 && excluded > 0) {
-      return 'excluded';
-    }
-    if (ready === 0 && blocking === 0 && disabled > 0) {
-      return 'disabled';
-    }
-    if (ready === 0 && blocking === 0) {
-      return 'empty';
-    }
-    if (ready > 0 && blocking === 0) {
-      return 'publish';
-    }
-    if (ready > 0 && blocking > 0) {
-      return 'partial';
-    }
-    return 'blocked';
-  }
-
-  // AC3.4 — commandes bloquantes détectées au GET initial, plafonnées (auto-ouverture).
-  function collectBlockingCommandIds(tree, cap) {
-    var t = normalizeTree(tree);
-    var limit = (typeof cap === 'number' && cap > 0) ? cap : 4;
-    var ids = [];
-    for (var i = 0; i < t.commands.length && ids.length < limit; i++) {
-      var row = t.commands[i];
-      if (isUncoveredDiagnostic(row.diagnostic) || isExcludedDiagnostic(row.diagnostic) || isDisabledDiagnostic(row.diagnostic)) {
-        continue;
-      }
-      if (row.diagnostic != null && isBlockingDiagnostic(row.diagnostic)) {
-        ids.push(row.jeedom_cmd_id);
-      }
-    }
-    return ids;
-  }
-
-  // --- Story 22.2 (Q1 A, Q2 A, Q3 A) — compteurs de la pièce et de chaque équipement ---
-  // Dénombrement pur des arbres déjà lus par la surface (`GET /system/mapping_overrides/{eq_id}`,
-  // alimenté par evaluate_equipment()) : aucune décision n'est recalculée ici.
-  //   - « publié » = présent dans HA : `sync_status.published_in_ha` pour un équipement ; pour une
-  //     commande, portée par au moins une entité présente (`commands[].published_in_ha`, démon).
-  //     Il ne dérive plus d'un diagnostic de commande. `null` (démon plus ancien) = présence
-  //     inconnue : jamais comptée comme publiée.
-  //   - « en attente d'application » = `override_pending` (équipement : `sync_status` ou une entité ;
-  //     commande : portée par une entité en attente).
-  //   - « non pris en charge » : équipement ni exclu ni désactivé dont rien n'est dans HA et rien
-  //     n'attend ; commande absente de HA dont le diagnostic est bloquant ou « non couvert ».
-  // Les trois notions sont indépendantes (un équipement publié peut aussi avoir une modification en
-  // attente). « Exclu » et « désactivé dans Jeedom » restent comptés à part (choisis ou subis, pas
-  // des défauts).
 
   function entityIsPending(entity) {
     return !!entity && entity.override_pending === true;
   }
 
-  function commandIsPending(entities, cmdId) {
-    return (Array.isArray(entities) ? entities : []).some(function (entity) {
-      return entityIsPending(entity) && Array.isArray(entity.command_ids) && entity.command_ids.indexOf(cmdId) !== -1;
+  // D1 — état unique d'un équipement. Pure : ne mute pas l'arbre, aucun DOM, aucune E/S. Règles
+  // évaluées dans l'ordre, la première qui s'applique l'emporte.
+  function resolveEquipmentState(tree) {
+    var t = normalizeTree(tree);
+    var a = analyzeEquipment(t);
+    var sync = t.sync_status;
+    var presence = sync.published_in_ha;
+    // Jamais synchronisé (`synced_should_publish` null) : le démon marque alors `override_pending`
+    // faute de décision appliquée, ce qui n'est pas un réglage posé par l'utilisateur.
+    var neverSynced = sync.synced_should_publish === null;
+    var pending = !neverSynced && (sync.override_pending === true || t.entities.some(entityIsPending));
+    var state;
+    if (pending) {
+      state = 'to_apply';
+    } else if (presence === true) {
+      state = 'published';
+    } else if (a.disabled) {
+      state = 'disabled';
+    } else if (a.excluded) {
+      state = 'excluded';
+    } else if (presence === false && a.ready > 0 && sync.current_should_publish === true) {
+      state = 'to_apply';
+    } else if (presence === null && a.ready > 0 && sync.current_should_publish !== false) {
+      state = 'to_apply';
+    } else if (a.blocked > 0) {
+      state = 'blocked';
+    } else {
+      state = 'nothing_to_publish';
+    }
+    return {
+      state: state,
+      blocked_mention: (state === 'published' || state === 'to_apply') ? a.blocked : 0,
+    };
+  }
+
+  function summarizePublication(tree) {
+    var t = normalizeTree(tree);
+    var a = analyzeEquipment(t);
+    var excluded = a.counts.excluded;
+    var disabled = a.counts.disabled;
+    // Story 20-2 (AC8, X6) : sans commande, `equipment_decision` est la seule source (voir analyzeEquipment).
+    if (t.commands.length === 0) {
+      excluded = isExcludedDiagnostic(t.equipment_decision) ? 1 : 0;
+      disabled = excluded === 0 && isDisabledDiagnostic(t.equipment_decision) ? 1 : 0;
+    }
+    return {
+      total: t.commands.length,
+      ready_count: a.ready,
+      blocking_count: a.blocked,
+      unknown_count: a.counts.unknown,
+      uncovered_count: a.counts.ignored,
+      excluded_count: excluded,
+      disabled_count: disabled,
+      will_publish: a.ready > 0,
+      first_blocking_cmd_id: a.first_blocked_cmd_id,
+    };
+  }
+
+  // AC3.4 — commandes bloquées détectées au GET initial, plafonnées (auto-ouverture).
+  function collectBlockingCommandIds(tree, cap) {
+    var t = normalizeTree(tree);
+    var limit = (typeof cap === 'number' && cap > 0) ? cap : 4;
+    var ids = [];
+    for (var i = 0; i < t.commands.length && ids.length < limit; i++) {
+      if (classifyCommandCategory(t.commands[i]) === 'blocked') {
+        ids.push(t.commands[i].jeedom_cmd_id);
+      }
+    }
+    return ids;
+  }
+
+  // Story 25.1 (AC14) — la cause d'un blocage est dite une fois : un groupe par cause distincte, jamais
+  // un par commande. `generic_types_link` : le blocage se corrige dans les types génériques de Jeedom.
+  var GENERIC_TYPE_CAUSES = [
+    'no_generic_type_configured', 'ambiguous_skipped', 'duplicate_generic_types', 'conflicting_generic_types',
+  ];
+
+  function groupBlockedCauses(tree) {
+    var t = normalizeTree(tree);
+    var groups = [];
+    var byLabel = {};
+    for (var i = 0; i < t.commands.length; i++) {
+      var row = t.commands[i];
+      if (classifyCommandCategory(row) !== 'blocked') {
+        continue;
+      }
+      var code = resolveCauseCode(row.diagnostic);
+      var label = buildBlockingReason(row.diagnostic) || code || 'cause non précisée';
+      if (!byLabel[label]) {
+        byLabel[label] = {
+          code: code,
+          label: label,
+          count: 0,
+          command_ids: [],
+          generic_types_link: GENERIC_TYPE_CAUSES.indexOf(code) !== -1,
+          raw_code: code && !REASON_LABELS[code] ? code : null,
+        };
+        groups.push(byLabel[label]);
+      }
+      byLabel[label].count += 1;
+      byLabel[label].command_ids.push(row.jeedom_cmd_id);
+    }
+    return groups;
+  }
+
+  function buildCauseNoticeText(group) {
+    return pluralize(group.count, 'commande bloquée', 'commandes bloquées') + ' : ' + group.label;
+  }
+
+  function allCommandsBlocked(tree) {
+    var t = normalizeTree(tree);
+    return t.commands.length > 0 && t.commands.every(function (row) {
+      return classifyCommandCategory(row) === 'blocked';
     });
   }
 
-  // Compteurs d'UN équipement (arbre brut ou normalisé) : base de la ligne de l'équipement déplié
-  // et de l'agrégat de la pièce.
-  function summarizeEquipmentCounters(tree) {
+  // Story 25.1 (AC15) — commandes ignorées : repliées sur une ligne, jamais comptées comme défaut.
+  var IGNORED_NAMES_SHOWN = 3;
+  var NOT_SUPPORTED_BY_PLUGIN = 'non pris en charge par le plugin';
+
+  function joinNames(names) {
+    return names.slice(0, IGNORED_NAMES_SHOWN).join(', ') + (names.length > IGNORED_NAMES_SHOWN ? '…' : '');
+  }
+
+  function buildIgnoredSummary(tree) {
     var t = normalizeTree(tree);
-    var summary = summarizePublication(t);
-    var state = publicationSummaryState(summary);
-    var presence = t.sync_status.published_in_ha;
-    // Jamais synchronisé (`synced_should_publish` null) : le démon marque alors chaque entité
-    // `override_pending` faute de décision appliquée, ce qui n'est pas un réglage posé par
-    // l'utilisateur : rien n'est « en attente d'application ».
-    var neverSynced = t.sync_status.synced_should_publish === null;
-    var pendingEntities = neverSynced ? [] : t.entities;
-    var pending = t.sync_status.override_pending === true || pendingEntities.some(entityIsPending);
-    var excluded = state === 'excluded';
-    var disabled = state === 'disabled';
-    var commands = { published: 0, pending: 0, unsupported: 0, presence_unknown: 0 };
+    var items = [];
     for (var i = 0; i < t.commands.length; i++) {
       var row = t.commands[i];
-      var kind = classifyCommandRow(row);
-      if (kind === 'excluded' || kind === 'disabled') {
+      if (classifyCommandCategory(row) !== 'ignored') {
         continue;
       }
-      if (row.published_in_ha === true) {
-        commands.published += 1;
-      } else if (row.published_in_ha === null) {
-        commands.presence_unknown += 1;
-      } else if (kind === 'blocking' || kind === 'uncovered') {
-        commands.unsupported += 1;
-      }
-      if (commandIsPending(pendingEntities, row.jeedom_cmd_id)) {
-        commands.pending += 1;
+      var code = resolveCauseCode(row.diagnostic);
+      items.push({
+        cmd_id: row.jeedom_cmd_id,
+        name: row.cmd_name || ('#' + row.jeedom_cmd_id),
+        code: code,
+        not_supported_by_plugin: code === 'ha_component_not_in_product_scope',
+      });
+    }
+    var text = '';
+    if (items.length > 0) {
+      text = pluralize(items.length, 'commande ignorée', 'commandes ignorées')
+        + ', sans équivalent dans Home Assistant : ' + joinNames(items.map(function (item) { return item.name; }));
+      var notSupported = items.filter(function (item) { return item.not_supported_by_plugin; });
+      if (notSupported.length > 0) {
+        text += ' — ' + NOT_SUPPORTED_BY_PLUGIN + ' : ' + joinNames(notSupported.map(function (item) { return item.name; }));
       }
     }
+    return { count: items.length, text: text, items: items };
+  }
+
+  // Story 25.1 (AC8, AC13) — domaine HA dit en français, terme technique en petit à côté.
+  var HA_DOMAIN_LABELS = {
+    alarm_control_panel: 'Alarme',
+    binary_sensor: 'Capteur binaire',
+    button: 'Bouton',
+    climate: 'Thermostat',
+    cover: 'Volet',
+    light: 'Lumière',
+    sensor: 'Capteur',
+    switch: 'Interrupteur',
+  };
+
+  function translateHaDomain(type) {
+    if (typeof type !== 'string' || !type) {
+      return { label: 'Entité Home Assistant', technical: '' };
+    }
+    if (HA_DOMAIN_LABELS[type]) {
+      return { label: HA_DOMAIN_LABELS[type], technical: type };
+    }
+    return { label: type, technical: '' };
+  }
+
+  function formatHaDomain(type) {
+    var d = translateHaDomain(type);
+    return d.technical ? d.label + ' (' + d.technical + ')' : d.label;
+  }
+
+  // --- Compteurs de l'équipement et de la pièce (25.1, AC5, AC6) ---
+  // Dénombrement pur des arbres déjà lus par la surface : l'état d'un équipement vient uniquement de
+  // `resolveEquipmentState` ; les ignorées ne comptent jamais comme défaut.
+
+  var EQUIPMENT_STATES = ['published', 'to_apply', 'blocked', 'excluded', 'disabled', 'nothing_to_publish'];
+  var EQUIPMENT_STATE_LABELS = {
+    published: 'Publié',
+    to_apply: 'À appliquer',
+    blocked: 'Bloqué',
+    excluded: 'Exclu',
+    disabled: 'Désactivé',
+    nothing_to_publish: 'Rien à publier',
+  };
+
+  // Compteurs d'UN équipement (arbre brut ou normalisé) : base de la ligne de l'équipement déplié et
+  // de l'agrégat de la pièce.
+  function summarizeEquipmentCounters(tree) {
+    var t = normalizeTree(tree);
+    var resolved = resolveEquipmentState(t);
+    var a = analyzeEquipment(t);
     return {
-      equipment: {
-        published: presence === true,
-        presence_unknown: presence === null,
-        pending: pending,
-        excluded: excluded,
-        disabled: disabled,
-        unsupported: !excluded && !disabled && presence === false && !pending,
+      state: resolved.state,
+      blocked_mention: resolved.blocked_mention,
+      defects: a.counts.blocked,
+      presence_unknown: t.sync_status.published_in_ha === null,
+      commands: {
+        published: a.counts.published,
+        to_apply: a.counts.to_apply,
+        blocked: a.counts.blocked,
+        ignored: a.counts.ignored,
+        excluded: a.counts.excluded,
+        presence_unknown: a.presence_unknown,
       },
-      commands: commands,
     };
   }
 
@@ -1027,28 +1166,16 @@
     var out = {
       equipments_total: typeof totalEquipments === 'number' ? totalEquipments : list.length,
       equipments_read: list.length,
-      equipments_published: 0,
-      equipments_pending: 0,
-      equipments_unsupported: 0,
-      equipments_excluded: 0,
-      equipments_disabled: 0,
       equipments_presence_unknown: 0,
-      commands_published: 0,
-      commands_pending: 0,
-      commands_unsupported: 0,
+      defects: 0,
+      by_state: {},
     };
+    EQUIPMENT_STATES.forEach(function (state) { out.by_state[state] = 0; });
     for (var i = 0; i < list.length; i++) {
       var counters = summarizeEquipmentCounters(list[i]);
-      var eq = counters.equipment;
-      if (eq.published) out.equipments_published += 1;
-      if (eq.pending) out.equipments_pending += 1;
-      if (eq.unsupported) out.equipments_unsupported += 1;
-      if (eq.excluded) out.equipments_excluded += 1;
-      if (eq.disabled) out.equipments_disabled += 1;
-      if (eq.presence_unknown) out.equipments_presence_unknown += 1;
-      out.commands_published += counters.commands.published;
-      out.commands_pending += counters.commands.pending;
-      out.commands_unsupported += counters.commands.unsupported;
+      out.by_state[counters.state] += 1;
+      out.defects += counters.defects;
+      if (counters.presence_unknown) out.equipments_presence_unknown += 1;
     }
     return out;
   }
@@ -1057,23 +1184,29 @@
     return count + ' ' + (count > 1 ? plural : singular);
   }
 
-  // Libellés d'usage, unité dite dans chaque libellé (équipement ou commande).
+  var ROOM_STATE_WORDS = {
+    published: ['publié', 'publiés'],
+    to_apply: ['à appliquer', 'à appliquer'],
+    blocked: ['bloqué', 'bloqués'],
+    excluded: ['exclu', 'exclus'],
+    disabled: ['désactivé', 'désactivés'],
+    nothing_to_publish: ['rien à publier', 'rien à publier'],
+  };
+
+  // Ligne de compteurs de la pièce : un chiffre et un mot court par état non nul, dans l'ordre des états.
   function buildRoomCounterLabels(summary) {
     var s = summary || {};
+    var byState = s.by_state || {};
     function n(key) { return typeof s[key] === 'number' ? s[key] : 0; }
+    var items = [];
+    EQUIPMENT_STATES.forEach(function (state) {
+      var count = typeof byState[state] === 'number' ? byState[state] : 0;
+      if (count > 0) {
+        items.push({ state: state, count: count, text: pluralize(count, ROOM_STATE_WORDS[state][0], ROOM_STATE_WORDS[state][1]) });
+      }
+    });
     return {
-      equipments: [
-        pluralize(n('equipments_published'), 'équipement publié dans Home Assistant', 'équipements publiés dans Home Assistant'),
-        pluralize(n('equipments_pending'), 'équipement en attente d’application', 'équipements en attente d’application'),
-        pluralize(n('equipments_unsupported'), 'équipement non pris en charge', 'équipements non pris en charge'),
-        pluralize(n('equipments_excluded'), 'équipement exclu', 'équipements exclus'),
-        pluralize(n('equipments_disabled'), 'équipement désactivé dans Jeedom', 'équipements désactivés dans Jeedom'),
-      ],
-      commands: [
-        pluralize(n('commands_published'), 'commande publiée dans Home Assistant', 'commandes publiées dans Home Assistant'),
-        pluralize(n('commands_pending'), 'commande en attente d’application', 'commandes en attente d’application'),
-        pluralize(n('commands_unsupported'), 'commande non prise en charge', 'commandes non prises en charge'),
-      ],
+      items: items,
       unread: n('equipments_total') > n('equipments_read')
         ? pluralize(n('equipments_total') - n('equipments_read'), 'équipement non lu', 'équipements non lus')
         : '',
@@ -1084,21 +1217,26 @@
     };
   }
 
-  // Ligne de compteurs d'un équipement déplié (Q3 A) : trois notions en commandes, plus l'état
-  // « exclu » / « désactivé dans Jeedom » de l'équipement quand il s'applique.
+  // Ligne de commandes d'un équipement déplié : « 3 publiées · 1 bloquée · 5 ignorées » (zéros masqués).
   function buildEquipmentCounterLabels(tree) {
     var counters = summarizeEquipmentCounters(tree);
     var c = counters.commands;
-    var items = [
-      pluralize(c.published, 'commande publiée dans Home Assistant', 'commandes publiées dans Home Assistant'),
-      pluralize(c.pending, 'commande en attente d’application', 'commandes en attente d’application'),
-      pluralize(c.unsupported, 'commande non prise en charge', 'commandes non prises en charge'),
-    ];
-    if (counters.equipment.excluded) items.push('équipement exclu');
-    if (counters.equipment.disabled) items.push('équipement désactivé dans Jeedom');
+    var items = [];
+    [
+      [c.published, 'publiée', 'publiées'],
+      [c.to_apply, 'à appliquer', 'à appliquer'],
+      [c.blocked, 'bloquée', 'bloquées'],
+      [c.ignored, 'ignorée', 'ignorées'],
+      [c.excluded, 'exclue', 'exclues'],
+    ].forEach(function (entry) {
+      if (entry[0] > 0) {
+        items.push(pluralize(entry[0], entry[1], entry[2]));
+      }
+    });
     return {
       items: items,
-      presence_unknown: c.presence_unknown > 0 || counters.equipment.presence_unknown
+      text: items.join(' · '),
+      presence_unknown: c.presence_unknown > 0 || counters.presence_unknown
         ? 'présence dans Home Assistant inconnue (démon plus ancien)' : '',
     };
   }
@@ -1153,10 +1291,10 @@
         republish_reason: ACTION_REASONS.treeUnavailable, recreate_reason: ACTION_REASONS.treeUnavailable };
     }
     var normalized = normalizeTree(tree);
-    var state = publicationSummaryState(summarizePublication(normalized));
+    var flags = analyzeEquipment(normalized);
     var republishReason = '';
-    if (state === 'disabled') republishReason = ACTION_REASONS.republishDisabled;
-    if (state === 'excluded') republishReason = ACTION_REASONS.republishExcluded;
+    if (flags.excluded) republishReason = ACTION_REASONS.republishExcluded;
+    if (flags.disabled) republishReason = ACTION_REASONS.republishDisabled;
     var notPublished = normalized.sync_status.published_in_ha === false;
     return {
       readable: true,
@@ -1267,8 +1405,21 @@
     buildRoomCounterLabels: buildRoomCounterLabels,
     normalizeRoomsTree: normalizeRoomsTree,
     summarizePublication: summarizePublication,
-    buildPublicationSummaryLabel: buildPublicationSummaryLabel,
-    publicationSummaryState: publicationSummaryState,
+    resolveEquipmentState: resolveEquipmentState,
+    classifyCommandCategory: classifyCommandCategory,
+    categoryOfCause: categoryOfCause,
+    resolveCauseCode: resolveCauseCode,
+    COMMAND_CAUSE_CATEGORIES: COMMAND_CAUSE_CATEGORIES,
+    REASON_LABELS: REASON_LABELS,
+    EQUIPMENT_STATES: EQUIPMENT_STATES,
+    EQUIPMENT_STATE_LABELS: EQUIPMENT_STATE_LABELS,
+    groupBlockedCauses: groupBlockedCauses,
+    buildCauseNoticeText: buildCauseNoticeText,
+    allCommandsBlocked: allCommandsBlocked,
+    buildIgnoredSummary: buildIgnoredSummary,
+    translateHaDomain: translateHaDomain,
+    formatHaDomain: formatHaDomain,
+    HA_DOMAIN_LABELS: HA_DOMAIN_LABELS,
     shouldShowOverridePendingBadge: shouldShowOverridePendingBadge,
     shouldShowEntityPendingBadge: shouldShowEntityPendingBadge,
     readPublicationRequestError: readPublicationRequestError,

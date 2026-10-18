@@ -60,11 +60,16 @@ const READY = view('sure', true, true);
 const EXCLUDED = view('publication_excluded_eqlogic', false, false);
 const DISABLED = view('disabled_eqlogic', false, false);
 
+const isReady = (d) => !!d && d.should_publish === true && !!d.projection_validity && d.projection_validity.is_valid === true;
+
 function tree(id, diagnostics, extra) {
   const options = extra || {};
   // Story 22.2 : présence dans HA (`sync_status.published_in_ha`, `commands[].published_in_ha`).
-  // Par défaut l'équipement est présent ; un `sync` explicite sans le champ simule un démon plus ancien.
-  let present = true;
+  // Story 25.1 : par défaut un équipement est présent dès qu'une commande est prête (un équipement
+  // exclu, désactivé ou bloqué n'est pas dans HA) ; un `sync` explicite sans le champ simule un démon
+  // plus ancien (présence inconnue).
+  const anyReady = diagnostics.some(isReady);
+  let present = anyReady;
   if (options.present !== undefined) present = options.present;
   else if (options.sync) present = typeof options.sync.published_in_ha === 'boolean' ? options.sync.published_in_ha : null;
   return {
@@ -74,8 +79,11 @@ function tree(id, diagnostics, extra) {
     eligible: true,
     equipment_decision: options.decision || null,
     entities: options.entities || [],
-    sync_status: options.sync || { synced_should_publish: true, current_should_publish: true, override_pending: false, published_in_ha: present },
-    commands: diagnostics.map((d, i) => ({ jeedom_cmd_id: id * 100 + i, cmd_name: 'Commande ' + i, diagnostic: d, published_in_ha: present })),
+    sync_status: options.sync || { synced_should_publish: anyReady, current_should_publish: anyReady, override_pending: false, published_in_ha: present },
+    commands: diagnostics.map((d, i) => ({
+      jeedom_cmd_id: id * 100 + i, cmd_name: 'Commande ' + i, diagnostic: d,
+      published_in_ha: present === null ? null : (present && isReady(d)),
+    })),
   };
 }
 const ok = (payload) => ({ state: 'ok', result: { payload } });
@@ -135,6 +143,20 @@ function createUi(rooms) {
       if (!target.length) throw new Error('élément introuvable : ' + selector);
       target.list[0].handlers.click.call(target.list[0], { preventDefault() {} });
     },
+    /** Touche au clavier sur le premier élément trouvé (gestionnaire `keydown` du vrai code). */
+    key: (selector, key) => {
+      const target = dom.$(selector).first();
+      if (!target.length) throw new Error('élément introuvable : ' + selector);
+      const el = target.list[0];
+      if (!el.handlers.keydown) throw new Error('aucun gestionnaire keydown : ' + selector);
+      el.handlers.keydown.call(el, { key, target: el, preventDefault() {}, stopPropagation() {} });
+    },
+    /** Clic en dehors de tout menu (gestionnaire posé sur le document par le vrai code). */
+    clickOutside: () => {
+      const handler = dom.documentEl.handlers.click;
+      if (!handler) throw new Error('aucun gestionnaire de clic sur le document');
+      handler.call(dom.documentEl, { target: dom.body });
+    },
     button: (selector) => dom.$(selector).first(),
     isDisabled: (selector) => dom.$(selector).first().prop('disabled') === true,
     /** Dernier dialogue de confirmation ouvert (bootbox) hors modale de pièce. */
@@ -143,4 +165,4 @@ function createUi(rooms) {
   return ui;
 }
 
-module.exports = { createUi, tree, ok, READY, EXCLUDED, DISABLED, BRIDGE_UP, view };
+module.exports = { createUi, tree, ok, READY, EXCLUDED, DISABLED, BRIDGE_UP, view, isReady };

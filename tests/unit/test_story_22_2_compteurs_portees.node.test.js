@@ -33,97 +33,120 @@ const entity = (type, ids, extra) => Object.assign({
 const plain = (text) => text.replace(/\{\{|\}\}/g, '');
 const labelsOf = (ui, selector) => ui.$(selector).list.map((el) => ui.$(el).text());
 
-describe('22.2 / AC2 — compteurs de l’équipement déplié', () => {
-  it('chaque équipement déplié affiche ses commandes publiées / en attente / non prises en charge', () => {
+describe('22.2 / AC2 (25.1) — état et compteurs de l’équipement déplié', () => {
+  const stateOf = (ui, id) => ui.$(`.j2ha-eq-panel[data-eq-id="${id}"] .j2ha-eq-head-state`).text().trim();
+
+  it('chaque équipement déplié affiche son état puis ses commandes publiées / bloquées', () => {
     const t = tree(1, [READY, READY, REFUSED], { present: true });
-    t.commands[2].published_in_ha = false;
     t.entities = [entity('light', [100, 101], { override_pending: true })];
     const ui = openRoomWith([ok(t), ok(tree(2, [DISABLED], { present: false }))]);
-    assert.deepEqual(labelsOf(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter'), [
-      '2 commandes publiées dans Home Assistant',
-      '2 commandes en attente d’application',
-      '1 commande non prise en charge',
-    ]);
-    // La pièce garde ses compteurs propres, en plus.
-    assert.equal(ui.$('.j2ha-room-counter').length, 8);
+    assert.equal(stateOf(ui, 1), 'À appliquer', 'le réglage de l’entité attend d’être appliqué');
+    assert.deepEqual(labelsOf(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter'), ['2 publiées', '1 bloquée']);
+    // La pièce garde ses compteurs propres, par état d’équipement : un chiffre et un mot.
+    assert.deepEqual(ui.$('.j2ha-room-counter').list.map((el) => ui.$(el).text().trim()), ['1 à appliquer', '1 désactivé']);
   });
 
   it('un équipement désactivé le dit dans sa ligne ; une lecture en échec la vide', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { present: true })), ok(tree(2, [DISABLED], { present: false }))]);
-    assert.ok(labelsOf(ui, '.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-counter').includes('équipement désactivé dans Jeedom'));
+    assert.equal(stateOf(ui, 2), 'Désactivé');
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
     ui.respond('executeHaAction', { state: 'ok', result: null });
     ui.fail('getMappingOverrides');
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter').length, 0, 'plus de compteur sur un arbre périmé');
+    assert.equal(stateOf(ui, 1), '', 'ni d’état périmé');
   });
 
   it('démon plus ancien (champ absent) : présence dite inconnue, rien n’est compté publié', () => {
     const old = tree(1, [READY], { sync: { override_pending: false } });
     const ui = openRoomWith([ok(old), ok(tree(2, [READY]))]);
     assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter-line').text(), /présence dans Home Assistant inconnue/);
-    assert.ok(labelsOf(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter').includes('0 commande publiée dans Home Assistant'));
+    assert.ok(!labelsOf(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter').some((text) => /publiée/.test(text)));
+    assert.equal(stateOf(ui, 1), 'À appliquer', 'jamais « Publié » (R6)');
   });
 });
 
-describe('22.2 / AC3 — portée des actions et masquage des doublons', () => {
-  const buttonLabels = (ui, scope) => ui.$(scope + ' .j2ha-publication-actions button').list.map((b) => ui.$(b).text());
+describe('22.2 / AC3 (25.1) — portée du réglage de publication et masquage des doublons', () => {
+  const segments = (ui, scope) => ui.$(scope + ' .j2ha-seg-btn').list.map((b) => plain(ui.$(b).text()));
+  const active = (ui, scope) => ui.$(scope + ' .j2ha-seg-active').list.map((b) => b.attrs['data-value']);
+  const EQUIPMENT = '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-controls';
+  const GROUPS = '.j2ha-eq-panel[data-eq-id="1"] .j2ha-group-head';
 
-  it('équipement à une seule entité : actions d’équipement nommées, actions d’entité masquées', () => {
+  it('équipement à une seule entité : un seul contrôle (équipement), aucun en-tête de groupe en doublon', () => {
     const t = tree(1, [READY], { entities: [entity('light', [100])] });
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-    assert.deepEqual(buttonLabels(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-actions').map(plain), [
-      'Exclure l’équipement', 'Forcer l’équipement', 'Revenir au mode automatique (équipement entier)',
-    ]);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row button').length, 0, 'aucun doublon sur la ligne d’entité');
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row').length, 1, 'la ligne d’entité reste affichée');
+    assert.deepEqual(segments(ui, EQUIPMENT), ['Automatique', 'Toujours', 'Jamais']);
+    assert.deepEqual(active(ui, EQUIPMENT), ['auto']);
+    assert.equal(ui.$(GROUPS).length, 0, 'l’en-tête de groupe n’est pas rendu');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-group-head .j2ha-seg-btn').length, 0);
   });
 
-  it('équipement multi-entités : chaque entité garde ses actions, libellées « cette entité »', () => {
+  it('équipement multi-entités : chaque entité a son contrôle compact, dans son en-tête de groupe', () => {
     const t = tree(1, [READY, READY], { entities: [entity('switch', [100]), entity('sensor', [101])] });
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-    const rows = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row').list;
-    assert.equal(rows.length, 2);
-    for (const row of rows) {
-      const labels = ui.$(row).find('button').list.map((b) => ui.$(b).text());
-      assert.equal(labels.length, 3);
-      assert.ok(labels.every((l) => /cette entité/.test(plain(l))), labels.join(' | '));
-      assert.deepEqual(labels.map(plain), ['Exclure cette entité', 'Forcer cette entité', 'Revenir au mode automatique (cette entité)']);
+    const heads = ui.$(GROUPS).list;
+    assert.equal(heads.length, 2);
+    for (const head of heads) {
+      const labels = ui.$(head).find('.j2ha-seg-btn').list.map((b) => plain(ui.$(b).text()));
+      assert.deepEqual(labels, ['Automatique', 'Toujours', 'Jamais']);
+      assert.ok(ui.$(head).find('.j2ha-seg-compact').length === 1);
     }
+    assert.equal(ui.$(EQUIPMENT + ' .j2ha-seg-btn').length, 3, 'et le contrôle de l’équipement reste unique');
   });
 
-  it('une exclusion ou un forçage posé sur la commande de l’entité garde ses actions (non équivalent)', () => {
+  it('une exclusion ou un forçage posé sur la commande de l’entité garde son contrôle (non équivalent)', () => {
+    const expected = { exclude_command: 'never', force_publish: 'always' };
     for (const policy of ['exclude_command', 'force_publish']) {
       const t = tree(1, [READY], { entities: [entity('light', [100], { publication_override: policy })] });
       const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-      assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row button').length, 3, policy);
+      assert.equal(ui.$(GROUPS).length, 1, policy);
+      assert.deepEqual(active(ui, GROUPS), [expected[policy]], policy);
     }
   });
 
-  it('un veto ou un forçage posé sur l’équipement : les actions d’entité (inertes) sont masquées', () => {
+  it('un veto ou un forçage posé sur l’équipement : le contrôle d’entité (inerte) est masqué, celui de l’équipement le montre', () => {
     const veto = tree(1, [READY], { entities: [entity('light', [100], { publication_override: 'exclude_eqlogic' })] });
     const forced = tree(1, [READY], { entities: [entity('light', [100], { publication_override: 'force_publish' })] });
     forced.equipment_publication_override = 'force_publish';
-    for (const t of [veto, forced]) {
+    for (const [t, value] of [[veto, 'never'], [forced, 'always']]) {
       const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-      assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row button').length, 0);
-      assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-actions .j2ha-publication-actions button').length, 3);
+      assert.equal(ui.$(GROUPS).length, 0);
+      assert.deepEqual(active(ui, EQUIPMENT), [value]);
     }
   });
 
-  it('mêmes routes : les boutons d’équipement et d’entité n’ont pas changé de requête', () => {
-    // Rien de publié : « Exclure » part sans confirmation, la requête est directement observable.
+  it('segment actif : exclu → « Jamais », forcé → « Toujours », sinon « Automatique » (équipement)', () => {
+    const excluded = tree(1, [READY]);
+    excluded.equipment_publication_override = 'exclude';
+    const forced = tree(1, [READY]);
+    forced.equipment_publication_override = 'force_publish';
+    for (const [t, value] of [[excluded, 'never'], [forced, 'always'], [tree(1, [READY]), 'auto']]) {
+      const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
+      assert.deepEqual(active(ui, EQUIPMENT), [value]);
+    }
+  });
+
+  it('mêmes routes : les segments d’équipement et d’entité n’ont pas changé de requête', () => {
+    // Rien de publié : « Jamais » part sans confirmation, la requête est directement observable.
     const t = tree(1, [REFUSED, REFUSED], { decision: REFUSED, entities: [
       entity('switch', [100], { decision: REFUSED }), entity('sensor', [101], { decision: REFUSED })] });
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-    const eqButton = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-actions .j2ha-publication-actions button').list[0];
-    eqButton.handlers.click.call(eqButton);
+    const eqSegment = ui.$(EQUIPMENT + ' .j2ha-seg-never').list[0];
+    eqSegment.handlers.click.call(eqSegment);
     const call = ui.pending('savePublicationOverride')[0];
     assert.deepEqual([call.data.eqId, call.data.publicationPolicy, call.data.cmdId], [1, 'exclude', undefined]);
     call.respond({ state: 'ok', result: null });
-    const entityButton = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-entity-row button').list[0];
-    entityButton.handlers.click.call(entityButton);
+    const entitySegment = ui.$(GROUPS + ' .j2ha-seg-never').list[0];
+    entitySegment.handlers.click.call(entitySegment);
     const entityCall = ui.pending('savePublicationOverride')[0];
     assert.deepEqual([entityCall.data.eqId, entityCall.data.publicationPolicy, entityCall.data.cmdId], [1, 'exclude', 100]);
+    entityCall.respond({ state: 'ok', result: null });
+    // « Automatique » : même route de retrait qu'avant, portée équipement (sans cmdId) puis entité (cmdId).
+    const forcedTree = tree(1, [REFUSED], { decision: REFUSED, entities: [entity('switch', [100], { decision: REFUSED, publication_override: 'exclude_command' })] });
+    const ui2 = openRoomWith([ok(forcedTree), ok(tree(2, [READY]))]);
+    const revert = ui2.$(GROUPS + ' .j2ha-seg-auto').list[0];
+    revert.handlers.click.call(revert);
+    const revertCall = ui2.pending('revertPublicationOverride')[0];
+    assert.deepEqual([revertCall.data.eqId, revertCall.data.cmdId], [1, 100]);
   });
 
   it('entityActionsDuplicateEquipment : cas stricts (pur)', () => {
@@ -149,14 +172,15 @@ describe('22.2 / AC4 — « Supprimer de Home Assistant »', () => {
 
   it('boutons équipement et pièce, confirmations : libellé fidèle et rappel que « Republier » remet', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').text(), '{{Supprimer de Home Assistant}}');
-    assert.equal(ui.$('.j2ha-room-recreate').text().trim(), '{{Supprimer la pièce de Home Assistant}}');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').text(), '{{Supprimer de Home Assistant…}}');
+    assert.equal(ui.$('.j2ha-room-recreate').text().trim(), '{{Supprimer de Home Assistant…}}');
     for (const selector of ['.j2ha-room-recreate', '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate']) {
       ui.click(selector);
       const { options } = ui.lastConfirmation();
       assert.match(options.message, /Rien n.est recréé automatiquement/);
       assert.match(options.message, /« Republier »/);
       assert.equal(options.buttons.confirm.className, 'btn-danger');
+      assert.doesNotMatch(options.message, /Supprimer de Home Assistant…/, 'la confirmation ne répète pas l’ellipse du menu');
       options.buttons.cancel.callback();
     }
   });
@@ -172,7 +196,7 @@ describe('22.2 / AC4 — « Supprimer de Home Assistant »', () => {
   });
 });
 
-describe('22.2 / AC5 (CC-58) — sélecteur « Override HA » d’une commande portée par deux entités', () => {
+describe('22.2 / AC5 (CC-58) — réglage « Type HA » d’une commande portée par deux entités', () => {
   // Forme « 579 » : la commande d’état 105 est portée par le principal (refusé) et par un secondaire (publié).
   function tree579() {
     const t = tree(1, [READY, READY], { entities: [
@@ -187,34 +211,41 @@ describe('22.2 / AC5 (CC-58) — sélecteur « Override HA » d’une commande p
     return t;
   }
 
-  it('désactivé avec explication sur la commande partagée ; actif sur la commande d’une seule entité', () => {
+  const typeLink = (ui, cmdId) => ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] .j2ha-type-link`);
+
+  it('indisponible avec explication sur la commande partagée ; ouvrable sur la commande d’une seule entité', () => {
     const ui = openRoomWith([ok(tree579()), ok(tree(2, [READY]))]);
-    const shared = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select');
-    assert.equal(shared.prop('disabled'), true);
+    const shared = typeLink(ui, 105);
+    assert.ok(shared.hasClass('j2ha-type-unavailable'));
+    assert.equal(shared.attr('aria-disabled'), 'true');
     // Formulation toujours vraie, y compris quand l'entité principale est elle-même publiée.
     assert.equal(shared.attr('title'), 'Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici.');
     assert.doesNotMatch(shared.attr('title'), /celle qui est publiée/);
-    const own = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select');
-    assert.notEqual(own.prop('disabled'), true);
+    const own = typeLink(ui, 106);
+    assert.ok(!own.hasClass('j2ha-type-unavailable'));
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select').length, 0, 'le sélecteur n’est pas rendu en permanence');
+    ui.click('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] .j2ha-type-link');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select').length, 1, 'ouvert par le lien');
   });
 
-  it('R1 : désactivé aussi quand l’entité principale est elle-même publiée, avec la même explication', () => {
+  it('R1 : indisponible aussi quand l’entité principale est elle-même publiée, avec la même explication', () => {
     const t = tree(1, [READY], { entities: [
       entity('switch', [105], { present_in_ha: true }),
       entity('binary_sensor', [105], { present_in_ha: true }),
     ] });
     t.commands = [{ jeedom_cmd_id: 105, cmd_name: 'Etat', covered: true, diagnostic: READY, published_in_ha: true }];
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-    const shared = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select');
-    assert.equal(shared.prop('disabled'), true);
+    const shared = typeLink(ui, 105);
+    assert.ok(shared.hasClass('j2ha-type-unavailable'));
     assert.match(shared.attr('title'), /portée par plusieurs entités/);
     assert.doesNotMatch(shared.attr('title'), /pas à celle qui est publiée/);
   });
 
-  it('aucun aperçu ni enregistrement n’est émis depuis le sélecteur désactivé', () => {
+  it('aucun aperçu ni enregistrement n’est émis depuis le réglage indisponible', () => {
     const ui = openRoomWith([ok(tree579()), ok(tree(2, [READY]))]);
-    const shared = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select').list[0];
-    assert.equal(shared.handlers.change, undefined);
+    const shared = typeLink(ui, 105).list[0];
+    assert.equal(shared.handlers.click, undefined);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select').length, 0);
     assert.equal(ui.pending('previewMappingOverride').length + ui.pending('saveMappingOverride').length, 0);
   });
 
@@ -288,7 +319,7 @@ describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380
 
   it('la cause affichée reste « précisez les types génériques dans Jeedom »', () => {
     assert.equal(M.buildPublishCellLabel(refusedByProjection),
-      'Ne sera pas publié — type Home Assistant ambigu — précisez les types génériques dans Jeedom');
+      'Bloquée → type Home Assistant ambigu — précisez les types génériques dans Jeedom');
   });
 
   it('la liste complète de l’interface reste celle du registre (le filtre est fait par le démon)', () => {
@@ -319,13 +350,16 @@ describe('22.2 / AC7 — actions globales du bandeau (relecture Codex)', () => {
   });
 });
 
-describe('22.2 R2 / AC6 — liste « Override HA » filtrée par le démon', () => {
+describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
   const FULL = ['alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'sensor', 'switch'];
   const row = (extra) => Object.assign({
     jeedom_cmd_id: 2971, cmd_name: 'Etat', covered: true, diagnostic: REFUSED, generic_type: 'FLAP_STATE',
   }, extra || {});
-  const optionValues = (ui, cmdId) => ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] option`)
-    .list.map((o) => o.attrs.value);
+  // Le sélecteur n'existe qu'après un clic sur le lien « auto » / « imposé (…) » de la commande.
+  const optionValues = (ui, cmdId) => {
+    ui.click(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] .j2ha-type-link`);
+    return ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] option`).list.map((o) => o.attrs.value);
+  };
 
   it('pur : seuls les types annoncés sont proposés, dans l’ordre de la liste d’interface', () => {
     assert.deepEqual(M.getOverrideTypeOptions(row({ override_types_allowed: ['sensor', 'cover', 'light'] })), ['cover', 'light', 'sensor']);
@@ -351,7 +385,7 @@ describe('22.2 R2 / AC6 — liste « Override HA » filtrée par le démon', () 
     assert.equal(posed.active, true);
   });
 
-  it('rendu : le sélecteur de la commande 2971 ne propose ni sensor ni binary_sensor, mais « mode automatique » et cover', () => {
+  it('rendu : le sélecteur de la commande 2971 ne propose ni sensor ni binary_sensor, mais « auto » et cover', () => {
     const t = tree(1, [REFUSED, READY]);
     t.commands[0] = row({ jeedom_cmd_id: 100, override_types_allowed: ['cover'] });
     t.commands[1].override_types_allowed = FULL.slice();
@@ -359,14 +393,16 @@ describe('22.2 R2 / AC6 — liste « Override HA » filtrée par le démon', () 
     assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
     assert.notEqual(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select').prop('disabled'), true);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] option').list[0].children[0].text, '{{auto}}');
   });
 
-  it('rendu : liste vide → sélecteur désactivé avec l’explication ; champ absent → liste d’avant', () => {
+  it('rendu : liste vide → réglage indisponible avec l’explication ; champ absent → liste d’avant', () => {
     const t = tree(1, [REFUSED, REFUSED]);
     t.commands[0].override_types_allowed = [];
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
-    const disabled = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select');
-    assert.equal(disabled.prop('disabled'), true);
+    const disabled = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] .j2ha-type-link');
+    assert.ok(disabled.hasClass('j2ha-type-unavailable'));
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select').length, 0);
     assert.match(disabled.attr('title'), /précisez les types génériques dans Jeedom/);
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

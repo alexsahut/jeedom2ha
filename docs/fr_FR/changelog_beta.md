@@ -6,6 +6,17 @@
 
 ---
 
+# 2026-10-18 — Un seul état par équipement, mots unifiés et fenêtre de pièce réorganisée
+
+- Chaque équipement porte **un seul état**, dit avec le même mot et la même couleur dans le badge, la ligne de son panneau et les compteurs de la pièce : Publié, À appliquer, Bloqué, Exclu, Désactivé ou Rien à publier (« Désactivé » l'emporte sur « Exclu »). L'ancien état « partiel » devient la mention orange « N bloquées » à côté de « Publié ». Voir la page « Les états et les compteurs ».
+- Le réglage de publication est un contrôle à trois positions : **Automatique, Toujours, Jamais** (il remplace « Exclure », « Forcer » et « Revenir au mode automatique »). « Appliquer » n'apparaît que lorsqu'un réglage attend ; « Republier » et « Supprimer de Home Assistant… » passent dans un menu « ⋯ ».
+- Le tableau des commandes est regroupé par entité (colonnes : Commande, Dans Home Assistant, Type Jeedom, Type HA). La cause d'un blocage est dite une seule fois, avec un bouton « Ouvrir les types génériques ». Les commandes sans équivalent dans Home Assistant sont repliées sous le tableau et ne comptent plus comme des défauts.
+- Un seul équipement est déplié à la fois, son en-tête reste visible, et la fenêtre n'a plus qu'une barre de défilement.
+- Les couleurs suivent les thèmes clair et sombre de Jeedom.
+- Les mots de l'interface changent : « Bridge » devient « Démon », « Rescanner la topologie Jeedom » devient « Relire Jeedom », « Override HA » devient « Type HA ». Aucune modification du démon, ni de ce qui est publié dans Home Assistant.
+
+---
+
 # 2026-10-18 — Debian 12 seulement
 
 - Le plugin est désormais annoncé pour Debian 12 seulement (Debian 11 est en fin de vie).

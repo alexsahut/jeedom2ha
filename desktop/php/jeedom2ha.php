@@ -64,34 +64,34 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
 		</div>
 
-		<!-- Bandeau global de santé toujours visible (Story 2.2) -->
-		<div id="div_bridgeHealthBanner" class="well well-sm" style="margin:10px 5px; display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
-			<div style="display:flex; align-items:center;">
-				<i class="fas fa-server" style="margin-right:5px;"></i> <strong>{{Bridge}}</strong> :
-				<span id="span_healthBridge" class="label label-default" style="margin-left:5px;">{{Chargement...}}</span>
+		<!-- Bandeau global de santé toujours visible (Story 2.2). Story 25.1 : « Bridge » devient « Démon ». -->
+		<div id="div_bridgeHealthBanner" class="well well-sm j2ha-health-banner">
+			<div class="j2ha-health-item">
+				<i class="fas fa-server j2ha-health-icon"></i> <strong>{{Démon}}</strong> :
+				<span id="span_healthBridge" class="label label-default j2ha-health-value">{{Chargement...}}</span>
 			</div>
-			<div style="display:flex; align-items:center;">
-				<i class="fas fa-network-wired" style="margin-right:5px;"></i> <strong>{{MQTT}}</strong> :
-				<span id="span_healthMqtt" class="label label-default" style="margin-left:5px;">{{Chargement...}}</span>
-				<span id="span_healthMqttBroker" style="margin-left:8px; color:#666; font-size:0.9em;"></span>
+			<div class="j2ha-health-item">
+				<i class="fas fa-network-wired j2ha-health-icon"></i> <strong>{{MQTT}}</strong> :
+				<span id="span_healthMqtt" class="label label-default j2ha-health-value">{{Chargement...}}</span>
+				<span id="span_healthMqttBroker" class="j2ha-health-note"></span>
 			</div>
-			<div style="display:flex; align-items:center;">
-				<i class="fas fa-sync-alt" style="margin-right:5px;"></i> <strong>{{Dernière synchro}}</strong> :
-				<span id="span_healthSync" style="margin-left:5px; font-weight:500; color:#555;">{{...}}</span>
+			<div class="j2ha-health-item">
+				<i class="fas fa-sync-alt j2ha-health-icon"></i> <strong>{{Dernière synchro}}</strong> :
+				<span id="span_healthSync" class="j2ha-health-sync">{{...}}</span>
 			</div>
-			<div style="display:flex; align-items:center;">
-				<i class="fas fa-tasks" style="margin-right:5px;"></i> <strong>{{Dernière opération}}</strong> :
-				<span id="span_healthOp" class="label label-default" style="margin-left:5px;">{{...}}</span>
-				<span id="span_healthOpMsg" style="margin-left:8px; color:#666; font-size:0.9em;"></span>
+			<div class="j2ha-health-item">
+				<i class="fas fa-tasks j2ha-health-icon"></i> <strong>{{Dernière opération}}</strong> :
+				<span id="span_healthOp" class="label label-default j2ha-health-value">{{...}}</span>
+				<span id="span_healthOpMsg" class="j2ha-health-note"></span>
 			</div>
 		</div>
 
 		<!-- Zone Actions Home Assistant — Story 2.3
 		     Boutons visibles et soumis au gating. Aucun handler click câblé ici.
 		     Logique opérationnelle complète → Epic 4 (Stories 4.2 et 4.3). -->
-		<div id="div_haActions" class="well well-sm" style="margin:10px 5px;">
+		<div id="div_haActions" class="well well-sm j2ha-ha-actions">
 			<strong>{{Actions Home Assistant}}</strong>
-			<div style="margin-top:8px;">
+			<div class="j2ha-ha-actions-row">
 				<button type="button"
 				        class="btn btn-default btn-sm j2ha-ha-action"
 				        data-ha-action="republier"
@@ -102,53 +102,50 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 				        id="bt_rescanTopology"
 				        class="btn btn-default btn-sm j2ha-ha-action"
 				        data-ha-action="rescan"
-				        disabled
-				        style="margin-left:8px;">
-					<i class="fas fa-sync-alt"></i> {{Rescanner la topologie Jeedom}}
+				        disabled>
+					<i class="fas fa-sync-alt"></i> {{Relire Jeedom}}
 				</button>
 				<button type="button"
 				        class="btn btn-default btn-sm j2ha-ha-action"
 				        data-ha-action="supprimer-recreer"
-				        disabled
-				        style="margin-left:8px;">
-					<i class="fas fa-trash"></i> {{Supprimer de Home Assistant}}
+				        disabled>
+					<i class="fas fa-trash"></i> {{Supprimer de Home Assistant…}}
 				</button>
 			</div>
 			<div id="div_haGatingReason"
-			     class="text-muted"
-			     style="margin-top:6px; font-size:0.9em; display:none;">
+			     class="text-muted j2ha-ha-gating-reason">
 			</div>
 		</div>
 
 		<!-- Export diagnostic support -->
-		<div class="form-group" style="margin:4px 5px 10px 5px;">
+		<div class="form-group j2ha-export">
 			<div class="col-sm-12">
-				<label style="font-weight:normal; margin-right:8px;">
-					<input type="checkbox" id="cb_pseudonymize" style="margin-right:4px;"/>
+				<label class="j2ha-export-label">
+					<input type="checkbox" id="cb_pseudonymize" class="j2ha-export-check"/>
 					{{Pseudonymiser les noms d'équipements}}
 				</label>
 				<button id="bt_exportDiagnostic" class="btn btn-default btn-sm">
 					<i class="fas fa-download"></i> {{Télécharger le diagnostic support}}
 				</button>
-				<span id="span_exportResult" style="display:none; margin-left:8px;"></span>
+				<span id="span_exportResult" class="j2ha-export-result"></span>
 			</div>
 		</div>
 
 		<!-- Story 16.8 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
 		     Point d'entrée dédié, supersède l'onglet inatteignable de la 16.5. -->
 		<legend><i class="fas fa-home"></i> {{Configuration Home Assistant par pièce}}</legend>
-		<div class="alert alert-info" style="margin:10px 5px;">
+		<div class="alert alert-info j2ha-surface-intro">
 			<i class="fas fa-info-circle"></i>
-			{{Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle répond aux prérequis Home Assistant (prêt / bloquant + pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
+			{{Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle est publiée dans Home Assistant, à appliquer ou bloquée (et pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié.}}
 		</div>
 		<?php
 		if (count($j2haRoomsTree) == 0) {
-			echo '<div class="text-center" style="font-size:1.1em; margin:10px 5px;">{{Aucune pièce avec équipement trouvée.}}</div>';
+			echo '<div class="text-center j2ha-no-rooms">{{Aucune pièce avec équipement trouvée.}}</div>';
 		} else {
 			echo '<div class="objectListContainer" id="j2ha_roomCards">';
 			foreach ($j2haRoomsTree as $room) {
 				echo '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $room['object_id'] . '" onclick="j2haOpenRoom(' . $room['object_id'] . ')">';
-				echo '<i class="fas fa-door-open" style="font-size:3em; margin-top:10px;"></i>';
+				echo '<i class="fas fa-door-open j2ha-room-icon"></i>';
 				echo '<br>';
 				echo '<span class="name' . ($room['object_id'] > 0 ? ' j2ha-free-name' : '') . '">' . htmlspecialchars($room['object_name'], ENT_QUOTES, 'UTF-8') . '</span>';
 				echo '<span class="text-muted"> (' . count($room['equipments']) . ')</span>';
@@ -163,7 +160,7 @@ sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 	<!-- Page de présentation de l'équipement -->
 	<div class="col-xs-12 eqLogic" style="display: none;">
 		<!-- barre de gestion de l'équipement -->
-		<div class="input-group pull-right" style="display:inline-flex;">
+		<div class="input-group pull-right j2ha-inline-flex">
 			<span class="input-group-btn">
 				<!-- Les balises <a></a> sont volontairement fermées à la ligne suivante pour éviter les espaces entre les boutons. Ne pas modifier -->
 				<a class="btn btn-sm btn-default eqLogicAction roundedLeft" data-action="configure"><i class="fas fa-cogs"></i><span class="hidden-xs"> {{Configuration avancée}}</span>

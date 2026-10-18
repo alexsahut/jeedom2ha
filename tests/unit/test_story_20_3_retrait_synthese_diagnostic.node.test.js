@@ -154,14 +154,14 @@ describe('20.3 / AC6 — libellés français d’usage', () => {
   it('table validée : libellés de remplacement présents', () => {
     const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
     assert.match(php, /\{\{Configuration Home Assistant par pièce\}\}/);
-    assert.equal(M.buildUncoveredLabel(), 'Ne sera pas publié — commande sans type Home Assistant applicable');
+    assert.equal(M.buildUncoveredLabel(), 'Ignorée → sans équivalent dans Home Assistant');
     const reason = (code) => M.buildBlockingReason({
       publication_reason: code, should_publish: false, projection_validity: { is_valid: false },
     });
     assert.match(reason('ambiguous_skipped'), /^type Home Assistant ambigu/);
     assert.match(reason('sure_mapping'), /^type Home Assistant identifié/);
     assert.match(reason('no_mapping'), /^aucun type Home Assistant identifié/);
-    assert.match(reason('command_not_covered'), /^commande sans type Home Assistant applicable/);
+    assert.match(reason('command_not_covered'), /^sans équivalent dans Home Assistant/);
   });
 
   it('la section « Mes templates » et les champs sans usage sont retirés sans eqLogicAttr orphelin', () => {

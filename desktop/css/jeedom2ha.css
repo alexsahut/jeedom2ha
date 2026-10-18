@@ -1,96 +1,217 @@
-/* Story 20.3 — compteurs de la pièce ouverte */
+/* Story 25.1 — palette sémantique, thèmes clair et sombre de Jeedom.
+ *
+ * Quatre teintes portent le sens, jamais seules (un mot et une icône les accompagnent toujours) :
+ *   vert  (--j2ha-ok)      Publié / Publiée
+ *   bleu  (--j2ha-todo)    À appliquer
+ *   orange (--j2ha-warn)   Bloqué / Bloquée / mention « N bloquées »
+ *   gris  (--j2ha-neutral) Exclu / Désactivé / Rien à publier / Ignorée / Exclue
+ * Le rouge (--j2ha-danger) est réservé aux actions destructives (menu « ⋯ » et confirmation).
+ *
+ * Les valeurs vivent UNIQUEMENT dans les blocs de variables ci-dessous ; partout ailleurs on lit
+ * var(--j2ha-…) (ou une variable du core suivie d'un repli --j2ha-…, pour Jeedom 4.4).
+ * Contrastes mesurés par tests/unit/test_story_25_1_palette_theme.node.test.js (texte ≥ 4,5:1,
+ * bordures et icônes ≥ 3:1) sur les fonds de référence du test.
+ * Thème = <body data-theme="core2019_Light|core2019_Dark"> ; attribut absent ou inconnu : jeu clair. */
+
+/* Jeu de repli (aucun sélecteur de thème) puis thème clair : mêmes valeurs. */
+:root,
+body[data-theme*="Light"] {
+  --j2ha-ok: #1b5e20;
+  --j2ha-todo: #0d47a1;
+  --j2ha-warn: #8a4204;
+  --j2ha-neutral: #4f545a;
+  --j2ha-danger: #b71c1c;
+  --j2ha-ok-bg: color-mix(in srgb, var(--j2ha-ok) 14%, transparent);
+  --j2ha-todo-bg: color-mix(in srgb, var(--j2ha-todo) 14%, transparent);
+  --j2ha-warn-bg: color-mix(in srgb, var(--j2ha-warn) 14%, transparent);
+  --j2ha-neutral-bg: color-mix(in srgb, var(--j2ha-neutral) 14%, transparent);
+  --j2ha-surface: rgba(0, 0, 0, 0.03);
+  --j2ha-surface-strong: rgba(0, 0, 0, 0.07);
+  --j2ha-line: rgba(0, 0, 0, 0.2);
+  --j2ha-menu-bg: #ffffff;
+  --j2ha-highlight: rgba(255, 193, 7, 0.35);
+}
+
+/* Thème sombre (angles droits, fonds proches de rgb(25, 25, 25) relevé sur Jeedom 4.6.1). */
+body[data-theme*="Dark"] {
+  --j2ha-ok: #81c784;
+  --j2ha-todo: #90caf9;
+  --j2ha-warn: #ffcc80;
+  --j2ha-neutral: #c4c4c4;
+  --j2ha-danger: #ff8a80;
+  --j2ha-ok-bg: color-mix(in srgb, var(--j2ha-ok) 14%, transparent);
+  --j2ha-todo-bg: color-mix(in srgb, var(--j2ha-todo) 14%, transparent);
+  --j2ha-warn-bg: color-mix(in srgb, var(--j2ha-warn) 14%, transparent);
+  --j2ha-neutral-bg: color-mix(in srgb, var(--j2ha-neutral) 14%, transparent);
+  --j2ha-surface: rgba(255, 255, 255, 0.04);
+  --j2ha-surface-strong: rgba(255, 255, 255, 0.09);
+  --j2ha-line: rgba(255, 255, 255, 0.28);
+  --j2ha-menu-bg: #2a2a2a;
+  --j2ha-highlight: rgba(255, 193, 7, 0.3);
+}
+
+/* color-mix() absent (vieux Safari, iPad mural) : fonds translucides équivalents en rgba(). */
+@supports not (color: color-mix(in srgb, red 10%, transparent)) {
+  :root,
+  body[data-theme*="Light"] {
+    --j2ha-ok-bg: rgba(27, 94, 32, 0.14);
+    --j2ha-todo-bg: rgba(13, 71, 161, 0.14);
+    --j2ha-warn-bg: rgba(138, 66, 4, 0.14);
+    --j2ha-neutral-bg: rgba(79, 84, 90, 0.14);
+  }
+  body[data-theme*="Dark"] {
+    --j2ha-ok-bg: rgba(129, 199, 132, 0.14);
+    --j2ha-todo-bg: rgba(144, 202, 249, 0.14);
+    --j2ha-warn-bg: rgba(255, 204, 128, 0.14);
+    --j2ha-neutral-bg: rgba(196, 196, 196, 0.14);
+  }
+}
+
+/* --- Largeur de la fenêtre d'une pièce (classe, jamais de style en ligne) --- */
+.modal-j2ha-room .modal-dialog {
+  width: 90%;
+  max-width: 1100px;
+}
+
+/* --- Page principale : bandeau d'état du démon, actions, export --- */
+.j2ha-health-banner {
+  margin: 10px 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+.j2ha-health-item {
+  display: flex;
+  align-items: center;
+}
+.j2ha-health-icon {
+  margin-right: 5px;
+}
+.j2ha-health-value {
+  margin-left: 5px;
+}
+.j2ha-health-note {
+  margin-left: 8px;
+  color: var(--j2ha-neutral);
+  font-size: 0.9em;
+}
+.j2ha-health-sync {
+  margin-left: 5px;
+  font-weight: 500;
+  color: var(--j2ha-neutral);
+}
+.j2ha-health-banner .j2ha-op-warn {
+  background-color: var(--j2ha-warn);
+  color: var(--j2ha-menu-bg);
+}
+.j2ha-ha-actions {
+  margin: 10px 5px;
+}
+.j2ha-ha-actions-row {
+  margin-top: 8px;
+}
+.j2ha-ha-actions-row .j2ha-ha-action + .j2ha-ha-action {
+  margin-left: 8px;
+}
+.j2ha-ha-gating-reason {
+  margin-top: 6px;
+  font-size: 0.9em;
+  display: none;
+}
+.j2ha-export {
+  margin: 4px 5px 10px 5px;
+}
+.j2ha-export-label {
+  font-weight: normal;
+  margin-right: 8px;
+}
+.j2ha-export-check {
+  margin-right: 4px;
+}
+.j2ha-export-result {
+  display: none;
+  margin-left: 8px;
+}
+.j2ha-surface-intro {
+  margin: 10px 5px;
+}
+.j2ha-no-rooms {
+  font-size: 1.1em;
+  margin: 10px 5px;
+}
+.j2ha-inline-flex {
+  display: inline-flex;
+}
+.j2ha-room-card i.fa-door-open {
+  color: var(--logo-primary-color, var(--j2ha-todo));
+}
+#j2ha_roomCards .j2ha-room-icon {
+  font-size: 3em;
+  margin-top: 10px;
+}
+
+/* --- Compteurs de la pièce (un chiffre et un mot court par état) --- */
+.j2ha-room-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+}
+.j2ha-room-counters {
+  flex: 1 1 auto;
+}
 .j2ha-room-counter-line {
   margin: 4px 0;
 }
-.j2ha-room-counter {
+.j2ha-chip {
   display: inline-block;
   margin: 0 6px 4px 0;
+  padding: 1px 8px;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--j2ha-neutral);
+  background-color: var(--j2ha-neutral-bg);
+  border-radius: var(--border-radius, 0);
+}
+.j2ha-chip.j2ha-chip-published { color: var(--j2ha-ok); background-color: var(--j2ha-ok-bg); }
+.j2ha-chip.j2ha-chip-to_apply { color: var(--j2ha-todo); background-color: var(--j2ha-todo-bg); }
+.j2ha-chip.j2ha-chip-blocked { color: var(--j2ha-warn); background-color: var(--j2ha-warn-bg); font-weight: 600; }
+.j2ha-chip.j2ha-chip-disabled { font-style: italic; }
+.j2ha-room-counter-unread {
+  margin-left: 4px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-room-actions {
+  flex: 0 0 auto;
+}
+.j2ha-room-feedback {
+  display: none;
+  margin: 6px 0;
 }
 
-/* Story 4.6 — mise en évidence temporaire de la ligne ciblée dans le tableau des commandes (ancre « première commande bloquante », story 16.8) */
+/* Story 4.6 — mise en évidence temporaire de la ligne ciblée dans le tableau (ancre « première commande bloquée »). */
 .j2ha-diag-target-highlight > td {
-  background-color: #fff9c4 !important;
-  color: #333 !important;
+  background-color: var(--j2ha-highlight) !important;
+}
+.j2ha-diag-target-highlight {
+  outline: 2px solid var(--j2ha-warn);
+  transition: outline 0.3s ease;
 }
 
-/* Story 16.8 — Tableau des commandes (Commande | generic_type | Override HA | Diagnostic). */
-.j2ha-cmd-table {
-  margin-bottom: 0;
-  table-layout: auto;
+/* --- Équipements : un seul déplié, en-tête collant, un seul défilement (celui de la fenêtre) --- */
+.modal-j2ha-room .j2ha-eq-accordion .j2ha-eq-panel {
+  margin-top: 6px;
 }
-.j2ha-cmd-table > thead > tr > th {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #888;
-  border-bottom: 2px solid #ddd;
-  white-space: nowrap;
+.modal-j2ha-room .j2ha-eq-head {
+  border-radius: var(--border-radius, 0);
 }
-.j2ha-cmd-table > tbody > tr > td {
-  vertical-align: middle;
-}
-.j2ha-cmd-table .mo-td-name {
-  font-weight: 600;
-}
-.j2ha-cmd-table .mo-td-override {
-  white-space: nowrap;
-  min-width: 200px;
-}
-.j2ha-cmd-table .mo-td-override .mapping-override-select {
-  display: inline-block;
-  width: auto;
-  max-width: 160px;
-  vertical-align: middle;
-}
-.mo-native-value {
-  font-family: monospace;
-  color: #555;
-  font-weight: 600;
-}
-.mo-spinner {
-  margin-left: 6px;
-  color: #337ab7;
-}
-.mo-revert-cmd {
-  display: inline-block;
-  margin-left: 8px;
-  color: #337ab7;
-  cursor: pointer;
-}
-/* Diagnostic : information jamais codée uniquement par la couleur (message textuel primaire). */
-.mo-diag-cell {
-  font-size: 13px;
-}
-.mo-diag-cell.j2ha-diag-ready {
-  color: #3c763d;
-}
-/* Bloquant : ton neutre/factuel, jamais rouge alarmant (AC8). */
-.mo-diag-cell.j2ha-diag-blocking {
-  color: #8a6d3b;
-}
-.mo-diag-cell.j2ha-diag-unknown {
-  color: #999;
-}
-/* Non couvert : commande sans mapping — ton neutre grisé, factuel (AC12 « jamais vide »). */
-.mo-diag-cell.j2ha-diag-uncovered {
-  color: #777;
-  font-style: italic;
-}
-/* CC-38 — exclusion volontaire : neutre et distincte d’une commande non couverte. */
-.mo-diag-cell.j2ha-diag-excluded {
-  color: #777;
-}
-/* Story 20.1 — équipement désactivé : état neutre, non bloquant. */
-.mo-diag-cell.j2ha-diag-disabled {
-  color: #777;
-}
-
-/* Story 16.8 — Surface par pièce (cartes pièces + accordéon équipements + synthèse publication). */
-.j2ha-room-card i.fa-door-open {
-  color: #5b9bd5;
-}
-.j2ha-eq-accordion .j2ha-eq-panel.j2ha-eq-disabled {
-  opacity: 0.6;
+.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open > .j2ha-eq-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 .j2ha-eq-toggle {
   display: flex;
@@ -105,43 +226,308 @@
 .j2ha-eq-name {
   font-weight: 600;
 }
-/* Badge de synthèse : message textuel primaire, la couleur reste secondaire (a11y). */
-.j2ha-eq-publish-badge {
-  margin-left: auto;
+.j2ha-eq-panel.j2ha-eq-disabled .j2ha-eq-name {
+  font-style: italic;
+}
+.j2ha-eq-controls {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open .j2ha-eq-controls {
+  display: flex;
+}
+.j2ha-control-label {
+  color: var(--j2ha-neutral);
   font-size: 12px;
+}
+.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open > .panel-collapse > .panel-body {
+  margin-left: 12px;
+  background-color: var(--j2ha-surface);
+  border-left: 3px solid var(--j2ha-ok);
+}
+.j2ha-publication-error {
+  flex-basis: 100%;
+  margin-top: 4px;
+  color: var(--j2ha-warn);
+  font-weight: 600;
+}
+
+/* Badge d'état : le mot est primaire, la teinte secondaire. « Publié » est discret (sans bordure) ;
+   « Bloqué » est le plus visible de la ligne (gras, bordure pleine). */
+.j2ha-eq-publish-badge,
+.j2ha-badge {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 400;
   white-space: normal;
   text-align: left;
+  color: var(--j2ha-neutral);
+  background-color: var(--j2ha-neutral-bg);
+  border-radius: var(--border-radius, 0);
 }
-.j2ha-eq-publish-badge.j2ha-publish-ok {
-  background-color: #dff0d8;
-  color: #3c763d;
+.j2ha-badge.j2ha-state-published { color: var(--j2ha-ok); background-color: transparent; }
+.j2ha-badge.j2ha-state-to_apply { color: var(--j2ha-todo); background-color: var(--j2ha-todo-bg); }
+.j2ha-badge.j2ha-state-blocked {
+  color: var(--j2ha-warn);
+  background-color: var(--j2ha-warn-bg);
+  border: 1px solid var(--j2ha-warn);
+  font-weight: 700;
 }
-.j2ha-eq-publish-badge.j2ha-publish-partial {
-  background-color: #fcf8e3;
-  color: #8a6d3b;
+.j2ha-badge.j2ha-state-disabled { font-style: italic; }
+.j2ha-eq-blocked-mention {
+  color: var(--j2ha-warn);
+  font-size: 12px;
+  font-weight: 600;
 }
-.j2ha-eq-publish-badge.j2ha-publish-blocked {
-  background-color: #f2dede;
-  color: #8a6d3b;
+.j2ha-state-word {
+  font-weight: 600;
+  color: var(--j2ha-neutral);
 }
-.j2ha-eq-publish-badge.j2ha-publish-empty {
-  background-color: #eee;
-  color: #777;
+.j2ha-state-word.j2ha-state-published { color: var(--j2ha-ok); }
+.j2ha-state-word.j2ha-state-to_apply { color: var(--j2ha-todo); }
+.j2ha-state-word.j2ha-state-blocked { color: var(--j2ha-warn); }
+.j2ha-state-word.j2ha-state-disabled { font-style: italic; }
+.j2ha-eq-counter-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
 }
-.j2ha-eq-publish-badge.j2ha-publish-excluded {
-  background-color: #eee;
-  color: #777;
+.j2ha-eq-counter + .j2ha-eq-counter::before {
+  content: "·";
+  margin-right: 12px;
 }
-.j2ha-eq-publish-badge.j2ha-publish-disabled {
-  background-color: #eee;
-  color: #777;
+
+/* --- Encart de cause (dite une fois par cause) --- */
+.j2ha-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: var(--border-radius, 0);
+}
+.j2ha-notice.j2ha-notice-warn {
+  color: var(--j2ha-warn);
+  background-color: var(--j2ha-warn-bg);
+  border: 1px solid var(--j2ha-warn);
+}
+.j2ha-notice .btn {
+  font-size: 12px;
 }
 .j2ha-goto-blocking {
-  color: #337ab7;
+  color: var(--link-color, var(--j2ha-todo));
   cursor: pointer;
   font-size: 12px;
 }
-.j2ha-diag-target-highlight {
-  outline: 2px solid #f0ad4e;
-  transition: outline 0.3s ease;
+
+/* --- Contrôle segmenté « Automatique | Toujours | Jamais » --- */
+.j2ha-seg {
+  display: inline-flex;
+  border: 1px solid var(--j2ha-line);
+  border-radius: var(--border-radius, 0);
+  overflow: hidden;
+}
+.j2ha-seg-item {
+  display: inline-flex;
+}
+.j2ha-seg-item + .j2ha-seg-item {
+  border-left: 1px solid var(--j2ha-line);
+}
+.j2ha-seg-btn {
+  padding: 2px 10px;
+  font-size: 12px;
+  color: inherit;
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.j2ha-seg-btn:hover:not(:disabled) {
+  background-color: var(--j2ha-surface-strong);
+}
+.j2ha-seg-btn.j2ha-seg-active {
+  font-weight: 700;
+  color: var(--j2ha-todo);
+  background-color: var(--j2ha-todo-bg);
+  box-shadow: inset 0 -2px 0 var(--j2ha-todo);
+}
+.j2ha-seg-btn.j2ha-seg-disabled {
+  color: var(--j2ha-neutral);
+  cursor: not-allowed;
+}
+.j2ha-seg-btn:focus-visible,
+.j2ha-menu-item:focus-visible,
+.j2ha-ignored-toggle:focus-visible,
+.j2ha-type-link:focus-visible {
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: 1px;
+}
+.j2ha-seg-compact .j2ha-seg-btn {
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* --- Menu d'actions secondaires « ⋯ » --- */
+.j2ha-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+.j2ha-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  min-width: 230px;
+  margin: 2px 0 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background-color: var(--j2ha-menu-bg);
+  border: 1px solid var(--j2ha-line);
+  border-radius: var(--border-radius, 0);
+}
+.j2ha-menu-wrap.j2ha-menu-open .j2ha-menu {
+  display: block;
+}
+.j2ha-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  color: inherit;
+  background-color: transparent;
+  border: 0;
+}
+.j2ha-menu-item i {
+  margin-right: 8px;
+}
+.j2ha-menu-item:hover:not(:disabled),
+.j2ha-menu-item:focus {
+  background-color: var(--j2ha-surface-strong);
+}
+.j2ha-menu-item:disabled {
+  color: var(--j2ha-neutral);
+  cursor: not-allowed;
+}
+.j2ha-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background-color: var(--j2ha-line);
+}
+.j2ha-menu-item.j2ha-menu-danger {
+  color: var(--j2ha-danger);
+}
+
+/* --- Tableau des commandes : Commande | Dans Home Assistant | Type Jeedom | Type HA --- */
+.j2ha-cmd-table {
+  margin-bottom: 0;
+  table-layout: auto;
+}
+.j2ha-cmd-table > thead > tr > th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--j2ha-neutral);
+  border-bottom: 2px solid var(--j2ha-line);
+  white-space: nowrap;
+}
+.j2ha-cmd-table > tbody > tr > td {
+  vertical-align: middle;
+}
+.j2ha-cmd-table .mo-td-name {
+  font-weight: 600;
+}
+.j2ha-cmd-table .mo-td-override {
+  white-space: nowrap;
+  min-width: 160px;
+}
+.j2ha-cmd-table .mo-td-override .mapping-override-select {
+  display: inline-block;
+  width: auto;
+  max-width: 160px;
+  vertical-align: middle;
+}
+.j2ha-cmd-table .mo-native-value {
+  font-family: inherit;
+  font-weight: 400;
+  color: inherit;
+}
+.j2ha-cmd-table .mo-spinner {
+  margin-left: 6px;
+  color: var(--j2ha-todo);
+}
+.j2ha-cmd-table .mo-revert-cmd {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--link-color, var(--j2ha-todo));
+  cursor: pointer;
+}
+.j2ha-cmd-table .mo-revert-error {
+  margin-left: 6px;
+  color: var(--j2ha-warn);
+}
+.j2ha-type-link {
+  color: var(--link-color, var(--j2ha-todo));
+  text-decoration: underline dotted;
+}
+.j2ha-type-link.j2ha-type-forced {
+  font-weight: 700;
+  color: var(--j2ha-todo);
+  background-color: var(--j2ha-todo-bg);
+  padding: 0 6px;
+  text-decoration: none;
+}
+.j2ha-type-link.j2ha-type-unavailable {
+  color: var(--j2ha-neutral);
+  text-decoration: none;
+  cursor: not-allowed;
+}
+.j2ha-cmd-table .j2ha-group-head > td {
+  padding-top: 10px;
+  background-color: var(--j2ha-surface-strong);
+}
+.j2ha-group-count {
+  margin-right: 12px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-tech {
+  color: var(--j2ha-neutral);
+}
+/* « Dans Home Assistant » : le mot est primaire, la teinte secondaire (jamais la couleur seule). */
+.j2ha-cmd-table .mo-diag-cell {
+  font-size: 13px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-cmd-table .mo-diag-cell.j2ha-diag-ready { color: var(--j2ha-ok); }
+.j2ha-cmd-table .mo-diag-cell.j2ha-diag-todo { color: var(--j2ha-todo); }
+.j2ha-cmd-table .mo-diag-cell.j2ha-diag-blocking { color: var(--j2ha-warn); font-weight: 700; }
+.j2ha-cmd-table .mo-diag-cell.j2ha-diag-uncovered { font-style: italic; }
+.j2ha-cmd-table .mo-diag-cell.j2ha-diag-disabled { font-style: italic; }
+.j2ha-empty {
+  padding: 8px;
+}
+
+/* --- Commandes ignorées : une ligne repliée, dépliable --- */
+.j2ha-ignored {
+  margin-top: 8px;
+}
+.j2ha-ignored-toggle {
+  padding: 4px 0;
+  text-align: left;
+  color: var(--j2ha-neutral);
+  background-color: transparent;
+  border: 0;
+}
+.j2ha-ignored-list {
+  display: none;
+  margin: 4px 0 0 18px;
+  padding: 0 0 0 18px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-ignored.j2ha-open .j2ha-ignored-list {
+  display: block;
 }

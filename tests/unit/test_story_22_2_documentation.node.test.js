@@ -23,16 +23,19 @@ describe('22.2 / AC9 — docs/fr_FR/compteurs.md', () => {
     assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: compteurs de la fenêtre d'une pièce -->/);
   });
 
-  it('décrit les trois notions décidées et chaque libellé rendu par l’interface', () => {
-    const labels = M.buildRoomCounterLabels({ equipments_total: 1, equipments_read: 1 });
-    const stems = [
-      'équipement(s) publié(s) dans Home Assistant', 'équipement(s) en attente d\'application',
-      'équipement(s) non pris en charge', 'équipement(s) exclu(s)', 'équipement(s) désactivé(s) dans Jeedom',
-      'commande(s) publiée(s) dans Home Assistant', 'commande(s) en attente d\'application',
-      'commande(s) non prise(s) en charge',
-    ];
-    assert.equal(stems.length, labels.equipments.length + labels.commands.length);
-    stems.forEach((stem) => assert.ok(compteurs.includes(stem), stem));
+  it('décrit la notion « publié = présent dans Home Assistant » et chaque état rendu par l’interface (25.1 : un état unique)', () => {
+    // 25.1 : les trois chiffres de 22.2 (publiés / en attente / non pris en charge) sont remplacés par un
+    // état unique ; la ligne de la pièce compte un mot par état, la sémantique « présent dans HA » demeure.
+    const states = Object.values(M.EQUIPMENT_STATE_LABELS);
+    assert.equal(states.length, 6);
+    states.forEach((label) => assert.ok(compteurs.includes(`**${label}**`), label));
+    const room = M.buildRoomCounterLabels({ equipments_total: 6, equipments_read: 6,
+      by_state: { published: 1, to_apply: 1, blocked: 1, excluded: 1, disabled: 1, nothing_to_publish: 1 } });
+    assert.equal(room.items.length, 6);
+    room.items.forEach((item) => {
+      const word = item.text.replace(/^\d+ /, '');
+      assert.ok(compteurs.includes(`**${word}**`) || compteurs.includes(word), word);
+    });
     assert.match(compteurs, /présent dans Home Assistant/);
     assert.match(compteurs, /au moins une/);
   });
@@ -48,7 +51,8 @@ describe('22.2 / AC4 — « Supprimer de Home Assistant » dans la documentation
   it('la page principale n’annonce plus de recréation', () => {
     assert.doesNotMatch(index, /Supprimer puis recréer|puis recréer/);
     assert.match(index, /Supprimer de Home Assistant/);
-    assert.match(index, /Supprimer la pièce de Home Assistant/);
+    // 25.1 : « Supprimer la pièce de Home Assistant » devient « Supprimer de Home Assistant… » dans le menu de la pièce.
+    assert.match(index, /Supprimer de Home Assistant…/);
     assert.match(index, /Rien n'est recréé automatiquement/);
   });
 
