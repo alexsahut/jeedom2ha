@@ -6,6 +6,13 @@
 
 ---
 
+# 2026-10-18 — Licence AGPL-3.0-or-later
+
+- À partir de la version 1.2.0, le plugin est publié sous AGPL-3.0-or-later. Les versions
+  antérieures restent publiées sous leur licence d'origine.
+
+---
+
 # 2026-10-12 — Plus de nom doublé dans Home Assistant
 
 - Quand une entité porte exactement le nom de son appareil (boutons de scénario, équipements à une entité), Home Assistant affichait le nom deux fois (« X X »). Le nom n'est plus doublé et l'assistant vocal retrouve l'entité sous son nom. Seul le nom affiché change : aucun identifiant d'entité n'est modifié.

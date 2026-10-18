@@ -37,4 +37,7 @@ Ouvrez un ticket sur la page [Issues](https://github.com/alexsahut/jeedom2ha/iss
 
 ## Licence
 
-AGPL. Auteur : Alexandre SAHUT.
+Ce plugin est publié sous [AGPL-3.0-or-later](LICENSE). Auteur : Alexandre SAHUT.
+
+Le champ Market `licence` reste `AGPL` dans `plugin_info/info.json`, chaîne attendue et
+validée par le Market ; il désigne cette licence AGPL-3.0-or-later.

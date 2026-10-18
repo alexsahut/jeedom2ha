@@ -1,8 +1,8 @@
 # Story 23.5 : Choix et cohérence de la licence
 
-Status: draft
+Status: review
 
-> Brouillon. Aucune licence, métadonnée Market ou README ne change avant décision écrite d'Alexandre.
+> Décision écrite d'Alexandre reçue le 2026-10-12 à 19:21 : AGPL-3.0-or-later. Alignement soumis à relecture.
 
 ## Story
 
@@ -17,7 +17,16 @@ En tant que responsable du plugin, je veux choisir une licence compatible avec l
 
 ## Tâches proposées
 
-- [ ] **Prérequis :** la question de licence est soumise à Alexandre; commencer uniquement par la fiche d'options, sans modifier le dépôt.
-- [ ] Inventorier licences, tags/releases et conditions Market avec sources datées.
-- [ ] Rédiger fiche d'arbitrage et demander décision Alexandre.
-- [ ] Après décision, appliquer alignement minimal et contrôle automatisé.
+- [x] **Prérequis :** décision d'Alexandre reçue le 2026-10-12 à 19:21 : AGPL-3.0-or-later.
+- [x] Inventorier licences, tags/releases et conditions Market avec sources datées.
+- [x] Rédiger fiche d'arbitrage et demander décision Alexandre.
+- [x] Après décision, appliquer l'alignement minimal : LICENSE, en-têtes PHP, README et changelog beta.
+
+## Décision Alexandre — 2026-10-12 19:21
+
+Le plugin est publié sous **AGPL-3.0-or-later**. `LICENSE` contient le texte intégral
+d'AGPL-3.0 et les en-têtes des 11 fichiers PHP du gabarit portent l'identifiant SPDX
+`AGPL-3.0-or-later`.
+
+Le Market Jeedom attend et a déjà validé la chaîne `AGPL` : `plugin_info/info.json` la
+conserve, avec cette décision consignée pour lever toute ambiguïté avec la licence complète.

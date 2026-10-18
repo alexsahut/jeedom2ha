@@ -424,7 +424,7 @@ development_status:
   23-2-captures-et-video-de-promotion-rejouables: draft
   23-3-remontee-d-etat-lumieres-et-volets: done  # preuve terrain 2026-10-13 : etat, luminosite et position verifies via HA/MQTT/Jeedom
   23-4-installation-hors-market-depuis-github: ready-for-dev  # approuve ClaudeBox 2026-10-12
-  23-5-choix-et-coherence-de-la-licence: ready-for-dev  # fiche d'options seulement; aucun changement licence sans decision Alexandre
+  23-5-choix-et-coherence-de-la-licence: review  # decision Alexandre 2026-10-12 19:21 : AGPL-3.0-or-later; alignement soumis a relecture
 
   # ==============================================================
   # pe-epic-24 — Parite HomeKit (CC-33) : ce qui est pilote par la voix dans Apple Maison l'est par Assist dans HA
