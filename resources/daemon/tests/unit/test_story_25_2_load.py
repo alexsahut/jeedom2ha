@@ -68,7 +68,7 @@ def _light(eq_id):
 
 
 @pytest.fixture
-def app(tmp_path):
+async def app(tmp_path):
     application = create_app(local_secret=SECRET)
     eqs = {1000 + i: _equipment(1000 + i) for i in range(PARC)}
     application["topology"] = TopologySnapshot(

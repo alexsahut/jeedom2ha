@@ -18,7 +18,7 @@ SNAPSHOT = Path(__file__).resolve().parent.parent / "fixtures" / "story_25_2_map
 
 
 @pytest.fixture
-def app(tmp_path):
+async def app(tmp_path):
     return apply_corpus(create_app(local_secret=SECRET), tmp_path)
 
 

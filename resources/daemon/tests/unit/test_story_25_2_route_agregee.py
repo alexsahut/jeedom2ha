@@ -35,7 +35,7 @@ FORBIDDEN_KEYS = {
 
 
 @pytest.fixture
-def app(tmp_path):
+async def app(tmp_path):
     return apply_corpus(create_app(local_secret=SECRET), tmp_path)
 
 
