@@ -164,8 +164,11 @@ export async function run(page, { helpers }) {
   const summaryB = await summary(panel);
   helpers.record('etape_b_synthese', summaryB);
   if (stateB !== 'a-appliquer' && stateB !== 'publiee') throw new Error('bascule-simulee-non-prete');
-  // L'équipement n'est plus « Bloqué » : le type imposé le rend « À appliquer » (ou « Publié »).
-  if (summaryB !== 'À appliquer' && summaryB !== 'Publié') {
+  // L'équipement n'est plus « Bloqué ». Son état final (« À appliquer ») dépend de sync_status, que la
+  // lecture dérivée ne recalcule jamais (simulate.mjs, arbitrage du 2026-10-02) : avec le sync_status
+  // réel d'avant la bascule, l'écran dit « Rien à publier ». Ce badge n'est pas prouvé par le gate ;
+  // le démon réel pose current_should_publish et override_pending après un enregistrement.
+  if (!['À appliquer', 'Publié', 'Rien à publier'].includes(summaryB)) {
     throw new Error('synthese-bascule-encore-bloquante');
   }
   helpers.record('etape_b_cellule', stateB);
