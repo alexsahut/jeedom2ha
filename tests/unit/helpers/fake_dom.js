@@ -216,9 +216,38 @@ function createDom() {
   };
   proto.is = function (selector) { return this.list.some((el) => matchesSelector(el, selector)); };
   proto.showAlert = function (options) { alerts.push(options); return this; };
+  // Story 25.1 : méthodes utilisées par le menu « ⋯ », le contrôle segmenté et l'accordéon.
+  proto.prepend = function (...args) {
+    each(this, (el) => args.forEach((arg) => toNodes(arg).slice().reverse().forEach((n) => { n.parent = el; el.children.unshift(n); })));
+    return this;
+  };
+  proto.toggleClass = function (names, state) {
+    each(this, (el) => String(names).split(/\s+/).filter(Boolean).forEach((c) => {
+      const on = state === undefined ? !el.classes.has(c) : !!state;
+      if (on) el.classes.add(c); else el.classes.delete(c);
+    }));
+    return this;
+  };
+  proto.parent = function () { return wrap(this.list.map((el) => el.parent).filter((p) => p instanceof El)); };
+  proto.children = function () {
+    const out = [];
+    this.list.forEach((el) => el.children.forEach((c) => { if (c instanceof El) out.push(c); }));
+    return wrap(out);
+  };
+  proto.last = function () { return wrap(this.list.slice(-1)); };
+  proto.eq = function (i) { return wrap(this.list.slice(i, i + 1)); };
+  proto.get = function (i) { return i === undefined ? this.list.slice() : this.list[i]; };
+  proto.focus = function () { if (this.list.length) { dom.focused = this.list[0]; this.list[0].focusCount = (this.list[0].focusCount || 0) + 1; } return this; };
+  proto.trigger = function (event, extra) {
+    each(this, (el) => { if (el.handlers[event]) el.handlers[event].call(el, Object.assign({ target: el, preventDefault() {}, stopPropagation() {} }, extra || {})); });
+    return this;
+  };
 
+  const documentEl = new El('document');
+  const dom = { focused: null };
   function $(arg) {
     if (typeof arg === 'function') { arg(); return undefined; }
+    if (arg === dom.document) return wrap([documentEl]);
     if (typeof arg === 'string') {
       if (/^\s*</.test(arg)) return wrap(parseHtml(arg).filter((n) => n instanceof El));
       return wrap(descendants(body).filter((el) => matchesSelector(el, arg)));
@@ -250,12 +279,12 @@ function createDom() {
     },
   };
 
-  return {
-    $, body, bootbox, alerts, dialogs,
+  dom.document = { createTextNode: (text) => ({ textNode: String(text) }) };
+  return Object.assign(dom, {
+    $, body, bootbox, alerts, dialogs, documentEl,
     El, parse: parseHtml, wrap,
-    document: { createTextNode: (text) => ({ textNode: String(text) }) },
     add(html) { const nodes = parseHtml(html); nodes.forEach((n) => { n.parent = body; body.children.push(n); }); return $(nodes.filter((n) => n instanceof El)[0]); },
-  };
+  });
 }
 
 module.exports = { createDom };

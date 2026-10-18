@@ -92,6 +92,8 @@ function loadHarness(ajax) {
   const sandbox = {
     $: Object.assign((arg) => (typeof arg === 'string' ? fakeEl(arg) : arg), { ajax: ajax }),
     M: M,
+    // Story 25.1 : la cellule « Dans Home Assistant » insère des noeuds texte.
+    document: { createTextNode: (text) => ({ textNode: String(text), children: [] }) },
     AJAX_URL: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     ctx: { reassurance: M.initReassuranceState(), timers: {}, xhr: {} },
     reloadCalls: [],

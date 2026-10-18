@@ -39,14 +39,16 @@ describe('20.3 / AC4 — gating indépendant d’un rendu de synthèse', () => {
   it('applyHAGating ne lit aucun élément de synthèse et les boutons de la surface suivent le gating', () => {
     const gating = home.match(/function applyHAGating[\s\S]*?\n\}/)[0];
     assert.doesNotMatch(gating, /scopeSummary/);
-    assert.match(surface, /data-ha-action="republier"/);
-    assert.match(surface, /data-ha-action="supprimer"/);
+    // Story 25.1 : les entrées du menu « ⋯ » portent `data-ha-action` (posé par buildMenu).
+    assert.match(surface, /\.attr\('data-ha-action', entry\.haAction\)/);
+    assert.match(surface, /haAction: 'republier'/);
+    assert.match(surface, /haAction: 'supprimer'/);
     assert.match(surface, /applyHAGating\(window\.jeedom2haLastBridgeStatus \|\| null\)/);
   });
 
   it('le bouton « Supprimer de Home Assistant » ajouté après le chargement de l’arbre est soumis au gating', () => {
-    const render = surface.match(/function renderEquipmentTree[\s\S]*?\n  function roomHasEquipment/)[0];
-    const afterButton = render.slice(render.indexOf('appendEquipmentDeleteButton('));
+    const render = surface.match(/function renderControls[\s\S]*?\n  function renderEquipmentTree/)[0];
+    const afterButton = render.slice(render.indexOf('buildMenu('));
     assert.match(afterButton, /reapplyBridgeGating\(\)/);
     assert.match(surface, /function reapplyBridgeGating[\s\S]*?applyHAGating\(window\.jeedom2haLastBridgeStatus \|\| null\)/);
   });

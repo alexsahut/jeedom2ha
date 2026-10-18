@@ -52,7 +52,7 @@ test('publicationActionState — équipement inéligible AVEC override posé : R
 test('publicationActionState — équipement inéligible SANS aucun override : Revenir reste grisé', () => {
   const state = M.publicationActionState({ eligible: false, publication_override: null, has_publication_override: false }, true);
   assert.equal(state.can_revert, false);
-  assert.match(state.revert_reason, /[Aa]ucun override/);
+  assert.match(state.revert_reason, /Aucun réglage de publication/);
 });
 
 test('publicationActionState — eligible absent (démon plus ancien) : comportement équipement inchangé', () => {
