@@ -228,3 +228,30 @@ describe('25.1 / AC2 — pureté et domaine de sortie', () => {
     }
   });
 });
+
+describe('25.1 / R2-2 — « Désactivé » prime sur « Exclu » (R3) avec `enabled` explicite', () => {
+  it('equipment_decision=excluded_eqlogic + enabled:false → disabled', () => {
+    const tree = eq({ decision: EXCLUDED });
+    assert.equal(M.resolveEquipmentState(tree, false).state, 'disabled');
+  });
+
+  it('sans information `enabled` ou enabled:true, l’exclusion du démon reste « Exclu »', () => {
+    const tree = eq({ decision: EXCLUDED });
+    assert.equal(M.resolveEquipmentState(tree).state, 'excluded');
+    assert.equal(M.resolveEquipmentState(tree, true).state, 'excluded');
+  });
+
+  it('la fonction reste pure : l’arbre n’est pas muté', () => {
+    const tree = eq({ decision: EXCLUDED });
+    const before = JSON.stringify(tree);
+    M.resolveEquipmentState(tree, false);
+    assert.equal(JSON.stringify(tree), before);
+  });
+
+  it('le compteur de pièce range l’équipement désactivé dans « désactivé », pas « exclu »', () => {
+    const tree = eq({ decision: EXCLUDED });
+    const summary = M.summarizeRoom([tree], 1, { 1: false });
+    assert.equal(summary.by_state.disabled, 1);
+    assert.equal(summary.by_state.excluded, 0);
+  });
+});

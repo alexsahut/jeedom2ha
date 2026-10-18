@@ -945,8 +945,10 @@
   }
 
   // D1 — état unique d'un équipement. Pure : ne mute pas l'arbre, aucun DOM, aucune E/S. Règles
-  // évaluées dans l'ordre, la première qui s'applique l'emporte.
-  function resolveEquipmentState(tree) {
+  // évaluées dans l'ordre, la première qui s'applique l'emporte. `enabled` (arbre PHP `j2haRoomsTree`) est
+  // un paramètre explicite : `false` fait prévaloir « Désactivé » sur « Exclu » (R3), quelle que soit
+  // `equipment_decision` ; `undefined`/`null` = inconnu, l'état ne dépend alors que de l'arbre.
+  function resolveEquipmentState(tree, enabled) {
     var t = normalizeTree(tree);
     var a = analyzeEquipment(t);
     var sync = t.sync_status;
@@ -960,7 +962,7 @@
       state = 'to_apply';
     } else if (presence === true) {
       state = 'published';
-    } else if (a.disabled) {
+    } else if (a.disabled || enabled === false) {
       state = 'disabled';
     } else if (a.excluded) {
       state = 'excluded';
@@ -1139,9 +1141,9 @@
 
   // Compteurs d'UN équipement (arbre brut ou normalisé) : base de la ligne de l'équipement déplié et
   // de l'agrégat de la pièce.
-  function summarizeEquipmentCounters(tree) {
+  function summarizeEquipmentCounters(tree, enabled) {
     var t = normalizeTree(tree);
-    var resolved = resolveEquipmentState(t);
+    var resolved = resolveEquipmentState(t, enabled);
     var a = analyzeEquipment(t);
     return {
       state: resolved.state,
@@ -1161,7 +1163,8 @@
 
   // `trees` : arbres normalisés ou bruts des équipements dont la lecture a abouti ;
   // `totalEquipments` : nombre d'équipements de la pièce (pour signaler les lectures manquantes).
-  function summarizeRoom(trees, totalEquipments) {
+  // `enabledById` : { eq_id: boolean } issu de `j2haRoomsTree` (optionnel).
+  function summarizeRoom(trees, totalEquipments, enabledById) {
     var list = Array.isArray(trees) ? trees : [];
     var out = {
       equipments_total: typeof totalEquipments === 'number' ? totalEquipments : list.length,
@@ -1172,7 +1175,9 @@
     };
     EQUIPMENT_STATES.forEach(function (state) { out.by_state[state] = 0; });
     for (var i = 0; i < list.length; i++) {
-      var counters = summarizeEquipmentCounters(list[i]);
+      var eqId = list[i] && list[i].jeedom_eq_id;
+      var enabled = enabledById && eqId != null ? enabledById[eqId] : undefined;
+      var counters = summarizeEquipmentCounters(list[i], enabled);
       out.by_state[counters.state] += 1;
       out.defects += counters.defects;
       if (counters.presence_unknown) out.equipments_presence_unknown += 1;
@@ -1218,8 +1223,8 @@
   }
 
   // Ligne de commandes d'un équipement déplié : « 3 publiées · 1 bloquée · 5 ignorées » (zéros masqués).
-  function buildEquipmentCounterLabels(tree) {
-    var counters = summarizeEquipmentCounters(tree);
+  function buildEquipmentCounterLabels(tree, enabled) {
+    var counters = summarizeEquipmentCounters(tree, enabled);
     var c = counters.commands;
     var items = [];
     [

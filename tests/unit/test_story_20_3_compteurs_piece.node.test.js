@@ -175,7 +175,7 @@ describe('20.3 / AC7 — le dénombrement ne lit que l’arbre de la pièce ouve
   const override = fs.readFileSync('desktop/js/jeedom2ha_mapping_override.js', 'utf8');
 
   it('les compteurs sont alimentés depuis ctx.trees (arbres de la pièce) par M.summarizeRoom', () => {
-    assert.match(surface, /M\.summarizeRoom\(trees, ctx\.room\.equipments\.length\)/);
+    assert.match(surface, /M\.summarizeRoom\(trees, ctx\.room\.equipments\.length, roomEnabledById\(\)\)/);
     assert.match(surface, /ctx\.trees\[eqId\] = normalized;/);
   });
 
