@@ -1,8 +1,8 @@
 # Story 25.2 : Route agrégée côté démon — états par pièce et par équipement en un appel
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-18).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 00:35, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — voir § Décisions).** Précédemment : `backlog` (2026-10-18). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -349,6 +349,47 @@ Session cloud déléguée Claude Code (`create-story`, documentaire), 2026-10-18
 - Story : ce fichier.
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (commentaire de l'entrée 25-2 seulement).
 
+## Décisions (ClaudeBox, 2026-10-19 00:35, par délégation d'Alexandre du 2026-10-18 23:50)
+
+Relecture ClaudeBox : story approuvée. Les recommandations sont suivies, sauf **Q3** (option B) et **Q9** (option A, relais inclus). Q8 et Q10 sont chiffrées ci-dessous.
+
+- **Q1 = A.** Arbre unitaire réduit à la liste blanche, sans compte précalculé. La partition D3 reste en JS.
+- **Q2 = A.** Pas de relais d'`enabled`, qui vient de `j2haRoomsTree`.
+- **Q3 = B.** Pas d'index `rooms` : la réponse est une carte plate `equipments`. Le JS regroupe avec `j2haRoomsTree`, seule source de l'appartenance aux pièces, de leurs noms et de leur ordre.
+  - *Motif :* une seule source de vérité. Un index « non autoritaire » est une seconde vérité qu'il faudrait réconcilier, alors que le besoin « par pièce » est couvert côté client.
+  - *Conséquences :* AC2 et le contrat retirent `rooms`. AC2 garde son corpus de ≥ 3 pièces, pour vérifier que le regroupement côté JS ne dépend que de `j2haRoomsTree`.
+- **Q3 bis = A.** La réconciliation des équipements de `j2haRoomsTree` absents du démon se fait côté client (25.3). La route reste un `GET` sans paramètre.
+- **Q4 = A.** Invalidation totale, reconstruction paresseuse. Le passage au partiel n'est envisagé que si la mesure terrain dépasse le budget de Q10.
+- **Q5 = A.** `/action/execute` et `_republish_all_from_cache` invalident aussi le cache (AC13 maintenu, avec son test d'énumération des chemins d'écriture).
+- **Q6 = A.** Construction paresseuse, single-flight.
+- **Q7 = A.** Jamais de construction pendant `action_lock`. Pendant une action, on sert l'entrée valide avec `meta.action_in_progress:true`, sinon `available:false` / `reason:"action_in_progress"`. 25.3 gérera la relecture.
+- **Q8 = A.** Plafond de sécurité de **300 s** (5 min), plus `refresh=1` réservé au bouton « Actualiser ».
+- **Q9 = A.** Le relais PHP est **inclus**, dans sa version minimale :
+  - une action ajax en lecture seule, `getEquipmentStates`, qui relaie la route et transmet `refresh=1` ;
+  - budget `JEEDOM2HA_RELAY_BUDGET_SHORT_S` ;
+  - un test PHP ;
+  - entrée dans la liste des lectures autorisées du gate 20-0 (`tests/e2e/gate/lib/policy.mjs`), sans parcours ni appel de page.
+
+  *Motif :* livrer une route testée de bout en bout, pour que 25.3 ne porte que l'interface.
+
+  *Conséquences :* AC18 autorise `core/ajax/jeedom2ha.ajax.php`, son test PHP et la ligne de politique du gate. `desktop/` et `plugin_info/` restent inchangés. L'inventaire des requêtes de page reste inchangé.
+- **Q10 — Budgets.**
+  - **Test de charge synthétique** (AC15, 292 équipements, méthode 19-6 : coût unitaire × `MARGE_MESURE` × `MACHINE_FACTOR`) :
+    - `build_cold_ms` projeté sur la box ≤ **4 000 ms** ;
+    - `hit_ms` ≤ **50 ms** ;
+    - `bytes` ≤ **1 500 000** ;
+    - rapport de gain sur la boucle actuelle consigné.
+  - **Terrain** (AC16, mesuré par ClaudeBox), de bout en bout via le relais :
+    - à froid ≤ **6 s** ;
+    - à chaud ≤ **500 ms**.
+
+    Les deux restent sous les 15 s du relais. Si un budget terrain n'est pas tenu, la story le consigne et on rouvre **Q4 (partiel)** ou **Q7 B (exécuteur)** par décision, sans relever le budget en silence.
+- **Q11.** `GET /system/equipment_states`.
+- **Q12 = A.** 200, `available:false`, collections vides.
+- **Q13 = oui.** 25.3 s'appuie sur l'invalidation côté démon et réserve `refresh=1` au bouton « Actualiser ».
+
+*Toutes ces décisions sont réversibles. Elles figurent au journal de nuit du plan ClaudeBox, pour relecture par Alexandre.*
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation** ; **aucune n'est tranchée par la session**. Les AC écrits « par défaut » ci-dessus suivent la recommandation, pour qu'une réponse « je valide les recommandations » rende la story prête sans réécriture.
@@ -407,6 +448,8 @@ Proposition de forme, valeurs à fixer par ClaudeBox : un budget de **constructi
 **Q13 — Cohérence avec 25.3 sur la fraîcheur.** Le cadrage (Q2) calcule les jauges « à l'ouverture, après chaque action, à chaque fin de synchro, plus un bouton Actualiser ». Confirmer que 25.3 s'appuiera sur l'invalidation côté démon (AC11-AC13) et réservera `refresh=1` au bouton « Actualiser », plutôt que de forcer `refresh=1` à chaque ouverture (ce qui annulerait le cache). *(recommandé : oui)*
 
 ## Change Log
+
+- 2026-10-19 00:35 — Relecture ClaudeBox : décisions Q1-Q13 (§ Décisions, par délégation d'Alexandre) ; `ready-for-dev`.
 
 - 2026-10-18 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 19 AC, 14 questions ouvertes pour ClaudeBox / Alexandre ; décisions de ClaudeBox du 2026-10-18 23:50 (par délégation d'Alexandre) consignées ; `ready-for-dev` non accordé.
 - 2026-10-18 — Revue Codex de la PR #287 (P2, P1) : `not_in_topology` retiré du contrat serveur (réconciliation côté client, Q3 bis) ; AC11 et Q7 amendés (aucune construction tant que `action_lock` est pris, l'absence d'`await` du builder ne garantissant pas l'atomicité face à la synchro).
