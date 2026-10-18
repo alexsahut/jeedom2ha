@@ -127,7 +127,7 @@ describe('25.1 / AC18 — quatre teintes sémantiques, fonds translucides, repli
     }
     const defined = new Set(rules.filter((r) => isVariableBlock(r)).flatMap((r) => declarations(r.body).map((d) => d.property)));
     const colorTints = [...defined].filter((p) => /^--j2ha-[a-z]+$/.test(p));
-    assert.deepEqual(colorTints.sort(), ['--j2ha-danger', '--j2ha-highlight', '--j2ha-line', '--j2ha-neutral', '--j2ha-ok', '--j2ha-surface', '--j2ha-todo', '--j2ha-warn'].sort());
+    assert.deepEqual(colorTints.sort(), ['--j2ha-danger', '--j2ha-highlight', '--j2ha-line', '--j2ha-neutral', '--j2ha-ok', '--j2ha-surface', '--j2ha-text', '--j2ha-todo', '--j2ha-warn'].sort());
   });
 
   it('le rouge n’est utilisé que par la zone destructive (menu « ⋯ »)', () => {
@@ -245,6 +245,62 @@ describe('25.1 / AC19 — contrastes mesurés dans les deux thèmes', () => {
   it('les gris #555 #666 #888 #999 (< 3:1 sur fond sombre) n’existent plus', () => {
     assert.doesNotMatch(css, /#(555|666|888|999)\b/);
   });
+});
+
+describe('25.1 / AC19 (R2-1) — texte du contrôle segmenté lisible dans les trois états et les deux thèmes', () => {
+  const ruleBody = (selector) => (rules.find((r) => r.selector === selector) || { body: '' }).body;
+  const prop = (body, name) => (declarations(body).find((d) => d.property === name) || {}).value;
+  const BACKGROUNDS = { clair: ['#ffffff', '#f5f5f5'], sombre: ['#191919', '#2a2a2a'] };
+  const THEMES = { clair: light, sombre: dark };
+  // Teinte portée par le segment actif de chaque catégorie.
+  const ACTIVE_TINT = { auto: 'ok', always: 'todo', never: 'neutral' };
+
+  it('le texte d’un segment vient d’une variable de thème, pas de l’héritage Bootstrap', () => {
+    const base = ruleBody('.j2ha-seg-btn');
+    assert.match(prop(base, 'color'), /^var\(--txt-color, var\(--j2ha-[a-z-]+\)\)$/);
+    assert.doesNotMatch(prop(base, 'color'), /inherit/);
+  });
+
+  it('le segment désactivé est atténué par opacité, sans couleur de texte propre', () => {
+    const body = ruleBody('.j2ha-seg-btn.j2ha-seg-disabled');
+    const opacity = Number(prop(body, 'opacity'));
+    assert.ok(opacity > 0 && opacity < 1, 'opacity attendue : ' + opacity);
+    assert.equal(prop(body, 'color'), undefined);
+  });
+
+  it('le segment actif prend la teinte de sa catégorie (Automatique / Toujours / Jamais)', () => {
+    for (const [key, tint] of Object.entries(ACTIVE_TINT)) {
+      const selector = key === 'always' ? '.j2ha-seg-btn.j2ha-seg-active' : `.j2ha-seg-btn.j2ha-seg-active.j2ha-seg-${key}`;
+      const body = ruleBody(selector);
+      assert.equal(prop(body, 'color'), `var(--j2ha-${tint})`, key);
+      assert.equal(prop(body, 'background-color'), `var(--j2ha-${tint}-bg)`, key);
+    }
+  });
+
+  for (const [name, backgrounds] of Object.entries(BACKGROUNDS)) {
+    it(`thème ${name} : texte des segments actif / disponible ≥ 4,5:1, désactivé atténué ≥ 3:1`, () => {
+      const theme = THEMES[name];
+      const opacity = Number(prop(ruleBody('.j2ha-seg-btn.j2ha-seg-disabled'), 'opacity'));
+      const base = prop(ruleBody('.j2ha-seg-btn'), 'color');
+      assert.match(base, /var\(--j2ha-([a-z-]+)\)\)$/);
+      const fallbackVar = '--j2ha-' + base.match(/var\(--j2ha-([a-z-]+)\)\)$/)[1];
+      for (const bgHex of backgrounds) {
+        const bg = toRgb(bgHex);
+        // Disponible : texte du thème (repli) sur le fond nu.
+        const text = toRgb(theme[fallbackVar]);
+        assert.ok(contrast(text, bg) >= 4.5, `${name} ${bgHex} disponible : ${contrast(text, bg).toFixed(2)}`);
+        // Désactivé : même texte, atténué par l'opacité.
+        const faded = blend(text, bg, opacity);
+        assert.ok(contrast(faded, bg) >= 3, `${name} ${bgHex} désactivé : ${contrast(faded, bg).toFixed(2)}`);
+        // Actif : teinte de la catégorie sur son fond teinté à 14 %.
+        for (const [key, tint] of Object.entries(ACTIVE_TINT)) {
+          const color = toRgb(theme['--j2ha-' + tint]);
+          const tinted = blend(color, bg, 0.14);
+          assert.ok(contrast(color, tinted) >= 4.5, `${name} ${bgHex} actif ${key} : ${contrast(color, tinted).toFixed(2)}`);
+        }
+      }
+    });
+  }
 });
 
 describe('25.1 / AC20 — ne jamais restyler le core ; arrondi du thème', () => {
