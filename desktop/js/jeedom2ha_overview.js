@@ -636,6 +636,7 @@
       if (!openMenuWrap) return;
       var $toggle = openMenuWrap.find('.j2ha-menu-toggle');
       openMenuWrap.removeClass('j2ha-menu-open');
+      openMenuWrap.closest('.j2ha-room-has-menu').removeClass('j2ha-room-menu-shown');
       $toggle.attr('aria-expanded', 'false');
       if (returnFocus) $toggle.focus();
       openMenuWrap = null;
@@ -647,6 +648,18 @@
       return items;
     }
 
+    // Menu d'une carte de pièce : la carte (overflow:hidden du cœur) le laisse déborder tant qu'il est ouvert ; aligné à droite
+    // sous le « ⋯ », il bascule à gauche s'il sortirait de la fenêtre (première carte d'une rangée).
+    function placeRoomMenu($wrap) {
+      var $card = $wrap.closest('.j2ha-room-has-menu');
+      if ($card.length === 0) return;
+      $card.addClass('j2ha-room-menu-shown');
+      $wrap.removeClass('j2ha-room-menu-start');
+      var menu = $wrap.find('.j2ha-room-menu-list').get(0);
+      if (!menu || typeof menu.getBoundingClientRect !== 'function') return;
+      if (menu.getBoundingClientRect().left < 8) $wrap.addClass('j2ha-room-menu-start');
+    }
+
     function bindMenu($wrap) {
       var $toggle = $wrap.find('.j2ha-menu-toggle');
       function open() {
@@ -654,6 +667,7 @@
         $wrap.addClass('j2ha-menu-open');
         $toggle.attr('aria-expanded', 'true');
         openMenuWrap = $wrap;
+        placeRoomMenu($wrap);
         var first = menuItems($wrap)[0];
         if (first) $(first).focus();
       }

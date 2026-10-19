@@ -330,6 +330,69 @@ body[data-theme*="Dark"] {
 .j2ha-room-groups .j2ha-room-excluded-line .j2ha-room-notyet {
   color: var(--j2ha-todo);
 }
+/* Correctif 25.8 (retour d'Alex, box 4.6.1) : AJOUTS seulement, qui priment par l'ordre sur les règles ci-dessus.
+   Le cœur impose `.objectDisplayCard i { font-size: 38px !important }` à TOUTE icône de la carte : seule l'icône de pièce
+   doit garder cette taille, d'où les tailles en !important (portée plugin, spécificité supérieure) sur le « ⋯ », l'œil
+   barré de « Pièce exclue » et l'icône de l'entrée du menu. */
+/* « ⋯ » : glyphe discret de 16 px dans le coin haut-droit ; la cible reste 44 × 44 px (souris, doigt), le survol la montre. */
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  line-height: 1;
+  border-radius: var(--border-radius, 0);
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle i {
+  font-size: 16px !important;
+  margin: 0;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle:hover,
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle[aria-expanded="true"] {
+  color: var(--txt-color, var(--j2ha-text));
+  background-color: var(--j2ha-surface-strong);
+  outline: none;
+}
+/* Focus clavier : contour DANS la carte (rogné sinon par l'overflow:hidden du cœur au ras du coin). */
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle:focus-visible {
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: 0;
+}
+/* Menu ouvert (classe posée par le JS) : la carte (130 px, overflow:hidden du cœur) laisse déborder son menu SUR LES CÔTÉS
+   et passe au-dessus de ses voisines ; le clip-path garde rogné en haut et en bas ce que la carte cache d'ordinaire. */
+.j2ha-room-groups .j2ha-room-card.j2ha-room-has-menu.j2ha-room-menu-shown {
+  overflow: visible;
+  z-index: 6;
+  -webkit-clip-path: inset(0 -100vw 0 -100vw);
+  clip-path: inset(0 -100vw 0 -100vw);
+}
+/* Menu : sous le bouton, aligné sur le bord droit de la carte, largeur du contenu ; basculé à gauche (classe posée par le
+   JS) quand il sortirait de la fenêtre. */
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-list {
+  top: 100%;
+  min-width: 160px;
+  width: max-content;
+  max-width: 280px;
+  margin-top: 0;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu.j2ha-room-menu-start .j2ha-room-menu-list {
+  right: auto;
+  left: 0;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-list i {
+  font-size: 14px !important;
+  width: 16px;
+  text-align: center;
+}
+/* « Pièce exclue » : même gabarit que le ratio qu'elle remplace (12 px), œil barré à la taille du texte. */
+.j2ha-room-groups .j2ha-room-excluded-line {
+  line-height: 16px;
+}
+.j2ha-room-groups .j2ha-room-excluded-line i {
+  font-size: 12px !important;
+  margin-right: 2px;
+}
 /* Story 25.7 : repère gris « N exclus » de la carte, déclaré sous .j2ha-room-groups (aucune règle sur .j2ha-mark nue). */
 .j2ha-room-groups .j2ha-mark.j2ha-mark-excluded { color: var(--j2ha-neutral); }
 .j2ha-state-word.j2ha-state-unread { color: var(--j2ha-neutral); }
