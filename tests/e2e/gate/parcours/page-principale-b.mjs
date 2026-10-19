@@ -75,7 +75,12 @@ async function checkGauges(page, helpers) {
 
 /** (4) Chaque puce non vide filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé. */
 async function checkFilters(page, helpers) {
-  const before = helpers.journalEntries().length;
+  // Seules les requêtes du plugin comptent : le cœur Jeedom (événements, santé) peut interroger la box
+  // pendant la boucle sans lien avec les filtres (constat du gate du 2026-10-19).
+  const pluginCalls = () => helpers.journalEntries()
+    .filter((entry) => ['fetch', 'xhr'].includes(entry.resourceType) && String(entry.path ?? '').startsWith('/plugins/jeedom2ha/core/ajax/'))
+    .length;
+  const before = pluginCalls();
   const chips = page.locator('#j2ha_houseChips .j2ha-chip-filter:not([disabled])');
   const count = await chips.count();
   if (count === 0) throw new Error('aucune-puce-active');
@@ -89,7 +94,7 @@ async function checkFilters(page, helpers) {
     await chip.click();
     if ((await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) throw new Error('filtre-non-retire');
   }
-  if (helpers.journalEntries().length !== before) throw new Error('requete-pendant-filtre');
+  if (pluginCalls() !== before) throw new Error('requete-pendant-filtre');
   helpers.record('puces_controlees', count);
   helpers.record('requetes_pendant_filtres', 0);
 }
