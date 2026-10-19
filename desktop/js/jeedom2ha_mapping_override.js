@@ -1220,7 +1220,7 @@
   /**
    * @param {object} tree entrée agrégée (page B) OU arbre unitaire (détail) : même forme, parité prouvée en 25.2.
    * @param {boolean|undefined} enabled `enabled` de `j2haRoomsTree` (`false` : « Désactivé » prime, aucune cause).
-   * @returns {{kind: string, code: string}|null}
+   * @returns {({kind: string, code: string}|null)}
    */
   function exclusionCauseOf(tree, enabled) {
     if (!tree || typeof tree !== 'object') return null;
