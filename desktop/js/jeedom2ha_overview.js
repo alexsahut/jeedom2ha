@@ -62,14 +62,17 @@
   function emptyCounts() { return { published: 0, to_apply: 0, blocked: 0, other: 0, unread: 0 }; }
 
   // Puces de filtre (Story 25.4) : calculées ICI pour la page principale ET pour la vue de travail, afin qu'aucun second
-  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée.
-  function chipsFor(counts) {
+  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée, SAUF la puce
+  // active (`active`) : elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la
+  // pièce ne compte aucun équipement du filtre hérité de la page B).
+  function chipsFor(counts, active) {
     var c = counts || emptyCounts();
     var chips = [];
     FILTERS.forEach(function (f) {
       var count = c[f.key] || 0;
-      if (f.key === 'unread' && count === 0) return;
-      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 });
+      var isActive = active === f.key;
+      if (f.key === 'unread' && count === 0 && !isActive) return;
+      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 && !isActive });
     });
     return chips;
   }
@@ -363,7 +366,7 @@
       setText('#j2ha_houseSub', head.sub);
       setText('#j2ha_houseMeta', o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces'));
       $gaugeHost.append(buildGauge(o.counts, o.total));
-      chipsFor(o.counts).forEach(function (chip) {
+      chipsFor(o.counts, filter).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', filter === chip.key ? 'true' : 'false')

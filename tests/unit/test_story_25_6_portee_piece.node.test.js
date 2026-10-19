@@ -250,3 +250,23 @@ describe('25.6 / D1 — modèle d’arbre pur', () => {
     assert.equal(W.buildTreeModel(base).roomCount, 3, 'sans portée : comportement de 25.4');
   });
 });
+
+// Relecture ClaudeBox de #307 (P2) : une carte « grisée » par le filtre de la page B reste cliquable et ouvre la pièce
+// seule avec ce filtre ; la puce active ne doit jamais être désactivée, sinon le filtre ne peut plus être retiré.
+describe('25.6 — puce active jamais désactivée (relecture #307)', () => {
+  const O = require('../../desktop/js/jeedom2ha_overview.js');
+  it('chipsFor : la puce active à zéro reste cliquable ; les autres puces à zéro restent désactivées', () => {
+    const counts = { published: 0, to_apply: 0, blocked: 2, other: 0, unread: 0 };
+    const chips = O.chipsFor(counts, 'published');
+    assert.equal(chips.find((c) => c.key === 'published').disabled, false);
+    assert.equal(chips.find((c) => c.key === 'to_apply').disabled, true);
+    assert.equal(chips.find((c) => c.key === 'blocked').disabled, false);
+  });
+  it('chipsFor : la puce « non lus » active à zéro reste affichée', () => {
+    const chips = O.chipsFor({ published: 1, to_apply: 0, blocked: 0, other: 0, unread: 0 }, 'unread');
+    const unread = chips.find((c) => c.key === 'unread');
+    assert.ok(unread, 'puce non lus présente');
+    assert.equal(unread.disabled, false);
+    assert.equal(O.chipsFor({ published: 1, to_apply: 0, blocked: 0, other: 0, unread: 0 }).find((c) => c.key === 'unread'), undefined);
+  });
+});

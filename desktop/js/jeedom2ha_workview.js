@@ -693,6 +693,12 @@
         var node = $selected.get(0);
         if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
         $selected.focus();
+      } else {
+        // Sélection masquée par une recherche ou un filtre : le focus ne doit pas tomber sur `body` (le bouton
+        // « Toutes les pièces » vient d'être retiré du DOM) — repli sur le champ de recherche, sinon la première ligne.
+        var $first = el.tree.find('[role=treeitem]').first();
+        if (el.search && el.search.length) el.search.focus();
+        else if ($first.length) { $first.attr('tabindex', '0'); $first.focus(); }
       }
       syncUrl('replace');
       announce('{{Toutes les pièces}}');
@@ -718,7 +724,7 @@
       // Effectifs : ceux de la pièce en portée « piece » (invariant « lignes de l'arbre = effectif de la puce »), ceux de la
       // maison en portée « toutes » ; `computeOverview` les a déjà calculés, aucun second calcul.
       var narrow = st.scope === 'piece' && overviewRoom(st.room);
-      O.chipsFor(narrow ? narrow.counts : overview.counts).forEach(function (chip) {
+      O.chipsFor(narrow ? narrow.counts : overview.counts, active).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter j2ha-wv-chip"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', active === chip.key ? 'true' : 'false')
