@@ -1,8 +1,8 @@
 # Story 25.7 : Cause d'exclusion affichée
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, point 3 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, point 3 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -247,6 +247,19 @@ _(à remplir au `dev-story`)_
 
 ### File List
 
+## Décisions (ClaudeBox, 2026-10-19 17:40)
+
+Story relue. Les recommandations sont retenues pour Q1 à Q7 :
+- **Q1** : le nom du plugin vient de la page. On ajoute un `eq_type` dans `j2haRoomsTree` et une table des noms de plugins lue dans Jeedom, côté PHP. Aucune modification du démon ni de la liste blanche. La table sert aussi à 25.9.
+- **Q2** : mention courte après « Exclu » (« par le plugin X », « par la pièce », « individuelle »), phrase complète dans le détail.
+- **Q3** : `excluded_eqlogic` s'affiche « individuelle », précisé « réglage de l'équipement dans Jeedom ».
+- **Q4** : le détail dit où agir, en texte, avec un lien vers la configuration pour le plugin. Pour la pièce, le lien renvoie au contrôle de 25.8 une fois celui-ci livré. Aucune écriture dans cette story.
+- **Q5** : repère gris « N exclus » sur la carte, avec la ventilation en infobulle et dans le nom accessible.
+- **Q6** : « N autre » pour une cause indéterminable.
+- **Q7** : infobulle des cellules inchangée, `REASON_LABELS` n'est pas modifié.
+
+**Statut : `ready-for-dev`.**
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation argumentée** ; **aucune n'est tranchée par la session**.
@@ -286,3 +299,4 @@ Ni l'entrée agrégée, ni l'arbre unitaire, ni `j2haRoomsTree` ne portent le ty
 ## Change Log
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (point 3) : statut `backlog`, 14 AC, 10 décisions déjà arbitrées, 7 questions ouvertes avec recommandation ; constat consigné : le nom du plugin n'est pas disponible côté interface (Q1) ; `ready-for-dev` non accordé ; statut cible `ready-for-UX-validation` (validation UX finale en 25.5).
+- 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.

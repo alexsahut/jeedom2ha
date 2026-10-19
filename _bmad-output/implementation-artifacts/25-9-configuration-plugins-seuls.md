@@ -1,8 +1,8 @@
 # Story 25.9 : Page de configuration — exclusion par plugin seulement
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D4**, point 4 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q6 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.8) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D4**, point 4 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q6 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.8) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -216,6 +216,20 @@ _(à remplir au `dev-story`)_
 
 ### File List
 
+## Décisions (ClaudeBox, 2026-10-19 17:40)
+
+Story relue. Les recommandations sont retenues pour Q1 à Q6 :
+- **Q1** : la liste propose les plugins qui ont au moins un équipement, hors `jeedom2ha`.
+- **Q2** : un plugin exclu mais absent de Jeedom est affiché coché, avec « (absent de Jeedom) », et reste décochable.
+- **Q3** : un champ masqué `configKey` `excludedPlugins` est tenu à jour par les cases. « Sauvegarder » et « Appliquer et rescanner » fonctionnent toujours.
+- **Q4** : pas de normalisation. La valeur est réécrite identique si rien ne change.
+- **Q5** : liste de hauteur bornée, sans champ de recherche.
+- **Q6** : le renvoi affiche un texte, un lien vers la page du plugin et le nombre de pièces exclues, sans leurs noms.
+
+Point d'ordonnancement : **déploiement en même temps que 25.8** (25.8 Q9).
+
+**Statut : `ready-for-dev`.**
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation argumentée** ; **aucune n'est tranchée par la session**.
@@ -249,3 +263,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 ## Change Log
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (D4) : statut `backlog`, 12 AC, 8 décisions déjà arbitrées, 6 questions ouvertes avec recommandation ; dépend de 25.8 ; `ready-for-dev` non accordé ; statut cible `ready-for-UX-validation` (validation UX finale en 25.5).
+- 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.

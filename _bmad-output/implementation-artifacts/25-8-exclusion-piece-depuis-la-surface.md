@@ -1,8 +1,8 @@
 # Story 25.8 : Exclusion de pièce depuis la surface
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décisions **D1** et **D3**, avis de clawcode « A1 / `excludedObjects` »). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q10 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6 et 25.7) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne ; identifiants fictifs dans les fixtures, identifiants techniques seuls dans la preuve terrain (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décisions **D1** et **D3**, avis de clawcode « A1 / `excludedObjects` »). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q10 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6 et 25.7) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne ; identifiants fictifs dans les fixtures, identifiants techniques seuls dans la preuve terrain (CC-48).
 
 ## Story
 
@@ -319,6 +319,24 @@ _(à remplir au `dev-story`)_
 
 ### File List
 
+## Décisions (ClaudeBox, 2026-10-19 17:40)
+
+Story relue. Les recommandations sont retenues pour Q1 à Q10, avec ces précisions :
+- **Q1 = B.** On ajoute `present_in_ha` aux entités de la liste blanche de la route agrégée. C'est un ajout de champ, autorisé : la contrainte « aucun changement du démon » du sprint-change ne porte que sur la règle de priorité (D1). Le chiffre annoncé doit être exact pour servir de preuve.
+  - **Mesure obligatoire** de la taille de la réponse sur la fixture la plus lourde, puis sur la box en preuve terrain. Seuil de vigilance : 1 350 000 octets. Seuil bloquant : 1 500 000 octets.
+  - Si le seuil de vigilance est dépassé sur la box, on garde quand même le champ, et la preuve consigne le chiffre. Si le budget est dépassé, on se replie sur « N équipements (M commandes) » sans le champ, et on le consigne.
+- **Q2** : route `saveRoomExclusion` (`objectId`, `excluded=1|0`), déclarée dans `policy.mjs` comme écriture simulée, avec sa branche dédiée dans l'intercepteur. On n'utilise pas la branche `else` des retours de réglage.
+- **Q3** : menu « ⋯ » sur la carte, avec arrêt de propagation du clic.
+- **Q4** : sur la carte d'une pièce exclue, « Pièce exclue » remplace seulement le ratio. On garde la jauge et les repères, plus « N pas encore retirés » tant que la relecture n'a pas eu lieu.
+- **Q5** : les jetons inconnus sont conservés tels quels, dans leur ordre.
+- **Q6** : la relecture applique aussi tous les réglages en attente de la maison. On l'annonce, chiffré, dans la même confirmation. On relit même s'il n'y a aucun changement.
+- **Q7** : « Ne plus exclure » demande une confirmation sans chiffre, avec un bouton principal (pas rouge).
+- **Q8** : si la lecture est indisponible, l'action reste autorisée, avec « Nombre d'entités inconnu ».
+- **Q9** : la preuve terrain se fait sur une pièce de test **choisie avec Alexandre au moment de la preuve**, état initial restauré. **25.8 et 25.9 sont déployées ensemble**, pour ne jamais laisser « Appliquer et rescanner » réécrire une valeur périmée d'`excludedObjects`.
+- **Q10** : infobulle « Pièce exclue : elle prime sur ce réglage. », sans modifier `publicationActionState`.
+
+**Statut : `ready-for-dev`.**
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation argumentée** ; **aucune n'est tranchée par la session**. Les AC écrits « par défaut » suivent la recommandation.
@@ -370,3 +388,4 @@ La route agrégée ne dit pas, entité par entité, ce qui est présent dans Hom
 ## Change Log
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (D1, D3) : statut `backlog`, 21 AC, 13 décisions déjà arbitrées, 10 questions ouvertes avec recommandation ; constats consignés : la relecture applique tous les réglages en attente (Q6), le décompte exact en entités n'est pas dans la route agrégée (Q1), fenêtre de risque avant 25.9 (Q9) ; `ready-for-dev` non accordé ; statut cible `ready-for-UX-validation` (validation UX finale en 25.5).
+- 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.

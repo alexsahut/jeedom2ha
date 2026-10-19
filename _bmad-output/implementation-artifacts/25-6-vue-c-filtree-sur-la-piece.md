@@ -1,8 +1,8 @@
 # Story 25.6 : Vue C filtrée sur la pièce d'entrée
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D2**). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale est portée par **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` (après 25.4 : #301 `0a71a05`, #302 `90d4177`, #303 `5789c04`, preuve terrain #304, sprint change #305) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D2**). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale est portée par **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` (après 25.4 : #301 `0a71a05`, #302 `90d4177`, #303 `5789c04`, preuve terrain #304, sprint change #305) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -275,6 +275,19 @@ _(à remplir au `dev-story`)_
 
 ### File List
 
+## Décisions (ClaudeBox, 2026-10-19 17:40)
+
+Story relue. Les recommandations sont retenues pour Q1 à Q7 :
+- **Q1** : le bouton de retour devient « Page principale ». Le libellé « Toutes les pièces » est réservé à l'élargissement (D2).
+- **Q2** : depuis une ligne de la liste filtrée, la vue s'ouvre sur toutes les pièces, pour garder le contexte du filtre.
+- **Q3** : la clé de fragment est `seule:1`, absente en vue complète. Les liens de 25.4 restent valides.
+- **Q4** : l'élargissement remplace l'entrée d'historique, avec un état `null` (#302).
+- **Q5** : les puces affichent les effectifs de la pièce. L'invariant « lignes = effectif » est conservé.
+- **Q6** : le bouton est en tête de la colonne de l'arbre, visible seulement en portée pièce.
+- **Q7** : la sélection est conservée après élargissement, ramenée dans la zone visible, avec le focus.
+
+**Statut : `ready-for-dev`.**
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation argumentée** ; **aucune n'est tranchée par la session**. Les AC écrits « par défaut » suivent la recommandation, pour qu'une réponse « je valide les recommandations » rende la story prête sans réécriture.
@@ -312,3 +325,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 ## Change Log
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (D2) : statut `backlog`, 15 AC, 7 décisions déjà arbitrées, 7 questions ouvertes avec recommandation ; `ready-for-dev` non accordé ; statut cible après implémentation `ready-for-UX-validation` (validation UX finale en 25.5).
+- 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.
