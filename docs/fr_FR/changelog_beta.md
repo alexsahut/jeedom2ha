@@ -6,6 +6,16 @@
 
 ---
 
+# 2026-10-19 — Page principale : barre de santé compacte, jauge de la maison et cartes de pièce
+
+- Le bandeau bleu disparaît : une ligne d'aide discrète avec un lien « Aide » le remplace.
+- La barre de santé tient sur une ligne et porte les actions : « Republier tout », « Relire Jeedom » et un menu « ⋯ » qui range « Télécharger le diagnostic… » et, en rouge, « Supprimer tout de Home Assistant… ».
+- Un bloc « publiés sur » le total donne dès le premier écran l'état de la maison, avec une jauge dont chaque segment filtre la liste des équipements, toutes pièces confondues. « Actualiser » relit les chiffres ; ils sont aussi relus après chaque action et au retour sur l'onglet.
+- Les cartes de pièce montrent leur propre jauge et leurs repères (bloqués, à appliquer, non lus), l'icône et la couleur choisies dans Jeedom, et sont regroupées par objet parent.
+- Aucune modification du démon, ni de ce qui est publié dans Home Assistant.
+
+---
+
 # 2026-10-18 — Un seul état par équipement, mots unifiés et fenêtre de pièce réorganisée
 
 - Chaque équipement porte **un seul état**, dit avec le même mot et la même couleur dans le badge, la ligne de son panneau et les compteurs de la pièce : Publié, À appliquer, Bloqué, Exclu, Désactivé ou Rien à publier (« Désactivé » l'emporte sur « Exclu »). L'ancien état « partiel » devient la mention orange « N bloquées » à côté de « Publié ». Voir la page « Les états et les compteurs ».

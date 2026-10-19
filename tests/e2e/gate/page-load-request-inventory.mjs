@@ -186,6 +186,7 @@ const ALLOWED_READS = [
       'getMqttConfig',
       'getBridgeStatus',
       'getMappingOverrides',
+      'getEquipmentStates',
       'previewMappingOverride',
     ],
   },
@@ -204,12 +205,16 @@ function isAllowedRead(request, url, action, ambiguous) {
 }
 
 const verdictCounts = new Map();
+// Story 25.3 (AC1, AC17) : décompte des lectures du plugin au chargement, par action. La page B émet UNE lecture
+// d'état (`getEquipmentStates`) et aucune lecture par équipement (`getMappingOverrides`) avant l'ouverture d'une pièce.
+const readCounts = new Map();
 
 function logLine(method, resourceType, pathname, action, verdict) {
   const ts = new Date().toISOString();
   const actionPart = action ? `action=${action}` : 'action=-';
   console.log(`${ts} ${method} ${resourceType} ${pathname} ${actionPart} verdict=${verdict}`);
   verdictCounts.set(verdict, (verdictCounts.get(verdict) ?? 0) + 1);
+  if (verdict === 'lecture' && action) readCounts.set(action, (readCounts.get(action) ?? 0) + 1);
 }
 
 /** Compte les sauts d'une chaîne de redirection en remontant redirectedFrom(). Playwright
@@ -377,6 +382,16 @@ async function main() {
   console.log('--- Décompte des requêtes par verdict ---');
   for (const [verdict, count] of verdictCounts) {
     console.log(`${verdict}: ${count}`);
+  }
+
+  console.log('--- Lectures du plugin au chargement (story 25.3) ---');
+  const stateReads = readCounts.get('getEquipmentStates') ?? 0;
+  const perEquipmentReads = readCounts.get('getMappingOverrides') ?? 0;
+  console.log(`getEquipmentStates: ${stateReads} (attendu : 1)`);
+  console.log(`getMappingOverrides: ${perEquipmentReads} (attendu : 0)`);
+  if (stateReads !== 1 || perEquipmentReads !== 0) {
+    console.log('inventaire du chargement inattendu : une lecture d\'état et aucune lecture par équipement attendues');
+    process.exitCode = 1;
   }
 }
 

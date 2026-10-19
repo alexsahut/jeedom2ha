@@ -37,8 +37,10 @@ check('le conteneur eqLogicThumbnailContainer est conservé', strpos($rendered, 
 check('« Télécharger le diagnostic support » est conservé', strpos($rendered, 'bt_exportDiagnostic') !== false);
 
 echo "R1-I — nom de pièce échappé\n";
-check('object_name est rendu via htmlspecialchars', strpos($rendered, 'htmlspecialchars($room[\'object_name\']') !== false);
-check('object_name n\'est jamais écrit brut', preg_match('/echo[^;]*\\.\\s*\\$room\\[\'object_name\'\\]\\s*\\./', $rendered) === 0);
+// Story 25.3 : le rendu des cartes est passé dans desktop/php/jeedom2ha_overview_helpers.php (j2ha_html = htmlspecialchars).
+$helpers = file_get_contents(__DIR__ . '/../../desktop/php/jeedom2ha_overview_helpers.php');
+check('object_name est rendu via htmlspecialchars', strpos($helpers, 'j2ha_html($room[\'object_name\']') !== false && strpos($helpers, 'htmlspecialchars((string) $text, ENT_QUOTES, \'UTF-8\')') !== false);
+check('object_name n\'est jamais écrit brut', preg_match('/echo[^;]*\\.\\s*\\$room\\[\'object_name\'\\]\\s*\\./', $rendered . $helpers) === 0 && preg_match('/\\.\\s*\\$room\\[\'object_name\'\\]\\s*\\./', $helpers) === 0);
 
 echo "AC6 — vocabulaire de gabarit retiré\n";
 foreach (array('Mes templates', 'Équipement Template', 'Paramètre n°1', 'Paramètres spécifiques', 'Mot de passe', 'Auto-actualisation', 'Configuration mapping') as $needle) {

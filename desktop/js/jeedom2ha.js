@@ -116,6 +116,14 @@ function refreshBridgeStatus() {
   });
 }
 
+/* Story 25.3 (AC6) : une action terminée (succès ou échec) peut avoir changé les états ; la page principale
+ * relit alors les chiffres (sans refresh, coalescée) — voir jeedom2ha_overview.js. Sans effet si la page B est absente. */
+function notifyStatesChanged() {
+  if (typeof window !== 'undefined' && typeof window.j2haNotifyStatesChanged === 'function') {
+    window.j2haNotifyStatesChanged();
+  }
+}
+
 /* Gating des actions Home Assistant selon la santé du pont (Story 2.3) */
 
 /**
@@ -382,6 +390,7 @@ function triggerTopologyRescan($button, snapshot, owner) {
     },
     complete: function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
+      notifyStatesChanged();
     },
   });
 }
@@ -403,6 +412,7 @@ function triggerPublierAction($button, portee, selection, reservation) {
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
+      notifyStatesChanged();
     },
   });
 }
@@ -424,6 +434,7 @@ function triggerSupprimerAction($button, portee, selection, reservation) {
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
+      notifyStatesChanged();
     },
   });
 }

@@ -42,7 +42,7 @@ Quelques repères de vocabulaire, utilisés partout dans cette documentation :
 | **Publier** | Rendre une entité visible et utilisable dans Home Assistant. |
 | **Réglage** | Un choix manuel que vous posez et que le plugin conserve : le « Type HA » d'une commande, ou la publication d'un équipement ou d'une entité (« Automatique », « Toujours » ou « Jamais »). Il remplace le choix automatique du plugin. |
 | **État** | Ce que dit le badge d'un équipement : Publié, À appliquer, Bloqué, Exclu, Désactivé ou Rien à publier. Un équipement n'a toujours qu'un seul état (voir [Les états et les compteurs](compteurs.md)). |
-| **Démon** | Le programme du plugin qui tourne en arrière-plan. Son indicateur se lit dans le bandeau de la page principale. |
+| **Démon** | Le programme du plugin qui tourne en arrière-plan. Son indicateur se lit dans la barre de santé de la page principale. |
 
 Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom. Si vous utilisez aussi le plugin Homebridge, rien ne change pour lui : l'écran du plugin le rappelle par le message « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
 
@@ -110,24 +110,24 @@ Les exclusions de cette page sont **distinctes** de celles que vous posez avec l
 
 ## Première synchronisation
 
-1. Configurez le broker MQTT, cliquez sur « Sauvegarder », puis démarrez ou redémarrez le démon. Vérifiez que le bandeau indique MQTT « Connecté » (vous pouvez aussi utiliser « Tester la connexion »).
+1. Configurez le broker MQTT, cliquez sur « Sauvegarder », puis démarrez ou redémarrez le démon. Vérifiez que la barre de santé de la page principale indique MQTT « Connecté » (vous pouvez aussi utiliser « Tester la connexion »).
 2. Ajustez les filtres si nécessaire.
 3. Cliquez sur le bouton situé sous les filtres (page de configuration) ou, depuis la page principale du plugin, sur **« Relire Jeedom »**. Les deux lancent une lecture complète de Jeedom ; voir [Relire Jeedom](#relire-jeedom).
 4. Dans Home Assistant, ouvrez **Paramètres → Appareils et services → MQTT** : vos équipements apparaissent.
 5. Si un équipement manque, ouvrez sa pièce dans la page du plugin : l'écran vous dit son état et, s'il est bloqué, pourquoi.
 
-Si, après un redémarrage du broker MQTT, Home Assistant ne retrouve pas ses entités, utilisez **« Republier dans Home Assistant »** sur la page principale.
+Si, après un redémarrage du broker MQTT, Home Assistant ne retrouve pas ses entités, utilisez **« Republier tout »** sur la page principale.
 
 ---
 
 ## La page principale
 
-La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « Configuration »), le bandeau de santé, la zone « Actions Home Assistant », l'export de diagnostic, puis la configuration par pièce.
+La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « Configuration »), la barre de santé et ses actions, puis la configuration par pièce (une ligne d'aide, le bloc de la maison et les cartes de pièce). Aucun bandeau bleu n'ouvre plus la page.
 <!-- CAPTURE-A-PRENDRE: page principale du plugin -->
 
-### Le bandeau de santé
+### La barre de santé
 
-Le bandeau est lu **à l'ouverture de la page**, puis relu après « Republier », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après « Relire Jeedom ». Il n'est pas relu après un changement du réglage de publication, et il ne se rafraîchit pas tout seul : rechargez la page pour l'actualiser. Il comporte quatre indicateurs.
+La barre tient sur une ligne (elle se replie sur les petits écrans) : quatre indicateurs, chacun avec un point d'état et un mot, puis les actions à droite. Elle est lue **à l'ouverture de la page**, puis relue après « Republier tout », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après « Relire Jeedom ». Il n'est pas relu après un changement du réglage de publication, et elle ne se rafraîchit pas toute seule : rechargez la page pour l'actualiser. Les quatre indicateurs :
 
 | Indicateur | Valeurs possibles |
 |---|---|
@@ -136,17 +136,20 @@ Le bandeau est lu **à l'ouverture de la page**, puis relu après « Republier �
 | **Dernière synchro** | La date et l'heure (jour/mois et heures:minutes:secondes) de la dernière lecture complète, « Jamais » si aucune n'a eu lieu, « Inconnue » si le démon est arrêté. |
 | **Dernière opération** | « Succès » (vert) ; « Partiel » ou « Échec » (orange : c'est un problème de configuration, pas une panne d'infrastructure) ; « Aucune » ; « Inconnue » si le démon est arrêté. Le message de l'opération s'affiche à côté. |
 
-### La zone « Actions Home Assistant »
+### Les actions de la barre de santé
 
-Trois boutons agissent sur **l'ensemble du parc** :
+Deux boutons de poids normal agissent sur **l'ensemble du parc** ; les actions moins courantes sont rangées dans le menu « ⋯ » (« Plus d'actions »), à droite :
 
-| Bouton | Ce qu'il fait |
+| Action | Ce qu'elle fait |
 |---|---|
-| **« Republier dans Home Assistant »** | Après confirmation (« Republier tous les équipements inclus ? »), republie dans Home Assistant les équipements inclus et applique leurs réglages en attente. Les équipements « inclus » sont ceux que le plugin ne met pas d'office de côté (par exemple par une exclusion de la configuration ou parce qu'ils sont désactivés). « Republier » travaille sur ce que la dernière lecture complète a lu : il ne relit pas Jeedom. |
+| **« Republier tout »** | Après confirmation (« Republier tous les équipements inclus ? »), republie dans Home Assistant les équipements inclus et applique leurs réglages en attente. Les équipements « inclus » sont ceux que le plugin ne met pas d'office de côté (par exemple par une exclusion de la configuration ou parce qu'ils sont désactivés). « Republier tout » travaille sur ce que la dernière lecture complète a lu : il ne relit pas Jeedom. |
 | **« Relire Jeedom »** | Relit tout Jeedom. Voir [Relire Jeedom](#relire-jeedom). |
-| **« Supprimer de Home Assistant… »** | Retire de Home Assistant tout le parc publié, après une confirmation forte. Rien n'est recréé ensuite : « Republier » remet les équipements. Voir [Les actions de publication](#les-actions-de-publication). |
+| **« Télécharger le diagnostic… »** (menu « ⋯ ») | Ouvre une boîte qui propose le téléchargement du diagnostic support. Voir [Télécharger le diagnostic support](#télécharger-le-diagnostic-support). |
+| **« Supprimer tout de Home Assistant… »** (menu « ⋯ », en rouge, séparé par un trait) | Retire de Home Assistant tout le parc publié, après une confirmation forte. Rien n'est recréé ensuite : « Republier » remet les équipements. Voir [Les actions de publication](#les-actions-de-publication). |
 
-**Quand certains boutons sont grisés.** Les trois boutons ci-dessus, ainsi que « Appliquer » et les entrées « Republier » et « Supprimer de Home Assistant… » des menus « ⋯ » (de la pièce et de chaque équipement), ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
+Le menu « ⋯ » s'ouvre au clic ou au clavier, se ferme par Échap ou par un clic à l'extérieur, et rend le focus à son bouton. Aucune action destructrice n'est visible hors de ce menu.
+
+**Quand certains boutons sont grisés.** « Republier tout », « Relire Jeedom » et « Supprimer tout de Home Assistant… », ainsi que « Appliquer » et les entrées « Republier » et « Supprimer de Home Assistant… » des menus « ⋯ » (de la pièce et de chaque équipement), ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
 
 - « Démon arrêté — actions Home Assistant bloquées. » (le démon est arrêté) ;
 - « MQTT déconnecté — actions Home Assistant bloquées. » ;
@@ -162,11 +165,11 @@ Pendant une relecture de Jeedom, ces mêmes boutons sont aussi grisés. Le régl
 - **Ce qu'il ne fait pas** : il ne modifie rien dans Jeedom.
 - **Scénarios** : le bouton Home Assistant d'un scénario Jeedom désactivé (ou supprimé) disparaît à la prochaine relecture ou au prochain redémarrage du démon, et revient à la réactivation. **Une seule installation jeedom2ha par broker MQTT** : le plugin considère le broker comme la référence des boutons de scénario, donc une deuxième instance (box de test, clone restauré) qui y serait connectée verrait ses boutons de scénario retirés par l'autre, et inversement.
 - **Pendant l'opération** : le bouton affiche « Relecture en cours… » et les autres boutons d'action sont grisés.
-- **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. Le bandeau de santé est ensuite relu.
+- **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. La barre de santé est ensuite relue.
 
 ### Télécharger le diagnostic support
 
-Sous la zone d'actions, le bouton **« Télécharger le diagnostic support »** produit un fichier `jeedom2ha-diagnostic-AAAA-MM-JJ.json` à joindre à une demande d'aide.
+Le menu « ⋯ » de la barre de santé propose **« Télécharger le diagnostic… »**. Une boîte s'ouvre ; son bouton **« Télécharger le diagnostic support »** produit un fichier `jeedom2ha-diagnostic-AAAA-MM-JJ.json` à joindre à une demande d'aide. Fermer la boîte n'envoie rien.
 
 - La case **« Pseudonymiser les noms d'équipements »** remplace les noms d'équipements par « Équipement_N », les noms de pièces par « Pièce_M » et les noms de commandes par « Cmd_ » suivi de leur numéro, et masque l'adresse du broker.
 - Messages : « Export en cours... », puis « Diagnostic téléchargé » ; en cas de problème, « Erreur export » ou « Erreur de communication », ou le message du démon (par exemple « Démon indisponible ou timeout — relancez le démon et réessayez. »).
@@ -177,11 +180,24 @@ Ce fichier est un outil d'assistance. Pour comprendre l'état d'un équipement, 
 
 ## La configuration par pièce
 
-Sous l'export de diagnostic, la section **« Configuration Home Assistant par pièce »** rappelle : « Choisissez une pièce pour voir ses équipements et, pour chaque commande, si elle est publiée dans Home Assistant, à appliquer ou bloquée (et pourquoi). Le type natif Jeedom (partagé Homebridge) n'est jamais modifié. »
+Sous la barre de santé, la section **« Configuration Home Assistant par pièce »** commence par une ligne d'aide discrète, avec un lien **« Aide »** vers cette documentation. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin.
+
+### Le bloc de la maison
+
+Le bloc de la maison donne, dès le premier écran, le chiffre qui compte : un grand nombre suivi de « publiés sur » le total des équipements Jeedom, avec le nombre de pièces. Dessous, une **jauge** segmentée (publiés en vert, à appliquer en bleu, bloqués en orange, exclus et autres en gris, non lus en hachuré) et une **légende en puces**.
+
+- **Chaque puce (et chaque segment de la jauge) est un filtre** qui s'applique à toutes les pièces : un clic affiche, sous le bloc, la liste des équipements dans cet état, avec leur pièce ; les cartes de pièce sans équipement concerné sont atténuées (jamais masquées). Un clic sur une ligne ouvre la fenêtre de sa pièce. Un second clic sur la puce, la touche Échap ou « Tout afficher » retire le filtre. Un filtre ne fait aucune requête : il lit les chiffres déjà affichés.
+- Les puces à zéro restent affichées mais sont grisées. La puce « exclus et autres » regroupe les équipements exclus, désactivés et sans rien à publier ; chaque ligne garde son propre mot d'état.
+- **« Actualiser »** relit les chiffres en contournant la mémoire du démon, et « Chiffres relus à HH:MM » indique l'heure de la dernière lecture. Les chiffres sont relus à l'ouverture de la page, après chaque action (« Republier tout », « Relire Jeedom », « Supprimer tout de Home Assistant… », et chaque action de la fenêtre d'une pièce, qu'elle réussisse ou échoue) et quand vous revenez sur l'onglet du navigateur après plus d'une minute. Il n'y a pas de relecture périodique.
+- Pendant une opération du plugin, une mention « Opération en cours : ces chiffres peuvent changer » s'affiche ; le plugin relit alors trois fois au plus, puis laisse la mention en place. Avant la première synchronisation, la page indique « Aucune synchronisation n'a encore eu lieu » ; si la lecture échoue, « Chiffres indisponibles » (les derniers chiffres valides restent affichés, atténués).
+
+Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-jauge-de-la-maison).
 
 ### Les cartes de pièce
 
-Chaque pièce qui contient au moins un équipement a une carte portant son nom et, entre parenthèses, son nombre d'équipements. La carte **« Sans pièce »** rassemble les équipements qui n'ont pas de pièce. Les équipements **désactivés dans Jeedom sont comptés et listés**. Les équipements du plugin jeedom2ha lui-même sont écartés. S'il n'y a aucune pièce avec équipement, la page affiche « Aucune pièce avec équipement trouvée. »
+Chaque pièce qui contient au moins un équipement a une carte portant l'icône et la couleur choisies dans Jeedom pour l'objet, son nom, « n / t publiés », une petite jauge segmentée et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange), « N à appliquer » (bleu) et « N non lus » (gris). Une carte qui contient au moins un équipement bloqué porte un liseré orange. Les cartes sont **regroupées par objet parent** (sous-titre du groupe, ordre de Jeedom conservé). La carte **« Sans pièce »** rassemble les équipements qui n'ont pas de pièce, en dernier. Les équipements **désactivés dans Jeedom sont comptés et listés**. Les équipements du plugin jeedom2ha lui-même sont écartés. S'il n'y a aucune pièce avec équipement, la page affiche « Aucune pièce avec équipement trouvée. »
+
+Les cartes sont opérables au clavier (Entrée ou Espace ouvre la fenêtre de la pièce). Un équipement dont la lecture a échoué, ou que le démon ne connaît pas encore, est compté **« non lu »** : il n'est jamais compté publié, bloqué, exclu ni désactivé.
 <!-- CAPTURE-A-PRENDRE: cartes de pièce -->
 
 ### La fenêtre d'une pièce
@@ -277,7 +293,7 @@ Un réglage enregistré n'est pas publié immédiatement. Tant qu'il attend, l'�
 
 Un équipement est aussi « À appliquer » quand sa publication est due mais n'a pas eu lieu (jamais publié alors qu'il le devrait), ou quand le démon est une version plus ancienne qui ne dit pas s'il est présent dans Home Assistant : il n'est alors jamais affiché « Publié ». Voir [Les états et les compteurs](compteurs.md).
 
-Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »**. « Republier » (menu « ⋯ » de la pièce) et « Republier dans Home Assistant » appliquent aussi les réglages en attente des équipements concernés. Un [relevé de Jeedom](#relire-jeedom) applique d'un coup ceux de **tous** les équipements. « Appliquer » ne demande pas de confirmation ; son résultat s'affiche dans la zone de résultat de la pièce, et en cas d'échec le bouton reste affiché avec le message d'erreur.
+Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »**. « Republier » (menu « ⋯ » de la pièce) et « Republier tout » appliquent aussi les réglages en attente des équipements concernés. Un [relevé de Jeedom](#relire-jeedom) applique d'un coup ceux de **tous** les équipements. « Appliquer » ne demande pas de confirmation ; son résultat s'affiche dans la zone de résultat de la pièce, et en cas d'échec le bouton reste affiché avec le message d'erreur.
 
 ### Les actions de publication
 
@@ -306,7 +322,7 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 - *Équipement* : « Appliquer » (bouton bleu, seulement quand l'état est « À appliquer ») et « Republier » (menu « ⋯ ») utilisent la même route. Sans confirmation.
 - *Pièce* : « Republier » (menu « ⋯ » de la pièce) demande « <nom de la pièce> — republier les équipements inclus de cette pièce. Confirmer ? » (bouton « Republier »). Elle applique aussi les réglages en attente de la pièce.
 - *Dans tous les cas*, « Republier » ne relit pas Jeedom : il travaille sur ce que la dernière lecture complète a lue.
-- *Parc* : voir [la page principale](#la-zone--actions-home-assistant-).
+- *Parc* : voir [la page principale](#les-actions-de-la-barre-de-santé).
 
 **Supprimer de Home Assistant…**
 
@@ -325,7 +341,7 @@ Un bouton ou une position grisés affichent **leur propre motif** dans une infob
 
 | Bouton | Motifs affichés |
 |---|---|
-| Appliquer, Republier, Supprimer de Home Assistant… (toutes portées) et Relire Jeedom | Voir [la zone « Actions Home Assistant »](#la-zone--actions-home-assistant-) (démon arrêté, MQTT déconnecté, relecture en cours). Les positions « Automatique », « Toujours » et « Jamais » ne sont pas concernées. |
+| Appliquer, Republier, Supprimer de Home Assistant… (toutes portées) et Relire Jeedom | Voir [les actions de la barre de santé](#les-actions-de-la-barre-de-santé) (démon arrêté, MQTT déconnecté, relecture en cours). Les positions « Automatique », « Toujours » et « Jamais » ne sont pas concernées. |
 | Jamais | « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
 | Toujours | « Déjà publiée : « Toujours » n’aurait pas d’effet. » ; « Aucun type Home Assistant identifié pour cette entité. » ; « Type HA hors périmètre de ce plugin. » ; « Projection invalide pour ce type HA. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
 | Automatique | « Aucun réglage de publication à retirer. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » |
@@ -497,11 +513,11 @@ Si un encart affiche un texte technique ou une liste de codes à la place d'une 
 |---|---|---|
 | Le démon ne démarre pas | Bandeau, indicateur « Démon » : « Arrêté » | Relancez l'installation des dépendances, puis démarrez le démon. Consultez le journal `jeedom2ha`. |
 | Le broker n'est pas joignable | Indicateur « MQTT » : « Déconnecté » | Vérifiez les paramètres et utilisez « Tester la connexion » dans la configuration. |
-| Les boutons d'action sont grisés | Ligne d'explication sous la zone « Actions Home Assistant » | Corrigez le démon ou MQTT : voir [la page principale](#la-zone--actions-home-assistant-). |
+| Les boutons d'action sont grisés | Ligne d'explication sous la barre de santé | Corrigez le démon ou MQTT : voir [la page principale](#les-actions-de-la-barre-de-santé). |
 | Un équipement manque dans Home Assistant | Ouvrez sa pièce : badge de l'équipement et encart de cause | Appliquez la correction de la [famille de causes](#les-causes-de-blocage) correspondante. |
 | Un réglage n'a pas d'effet dans Home Assistant | Badge « À appliquer » et bouton « Appliquer » dans l'en-tête de l'équipement | Cliquez sur « Appliquer », ou lancez « Relire Jeedom ». |
 | Les états ne se mettent pas à jour | Bandeau de santé | Vérifiez le démon et MQTT, puis le journal `jeedom2ha`. |
-| Le bandeau semble figé | Il n'est lu qu'à l'ouverture de la page | Rechargez la page. |
+| La barre de santé semble figée | Elle n'est lue qu'à l'ouverture de la page et après chaque action | Rechargez la page. |
 
 Journaux : **Jeedom → Analyse → Logs → `jeedom2ha`**. Pour signaler un problème : [github.com/alexsahut/jeedom2ha/issues](https://github.com/alexsahut/jeedom2ha/issues).
 
