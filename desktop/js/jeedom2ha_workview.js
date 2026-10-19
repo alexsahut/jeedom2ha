@@ -568,8 +568,9 @@
       st.room = null;
       st.eq = null;
       st.search = '';
-      st.pushed = 0;
-      st.hist = [currentHash()];
+      // La pile n'est PAS oubliée : les entrées de la vue restent accessibles par « Suivant » (onPop y retrouve sa
+      // position). Seule l'entrée courante est mise à jour (fermeture sans historique : fragment retiré sur place).
+      st.hist[st.pushed] = currentHash();
       if (el.search) el.search.val('');
       el.pane.empty();
       resetFeedback();

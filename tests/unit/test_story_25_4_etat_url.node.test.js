@@ -186,3 +186,22 @@ describe('25.4 / AC18 — cohabitation avec le popstate du cœur Jeedom', () => 
     assert.deepEqual(loads, [], 'le cœur ne recharge jamais la page');
   });
 });
+
+describe('25.4 / AC17 — « Suivant » après un retour à la page principale (relecture Codex #302)', () => {
+  maybe('Précédent ×2, Suivant, nouvel équipement, « Toutes les pièces » : retour à la page principale', () => {
+    const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
+    openCard(ui, 10);
+    const eqs = ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list.map((n) => Number(n.attrs['data-eq-id']));
+    ui.selectEquipment(eqs[0], ok(tree(eqs[0], [READY])));
+    ui.win.history.back();
+    ui.win.history.back();
+    assert.equal(ui.isOpen(), false);
+    ui.win.history.forward();
+    assert.equal(ui.isOpen(), true, 'Suivant rouvre la pièce');
+    ui.selectEquipment(eqs[1], ok(tree(eqs[1], [READY])));
+    ui.click('.j2ha-wv-back');
+    assert.equal(ui.isOpen(), false, '« Toutes les pièces » revient à la page principale');
+    assert.equal(ui.win.historyIndex(), 0);
+    assert.equal(ui.win.location.hash, '');
+  });
+});
