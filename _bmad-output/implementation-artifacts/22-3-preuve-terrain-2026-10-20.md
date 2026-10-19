@@ -33,4 +33,4 @@ Mise en regard avec le constat du 18/10 (`25-1-preuve-terrain-2026-10-18.md`) : 
 
 ## Bilan
 
-Le volet démon de 22-3 est prouvé sur la box. Seul l'essai vocal d'Alexandre reste ; 22-3 passe à `ready-for-UX-validation` en l'attendant.
+Le volet démon de 22-3 est prouvé sur la box. Seul l'essai vocal d'Alexandre reste. 22-3 reste en `review` (story démon sans écran : `ready-for-UX-validation` ne s'applique pas, `docs/bmad-parcours-rapide-complet.md`) et passera à `done` si l'essai est concluant.

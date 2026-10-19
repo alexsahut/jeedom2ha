@@ -1,6 +1,6 @@
 # Story 22.3 : Nom d'entité identique au nom d'appareil
 
-Status: ready-for-UX-validation
+Status: review
 
 > Rattachée à l'epic 22 (noms Home Assistant = noms Jeedom, suite de 22-1). `pe-epic-22` reste `in-progress`. Story créée et développée par une session cloud déléguée (sans accès box, HA ni secret). Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
 
