@@ -15,6 +15,11 @@
  * « Pièces » s'ouvre et se ferme, sans requête ; (8) le bouton « Précédent » remonte équipement → pièce → page principale ;
  * (9) ouvrir le menu « ⋯ » de pièce puis annuler la confirmation de suppression n'émet aucune écriture.
  *
+ * Story 25.6 : une carte ouvre la vue sur la PIÈCE SEULE (`data-j2ha-scope="piece"`). L'étape 2 vérifie d'abord cette portée
+ * (`portee-piece-seule` : une seule pièce dans l'arbre, ses repères égaux à ceux de la carte, `seule:1` dans l'URL), puis
+ * active « Toutes les pièces » sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
+ * assertions existantes (toutes les pièces de la page, mêmes repères). Étapes 3 à 9 inchangées dans leurs exigences.
+ *
  * L'assertion (5) (réponse tardive d'une sélection abandonnée, jamais rendue) n'est PAS portée par ce parcours : l'interception
  * du gate ne retarde pas une réponse à la demande et n'est pas modifiée pour cela. Elle est prouvée en vrai Chromium par
  * `tests/unit/test_story_25_4_navigateur_reel.node.test.js` (réseau factice retardé), report consigné au Dev Agent Record.
@@ -66,6 +71,31 @@ async function checkOpen(page, helpers) {
     throw new Error('lecture-a-l-ouverture');
   }
   helpers.record('lectures_a_l_ouverture', 0);
+}
+
+/**
+ * (2, Story 25.6) Depuis une carte : l'arbre ne contient QUE la pièce de la carte cliquée, ses repères égalent ceux de la
+ * carte, l'URL porte `seule:1` ; puis « Toutes les pièces » élargit sans aucune requête du plugin.
+ */
+async function checkScopeAndWiden(page, helpers, cards) {
+  const opened = cards[0];
+  const scope = await page.locator(VIEW).getAttribute('data-j2ha-scope');
+  const rooms = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-room`).evaluateAll((nodes) => nodes.map((room) => ({
+    id: room.getAttribute('data-object_id'),
+    ratio: (room.querySelector('.j2ha-wv-ratio')?.textContent ?? '').trim(),
+    marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
+  })));
+  const hash = await page.evaluate(() => window.location.hash);
+  if (scope !== 'piece' || rooms.length !== 1 || rooms[0].id !== opened.id || !/;seule:1$/.test(hash)) throw new Error('portee-piece-seule');
+  if (rooms[0].ratio !== opened.ratio || JSON.stringify(rooms[0].marks) !== JSON.stringify(opened.marks)) throw new Error('portee-piece-seule');
+  helpers.record('portee_ouverture', 'piece');
+  helpers.record('pieces_arbre_portee_piece', rooms.length);
+  const before = pluginCalls(helpers);
+  await page.locator(`${VIEW} .j2ha-wv-widen`).click();
+  await page.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('data-j2ha-scope') === 'toutes', VIEW, { timeout: 5000 })
+    .catch(() => { throw new Error('portee-piece-seule'); });
+  if (pluginCalls(helpers) !== before) throw new Error('requete-pendant-elargissement');
+  helpers.record('requetes_pendant_elargissement', 0);
 }
 
 /** (2) L'arbre contient toutes les pièces de la page B ; ses repères somment aux nombres de la page B. */
@@ -228,7 +258,10 @@ export async function run(page, { helpers }) {
   await page.waitForFunction(() => (document.querySelector('#j2ha_houseNumber')?.textContent ?? '').trim() !== '');
   const cards = await readCards(page);
   await atStep(helpers, 1, 'ouverture-sans-lecture', () => checkOpen(page, helpers));
-  await atStep(helpers, 2, 'arbre-et-reperes', () => checkTree(page, helpers, cards));
+  await atStep(helpers, 2, 'arbre-et-reperes', async () => {
+    await checkScopeAndWiden(page, helpers, cards);
+    await checkTree(page, helpers, cards);
+  });
   await atStep(helpers, 3, 'recherche-et-filtres', () => checkFilters(page, helpers));
   const eqId = await atStep(helpers, 4, 'selection-un-arbre', () => checkSelection(page, helpers));
   await atStep(helpers, 6, 'lien-profond', () => checkDeepLink(page, helpers, eqId));
