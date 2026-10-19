@@ -28,7 +28,7 @@ describe('25.8 / AC8 — fonction pure du nombre d\'entités (Q1 B)', () => {
       202: entry(202, [entity(true)]),
       203: entry(203, []),
     }), ROOMS, 2);
-    assert.deepEqual(impact, { known: true, entities: 3, unknown: 0, unread: 0, pending: 0 });
+    assert.deepEqual(impact, { known: true, entities: 3, unknown: 0, unread: 0, pending: 0, atLeast: false });
   });
 
   it('une entité dont la présence est inconnue n\'est pas comptée mais signalée ; un équipement non lu aussi', () => {
@@ -208,5 +208,32 @@ describe('25.8 / AC8 — confirmation dans la page : aucune requête avant le cl
     assert.ok(plain(dlg.options.message).includes("Ses équipements seront relus et publiés s'ils sont publiables."));
     assert.equal(dlg.options.buttons.confirm.className, 'btn-primary');
     assert.equal(ui.count('saveRoomExclusion'), 0);
+  });
+});
+
+// Relecture ClaudeBox de #309 (P2-1) : un réglage en attente peut remplacer une entité (domaine changé) ; l'ancienne reste dans
+// Home Assistant jusqu'à la relecture et n'apparaît pas dans `entities[]`. Le nombre annoncé est alors un minimum, dit comme tel.
+describe('25.8 / AC8 — nombre minimum quand un réglage est en attente (relecture #309)', () => {
+  const pending = (present) => ({ override_pending: true, present_in_ha: present });
+  it('un réglage en attente sur une entité de la pièce rend le nombre minimum', () => {
+    const impact = O.roomExclusionImpact(snapshot({ 201: entry(201, [entity(true), pending(false)]) }), ROOMS, 2);
+    assert.equal(impact.entities, 1);
+    assert.equal(impact.atLeast, true);
+    const d = O.roomExclusionDialog({ name: 'Pièce fictive', excluded: true, impact });
+    assert.ok(d.lines.some((l) => plain(l).startsWith('Au moins 1 entité sera retirée')), JSON.stringify(d.lines));
+  });
+  it('aucune entité présente mais un réglage en attente : pas de « Aucune entité » mais un nombre inconnu', () => {
+    const snap = snapshot({ 201: entry(201, [pending(false)]) });
+    const impact = O.roomExclusionImpact(snap, ROOMS, 2);
+    assert.equal(impact.entities, 0);
+    assert.equal(impact.atLeast, true);
+    const d = O.roomExclusionDialog({ name: 'Pièce fictive', excluded: true, impact });
+    assert.ok(!d.lines.some((l) => plain(l).includes('Aucune entité')), JSON.stringify(d.lines));
+  });
+  it('sans réglage en attente, le nombre reste exact (pas de « Au moins »)', () => {
+    const impact = O.roomExclusionImpact(snapshot({ 201: entry(201, [entity(true), entity(true)]) }), ROOMS, 2);
+    assert.equal(impact.atLeast, false);
+    const d = O.roomExclusionDialog({ name: 'Pièce fictive', excluded: true, impact });
+    assert.ok(d.lines.some((l) => plain(l).startsWith('2 entités seront retirées')), JSON.stringify(d.lines));
   });
 });

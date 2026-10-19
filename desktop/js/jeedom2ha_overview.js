@@ -166,7 +166,9 @@
    *   `unread` : équipements de la pièce absents de la copie ; `pending` : effectif maison « à appliquer » (la relecture les applique aussi).
    */
   function roomExclusionImpact(snap, rooms, roomId) {
-    var out = { known: false, entities: 0, unknown: 0, unread: 0, pending: 0 };
+    // `atLeast` (relecture ClaudeBox #309, P2-1) : un réglage en attente peut remplacer une entité (domaine changé) dont
+    // l'ancienne version reste dans Home Assistant jusqu'à la relecture ; le nombre est alors un minimum, annoncé comme tel.
+    var out = { known: false, entities: 0, unknown: 0, unread: 0, pending: 0, atLeast: false };
     var view = snap && snap.view;
     if (!snap || snap.kind !== 'ok' || !view || view.stale === true || !view.equipments || !view.overview) return out;
     out.known = true;
@@ -180,6 +182,7 @@
       entities.forEach(function (entity) {
         if (entity && entity.present_in_ha === true) out.entities += 1;
         else if (!entity || typeof entity.present_in_ha !== 'boolean') out.unknown += 1;
+        if (entity && entity.override_pending === true) out.atLeast = true;
       });
     });
     return out;
@@ -195,10 +198,12 @@
     if (input && input.excluded) {
       if (!impact.known) {
         lines.push("{{Nombre d'entités inconnu : la lecture des états n'est pas disponible.}}");
+      } else if (impact.entities === 0 && impact.atLeast) {
+        lines.push("{{Des entités encore présentes dans Home Assistant (réglage en attente) seront retirées ; leur nombre exact n'est pas connu.}}");
       } else if (impact.entities === 0) {
         lines.push("{{Aucune entité n'est publiée dans cette pièce.}}");
       } else {
-        lines.push(impact.entities + ' ' + w(impact.entities > 1 ? 'entités seront retirées' : 'entité sera retirée') + ' ' + w('de Home Assistant.'));
+        lines.push((impact.atLeast ? w('Au moins') + ' ' : '') + impact.entities + ' ' + w(impact.entities > 1 ? 'entités seront retirées' : 'entité sera retirée') + ' ' + w('de Home Assistant.'));
       }
       if (impact.known && impact.unknown > 0) {
         lines.push(impact.unknown + ' ' + w(impact.unknown > 1 ? 'entités dont la présence est inconnue ne sont pas comptées.' : 'entité dont la présence est inconnue n\'est pas comptée.'));
