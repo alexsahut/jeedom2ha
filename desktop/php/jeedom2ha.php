@@ -180,7 +180,10 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 			</div>
 		</div>
 
-		<!-- Story 16.8 / 25.3 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande). -->
+		<!-- Story 16.8 / 25.3 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
+		     Story 25.4 : #j2ha_mainView regroupe titre, bloc maison, liste filtrée et cartes (masqués, non détruits, quand la
+		     vue de travail #j2ha_workView est ouverte) ; la barre de santé reste visible au-dessus. -->
+		<div id="j2ha_mainView">
 		<legend><i class="fas fa-home"></i> {{Configuration Home Assistant par pièce}}</legend>
 		<p class="text-muted j2ha-help-line">{{Choisissez une pièce pour voir ses équipements et ce qui est publié dans Home Assistant.}} <a href="<?php echo j2ha_html($j2haDocUrl); ?>" target="_blank" rel="noopener">{{Aide}}</a></p>
 
@@ -215,6 +218,11 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 			echo '</div>';
 		}
 		?>
+		</div> <!-- /#j2ha_mainView -->
+
+		<!-- Story 25.4 — Vue de travail maître-détail (jeedom2ha_workview.js) : arbre pièces → équipements à gauche, détail
+		     à droite. Construite à l'ouverture ; remplace l'ancienne fenêtre de pièce. -->
+		<div id="j2ha_workView" class="j2ha-wv" style="display:none;"></div>
 
 	</div> <!-- /.eqLogicThumbnailDisplay -->
 
@@ -328,7 +336,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 
 			<!-- Story 16.8 — L'onglet override par commande (16.5) est retiré : point d'entrée
 			     inatteignable (0 eqLogic jeedom2ha). Le triptyque + diagnostic vivent désormais
-			     dans la surface « Configuration Home Assistant par pièce » (modale par pièce). -->
+			     dans la surface « Configuration Home Assistant par pièce » (vue de travail maître-détail). -->
 
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
@@ -341,6 +349,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 <?php include_file('desktop', 'jeedom2ha_mapping_surface', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_action_budget', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_overview', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_workview', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
