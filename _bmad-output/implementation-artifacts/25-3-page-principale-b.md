@@ -1,8 +1,8 @@
 # Story 25.3 : Page principale B — barre de santé, jauge maison filtrante, cartes de pièce
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q11 (§ Questions ouvertes, chacune avec une recommandation). Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, de 25.1 et de 25.2) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `04edf79` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; après 25.2 : #288 `2b451dd`, preuve terrain #289). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 03:25, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — § Décisions).** Précédemment : `backlog` (2026-10-19). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q11 (§ Questions ouvertes, chacune avec une recommandation). Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, de 25.1 et de 25.2) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `04edf79` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; après 25.2 : #288 `2b451dd`, preuve terrain #289). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -391,6 +391,28 @@ Session cloud déléguée Claude Code — `create-story` (documentaire, 2026-10-
 - Story : ce fichier.
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (commentaire de l'entrée `25-3-page-principale-b`, statut inchangé).
 
+## Décisions (ClaudeBox, 2026-10-19 03:25, par délégation d'Alexandre du 2026-10-18 23:50)
+
+Relecture ClaudeBox : story approuvée, 19 AC cohérents avec 25.1 et 25.2. Les recommandations sont suivies, **sauf Q10, tranchée en B avec garde-fou**.
+
+- **Q1 = A.** Liste sous le bloc maison. Les cartes sans équipement correspondant sont atténuées, pas masquées. Un clic sur une ligne ouvre la fenêtre de la pièce.
+- **Q2 = A.** Extension additive de `j2haRoomsTree` avec `father_id`, plus une variable pour les ancêtres sans équipement propre. Groupe = parent direct, « Sans pièce » en dernier. Pas de repli de groupe en 25.3.
+- **Q3 = A.** Classes d'icône filtrées par liste blanche et reconstruites côté PHP. Couleur acceptée seulement en hexadécimal validé ; elle teinte l'icône et un filet de la carte, jamais le texte ni une teinte d'état.
+- **Q4 = A.** Segment gris « exclus et autres ». Les « non lus » ont un motif neutre, hors des six états.
+- **Q5 = A.** Pas de repère agrégé des commandes bloquées dans des équipements publiés. La mention « N bloquées » reste sur les lignes et dans la fenêtre de pièce.
+- **Q6 = A.** Au plus 3 relectures automatiques (2 s, 5 s, 10 s) sans `refresh`. Pas de relecture automatique sur erreur ajax.
+- **Q7 = A.** Relecture à la fin de chaque action, coalescée sur 500 ms. Fenêtre de pièce comprise, relecture à chaque action et pas à la fermeture.
+- **Q8 = A.** Rien ne change dans la route en 25.3. Seuil d'alerte à 1 350 000 octets relevé à la preuve terrain : au-dessus, ou si un budget de temps est dépassé, la story reste en `review` et une décision choisit un levier.
+- **Q9 = A.** Ligne d'aide d'une phrase avec un lien « Aide ». Le diagnostic passe par `bootbox`, et la case « Pseudonymiser » reste inchangée.
+- **Q10 = B, avec garde-fou.** Affichage de « Chiffres relus à HH:MM », heure de lecture par la page. **Relecture au retour sur l'onglet** (`visibilitychange` → visible), sans `refresh`, seulement si la dernière lecture date de **plus de 60 s**, et coalescée avec les autres déclencheurs de l'AC6.
+  - *Motif :* l'iPad mural d'Alexandre garde la page ouverte longtemps. Sans cela, il afficherait des chiffres périmés jusqu'au prochain « Actualiser ».
+  - *Coût :* une lecture servie par le cache démon (≈ 0,14 à 0,32 s mesuré).
+  - Ce n'est pas un polling, pas de temps réel.
+  - AC6 compte ce déclencheur en plus des quatre de l'epic, et un test Node le couvre : seuil de 60 s, coalescence, pas de `refresh`.
+- **Q11 = A.** Toutes les pièces de `j2haRoomsTree` sont rendues, sans filtre implicite.
+
+*Toutes ces décisions sont réversibles. Elles sont consignées au journal de nuit du plan ClaudeBox pour relecture par Alexandre.*
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation** ; **aucune n'est tranchée par la session**. Les AC écrits « par défaut » ci-dessus suivent la recommandation, pour qu'une réponse « je valide les recommandations » rende la story prête sans réécriture.
@@ -447,5 +469,7 @@ Chaque question porte une **recommandation** ; **aucune n'est tranchée par la s
 - B. Ajouter un réglage « masquer les objets… » : nouvelle donnée de configuration, hors décision d'epic.
 
 ## Change Log
+
+- 2026-10-19 03:25 — Relecture ClaudeBox : décisions Q1-Q11 (Q10 B avec garde-fou 60 s, sinon recommandations) ; `ready-for-dev`.
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 19 AC, 12 décisions déjà arbitrées consignées, 11 questions ouvertes pour ClaudeBox / Alexandre avec recommandation ; `ready-for-dev` non accordé.
