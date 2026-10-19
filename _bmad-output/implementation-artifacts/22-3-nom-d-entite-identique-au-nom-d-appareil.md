@@ -1,6 +1,6 @@
 # Story 22.3 : Nom d'entité identique au nom d'appareil
 
-Status: review
+Status: ready-for-UX-validation
 
 > Rattachée à l'epic 22 (noms Home Assistant = noms Jeedom, suite de 22-1). `pe-epic-22` reste `in-progress`. Story créée et développée par une session cloud déléguée (sans accès box, HA ni secret). Aucun nom réel d'équipement, de pièce, de scénario ou de personne (CC-48) : identifiants seulement.
 
@@ -40,6 +40,8 @@ afin qu'Assist la retrouve sous le nom Jeedom que je connais.
 - [x] **Task 4 — Suites complètes** comme la CI (pytest `tests` + `resources/daemon/tests`, tests `load`, `flake8`, `node --test`, tests PHP autonomes).
 - [x] **Task 5 — Documentation** : entrée dans `docs/fr_FR/changelog_beta.md`.
 - [ ] **Task 6 — Preuve terrain (ClaudeBox puis Alexandre, après fusion et déploiement)** : voir ci-dessous.
+  - [x] Part ClaudeBox (2026-10-20, `ae84d6e`, lecture seule) : `22-3-preuve-terrain-2026-10-20.md`.
+  - [ ] Essai vocal du scénario 38 par Alexandre.
 
 ## Preuve attendue (ClaudeBox, après déploiement)
 
