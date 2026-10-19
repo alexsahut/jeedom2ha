@@ -1,6 +1,6 @@
 # Story 25.8 : Exclusion de pièce depuis la surface
 
-Status: review
+Status: ready-for-UX-validation
 
 > **Statut : `review` (dev-story terminé, session cloud déléguée, 2026-10-19 ; Tasks 0 et 7 sautées, CC-48 : déploiement et preuve terrain à ClaudeBox après fusion, avec la pièce de test choisie avec Alexandre).** Précédemment : **`ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décisions **D1** et **D3**, avis de clawcode « A1 / `excludedObjects` »). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q10 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6 et 25.7) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne ; identifiants fictifs dans les fixtures, identifiants techniques seuls dans la preuve terrain (CC-48).
 
