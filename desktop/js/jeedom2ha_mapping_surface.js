@@ -1201,6 +1201,7 @@
     $panel.find('.j2ha-eq-controls').first().empty();
     $panel.find('.j2ha-eq-cmdlist').first().empty();
     $panel.find('.j2ha-eq-notices').first().empty();
+    $panel.find('.j2ha-eq-exclusion').first().empty();
     $panel.find('.j2ha-eq-counters').first().empty();
     $panel.find('.j2ha-eq-blocked-mention').first().empty();
     $panel.find('.j2ha-eq-publish-badge').first().empty();
