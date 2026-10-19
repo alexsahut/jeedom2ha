@@ -19,7 +19,7 @@ function startWorkview(options) {
   const scene = opts.scene || SCENE;
   const rendered = renderPhp(scene);
   const rooms = rendered.vars.j2haRoomsTree;
-  const ui = createUi(rooms, { skeleton: mainPart(rendered.html), ancestors: rendered.vars.j2haAncestors, window: opts.window, offsetTop: opts.offsetTop });
+  const ui = createUi(rooms, { skeleton: mainPart(rendered.html), ancestors: rendered.vars.j2haAncestors, window: opts.window, offsetTop: opts.offsetTop, pluginNames: opts.pluginNames || rendered.vars.j2haPluginNames });
   ui.rendered = rendered;
   ui.rooms = rooms;
   ui.equipments = opts.equipments || equipmentsFor(rooms);

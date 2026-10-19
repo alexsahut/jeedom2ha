@@ -109,7 +109,7 @@ describe('25.7 / AC3, AC5 — rendu : carte, ligne d\'arbre, détail de pièce',
     const breakdown = plain(M.exclusionBreakdownText(room.exclusion, {}));
     assert.equal(plain(mark.attr('title')), 'Exclus : ' + breakdown);
     assert.equal(plain(mark.attr('aria-label')), plain(mark.attr('title')));
-    const marks = ui.$(`${sel} .j2ha-room-marks .j2ha-mark`).list.map((n) => n.attrs.class);
+    const marks = ui.$(`${sel} .j2ha-room-marks .j2ha-mark`).list.map((n) => [...n.classes].join(' '));
     assert.match(marks[marks.length - 1], /j2ha-mark-excluded/, 'dernier repère : l\'ordre des repères existants est conservé');
     assert.equal(plain(ui.$(`${sel} .j2ha-room-ratio`).text()).trim().split(' ')[0], String(room.counts.published));
     assert.match(plain(ui.$(sel).attr('aria-label')), /exclus?/, 'le nom accessible de la carte mentionne les exclus');

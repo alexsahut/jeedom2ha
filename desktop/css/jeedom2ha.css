@@ -295,6 +295,8 @@ body[data-theme*="Dark"] {
 .j2ha-mark.j2ha-mark-blocked { color: var(--j2ha-warn); font-weight: 600; }
 .j2ha-mark.j2ha-mark-to_apply { color: var(--j2ha-todo); }
 .j2ha-mark.j2ha-mark-unread { color: var(--j2ha-neutral); }
+/* Story 25.7 : repère gris « N exclus » de la carte, déclaré sous .j2ha-room-groups (aucune règle sur .j2ha-mark nue). */
+.j2ha-room-groups .j2ha-mark.j2ha-mark-excluded { color: var(--j2ha-neutral); }
 .j2ha-state-word.j2ha-state-unread { color: var(--j2ha-neutral); }
 
 .j2ha-no-rooms {
@@ -458,6 +460,11 @@ body[data-theme*="Dark"] {
   color: var(--j2ha-warn);
   background-color: var(--j2ha-warn-bg);
   border: 1px solid var(--j2ha-warn);
+}
+.j2ha-wv .j2ha-notice.j2ha-notice-neutral {
+  color: var(--j2ha-neutral);
+  background-color: var(--j2ha-surface-strong);
+  border: 1px solid var(--j2ha-line);
 }
 .j2ha-notice .btn {
   font-size: 12px;
@@ -875,6 +882,22 @@ body[data-theme*="Dark"] {
   opacity: 0.75;
 }
 .j2ha-wv-unread {
+  color: var(--j2ha-neutral);
+}
+/* Story 25.7 : cause d'exclusion de la ligne d'arbre ; ellipse avant le nom (le nom reste prioritaire). */
+.j2ha-wv-cause {
+  flex: 0 10 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--j2ha-neutral);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.j2ha-wv-exclusion {
+  margin: 4px 0 0 0;
+  font-size: 12px;
   color: var(--j2ha-neutral);
 }
 .j2ha-wv-detail {

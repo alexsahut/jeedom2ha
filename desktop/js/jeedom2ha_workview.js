@@ -161,6 +161,7 @@
           var row = {
             eq_id: eq.eq_id, name: eq.eq_name, enabled: eq.enabled,
             state: src ? src.state : null, mention: src ? src.blocked_mention : 0, group: src ? src.group : null,
+            cause: src ? src.cause || null : null, eq_type: eq.eq_type || '',
             unread: !!ov && !!src && src.state === null,
             selected: input.selectedEq === eq.eq_id,
           };
@@ -229,6 +230,7 @@
     var page = env.page;
     var timeoutSet = env.setTimeout;
     var timeoutClear = env.clearTimeout;
+    var pluginNames = env.pluginNames || (win && win.j2haPluginNames) || {}; // Story 25.7 : { identifiant: nom affiché }
 
     var rooms = decorateRooms(env.rooms);
     var roomsById = {};
@@ -790,6 +792,11 @@
       var $row = $('<div class="j2ha-wv-row"></div>');
       $row.append(stateCell(row.state));
       $row.append($('<span class="j2ha-wv-name j2ha-free-name"></span>').text(row.name));
+      // Story 25.7 : la cause d'exclusion est une mention grise à côté du mot « Exclu », absente pour tout autre état.
+      if (row.cause) {
+        $row.append($('<span class="text-muted j2ha-wv-cause"></span>')
+          .text(' ' + M.exclusionCauseText(row.cause, M.exclusionPluginName(row.eq_type, pluginNames), 'short')));
+      }
       if (!row.enabled) $row.append($('<span class="text-muted j2ha-wv-off"></span>').text(' ' + '{{(désactivé dans Jeedom)}}'));
       if (row.unread) $row.append($('<span class="text-muted j2ha-wv-unread"></span>').text('{{non lu}}'));
       if (row.mention > 0) $row.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(O.blockedMentionLabel(row.mention)));
@@ -925,8 +932,10 @@
       $head.append(surface.buildRoomActions(room));
       el.pane.append($head);
       el.kpis = $('<div class="j2ha-wv-kpis" role="group"></div>').attr('aria-label', '{{Indicateurs de la pièce}}');
+      el.exclusion = $('<p class="text-muted j2ha-wv-exclusion"></p>');
+      el.kpiBlock = $('<div class="j2ha-wv-kpiblock"></div>').append(el.kpis);
       el.todo = $('<section class="j2ha-wv-todo"></section>');
-      el.pane.append(el.kpis).append(el.todo);
+      el.pane.append(el.kpiBlock).append(el.todo);
       refreshRoomDynamic();
       // Les boutons créés ici suivent le même gating que les boutons globaux (pont indisponible) et l'état des
       // équipements de la pièce (entrées agrégées) dès l'affichage, sans attendre le rendu suivant de la page B.
@@ -935,6 +944,8 @@
 
     function renderEquipmentPane(room, eq) {
       el.kpis = null;
+      el.exclusion = null;
+      el.kpiBlock = null;
       el.todo = null;
       detachLive();
       el.pane.empty();
@@ -1008,6 +1019,11 @@
       detachLive();
       el.kpis.empty();
       el.todo.empty();
+      // Story 25.7 (D2) : ventilation des exclus de la pièce, calculée par `computeOverview` (aucun second calcul).
+      el.exclusion.detach();
+      if (ov && ov.exclusion && ov.exclusion.excluded > 0) {
+        el.kpiBlock.append(el.exclusion.text('{{Exclus}} : ' + M.exclusionBreakdownText(ov.exclusion, pluginNames)));
+      }
       if (ov) {
         var labels = M.buildRoomCounterLabels(ov.summary);
         labels.items.forEach(function (item) { el.kpis.append(kpiButton(item, O.GROUP_OF_STATE[item.state])); });

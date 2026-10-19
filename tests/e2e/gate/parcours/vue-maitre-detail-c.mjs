@@ -56,7 +56,8 @@ async function readCards(page) {
   return page.locator('#j2ha_roomCards .j2ha-room-card').evaluateAll((cards) => cards.map((card) => ({
     id: card.getAttribute('data-object_id'),
     ratio: (card.querySelector('.j2ha-room-ratio')?.textContent ?? '').replace(/ publiés?$/, '').trim(),
-    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$/.test(text)),
+    // Les repères « non lus » (25.3) et « N exclus » (25.7) n'ont pas d'équivalent dans les repères de l'arbre.
+    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$/.test(text)),
   })));
 }
 

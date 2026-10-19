@@ -92,6 +92,8 @@
         var row = {
           eq_id: eq.eq_id, eq_name: eq.eq_name, room_id: room.object_id, room_name: room.object_name,
           state: null, blocked_mention: 0, group: 'unread',
+          // Story 25.7 : cause d'exclusion (mention à côté du mot « Exclu », jamais un état) et plugin de l'équipement.
+          cause: null, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
         };
         if (entry && typeof entry === 'object') {
           // `summarizeRoom` lit l'identifiant dans l'entrée : on le garantit sans cloner l'entrée.
@@ -100,13 +102,15 @@
           row.state = resolved.state;
           row.blocked_mention = resolved.blocked_mention;
           row.group = GROUP_OF_STATE[resolved.state];
+          if (resolved.state === 'excluded') row.cause = M.exclusionCauseOf(entry, eq.enabled);
         }
         counts[row.group] += 1;
         rows.push(row);
       });
       var summary = M.summarizeRoom(trees, list.length, enabledById);
       summaries.push(summary);
-      out.rooms.push({ object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, equipments: rows });
+      var exclusion = M.exclusionBreakdown(rows.filter(function (r) { return r.state === 'excluded'; }));
+      out.rooms.push({ object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows });
       out.total += list.length;
       if (room.object_id > 0) out.rooms_count += 1;
       GROUP_KEYS.forEach(function (key) { out.counts[key] += counts[key]; });
@@ -297,6 +301,7 @@
   function createPage(env) {
     var $ = env.$;
     var rooms = env.rooms || [];
+    var pluginNames = env.pluginNames || {}; // Story 25.7 : { identifiant: nom affiché } lu par la page (j2haPluginNames)
     var filter = null;
     var lastView = null;
     var lastState = null;
@@ -405,10 +410,19 @@
         if (c.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(plural(c.blocked, 'bloqué', 'bloqués')));
         if (c.to_apply > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-to_apply"></span>').text(c.to_apply + ' ' + w('à appliquer')));
         if (c.unread > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-unread"></span>').text(unreadLabel(c.unread)));
+        // Story 25.7 (Q5) : repère gris « N exclus » (même nombre que le compteur de la pièce), ventilation en infobulle et
+        // dans le nom accessible ; après les repères existants, sans toucher à la jauge ni au ratio.
+        var excludedText = '';
+        if (room.exclusion && room.exclusion.excluded > 0) {
+          var ventilation = M.exclusionBreakdownText(room.exclusion, pluginNames);
+          excludedText = w('Exclus') + ' : ' + ventilation;
+          $marks.append($('<span class="j2ha-mark j2ha-mark-excluded"></span>').text(plural(room.exclusion.excluded, 'exclu', 'exclus'))
+            .attr('title', excludedText).attr('aria-label', excludedText));
+        }
         $slot.append($marks);
         if (c.blocked > 0) $card.addClass('j2ha-room-blocked');
         if (filter && filterMatchesNothing(room)) $card.addClass('j2ha-room-dim');
-        $card.attr('aria-label', room.object_name + ', ' + gaugeLabel(c, total));
+        $card.attr('aria-label', room.object_name + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
       });
     }
 
@@ -630,6 +644,7 @@
         document: document,
         bootbox: window.bootbox,
         rooms: window.j2haRoomsTree || [],
+        pluginNames: window.j2haPluginNames || {},
         readStates: ajaxFetch(window.$),
         now: function () { return Date.now(); },
         setTimeout: function (fn, ms) { return window.setTimeout(fn, ms); },

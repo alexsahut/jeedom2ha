@@ -88,7 +88,7 @@ async function withRealView(t, options, fn) {
       .map((src) => `<script src="${src}"></script>`).join('');
     const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>'
       + css + '</style></head><body>' + mainPart(rendered.html).replace(/\{\{([^}]*)\}\}/g, '$1') + '<div id="div_alert"></div>'
-      + `<script>window.j2haRoomsTree = ${JSON.stringify(rooms)}; window.j2haAncestors = ${JSON.stringify(rendered.vars.j2haAncestors)};</script>`
+      + `<script>window.j2haRoomsTree = ${JSON.stringify(rooms)}; window.j2haAncestors = ${JSON.stringify(rendered.vars.j2haAncestors)}; window.j2haPluginNames = ${JSON.stringify(rendered.vars.j2haPluginNames || {})};</script>`
       + scriptTags + '</body></html>';
     await page.route('http://gate.test/**', async (route) => {
       const request = route.request();

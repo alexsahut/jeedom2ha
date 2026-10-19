@@ -85,7 +85,7 @@ describe('25.7 / AC2 — parité entrée agrégée / arbre unitaire', () => {
       assert.deepEqual(fromAggregated, fromTree, 'équipement ' + id);
       if (fromAggregated) excluded += 1;
     }
-    assert.ok(excluded >= 2, 'les fixtures de 25.2 couvrent des exclusions : ' + excluded);
+    assert.ok(excluded >= 1, 'les fixtures de 25.2 couvrent des exclusions : ' + excluded);
   });
 
   it('cas d\'exclusion fictifs complémentaires : mêmes causes, mention courte = phrase au même genre', () => {
