@@ -2,7 +2,7 @@
 
 Status: done
 
-> **Statut : `ready-for-dev` (2026-10-19 00:35, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — voir § Décisions).** Précédemment : `backlog` (2026-10-18). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `done` (2026-10-19, preuve terrain ClaudeBox `25-2-preuve-terrain-2026-10-19.md`).** Précédemment : **Statut : `ready-for-dev` (2026-10-19 00:35, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — voir § Décisions).** Précédemment : `backlog` (2026-10-18). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
