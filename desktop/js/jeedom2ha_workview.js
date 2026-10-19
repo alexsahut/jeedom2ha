@@ -900,7 +900,8 @@
       if (parent && last) $nav.append(doc.createTextNode(' › '));
       if (last) {
         if (withEquipment) {
-          var $link = $('<button type="button" class="btn btn-link j2ha-wv-crumb-room j2ha-free-name"></button>').text(last);
+          // Lien, pas `.btn` : le cœur donne un fond de bouton à tout `.btn` (`.btn:not(.cmdName)`), même `.btn-link`.
+          var $link = $('<button type="button" class="j2ha-wv-crumb-link j2ha-wv-crumb-room j2ha-free-name"></button>').text(last);
           $link.on('click', function () { selectRoom(room.object_id, { user: true }); });
           $nav.append($link);
         } else {

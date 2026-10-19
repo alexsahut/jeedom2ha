@@ -94,13 +94,37 @@ function jeedom2ha_html_attr($text) {
 }
 
 /**
+ * Résumé des plugins cochés (audit UX du 2026-10-19) : « Plugins cochés (N) : A, B. » ou « Aucun plugin coché. ». Noms échappés.
+ * Le JS de la page de configuration recalcule le même texte à chaque case cochée ou décochée.
+ */
+function jeedom2ha_excluded_plugins_summary(array $list) {
+  $names = array();
+  foreach ($list as $item) {
+    if ($item['checked']) {
+      $names[] = jeedom2ha_html_attr($item['name']);
+    }
+  }
+  if (count($names) === 0) {
+    return '{{Aucun plugin coché.}}';
+  }
+  return '{{Plugins cochés}} (' . count($names) . ') : ' . implode(', ', $names) . '.';
+}
+
+/**
  * Rendu du groupe de cases à cocher (D1, AC1, AC4) : vraie `input type="checkbox"` avec `label` associé par plugin, groupe nommé
  * par le libellé « Plugins exclus », hauteur bornée avec défilement vertical seulement (Q5). Les noms viennent de Jeedom et sont
  * échappés. Les cases ne portent PAS `configKey` : seul le champ masqué porteur est lu par « Sauvegarder » du cœur.
  */
 function jeedom2ha_render_excluded_plugins_checklist(array $list) {
-  $html = '<div id="div_excludedPluginsList" class="j2ha-plugin-checklist" role="group" aria-labelledby="lbl_excludedPlugins"'
-    . ' style="max-height:18em;overflow-y:auto;overflow-x:hidden;">';
+  // Audit UX du 2026-10-19 : sur la box (42 plugins), la boîte de 18 em n'en montrait que 7 et l'on ne voyait pas ce qui était
+  // coché. Résumé des plugins cochés AU-DESSUS de la liste (tenu à jour par le JS de la page), et liste en colonnes.
+  $html = '';
+  if (count($list) > 0) {
+    $html .= '<p class="help-block j2ha-plugin-summary" id="p_excludedPluginsSummary" aria-live="polite" style="margin-top:0;">'
+      . jeedom2ha_excluded_plugins_summary($list) . '</p>';
+  }
+  $html .= '<div id="div_excludedPluginsList" class="j2ha-plugin-checklist" role="group" aria-labelledby="lbl_excludedPlugins"'
+    . ' style="max-height:24em;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:repeat(auto-fill,minmax(14em,1fr));column-gap:16px;align-content:start;">';
   if (count($list) === 0) {
     $html .= '<p class="text-muted j2ha-plugin-empty">{{Aucun plugin avec des équipements.}}</p>';
   }
@@ -108,7 +132,7 @@ function jeedom2ha_render_excluded_plugins_checklist(array $list) {
   foreach ($list as $item) {
     $index++;
     $inputId = 'cb_excludedPlugin_' . $index;
-    $html .= '<div class="checkbox"><label for="' . $inputId . '">'
+    $html .= '<div class="checkbox" style="margin:0;padding:3px 0;"><label for="' . $inputId . '">'
       . '<input type="checkbox" id="' . $inputId . '" class="j2ha-excluded-plugin" value="' . jeedom2ha_html_attr($item['id']) . '"'
       . ' data-initial="' . ($item['checked'] ? '1' : '0') . '"' . ($item['checked'] ? ' checked' : '') . '> '
       . '<span>' . jeedom2ha_html_attr($item['name']) . '</span> '

@@ -218,6 +218,15 @@ function j2haExcludedPluginsValue() {
   return j2haComputeExcludedPlugins($carrier.attr('value') || '', initialChecked, nowChecked);
 }
 
+// Résumé des plugins cochés, au-dessus de la liste (même texte que le rendu PHP) : ce qui est coché reste visible sans défiler.
+function j2haRefreshExcludedPluginsSummary() {
+  var names = [];
+  $('#div_excludedPluginsList input.j2ha-excluded-plugin:checked').each(function() {
+    names.push($(this).closest('label').find('span').first().text());
+  });
+  $('#p_excludedPluginsSummary').text(names.length === 0 ? '{{Aucun plugin coché.}}' : '{{Plugins cochés}} (' + names.length + ') : ' + names.join(', ') + '.');
+}
+
 $(function() {
   // ---- Plugins exclus : le champ porteur masqué (configKey) suit les cases (Q3) ----
   // « Sauvegarder » du cœur et « Appliquer… » écrivent donc la même clé au même format. Le cœur remplit les `configKey` après le
@@ -226,6 +235,7 @@ $(function() {
   var $excludedPlugins = $('.configKey[data-l1key=excludedPlugins]');
   $('#div_excludedPluginsList').on('change', 'input.j2ha-excluded-plugin', function() {
     $excludedPlugins.val(j2haExcludedPluginsValue());
+    j2haRefreshExcludedPluginsSummary();
   });
   $excludedPlugins.on('change', function() {
     // La valeur remplie par le cœur devient la valeur de référence (« chargée ») : cases, état initial et valeur d'origine.
@@ -236,6 +246,7 @@ $(function() {
       var isExcluded = wanted.indexOf($(this).val()) !== -1;
       $(this).prop('checked', isExcluded).attr('data-initial', isExcluded ? '1' : '0');
     });
+    j2haRefreshExcludedPluginsSummary();
   });
 
   // ---- Auto-détection MQTT Manager au chargement ----
