@@ -23,7 +23,7 @@ function startWorkview(options) {
   ui.rendered = rendered;
   ui.rooms = rooms;
   ui.equipments = opts.equipments || equipmentsFor(rooms);
-  ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
+  if (opts.bridge !== false) ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
   ui.page.init();
   if (opts.states !== false) ui.respond('getEquipmentStates', okBody(ui.equipments));
   ui.text = (selector) => plain(ui.$(selector).text());

@@ -106,8 +106,8 @@ describe('25.4 / AC18, AC17 — historique et « Précédent »', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     const before = ui.calls.length;
     openCard(ui, 10);
-    ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="blocked"]');
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
+    ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
     assert.equal(ui.calls.length, before);
   });
 });

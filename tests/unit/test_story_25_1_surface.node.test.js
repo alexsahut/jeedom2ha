@@ -19,11 +19,40 @@ function room(id, name, equipmentIds) {
   return { object_id: id, object_name: name, equipments: equipmentIds.map((eq) => ({ eq_id: eq, eq_name: 'Eq ' + eq, enabled: true })) };
 }
 
-function openRoomWith(rooms, objectId, trees) {
+/** Revient au détail de la pièce (clic sur sa ligne d'arbre) : KPI et liste « À traiter » calculés depuis les entrées agrégées. */
+function showRoom(ui) {
+  ui.click(`.j2ha-wv-room[data-object_id="${ui.wv.state().room}"] .j2ha-wv-row`);
+}
+
+/** Affiche l'équipement `eqId` (clic sur sa ligne d'arbre) et répond à la lecture de son arbre avec `ui.trees[eqId]`. */
+function show(ui, rooms, eqId, body) {
+  if (!ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-row`).length) {
+    const owner = rooms.filter((r) => r.equipments.some((e) => e.eq_id === eqId))[0];
+    ui.click(`.j2ha-wv-room[data-object_id="${owner.object_id}"] .j2ha-wv-row`);
+  }
+  ui.selectEquipment(eqId, body !== undefined ? body : ui.trees[eqId]);
+}
+
+/**
+ * Ouvre la vue C sur la pièce `objectId` : les arbres servent d'entrées agrégées (états, KPI, liste « À traiter », sans
+ * lecture d'arbre) ; le premier équipement (ou `options.select`, `null` = aucun) est sélectionné et son arbre lu.
+ */
+function openRoomWith(rooms, objectId, trees, options) {
+  const o = options || {};
   const ui = createUi(rooms);
   ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
+  ui.trees = {};
+  const entries = {};
+  (trees || []).forEach((body) => {
+    const payload = body.result.payload;
+    ui.trees[payload.jeedom_eq_id] = body;
+    entries[String(payload.jeedom_eq_id)] = payload;
+  });
+  ui.loadStates(entries);
   ui.openRoom(objectId);
-  (trees || []).forEach((t) => ui.respond('getMappingOverrides', t));
+  const first = o.select !== undefined ? o.select : (trees && trees.length ? trees[0].result.payload.jeedom_eq_id : null);
+  if (first !== null) show(ui, rooms, first);
+  ui.show = (eqId, body) => show(ui, rooms, eqId, body);
   return ui;
 }
 
@@ -54,9 +83,12 @@ describe('25.1 / AC3 — badge, compteurs et en-tête déplié disent le même �
   it('pour chacun des six états : mot du badge, classe de la ligne, compteur de la pièce et en-tête identiques', () => {
     const fixture = sixStates();
     const ui = openRoomWith(fixture.rooms, 7, fixture.trees);
+    // KPI de la pièce : calculés depuis les entrées agrégées, sans lecture d'arbre (vue C).
+    showRoom(ui);
     const counted = {};
-    ui.$('.j2ha-room-counter').list.forEach((el) => { counted[el.attrs['data-state']] = Number(ui.$(el).text().trim().split(' ')[0]); });
+    ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.forEach((el) => { counted[el.attrs['data-state']] = Number(ui.$(el).text().trim().split(' ')[0]); });
     for (const [id, state] of Object.entries(fixture.expected)) {
+      ui.show(Number(id)); // un seul détail d'équipement à la fois
       const panel = ui.$(`.j2ha-eq-panel[data-eq-id="${id}"]`);
       const word = M.EQUIPMENT_STATE_LABELS[state];
       assert.equal(panel.find('.j2ha-eq-publish-badge').text().trim(), word, 'badge ' + id);
@@ -76,7 +108,8 @@ describe('25.1 / AC3 — badge, compteurs et en-tête déplié disent le même �
     };
     for (const [objectId, trees] of Object.entries(sets)) {
       const ui = openRoomWith(rooms, Number(objectId), trees.map(ok));
-      const total = ui.$('.j2ha-room-counter').list.reduce((sum, el) => sum + Number(ui.$(el).text().trim().split(' ')[0]), 0);
+      showRoom(ui);
+      const total = ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.reduce((sum, el) => sum + Number(ui.$(el).text().trim().split(' ')[0]), 0);
       assert.equal(total, trees.length, 'pièce ' + objectId);
     }
   });
@@ -89,7 +122,8 @@ describe('25.1 / AC4 — « Désactivé » prime sur « Exclu » (visible)', () 
     const panel = ui.$('.j2ha-eq-panel[data-eq-id="5"]');
     assert.equal(panel.find('.j2ha-eq-publish-badge').text().trim(), 'Désactivé');
     assert.doesNotMatch(panel.find('.j2ha-eq-head').text(), /Exclu/);
-    const chips = ui.$('.j2ha-room-counter').list.map((el) => [el.attrs['data-state'], ui.$(el).text().trim()]);
+    showRoom(ui);
+    const chips = ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.map((el) => [el.attrs['data-state'], ui.$(el).text().trim()]);
     assert.deepEqual(chips, [['disabled', '1 désactivé']]);
   });
 });
@@ -116,17 +150,17 @@ describe('25.1 / AC5 — commandes ignorées hors des défauts', () => {
 describe('25.1 / AC6 — compteurs de la pièce, zéros masqués', () => {
   it('« Appliquer » ne figure pas dans les compteurs ; aucun « 0 … » ; l’ordre est celui des états', () => {
     const fixture = sixStates();
-    const ui = openRoomWith(fixture.rooms, 7, fixture.trees);
-    const texts = ui.$('.j2ha-room-counter').list.map((el) => ui.$(el).text().trim());
+    const ui = openRoomWith(fixture.rooms, 7, fixture.trees, { select: null });
+    const texts = ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.map((el) => ui.$(el).text().trim());
     assert.deepEqual(texts, ['1 publié', '1 à appliquer', '1 bloqué', '1 exclu', '1 désactivé', '1 rien à publier']);
     assert.ok(texts.every((t) => !/^0 /.test(t)));
   });
 
   it('équipements non lus et présence inconnue conservés, au glossaire', () => {
     const old = tree(1, [READY], { sync: { override_pending: false } });
-    const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(old)]);
-    ui.fail('getMappingOverrides');
-    const text = ui.$('.j2ha-room-counters').text();
+    // L'équipement 2 est absent de la copie des états : « non lu » (plus de lecture d'arbre échouée en vue C).
+    const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(old)], { select: null });
+    const text = ui.$('.j2ha-wv-kpis').text();
     assert.match(text, /1 équipement non lu/);
     assert.match(text, /1 équipement dont la présence dans Home Assistant est inconnue \(démon plus ancien\)/);
   });
@@ -358,18 +392,23 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
     assert.equal(ui.pending('executeHaAction').length, 1, 'même route qu’avant');
   });
 
-  it('pièce : « Republier » et « Supprimer de Home Assistant… » dans le menu de l’en-tête de pièce', () => {
+  it('pièce : « Republier la pièce » est un bouton du détail ; « Supprimer de Home Assistant… » est dans le menu « ⋯ » (vue C, AC14)', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
-    const head = '.modal-j2ha-room .j2ha-room-actions ';
+    showRoom(ui);
+    const head = '.j2ha-wv .j2ha-room-actions ';
     assert.equal(ui.$(head + '.j2ha-menu-toggle').attr('aria-haspopup'), 'menu');
-    assert.equal(plain(ui.$(head + '.j2ha-room-republish').text()), 'Republier');
+    assert.equal(plain(ui.$(head + '.j2ha-room-republish').text()), 'Republier la pièce');
+    assert.equal(ui.$(head + '.j2ha-room-republish').closest('.j2ha-menu-wrap').length, 0, 'bouton visible, pas dans le menu');
     assert.equal(plain(ui.$(head + '.j2ha-room-recreate').text()), 'Supprimer de Home Assistant…');
+    assert.equal(ui.$(head + '.j2ha-room-recreate').closest('.j2ha-menu-wrap').length, 1, 'suppression dans le menu');
     assert.ok(ui.$(head + '.j2ha-room-recreate').hasClass('j2ha-menu-danger'));
   });
 
   it('les confirmations de suppression gardent leur texte d’impact et « rien n’est recréé »', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
     for (const selector of ['.j2ha-room-recreate', EQ + '.j2ha-eq-recreate']) {
+      // Détail de pièce puis détail d'équipement : un seul des deux est affiché à la fois.
+      if (selector === '.j2ha-room-recreate') showRoom(ui); else ui.show(1);
       ui.click(selector);
       const { options } = ui.lastConfirmation();
       for (const word of ['historique', 'dashboards', 'automatisations', 'Rien n\'est recréé automatiquement']) {
@@ -464,7 +503,7 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     assert.equal(occurrences, 1, 'la phrase de cause apparaît exactement une fois');
     ui.$(PANEL + '.mo-diag-cell').list.forEach((cell) => assert.equal(plain(ui.$(cell).text().trim()), 'Bloquée'));
     // Ouvrir l'écran Jeedom n'écrit rien : seules des lectures ont été émises.
-    assert.ok(ui.calls.every((c) => ['getBridgeStatus', 'getMappingOverrides'].includes(c.action)));
+    assert.ok(ui.calls.every((c) => ['getBridgeStatus', 'getEquipmentStates', 'getMappingOverrides'].includes(c.action)));
   });
 
   it('causes différentes : un encart par cause, avec son nombre ; jamais un par commande', () => {
@@ -549,43 +588,41 @@ describe('25.1 / AC15 — commandes ignorées repliées', () => {
   });
 });
 
-describe('25.1 / AC16 — un seul équipement déplié, en-tête collant, un seul défilement', () => {
-  it('déplier B replie A ; l’accordéon n’est plus multisélectionnable', () => {
+describe('25.1 / AC16 — un seul détail d’équipement, en-tête collant, un seul défilement', () => {
+  it('sélectionner B remplace le détail de A (plus d’accordéon : ni .j2ha-eq-toggle, ni .panel-collapse)', () => {
     const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(tree(1, [READY])), ok(tree(2, [READY]))]);
-    const toggleA = '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-toggle';
-    const toggleB = '.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-toggle';
-    ui.click(toggleA);
-    assert.equal(ui.$(toggleA).attr('aria-expanded'), 'true');
+    assert.equal(ui.$('.j2ha-eq-panel').length, 1);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"]').length, 1);
     assert.ok(ui.$('.j2ha-eq-panel[data-eq-id="1"]').hasClass('j2ha-eq-open'));
-    ui.click(toggleB);
-    assert.equal(ui.$(toggleA).attr('aria-expanded'), 'false');
-    assert.ok(!ui.$('.j2ha-eq-panel[data-eq-id="1"]').hasClass('j2ha-eq-open'));
-    assert.ok(!ui.$('.j2ha-eq-panel[data-eq-id="1"] .panel-collapse').hasClass('in'));
-    assert.equal(ui.$('.j2ha-eq-panel.j2ha-eq-open').length, 1);
-    ui.click(toggleB);
-    assert.equal(ui.$('.j2ha-eq-panel.j2ha-eq-open').length, 0, 'un second clic replie');
-    assert.equal(ui.$('.j2ha-eq-accordion').attr('aria-multiselectable'), undefined);
+    assert.equal(ui.$('.j2ha-wv-eq[data-eq-id="1"]').attr('aria-selected'), 'true');
+    ui.show(2);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"]').length, 0, 'le détail de A est remplacé');
+    assert.equal(ui.$('.j2ha-eq-panel').length, 1);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="2"]').length, 1);
+    assert.equal(ui.$('.j2ha-wv-eq[data-eq-id="1"]').attr('aria-selected'), 'false');
+    assert.equal(ui.$('.j2ha-wv-eq[data-eq-id="2"]').attr('aria-selected'), 'true');
+    assert.equal(ui.$('.j2ha-eq-toggle').length + ui.$('.panel-collapse').length + ui.$('.j2ha-eq-accordion').length, 0);
   });
 
-  it('plus de max-height ni d’overflow imbriqué dans le JS ni le PHP ; en-tête collant et fond distinct dans le CSS', () => {
+  it('plus de max-height ni d’overflow imbriqué dans le JS ni le PHP ; en-tête collant à fond opaque dans le CSS de la vue', () => {
     for (const file of ['desktop/js/jeedom2ha.js', 'desktop/js/jeedom2ha_mapping_surface.js', 'desktop/js/jeedom2ha_mapping_override.js', 'desktop/php/jeedom2ha.php']) {
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /max-height|overflow-y|aria-multiselectable/, file);
     }
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
-    assert.match(css, /\.j2ha-eq-panel\.j2ha-eq-open > \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0/);
+    assert.match(css, /\.j2ha-wv \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0[^}]*background-color:\s*var\(--bg-color, var\(--j2ha-menu-bg\)\)/);
     assert.doesNotMatch(css, /\.j2ha-eq-cmdlist[^{]*\{[^}]*overflow/);
-    assert.match(css, /\.j2ha-eq-open > \.panel-collapse > \.panel-body\s*\{[^}]*background-color:\s*var\(--j2ha-surface\)[^}]*border-left:\s*3px solid var\(--j2ha-ok\)/);
   });
 });
 
 describe('25.1 / AC22 — aucune lecture ni écriture de plus', () => {
-  it('ouvrir une pièce : une lecture par équipement et rien d’autre ; ouvrir/replier un équipement ne lit rien', () => {
-    const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(tree(1, [READY])), ok(tree(2, [READY]))]);
-    const actions = ui.calls.map((c) => c.action).sort();
-    assert.deepEqual(actions, ['getBridgeStatus', 'getMappingOverrides', 'getMappingOverrides']);
-    ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-toggle');
-    ui.click('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-toggle');
-    assert.equal(ui.calls.length, 3);
+  it('ouvrir une pièce ne lit aucun arbre ; sélectionner un équipement en lit un seul ; revenir à la pièce ne lit rien', () => {
+    const ui = openRoomWith([room(7, 'Zone', [1, 2])], 7, [ok(tree(1, [READY])), ok(tree(2, [READY]))], { select: null });
+    assert.deepEqual(ui.calls.map((c) => c.action).sort(), ['getBridgeStatus', 'getEquipmentStates']);
+    ui.show(1);
+    ui.show(2);
+    assert.deepEqual(ui.calls.map((c) => c.action).sort(), ['getBridgeStatus', 'getEquipmentStates', 'getMappingOverrides', 'getMappingOverrides']);
+    showRoom(ui);
+    assert.equal(ui.calls.length, 4);
   });
 });
 
@@ -593,12 +630,21 @@ describe('25.1 / AC26 — accessibilité minimale', () => {
   it('l’état n’est jamais porté par la seule couleur (mot + icône) ; boutons-icônes nommés', () => {
     const fixture = sixStates();
     const ui = openRoomWith(fixture.rooms, 7, fixture.trees);
-    ui.$('.j2ha-eq-publish-badge').list.forEach((badge) => {
-      assert.ok(ui.$(badge).find('i').length === 1, 'icône');
-      assert.ok(ui.$(badge).find('.j2ha-state-text').text().trim().length > 0, 'mot');
+    for (const id of Object.keys(fixture.expected)) {
+      ui.show(Number(id));
+      ui.$('.j2ha-eq-publish-badge').list.forEach((badge) => {
+        assert.ok(ui.$(badge).find('i').length === 1, 'icône');
+        assert.ok(ui.$(badge).find('.j2ha-state-text').text().trim().length > 0, 'mot');
+      });
+      ui.$('.j2ha-menu-toggle').list.forEach((toggle) => assert.equal(toggle.attrs['aria-label'], '{{Autres actions}}'));
+      ui.$('.j2ha-wv .j2ha-seg').list.forEach((group) => assert.ok(group.attrs['aria-label'])); // contrôles segmentés du détail (les segments de jauge de la page B sont aria-hidden)
+    }
+    showRoom(ui);
+    ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.forEach((kpi) => {
+      assert.ok(ui.$(kpi).find('i').length === 1, 'icône du KPI');
+      assert.ok(ui.$(kpi).text().trim().length > 0, 'mot du KPI');
     });
     ui.$('.j2ha-menu-toggle').list.forEach((toggle) => assert.equal(toggle.attrs['aria-label'], '{{Autres actions}}'));
-    ui.$('.j2ha-seg').list.forEach((group) => assert.ok(group.attrs['aria-label']));
   });
 });
 

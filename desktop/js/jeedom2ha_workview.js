@@ -819,6 +819,9 @@
       el.todo = $('<section class="j2ha-wv-todo"></section>');
       el.pane.append(el.kpis).append(el.todo);
       refreshRoomDynamic();
+      // Les boutons créés ici suivent le même gating que les boutons globaux (pont indisponible) et l'état des
+      // équipements de la pièce (entrées agrégées) dès l'affichage, sans attendre le rendu suivant de la page B.
+      surface.refreshRoomGating(room, roomEntries(room));
     }
 
     function renderEquipmentPane(room, eq) {

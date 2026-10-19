@@ -170,13 +170,16 @@ describe('22.2 / AC1 (25.1) — libellés d’unité', () => {
   });
 });
 
-describe('20.3 / AC7 — le dénombrement ne lit que l’arbre de la pièce ouverte', () => {
+describe('20.3 / AC7 (25.4) — le dénombrement de pièce ne lit AUCUN arbre : il vient des entrées agrégées', () => {
   const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
   const override = fs.readFileSync('desktop/js/jeedom2ha_mapping_override.js', 'utf8');
+  const overview = fs.readFileSync('desktop/js/jeedom2ha_overview.js', 'utf8');
+  const workview = fs.readFileSync('desktop/js/jeedom2ha_workview.js', 'utf8');
 
-  it('les compteurs sont alimentés depuis ctx.trees (arbres de la pièce) par M.summarizeRoom', () => {
-    assert.match(surface, /M\.summarizeRoom\(trees, ctx\.room\.equipments\.length, roomEnabledById\(\)\)/);
-    assert.match(surface, /ctx\.trees\[eqId\] = normalized;/);
+  it('les compteurs sont alimentés par M.summarizeRoom sur la copie agrégée de la page B, affichés par buildRoomCounterLabels', () => {
+    assert.match(overview, /M\.summarizeRoom\(trees, list\.length, enabledById\)/);
+    assert.match(workview, /M\.buildRoomCounterLabels\(ov\.summary\)/);
+    assert.doesNotMatch(surface, /readRoomTrees|renderRoomCounters|summarizeRoom/, 'la surface ne dénombre plus la pièce depuis des arbres chargés');
   });
 
   it('aucune lecture globale du parc depuis la surface', () => {

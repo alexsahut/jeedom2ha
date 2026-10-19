@@ -462,7 +462,8 @@ describe('25.3 / AC13 — icône, couleur Jeedom, regroupement par objet parent'
       const selector = block.slice(0, block.indexOf('{')).trim();
       assert.doesNotMatch(block, /background(-color)?\s*:[^;]*--j2ha-room-color/, block);
       if (/(^|;|\{)\s*color\s*:[^;]*--j2ha-room-color/.test(block)) {
-        assert.match(selector, /\.j2ha-room-icon$/, 'seule l\'icône peut porter la couleur : ' + selector);
+        // Story 25.4 : les icônes de l'arbre et du détail de la vue C portent la même couleur d'accent (glyphe seulement).
+        assert.match(selector, /\.(j2ha-room-icon|j2ha-wv-icon|j2ha-wv-roomicon)$/, 'seule l\'icône peut porter la couleur : ' + selector);
       }
     });
   });

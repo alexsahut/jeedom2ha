@@ -26,15 +26,51 @@ const SECONDARY_PUBLISHED = { synced_should_publish: false, current_should_publi
 const OLD_DAEMON = { synced_should_publish: false, current_should_publish: true, override_pending: false };
 const PENDING_ENTITY = [{ ha_entity_type: 'light', command_ids: [100], decision: null, override_pending: true }];
 
-/** Ouvre la pièce A avec le pont disponible ; `trees` : arbres renvoyés (ou null = en attente). */
-function openRoomWith(trees, rooms) {
+/** Ouvre la vue sur la pièce A (pont non encore signalé) : les arbres `trees` servent d'entrées agrégées (KPI, gating
+ * de pièce) ; l'équipement 1 est sélectionné et son arbre lu, sauf `select: null` (détail de pièce). `trees` : corps
+ * `ok(tree(...))` ou corps d'échec ; null = rien de chargé. */
+function openRoomWith(trees, rooms, options) {
   const ui = createUi(rooms || [ROOM, OTHER_ROOM, NO_ROOM]);
   ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
-  ui.openRoom(7);
-  if (trees) {
-    trees.forEach((t) => ui.respond('getMappingOverrides', t));
+  const o = options || {};
+  if (!trees) {
+    ui.openRoom(7);
+    if (o.select !== null) ui.selectEquipment(o.select === undefined ? 1 : o.select);
+    return ui;
   }
+  ui.trees = {};
+  const entries = {};
+  trees.forEach((body, index) => {
+    const payload = body && body.result && body.result.payload;
+    const id = payload && payload.jeedom_eq_id != null ? payload.jeedom_eq_id : null;
+    if (id !== null && body.state === 'ok' && id === index + 1) entries[String(id)] = payload;
+  });
+  ui.loadStates(entries);
+  ui.openRoom(7);
+  ui.treeBodies = trees;
+  if (o.select !== null) ui.selectEquipment(o.select === undefined ? 1 : o.select, trees[(o.select === undefined ? 1 : o.select) - 1]);
   return ui;
+}
+
+/** Détail de la pièce A (aucun équipement sélectionné) avec ses boutons de pièce gatés (état des entrées, puis pont). */
+function openRoomLevel(trees) {
+  const ui = openRoomWith(trees, null, { select: null });
+  ui.page.render();
+  ui.bridgeUp();
+  return ui;
+}
+
+/** Revient au détail de la pièce ; les boutons de pièce suivent ensuite le gating habituel : état des entrées agrégées
+ * (rendu suivant de la page B, `refreshRoomGating`) puis état du pont (`applyHAGating`). */
+function showRoom(ui) {
+  ui.showRoom();
+  ui.page.render();
+  ui.bridgeUp();
+}
+
+/** Affiche l'équipement `eqId` (un seul détail à la fois) avec le corps déjà fourni à `openRoomWith`. */
+function showEq(ui, eqId) {
+  ui.selectEquipment(eqId, ui.treeBodies[eqId - 1]);
 }
 
 const ACTION_OK = { state: 'ok', result: { payload: { resultat: 'succes', message: 'Fait.', perimetre_impacte: { nom: 'Périmètre X' } } } };
@@ -83,6 +119,7 @@ describe('R1-B — gating d’état des actions par équipement', () => {
       const unpublished = ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate');
       assert.equal(unpublished.prop('disabled'), true);
       assert.match(unpublished.attr('title'), /non publié/);
+      showEq(ui, 2); // un seul détail à la fois (vue C)
       const published = ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-recreate');
       assert.equal(published.prop('disabled'), false, 'un équipement publié garde l’action');
     }
@@ -91,19 +128,23 @@ describe('R1-B — gating d’état des actions par équipement', () => {
   it('R2-1 — principal refusé mais secondaire publié (published_in_ha) : « Supprimer de Home Assistant » reste actif, équipement et pièce', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: SECONDARY_PUBLISHED })), ok(tree(2, [READY], { sync: UNSYNCED }))]);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
+    showEq(ui, 2);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-recreate').prop('disabled'), true);
+    showRoom(ui);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
   });
 
   it('R2-1 — champ absent (démon plus ancien) : « Supprimer de Home Assistant » reste actif', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: OLD_DAEMON })), ok(tree(2, [READY], { sync: OLD_DAEMON }))]);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), false);
+    showRoom(ui);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false);
   });
 
   it('« Republier » grisé pour un équipement désactivé ou exclu, actif sinon', () => {
     const ui = openRoomWith([ok(tree(1, [DISABLED])), ok(tree(2, [EXCLUDED]))]);
     for (const id of [1, 2]) {
+      if (id === 2) showEq(ui, 2);
       const button = ui.$(`.j2ha-eq-panel[data-eq-id="${id}"] .j2ha-eq-republish`);
       assert.equal(button.prop('disabled'), true, 'équipement ' + id);
       assert.ok(button.attr('title'));
@@ -124,33 +165,48 @@ describe('R1-B — gating d’état des actions par équipement', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), ok(tree(2, [READY]))]);
     ui.bridgeUp();
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').prop('disabled'), true);
+    showEq(ui, 2);
+    ui.bridgeUp();
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-recreate').prop('disabled'), false);
   });
 
   it('pont indisponible : toutes les actions sont grisées', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.sandbox.applyHAGating({ daemon: false });
-    for (const sel of ['.j2ha-eq-republish', '.j2ha-eq-recreate', '.j2ha-room-republish', '.j2ha-room-recreate']) {
+    for (const sel of ['.j2ha-eq-republish', '.j2ha-eq-recreate']) {
+      assert.ok(ui.$(sel).length > 0, sel);
+      ui.$(sel).list.forEach((b) => assert.equal(b.props.disabled, true, sel));
+    }
+    showRoom(ui);
+    ui.sandbox.applyHAGating({ daemon: false });
+    for (const sel of ['.j2ha-room-republish', '.j2ha-room-recreate']) {
+      assert.ok(ui.$(sel).length > 0, sel);
       ui.$(sel).list.forEach((b) => assert.equal(b.props.disabled, true, sel));
     }
   });
 });
 
 describe('R1-B — gating d’état des actions de pièce', () => {
-  it('R2-3 — pendant la lecture, les actions de pièce restent actives (le démon ignore les équipements sans objet)', () => {
-    const ui = openRoomWith(null);
+  // Vue C : le gating de pièce est lu dans les entrées AGRÉGÉES de la pièce (copie de la page B), sans lecture d'arbre ;
+  // un équipement absent de la copie (« non lu ») équivaut à l'ancienne lecture encore attendue ou en échec.
+  const UNREAD = { state: 'error', result: 'non lu' };
+
+  it('R2-3 — états pas encore lus : les actions de pièce restent actives (le démon ignore les équipements sans objet)', () => {
+    const ui = openRoomWith(null, null, { select: null });
+    showRoom(ui);
     for (const sel of ['.j2ha-room-republish', '.j2ha-room-recreate']) {
       assert.equal(ui.$(sel).prop('disabled'), false, sel);
       assert.equal(ui.$(sel).attr('title'), undefined, sel);
     }
-    ui.respond('getMappingOverrides', ok(tree(1, [EXCLUDED])));
-    assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false, 'lecture encore incomplète');
+    const partial = openRoomWith([ok(tree(1, [EXCLUDED])), UNREAD], null, { select: null });
+    showRoom(partial);
+    assert.equal(partial.$('.j2ha-room-republish').prop('disabled'), false, 'lecture encore incomplète');
+    assert.equal(partial.count('getMappingOverrides'), 0, 'aucune lecture d’arbre pour le gating de pièce');
   });
 
-  it('R2-3 — une lecture en échec ne conclut jamais à « rien à faire » : boutons actifs, sans infobulle « aucun équipement »', () => {
-    const ui = openRoomWith(null);
-    ui.respond('getMappingOverrides', ok(tree(1, [EXCLUDED], { sync: UNSYNCED })));
-    ui.fail('getMappingOverrides');
+  it('R2-3 — un équipement non lu ne conclut jamais à « rien à faire » : boutons actifs, sans infobulle « aucun équipement »', () => {
+    const ui = openRoomWith([ok(tree(1, [EXCLUDED], { sync: UNSYNCED })), UNREAD], null, { select: null });
+    showRoom(ui);
     for (const sel of ['.j2ha-room-republish', '.j2ha-room-recreate']) {
       assert.equal(ui.$(sel).prop('disabled'), false, sel);
       assert.equal(ui.$(sel).attr('title'), undefined, sel);
@@ -158,22 +214,26 @@ describe('R1-B — gating d’état des actions de pièce', () => {
   });
 
   it('« Republier la pièce » actif dès qu’un équipement est à publier ; « Supprimer… la pièce » dès qu’un est publié', () => {
-    const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED }))]);
+    const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), UNREAD], null, { select: null });
+    showRoom(ui);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), false, 'lecture encore incomplète');
-    ui.respond('getMappingOverrides', ok(tree(2, [READY], { sync: UNSYNCED })));
-    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true, 'tout lu, aucun publié');
-    assert.match(ui.$('.j2ha-room-recreate').attr('title'), /Aucun équipement publié/);
+    const full = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), ok(tree(2, [READY], { sync: UNSYNCED }))], null, { select: null });
+    showRoom(full);
+    assert.equal(full.$('.j2ha-room-recreate').prop('disabled'), true, 'tout lu, aucun publié');
+    assert.match(full.$('.j2ha-room-recreate').attr('title'), /Aucun équipement publié/);
   });
 
-  it('tous les arbres lus : aucun équipement à publier => « Republier la pièce » grisé', () => {
-    const ui = openRoomWith([ok(tree(1, [EXCLUDED])), ok(tree(2, [DISABLED]))]);
+  it('tous les équipements lus : aucun équipement à publier => « Republier la pièce » grisé', () => {
+    const ui = openRoomWith([ok(tree(1, [EXCLUDED])), ok(tree(2, [DISABLED]))], null, { select: null });
+    showRoom(ui);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), true);
     assert.match(ui.$('.j2ha-room-republish').attr('title'), /Aucun équipement à publier/);
   });
 
-  it('tous les arbres lus : aucun équipement publié => « Supprimer la pièce de Home Assistant » grisé', () => {
-    const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), ok(tree(2, [READY], { sync: NEVER_SYNCED }))]);
+  it('tous les équipements lus : aucun équipement publié => « Supprimer la pièce de Home Assistant » grisé', () => {
+    const ui = openRoomWith([ok(tree(1, [READY], { sync: UNSYNCED })), ok(tree(2, [READY], { sync: NEVER_SYNCED }))], null, { select: null });
+    showRoom(ui);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true);
     assert.match(ui.$('.j2ha-room-recreate').attr('title'), /Aucun équipement publié/);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
@@ -183,7 +243,8 @@ describe('R1-B — gating d’état des actions de pièce', () => {
     const ui = createUi([NO_ROOM]);
     ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
     ui.openRoom(0);
-    ui.respond('getMappingOverrides', ok(tree(9, [READY])));
+    assert.equal(ui.$('.j2ha-room-republish').length + ui.$('.j2ha-room-recreate').length, 0);
+    ui.selectEquipment(9, ok(tree(9, [READY])));
     assert.equal(ui.$('.j2ha-room-republish').length + ui.$('.j2ha-room-recreate').length, 0);
     assert.equal(ui.$('.j2ha-eq-recreate').length, 1);
   });
@@ -225,7 +286,7 @@ describe('R1-B/E — arbre en erreur : aucune action, jamais [null]', () => {
 
 describe('R1-C — action en cours : réservation du bouton (applyHAGating, double clic)', () => {
   it('applyHAGating ne réactive pas un bouton dont l’action est en cours', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     const button = ui.$('.j2ha-room-republish');
@@ -239,7 +300,7 @@ describe('R1-C — action en cours : réservation du bouton (applyHAGating, doub
   });
 
   it('le bouton est réservé dès l’ouverture de la confirmation : un second clic n’ouvre pas une seconde boîte', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-recreate');
     const button = ui.$('.j2ha-room-recreate');
     assert.equal(button.attr('data-ha-pending'), '1');
@@ -249,7 +310,7 @@ describe('R1-C — action en cours : réservation du bouton (applyHAGating, doub
   });
 
   it('annuler la confirmation libère le bouton (libellé et état d’origine) ; Échap/fermeture aussi', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     const before = ui.$('.j2ha-room-republish').html();
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.cancel.callback();
@@ -297,8 +358,10 @@ describe('R1-C — action en cours : réservation du bouton (applyHAGating, doub
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.sandbox.window.jeedom2haRescanInProgress = true;
     ui.sandbox.applyHAGating(BRIDGE_UP);
-    assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), true);
     assert.equal(ui.$('.j2ha-eq-recreate').first().prop('disabled'), true);
+    ui.showRoom();
+    ui.sandbox.applyHAGating(BRIDGE_UP);
+    assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), true);
     ui.sandbox.window.jeedom2haRescanInProgress = false;
     ui.sandbox.applyHAGating(BRIDGE_UP);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
@@ -307,23 +370,31 @@ describe('R1-C — action en cours : réservation du bouton (applyHAGating, doub
 
 describe('R1-D — retour d’une action de pièce (pièce capturée au lancement)', () => {
   function launchRoomRepublish() {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     return ui;
   }
 
-  it('modale toujours ouverte sur la même pièce : résultat dans la modale, arbres de la pièce relus', () => {
+  it('détail de la pièce toujours affiché : résultat dans le détail, aucune lecture d’arbre (les états suivent la page B)', () => {
     const ui = launchRoomRepublish();
     ui.respond('executeHaAction', ACTION_OK);
-    assert.match(ui.$('.modal-j2ha-room .j2ha-room-feedback').text(), /Périmètre X — Fait\./);
+    assert.match(ui.$('.j2ha-wv .j2ha-room-feedback').text(), /Périmètre X — Fait\./);
     assert.equal(ui.dom.alerts.length, 0);
-    assert.deepEqual(ui.pending('getMappingOverrides').map((c) => c.data.eqId).sort(), [1, 2]);
+    assert.equal(ui.pending('getMappingOverrides').length, 0, 'aucun équipement sélectionné : rien à relire');
   });
 
-  it('modale fermée avant le retour : résultat dans la zone d’alerte de la page, aucun rechargement', () => {
+  it('un équipement de la pièce sélectionné pendant l’action : au retour, son arbre — et lui seul — est relu (D2)', () => {
     const ui = launchRoomRepublish();
-    ui.dom.dialogs.find((d) => !d.options.buttons).close();
+    ui.selectEquipment(1, ok(tree(1, [READY])));
+    ui.respond('executeHaAction', ACTION_OK);
+    assert.match(ui.$('.j2ha-wv .j2ha-room-feedback').text(), /Périmètre X — Fait\./, 'la pièce est toujours affichée');
+    assert.deepEqual(ui.pending('getMappingOverrides').map((c) => c.data.eqId), [1]);
+  });
+
+  it('vue refermée avant le retour : résultat dans la zone d’alerte de la page, aucun rechargement', () => {
+    const ui = launchRoomRepublish();
+    ui.click('.j2ha-wv-back');
     ui.respond('executeHaAction', ACTION_OK);
     assert.equal(ui.dom.alerts.length, 1);
     assert.equal(ui.dom.alerts[0].level, 'success');
@@ -331,26 +402,25 @@ describe('R1-D — retour d’une action de pièce (pièce capturée au lancemen
     assert.equal(ui.pending('getMappingOverrides').length, 0);
   });
 
-  it('une autre pièce ouverte au retour : alerte de page, aucun rechargement de l’autre pièce, son cache intact', () => {
+  it('une autre pièce affichée au retour : alerte de page, rien dans le détail de l’autre pièce, aucune relecture', () => {
     const ui = launchRoomRepublish();
-    ui.dom.dialogs.find((d) => !d.options.buttons).close();
     ui.openRoom(8);
-    ui.respond('getMappingOverrides', ok(tree(3, [READY])));
+    ui.selectEquipment(3, ok(tree(3, [READY])));
     ui.respond('executeHaAction', ACTION_OK);
     assert.equal(ui.dom.alerts.length, 1);
-    assert.equal(ui.$('.modal-j2ha-room .j2ha-room-feedback').text(), '', 'rien dans la modale de l’autre pièce');
+    assert.equal(ui.$('.j2ha-wv .j2ha-room-feedback').text(), '', 'rien dans le détail de l’autre pièce');
     assert.equal(ui.pending('getMappingOverrides').length, 0, 'ni la pièce A ni la pièce B ne sont relues');
   });
 
   it('erreur à l’appel : message en danger au bon endroit et bouton libéré', () => {
     const ui = launchRoomRepublish();
     ui.fail('executeHaAction');
-    assert.match(ui.$('.modal-j2ha-room .j2ha-room-feedback').text(), /Erreur de communication/);
+    assert.match(ui.$('.j2ha-wv .j2ha-room-feedback').text(), /Erreur de communication/);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false);
     assert.equal(ui.pending('getMappingOverrides').length, 0, 'un échec ne recharge rien');
   });
 
-  it('résultat d’échec du démon : aucun rechargement ; succès partiel : alerte warning et rechargement', () => {
+  it('résultat d’échec du démon : aucun rechargement ; message en danger dans le détail', () => {
     const ui = launchRoomRepublish();
     ui.respond('executeHaAction', { state: 'ok', result: { payload: { resultat: 'echec', message: 'Refusé' } } });
     assert.equal(ui.pending('getMappingOverrides').length, 0);
@@ -359,64 +429,60 @@ describe('R1-D — retour d’une action de pièce (pièce capturée au lancemen
   });
 });
 
-describe('R1-E — compteurs : lecture en échec et cache purgé', () => {
-  it('chargement en cours : « Chargement des compteurs… »', () => {
-    const ui = openRoomWith(null);
-    assert.equal(ui.$('.j2ha-room-counters').text(), '{{Chargement des compteurs…}}');
+describe('R1-E — KPI de pièce (entrées agrégées) et détail d’équipement : lecture en échec, état périmé purgé', () => {
+  const UNREAD = { state: 'error', result: 'non lu' };
+
+  it('états pas encore lus : aucun KPI, aucune lecture d’arbre', () => {
+    const ui = openRoomWith(null, null, { select: null });
+    assert.equal(ui.$('.j2ha-wv-kpis .j2ha-room-counter').length, 0);
+    assert.equal(ui.pending('getMappingOverrides').length, 0);
   });
 
-  it('aucune lecture d’arbre n’aboutit : message d’erreur, plus de chargement sans fin', () => {
-    const ui = openRoomWith(null);
-    ui.fail('getMappingOverrides');
-    assert.equal(ui.$('.j2ha-room-counters').text(), '{{Chargement des compteurs…}}', 'une lecture encore attendue');
-    ui.fail('getMappingOverrides');
-    assert.match(ui.$('.j2ha-room-counters').text(), /Compteurs indisponibles/);
-  });
-
-  it('une lecture réussie suffit : compteurs affichés avec le nombre d’équipements non lus', () => {
-    const ui = openRoomWith(null);
-    ui.respond('getMappingOverrides', ok(tree(1, [READY, READY])));
-    ui.fail('getMappingOverrides');
-    const text = ui.$('.j2ha-room-counters').text();
+  it('équipement non lu : KPI avec le nombre d’équipements non lus, jamais « Chargement des compteurs… » sans fin', () => {
+    const ui = openRoomWith([ok(tree(1, [READY, READY])), UNREAD], null, { select: null });
+    const text = ui.$('.j2ha-wv-kpis').text();
     assert.match(text, /1 publié/);
     assert.doesNotMatch(text, /commande/, 'plus de compteur de commandes au niveau de la pièce (Q4)');
     assert.match(text, /1 équipement non lu/);
+    assert.doesNotMatch(text, /Chargement/);
   });
 
-  it('un rechargement en échec purge l’arbre en cache : les compteurs ne servent plus la donnée périmée', () => {
+  it('une lecture d’arbre en échec : détail vidé (plus d’action sur un arbre périmé), KPI inchangés (copie de la page B)', () => {
     const ui = openRoomWith([ok(tree(1, [READY, READY])), ok(tree(2, [READY]))]);
-    assert.match(ui.$('.j2ha-room-counters').text(), /2 publiés/);
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
     ui.respond('executeHaAction', { state: 'ok', result: null });
     ui.fail('getMappingOverrides'); // la relecture de l'équipement 1 échoue
-    const text = ui.$('.j2ha-room-counters').text();
-    assert.match(text, /1 publié/);
-    assert.match(text, /1 équipement non lu/);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').length, 0, 'plus d’action sur un arbre périmé');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter').length, 0, 'ni de compteur périmé');
+    ui.showRoom();
+    assert.match(ui.$('.j2ha-wv-kpis').text(), /2 publiés/, 'les KPI viennent des états, pas de l’arbre unitaire');
   });
 
-  it('une réponse tardive d’une pièce refermée ne touche pas la pièce ouverte', () => {
-    const ui = openRoomWith(null);
-    ui.dom.dialogs[ui.dom.dialogs.length - 1].close();
+  it('une réponse tardive d’un équipement abandonné ne touche pas la pièce affichée', () => {
+    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]); // lecture de 1 déjà répondue
+    ui.selectEquipment(1); // relecture de 1 en attente
     ui.openRoom(8);
-    ui.respond('getMappingOverrides', ok(tree(1, [READY]))); // réponse de l'équipement 1 de la pièce A
-    assert.equal(ui.$('.j2ha-room-counters').text(), '{{Chargement des compteurs…}}');
+    ui.respond('getMappingOverrides', ok(tree(1, [READY])));
+    assert.equal(ui.$('.j2ha-eq-panel').length, 0);
+    assert.match(ui.$('.j2ha-wv-title').text(), /Pièce B/);
   });
 });
 
 describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attente', () => {
   it('« Supprimer de Home Assistant… » (équipement et pièce) : rouge dans le menu seulement, jamais un bouton rouge plein', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    assert.ok(ui.$('.j2ha-eq-recreate').length > 0);
+    ui.$('.j2ha-eq-recreate').list.forEach((b) => assert.ok(b.classes.has('j2ha-menu-danger')));
+    assert.equal(ui.$('.j2ha-wv .btn-danger').length, 0, 'aucun bouton rouge plein avant la confirmation (équipement)');
+    ui.showRoom();
     assert.ok(ui.$('.j2ha-room-recreate').hasClass('j2ha-menu-danger'));
     assert.equal(ui.$('.j2ha-room-recreate').text(), '{{Supprimer de Home Assistant…}}');
-    ui.$('.j2ha-eq-recreate').list.forEach((b) => assert.ok(b.classes.has('j2ha-menu-danger')));
     assert.equal(ui.$('.j2ha-room-recreate').closest('.j2ha-menu-wrap').length, 1);
-    const plainRed = ui.$('.modal-j2ha-room .btn-danger');
-    assert.equal(plainRed.length, 0, 'aucun bouton rouge plein avant la confirmation');
+    assert.equal(ui.$('.j2ha-wv .btn-danger').length, 0, 'aucun bouton rouge plein avant la confirmation (pièce)');
   });
 
   it('la confirmation de suppression a un bouton rouge, un bouton Annuler et la mise en garde forte', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-recreate');
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
@@ -427,7 +493,7 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
   });
 
   it('la confirmation de republication garde le bouton principal (pas rouge)', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-republish');
     assert.equal(ui.lastConfirmation().options.buttons.confirm.className, 'btn-primary');
   });
@@ -445,7 +511,9 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
   });
 
   it('noms échappés dans la confirmation de pièce et d’équipement ; routes et périmètre corrects', () => {
-    const ui = openRoomWith([ok(tree(1, [READY], { name: 'Équipement <i>1</i>' })), ok(tree(2, [READY]))]);
+    const ui = openRoomWith([ok(tree(1, [READY], { name: 'Équipement <i>1</i>' })), ok(tree(2, [READY]))], null, { select: null });
+    ui.page.render();
+    ui.bridgeUp();
     ui.click('.j2ha-room-republish');
     assert.match(ui.lastConfirmation().options.message, /Pièce &lt;b&gt;/);
     assert.doesNotMatch(ui.lastConfirmation().options.message, /<b>/);
@@ -459,6 +527,7 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     );
     ui.respond('executeHaAction', ACTION_OK);
 
+    showEq(ui, 1);
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate');
     assert.match(ui.lastConfirmation().options.message, /Équipement &lt;i&gt;1&lt;\/i&gt;/);
     assert.match(ui.lastConfirmation().options.buttons.confirm.label, /Supprimer 1 équipement/);
@@ -476,7 +545,7 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
   });
 
   it('état d’attente : libellé animé pendant l’action, état d’origine restauré ensuite', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     const button = ui.$('.j2ha-room-recreate');
     const before = button.html();
     ui.click('.j2ha-room-recreate');
@@ -503,43 +572,47 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
   });
 });
 
-describe('G — rendu de la modale de pièce (buildRoomModalHtml) et des compteurs (renderRoomCounters)', () => {
-  it('structure : réassurance, compteurs, actions, retour, un panneau par équipement dans l’ordre', () => {
-    const ui = openRoomWith(null);
-    const surface = ui.$('.modal-j2ha-room .j2ha-room-surface');
-    assert.equal(surface.length, 1);
-    assert.equal(ui.$('.j2ha-room-counters').length, 1);
+describe('G — rendu du détail de pièce et d’équipement de la vue C (ex-fenêtre de pièce)', () => {
+  it('structure du détail de pièce : réassurance, KPI, actions, zone de retour, « À traiter » ; un seul détail d’équipement à la fois', () => {
+    const ui = openRoomWith(null, null, { select: null });
+    assert.equal(ui.$('.j2ha-wv #j2haSurface_reassurance').length, 1);
+    assert.equal(ui.$('.j2ha-wv-kpis').length, 1);
     assert.equal(ui.$('.j2ha-room-actions').length, 1);
-    assert.equal(ui.$('.j2ha-room-feedback').length, 1);
-    assert.deepEqual(ui.$('.j2ha-eq-panel').list.map((p) => p.attrs['data-eq-id']), ['1', '2']);
+    assert.equal(ui.$('.j2ha-wv .j2ha-room-feedback').length, 1);
+    assert.equal(ui.$('.j2ha-wv-todo').length, 1);
+    assert.equal(ui.$('.modal-j2ha-room, .j2ha-room-surface, .j2ha-eq-accordion').length, 0, 'plus de fenêtre ni d’accordéon');
+    assert.deepEqual(ui.$('.j2ha-wv-eq').list.map((p) => p.attrs['data-eq-id']), ['1', '2'], 'équipements de la pièce, dans l’ordre, dans l’arbre');
+    assert.equal(ui.$('.j2ha-eq-panel').length, 0, 'aucun détail d’équipement sans sélection (aucune lecture)');
   });
 
   it('nom d’équipement et de pièce rendus en texte (jamais en HTML) ; équipement désactivé marqué', () => {
     const ui = createUi([{ object_id: 7, object_name: 'Pièce <b>x</b>', equipments: [{ eq_id: 1, eq_name: '<i>Nom</i>', enabled: false }] }]);
     ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
     ui.openRoom(7);
+    assert.equal(ui.$('.j2ha-wv-title .j2ha-free-name').text(), 'Pièce <b>x</b>');
+    assert.equal(ui.$('.j2ha-wv-title b').length, 0);
+    ui.selectEquipment(1, ok(tree(1, [READY])));
     assert.equal(ui.$('.j2ha-eq-name').text(), '<i>Nom</i>');
     assert.equal(ui.$('.j2ha-eq-name i').length, 0);
-    assert.equal(ui.$('.modal-j2ha-room .modal-title b').length, 0);
     assert.ok(ui.$('.j2ha-eq-panel').hasClass('j2ha-eq-disabled'));
     assert.match(ui.$('.j2ha-eq-panel').text(), /désactivé dans Jeedom/);
   });
 
-  it('compteurs : un chiffre et un mot par état non nul, issus du dénombrement de l’arbre', () => {
-    const ui = openRoomWith([ok(tree(1, [READY, READY])), ok(tree(2, [EXCLUDED], { present: false }))]);
+  it('KPI de pièce : un chiffre et un mot par état non nul, issus du dénombrement des entrées agrégées', () => {
+    const ui = openRoomWith([ok(tree(1, [READY, READY])), ok(tree(2, [EXCLUDED], { present: false }))], null, { select: null });
     const labels = ui.$('.j2ha-room-counter').list.map((el) => ui.$(el).text().trim());
     assert.deepEqual(labels, ['1 publié', '1 exclu']);
   });
 });
 
-describe('R2-2 / R2-4 — retour d’une action hors modale et par équipement', () => {
+describe('R2-2 / R2-4 — retour d’une action hors du détail de la pièce et par équipement', () => {
   const NAMED = { state: 'ok', result: { payload: { resultat: 'succes', message: 'Fait.', perimetre_impacte: { nom: '<img src=x onerror=1>' } } } };
 
   it('R2-2 — le message est échappé avant la zone d’alerte de la page (rendu HTML par le cœur)', () => {
-    const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
+    const ui = openRoomLevel([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
-    ui.dom.dialogs.find((d) => !d.options.buttons).close();
+    ui.click('.j2ha-wv-back'); // la pièce n'est plus affichée : zone d'alerte de la page
     ui.respond('executeHaAction', NAMED);
     assert.equal(ui.dom.alerts.length, 1);
     assert.doesNotMatch(ui.dom.alerts[0].message, /<img/);
@@ -563,7 +636,7 @@ describe('R2-2 / R2-4 — retour d’une action hors modale et par équipement',
     assert.equal(ui.pending('getBridgeStatus').length, 1);
   });
 
-  it('R2-4 — succès : message du périmètre dans la modale, relecture et bandeau', () => {
+  it('R2-4 — succès : message du périmètre dans le détail, relecture et bandeau', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
     ui.respond('executeHaAction', ACTION_OK);
@@ -573,7 +646,7 @@ describe('R2-2 / R2-4 — retour d’une action hors modale et par équipement',
   });
 });
 
-describe('R2-6 — libellés statiques de la modale (gate) : seuls les noms libres sont marqués', () => {
+describe('R2-6 — libellés statiques de la vue (gate) : seuls les noms libres sont marqués', () => {
   it('groupes d’entités : libellés statiques (domaine traduit), noms de commande marqués comme libres', () => {
     const entities = [{ ha_entity_type: 'light', command_ids: [100, 101], decision: null, override_pending: false },
       { ha_entity_type: 'switch', command_ids: [], decision: null, override_pending: false }];
@@ -587,9 +660,9 @@ describe('R2-6 — libellés statiques de la modale (gate) : seuls les noms libr
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-ignored-list .j2ha-free-name').text(), 'Commande 2');
   });
 
-  it('titre de la modale : nom de pièce marqué, « Sans pièce » reste un libellé statique', () => {
-    const ui = openRoomWith(null);
-    const name = ui.$('.modal-j2ha-room .modal-title .j2ha-free-name');
+  it('titre du détail de pièce : nom de pièce marqué, « Sans pièce » reste un libellé statique', () => {
+    const ui = openRoomWith(null, null, { select: null });
+    const name = ui.$('.j2ha-wv-title .j2ha-free-name');
     assert.equal(name.length, 1);
     // Le vrai jQuery rend le texte d'origine (entités décodées), jamais une balise : le nom reste du texte.
     assert.equal(name.text(), 'Pièce <b>"A"</b>', 'nom rendu comme texte, pas comme balise');
@@ -597,7 +670,7 @@ describe('R2-6 — libellés statiques de la modale (gate) : seuls les noms libr
     const noRoom = createUi([NO_ROOM]);
     noRoom.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
     noRoom.openRoom(0);
-    assert.equal(noRoom.$('.modal-j2ha-room .modal-title .j2ha-free-name').length, 0);
-    assert.match(noRoom.$('.modal-j2ha-room .modal-title').text(), /Sans pièce/);
+    assert.equal(noRoom.$('.j2ha-wv-title .j2ha-free-name').length, 0);
+    assert.match(noRoom.$('.j2ha-wv-title').text(), /Sans pièce/);
   });
 });

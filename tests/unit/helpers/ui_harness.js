@@ -208,6 +208,40 @@ function createUi(rooms, options) {
       sandbox.applyHAGating(BRIDGE_UP);
     },
     openRoom(objectId) { win.j2haOpenRoom(objectId); },
+    /**
+     * Ouvre la vue sur la pièce `objectId` avec les arbres unitaires `trees` (corps `ok(tree(...))`) : leurs charges utiles
+     * servent d'entrées agrégées (même forme, parité 25.2) pour l'arbre, les KPI et la liste « À traiter » ; puis
+     * sélectionne l'équipement `select` (défaut : le premier de `trees` ; `null` : aucun) et répond à la lecture de son arbre.
+     * `ui.trees` garde les corps par eq_id ; `ui.show(eqId)` affiche un autre équipement (une lecture, comme en production).
+     */
+    openRoomWith(objectId, trees, options) {
+      const o = options || {};
+      ui.trees = {};
+      const entries = {};
+      (trees || []).forEach((body) => {
+        const payload = body && body.result && body.result.payload;
+        if (payload && payload.jeedom_eq_id !== undefined && payload.jeedom_eq_id !== null) {
+          ui.trees[payload.jeedom_eq_id] = body;
+          entries[String(payload.jeedom_eq_id)] = payload;
+        }
+      });
+      if (o.states !== false) ui.loadStates(entries);
+      ui.openRoom(objectId);
+      const first = o.select !== undefined ? o.select : (trees && trees[0] && trees[0].result && trees[0].result.payload ? trees[0].result.payload.jeedom_eq_id : null);
+      if (first !== null && first !== undefined) ui.show(first);
+      return ui;
+    },
+    /** Affiche l'équipement `eqId` (clic sur sa ligne d'arbre) et répond à la lecture de son arbre avec `ui.trees[eqId]`. */
+    show(eqId, body) {
+      const row = dom.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-row`);
+      if (!row.length) {
+        const owner = rooms.filter((r) => r.equipments.some((e) => e.eq_id === eqId))[0];
+        if (!owner) throw new Error('équipement inconnu : ' + eqId);
+        ui.click(`.j2ha-wv-room[data-object_id="${owner.object_id}"] .j2ha-wv-row`);
+      }
+      const reply = body !== undefined ? body : (ui.trees || {})[eqId];
+      ui.selectEquipment(eqId, reply);
+    },
     /** Sélectionne un équipement dans l'arbre de la vue (clic réel sur la ligne) puis, si `tree` est fourni, répond à la lecture. */
     selectEquipment(eqId, tree) {
       ui.click(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-row`);

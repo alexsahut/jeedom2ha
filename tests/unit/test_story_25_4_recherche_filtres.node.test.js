@@ -69,7 +69,8 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
 
   maybe('lignes d’équipement : état avant le nom (mot + icône), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 21, unread: 3 });
-    for (const id of [10, 11, 12]) ui.click('.j2ha-wv-room[data-object_id="' + id + '"] .j2ha-wv-toggle');
+    openCard(ui, 10);
+    for (const id of [11, 12]) ui.click('.j2ha-wv-room[data-object_id="' + id + '"] .j2ha-wv-toggle');
     const rows = eqRows(ui);
     assert.ok(rows.length >= 40);
     const view = ui.page.snapshot().view.overview;

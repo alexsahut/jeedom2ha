@@ -1,5 +1,9 @@
 /** Story 25.3 : page principale B en lecture seule (barre de santé, jauge maison filtrante, cartes, menu « ⋯ »).
  *
+ * Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C. Un clic sur une puce ouvre la vue avec ce filtre
+ * (l'étape 4 contrôle les mêmes exigences dans la vue, mêmes étiquettes d'erreur) ; l'étape 7 vérifie que la carte ouvre la
+ * vue (lignes d'arbre > 0), sans lecture d'état supplémentaire et sans lecture d'arbre avant sélection. Vrais clics.
+ *
  * Aucune écriture : aucun clic ne confirme une action destructrice (la confirmation est annulée), la boîte du
  * diagnostic est fermée sans télécharger. La politique d'interception du gate n'est pas modifiée :
  * `getEquipmentStates` y est déjà inscrit comme lecture. Elle ne distingue pas `refresh=1` ; l'assertion (5) est
@@ -73,7 +77,9 @@ async function checkGauges(page, helpers) {
   helpers.record('cartes_controlees', sums.cards.length);
 }
 
-/** (4) Chaque puce non vide filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé. */
+/** (4) Chaque puce non vide filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé.
+ * Story 25.4 : la puce de la page B ouvre la vue de travail avec ce filtre ; les lignes sont celles de l'arbre de la vue,
+ * la puce pressée est celle de la vue, un second clic retire le filtre ; « Toutes les pièces » ramène à la page. */
 async function checkFilters(page, helpers) {
   // Seules les requêtes du plugin comptent : le cœur Jeedom (événements, santé) peut interroger la box
   // pendant la boucle sans lien avec les filtres (constat du gate du 2026-10-19).
@@ -86,13 +92,20 @@ async function checkFilters(page, helpers) {
   if (count === 0) throw new Error('aucune-puce-active');
   for (let index = 0; index < count; index += 1) {
     const chip = chips.nth(index);
+    const key = await chip.getAttribute('data-filter');
     const announced = Number(((await chip.textContent()) ?? '').replace(/[^0-9].*$/, '').trim());
     await chip.click();
-    const rows = await page.locator('#j2ha_filterList .j2ha-frow').count();
+    await page.locator('#j2ha_workView').waitFor({ state: 'visible' });
+    const viewChip = page.locator(`#j2ha_workView .j2ha-wv-chips .j2ha-chip-filter[data-filter="${key}"]`);
+    const rows = await page.locator('#j2ha_workView .j2ha-wv-tree .j2ha-wv-eq').count();
     if (rows !== announced) throw new Error('lignes-filtre-differentes-du-nombre');
-    if ((await chip.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');
-    await chip.click();
-    if ((await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) throw new Error('filtre-non-retire');
+    if ((await viewChip.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');
+    await viewChip.click();
+    if ((await viewChip.getAttribute('aria-pressed')) !== 'false' || (await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) {
+      throw new Error('filtre-non-retire');
+    }
+    await page.locator('#j2ha_workView .j2ha-wv-back').click();
+    await page.locator('#j2ha_houseChips').waitFor({ state: 'visible' });
   }
   if (pluginCalls() !== before) throw new Error('requete-pendant-filtre');
   helpers.record('puces_controlees', count);
@@ -156,13 +169,17 @@ async function checkMenu(page, helpers) {
   helpers.record('ecritures_menu', writes);
 }
 
-/** (7) Non-régression : une carte ouvre toujours la fenêtre de pièce existante. */
+/** (7) Non-régression de l'ouverture : une carte ouvre la vue de travail (Story 25.4, plus de fenêtre de pièce) ; l'ouverture
+ * ne lit ni état ni arbre (AC28 : aucun getEquipmentStates supplémentaire, zéro getMappingOverrides avant sélection). */
 async function checkRoomWindow(page, helpers) {
+  const statesBefore = reads(helpers, 'getEquipmentStates');
   const card = page.locator('#j2ha_roomCards .j2ha-room-card').first();
   await card.click();
-  await page.locator('.modal-j2ha-room').waitFor({ state: 'visible' });
-  const panels = await page.locator('.modal-j2ha-room .j2ha-eq-panel').count();
+  await page.locator('#j2ha_workView').waitFor({ state: 'visible' });
+  const panels = await page.locator('#j2ha_workView .j2ha-wv-tree .j2ha-wv-eq').count();
   if (panels === 0) throw new Error('fenetre-piece-vide');
+  if (reads(helpers, 'getEquipmentStates') !== statesBefore) throw new Error('lecture-etat-supplementaire-a-l-ouverture');
+  if (reads(helpers, 'getMappingOverrides') !== 0) throw new Error('lecture-arbre-avant-selection');
   helpers.record('equipements_fenetre_piece', panels);
 }
 

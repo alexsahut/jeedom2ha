@@ -96,7 +96,6 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
 
   maybe('le gating et les boutons globaux de la barre restent opérants avec la vue ouverte', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    ui.respond('getBridgeStatus', { state: 'ok', result: { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } });
     openCard(ui, 10);
     ui.bridgeUp();
     assert.equal(ui.$('.j2ha-ha-action[data-ha-action="republier"]').first().prop('disabled'), false);
@@ -125,6 +124,29 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
     assert.match(ui.text('.j2ha-wv-detail'), /Republication et suppression de pièce indisponibles/);
     ui.selectEquipment(111);
     assert.equal(ui.count('getMappingOverrides'), 1, 'les actions par équipement sont conservées');
+  });
+});
+
+describe('25.4 / AC3, AC14 — gating des actions de pièce dès l’affichage du détail', () => {
+  maybe('pont indisponible : « Republier la pièce » et « Supprimer… » sont grisés dès l’ouverture, sans attendre un rendu de B', () => {
+    const ui = startBig({ rooms: 3, equipments: 30, seed: 4, bridge: false });
+    openCard(ui, 10);
+    assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), true);
+    assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true);
+    assert.equal(ui.$('.j2ha-wv-todo-apply').length === 0 || ui.$('.j2ha-wv-todo-apply').first().prop('disabled') === true, true);
+  });
+
+  maybe('aucun équipement à republier dans la pièce (tout désactivé ou exclu) : « Republier » grisé avec sa cause, lu dans les entrées agrégées', () => {
+    const { FIXTURE, clone } = require('./helpers/page_b_harness');
+    const scene = { objects: [{ id: 10, name: 'Zone fictive', father_id: null, display: {} }], eqlogics: { 10: [{ id: 1, name: 'Eq 1', enabled: false }, { id: 2, name: 'Eq 2', enabled: true }] }, doc: 'https://doc.example.test/plugin' };
+    const equipments = { 1: Object.assign(clone(FIXTURE['104'].aggregated), { jeedom_eq_id: 1 }), 2: Object.assign(clone(FIXTURE['110'].aggregated), { jeedom_eq_id: 2 }) };
+    const ui = startWorkview({ scene, equipments });
+    openCard(ui, 10);
+    const button = ui.$('.j2ha-room-republish');
+    assert.equal(button.prop('disabled'), true);
+    assert.equal(button.attr('data-ha-state-blocked'), '1');
+    assert.equal(button.attr('title'), 'Aucun équipement à publier dans cette pièce.');
+    assert.equal(ui.count('getMappingOverrides'), 0);
   });
 });
 

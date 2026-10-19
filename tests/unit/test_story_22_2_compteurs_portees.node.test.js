@@ -17,11 +17,22 @@ const ROOM = { object_id: 7, object_name: 'Zone', equipments: [
   { eq_id: 2, eq_name: 'Eq 2', enabled: true },
 ] };
 
+// Story 25.4 : fenêtre de pièce remplacée par la vue C. Les arbres servent d'entrées agrégées (KPI de pièce, sans lecture
+// d'arbre) ; le détail du premier équipement est affiché (une lecture d'arbre unitaire, comme en production) ; `show(id)`
+// affiche un autre équipement.
 function openRoomWith(trees) {
   const ui = createUi([ROOM]);
   ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
+  const bodies = {};
+  const entries = {};
+  trees.forEach((body) => { const p = body.result.payload; bodies[p.jeedom_eq_id] = body; entries[String(p.jeedom_eq_id)] = p; });
+  ui.loadStates(entries);
   ui.openRoom(7);
-  trees.forEach((t) => ui.respond('getMappingOverrides', t));
+  ui.show = (eqId) => {
+    if (!ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-row`).length) ui.click('.j2ha-wv-room[data-object_id="7"] .j2ha-wv-row');
+    ui.selectEquipment(eqId, bodies[eqId]);
+  };
+  ui.show(trees[0].result.payload.jeedom_eq_id);
   return ui;
 }
 
@@ -43,12 +54,15 @@ describe('22.2 / AC2 (25.1) — état et compteurs de l’équipement déplié',
     assert.equal(stateOf(ui, 1), 'À appliquer', 'le réglage de l’entité attend d’être appliqué');
     assert.deepEqual(labelsOf(ui, '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-counter'), ['2 publiées', '1 bloquée']);
     // La pièce garde ses compteurs propres, par état d’équipement : un chiffre et un mot.
-    assert.deepEqual(ui.$('.j2ha-room-counter').list.map((el) => ui.$(el).text().trim()), ['1 à appliquer', '1 désactivé']);
+    ui.click('.j2ha-wv-room[data-object_id="7"] .j2ha-wv-row');
+    assert.deepEqual(ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.map((el) => ui.$(el).text().trim()), ['1 à appliquer', '1 désactivé']);
   });
 
   it('un équipement désactivé le dit dans sa ligne ; une lecture en échec la vide', () => {
     const ui = openRoomWith([ok(tree(1, [READY], { present: true })), ok(tree(2, [DISABLED], { present: false }))]);
+    ui.show(2);
     assert.equal(stateOf(ui, 2), 'Désactivé');
+    ui.show(1);
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
     ui.respond('executeHaAction', { state: 'ok', result: null });
     ui.fail('getMappingOverrides');
@@ -173,8 +187,11 @@ describe('22.2 / AC4 — « Supprimer de Home Assistant »', () => {
   it('boutons équipement et pièce, confirmations : libellé fidèle et rappel que « Republier » remet', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate').text(), '{{Supprimer de Home Assistant…}}');
+    ui.click('.j2ha-wv-room[data-object_id="7"] .j2ha-wv-row');
     assert.equal(ui.$('.j2ha-room-recreate').text().trim(), '{{Supprimer de Home Assistant…}}');
     for (const selector of ['.j2ha-room-recreate', '.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-recreate']) {
+      // Vue C : le détail de pièce et celui d'un équipement ne sont pas affichés ensemble.
+      if (selector === '.j2ha-room-recreate') ui.click('.j2ha-wv-room[data-object_id="7"] .j2ha-wv-row'); else ui.show(1);
       ui.click(selector);
       const { options } = ui.lastConfirmation();
       assert.match(options.message, /Rien n.est recréé automatiquement/);
@@ -283,6 +300,7 @@ describe('22.2 / AC7 (P3 de 20-3) — bandeau de santé relu après un échec de
   it('action de pièce en échec réseau : bandeau relu', () => {
     const ui = openRoomWith([ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     const before = bridgeCalls(ui);
+    ui.click('.j2ha-wv-room[data-object_id="7"] .j2ha-wv-row');
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     ui.fail('executeHaAction');
