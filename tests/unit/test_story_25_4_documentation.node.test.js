@@ -119,7 +119,8 @@ describe('25.4 / AC30 — compteurs.md : bloc isolé, mêmes définitions que la
 describe('25.4 / AC30 — changelog_beta.md', () => {
   it('une entrée annonce la vue de travail ; aucun nom réel (CC-48)', () => {
     assert.match(changelogBeta, /# 2026-10-19 — Vue de travail : l'arbre des pièces et le détail, sans fenêtre/);
-    const entry = changelogBeta.split('---')[1];
+    // 24.2 ajoute une entrée plus récente en tête : on isole l'entrée par son titre, plus par sa position.
+    const entry = changelogBeta.split('---').find((part) => part.includes('# 2026-10-19 — Vue de travail'));
     assert.match(entry, /vue de travail/);
     assert.match(entry, /Aucune modification du démon/);
     assert.doesNotMatch(entry, /\b(salon|cuisine|chambre|garage|Alexandre|Dupont)\b/i);
