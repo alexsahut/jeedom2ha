@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
 const O = require('../../desktop/js/jeedom2ha_overview.js');
 const W = require('../../desktop/js/jeedom2ha_workview.js');
-const { diffAgainstBase, removedLines } = require('./helpers/git_base');
+const { diffAgainstBase, fileAtBase, removedLines } = require('./helpers/git_base');
 const { FIXTURE, phpAvailable, SCENE, clone } = require('./helpers/page_b_harness');
 const { startWorkview, openCard } = require('./helpers/workview_harness');
 const { makeScene } = require('./helpers/big_scene');
@@ -22,9 +22,12 @@ const maybe = phpAvailable ? it : it.skip;
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne changent pas', () => {
-  it('git diff --stat sur resources/daemon/, core/ajax/, core/class/, scripts de déploiement et lib/policy.mjs : vide', () => {
+  // Story 24.2 (autorisée par ClaudeBox) : l'export de décision ajoute une route du démon, une action ajax et deux clés de
+  // sync_config. Le gel de resources/daemon/, core/ajax/ et core/class/ est donc levé ; ce que 25.4 protège vraiment (la liste
+  // blanche et le budget de getEquipmentStates, le relais de cette lecture) reste gardé à l'octet près par AC32 ci-dessous.
+  it('git diff --stat sur les scripts de déploiement et lib/policy.mjs : vide', () => {
     const diff = diffAgainstBase(['--stat'], [
-      'resources/daemon/', 'core/ajax/', 'core/class/', 'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh',
+      'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh',
       'scripts/deploy-inventory-diff.sh', 'tests/e2e/gate/lib/policy.mjs',
     ]);
     if (diff !== null) assert.equal(diff, '');
@@ -58,9 +61,20 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     }
   });
 
-  it('la liste blanche et le budget de la route ne sont pas touchés', () => {
-    const diff = diffAgainstBase(['--stat'], ['resources/daemon/transport/http_server.py']);
-    if (diff !== null) assert.equal(diff, '');
+  it('la liste blanche et le budget de la route ne sont pas touchés (projection, durée de cache, relais ajax de la lecture)', () => {
+    const slice = (text, from, to) => text.slice(text.indexOf(from), text.indexOf(to, text.indexOf(from)));
+    const pyBase = fileAtBase('resources/daemon/transport/http_server.py');
+    const phpBase = fileAtBase('core/ajax/jeedom2ha.ajax.php');
+    if (pyBase === null || phpBase === null) return; // aucune base : garde sans effet
+    const py = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
+    const php = fs.readFileSync(path.join(root, 'core/ajax/jeedom2ha.ajax.php'), 'utf8');
+    const projection = ['def _project_equipment_state', 'def _build_equipment_states'];
+    assert.ok(py.includes(projection[0]));
+    assert.equal(slice(py, ...projection), slice(pyBase, ...projection), 'liste blanche (projection) modifiée');
+    const constants = (text) => text.split('\n').filter((l) => /^_EQUIPMENT_STATES_/.test(l)).join('\n');
+    assert.equal(constants(py), constants(pyBase), 'constantes de la route modifiées');
+    const relay = ["$action == 'getEquipmentStates'", 'else if ($action =='];
+    assert.equal(slice(php, ...relay), slice(phpBase, ...relay), 'relais getEquipmentStates modifié');
   });
 
   it('292 équipements de la forme la plus lourde : calcul de l’arbre, des KPI et des filtres mesuré (consigné, sans seuil)', (t) => {

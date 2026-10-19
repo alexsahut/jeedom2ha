@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-10-20 — Export de décision : ce que le plugin a décidé, dans un fichier
+
+- Le menu « ⋯ » de la page principale propose « Télécharger l'export de décision… » : un fichier JSON qui dit, pour chaque équipement, chaque commande et chaque scénario, ce que le plugin a décidé (publié ou non, et pourquoi), d'après la dernière synchronisation ou le dernier « Publier ».
+- Le fichier ne contient que des identifiants : aucun nom d'équipement, de pièce, de commande ni de scénario, aucun secret. Il est réservé à l'administrateur.
+- Lecture seule : rien de ce qui est publié dans Home Assistant ne change.
+
+---
+
 # 2026-10-19 — Vue de travail : l'arbre des pièces et le détail, sans fenêtre
 
 - Un clic sur une carte de pièce, sur une puce ou un segment de la jauge, ou sur une ligne de la liste filtrée ouvre une **vue de travail** dans la page du plugin, à la place de l'ancienne fenêtre de pièce : l'arbre des pièces et de leurs équipements à gauche (recherche, filtres), le détail à droite.

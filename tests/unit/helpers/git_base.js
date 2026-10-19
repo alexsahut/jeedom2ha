@@ -24,6 +24,11 @@ function diffAgainstBase(options, files) {
   return git(['diff', ...options, '{base}', '--', ...files]);
 }
 
+/** Contenu d'un fichier à la base de comparaison (`git show <base>:<fichier>`), null si aucune base (story 24.2). */
+function fileAtBase(file) {
+  return git(['show', '{base}:' + file]);
+}
+
 const removedLines = (diff) => diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
 
-module.exports = { diffAgainstBase, removedLines, BASES };
+module.exports = { diffAgainstBase, fileAtBase, removedLines, BASES };

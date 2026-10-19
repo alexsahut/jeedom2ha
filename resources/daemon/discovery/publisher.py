@@ -397,6 +397,18 @@ class DiscoveryPublisher:
                 purged.append(scenario_id)
         return sorted(set(purged))
 
+    def build_discovery_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> Optional[dict]:
+        """Story 24.2 — payload de découverte d'un mapping, sans publication (fonction pure).
+
+        Même constructeur que `publish_*` : l'export de décision lit `unique_id` et
+        `default_entity_id` dans le payload réel (AC6), jamais dans une seconde formule.
+        None si le type HA n'a pas de constructeur.
+        """
+        builder = getattr(self, f"_build_{mapping.ha_entity_type}_payload", None)
+        if builder is None:
+            return None
+        return builder(mapping, snapshot)
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

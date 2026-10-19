@@ -146,6 +146,11 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 									<i class="fas fa-download"></i>{{Télécharger le diagnostic…}}
 								</button>
 							</li>
+							<li role="none">
+								<button type="button" id="bt_openDecisionExport" class="j2ha-menu-item" role="menuitem">
+									<i class="fas fa-file-code"></i>{{Télécharger l'export de décision…}}
+								</button>
+							</li>
 							<li class="j2ha-menu-sep" role="separator"></li>
 							<li role="none">
 								<button type="button"
@@ -177,6 +182,18 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 					<i class="fas fa-download"></i> {{Télécharger le diagnostic support}}
 				</button>
 				<span id="span_exportResult" class="j2ha-export-result"></span>
+			</div>
+		</div>
+
+		<!-- Export de décision (story 24.2) : contenu de la boîte ouverte par « Télécharger l'export de décision… »,
+		     même mécanique que le diagnostic. Lecture seule, identifiants seulement. -->
+		<div id="div_decisionExportDialog" class="j2ha-diagnostic-dialog" style="display:none;">
+			<div class="form-group j2ha-export">
+				<p class="text-muted">{{Fichier JSON des décisions du plugin : identifiants seulement, aucun nom d'équipement, de pièce, de commande ni de scénario}}</p>
+				<button id="bt_exportDecision" class="btn btn-default btn-sm">
+					<i class="fas fa-download"></i> {{Télécharger l'export de décision}}
+				</button>
+				<span id="span_decisionExportResult" class="j2ha-export-result"></span>
 			</div>
 		</div>
 

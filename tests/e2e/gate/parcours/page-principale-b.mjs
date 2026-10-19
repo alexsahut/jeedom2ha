@@ -133,13 +133,13 @@ async function checkRefresh(page, helpers) {
   helpers.record('refresh_emis', refreshed);
 }
 
-/** (6) Le menu « ⋯ » : deux entrées dans l'ordre ; fermer la boîte et la confirmation n'écrit rien. */
+/** (6) Le menu « ⋯ » : trois entrées dans l'ordre (24.2 ajoute l'export de décision) ; fermer la boîte et la confirmation n'écrit rien. */
 async function checkMenu(page, helpers) {
   const toggle = page.locator('#j2ha_moreMenu .j2ha-menu-toggle');
   await toggle.click();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') throw new Error('menu-non-ouvert');
   const items = await page.locator('#j2ha_moreMenu .j2ha-menu-item').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  if (items.length !== 2 || items[0] !== 'Télécharger le diagnostic…' || items[1] !== 'Supprimer tout de Home Assistant…') {
+  if (items.length !== 3 || items[0] !== 'Télécharger le diagnostic…' || items[1] !== 'Télécharger l\'export de décision…' || items[2] !== 'Supprimer tout de Home Assistant…') {
     throw new Error('entrees-menu-inattendues');
   }
   await page.locator('#bt_openDiagnostic').click();

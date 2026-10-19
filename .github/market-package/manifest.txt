@@ -73,6 +73,9 @@ forbid docs/git-strategy.md
 forbid docs/release-market.md
 forbid docs/ci.md
 forbid docs/index.md
+# Story 24.2 : l'export de décision est un fichier d'exécution (data/, mode 600) qui porte des identifiants
+# physiques bruts ; il ne doit jamais entrer dans le paquet ni dans le dépôt.
+forbid data/jeedom2ha_decision_export.json
 
 # --- Fichiers/dossiers obligatoires dans le paquet ---
 require plugin_info/info.json
@@ -80,6 +83,7 @@ require plugin_info/install.php
 require core/
 require desktop/
 require resources/daemon/main.py
+require resources/daemon/export/decision_export.py
 require docs/fr_FR/changelog.md
 require docs/fr_FR/changelog_beta.md
 require docs/fr_FR/index.md

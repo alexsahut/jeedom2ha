@@ -73,6 +73,15 @@ from mapping.overrides import (
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
+from export.decision_export import (
+    DecisionMemo,
+    build_decision_export,
+    index_overrides,
+    make_equipment_record,
+    make_ineligible_record,
+    normalize_export_config,
+    write_decision_export,
+)
 from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
 
 # Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
@@ -453,6 +462,61 @@ def _scope_excluded_decision(
     _apply_availability_metadata(decision, mapping, topology)
     _sync_publication_decision_refs(mapping, decision)
     return decision
+
+
+def _build_decision_export_document(
+    app,
+    data_dir: str,
+    *,
+    overrides: Optional[Dict[str, dict]] = None,
+    equipment_overrides: Optional[Dict[str, dict]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Story 24.2 — document d'export de décision depuis la mémoire (None sans sync préalable).
+
+    Les décisions viennent du verdict mémorisé au sync / « Publier » (`app["decision_memo"]`),
+    jamais recalculées ici ; l'état d'exécution (`discovery_published`, streaming) est lu en direct.
+    Les overrides courants (pour `pending_changes`) sont ceux que l'appelant vient de lire, sinon
+    relus sur disque.
+    """
+    topology = app.get("topology")
+    if topology is None:
+        return None
+    state_sync = app.get("state_synchronizer")
+    return build_decision_export(
+        snapshot=topology,
+        memo=app["decision_memo"],
+        mappings=app.get("mappings") or {},
+        publications=app.get("publications") or {},
+        scenario_publications=app.get("scenario_publications") or {},
+        streaming_targets=state_sync.list_state_targets() if state_sync is not None else [],
+        current_overrides=index_overrides(
+            list_overrides(data_dir) if overrides is None else overrides,
+            list_equipment_overrides(data_dir) if equipment_overrides is None else equipment_overrides,
+        ),
+        plugin_version=str(app.get("plugin_version") or "inconnu"),
+        confidence_policy=app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY,
+    )
+
+
+def _refresh_decision_export(
+    app,
+    data_dir: str,
+    *,
+    overrides: Optional[Dict[str, dict]] = None,
+    equipment_overrides: Optional[Dict[str, dict]] = None,
+) -> None:
+    """Story 24.2 (AC1) — réécrit le fichier d'export aux points d'écriture du cache disque.
+
+    Ne lève jamais : un export en échec ne doit ni faire échouer un sync ni un « Publier ».
+    """
+    try:
+        document = _build_decision_export_document(
+            app, data_dir, overrides=overrides, equipment_overrides=equipment_overrides,
+        )
+        if document is not None:
+            write_decision_export(document, data_dir)
+    except Exception as exc:
+        _LOGGER.error("[EXPORT] Export de décision non produit : %s", type(exc).__name__)
 
 
 def _secondary_discovery_published(decision: Optional[PublicationDecision]) -> bool:
@@ -1918,6 +1982,9 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     overrides_cache = list_overrides(data_dir)
     # Story 16.3 — même principe pour les overrides de politique de publication (équipement).
     equipment_overrides_cache = list_equipment_overrides(data_dir)
+    # Story 24.2 — verdicts mémorisés pour l'export de décision (overrides appliqués par eq_id).
+    export_overrides = index_overrides(overrides_cache, equipment_overrides_cache)
+    decision_records: Dict[int, Dict[str, Any]] = {}
 
     # Story 19.4 (AC3) — filtre de scope unique, appliqué APRÈS la décision, comme « Publier ».
     scope_entries = {
@@ -1928,6 +1995,12 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
+            ineligible_eq = snapshot.eq_logics.get(eq_id)
+            if ineligible_eq is not None:
+                decision_records[eq_id] = make_ineligible_record(
+                    ineligible_eq, snapshot, result,
+                    applied_overrides=export_overrides.get(eq_id),
+                )
             continue
 
         eq = snapshot.eq_logics.get(eq_id)
@@ -1948,6 +2021,15 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
             persisted_equipment_overrides=equipment_overrides_cache,
         )
         mapping = evaluation.mapping
+        scope_included = mapping is None or _scope_entry_is_included(
+            eq_id, scope_entries.get(eq_id), eligibility
+        )
+        decision_records[eq_id] = make_equipment_record(
+            evaluation,
+            eligible=True,
+            scope_excluded=not scope_included,
+            applied_overrides=export_overrides.get(eq_id),
+        )
         if mapping is None:
             continue  # Not mapped by any mapper
 
@@ -1957,7 +2039,7 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         # Story 19.4 (AC3) — hors périmètre publié : jamais publié, quelle que soit la
         # décision. L'équipement n'entre pas dans `nouveaux_eq_ids` : la purge plus bas
         # (équipements retirés) dépublie ce qui l'était encore et efface sa disponibilité.
-        if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):
+        if not scope_included:
             publications[eq_id] = _scope_excluded_decision(mapping, snapshot)
             scope_excluded_eq_ids.add(eq_id)
             continue
@@ -2212,6 +2294,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
     save_publications_cache(request.app["publications"], data_dir)
+
+    # Story 24.2 (AC1) — verdicts du sync mémorisés, puis export de décision (fichier séparé).
+    decision_memo = request.app["decision_memo"]
+    decision_memo.equipments = decision_records
+    decision_memo.config = normalize_export_config(sync_config)
+    decision_memo.sync_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _refresh_decision_export(
+        request.app, data_dir,
+        overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
+    )
 
     # Story 5.1 — Task 7.3: purger boot_cache après le premier sync (rôle accompli)
     if is_first_sync and request.app.get("boot_cache"):
@@ -4082,6 +4174,42 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_decision_export(request: web.Request) -> web.Response:
+    """Handle GET /system/decision_export — Story 24.2 : contrat de décision versionné (JSON).
+
+    Même document que le fichier ``jeedom2ha_decision_export.json``, construit depuis la
+    mémoire. Route interne (secret requis) : l'administrateur passe par l'action AJAX
+    ``getDecisionExport``.
+    """
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    try:
+        document = _build_decision_export_document(request.app, _resolve_data_dir(request))
+    except Exception as exc:
+        _LOGGER.error("[EXPORT] Export de décision non produit : %s", type(exc).__name__)
+        return web.json_response({
+            "status": "error",
+            "message": "Export de décision indisponible : construction du document en échec.",
+        })
+    if document is None:
+        return web.json_response({
+            "status": "error",
+            "message": "Export de décision indisponible : aucune donnée en mémoire (appelez /action/sync d'abord)."
+        })
+
+    return web.json_response({
+        "action": "system.decision_export",
+        "status": "ok",
+        "payload": document,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 async def _handle_system_published_scope(request: web.Request) -> web.Response:
     """Handle GET /system/published_scope — return canonical backend scope contract."""
     local_secret = request.app["local_secret"]
@@ -4539,6 +4667,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 pending_discovery_unpublish,
             )
             save_publications_cache(publications, _resolve_data_dir(request))
+            _refresh_decision_export(request.app, _resolve_data_dir(request))
             _supprimer_msg = _build_supprimer_message(
                 resultat=resultat,
                 equipements_supprimes=equipements_supprimes,
@@ -4591,6 +4720,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         data_dir = _resolve_data_dir(request)
         overrides_cache = list_overrides(data_dir)
         equipment_overrides_cache = list_equipment_overrides(data_dir)
+        # Story 24.2 — verdicts « Publier » mémorisés pour l'export de décision.
+        export_overrides = index_overrides(overrides_cache, equipment_overrides_cache)
+        decision_memo = request.app["decision_memo"]
         mapper_registry = MapperRegistry()
         confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
         if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
@@ -4672,6 +4804,13 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             if mapping is None:
                 mapping = mappings.get(eq_id)
             is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
+            if evaluation is not None:
+                decision_memo.equipments[eq_id] = make_equipment_record(
+                    evaluation,
+                    eligible=True,
+                    scope_excluded=not is_included and evaluation.mapping is not None,
+                    applied_overrides=export_overrides.get(eq_id),
+                )
             if deadline_s is not None and (
                 is_included
                 or _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish)
@@ -4844,6 +4983,10 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             pending_discovery_unpublish,
         )
         save_publications_cache(publications, _resolve_data_dir(request))
+        _refresh_decision_export(
+            request.app, data_dir,
+            overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
+        )
         _publier_msg = _build_publier_message(
             resultat=resultat,
             equipements_publies_ou_crees=equipements_publies_ou_crees,
@@ -4962,6 +5105,7 @@ def create_app(local_secret: str) -> web.Application:
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
+    app["decision_memo"] = DecisionMemo()  # Story 24.2 — verdicts mémorisés au sync / « Publier »
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
@@ -4997,6 +5141,8 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/publication_override", _handle_publication_override_save)
     app.router.add_post("/action/publication_override_revert", _handle_publication_override_revert)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
+    # Story 24.2 — export JSON versionné du contrat de décision (route interne, secret requis).
+    app.router.add_get("/system/decision_export", _handle_system_decision_export)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
     # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)
