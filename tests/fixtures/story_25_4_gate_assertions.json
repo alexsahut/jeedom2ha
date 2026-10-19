@@ -1,0 +1,266 @@
+{
+  "description": "Story 25.4 (AC27) : registre d'assertions des parcours du gate 20-0 qui touchent la fenêtre de pièce, capturé sur main. Sur-ensemble minimal : ajouter est permis, retirer non.",
+  "parcours": {
+    "decouverte-piece-25-eq-579": {
+      "errors": [
+        "synthese-presente",
+        "bouton-synthese-present",
+        "parc-global-present",
+        "action-diagnostic-presente",
+        "export-support-absent",
+        "lecture-synthese-ou-diagnostic",
+        "compteurs-piece-incomplets",
+        "compteur-piece-illisible",
+        "compteurs-piece-somme-inattendue",
+        "compteurs-eq-579-illisibles",
+        "eq-579-moins-de-deux-entites",
+        "actions-entite-579-inattendues",
+        "actions-equipement-579-inattendues",
+        "cmd-5369-absente",
+        "selecteur-5369-actif",
+        "selecteur-5369-sans-explication",
+        "etape ${label} : ${message}",
+        "gestion-apres-surface",
+        "gestion-apres-bandeau",
+        "chaine-interdite-page-${[...pageRanks, ...editRanks].join('-')}",
+        "lecture-mapping-avant-piece",
+        "cartes-sans-piece-dupliquees",
+        "compte-sans-piece-illisible",
+        "eqid-eq-579-illisible",
+        "cmdid-eq-579-illisible",
+        "synthese-eq-579-illisible",
+        "eqid-badge-illisible",
+        "badge-eq-514-non-desactive",
+        "cellule-eq-514-non-desactive",
+        "chaine-interdite-piece-${roomRanks.join('-')}",
+        "actions-deplacees-absentes",
+        "chaine-interdite-sans-piece-${unassignedRanks.join('-')}",
+        "actions-piece-sans-piece"
+      ],
+      "records": [
+        "absence_synthese",
+        "absence_action_diagnostic",
+        "export_support_present",
+        "lectures_synthese_diagnostic",
+        "${prefix}_compteur_${index + 1}",
+        "eq_579_compteur_${index + 1}",
+        "eq_579_entite_${index + 1}_actions",
+        "eq_579_actions_equipement",
+        "selecteur_5369_desactive",
+        "etape_${index}",
+        "gestion_avant_surface",
+        "gestion_avant_bandeau",
+        "chaines_interdites_page",
+        "mapping_avant_piece",
+        "sans_piece_presente",
+        "sans_piece_equipements",
+        "eq_id",
+        "cmd_${command.id}_id",
+        "cmd_${command.id}_etat",
+        "synthese",
+        "eq_${equipment.id}_badge",
+        "eq_514_cmd_${command.id}_etat",
+        "chaines_interdites_piece",
+        "actions_piece_presentes",
+        "sans_piece_sans_action_piece"
+      ],
+      "steps": [
+        "0:elements-retires",
+        "1:carte-piece-25",
+        "2:modale",
+        "3:panneau-eq-579",
+        "4:depliage",
+        "5:table",
+        "6:diagnostics",
+        "6a:multi-entites-eq-579",
+        "7:diagnostics-eq-514",
+        "8:compteurs-piece-25",
+        "9:fermeture-piece-25",
+        "10:carte-sans-piece",
+        "11:modale-sans-piece",
+        "12:compteurs-sans-piece"
+      ],
+      "declared": {
+        "declaredEquipments": "{}",
+        "declaredBascules": "[]",
+        "declaredPublicationOverrides": "{}"
+      }
+    },
+    "exclusion-publication-non-publiee": {
+      "errors": [
+        "journal-attendu-absent",
+        "etape ${label} : ${message}",
+        "eq-introuvable",
+        "eq-sans-entite",
+        "eq-287-plusieurs-entites",
+        "actions-entite-doublons-visibles",
+        "compteurs-eq-287-illisibles",
+        "modale-confirmation-inattendue"
+      ],
+      "records": [
+        "etape_${index}",
+        "actions_entite_masquees",
+        "eq_287_compteur_${index + 1}"
+      ],
+      "steps": [
+        "1:ouverture-piece-connue",
+        "2:fermeture-piece-connue",
+        "3_${i}:ouverture-piece-${i}",
+        "4_${i}:fermeture-piece-${i}",
+        "5:depliage",
+        "6a:compteurs-equipement",
+        "6:exclure",
+        "7:journal-exclusion",
+        "8:journal-relecture-exclusion",
+        "9:etat-boutons-apres-exclusion",
+        "10:revenir-au-mode-automatique",
+        "11:journal-retrait",
+        "12:etat-bouton-final"
+      ],
+      "declared": {
+        "declaredEquipments": "{ '287': { commands: [] } }",
+        "declaredBascules": "[]",
+        "declaredPublicationOverrides": "{ '287': { commands: [] } }"
+      }
+    },
+    "reference-bascule-eq-380": {
+      "errors": [
+        "etape ${label} : ${message}",
+        "cmd-cible-inattendue",
+        "journal-attendu-absent",
+        "compteurs-eq-380-illisibles",
+        "mode-automatique-absent",
+        "type-refuse-encore-propose",
+        "liste-types-inattendue",
+        "cmd-cible-non-bloquante",
+        "cause-refus-illisible",
+        "ecriture-avant-bascule",
+        "bascule-simulee-non-prete",
+        "synthese-bascule-encore-bloquante",
+        "retour-automatique-incomplet",
+        "compteurs-non-restitues"
+      ],
+      "records": [
+        "etape_${index}",
+        "synthese_initiale",
+        "compteur_initial_${index + 1}",
+        "cmd_cible_id",
+        "cmd_cible_initial",
+        "etape_a_types_proposes",
+        "etape_a_cause_lisible",
+        "etape_a_cellule",
+        "etape_a_ecriture",
+        "etape_a_entrees_journal",
+        "etape_b_synthese",
+        "etape_b_cellule",
+        "etape_b_entrees_journal",
+        "etape_c_synthese",
+        "compteurs_restitues",
+        "etape_c_cellule",
+        "etape_c_entrees_journal"
+      ],
+      "steps": [
+        "1:carte-piece-4",
+        "2:modale",
+        "3:panneau-eq-380",
+        "4:depliage",
+        "5:table",
+        "6:ancre-bloquante",
+        "7:synthese-initiale",
+        "7a:compteurs-initiaux",
+        "8:premiere-bloquante",
+        "9:liste-types-filtree",
+        "10:bascule-simulee",
+        "11:retour-automatique",
+        "11a:compteurs-finaux"
+      ],
+      "declared": {
+        "declaredEquipments": "{ '380': { commands: ['2971', '2968', '2969', '2970'] }, }",
+        "declaredBascules": "[ { eqId: '380', cmdId: '2971', haEntityType: BASCULE_TYPE }, ]",
+        "declaredPublicationOverrides": "{}"
+      }
+    },
+    "controle-ecriture-non-declaree": {
+      "errors": [
+        "etape ${label} : ${message}",
+        "cmd-cible-inattendue",
+        "ecriture-non-declaree-non-bloquee"
+      ],
+      "records": [
+        "etape_${index}",
+        "cmd_cible_id",
+        "requete_page_echouee"
+      ],
+      "steps": [
+        "1:carte-piece-4",
+        "2:modale",
+        "3:panneau-eq-380",
+        "4:depliage",
+        "5:ancre-bloquante",
+        "6:premiere-bloquante",
+        "7:ecriture-sans-apercu"
+      ],
+      "declared": {
+        "declaredEquipments": "{ '380': { commands: ['2971', '2968', '2969', '2970'] }, }",
+        "declaredBascules": "[]",
+        "declaredPublicationOverrides": "{}"
+      }
+    },
+    "page-principale-b": {
+      "errors": [
+        "etape ${label} : ${message}",
+        "lectures-etat-au-chargement",
+        "lecture-par-equipement-au-chargement",
+        "bandeau-bleu-present",
+        "ligne-aide-absente",
+        "barre-sante-absente",
+        "jauge-maison-somme",
+        "jauge-carte-somme",
+        "aucune-puce-active",
+        "lignes-filtre-differentes-du-nombre",
+        "puce-non-pressee",
+        "filtre-non-retire",
+        "requete-pendant-filtre",
+        "lecture-actualiser-absente",
+        "refresh-un-seul-attendu",
+        "lectures-etat-supplementaires",
+        "menu-non-ouvert",
+        "entrees-menu-inattendues",
+        "boite-diagnostic-absente",
+        "bouton-fermer-absent",
+        "bouton-fermer-non-cliquable",
+        "boite-diagnostic-non-fermee",
+        "ecriture-emise",
+        "fenetre-piece-vide"
+      ],
+      "records": [
+        "etape_${index}",
+        "lectures_etat_chargement",
+        "lectures_par_equipement_chargement",
+        "bandeau_bleu_absent",
+        "equipements_total",
+        "cartes_controlees",
+        "puces_controlees",
+        "requetes_pendant_filtres",
+        "refresh_emis",
+        "supprimer_tout_grise",
+        "ecritures_menu",
+        "equipements_fenetre_piece"
+      ],
+      "steps": [
+        "1:chargement",
+        "2:bandeau-absent",
+        "3:jauges",
+        "4:filtres",
+        "5:actualiser",
+        "6:menu",
+        "7:fenetre-piece"
+      ],
+      "declared": {
+        "declaredEquipments": "{}",
+        "declaredBascules": "[]",
+        "declaredRescan": "false"
+      }
+    }
+  }
+}

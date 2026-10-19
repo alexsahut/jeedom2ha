@@ -1,0 +1,54 @@
+{
+  "description": "Story 25.4 (AC24, Task 1.4) : inventaire des classes partagées relevé sur main avant la story (composant → propriétaire → contextes d'usage). La vue C les réutilise SANS modifier leurs règles ; toute variante passe par une classe .j2ha-wv-… déclarée sous .j2ha-wv.",
+  "components": [
+    {
+      "component": ".j2ha-seg (contrôle segmenté « Automatique | Toujours | Jamais »)",
+      "classes": [".j2ha-seg", ".j2ha-seg-item", ".j2ha-seg-btn", ".j2ha-seg-active", ".j2ha-seg-disabled", ".j2ha-seg-compact", ".j2ha-seg-auto", ".j2ha-seg-always", ".j2ha-seg-never"],
+      "owner": "25.1 (jeedom2ha_mapping_surface.js, buildSegmented)",
+      "contexts": ["détail d'équipement (équipement et en-tête de groupe d'entité) : [role=radiogroup].j2ha-seg", "fenêtre de pièce (retirée par 25.4)"],
+      "collision": "la classe nue .j2ha-seg est AUSSI celle d'un segment de la jauge (.j2ha-gauge .j2ha-seg, 25.3) ; toute règle de jauge reste sous .j2ha-gauge (PR #296)"
+    },
+    {
+      "component": ".j2ha-gauge (jauge segmentée)",
+      "classes": [".j2ha-gauge", ".j2ha-gauge-card", ".j2ha-gauge-neutral", ".j2ha-gauge .j2ha-seg", ".j2ha-seg-published", ".j2ha-seg-to_apply", ".j2ha-seg-blocked", ".j2ha-seg-other", ".j2ha-seg-unread"],
+      "owner": "25.3 (jeedom2ha_overview.js, buildGauge)",
+      "contexts": ["bloc maison de la page principale", "cartes de pièce de la page principale"],
+      "collision": "segments = .j2ha-seg ; voir ci-dessus"
+    },
+    {
+      "component": ".j2ha-menu-* (menu « ⋯ »)",
+      "classes": [".j2ha-menu-wrap", ".j2ha-menu-toggle", ".j2ha-menu", ".j2ha-menu-open", ".j2ha-menu-item", ".j2ha-menu-sep", ".j2ha-menu-danger"],
+      "owner": "25.1 (buildMenu) / 25.3 (barre de santé, bindMenu)",
+      "contexts": ["barre de santé de la page principale", "menu de pièce et d'équipement (détail de la vue C)"],
+      "collision": "aucune ; rouge réservé à .j2ha-menu-danger"
+    },
+    {
+      "component": ".j2ha-state-* (mot d'état : point/icône + mot)",
+      "classes": [".j2ha-state-word", ".j2ha-state-text", ".j2ha-state-published", ".j2ha-state-to_apply", ".j2ha-state-blocked", ".j2ha-state-excluded", ".j2ha-state-disabled", ".j2ha-state-nothing_to_publish", ".j2ha-state-unread"],
+      "owner": "25.1 (stateWord)",
+      "contexts": ["liste filtrée de la page principale", "badge et en-tête d'équipement", "arbre et listes de la vue C"],
+      "collision": "la classe .j2ha-state-<état> est aussi posée sur .j2ha-eq-panel et .j2ha-badge (règles propres à chaque combinaison)"
+    },
+    {
+      "component": ".j2ha-badge / .j2ha-eq-publish-badge (badge d'état d'équipement)",
+      "classes": [".j2ha-badge", ".j2ha-eq-publish-badge"],
+      "owner": "25.1 (renderSummary)",
+      "contexts": ["en-tête du détail d'équipement"],
+      "collision": "margin-left: auto (alignement à droite) : la vue C le contient dans un conteneur flex"
+    },
+    {
+      "component": "puces de filtre de la page principale",
+      "classes": [".j2ha-chips", ".j2ha-chip-filter", ".j2ha-chip-filter-published", ".j2ha-chip-filter-to_apply", ".j2ha-chip-filter-blocked", ".j2ha-chip-filter-other", ".j2ha-chip-filter-unread", ".j2ha-chip-dot"],
+      "owner": "25.3 (renderHouse)",
+      "contexts": ["bloc maison de la page principale", "barre d'outils de l'arbre de la vue C (mêmes libellés, mêmes effectifs)"],
+      "collision": "aucune"
+    },
+    {
+      "component": ".j2ha-chip (étiquette de compteur)",
+      "classes": [".j2ha-chip", ".j2ha-chip-published", ".j2ha-chip-to_apply", ".j2ha-chip-blocked", ".j2ha-chip-disabled"],
+      "owner": "25.1 (compteurs de pièce, étiquette « À appliquer » d'entité)",
+      "contexts": ["KPI de la pièce (vue C)", "en-tête de groupe d'entité (détail)"],
+      "collision": "aucune"
+    }
+  ]
+}
