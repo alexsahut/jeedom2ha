@@ -1168,3 +1168,73 @@ body[data-theme*="Dark"] {
     min-height: 0;
   }
 }
+
+/* =====================================================================================================
+   Audit UX du 2026-10-19 (captures de la box, Jeedom 4.6.1) — AJOUTS seulement, qui priment par l'ordre.
+   ===================================================================================================== */
+/* Carte de pièce : le cœur la fige à 130 × 130 px en overflow:hidden (`div[class*="DisplayCard"] { height: 130px !important }`).
+   Un nom sur deux lignes repoussait la jauge et les repères hors de la carte (rognés, invisibles). La carte garde 130 px au
+   minimum, grandit avec son contenu, et la jauge se cale en bas : toutes les jauges d'une rangée sont alignées. */
+.j2ha-room-groups .objectListContainer > .j2ha-room-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: auto !important;
+  min-height: 130px !important;
+}
+.j2ha-room-groups .objectListContainer > .j2ha-room-card > .j2ha-room-state {
+  align-self: stretch;
+  margin-top: auto;
+  padding-top: 4px;
+}
+/* Repères de la carte (« 1 bloqué », « 2 à appliquer », « 3 exclus ») : un repère n'est jamais coupé en deux lignes. */
+.j2ha-room-groups .objectListContainer > .j2ha-room-card .j2ha-room-marks .j2ha-mark {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* Vue C, ligne d'équipement : la cause d'exclusion et « (désactivé dans Jeedom) » passent sous le nom, alignées sur lui, en
+   entier ; elles ne se disputent plus la largeur avec le nom (ellipse « par le… », mot coupé « désactiv é »). */
+.j2ha-wv .j2ha-wv-eq > .j2ha-wv-row {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.j2ha-wv .j2ha-wv-eq > .j2ha-wv-row > .j2ha-wv-name {
+  flex: 1 1 0;
+}
+.j2ha-wv .j2ha-wv-eq > .j2ha-wv-row > .j2ha-wv-cause,
+.j2ha-wv .j2ha-wv-eq > .j2ha-wv-row > .j2ha-wv-off {
+  flex: 1 0 100%;
+  max-width: none;
+  padding-left: calc(7.5em + 6px);
+  font-size: 12px;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: normal;
+}
+/* Vue C, fil d'Ariane : la pièce (cliquable quand un équipement est affiché) est un lien, pas un bouton du cœur. */
+.j2ha-wv .j2ha-wv-crumb .j2ha-wv-crumb-link {
+  padding: 2px 0;
+  font: inherit;
+  color: var(--link-color, var(--j2ha-todo));
+  text-decoration: underline;
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.j2ha-wv .j2ha-wv-crumb .j2ha-wv-crumb-link:focus-visible {
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: 1px;
+}
+/* Vue C : les boutons d'une ligne « À traiter » gardent leur cible de 44 px ; le cœur fixe leur hauteur de texte
+   (`.btn { height: 32px; line-height: 18px }`), le libellé restait collé en haut : il est centré. */
+.j2ha-wv .j2ha-wv-todo-actions .btn {
+  display: inline-flex;
+  align-items: center;
+}
+/* Vue C, disposition large (même seuil que LAYOUT_SPLIT_MIN_WIDTH) : l'arbre suit la largeur, 320 px au seuil et jusqu'à
+   420 px, pour que les noms tiennent sur une ligne en grand écran. */
+@media (min-width: 980px) {
+  .j2ha-wv .j2ha-wv-nav {
+    flex-basis: clamp(320px, 30%, 420px);
+  }
+}
