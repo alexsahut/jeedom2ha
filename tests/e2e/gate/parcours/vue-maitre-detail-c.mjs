@@ -145,6 +145,13 @@ async function checkDeepLink(page, helpers, eqId) {
   await page.locator(`${VIEW} .j2ha-eq-panel[data-eq-id="${eqId}"] .j2ha-cmd-table`).waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {
     throw new Error('lien-profond-selection-perdue');
   });
+  // Les deux lectures du rechargement partent en parallèle : l'arbre unitaire (≈ 70 ms) peut être rendu avant que la
+  // lecture des états (≈ 300 ms) n'arrive au journal. Attente bornée de l'une ET l'autre, puis égalité stricte (pas plus).
+  const deadline = Date.now() + 15_000;
+  while ((reads(helpers, 'getEquipmentStates') - states < 1 || reads(helpers, 'getMappingOverrides') - trees < 1) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 1000));
   if (reads(helpers, 'getEquipmentStates') - states !== 1 || reads(helpers, 'getMappingOverrides') - trees !== 1) {
     throw new Error('lien-profond-lectures');
   }
