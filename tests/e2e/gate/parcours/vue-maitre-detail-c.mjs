@@ -20,6 +20,10 @@
  * active « Toutes les pièces » sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
  * assertions existantes (toutes les pièces de la page, mêmes repères). Étapes 3 à 9 inchangées dans leurs exigences.
  *
+ * Story 25.7 : l'étape 10 (`cause-exclusion`, lecture seule) vérifie, dans l'arbre élargi filtré sur « exclus et autres »,
+ * que chaque ligne « Exclu » porte une mention de cause de la forme du glossaire (ou aucune), qu'aucune ligne « Désactivé »
+ * n'en porte, et que la somme des repères « N exclus » des cartes égale le nombre de lignes « Exclu » ; zéro requête du plugin.
+ *
  * L'assertion (5) (réponse tardive d'une sélection abandonnée, jamais rendue) n'est PAS portée par ce parcours : l'interception
  * du gate ne retarde pas une réponse à la demande et n'est pas modifiée pour cela. Elle est prouvée en vrai Chromium par
  * `tests/unit/test_story_25_4_navigateur_reel.node.test.js` (réseau factice retardé), report consigné au Dev Agent Record.
@@ -56,6 +60,7 @@ async function readCards(page) {
   return page.locator('#j2ha_roomCards .j2ha-room-card').evaluateAll((cards) => cards.map((card) => ({
     id: card.getAttribute('data-object_id'),
     ratio: (card.querySelector('.j2ha-room-ratio')?.textContent ?? '').replace(/ publiés?$/, '').trim(),
+    excluded: Number(((card.querySelector('.j2ha-room-marks .j2ha-mark-excluded')?.textContent ?? '').match(/^\d+/) ?? ['0'])[0]),
     // Les repères « non lus » (25.3) et « N exclus » (25.7) n'ont pas d'équivalent dans les repères de l'arbre.
     marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$/.test(text)),
   })));
@@ -232,6 +237,32 @@ async function checkBack(page, helpers) {
   helpers.record('precedent_niveaux', 2);
 }
 
+/** (10, Story 25.7) Cause d'exclusion : mentions de l'arbre conformes au glossaire, jamais sur un « Désactivé », somme des cartes = lignes « Exclu ». */
+async function checkExclusionCause(page, helpers, cards) {
+  const before = pluginCalls(helpers);
+  if ((await page.locator(VIEW).getAttribute('data-j2ha-scope')) === 'piece') await page.locator(`${VIEW} .j2ha-wv-widen`).click();
+  const chip = page.locator(`${VIEW} .j2ha-wv-chips .j2ha-chip-filter[data-filter="other"]`);
+  const usable = (await chip.count()) > 0 && !(await chip.isDisabled());
+  if (usable) await chip.click();
+  const rows = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-eq`).evaluateAll((items) => items.map((item) => ({
+    state: (item.querySelector('.j2ha-state-word')?.textContent ?? '').trim(),
+    cause: item.querySelector('.j2ha-wv-cause') ? (item.querySelector('.j2ha-wv-cause').textContent ?? '').trim() : null,
+  })));
+  const FORM = /^(par le plugin .+|par son plugin|par la pièce|individuelle)$/;
+  const excluded = rows.filter((row) => row.state === 'Exclu');
+  if (excluded.some((row) => row.cause !== null && !FORM.test(row.cause))) throw new Error('cause-exclusion-hors-glossaire');
+  if (rows.some((row) => row.state !== 'Exclu' && row.cause !== null)) throw new Error('cause-sur-desactive');
+  const fromCards = cards.reduce((n, card) => n + card.excluded, 0);
+  if (fromCards !== excluded.length) throw new Error('exclus-carte-differents-de-l-arbre');
+  if (usable) await chip.click();
+  if (pluginCalls(helpers) !== before) throw new Error('requete-pendant-cause-exclusion');
+  const count = (re) => excluded.filter((row) => row.cause !== null && re.test(row.cause)).length;
+  helpers.record('exclus_par_plugin', count(/^par (le|son) plugin/));
+  helpers.record('exclus_par_piece', count(/^par la pièce$/));
+  helpers.record('exclus_individuels', count(/^individuelle$/));
+  helpers.record('exclus_sans_cause', excluded.filter((row) => row.cause === null).length);
+}
+
 /** (9) Le menu « ⋯ » de pièce, puis l'annulation de la confirmation de suppression : aucune écriture. */
 async function checkRoomMenu(page, helpers) {
   await page.locator('#j2ha_roomCards .j2ha-room-card').first().click();
@@ -269,4 +300,5 @@ export async function run(page, { helpers }) {
   await atStep(helpers, 7, 'disposition', () => checkLayout(page, helpers));
   await atStep(helpers, 8, 'precedent', () => checkBack(page, helpers));
   await atStep(helpers, 9, 'menu-de-piece', () => checkRoomMenu(page, helpers));
+  await atStep(helpers, 10, 'cause-exclusion', () => checkExclusionCause(page, helpers, cards));
 }
