@@ -44,8 +44,9 @@ describe('25.7 / AC10 — documentation de la cause d\'exclusion', () => {
     }
   });
 
-  it('changelog_beta.md : première entrée = la cause d\'exclusion ; aucun nom réel', () => {
-    const entry = changelog.split('---')[1];
+  it('changelog_beta.md : l\'entrée de la cause d\'exclusion existe ; aucun nom réel', () => {
+    // Stories postérieures (25.8, 25.9) : l'entrée est cherchée par son titre, plus par sa position en tête du fichier.
+    const entry = changelog.split('---').find((part) => part.includes("Cause d'exclusion affichée"));
     assert.match(entry, /Cause d'exclusion affichée/);
     assert.match(entry, /« par le plugin X »/);
     assert.match(entry, /Aucune modification du démon/);
