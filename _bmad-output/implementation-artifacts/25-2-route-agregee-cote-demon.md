@@ -1,6 +1,6 @@
 # Story 25.2 : Route agrégée côté démon — états par pièce et par équipement en un appel
 
-Status: review
+Status: done
 
 > **Statut : `ready-for-dev` (2026-10-19 00:35, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — voir § Décisions).** Précédemment : `backlog` (2026-10-18). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q13 (+ Q3 bis) (§ Questions ouvertes). Pointeurs de code pris sur `main` à `560f344` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3`, statuts #285). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
@@ -266,8 +266,8 @@ Convention : chaque AC est vérifiable par un test nommé (pytest, Node, PHP) ou
   - [x] 6.1 `test_story_25_2_load.py` (`load`), 292 équipements fictifs, comparaison avec la boucle actuelle.
   - [x] 6.2 `make test`, `pytest`, `flake8`, `node --test tests/unit/*.node.test.js`, `scripts/ci-local.sh` ; `git diff --stat` des AC6 / AC18 vides comme attendu.
 - [ ] Task 7 (SAUTÉE par la session cloud : mesure sur la box réelle interdite, CC-48) — Preuve terrain (humain / ClaudeBox, après fusion ; CC-48)
-  - [ ] 7.1 Relevé du budget sur le parc réel (AC16) dans `25-2-preuve-terrain-<date>.md`.
-  - [ ] 7.2 Vérification qu'aucune publication HA ni inventaire MQTT n'a changé (gate d'inventaire identique) et 0 `ERROR` dans le journal du démon.
+  - [x] 7.1 Relevé du budget sur le parc réel (AC16) dans `25-2-preuve-terrain-<date>.md`.
+  - [x] 7.2 Vérification qu'aucune publication HA ni inventaire MQTT n'a changé (gate d'inventaire identique) et 0 `ERROR` dans le journal du démon.
 
 ## Dev Notes
 
@@ -471,6 +471,8 @@ Proposition de forme, valeurs à fixer par ClaudeBox : un budget de **constructi
 **Q13 — Cohérence avec 25.3 sur la fraîcheur.** Le cadrage (Q2) calcule les jauges « à l'ouverture, après chaque action, à chaque fin de synchro, plus un bouton Actualiser ». Confirmer que 25.3 s'appuiera sur l'invalidation côté démon (AC11-AC13) et réservera `refresh=1` au bouton « Actualiser », plutôt que de forcer `refresh=1` à chaque ouverture (ce qui annulerait le cache). *(recommandé : oui)*
 
 ## Change Log
+
+- 2026-10-19 02:50 — Preuve terrain ClaudeBox (`25-2-preuve-terrain-2026-10-19.md`) : budgets Q10 tenus sur le parc réel (froid 314 ms, chaud 136-322 ms, build 172-185 ms) ; charge utile 1,34 Mo (89 % du budget, point d'attention 25.3) ; mesures après écriture d'override et après synchro non faites sur le terrain (gate sans écriture), couvertes par les tests ; `done`.
 
 - 2026-10-18 — `dev-story` (session cloud) : Tasks 1-6 implémentées, Task 0 et Task 7 sautées ; statut `review`.
 
