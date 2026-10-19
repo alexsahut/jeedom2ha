@@ -65,7 +65,8 @@ async function withRealPage(t, fn) {
       if (url.pathname.endsWith('/jeedom2ha.ajax.php')) {
         const params = new URLSearchParams(request.postData() || '');
         const action = params.get('action');
-        journal.push({ action, verdict: 'lecture', method: 'POST' });
+        // Même forme que le journal du gate (appendEntry) : le parcours filtre sur resourceType et path.
+        journal.push({ action, verdict: 'lecture', method: 'POST', resourceType: request.resourceType(), path: url.pathname });
         bodies.push(request.postData() || '');
         let body = { state: 'error', result: 'écriture interdite en test' };
         if (action === 'getBridgeStatus') body = fixtures.bridge;
