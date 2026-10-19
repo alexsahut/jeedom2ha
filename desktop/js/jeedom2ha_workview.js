@@ -223,7 +223,7 @@
     var roomsById = {};
     var st = {
       open: false, room: null, eq: null, search: '', expanded: {}, drawerOpen: false, layout: null,
-      pushed: 0, savedScroll: 0, lastFilter: null, groupTitleOf: {}, searchTimer: null, built: false, focusTitle: false,
+      pushed: 0, hist: [''], savedScroll: 0, lastFilter: null, groupTitleOf: {}, searchTimer: null, built: false, focusTitle: false,
       opening: false, trigger: null, live: {},
     };
     var $root = null;
@@ -433,16 +433,23 @@
       try { if (win.sessionStorage) win.sessionStorage.removeItem(STORAGE_KEY); } catch (e) { /* stockage indisponible */ }
     }
 
+    // Entrées d'historique de la vue : TOUJOURS avec un état `null`. Le cœur Jeedom (desktop/common/js/utils.js, 4.4 à
+    // 4.6) écoute `popstate` et recharge la page par `jeedomUtils.loadPage` dès que `event.state !== null` ; avec `null`,
+    // il ne fait que chercher un onglet `.nav-tabs` portant ce fragment (aucun ici). La profondeur n'est donc pas portée
+    // par `history.state` mais par la pile `st.hist` (fragments) et la position `st.pushed`, tenues ici.
     function syncUrl(mode) {
       var state = { piece: st.room, eq: st.eq, filter: snap().filter };
       var hash = formatFragment(state);
       if (hash === currentHash()) return;
       try {
         if (mode === 'push') {
-          win.history.pushState({ j2ha: st.pushed + 1 }, '', hash === '' ? baseUrl() : hash);
+          win.history.pushState(null, '', hash === '' ? baseUrl() : hash);
+          st.hist = st.hist.slice(0, st.pushed + 1);
+          st.hist.push(hash);
           st.pushed += 1;
         } else {
-          win.history.replaceState({ j2ha: st.pushed }, '', hash === '' ? baseUrl() : hash);
+          win.history.replaceState(null, '', hash === '' ? baseUrl() : hash);
+          st.hist[st.pushed] = hash;
         }
       } catch (e) {
         // Le cœur intercepte ou interdit le fragment : la sélection est gardée en session (pas de lien partageable).
@@ -459,9 +466,13 @@
       closeView();
     }
 
-    function onPop(event) {
-      var depth = event && event.state && typeof event.state.j2ha === 'number' ? event.state.j2ha : 0;
-      st.pushed = depth;
+    function onPop() {
+      // Position dans la pile : un cran en arrière, un cran en avant, sinon entrée inconnue (rechargement, autre
+      // navigation) : la pile repart de cette entrée, et « Toutes les pièces » ne remontera jamais hors du plugin.
+      var here = currentHash();
+      if (st.pushed > 0 && st.hist[st.pushed - 1] === here) st.pushed -= 1;
+      else if (st.hist[st.pushed + 1] === here) st.pushed += 1;
+      else { st.hist = [here]; st.pushed = 0; }
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (!parsed) {
         if (st.open) closeView();
@@ -557,7 +568,9 @@
       st.room = null;
       st.eq = null;
       st.search = '';
-      st.pushed = 0;
+      // La pile n'est PAS oubliée : les entrées de la vue restent accessibles par « Suivant » (onPop y retrouve sa
+      // position). Seule l'entrée courante est mise à jour (fermeture sans historique : fragment retiré sur place).
+      st.hist[st.pushed] = currentHash();
       if (el.search) el.search.val('');
       el.pane.empty();
       resetFeedback();
@@ -1010,9 +1023,10 @@
     };
 
     function start() {
-      // Entrée d'historique reçue d'un rechargement (history.state conservé par le navigateur) : le nombre de niveaux poussés.
-      var initial = win.history && win.history.state;
-      st.pushed = initial && typeof initial.j2ha === 'number' ? initial.j2ha : 0;
+      // Après un chargement (lien profond, rechargement), la pile part de l'entrée courante : aucune entrée antérieure n'est
+      // supposée appartenir à la vue (« Toutes les pièces » revient alors à la page principale par replaceState).
+      st.hist = [currentHash()];
+      st.pushed = 0;
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (parsed) {
         open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });
