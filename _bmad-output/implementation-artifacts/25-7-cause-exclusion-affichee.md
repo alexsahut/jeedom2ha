@@ -246,7 +246,7 @@ Claude (session cloud déléguée, branche `claude/stories-25-6-25-7-aebjpn`, 20
 - Task 1 : `test_story_25_7_cause_exclusion`, `…_ventilation` et le test PHP ont été commités rouges (32 tests Node en échec, test PHP en erreur fatale) avant le code. `test_story_25_7_detail_equipement` (AC4) a été écrit APRÈS l'affichage du détail (il est vert dès sa première exécution).
 - Le premier essai de contrôle négatif du gate (patch de la bibliothèque dans la page) ne rejetait pas : l'étape 6 du parcours recharge la page, ce qui effaçait le patch. Le patch est désormais posé par `addInitScript` à l'affectation de `Jeedom2haMappingOverride`, avant chaque chargement.
 - Tests de 25.x échoués après l'ajout puis adaptés PAR AJOUT (liste ci-dessous) : `test_story_25_4_ecritures_deplacees` interdit de modifier `renderSummary` (comparé à main) : l'encart est donc rendu par une fonction nouvelle `renderExclusion`, appelée par `renderEquipmentTree` (colle) et `refreshEquipmentState`.
-- `scripts/ci-local.sh` : voir la PR (relancé en fin de story).
+- `scripts/ci-local.sh` (relancé en fin de story, après les deux stories) : flake8, pytest 3.9 / 3.11 / 3.12 (2404 passed, 2 skipped), node (1022 tests), `bash -n`, `php -l`, tests PHP : tout vert. `make test` (pytest direct) : 778 passed, 2 skipped.
 
 ### Completion Notes List
 

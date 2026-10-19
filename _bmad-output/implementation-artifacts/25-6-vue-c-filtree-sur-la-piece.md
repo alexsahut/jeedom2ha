@@ -273,7 +273,7 @@ Claude (session cloud déléguée, branche `claude/stories-25-6-25-7-aebjpn`, 20
 
 - Rouge → vert : les 33 tests de `test_story_25_6_*` ont été écrits et commités rouges (28 en échec) avant le code (commit « task 1 »), puis verts après les commits « task 2 et 3.1 » et « task 3.2 ».
 - Le test réel `test_story_25_6_navigateur_reel` (cible tactile) a révélé qu'une règle CSS manquait pour `.j2ha-wv-widen` (118 × 21 px) : ajoutée (`min-height: 44px` hors disposition large).
-- `scripts/ci-local.sh` : flake8, pytest 3.9 et 3.12, node (975 tests), `bash -n`, `php -l`, tests PHP verts. Un test pytest de la matrice 3.11 a échoué une fois (code du démon, que cette story ne touche pas) puis a passé à la relance isolée en 3.11 (2413 passed) : échec non reproductible, à surveiller.
+- `scripts/ci-local.sh` : flake8, pytest 3.9 et 3.12, node (975 tests), `bash -n`, `php -l`, tests PHP verts. Un test pytest de la matrice 3.11 a échoué une fois (code du démon, que cette story ne touche pas) puis a passé à la relance isolée en 3.11 (2413 passed) : échec non reproductible : la relance finale de `scripts/ci-local.sh` (après 25.6 et 25.7) est entièrement verte (3.9 / 3.11 / 3.12 : 2404 passed, 2 skipped ; node : 1022 tests).
 
 ### Completion Notes List
 
