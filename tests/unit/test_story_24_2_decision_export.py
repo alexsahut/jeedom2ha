@@ -282,6 +282,19 @@ async def test_ac4_old_payload_without_filter_config_gives_empty_config(cli):
     assert doc["config"] == {"excluded_plugins": [], "excluded_piece_ids": []}
 
 
+def test_ac4_duplicate_command_ids_give_one_row_per_cmd_id():
+    payload = _payload()
+    payload["eq_logics"][0]["cmds"] = LIGHT_CMDS + [_cmd(11, "LIGHT_ON")]
+    snapshot = TopologySnapshot.from_jeedom_payload(payload)
+    doc = dx.build_decision_export(
+        snapshot=snapshot, memo=dx.DecisionMemo(), mappings={}, publications={}, scenario_publications={},
+        streaming_targets=[], current_overrides={}, plugin_version="x", confidence_policy="sure_probable",
+    )
+    ids = [c["cmd_id"] for c in _eq_row(doc, 1)["commands"]]
+    assert ids == sorted(set(ids)) == [11, 12, 13, 14]
+    assert doc["totals"]["commands"] == sum(len(r["commands"]) for r in doc["equipments"])
+
+
 # --- AC5 -------------------------------------------------------------------
 
 async def test_ac5_no_name_no_secret_in_document_or_file(cli, app, data_dir):

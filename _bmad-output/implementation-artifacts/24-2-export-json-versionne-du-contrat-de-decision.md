@@ -145,7 +145,7 @@ Session cloud déléguée (Claude Code), branche `claude/export-decision-json-5p
 Création :
 - `resources/daemon/export/__init__.py`, `resources/daemon/export/decision_export.py` — `DecisionMemo`, `make_equipment_record`, `make_ineligible_record`, `index_overrides`, `build_decision_export`, `normalize_export_config`, `write_decision_export` (fichier temporaire + `fsync` + `os.replace`, mode 600, ne lève jamais).
 - `docs/dev-decision-export.md` — schéma, politique de version, confidentialité, taille.
-- `tests/unit/test_story_24_2_decision_export.py` (28 tests), `tests/unit/test_story_24_2_php_export.php` (18 contrôles), `tests/unit/test_story_24_2_bouton_export.node.test.js` (7 tests).
+- `tests/unit/test_story_24_2_decision_export.py` (29 tests), `tests/unit/test_story_24_2_php_export.php` (18 contrôles), `tests/unit/test_story_24_2_bouton_export.node.test.js` (7 tests).
 
 Modification (additive, sauf mention) :
 - `resources/daemon/transport/http_server.py` — mémorisation des verdicts dans le sync et « Publier » ; `_refresh_decision_export` (jamais bloquant) au sync, au « Publier » et au « Supprimer » ; route `GET /system/decision_export`. Le bloc `if mapping is None: continue` / filtre de périmètre du sync a été réordonné pour calculer `scope_included` une fois (même logique, mêmes appels).

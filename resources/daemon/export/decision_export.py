@@ -297,7 +297,11 @@ def _equipment_row(eq, record, mapping, publication, snapshot, publisher, stream
     commands_memo = (record or {}).get("commands", {})
 
     commands = []
+    seen_cmd_ids: Set[int] = set()
     for cmd in sorted(eq.cmds, key=lambda c: c.id):
+        if cmd.id in seen_cmd_ids:  # commande en double dans le snapshot : une seule ligne par cmd_id
+            continue
+        seen_cmd_ids.add(cmd.id)
         memo = commands_memo.get(cmd.id)
         if memo is None:
             memo = {
