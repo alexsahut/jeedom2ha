@@ -962,6 +962,9 @@
     };
 
     function start() {
+      // Entrée d'historique reçue d'un rechargement (history.state conservé par le navigateur) : le nombre de niveaux poussés.
+      var initial = win.history && win.history.state;
+      st.pushed = initial && typeof initial.j2ha === 'number' ? initial.j2ha : 0;
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (parsed) {
         open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });

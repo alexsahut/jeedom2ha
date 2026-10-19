@@ -8,7 +8,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { withRealView, treeBody } = require('./helpers/workview_browser');
+const { withRealView, gate } = require('./helpers/workview_browser');
 const { makeScene } = require('./helpers/big_scene');
 
 const actions = (ctx, name) => ctx.journal.filter((e) => e.action === name);
@@ -51,7 +51,7 @@ test('25.4 réel — A puis B : la réponse tardive de A n’est pas rendue (AC2
     await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]').click();
     await page.locator('.j2ha-wv-eq[data-eq-id="102"] .j2ha-wv-row').click();
     await page.locator('.j2ha-wv-eq[data-eq-id="103"] .j2ha-wv-row').click();
-    await page.locator('.j2ha-eq-panel[data-eq-id="103"] .j2ha-cmd-table').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => (document.querySelector('.j2ha-eq-panel[data-eq-id="103"] .j2ha-eq-publish-badge')?.textContent ?? '').trim() !== '');
     await new Promise((resolve) => setTimeout(resolve, 900));
     assert.equal(actions(ctx, 'getMappingOverrides').length, 2);
     assert.equal(await page.locator('.j2ha-eq-panel[data-eq-id="102"]').count(), 0, 'la réponse de A, arrivée après, n’est pas rendue');
@@ -118,6 +118,27 @@ test('25.4 réel — clavier : roving tabindex, flèches, Entrée ; focus dépla
   });
 });
 
+test('25.4 réel — le focus clavier reste sur la puce de la vue après un filtre et après une relecture des états', async (t) => {
+  await withRealView(t, {}, async (page, ctx) => {
+    await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]').click();
+    const chip = page.locator('.j2ha-wv-chips .j2ha-chip-filter:not([disabled])').first();
+    const key = await chip.getAttribute('data-filter');
+    await chip.focus();
+    await page.keyboard.press('Enter');
+    const focused = () => page.evaluate(() => document.activeElement && { cls: document.activeElement.className, filter: document.activeElement.getAttribute('data-filter'), pressed: document.activeElement.getAttribute('aria-pressed') });
+    let now = await focused();
+    assert.match(now.cls, /j2ha-wv-chip/);
+    assert.equal(now.filter, key);
+    assert.equal(now.pressed, 'true');
+    await page.evaluate(() => window.j2haNotifyStatesChanged());
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    assert.equal(ctx.journal.filter((e) => e.action === 'getEquipmentStates').length, 2);
+    now = await focused();
+    assert.match(now.cls, /j2ha-wv-chip/, 'la puce garde le focus après la relecture');
+    assert.deepEqual(ctx.errors, []);
+  });
+});
+
 test('25.4 réel — ouvrir le menu « ⋯ » de pièce puis annuler la suppression n’émet aucune écriture (AC29 (9))', async (t) => {
   await withRealView(t, {}, async (page, ctx) => {
     await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]').click();
@@ -131,4 +152,43 @@ test('25.4 réel — ouvrir le menu « ⋯ » de pièce puis annuler la suppress
   });
 });
 
-void treeBody;
+test('25.4 réel — le parcours vue-maitre-detail-c du gate passe sur la page livrée, en lecture seule', async (t) => {
+  await withRealView(t, {}, async (page, ctx) => {
+    const parcours = await import(gate('parcours', 'vue-maitre-detail-c.mjs'));
+    const { normalizeParcoursRecord } = await import(gate('lib', 'report.mjs'));
+    const recorded = {};
+    const helpers = {
+      record: (key, value) => { const [k, v] = normalizeParcoursRecord(key, value); recorded[k] = v; },
+      journalEntries: () => ctx.journal,
+    };
+    await parcours.run(page, { helpers });
+    assert.equal(recorded.lectures_a_l_ouverture, 0);
+    assert.equal(recorded.lectures_arbre_selection, 1);
+    assert.equal(recorded.lien_profond_lectures_etat, 1);
+    assert.equal(recorded.lien_profond_lectures_arbre, 1);
+    assert.ok(recorded.largeur_fenetre_large >= 1024 && recorded.largeur_fenetre_etroite < 1024);
+    assert.equal(recorded.precedent_niveaux, 2);
+    assert.equal(recorded.ecritures_menu_piece, 0);
+    assert.ok(Number.isFinite(recorded.temps_chargement_eq_selectionne_ms));
+    assert.deepEqual(ctx.errors, []);
+    const writes = ctx.journal.filter((e) => ['executeHaAction', 'exportDiagnostic', 'scanTopology', 'saveMappingOverride', 'savePublicationOverride'].includes(e.action)).length;
+    assert.equal(writes, 0, 'aucune écriture émise par le parcours');
+  });
+});
+
+test('25.4 réel — un défilement horizontal du détail, une lecture à l’ouverture ou un arbre sans les pièces de la page fait échouer le parcours', async (t) => {
+  await withRealView(t, {}, async (page) => {
+    const parcours = await import(gate('parcours', 'vue-maitre-detail-c.mjs'));
+    // Une lecture d'arbre émise à l'ouverture (journal truqué) fait échouer l'assertion (1).
+    let calls = 0;
+    const helpers = {
+      record: () => {},
+      journalEntries: () => {
+        calls += 1;
+        return calls > 2 ? [{ action: 'getMappingOverrides', resourceType: 'xhr', path: '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php' }] : [];
+      },
+    };
+    await assert.rejects(() => parcours.run(page, { helpers }), /lecture-a-l-ouverture/);
+  });
+});
+

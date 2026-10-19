@@ -46,6 +46,18 @@ function treeBody(eqId, source) {
 }
 
 /**
+ * Arbre unitaire COHÉRENT avec l'entrée agrégée de l'équipement (même fixture de 25.2) : la parité d'état entre l'arbre
+ * de la vue et le détail est alors observable (un arbre au hasard la fausserait).
+ */
+function unitTreeFor(equipments, eqId) {
+  const entry = equipments[String(eqId)];
+  if (!entry) return treeBody(eqId);
+  const wanted = JSON.stringify(Object.assign({}, entry, { jeedom_eq_id: 0 }));
+  const source = Object.keys(FIXTURE).find((id) => JSON.stringify(Object.assign({}, FIXTURE[id].aggregated, { jeedom_eq_id: 0 })) === wanted);
+  return treeBody(eqId, source || '101');
+}
+
+/**
  * @param {object} t contexte node:test (pour `t.skip`)
  * @param {object} options { css (texte CSS de remplacement), width, height, hash, scene, equipments, delay (action, eqId) -> ms,
  *                           treeFor (eqId) -> corps, extraCss }
@@ -71,12 +83,24 @@ async function withRealView(t, options, fn) {
     const bodies = [];
     const errors = [];
     const css = (opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css')) + (opts.extraCss || '');
+    // Les scripts sont SERVIS (balises <script src>) pour que `page.reload()` rejoue la page entière, lien profond compris.
+    const scriptTags = ['/assets/jquery.js', '/assets/bootbox-stub.js', ...SCRIPTS.map((file) => `/assets/${file}.js`)]
+      .map((src) => `<script src="${src}"></script>`).join('');
     const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>'
-      + css + '</style></head><body>' + mainPart(rendered.html).replace(/\{\{([^}]*)\}\}/g, '$1') + '<div id="div_alert"></div></body></html>';
+      + css + '</style></head><body>' + mainPart(rendered.html).replace(/\{\{([^}]*)\}\}/g, '$1') + '<div id="div_alert"></div>'
+      + `<script>window.j2haRoomsTree = ${JSON.stringify(rooms)}; window.j2haAncestors = ${JSON.stringify(rendered.vars.j2haAncestors)};</script>`
+      + scriptTags + '</body></html>';
     await page.route('http://gate.test/**', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
       if (url.pathname === '/') { await route.fulfill({ contentType: 'text/html', body: html }); return; }
+      if (url.pathname === '/assets/jquery.js') { await route.fulfill({ contentType: 'application/javascript', body: read0(JQUERY) }); return; }
+      if (url.pathname === '/assets/bootbox-stub.js') { await route.fulfill({ contentType: 'application/javascript', body: BOOTBOX_STUB }); return; }
+      const script = /^\/assets\/([a-z0-9_]+)\.js$/.exec(url.pathname);
+      if (script && SCRIPTS.includes(script[1])) {
+        await route.fulfill({ contentType: 'application/javascript', body: read(`desktop/js/${script[1]}.js`).replace(/\{\{([^}]*)\}\}/g, '$1') });
+        return;
+      }
       if (url.pathname.endsWith('/jeedom2ha.ajax.php')) {
         const raw = request.postData() || '';
         const params = new URLSearchParams(raw);
@@ -87,7 +111,7 @@ async function withRealView(t, options, fn) {
         let body = { state: 'error', result: 'écriture interdite en test' };
         if (action === 'getBridgeStatus') body = { state: 'ok', result: { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } };
         else if (action === 'getEquipmentStates') body = states;
-        else if (action === 'getMappingOverrides') body = opts.treeFor ? opts.treeFor(eqId) : treeBody(eqId);
+        else if (action === 'getMappingOverrides') body = opts.treeFor ? opts.treeFor(eqId) : unitTreeFor(equipments, eqId);
         const wait = opts.delay ? opts.delay(action, eqId) : 0;
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
@@ -97,12 +121,6 @@ async function withRealView(t, options, fn) {
     });
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('http://gate.test/' + (opts.hash || ''));
-    await page.addScriptTag({ content: read0(JQUERY) });
-    await page.evaluate((vars) => { window.j2haRoomsTree = vars.j2haRoomsTree; window.j2haAncestors = vars.j2haAncestors; }, rendered.vars);
-    await page.addScriptTag({ content: BOOTBOX_STUB });
-    for (const file of SCRIPTS) {
-      await page.addScriptTag({ content: read(`desktop/js/${file}.js`).replace(/\{\{([^}]*)\}\}/g, '$1') });
-    }
     await page.waitForFunction(() => (document.querySelector('#j2ha_houseNumber')?.textContent ?? '').trim() !== '');
     await fn(page, { rendered, rooms, errors, journal, bodies, equipments, states, browser, context });
   } finally {

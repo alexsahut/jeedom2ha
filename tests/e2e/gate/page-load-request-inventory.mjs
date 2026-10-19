@@ -249,6 +249,9 @@ async function main() {
   // Un seul contexte, service workers bloqués (AC1). Pas de recordHar/recordVideo,
   // pas de storageState persisté : rien n'est écrit sur disque par ce contexte.
   const context = await browser.newContext({ serviceWorkers: 'block' });
+  // Story 25.4 : variante « lien profond » (lecture seule), mesurée après le chargement par défaut dont les compteurs
+  // ci-dessous (`readCounts`) restent ceux d'un chargement SANS état d'URL.
+  let deepLinkReads = null;
 
   try {
     await context.route('**/*', async (route) => {
@@ -369,6 +372,28 @@ async function main() {
     // Attente bornée pour laisser le chargement émettre ses requêtes (toutes
     // journalisées par l'intercepteur HTTP/WebSocket ci-dessus).
     await page.waitForTimeout(PAGE_LOAD_WAIT_MS);
+
+    // Story 25.4 (AC7, AC29) : variante « lien profond » — la page rechargée avec `#j2ha-vue=piece:P;eq:E` (identifiants lus
+    // dans les données de la page, jamais enregistrés) émet UN getEquipmentStates (sans refresh) et UN getMappingOverrides
+    // (celui de l'équipement désigné). Mêmes lectures autorisées, aucune écriture.
+    const defaultReads = new Map(readCounts);
+    const target = await page.evaluate(() => {
+      const rooms = Array.isArray(window.j2haRoomsTree) ? window.j2haRoomsTree : [];
+      const room = rooms.find((r) => r.object_id > 0 && r.equipments.length > 0) || rooms.find((r) => r.equipments.length > 0);
+      return room ? { piece: room.object_id, eq: room.equipments[0].eq_id } : null;
+    });
+    if (target) {
+      await page.evaluate((hash) => { window.history.replaceState(null, '', hash); }, `#j2ha-vue=piece:${target.piece};eq:${target.eq}`);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForTimeout(PAGE_LOAD_WAIT_MS);
+      deepLinkReads = {
+        states: (readCounts.get('getEquipmentStates') ?? 0) - (defaultReads.get('getEquipmentStates') ?? 0),
+        trees: (readCounts.get('getMappingOverrides') ?? 0) - (defaultReads.get('getMappingOverrides') ?? 0),
+      };
+      // Les compteurs du chargement par défaut ne sont pas modifiés par la variante.
+      readCounts.clear();
+      defaultReads.forEach((value, key) => readCounts.set(key, value));
+    }
   } finally {
     await context.close();
     await browser.close();
@@ -392,6 +417,18 @@ async function main() {
   if (stateReads !== 1 || perEquipmentReads !== 0) {
     console.log('inventaire du chargement inattendu : une lecture d\'état et aucune lecture par équipement attendues');
     process.exitCode = 1;
+  }
+
+  console.log('--- Variante « lien profond » (story 25.4) ---');
+  if (deepLinkReads === null) {
+    console.log('variante non mesurée (aucune pièce avec équipement)');
+  } else {
+    console.log(`getEquipmentStates: ${deepLinkReads.states} (attendu : 1)`);
+    console.log(`getMappingOverrides: ${deepLinkReads.trees} (attendu : 1)`);
+    if (deepLinkReads.states !== 1 || deepLinkReads.trees !== 1) {
+      console.log('variante lien profond inattendue : une lecture d\'état et une lecture d\'arbre attendues');
+      process.exitCode = 1;
+    }
   }
 }
 

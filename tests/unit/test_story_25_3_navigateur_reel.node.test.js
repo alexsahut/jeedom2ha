@@ -38,7 +38,8 @@ $.fn.sortable = function () { return this; };
 $.fn.showAlert = function () { return this; };
 `;
 
-async function withRealPage(t, fn) {
+async function withRealPage(t, fn, options) {
+  const withView = !options || options.workview !== false;
   if (!phpAvailable || !JQUERY) { t.skip('PHP ou jQuery indisponible'); return; }
   let playwright;
   try {
@@ -83,7 +84,7 @@ async function withRealPage(t, fn) {
     await page.addScriptTag({ content: read(JQUERY) });
     await page.evaluate((vars) => { window.j2haRoomsTree = vars.j2haRoomsTree; window.j2haAncestors = vars.j2haAncestors; }, rendered.vars);
     await page.addScriptTag({ content: BOOTBOX_STUB });
-    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', 'jeedom2ha']) {
+    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', ...(withView ? ['jeedom2ha_workview'] : []), 'jeedom2ha']) {
       await page.addScriptTag({ content: read(`desktop/js/${file}.js`).replace(/\{\{([^}]*)\}\}/g, '$1') });
     }
     await page.waitForFunction(() => (document.querySelector('#j2ha_houseNumber')?.textContent ?? '').trim() !== '');
@@ -155,6 +156,9 @@ test('25.3 navigateur réel — un bandeau bleu ou une lecture par équipement a
   });
 });
 
+// Story 25.4 : avec la vue de travail, une puce de la page B ouvre la vue ; le comportement de 25.3 (liste filtrée sur la page B)
+// est celui du repli sans la vue, que ce test exerce (`workview: false`). Le focus des puces DE LA VUE est contrôlé par
+// `test_story_25_4_navigateur_reel`.
 test('25.3 navigateur réel — le focus clavier reste sur la puce après un filtre ou une relecture', async (t) => {
   await withRealPage(t, async (page, ctx) => {
     await page.locator('#j2ha_houseChips .j2ha-chip-filter:not([disabled])').first().focus();
@@ -171,5 +175,5 @@ test('25.3 navigateur réel — le focus clavier reste sur la puce après un fil
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#j2ha_filterList .j2ha-frow').count(), 0, 'Échap retire le filtre');
     assert.deepEqual(ctx.errors, []);
-  });
+  }, { workview: false });
 });

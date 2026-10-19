@@ -55,7 +55,11 @@ test('25.3 gate — la politique ne change pas d’action autorisée : getEquipm
 });
 
 test('25.3 gate — les parcours existants et la politique n’ont perdu aucune assertion', () => {
-  const existing = ['controle-ecriture-non-declaree', 'decouverte-piece-25-eq-579', 'exclusion-publication-non-publiee', 'reference-bascule-eq-380', 'rescan-page-principale'];
+  // Story 25.4 (AC27) : quatre parcours ont dû être ADAPTÉS à la vue de travail (la fenêtre de pièce n'existe plus) ; leur
+  // garde « aucune ligne retirée » est remplacée par le registre d'assertions de `test_story_25_4_gate` (étiquettes
+  // d'erreur, clés record, étapes et écritures déclarées : plus strict sur ce qui compte, tolérant aux sélecteurs).
+  // `rescan-page-principale` n'est pas touché : il garde la garde « aucune ligne retirée ».
+  const existing = ['rescan-page-principale'];
   for (const name of existing) {
     const diff = diffAgainstMain(`tests/e2e/gate/parcours/${name}.mjs`);
     if (diff === null) continue;

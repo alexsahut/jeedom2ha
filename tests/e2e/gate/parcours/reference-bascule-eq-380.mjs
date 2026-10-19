@@ -24,16 +24,22 @@ async function atStep(helpers, index, label, operation) {
   }
 }
 
+// Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C. « modale » = la vue est visible ; « depliage » =
+// sélection de l'équipement dans l'arbre (clic réel sur sa ligne) ; son détail est déjà déplié. Mêmes étiquettes de suivi.
 async function openEq380(page, helpers) {
   const room = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]');
   await atStep(helpers, 1, 'carte-piece-4', () => room.click());
-  const modal = page.locator('.modal-j2ha-room');
-  await atStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="380"]');
-  await atStep(helpers, 3, 'panneau-eq-380', () => panel.waitFor({ state: 'visible' }));
+  const view = page.locator('#j2ha_workView');
+  await atStep(helpers, 2, 'modale', () => view.waitFor({ state: 'visible' }));
+  const row = view.locator('.j2ha-wv-eq[data-eq-id="380"]');
+  const panel = view.locator('.j2ha-eq-panel[data-eq-id="380"]');
+  await atStep(helpers, 3, 'panneau-eq-380', () => row.waitFor({ state: 'visible' }));
   await atStep(helpers, 4, 'depliage', async () => {
-    await panel.locator('.j2ha-eq-toggle').click();
-    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+    const started = Date.now();
+    await row.locator('.j2ha-wv-row').click();
+    await panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' });
+    // Chronométrage du chargement d'un équipement sélectionné (valeur seulement, aucun seuil) : réserve de 25.3.
+    helpers.record('temps_chargement_eq_selectionne_ms', Date.now() - started);
   });
   await atStep(helpers, 5, 'table', () => panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' }));
   await atStep(helpers, 6, 'ancre-bloquante', () => panel.locator('.j2ha-goto-blocking').waitFor({ state: 'visible' }));

@@ -1,6 +1,12 @@
 /** Parcours de découverte lecture seule : pièce 25 puis équipement 579 (étendu en 20.3 :
  * absence de la synthèse et de la modale Diagnostic, chaînes interdites, compteurs de la pièce ;
- * 25.1 : un seul état par équipement, contrôle segmenté, tableau regroupé par entité). */
+ * 25.1 : un seul état par équipement, contrôle segmenté, tableau regroupé par entité).
+ *
+ * Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C (racine `#j2ha_workView`, arbre à gauche, détail à
+ * droite). Les exigences sont conservées, avec les MÊMES étiquettes d'erreur, clés `record` et étapes : « modale » = la vue
+ * est visible ; « dépliage » = sélection de l'équipement dans l'arbre ; les mots d'état de toute la pièce se lisent dans les
+ * lignes de l'arbre ; les compteurs de pièce (y compris « Sans pièce ») dans le détail de pièce ; « fermeture » = retour à
+ * la page principale. Vrais clics Playwright (contrôle d'actionnabilité), plus aucun dispatchEvent. */
 
 export const name = 'decouverte-piece-25-eq-579';
 export const declaredEquipments = {};
@@ -11,7 +17,7 @@ export const declaredBascules = [];
  * (les commandes ignorées ne sont plus des lignes : un équipement peut n'en avoir aucune). */
 async function waitForDiagnostics(page, eqId) {
   await page.waitForFunction((targetId) => {
-    const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
+    const panels = [...document.querySelectorAll('#j2ha_workView .j2ha-eq-panel')];
     const panel = panels.find((item) => item.getAttribute('data-eq-id') === targetId);
     if (!panel) return false;
     const badge = panel.querySelector('.j2ha-eq-publish-badge');
@@ -49,24 +55,24 @@ async function readCommandStates(panel) {
   }));
 }
 
-/** Attend puis lit les états de badge de tous les équipements déjà présents dans la modale. */
-async function readEquipmentBadgeStates(page, modal) {
+/** Attend puis lit les états de tous les équipements de la pièce, dans les lignes de l'arbre de la vue (l'état de chaque
+ * ligne est celui de l'entrée agrégée de la page : même vocabulaire que le badge du détail). Un équipement « non lu » n'a pas
+ * de mot d'état et n'est pas relevé. */
+async function readEquipmentBadgeStates(page, view, roomId) {
   const states = ['published', 'to_apply', 'blocked', 'excluded', 'disabled', 'nothing_to_publish'];
-  await page.waitForFunction((known) => {
-    const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
-    return panels.length > 0 && panels.every((item) => {
-      const badge = item.querySelector('.j2ha-eq-publish-badge');
-      return badge && known.some((state) => badge.classList.contains(`j2ha-state-${state}`));
-    });
-  }, states);
-  return modal.locator('.j2ha-eq-panel').evaluateAll((panels, known) => panels.map((item) => {
-    const badge = item.querySelector('.j2ha-eq-publish-badge');
+  const rows = view.locator(`.j2ha-wv-room[data-object_id="${roomId}"] .j2ha-wv-eq`);
+  await page.waitForFunction(({ id }) => {
+    const items = [...document.querySelectorAll(`#j2ha_workView .j2ha-wv-room[data-object_id="${id}"] .j2ha-wv-eq`)];
+    return items.length > 0 && items.every((item) => item.querySelector('.j2ha-state-word') || item.querySelector('.j2ha-wv-unread'));
+  }, { id: roomId });
+  return rows.evaluateAll((items, known) => items.map((item) => {
+    const word = item.querySelector('.j2ha-state-word');
     const names = {
       published: 'publie', to_apply: 'a-appliquer', blocked: 'bloque', excluded: 'exclu',
       disabled: 'desactive', nothing_to_publish: 'rien-a-publier',
     };
     let state = 'inconnu';
-    known.forEach((candidate) => { if (badge?.classList.contains(`j2ha-state-${candidate}`)) state = names[candidate]; });
+    known.forEach((candidate) => { if (word?.classList.contains(`j2ha-state-${candidate}`)) state = names[candidate]; });
     return { id: item.getAttribute('data-eq-id'), state };
   }), states);
 }
@@ -123,15 +129,12 @@ async function checkRemovedElements(page, helpers) {
   helpers.record('lectures_synthese_diagnostic', loadRequests);
 }
 
-/** Relève les compteurs de la pièce ouverte (25.1) : un chiffre et un mot court par état d'équipement non
- * nul, dont la somme est le nombre d'équipements de la pièce. */
-async function readRoomCounters(modal, helpers, prefix) {
-  // Les compteurs ne sont complets qu'une fois tous les équipements de la pièce lus (badges rendus).
-  await modal.page().waitForFunction(() => {
-    const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
-    return panels.length > 0 && panels.every((item) => (item.querySelector('.j2ha-eq-publish-badge')?.textContent ?? '').trim() !== '');
-  });
-  const counters = await modal.locator('.j2ha-room-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+/** Relève les compteurs de la pièce ouverte (25.1, KPI du détail de pièce en 25.4) : un chiffre et un mot court par état
+ * d'équipement non nul, dont la somme est le nombre d'équipements lus de la pièce. `roomId` : identifiant d'objet. */
+async function readRoomCounters(view, helpers, prefix, roomId) {
+  // Les compteurs viennent des états de la page : attendre qu'ils soient rendus.
+  await view.locator('.j2ha-wv-kpis .j2ha-room-counter').first().waitFor({ state: 'visible' });
+  const counters = await view.locator('.j2ha-wv-kpis .j2ha-room-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
   if (counters.length < 1 || counters.length > 6) throw new Error('compteurs-piece-incomplets');
   let total = 0;
   counters.forEach((text, index) => {
@@ -140,7 +143,10 @@ async function readRoomCounters(modal, helpers, prefix) {
     total += Number(match[1]);
     helpers.record(`${prefix}_compteur_${index + 1}`, text);
   });
-  const equipments = await modal.locator('.j2ha-eq-panel').count();
+  // Équipements de la pièce, hors « non lus » (sans état) : la somme des compteurs est celle des équipements lus.
+  const equipments = await view.locator(`.j2ha-wv-room[data-object_id="${roomId}"] .j2ha-wv-eq`).evaluateAll((items) => (
+    items.filter((item) => !item.querySelector('.j2ha-wv-unread')).length
+  ));
   if (total !== equipments) throw new Error('compteurs-piece-somme-inattendue');
 }
 
@@ -226,16 +232,19 @@ export async function run(page, { helpers }) {
   const roomCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
   await waitAtStep(helpers, 1, 'carte-piece-25', () => roomCard.click());
 
-  const modal = page.locator('.modal-j2ha-room');
-  await waitAtStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="579"]');
-  await waitAtStep(helpers, 3, 'panneau-eq-579', () => panel.waitFor({ state: 'visible' }));
+  // « modale » : la vue de travail est visible (plus aucune fenêtre ; l'étape garde son étiquette de suivi).
+  const view = page.locator('#j2ha_workView');
+  await waitAtStep(helpers, 2, 'modale', () => view.waitFor({ state: 'visible' }));
+  const row = view.locator('.j2ha-wv-eq[data-eq-id="579"]');
+  const panel = view.locator('.j2ha-eq-panel[data-eq-id="579"]');
+  await waitAtStep(helpers, 3, 'panneau-eq-579', () => row.waitFor({ state: 'visible' }));
 
-  const eqId = await panel.getAttribute('data-eq-id');
+  const eqId = await row.getAttribute('data-eq-id');
   if (!/^\d+$/.test(eqId ?? '')) throw new Error('eqid-eq-579-illisible');
+  // « dépliage » : sélection de l'équipement dans l'arbre (clic réel sur sa ligne) ; son détail est déjà déplié.
   await waitAtStep(helpers, 4, 'depliage', async () => {
-    await panel.locator('.j2ha-eq-toggle').click();
-    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+    await row.locator('.j2ha-wv-row').click();
+    await panel.waitFor({ state: 'visible' });
   });
   await waitAtStep(helpers, 5, 'table', () => {
     return panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' });
@@ -252,12 +261,22 @@ export async function run(page, { helpers }) {
   const summary = (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
   if (!summary) throw new Error('synthese-eq-579-illisible');
   helpers.record('synthese', summary);
-  for (const equipment of await readEquipmentBadgeStates(page, modal)) {
+  // L'action « Supprimer de Home Assistant… » de l'équipement est dans le détail de l'équipement.
+  const perEquipment = await panel.locator('.j2ha-eq-recreate').count();
+  // Mots d'état de TOUS les équipements de la pièce : lignes de l'arbre (entrées agrégées de la page).
+  for (const equipment of await readEquipmentBadgeStates(page, view, '25')) {
     if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
     helpers.record(`eq_${equipment.id}_badge`, equipment.state);
   }
-  const disabledPanel = modal.locator('.j2ha-eq-panel[data-eq-id="514"]');
-  await waitAtStep(helpers, 7, 'diagnostics-eq-514', () => waitForDiagnostics(page, '514'));
+  // Parité : le mot d'état de l'arbre pour l'équipement 579 est celui de son badge de détail.
+  const treeWord = (await row.locator('.j2ha-state-word').first().innerText()).trim();
+  if (treeWord !== summary) throw new Error('etat-arbre-different-du-badge-eq-579');
+  const disabledRow = view.locator('.j2ha-wv-eq[data-eq-id="514"]');
+  await waitAtStep(helpers, 7, 'diagnostics-eq-514', async () => {
+    await disabledRow.locator('.j2ha-wv-row').click();
+    await waitForDiagnostics(page, '514');
+  });
+  const disabledPanel = view.locator('.j2ha-eq-panel[data-eq-id="514"]');
   const disabledBadge = (await disabledPanel.locator('.j2ha-eq-publish-badge').innerText()).trim();
   if (!disabledBadge || !(await disabledPanel.locator('.j2ha-eq-publish-badge').evaluate((badge) => badge.classList.contains('j2ha-state-disabled')))) {
     throw new Error('badge-eq-514-non-desactive');
@@ -267,43 +286,42 @@ export async function run(page, { helpers }) {
     helpers.record(`eq_514_cmd_${command.id}_etat`, command.state);
   }
 
-  // Story 20.3 : compteurs de la pièce ouverte, chaînes interdites dans la modale, actions déplacées présentes
+  // Story 20.3 : compteurs de la pièce ouverte, chaînes interdites dans la vue, actions déplacées présentes
   // (jamais cliquées par le gate : le clic réel est une preuve terrain séparée, avec GO d'Alexandre).
-  await waitAtStep(helpers, 8, 'compteurs-piece-25', () => readRoomCounters(modal, helpers, 'piece_25'));
-  const roomRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
+  // Story 25.4 : les compteurs et les actions de pièce sont dans le détail de pièce (clic sur la ligne de la pièce).
+  await waitAtStep(helpers, 8, 'compteurs-piece-25', async () => {
+    await view.locator('.j2ha-wv-room[data-object_id="25"] > .j2ha-wv-row').click();
+    await readRoomCounters(view, helpers, 'piece_25', '25');
+  });
+  const roomRanks = await forbiddenTextRanks(page, '#j2ha_workView');
   if (roomRanks.length) throw new Error(`chaine-interdite-piece-${roomRanks.join('-')}`);
   helpers.record('chaines_interdites_piece', 0);
-  const actionsPresent = await modal.evaluate((node) => ({
+  const actionsPresent = await view.evaluate((node) => ({
     republish: node.querySelectorAll('.j2ha-room-republish').length,
     recreate: node.querySelectorAll('.j2ha-room-recreate').length,
-    perEquipment: node.querySelectorAll('.j2ha-eq-recreate').length,
   }));
-  if (actionsPresent.republish !== 1 || actionsPresent.recreate !== 1 || actionsPresent.perEquipment < 1) {
+  if (actionsPresent.republish !== 1 || actionsPresent.recreate !== 1 || perEquipment < 1) {
     throw new Error('actions-deplacees-absentes');
   }
   helpers.record('actions_piece_presentes', true);
 
   // « Sans pièce » (quand la carte existe) : compteurs lus, aucune action de pièce.
   if (unassignedCount === 1) {
-    await page.keyboard.press('Escape');
-    await waitAtStep(helpers, 9, 'fermeture-piece-25', () => modal.waitFor({ state: 'detached' }));
-    await waitAtStep(helpers, 10, 'carte-sans-piece', () => unassigned.click());
-    const unassignedModal = page.locator('.modal-j2ha-room');
-    await waitAtStep(helpers, 11, 'modale-sans-piece', () => unassignedModal.waitFor({ state: 'visible' }));
-    await waitAtStep(helpers, 12, 'compteurs-sans-piece', async () => {
-      await unassignedModal.locator('.j2ha-room-counter').first().waitFor({ state: 'visible' });
-      await page.waitForFunction(() => {
-        const panels = [...document.querySelectorAll('.modal-j2ha-room .j2ha-eq-panel')];
-        return panels.length > 0 && panels.every((item) => {
-          const badge = item.querySelector('.j2ha-eq-publish-badge');
-          return badge && badge.textContent.trim() !== '';
-        });
-      });
-      await readRoomCounters(unassignedModal, helpers, 'sans_piece');
+    // « fermeture » : retour à la page principale (clic réel sur « Toutes les pièces »), la grille est de nouveau visible.
+    await waitAtStep(helpers, 9, 'fermeture-piece-25', async () => {
+      await view.locator('.j2ha-wv-back').click();
+      await view.waitFor({ state: 'hidden' });
     });
-    const unassignedRanks = await forbiddenTextRanks(page, '.modal-j2ha-room');
+    await waitAtStep(helpers, 10, 'carte-sans-piece', () => unassigned.click());
+    const unassignedView = page.locator('#j2ha_workView');
+    await waitAtStep(helpers, 11, 'modale-sans-piece', () => unassignedView.waitFor({ state: 'visible' }));
+    await waitAtStep(helpers, 12, 'compteurs-sans-piece', async () => {
+      await unassignedView.locator('.j2ha-wv-kpis .j2ha-room-counter').first().waitFor({ state: 'visible' });
+      await readRoomCounters(unassignedView, helpers, 'sans_piece', '0');
+    });
+    const unassignedRanks = await forbiddenTextRanks(page, '#j2ha_workView');
     if (unassignedRanks.length) throw new Error(`chaine-interdite-sans-piece-${unassignedRanks.join('-')}`);
-    const roomActions = await unassignedModal.locator('.j2ha-room-republish, .j2ha-room-recreate').count();
+    const roomActions = await unassignedView.locator('.j2ha-room-republish, .j2ha-room-recreate').count();
     if (roomActions !== 0) throw new Error('actions-piece-sans-piece');
     helpers.record('sans_piece_sans_action_piece', true);
   }
