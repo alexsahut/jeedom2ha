@@ -69,3 +69,7 @@ test('25.6/25.8 gate — l\'arbre lit « Pièce exclue » quand une pièce n\'a 
   const readers = source.match(/ratio: \(\(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-ratio'\)\?\.textContent \?\? ''\) \|\| \(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-excluded'\)\?\.textContent \?\? ''\)\)\.trim\(\),/g) || [];
   assert.equal(readers.length, 2, 'les deux lectures d\'arbre (portée pièce et élargissement) se replient sur « Pièce exclue »');
 });
+
+test('25.8 gate — la carte ignore le suffixe « pas encore retirés » pour comparer « Pièce exclue » à l\'arbre', () => {
+  assert.match(source, /\.filter\(\(node\) => !\(node\.classList && node\.classList\.contains\('j2ha-room-notyet'\)\)\)/);
+});

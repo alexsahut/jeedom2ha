@@ -59,7 +59,11 @@ const VIEW = '#j2ha_workView';
 async function readCards(page) {
   return page.locator('#j2ha_roomCards .j2ha-room-card').evaluateAll((cards) => cards.map((card) => ({
     id: card.getAttribute('data-object_id'),
-    ratio: (card.querySelector('.j2ha-room-ratio')?.textContent ?? '').replace(/ publiés?$/, '').trim(),
+    // Story 25.8 : le suffixe « · N pas encore retirés » d'une pièce exclue (relecture en attente) n'a pas d'équivalent dans
+    // l'arbre ; il est ignoré pour comparer le libellé « Pièce exclue » (relecture Codex #312).
+    ratio: [...(card.querySelector('.j2ha-room-ratio')?.childNodes ?? [])]
+      .filter((node) => !(node.classList && node.classList.contains('j2ha-room-notyet')))
+      .map((node) => node.textContent ?? '').join('').replace(/ publiés?$/, '').trim(),
     excluded: Number(((card.querySelector('.j2ha-room-marks .j2ha-mark-excluded')?.textContent ?? '').match(/^\d+/) ?? ['0'])[0]),
     // Les repères « non lus » (25.3) et « N exclus » (25.7) n'ont pas d'équivalent dans les repères de l'arbre.
     marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$/.test(text)),
