@@ -90,7 +90,7 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     const diff = diffAgainstBase(['-U0'], ['resources/daemon/transport/http_server.py']);
     if (diff === null) return;
     const removed = removedLines(diff).map((line) => line.slice(1).trim());
-    if (removed.length === 0) {
+    if (diff === '') {
       // Base déjà porteuse de 25.8 (CI de `main` après la fusion de #309) : le diff est vide, on vérifie l'état final.
       const source = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
       assert.ok(source.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));
