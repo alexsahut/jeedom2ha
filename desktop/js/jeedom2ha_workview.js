@@ -174,7 +174,7 @@
         var isExpanded = active ? true : !!expanded[id];
         list.push({
           object_id: id, name: room.object_name, icon: room.icon_classes, color: room.color,
-          total: room.equipments.length,
+          total: room.equipments.length, excluded: room.excluded === true && room.object_id > 0,
           published: counts ? counts.published : null, blocked: counts ? counts.blocked : 0, to_apply: counts ? counts.to_apply : 0,
           hasStates: !!ov, expanded: isExpanded, selected: input.selectedRoom === id && input.selectedEq == null,
           rows: isExpanded ? rows : [],
@@ -764,7 +764,11 @@
       $row.append($toggle);
       $row.append($('<i class="j2ha-wv-icon"></i>').addClass(room.icon).attr('aria-hidden', 'true'));
       $row.append($('<span class="j2ha-wv-name j2ha-free-name"></span>').text(room.name));
-      if (room.published !== null) {
+      if (room.excluded) {
+        // Story 25.8 (AC12) : « Pièce exclue » à la place du ratio (mot et icône, pas seulement la couleur).
+        $row.append($('<span class="text-muted j2ha-wv-excluded"></span>')
+          .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>')).append(doc.createTextNode(' {{Pièce exclue}}')));
+      } else if (room.published !== null) {
         $row.append($('<span class="text-muted j2ha-wv-ratio"></span>').text(room.published + ' / ' + room.total));
       }
       var $marks = $('<span class="j2ha-wv-room-marks"></span>');
@@ -937,6 +941,9 @@
       $head.append($title);
       $head.append(surface.buildRoomActions(room));
       el.pane.append($head);
+      // Story 25.8 (AC7) : encart neutre d'une pièce exclue (jamais pour « Sans pièce »).
+      var $excludedNotice = typeof surface.buildRoomExcludedNotice === 'function' ? surface.buildRoomExcludedNotice(room) : null;
+      if ($excludedNotice) el.pane.append($excludedNotice);
       el.kpis = $('<div class="j2ha-wv-kpis" role="group"></div>').attr('aria-label', '{{Indicateurs de la pièce}}');
       el.exclusion = $('<p class="text-muted j2ha-wv-exclusion"></p>');
       el.kpiBlock = $('<div class="j2ha-wv-kpiblock"></div>').append(el.kpis);
@@ -1074,8 +1081,22 @@
     }
 
     // --- Mise à jour à chaque rendu de la page B (relecture des états) ---
+    // Story 25.8 : le drapeau « pièce exclue » vit dans la page principale (source unique, remplacé par une écriture réussie) ;
+    // la vue en recopie la valeur à chaque rendu. Rend vrai si une pièce a changé.
+    function syncExcludedFlags() {
+      if (!page || typeof page.isRoomExcluded !== 'function') return false;
+      var changed = false;
+      rooms.forEach(function (room) {
+        var next = room.object_id > 0 && page.isRoomExcluded(room.object_id) === true;
+        if (room.excluded !== next) { room.excluded = next; changed = true; }
+      });
+      return changed;
+    }
+
     function onPageRender() {
+      var excludedChanged = syncExcludedFlags();
       if (!st.open) return;
+      if (excludedChanged && st.room !== null && st.eq === null) renderPane();
       renderStatus();
       renderChips();
       renderTree();

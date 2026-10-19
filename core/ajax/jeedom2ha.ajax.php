@@ -826,6 +826,29 @@ try {
         . '" confidencePolicy="' . $confidencePolicy . '"');
       ajax::success(['saved' => true]);
     }
+    else if ($action == 'saveRoomExclusion') {
+      // Story 25.8 (D2) — exclusion d'une pièce depuis la surface : lit, modifie puis écrit la SEULE clé
+      // `excludedObjects` (jamais excludedPlugins ni confidencePolicy). Aucun appel au démon, aucune relecture
+      // implicite : l'interface enchaîne explicitement la relecture après la confirmation chiffrée.
+      require_once __DIR__ . '/../php/jeedom2ha_room_exclusion.php'; // fonctions pures, sans cœur Jeedom
+      $result = jeedom2ha_save_room_exclusion(
+        init('objectId', ''),
+        init('excluded', ''),
+        function (int $objectId) {
+          return is_object(jeeObject::byId($objectId));
+        },
+        function () {
+          return (string) config::byKey('excludedObjects', 'jeedom2ha', '');
+        },
+        function (string $value) {
+          config::save('excludedObjects', $value, 'jeedom2ha');
+        },
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        }
+      );
+      ajax::success($result);
+    }
     else if ($action == 'executeHaAction') {
       // Story 5.1 — Relay strict de la façade backend unique /action/execute.
       // Aucun calcul local : les paramètres sont transmis au daemon tel quel.

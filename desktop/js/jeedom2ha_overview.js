@@ -113,7 +113,11 @@
       var summary = M.summarizeRoom(trees, list.length, enabledById);
       summaries.push(summary);
       var exclusion = M.exclusionBreakdown(rows.filter(function (r) { return r.state === 'excluded'; }));
-      out.rooms.push({ object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows });
+      out.rooms.push({
+        object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows,
+        // Story 25.8 : la pièce est exclue (clé `excludedObjects`) — jamais pour « Sans pièce ».
+        excluded: room.excluded === true && room.object_id > 0,
+      });
       out.total += list.length;
       if (room.object_id > 0) out.rooms_count += 1;
       GROUP_KEYS.forEach(function (key) { out.counts[key] += counts[key]; });
@@ -149,6 +153,68 @@
     if (counts.other > 0) parts.push(counts.other + ' ' + w('exclus et autres'));
     if (counts.unread > 0) parts.push(unreadLabel(counts.unread));
     return parts.join(', ');
+  }
+
+  // --- Story 25.8 : exclusion d'une pièce — nombre d'entités annoncé (Q1 B) et texte de la confirmation (D4) ---
+  // Fonctions PURES : le nombre est calculé depuis la copie des états déjà en mémoire (aucune requête avant le clic de confirmation).
+
+  /**
+   * @param {object} snap `page.snapshot()` : { kind, view: { stale, equipments, overview } }
+   * @param {Array} rooms `j2haRoomsTree`
+   * @returns {{known: boolean, entities: number, unknown: number, unread: number, pending: number}} `entities` : entités PRÉSENTES dans
+   *   Home Assistant (`present_in_ha`) des équipements lus de la pièce ; `unknown` : entités à présence inconnue (non comptées) ;
+   *   `unread` : équipements de la pièce absents de la copie ; `pending` : effectif maison « à appliquer » (la relecture les applique aussi).
+   */
+  function roomExclusionImpact(snap, rooms, roomId) {
+    var out = { known: false, entities: 0, unknown: 0, unread: 0, pending: 0 };
+    var view = snap && snap.view;
+    if (!snap || snap.kind !== 'ok' || !view || view.stale === true || !view.equipments || !view.overview) return out;
+    out.known = true;
+    out.pending = (view.overview.counts && view.overview.counts.to_apply) || 0;
+    var room = (Array.isArray(rooms) ? rooms : []).filter(function (r) { return r && r.object_id === roomId; })[0];
+    if (!room) return out;
+    (Array.isArray(room.equipments) ? room.equipments : []).forEach(function (eq) {
+      var key = String(eq.eq_id);
+      if (!Object.prototype.hasOwnProperty.call(view.equipments, key)) { out.unread += 1; return; }
+      var entities = view.equipments[key] && Array.isArray(view.equipments[key].entities) ? view.equipments[key].entities : [];
+      entities.forEach(function (entity) {
+        if (entity && entity.present_in_ha === true) out.entities += 1;
+        else if (!entity || typeof entity.present_in_ha !== 'boolean') out.unknown += 1;
+      });
+    });
+    return out;
+  }
+
+  /** Texte de la confirmation (D4) : { title, lines[], confirmLabel, danger }. Le nom est du texte brut (échappé au rendu). */
+  function roomExclusionDialog(input) {
+    var rawName = input && input.name;
+    var name = rawName === undefined || rawName === null ? '' : String(rawName);
+    var impact = (input && input.impact) || { known: false, entities: 0, unknown: 0, unread: 0, pending: 0 };
+    var lines = [];
+    var out;
+    if (input && input.excluded) {
+      if (!impact.known) {
+        lines.push("{{Nombre d'entités inconnu : la lecture des états n'est pas disponible.}}");
+      } else if (impact.entities === 0) {
+        lines.push("{{Aucune entité n'est publiée dans cette pièce.}}");
+      } else {
+        lines.push(impact.entities + ' ' + w(impact.entities > 1 ? 'entités seront retirées' : 'entité sera retirée') + ' ' + w('de Home Assistant.'));
+      }
+      if (impact.known && impact.unknown > 0) {
+        lines.push(impact.unknown + ' ' + w(impact.unknown > 1 ? 'entités dont la présence est inconnue ne sont pas comptées.' : 'entité dont la présence est inconnue n\'est pas comptée.'));
+      }
+      if (impact.known && impact.unread > 0) {
+        lines.push(impact.unread + ' ' + w(impact.unread > 1 ? 'équipements non lus ne sont pas comptés.' : 'équipement non lu n\'est pas compté.'));
+      }
+      out = { title: w('Exclure la pièce') + ' « ' + name + ' » ' + w('de Home Assistant ?'), lines: lines, confirmLabel: '{{Exclure la pièce}}', danger: true };
+    } else {
+      lines.push("{{Ses équipements seront relus et publiés s'ils sont publiables.}}");
+      out = { title: w('Ne plus exclure la pièce') + ' « ' + name + ' » ?', lines: lines, confirmLabel: '{{Ne plus exclure}}', danger: false };
+    }
+    if (impact.pending > 0) {
+      lines.push(w('La relecture appliquera aussi') + ' ' + (impact.pending > 1 ? w('les') + ' ' + impact.pending + ' ' + w('réglages en attente') : w('le réglage en attente')) + ' ' + w('de la maison.'));
+    }
+    return out;
   }
 
   // --- États de rendu de la lecture (D2) ---
@@ -321,6 +387,17 @@
 
     function chipId(key) { return '.j2ha-chip-filter[data-filter="' + key + '"]'; }
 
+    // Story 25.8 : l'état « pièce exclue » vit dans `rooms` (j2haRoomsTree, champ `excluded`) ; une écriture réussie le
+    // remplace pour TOUTES les pièces depuis `excluded_objects` (une écriture d'un autre onglet est ainsi reflétée).
+    function roomOf(id) { return rooms.filter(function (r) { return r.object_id === id; })[0] || null; }
+    function isRoomExcluded(id) { var r = roomOf(id); return !!r && r.object_id > 0 && r.excluded === true; }
+    function roomName(id) { var r = roomOf(id); return r ? String(r.object_name) : ''; }
+    function setExcludedObjects(ids) {
+      var list = Array.isArray(ids) ? ids : [];
+      rooms.forEach(function (room) { room.excluded = room.object_id > 0 && list.indexOf(room.object_id) !== -1; });
+      render();
+    }
+
     function stateWord(state) {
       return $('<span class="j2ha-state-word"></span>').addClass('j2ha-state-' + state)
         .append($('<i class="fas"></i>').addClass(STATE_ICONS[state]))
@@ -393,6 +470,30 @@
         .append(document_text(' ' + (busy ? w('Actualisation…') : w('Actualiser'))));
     }
 
+    // Story 25.8 : libellé du menu « ⋯ » de la carte selon l'état d'exclusion de la pièce (« Exclure… » / « Ne plus exclure… »).
+    function syncRoomMenu($card, excluded) {
+      var $item = $card.find('.j2ha-room-exclude');
+      if ($item.length === 0) return;
+      $item.attr('data-excluded', excluded ? '1' : '0');
+      $item.find('.j2ha-room-exclude-label').text(excluded ? w('Ne plus exclure la pièce…') : w('Exclure la pièce…'));
+    }
+
+    // Équipements de la pièce pas encore exclus dans la copie des états (relecture à faire ou échouée) : ni « Exclu », ni
+    // « Désactivé » (qui prime et le reste), ni non lu.
+    function notYetRemovedCount(room) {
+      return room.equipments.filter(function (row) { return row.state !== null && row.state !== 'excluded' && row.state !== 'disabled'; }).length;
+    }
+
+    function excludedLine(notYet) {
+      var $line = $('<div class="j2ha-room-ratio j2ha-room-excluded-line"></div>')
+        .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'))
+        .append(document_text(' ' + w('Pièce exclue')));
+      if (notYet > 0) {
+        $line.append($('<span class="j2ha-room-notyet"></span>').text(' · ' + notYet + ' ' + w(notYet > 1 ? 'pas encore retirés' : 'pas encore retiré')));
+      }
+      return $line;
+    }
+
     function renderCards(vm) {
       var o = vm.overview;
       $('#j2ha_roomCards .j2ha-room-card').each(function (_i, el) {
@@ -400,14 +501,28 @@
         var id = parseInt($card.attr('data-object_id'), 10);
         var $slot = $card.find('.j2ha-room-state').empty();
         var room = o ? o.rooms.filter(function (r) { return r.object_id === id; })[0] : null;
-        $card.removeClass('j2ha-room-blocked j2ha-room-dim');
+        var excluded = isRoomExcluded(id);
+        syncRoomMenu($card, excluded);
+        $card.removeClass('j2ha-room-blocked j2ha-room-dim j2ha-room-excluded');
         if (!room) {
           $card.removeAttr('aria-label');
+          if (excluded) {
+            // Les états ne sont pas lus : la carte dit quand même que la pièce est exclue (écriture déjà enregistrée).
+            $card.addClass('j2ha-room-excluded');
+            $slot.append(excludedLine(0));
+            $card.attr('aria-label', roomName(id) + ', ' + w('pièce exclue'));
+          }
           return;
         }
         var c = room.counts;
         var total = room.summary.equipments_total;
-        $slot.append($('<div class="j2ha-room-ratio"></div>').text(c.published + ' / ' + total + ' ' + w(c.published > 1 ? 'publiés' : 'publié')));
+        // Story 25.8 (AC12, Q4) : « Pièce exclue » REMPLACE seulement le ratio ; la jauge et les repères sont conservés.
+        if (excluded) {
+          $card.addClass('j2ha-room-excluded');
+          $slot.append(excludedLine(notYetRemovedCount(room)));
+        } else {
+          $slot.append($('<div class="j2ha-room-ratio"></div>').text(c.published + ' / ' + total + ' ' + w(c.published > 1 ? 'publiés' : 'publié')));
+        }
         $slot.append(buildGauge(c, total, 'j2ha-gauge-card'));
         var $marks = $('<div class="j2ha-room-marks"></div>');
         if (c.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(plural(c.blocked, 'bloqué', 'bloqués')));
@@ -425,7 +540,7 @@
         $slot.append($marks);
         if (c.blocked > 0) $card.addClass('j2ha-room-blocked');
         if (filter && filterMatchesNothing(room)) $card.addClass('j2ha-room-dim');
-        $card.attr('aria-label', room.object_name + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
+        $card.attr('aria-label', room.object_name + (excluded ? ', ' + w('pièce exclue') : '') + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
       });
     }
 
@@ -542,6 +657,8 @@
         if (openMenuWrap && openMenuWrap.get(0) === $wrap.get(0)) closeMenu(false); else open();
       });
       function onKey(event) {
+        // Story 25.8 : un menu posé dans une carte ne doit jamais faire remonter ses touches jusqu'à la carte (qui ouvrirait la pièce).
+        if (event && event.stopPropagation) event.stopPropagation();
         var key = event && event.key;
         if (key === 'Escape') { closeMenu(true); return; }
         if (key !== 'ArrowDown' && key !== 'ArrowUp') return;
@@ -557,6 +674,28 @@
       $wrap.find('.j2ha-menu').on('keydown', onKey);
       $wrap.find('.j2ha-menu-item').each(function (_i, el) {
         $(el).on('click.j2haMenu', function () { closeMenu(false); });
+      });
+    }
+
+    // Story 25.8 (AC6) : menu « ⋯ » d'une carte de pièce. La carte est un role="button" qui ouvre la pièce : le clic, keydown et keyup
+    // du bouton, du menu et de ses entrées sont arrêtés avant l'`onclick` de la carte et l'écouteur clavier ci-dessous.
+    function bindRoomMenu($wrap) {
+      var $card = $wrap.closest('.j2ha-room-card');
+      var $toggle = $wrap.find('.j2ha-menu-toggle');
+      var $menu = $wrap.find('.j2ha-menu');
+      function stop(event) { if (event && event.stopPropagation) event.stopPropagation(); }
+      // Classe posée ici (le balisage de la carte reste celui de 25.3) : elle ancre le menu dans le coin de la carte.
+      $card.addClass('j2ha-room-has-menu');
+      bindMenu($wrap);
+      $toggle.on('keyup', stop);
+      $menu.on('click', stop);
+      $menu.on('keyup', stop);
+      $wrap.find('.j2ha-room-exclude').on('click', function (event) {
+        stop(event);
+        var $item = $wrap.find('.j2ha-room-exclude');
+        if ($item.prop('disabled')) return;
+        var id = parseInt($card.attr('data-object_id'), 10);
+        if (typeof env.excludeRoom === 'function') env.excludeRoom(id, roomName(id), !isRoomExcluded(id), $item, $toggle);
       });
     }
 
@@ -582,6 +721,7 @@
       $('#bt_clearFilter').on('click', function () { setFilter(null); });
       $('#j2ha_filterPanel').on('keydown', onFilterKey);
       $('#j2ha_moreMenu .j2ha-menu-wrap').each(function (_i, el) { bindMenu($(el)); });
+      $('#j2ha_roomCards .j2ha-room-menu').each(function (_i, el) { bindRoomMenu($(el)); });
       $('#bt_openDiagnostic').on('click', openDiagnosticDialog);
       $('#j2ha_roomCards .j2ha-room-card').each(function (_i, el) {
         $(el).on('keydown', function (event) {
@@ -603,14 +743,22 @@
       reader.load();
     }
 
+    function snapshotNow() {
+      return { kind: lastState && lastState.kind, view: lastView, filter: filter, readAt: lastState && lastState.readAt };
+    }
+
     return {
       reader: reader, init: init, render: render, setFilter: setFilter, setFilterExact: setFilterExact,
+      // Story 25.8 : drapeau « pièce exclue » (lecture) et remplacement depuis `excluded_objects` d'une écriture réussie.
+      isRoomExcluded: isRoomExcluded, setExcludedObjects: setExcludedObjects,
+      // Confirmation chiffrée de l'exclusion d'une pièce, calculée depuis la copie des états en mémoire (aucune requête).
+      exclusionDialog: function (id, name, excluded) {
+        return roomExclusionDialog({ name: name, excluded: excluded, impact: roomExclusionImpact(snapshotNow(), rooms, id) });
+      },
       filter: function () { return filter; },
       view: function () { return lastView; },
       // Story 25.4 : ce que la vue de travail lit (copie unique en mémoire, agrégats dérivés) et abonnement aux rendus.
-      snapshot: function () {
-        return { kind: lastState && lastState.kind, view: lastView, filter: filter, readAt: lastState && lastState.readAt };
-      },
+      snapshot: snapshotNow,
       subscribe: function (fn) {
         subscribers.push(fn);
         return function () { subscribers = subscribers.filter(function (f) { return f !== fn; }); };
@@ -625,6 +773,8 @@
     gaugeLabel: gaugeLabel,
     houseHeadline: houseHeadline,
     chipsFor: chipsFor,
+    roomExclusionImpact: roomExclusionImpact,
+    roomExclusionDialog: roomExclusionDialog,
     GROUP_KEYS: GROUP_KEYS,
     GROUP_OF_STATE: GROUP_OF_STATE,
     plural: plural,
@@ -653,6 +803,8 @@
         setTimeout: function (fn, ms) { return window.setTimeout(fn, ms); },
         clearTimeout: function (id) { window.clearTimeout(id); },
         openRoom: function (id) { if (typeof window.j2haOpenRoom === 'function') window.j2haOpenRoom(id); },
+        // Story 25.8 : demande d'exclusion d'une pièce (confirmation chiffrée, écriture, relecture) — jeedom2ha.js.
+        excludeRoom: function () { if (typeof window.requestRoomExclusion === 'function') return window.requestRoomExclusion.apply(window, arguments); },
         // Story 25.4 : la vue de travail remplace la fenêtre de pièce ; `false` = vue indisponible (repli sur la page B).
         openView: function (target) {
           var view = window.Jeedom2haWorkviewInstance;

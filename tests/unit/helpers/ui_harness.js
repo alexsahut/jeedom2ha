@@ -161,7 +161,10 @@ function createUi(rooms, options) {
     pluginNames: opts.pluginNames || {},
     openRoom: (id) => holder.wv.open({ room: id }),
     openView: (target) => holder.wv.open(target),
+    // Story 25.8 : le menu « ⋯ » d'une carte demande l'exclusion par la fonction du gabarit (jeedom2ha.js), comme en production.
+    excludeRoom: function () { return sandbox.requestRoomExclusion.apply(null, arguments); },
   });
+  win.Jeedom2haOverviewPage = page;
   const wv = W.createWorkview({
     $: dom.$, document: dom.document, window: win, surface: win.Jeedom2haSurface,
     page, rooms: win.j2haRoomsTree, now: env.now, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout,

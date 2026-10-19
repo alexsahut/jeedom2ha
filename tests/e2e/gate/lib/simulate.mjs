@@ -30,6 +30,9 @@
  *     vigueur (une écriture "sauvegardée" simulée, jamais transmise au démon).
  *   - lastPreviewType : même forme que ctx.lastPreviewType de policy.mjs — à propager tel
  *     quel dans le ctx de classifyRequest pour que saveMappingOverride soit autorisée.
+ *   - roomExclusionIds (Story 25.8) : identifiants d'objets exclus SIMULÉS, initialisés depuis la valeur RÉELLE de
+ *     `excludedObjects` (lue en lecture seule par le lanceur, `setRoomExclusionBase`) puis tenus à jour par les écritures
+ *     `saveRoomExclusion` déclarées. La configuration réelle n'est jamais écrite.
  */
 
 function key(eqId, cmdId) {
@@ -46,6 +49,50 @@ export function createState() {
     simulations: Object.create(null),
     lastPreviewType: Object.create(null),
     publicationSimulations: Object.create(null),
+    roomExclusionIds: [],
+  };
+}
+
+// --- Story 25.8 : exclusion d'une pièce (saveRoomExclusion), écriture de configuration simulée ---
+
+const NUMERIC_TOKEN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/** Mêmes règles que l'extraction du plugin (`trim`, `array_unique`, `is_numeric`, `intval`) ; chaîne illisible : liste vide. */
+export function readExcludedObjectIds(raw) {
+  if (typeof raw !== 'string') return [];
+  const tokens = [...new Set(raw.split(',').map((token) => token.trim()))];
+  return tokens.filter((token) => NUMERIC_TOKEN.test(token)).map((token) => Math.trunc(Number(token)));
+}
+
+/** Initialise la liste simulée depuis la valeur réelle de `excludedObjects` (lecture seule, faite par le lanceur). */
+export function setRoomExclusionBase(state, raw) {
+  state.roomExclusionIds = readExcludedObjectIds(raw);
+}
+
+/**
+ * Applique l'écriture déclarée à la liste simulée et rend la réponse de la route (forme de D2 : object_id, excluded, changed,
+ * excluded_objects). Jamais transmise à la box. Entrée invalide : exception (jamais une simulation silencieuse).
+ */
+export function buildRoomExclusionResponse(state, { objectId, excluded }) {
+  if (typeof objectId !== 'string' || !/^[1-9][0-9]{0,8}$/.test(objectId)) {
+    throw new Error('buildRoomExclusionResponse: objectId invalide');
+  }
+  if (excluded !== '1' && excluded !== '0') {
+    throw new Error('buildRoomExclusionResponse: excluded invalide');
+  }
+  const id = Number(objectId);
+  const present = state.roomExclusionIds.includes(id);
+  let changed = false;
+  if (excluded === '1' && !present) {
+    state.roomExclusionIds = [...state.roomExclusionIds, id];
+    changed = true;
+  } else if (excluded === '0' && present) {
+    state.roomExclusionIds = state.roomExclusionIds.filter((value) => value !== id);
+    changed = true;
+  }
+  return {
+    state: 'ok',
+    result: { object_id: id, excluded: excluded === '1', changed, excluded_objects: [...state.roomExclusionIds] },
   };
 }
 

@@ -42,12 +42,14 @@ describe('25.4 / AC8 — corps d’écriture identiques à la référence de mai
     assert.notEqual(serialize({ action: 'x', eqId: 1 }), serialize({ action: 'x', eqId: 1, extra: 1 }));
   });
 
-  it('lib/policy.mjs n’ajoute ni ne retire aucune action autorisée (diff vide)', () => {
+  // Story 25.8 : `saveRoomExclusion` est ajoutée à la politique comme écriture SIMULÉE déclarée (jamais une lecture autorisée) ;
+  // les actions autorisées (lectures) et les verdicts existants sont inchangés : aucune ligne existante n’est retirée.
+  it('lib/policy.mjs n’ajoute ni ne retire aucune action autorisée (aucune ligne retirée)', () => {
     const { execFileSync } = require('node:child_process');
     for (const base of ['main', 'origin/main']) {
       try {
         const diff = execFileSync('git', ['diff', base, '--', 'tests/e2e/gate/lib/policy.mjs'], { encoding: 'utf8' });
-        assert.equal(diff, '');
+        assert.deepEqual(diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')), []);
         return;
       } catch (error) {
         if (error.code === 'ERR_ASSERTION') throw error;

@@ -106,8 +106,18 @@ async function withRealView(t, options, fn) {
         const params = new URLSearchParams(raw);
         const action = params.get('action');
         const eqId = Number(params.get('eqId'));
-        journal.push({ action, eqId: Number.isFinite(eqId) ? eqId : null, verdict: 'lecture', method: 'POST', resourceType: request.resourceType(), path: url.pathname, at: Date.now() });
+        const entry = { action, eqId: Number.isFinite(eqId) ? eqId : null, verdict: 'lecture', method: 'POST', resourceType: request.resourceType(), path: url.pathname, at: Date.now() };
+        journal.push(entry);
         bodies.push(raw);
+        // Story 25.8 : `opts.gate` applique la VRAIE politique du gate (policy.mjs) et la VRAIE simulation (simulate.mjs) aux
+        // écritures déclarées : `handleWrite(action, request)` rend { verdict, body } ('simulee') ou { verdict: 'block-fail' } (refus).
+        if (opts.gate && opts.gate.isWrite(action)) {
+          const outcome = opts.gate.handleWrite(action, { method: request.method(), url: request.url(), postData: raw, headers: request.headers(), resourceType: request.resourceType() });
+          entry.verdict = outcome.verdict;
+          if (outcome.verdict !== 'simulee') { await route.abort(); return; }
+          await route.fulfill({ contentType: 'application/json', body: JSON.stringify(outcome.body) });
+          return;
+        }
         let body = { state: 'error', result: 'écriture interdite en test' };
         if (action === 'getBridgeStatus') body = { state: 'ok', result: { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } };
         else if (action === 'getEquipmentStates') body = states;

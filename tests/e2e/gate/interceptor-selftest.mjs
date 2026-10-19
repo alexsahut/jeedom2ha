@@ -11,6 +11,7 @@ import http from 'node:http';
 import { loadPlaywright } from './lib/playwright.mjs';
 import { installInterceptor } from './lib/interceptor.mjs';
 import { createState } from './lib/simulate.mjs';
+import { setRoomExclusionBase } from './lib/simulate.mjs';
 import { neutralizeOpenPages } from './run-gate.mjs';
 
 const PLUGIN_AJAX = '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
@@ -21,6 +22,7 @@ const FORBIDDEN_ACTIONS = new Set([
   'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection',
   'saveMappingOverride', 'revertMappingOverride', 'login',
   'savePublicationOverride', 'revertPublicationOverride',
+  'saveRoomExclusion',
 ]);
 
 /** CC-43 (reprise) : même ordre que le gate — neutraliser avant de couper le réseau. */
@@ -320,6 +322,38 @@ async function main() {
     await neutralizeThenOffline(declaredContext);
     await declaredContext.close();
 
+    // Story 25.8 (AC14) : `saveRoomExclusion` déclarée est SIMULÉE par sa branche explicite de l'intercepteur (réponse de la forme
+    // de la route, ids dérivés de la configuration réelle et de l'écriture déclarée) ; une écriture sur une AUTRE pièce, ou dans le
+    // sens opposé, est bloquée. Le serveur ne reçoit jamais aucune de ces requêtes.
+    const roomContext = await browser.newContext({ serviceWorkers: 'block' });
+    const roomJournal = { entries: [], failed: false, failures: [] };
+    const roomState = createState();
+    setRoomExclusionBase(roomState, '5,12');
+    await installInterceptor(roomContext, {
+      ctx: { ...ctx, declaredRoomExclusions: { 7: { excluded: '1' } }, lastPreviewType: roomState.lastPreviewType },
+      simState: roomState, journal: roomJournal, declaredBascules: [],
+    });
+    const roomPage = await roomContext.newPage();
+    await roomPage.goto(`${origin}/index.php?v=d&m=jeedom2ha&p=jeedom2ha`, { waitUntil: 'load' });
+    const roomResults = await roomPage.evaluate(async () => {
+      const endpoint = location.origin + '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
+      const post = async (body) => {
+        try {
+          const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+          return await response.json();
+        } catch {
+          return 'bloquee';
+        }
+      };
+      return {
+        declared: await post('action=saveRoomExclusion&objectId=7&excluded=1'),
+        otherRoom: await post('action=saveRoomExclusion&objectId=8&excluded=1'),
+        otherDirection: await post('action=saveRoomExclusion&objectId=7&excluded=0'),
+      };
+    });
+    await neutralizeThenOffline(roomContext);
+    await roomContext.close();
+
     // Document (page de connexion) qui redirige vers la même action interdite que
     // REDIRECT_PNG : la navigation doit échouer puisque l'intercepteur abandonne la
     // route avant tout fulfill, sans jamais joindre le serveur sur la cible.
@@ -436,6 +470,21 @@ async function main() {
         && declaredRescan.result.operation_result === 'succes'
         && typeof declaredRescan.result.operation_message === 'string'
         && declaredJournal.entries.some((entry) => entry.action === 'scanTopology' && entry.verdict === 'simulee'),
+      failures);
+
+    report('exclusion de pièce déclarée : réponse simulée de la forme de la route, ids dérivés de la configuration lue',
+      roomResults.declared.state === 'ok' && roomResults.declared.result.object_id === 7
+        && roomResults.declared.result.excluded === true && roomResults.declared.result.changed === true
+        && JSON.stringify(roomResults.declared.result.excluded_objects) === JSON.stringify([5, 12, 7])
+        && roomJournal.entries.some((entry) => entry.action === 'saveRoomExclusion' && entry.verdict === 'simulee'),
+      failures);
+    report('exclusion de pièce non déclarée (autre pièce, autre sens) : bloquée, jamais servie',
+      roomResults.otherRoom === 'bloquee' && roomResults.otherDirection === 'bloquee'
+        && roomJournal.failures.filter((entry) => entry.action === 'saveRoomExclusion' && entry.verdict === 'block-fail'
+          && entry.reason === 'exclusion-piece-non-declaree').length === 2,
+      failures);
+    report('exclusion de pièce : aucune requête saveRoomExclusion n\'atteint le serveur',
+      !requests.some((request) => request.actions.includes('saveRoomExclusion')),
       failures);
 
     const expectedFailures = [

@@ -23,11 +23,11 @@ test('25.6 gate — étape 2 : étiquettes d’erreur et clés record nouvelles 
   for (const step of [1, 2, 3, 4, 6, 7, 8, 9]) assert.match(source, new RegExp(`atStep\\(helpers, ${step},`), 'étape ' + step);
 });
 
-test('25.6 gate — lib/policy.mjs n’est pas modifié par la story', () => {
+test('25.6 gate — lib/policy.mjs n’est pas modifié par la story (Story 25.8 : ajout seul de saveRoomExclusion, aucune ligne retirée)', () => {
   for (const base of ['main', 'origin/main']) {
     try {
       const diff = execFileSync('git', ['diff', '-U0', base, '--', 'tests/e2e/gate/lib/policy.mjs'], { encoding: 'utf8', cwd: root });
-      assert.equal(diff, '', 'policy.mjs inchangé');
+      assert.deepEqual(diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')), [], 'policy.mjs : aucune ligne retirée');
       return;
     } catch (error) {
       if (error.code === 'ERR_ASSERTION') throw error;

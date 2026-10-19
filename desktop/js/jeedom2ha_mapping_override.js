@@ -801,6 +801,8 @@
       parent_number: typeof r.parent_number === 'number' ? r.parent_number : 0,
       // Équipements avec id valide uniquement ; ordre natif Jeedom préservé.
       equipments: eqs.map(normalizeRoomEquipment).filter(function (e) { return e.eq_id !== null; }),
+      // Story 25.8 (AC5) : champ ADDITIF de `j2haRoomsTree` — la pièce figure dans `excludedObjects` (absent : false).
+      excluded: r.excluded === true,
     };
   }
 

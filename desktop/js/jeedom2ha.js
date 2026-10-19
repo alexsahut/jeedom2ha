@@ -17,6 +17,8 @@
 
 /* Statut du pont MQTT et santé globale (Story 2.2) */
 function refreshBridgeStatus() {
+  // Story 25.8 : compteur d'appels, pour qu'une fin de relecture enchaînée ne relise pas deux fois la santé du pont.
+  window.jeedom2haBridgeRefreshes = (window.jeedom2haBridgeRefreshes || 0) + 1;
   $.ajax({
     type: 'POST',
     url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -149,6 +151,7 @@ function applyHAGating(r) {
   var $haActions = $('[data-ha-action]').not('[data-ha-pending="1"]');
   if (window.jeedom2haRescanInProgress === true) {
     $haActions.prop('disabled', true);
+    syncRoomExclusionHints('{{Une opération est déjà en cours.}}');
     return;
   }
   var available = r ? isHABridgeAvailable(r) : false;
@@ -158,6 +161,7 @@ function applyHAGating(r) {
     $haActions.not('[data-ha-state-blocked="1"]').prop('disabled', false).removeClass('j2ha-ha-gated');
     $haActions.filter('[data-ha-state-blocked="1"]').removeClass('j2ha-ha-gated');
     $reason.hide();
+    syncRoomExclusionHints('');
   } else {
     $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
     var reason = '{{Démon ou MQTT indisponible — actions Home Assistant bloquées.}}';
@@ -167,7 +171,21 @@ function applyHAGating(r) {
       reason = '{{MQTT déconnecté — actions Home Assistant bloquées.}}';
     }
     $reason.text(reason).show();
+    syncRoomExclusionHints(reason);
   }
+}
+
+/* Story 25.8 (AC11) : les entrées « Exclure la pièce… » suivent le gating des actions Home Assistant ; grisées, elles disent pourquoi
+ * (relecture en cours, ou la raison du gating du pont), comme « Relire Jeedom ». */
+function syncRoomExclusionHints(reason) {
+  $('.j2ha-room-exclude').each(function() {
+    var $item = $(this);
+    if ($item.prop('disabled') && reason) {
+      $item.attr('title', reason);
+    } else {
+      $item.removeAttr('title');
+    }
+  });
 }
 
 function confirmTopologyRescan(onConfirm, onCancel) {
@@ -353,8 +371,10 @@ function executeHaAction(intention, portee, selection, handlers) {
   });
 }
 
-function triggerTopologyRescan($button, snapshot, owner) {
+function triggerTopologyRescan($button, snapshot, owner, chain) {
   if (window.jeedom2haRescanOwner !== owner) return;
+  // Story 25.8 : `chain` (facultatif) = { onComplete(failed) } — relecture enchaînée après une exclusion de pièce, même chemin.
+  var outcome = {failed: false};
   $button.html('<i class="fas fa-spinner fa-spin"></i> {{Relecture en cours…}}');
   $('[data-ha-action]').not('[data-ha-pending="1"]').prop('disabled', true);
   $.ajax({
@@ -363,6 +383,7 @@ function triggerTopologyRescan($button, snapshot, owner) {
     timeout: (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
     success: function(data) {
       var result = data && data.result;
+      outcome.failed = !(data && data.state === 'ok' && result && result.status === 'ok' && result.operation_result !== 'echec');
       if (data.state !== 'ok') {
         $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou la relecture a échoué.}}', level: 'danger'});
         return;
@@ -386,13 +407,97 @@ function triggerTopologyRescan($button, snapshot, owner) {
       }
     },
     error: function() {
+      outcome.failed = true;
       $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
       notifyStatesChanged();
+      if (chain && typeof chain.onComplete === 'function') {
+        chain.onComplete(outcome.failed);
+      }
     },
   });
+}
+
+/* Story 25.8 (D3, D4) — exclusion d'une pièce depuis la surface (carte de la page principale, détail de pièce) :
+ *   1. confirmation chiffrée (annuler n'écrit rien) ; 2. `saveRoomExclusion` (échec : message, AUCUNE relecture) ;
+ *   3. drapeaux « pièce exclue » mis à jour en mémoire depuis `excluded_objects` ; 4. relecture EXPLICITE par le chemin de
+ *   « Relire Jeedom » (`triggerTopologyRescan` : même réservation, même budget client, mêmes messages), sans sa confirmation ;
+ *   5. fin de relecture (succès ou échec) : `refreshBridgeStatus()` et relecture des états.
+ * Pendant 1 à 5, « Relire Jeedom » et toutes les entrées [data-ha-action] (dont l'exclusion des autres pièces) sont réservées. */
+function escapeRoomExclusionText(value) {
+  return $('<span></span>').text(String(value)).html();
+}
+
+function requestRoomExclusion(roomId, roomName, excluded, $trigger, $returnFocus) {
+  var page = window.Jeedom2haOverviewPage;
+  var $rescan = $('#bt_rescanTopology');
+  if (!page || typeof page.exclusionDialog !== 'function' || $rescan.length === 0) return;
+  if (window.jeedom2haRescanInProgress === true || ($trigger && $trigger.prop('disabled'))) return;
+  var snapshot = setHaActionPendingState($rescan, '{{Confirmation en cours…}}');
+  var owner = {};
+  window.jeedom2haRescanInProgress = true;
+  window.jeedom2haRescanOwner = owner;
+  applyHAGating(window.jeedom2haLastBridgeStatus || null);
+  var giveBackFocus = function() {
+    // `$returnFocus` peut être une fonction : le détail d'une pièce est redessiné après une écriture réussie.
+    var $target = typeof $returnFocus === 'function' ? $returnFocus() : $returnFocus;
+    if ($target && $target.length) {
+      $target.focus();
+    }
+  };
+  var dialog = page.exclusionDialog(roomId, roomName, excluded);
+  var message = dialog.lines.map(function(line) {
+    return '<p>' + escapeRoomExclusionText(line) + '</p>';
+  }).join('');
+  confirmHaPublishAction(
+    escapeRoomExclusionText(dialog.title),
+    message,
+    dialog.confirmLabel,
+    function() {
+      updateHaActionPendingLabel($rescan, '{{Enregistrement…}}');
+      var failSave = function(text) {
+        $('#div_alert').showAlert({message: text, level: 'danger'});
+        releaseTopologyRescanReservation($rescan, snapshot, owner);
+        giveBackFocus();
+      };
+      $.ajax({
+        type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+        data: {action: 'saveRoomExclusion', objectId: String(roomId), excluded: excluded ? '1' : '0'}, dataType: 'json',
+        timeout: 20000,
+        success: function(data) {
+          var result = data && data.state === 'ok' ? data.result : null;
+          if (!result || !Array.isArray(result.excluded_objects)) {
+            failSave((data && typeof data.result === 'string' && data.result) || '{{L\'exclusion de la pièce n\'a pas été enregistrée.}}');
+            return;
+          }
+          page.setExcludedObjects(result.excluded_objects);
+          var refreshesBefore = window.jeedom2haBridgeRefreshes || 0;
+          triggerTopologyRescan($rescan, snapshot, owner, {
+            onComplete: function(failed) {
+              if (failed) {
+                $('#div_alert').showAlert({message: '{{Relancez « Relire Jeedom » pour retirer les entités.}}', level: 'warning'});
+              }
+              // La relecture relit déjà la santé du pont dans la plupart des issues ; sinon, c'est fait ici (une seule fois).
+              if ((window.jeedom2haBridgeRefreshes || 0) === refreshesBefore) {
+                refreshBridgeStatus();
+              }
+              giveBackFocus();
+            },
+          });
+        },
+        error: function() {
+          failSave('{{Erreur de communication : l\'exclusion de la pièce n\'a pas pu être confirmée. Vérifiez l\'état de la pièce avant de recommencer.}}');
+        },
+      });
+    },
+    function() {
+      releaseTopologyRescanReservation($rescan, snapshot, owner);
+      giveBackFocus();
+    },
+    dialog.danger ? 'btn-danger' : 'btn-primary'
+  );
 }
 
 function triggerPublierAction($button, portee, selection, reservation) {

@@ -24,6 +24,7 @@ import {
   normalizeParcoursRecord,
 } from './lib/report.mjs';
 import { createState } from './lib/simulate.mjs';
+import { setRoomExclusionBase } from './lib/simulate.mjs';
 import { classifyRequest } from './lib/policy.mjs';
 
 const ORIGIN = 'https://domobox.famille-sahut.fr';
@@ -428,6 +429,8 @@ async function main() {
       loginAttempts: 0,
       declaredEquipments: parcours.declaredEquipments,
       declaredPublicationOverrides: parcours.declaredPublicationOverrides || {},
+      // Story 25.8 : exclusions de pièce déclarées par le parcours ({ [objectId]: { excluded: '1' | '0' } }), défaut {}.
+      declaredRoomExclusions: parcours.declaredRoomExclusions || {},
       declaredRescan: parcours.declaredRescan === true,
       lastPreviewType: simState.lastPreviewType,
     };
@@ -461,6 +464,9 @@ async function main() {
       recordLoginAttempt(journal, authenticated);
     }
     probeBefore = await probe(context.request);
+    // Story 25.8 : la liste d'exclusions SIMULÉE part de la valeur RÉELLE de `excludedObjects` (lecture seule, déjà relevée par la
+    // sonde) ; la configuration réelle n'est jamais écrite (`saveRoomExclusion` est simulée par la politique).
+    setRoomExclusionBase(simState, probeBefore.configValues.excludedObjects);
     const page = await context.newPage();
     const navigation = await page.goto(`${ORIGIN}${PLUGIN}`, { waitUntil: 'load' });
     if (!expectedUrl(page) || !redirectsStayOnOrigin(navigation)) {
