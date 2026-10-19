@@ -965,6 +965,7 @@ body[data-theme*="Dark"] {
 }
 /* Détail d'un équipement : en-tête collant (opaque), réglage de publication, tableau des commandes. */
 .j2ha-wv .j2ha-eq-head {
+  position: -webkit-sticky; /* repli iOS Safari ancien */
   position: sticky;
   top: 0;
   z-index: 3;
@@ -1005,7 +1006,7 @@ body[data-theme*="Dark"] {
   max-width: 100%;
 }
 /* Disposition large : arbre fixe à gauche, détail à droite ; chaque colonne défile seule. */
-@media (min-width: 1024px) {
+@media (min-width: 980px) {
   .j2ha-wv-body {
     flex-direction: row;
     gap: 12px;

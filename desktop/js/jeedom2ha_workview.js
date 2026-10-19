@@ -23,16 +23,15 @@
   'use strict';
 
   // Seuil de repli entre la disposition large (deux colonnes) et la disposition étroite (panneau repliable) : UNE
-  // constante, reprise à l'identique par la media query CSS de la vue (test d'égalité).
-  var LAYOUT_SPLIT_MIN_WIDTH = 1024;
+  // constante, reprise à l'identique par la media query CSS de la vue (test d'égalité). Valeur MESURÉE (Task 7) :
+  // voir tests/fixtures/story_25_4_mesure_seuil.json ; confirmée ou révisée par la preuve terrain sur l'iPad mural.
+  var LAYOUT_SPLIT_MIN_WIDTH = 980;
   var MIN_HEIGHT = 480;               // hauteur minimale utile de la vue (Q12)
   var SEARCH_DEBOUNCE_MS = 150;
   var FRAGMENT_PREFIX = 'j2ha-vue=';
   var STORAGE_KEY = 'j2ha-vue';        // repli sessionStorage (Q1) si le fragment est inutilisable
   var FILTER_KEYS = ['published', 'blocked', 'to_apply', 'other', 'unread'];
   var ICON_FALLBACK = 'fas fa-door-open';
-
-  function w(text) { return '{{' + text + '}}'; }
 
   // --- Fragment d'URL : `#j2ha-vue=piece:P;eq:E;f:F` (valeurs validées avant tout usage, AC7, AC18) ---
 
@@ -205,8 +204,8 @@
   function noActionSentence(summary) {
     var read = summary && typeof summary.equipments_read === 'number' ? summary.equipments_read : 0;
     var unread = summary && summary.equipments_total > read;
-    if (read === 1) return w(unread ? "L'équipement lu de cette pièce n'appelle aucune action" : "L'équipement de cette pièce n'appelle aucune action");
-    return w('Les') + ' ' + read + ' ' + w(unread ? 'équipements lus de cette pièce' : 'équipements de cette pièce') + ' ' + w("n'appellent aucune action");
+    if (read === 1) return unread ? "{{L'équipement lu de cette pièce n'appelle aucune action}}" : "{{L'équipement de cette pièce n'appelle aucune action}}";
+    return '{{Les}} ' + read + ' ' + (unread ? '{{équipements lus de cette pièce}}' : '{{équipements de cette pièce}}') + " {{n'appellent aucune action}}";
   }
 
   // --- Contrôleur ---
@@ -304,9 +303,9 @@
 
       var $bar = $('<div class="j2ha-wv-bar"></div>');
       el.back = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-back"></button>')
-        .append($('<i class="fas fa-arrow-left"></i>')).append(doc.createTextNode(' ' + w('Toutes les pièces')));
+        .append($('<i class="fas fa-arrow-left"></i>')).append(doc.createTextNode(' ' + '{{Toutes les pièces}}'));
       el.drawerToggle = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-drawer-toggle" aria-expanded="false" aria-controls="j2ha_wvNav"></button>')
-        .append($('<i class="fas fa-list"></i>')).append(doc.createTextNode(' ' + w('Pièces')));
+        .append($('<i class="fas fa-list"></i>')).append(doc.createTextNode(' ' + '{{Pièces}}'));
       el.readStatus = $('<div class="text-muted j2ha-wv-read-status" role="status" aria-live="polite"></div>');
       el.live = $('<span class="j2ha-wv-live" role="status" aria-live="polite"></span>');
       $bar.append(el.back).append(el.drawerToggle).append(el.readStatus).append(el.live);
@@ -315,17 +314,17 @@
       el.nav = $('<aside class="j2ha-wv-nav" id="j2ha_wvNav"></aside>');
       var $tools = $('<div class="j2ha-wv-tools"></div>');
       el.search = $('<input type="search" class="form-control input-sm j2ha-wv-search" autocomplete="off"/>')
-        .attr('aria-label', w('Rechercher une pièce ou un équipement')).attr('placeholder', w('Rechercher une pièce ou un équipement'));
+        .attr('aria-label', '{{Rechercher une pièce ou un équipement}}').attr('placeholder', '{{Rechercher une pièce ou un équipement}}');
       el.chips = $('<div class="j2ha-wv-chips"></div>');
       el.searchStatus = $('<div class="text-muted j2ha-wv-search-status" role="status" aria-live="polite"></div>');
       $tools.append(el.search).append(el.chips).append(el.searchStatus);
-      el.tree = $('<ul class="j2ha-wv-tree" role="tree"></ul>').attr('aria-label', w('Pièces et équipements'));
+      el.tree = $('<ul class="j2ha-wv-tree" role="tree"></ul>').attr('aria-label', '{{Pièces et équipements}}');
       el.nav.append($tools).append(el.tree);
 
       el.detail = $('<div class="j2ha-wv-detail"></div>');
       el.reassurance = $('<div id="j2haSurface_reassurance" class="alert alert-warning" role="status" aria-live="polite"></div>')
         .append($('<i class="fas fa-shield-alt"></i>'))
-        .append(doc.createTextNode(' ' + w('Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.')));
+        .append(doc.createTextNode(' ' + '{{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}'));
       el.reassurance.hide();
       el.feedback = $('<div class="j2ha-room-feedback" role="status"></div>');
       el.feedback.hide();
@@ -372,7 +371,7 @@
         // Compact : panneau ouvert tant qu'aucune sélection n'existe ; large : jamais de tiroir.
         st.drawerOpen = next === 'compact' && st.room === null;
         syncDrawer();
-        if (announceChange) announce(next === 'split' ? w('Disposition en deux colonnes') : w('Disposition en une colonne'));
+        if (announceChange) announce(next === 'split' ? '{{Disposition en deux colonnes}}' : '{{Disposition en une colonne}}');
       }
     }
 
@@ -419,7 +418,7 @@
       if (!el.nav) return;
       el.nav.toggleClass('j2ha-wv-nav-open', st.layout === 'compact' && st.drawerOpen);
       el.drawerToggle.attr('aria-expanded', st.layout === 'compact' && st.drawerOpen ? 'true' : 'false');
-      el.drawerToggle.attr('aria-label', st.drawerOpen ? w('Masquer les pièces') : w('Pièces'));
+      el.drawerToggle.attr('aria-label', st.drawerOpen ? '{{Masquer les pièces}}' : '{{Pièces}}');
     }
 
     // --- État d'URL (fragment, repli sessionStorage) ---
@@ -496,7 +495,7 @@
       renderTree();
       renderPane();
       afterSelect(opts, changedRoom);
-      if (changed) announce(w('Pièce') + ' ' + room.object_name);
+      if (changed) announce('{{Pièce}}' + ' ' + room.object_name);
       focusTitleIfAsked();
       return true;
     }
@@ -512,7 +511,7 @@
       renderTree();
       renderEquipmentPane(room, eq);
       afterSelect(opts, changedRoom);
-      announce(w('Équipement') + ' ' + eq.eq_name);
+      announce('{{Équipement}}' + ' ' + eq.eq_name);
       focusTitleIfAsked();
       return true;
     }
@@ -658,7 +657,7 @@
         .attr('tabindex', '-1');
       var $row = $('<div class="j2ha-wv-row"></div>');
       var $toggle = $('<button type="button" class="j2ha-wv-toggle" tabindex="-1"></button>')
-        .attr('aria-label', room.expanded ? w('Replier') : w('Déplier'))
+        .attr('aria-label', room.expanded ? '{{Replier}}' : '{{Déplier}}')
         .append($('<i class="fas"></i>').addClass(room.expanded ? 'fa-chevron-down' : 'fa-chevron-right'));
       $row.append($toggle);
       $row.append($('<i class="j2ha-wv-icon"></i>').addClass(room.icon).attr('aria-hidden', 'true'));
@@ -668,7 +667,7 @@
       }
       var $marks = $('<span class="j2ha-wv-room-marks"></span>');
       if (room.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(O.plural(room.blocked, 'bloqué', 'bloqués')));
-      if (room.to_apply > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-to_apply"></span>').text(room.to_apply + ' ' + w('à appliquer')));
+      if (room.to_apply > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-to_apply"></span>').text(room.to_apply + ' ' + '{{à appliquer}}'));
       $row.append($marks);
       if (room.color) {
         var node = $item.get(0);
@@ -697,8 +696,8 @@
       var $row = $('<div class="j2ha-wv-row"></div>');
       $row.append(stateCell(row.state));
       $row.append($('<span class="j2ha-wv-name j2ha-free-name"></span>').text(row.name));
-      if (!row.enabled) $row.append($('<span class="text-muted j2ha-wv-off"></span>').text(' ' + w('(désactivé dans Jeedom)')));
-      if (row.unread) $row.append($('<span class="text-muted j2ha-wv-unread"></span>').text(w('non lu')));
+      if (!row.enabled) $row.append($('<span class="text-muted j2ha-wv-off"></span>').text(' ' + '{{(désactivé dans Jeedom)}}'));
+      if (row.unread) $row.append($('<span class="text-muted j2ha-wv-unread"></span>').text('{{non lu}}'));
       if (row.mention > 0) $row.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(O.blockedMentionLabel(row.mention)));
       $row.on('click', function () { selectEquipment(room.object_id, row.eq_id, { user: true }); });
       $item.append($row);
@@ -722,7 +721,7 @@
         }
         g.rooms.forEach(function (room) { el.tree.append(buildRoomItem(room)); });
       });
-      el.searchStatus.text(model.roomCount === 0 && (model.active) ? w('Aucun résultat') : '');
+      el.searchStatus.text(model.roomCount === 0 && (model.active) ? '{{Aucun résultat}}' : '');
       // Roving tabindex : une seule ligne dans l'ordre de tabulation (celle qui a le focus, sinon la sélection, sinon la première).
       var target = focusKey ? el.tree.find('[data-key="' + focusKey + '"]') : $();
       if (!target.length) target = el.tree.find('[aria-selected="true"]');
@@ -736,7 +735,7 @@
       var o = overviewOf();
       if (st.search === '' && !snap().filter) return;
       var model = buildTreeModel({ rooms: rooms, groups: groups, overview: o, filter: snap().filter, search: st.search, expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq });
-      announce(model.roomCount === 0 ? w('Aucun résultat') : model.rowCount + ' ' + w(model.rowCount > 1 ? 'équipements affichés' : 'équipement affiché'));
+      announce(model.roomCount === 0 ? '{{Aucun résultat}}' : model.rowCount + ' ' + (model.rowCount > 1 ? '{{équipements affichés}}' : '{{équipement affiché}}'));
     }
 
     // --- Clavier de l'arbre (motif ARIA tree) ---
@@ -783,7 +782,7 @@
 
     // --- Détail ---
     function crumb(room, withEquipment) {
-      var $nav = $('<nav class="j2ha-wv-crumb text-muted"></nav>').attr('aria-label', w("Fil d'Ariane"));
+      var $nav = $('<nav class="j2ha-wv-crumb text-muted"></nav>').attr('aria-label', "{{Fil d'Ariane}}");
       var parent = groupTitleFor(room.object_id);
       var last = parent && parent.slice(-room.object_name.length) === room.object_name ? '' : room.object_name;
       if (parent) $nav.append($('<span class="j2ha-free-name"></span>').text(parent));
@@ -804,7 +803,7 @@
       el.pane.empty();
       var room = st.room !== null ? roomsById[st.room] : null;
       if (!room) {
-        el.pane.append($('<div class="text-muted j2ha-wv-empty"></div>').text(w('Sélectionnez une pièce ou un équipement')));
+        el.pane.append($('<div class="text-muted j2ha-wv-empty"></div>').text('{{Sélectionnez une pièce ou un équipement}}'));
         return;
       }
       el.pane.append(crumb(room, false));
@@ -815,7 +814,7 @@
       $head.append($title);
       $head.append(surface.buildRoomActions(room));
       el.pane.append($head);
-      el.kpis = $('<div class="j2ha-wv-kpis" role="group"></div>').attr('aria-label', w('Indicateurs de la pièce'));
+      el.kpis = $('<div class="j2ha-wv-kpis" role="group"></div>').attr('aria-label', '{{Indicateurs de la pièce}}');
       el.todo = $('<section class="j2ha-wv-todo"></section>');
       el.pane.append(el.kpis).append(el.todo);
       refreshRoomDynamic();
@@ -869,13 +868,13 @@
       var $error = $('<div class="j2ha-publication-error text-danger"></div>').hide();
       if (item.genericTypes) {
         var $link = $('<a class="btn btn-default btn-xs j2ha-open-generic-types" target="_blank" rel="noopener"></a>')
-          .attr('href', surface.genericTypesUrl).text(w('Ouvrir les types génériques'));
+          .attr('href', surface.genericTypesUrl).text('{{Ouvrir les types génériques}}');
         $link.on('click', function (event) { if (event && event.stopPropagation) event.stopPropagation(); });
         $actions.append($link);
       }
       if (item.canApply) {
         // Q11 : écriture directe (executeHaAction publier / equipement), sans lire d'arbre ; même réservation de bouton.
-        var $apply = $('<button type="button" class="btn btn-primary btn-xs j2ha-wv-todo-apply" data-ha-action="republier"></button>').text(w('Appliquer'));
+        var $apply = $('<button type="button" class="btn btn-primary btn-xs j2ha-wv-todo-apply" data-ha-action="republier"></button>').text('{{Appliquer}}');
         $apply.on('click', function (event) {
           if (event && event.stopPropagation) event.stopPropagation();
           surface.setRoom(room);
@@ -903,12 +902,12 @@
           if (text) el.kpis.append($('<span class="text-muted j2ha-wv-kpi-note"></span>').text(text));
         });
       }
-      el.todo.append($('<h3 class="j2ha-wv-todo-title"></h3>').text(w('À traiter dans cette pièce')));
+      el.todo.append($('<h3 class="j2ha-wv-todo-title"></h3>').text('{{À traiter dans cette pièce}}'));
       if (!ov) return;
       var list = buildTreatList(ov, entriesOf(), room);
       if (list.length === 0) {
         var $empty = $('<div class="j2ha-wv-todo-empty"></div>');
-        $empty.append($('<p class="j2ha-wv-todo-none"></p>').text(w('Rien à traiter dans cette pièce')));
+        $empty.append($('<p class="j2ha-wv-todo-none"></p>').text('{{Rien à traiter dans cette pièce}}'));
         $empty.append($('<p class="text-muted j2ha-wv-todo-sentence"></p>').text(noActionSentence(ov.summary)));
         el.todo.append($empty);
       } else {

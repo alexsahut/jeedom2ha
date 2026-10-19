@@ -1,7 +1,7 @@
 // ARTEFACT — Story 20.3, correctifs de revue R1 (A à F, G) : exécute le VRAI code de l'interface
 // (jeedom2ha.js + jeedom2ha_mapping_surface.js) sur un faux DOM. Seuls le DOM, le réseau et bootbox
 // sont factices : setHaActionPendingState, restoreHaActionPendingState, buildHaActionUserMessage,
-// confirmHaSupprimerAction, applyHAGating, renderRoomCounters et buildRoomModalHtml sont ceux de la
+// confirmHaSupprimerAction, applyHAGating, renderRoomCounters sont ceux de la
 // production. Données d'exemple génériques uniquement.
 'use strict';
 
@@ -580,7 +580,8 @@ describe('G — rendu du détail de pièce et d’équipement de la vue C (ex-fe
     assert.equal(ui.$('.j2ha-room-actions').length, 1);
     assert.equal(ui.$('.j2ha-wv .j2ha-room-feedback').length, 1);
     assert.equal(ui.$('.j2ha-wv-todo').length, 1);
-    assert.equal(ui.$('.modal-j2ha-room, .j2ha-room-surface, .j2ha-eq-accordion').length, 0, 'plus de fenêtre ni d’accordéon');
+    assert.equal(ui.dom.dialogs.filter((d) => !d.options.buttons).length, 0, 'plus de fenêtre de pièce');
+    assert.equal(ui.$('.j2ha-room-surface, .j2ha-eq-accordion').length, 0, 'plus d’accordéon');
     assert.deepEqual(ui.$('.j2ha-wv-eq').list.map((p) => p.attrs['data-eq-id']), ['1', '2'], 'équipements de la pièce, dans l’ordre, dans l’arbre');
     assert.equal(ui.$('.j2ha-eq-panel').length, 0, 'aucun détail d’équipement sans sélection (aucune lecture)');
   });

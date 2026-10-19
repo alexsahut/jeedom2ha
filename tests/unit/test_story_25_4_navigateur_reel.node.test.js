@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const { withRealView, gate } = require('./helpers/workview_browser');
 const { makeScene } = require('./helpers/big_scene');
 
+const THRESHOLD = require('../../desktop/js/jeedom2ha_workview.js').LAYOUT_SPLIT_MIN_WIDTH;
 const actions = (ctx, name) => ctx.journal.filter((e) => e.action === name);
 
 test('25.4 réel — ouvrir depuis une carte : aucune modale, aucune lecture ; la barre de santé reste, la grille est masquée', async (t) => {
@@ -18,7 +19,7 @@ test('25.4 réel — ouvrir depuis une carte : aucune modale, aucune lecture ; l
     const before = ctx.journal.length;
     await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]').click();
     await page.locator('#j2ha_workView').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('.modal-j2ha-room, .bootbox:visible').count(), 0, 'aucune modale');
+    assert.equal(await page.locator('.modal:visible, .bootbox:visible').count(), 0, 'aucune modale');
     assert.equal(ctx.journal.length, before, 'aucune requête à l’ouverture');
     assert.equal(await page.locator('#div_bridgeHealthBanner').isVisible(), true);
     assert.equal(await page.locator('#j2ha_roomCards').isVisible(), false);
@@ -82,7 +83,7 @@ test('25.4 réel — aucun défilement horizontal dans le détail à plusieurs l
       await page.locator('#j2ha_roomCards .j2ha-room-card').first().click();
       await page.locator('.j2ha-wv-eq .j2ha-wv-row').first().waitFor({ state: 'visible' }).catch(() => {});
       const layout = await page.locator('#j2ha_workView').getAttribute('data-j2ha-layout');
-      assert.equal(layout, width >= 1024 ? 'split' : 'compact', 'largeur ' + width);
+      assert.equal(layout, width >= THRESHOLD ? 'split' : 'compact', 'largeur ' + width);
       if (layout === 'compact') {
         const toggle = page.locator('.j2ha-wv-drawer-toggle');
         await toggle.click();
@@ -166,7 +167,7 @@ test('25.4 réel — le parcours vue-maitre-detail-c du gate passe sur la page l
     assert.equal(recorded.lectures_arbre_selection, 1);
     assert.equal(recorded.lien_profond_lectures_etat, 1);
     assert.equal(recorded.lien_profond_lectures_arbre, 1);
-    assert.ok(recorded.largeur_fenetre_large >= 1024 && recorded.largeur_fenetre_etroite < 1024);
+    assert.ok(recorded.largeur_fenetre_large >= THRESHOLD && recorded.largeur_fenetre_etroite < THRESHOLD);
     assert.equal(recorded.precedent_niveaux, 2);
     assert.equal(recorded.ecritures_menu_piece, 0);
     assert.ok(Number.isFinite(recorded.temps_chargement_eq_selectionne_ms));

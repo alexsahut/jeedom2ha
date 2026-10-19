@@ -6,6 +6,17 @@
 
 ---
 
+# 2026-10-19 — Vue de travail : l'arbre des pièces et le détail, sans fenêtre
+
+- Un clic sur une carte de pièce, sur une puce ou un segment de la jauge, ou sur une ligne de la liste filtrée ouvre une **vue de travail** dans la page du plugin, à la place de l'ancienne fenêtre de pièce : l'arbre des pièces et de leurs équipements à gauche (recherche, filtres), le détail à droite.
+- Le détail d'une pièce propose « Republier la pièce », le menu « ⋯ » et la liste « À traiter dans cette pièce » (équipements bloqués ou à appliquer, cause dite une fois, « Ouvrir les types génériques » ou « Appliquer »). Le détail d'un équipement reprend l'état, le réglage de publication, le tableau des commandes et les actions déjà connus.
+- La configuration d'un équipement n'est lue que lorsque vous le choisissez ; ouvrir une pièce ne lit plus que les chiffres déjà chargés par la page principale.
+- « Toutes les pièces » et le bouton « Précédent » du navigateur reviennent à la page principale telle que vous l'avez laissée ; l'adresse de la page garde la sélection.
+- Sur tablette, l'arbre devient un tiroir « Pièces » sous une largeur d'écran de 980 pixels ; la vue s'adapte à la rotation.
+- Aucune modification du démon, ni de ce qui est publié dans Home Assistant.
+
+---
+
 # 2026-10-19 — Page principale : barre de santé compacte, jauge de la maison et cartes de pièce
 
 - Le bandeau bleu disparaît : une ligne d'aide discrète avec un lien « Aide » le remplace.

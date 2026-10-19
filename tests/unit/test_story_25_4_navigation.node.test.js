@@ -81,7 +81,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
     ui.win.scrollY = 640;
     openCard(ui, 11);
     assert.equal(ui.dom.dialogs.length, dialogsBefore, 'aucune bootbox de pièce');
-    assert.equal(ui.$('.modal-j2ha-room').length, 0);
+    assert.equal(ui.$('.modal').length, 0);
     assert.equal(ui.visible('#div_bridgeHealthBanner'), true);
     assert.equal(ui.visible('#j2ha_mainView'), false, 'jauge, liste filtrée et cartes masquées');
     assert.equal(ui.visible('#j2ha_workView'), true);

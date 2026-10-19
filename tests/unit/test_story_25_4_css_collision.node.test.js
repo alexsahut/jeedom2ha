@@ -44,7 +44,7 @@ test('25.4 / AC25 (2) non-modification — aucune déclaration d’un sélecteur
 test('25.4 / AC2 — les sélecteurs propres à la fenêtre de pièce sont supprimés (pas seulement inutilisés)', () => {
   const stillThere = baseline.modal_selectors.filter((selector) => Object.keys(finalTable).some((key) => bare(key) === selector));
   assert.deepEqual(stillThere, []);
-  assert.doesNotMatch(css, /modal-j2ha-room|j2ha-eq-accordion|panel-group|panel-collapse|j2ha-eq-toggle/);
+  assert.doesNotMatch(css, /j2ha-eq-accordion|panel-group|panel-collapse|j2ha-eq-toggle/);
 });
 
 test('25.4 / AC24 — l’inventaire des classes partagées est écrit dans l’en-tête du bloc CSS de la vue', () => {

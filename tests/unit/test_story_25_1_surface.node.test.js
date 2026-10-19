@@ -255,7 +255,7 @@ describe('25.1 / AC10 — réglage de publication segmenté', () => {
 
   it('les anciens boutons Exclure / Forcer / Revenir au mode automatique n’existent plus', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
-    const text = ui.$('.modal-j2ha-room').text();
+    const text = ui.$('.j2ha-wv').text();
     assert.doesNotMatch(text, /Revenir au mode automatique|Forcer l|Exclure l|Exclure cette|Forcer cette/);
     const walk = (dir) => fs.readdirSync(dir).flatMap((f) => (fs.statSync(dir + '/' + f).isDirectory() ? walk(dir + '/' + f) : [dir + '/' + f]));
     for (const file of walk('desktop')) {

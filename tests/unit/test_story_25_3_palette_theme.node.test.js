@@ -85,7 +85,7 @@ describe('25.3 / AC15 — variables --j2ha-* et replis', () => {
       if (m[1].trim().startsWith('@')) continue;
       for (const selector of m[1].split(',').map((s) => s.trim())) {
         if (!selector) continue;
-        assert.match(selector, /\.j2ha-|\.modal-j2ha-room|#j2ha_roomCards|^:root|^body\[data-theme/, selector);
+        assert.match(selector, /\.j2ha-|#j2ha_roomCards|^:root|^body\[data-theme/, selector);
         assert.doesNotMatch(selector, /^\.(label|btn|panel|modal|objectDisplayCard)(?![\w-])/, selector);
       }
     }

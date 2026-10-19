@@ -306,12 +306,12 @@ describe('25.1 / AC19 (R2-1) — texte du contrôle segmenté lisible dans les t
 });
 
 describe('25.1 / AC20 — ne jamais restyler le core ; arrondi du thème', () => {
-  it('tous les sélecteurs sont préfixés .j2ha- ou limités à .modal-j2ha-room / #j2ha_roomCards', () => {
+  it('tous les sélecteurs sont préfixés .j2ha- ou limités à #j2ha_roomCards (Story 25.4 : plus de fenêtre de pièce)', () => {
     const offenders = [];
     for (const rule of rules) {
       if (isVariableBlock(rule)) continue;
       for (const selector of rule.selector.split(',').map((s) => s.trim())) {
-        if (!/\.j2ha-|\.modal-j2ha-room|#j2ha_roomCards/.test(selector)) offenders.push(selector);
+        if (!/\.j2ha-|#j2ha_roomCards/.test(selector)) offenders.push(selector);
         // Aucune règle ne cible seule .label, .btn, .panel, .modal, .objectDisplayCard.
         assert.doesNotMatch(selector, /^\.(label|btn|panel|modal|objectDisplayCard)(?![\w-])/, selector);
       }

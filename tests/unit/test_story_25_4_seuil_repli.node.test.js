@@ -50,6 +50,23 @@ describe('25.4 / AC21 — une constante, un seul endroit', () => {
   });
 });
 
+describe('25.4 / AC20 — le seuil est celui de la mesure consignée (ou 1024 px par défaut)', () => {
+  const measure = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'story_25_4_mesure_seuil.json'), 'utf8'));
+
+  it('la plus petite largeur candidate qui satisfait (a), (b) ≥ 280 px et (c) ≥ 560 px est le seuil retenu', () => {
+    assert.deepEqual(measure.rows.map((r) => r.width), [768, 834, 900, 980, 1024, 1112, 1180, 1280]);
+    for (const row of measure.rows) {
+      assert.equal(row.ok, row.a_no_hscroll && row.nav_width >= 280 && row.detail_width >= 560, 'largeur ' + row.width);
+    }
+    const first = measure.rows.find((row) => row.ok);
+    assert.equal(measure.measured_threshold, first ? first.width : null);
+    assert.equal(measure.retained_threshold, first ? first.width : 1024, 'repli à 1024 px seulement si la mesure n’aboutit pas');
+    assert.equal(W.LAYOUT_SPLIT_MIN_WIDTH, measure.retained_threshold);
+    assert.equal(measure.fallback_used, !first);
+    assert.match(measure.reserve, /iPad mural/);
+  });
+});
+
 describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
   const layout = (ui) => ui.$('#j2ha_workView').attr('data-j2ha-layout');
 

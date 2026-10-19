@@ -52,7 +52,7 @@ test('25.4 gate — vrais clics Playwright : plus aucun dispatchEvent(click) dan
   for (const name of [...PARCOURS, 'vue-maitre-detail-c']) {
     const source = fs.readFileSync(path.join(gateDir, 'parcours', name + '.mjs'), 'utf8');
     assert.doesNotMatch(source, /dispatchEvent\(\s*['"]click['"]/, name);
-    assert.doesNotMatch(source, /modal-j2ha-room|j2ha-eq-toggle|panel-collapse|bootbox-close-button/, name + ' : plus de fenêtre de pièce');
+    assert.doesNotMatch(source, /j2ha-eq-toggle|panel-collapse|bootbox-close-button/, name + ' : plus de fenêtre de pièce ni d’accordéon');
   }
 });
 
