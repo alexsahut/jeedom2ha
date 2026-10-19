@@ -131,9 +131,12 @@ async function checkMenu(page, helpers) {
   }
   await page.locator('#bt_openDiagnostic').click();
   const dialog = page.locator('.bootbox').filter({ has: page.locator('#cb_pseudonymize') });
-  await dialog.waitFor({ state: 'visible' });
-  await page.keyboard.press('Escape');
-  await dialog.waitFor({ state: 'hidden' });
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => { throw new Error('boite-diagnostic-absente'); });
+  // Fermeture par le bouton « Fermer » de la boîte, comme le parcours d'exclusion ferme la fenêtre de pièce :
+  // Échap dépend du focus posé par Bootstrap en fin d'animation et n'est pas exigé par la story.
+  const close = dialog.locator('.btn-default').filter({ hasText: /^Fermer$/ }).first();
+  await close.dispatchEvent('click');
+  await dialog.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => { throw new Error('boite-diagnostic-non-fermee'); });
   const dangerous = page.locator('#j2ha_moreMenu .j2ha-menu-danger');
   if (await dangerous.isDisabled()) {
     helpers.record('supprimer_tout_grise', true);
