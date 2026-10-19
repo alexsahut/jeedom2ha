@@ -88,7 +88,8 @@ async function checkScopeAndWiden(page, helpers, cards) {
   const scope = await page.locator(VIEW).getAttribute('data-j2ha-scope');
   const rooms = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-room`).evaluateAll((nodes) => nodes.map((room) => ({
     id: room.getAttribute('data-object_id'),
-    ratio: (room.querySelector('.j2ha-wv-ratio')?.textContent ?? '').trim(),
+    // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const hash = await page.evaluate(() => window.location.hash);
@@ -108,7 +109,8 @@ async function checkScopeAndWiden(page, helpers, cards) {
 async function checkTree(page, helpers, cards) {
   const tree = await page.locator(`${VIEW} .j2ha-wv-room`).evaluateAll((rooms) => rooms.map((room) => ({
     id: room.getAttribute('data-object_id'),
-    ratio: (room.querySelector('.j2ha-wv-ratio')?.textContent ?? '').trim(),
+    // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
