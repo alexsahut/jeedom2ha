@@ -771,6 +771,14 @@ body[data-theme*="Dark"] {
   padding: 8px;
   border-bottom: 1px solid var(--j2ha-line);
 }
+/* Story 25.6 : élargir la portée (présent seulement en portée « pièce »), cible tactile de 44 px en disposition étroite. */
+.j2ha-wv-widen {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 6px;
+  text-align: left;
+}
 .j2ha-wv-search {
   margin-bottom: 6px;
 }
@@ -1024,7 +1032,8 @@ body[data-theme*="Dark"] {
     min-height: 32px;
   }
   .j2ha-wv-chip,
-  .j2ha-wv-kpi {
+  .j2ha-wv-kpi,
+  .j2ha-wv-widen {
     min-height: 0;
   }
 }
