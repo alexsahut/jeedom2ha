@@ -26,7 +26,7 @@ describe('25.6 / AC1 — depuis une carte : cette pièce seule', () => {
     assert.equal(room.attr('aria-expanded'), 'true');
     assert.equal(room.attr('aria-selected'), 'true');
     assert.equal(ui.$('.j2ha-wv-tree .j2ha-wv-group').length, 0, 'aucun sous-titre de groupe');
-    assert.equal(plain(ui.$('.j2ha-wv-room[data-object_id="12"] > .j2ha-wv-row .j2ha-wv-ratio').text()).trim(), ratio);
+    assert.equal(plain(ui.$('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-ratio').text()).trim(), ratio);
     assert.equal(ui.$('.j2ha-wv-tree [role=treeitem][aria-level="1"]').length, 1, 'un seul treeitem de niveau 1');
   });
 
@@ -136,10 +136,10 @@ describe('25.6 / AC7, Q5 — recherche, puces et KPI dans la portée', () => {
     openCard(ui, 11);
     const ov = house.rooms.find((r) => r.object_id === 11);
     const O = require('../../desktop/js/jeedom2ha_overview.js');
-    assert.deepEqual(chipText('.j2ha-wv-chips .j2ha-chip-filter'), O.chipsFor(ov.counts).map((c) => c.label));
+    assert.deepEqual(chipText('.j2ha-wv-chips .j2ha-chip-filter'), O.chipsFor(ov.counts).map((c) => plain(c.label)));
     assert.deepEqual(chipText('#j2ha_houseChips .j2ha-chip-filter'), before, 'les puces de la page B gardent les effectifs maison');
     ui.click('.j2ha-wv-widen');
-    assert.deepEqual(chipText('.j2ha-wv-chips .j2ha-chip-filter'), O.chipsFor(house.counts).map((c) => c.label));
+    assert.deepEqual(chipText('.j2ha-wv-chips .j2ha-chip-filter'), O.chipsFor(house.counts).map((c) => plain(c.label)));
   });
 
   maybe('invariant AC13 de 25.4 : lignes de l’arbre pour une puce = effectif de la puce, dans les deux portées (20 scènes seedées)', () => {

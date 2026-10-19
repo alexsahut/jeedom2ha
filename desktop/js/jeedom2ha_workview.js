@@ -33,7 +33,7 @@
   var FILTER_KEYS = ['published', 'blocked', 'to_apply', 'other', 'unread'];
   var ICON_FALLBACK = 'fas fa-door-open';
 
-  // --- Fragment d'URL : `#j2ha-vue=piece:P;eq:E;f:F` (valeurs validées avant tout usage, AC7, AC18) ---
+  // --- Fragment d'URL : `#j2ha-vue=piece:P;eq:E;f:F;seule:1` (valeurs validées avant tout usage, AC7, AC18 ; `seule:1` = Story 25.6) ---
 
   var INT_RE = /^(0|[1-9][0-9]{0,8})$/;
   var POSITIVE_RE = /^[1-9][0-9]{0,8}$/;
@@ -54,9 +54,11 @@
       if (m[1] === 'piece' && INT_RE.test(m[2])) out.piece = parseInt(m[2], 10);
       else if (m[1] === 'eq' && POSITIVE_RE.test(m[2])) out.eq = parseInt(m[2], 10);
       else if (m[1] === 'f' && FILTER_KEYS.indexOf(m[2]) !== -1) out.filter = m[2];
+      else if (m[1] === 'seule' && m[2] === '1') out.seule = true;
       else return null;
     }
     if (out.eq !== null && out.piece === null) return null;
+    if (out.seule && out.piece === null) return null;
     return out;
   }
 
@@ -66,6 +68,7 @@
     if (typeof s.piece === 'number') parts.push('piece:' + s.piece);
     if (typeof s.eq === 'number') parts.push('eq:' + s.eq);
     if (typeof s.filter === 'string' && FILTER_KEYS.indexOf(s.filter) !== -1) parts.push('f:' + s.filter);
+    if (s.seule === true && typeof s.piece === 'number') parts.push('seule:1');
     return parts.length ? '#' + FRAGMENT_PREFIX + parts.join(';') : '';
   }
 
@@ -80,7 +83,9 @@
     }
     if (!room) return null;
     if (parsed.eq !== null && !room.equipments.some(function (eq) { return eq.eq_id === parsed.eq; })) return null;
-    return { piece: parsed.piece, eq: parsed.eq, filter: parsed.filter };
+    var resolved = { piece: parsed.piece, eq: parsed.eq, filter: parsed.filter };
+    if (parsed.seule) resolved.seule = true;
+    return resolved;
   }
 
   // Insensible à la casse et aux accents ; le texte est toujours littéral (jamais une expression régulière).
@@ -112,7 +117,7 @@
 
   /**
    * @param {object} input rooms (décorées), groups ([{ title, room_ids }] lus dans la grille de la page B), overview
-   *   (`computeOverview` ou null), filter, search, expanded ({ id: true }), selectedRoom, selectedEq.
+   *   (`computeOverview` ou null), filter, search, expanded ({ id: true }), selectedRoom, selectedEq, scope ('piece' | 'toutes').
    * Rend { groups: [{ title, rooms: [...] }], rowCount, active, hasStates } ; chaque pièce porte ses lignes (le rendu
    * différé ne les affiche que dépliées, Q5).
    */
@@ -129,6 +134,12 @@
     rooms.forEach(function (r) { roomsById[r.object_id] = r; });
 
     var groups = (input.groups && input.groups.length) ? input.groups.slice() : [{ title: null, room_ids: rooms.map(function (r) { return r.object_id; }) }];
+    // Portée « piece » (Story 25.6, D1) : l'arbre ne contient que la pièce sélectionnée, sans titre de groupe ; le reste du
+    // calcul (filtre, recherche, repères) est inchangé. Sans pièce sélectionnée ou inconnue, la portée « toutes » s'applique.
+    if (input.scope === 'piece' && input.selectedRoom !== null && input.selectedRoom !== undefined && roomsById[input.selectedRoom]) {
+      rooms = [roomsById[input.selectedRoom]];
+      groups = [{ title: null, room_ids: [input.selectedRoom] }];
+    }
     var placed = {};
     groups.forEach(function (g) { g.room_ids.forEach(function (id) { placed[id] = true; }); });
     var rest = rooms.filter(function (r) { return !placed[r.object_id]; }).map(function (r) { return r.object_id; });
@@ -224,7 +235,7 @@
     var st = {
       open: false, room: null, eq: null, search: '', expanded: {}, drawerOpen: false, layout: null,
       pushed: 0, hist: [''], savedScroll: 0, lastFilter: null, groupTitleOf: {}, searchTimer: null, built: false, focusTitle: false,
-      opening: false, trigger: null, live: {},
+      opening: false, trigger: null, live: {}, scope: 'toutes',
     };
     var $root = null;
     var $main = null;
@@ -304,7 +315,7 @@
 
       var $bar = $('<div class="j2ha-wv-bar"></div>');
       el.back = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-back"></button>')
-        .append($('<i class="fas fa-arrow-left"></i>')).append(doc.createTextNode(' ' + '{{Toutes les pièces}}'));
+        .append($('<i class="fas fa-arrow-left"></i>')).append(doc.createTextNode(' ' + '{{Page principale}}'));
       el.drawerToggle = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-drawer-toggle" aria-expanded="false" aria-controls="j2ha_wvNav"></button>')
         .append($('<i class="fas fa-list"></i>')).append(doc.createTextNode(' ' + '{{Pièces}}'));
       el.readStatus = $('<div class="text-muted j2ha-wv-read-status" role="status" aria-live="polite"></div>');
@@ -314,6 +325,11 @@
       var $body = $('<div class="j2ha-wv-body"></div>');
       el.nav = $('<aside class="j2ha-wv-nav" id="j2ha_wvNav"></aside>');
       var $tools = $('<div class="j2ha-wv-tools"></div>');
+      el.tools = $tools;
+      // Élargir la portée à toutes les pièces (Story 25.6) : dans le DOM seulement en portée « piece » (renderScope).
+      el.widen = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-widen"></button>')
+        .append($('<i class="fas fa-expand-alt" aria-hidden="true"></i>')).append(doc.createTextNode(' ' + '{{Toutes les pièces}}'));
+      el.widen.on('click', widen);
       el.search = $('<input type="search" class="form-control input-sm j2ha-wv-search" autocomplete="off"/>')
         .attr('aria-label', '{{Rechercher une pièce ou un équipement}}').attr('placeholder', '{{Rechercher une pièce ou un équipement}}');
       el.chips = $('<div class="j2ha-wv-chips"></div>');
@@ -438,7 +454,7 @@
     // il ne fait que chercher un onglet `.nav-tabs` portant ce fragment (aucun ici). La profondeur n'est donc pas portée
     // par `history.state` mais par la pile `st.hist` (fragments) et la position `st.pushed`, tenues ici.
     function syncUrl(mode) {
-      var state = { piece: st.room, eq: st.eq, filter: snap().filter };
+      var state = { piece: st.room, eq: st.eq, filter: snap().filter, seule: st.scope === 'piece' };
       var hash = formatFragment(state);
       if (hash === currentHash()) return;
       try {
@@ -478,7 +494,7 @@
         if (st.open) closeView();
         return;
       }
-      open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });
+      open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, scope: parsed.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
     }
 
     // --- Sélection ---
@@ -531,6 +547,7 @@
     function clearSelection() {
       st.room = null;
       st.eq = null;
+      st.scope = 'toutes';
       surface.clearEquipment();
       renderTree();
       renderPane();
@@ -567,6 +584,7 @@
       st.open = false;
       st.room = null;
       st.eq = null;
+      st.scope = 'toutes';
       st.search = '';
       // La pile n'est PAS oubliée : les entrées de la vue restent accessibles par « Suivant » (onPop y retrouve sa
       // position). Seule l'entrée courante est mise à jour (fermeture sans historique : fragment retiré sur place).
@@ -592,7 +610,8 @@
     }
 
     /**
-     * Ouvre la vue. `target` : { room?, eq?, filter?, fromHistory?, exactFilter? }. Rend `false` si la cible est
+     * Ouvre la vue. `target` : { room?, eq?, filter?, scope?, fromHistory?, exactFilter? } ; `scope: 'piece'` (cette pièce
+     * seule, Story 25.6) exige une pièce, sinon la portée est « toutes ». Rend `false` si la cible est
      * invalide (pièce inconnue, équipement d'une autre pièce) : l'appelant garde alors la page principale.
      */
     function open(target) {
@@ -616,10 +635,12 @@
         st.opening = false;
       }
       st.lastFilter = snap().filter;
+      st.scope = t.scope === 'piece' && roomId !== null ? 'piece' : 'toutes';
       var opts = { history: false, user: !t.fromHistory };
       if (roomId === null) clearSelection();
       else if (eqId !== null) selectEquipment(roomId, eqId, opts);
       else selectRoom(roomId, opts);
+      renderScope();
       renderChips();
       renderStatus();
       if (!t.fromHistory) syncUrl('push');
@@ -632,12 +653,47 @@
       indexRooms();
       if (!st.open) return;
       if (st.room !== null && !roomsById[st.room]) {
+        var wasNarrow = st.scope === 'piece';
         clearSelection();
+        renderScope();
+        renderChips();
+        if (wasNarrow) syncUrl('replace');
       } else if (st.eq !== null && !eqOf(roomsById[st.room], st.eq)) {
         selectRoom(st.room, { history: false });
       } else {
         renderTree();
       }
+    }
+
+    // --- Portée (Story 25.6) : attribut observable, bouton « Toutes les pièces » présent seulement en portée « piece » ---
+    function renderScope() {
+      if (!$root) return;
+      $root.attr('data-j2ha-scope', st.scope);
+      if (st.scope === 'piece') {
+        if (!el.widen.parent().length) el.tools.prepend(el.widen);
+      } else if (el.widen.parent().length) {
+        el.widen.detach();
+      }
+    }
+
+    // Élargit à toutes les pièces : la sélection est conservée (ligne ramenée dans la zone visible, focus dessus) ; l'entrée
+    // d'historique est REMPLACÉE (état `null`), comme un changement de filtre : « Précédent » garde la profondeur de 25.4.
+    function widen() {
+      if (st.scope !== 'piece') return;
+      st.scope = 'toutes';
+      renderScope();
+      renderChips();
+      renderTree();
+      var $selected = el.tree.find('[aria-selected="true"]').first();
+      if ($selected.length) {
+        el.tree.find('[role=treeitem]').attr('tabindex', '-1');
+        $selected.attr('tabindex', '0');
+        var node = $selected.get(0);
+        if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
+        $selected.focus();
+      }
+      syncUrl('replace');
+      announce('{{Toutes les pièces}}');
     }
 
     // --- Rendu : puces, état de lecture, arbre ---
@@ -657,7 +713,10 @@
       if (focused && focused.classList && focused.classList.contains('j2ha-wv-chip')) focusKey = focused.getAttribute('data-filter');
       el.chips.empty();
       if (!overview) return;
-      O.chipsFor(overview.counts).forEach(function (chip) {
+      // Effectifs : ceux de la pièce en portée « piece » (invariant « lignes de l'arbre = effectif de la puce »), ceux de la
+      // maison en portée « toutes » ; `computeOverview` les a déjà calculés, aucun second calcul.
+      var narrow = st.scope === 'piece' && overviewRoom(st.room);
+      O.chipsFor(narrow ? narrow.counts : overview.counts).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter j2ha-wv-chip"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', active === chip.key ? 'true' : 'false')
@@ -746,7 +805,7 @@
       var scroll = node && typeof node.scrollTop === 'number' ? node.scrollTop : 0;
       var model = buildTreeModel({
         rooms: rooms, groups: groups, overview: overviewOf(), filter: snap().filter, search: st.search,
-        expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq,
+        expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq, scope: st.scope,
       });
       el.tree.empty();
       model.groups.forEach(function (g) {
@@ -769,7 +828,7 @@
     function announceResults() {
       var o = overviewOf();
       if (st.search === '' && !snap().filter) return;
-      var model = buildTreeModel({ rooms: rooms, groups: groups, overview: o, filter: snap().filter, search: st.search, expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq });
+      var model = buildTreeModel({ rooms: rooms, groups: groups, overview: o, filter: snap().filter, search: st.search, expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq, scope: st.scope });
       announce(model.roomCount === 0 ? '{{Aucun résultat}}' : model.rowCount + ' ' + (model.rowCount > 1 ? '{{équipements affichés}}' : '{{équipement affiché}}'));
     }
 
@@ -1019,7 +1078,7 @@
     // Point d'entrée des cartes (Q14) : `onclick="j2haOpenRoom(id)"` ; seul contrat : ouvrir la vue sur cette pièce.
     win.j2haOpenRoom = function (objectId) {
       var id = parseInt(objectId, 10);
-      if (!isNaN(id)) open({ room: id });
+      if (!isNaN(id)) open({ room: id, scope: 'piece' });
     };
 
     function start() {
@@ -1029,14 +1088,14 @@
       st.pushed = 0;
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (parsed) {
-        open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });
+        open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, scope: parsed.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
         return;
       }
       try {
         var saved = win.sessionStorage ? JSON.parse(win.sessionStorage.getItem(STORAGE_KEY) || 'null') : null;
         if (saved && saved.mode === 'storage' && currentHash() === '') {
-          var again = resolveFragment({ piece: saved.piece === undefined ? null : saved.piece, eq: saved.eq === undefined ? null : saved.eq, filter: saved.filter || null }, rooms);
-          if (again) open({ room: again.piece, eq: again.eq, filter: again.filter, fromHistory: true, exactFilter: true });
+          var again = resolveFragment({ piece: saved.piece === undefined ? null : saved.piece, eq: saved.eq === undefined ? null : saved.eq, filter: saved.filter || null, seule: saved.seule === true }, rooms);
+          if (again) open({ room: again.piece, eq: again.eq, filter: again.filter, scope: again.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
         }
       } catch (e) { /* stockage illisible : page principale */ }
     }
@@ -1044,7 +1103,7 @@
     return {
       open: open, start: start, reconcile: reconcile, height: height,
       isOpen: function () { return st.open; },
-      state: function () { return { open: st.open, room: st.room, eq: st.eq, layout: st.layout, search: st.search, drawerOpen: st.drawerOpen }; },
+      state: function () { return { open: st.open, room: st.room, eq: st.eq, scope: st.scope, layout: st.layout, search: st.search, drawerOpen: st.drawerOpen }; },
     };
   }
 

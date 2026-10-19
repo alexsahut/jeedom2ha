@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { tree, ok, READY, view } = require('./helpers/ui_harness');
 
 const BLOCKED_VIEW = view('no_generic_type_configured', false, false);
@@ -23,7 +23,7 @@ function eqIdsOf(ui, objectId) {
 describe('25.4 / AC6 — zéro lecture d’arbre tant qu’aucun équipement n’est sélectionné', () => {
   maybe('≥ 3 pièces, ≥ 40 équipements : ouvrir, choisir une pièce, déplier, filtrer, chercher → 0 appel', () => {
     const ui = startBig({ rooms: 4, equipments: 44, seed: 11 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle');
     ui.click('.j2ha-wv-room[data-object_id="13"] .j2ha-wv-toggle');
@@ -37,7 +37,7 @@ describe('25.4 / AC6 — zéro lecture d’arbre tant qu’aucun équipement n�
 
   maybe('100 équipements : l’ouverture de n’importe quelle pièce ne lit aucun arbre (plus de préchargement par équipement)', () => {
     const ui = startBig({ rooms: 5, equipments: 100, seed: 5 });
-    for (const id of [10, 11, 12, 13, 14]) openCard(ui, id);
+    for (const id of [10, 11, 12, 13, 14]) openCardWide(ui, id);
     assert.equal(ui.count('getMappingOverrides'), 0);
   });
 
@@ -61,7 +61,7 @@ describe('25.4 / AC6 — zéro lecture d’arbre tant qu’aucun équipement n�
 describe('25.4 / AC6 — une sélection = une lecture', () => {
   maybe('sélectionner un équipement émet exactement un appel avec son eqId ; resélectionner le rafraîchit (Q9)', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 2 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const [first, second] = eqIdsOf(ui, 10);
     ui.selectEquipment(first);
     assert.equal(ui.count('getMappingOverrides'), 1);
@@ -75,7 +75,7 @@ describe('25.4 / AC6 — une sélection = une lecture', () => {
 
   maybe('sélection d’une pièce : aucun appel ; sélection du même équipement pendant sa lecture : pas de doublon', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 2 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const [first] = eqIdsOf(ui, 10);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     assert.equal(ui.count('getMappingOverrides'), 0);
@@ -89,7 +89,7 @@ describe('25.4 / AC6 — une sélection = une lecture', () => {
 
   maybe('A puis B rapidement : deux appels, seule la réponse de B est rendue ; celle de A, tardive, est ignorée sans erreur', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 2 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const [a, b] = eqIdsOf(ui, 10);
     ui.selectEquipment(a);
     ui.selectEquipment(b);
@@ -112,7 +112,7 @@ describe('25.4 / AC6 — une sélection = une lecture', () => {
 
   maybe('quitter la vue annule les lectures en vol : aucune écriture dans un DOM détaché, aucune erreur', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 2 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const [a] = eqIdsOf(ui, 10);
     ui.selectEquipment(a);
     ui.click('.j2ha-wv-back');
