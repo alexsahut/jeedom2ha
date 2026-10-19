@@ -12,21 +12,26 @@ require_once __DIR__ . '/jeedom2ha_overview_helpers.php';
 // Story 16.8 — Arbre pièce -> équipement pour la surface de mapping HA (modèle Homebridge).
 // Consommé côté front (data Jeedom, aucune route daemon ajoutée). Les eqLogics de type
 // jeedom2ha sont exclus : ce sont des templates du bridge, pas des cibles de mapping.
+// Story 25.7 (Q1 A) : `eq_type` (identifiant du plugin de l'équipement) par équipement et table `j2haPluginNames`.
 // Story 25.3 (AC13) : extension ADDITIVE — `father_id`, `icon_classes`, `color` ; les champs existants
 // ne changent ni de nom ni de type. Les objets sans équipement propre alimentent `j2haAncestors`
 // (sous-titres de groupe) et ne produisent pas de carte.
 $j2haRoomsTree = array();
 $j2haAncestors = array();
+$j2haPluginIds = array();
 foreach ((jeeObject::buildTree(null, false)) as $object) {
 	$roomEqList = array();
 	foreach (eqLogic::byObjectId($object->getId(), false) as $roomEq) {
 		if ($roomEq->getEqType_name() === 'jeedom2ha') {
 			continue;
 		}
+		$pluginId = j2ha_plugin_id($roomEq->getEqType_name());
+		$j2haPluginIds[] = $pluginId;
 		$roomEqList[] = array(
 			'eq_id'   => (int) $roomEq->getId(),
 			'eq_name' => $roomEq->getName(),
 			'enabled' => ($roomEq->getIsEnable() == 1),
+			'eq_type' => $pluginId,
 		);
 	}
 	$fatherId = ($object->getFather_id() !== null) ? (int) $object->getFather_id() : 0;
@@ -55,10 +60,13 @@ foreach (eqLogic::byObjectId(null, false) as $roomEq) {
 	if ($roomEq->getEqType_name() === 'jeedom2ha') {
 		continue;
 	}
+	$pluginId = j2ha_plugin_id($roomEq->getEqType_name());
+	$j2haPluginIds[] = $pluginId;
 	$unassignedEqList[] = array(
 		'eq_id'   => (int) $roomEq->getId(),
 		'eq_name' => $roomEq->getName(),
 		'enabled' => ($roomEq->getIsEnable() == 1),
+		'eq_type' => $pluginId,
 	);
 }
 if (count($unassignedEqList) > 0) {
@@ -74,6 +82,10 @@ if (count($unassignedEqList) > 0) {
 }
 sendVarToJS('j2haRoomsTree', $j2haRoomsTree);
 sendVarToJS('j2haAncestors', $j2haAncestors);
+// Story 25.7 : nom affiché des seuls plugins présents (API du cœur ; repli sur l'identifiant si le plugin est inconnu).
+sendVarToJS('j2haPluginNames', j2ha_plugin_names($j2haPluginIds, function ($pluginId) {
+	return plugin::byId($pluginId)->getName();
+}));
 
 // Story 25.3 (Q9) : lien « Aide » vers la documentation du plugin (API du cœur, repli sur le lien d'info.json).
 $j2haDocUrl = '';
