@@ -224,6 +224,7 @@
     var st = {
       open: false, room: null, eq: null, search: '', expanded: {}, drawerOpen: false, layout: null,
       pushed: 0, savedScroll: 0, lastFilter: null, groupTitleOf: {}, searchTimer: null, built: false, focusTitle: false,
+      opening: false, trigger: null, live: {},
     };
     var $root = null;
     var $main = null;
@@ -534,6 +535,9 @@
 
     // --- Ouverture, fermeture ---
     function enterView() {
+      // AC19 : l'élément qui a le focus (carte, puce, segment) reçoit de nouveau le focus au retour.
+      var active = doc && doc.activeElement;
+      st.trigger = active && active !== doc.body ? $(active) : null;
       st.savedScroll = typeof win.scrollY === 'number' ? win.scrollY : (win.pageYOffset || 0);
       $main.hide();
       $root.show();
@@ -548,6 +552,7 @@
       if (!st.open) return;
       if (st.searchTimer !== null) { timeoutClear(st.searchTimer); st.searchTimer = null; }
       surface.clearEquipment();
+      var lastRoom = st.room;
       st.open = false;
       st.room = null;
       st.eq = null;
@@ -560,6 +565,17 @@
       $root.hide();
       $main.show();
       if (typeof win.scrollTo === 'function') win.scrollTo(0, st.savedScroll);
+      restoreFocus(lastRoom);
+    }
+
+    // Retour : le déclencheur s'il est encore dans le document, sinon la carte de la pièce qui était ouverte.
+    function restoreFocus(lastRoom) {
+      var trigger = st.trigger;
+      st.trigger = null;
+      if (trigger && trigger.length && trigger.closest('body').length) { trigger.focus(); return; }
+      if (lastRoom === null || lastRoom === undefined) return;
+      var card = $main.find('[data-object_id="' + lastRoom + '"]').first();
+      if (card.length) card.focus();
     }
 
     /**
@@ -579,7 +595,13 @@
       if (!$('#j2ha_workView').length) return false;
       build();
       if (!st.open) enterView();
-      if (t.exactFilter || (t.filter !== undefined && t.filter !== null)) page.setFilterExact(t.filter === undefined ? null : t.filter);
+      // Le rendu de B déclenché par le filtre ne doit pas réécrire l'entrée d'historique de la page principale (AC17).
+      st.opening = true;
+      try {
+        if (t.exactFilter || (t.filter !== undefined && t.filter !== null)) page.setFilterExact(t.filter === undefined ? null : t.filter);
+      } finally {
+        st.opening = false;
+      }
       st.lastFilter = snap().filter;
       var opts = { history: false, user: !t.fromHistory };
       if (roomId === null) clearSelection();
@@ -799,7 +821,23 @@
       return $nav;
     }
 
+    // « Appliquer » d'une ligne « À traiter » : la ligne dont l'écriture est en vol, ou dont l'erreur n'a pas été lue, est
+    // détachée (jamais détruite) avant chaque rendu puis réinsérée telle quelle : son bouton reste réservé (un seul envoi)
+    // et son message d'erreur reste lisible.
+    function liveBusy(live) { return !!live.$apply.prop('disabled'); }
+    function liveFailed(live) { return live.$error.text() !== ''; }
+    function detachLive() {
+      Object.keys(st.live).forEach(function (id) { st.live[id].$row.detach(); });
+    }
+    function pruneLive(reinserted) {
+      Object.keys(st.live).forEach(function (id) {
+        var live = st.live[id];
+        if (!reinserted[id] && !liveBusy(live) && !liveFailed(live)) delete st.live[id];
+      });
+    }
+
     function renderPane() {
+      detachLive();
       el.pane.empty();
       var room = st.room !== null ? roomsById[st.room] : null;
       if (!room) {
@@ -826,6 +864,7 @@
     function renderEquipmentPane(room, eq) {
       el.kpis = null;
       el.todo = null;
+      detachLive();
       el.pane.empty();
       el.pane.append(crumb(room, true));
       var $host = $('<div class="j2ha-wv-eqhost"></div>');
@@ -879,6 +918,7 @@
           if (event && event.stopPropagation) event.stopPropagation();
           surface.setRoom(room);
           surface.applyEquipment(item.eq_id, $apply, $error);
+          st.live[item.eq_id] = { $row: $row, $apply: $apply, $error: $error };
         });
         $actions.append($apply);
       }
@@ -893,6 +933,7 @@
       if (st.room === null || st.eq !== null || !el.kpis) return;
       var room = roomsById[st.room];
       var ov = overviewRoom(st.room);
+      detachLive();
       el.kpis.empty();
       el.todo.empty();
       if (ov) {
@@ -912,9 +953,17 @@
         el.todo.append($empty);
       } else {
         var $list = $('<ul class="j2ha-wv-todo-list"></ul>');
-        list.forEach(function (item) { $list.append(todoRow(room, item)); });
+        var reinserted = {};
+        list.forEach(function (item) {
+          var live = st.live[item.eq_id];
+          if (live && (liveBusy(live) || liveFailed(live))) { reinserted[item.eq_id] = true; $list.append(live.$row); return; }
+          $list.append(todoRow(room, item));
+        });
         el.todo.append($list);
+        pruneLive(reinserted);
+        return;
       }
+      pruneLive({});
     }
 
     function roomEntries(room) {
@@ -945,7 +994,7 @@
         }
       }
       var filter = snap().filter;
-      if (filter !== st.lastFilter) {
+      if (filter !== st.lastFilter && !st.opening) {
         st.lastFilter = filter;
         syncUrl('replace');
       }
@@ -1001,6 +1050,9 @@
 
   // Démarrage dans le navigateur, après la page principale (jamais sous Node : les tests pilotent createWorkview).
   if (typeof window !== 'undefined' && typeof window.$ === 'function' && typeof document !== 'undefined' && !(typeof module === 'object' && module.exports)) {
+    // Point d'entrée des cartes défini dès le chargement du script (comme avant la vue C) : sans instance il ne fait rien ;
+    // `createWorkview` le remplace dès que la vue est prête.
+    if (typeof window.j2haOpenRoom !== 'function') window.j2haOpenRoom = function () { /* vue pas encore prête */ };
     window.$(function () {
       if (window.$('#j2ha_workView').length === 0 || !window.Jeedom2haOverviewPage || !window.Jeedom2haSurface) return;
       var view = createWorkview({

@@ -58,13 +58,18 @@ async function readCommandStates(panel) {
 /** Attend puis lit les états de tous les équipements de la pièce, dans les lignes de l'arbre de la vue (l'état de chaque
  * ligne est celui de l'entrée agrégée de la page : même vocabulaire que le badge du détail). Un équipement « non lu » n'a pas
  * de mot d'état et n'est pas relevé. */
-async function readEquipmentBadgeStates(page, view, roomId) {
+async function readEquipmentBadgeStates(page, view, roomId, helpers) {
   const states = ['published', 'to_apply', 'blocked', 'excluded', 'disabled', 'nothing_to_publish'];
   const rows = view.locator(`.j2ha-wv-room[data-object_id="${roomId}"] .j2ha-wv-eq`);
   await page.waitForFunction(({ id }) => {
     const items = [...document.querySelectorAll(`#j2ha_workView .j2ha-wv-room[data-object_id="${id}"] .j2ha-wv-eq`)];
     return items.length > 0 && items.every((item) => item.querySelector('.j2ha-state-word') || item.querySelector('.j2ha-wv-unread'));
   }, { id: roomId });
+  // Invariant de main conservé : un état connu pour TOUS les équipements de la pièce. Un équipement « non lu » (absent de la
+  // réponse agrégée) est enregistré puis fait échouer le parcours.
+  const unread = await rows.evaluateAll((items) => items.filter((item) => item.querySelector('.j2ha-wv-unread')).length);
+  helpers.record(`equipements_non_lus_piece_${roomId}`, unread);
+  if (unread > 0) throw new Error(`equipement-non-lu-piece-${roomId}`);
   return rows.evaluateAll((items, known) => items.map((item) => {
     const word = item.querySelector('.j2ha-state-word');
     const names = {
@@ -143,11 +148,14 @@ async function readRoomCounters(view, helpers, prefix, roomId) {
     total += Number(match[1]);
     helpers.record(`${prefix}_compteur_${index + 1}`, text);
   });
-  // Équipements de la pièce, hors « non lus » (sans état) : la somme des compteurs est celle des équipements lus.
-  const equipments = await view.locator(`.j2ha-wv-room[data-object_id="${roomId}"] .j2ha-wv-eq`).evaluateAll((items) => (
-    items.filter((item) => !item.querySelector('.j2ha-wv-unread')).length
-  ));
-  if (total !== equipments) throw new Error('compteurs-piece-somme-inattendue');
+  // Invariant de main : la somme des compteurs est celle de TOUS les équipements de la pièce, et aucun n'est « non lu ».
+  const counts = await view.locator(`.j2ha-wv-room[data-object_id="${roomId}"] .j2ha-wv-eq`).evaluateAll((items) => ({
+    all: items.length,
+    unread: items.filter((item) => item.querySelector('.j2ha-wv-unread')).length,
+  }));
+  helpers.record(`${prefix}_non_lus`, counts.unread);
+  if (counts.unread > 0) throw new Error('equipement-non-lu-compteurs-piece');
+  if (total !== counts.all) throw new Error('compteurs-piece-somme-inattendue');
 }
 
 /** Story 22.2 / 25.1 : équipement 579 (plusieurs entités, commande 5369 portée par plusieurs entités).
@@ -264,7 +272,7 @@ export async function run(page, { helpers }) {
   // L'action « Supprimer de Home Assistant… » de l'équipement est dans le détail de l'équipement.
   const perEquipment = await panel.locator('.j2ha-eq-recreate').count();
   // Mots d'état de TOUS les équipements de la pièce : lignes de l'arbre (entrées agrégées de la page).
-  for (const equipment of await readEquipmentBadgeStates(page, view, '25')) {
+  for (const equipment of await readEquipmentBadgeStates(page, view, '25', helpers)) {
     if (!/^\d+$/.test(equipment.id ?? '')) throw new Error('eqid-badge-illisible');
     helpers.record(`eq_${equipment.id}_badge`, equipment.state);
   }
