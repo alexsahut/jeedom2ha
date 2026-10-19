@@ -917,6 +917,41 @@
     };
   }
 
+  // Story 25.8 : élément qui reprend le focus quand la confirmation d'exclusion se referme. Résolu à l'instant du besoin (le
+  // détail de la pièce est redessiné après une écriture réussie) : le bouton de l'encart « Pièce exclue » s'il vient de là,
+  // sinon le bouton « ⋯ » des actions de la pièce.
+  function roomActionsFocus(origin) {
+    return function () {
+      if (origin === 'notice') {
+        var $notice = $('.j2ha-wv .j2ha-wv-room-excluded .j2ha-room-exclude').first();
+        if ($notice.length > 0) return $notice;
+      }
+      return $('.j2ha-wv .j2ha-room-actions .j2ha-menu-toggle').first();
+    };
+  }
+
+  // Story 25.8 (AC7) : encart neutre du détail d'une pièce exclue, avec « Ne plus exclure la pièce… » (jamais pour « Sans pièce »).
+  function buildRoomExcludedNotice(room) {
+    if (!room || room.object_id <= 0 || room.excluded !== true) {
+      return null;
+    }
+    var $notice = $('<div class="j2ha-notice j2ha-notice-neutral j2ha-wv-room-excluded" role="status"></div>');
+    $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' {{Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant.}}'));
+    var $button = $('<button type="button" class="btn btn-default btn-sm j2ha-room-exclude" data-ha-action="exclure-piece"></button>')
+      .text('{{Ne plus exclure la pièce…}}');
+    $button.on('click', function () {
+      if ($button.prop('disabled')) {
+        return;
+      }
+      if (typeof requestRoomExclusion === 'function') {
+        requestRoomExclusion(room.object_id, room.object_name, false, $button, roomActionsFocus('notice'));
+      }
+    });
+    $notice.append($button);
+    return $notice;
+  }
+
   function buildRoomActions(room) {
     var $wrap = $('<div class="j2ha-room-actions"></div>');
     // La convention daemon object_id=0 (« Sans pièce ») n'est pas une pièce adressable par la
@@ -952,7 +987,20 @@
       );
     };
     $republishButton.on('click', function () { onRepublish($republishButton); });
+    // Story 25.8 (AC7) : l'exclusion de la pièce est la première entrée du menu, AVANT le séparateur et « Supprimer de Home
+    // Assistant… ». Elle ne dépend d'aucun état d'équipement : seul le gating du pont (data-ha-action) la grise.
+    var roomExcluded = room.excluded === true;
     var menu = buildMenu('{{Autres actions}}', [
+      {
+        key: 'exclusion', className: 'j2ha-room-exclude', icon: 'fa-eye-slash', haAction: 'exclure-piece',
+        label: roomExcluded ? '{{Ne plus exclure la pièce…}}' : '{{Exclure la pièce…}}',
+        onClick: function ($item) {
+          if (typeof requestRoomExclusion === 'function') {
+            requestRoomExclusion(room.object_id, room.object_name, !roomExcluded, $item, roomActionsFocus('toggle'));
+          }
+        },
+      },
+      { separator: true },
       {
         key: 'recreate', className: 'j2ha-room-recreate j2ha-menu-danger', icon: 'fa-trash',
         label: '{{Supprimer de Home Assistant…}}', haAction: 'supprimer',
@@ -1315,6 +1363,26 @@
     });
   }
 
+  // Story 25.8 (D1, Q10) : une pièce exclue prime sur « Toujours ». Les segments grisés « Toujours » / « Jamais » d'un équipement
+  // exclu PAR SA PIÈCE le disent (cause lue par `exclusionCauseOf`, 25.7) ; `publicationActionState` (25.1) n'est pas modifié et un
+  // réglage « Toujours » déjà posé reste la position courante (aucune écriture ici).
+  var ROOM_PRECEDENCE_REASON = '{{Pièce exclue : elle prime sur ce réglage.}}';
+
+  function applyRoomExclusionPrecedence($group, tree, eqId) {
+    var cause = M.exclusionCauseOf(tree, roomEnabledById()[eqId]);
+    if (!cause || cause.kind !== 'piece') {
+      return;
+    }
+    $group.find('.j2ha-seg-btn').each(function (_i, el) {
+      var $button = $(el);
+      var key = $button.attr('data-value');
+      if ((key === 'always' || key === 'never') && $button.hasClass('j2ha-seg-disabled')) {
+        $button.attr('title', ROOM_PRECEDENCE_REASON);
+        $button.closest('.j2ha-seg-item').attr('title', ROOM_PRECEDENCE_REASON);
+      }
+    });
+  }
+
   // En-tête collant de l'équipement déplié : réglage de publication (contrôle segmenté), « Appliquer »
   // seulement quand un réglage attend, menu « ⋯ » (Republier, Supprimer de Home Assistant…).
   function renderControls($panel, eqId, normalized, resolved) {
@@ -1325,7 +1393,9 @@
     var $error = $('<div class="j2ha-publication-error text-danger"></div>').hide();
     var target = M.equipmentPublicationTarget(normalized);
     $host.append($('<span class="j2ha-control-label"></span>').text('{{Publication dans Home Assistant}}'));
-    $host.append(buildPublicationControl(eqId, target, true, normalized.commands, normalized.entities, $error, false));
+    var $publicationControl = buildPublicationControl(eqId, target, true, normalized.commands, normalized.entities, $error, false);
+    applyRoomExclusionPrecedence($publicationControl, normalized, eqId);
+    $host.append($publicationControl);
     var actionState = M.equipmentActionState(normalized);
     var eqName = normalized.eq_name || $panel.find('.j2ha-eq-name').first().text();
     if (resolved.state === 'to_apply') {
@@ -1549,6 +1619,7 @@
     refreshEquipmentState: refreshEquipmentState,
     refreshRoomGating: refreshRoomGating,
     buildRoomActions: buildRoomActions,
+    buildRoomExcludedNotice: buildRoomExcludedNotice,
     applyEquipment: applyEquipment,
     stateWord: stateWord,
     resetSession: resetSession,

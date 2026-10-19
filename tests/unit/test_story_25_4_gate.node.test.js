@@ -56,10 +56,11 @@ test('25.4 gate — vrais clics Playwright : plus aucun dispatchEvent(click) dan
   }
 });
 
-test('25.4 gate — la politique et le lanceur ne changent pas (diff vide) ; aucune action n’est ajoutée', async () => {
+test('25.4 gate — la politique et le lanceur ne perdent aucune ligne ; aucune action de LECTURE n’est ajoutée', async () => {
   for (const file of ['tests/e2e/gate/lib/policy.mjs', 'tests/e2e/gate/run-gate.mjs', 'tests/e2e/gate/lib/interceptor.mjs', 'tests/e2e/gate/lib/simulate.mjs']) {
+    // Story 25.8 : `saveRoomExclusion` (écriture simulée déclarée) est ajoutée par AJOUT ; aucune ligne existante n’est retirée.
     const diff = diffAgainstMain(file);
-    if (diff !== null) assert.equal(diff, '', file + ' inchangé');
+    if (diff !== null) assert.deepEqual(diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')), [], file + ' : aucune ligne retirée ou modifiée');
   }
   const policy = await import(gate('lib', 'policy.mjs'));
   const plugin = policy.ALLOWED_READS.find((entry) => entry.pathname === '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php');

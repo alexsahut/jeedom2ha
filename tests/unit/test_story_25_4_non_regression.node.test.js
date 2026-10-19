@@ -22,12 +22,40 @@ const maybe = phpAvailable ? it : it.skip;
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne changent pas', () => {
-  it('git diff --stat sur resources/daemon/, core/ajax/, core/class/, scripts de déploiement et lib/policy.mjs : vide', () => {
+  // Stories 25.8 et 25.9 (adaptation par ajout) : seules ces lignes existantes ont été remplacées — la liste blanche de la route agrégée
+  // gagne `present_in_ha` (25.8, Q1 B) et `saveFilteringConfig` n'écrit plus la clé des pièces exclues (25.9, AC6). Tout autre
+  // retrait dans ces fichiers fait échouer le garde.
+  const REPLACED_BY_25_8_25_9 = [
+    '"entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],',
+    'equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,',
+    'assert all(set(e) == {"override_pending"} for e in entry["entities"])', // test de la liste blanche de 25.2, mis à jour avec elle
+    "$excludedPlugins  = init('excludedPlugins', '');",
+    "$excludedObjects  = init('excludedObjects', '');",
+    "$confidencePolicy = init('confidencePolicy', 'sure_probable');",
+    '// Validation : valeurs autorisées uniquement',
+    "if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {",
+    "$confidencePolicy = 'sure_probable';",
+    '}',
+    "config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');",
+    "config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');",
+    "config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');",
+    "log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins=\"'",
+    '. $excludedPlugins . \'" excludedObjects="\' . $excludedObjects',
+    '. \'" confidencePolicy="\' . $confidencePolicy . \'"\');',
+  ];
+
+  it('git diff --stat sur core/class/ et les scripts de déploiement : vide', () => {
     const diff = diffAgainstBase(['--stat'], [
-      'resources/daemon/', 'core/ajax/', 'core/class/', 'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh',
-      'scripts/deploy-inventory-diff.sh', 'tests/e2e/gate/lib/policy.mjs',
+      'core/class/', 'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh',
     ]);
     if (diff !== null) assert.equal(diff, '');
+  });
+
+  it('resources/daemon/, core/ajax/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8 et 25.9', () => {
+    const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'tests/e2e/gate/lib/policy.mjs']);
+    if (diff === null) return;
+    const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !REPLACED_BY_25_8_25_9.includes(line));
+    assert.deepEqual(unexpected, []);
   });
 
   it('aucun fichier core/i18n n’est créé', () => {
@@ -58,9 +86,16 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     }
   });
 
-  it('la liste blanche et le budget de la route ne sont pas touchés', () => {
-    const diff = diffAgainstBase(['--stat'], ['resources/daemon/transport/http_server.py']);
-    if (diff !== null) assert.equal(diff, '');
+  it('la liste blanche et le budget de la route : le seul changement est l\'ajout de `present_in_ha` aux entités (Story 25.8, Q1 B)', () => {
+    const diff = diffAgainstBase(['-U0'], ['resources/daemon/transport/http_server.py']);
+    if (diff === null) return;
+    const removed = removedLines(diff).map((line) => line.slice(1).trim());
+    assert.deepEqual(removed, [
+      '"entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],',
+      'equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,',
+    ]);
+    assert.ok(diff.includes('"present_in_ha": e["present_in_ha"]'));
+    assert.doesNotMatch(diff, /BUDGET|1_500_000|1500000/);
   });
 
   it('292 équipements de la forme la plus lourde : calcul de l’arbre, des KPI et des filtres mesuré (consigné, sans seuil)', (t) => {

@@ -67,7 +67,7 @@ $eq = $rooms[0]['equipments'][0];
 check('eq_type ajouté à chaque équipement', $eq['eq_type'] === 'plugin_alpha' && $rooms[0]['equipments'][1]['eq_type'] === 'plugin_gone');
 check('« Sans pièce » porte aussi eq_type', $rooms[1]['object_id'] === 0 && $rooms[1]['equipments'][0]['eq_type'] === 'plugin_alpha');
 check('champs existants inchangés (noms et types)', array_keys($eq) === array('eq_id', 'eq_name', 'enabled', 'eq_type') && is_int($eq['eq_id']) && is_bool($eq['enabled']));
-$expected = array('object_id', 'object_name', 'parent_number', 'father_id', 'icon_classes', 'color', 'equipments');
+$expected = array('object_id', 'object_name', 'parent_number', 'father_id', 'icon_classes', 'color', 'equipments', 'excluded'); // Story 25.8 : champ additif en fin
 check('champs de pièce inchangés', array_keys($rooms[0]) === $expected);
 $table = $out['vars']['j2haPluginNames'];
 check('table des noms : seulement les plugins présents', array_keys($table) === array('plugin_alpha', 'plugin_gone'));

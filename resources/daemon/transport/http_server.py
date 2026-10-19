@@ -3373,7 +3373,12 @@ def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "jeedom_eq_id": tree["jeedom_eq_id"],
         "equipment_decision": tree["equipment_decision"],
-        "entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],
+        # Story 25.8 (Q1 B) : `present_in_ha` (champ additif de 22.2, déjà calculé par le constructeur) rejoint la liste
+        # blanche pour que la surface annonce un nombre d'ENTITÉS exact avant d'exclure une pièce.
+        "entities": [
+            {"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}
+            for e in tree["entities"]
+        ],
         "commands": [
             {
                 "jeedom_cmd_id": c["jeedom_cmd_id"],
@@ -3474,7 +3479,7 @@ async def _handle_equipment_states_get(request: web.Request) -> web.Response:
     Lecture seule stricte. Auth `X-Local-Secret` (401 sinon). Réponse 200 `{status, payload}` :
     `payload = {schema_version, available, meta{generated_at, generation, cache{hit, build_ms},
     equipments_total, equipments_read, action_in_progress}, equipments{"<eq_id>": {jeedom_eq_id,
-    equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,
+    equipment_decision, entities[{override_pending, present_in_ha}], commands[{jeedom_cmd_id, covered,
     published_in_ha, diagnostic}], sync_status}}, unread[{eq_id, reason:"build_error"}]}`.
     Chaque entrée est la projection (liste blanche) de ce que renvoie
     `GET /system/mapping_overrides/{eq_id}` (même constructeur) : ni état résolu, ni compteur, ni

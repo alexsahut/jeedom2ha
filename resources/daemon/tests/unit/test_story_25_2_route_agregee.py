@@ -26,6 +26,7 @@ EQ_IDS = sorted(build_corpus_topology().eq_logics)
 
 EQUIPMENT_KEYS = {"jeedom_eq_id", "equipment_decision", "entities", "commands", "sync_status"}
 COMMAND_KEYS = {"jeedom_cmd_id", "covered", "published_in_ha", "diagnostic"}
+ENTITY_KEYS = {"override_pending", "present_in_ha"}  # Story 25.8 (Q1 B) : ajout de `present_in_ha`
 SYNC_KEYS = {"synced_should_publish", "current_should_publish", "override_pending", "published_in_ha"}
 FORBIDDEN_KEYS = {"state", "blocked_mention", "by_state", "defects", "counts", "enabled",
                   "category", "to_apply", "blocked_count", "ignored", "rooms",
@@ -64,7 +65,8 @@ def _project(tree):
     return {
         "jeedom_eq_id": tree["jeedom_eq_id"],
         "equipment_decision": tree["equipment_decision"],
-        "entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],
+        # Story 25.8 (Q1 B) : `present_in_ha` (champ additif de 22.2) rejoint la liste blanche des entités.
+        "entities": [{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]} for e in tree["entities"]],
         "commands": [{k: c[k] for k in COMMAND_KEYS} for c in tree["commands"]],
         "sync_status": tree["sync_status"],
     }
@@ -99,7 +101,7 @@ async def test_ac2_forme_et_liste_blanche(cli):
     for entry in payload["equipments"].values():
         assert set(entry) == EQUIPMENT_KEYS
         assert set(entry["sync_status"]) == SYNC_KEYS
-        assert all(set(e) == {"override_pending"} for e in entry["entities"])
+        assert all(set(e) == ENTITY_KEYS for e in entry["entities"])
         assert all(set(c) == COMMAND_KEYS for c in entry["commands"])
 
 

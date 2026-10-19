@@ -41,7 +41,8 @@
    ],
    "entities": [
     {
-     "override_pending": false
+     "override_pending": false,
+     "present_in_ha": true
     }
    ],
    "equipment_decision": {
@@ -297,13 +298,16 @@
    ],
    "entities": [
     {
-     "override_pending": false
+     "override_pending": false,
+     "present_in_ha": true
     },
     {
-     "override_pending": false
+     "override_pending": false,
+     "present_in_ha": false
     },
     {
-     "override_pending": false
+     "override_pending": false,
+     "present_in_ha": false
     }
    ],
    "equipment_decision": {
@@ -865,7 +869,8 @@
    ],
    "entities": [
     {
-     "override_pending": true
+     "override_pending": true,
+     "present_in_ha": true
     }
    ],
    "equipment_decision": {
@@ -1190,7 +1195,8 @@
    ],
    "entities": [
     {
-     "override_pending": true
+     "override_pending": true,
+     "present_in_ha": false
     }
    ],
    "equipment_decision": {
@@ -1374,7 +1380,8 @@
    ],
    "entities": [
     {
-     "override_pending": false
+     "override_pending": false,
+     "present_in_ha": false
     }
    ],
    "equipment_decision": {
@@ -1566,7 +1573,8 @@
    ],
    "entities": [
     {
-     "override_pending": true
+     "override_pending": true,
+     "present_in_ha": true
     }
    ],
    "equipment_decision": {

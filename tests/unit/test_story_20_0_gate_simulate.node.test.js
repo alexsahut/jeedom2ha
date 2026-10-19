@@ -498,3 +498,56 @@ test('story 20-0 — simulation des écritures d\'override (simulate.mjs)', asyn
     assert.deepEqual(derivePublicationOverrideTree(state, '1', real), real);
   });
 });
+
+// Story 25.8 (AC14) — réponse simulée de `saveRoomExclusion` : forme de la route, `excluded_objects` dérivés de la configuration
+// RÉELLE (lue en lecture seule par le lanceur) et des écritures déclarées ; jamais transmise, jamais d'effet sur la configuration réelle.
+test('story 25-8 — simulation de saveRoomExclusion', async (t) => {
+  const sim = await loadSimulate();
+
+  await t.test('forme de la réponse = forme de la route (D2) et ids dérivés de la configuration réelle', () => {
+    const state = sim.createState();
+    sim.setRoomExclusionBase(state, ' 5 , 12 ,abc,5');
+    const response = sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '1' });
+    assert.deepEqual(response, { state: 'ok', result: { object_id: 7, excluded: true, changed: true, excluded_objects: [5, 12, 7] } });
+  });
+
+  await t.test('la même écriture rejouée ne change rien ; « ne plus exclure » retire ; l\'état simulé s\'accumule', () => {
+    const state = sim.createState();
+    sim.setRoomExclusionBase(state, '5,12');
+    sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '1' });
+    const again = sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '1' });
+    assert.equal(again.result.changed, false);
+    assert.deepEqual(again.result.excluded_objects, [5, 12, 7]);
+    const removed = sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '0' });
+    assert.equal(removed.result.changed, true);
+    assert.deepEqual(removed.result.excluded_objects, [5, 12]);
+    assert.equal(removed.result.excluded, false);
+    assert.equal(sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '0' }).result.changed, false);
+  });
+
+  await t.test('même interprétation que le plugin : numériques retenus, entiers, jamais de 0 ni de texte', () => {
+    const state = sim.createState();
+    sim.setRoomExclusionBase(state, 'abc,5.0,-3,,1e1, 8');
+    assert.deepEqual(sim.buildRoomExclusionResponse(state, { objectId: '9', excluded: '1' }).result.excluded_objects, [5, -3, 10, 8, 9]);
+  });
+
+  await t.test('sans configuration lue : base vide, jamais d\'exception', () => {
+    const state = sim.createState();
+    assert.deepEqual(sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '1' }).result.excluded_objects, [7]);
+    sim.setRoomExclusionBase(state, undefined);
+    sim.setRoomExclusionBase(state, null);
+  });
+
+  await t.test('entrée invalide : exception explicite (jamais une simulation silencieuse)', () => {
+    const state = sim.createState();
+    assert.throws(() => sim.buildRoomExclusionResponse(state, { objectId: 'abc', excluded: '1' }), /objectId/);
+    assert.throws(() => sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '2' }), /excluded/);
+  });
+
+  await t.test('n\'altère aucun autre état de simulation', () => {
+    const state = sim.createState();
+    const before = JSON.stringify({ p: state.previews, s: state.simulations, ps: state.publicationSimulations });
+    sim.buildRoomExclusionResponse(state, { objectId: '7', excluded: '1' });
+    assert.equal(JSON.stringify({ p: state.previews, s: state.simulations, ps: state.publicationSimulations }), before);
+  });
+});

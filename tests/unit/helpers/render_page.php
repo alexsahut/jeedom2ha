@@ -52,6 +52,13 @@ class J2haFakePlugin {
 }
 class plugin { public static function byId($id) { return new J2haFakePlugin($id); } }
 class jeedom { public static function getConfiguration($k) { return array(); } }
+// Story 25.8 : configuration du plugin lue dans la fixture (`config`) ; clé absente = valeur par défaut.
+class config {
+    public static function byKey($key, $plugin = 'core', $default = '') {
+        $values = isset($GLOBALS['j2ha_fixture']['config']) ? $GLOBALS['j2ha_fixture']['config'] : array();
+        return array_key_exists($key, $values) ? $values[$key] : $default;
+    }
+}
 function isConnect($right = '') { return true; }
 function sendVarToJS($name, $value) { $GLOBALS['j2ha_vars'][$name] = $value; }
 function __($text, $file = '') { return $text; }

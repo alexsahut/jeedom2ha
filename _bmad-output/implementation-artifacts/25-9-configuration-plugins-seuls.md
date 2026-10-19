@@ -1,8 +1,8 @@
 # Story 25.9 : Page de configuration — exclusion par plugin seulement
 
-Status: ready-for-dev
+Status: review
 
-> **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D4**, point 4 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q6 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.8) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `review` (dev-story terminé, session cloud déléguée, 2026-10-19, dans la même PR que 25.8 ; Tasks 0 et 5 sautées, CC-48 : déploiement conjoint avec 25.8 et preuve terrain à ClaudeBox).** Précédemment : **`ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D4**, point 4 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q6 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.8) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -148,19 +148,19 @@ Liste calculée par la page (PHP, au rendu) : les **identifiants techniques** de
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48)]**
-  - [ ] Dry-run `./scripts/deploy-to-box.sh --dry-run` ; déploiement `--sha <complet> --restart-daemon` depuis un worktree neuf (de préférence avec 25.8, Q9 de 25.8) ; `Deploy complete.`
+- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48)]**
+  - [ ] Dry-run `./scripts/deploy-to-box.sh --dry-run` ; déploiement `--sha <complet> --restart-daemon` depuis un worktree neuf (avec 25.8, Q9 de 25.8) ; `Deploy complete.`
   - [ ] Relever `excludedPlugins` et `excludedObjects` (identifiants seuls).
-- [ ] Task 1 — Tests d'abord (AC: 1, 2, 3, 5, 6, 7)
-  - [ ] 1.1 `tests/test_php_story_25_9_configuration.php` (liste D1, équivalence D2, `saveFilteringConfig` sans `excludedObjects`, HTML sans `configKey` `excludedObjects`).
-  - [ ] 1.2 Test Node du JS en ligne (valeur écrite, corps de la requête).
-- [ ] Task 2 — Liste à cocher (AC: 1 à 4)
-  - [ ] 2.1 Fonction pure de construction de la liste (réutilise la table des noms de 25.7 si disponible) ; rendu ; champ porteur `configKey` tenu à jour (Q3).
-- [ ] Task 3 — Pièces et relais (AC: 5 à 7)
-  - [ ] 3.1 Retrait du champ, renvoi et nombre de pièces exclues ; `saveFilteringConfig` et son journal ; JS du bouton.
-- [ ] Task 4 — Documentation et non-régression (AC: 8 à 10, 12)
-  - [ ] 4.1 `index.md`, `changelog_beta.md`, test de documentation ; `git diff --stat` de l'AC9 ; suites complètes, `flake8`, `scripts/ci-local.sh`.
-- [ ] Task 5 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48)]**
+- [x] Task 1 — Tests d'abord (AC: 1, 2, 3, 5, 6, 7)
+  - [x] 1.1 `tests/test_php_story_25_9_configuration.php` (liste D1, équivalence D2, `saveFilteringConfig` sans `excludedObjects`, page rendue sans `configKey` `excludedObjects`) — rouge sans le module, vert après.
+  - [x] 1.2 `tests/unit/test_story_25_9_configuration.node.test.js` : valeur écrite (vm) et page rendue en vrai Chromium (corps de la requête).
+- [x] Task 2 — Liste à cocher (AC: 1 à 4)
+  - [x] 2.1 `core/php/jeedom2ha_excluded_plugins.php` (fonctions pures ; noms par `j2ha_plugin_names` de 25.7, réutilisé sans modification) ; rendu ; champ porteur `configKey` tenu à jour (Q3).
+- [x] Task 3 — Pièces et relais (AC: 5 à 7)
+  - [x] 3.1 Retrait du champ, renvoi et nombre de pièces exclues ; `saveFilteringConfig` et son journal ; JS du bouton.
+- [x] Task 4 — Documentation et non-régression (AC: 8 à 10, 12)
+  - [x] 4.1 `index.md`, `changelog_beta.md`, `compteurs.md` (renvoi), test de documentation ; `git diff --stat` de l'AC9 ; suites complètes, `flake8`, `scripts/ci-local.sh`.
+- [ ] Task 5 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48)]**
   - [ ] 5.1 AC11 ; `25-9-preuve-terrain-<date>.md` (identifiants seuls) ; statut `ready-for-UX-validation`.
 
 ## Dev Notes
@@ -208,13 +208,36 @@ AC1 à AC12 tenus ; suites vertes ; PR relue par ClaudeBox ; preuve terrain (Tas
 
 ### Agent Model Used
 
-_(à remplir au `dev-story`)_
+Claude (session cloud déléguée, branche `claude/epic-25-room-exclusion-plugins-i17h7v`, 2026-10-19), après 25.8 (statut `review`, même branche, commits distincts).
 
 ### Debug Log References
 
+- **Rouge avant vert** : `test_php_story_25_9_configuration.php` écrit avant le module (échec à la première assertion sans `core/php/jeedom2ha_excluded_plugins.php`) ; après le module, 11 assertions restaient rouges tant que la page de configuration, la branche `saveFilteringConfig` et le JS n'étaient pas modifiés. `test_story_25_9_configuration.node.test.js` écrit avec la page (vrai Chromium sur la page rendue par PHP avec un faux cœur : vert dès la première exécution complète).
+- Le premier jet de la page gardait un libellé « Pièces exclues » devant le renvoi : le test d'absence du champ l'a refusé ; le renvoi est maintenant un paragraphe sans libellé de champ.
+- Le test PHP comptait 4 lignes de journal pour 5 appels : corrigé dans le test (assertion mal comptée, pas le code).
+- Cœur Jeedom (Guardrail « à quel moment le cœur remplit les `configKey` ») : non vérifiable sans cœur réel ; le JS ne dépend d'aucun ordre : les cases sont rendues cochées côté serveur depuis la MÊME valeur que le champ porteur, la valeur écrite est calculée depuis les cases (jamais lue dans le champ), et un événement `change` du champ porteur (remplissage par le cœur) fait de la valeur chargée la nouvelle référence. **À vérifier par ClaudeBox sur la box** (Task 5) : l'ordre réel de remplissage, et que « Sauvegarder » écrit bien la valeur du champ porteur.
+- `scripts/ci-local.sh` : voir la ligne « Résultat final » ci-dessous.
+
 ### Completion Notes List
 
+- **D1/D2 — liste à cocher** : `jeedom2ha_build_excluded_plugins_list($names, $csv)` (fonction pure) : plugins présents (≥ 1 équipement, hors `jeedom2ha`, lus par `eqLogic::all()` dans la page), triés par nom affiché sans casse ni accents (table de repli explicite, sans `intl`), cochés selon la règle de l'extraction (`jeedom2ha_excluded_plugin_ids`, test d'équivalence sur 9 chaînes) ; les plugins exclus mais absents de Jeedom sont ajoutés cochés « (absent de Jeedom) ». Rendu `jeedom2ha_render_excluded_plugins_checklist` : `role="group"` nommé par « Plugins exclus » (`aria-labelledby`), une vraie `input type="checkbox"` + `label for` par plugin, libellé = nom puis identifiant en texte secondaire, noms et identifiants échappés (test avec `<img onerror>`), hauteur bornée à 18 em avec défilement vertical seulement (Q5), aide « Les équipements des plugins cochés ne sont pas publiés dans Home Assistant. », « Aucun plugin avec des équipements. » sans plugin. Aucune case ne porte `configKey`.
+- **Q3 — champ porteur** : `<input type="hidden" class="configKey" data-l1key="excludedPlugins" value="…verbatim…">`, tenu à jour par les cases ; « Sauvegarder » et « Appliquer et rescanner » écrivent la même clé au même format. **Q4 — aucune normalisation** : rien de touché → la valeur chargée est renvoyée VERBATIM (espaces compris, test vrai Chromium) ; sinon ordre conservé, ajout en fin, retrait de toutes les occurrences, jetons inconnus conservés (`j2haComputeExcludedPlugins`, bloc balisé testé sous `vm`). Le JS reste EN LIGNE dans `configuration.php`.
+- **AC5 — pièces** : `grep excludedObjects plugin_info/configuration.php` ne renvoie plus rien (le nombre de pièces exclues est lu par `jeedom2ha_excluded_rooms_count()`, dans le module de fonctions, par la règle de 25.8) ; paragraphe « Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce). » + lien `index.php?v=d&m=jeedom2ha&p=jeedom2ha` + « N pièces exclues » (sans noms, Q6 = A) ; aucun `configKey` ne porte plus la clé : « Sauvegarder » du cœur ne l'écrit plus.
+- **AC6/AC7 — relais** : la logique de `saveFilteringConfig` est extraite en `jeedom2ha_save_filtering_config(array $request, $save, $log)` (comportement conservé pour `excludedPlugins` et `confidencePolicy`, repli `sure_probable`) ; la branche ajax ne transmet que ces deux clés ; `excludedObjects` n'est NI écrit NI effacé, même avec un paramètre d'une ancienne page restée ouverte ou sans paramètre ; la ligne de journal ne le mentionne plus ; la réponse reste `{ saved: true }`. Le bouton envoie exactement `action`, `excludedPlugins`, `confidencePolicy` ; délais (10 s / 90 s) et messages inchangés (`test_story_20_4_rescan_ui`, `test_story_a1_client_timeout`, `test_story_9_0_mapping_summary_total` verts sans modification).
+- **AC9** : `git diff --stat origin/main -- resources/daemon core/class desktop tests/e2e/gate` pour les seuls commits de 25.9 est vide (les fichiers du démon, de `desktop/` et du gate sont ceux de 25.8, commit précédent) ; l'ajax ne change que par la branche `saveFilteringConfig` (le `require_once` est DANS la branche) ; `desktop/php/jeedom2ha_overview_helpers.php` est réutilisé sans modification (`j2ha_plugin_id`, `j2ha_plugin_names`) ; `test_php_topology_extraction.php` : seul l'ajout de 25.8 (lecture des clés inchangée).
+- **AC10** : une seule occurrence de `config::save('excludedObjects'` dans `core/` (la route de 25.8), vérifiée par un test PHP.
+- **Documentation (AC8)** : § « Filtrage et publication » réécrit (liste à cocher, plugins absents encore exclus, ordre sans importance, renvoi pièces, pièces reprises telles quelles), § « Première synchronisation », famille 7 « Exclusions volontaires » et conseil de reprise réalignés, `changelog_beta.md` (une entrée commune avec 25.8), `test_story_25_9_documentation.node.test.js`. Tests de 25.x adaptés par ajout : voir le Dev Agent Record de 25.8 (liste commune).
+- **Hors périmètre respecté** : aucun changement du démon, de `core/class/`, du format des clés, du gate (la page de configuration n'est pas un parcours) ni de la politique de publication / MQTT. Tasks 0 et 5 sautées (CC-48).
+- **Résultat final de `scripts/ci-local.sh`** : voir ci-dessous (mis à jour en fin de session).
+
 ### File List
+
+- `core/php/jeedom2ha_excluded_plugins.php` (nouveau)
+- `core/ajax/jeedom2ha.ajax.php` (branche `saveFilteringConfig` seulement)
+- `plugin_info/configuration.php`
+- `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`
+- Tests nouveaux : `tests/test_php_story_25_9_configuration.php`, `tests/unit/test_story_25_9_configuration.node.test.js`, `tests/unit/test_story_25_9_documentation.node.test.js`
+- `_bmad-output/implementation-artifacts/25-9-configuration-plugins-seuls.md`, `sprint-status.yaml` (statuts, Dev Agent Record)
 
 ## Décisions (ClaudeBox, 2026-10-19 17:40)
 
@@ -264,3 +287,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (D4) : statut `backlog`, 12 AC, 8 décisions déjà arbitrées, 6 questions ouvertes avec recommandation ; dépend de 25.8 ; `ready-for-dev` non accordé ; statut cible `ready-for-UX-validation` (validation UX finale en 25.5).
 - 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.
+- 2026-10-19 — Dev-story (session cloud déléguée, après 25.8, même PR) : AC1 à AC10 et AC12 implémentés (liste à cocher des plugins présents, champ porteur masqué, retrait du champ « Pièces exclues » et renvoi, `saveFilteringConfig` sans `excludedObjects`, documentation) ; tests rouges puis verts ; statut `review`. Tasks 0 et 5 (déploiement conjoint avec 25.8, preuve terrain, AC11) laissées à ClaudeBox.

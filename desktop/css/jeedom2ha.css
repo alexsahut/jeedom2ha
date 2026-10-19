@@ -295,6 +295,41 @@ body[data-theme*="Dark"] {
 .j2ha-mark.j2ha-mark-blocked { color: var(--j2ha-warn); font-weight: 600; }
 .j2ha-mark.j2ha-mark-to_apply { color: var(--j2ha-todo); }
 .j2ha-mark.j2ha-mark-unread { color: var(--j2ha-neutral); }
+/* Story 25.8 : menu « ⋯ » de la carte de pièce et ligne « Pièce exclue ». Classes propres à la story, déclarées sous
+   .j2ha-room-groups ; le composant .j2ha-menu-* (25.1) est réutilisé SANS que ses règles soient modifiées. */
+.j2ha-room-groups .j2ha-room-card.j2ha-room-has-menu {
+  position: relative;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  text-align: left;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--j2ha-neutral);
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle:hover,
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-toggle:focus-visible {
+  color: var(--txt-color, var(--j2ha-text));
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: 1px;
+}
+.j2ha-room-groups .j2ha-room-card .j2ha-room-menu-list {
+  min-width: 200px;
+}
+.j2ha-room-groups .j2ha-room-excluded-line {
+  color: var(--j2ha-neutral);
+}
+.j2ha-room-groups .j2ha-room-excluded-line .j2ha-room-notyet {
+  color: var(--j2ha-todo);
+}
 /* Story 25.7 : repère gris « N exclus » de la carte, déclaré sous .j2ha-room-groups (aucune règle sur .j2ha-mark nue). */
 .j2ha-room-groups .j2ha-mark.j2ha-mark-excluded { color: var(--j2ha-neutral); }
 .j2ha-state-word.j2ha-state-unread { color: var(--j2ha-neutral); }
@@ -872,6 +907,16 @@ body[data-theme*="Dark"] {
 }
 .j2ha-wv-room-marks {
   margin-left: 0;
+}
+/* Story 25.8 : « Pièce exclue » à la place du ratio d'une ligne de pièce, et encart de la pièce exclue (sous .j2ha-wv). */
+.j2ha-wv .j2ha-wv-excluded {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--j2ha-neutral);
+}
+.j2ha-wv .j2ha-wv-room-excluded {
+  margin: 8px 0;
 }
 .j2ha-wv-state {
   flex: 0 0 7.5em;

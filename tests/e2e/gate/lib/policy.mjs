@@ -16,6 +16,8 @@
  *   - ctx.declaredEquipments : { [eqId]: { commands: [cmdId, ...] } } — équipements et
  *     commandes déclarés par le parcours (AC2).
  *   - ctx.declaredRescan : true seulement si le parcours déclare le rescan (AC7).
+ *   - ctx.declaredRoomExclusions : { [objectId]: { excluded: '1' | '0' } } — exclusions de pièce déclarées par le
+ *     parcours (Story 25.8, AC14) : `saveRoomExclusion` n'est simulée que pour un objectId et un sens déclarés.
  *   - ctx.lastPreviewType : { [`${eqId}:${cmdId}`]: haEntityType } — dernier type
  *     prévisualisé par previewMappingOverride pour ce couple, exigé identique par
  *     saveMappingOverride (AC2).
@@ -69,6 +71,10 @@ const SIDE_EFFECT_ACTIONS = [
 // Paramètres de core/ajax/jeedom2ha.ajax.php:877-920 (previewMappingOverride,
 // saveMappingOverride, revertMappingOverride) : eqId, cmdId, haEntityType.
 const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride'];
+
+// Story 25.8 : exclusion d'une pièce depuis la surface — écriture de configuration SIMULÉE, jamais transmise à la box.
+const ROOM_EXCLUSION_ACTION = 'saveRoomExclusion';
+const ROOM_EXCLUSION_PARAMS = 'action,excluded,objectId';
 
 const PARAMETER_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 const STATIC_EXTENSIONS = /\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|map)$/i;
@@ -203,6 +209,20 @@ function validatePublicationWrite(action, params, ctx) {
   return params.publicationPolicy === undefined;
 }
 
+// Story 25.8 (AC14) : POST, exactement action + objectId + excluded, objectId = entier strictement positif déclaré par le
+// parcours, excluded = le sens déclaré pour cet objectId ('1' exclure, '0' ne plus exclure).
+function validateRoomExclusion(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== ROOM_EXCLUSION_PARAMS) return false;
+  const objectId = params.objectId;
+  if (typeof objectId !== 'string' || !/^[1-9][0-9]{0,8}$/.test(objectId)) return false;
+  if (params.excluded !== '1' && params.excluded !== '0') return false;
+  const declared = ctx.declaredRoomExclusions;
+  if (!hasOwnSafe(declared, objectId)) return false;
+  const entry = declared[objectId];
+  return !!entry && typeof entry === 'object' && entry.excluded === params.excluded;
+}
+
 function validateDeclaredRescan(req, ctx) {
   return req.method === 'POST' && ctx && ctx.declaredRescan === true;
 }
@@ -261,6 +281,13 @@ export function classifyRequest(req, ctx) {
         return { verdict: 'simulate', reason: 'rescan-declare', action, params };
       }
       return { verdict: 'block-fail', reason: 'effet-de-bord', action };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === ROOM_EXCLUSION_ACTION) {
+      if (validateRoomExclusion(req, params, ctx)) {
+        return { verdict: 'simulate', reason: 'exclusion-piece-declaree', action, params };
+      }
+      return { verdict: 'block-fail', reason: 'exclusion-piece-non-declaree', action };
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {

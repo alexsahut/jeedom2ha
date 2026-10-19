@@ -10,6 +10,7 @@
 
 import { classifyRequest } from './policy.mjs';
 import {
+  buildRoomExclusionResponse,
   buildRevertResponse,
   buildSaveResponse,
   buildEmptyChangesResponse,
@@ -297,6 +298,10 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         } else if (decision.action === 'revertPublicationOverride') {
           const revert = recordPublicationRevert(simState, { eqId: params.eqId, cmdId: params.cmdId });
           response = buildPublicationRevertResponse(revert);
+        } else if (decision.action === 'saveRoomExclusion') {
+          // Story 25.8 : branche EXPLICITE (jamais la branche `else` ci-dessous, qui sert le retour d'un réglage). La réponse est
+          // dérivée de la configuration réelle (lue par le lanceur) et de l'écriture déclarée ; rien n'est transmis à la box.
+          response = buildRoomExclusionResponse(simState, { objectId: params.objectId, excluded: params.excluded });
         } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
