@@ -1,8 +1,8 @@
 # Story 25.4 : Vue maître-détail C — remplacement de la fenêtre de pièce
 
-Status: backlog
+Status: ready-for-dev
 
-> **Statut courant : `backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48). **`ready-for-dev` n'est pas accordé** : la relecture de la story par ClaudeBox est obligatoire, puis les décisions sur les questions Q1 à Q14 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale de la vue C est portée par **25.5**, pas par cette story. Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, du cadrage, de 25.1 à 25.3 et de la commande de cette story) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `a5ba89b` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; 25.2 : #288 `2b451dd` ; 25.3 : #293 `ebec48b`, correctifs #294 #296 #297, preuve terrain `030d6e8` / #298) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `ready-for-dev` (2026-10-19 07:45, relecture et décisions ClaudeBox par délégation d'Alexandre — § Décisions : Q1 à Q14 = A, avec précisions).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48). **`ready-for-dev` n'est pas accordé** : la relecture de la story par ClaudeBox est obligatoire, puis les décisions sur les questions Q1 à Q14 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale de la vue C est portée par **25.5**, pas par cette story. Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, du cadrage, de 25.1 à 25.3 et de la commande de cette story) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `a5ba89b` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; 25.2 : #288 `2b451dd` ; 25.3 : #293 `ebec48b`, correctifs #294 #296 #297, preuve terrain `030d6e8` / #298) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -505,6 +505,35 @@ Session cloud déléguée Claude Code — `create-story` (documentaire, 2026-10-
 - `_bmad-output/implementation-artifacts/25-4-vue-maitre-detail-c.md` (ce fichier, nouveau).
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (clé `25-4-vue-maitre-detail-c` : commentaire mis à jour, statut `backlog` inchangé ; `last_updated`).
 
+## Décisions (ClaudeBox, 2026-10-19 07:45, par délégation d'Alexandre du 2026-10-18 23:50)
+
+Story relue en entier : 34 AC, D1 à D4, table D2, Tasks, Q1 à Q14. Elle est conforme à la commande et aux décisions de cadrage. **Les recommandations A sont retenues pour Q1 à Q14**, avec les précisions suivantes. Elles font foi en cas d'écart avec le texte des AC.
+
+- **Q1 = A (fragment).** Avant d'écrire le routage, le `dev-story` vérifie dans le code du core (Jeedom 4.4 à 4.6) si le fragment est déjà lu ou réécrit, par exemple pour les onglets ou `jeedomUtils`. Il consigne ce qu'il trouve. Si le core intercepte le fragment, il applique le **repli `sessionStorage`** sans redemander : sélection restaurée, pas de lien partageable. L'AC18 est alors amendée dans le Dev Agent Record : « Précédent » remonte d'un niveau grâce à `history.state`. Le préfixe `j2ha-vue=` reste obligatoire, pour ne jamais lire un fragment qui ne serait pas au plugin.
+- **Q2 = A (tiroir repliable).**
+- **Q3 = A**, avec les critères (a), (b) ≥ 280 px et (c) ≥ 560 px. Valeur par défaut : 1024 px. La largeur réelle de l'iPad mural en mode bureau sera relevée en preuve terrain (Task 11) ; elle peut réviser le seuil par une PR de suite.
+- **Q4 = A (nouveau `jeedom2ha_workview.js`).** Le rendu et les écritures de l'équipement restent dans `jeedom2ha_mapping_surface.js` et sont exposés par une fonction. L'AC8 s'applique : déplacement prouvé par `--color-moved`.
+- **Q5 = A (rendu différé).**
+- **Q6 = A (noms seulement).**
+- **Q7 = A (une seule vérité de filtre B ↔ C, KPI cliquables).**
+- **Q8 = A.** Si un champ manque à l'entrée agrégée, **arrêt et question**. Aucune lecture d'arbre de pièce, et aucune extension de la liste blanche de la route dans cette story.
+- **Q9 = A (relecture à chaque sélection, sans cache).**
+- **Q10 = A (ordre natif de Jeedom).**
+- **Q11 = A (« Appliquer » direct depuis la ligne).** Le bouton n'est proposé que pour une ligne `to_apply`. Il reprend la même écriture, la même réservation de bouton et la même confirmation qu'aujourd'hui, avec le même contrat de corps (AC8). Un clic sur le reste de la ligne sélectionne l'équipement.
+- **Q12 = A (décalage haut mesuré à l'exécution, `dvh` avec repli `vh`, hauteur minimale ≈ 480 px).**
+- **Q13 = A (pas d'Échap pour quitter la vue).**
+- **Q14 = A (`window.j2haOpenRoom` conservé).**
+
+**Précisions ClaudeBox hors questions :**
+
+1. **AC29 (5), réponse tardive dans le gate.** L'interception du gate ne retarde peut-être pas une réponse à la demande. Dans ce cas, l'assertion (5) est portée par le test en vrai Chromium (`test_story_25_4_*`, précédent : `test_story_25_3_navigateur_reel`), avec un réseau factice qui retarde la réponse. Le parcours garde les assertions (1) à (4) et (6) à (9). Ce report est **consigné** au Dev Agent Record ; ce n'est pas un affaiblissement. L'interception de `lib/policy.mjs` n'est pas modifiée pour ça.
+2. **Vrai clic dans les parcours.** Depuis #299 : les parcours adaptés et le nouveau parcours utilisent des **clics Playwright réels**, avec contrôle d'actionnabilité. Ce qui est caché, recouvert ou réduit à 2 px doit faire échouer le gate. `dispatchEvent('click')` n'est admis que là où un parcours existant l'utilisait déjà, sur un bouton de fermeture de bootbox qui disparaît avec la modale. Il n'est pas reconduit dans la vue C.
+3. **Retrait de la modale et « Sans pièce ».** Le parcours `decouverte-piece-25-eq-579` vérifie aujourd'hui les compteurs de « Sans pièce » dans la modale. Il les vérifie désormais dans le détail de pièce de la vue C, **avec les mêmes clés `record`** : registre de l'AC27.
+4. **Taille de la story.** Elle est grande (34 AC). Pas de découpage : la vue, le retrait de la modale et l'adaptation du gate sont indissociables, c'est la décision Q4 du cadrage. En revanche, le `dev-story` livre **une seule PR**, dont les commits suivent les Tasks, pour une relecture par étapes. Si la PR dépasse ce qu'une session peut finir, la session s'arrête proprement après le premier jalon cohérent qui laisse `main` vert et le dit. Premier jalon possible : la vue C derrière la modale encore présente ne convient **pas** ; il faut au minimum le retrait et le gate adapté.
+5. **Statut de la commande.** La lecture de la session est confirmée : `backlog` à la création, puis `ready-for-dev` par la présente relecture, et `ready-for-UX-validation` seulement après la preuve terrain.
+
+**Statut : `ready-for-dev`.**
+
 ## Questions ouvertes pour ClaudeBox / Alexandre
 
 Chaque question porte une **recommandation argumentée** ; **aucune n'est tranchée par la session**. Les AC écrits « par défaut » ci-dessus suivent la recommandation, pour qu'une réponse « je valide les recommandations » rende la story prête sans réécriture.
@@ -584,3 +613,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 ## Change Log
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 34 AC, 12 décisions déjà arbitrées consignées, 14 questions ouvertes pour ClaudeBox / Alexandre avec recommandation ; `ready-for-dev` non accordé ; statut cible après implémentation `ready-for-UX-validation` (validation UX finale en 25.5).
+- 2026-10-19 07:45 — Relecture ClaudeBox : Q1 à Q14 = A (repli `sessionStorage` pour Q1 si le core intercepte le fragment ; « Appliquer » direct seulement sur `to_apply` pour Q11), précisions sur l'AC29 (5), les vrais clics (#299), « Sans pièce », la taille de la story et le statut ; `ready-for-dev`.
