@@ -123,14 +123,14 @@ function createUi(rooms, options) {
     clearTimeout,
     console,
   };
-  // Le faux navigateur fournit location / history / matchMedia ; le reste de `window` est le bac à sable lui-même.
-  Object.assign(sandbox, win);
-  Object.defineProperty(sandbox, 'location', { value: win.location, configurable: true });
-  Object.defineProperty(sandbox, 'history', { value: win.history, configurable: true });
-  sandbox.window = sandbox;
-  sandbox.window.j2haRoomsTree = rooms || [];
-  sandbox.window.j2haAncestors = opts.ancestors || [];
-  sandbox.window.confirm = () => false;
+  // `window` est le faux navigateur (location / history / matchMedia / tailles) ; le code testé y pose ses globales.
+  Object.assign(win, {
+    Jeedom2haMappingOverride: M,
+    j2haRoomsTree: rooms || [],
+    j2haAncestors: opts.ancestors || [],
+    confirm: () => false,
+  });
+  sandbox.window = win;
   vm.createContext(sandbox);
 
   // Éléments de la page principale (extrait minimal du squelette PHP) pour les gestionnaires globaux.
@@ -161,12 +161,15 @@ function createUi(rooms, options) {
     openView: (target) => holder.wv.open(target),
   });
   const wv = W.createWorkview({
-    $: dom.$, document: dom.document, window: sandbox.window, surface: sandbox.window.Jeedom2haSurface,
-    page, rooms: sandbox.window.j2haRoomsTree, now: env.now, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout,
+    $: dom.$, document: dom.document, window: win, surface: win.Jeedom2haSurface,
+    page, rooms: win.j2haRoomsTree, now: env.now, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout,
     offsetTop: () => opts.offsetTop || 120,
   });
   holder.wv = wv;
-  window_exposure(sandbox, wv);
+  // Fins d'action : une relecture des états par B, sans refresh, coalescée (ce que fait le démarrage navigateur de B).
+  win.j2haNotifyStatesChanged = () => page.reader.trigger();
+
+  wv.start();
 
   const ui = {
     dom, calls, sandbox, page, wv, win,
@@ -204,13 +207,18 @@ function createUi(rooms, options) {
       sandbox.window.jeedom2haLastBridgeStatus = BRIDGE_UP;
       sandbox.applyHAGating(BRIDGE_UP);
     },
-    openRoom(objectId) { sandbox.window.j2haOpenRoom(objectId); },
+    openRoom(objectId) { win.j2haOpenRoom(objectId); },
     /** Sélectionne un équipement dans l'arbre de la vue (clic réel sur la ligne) puis, si `tree` est fourni, répond à la lecture. */
     selectEquipment(eqId, tree) {
       ui.click(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-row`);
       if (tree !== undefined && tree !== null) ui.respond('getMappingOverrides', tree);
     },
     isOpen: () => wv.isOpen(),
+    /** Revient au détail de la pièce affichée (clic sur la ligne de la pièce dans l'arbre). */
+    showRoom() {
+      const state = wv.state();
+      ui.click(`.j2ha-wv-room[data-object_id="${state.room}"] .j2ha-wv-row`);
+    },
     click: (selector) => {
       const target = dom.$(selector).first();
       if (!target.length) throw new Error('élément introuvable : ' + selector);
@@ -236,11 +244,6 @@ function createUi(rooms, options) {
     lastConfirmation: () => dom.dialogs.filter((d) => d.options.buttons).slice(-1)[0],
   };
   return ui;
-}
-
-function window_exposure(sandbox, wv) {
-  // `window.j2haOpenRoom` est le point d'entrée des cartes (Q14) : posé par la vue elle-même.
-  if (typeof sandbox.window.j2haOpenRoom !== 'function') sandbox.window.j2haOpenRoom = (id) => wv.open({ room: Number(id) });
 }
 
 module.exports = { createUi, skeletonFor, tree, ok, READY, EXCLUDED, DISABLED, BRIDGE_UP, view, isReady };

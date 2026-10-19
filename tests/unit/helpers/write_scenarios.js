@@ -172,6 +172,7 @@ const SCENARIOS = [
     name: 'republier-piece',
     async run(open) {
       const ui = open(ROOMS, 7, [ok(tree(1, [READY], { present: true }))]);
+      if (ui.showRoom) ui.showRoom(); // vue C : le détail de la pièce (sur main, la fenêtre de pièce l'affichait déjà)
       ui.click('.j2ha-room-republish');
       ui.lastConfirmation().options.buttons.confirm.callback();
       return writesOf(ui);
@@ -181,6 +182,7 @@ const SCENARIOS = [
     name: 'supprimer-piece',
     async run(open) {
       const ui = open(ROOMS, 7, [ok(tree(1, [READY], { present: true }))]);
+      if (ui.showRoom) ui.showRoom();
       ui.click('.j2ha-room-recreate');
       ui.lastConfirmation().options.buttons.confirm.callback();
       return writesOf(ui);

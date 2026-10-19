@@ -13,8 +13,7 @@
     ".j2ha-eq-controls",
     ".j2ha-room-head",
     ".j2ha-room-counters",
-    ".j2ha-room-counter-line",
-    ".j2ha-room-counter-unread"
+    ".j2ha-room-counter-line"
   ],
   "selectors": {
     ":root": "--j2ha-text:#222222;--j2ha-ok:#1b5e20;--j2ha-todo:#0d47a1;--j2ha-warn:#8a4204;--j2ha-neutral:#4f545a;--j2ha-danger:#b71c1c;--j2ha-ok-bg:color-mix(in srgb, var(--j2ha-ok) 14%, transparent);--j2ha-todo-bg:color-mix(in srgb, var(--j2ha-todo) 14%, transparent);--j2ha-warn-bg:color-mix(in srgb, var(--j2ha-warn) 14%, transparent);--j2ha-neutral-bg:color-mix(in srgb, var(--j2ha-neutral) 14%, transparent);--j2ha-surface:rgba(0, 0, 0, 0.03);--j2ha-surface-strong:rgba(0, 0, 0, 0.07);--j2ha-line:rgba(0, 0, 0, 0.2);--j2ha-menu-bg:#ffffff;--j2ha-highlight:rgba(255, 193, 7, 0.35)",

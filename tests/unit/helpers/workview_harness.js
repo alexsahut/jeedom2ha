@@ -6,7 +6,7 @@
  * et bootbox sont factices. Données fictives (CC-48). */
 
 const assert = require('node:assert/strict');
-const { createUi } = require('./ui_harness');
+const { createUi, BRIDGE_UP } = require('./ui_harness');
 const { SCENE, phpAvailable, renderPhp, mainPart, equipmentsFor, okBody, plain } = require('./page_b_harness');
 const { makeScene } = require('./big_scene');
 
@@ -23,6 +23,7 @@ function startWorkview(options) {
   ui.rendered = rendered;
   ui.rooms = rooms;
   ui.equipments = opts.equipments || equipmentsFor(rooms);
+  ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
   ui.page.init();
   if (opts.states !== false) ui.respond('getEquipmentStates', okBody(ui.equipments));
   ui.text = (selector) => plain(ui.$(selector).text());

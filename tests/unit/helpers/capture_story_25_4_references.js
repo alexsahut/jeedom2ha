@@ -86,10 +86,10 @@ const MODAL_SELECTORS = [
   // Accordéon : les commandes n'étaient visibles que dans un panneau déplié (`display: none` par défaut).
   '.j2ha-eq-controls',
   // En-tête de la fenêtre (compteurs de pièce lus dans les arbres chargés) : remplacé par les KPI de la vue C.
+  // `.j2ha-room-counter-unread` RESTE : le détail d'équipement l'emploie pour la présence inconnue (démon plus ancien).
   '.j2ha-room-head',
   '.j2ha-room-counters',
   '.j2ha-room-counter-line',
-  '.j2ha-room-counter-unread',
 ];
 
 function captureCss() {
