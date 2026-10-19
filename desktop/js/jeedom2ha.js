@@ -314,6 +314,12 @@ function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCance
     if (typeof onCancel === 'function' && dialog && typeof dialog.on === 'function') {
       dialog.on('hidden.bs.modal', cancelConfirmation);
     }
+    // Preuve terrain 25.8 (AC8) : le thème du cœur force `.modal-footer .btn.bootbox-accept` en vert (`!important`), quelle que
+    // soit la classe btn-*. Une confirmation qui retire de Home Assistant garde le rouge du thème : on retire au bouton la seule
+    // classe `bootbox-accept` (aucun CSS ajouté, aucun composant du cœur restylé, la clé `confirm` et son rappel inchangés).
+    if (confirmClass === 'btn-danger' && dialog && typeof dialog.find === 'function') {
+      dialog.find('.modal-footer .btn-danger.bootbox-accept').removeClass('bootbox-accept');
+    }
     return;
   }
   if (window.confirm(message)) onConfirm();
