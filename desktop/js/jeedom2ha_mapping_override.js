@@ -786,6 +786,8 @@
       eq_id: isNaN(id) ? null : id,
       eq_name: typeof e.eq_name === 'string' ? e.eq_name : '',
       enabled: e.enabled === true,
+      // Story 25.7 (Q1 A) : identifiant du plugin de l'équipement, champ ADDITIF de `j2haRoomsTree` (absent : chaîne vide).
+      eq_type: typeof e.eq_type === 'string' ? e.eq_type : '',
     };
   }
 
@@ -1201,6 +1203,116 @@
     return out;
   }
 
+  // --- Story 25.7 — cause d'exclusion d'un équipement (D1) et ventilation par pièce (D2) ---
+  // Ajouts PURS : aucune règle d'état n'est écrite ici (`resolveEquipmentState` décide de l'état « Exclu »), la cause est
+  // une MENTION à côté de ce mot, jamais un septième état. Une seule cause par équipement : celle de la décision
+  // d'équipement, sinon celle des commandes si elle est la même pour toutes ; jamais de cause inventée ni cumulée.
+  var EXCLUSION_KIND_OF = {
+    excluded_plugin: 'plugin',
+    excluded_object: 'piece',
+    excluded_eqlogic: 'individuelle',
+    publication_excluded_eqlogic: 'individuelle',
+    publication_excluded_command: 'individuelle',
+  };
+
+  /**
+   * @param {object} tree entrée agrégée (page B) OU arbre unitaire (détail) : même forme, parité prouvée en 25.2.
+   * @param {boolean|undefined} enabled `enabled` de `j2haRoomsTree` (`false` : « Désactivé » prime, aucune cause).
+   * @returns {{kind: string, code: string}|null}
+   */
+  function exclusionCauseOf(tree, enabled) {
+    if (!tree || typeof tree !== 'object') return null;
+    if (resolveEquipmentState(tree, enabled).state !== 'excluded') return null;
+    var t = normalizeTree(tree);
+    var decision = readDiagnosticView(t.equipment_decision);
+    if (decision && Object.prototype.hasOwnProperty.call(EXCLUSION_KIND_OF, decision.publication_reason)) {
+      return { kind: EXCLUSION_KIND_OF[decision.publication_reason], code: decision.publication_reason };
+    }
+    var reasons = [];
+    t.commands.forEach(function (row) {
+      var d = readDiagnosticView(row.diagnostic);
+      if (d && Object.prototype.hasOwnProperty.call(EXCLUSION_KIND_OF, d.publication_reason) && reasons.indexOf(d.publication_reason) === -1) {
+        reasons.push(d.publication_reason);
+      }
+    });
+    return reasons.length === 1 ? { kind: EXCLUSION_KIND_OF[reasons[0]], code: reasons[0] } : null;
+  }
+
+  // Nom affiché du plugin : table de la page (`j2haPluginNames`), repli sur l'identifiant, sinon chaîne vide.
+  function exclusionPluginName(pluginType, names) {
+    var type = typeof pluginType === 'string' ? pluginType : '';
+    var table = names && typeof names === 'object' ? names : {};
+    var name = type !== '' && Object.prototype.hasOwnProperty.call(table, type) && typeof table[type] === 'string' ? table[type].trim() : '';
+    return name !== '' ? name : type;
+  }
+
+  /**
+   * Libellé d'une cause : `form` 'short' (ligne d'arbre, carte) ou 'sentence' (détail d'équipement). Le nom du plugin est
+   * un texte (jamais du HTML) ; sans nom : « son plugin ». Chaîne vide pour une cause nulle ou inconnue.
+   */
+  function exclusionCauseText(cause, pluginName, form) {
+    if (!cause || typeof cause !== 'object') return '';
+    var name = typeof pluginName === 'string' ? pluginName.trim() : '';
+    var sentence = form === 'sentence';
+    if (cause.kind === 'plugin') {
+      var who = name !== '' ? '{{par le plugin}} ' + name : '{{par son plugin}}';
+      return sentence ? '{{Exclu}} ' + who + ' ({{configuration du plugin, « Plugins exclus »}})' : who;
+    }
+    if (cause.kind === 'piece') return sentence ? '{{Exclu par la pièce : toute la pièce est exclue}}' : '{{par la pièce}}';
+    if (cause.kind === 'individuelle') {
+      if (!sentence) return '{{individuelle}}';
+      if (cause.code === 'publication_excluded_command') return '{{Exclusion individuelle : « Jamais » sur ses entités}}';
+      if (cause.code === 'excluded_eqlogic') return "{{Exclusion individuelle : réglage de l'équipement dans Jeedom}}";
+      return '{{Exclusion individuelle : réglage « Jamais »}}';
+    }
+    return '';
+  }
+
+  /**
+   * D2 — ventilation des exclus d'une pièce. `items` : [{ cause, eq_type }] des équipements lus dont l'état est « Exclu ».
+   * `autre` = exclus dont la cause est indéterminable (Q6). Plugins triés par identifiant (ordre déterministe).
+   */
+  function exclusionBreakdown(items) {
+    var list = Array.isArray(items) ? items : [];
+    var out = { excluded: 0, plugin: [], piece: 0, individuelle: 0, autre: 0 };
+    var byType = {};
+    list.forEach(function (item) {
+      out.excluded += 1;
+      var cause = item && item.cause;
+      if (!cause) { out.autre += 1; return; }
+      if (cause.kind === 'plugin') {
+        var type = typeof item.eq_type === 'string' ? item.eq_type : '';
+        if (!Object.prototype.hasOwnProperty.call(byType, type)) {
+          byType[type] = { eq_type: type, count: 0 };
+          out.plugin.push(byType[type]);
+        }
+        byType[type].count += 1;
+      } else if (cause.kind === 'piece') {
+        out.piece += 1;
+      } else if (cause.kind === 'individuelle') {
+        out.individuelle += 1;
+      } else {
+        out.autre += 1;
+      }
+    });
+    out.plugin.sort(function (a, b) { return a.eq_type < b.eq_type ? -1 : a.eq_type > b.eq_type ? 1 : 0; });
+    return out;
+  }
+
+  /** « 2 par le plugin Alpha, 1 par la pièce, 1 individuelle, 1 autre » : zéros omis, pluriels accordés ici. */
+  function exclusionBreakdownText(breakdown, names) {
+    var b = breakdown || {};
+    var parts = [];
+    (b.plugin || []).forEach(function (p) {
+      var name = exclusionPluginName(p.eq_type, names);
+      parts.push(p.count + ' ' + (name !== '' ? '{{par le plugin}} ' + name : '{{par son plugin}}'));
+    });
+    if (b.piece > 0) parts.push(b.piece + ' {{par la pièce}}');
+    if (b.individuelle > 0) parts.push(b.individuelle + ' ' + (b.individuelle > 1 ? '{{individuelles}}' : '{{individuelle}}'));
+    if (b.autre > 0) parts.push(b.autre + ' {{autre}}');
+    return parts.join(', ');
+  }
+
   function pluralize(count, singular, plural) {
     return count + ' ' + (count > 1 ? plural : singular);
   }
@@ -1435,6 +1547,11 @@
     REASON_LABELS: REASON_LABELS,
     EQUIPMENT_STATES: EQUIPMENT_STATES,
     EQUIPMENT_STATE_LABELS: EQUIPMENT_STATE_LABELS,
+    exclusionCauseOf: exclusionCauseOf,
+    exclusionCauseText: exclusionCauseText,
+    exclusionPluginName: exclusionPluginName,
+    exclusionBreakdown: exclusionBreakdown,
+    exclusionBreakdownText: exclusionBreakdownText,
     groupBlockedCauses: groupBlockedCauses,
     buildCauseNoticeText: buildCauseNoticeText,
     allCommandsBlocked: allCommandsBlocked,
