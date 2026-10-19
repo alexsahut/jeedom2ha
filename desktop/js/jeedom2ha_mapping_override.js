@@ -1185,6 +1185,22 @@
     return out;
   }
 
+  // Story 25.3 (AC2) — agrégat de la maison : somme des résumés de pièce, jamais un second calcul d'état.
+  function summarizeHouse(roomSummaries) {
+    var list = Array.isArray(roomSummaries) ? roomSummaries : [];
+    var out = { equipments_total: 0, equipments_read: 0, equipments_presence_unknown: 0, defects: 0, by_state: {} };
+    EQUIPMENT_STATES.forEach(function (state) { out.by_state[state] = 0; });
+    list.forEach(function (room) {
+      if (!room) return;
+      out.equipments_total += room.equipments_total || 0;
+      out.equipments_read += room.equipments_read || 0;
+      out.equipments_presence_unknown += room.equipments_presence_unknown || 0;
+      out.defects += room.defects || 0;
+      EQUIPMENT_STATES.forEach(function (state) { out.by_state[state] += (room.by_state && room.by_state[state]) || 0; });
+    });
+    return out;
+  }
+
   function pluralize(count, singular, plural) {
     return count + ' ' + (count > 1 ? plural : singular);
   }
@@ -1399,6 +1415,7 @@
     markReassuranceShown: markReassuranceShown,
     collectBlockingCommandIds: collectBlockingCommandIds,
     summarizeRoom: summarizeRoom,
+    summarizeHouse: summarizeHouse,
     summarizeEquipmentCounters: summarizeEquipmentCounters,
     buildEquipmentCounterLabels: buildEquipmentCounterLabels,
     entityActionsDuplicateEquipment: entityActionsDuplicateEquipment,

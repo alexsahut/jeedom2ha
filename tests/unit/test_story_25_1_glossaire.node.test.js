@@ -158,7 +158,8 @@ describe('25.1 / AC8 — libellés exacts du glossaire', () => {
     const page = fs.readFileSync('desktop/php/jeedom2ha.php', 'utf8');
     assert.match(page, /<strong>\{\{Démon\}\}<\/strong>/);
     assert.match(page, /\{\{Relire Jeedom\}\}/);
-    assert.match(page, /\{\{Supprimer de Home Assistant…\}\}/);
+    // Story 25.3 (AC9) : l'action globale vit dans le menu « ⋯ » sous le libellé « Supprimer tout de Home Assistant… ».
+    assert.match(page, /\{\{Supprimer tout de Home Assistant…\}\}/);
     const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
     assert.match(home, /\{\{Relire Jeedom\}\}/);
     assert.match(home, /\{\{Relire\}\}/);

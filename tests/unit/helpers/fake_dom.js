@@ -139,7 +139,12 @@ function createDom() {
   }
 
   proto.append = function (...args) {
-    each(this, (el) => args.forEach((arg) => toNodes(arg).forEach((n) => { n.parent = el; el.children.push(n); })));
+    // Comme jQuery, ajouter un nœud déjà présent ailleurs le DÉPLACE (Story 25.3 : boîte du diagnostic).
+    each(this, (el) => args.forEach((arg) => toNodes(arg).forEach((n) => {
+      if (n.parent && n.parent !== el) n.parent.children = n.parent.children.filter((c) => c !== n);
+      n.parent = el;
+      if (!el.children.includes(n)) el.children.push(n);
+    })));
     return this;
   };
   proto.empty = function () { each(this, (el) => { el.children = []; }); return this; };

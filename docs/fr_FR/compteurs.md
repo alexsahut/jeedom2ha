@@ -14,6 +14,11 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Champs du démon lus : sync_status.published_in_ha, sync_status.current_should_publish,
   sync_status.synced_should_publish, sync_status.override_pending, entities[].override_pending,
   commands[].published_in_ha, equipment_decision (GET /system/mapping_overrides/{eq_id}).
+- Story 25.3 : la page principale lit les états de tous les équipements en UN appel (action ajax getEquipmentStates,
+  route GET /system/equipment_states) et en dérive la jauge de la maison et les repères des cartes avec les MÊMES
+  fonctions (resolveEquipmentState, summarizeRoom, puis summarizeHouse, desktop/js/jeedom2ha_mapping_override.js ;
+  desktop/js/jeedom2ha_overview.js). Un équipement de Jeedom absent de la réponse est « non lu » (hors des six états).
+  Tests : test_story_25_3_etats_lecture, test_story_25_3_page_b.
 - Tests Node correspondants : test_story_25_1_etat_unique, test_story_25_1_compteurs, test_story_25_1_surface,
   test_story_20_3_compteurs_piece, test_story_22_2_compteurs_portees.
 - Règle de cloisonnement : aucun libellé de compteur (ligne des états de la pièce, ligne des commandes d'un équipement,
@@ -73,6 +78,18 @@ Conséquences à retenir :
 | **Exclue** (gris) | Écartée par un réglage. | Non |
 
 Les commandes **ignorées** ne sont jamais comptées comme un défaut et ne sont pas des lignes du tableau : elles sont repliées sous le tableau. Une cause inconnue du plugin (démon plus récent) classe la commande « Bloquée » : elle n'est jamais masquée. Voir [Les causes de blocage](index.md#les-causes-de-blocage).
+
+## La jauge de la maison
+
+Sur la page principale, le bloc de la maison reprend les mêmes états, **équipement par équipement**, pour toutes les pièces : « N publiés sur M » où M est le nombre d'équipements Jeedom de toutes les cartes (la carte « Sans pièce » comprise) et N ceux à l'état **Publié**. La jauge est découpée, dans cet ordre, en **publiés** (vert), **à appliquer** (bleu), **bloqués** (orange), **exclus et autres** (gris : exclus, désactivés et rien à publier) et **non lus** (hachuré). La somme des segments est toujours M, et celle des cartes de pièce est toujours celle de la maison.
+
+- **Non lu** n'est pas un septième état : c'est un équipement de Jeedom dont les chiffres n'ont pas pu être lus (le démon ne le connaît pas encore, ou sa lecture a échoué). Il n'est jamais compté publié, bloqué, exclu ni désactivé, et la jauge ne devient jamais « pleine de non lus » quand la lecture n'a pas eu lieu : elle reste neutre avec un message.
+- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît sur la ligne de la liste filtrée et dans la fenêtre de la pièce, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés.
+- Les chiffres sont relus à l'ouverture de la page, après chaque action, au retour sur l'onglet après plus d'une minute et par « Actualiser ». « Chiffres relus à HH:MM » est l'heure de la dernière lecture par la page.
+
+## Les repères d'une carte de pièce
+
+La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont ceux de la fenêtre de la pièce, à une différence près : la fenêtre ne les affiche qu'au fur et à mesure de ses lectures.
 
 ## La ligne des états (sous le titre de la pièce)
 

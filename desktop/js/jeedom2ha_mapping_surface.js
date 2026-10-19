@@ -591,6 +591,7 @@
         // Story 22.2 (Q8 A, P3 de 20-3) : le bandeau de santé est relu quelle que soit l'issue
         // (succès, échec ou réponse refusée) — une opération ratée change le dernier résultat affiché.
         refreshBridgeStatus();
+        if (typeof notifyStatesChanged === 'function') notifyStatesChanged();
       })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
@@ -809,11 +810,13 @@
           onSuccess();
         }
         refreshBridgeStatus();
+        notifyOverview();
       },
       onError: function (message) {
         showActionFeedback(room, message, 'danger');
         // Story 22.2 (Q8 A, P3 de 20-3) : une action de pièce en échec rafraîchit aussi le bandeau.
         refreshBridgeStatus();
+        notifyOverview();
       },
       onComplete: function () {
         restoreHaActionPendingState($button, pendingState);
@@ -1459,7 +1462,16 @@
     });
   }
 
+  // Story 25.3 (AC6, Q7) : une écriture terminée peut avoir changé les chiffres de la page derrière la fenêtre ;
+  // la relecture (sans refresh, coalescée) est portée par la page principale, ici on la signale seulement.
+  function notifyOverview() {
+    if (typeof notifyStatesChanged === 'function') {
+      notifyStatesChanged();
+    }
+  }
+
   function reloadEquipment(eqId) {
+    notifyOverview();
     var $panel = $('.j2ha-eq-panel[data-eq-id="' + eqId + '"]');
     if ($panel.length > 0) {
       $panel.data('loaded', true);

@@ -1,8 +1,8 @@
 # Story 25.3 : Page principale B — barre de santé, jauge maison filtrante, cartes de pièce
 
-Status: ready-for-dev
+Status: review
 
-> **Statut : `ready-for-dev` (2026-10-19 03:25, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — § Décisions).** Précédemment : `backlog` (2026-10-19). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q11 (§ Questions ouvertes, chacune avec une recommandation). Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, de 25.1 et de 25.2) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `04edf79` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; après 25.2 : #288 `2b451dd`, preuve terrain #289). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
+> **Statut : `review` (2026-10-19, `dev-story` terminé par une session cloud déléguée : AC1 à AC19 implémentés et prouvés par les suites locales ; Tasks 0 et 8 SAUTÉES (CC-48 : aucun accès box / VM / Home Assistant) ; la preuve terrain et le passage à `ready-for-UX-validation` restent à ClaudeBox après fusion).** Précédemment : `ready-for-dev` (2026-10-19 03:25, relecture et décisions ClaudeBox par délégation d'Alexandre du 2026-10-18 23:50 — § Décisions).** Précédemment : `backlog` (2026-10-19). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucun accès box / VM / Home Assistant / secret, CC-48). **`ready-for-dev` n'est pas accordé** : relecture ClaudeBox obligatoire, puis décisions sur les questions Q1 à Q11 (§ Questions ouvertes, chacune avec une recommandation). Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, de 25.1 et de 25.2) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `04edf79` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; après 25.2 : #288 `2b451dd`, preuve terrain #289). Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
 ## Story
 
@@ -266,39 +266,39 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP, parcours d
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 (SAUTÉE par la session cloud : réservée à l'humain / ClaudeBox) — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
+- [ ] Task 0 (SAUTÉE par la session cloud : réservée à l'humain / ClaudeBox ; CC-48, aucun accès à la box) — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
   - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
   - [ ] Relever sur la box (identifiants seuls, CC-48) ce que renvoient `getDisplay('icon')` et `getDisplay('tagColor')` des objets (forme du HTML d'icône, valeurs de couleur) et la forme réelle de `father_id` (alimente AC13, Q2, Q3).
-- [ ] Task 1 — Tests d'abord, données et états (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] 1.1 `test_story_25_3_chargement_unique.node.test.js` (AC1), `test_story_25_3_reconciliation_non_lu.node.test.js` (AC3), `test_story_25_3_etats_lecture.node.test.js` (AC4, table D2), `test_story_25_3_refresh_actualiser.node.test.js` (AC5, AC6).
-  - [ ] 1.2 Fixtures JSON fictives dérivées du corpus de 25.2 (`tests/fixtures/`), plus les cinq réponses de la table D2.
-  - [ ] 1.3 Ajouter les fonctions pures d'agrégat (`summarizeHouse` ou équivalent) **par ajout** dans `jeedom2ha_mapping_override.js`, sans toucher `resolveEquipmentState` ni `summarizeRoom` (AC2).
-- [ ] Task 2 — Couche de lecture et état de la page (AC: 1, 4, 5, 6, 7)
-  - [ ] 2.1 Une fonction de lecture unique de `getEquipmentStates` ; copie unique en mémoire (D3) ; dérivation des agrégats à chaque rendu.
-  - [ ] 2.2 Relectures déclenchées par les événements de l'AC6 (rattachement aux callbacks existants de `jeedom2ha.js` et de la fenêtre de pièce), coalescence, politique de Q6.
-  - [ ] 2.3 Bouton « Actualiser » (`refresh=1`) et mention « Chiffres relus à HH:MM ».
-- [ ] Task 3 — Page principale (AC: 8, 9, 10, 11, 12, 14, 15)
-  - [ ] 3.1 Suppression du bandeau bleu, ligne d'aide (Q9).
-  - [ ] 3.2 Barre de santé compacte, actions, menu « ⋯ », boîte de dialogue du diagnostic (identifiants et `data-*` conservés).
-  - [ ] 3.3 Bloc maison : jauge, puces, liste filtrée globale (Q1, Q4, Q5).
-  - [ ] 3.4 Cartes de pièce : jauge, repères, liseré, conservation de `j2haOpenRoom`.
-  - [ ] 3.5 CSS `.j2ha-…` et variables `--j2ha-*` ; `test_story_25_3_palette_theme.node.test.js`.
-- [ ] Task 4 — Icône, couleur et regroupement par objet parent (AC: 13)
-  - [ ] 4.1 Extension additive de `j2haRoomsTree` (Q2, Q3) et test PHP (entrées hostiles).
-  - [ ] 4.2 Regroupement, sous-titres de groupe, repli d'icône ; `test_story_25_3_hierarchie_objets.node.test.js`.
-- [ ] Task 5 — Documentation (AC: 14)
-  - [ ] 5.1 `index.md`, bloc `compteurs.md`, `changelog_beta.md` ; `test_story_25_3_documentation.node.test.js`.
-- [ ] Task 6 — Gate 20-0 et non-régression (AC: 16, 17, 19)
-  - [ ] 6.1 Adapter les 5 parcours sans retirer d'assertion ; ajouter `page-principale-b.mjs` ; mettre à jour l'inventaire de chargement ; lancer les suites simulées.
-  - [ ] 6.2 `git diff --stat main...HEAD -- resources/daemon/ core/ajax/ …` vide ; suites `test_story_25_1_*` et `25_2_*` vertes.
-  - [ ] 6.3 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
-- [ ] Task 7 — Vigilance taille (AC: 7)
-  - [ ] 7.1 Mesure Node du calcul d'agrégats sur 292 équipements lourds ; test « une seule copie, aucun `JSON.stringify` sur `equipments` » ; consigner dans le Dev Agent Record.
-- [ ] Task 8 (SAUTÉE par la session cloud : réservée à l'humain / ClaudeBox ; CC-48) — Preuve terrain (après fusion)
+- [x] Task 1 — Tests d'abord, données et états (AC: 1, 2, 3, 4, 5, 6)
+  - [x] 1.1 `test_story_25_3_chargement_unique.node.test.js` (AC1), `test_story_25_3_reconciliation_non_lu.node.test.js` (AC3), `test_story_25_3_etats_lecture.node.test.js` (AC4, table D2), `test_story_25_3_refresh_actualiser.node.test.js` (AC5, AC6).
+  - [x] 1.2 Fixtures JSON fictives dérivées du corpus de 25.2 (`tests/fixtures/`), plus les cinq réponses de la table D2.
+  - [x] 1.3 Ajouter les fonctions pures d'agrégat (`summarizeHouse` ou équivalent) **par ajout** dans `jeedom2ha_mapping_override.js`, sans toucher `resolveEquipmentState` ni `summarizeRoom` (AC2).
+- [x] Task 2 — Couche de lecture et état de la page (AC: 1, 4, 5, 6, 7)
+  - [x] 2.1 Une fonction de lecture unique de `getEquipmentStates` ; copie unique en mémoire (D3) ; dérivation des agrégats à chaque rendu.
+  - [x] 2.2 Relectures déclenchées par les événements de l'AC6 (rattachement aux callbacks existants de `jeedom2ha.js` et de la fenêtre de pièce), coalescence, politique de Q6.
+  - [x] 2.3 Bouton « Actualiser » (`refresh=1`) et mention « Chiffres relus à HH:MM ».
+- [x] Task 3 — Page principale (AC: 8, 9, 10, 11, 12, 14, 15)
+  - [x] 3.1 Suppression du bandeau bleu, ligne d'aide (Q9).
+  - [x] 3.2 Barre de santé compacte, actions, menu « ⋯ », boîte de dialogue du diagnostic (identifiants et `data-*` conservés).
+  - [x] 3.3 Bloc maison : jauge, puces, liste filtrée globale (Q1, Q4, Q5).
+  - [x] 3.4 Cartes de pièce : jauge, repères, liseré, conservation de `j2haOpenRoom`.
+  - [x] 3.5 CSS `.j2ha-…` et variables `--j2ha-*` ; `test_story_25_3_palette_theme.node.test.js`.
+- [x] Task 4 — Icône, couleur et regroupement par objet parent (AC: 13)
+  - [x] 4.1 Extension additive de `j2haRoomsTree` (Q2, Q3) et test PHP (entrées hostiles).
+  - [x] 4.2 Regroupement, sous-titres de groupe, repli d'icône ; `test_story_25_3_hierarchie_objets.node.test.js`.
+- [x] Task 5 — Documentation (AC: 14)
+  - [x] 5.1 `index.md`, bloc `compteurs.md`, `changelog_beta.md` ; `test_story_25_3_documentation.node.test.js`.
+- [x] Task 6 — Gate 20-0 et non-régression (AC: 16, 17, 19)
+  - [x] 6.1 Adapter les 5 parcours sans retirer d'assertion ; ajouter `page-principale-b.mjs` ; mettre à jour l'inventaire de chargement ; lancer les suites simulées.
+  - [x] 6.2 `git diff --stat main...HEAD -- resources/daemon/ core/ajax/ …` vide ; suites `test_story_25_1_*` et `25_2_*` vertes.
+  - [x] 6.3 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
+- [x] Task 7 — Vigilance taille (AC: 7)
+  - [x] 7.1 Mesure Node du calcul d'agrégats sur 292 équipements lourds ; test « une seule copie, aucun `JSON.stringify` sur `equipments` » ; consigner dans le Dev Agent Record.
+- [ ] Task 8 (SAUTÉE par la session cloud : réservée à l'humain / ClaudeBox ; CC-48, aucune preuve terrain possible depuis le cloud) — Preuve terrain (après fusion)
   - [ ] 8.1 Gate 20-0 contre la box, parcours de l'AC17 compris ; résultat dans `25-3-preuve-terrain-<date>.md` (identifiants seuls).
   - [ ] 8.2 Mesure de la taille et des temps depuis la page B, comparaison aux budgets de 25.2 et à 1 342 346 octets (AC7).
   - [ ] 8.3 Vérification **à la main, hors gate** (le gate interdit toute écriture) que les chiffres changent sans `refresh=1` après une écriture d'override puis après une synchro : c'est la mesure que 25.2 a laissée à 25.3 (« on le revérifiera par l'usage en 25.3 »).
@@ -371,25 +371,45 @@ AC1 à AC19 tenus ; suites locales vertes ; PR relue par ClaudeBox ; preuve terr
 
 ### Agent Model Used
 
-Session cloud déléguée Claude Code — `create-story` (documentaire, 2026-10-19).
+Session cloud déléguée Claude Code — `dev-story` (2026-10-19), branche `story/25-3-dev` (base `main` `dc2c2ae`). Précédemment : `create-story` (documentaire, 2026-10-19).
 
 ### Debug Log References
 
+- `node --test tests/unit/*.node.test.js` : 766 tests verts (dont 11 fichiers `test_story_25_3_*`). Tests PHP du dépôt (`find tests -name '*.php'`, hors les trois qui exigent le cœur Jeedom) : verts, dont `test_story_25_3_php_hierarchie.php` (34 vérifications) et `test_story_20_3_php_page.php`. `php -l` sur tous les `*.php` : propre.
+- Gate 20-0 : suites simulées `test_story_20_0_gate_*` et `test_story_20_3_gate_parcours` vertes (Chromium + Playwright disponibles dans la session) ; **nouveau** `test_story_25_3_navigateur_reel` : le parcours `page-principale-b.mjs` s'exécute dans un vrai Chromium sur le vrai squelette PHP (faux cœur Jeedom), le vrai CSS, le vrai jQuery 3 et les vrais scripts du plugin, le réseau étant servi par Playwright (vraies requêtes POST) — il passe et l'assertion `refresh=1` est observée sur de vraies requêtes. Le gate contre la **box réelle** n'a pas été lancé (CC-48).
+- `git diff --stat origin/main -- resources/daemon/ core/ajax/ scripts/deploy-to-box.sh scripts/parity-snapshot.sh scripts/deploy-inventory-diff.sh` : **vide** (AC16). `git diff origin/main -- desktop/js/jeedom2ha_mapping_override.js` : 17 lignes ajoutées (`summarizeHouse` + export), **0 ligne retirée ou modifiée** (AC2).
+- `make test` (pytest) et `flake8 resources tests core desktop` : voir la section « Suites lancées » de la PR.
+
 ### Completion Notes List
 
-- Rédaction `create-story` : documentaire seulement ; aucun fichier de code, de test ou de doc utilisateur modifié ; statut **`backlog` conservé** (`ready-for-dev` non accordé : relecture ClaudeBox obligatoire, Q1-Q11 à trancher). `sprint-status.yaml` : seul le commentaire de l'entrée `25-3-page-principale-b` est complété.
-- Écarts et constats relevés dans les sources, à confirmer par ClaudeBox :
-  1. `parent_number` (lu dans `getConfiguration('parentNumber')`) n'est pas l'identifiant du parent ; le dépôt lit déjà `father_id` (`core/class/jeedom2ha.class.php:758`). Le regroupement par parent demande donc d'étendre `j2haRoomsTree` (→ Q2).
-  2. `jeedom2ha.php` omet les objets sans équipement propre : un parent qui ne porte que des sous-pièces n'a pas de carte, mais il faut son nom pour le sous-titre de groupe (→ Q2).
-  3. La signature réelle est `resolveEquipmentState(tree, enabled)` ; `enabled` vient de `j2haRoomsTree`, la route n'en porte pas (25.2 Q2 A).
-  4. La route ne documente `reason:"action_in_progress"` que dans le texte de 25.2 (AC11, Q7), pas dans l'exemple de son § Contrat final ; la page doit tolérer son absence (D2) — à confirmer contre `http_server.py` au dev-story.
-  5. La taille de réponse mesurée en 25.2 (1,34 Mo, 89 % du budget) est inscrite comme AC de vigilance (AC7) et comme question (Q8), pas retranchée.
-- Aucune mesure ni donnée terrain n'a été produite ni inventée (CC-48).
+- **Architecture.** Nouveau module `desktop/js/jeedom2ha_overview.js` (UMD : partie pure testée sous Node + démarrage navigateur) : `computeOverview` (agrégats sur `resolveEquipmentState` et `summarizeRoom`, maison = `summarizeHouse`, ajout pur dans `jeedom2ha_mapping_override.js`), `classifyResponse` / `buildViewModel` (table D2), `createReader` (un appel, coalescence 500 ms, 3 relectures 2/5/10 s sur « opération en cours », pas de relecture sur erreur, retour d'onglet > 60 s, `refresh` réservé à `reader.refresh()`), `ajaxFetch` (unique site d'appel de `getEquipmentStates`), `createPage` (rendu de la barre, du bloc maison, de la liste filtrée, des cartes ; menu « ⋯ » ; boîte du diagnostic). Aides PHP pures dans `desktop/php/jeedom2ha_overview_helpers.php` (icône par liste blanche, couleur hexadécimale, regroupement par parent, rendu des cartes), compatibles PHP 7.4.
+- **Décisions respectées sans réouverture.** Q1 A (liste sous le bloc, cartes atténuées, clic de ligne → fenêtre de pièce), Q2 A (`father_id` + variable `j2haAncestors`, groupe = parent direct, titre « Parent › Enfant », « Sans pièce » en dernier, pas de repli), Q3 A (classes d'icône filtrées côté PHP, couleur hexadécimale seule, accent d'icône et filet de carte), Q4 A (« exclus et autres », « non lus » en motif neutre), Q5 A (pas de repère agrégé des commandes bloquées), Q6 A, Q7 A, Q8 A (route et budgets inchangés), Q9 A (ligne d'aide + « Aide », boîte `bootbox`, case inchangée), Q10 B (retour d'onglet, seuil 60 s, coalescé, sans `refresh`), Q11 A.
+- **Q10 B contre le texte d'AC6.** AC6 (écrite avant les décisions) dit « pas d'écoute de `visibilitychange` » ; la décision Q10 = B la remplace : l'écoute existe, est testée (seuil de 60 s, coalescence, pas de `refresh`) et la recherche de texte AC6 est adaptée en conséquence (`setInterval` reste interdit, `focus` aussi).
+- **Fonctionnement des relectures.** `jeedom2ha.js` et la fenêtre de pièce signalent la fin de chaque action (succès **ou** échec) par `notifyStatesChanged()` → `reader.trigger()` (coalescé) ; sans la page B le signal est sans effet. Fenêtre de pièce : une relecture à chaque action (`reloadEquipment`, `runHaAction`, `applyEquipment`), pas à la fermeture (Q7 A).
+- **Menu « ⋯ ».** Le balisage est dans la page PHP et les entrées gardent `j2ha-ha-action` + `data-ha-action` : le gestionnaire global de 20.3/5.3 et `applyHAGating` s'appliquent **sans changement** (confirmation forte `btn-danger` et libellés inchangés). Le comportement (ouverture clic/clavier, Échap, clic extérieur, focus rendu) est un second binder compact dans `jeedom2ha_overview.js` qui réutilise les **classes CSS** du composant de 25.1 (`.j2ha-menu-*`), car le constructeur JS de 25.1 est privé à la fenêtre de pièce et produit des entrées dynamiques : l'exporter aurait obligé à réécrire les gestionnaires globaux. À arbitrer par ClaudeBox si une factorisation est souhaitée (suite possible : exporter `buildMenu`).
+- **Boîte du diagnostic.** Le contenu (case `#cb_pseudonymize`, bouton `#bt_exportDiagnostic`, `#span_exportResult`) reste dans la page (bloc masqué `#div_diagnosticDialog`) et est déplacé dans une boîte `bootbox` à l'ouverture, puis rendu à sa place à la fermeture : le gestionnaire d'export de `jeedom2ha.js` est **inchangé** (même action ajax, mêmes paramètres, même pseudonymisation).
+- **Écarts relevés (story vs code) et suites.** (1) La route ne distingue pas `refresh=1` dans `policy.mjs` : l'assertion est portée par le parcours (observation des requêtes via `page.on`), liste blanche inchangée. (2) `parent_number` n'est pas utilisé (Q2). (3) Les icônes sont filtrées par une liste blanche de familles (`fas far fab fal fa icon`) et de préfixes de glyphes (`fa- jeedom- jeedomapp- nature- maison- meteo- loisir- techno- divers- securite- mdi- fontawesome-`) : **forme réelle de `getDisplay('icon')` et de `getDisplay('tagColor')` non relevée (Task 0 sautée)** — si la box rend un préfixe absent de la liste, la carte retombe sur la porte (repli sûr) ; à confirmer par ClaudeBox. (4) `plugin::getDocumentation()` est utilisé pour l'URL d'aide avec repli sur le lien d'`info.json` si la valeur n'est pas une URL `https://`.
+- **Tests existants adaptés (documenté, AC16).** (a) `test_story_25_1_glossaire` : le libellé global devient « Supprimer tout de Home Assistant… » (imposé par AC9) ; (b) `test_story_20_3_php_page.php` : le rendu des noms de pièce (`htmlspecialchars`) est passé dans `jeedom2ha_overview_helpers.php` ; (c) `tests/unit/helpers/fake_dom.js` : ajouter un nœud déjà présent ailleurs le **déplace** (comme jQuery), nécessaire pour la boîte du diagnostic ; aucune autre suite de 20.x, 22.x, 25.1 ou 25.2 n'a été modifiée.
+- **Gate 20-0 (AC17).** Les cinq parcours existants sont **inchangés** (0 ligne retirée, vérifié par `test_story_25_3_gate`) : les sélecteurs conservés (`.j2ha-room-card`, `data-object_id`, `bt_rescanTopology`, `data-ha-action`, `span_health*`, `bt_exportDiagnostic`) évitent toute réécriture. Ajouts : parcours `page-principale-b.mjs` (7 contrôles, lecture seule, confirmation de suppression annulée) et extension de `page-load-request-inventory.mjs` : `getEquipmentStates` ajouté à ses lectures autorisées (identiques à `policy.mjs`), décompte au chargement (**1** `getEquipmentStates`, **0** `getMappingOverrides`, sortie en erreur sinon). Diff de l'inventaire : +1 entrée de liste blanche, +1 compteur `readCounts`, +1 bloc de sortie ; aucune ligne retirée.
+- **AC7 — taille et calcul.** La page ne modifie ni la route, ni la liste blanche, ni les budgets. Une seule copie de la réponse en mémoire (le lecteur garde `valid` ; aucune re-sérialisation : test `JSON.stringify` à zéro appel sur 292 équipements). **Mesure Node : `computeOverview` sur 292 équipements de la forme la plus lourde du corpus de 25.2 — médiane 2,2 ms, max ≈ 10 ms sur 20 passes** (aucun seuil inventé). Risque « croissance du parc » : la réponse mesurée en 25.2 pèse 1 342 346 octets (89 % du budget) ; le seuil d'alerte de Q8 (1 350 000 octets) est à relever par ClaudeBox à la preuve terrain, le palier suivant reste une décision (gzip du relais, allègement de `diagnostic`, ou suivi du parc).
+- **À faire par ClaudeBox après fusion (Tasks 0 et 8, sautées).** Relever sur la box la forme de `getDisplay('icon')` / `tagColor` / `father_id` ; lancer le gate 20-0 complet (cinq parcours + `page-principale-b` + relevé de chargement) ; mesurer taille et temps depuis la page B et les comparer à 1 342 346 octets, au seuil de 1 350 000 octets et aux budgets de 25.2 ; vérifier à la main (hors gate) que les chiffres changent sans `refresh=1` après une écriture d'override puis après une synchro ; rendu sombre sur Jeedom 4.6.1, rendu clair, rendu 4.4 (porté ensuite par 25.5) ; puis passage à `ready-for-UX-validation`.
+- Aucune donnée réelle (CC-48) : fixtures et tests n'utilisent que des identifiants, noms, icônes et couleurs fictifs.
 
 ### File List
 
-- Story : ce fichier.
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (commentaire de l'entrée `25-3-page-principale-b`, statut inchangé).
+Code et page :
+- `desktop/js/jeedom2ha_overview.js` (nouveau).
+- `desktop/php/jeedom2ha_overview_helpers.php` (nouveau).
+- `desktop/php/jeedom2ha.php` (barre de santé, menu « ⋯ », boîte du diagnostic, ligne d'aide, bloc maison, liste filtrée, cartes groupées, extension additive de `j2haRoomsTree`, `j2haAncestors`).
+- `desktop/js/jeedom2ha.js` (`notifyStatesChanged`, signaux de fin d'action), `desktop/js/jeedom2ha_mapping_surface.js` (signaux de fin d'action), `desktop/js/jeedom2ha_mapping_override.js` (ajout de `summarizeHouse`, aucune ligne retirée), `desktop/css/jeedom2ha.css`.
+
+Documentation : `docs/fr_FR/index.md`, `docs/fr_FR/compteurs.md` (bloc isolé), `docs/fr_FR/changelog_beta.md`.
+
+Gate : `tests/e2e/gate/parcours/page-principale-b.mjs` (nouveau), `tests/e2e/gate/page-load-request-inventory.mjs` (étendu).
+
+Tests (nouveaux) : `tests/unit/test_story_25_3_etats_lecture.node.test.js`, `…_chargement_unique…`, `…_refresh_actualiser…`, `…_page_b…`, `…_glossaire…`, `…_palette_theme…`, `…_documentation…`, `…_gate…`, `…_navigateur_reel…` (tous `.node.test.js`), `tests/unit/test_story_25_3_php_hierarchie.php`, `tests/unit/helpers/page_b_harness.js`, `tests/unit/helpers/render_page.php`. Adaptés : `test_story_25_1_glossaire.node.test.js`, `test_story_20_3_php_page.php`, `tests/unit/helpers/fake_dom.js`.
+
+Suivi : `_bmad-output/implementation-artifacts/sprint-status.yaml` (25-3 → `review`), ce fichier.
 
 ## Décisions (ClaudeBox, 2026-10-19 03:25, par délégation d'Alexandre du 2026-10-18 23:50)
 
@@ -470,6 +490,7 @@ Chaque question porte une **recommandation** ; **aucune n'est tranchée par la s
 
 ## Change Log
 
+- 2026-10-19 — `dev-story` (session cloud déléguée) : implémentation AC1 à AC19, statut `review` ; Tasks 0 et 8 sautées (CC-48) ; preuve terrain et passage à `ready-for-UX-validation` laissés à ClaudeBox.
 - 2026-10-19 03:25 — Relecture ClaudeBox : décisions Q1-Q11 (Q10 B avec garde-fou 60 s, sinon recommandations) ; `ready-for-dev`.
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 19 AC, 12 décisions déjà arbitrées consignées, 11 questions ouvertes pour ClaudeBox / Alexandre avec recommandation ; `ready-for-dev` non accordé.
