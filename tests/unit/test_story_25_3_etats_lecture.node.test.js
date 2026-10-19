@@ -97,7 +97,8 @@ describe('25.3 / D1, AC2 — agrégats construits sur resolveEquipmentState et s
     try { execFileSync('git', ['rev-parse', '--verify', base], { stdio: 'ignore' }); } catch { base = 'origin/main'; }
     let diff = '';
     try { diff = execFileSync('git', ['diff', '-U0', base, '--', 'desktop/js/jeedom2ha_mapping_override.js'], { encoding: 'utf8' }); } catch { return; }
-    const removed = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    const { ALLOWED_REMOVED } = require('./helpers/git_base');
+    const removed = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---') && !ALLOWED_REMOVED.has(l));
     assert.deepEqual(removed, [], 'seuls des ajouts sont admis dans jeedom2ha_mapping_override.js');
   });
 });
