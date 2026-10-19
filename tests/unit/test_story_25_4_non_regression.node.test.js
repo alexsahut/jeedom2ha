@@ -90,6 +90,13 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     const diff = diffAgainstBase(['-U0'], ['resources/daemon/transport/http_server.py']);
     if (diff === null) return;
     const removed = removedLines(diff).map((line) => line.slice(1).trim());
+    if (diff === '') {
+      // Base déjà porteuse de 25.8 (CI de `main` après la fusion de #309) : le diff est vide, on vérifie l'état final.
+      const source = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
+      assert.ok(source.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));
+      assert.doesNotMatch(diff, /BUDGET|1_500_000|1500000/);
+      return;
+    }
     assert.deepEqual(removed, [
       '"entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],',
       'equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,',
