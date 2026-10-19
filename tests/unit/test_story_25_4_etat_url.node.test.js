@@ -153,3 +153,36 @@ describe('25.4 / Q1 — repli sessionStorage si le fragment est inutilisable', (
     assert.equal(ui.isOpen(), false);
   });
 });
+
+// Correctif du 2026-10-19 (gate 20-0 sur la box, parcours vue-maitre-detail-c, étape 8 « precedent-ne-remonte-pas ») :
+// le cœur Jeedom (desktop/common/js/utils.js, 4.4 à 4.6) écoute `popstate` et recharge la page par
+// `jeedomUtils.loadPage(index.php?…)` dès que `event.state !== null`. Les entrées de la vue portent donc un état `null`,
+// et la profondeur est tenue par la vue elle-même.
+describe('25.4 / AC18 — cohabitation avec le popstate du cœur Jeedom', () => {
+  function coreListener(win) {
+    const loads = [];
+    win.addEventListener('popstate', (event) => { if (event.state !== null) loads.push(win.location.hash); });
+    return loads;
+  }
+
+  maybe('aucune entrée d’historique de la vue ne déclenche le rechargement du cœur ; « Précédent » remonte toujours', () => {
+    const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
+    const loads = coreListener(ui.win);
+    openCard(ui, 10);
+    assert.equal(ui.win.history.state, null);
+    const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
+    ui.selectEquipment(eq, ok(tree(eq, [READY])));
+    assert.equal(ui.win.history.state, null);
+    ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
+    assert.equal(ui.win.history.state, null, 'replaceState aussi');
+    ui.win.history.back();
+    assert.equal(ui.isOpen(), true);
+    assert.equal(ui.$('.j2ha-eq-panel').length, 0, 'retour à la pièce');
+    ui.win.history.forward();
+    assert.equal(ui.$('.j2ha-eq-panel').length, 1, 'en avant : de nouveau l’équipement');
+    ui.win.history.back();
+    ui.win.history.back();
+    assert.equal(ui.isOpen(), false, 'retour à la page principale');
+    assert.deepEqual(loads, [], 'le cœur ne recharge jamais la page');
+  });
+});
