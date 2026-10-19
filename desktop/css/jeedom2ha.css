@@ -187,20 +187,26 @@ body[data-theme*="Dark"] {
 .j2ha-gauge.j2ha-gauge-card {
   height: 6px;
 }
-.j2ha-seg {
+/* Segments de jauge : TOUJOURS sous .j2ha-gauge. La classe .j2ha-seg nue est celle du contrôle segmenté
+   « Automatique | Toujours | Jamais » (25.1) : une règle non portée l'écrasait (flex-basis: 0 → contrôle
+   réduit à 2 px dans la fenêtre de pièce, constat du gate 20-0 du 2026-10-19). */
+.j2ha-gauge .j2ha-seg {
+  display: block;
   flex-basis: 0;
   min-width: 2px;
+  border: 0;
+  border-radius: var(--border-radius, 0);
   cursor: pointer;
 }
 .j2ha-gauge-card .j2ha-seg {
   cursor: inherit;
 }
-.j2ha-seg.j2ha-seg-published { background-color: var(--j2ha-ok); }
-.j2ha-seg.j2ha-seg-to_apply { background-color: var(--j2ha-todo); }
-.j2ha-seg.j2ha-seg-blocked { background-color: var(--j2ha-warn); }
-.j2ha-seg.j2ha-seg-other { background-color: var(--j2ha-neutral); }
+.j2ha-gauge .j2ha-seg.j2ha-seg-published { background-color: var(--j2ha-ok); }
+.j2ha-gauge .j2ha-seg.j2ha-seg-to_apply { background-color: var(--j2ha-todo); }
+.j2ha-gauge .j2ha-seg.j2ha-seg-blocked { background-color: var(--j2ha-warn); }
+.j2ha-gauge .j2ha-seg.j2ha-seg-other { background-color: var(--j2ha-neutral); }
 /* « Non lus » : motif neutre, hors des six états. */
-.j2ha-seg.j2ha-seg-unread {
+.j2ha-gauge .j2ha-seg.j2ha-seg-unread {
   background-color: transparent;
   background-image: repeating-linear-gradient(135deg, var(--j2ha-neutral) 0, var(--j2ha-neutral) 2px, transparent 2px, transparent 6px);
 }
