@@ -1,6 +1,6 @@
 # Story 25.6 : Vue C filtrée sur la pièce d'entrée
 
-Status: ready-for-dev
+Status: review
 
 > **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, décision **D2**). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale est portée par **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` (après 25.4 : #301 `0a71a05`, #302 `90d4177`, #303 `5789c04`, preuve terrain #304, sprint change #305) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
@@ -198,24 +198,24 @@ Convention : chaque AC est vérifiable par un test nommé (Node, parcours du gat
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48 : aucun accès box, SSH ni Home Assistant)]**
+- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48 : aucun accès box, SSH ni Home Assistant)]**
   - [ ] Dry-run : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Mode : story d'interface seule, aucune publication attendue → `./scripts/deploy-to-box.sh --sha <complet> --restart-daemon` depuis un worktree neuf (garde-fous CC-56, CC-50) ; vérifier `Deploy complete.`
-- [ ] Task 1 — Tests d'abord (AC: 1, 2, 3, 5, 6, 7, 9)
-  - [ ] 1.1 `test_story_25_6_portee_piece`, `…_etat_url` (table D1/D2 + entrées hostiles + cohabitation `popstate` du cœur), `…_aucune_requete`, `…_navigateur_reel` (zone visible, 40 pièces fictives).
-  - [ ] 1.2 Invariant puces / lignes dans les deux portées (20 fixtures seedées, dérivées du corpus fictif de 25.2).
-- [ ] Task 2 — Portée et fragment (AC: 1, 2, 5, 9)
-  - [ ] 2.1 `st.scope` dans `createWorkview` ; `open(target)` reçoit `scope` (`j2haOpenRoom` → `piece` ; puces, segments, lignes → `toutes`) ; `parseFragment` / `formatFragment` / `resolveFragment` gèrent `seule:1` (D2).
-  - [ ] 2.2 `buildTreeModel` reçoit la portée et ne rend que la pièce en portée `piece` (aucun second algorithme de regroupement) ; `reconcile` (AC9).
-- [ ] Task 3 — Élargir et libellés (AC: 3, 4, 7, 8, 10)
-  - [ ] 3.1 Bouton `.j2ha-wv-widen`, `replaceState` (Q4), sélection conservée et ramenée dans la zone visible, focus, annonce.
-  - [ ] 3.2 Libellé du bouton de retour (Q1) ; effectifs des puces par portée (Q5) ; CSS sous `.j2ha-wv`.
-- [ ] Task 4 — Gate 20-0 (AC: 11)
-  - [ ] 4.1 Adapter `vue-maitre-detail-c` (étape 2) et vérifier les autres parcours ; registre 25.4 vert, `policy.mjs` intact ; suites simulées.
-- [ ] Task 5 — Non-régression, documentation, conventions (AC: 12, 13, 14, 15)
-  - [ ] 5.1 `git diff --stat` de l'AC12 vide ; tests 25.4 adaptés listés ; `index.md`, `changelog_beta.md`, test de documentation.
-  - [ ] 5.2 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
-- [ ] Task 6 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48)]**
+- [x] Task 1 — Tests d'abord (AC: 1, 2, 3, 5, 6, 7, 9)
+  - [x] 1.1 `test_story_25_6_portee_piece`, `…_etat_url` (table D1/D2 + entrées hostiles + cohabitation `popstate` du cœur), `…_aucune_requete`, `…_navigateur_reel` (zone visible, 40 pièces fictives).
+  - [x] 1.2 Invariant puces / lignes dans les deux portées (20 fixtures seedées, dérivées du corpus fictif de 25.2).
+- [x] Task 2 — Portée et fragment (AC: 1, 2, 5, 9)
+  - [x] 2.1 `st.scope` dans `createWorkview` ; `open(target)` reçoit `scope` (`j2haOpenRoom` → `piece` ; puces, segments, lignes → `toutes`) ; `parseFragment` / `formatFragment` / `resolveFragment` gèrent `seule:1` (D2).
+  - [x] 2.2 `buildTreeModel` reçoit la portée et ne rend que la pièce en portée `piece` (aucun second algorithme de regroupement) ; `reconcile` (AC9).
+- [x] Task 3 — Élargir et libellés (AC: 3, 4, 7, 8, 10)
+  - [x] 3.1 Bouton `.j2ha-wv-widen`, `replaceState` (Q4), sélection conservée et ramenée dans la zone visible, focus, annonce.
+  - [x] 3.2 Libellé du bouton de retour (Q1) ; effectifs des puces par portée (Q5) ; CSS sous `.j2ha-wv`.
+- [x] Task 4 — Gate 20-0 (AC: 11)
+  - [x] 4.1 Adapter `vue-maitre-detail-c` (étape 2) et vérifier les autres parcours ; registre 25.4 vert, `policy.mjs` intact ; suites simulées.
+- [x] Task 5 — Non-régression, documentation, conventions (AC: 12, 13, 14, 15)
+  - [x] 5.1 `git diff --stat` de l'AC12 vide ; tests 25.4 adaptés listés ; `index.md`, `changelog_beta.md`, test de documentation.
+  - [x] 5.2 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
+- [ ] Task 6 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48)]**
   - [ ] 6.1 Gate 20-0 contre la box, tous parcours (dont `vue-maitre-detail-c` adapté) ; contrôle négatif en échec attendu ; résultat dans `25-6-preuve-terrain-<date>.md` (identifiants seuls).
   - [ ] 6.2 Ouverture depuis la carte d'une pièce placée en fin de grille : pièce seule visible, élargissement, « Précédent » sans rechargement par le cœur ; 0 ligne `ERROR` dans le démon ; taille de la réponse inchangée.
   - [ ] 6.3 Passage du statut à `ready-for-UX-validation`.
@@ -267,13 +267,38 @@ AC1 à AC15 tenus ; suites locales vertes ; PR relue par ClaudeBox ; preuve terr
 
 ### Agent Model Used
 
-_(à remplir au `dev-story`)_
+Claude (session cloud déléguée, branche `claude/stories-25-6-25-7-aebjpn`, 2026-10-19).
 
 ### Debug Log References
 
+- Rouge → vert : les 33 tests de `test_story_25_6_*` ont été écrits et commités rouges (28 en échec) avant le code (commit « task 1 »), puis verts après les commits « task 2 et 3.1 » et « task 3.2 ».
+- Le test réel `test_story_25_6_navigateur_reel` (cible tactile) a révélé qu'une règle CSS manquait pour `.j2ha-wv-widen` (118 × 21 px) : ajoutée (`min-height: 44px` hors disposition large).
+- `scripts/ci-local.sh` : flake8, pytest 3.9 et 3.12, node (975 tests), `bash -n`, `php -l`, tests PHP verts. Un test pytest de la matrice 3.11 a échoué une fois (code du démon, que cette story ne touche pas) puis a passé à la relance isolée en 3.11 (2413 passed) : échec non reproductible : la relance finale de `scripts/ci-local.sh` (après 25.6 et 25.7) est entièrement verte (3.9 / 3.11 / 3.12 : 2404 passed, 2 skipped ; node : 1022 tests).
+
 ### Completion Notes List
 
+- **Portée** (`st.scope` : `piece` | `toutes`) : `j2haOpenRoom` ouvre en `piece` ; puces, segments, lignes de liste (`openView`), liens de 25.4 et `ui.openRoom` sans portée ouvrent en `toutes` (Q2). `open()` ne retient `piece` que si une pièce est désignée.
+- **Fragment** : clé `seule:1`, valide seulement avec `piece:P` ; ordre d'écriture `piece`, `eq`, `f`, `seule` ; `parseFragment`/`resolveFragment` ne posent `seule: true` que lorsqu'elle est présente (les objets de 25.4 restent identiques). Toutes les entrées d'historique gardent l'état `null` (#302) ; élargir REMPLACE l'entrée (Q4) ; « Précédent » restaure la portée de l'entrée.
+- **Arbre** : `buildTreeModel` reçoit `scope` et ne rend que la pièce sélectionnée, sans titre de groupe (aucun second algorithme de regroupement). **Puces** : effectifs de `overview.rooms[P].counts` en portée pièce (Q5), invariant lignes = effectif vérifié sur 20 scènes seedées dans les deux portées.
+- **Bouton `.j2ha-wv-widen`** (Q6) : en tête de la zone d'outils, dans le DOM seulement en portée pièce ; élargir conserve la sélection, l'amène dans la zone visible (`scrollIntoView({block:'nearest'})`), donne le focus à la ligne et annonce « Toutes les pièces ». **Retour** (`.j2ha-wv-back`) : libellé « Page principale » (Q1), classe et comportement inchangés.
+- **Pièce disparue** (`reconcile`) : portée `toutes`, sans sélection, entrée remplacée (aucune entrée poussée) ; équipement disparu : retour à la sélection de la pièce, portée conservée.
+- **Gate 20-0** : `vue-maitre-detail-c` étape 2 : `portee-piece-seule` (une pièce, repères = carte, `seule:1`), puis « Toutes les pièces » (`requete-pendant-elargissement`), puis les assertions existantes inchangées ; nouveaux `record` : `portee_ouverture`, `pieces_arbre_portee_piece` (+ `requetes_pendant_elargissement`). Registre 25.4 intact (`test_story_25_4_gate` vert), `policy.mjs` et lanceur inchangés. Les autres parcours (`decouverte-piece-25-eq-579`, `exclusion-publication-non-publiee`, `reference-bascule-eq-380`, `controle-ecriture-non-declaree`, `page-principale-b`) lisent la pièce de la carte ouverte : aucune modification nécessaire.
+- **Aucun changement hors interface** : `git diff --stat origin/main...HEAD -- resources/daemon core plugin_info desktop/php tests/e2e/gate/lib/policy.mjs scripts desktop/js/jeedom2ha_mapping_override.js desktop/js/jeedom2ha_mapping_surface.js` est vide. `desktop/js/jeedom2ha_overview.js` non modifié (la portée par défaut de `openView` est `toutes`).
+- **Tests de 25.4 adaptés (AC13)** — élargissement explicite, aucune assertion retirée : aide `openCardWide` ajoutée à `tests/unit/helpers/workview_harness.js` ; `test_story_25_4_aucune_lecture_etats`, `…_etat_url`, `…_lecture_tardive`, `…_navigation`, `…_recherche_filtres` (`openCard` → `openCardWide`) ; `…_seuil_repli` (un `ui.click('.j2ha-wv-widen')` après `ui.openRoom`) ; `…_glossaire` étendu par ajout (« Page principale », `.j2ha-wv-widen`). Non modifiés : `…_navigateur_reel` (passe via le parcours adapté), `…_gate`, `…_documentation`, `…_css_collision`, `…_palette_theme`, `…_accessibilite`.
+- **Tâches sautées** : Task 0 (pre-flight terrain) et Task 6 (preuve terrain, passage à `ready-for-UX-validation`) sont réservées à ClaudeBox (CC-48) : aucun accès box/VM/Home Assistant/SSH, aucune donnée réelle. Le statut reste donc `review` ; `ready-for-UX-validation` est posé par ClaudeBox après la preuve terrain.
+- **Commits** : un commit par Task (Task 2 et la partie JS de Task 3.1 sont dans le même commit, le bouton et la portée étant indissociables dans `createWorkview`).
+
 ### File List
+
+- `desktop/js/jeedom2ha_workview.js` (modifié)
+- `desktop/css/jeedom2ha.css` (modifié)
+- `docs/fr_FR/index.md` (modifié)
+- `docs/fr_FR/changelog_beta.md` (modifié)
+- `tests/e2e/gate/parcours/vue-maitre-detail-c.mjs` (modifié)
+- `tests/unit/helpers/workview_harness.js` (modifié)
+- `tests/unit/test_story_25_4_aucune_lecture_etats.node.test.js`, `…_etat_url…`, `…_lecture_tardive…`, `…_navigation…`, `…_recherche_filtres…`, `…_seuil_repli…`, `…_glossaire…` (modifiés)
+- `tests/unit/test_story_25_6_portee_piece.node.test.js`, `…_etat_url…`, `…_aucune_requete…`, `…_navigateur_reel…`, `…_gate…`, `…_documentation…` (nouveaux)
+- `_bmad-output/implementation-artifacts/25-6-vue-c-filtree-sur-la-piece.md`, `sprint-status.yaml` (statuts, Dev Agent Record)
 
 ## Décisions (ClaudeBox, 2026-10-19 17:40)
 
@@ -326,3 +351,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (D2) : statut `backlog`, 15 AC, 7 décisions déjà arbitrées, 7 questions ouvertes avec recommandation ; `ready-for-dev` non accordé ; statut cible après implémentation `ready-for-UX-validation` (validation UX finale en 25.5).
 - 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.
+- 2026-10-19 — dev-story (session cloud déléguée) : Tasks 1 à 5 faites, Tasks 0 et 6 sautées (CC-48) ; statut `review` ; preuve terrain et `ready-for-UX-validation` à ClaudeBox.

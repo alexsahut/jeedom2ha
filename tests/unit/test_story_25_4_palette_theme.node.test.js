@@ -88,6 +88,8 @@ describe('25.4 / AC23 — accent d’objet, rayon, replis', () => {
     for (const [key] of added) {
       const selector = key.replace(/^.*\| /, '');
       assert.doesNotMatch(selector, /^\.(label|btn|panel|modal|objectDisplayCard)(?![\w-])/, selector);
+      // Story 25.7 (AC8) : l'unique exception est le repère de carte, sur sa classe nouvelle, sous .j2ha-room-groups.
+      if (selector === '.j2ha-room-groups .j2ha-mark.j2ha-mark-excluded') continue;
       assert.match(selector, /^\.j2ha-wv/, selector);
     }
   });

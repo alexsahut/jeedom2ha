@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
 const O = require('../../desktop/js/jeedom2ha_overview.js');
 const W = require('../../desktop/js/jeedom2ha_workview.js');
-const { startWorkview, startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startWorkview, startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { makeScene } = require('./helpers/big_scene');
 
 const maybe = phpAvailable ? it : it.skip;
@@ -28,7 +28,7 @@ const eqRows = (ui) => ui.$('.j2ha-wv-eq').list;
 describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe et les repères de la page B', () => {
   maybe('pièces dans l’ordre de la grille, sous-titres de groupe, « Sans pièce » présente, une seule pièce dépliée', () => {
     const ui = startWorkview();
-    openCard(ui, 4);
+    openCardWide(ui, 4);
     const grid = ui.$('#j2ha_roomCards .j2ha-room-card').list.map((el) => Number(el.attrs['data-object_id']));
     assert.deepEqual(roomIds(ui), grid);
     assert.ok(roomIds(ui).includes(0), 'Sans pièce');
@@ -42,7 +42,7 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
 
   maybe('rendu différé : les lignes d’une pièce repliée ne sont pas dans le DOM ; elles apparaissent au dépliage', () => {
     const ui = startBig({ rooms: 4, equipments: 44, seed: 9 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const rendered = ui.$('.j2ha-wv-eq').length;
     const dom10 = ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').length;
     assert.equal(rendered, dom10, 'seules les lignes de la pièce sélectionnée existent');
@@ -54,14 +54,14 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
 
   maybe('chaque pièce : « n / t », repères « N bloqués » et « N à appliquer » seulement s’ils sont non nuls, comme sur la carte', () => {
     const ui = startWorkview();
-    openCard(ui, 4);
+    openCardWide(ui, 4);
     for (const room of ui.page.snapshot().view.overview.rooms) {
       const item = ui.$(`.j2ha-wv-room[data-object_id="${room.object_id}"]`);
       const card = ui.$(`#j2ha_roomCards .j2ha-room-card[data-object_id="${room.object_id}"]`);
       const ratio = plain(item.find('.j2ha-wv-ratio').first().text());
       assert.equal(ratio, plain(card.find('.j2ha-room-ratio').text()).replace(/ publiés?$/, ''), 'ratio ' + room.object_id);
       const treeMarks = item.find('.j2ha-wv-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text()));
-      const cardMarks = card.find('.j2ha-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text())).filter((t) => !/non lu/.test(t));
+      const cardMarks = card.find('.j2ha-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text())).filter((t) => !/non lu|exclus?$/.test(t));
       assert.deepEqual(treeMarks, cardMarks, 'repères ' + room.object_id);
       if (room.counts.blocked === 0) assert.ok(!treeMarks.some((t) => /bloqué/.test(t)));
     }
@@ -69,7 +69,7 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
 
   maybe('lignes d’équipement : état avant le nom (mot + icône), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 21, unread: 3 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     for (const id of [11, 12]) ui.click('.j2ha-wv-room[data-object_id="' + id + '"] .j2ha-wv-toggle');
     const rows = eqRows(ui);
     assert.ok(rows.length >= 40);
@@ -99,7 +99,7 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
 describe('25.4 / AC12 — recherche', () => {
   maybe('sans casse ni accents, noms de pièce et d’équipement seulement ; pièce dont le nom correspond = tous ses équipements', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 5, longNames: true });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     search(ui, 'PIECE FICTIVE NUMERO 1');
     assert.deepEqual(roomIds(ui), [11], 'une seule pièce, sa recherche ne porte pas sur les autres');
     const all = ui.page.snapshot().view.overview.rooms.find((r) => r.object_id === 11).equipments.length;
@@ -115,7 +115,7 @@ describe('25.4 / AC12 — recherche', () => {
 
   maybe('aucune requête réseau ; vider le champ restaure dépliages et sélection', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 5 });
-    openCard(ui, 11);
+    openCardWide(ui, 11);
     ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle');
     const before = ui.calls.length;
     search(ui, 'eq 10');
@@ -127,7 +127,7 @@ describe('25.4 / AC12 — recherche', () => {
 
   maybe('le texte saisi n’est ni du HTML ni une expression régulière ; la sélection en cours n’est pas perdue', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 5 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     for (const hostile of ['<img src=x onerror=alert(1)>', '(.*', '[a-', '\\', '.*', '"><script>x</script>']) {
       assert.doesNotThrow(() => search(ui, hostile), hostile);
       assert.equal(ui.$('.j2ha-wv-tree img, .j2ha-wv-tree script').length, 0);
@@ -146,7 +146,7 @@ describe('25.4 / AC12 — recherche', () => {
 describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
   maybe('mêmes puces, mêmes libellés et effectifs que la page B ; une puce à zéro est désactivée', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17, unread: 2 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const b = ui.$('#j2ha_houseChips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
     const c = ui.$('.j2ha-wv-chips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
     assert.deepEqual(c, b);
@@ -156,7 +156,7 @@ describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
   maybe('le filtre de B est l’état initial de C ; un changement dans C est visible au retour en B ; une seule vérité', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17 });
     ui.page.setFilter('blocked');
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(ui.$('.j2ha-wv-chips .j2ha-chip-filter[data-filter="blocked"]').attr('aria-pressed'), 'true');
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="to_apply"]');
     assert.equal(ui.page.filter(), 'to_apply');
@@ -167,7 +167,7 @@ describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
 
   maybe('le nombre de lignes de l’arbre pour un filtre égale l’effectif de la puce ; ET logique avec la recherche ; aucune requête', () => {
     const ui = startBig({ rooms: 4, equipments: 60, seed: 23, unread: 3 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const before = ui.calls.length;
     for (const chip of ui.$('.j2ha-wv-chips .j2ha-chip-filter').list) {
       if (chip.props.disabled) continue;
@@ -186,7 +186,7 @@ describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
 
   maybe('un équipement sélectionné qui sort du filtre reste affiché dans le détail', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const first = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(first);
     const state = ui.page.snapshot().view.overview.rooms.flatMap((r) => r.equipments).find((r) => r.eq_id === first).group;
@@ -224,7 +224,7 @@ describe('25.4 / AC4, AC14 — source de vérité unique et invariants', () => {
       const overview = ui.page.snapshot().view.overview;
       const houseByState = {};
       for (const room of overview.rooms) {
-        openCard(ui, room.object_id);
+        openCardWide(ui, room.object_id);
         const kpis = ui.$('.j2ha-wv-kpis .j2ha-room-counter').list.map((el) => [el.attrs['data-state'], Number(plain(ui.$(el).text()).trim().split(' ')[0])]);
         const byState = {};
         kpis.forEach(([state, n]) => { byState[state] = n; houseByState[state] = (houseByState[state] || 0) + n; });
@@ -250,7 +250,7 @@ describe('25.4 / AC4, AC14 — source de vérité unique et invariants', () => {
     const ui = startWorkview({ scene: big.scene, equipments: big.equipments });
     const overview = ui.page.snapshot().view.overview;
     for (const room of overview.rooms) {
-      openCard(ui, room.object_id);
+      openCardWide(ui, room.object_id);
       const expected = room.equipments.filter((r) => r.state === 'blocked' || r.state === 'to_apply').map((r) => r.eq_id);
       const listed = ui.$('.j2ha-wv-todo-row').list.map((el) => Number(el.attrs['data-eq-id']));
       assert.deepEqual(listed, expected, 'pièce ' + room.object_id);
@@ -278,7 +278,7 @@ describe('25.4 / AC4, AC14 — source de vérité unique et invariants', () => {
     const ui = startWorkview({ scene: big.scene, equipments: big.equipments });
     const overview = ui.page.snapshot().view.overview;
     const room = overview.rooms.find((r) => r.equipments.some((e) => e.state === 'to_apply'));
-    openCard(ui, room.object_id);
+    openCardWide(ui, room.object_id);
     const target = room.equipments.find((e) => e.state === 'to_apply').eq_id;
     ui.click(`.j2ha-wv-todo-row[data-eq-id="${target}"] .j2ha-wv-todo-apply`);
     const call = ui.pending('executeHaAction')[0];

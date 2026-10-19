@@ -65,6 +65,7 @@ Les règles s'appliquent dans cet ordre, la première qui convient l'emporte («
 Conséquences à retenir :
 
 - **« Désactivé » l'emporte sur « Exclu »** : un équipement à la fois désactivé et exclu s'affiche « Désactivé », et il est compté « désactivé », jamais « exclu ».
+- **La cause d'exclusion n'est pas un état de plus.** « Par le plugin X », « par la pièce » et « individuelle » sont des mentions à côté du mot « Exclu » ; les six états et leurs effectifs ne changent pas. La ventilation des exclus d'une pièce (ligne « Exclus : » du détail de pièce, repère « N exclus » de la carte) ne compte que les équipements dont la cause est connue : sa somme peut être inférieure au compte « exclu », l'écart étant dit « autre ». Un équipement « Désactivé » n'a jamais de cause d'exclusion.
 - **Il n'existe pas d'état « partiel »** : un équipement dont une partie des commandes est dans Home Assistant est « Publié », avec la mention orange du nombre de commandes bloquées.
 - Un équipement hors du périmètre de publication (le plan ne demande pas sa publication) n'est jamais « À appliquer » : « Appliquer » ne pourrait pas le publier.
 

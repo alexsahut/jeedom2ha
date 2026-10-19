@@ -64,6 +64,41 @@ function j2ha_color_hex($raw) {
 	return preg_match('/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/', $raw) ? $raw : '';
 }
 
+/**
+ * Story 25.7 (Q1 A) — identifiant technique d'un plugin (`getEqType_name()`), réduit à une liste blanche de caractères :
+ * sinon chaîne vide. Valeur NON FIABLE tant qu'elle n'est pas passée ici.
+ */
+function j2ha_plugin_id($raw) {
+	if (!is_string($raw)) {
+		return '';
+	}
+	return preg_match('/^[A-Za-z0-9_-]{1,64}$/', $raw) ? $raw : '';
+}
+
+/**
+ * Story 25.7 (Q1 A) — table { identifiant: nom affiché } des seuls plugins présents. `$resolver` rend le nom affiché d'un
+ * identifiant (lève une exception ou rend une valeur vide si le plugin est inconnu) ; repli sur l'identifiant. Le nom reste
+ * un texte brut : l'interface l'insère par `.text()`, jamais par `.html()`.
+ */
+function j2ha_plugin_names($pluginIds, $resolver) {
+	$names = array();
+	foreach ((array) $pluginIds as $raw) {
+		$id = j2ha_plugin_id($raw);
+		if ($id === '' || isset($names[$id])) {
+			continue;
+		}
+		$name = '';
+		try {
+			$resolved = call_user_func($resolver, $id);
+			$name = is_string($resolved) ? trim($resolved) : '';
+		} catch (Throwable $e) {
+			$name = '';
+		}
+		$names[$id] = ($name !== '') ? $name : $id;
+	}
+	return $names;
+}
+
 function j2ha_html($text) {
 	return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
 }

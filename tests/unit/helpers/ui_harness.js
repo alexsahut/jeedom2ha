@@ -128,6 +128,7 @@ function createUi(rooms, options) {
     Jeedom2haMappingOverride: M,
     j2haRoomsTree: rooms || [],
     j2haAncestors: opts.ancestors || [],
+    j2haPluginNames: opts.pluginNames || {},
     confirm: () => false,
   });
   sandbox.window = win;
@@ -157,6 +158,7 @@ function createUi(rooms, options) {
     $: dom.$, document: dom.document, bootbox: dom.bootbox, rooms: sandbox.window.j2haRoomsTree,
     readStates: O.ajaxFetch(dom.$),
     now: env.now, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout,
+    pluginNames: opts.pluginNames || {},
     openRoom: (id) => holder.wv.open({ room: id }),
     openView: (target) => holder.wv.open(target),
   });

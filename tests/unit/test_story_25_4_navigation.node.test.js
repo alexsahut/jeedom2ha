@@ -5,7 +5,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { startWorkview, startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startWorkview, startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { tree, ok, READY, view } = require('./helpers/ui_harness');
 
 const maybe = phpAvailable ? it : it.skip;
@@ -24,17 +24,17 @@ function delta(ui, run) {
 
 describe('25.4 / D2, AC10 — chaque événement et ses lectures réseau', () => {
   const rows = [
-    ['clic sur une carte de pièce', (ui) => openCard(ui, 10), { states: 0, trees: 0 }],
+    ['clic sur une carte de pièce', (ui) => openCardWide(ui, 10), { states: 0, trees: 0 }],
     ['clic sur une puce du bloc maison', (ui) => ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'), { states: 0, trees: 0 }],
     ['clic sur un segment de la jauge maison', (ui) => ui.click('#j2ha_houseGauge .j2ha-seg-published'), { states: 0, trees: 0 }],
     ['clic sur une ligne de la liste filtrée', (ui) => {
       ui.page.setFilter('published');
       ui.click('#j2ha_filterList .j2ha-frow-btn');
     }, { states: 0, trees: 1 }],
-    ['sélection d’une pièce dans l’arbre', (ui) => { openCard(ui, 10); ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row'); }, { states: 0, trees: 0 }],
-    ['dépliage d’une pièce', (ui) => { openCard(ui, 10); ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle'); }, { states: 0, trees: 0 }],
-    ['sélection d’un équipement dans l’arbre', (ui) => { openCard(ui, 10); ui.click('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq .j2ha-wv-row'); }, { states: 0, trees: 1 }],
-    ['retour à la page principale', (ui) => { openCard(ui, 10); ui.click('.j2ha-wv-back'); }, { states: 0, trees: 0 }],
+    ['sélection d’une pièce dans l’arbre', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row'); }, { states: 0, trees: 0 }],
+    ['dépliage d’une pièce', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle'); }, { states: 0, trees: 0 }],
+    ['sélection d’un équipement dans l’arbre', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq .j2ha-wv-row'); }, { states: 0, trees: 1 }],
+    ['retour à la page principale', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-back'); }, { states: 0, trees: 0 }],
   ];
   for (const [name, run, expected] of rows) {
     maybe(name, () => {
@@ -47,7 +47,7 @@ describe('25.4 / D2, AC10 — chaque événement et ses lectures réseau', () =>
 
   maybe('fin d’action sur l’équipement sélectionné : une relecture des états (sans refresh) et une relecture de son arbre', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const eqId = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eqId, ok(tree(eqId, [READY], { entities: [entity('light', [eqId * 100], { override_pending: true })] })));
     const got = delta(ui, () => {
@@ -61,7 +61,7 @@ describe('25.4 / D2, AC10 — chaque événement et ses lectures réseau', () =>
 
   maybe('fin d’action en échec : mêmes relectures (quelle que soit l’issue) et le bandeau de santé est relu', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const before = ui.count('getBridgeStatus');
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
@@ -79,7 +79,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
     const dialogsBefore = ui.dom.dialogs.length;
     ui.page.setFilter('blocked');
     ui.win.scrollY = 640;
-    openCard(ui, 11);
+    openCardWide(ui, 11);
     assert.equal(ui.dom.dialogs.length, dialogsBefore, 'aucune bootbox de pièce');
     assert.equal(ui.$('.modal').length, 0);
     assert.equal(ui.visible('#div_bridgeHealthBanner'), true);
@@ -96,7 +96,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
 
   maybe('le gating et les boutons globaux de la barre restent opérants avec la vue ouverte', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.bridgeUp();
     assert.equal(ui.$('.j2ha-ha-action[data-ha-action="republier"]').first().prop('disabled'), false);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), false, 'les actions de la vue suivent le même gating');
@@ -106,7 +106,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
 
   maybe('Échap : ferme le menu « ⋯ » ouvert puis ne fait rien d’autre (pas de sortie de la vue)', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-wv .j2ha-menu-toggle');
     assert.ok(ui.$('.j2ha-wv .j2ha-menu-wrap').hasClass('j2ha-menu-open'));
     ui.key('.j2ha-wv .j2ha-menu-toggle', 'Escape');
@@ -118,7 +118,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
 
   maybe('la pièce « Sans pièce » est dans l’arbre ; ses actions de pièce sont indisponibles, le texte explicatif est conservé', () => {
     const ui = startWorkview();
-    openCard(ui, 0);
+    openCardWide(ui, 0);
     assert.equal(ui.$('.j2ha-wv-room[data-object_id="0"]').length, 1);
     assert.equal(ui.$('.j2ha-room-republish, .j2ha-room-recreate').length, 0);
     assert.match(ui.text('.j2ha-wv-detail'), /Republication et suppression de pièce indisponibles/);
@@ -130,7 +130,7 @@ describe('25.4 / AC1, AC3, AC9, AC17 — coquille, restauration de la page princ
 describe('25.4 / AC3, AC14 — gating des actions de pièce dès l’affichage du détail', () => {
   maybe('pont indisponible : « Republier la pièce » et « Supprimer… » sont grisés dès l’ouverture, sans attendre un rendu de B', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4, bridge: false });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(ui.$('.j2ha-room-republish').prop('disabled'), true);
     assert.equal(ui.$('.j2ha-room-recreate').prop('disabled'), true);
     assert.equal(ui.$('.j2ha-wv-todo-apply').length === 0 || ui.$('.j2ha-wv-todo-apply').first().prop('disabled') === true, true);
@@ -141,7 +141,7 @@ describe('25.4 / AC3, AC14 — gating des actions de pièce dès l’affichage d
     const scene = { objects: [{ id: 10, name: 'Zone fictive', father_id: null, display: {} }], eqlogics: { 10: [{ id: 1, name: 'Eq 1', enabled: false }, { id: 2, name: 'Eq 2', enabled: true }] }, doc: 'https://doc.example.test/plugin' };
     const equipments = { 1: Object.assign(clone(FIXTURE['104'].aggregated), { jeedom_eq_id: 1 }), 2: Object.assign(clone(FIXTURE['110'].aggregated), { jeedom_eq_id: 2 }) };
     const ui = startWorkview({ scene, equipments });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const button = ui.$('.j2ha-room-republish');
     assert.equal(button.prop('disabled'), true);
     assert.equal(button.attr('data-ha-state-blocked'), '1');
@@ -153,14 +153,14 @@ describe('25.4 / AC3, AC14 — gating des actions de pièce dès l’affichage d
 describe('25.4 / AC16 — retour d’une action : la bonne pièce, jamais une autre', () => {
   maybe('pièce toujours affichée : résultat dans le détail ; pièce quittée : dans la zone d’alerte de la page', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     ui.respond('executeHaAction', ACTION_OK);
     assert.match(ui.text('.j2ha-wv .j2ha-room-feedback'), /Périmètre X — Fait\./);
     assert.equal(ui.dom.alerts.length, 0);
 
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
@@ -172,7 +172,7 @@ describe('25.4 / AC16 — retour d’une action : la bonne pièce, jamais une au
 
   maybe('le bouton qui lance l’action est réservé pendant l’appel (pas de double envoi)', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-room-republish');
     ui.lastConfirmation().options.buttons.confirm.callback();
     assert.equal(ui.$('.j2ha-room-republish').attr('data-ha-pending'), '1');
@@ -185,7 +185,7 @@ describe('25.4 / AC16 — retour d’une action : la bonne pièce, jamais une au
 describe('25.4 / AC4 — pas d’erreur quand l’état disparaît', () => {
   maybe('un équipement sélectionné qui disparaît de la liste après relecture : retour à la sélection de sa pièce, sans erreur', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const eqId = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eqId, ok(tree(eqId, [READY])));
     const withoutRoom10 = ui.rooms.filter((r) => r.object_id !== 10);

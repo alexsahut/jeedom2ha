@@ -19,11 +19,13 @@ const baseline = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/stor
 const shared = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/story_25_4_shared_classes.json'), 'utf8'));
 const finalTable = selectorTable(css);
 const bare = (key) => key.replace(/^.*\| /, '');
+// Story 25.7 (AC8) : UNE seule règle hors de .j2ha-wv, sur la classe nouvelle du repère de carte, déclarée sous .j2ha-room-groups.
+const OUTSIDE_ALLOWED = ['.j2ha-room-groups .j2ha-mark.j2ha-mark-excluded'];
 
 test('25.4 / AC25 (1) portée — tout sélecteur ajouté commence par .j2ha-wv ou contient .j2ha-wv-', () => {
   const added = Object.keys(finalTable).filter((key) => !(key in baseline.selectors));
   assert.ok(added.length > 0, 'la vue C a du CSS');
-  const outside = added.filter((key) => !(bare(key).startsWith('.j2ha-wv') || bare(key).includes('.j2ha-wv-')));
+  const outside = added.filter((key) => !(bare(key).startsWith('.j2ha-wv') || bare(key).includes('.j2ha-wv-') || OUTSIDE_ALLOWED.includes(bare(key))));
   assert.deepEqual(outside, [], 'sélecteurs ajoutés hors de la portée de la vue');
   // Jamais un sélecteur nu sur un composant partagé ni un nom générique de la maquette.
   const generic = added.filter((key) => /(^|[\s>+~,])\.(seg|chip|pill|dot|row|btn|c-[a-z]+|j2ha-seg|j2ha-menu|j2ha-badge|j2ha-gauge|j2ha-state-[a-z_]+)([\s.:>+~,\[]|$)/.test(bare(key))

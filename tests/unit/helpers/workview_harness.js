@@ -19,7 +19,7 @@ function startWorkview(options) {
   const scene = opts.scene || SCENE;
   const rendered = renderPhp(scene);
   const rooms = rendered.vars.j2haRoomsTree;
-  const ui = createUi(rooms, { skeleton: mainPart(rendered.html), ancestors: rendered.vars.j2haAncestors, window: opts.window, offsetTop: opts.offsetTop });
+  const ui = createUi(rooms, { skeleton: mainPart(rendered.html), ancestors: rendered.vars.j2haAncestors, window: opts.window, offsetTop: opts.offsetTop, pluginNames: opts.pluginNames || rendered.vars.j2haPluginNames });
   ui.rendered = rendered;
   ui.rooms = rooms;
   ui.equipments = opts.equipments || equipmentsFor(rooms);
@@ -46,4 +46,13 @@ function openCard(ui, objectId) {
   ui.sandbox.window.j2haOpenRoom(objectId);
 }
 
-module.exports = { startWorkview, startBig, openCard, phpAvailable, assert, SCENE };
+/**
+ * Story 25.6 : une carte ouvre désormais la pièce SEULE (`data-j2ha-scope="piece"`). Les tests de 25.4 qui supposent l'arbre
+ * complet élargissent explicitement (bouton « Toutes les pièces ») : même arbre, même fragment (l'entrée est remplacée).
+ */
+function openCardWide(ui, objectId) {
+  openCard(ui, objectId);
+  ui.click('.j2ha-wv-widen');
+}
+
+module.exports = { startWorkview, startBig, openCard, openCardWide, phpAvailable, assert, SCENE };

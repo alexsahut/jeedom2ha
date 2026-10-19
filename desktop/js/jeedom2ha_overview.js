@@ -62,14 +62,17 @@
   function emptyCounts() { return { published: 0, to_apply: 0, blocked: 0, other: 0, unread: 0 }; }
 
   // Puces de filtre (Story 25.4) : calculées ICI pour la page principale ET pour la vue de travail, afin qu'aucun second
-  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée.
-  function chipsFor(counts) {
+  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée, SAUF la puce
+  // active (`active`) : elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la
+  // pièce ne compte aucun équipement du filtre hérité de la page B).
+  function chipsFor(counts, active) {
     var c = counts || emptyCounts();
     var chips = [];
     FILTERS.forEach(function (f) {
       var count = c[f.key] || 0;
-      if (f.key === 'unread' && count === 0) return;
-      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 });
+      var isActive = active === f.key;
+      if (f.key === 'unread' && count === 0 && !isActive) return;
+      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 && !isActive });
     });
     return chips;
   }
@@ -92,6 +95,8 @@
         var row = {
           eq_id: eq.eq_id, eq_name: eq.eq_name, room_id: room.object_id, room_name: room.object_name,
           state: null, blocked_mention: 0, group: 'unread',
+          // Story 25.7 : cause d'exclusion (mention à côté du mot « Exclu », jamais un état) et plugin de l'équipement.
+          cause: null, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
         };
         if (entry && typeof entry === 'object') {
           // `summarizeRoom` lit l'identifiant dans l'entrée : on le garantit sans cloner l'entrée.
@@ -100,13 +105,15 @@
           row.state = resolved.state;
           row.blocked_mention = resolved.blocked_mention;
           row.group = GROUP_OF_STATE[resolved.state];
+          if (resolved.state === 'excluded') row.cause = M.exclusionCauseOf(entry, eq.enabled);
         }
         counts[row.group] += 1;
         rows.push(row);
       });
       var summary = M.summarizeRoom(trees, list.length, enabledById);
       summaries.push(summary);
-      out.rooms.push({ object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, equipments: rows });
+      var exclusion = M.exclusionBreakdown(rows.filter(function (r) { return r.state === 'excluded'; }));
+      out.rooms.push({ object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows });
       out.total += list.length;
       if (room.object_id > 0) out.rooms_count += 1;
       GROUP_KEYS.forEach(function (key) { out.counts[key] += counts[key]; });
@@ -297,6 +304,7 @@
   function createPage(env) {
     var $ = env.$;
     var rooms = env.rooms || [];
+    var pluginNames = env.pluginNames || {}; // Story 25.7 : { identifiant: nom affiché } lu par la page (j2haPluginNames)
     var filter = null;
     var lastView = null;
     var lastState = null;
@@ -358,7 +366,7 @@
       setText('#j2ha_houseSub', head.sub);
       setText('#j2ha_houseMeta', o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces'));
       $gaugeHost.append(buildGauge(o.counts, o.total));
-      chipsFor(o.counts).forEach(function (chip) {
+      chipsFor(o.counts, filter).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', filter === chip.key ? 'true' : 'false')
@@ -405,10 +413,19 @@
         if (c.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(plural(c.blocked, 'bloqué', 'bloqués')));
         if (c.to_apply > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-to_apply"></span>').text(c.to_apply + ' ' + w('à appliquer')));
         if (c.unread > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-unread"></span>').text(unreadLabel(c.unread)));
+        // Story 25.7 (Q5) : repère gris « N exclus » (même nombre que le compteur de la pièce), ventilation en infobulle et
+        // dans le nom accessible ; après les repères existants, sans toucher à la jauge ni au ratio.
+        var excludedText = '';
+        if (room.exclusion && room.exclusion.excluded > 0) {
+          var ventilation = M.exclusionBreakdownText(room.exclusion, pluginNames);
+          excludedText = w('Exclus') + ' : ' + ventilation;
+          $marks.append($('<span class="j2ha-mark j2ha-mark-excluded"></span>').text(plural(room.exclusion.excluded, 'exclu', 'exclus'))
+            .attr('title', excludedText).attr('aria-label', excludedText));
+        }
         $slot.append($marks);
         if (c.blocked > 0) $card.addClass('j2ha-room-blocked');
         if (filter && filterMatchesNothing(room)) $card.addClass('j2ha-room-dim');
-        $card.attr('aria-label', room.object_name + ', ' + gaugeLabel(c, total));
+        $card.attr('aria-label', room.object_name + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
       });
     }
 
@@ -630,6 +647,7 @@
         document: document,
         bootbox: window.bootbox,
         rooms: window.j2haRoomsTree || [],
+        pluginNames: window.j2haPluginNames || {},
         readStates: ajaxFetch(window.$),
         now: function () { return Date.now(); },
         setTimeout: function (fn, ms) { return window.setTimeout(fn, ms); },

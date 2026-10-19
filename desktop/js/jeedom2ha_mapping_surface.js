@@ -49,6 +49,8 @@
 
   // Q5 (décision 2026-10-18) : écran « Types d'équipement » du core Jeedom, ouvert sans rien écrire (D10).
   var GENERIC_TYPES_URL = 'index.php?v=d&p=types';
+  // Story 25.7 (Q4) : page de configuration du plugin, où se règle « Plugins exclus » ; ouverture seule, aucune écriture.
+  var PLUGIN_CONFIG_URL = 'index.php?v=d&p=plugin&id=jeedom2ha';
   var CELL_CLASSES = 'j2ha-diag-ready j2ha-diag-todo j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered '
     + 'j2ha-diag-excluded j2ha-diag-disabled';
 
@@ -628,6 +630,34 @@
     return map;
   }
 
+  function roomEqTypeById() {
+    var map = {};
+    ((ctx.room && ctx.room.equipments) || []).forEach(function (eq) {
+      map[eq.eq_id] = eq.eq_type || '';
+    });
+    return map;
+  }
+
+  // Story 25.7 (AC4) : la cause d'exclusion, dite UNE fois, sous le badge. Neutre (gris), jamais un état de plus ; absente
+  // pour tout état autre que « Exclu » (y compris « Désactivé »). Le lien d'action n'écrit rien (Q4).
+  function renderExclusion($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-exclusion').first().empty();
+    var eqId = tree.jeedom_eq_id;
+    var cause = M.exclusionCauseOf(tree, roomEnabledById()[eqId]);
+    if (!cause) {
+      return;
+    }
+    var name = M.exclusionPluginName(roomEqTypeById()[eqId], window.j2haPluginNames);
+    var $notice = $('<div class="j2ha-notice j2ha-notice-neutral" role="status"></div>');
+    $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + M.exclusionCauseText(cause, name, 'sentence')));
+    if (cause.kind === 'plugin') {
+      $notice.append($('<a class="btn btn-default btn-xs j2ha-open-plugin-config" target="_blank" rel="noopener"></a>')
+        .attr('href', PLUGIN_CONFIG_URL).text('{{Ouvrir la configuration du plugin}}'));
+    }
+    $host.append($notice);
+  }
+
   function renderEquipmentCounters($panel, tree) {
     var $host = $panel.find('.j2ha-eq-counters').first().empty();
     if (!tree) {
@@ -1171,6 +1201,7 @@
     $panel.find('.j2ha-eq-controls').first().empty();
     $panel.find('.j2ha-eq-cmdlist').first().empty();
     $panel.find('.j2ha-eq-notices').first().empty();
+    $panel.find('.j2ha-eq-exclusion').first().empty();
     $panel.find('.j2ha-eq-counters').first().empty();
     $panel.find('.j2ha-eq-blocked-mention').first().empty();
     $panel.find('.j2ha-eq-publish-badge').first().empty();
@@ -1346,6 +1377,7 @@
     delete ctx.treeErrors[eqId];
 
     var resolved = renderSummary($panel, normalized);
+    renderExclusion($panel, normalized);
     renderEquipmentCounters($panel, normalized);
     renderNotices($panel, normalized);
     renderControls($panel, eqId, normalized, resolved);
@@ -1459,6 +1491,7 @@
     $head.append($('<div class="j2ha-eq-controls"></div>'));
     var $body = $('<div class="j2ha-eq-body"></div>');
     $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
+    $body.append($('<div class="j2ha-eq-exclusion"></div>'));
     $body.append($('<div class="j2ha-eq-counters text-muted" role="status"></div>'));
     $body.append($('<div class="j2ha-eq-notices"></div>'));
     $body.append($('<div class="j2ha-eq-cmdlist"></div>'));
@@ -1500,6 +1533,7 @@
       return;
     }
     renderSummary(ctx.current.$panel, entry);
+    renderExclusion(ctx.current.$panel, entry);
     renderEquipmentCounters(ctx.current.$panel, entry);
   }
 
