@@ -136,15 +136,26 @@ function fullRoom() {
   decisions[2].commands[0].published_in_ha = false;
   const ui = createUi([{ object_id: 7, object_name: 'Zone', equipments: decisions.map((t, i) => ({ eq_id: i + 1, eq_name: 'Eq ' + (i + 1), enabled: true })) }]);
   ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
-  ui.openRoom(7);
-  decisions.forEach((t) => ui.respond('getMappingOverrides', ok(t)));
+  // Story 25.4 : la fenêtre de pièce n'existe plus ; le détail de pièce (KPI, actions) puis chaque détail d'équipement
+  // (un seul à la fois) sont parcourus par `eachView`.
+  ui.openRoomWith(7, decisions.map(ok), { select: null });
   return ui;
+}
+
+/** Appelle `fn` sur le détail de la pièce puis sur le détail de chacun des six équipements (une lecture chacun). */
+function eachView(ui, fn) {
+  fn('pièce');
+  for (let id = 1; id <= 6; id += 1) {
+    ui.show(id);
+    fn('équipement ' + id);
+  }
 }
 
 describe('25.1 / AC8 — libellés exacts du glossaire', () => {
   it('états d’équipement, états de commande, réglage de publication et actions présents tels quels', () => {
     const ui = fullRoom();
-    const text = ui.$('.modal-j2ha-room').text().replace(/\{\{|\}\}/g, '');
+    let text = '';
+    eachView(ui, () => { text += ' ' + ui.$('.j2ha-wv').text().replace(/\{\{|\}\}/g, ''); });
     for (const label of ['Publié', 'À appliquer', 'Bloqué', 'Exclu', 'Désactivé', 'Rien à publier',
       'Publiée', 'Bloquée', 'Exclue', 'Automatique', 'Toujours', 'Jamais', 'Appliquer', 'Republier',
       'Supprimer de Home Assistant…']) {
@@ -168,12 +179,14 @@ describe('25.1 / AC8 — libellés exacts du glossaire', () => {
   it('aucune étiquette de badge, bouton, en-tête ou segment ne se termine par un point', () => {
     const ui = fullRoom();
     const selectors = ['.j2ha-eq-publish-badge', '.j2ha-seg-btn', '.j2ha-menu-item', '.j2ha-eq-apply', 'th', '.j2ha-group-head', '.j2ha-chip', '.j2ha-open-generic-types'];
-    for (const selector of selectors) {
-      ui.$('.modal-j2ha-room ' + selector).list.forEach((el) => {
-        const text = ui.$(el).text().replace(/\{\{|\}\}/g, '').trim();
-        assert.doesNotMatch(text, /\.$/, selector + ' : ' + text);
-      });
-    }
+    eachView(ui, (name) => {
+      for (const selector of selectors) {
+        ui.$('.j2ha-wv ' + selector).list.forEach((el) => {
+          const text = ui.$(el).text().replace(/\{\{|\}\}/g, '').trim();
+          assert.doesNotMatch(text, /\.$/, name + ' ' + selector + ' : ' + text);
+        });
+      }
+    });
     const page = fs.readFileSync('desktop/php/jeedom2ha.php', 'utf8');
     for (const label of page.match(/<button[\s\S]*?<\/button>/g)) {
       const text = label.replace(/<[^>]*>/g, ' ').replace(/\{\{|\}\}/g, '').trim();
@@ -188,8 +201,7 @@ describe('25.1 / AC8 — libellés exacts du glossaire', () => {
     ] });
     const ui = createUi([{ object_id: 7, object_name: 'Zone', equipments: [{ eq_id: 1, eq_name: 'Eq', enabled: true }] }]);
     ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
-    ui.openRoom(7);
-    ui.respond('getMappingOverrides', ok(t));
+    ui.openRoomWith(7, [ok(t)]);
     assert.deepEqual(ui.$('.j2ha-group-name strong').list.map((el) => ui.$(el).text()), ['Lumière', 'Alarme']);
     assert.deepEqual(ui.$('.j2ha-group-name .j2ha-tech').list.map((el) => ui.$(el).text()), ['light', 'alarm_control_panel']);
   });

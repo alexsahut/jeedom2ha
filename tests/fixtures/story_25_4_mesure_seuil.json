@@ -1,0 +1,103 @@
+{
+  "description": "Story 25.4 (AC20, Q3) : mesure du seuil de repli, Chromium de la session (voir measure_story_25_4_threshold.js). Données fictives.",
+  "method": "disposition large forcée à chaque largeur candidate ; fixture : 292 équipements, équipement de 5 entités aux noms longs ; contexte Jeedom imité (marges de 15 px, barre de défilement réservée)",
+  "criteria": {
+    "a": "aucun défilement horizontal dans le détail",
+    "b": "panneau de gauche >= 280 px",
+    "c": "détail utile >= 560 px"
+  },
+  "rows": [
+    {
+      "width": 768,
+      "detail_width": 394,
+      "nav_width": 322,
+      "table_width": 386,
+      "height": 785,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": false,
+      "ok": false
+    },
+    {
+      "width": 834,
+      "detail_width": 460,
+      "nav_width": 322,
+      "table_width": 452,
+      "height": 785,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": false,
+      "ok": false
+    },
+    {
+      "width": 900,
+      "detail_width": 526,
+      "nav_width": 322,
+      "table_width": 518,
+      "height": 785,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": false,
+      "ok": false
+    },
+    {
+      "width": 980,
+      "detail_width": 606,
+      "nav_width": 322,
+      "table_width": 598,
+      "height": 811,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": true,
+      "ok": true
+    },
+    {
+      "width": 1024,
+      "detail_width": 650,
+      "nav_width": 322,
+      "table_width": 642,
+      "height": 811,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": true,
+      "ok": true
+    },
+    {
+      "width": 1112,
+      "detail_width": 738,
+      "nav_width": 322,
+      "table_width": 730,
+      "height": 811,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": true,
+      "ok": true
+    },
+    {
+      "width": 1180,
+      "detail_width": 806,
+      "nav_width": 322,
+      "table_width": 798,
+      "height": 811,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": true,
+      "ok": true
+    },
+    {
+      "width": 1280,
+      "detail_width": 906,
+      "nav_width": 322,
+      "table_width": 898,
+      "height": 811,
+      "a_no_hscroll": true,
+      "b_nav_280": true,
+      "c_detail_560": true,
+      "ok": true
+    }
+  ],
+  "measured_threshold": 980,
+  "retained_threshold": 980,
+  "fallback_used": false,
+  "reserve": "La largeur CSS réelle de l'iPad mural en mode bureau est relevée en preuve terrain (Task 11, CC-48) : elle peut réviser ce seuil par une PR de suite."
+}

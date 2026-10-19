@@ -1,8 +1,10 @@
-/* Story 16.8 / 25.1 — Surface de mapping HA par pièce (modèle Homebridge).
+/* Story 16.8 / 25.1 / 25.4 — Surface de mapping HA : détail d'un équipement et actions de pièce.
  *
- * Navigation : page plugin -> cartes pièces -> modale par pièce -> accordéon
- * équipements (un seul déplié) -> état unique, réglage de publication et tableau
- * des commandes regroupé par entité.
+ * Navigation (25.4) : page plugin -> vue de travail maître-détail (jeedom2ha_workview.js) -> détail de
+ * l'équipement sélectionné : état unique, réglage de publication et tableau des commandes regroupé par
+ * entité. La fenêtre de pièce et son accordéon n'existent plus ; ce module expose `window.Jeedom2haSurface`
+ * (voir la fin du fichier) que la vue appelle. Les fonctions d'écriture sont DÉPLACÉES telles quelles, pas
+ * réécrites (AC8).
  *
  * Ce contrôleur ne réinvente aucune logique métier : il réutilise strictement le
  * module pur Jeedom2haMappingOverride (état diagnostic, auto-validation, synthèse
@@ -18,22 +20,12 @@
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   var DEBOUNCE_MS = 400;
 
-  // État volatil de la surface courante (une modale pièce ouverte à la fois).
-  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null };
+  // État volatil de la surface courante (un seul équipement affiché à la fois, dans la vue de travail).
+  // `current` : l'équipement sélectionné { eqId, $panel } ; `reads` : lectures d'arbre en vol, par eqId.
+  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null, current: null, reads: {} };
 
-  function normalizedRooms() {
-    return M.normalizeRoomsTree(window.j2haRoomsTree || []);
-  }
-
-  function findRoom(objectId) {
-    var rooms = normalizedRooms();
-    for (var i = 0; i < rooms.length; i++) {
-      if (rooms[i].object_id === objectId) {
-        return rooms[i];
-      }
-    }
-    return null;
-  }
+  // La vue de travail dit si la pièce est toujours affichée (retour d'une action, R1-D de 20.3).
+  var host = { isRoomShown: function () { return false; } };
 
   // --- Tableau des commandes (16.8, 25.1) : colonnes
   //     Commande | Dans Home Assistant | Type Jeedom | Type HA, regroupées par entité.
@@ -609,64 +601,6 @@
       .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
-  // --- Story 20.3 (Q1=A) — compteurs de la pièce ouverte ---
-  // Lus uniquement dans les arbres déjà chargés pour cette pièce (aucune autre lecture) ;
-  // le dénombrement vit dans le module pur (M.summarizeRoom), jamais de décision recalculée.
-
-  function roomEquipmentCount() {
-    return ctx.room ? ctx.room.equipments.length : 0;
-  }
-
-  function readRoomTrees() {
-    var trees = [];
-    var errors = 0;
-    if (!ctx.room) {
-      return { trees: trees, errors: errors };
-    }
-    for (var i = 0; i < ctx.room.equipments.length; i++) {
-      var eqId = ctx.room.equipments[i].eq_id;
-      if (ctx.trees[eqId]) {
-        trees.push(ctx.trees[eqId]);
-      } else if (ctx.treeErrors[eqId]) {
-        errors += 1;
-      }
-    }
-    return { trees: trees, errors: errors };
-  }
-
-  function renderRoomCounters() {
-    var $host = $('.modal-j2ha-room .j2ha-room-counters').first();
-    if ($host.length === 0 || !ctx.room) {
-      return;
-    }
-    var read = readRoomTrees();
-    var trees = read.trees;
-    $host.empty();
-    if (trees.length === 0) {
-      // R1-E : si plus aucune lecture ne peut aboutir, un message d'erreur remplace le chargement.
-      if (read.errors >= roomEquipmentCount() && read.errors > 0) {
-        $host.text('{{Compteurs indisponibles : la configuration des équipements de cette pièce n’a pas pu être lue.}}');
-      } else {
-        $host.text('{{Chargement des compteurs…}}');
-      }
-      return;
-    }
-    var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length, roomEnabledById()));
-    var $line = $('<div class="j2ha-room-counter-line"></div>');
-    labels.items.forEach(function (item) {
-      $line.append($('<span class="j2ha-chip j2ha-room-counter"></span>')
-        .addClass('j2ha-chip-' + item.state).attr('data-state', item.state)
-        .append($('<i class="fas"></i>').addClass(STATE_ICONS[item.state]))
-        .append(document.createTextNode(' ' + item.text)));
-    });
-    [labels.unread, labels.presence_unknown].forEach(function (text) {
-      if (text) {
-        $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(text));
-      }
-    });
-    $host.append($line);
-  }
-
   // Un état = un mot + une icône + une teinte (la couleur ne porte jamais seule le sens).
   var STATE_ICONS = {
     published: 'fa-check-circle',
@@ -736,31 +670,27 @@
     }
   }
 
-  function updateRoomActionsGating() {
-    var $republish = $('.modal-j2ha-room .j2ha-room-republish').first();
-    var $recreate = $('.modal-j2ha-room .j2ha-room-recreate').first();
-    if (!ctx.room || ($republish.length === 0 && $recreate.length === 0)) {
+  // Gating d'état des actions de pièce, lu dans les entrées agrégées de la pièce (copie unique de la page B) :
+  // aucune lecture, aucune décision recalculée (`M.roomActionState`, R2-3 : actives tant que tout n'est pas lu).
+  function refreshRoomGating(room, entries) {
+    var $republish = $('.j2ha-wv .j2ha-room-republish').first();
+    var $recreate = $('.j2ha-wv .j2ha-room-recreate').first();
+    if (!room || ($republish.length === 0 && $recreate.length === 0)) {
       return;
     }
-    var read = readRoomTrees();
-    var state = M.roomActionState(read.trees, roomEquipmentCount(), read.trees.length + read.errors);
+    var list = Array.isArray(entries) ? entries : [];
+    var state = M.roomActionState(list, room.equipments.length, list.length);
     if ($republish.length > 0) setStateGate($republish, state.can_republish, state.republish_reason);
     if ($recreate.length > 0) setStateGate($recreate, state.can_recreate, state.recreate_reason);
     reapplyBridgeGating();
   }
 
-  function refreshRoomView() {
-    renderRoomCounters();
-    updateRoomActionsGating();
-  }
-
   function isRoomOpen(room) {
-    return !!room && !!ctx.room && ctx.room.object_id === room.object_id
-      && $('.modal-j2ha-room .j2ha-room-surface').length > 0;
+    return !!room && host.isRoomShown(room.object_id) === true;
   }
 
   function showRoomFeedback(message, level) {
-    var $slot = $('.modal-j2ha-room .j2ha-room-feedback').first();
+    var $slot = $('.j2ha-wv .j2ha-room-feedback').first();
     if ($slot.length === 0) {
       return;
     }
@@ -768,8 +698,8 @@
       .addClass('alert-' + level).text(message)).show();
   }
 
-  // R1-D : le résultat d'une action est rendu dans la modale seulement si cette pièce y est
-  // toujours ouverte ; sinon (modale fermée, autre pièce ouverte), dans la zone d'alerte de la page.
+  // R1-D : le résultat d'une action est rendu dans le détail de la vue seulement si cette pièce y est
+  // toujours affichée ; sinon (autre pièce ou vue refermée), dans la zone d'alerte de la page.
   function showActionFeedback(room, message, level) {
     if (isRoomOpen(room)) {
       showRoomFeedback(message, level);
@@ -779,11 +709,16 @@
     $('#div_alert').showAlert({ message: escapeHtml(message), level: level });
   }
 
+  // Story 25.4 : les états de la vue suivent la relecture de la page B ; seul l'arbre de l'équipement sélectionné
+  // de cette pièce est relu après une action de pièce (D2).
   function reloadRoom(room) {
-    if (!isRoomOpen(room)) {
+    if (!isRoomOpen(room) || !ctx.current) {
       return;
     }
-    room.equipments.forEach(function (eq) { reloadEquipment(eq.eq_id); });
+    var eqId = ctx.current.eqId;
+    if (room.equipments.some(function (eq) { return eq.eq_id === eqId; })) {
+      reloadEquipment(eqId);
+    }
   }
 
   function hasValidSelection(selection) {
@@ -962,30 +897,32 @@
         .text('{{Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement.}}'));
       return $wrap;
     }
-    var menu = buildMenu('{{Autres actions}}', [
-      {
-        key: 'republish', className: 'j2ha-room-republish', icon: 'fa-upload', label: '{{Republier}}', haAction: 'republier',
-        onClick: function ($republish) {
-          if ($republish.prop('disabled')) {
-            return;
-          }
-          var reservation = setHaActionPendingState($republish, '{{Confirmation en cours…}}');
-          confirmHaPublishAction(
-            '{{Republier la pièce}}',
-            escapeHtml(room.object_name) + ' — {{republier les équipements inclus de cette pièce. Confirmer ?}}',
-            '{{Republier}}',
-            function () {
-              runHaAction(room, 'publier', 'piece', [room.object_id], $republish, '{{En cours...}}', reservation, function () {
-                reloadRoom(room);
-              });
-            },
-            function () {
-              restoreHaActionPendingState($republish, reservation);
-            }
-          );
+    // Story 25.4 (AC14) : « Republier la pièce » est un bouton du détail ; « Supprimer de Home Assistant… » reste
+    // dans le menu « ⋯ » (rouge dans le menu seulement). Mêmes écritures qu'en 25.1 (executeHaAction publier /
+    // supprimer, portée `piece`), mêmes confirmations, mêmes réservations de bouton.
+    var $republishButton = $('<button type="button" class="btn btn-default btn-sm j2ha-room-republish" data-ha-action="republier"></button>')
+      .append($('<i class="fas fa-upload"></i>')).append(document.createTextNode('{{Republier la pièce}}'));
+    var onRepublish = function ($republish) {
+      if ($republish.prop('disabled')) {
+        return;
+      }
+      var reservation = setHaActionPendingState($republish, '{{Confirmation en cours…}}');
+      confirmHaPublishAction(
+        '{{Republier la pièce}}',
+        escapeHtml(room.object_name) + ' — {{republier les équipements inclus de cette pièce. Confirmer ?}}',
+        '{{Republier}}',
+        function () {
+          runHaAction(room, 'publier', 'piece', [room.object_id], $republish, '{{En cours...}}', reservation, function () {
+            reloadRoom(room);
+          });
         },
-      },
-      { separator: true },
+        function () {
+          restoreHaActionPendingState($republish, reservation);
+        }
+      );
+    };
+    $republishButton.on('click', function () { onRepublish($republishButton); });
+    var menu = buildMenu('{{Autres actions}}', [
       {
         key: 'recreate', className: 'j2ha-room-recreate j2ha-menu-danger', icon: 'fa-trash',
         label: '{{Supprimer de Home Assistant…}}', haAction: 'supprimer',
@@ -1011,7 +948,8 @@
       },
     ]);
     // Actifs par défaut (R2-3) : grisés seulement quand toutes les lectures ont abouti sans erreur
-    // et qu'aucun équipement ne justifie l'action (voir updateRoomActionsGating).
+    // et qu'aucun équipement ne justifie l'action (voir refreshRoomGating).
+    $wrap.append($republishButton);
     $wrap.append(menu.$wrap);
     return $wrap;
   }
@@ -1237,7 +1175,6 @@
     $panel.find('.j2ha-eq-blocked-mention').first().empty();
     $panel.find('.j2ha-eq-publish-badge').first().empty();
     $panel.find('.j2ha-eq-status').first().text(message);
-    refreshRoomView();
   }
 
   // Groupes du tableau : une entité = un groupe (ses commandes, dans l'ordre de l'entité). Une commande
@@ -1390,7 +1327,7 @@
     setStateGate(menu.buttons.revert, revertState.can_revert, revertState.revert_reason);
     $host.append(menu.$wrap);
     $host.append($error);
-    // Les boutons viennent d'être ajoutés après l'ouverture de la modale : ils suivent le même gating
+    // Les boutons viennent d'être ajoutés après l'ouverture de la vue : ils suivent le même gating
     // que les boutons globaux (pont indisponible, relecture en cours), sinon ils resteraient actifs.
     reapplyBridgeGating();
   }
@@ -1407,7 +1344,6 @@
 
     ctx.trees[eqId] = normalized;
     delete ctx.treeErrors[eqId];
-    refreshRoomView();
 
     var resolved = renderSummary($panel, normalized);
     renderEquipmentCounters($panel, normalized);
@@ -1424,23 +1360,47 @@
     renderIgnored($list, eqId, normalized);
   }
 
-  function roomHasEquipment(eqId) {
-    return !!ctx.room && ctx.room.equipments.some(function (eq) { return eq.eq_id === eqId; });
+  function isCurrent(eqId) {
+    return !!ctx.current && ctx.current.eqId === eqId;
   }
 
-  function loadEquipment($panel, eqId) {
-    var $status = $panel.find('.j2ha-eq-status').first();
-    $status.text('{{Chargement…}}');
+  // UNIQUE site de lecture d'un arbre unitaire (Story 25.4, AC6, D3) : appelée à la SÉLECTION d'un équipement et
+  // après une écriture sur lui, jamais pour remplir l'arbre ni à la sélection d'une pièce. Une lecture en vol pour
+  // le même équipement n'est pas doublée (`again` : une écriture a eu lieu pendant la lecture, une relecture suit) ;
+  // une réponse qui arrive après que la sélection a changé est ignorée, sans erreur et sans toucher l'affichage.
+  function loadEquipment(eqId, again) {
+    if (!isCurrent(eqId)) {
+      return;
+    }
+    ctx.current.$panel.find('.j2ha-eq-status').first().text('{{Chargement…}}');
+    if (ctx.reads[eqId]) {
+      if (again) {
+        ctx.reads[eqId].again = true;
+      }
+      return;
+    }
+    var slot = { again: false };
+    ctx.reads[eqId] = slot;
+    // Rend `true` si une relecture suit (l'écriture est postérieure à cette lecture) : rien n'est alors rendu.
+    function settle() {
+      delete ctx.reads[eqId];
+      if (slot.again && isCurrent(eqId)) {
+        loadEquipment(eqId);
+        return true;
+      }
+      return false;
+    }
     $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'getMappingOverrides', eqId: eqId },
       dataType: 'json',
       success: function (data) {
-        // Réponse tardive d'une pièce refermée : ignorée (elle ne doit pas toucher le cache d'une autre pièce).
-        if (!roomHasEquipment(eqId)) {
+        if (settle() || !isCurrent(eqId)) {
           return;
         }
+        var $panel = ctx.current.$panel;
+        var $status = $panel.find('.j2ha-eq-status').first();
         var result = data && data.result ? data.result : data;
         var payload = result && result.payload ? result.payload : result;
         var failed = (data && data.state && data.state !== 'ok')
@@ -1454,15 +1414,15 @@
         renderEquipmentTree($panel, payload);
       },
       error: function () {
-        if (!roomHasEquipment(eqId)) {
+        if (settle() || !isCurrent(eqId)) {
           return;
         }
-        markTreeError($panel, eqId, '{{Impossible de charger la configuration HA (démon indisponible).}}');
+        markTreeError(ctx.current.$panel, eqId, '{{Impossible de charger la configuration HA (démon indisponible).}}');
       },
     });
   }
 
-  // Story 25.3 (AC6, Q7) : une écriture terminée peut avoir changé les chiffres de la page derrière la fenêtre ;
+  // Story 25.3 (AC6, Q7) : une écriture terminée peut avoir changé les chiffres de la page derrière la vue ;
   // la relecture (sans refresh, coalescée) est portée par la page principale, ici on la signale seulement.
   function notifyOverview() {
     if (typeof notifyStatesChanged === 'function') {
@@ -1472,150 +1432,94 @@
 
   function reloadEquipment(eqId) {
     notifyOverview();
-    var $panel = $('.j2ha-eq-panel[data-eq-id="' + eqId + '"]');
-    if ($panel.length > 0) {
-      $panel.data('loaded', true);
-      loadEquipment($panel, eqId);
+    if (isCurrent(eqId)) {
+      loadEquipment(eqId, true);
     }
   }
 
-  // --- Modale par pièce : accordéon des équipements (un seul déplié à la fois, 25.1 AC16) ---
+  // --- Détail d'un équipement (Story 25.4) : le panneau remplace l'ancien accordéon de la fenêtre de pièce ---
 
-  function setPanelOpen($panel, open) {
-    $panel.toggleClass('j2ha-eq-open', open);
-    $panel.find('.panel-collapse').first().toggleClass('in', open);
-    $panel.find('.j2ha-eq-toggle').first().attr('aria-expanded', open ? 'true' : 'false');
+  // En-tête collant (titre, badge d'état, mention des bloquées, contrôles) puis corps : état de chargement,
+  // compteurs, encart de cause, tableau des commandes. Mêmes classes qu'en 25.1 (tests, gate, scrollToCommand),
+  // sans accordéon : `.j2ha-eq-toggle` et `.panel-collapse` n'existent plus.
+  function buildEquipmentPanel(eq) {
+    var $panel = $('<div class="j2ha-eq-panel j2ha-eq-open"></div>').attr('data-eq-id', eq.eq_id);
+    if (!eq.enabled) {
+      $panel.addClass('j2ha-eq-disabled');
+    }
+    var $head = $('<div class="j2ha-eq-head"></div>');
+    var $title = $('<h3 class="j2ha-eq-title j2ha-wv-title" tabindex="-1"></h3>');
+    $title.append($('<span class="j2ha-eq-name j2ha-free-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
+    if (!eq.enabled) {
+      $title.append($('<span class="text-muted"></span>').text(' {{(désactivé dans Jeedom)}}'));
+    }
+    $title.append($('<span class="j2ha-eq-publish-badge j2ha-badge"></span>'));
+    $title.append($('<span class="j2ha-eq-blocked-mention"></span>'));
+    $head.append($title);
+    $head.append($('<div class="j2ha-eq-controls"></div>'));
+    var $body = $('<div class="j2ha-eq-body"></div>');
+    $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
+    $body.append($('<div class="j2ha-eq-counters text-muted" role="status"></div>'));
+    $body.append($('<div class="j2ha-eq-notices"></div>'));
+    $body.append($('<div class="j2ha-eq-cmdlist"></div>'));
+    $panel.append($head).append($body);
+    return $panel;
   }
 
-  // Déplier un équipement replie celui qui l'était : le défilement est celui de la fenêtre seule.
-  function togglePanel($panel) {
-    var open = $panel.hasClass('j2ha-eq-open');
-    if (!open) {
-      $panel.closest('.j2ha-eq-accordion').find('.j2ha-eq-panel').each(function (index, el) {
-        if (el !== $panel.get(0)) {
-          setPanelOpen($(el), false);
-        }
-      });
-    }
-    setPanelOpen($panel, !open);
-    // Garde-fou : un panneau jamais chargé (ex. échec réseau initial) l'est à la première ouverture.
-    if (!open && !$panel.data('loaded')) {
-      $panel.data('loaded', true);
-      loadEquipment($panel, parseInt($panel.attr('data-eq-id'), 10));
-    }
-  }
-
-  function buildRoomModalHtml(room) {
-    var $wrap = $('<div class="j2ha-room-surface"></div>');
-    $wrap.append($('<div id="j2haSurface_reassurance" class="alert alert-warning" role="status" aria-live="polite">' +
-      '<i class="fas fa-shield-alt"></i> {{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}</div>').hide());
-
-    var $head = $('<div class="j2ha-room-head"></div>');
-    $head.append($('<div class="j2ha-room-counters text-muted" role="status" aria-live="polite"></div>'));
-    $head.append(buildRoomActions(room));
-    $wrap.append($head);
-    $wrap.append($('<div class="j2ha-room-feedback" role="status"></div>').hide());
-
-    var $accordion = $('<div class="panel-group j2ha-eq-accordion"></div>');
-    for (var i = 0; i < room.equipments.length; i++) {
-      var eq = room.equipments[i];
-      var panelId = 'j2haEqBody_' + room.object_id + '_' + eq.eq_id;
-      var headId = 'j2haEqHead_' + room.object_id + '_' + eq.eq_id;
-
-      var $panel = $('<div class="panel panel-default j2ha-eq-panel"></div>')
-        .attr('data-eq-id', eq.eq_id);
-      if (!eq.enabled) {
-        $panel.addClass('j2ha-eq-disabled');
-      }
-
-      var $head = $('<div class="panel-heading j2ha-eq-head"></div>').attr('id', headId);
-      var $toggle = $('<a class="j2ha-eq-toggle" role="button"></a>')
-        .attr('href', '#' + panelId)
-        .attr('aria-expanded', 'false')
-        .attr('aria-controls', panelId);
-      $toggle.append($('<span class="j2ha-eq-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
-      if (!eq.enabled) {
-        $toggle.append($('<span class="text-muted"></span>').text(' {{(désactivé dans Jeedom)}}'));
-      }
-      $toggle.append($('<span class="j2ha-eq-publish-badge j2ha-badge"></span>'));
-      $toggle.append($('<span class="j2ha-eq-blocked-mention"></span>'));
-      $toggle.on('click', (function ($p) {
-        return function (event) {
-          if (event && event.preventDefault) event.preventDefault();
-          togglePanel($p);
-        };
-      }($panel)));
-      $head.append($('<h4 class="panel-title"></h4>').append($toggle));
-      $head.append($('<div class="j2ha-eq-controls"></div>'));
-      $panel.append($head);
-
-      var $collapse = $('<div class="panel-collapse collapse"></div>')
-        .attr('id', panelId)
-        .attr('aria-labelledby', headId);
-      var $body = $('<div class="panel-body"></div>');
-      $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
-      $body.append($('<div class="j2ha-eq-counters text-muted" role="status"></div>'));
-      $body.append($('<div class="j2ha-eq-notices"></div>'));
-      $body.append($('<div class="j2ha-eq-cmdlist"></div>'));
-      $collapse.append($body);
-      $panel.append($collapse);
-      $accordion.append($panel);
-    }
-    $wrap.append($accordion);
-    return $wrap;
-  }
-
-  function openRoom(objectId) {
-    var room = findRoom(objectId);
-    if (!room) {
-      return;
-    }
-    // Réinitialise l'état réassurance par pièce (une fois par ouverture).
-    ctx.reassurance = M.initReassuranceState();
+  function clearEquipment() {
+    closeMenu();
+    Object.keys(ctx.timers).forEach(function (cmdId) {
+      if (ctx.timers[cmdId]) clearTimeout(ctx.timers[cmdId]);
+    });
+    Object.keys(ctx.xhr).forEach(function (cmdId) {
+      if (ctx.xhr[cmdId] && typeof ctx.xhr[cmdId].abort === 'function') ctx.xhr[cmdId].abort();
+    });
     ctx.timers = {};
     ctx.xhr = {};
     ctx.trees = {};
     ctx.treeErrors = {};
-    ctx.room = room;
-
-    var $content = buildRoomModalHtml(room);
-
-    bootbox.dialog({
-      // « Sans pièce » est un libellé statique ; le nom d'une vraie pièce est un nom libre.
-      title: '<i class="fas fa-home"></i> ' + (room.object_id > 0
-        ? '<span class="j2ha-free-name">' + escapeHtml(room.object_name) + '</span>'
-        : escapeHtml(room.object_name)),
-      message: $content,
-      size: 'large',
-      className: 'modal-j2ha-room',
-      onEscape: true,
-      backdrop: true,
-    });
-    renderRoomCounters();
-    // Les boutons d'action créés après le chargement de la page suivent le même gating que
-    // les boutons globaux (pont indisponible, rescan en cours).
-    if (typeof applyHAGating === 'function') {
-      applyHAGating(window.jeedom2haLastBridgeStatus || null);
-    }
-
-    // Synthèse de publication immédiate (AC9) : on charge le diagnostic de chaque
-    // équipement de la pièce dès l'ouverture pour que son état (badge et compteurs
-    // de la pièce) soit visible sans déplier l'accordéon. La lazyness reste au
-    // niveau page/pièce (AC5) : jamais les 290 équipements, seulement ceux de la
-    // pièce ouverte (une poignée), et le fetch n'a lieu qu'après ouverture.
-    $content.find('.j2ha-eq-panel').each(function () {
-      var $panel = $(this);
-      $panel.data('loaded', true);
-      loadEquipment($panel, parseInt($panel.attr('data-eq-id'), 10));
-    });
+    ctx.current = null;
   }
 
-  // Point d'entrée appelé par l'onclick inline des cartes pièce (pattern Homebridge éprouvé :
-  // objectDisplayCard + onclick, jamais eqLogicDisplayCard que le core Jeedom hijacke sur la page plugin).
-  window.j2haOpenRoom = function (objectId) {
-    var id = parseInt(objectId, 10);
-    if (!isNaN(id)) {
-      openRoom(id);
+  // Affiche le détail de l'équipement `eq` ({ eq_id, eq_name, enabled }) de la pièce `room` dans `$host` et lit son
+  // arbre unitaire (une lecture, D3). Rend le panneau.
+  function openEquipment($host, room, eq) {
+    clearEquipment();
+    ctx.room = room;
+    var $panel = buildEquipmentPanel(eq);
+    ctx.current = { eqId: eq.eq_id, $panel: $panel };
+    $host.empty().append($panel);
+    loadEquipment(eq.eq_id);
+    return $panel;
+  }
+
+  // Les états suivent la relecture de la page B (jamais un recalcul local) : badge, mention et compteurs de l'équipement
+  // affiché sont relus dans l'entrée agrégée (mêmes fonctions que l'arbre unitaire, parité prouvée en 25.2).
+  function refreshEquipmentState(entry) {
+    if (!ctx.current || !entry || entry.jeedom_eq_id !== ctx.current.eqId || !ctx.trees[ctx.current.eqId]) {
+      return;
     }
+    renderSummary(ctx.current.$panel, entry);
+    renderEquipmentCounters(ctx.current.$panel, entry);
+  }
+
+  // Réassurance Homebridge : réinitialisée à l'entrée dans la vue.
+  function resetSession() {
+    ctx.reassurance = M.initReassuranceState();
+    $('#j2haSurface_reassurance').hide();
+  }
+
+  window.Jeedom2haSurface = {
+    openEquipment: openEquipment,
+    clearEquipment: clearEquipment,
+    refreshEquipmentState: refreshEquipmentState,
+    refreshRoomGating: refreshRoomGating,
+    buildRoomActions: buildRoomActions,
+    applyEquipment: applyEquipment,
+    stateWord: stateWord,
+    resetSession: resetSession,
+    setRoom: function (room) { ctx.room = room; },
+    setHost: function (next) { host = next; },
+    genericTypesUrl: GENERIC_TYPES_URL,
   };
 })();

@@ -61,6 +61,19 @@
 
   function emptyCounts() { return { published: 0, to_apply: 0, blocked: 0, other: 0, unread: 0 }; }
 
+  // Puces de filtre (Story 25.4) : calculées ICI pour la page principale ET pour la vue de travail, afin qu'aucun second
+  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée.
+  function chipsFor(counts) {
+    var c = counts || emptyCounts();
+    var chips = [];
+    FILTERS.forEach(function (f) {
+      var count = c[f.key] || 0;
+      if (f.key === 'unread' && count === 0) return;
+      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 });
+    });
+    return chips;
+  }
+
   // `rooms` : j2haRoomsTree (seule source des pièces, des noms et de `enabled`) ;
   // `equipments` : payload.equipments de la route (clés = String(eq_id)).
   function computeOverview(rooms, equipments) {
@@ -154,7 +167,7 @@
   // Modèle de rendu : jamais « NaN », jamais une jauge de « non lus » quand la lecture n'a pas eu lieu.
   function buildViewModel(response, rooms, valid) {
     var res = response || {};
-    var vm = { kind: res.kind, overview: null, stale: false, message: '', notice: '', gauge: 'neutral' };
+    var vm = { kind: res.kind, overview: null, equipments: null, stale: false, message: '', notice: '', gauge: 'neutral' };
     var source = null;
     if (res.kind === 'ok' && res.payload) {
       source = res.payload;
@@ -170,6 +183,8 @@
     }
     if (source) {
       vm.overview = computeOverview(rooms, source.equipments);
+      // Même copie que celle des agrégats (jamais une seconde lecture) : la vue de travail y lit les causes (Story 25.4).
+      vm.equipments = source.equipments && typeof source.equipments === 'object' ? source.equipments : {};
       vm.gauge = 'normal';
     }
     return vm;
@@ -286,6 +301,7 @@
     var lastView = null;
     var lastState = null;
     var openMenuWrap = null;
+    var subscribers = [];
 
     var reader = createReader({
       readStates: env.readStates,
@@ -310,7 +326,7 @@
         var $seg = $('<span class="j2ha-seg"></span>').addClass('j2ha-seg-' + seg.key)
           .attr('data-filter', seg.key).attr('aria-hidden', 'true').attr('style', 'flex-grow:' + seg.count);
         if (extraClass !== 'j2ha-gauge-card') {
-          $seg.on('click', function () { setFilter(seg.key); });
+          $seg.on('click', function () { activateFilter(seg.key); });
         }
         $gauge.append($seg);
       });
@@ -342,16 +358,14 @@
       setText('#j2ha_houseSub', head.sub);
       setText('#j2ha_houseMeta', o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces'));
       $gaugeHost.append(buildGauge(o.counts, o.total));
-      FILTERS.forEach(function (f) {
-        var count = o.counts[f.key];
-        if (f.key === 'unread' && count === 0) return;
+      chipsFor(o.counts).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter"></button>')
-          .addClass('j2ha-chip-filter-' + f.key).attr('data-filter', f.key)
-          .attr('aria-pressed', filter === f.key ? 'true' : 'false')
+          .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
+          .attr('aria-pressed', filter === chip.key ? 'true' : 'false')
           .append($('<span class="j2ha-chip-dot"></span>'))
-          .append(document_text(f.label(count)));
-        if (count === 0) $chip.prop('disabled', true);
-        $chip.on('click', function () { setFilter(f.key); });
+          .append(document_text(chip.label));
+        if (chip.disabled) $chip.prop('disabled', true);
+        $chip.on('click', function () { activateFilter(chip.key); });
         $chip.on('keydown', onFilterKey);
         $chips.append($chip);
       });
@@ -419,7 +433,7 @@
         $btn.append($('<span class="j2ha-frow-name j2ha-free-name"></span>').text(row.eq_name));
         $btn.append($('<span class="text-muted j2ha-frow-room j2ha-free-name"></span>').text(row.room_name));
         if (row.blocked_mention > 0) $btn.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(blockedMentionLabel(row.blocked_mention)));
-        $btn.on('click', function () { if (typeof env.openRoom === 'function') env.openRoom(row.room_id); });
+        $btn.on('click', function () { openEquipmentView(row.room_id, row.eq_id); });
         $btn.on('keydown', onFilterKey);
         $list.append($('<li class="j2ha-frow"></li>').append($btn));
       });
@@ -450,11 +464,34 @@
       renderFreshness(lastState);
       renderCards(lastView);
       renderList(lastView);
+      subscribers.slice().forEach(function (fn) { fn(); });
     }
 
     function setFilter(key) {
       filter = (key && filter !== key) ? key : null;
       render();
+    }
+
+    // Story 25.4 : un filtre posé tel quel (sans bascule) : état initial de la vue de travail (une seule vérité de filtre).
+    function setFilterExact(key) {
+      var next = GROUP_KEYS.indexOf(key) !== -1 ? key : null;
+      if (next === filter) return;
+      filter = next;
+      render();
+    }
+
+    // Story 25.4 (AC1) : une puce ou un segment de la jauge ouvre la vue de travail avec ce filtre ; un second clic sur
+    // le filtre déjà actif le retire (la page principale reste affichée). Sans vue (env.openView absent ou refusé),
+    // le comportement de 25.3 est conservé : liste filtrée sur la page principale.
+    function activateFilter(key) {
+      if (filter === key) { setFilter(null); return; }
+      if (typeof env.openView === 'function' && env.openView({ filter: key }) !== false) return;
+      setFilter(key);
+    }
+
+    function openEquipmentView(roomId, eqId) {
+      if (typeof env.openView === 'function' && env.openView({ room: roomId, eq: eqId }) !== false) return;
+      if (typeof env.openRoom === 'function') env.openRoom(roomId);
     }
 
     // Menu « ⋯ » : balisage dans la page PHP, comportement ici (ouvre au clic et au clavier, Échap, clic extérieur).
@@ -550,9 +587,17 @@
     }
 
     return {
-      reader: reader, init: init, render: render, setFilter: setFilter,
+      reader: reader, init: init, render: render, setFilter: setFilter, setFilterExact: setFilterExact,
       filter: function () { return filter; },
       view: function () { return lastView; },
+      // Story 25.4 : ce que la vue de travail lit (copie unique en mémoire, agrégats dérivés) et abonnement aux rendus.
+      snapshot: function () {
+        return { kind: lastState && lastState.kind, view: lastView, filter: filter, readAt: lastState && lastState.readAt };
+      },
+      subscribe: function (fn) {
+        subscribers.push(fn);
+        return function () { subscribers = subscribers.filter(function (f) { return f !== fn; }); };
+      },
     };
   }
 
@@ -562,6 +607,10 @@
     gaugeSegments: gaugeSegments,
     gaugeLabel: gaugeLabel,
     houseHeadline: houseHeadline,
+    chipsFor: chipsFor,
+    GROUP_KEYS: GROUP_KEYS,
+    GROUP_OF_STATE: GROUP_OF_STATE,
+    plural: plural,
     unreadLabel: unreadLabel,
     blockedMentionLabel: blockedMentionLabel,
     classifyResponse: classifyResponse,
@@ -586,6 +635,11 @@
         setTimeout: function (fn, ms) { return window.setTimeout(fn, ms); },
         clearTimeout: function (id) { window.clearTimeout(id); },
         openRoom: function (id) { if (typeof window.j2haOpenRoom === 'function') window.j2haOpenRoom(id); },
+        // Story 25.4 : la vue de travail remplace la fenêtre de pièce ; `false` = vue indisponible (repli sur la page B).
+        openView: function (target) {
+          var view = window.Jeedom2haWorkviewInstance;
+          return view && typeof view.open === 'function' ? view.open(target) : false;
+        },
       });
       window.Jeedom2haOverviewPage = page;
       // Fins d'action (succès ou échec) : une relecture sans refresh, coalescée (AC6).

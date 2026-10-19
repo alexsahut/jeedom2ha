@@ -152,6 +152,7 @@ function createDom() {
     each(this, (el) => { if (el.parent) el.parent.children = el.parent.children.filter((c) => c !== el); el.parent = null; });
     return this;
   };
+  proto.detach = proto.remove;
   proto.text = function (value) {
     if (value === undefined) return this.list.map(textOf).join('');
     each(this, (el) => { const t = new TextNode(value); t.parent = el; el.children = [t]; });
@@ -284,7 +285,7 @@ function createDom() {
     },
   };
 
-  dom.document = { createTextNode: (text) => ({ textNode: String(text) }) };
+  dom.document = { createTextNode: (text) => ({ textNode: String(text) }), get activeElement() { return dom.focused; }, body };
   return Object.assign(dom, {
     $, body, bootbox, alerts, dialogs, documentEl,
     El, parse: parseHtml, wrap,

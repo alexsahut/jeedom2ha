@@ -64,22 +64,22 @@ describe('25.3 / AC6 — fins d’action → relecture des chiffres', () => {
     }
   });
 
-  it('fenêtre de pièce : « Appliquer » d’un équipement (succès, puis échec) signale à chaque action, pas à la fermeture', () => {
+  it('vue de travail : « Republier » d’un équipement (succès, puis échec) signale à chaque action, pas au retour à la page', () => {
     const { ui, count } = ui25();
-    ui.openRoom(7);
-    ui.respond('getMappingOverrides', ok(tree(1, [READY])));
-    ui.respond('getMappingOverrides', ok(tree(2, [READY])));
+    ui.openRoomWith(7, [ok(tree(1, [READY])), ok(tree(2, [READY]))]);
     const before = count();
     ui.click('.j2ha-eq-panel[data-eq-id="1"] .j2ha-eq-republish');
     ui.respond('executeHaAction', ACTION_OK);
     assert.ok(count() > before, 'succès signalé');
     const afterSuccess = count();
+    ui.respond('getMappingOverrides', ui.trees[1]); // relecture de l'arbre de l'équipement 1 après l'action
+    ui.show(2);
     ui.click('.j2ha-eq-panel[data-eq-id="2"] .j2ha-eq-republish');
     ui.fail('executeHaAction');
     assert.ok(count() > afterSuccess, 'échec signalé');
     const beforeClose = count();
-    ui.dom.dialogs.filter((d) => !d.options.buttons).forEach((d) => d.close());
-    assert.equal(count(), beforeClose, 'fermer la fenêtre ne signale rien');
+    ui.click('.j2ha-wv-back');
+    assert.equal(count(), beforeClose, 'revenir à la page principale ne signale rien');
   });
 
   it('sans la page B (hook absent), les actions fonctionnent sans erreur', () => {

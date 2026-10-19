@@ -81,31 +81,31 @@ async function waitAtStep(helpers, index, label, operation) {
   }
 }
 
-/** Ferme la modale de pièce sans clic par coordonnées : le bouton de fermeture peut se
- * retrouver hors de la zone visible selon le défilement de la page sous-jacente. */
-async function closeRoomModal(modal) {
-  await modal.locator('.bootbox-close-button').dispatchEvent('click');
-  await modal.waitFor({ state: 'hidden' });
+/** Story 25.4 : « fermer la fenêtre de pièce » = revenir à la page principale par un VRAI clic sur « Toutes les pièces »
+ * (contrôle d'actionnabilité de Playwright ; plus de dispatchEvent). */
+async function closeRoomModal(view) {
+  await view.locator('.j2ha-wv-back').click();
+  await view.waitFor({ state: 'hidden' });
 }
 
 // Story 20-2 (point 4) : l'eq 287 n'est désigné que par son id, jamais par un
 // nom de pièce. On tente d'abord directement la carte de son objet connu
-// (id d'objet 25) ; à défaut on referme et on retombe sur le parcours de
-// toutes les cartes, en refermant chaque modale sans résultat avant de
-// passer à la suivante.
-async function findEquipmentPanel(page, helpers, eqId) {
-  const modal = page.locator('.modal-j2ha-room');
+// (id d'objet 25) ; à défaut on revient à la page et on retombe sur le parcours de
+// toutes les cartes, en revenant à la page après chaque pièce sans résultat avant de
+// passer à la suivante. Story 25.4 : la pièce s'ouvre dans la vue de travail ; l'équipement est une ligne de l'arbre.
+async function findEquipmentRow(page, helpers, eqId) {
+  const view = page.locator('#j2ha_workView');
   const knownCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
   if (await knownCard.count() > 0) {
-    const panel = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
+    const row = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
       await knownCard.click();
-      await modal.waitFor({ state: 'visible' });
-      return modal.locator(`.j2ha-eq-panel[data-eq-id="${eqId}"]`);
+      await view.waitFor({ state: 'visible' });
+      return view.locator(`.j2ha-wv-eq[data-eq-id="${eqId}"]`);
     });
-    if (await panel.count() > 0) {
-      return panel;
+    if (await row.count() > 0) {
+      return row;
     }
-    await waitAtStep(helpers, 2, 'fermeture-piece-connue', () => closeRoomModal(modal));
+    await waitAtStep(helpers, 2, 'fermeture-piece-connue', () => closeRoomModal(view));
   }
 
   const roomCards = page.locator('#j2ha_roomCards .j2ha-room-card');
@@ -113,22 +113,24 @@ async function findEquipmentPanel(page, helpers, eqId) {
   for (let i = 0; i < roomCount; i += 1) {
     await waitAtStep(helpers, `3_${i}`, `ouverture-piece-${i}`, async () => {
       await roomCards.nth(i).click();
-      await modal.waitFor({ state: 'visible' });
+      await view.waitFor({ state: 'visible' });
     });
-    const panel = modal.locator(`.j2ha-eq-panel[data-eq-id="${eqId}"]`);
-    if (await panel.count() > 0) {
-      return panel;
+    const row = view.locator(`.j2ha-wv-eq[data-eq-id="${eqId}"]`);
+    if (await row.count() > 0) {
+      return row;
     }
-    await waitAtStep(helpers, `4_${i}`, `fermeture-piece-${i}`, () => closeRoomModal(modal));
+    await waitAtStep(helpers, `4_${i}`, `fermeture-piece-${i}`, () => closeRoomModal(view));
   }
   throw new Error('eq-introuvable');
 }
 
 export async function run(page, { helpers }) {
-  const panel = await findEquipmentPanel(page, helpers, '287');
+  const row = await findEquipmentRow(page, helpers, '287');
+  const panel = page.locator('#j2ha_workView .j2ha-eq-panel[data-eq-id="287"]');
+  // « depliage » : sélection de l'équipement dans l'arbre (clic réel) ; son détail est déjà déplié.
   await waitAtStep(helpers, 5, 'depliage', async () => {
-    await panel.locator('.j2ha-eq-toggle').click();
-    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+    await row.locator('.j2ha-wv-row').click();
+    await panel.waitFor({ state: 'visible' });
   });
 
   // Point P2 (reprise X5d) : le contrôle de publication n'est rendu qu'après la relecture

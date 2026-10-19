@@ -35,38 +35,59 @@ function multiEntityBody(id, { entitySeg = SEG, sharedAria = 'true' } = {}) {
     </tbody></table>`;
 }
 
+// Story 25.4 : la page simulée reproduit le DOM de la vue de travail C livrée — page principale (#j2ha_mainView), vue
+// (#j2ha_workView) avec arbre (lignes de pièce et d'équipement, état dit par `.j2ha-state-word`) et détail (détail de
+// pièce : KPI et actions ; détail d'équipement : panneau). Un clic sur une carte ouvre la vue, un clic sur une ligne
+// affiche son détail, « Toutes les pièces » revient à la page.
 function panel(id, name, state, badgeState, badgeText, options) {
   const badge = `<span class="j2ha-eq-publish-badge j2ha-badge j2ha-state-${badgeState}">${badgeText}</span>`;
+  const menu = '<span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-eq-recreate">Supprimer de Home Assistant…</button></li></ul></span>';
   if (id === 579) {
-    return `<div class="panel j2ha-eq-panel" data-eq-id="${id}">
-    <a class="j2ha-eq-toggle" href="#" onclick="this.parentNode.querySelector('.panel-collapse').style.display='block';return false;"><span class="j2ha-eq-name">${name}</span>
-      ${badge}</a>
-    <div class="panel-collapse" style="display:none">${multiEntityBody(id, options)}</div></div>`;
+    return `<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="${id}"><div class="j2ha-eq-head"><span class="j2ha-eq-name">${name}</span>${badge}</div>
+    <div class="j2ha-eq-body">${multiEntityBody(id, options).replace('<div class="j2ha-eq-controls">' + SEG + '</div>', '<div class="j2ha-eq-controls">' + SEG + menu + '</div>')}</div></div>`;
   }
-  return `<div class="panel j2ha-eq-panel" data-eq-id="${id}">
-    <a class="j2ha-eq-toggle" href="#" onclick="this.parentNode.querySelector('.panel-collapse').style.display='block';return false;"><span class="j2ha-eq-name">${name}</span>
-      ${badge}</a>
-    <div class="panel-collapse" style="display:none"><div class="j2ha-eq-controls">${SEG}<span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-eq-recreate">Supprimer de Home Assistant…</button></li></ul></span></div>
+  return `<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="${id}"><div class="j2ha-eq-head"><span class="j2ha-eq-name">${name}</span>${badge}</div>
+    <div class="j2ha-eq-body"><div class="j2ha-eq-controls">${SEG}${menu}</div>
       <table class="j2ha-cmd-table"><tbody><tr class="mapping-override-cmd" data-cmd-id="${id}1"><td class="mo-diag-cell ${state}">x</td></tr></tbody></table></div></div>`;
 }
 
+const stateWord = (state, text) => `<span class="j2ha-wv-state"><span class="j2ha-state-word j2ha-state-${state}">${text}</span></span>`;
+const treeEq = (id, name, state, text) => `<li class="j2ha-wv-eq" data-eq-id="${id}"><div class="j2ha-wv-row">${stateWord(state, text)}<span class="j2ha-wv-name j2ha-free-name">${name}</span></div></li>`;
+
 function html(withDiagnosticAction, titlePrefix = '', options = {}) {
-  const room25 = `<div class="modal-j2ha-room"><div class="modal-title">${titlePrefix}<span class="j2ha-free-name">Pièce 25</span></div><div class="j2ha-room-counters">${counters([['published', '1 publié'], ['disabled', '1 désactivé']])}</div>
-    <div class="j2ha-room-actions"><span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-room-republish">Republier</button></li><li><button class="j2ha-room-recreate">Supprimer de Home Assistant…</button></li></ul></span></div>
-    ${panel(579, 'Eq-579', 'j2ha-diag-ready', 'published', 'Publié', options)}${panel(514, 'Eq', 'j2ha-diag-disabled', 'disabled', 'Désactivé')}</div>`;
-  const unassigned = `<div class="modal-j2ha-room"><div class="j2ha-room-counters">${counters([['published', '1 publié']])}</div>
-    <div class="j2ha-room-actions"><span>Indisponible</span></div>${panel(7, 'Sans', 'j2ha-diag-ready', 'published', 'Publié')}</div>`;
+  const room25 = `<div class="j2ha-wv-roomhead"><h2 class="j2ha-wv-title" tabindex="-1">${titlePrefix}<span class="j2ha-free-name">Pièce 25</span></h2>
+    <div class="j2ha-room-actions"><button class="j2ha-room-republish">Republier</button><span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-room-recreate">Supprimer de Home Assistant…</button></li></ul></span></div></div>
+    <div class="j2ha-wv-kpis">${counters([['published', '1 publié'], ['disabled', '1 désactivé']])}</div>`;
+  const unassigned = `<div class="j2ha-wv-roomhead"><h2 class="j2ha-wv-title" tabindex="-1">Sans pièce</h2><div class="j2ha-room-actions"><span>Indisponible</span></div></div>
+    <div class="j2ha-wv-kpis">${counters([['published', '1 publié']])}</div>`;
+  const panels = { 579: panel(579, 'Eq-579', 'j2ha-diag-ready', 'published', 'Publié', options), 514: panel(514, 'Eq', 'j2ha-diag-disabled', 'disabled', 'Désactivé'), 7: panel(7, 'Sans', 'j2ha-diag-ready', 'published', 'Publié') };
   return `<body><div class="row"><div class="eqLogicThumbnailDisplay">
     <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
     ${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
     <div id="div_bridgeHealthBanner">Démon</div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
-    <div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name">Sans pièce</span><span class="text-muted"> (1)</span></div>
+    <div id="j2ha_mainView"><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name">Sans pièce</span><span class="text-muted"> (1)</span></div>
     <div class="j2ha-room-card" data-object_id="25" id="piece-25"><span class="name j2ha-free-name">Pièce 25</span><span class="text-muted"> (2)</span></div></div></div>
-    <div class="eqLogic" style="display:none">Équipement</div></div>
+    <div id="j2ha_workView" class="j2ha-wv" style="display:none"><div class="j2ha-wv-bar"><button class="j2ha-wv-back">Toutes les pièces</button></div>
+      <ul class="j2ha-wv-tree">
+        <li class="j2ha-wv-room" data-object_id="25"><div class="j2ha-wv-row"><span class="j2ha-wv-name j2ha-free-name">Pièce 25</span></div><ul>${treeEq(579, 'Eq-579', 'published', 'Publié')}${treeEq(514, 'Eq', 'disabled', 'Désactivé')}</ul></li>
+        <li class="j2ha-wv-room" data-object_id="0"><div class="j2ha-wv-row"><span class="j2ha-wv-name">Sans pièce</span></div><ul>${treeEq(7, 'Sans', 'published', 'Publié')}</ul></li>
+      </ul>
+      <div class="j2ha-wv-detail"><div class="j2ha-wv-pane"></div></div></div>
+    <div class="eqLogic" style="display:none">Équipement</div></div></div>
     <script>
-      document.querySelector('[data-object_id="25"]').onclick = function () { document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(room25)}); };
-      document.querySelector('[data-object_id="0"]').onclick = function () { document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(unassigned)}); };
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { var m = document.querySelector('.modal-j2ha-room'); if (m) m.remove(); } });
+      var panes = { room25: ${JSON.stringify(room25)}, room0: ${JSON.stringify(unassigned)}, eq: ${JSON.stringify(panels)} };
+      var view = document.getElementById('j2ha_workView');
+      var pane = view.querySelector('.j2ha-wv-pane');
+      function openView() { document.getElementById('j2ha_mainView').style.display = 'none'; view.style.display = 'block'; }
+      document.querySelector('[data-object_id="25"].j2ha-room-card').onclick = function () { openView(); pane.innerHTML = panes.room25; };
+      document.querySelector('[data-object_id="0"].j2ha-room-card').onclick = function () { openView(); pane.innerHTML = panes.room0; };
+      view.querySelector('.j2ha-wv-back').onclick = function () { view.style.display = 'none'; document.getElementById('j2ha_mainView').style.display = 'block'; };
+      view.querySelectorAll('.j2ha-wv-room > .j2ha-wv-row').forEach(function (row) {
+        row.onclick = function () { pane.innerHTML = row.parentNode.getAttribute('data-object_id') === '25' ? panes.room25 : panes.room0; };
+      });
+      view.querySelectorAll('.j2ha-wv-eq > .j2ha-wv-row').forEach(function (row) {
+        row.onclick = function () { pane.innerHTML = panes.eq[row.parentNode.getAttribute('data-eq-id')]; };
+      });
     </script></body>`;
 }
 
@@ -157,7 +178,7 @@ test('20.3 gate simulé (R1-H) — les noms libres ne sont pas soumis au gate de
   });
 });
 
-test('20.3 gate simulé (R1-H) — un libellé statique interdit dans la modale de pièce fait toujours échouer le parcours', async (t) => {
+test('20.3 gate simulé (R1-H) — un libellé statique interdit dans le détail de pièce (vue C) fait toujours échouer le parcours', async (t) => {
   const parcours = await import(gate('parcours', 'decouverte-piece-25-eq-579.mjs'));
   const content = html(false).replace('Republier</button>', 'Confiance mapping</button>');
   await withPage(t, content, [], async (page, helpers) => {
@@ -165,7 +186,7 @@ test('20.3 gate simulé (R1-H) — un libellé statique interdit dans la modale 
   });
 });
 
-test('20.3 gate simulé (R2-6) — un libellé interdit dans le titre statique de la modale (hors nom de pièce) fait échouer le parcours', async (t) => {
+test('20.3 gate simulé (R2-6) — un libellé interdit dans le titre statique du détail de pièce (hors nom de pièce) fait échouer le parcours', async (t) => {
   const parcours = await import(gate('parcours', 'decouverte-piece-25-eq-579.mjs'));
   const content = html(false, 'Confiance ');
   await withPage(t, content, [], async (page, helpers) => {
@@ -195,10 +216,10 @@ test('22.2 — les libellés attendus par les parcours 287 et 579 sont ceux que 
   const { createUi, tree, ok, READY, BRIDGE_UP } = require('./helpers/ui_harness');
   const ui = createUi([{ object_id: 7, object_name: 'Zone', equipments: [{ eq_id: 287, eq_name: 'Eq', enabled: true }] }]);
   ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
-  ui.openRoom(7);
-  ui.respond('getMappingOverrides', ok(tree(287, [READY], { entities: [{
+  // Story 25.4 : la fenêtre de pièce n'existe plus ; l'équipement est sélectionné dans l'arbre de la vue de travail.
+  ui.openRoomWith(7, [ok(tree(287, [READY], { entities: [{
     ha_entity_type: 'light', command_ids: [28700], decision: READY, publication_override: null,
-    override_command_id: 28700, override_pending: false, present_in_ha: true }] })));
+    override_command_id: 28700, override_pending: false, present_in_ha: true }] }))]);
   // Story 25.1 : « Exclure l’équipement » / « Revenir au mode automatique » deviennent les positions « Jamais » / « Automatique ».
   const rendered = ui.$('.j2ha-eq-controls .j2ha-seg-btn').list.map((b) => ui.$(b).text().replace(/\{\{|\}\}/g, ''));
   assert.deepEqual(rendered, ['Automatique', 'Toujours', 'Jamais']);
@@ -230,10 +251,10 @@ const READY_BADGE = 'À appliquer';
 
 function html380(journal, { sensorOffered = false } = {}) {
   const options = `<option value="">auto</option>${sensorOffered ? '<option value="sensor">sensor</option><option value="binary_sensor">binary_sensor</option>' : ''}<option value="cover">cover</option>`;
-  const modal = `<div class="modal-j2ha-room"><div class="j2ha-eq-panel" data-eq-id="380">
-    <a class="j2ha-eq-toggle" href="#" onclick="document.querySelector('.panel-collapse').style.display='block';return false;"><span class="j2ha-eq-name">Eq</span>
-      <span class="j2ha-eq-publish-badge j2ha-badge">${INITIAL_BADGE}</span></a>
-    <div class="panel-collapse" style="display:none">
+  // Story 25.4 : vue de travail C — l'équipement 380 est une ligne de l'arbre ; son détail s'affiche à la sélection.
+  const detail = `<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="380"><div class="j2ha-eq-head"><span class="j2ha-eq-name">Eq</span>
+      <span class="j2ha-eq-publish-badge j2ha-badge">${INITIAL_BADGE}</span></div>
+    <div class="j2ha-eq-body">
       <div class="j2ha-eq-counters"><div class="j2ha-eq-counter-line" id="counters380">
         <span class="j2ha-eq-counter">1 bloquée</span>
         <span class="j2ha-eq-counter">1 ignorée</span></div></div>
@@ -242,11 +263,17 @@ function html380(journal, { sensorOffered = false } = {}) {
       <table class="j2ha-cmd-table"><tbody>
         <tr class="mapping-override-cmd" data-cmd-id="2971"><td class="mo-td-diag mo-diag-cell j2ha-diag-blocking" id="diag2971">Bloquée</td>
           <td class="mo-td-override" id="type2971"><a class="j2ha-type-link" id="link2971" href="#">auto</a><span id="rev2971"></span></td></tr>
-      </tbody></table></div></div></div>`;
-  return `<body><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="4" id="piece-4">Pièce</div></div>
+      </tbody></table></div></div>`;
+  return `<body><div id="j2ha_mainView"><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="4" id="piece-4">Pièce</div></div></div>
+    <div id="j2ha_workView" class="j2ha-wv" style="display:none"><div class="j2ha-wv-bar"><button class="j2ha-wv-back">Toutes les pièces</button></div>
+      <ul class="j2ha-wv-tree"><li class="j2ha-wv-room" data-object_id="4"><div class="j2ha-wv-row">Pièce</div>
+        <ul><li class="j2ha-wv-eq" data-eq-id="380"><div class="j2ha-wv-row"><span class="j2ha-wv-name j2ha-free-name">Eq</span></div></li></ul></li></ul>
+      <div class="j2ha-wv-detail"><div class="j2ha-wv-pane"></div></div></div>
     <script>
       window.__push = function (action, verdict) { window.__pushNode(action, verdict); };
-      document.getElementById('piece-4').onclick = function () { document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(modal)}); wire(); };
+      var pane380 = document.querySelector('#j2ha_workView .j2ha-wv-pane');
+      document.getElementById('piece-4').onclick = function () { document.getElementById('j2ha_mainView').style.display = 'none'; document.getElementById('j2ha_workView').style.display = 'block'; };
+      document.querySelector('.j2ha-wv-eq[data-eq-id="380"] .j2ha-wv-row').onclick = function () { pane380.innerHTML = ${JSON.stringify(detail)}; wire(); };
       function setReady(on) {
         var cell = document.getElementById('diag2971');
         cell.className = 'mo-td-diag mo-diag-cell ' + (on ? 'j2ha-diag-todo' : 'j2ha-diag-blocking');

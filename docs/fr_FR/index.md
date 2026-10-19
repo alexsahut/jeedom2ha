@@ -18,7 +18,7 @@ Cette documentation décrit l'écran du plugin tel que vous le voyez, avec les m
 - [La page principale](#la-page-principale)
 - [La configuration par pièce](#la-configuration-par-pièce)
 - [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
-- [Les états et les compteurs de la fenêtre d'une pièce](compteurs.md)
+- [Les états et les compteurs de la vue de travail](compteurs.md)
 - [Dépannage](#dépannage)
 - [Annexes](#annexes)
   - [Noms et identifiants dans Home Assistant](#annexe--noms-et-identifiants-dans-home-assistant)
@@ -90,7 +90,7 @@ Trois boutons complètent la section :
 - **« Récupérer depuis MQTT Manager »** réimporte les paramètres de MQTT Manager **et les enregistre aussitôt**, sans attendre « Sauvegarder » (message de réussite : « Configuration importée depuis MQTT Manager »).
 - **« Réinitialiser le formulaire »** (lien) vide les champs de connexion à l'écran, sans rien enregistrer.
 
-**Pour que ces réglages soient pris en compte :** cliquez sur le bouton **« Sauvegarder »** de Jeedom (en bas de la fenêtre de configuration), puis **démarrez ou redémarrez le démon** : il ne lit les réglages MQTT qu'à son démarrage. Le bouton situé sous les trois réglages de filtrage, plus bas, n'enregistre pas la connexion au broker, seulement ces trois réglages.
+**Pour que ces réglages soient pris en compte :** cliquez sur le bouton **« Sauvegarder »** de Jeedom (en bas de l'écran de configuration), puis **démarrez ou redémarrez le démon** : il ne lit les réglages MQTT qu'à son démarrage. Le bouton situé sous les trois réglages de filtrage, plus bas, n'enregistre pas la connexion au broker, seulement ces trois réglages.
 
 ### Filtrage et publication
 
@@ -114,7 +114,7 @@ Les exclusions de cette page sont **distinctes** de celles que vous posez avec l
 2. Ajustez les filtres si nécessaire.
 3. Cliquez sur le bouton situé sous les filtres (page de configuration) ou, depuis la page principale du plugin, sur **« Relire Jeedom »**. Les deux lancent une lecture complète de Jeedom ; voir [Relire Jeedom](#relire-jeedom).
 4. Dans Home Assistant, ouvrez **Paramètres → Appareils et services → MQTT** : vos équipements apparaissent.
-5. Si un équipement manque, ouvrez sa pièce dans la page du plugin : l'écran vous dit son état et, s'il est bloqué, pourquoi.
+5. Si un équipement manque, ouvrez sa pièce dans la page du plugin : la vue de travail vous dit son état et, s'il est bloqué, pourquoi.
 
 Si, après un redémarrage du broker MQTT, Home Assistant ne retrouve pas ses entités, utilisez **« Republier tout »** sur la page principale.
 
@@ -186,9 +186,9 @@ Sous la barre de santé, la section **« Configuration Home Assistant par pièce
 
 Le bloc de la maison donne, dès le premier écran, le chiffre qui compte : un grand nombre suivi de « publiés sur » le total des équipements Jeedom, avec le nombre de pièces. Dessous, une **jauge** segmentée (publiés en vert, à appliquer en bleu, bloqués en orange, exclus et autres en gris, non lus en hachuré) et une **légende en puces**.
 
-- **Chaque puce (et chaque segment de la jauge) est un filtre** qui s'applique à toutes les pièces : un clic affiche, sous le bloc, la liste des équipements dans cet état, avec leur pièce ; les cartes de pièce sans équipement concerné sont atténuées (jamais masquées). Un clic sur une ligne ouvre la fenêtre de sa pièce. Un second clic sur la puce, la touche Échap ou « Tout afficher » retire le filtre. Un filtre ne fait aucune requête : il lit les chiffres déjà affichés.
+- **Chaque puce (et chaque segment de la jauge) est un filtre** qui s'applique à toutes les pièces : un clic ouvre la [vue de travail](#la-vue-de-travail) avec ce filtre actif (l'arbre ne montre que les équipements dans cet état). Au retour sur la page principale, le filtre est conservé : la liste des équipements dans cet état s'affiche sous le bloc, avec leur pièce, et les cartes de pièce sans équipement concerné sont atténuées (jamais masquées). Un clic sur une ligne de cette liste ouvre la vue de travail sur l'équipement. Un second clic sur la puce, la touche Échap ou « Tout afficher » retire le filtre. Un filtre ne fait aucune requête : il lit les chiffres déjà affichés.
 - Les puces à zéro restent affichées mais sont grisées. La puce « exclus et autres » regroupe les équipements exclus, désactivés et sans rien à publier ; chaque ligne garde son propre mot d'état.
-- **« Actualiser »** relit les chiffres en contournant la mémoire du démon, et « Chiffres relus à HH:MM » indique l'heure de la dernière lecture. Les chiffres sont relus à l'ouverture de la page, après chaque action (« Republier tout », « Relire Jeedom », « Supprimer tout de Home Assistant… », et chaque action de la fenêtre d'une pièce, qu'elle réussisse ou échoue) et quand vous revenez sur l'onglet du navigateur après plus d'une minute. Il n'y a pas de relecture périodique.
+- **« Actualiser »** relit les chiffres en contournant la mémoire du démon, et « Chiffres relus à HH:MM » indique l'heure de la dernière lecture. Les chiffres sont relus à l'ouverture de la page, après chaque action (« Republier tout », « Relire Jeedom », « Supprimer tout de Home Assistant… », et chaque action de la vue de travail, qu'elle réussisse ou échoue) et quand vous revenez sur l'onglet du navigateur après plus d'une minute. Il n'y a pas de relecture périodique.
 - Pendant une opération du plugin, une mention « Opération en cours : ces chiffres peuvent changer » s'affiche ; le plugin relit alors trois fois au plus, puis laisse la mention en place. Avant la première synchronisation, la page indique « Aucune synchronisation n'a encore eu lieu » ; si la lecture échoue, « Chiffres indisponibles » (les derniers chiffres valides restent affichés, atténués).
 
 Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-jauge-de-la-maison).
@@ -197,26 +197,29 @@ Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-j
 
 Chaque pièce qui contient au moins un équipement a une carte portant l'icône et la couleur choisies dans Jeedom pour l'objet, son nom, « n / t publiés », une petite jauge segmentée et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange), « N à appliquer » (bleu) et « N non lus » (gris). Une carte qui contient au moins un équipement bloqué porte un liseré orange. Les cartes sont **regroupées par objet parent** (sous-titre du groupe, ordre de Jeedom conservé). La carte **« Sans pièce »** rassemble les équipements qui n'ont pas de pièce, en dernier. Les équipements **désactivés dans Jeedom sont comptés et listés**. Les équipements du plugin jeedom2ha lui-même sont écartés. S'il n'y a aucune pièce avec équipement, la page affiche « Aucune pièce avec équipement trouvée. »
 
-Les cartes sont opérables au clavier (Entrée ou Espace ouvre la fenêtre de la pièce). Un équipement dont la lecture a échoué, ou que le démon ne connaît pas encore, est compté **« non lu »** : il n'est jamais compté publié, bloqué, exclu ni désactivé.
+Les cartes sont opérables au clavier (Entrée ou Espace ouvre la vue de travail sur la pièce). Un équipement dont la lecture a échoué, ou que le démon ne connaît pas encore, est compté **« non lu »** : il n'est jamais compté publié, bloqué, exclu ni désactivé.
 <!-- CAPTURE-A-PRENDRE: cartes de pièce -->
 
-### La fenêtre d'une pièce
+### La vue de travail
 
-Cliquer sur une carte ouvre une fenêtre qui porte le nom de la pièce. Elle contient :
+Cliquer sur une carte de pièce, sur une puce ou un segment de la jauge de la maison, ou sur une ligne de la liste filtrée ouvre la **vue de travail**, dans la page du plugin, **sans ouvrir de boîte de dialogue** : la barre de santé reste affichée au-dessus, le bloc de la maison, la liste filtrée et les cartes sont masqués (ils retrouvent leur état au retour). La vue occupe la hauteur de l'écran : à gauche l'arbre des pièces et de leurs équipements, à droite le détail de ce que vous avez choisi ; chaque colonne défile seule.
 
-1. **Les compteurs** de la pièce : un chiffre et un mot court par état d'équipement (publié, à appliquer, bloqué, exclu, désactivé, rien à publier), les états à zéro étant masqués. Voir [Les états et les compteurs](compteurs.md).
-2. **Le menu « ⋯ » de la pièce**, à droite des compteurs : « Republier » (la portée est donnée par l'endroit : toute la pièce) puis, séparée par un trait, « Supprimer de Home Assistant… » (en rouge, dans le menu seulement). Pour « Sans pièce », il n'existe pas : la fenêtre indique « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. »
-3. **Une zone de résultat**, où s'affiche le message de la dernière action (vert : succès ; orange : succès partiel ; rouge : échec).
-4. **La liste des équipements de la pièce**, un panneau par équipement. **Un seul panneau est déplié à la fois** : en déplier un replie celui qui l'était. Chaque panneau montre le nom de l'équipement, la mention « (désactivé dans Jeedom) » le cas échéant, et un **badge d'état** (voir [Les badges de synthèse](#les-badges-de-synthèse)).
+- **Le retour.** « Toutes les pièces » (ou le bouton « Précédent » du navigateur) revient à la page principale telle que vous l'avez laissée (filtre, position de défilement), sans rien relire. La touche Échap ne quitte pas la vue : elle ferme d'abord un menu ou une confirmation ouverts.
+- **L'adresse de la page** garde votre sélection (elle se termine par `#j2ha-vue=…`) : copiée dans un autre onglet, elle rouvre la même pièce et le même équipement. « Précédent » remonte d'un niveau : équipement, puis pièce, puis page principale. La recherche n'est pas mémorisée.
+- **L'arbre** reprend toutes les pièces, regroupées comme les cartes (sous-titre du groupe, ordre de Jeedom conservé), « Sans pièce » comprise. Chaque pièce porte l'icône et la couleur choisies dans Jeedom, son nom, « n / t » et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange) et « N à appliquer » (bleu). Déplier une pièce montre ses équipements : l'état avant le nom (le même mot que partout), la mention « (désactivé dans Jeedom) » le cas échéant, « N bloquées » pour un équipement publié qui en comporte, et « non lu » pour un équipement dont les chiffres n'ont pas pu être lus. La pièce choisie est dépliée ; les autres sont repliées. L'arbre se parcourt au clavier : flèches haut et bas, flèches droite et gauche pour déplier ou replier, Entrée ou Espace pour choisir, Début et Fin.
+- **La recherche** (« Rechercher une pièce ou un équipement ») porte sur les noms de pièce et d'équipement seulement, sans tenir compte de la casse ni des accents ; « Aucun résultat » s'affiche quand rien ne correspond. Une pièce dont le nom correspond montre tous ses équipements. Elle ne fait aucune requête.
+- **Les filtres** sont les mêmes puces que sur la page principale, avec les mêmes libellés et les mêmes effectifs. Le filtre est **partagé** avec la page principale : celui que vous avez choisi y est repris, et un changement fait dans la vue se retrouve au retour. Une puce à zéro est grisée. Choisir un filtre ne fait aucune requête et ne désélectionne rien : l'équipement affiché reste affiché même s'il sort du filtre.
 
-À l'ouverture, le plugin lit **uniquement les équipements de cette pièce**, ce qui prend quelques instants (« Chargement… » s'affiche dans chaque panneau). Si la lecture d'un équipement échoue, son panneau indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). » et n'offre aucune action.
+**Le détail d'une pièce** montre : le fil d'Ariane (parent puis pièce), le nom, le bouton **« Republier la pièce »** et le menu « ⋯ » (**« Supprimer de Home Assistant… »**, en rouge, dans le menu seulement), les **compteurs de la pièce** (un chiffre et un mot court par état d'équipement : publié, à appliquer, bloqué, exclu, désactivé, rien à publier ; les états à zéro sont masqués ; un clic sur un compteur filtre l'arbre — voir [Les états et les compteurs](compteurs.md)), une zone de résultat, et la liste **« À traiter dans cette pièce »** : une ligne par équipement bloqué ou à appliquer, avec son état, son nom, le nombre de commandes concernées et la cause dite une seule fois. L'action de la ligne est unique : **« Ouvrir les types génériques »** quand le blocage se corrige dans Jeedom, **« Appliquer »** pour un équipement à appliquer (le résultat s'affiche dans la zone de résultat). Un clic sur le reste de la ligne affiche l'équipement. Quand il n'y a rien à faire, la vue dit « Rien à traiter dans cette pièce » et rappelle combien d'équipements n'appellent aucune action. Pour « Sans pièce », il n'y a ni « Republier la pièce » ni menu : la vue indique « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. » Le résultat de la dernière action s'affiche dans la zone de résultat (vert : succès ; orange : succès partiel ; rouge : échec).
 
-La fenêtre n'a qu'**une seule barre de défilement**. L'en-tête de l'équipement déplié (nom, badge, réglage de publication, « Appliquer » et menu « ⋯ ») reste collé en haut pendant que vous faites défiler le tableau.
-<!-- CAPTURE-A-PRENDRE: fenêtre d'une pièce -->
+**Le détail d'un équipement** s'affiche quand vous choisissez un équipement dans l'arbre ou dans la liste « À traiter dans cette pièce ». Le plugin ne lit la configuration **que de cet équipement** et seulement à ce moment (« Chargement… » s'affiche) ; choisir de nouveau le même équipement la relit. Si la lecture échoue, le détail indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). » et n'offre aucune action. Un seul équipement est affiché à la fois ; son en-tête (nom, badge, réglage de publication, « Appliquer » et menu « ⋯ ») reste collé en haut pendant que vous faites défiler le tableau, sans autre barre de défilement dans le détail. Son contenu est décrit ci-dessous.
 
-### Le panneau d'un équipement
+**Sur tablette et petit écran** (en dessous de 980 pixels de large), l'arbre devient un **tiroir** : le bouton **« Pièces »** l'ouvre au-dessus du détail, un autre clic ou le choix d'une pièce ou d'un équipement le referme ; le tiroir est ouvert tant que rien n'est choisi. Le détail occupe toute la largeur, sans défilement horizontal. Tourner la tablette ne perd ni la sélection, ni le filtre, ni la recherche, ni votre position, et ne refait aucune requête. Les lignes, les puces et les boutons sont assez grands pour le doigt.
+<!-- CAPTURE-A-PRENDRE: vue de travail -->
 
-L'en-tête de l'équipement déplié, qui reste visible, comporte :
+### Le détail d'un équipement
+
+L'en-tête de l'équipement affiché, qui reste visible, comporte :
 
 - **Le badge d'état** (« Publié », « À appliquer », « Bloqué », « Exclu », « Désactivé » ou « Rien à publier »), suivi, quand l'équipement est publié ou à appliquer, de la **mention orange** du nombre de commandes bloquées (« 2 bloquées »).
 - **Le réglage « Publication dans Home Assistant »**, un contrôle à trois positions **« Automatique », « Toujours », « Jamais »**. La position courante est toujours montrée : « Jamais » pour un équipement exclu, « Toujours » pour un équipement forcé, « Automatique » sinon. Choisir une position enregistre le réglage (voir [Les actions de publication](#les-actions-de-publication)) ; il n'est pas publié tout de suite. Une position indisponible est grisée et son infobulle dit pourquoi. Au clavier, les flèches déplacent le choix, Espace ou Entrée le valident.
@@ -231,7 +234,7 @@ Dessous, de haut en bas :
 - **Une ligne repliée pour les commandes ignorées** : « 5 commandes ignorées, sans équivalent dans Home Assistant : … ». Elle se déplie au clic ou au clavier. Pour une commande qui n'est pas prise en charge par le plugin, la ligne ajoute « non pris en charge par le plugin ».
 
 Un équipement sans commande affiche « Aucune commande à configurer pour cet équipement. »
-<!-- CAPTURE-A-PRENDRE: panneau d'un équipement déplié -->
+<!-- CAPTURE-A-PRENDRE: détail d'un équipement -->
 
 ### Le tableau des commandes
 
@@ -255,7 +258,7 @@ Par défaut le plugin choisit seul le type Home Assistant d'une commande (« aut
 
 1. Cliquez sur le lien de la colonne « Type HA » : le sélecteur s'ouvre (Échap le referme). Choisissez un type dans la liste. Après une courte attente (environ 0,4 seconde), le plugin **vérifie** le choix et affiche le résultat dans la colonne « Dans Home Assistant ».
 2. Si le choix est valide (« À appliquer → <type> »), il est **enregistré automatiquement** : il n'y a pas de bouton « Enregistrer ».
-3. Sinon, il est **refusé** (« Bloquée → <cause> ») ; rien n'est enregistré. Rouvrez la pièce pour retrouver l'état réellement enregistré.
+3. Sinon, il est **refusé** (« Bloquée → <cause> ») ; rien n'est enregistré. Choisissez de nouveau l'équipement pour retrouver l'état réellement enregistré.
 4. Un choix enregistré **n'est pas publié tout de suite**. Le signe fiable est l'état « À appliquer » de l'équipement et le bouton « Appliquer ». Cliquez sur « Appliquer » ou lancez « Relire Jeedom ».
 5. Pour annuler le choix d'une commande, sélectionnez « auto » dans la liste, ou cliquez sur l'icône « Retirer le type imposé » à côté du lien. Cette icône ne retire que le choix de **type** de cette commande.
 
@@ -269,7 +272,7 @@ Le lien est **grisé avec une infobulle** quand le réglage n'a pas de sens :
 - « Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Retirer le type imposé » reste disponible.
 - « Aucun type Home Assistant ne peut aboutir pour cette commande en l’état : précisez les types génériques dans Jeedom. » (aucun type n'est valide pour cette commande ; la voie normale est de préciser les types génériques dans Jeedom)
 
-Quand une vérification fait apparaître une commande bloquée, un bandeau d'avertissement rappelle, une fois par ouverture de pièce : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
+Quand une vérification fait apparaître une commande bloquée, un bandeau d'avertissement rappelle, une fois par ouverture de la vue de travail : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
 
 ### Deux familles de réglages : type et publication
 
@@ -293,7 +296,7 @@ Un réglage enregistré n'est pas publié immédiatement. Tant qu'il attend, l'�
 
 Un équipement est aussi « À appliquer » quand sa publication est due mais n'a pas eu lieu (jamais publié alors qu'il le devrait), ou quand le démon est une version plus ancienne qui ne dit pas s'il est présent dans Home Assistant : il n'est alors jamais affiché « Publié ». Voir [Les états et les compteurs](compteurs.md).
 
-Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »**. « Republier » (menu « ⋯ » de la pièce) et « Republier tout » appliquent aussi les réglages en attente des équipements concernés. Un [relevé de Jeedom](#relire-jeedom) applique d'un coup ceux de **tous** les équipements. « Appliquer » ne demande pas de confirmation ; son résultat s'affiche dans la zone de résultat de la pièce, et en cas d'échec le bouton reste affiché avec le message d'erreur.
+Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »**. « Republier la pièce » et « Republier tout » appliquent aussi les réglages en attente des équipements concernés. Un [relevé de Jeedom](#relire-jeedom) applique d'un coup ceux de **tous** les équipements. « Appliquer » ne demande pas de confirmation ; son résultat s'affiche dans la zone de résultat du détail, et en cas d'échec le bouton reste affiché avec le message d'erreur.
 
 ### Les actions de publication
 
@@ -302,7 +305,7 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 **Jamais**
 
 - *Ce que ça fait* : l'équipement n'est plus publié dans Home Assistant, ou l'entité n'y est plus publiée.
-- *Confirmation* : seulement si le réglage fait **quitter Home Assistant** une entité publiée selon le diagnostic. La fenêtre demande « Régler cet équipement sur « Jamais » (exclu de Home Assistant) ? » (avec la liste « Entités qui quitteront Home Assistant : … ») ou « Régler cette entité sur « Jamais » (exclue de Home Assistant) ? ». Boutons « Annuler » et « Confirmer ». Sinon le réglage est enregistré directement.
+- *Confirmation* : seulement si le réglage fait **quitter Home Assistant** une entité publiée selon le diagnostic. La confirmation demande « Régler cet équipement sur « Jamais » (exclu de Home Assistant) ? » (avec la liste « Entités qui quitteront Home Assistant : … ») ou « Régler cette entité sur « Jamais » (exclue de Home Assistant) ? ». Boutons « Annuler » et « Confirmer ». Sinon le réglage est enregistré directement.
 - *Ensuite* : comme tout réglage, il attend d'être appliqué (« Appliquer », « Republier » ou « Relire Jeedom »).
 
 **Toujours**
@@ -320,7 +323,7 @@ Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »
 **Republier / Appliquer**
 
 - *Équipement* : « Appliquer » (bouton bleu, seulement quand l'état est « À appliquer ») et « Republier » (menu « ⋯ ») utilisent la même route. Sans confirmation.
-- *Pièce* : « Republier » (menu « ⋯ » de la pièce) demande « <nom de la pièce> — republier les équipements inclus de cette pièce. Confirmer ? » (bouton « Republier »). Elle applique aussi les réglages en attente de la pièce.
+- *Pièce* : « Republier la pièce » demande « <nom de la pièce> — republier les équipements inclus de cette pièce. Confirmer ? » (bouton « Republier »). Elle applique aussi les réglages en attente de la pièce.
 - *Dans tous les cas*, « Republier » ne relit pas Jeedom : il travaille sur ce que la dernière lecture complète a lue.
 - *Parc* : voir [la page principale](#les-actions-de-la-barre-de-santé).
 
@@ -401,7 +404,7 @@ Autres limites à connaître :
 
 ### Les badges de synthèse
 
-Le badge à droite du nom de chaque équipement dit son **état**. Un équipement n'en a qu'un, toujours dit avec le même mot et la même teinte dans le badge, la ligne de son panneau et les compteurs de la pièce (le détail des règles est dans [Les états et les compteurs](compteurs.md)).
+Le badge à droite du nom de chaque équipement dit son **état**. Un équipement n'en a qu'un, toujours dit avec le même mot et la même teinte dans l'arbre, le badge du détail et les compteurs de la pièce (le détail des règles est dans [Les états et les compteurs](compteurs.md)).
 
 | État | Teinte | Ce que cela veut dire |
 |---|---|---|

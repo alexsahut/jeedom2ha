@@ -1,8 +1,8 @@
 # Story 25.4 : Vue maître-détail C — remplacement de la fenêtre de pièce
 
-Status: ready-for-dev
+Status: review
 
-> **Statut : `ready-for-dev` (2026-10-19 07:45, relecture et décisions ClaudeBox par délégation d'Alexandre — § Décisions : Q1 à Q14 = A, avec précisions).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48). **`ready-for-dev` n'est pas accordé** : la relecture de la story par ClaudeBox est obligatoire, puis les décisions sur les questions Q1 à Q14 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale de la vue C est portée par **25.5**, pas par cette story. Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, du cadrage, de 25.1 à 25.3 et de la commande de cette story) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `a5ba89b` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; 25.2 : #288 `2b451dd` ; 25.3 : #293 `ebec48b`, correctifs #294 #296 #297, preuve terrain `030d6e8` / #298) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
+> **Statut : `review` (2026-10-19, `dev-story` terminé par une session cloud déléguée ; Tasks 0 et 11 SAUTÉES, CC-48 ; la preuve terrain, le passage à `ready-for-UX-validation` et la validation UX finale restent à ClaudeBox / 25.5).** Précédemment : `ready-for-dev` (2026-10-19 07:45, relecture et décisions ClaudeBox par délégation d'Alexandre — § Décisions : Q1 à Q14 = A, avec précisions). Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48). **`ready-for-dev` n'est pas accordé** : la relecture de la story par ClaudeBox est obligatoire, puis les décisions sur les questions Q1 à Q14 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** (et non `done`) ; la validation UX finale de la vue C est portée par **25.5**, pas par cette story. Les points listés en § Décisions déjà arbitrées sont **fermés** (ils viennent de l'epic, du cadrage, de 25.1 à 25.3 et de la commande de cette story) et ne sont pas rouverts ici. Pointeurs de code pris sur `main` à `a5ba89b` (après 25.1 : #279 `a704dd0`, R2 #282 `c940ac3` ; 25.2 : #288 `2b451dd` ; 25.3 : #293 `ebec48b`, correctifs #294 #296 #297, preuve terrain `030d6e8` / #298) ; **à re-vérifier au SHA courant** avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
 ## Story
 
@@ -366,51 +366,51 @@ Convention : chaque AC est vérifiable par un test nommé (Node, PHP, parcours d
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 (SAUTÉE par une session cloud : réservée à l'humain / ClaudeBox ; CC-48, aucun accès à la box) — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
+- [ ] Task 0 (SAUTÉE par la session cloud du `dev-story`, 2026-10-19 : réservée à l'humain / ClaudeBox ; CC-48, aucun accès à la box) — Pre-flight terrain (DEV/TEST ONLY — pas la release Market) **[réservé à l'humain / ClaudeBox ; une session cloud NE LA FAIT PAS (CC-48 : aucun accès box, SSH ni Home Assistant)]**
   - [ ] Dry-run : vérifier sans transférer : `./scripts/deploy-to-box.sh --dry-run`
   - [ ] Sélectionner le mode selon l'objectif de la story :
     - Vérification disparition entités HA sans republier : `./scripts/deploy-to-box.sh --stop-daemon-cleanup`
     - Cycle complet republication + validation discovery : `./scripts/deploy-to-box.sh --cleanup-discovery --restart-daemon`
   - [ ] Vérifier que le script se termine avec `Deploy complete.` ou `Stop+cleanup terminé.`
   - [ ] Relever, avant le `dev-story`, la largeur CSS réelle de l'iPad mural en mode bureau (identifiants seuls, aucune donnée de la maison) : alimente Q3 et AC20.
-- [ ] Task 1 — **Capturer l'état de référence AVANT tout changement de code** (AC: 2, 8, 24, 25, 27)
-  - [ ] 1.1 `tests/fixtures/story_25_4_corps_ecriture.json` : corps sérialisés (clés triées) de chaque écriture de l'écran d'équipement et de pièce, relevés en exécutant les suites existantes de la modale sur `main` (jamais sur la box).
-  - [ ] 1.2 `tests/fixtures/story_25_4_css_baseline.json` : sélecteurs et déclarations de `desktop/css/jeedom2ha.css` sur `main`, avec la liste des sélecteurs propres à la modale (à retirer en AC2).
-  - [ ] 1.3 `tests/fixtures/story_25_4_gate_assertions.json` : registre d'assertions des cinq parcours qui touchent la modale (AC27), généré par script lisant les parcours de `main`.
-  - [ ] 1.4 Inventaire des classes partagées (AC24) : relever sur `main` qui utilise quoi (`.j2ha-seg*`, `.j2ha-menu-*`, `.j2ha-state-*`, `.j2ha-badge`, `.j2ha-gauge`, puces de la page B).
-- [ ] Task 2 — Tests d'abord (AC: 4, 5, 6, 7, 10, 12, 13, 17, 18, 21, 25)
-  - [ ] 2.1 `test_story_25_4_aucune_lecture_etats`, `test_story_25_4_lecture_tardive`, `test_story_25_4_navigation` (table D2), `test_story_25_4_recherche_filtres`, `test_story_25_4_etat_url`, `test_story_25_4_seuil_repli`, `test_story_25_4_css_collision` (+ test négatif), `test_story_25_4_contrat_ecriture`.
-  - [ ] 2.2 Fixtures fictives dérivées du corpus de 25.2 (`tests/fixtures/`), dont 100 équipements et 292 équipements lourds.
-  - [ ] 2.3 Harnais : `tests/unit/helpers/fake_dom.js`, `ui_harness.js`, `page_b_harness.js` ; test navigateur réel sur le modèle de `test_story_25_3_navigateur_reel`.
-- [ ] Task 3 — Coquille, navigation, URL (AC: 1, 3, 9, 10, 17, 18, 19)
-  - [ ] 3.1 Nouveau module `desktop/js/jeedom2ha_workview.js` (UMD : partie pure testée sous Node + démarrage navigateur) : état de la vue, routage, `j2haOpenRoom` comme point d'entrée (Q14).
-  - [ ] 3.2 Hauteur à l'exécution, décalage haut mesuré (Q12), `resize` / `orientationchange`.
-  - [ ] 3.3 Vérifier sur la page du plugin simulée (faux cœur Jeedom) que le fragment d'URL n'est pas intercepté ; consigner (Q1).
-  - [ ] 3.4 Vérifier le comportement après « Relire Jeedom » avec la vue ouverte (AC3) ; consigner.
-- [ ] Task 4 — Arbre, recherche, filtres, détail de pièce (AC: 4, 11, 12, 13, 14)
-  - [ ] 4.1 Arbre `role="tree"`, regroupement partagé avec la grille de B, rendu différé des lignes (Q5).
-  - [ ] 4.2 Recherche (Q6), filtres partagés avec la page B (Q7).
-  - [ ] 4.3 Détail de pièce : KPI, « À traiter dans cette pièce » depuis l'entrée agrégée (Q8, Q11), actions de pièce.
-- [ ] Task 5 — Détail d'équipement et retrait de la modale (AC: 2, 6, 8, 15, 16)
-  - [ ] 5.1 Déplacer les fonctions de rendu et d'écriture de `jeedom2ha_mapping_surface.js` dans le panneau de détail **sans les réécrire** ; `git diff --color-moved` consigné.
-  - [ ] 5.2 Lecture tardive de l'arbre unitaire (D3), réponses tardives ignorées.
-  - [ ] 5.3 Retirer `openRoom` / `buildRoomModalHtml` / accordéon / CSS de la modale ; tests de non-occurrence (AC2).
-- [ ] Task 6 — CSS, thème, accessibilité (AC: 22, 23, 24, 26)
-  - [ ] 6.1 Bloc CSS `.j2ha-wv` / `.j2ha-wv-*` + commentaire d'en-tête (inventaire des classes partagées).
-  - [ ] 6.2 Clavier (roving tabindex), annonces, cibles tactiles ; contrastes.
-- [ ] Task 7 — Mesure du seuil de repli (AC: 20, 21, 22)
-  - [ ] 7.1 Protocole de mesure (Q3) dans un vrai Chromium de la session, largeurs candidates, fixture la plus lourde ; tableau au Dev Agent Record.
-  - [ ] 7.2 Fixer la constante (ou 1024 px par défaut si la mesure n'aboutit pas) ; test d'égalité JS / CSS.
-- [ ] Task 8 — Documentation (AC: 26, 30)
-  - [ ] 8.1 `index.md`, bloc `compteurs.md`, `changelog_beta.md` ; `test_story_25_4_documentation.node.test.js`.
-- [ ] Task 9 — Gate 20-0 (AC: 27, 28, 29)
-  - [ ] 9.1 Adapter les cinq parcours selon la table de l'AC28 ; registre d'assertions vert.
-  - [ ] 9.2 Ajouter `vue-maitre-detail-c.mjs` ; variante « lien profond » de l'inventaire ; lancer les suites simulées.
-- [ ] Task 10 — Non-régression et conventions (AC: 31, 32, 33)
-  - [ ] 10.1 `git diff --stat main...HEAD -- resources/daemon/ core/ajax/ core/class/ … tests/e2e/gate/lib/policy.mjs` vide.
-  - [ ] 10.2 Mesure Node (292 équipements lourds), absence de `JSON.stringify` sur les états ; liste des tests existants modifiés.
-  - [ ] 10.3 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
-- [ ] Task 11 (SAUTÉE par une session cloud : réservée à l'humain / ClaudeBox ; CC-48, aucune preuve terrain possible depuis le cloud) — Preuve terrain (après fusion)
+- [x] Task 1 — **Capturer l'état de référence AVANT tout changement de code** (AC: 2, 8, 24, 25, 27)
+  - [x] 1.1 `tests/fixtures/story_25_4_corps_ecriture.json` : corps sérialisés (clés triées) de chaque écriture de l'écran d'équipement et de pièce, relevés en exécutant les suites existantes de la modale sur `main` (jamais sur la box).
+  - [x] 1.2 `tests/fixtures/story_25_4_css_baseline.json` : sélecteurs et déclarations de `desktop/css/jeedom2ha.css` sur `main`, avec la liste des sélecteurs propres à la modale (à retirer en AC2).
+  - [x] 1.3 `tests/fixtures/story_25_4_gate_assertions.json` : registre d'assertions des cinq parcours qui touchent la modale (AC27), généré par script lisant les parcours de `main`.
+  - [x] 1.4 Inventaire des classes partagées (AC24) : relever sur `main` qui utilise quoi (`.j2ha-seg*`, `.j2ha-menu-*`, `.j2ha-state-*`, `.j2ha-badge`, `.j2ha-gauge`, puces de la page B).
+- [x] Task 2 — Tests d'abord (AC: 4, 5, 6, 7, 10, 12, 13, 17, 18, 21, 25)
+  - [x] 2.1 `test_story_25_4_aucune_lecture_etats`, `test_story_25_4_lecture_tardive`, `test_story_25_4_navigation` (table D2), `test_story_25_4_recherche_filtres`, `test_story_25_4_etat_url`, `test_story_25_4_seuil_repli`, `test_story_25_4_css_collision` (+ test négatif), `test_story_25_4_contrat_ecriture`.
+  - [x] 2.2 Fixtures fictives dérivées du corpus de 25.2 (`tests/fixtures/`), dont 100 équipements et 292 équipements lourds.
+  - [x] 2.3 Harnais : `tests/unit/helpers/fake_dom.js`, `ui_harness.js`, `page_b_harness.js` ; test navigateur réel sur le modèle de `test_story_25_3_navigateur_reel`.
+- [x] Task 3 — Coquille, navigation, URL (AC: 1, 3, 9, 10, 17, 18, 19)
+  - [x] 3.1 Nouveau module `desktop/js/jeedom2ha_workview.js` (UMD : partie pure testée sous Node + démarrage navigateur) : état de la vue, routage, `j2haOpenRoom` comme point d'entrée (Q14).
+  - [x] 3.2 Hauteur à l'exécution, décalage haut mesuré (Q12), `resize` / `orientationchange`.
+  - [x] 3.3 Vérifier sur la page du plugin simulée (faux cœur Jeedom) que le fragment d'URL n'est pas intercepté ; consigner (Q1).
+  - [x] 3.4 Vérifier le comportement après « Relire Jeedom » avec la vue ouverte (AC3) ; consigner.
+- [x] Task 4 — Arbre, recherche, filtres, détail de pièce (AC: 4, 11, 12, 13, 14)
+  - [x] 4.1 Arbre `role="tree"`, regroupement partagé avec la grille de B, rendu différé des lignes (Q5).
+  - [x] 4.2 Recherche (Q6), filtres partagés avec la page B (Q7).
+  - [x] 4.3 Détail de pièce : KPI, « À traiter dans cette pièce » depuis l'entrée agrégée (Q8, Q11), actions de pièce.
+- [x] Task 5 — Détail d'équipement et retrait de la modale (AC: 2, 6, 8, 15, 16)
+  - [x] 5.1 Déplacer les fonctions de rendu et d'écriture de `jeedom2ha_mapping_surface.js` dans le panneau de détail **sans les réécrire** ; `git diff --color-moved` consigné.
+  - [x] 5.2 Lecture tardive de l'arbre unitaire (D3), réponses tardives ignorées.
+  - [x] 5.3 Retirer `openRoom` / `buildRoomModalHtml` / accordéon / CSS de la modale ; tests de non-occurrence (AC2).
+- [x] Task 6 — CSS, thème, accessibilité (AC: 22, 23, 24, 26)
+  - [x] 6.1 Bloc CSS `.j2ha-wv` / `.j2ha-wv-*` + commentaire d'en-tête (inventaire des classes partagées).
+  - [x] 6.2 Clavier (roving tabindex), annonces, cibles tactiles ; contrastes.
+- [x] Task 7 — Mesure du seuil de repli (AC: 20, 21, 22)
+  - [x] 7.1 Protocole de mesure (Q3) dans un vrai Chromium de la session, largeurs candidates, fixture la plus lourde ; tableau au Dev Agent Record.
+  - [x] 7.2 Fixer la constante (ou 1024 px par défaut si la mesure n'aboutit pas) ; test d'égalité JS / CSS.
+- [x] Task 8 — Documentation (AC: 26, 30)
+  - [x] 8.1 `index.md`, bloc `compteurs.md`, `changelog_beta.md` ; `test_story_25_4_documentation.node.test.js`.
+- [x] Task 9 — Gate 20-0 (AC: 27, 28, 29)
+  - [x] 9.1 Adapter les cinq parcours selon la table de l'AC28 ; registre d'assertions vert.
+  - [x] 9.2 Ajouter `vue-maitre-detail-c.mjs` ; variante « lien profond » de l'inventaire ; lancer les suites simulées.
+- [x] Task 10 — Non-régression et conventions (AC: 31, 32, 33)
+  - [x] 10.1 `git diff --stat main...HEAD -- resources/daemon/ core/ajax/ core/class/ … tests/e2e/gate/lib/policy.mjs` vide.
+  - [x] 10.2 Mesure Node (292 équipements lourds), absence de `JSON.stringify` sur les états ; liste des tests existants modifiés.
+  - [x] 10.3 `make test`, `node --test tests/unit/*.node.test.js`, tests PHP, `flake8`, `scripts/ci-local.sh`.
+- [ ] Task 11 (SAUTÉE par la session cloud du `dev-story`, 2026-10-19 : réservée à l'humain / ClaudeBox ; CC-48, aucune preuve terrain possible depuis le cloud) — Preuve terrain (après fusion)
   - [ ] 11.1 Gate 20-0 contre la box, parcours adaptés et `vue-maitre-detail-c` compris ; résultat dans `25-4-preuve-terrain-<date>.md` (identifiants seuls).
   - [ ] 11.2 **Preuve sur l'iPad mural en mode bureau** : largeur CSS réelle, disposition obtenue (`data-j2ha-layout`), tiroir « Pièces », rotation, sélection d'un équipement, aucune barre de défilement horizontale ; confirmation ou révision du seuil (Q3).
   - [ ] 11.3 Chronométrage bout en bout de la sélection d'un équipement (lecture d'un arbre unitaire) et du premier affichage de la vue, depuis la page réelle (prolonge la réserve de 25.3).
@@ -487,23 +487,80 @@ AC1 à AC34 tenus ; suites locales vertes ; PR relue par ClaudeBox ; preuve terr
 
 ### Agent Model Used
 
-Session cloud déléguée Claude Code — `create-story` (documentaire, 2026-10-19). Aucun code, aucun test, aucune fixture écrits.
+Session cloud déléguée Claude Code — `dev-story` (2026-10-19), sur la branche imposée par la plateforme `claude/story-25-4-implementation-ieevms` (même commit de départ que `story/25-4-dev` : `4ff80cd`, PR #300 fusionnée), comme pour 25.3. **Tasks 0 et 11 sautées** (CC-48 : aucun accès box, VM, SSH ni Home Assistant depuis le cloud). **Statut de fin : `review`** (pas `ready-for-UX-validation` : la preuve terrain et la bascule finale restent à ClaudeBox après fusion, Décisions point 5).
 
 ### Debug Log References
 
-- Aucune exécution de test (story documentaire). Pointeurs de code relevés par lecture sur `main` à `a5ba89b`.
+- `node --test tests/unit/*.node.test.js` : 925 sous-tests verts (base `main` : 773 ; ajoutés par la story : tests `test_story_25_4_*` ; adaptés : voir ci-dessous).
+- `make test` / `scripts/ci-local.sh` / `flake8` / tests PHP : résultat consigné dans la PR (exécutés avant le push).
+- `git diff --stat 4ff80cd -- resources/daemon/ core/ajax/ core/class/ scripts/deploy-to-box.sh scripts/parity-snapshot.sh scripts/deploy-inventory-diff.sh tests/e2e/gate/lib/policy.mjs` : **vide** (AC31). `git diff -U0 4ff80cd -- desktop/js/jeedom2ha_mapping_override.js` : **vide** (aucun ajout nécessaire non plus).
+- Mesure du seuil : `node tests/unit/helpers/measure_story_25_4_threshold.js` → `tests/fixtures/story_25_4_mesure_seuil.json`.
 
 ### Completion Notes List
 
-- Story créée à partir de l'epic (§25.4), du cadrage, du diagnostic, des maquettes (onglet C) et des stories 25.1 à 25.3 et de la preuve terrain de 25.3.
-- Les quatre contraintes d'orientation sont des **AC** (pas des mentions) : source de vérité unique (AC4, AC5), lecture tardive des arbres et écritures inchangées (AC6, AC7, AC8), classes CSS non collisionnelles avec test anti-collision (AC24, AC25), extension du gate 20-0 sans régression avec registre d'assertions (AC27 à AC29).
-- Écarts relevés et suites : (1) la maquette C n'est pas reprise telle quelle (noms de classes génériques, hauteur fixe de 640 px, arbre à 330 px) ; (2) l'état d'URL est exigé par l'epic mais son mécanisme n'est pas tranché (Q1) ; (3) la modale actuelle précharge l'arbre de chaque équipement de la pièce à l'ouverture : c'est précisément ce que la lecture tardive supprime ; (4) la preuve iPad mural est une réserve (Task 11), pas une assertion.
-- Statut : `backlog` ; `ready-for-dev` non accordé ; relecture ClaudeBox obligatoire.
+**Architecture livrée.** `desktop/js/jeedom2ha_workview.js` (nouveau, UMD : partie pure testée sous Node + contrôleur + démarrage navigateur) ; `jeedom2ha_mapping_surface.js` perd la modale et l'accordéon, expose `window.Jeedom2haSurface` (détail d'équipement, actions de pièce, gating) ; `jeedom2ha_overview.js` ouvre la vue (cartes, puces, segments de jauge, lignes de la liste filtrée), partage l'état de filtre (`setFilterExact`, `snapshot`, `subscribe`) et exporte `chipsFor` (un seul calcul d'effectifs pour B et C) ; `desktop/php/jeedom2ha.php` : `#j2ha_mainView` (titre, bloc maison, liste filtrée, cartes) + `#j2ha_workView` + `include_file` ; `desktop/css/jeedom2ha.css` : bloc `.j2ha-wv` / `.j2ha-wv-*` et retrait des règles de la fenêtre.
+
+**Décisions ClaudeBox appliquées.** Q1 à Q14 = A avec les précisions : fragment `#j2ha-vue=piece:P;eq:E;f:F` (préfixe obligatoire), tiroir repliable (Q2), `jeedom2ha_workview.js` (Q4), rendu différé (Q5), recherche sur les noms (Q6), filtre unique B ↔ C et KPI cliquables (Q7), causes depuis l'entrée agrégée (Q8), relecture à chaque sélection sans cache (Q9), ordre natif (Q10), « Appliquer » direct seulement sur `to_apply` (Q11), hauteur mesurée avec `dvh`/`vh` et minimum 480 px (Q12), pas d'Échap pour quitter (Q13), `window.j2haOpenRoom` conservé (Q14).
+
+**Q1 — vérification du fragment dans le core (consigné, AC18).** Le code du core Jeedom (4.4 à 4.6) n'est ni dans le dépôt ni accessible depuis la session cloud (CC-48) : **non vérifié**. Le fragment est retenu (Q1 = A) avec le **repli `sessionStorage` automatique** prévu par la décision : si `history.pushState` / `replaceState` lèvent (cœur qui interdit ou intercepte), la sélection est gardée en session (`{ mode: 'storage', piece, eq, filter }`), restaurée au démarrage seulement si l'adresse n'a pas de fragment, effacée à la fermeture ; pas de lien partageable dans ce mode. **À confirmer à la preuve terrain** (Task 11) : un fragment réécrit par le core ferait échouer l'assertion (6) du parcours `vue-maitre-detail-c`.
+
+**Q8 — arrêt éventuel : non déclenché.** L'entrée agrégée porte `diagnostic` par commande et `entities[]` ; `groupBlockedCauses`, `buildCauseNoticeText` et `buildEquipmentCounterLabels` appliqués à l'entrée agrégée rendent exactement les causes et décomptes de l'arbre unitaire (test `test_story_25_4_non_regression` sur les 10 fixtures de 25.2). Aucun champ manquant, aucune lecture d'arbre pour « À traiter dans cette pièce ».
+
+**Mesure du seuil (Task 7, AC20, Q3 = A).** Protocole : Chromium de la session, disposition large forcée à chaque largeur (media query remplacée par `min-width: 0`), contexte Jeedom imité (marges de 15 px, barre de défilement réservée), fixture la plus lourde (292 équipements, un équipement à 5 entités aux noms de commande longs). Critères (Décisions) : (a) pas de défilement horizontal dans le détail ; (b) panneau de gauche ≥ 280 px ; (c) détail ≥ 560 px.
+
+| Largeur (px) | Détail (px) | Arbre (px) | (a) | (b) | (c) | Retenu |
+|---:|---:|---:|:-:|:-:|:-:|:-:|
+| 768 | 394 | 322 | oui | oui | non | non |
+| 834 | 460 | 322 | oui | oui | non | non |
+| 900 | 526 | 322 | oui | oui | non | non |
+| **980** | 606 | 322 | oui | oui | oui | **oui (seuil)** |
+| 1024 | 650 | 322 | oui | oui | oui | oui |
+| 1112 | 738 | 322 | oui | oui | oui | oui |
+| 1180 | 806 | 322 | oui | oui | oui | oui |
+| 1280 | 906 | 322 | oui | oui | oui | oui |
+
+**Seuil retenu : 980 px** (plus petite largeur candidate qui satisfait (a), (b) et (c) ; `LAYOUT_SPLIT_MIN_WIDTH = 980` côté JS, `@media (min-width: 980px)` côté CSS, test d'égalité). **Réserves** : le contexte Jeedom est imité, pas mesuré ; la largeur CSS réelle de l'iPad mural en mode bureau est relevée en preuve terrain (Task 11) et peut réviser le seuil par une PR de suite (la valeur par défaut de la décision de cadrage était 1024 px ; la mesure a abouti, ce défaut n'est donc pas utilisé).
+
+**Clic sur une puce de la page B (AC1, D2).** Une puce ou un segment de la jauge ouvre la vue C avec ce filtre (décision de l'énoncé et de D2) ; un second clic sur le filtre déjà actif le retire sur la page. Sans vue disponible (`env.openView` absent ou refusé), le comportement de 25.3 (liste filtrée sur la page B) est conservé : c'est le repli et c'est ce que les tests de 25.3 qui n'embarquent pas la vue exercent. Le parcours `page-principale-b` (étape 4) est adapté : mêmes étiquettes d'erreur, mêmes clés `record`, les lignes comptées sont celles de l'arbre de la vue. Les chiffres de 25.3 qui étaient lus « dans la fenêtre » sont lus dans l'arbre / le détail de pièce.
+
+**Task 3.4 — « Relire Jeedom » avec la vue ouverte (AC3, consigné).** La page **ne se recharge pas** après `scanTopology` : alerte, relecture du bandeau, puis `notifyStatesChanged()` → relecture des états par le lecteur de 25.3, sans `refresh`. `j2haRoomsTree` est rendu côté serveur et reste celui du chargement de la page (comportement identique à celui de la fenêtre de pièce) ; la vue suit les nouveaux états : un équipement sélectionné devenu « non lu » garde son détail, sa ligne dit « non lu », aucune erreur (test `test_story_25_4_accessibilite`) ; `reconcile(rooms)` existe et est testé en direct, mais **aucun code de production ne l'appelle** (R1) : `j2haRoomsTree` est rendu côté serveur et ne change pas sans rechargement de la page, donc rien ne produit une nouvelle liste de pièces à réconcilier ; il est conservé comme point d'entrée pour une future relecture de la topologie sans rechargement (AC3 « sélection disparue » n'a pas de producteur aujourd'hui).
+
+**AC29 (5) — réponse tardive (précision ClaudeBox n°1).** L'interception du gate ne retarde pas une réponse à la demande et n'est pas modifiée pour cela : l'assertion (5) est portée par `test_story_25_4_navigateur_reel` (vrai Chromium, réseau factice qui retarde la réponse de A) ; le parcours `vue-maitre-detail-c` garde (1) à (4) et (6) à (9). Report consigné, pas un affaiblissement.
+
+**Gate 20-0 (AC27 à AC29).** Registre d'assertions capturé avant la story (`tests/fixtures/story_25_4_gate_assertions.json`) ; `test_story_25_4_gate` échoue si une étiquette d'erreur, une clé `record`, une étape ou une écriture déclarée disparaît d'un parcours. Parcours adaptés avec de **vrais clics** (aucun `dispatchEvent`) : `decouverte-piece-25-eq-579` (compteurs de « Sans pièce » dans le détail de pièce, mêmes clés `record`), `exclusion-publication-non-publiee`, `reference-bascule-eq-380` (+ chronométrage de sélection, réserve de 25.3), `controle-ecriture-non-declaree`, `page-principale-b` ; nouveau `vue-maitre-detail-c` ; `lib/policy.mjs`, `run-gate.mjs`, `interceptor.mjs`, `simulate.mjs` inchangés. **Variante « lien profond »** ajoutée à `page-load-request-inventory.mjs` (additive : le chargement par défaut reste « 1 getEquipmentStates, 0 getMappingOverrides » ; la variante exige 1 + 1). Les pages simulées de `test_story_20_3_gate_parcours` reproduisent désormais le DOM de la vue. Les suites `test_story_20_0_gate_*`, `test_story_20_3_gate_parcours`, `test_story_25_3_gate` passent ; `test_story_25_3_gate` ne garde « aucune ligne retirée » que pour `rescan-page-principale` (les quatre autres sont couverts par le registre).
+
+**Écritures (AC8).** Corps comparés à `tests/fixtures/story_25_4_corps_ecriture.json` (14 scénarios relevés sur `main` AVANT tout changement). Équivalent automatisé de `git diff --color-moved` : `test_story_25_4_ecritures_deplacees` compare, caractère pour caractère, 18 fonctions d'écriture et 31 fonctions de rendu d'équipement de la surface à leur version de `main` (`4ff80cd`) ; seules 10 fonctions de colle fenêtre → vue changent de corps (liste figée) et 12 fonctions de la fenêtre sont retirées (aucune d'écriture ni de rendu d'équipement).
+
+**Revue interne — défaut trouvé et corrigé.** En adaptant les tests de 20.3, un fork a relevé que le détail de pièce n'appliquait ni le gating du pont ni celui de l'état des équipements avant le rendu suivant de la page B (boutons actifs démon arrêté). Corrigé (`renderPane` appelle `surface.refreshRoomGating`) avec test de non-régression dans `test_story_25_4_navigation`.
+
+**Performance (AC32).** Aucune modification de la liste blanche ni des budgets de la route ; aucun `JSON.stringify` / copie des états (test). Calcul en Node sur 292 équipements lourds (consigné par `test_story_25_4_non_regression`, sans seuil) : états + agrégats 6,7 ms, arbre complet 0,7 ms, 5 filtres + recherche 0,9 ms, KPI + « À traiter » 2,4 ms. Le chronométrage de bout en bout d'une sélection depuis la vue C est enregistré par les parcours (`temps_chargement_eq_selectionne_ms`, valeur seule) et reste une réserve de la preuve terrain.
+
+**Points de conception à connaître (relecture).** (1) KPI de pièce : un compteur par état (publié, à appliquer, bloqué, exclu, désactivé, rien à publier : mots du glossaire de 25.1) ; chaque compteur bascule le filtre **partagé** de la page (exclu, désactivé et rien à publier se rattachent tous au filtre « exclus et autres »). (2) Le bloc « Gestion » de la page reste affiché au-dessus de la vue (AC9 ne masque que le bloc maison, la liste filtrée et les cartes) ; la hauteur de la vue est mesurée sous lui. (3) La règle de fond/bordure du corps de l'accordéon (`panel-body`) n'a pas d'équivalent dans la vue (supprimée avec la modale). (4) `.j2ha-room-counter-unread` reste dans le CSS (le détail d'équipement l'emploie pour « présence inconnue ») : retiré de la liste de retrait. (5) Réassurance Homebridge : élément `#j2haSurface_reassurance` construit par la vue, état réinitialisé à l'entrée dans la vue.
+
+**Inventaire des classes partagées (AC24)** : `tests/fixtures/story_25_4_shared_classes.json` et en-tête du bloc CSS de la vue — `.j2ha-seg*` (contrôle segmenté, aussi segment de jauge sous `.j2ha-gauge`), `.j2ha-gauge`, `.j2ha-menu-*`, `.j2ha-state-*`, `.j2ha-badge`, `.j2ha-chip-filter`, `.j2ha-chip` ; la vue les réutilise sans toucher leurs règles. `test_story_25_4_css_collision` : portée (tout sélecteur ajouté sous `.j2ha-wv`), non-modification (aucune déclaration de la référence changée, hors liste de retrait), collision visuelle en vrai Chromium + test négatif qui réinjecte la règle de 25.3 et échoue comme attendu.
+
+**Tests existants modifiés (AC31 — liste une à une, aucun supprimé sans équivalent).**
+- `test_story_25_1_surface` (45) : compteurs lus dans `.j2ha-wv-kpis` depuis les entrées agrégées ; un seul détail d'équipement à la fois (`show`) ; menu de pièce → bouton « Republier la pièce » + « Supprimer… » dans le menu ; « un seul panneau déplié » → « sélectionner B remplace le détail de A » ; sticky `.j2ha-wv .j2ha-eq-head` ; « une lecture par équipement à l'ouverture » → « aucune lecture à l'ouverture, une par sélection » ; assertion de fond du corps d'accordéon retirée (règle supprimée).
+- `test_story_20_3_r1_ui_reelle` (56) : gating de pièce lu dans les entrées agrégées (« lecture en attente/en échec » → « équipement non lu ») ; R1-D : modale ouverte / fermée / autre pièce → détail affiché / `.j2ha-wv-back` / autre pièce, seul l'arbre de l'équipement sélectionné est relu ; R1-E compteurs réécrits (4 sous-tests) ; G : structure de la vue au lieu de la modale ; R2-6 : titre du détail.
+- `test_story_22_2_compteurs_portees` (32), `test_story_20_3_compteurs_piece` (17), `test_story_20_2_p1_p2_comportement_surface` (12) : sélecteurs et un détail à la fois ; `20.3 / AC7` : « le dénombrement ne lit que l'arbre de la pièce ouverte » → « ne lit AUCUN arbre » ; découpe du source adaptée au retrait de la section « compteurs de la pièce ».
+- `test_story_25_1_glossaire` (3 sous-tests : parcours des six équipements un par un), `test_story_25_1_palette_theme` (largeur par classe de la vue, fonds `--bg-color`, `matchMedia` admis pour la seule disposition), `test_story_25_3_palette_theme`, `test_story_25_3_page_b` (icônes de la vue portent l'accent), `test_story_25_3_refresh_actualiser` (vue de travail), `test_story_25_3_navigateur_reel` (la vue est chargée ; le test du focus des puces de B s'exécute sans la vue, repli de 25.3), `test_story_25_3_gate` (registre pour quatre parcours), `test_story_20_3_gate_parcours` (pages simulées = DOM de la vue), `test_story_25_1_documentation` / `test_story_22_2_documentation` (noms des emplacements de capture et des phrases du détail).
+- Harnais `ui_harness.js` : charge B, C et un faux navigateur ; `ui.openRoom` ouvre la vue (aucune lecture) ; nouveaux `openRoomWith`, `show`, `showRoom`, `selectEquipment`, `loadStates`, `advance`.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/25-4-vue-maitre-detail-c.md` (ce fichier, nouveau).
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (clé `25-4-vue-maitre-detail-c` : commentaire mis à jour, statut `backlog` inchangé ; `last_updated`).
+- `desktop/js/jeedom2ha_workview.js` (nouveau), `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/js/jeedom2ha_overview.js`, `desktop/php/jeedom2ha.php`, `desktop/css/jeedom2ha.css`.
+- `docs/fr_FR/index.md`, `docs/fr_FR/compteurs.md` (bloc isolé), `docs/fr_FR/changelog_beta.md`.
+- `tests/e2e/gate/parcours/{decouverte-piece-25-eq-579,exclusion-publication-non-publiee,reference-bascule-eq-380,controle-ecriture-non-declaree,page-principale-b}.mjs`, `tests/e2e/gate/parcours/vue-maitre-detail-c.mjs` (nouveau), `tests/e2e/gate/page-load-request-inventory.mjs`.
+- `tests/unit/test_story_25_4_*.node.test.js` (nouveaux : aucune_lecture_etats, lecture_tardive, navigation, recherche_filtres, etat_url, seuil_repli, css_collision, contrat_ecriture, ecritures_deplacees, navigateur_reel, gate, retrait_modale, palette_theme, glossaire, documentation, accessibilite, non_regression) ; tests adaptés listés ci-dessus.
+- `tests/unit/helpers/` : `ui_harness.js` (étendu), `fake_browser.js`, `big_scene.js`, `workview_harness.js`, `workview_browser.js`, `write_scenarios.js`, `git_base.js`, `capture_story_25_4_references.js`, `measure_story_25_4_threshold.js` (nouveaux).
+- `tests/fixtures/story_25_4_{corps_ecriture,css_baseline,gate_assertions,shared_classes,mesure_seuil}.json` (nouveaux).
+- `_bmad-output/implementation-artifacts/25-4-vue-maitre-detail-c.md` (ce fichier), `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+- **Inchangés (AC31)** : `resources/daemon/`, `core/ajax/`, `core/class/`, `tests/e2e/gate/lib/policy.mjs`, `run-gate.mjs`, `models/taxonomy.py`, `models/cause_mapping.py`, `models/ui_contract_4d.py`, `jeedom2ha_mapping_override.js`.
+
+### Change Log
+
+- 2026-10-19 — `dev-story` (session cloud déléguée) : vue de travail maître-détail C livrée à la place de la fenêtre de pièce ; seuil de repli mesuré à 980 px ; gate 20-0 adapté sans affaiblissement et parcours `vue-maitre-detail-c` ajouté ; documentation ; statut `review`. Tasks 0 et 11 sautées (CC-48).
+- 2026-10-19 — Reprise de la relecture R1 (PR #301) : P2-1 (`open()` pose `st.opening` autour de `setFilterExact`, le rendu de B ne réécrit plus l'entrée de la page principale ; « Précédent » depuis une puce ou un segment revient à la page principale), P2-2 (le déclencheur est mémorisé dans `enterView()` puis refocalisé au retour, sinon la carte de la pièce), P2-3 (gate `decouverte-piece-25-eq-579` : les « non lus » sont comptés, enregistrés — `equipements_non_lus_piece_25`, `piece_25_non_lus`, `sans_piece_non_lus` — et font échouer le parcours ; la somme des compteurs est de nouveau comparée à tous les équipements), P3-1 (la ligne « À traiter » dont l'écriture est en vol ou dont l'erreur n'a pas été lue est détachée puis réinsérée telle quelle : bouton réservé, un seul envoi, erreur lisible), P3-2 (scénario « Appliquer » d'une ligne comparé au corps `appliquer-equipement` de la référence), P3-3 (`window.j2haOpenRoom` défini dès le chargement du script, sans effet tant qu'il n'y a pas d'instance). Tests : `test_story_25_4_revue_r1` (9, tous en échec sans les correctifs). À consigner : `reconcile()` n'est pas appelé en production (voir Task 3.4) ; `refreshEquipmentState` réécrit le badge et les compteurs du détail à partir de l'entrée agrégée (et non de l'arbre unitaire de l'AC15) — écart acté, parité prouvée par les tests ; le comportement de `popstate` du core Jeedom et de `history.go(-n)` après rechargement reste une réserve de la preuve terrain (Task 11).
 
 ## Décisions (ClaudeBox, 2026-10-19 07:45, par délégation d'Alexandre du 2026-10-18 23:50)
 
@@ -614,3 +671,4 @@ Chaque question porte une **recommandation argumentée** ; **aucune n'est tranch
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) : story rédigée, statut `backlog`, 34 AC, 12 décisions déjà arbitrées consignées, 14 questions ouvertes pour ClaudeBox / Alexandre avec recommandation ; `ready-for-dev` non accordé ; statut cible après implémentation `ready-for-UX-validation` (validation UX finale en 25.5).
 - 2026-10-19 07:45 — Relecture ClaudeBox : Q1 à Q14 = A (repli `sessionStorage` pour Q1 si le core intercepte le fragment ; « Appliquer » direct seulement sur `to_apply` pour Q11), précisions sur l'AC29 (5), les vrais clics (#299), « Sans pièce », la taille de la story et le statut ; `ready-for-dev`.
+- 2026-10-19 — `dev-story` (session cloud déléguée) : implémentation AC1 à AC34 sur la branche de la plateforme, Tasks 1 à 10 faites, Tasks 0 et 11 sautées (CC-48) ; statut `review` ; la preuve terrain, `ready-for-UX-validation` et la validation UX (25.5) restent à ClaudeBox.

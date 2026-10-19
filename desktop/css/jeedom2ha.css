@@ -69,12 +69,6 @@ body[data-theme*="Dark"] {
   }
 }
 
-/* --- Largeur de la fenêtre d'une pièce (classe, jamais de style en ligne) --- */
-.modal-j2ha-room .modal-dialog {
-  width: 90%;
-  max-width: 1100px;
-}
-
 /* --- Page principale B (25.3) : barre de santé compacte, actions, boîte du diagnostic --- */
 .j2ha-health-bar {
   margin: 10px 5px 4px 5px;
@@ -345,21 +339,7 @@ body[data-theme*="Dark"] {
   margin-top: 4px;
 }
 
-/* --- Compteurs de la pièce (un chiffre et un mot court par état) --- */
-.j2ha-room-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 6px 0;
-}
-.j2ha-room-counters {
-  flex: 1 1 auto;
-}
-.j2ha-room-counter-line {
-  margin: 4px 0;
-}
+/* --- Étiquettes de compteur (un chiffre et un mot court par état) : KPI de la pièce, étiquettes d'entité --- */
 .j2ha-chip {
   display: inline-block;
   margin: 0 6px 4px 0;
@@ -395,35 +375,9 @@ body[data-theme*="Dark"] {
   transition: outline 0.3s ease;
 }
 
-/* --- Équipements : un seul déplié, en-tête collant, un seul défilement (celui de la fenêtre) --- */
-.modal-j2ha-room .j2ha-eq-accordion .j2ha-eq-panel {
-  margin-top: 6px;
-}
-.modal-j2ha-room .j2ha-eq-head {
-  border-radius: var(--border-radius, 0);
-}
-.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open > .j2ha-eq-head {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  /* Fond opaque : rien ne transparaît quand le tableau défile dessous. */
-  background-color: var(--bg-modal-color, var(--j2ha-menu-bg));
-}
+/* --- Détail d'un équipement : tableau des commandes, nom, mentions (la mise en page du détail est sous .j2ha-wv) --- */
 .j2ha-cmd-table tr.mapping-override-cmd {
   scroll-margin-top: 90px;
-}
-.modal-j2ha-room tr.mapping-override-cmd {
-  scroll-margin-top: 96px;
-}
-.j2ha-eq-toggle {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  text-decoration: none;
-}
-.j2ha-eq-toggle:focus {
-  text-decoration: none;
 }
 .j2ha-eq-name {
   font-weight: 600;
@@ -431,24 +385,9 @@ body[data-theme*="Dark"] {
 .j2ha-eq-panel.j2ha-eq-disabled .j2ha-eq-name {
   font-style: italic;
 }
-.j2ha-eq-controls {
-  display: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open .j2ha-eq-controls {
-  display: flex;
-}
 .j2ha-control-label {
   color: var(--j2ha-neutral);
   font-size: 12px;
-}
-.modal-j2ha-room .j2ha-eq-panel.j2ha-eq-open > .panel-collapse > .panel-body {
-  margin-left: 12px;
-  background-color: var(--j2ha-surface);
-  border-left: 3px solid var(--j2ha-ok);
 }
 .j2ha-publication-error {
   flex-basis: 100%;
@@ -742,4 +681,350 @@ body[data-theme*="Dark"] {
 }
 .j2ha-ignored.j2ha-open .j2ha-ignored-list {
   display: block;
+}
+
+/* =====================================================================================================
+   Vue de travail C (Story 25.4) — arbre pièces → équipements à gauche, détail à droite.
+
+   RÈGLE (AC24, AC25, leçon de la PR #296) : TOUT ce bloc est sous `.j2ha-wv` ou sur des classes `.j2ha-wv-…`.
+   Aucun sélecteur nu n'est ajouté ni modifié sur un composant partagé ; la vue les RÉUTILISE sans toucher leurs règles,
+   et toute variante passe par une classe `.j2ha-wv-…` qui porte SA déclaration sous `.j2ha-wv`. Les noms génériques de
+   la maquette (.seg, .chip, .pill, .dot, .row, .btn, .c-*) ne sont jamais repris.
+
+   Inventaire des classes partagées (composant → propriétaire → contextes d'usage) :
+   - .j2ha-seg*        contrôle segmenté « Automatique | Toujours | Jamais » (25.1, buildSegmented) ; la classe nue
+                       .j2ha-seg est AUSSI celle d'un segment de jauge (.j2ha-gauge .j2ha-seg, 25.3) → les règles de
+                       jauge restent SOUS .j2ha-gauge. Contextes : détail d'équipement et en-tête de groupe d'entité (vue C).
+   - .j2ha-gauge       jauge segmentée (25.3, buildGauge) : bloc maison et cartes de la page principale ; non utilisée par la vue C.
+   - .j2ha-menu-*      menu « ⋯ » (.j2ha-menu-wrap, .j2ha-menu-toggle, .j2ha-menu, .j2ha-menu-item ; 25.1 buildMenu, 25.3 bindMenu) :
+                       barre de santé, menu de pièce et d'équipement ; rouge réservé à .j2ha-menu-danger.
+   - .j2ha-state-*     mot d'état .j2ha-state-word (25.1 stateWord) : liste filtrée, badge d'équipement, arbre et liste « À traiter ».
+   - .j2ha-badge       badge d'état de l'équipement (25.1 renderSummary) : en-tête du détail.
+   - .j2ha-chip-filter puces de filtre de la page principale (25.3) : réutilisées dans la barre d'outils de l'arbre.
+   - .j2ha-chip        étiquette de compteur (25.1) : KPI de la pièce.
+   Seuil de repli : la media query ci-dessous reprend LAYOUT_SPLIT_MIN_WIDTH (jeedom2ha_workview.js) ; un test échoue si
+   les deux divergent. Couleurs : variables --j2ha-* uniquement (aucune valeur littérale).
+   ===================================================================================================== */
+.j2ha-wv {
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+  margin: 0 5px;
+  overflow: hidden;
+  /* Hauteur : mesurée à l'exécution par le JS (--j2ha-wv-height) ; repli vh, puis dvh quand le navigateur le connaît. */
+  height: var(--j2ha-wv-height, calc(100vh - 160px));
+}
+@supports (height: 100dvh) {
+  .j2ha-wv {
+    height: var(--j2ha-wv-height, calc(100dvh - 160px));
+  }
+}
+.j2ha-wv-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 6px 0;
+}
+.j2ha-wv-bar .btn {
+  min-height: 44px;
+}
+.j2ha-wv-drawer-toggle {
+  display: inline-block;
+}
+.j2ha-wv-read-status {
+  flex: 1 1 12em;
+  min-width: 0;
+}
+.j2ha-wv-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.j2ha-wv.j2ha-stale .j2ha-wv-tree {
+  opacity: 0.55;
+}
+.j2ha-wv-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Disposition étroite (par défaut) : panneau de gauche en tiroir au-dessus du détail. */
+.j2ha-wv-nav {
+  display: none;
+  flex: 0 0 auto;
+  max-height: 45%;
+  overflow-y: auto;
+  border: 1px solid var(--j2ha-line);
+  border-radius: var(--border-radius, 0);
+  margin-bottom: 8px;
+}
+.j2ha-wv-nav.j2ha-wv-nav-open {
+  display: block;
+}
+.j2ha-wv-tools {
+  padding: 8px;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-wv-search {
+  margin-bottom: 6px;
+}
+.j2ha-wv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.j2ha-wv-chip {
+  min-height: 44px;
+}
+.j2ha-wv-search-status {
+  min-height: 1.2em;
+  margin-top: 4px;
+}
+.j2ha-wv-tree {
+  margin: 0;
+  padding: 0 0 8px 0;
+  list-style: none;
+}
+.j2ha-wv-group {
+  list-style: none;
+  padding: 10px 10px 2px 10px;
+}
+.j2ha-wv-group-title {
+  font-size: 12px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-wv-room,
+.j2ha-wv-eq,
+.j2ha-wv-eqs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.j2ha-wv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.j2ha-wv-room > .j2ha-wv-row {
+  font-weight: 600;
+  border-top: 2px solid var(--j2ha-room-color, var(--j2ha-line));
+}
+.j2ha-wv-eq > .j2ha-wv-row {
+  padding-left: 30px;
+}
+.j2ha-wv [role="treeitem"][aria-selected="true"] > .j2ha-wv-row {
+  border-left-color: var(--j2ha-todo);
+  background-color: var(--j2ha-todo-bg);
+}
+.j2ha-wv [role="treeitem"]:focus {
+  outline: none;
+}
+.j2ha-wv [role="treeitem"]:focus > .j2ha-wv-row {
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: -2px;
+}
+.j2ha-wv-toggle {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: inherit;
+  background-color: transparent;
+  border: 0;
+}
+.j2ha-wv-icon {
+  color: var(--j2ha-room-color, var(--logo-primary-color, var(--j2ha-todo)));
+}
+.j2ha-wv-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.j2ha-wv-ratio,
+.j2ha-wv-room-marks {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.j2ha-wv-room-marks {
+  margin-left: 0;
+}
+.j2ha-wv-state {
+  flex: 0 0 7.5em;
+  font-size: 12px;
+}
+.j2ha-wv-eq-disabled .j2ha-wv-name {
+  font-style: italic;
+  opacity: 0.75;
+}
+.j2ha-wv-unread {
+  color: var(--j2ha-neutral);
+}
+.j2ha-wv-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 4px 12px 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.j2ha-wv-crumb {
+  margin: 4px 0;
+  font-size: 12px;
+}
+.j2ha-wv-crumb .btn-link {
+  padding: 0;
+  font-size: 12px;
+}
+.j2ha-wv-roomhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.j2ha-wv-roomicon {
+  color: var(--j2ha-room-color, var(--logo-primary-color, var(--j2ha-todo)));
+}
+.j2ha-wv-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.j2ha-wv-title:focus {
+  outline: 2px solid var(--j2ha-todo);
+  outline-offset: 2px;
+}
+.j2ha-wv-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 10px 0;
+}
+.j2ha-wv-kpi {
+  min-height: 44px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.j2ha-wv-kpi[aria-pressed="true"] {
+  border-color: var(--j2ha-todo);
+  font-weight: 700;
+}
+.j2ha-wv-todo-title {
+  margin: 14px 0 6px 0;
+  font-size: 16px;
+}
+.j2ha-wv-todo-list,
+.j2ha-wv-todo-causes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.j2ha-wv-todo-row {
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-wv-todo-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.j2ha-wv-todo-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.j2ha-wv-todo-cause {
+  margin: 4px 0 0 0;
+  color: var(--j2ha-warn);
+}
+.j2ha-wv-todo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+.j2ha-wv-todo-actions .btn {
+  min-height: 44px;
+}
+.j2ha-wv-empty {
+  padding: 24px 8px;
+}
+/* Détail d'un équipement : en-tête collant (opaque), réglage de publication, tableau des commandes. */
+.j2ha-wv .j2ha-eq-head {
+  position: -webkit-sticky; /* repli iOS Safari ancien */
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 8px 0 6px 0;
+  background-color: var(--bg-color, var(--j2ha-menu-bg));
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-wv .j2ha-eq-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: 18px;
+}
+.j2ha-wv .j2ha-eq-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.j2ha-wv .j2ha-eq-body {
+  padding-top: 8px;
+}
+.j2ha-wv .j2ha-cmd-table {
+  width: 100%;
+}
+.j2ha-wv .j2ha-cmd-table th,
+.j2ha-wv .j2ha-cmd-table td {
+  overflow-wrap: anywhere;
+}
+.j2ha-wv .j2ha-cmd-table .mo-td-override {
+  min-width: 0;
+  white-space: normal;
+}
+.j2ha-wv .j2ha-cmd-table .mo-td-override .mapping-override-select {
+  max-width: 100%;
+}
+/* Disposition large : arbre fixe à gauche, détail à droite ; chaque colonne défile seule. */
+@media (min-width: 980px) {
+  .j2ha-wv-body {
+    flex-direction: row;
+    gap: 12px;
+  }
+  .j2ha-wv-drawer-toggle {
+    display: none;
+  }
+  .j2ha-wv-nav {
+    display: block;
+    flex: 0 0 320px;
+    max-height: none;
+    margin-bottom: 0;
+  }
+  .j2ha-wv-row {
+    min-height: 32px;
+  }
+  .j2ha-wv-chip,
+  .j2ha-wv-kpi {
+    min-height: 0;
+  }
 }

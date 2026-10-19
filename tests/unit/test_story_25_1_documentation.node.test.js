@@ -36,9 +36,9 @@ describe('25.1 / AC23 — vocabulaire des deux pages', () => {
   });
 
   it('les emplacements de capture sont conservés (pas de captures, décision 20-5 Q3)', () => {
-    assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: compteurs de la fenêtre d'une pièce -->/);
+    assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->/);
     assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: ligne de compteurs d'un équipement déplié -->/);
-    for (const slot of ['page principale du plugin', 'cartes de pièce', 'fenêtre d\'une pièce', 'tableau des commandes']) {
+    for (const slot of ['page principale du plugin', 'cartes de pièce', 'vue de travail', 'tableau des commandes']) {
       assert.ok(index.includes(`<!-- CAPTURE-A-PRENDRE: ${slot} -->`), slot);
     }
     assert.doesNotMatch(index + compteurs, /!\[[^\]]*\]\([^)]*\.(png|jpg|gif)\)/);
@@ -134,15 +134,15 @@ describe('25.1 / AC23 — compteurs.md', () => {
   });
 });
 
-describe('25.1 / AC23 — index.md décrit la fenêtre réorganisée', () => {
+describe('25.1 / AC23 — index.md décrit le détail réorganisé (Story 25.4 : dans la vue de travail)', () => {
   it('contrôle segmenté, menu « ⋯ », encart de cause, « Appliquer » conditionnel', () => {
     assert.match(index, /« Automatique », « Toujours », « Jamais »/);
     assert.match(index, /Le menu « ⋯ »/);
     assert.match(index, /Les encarts de cause/);
     assert.match(index, /seulement quand l'état est « À appliquer »/);
     assert.match(index, /Ouvrir les types génériques/);
-    assert.match(index, /Un seul panneau est déplié à la fois/);
-    assert.match(index, /qu'\*\*une seule barre de défilement\*\*/);
+    assert.match(index, /Un seul équipement est affiché à la fois/);
+    assert.match(index, /sans autre barre de défilement dans le détail/);
   });
 
   it('les sections renommées existent ; la page principale n’annonce plus de recréation', () => {

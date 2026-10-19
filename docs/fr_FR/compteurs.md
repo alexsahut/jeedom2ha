@@ -27,12 +27,12 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Quand la sémantique change de nouveau, remplacer tout ce fichier ; rien d'autre dans la documentation n'est à modifier.
 -->
 
-# Les états et les compteurs de la fenêtre d'une pièce
+# Les états et les compteurs de la vue de travail
 
-Retour à la [documentation](index.md#la-fenêtre-dune-pièce).
+Retour à la [documentation](index.md#la-vue-de-travail).
 
-Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans le badge à droite de son nom, dans la ligne de son panneau déplié et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
-<!-- CAPTURE-A-PRENDRE: compteurs de la fenêtre d'une pièce -->
+Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la vue de travail, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
+<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->
 
 ## Comment lire un état
 
@@ -84,26 +84,30 @@ Les commandes **ignorées** ne sont jamais comptées comme un défaut et ne sont
 Sur la page principale, le bloc de la maison reprend les mêmes états, **équipement par équipement**, pour toutes les pièces : « N publiés sur M » où M est le nombre d'équipements Jeedom de toutes les cartes (la carte « Sans pièce » comprise) et N ceux à l'état **Publié**. La jauge est découpée, dans cet ordre, en **publiés** (vert), **à appliquer** (bleu), **bloqués** (orange), **exclus et autres** (gris : exclus, désactivés et rien à publier) et **non lus** (hachuré). La somme des segments est toujours M, et celle des cartes de pièce est toujours celle de la maison.
 
 - **Non lu** n'est pas un septième état : c'est un équipement de Jeedom dont les chiffres n'ont pas pu être lus (le démon ne le connaît pas encore, ou sa lecture a échoué). Il n'est jamais compté publié, bloqué, exclu ni désactivé, et la jauge ne devient jamais « pleine de non lus » quand la lecture n'a pas eu lieu : elle reste neutre avec un message.
-- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît sur la ligne de la liste filtrée et dans la fenêtre de la pièce, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés.
+- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît sur la ligne de la liste filtrée, dans l'arbre de la vue de travail et dans le détail de l'équipement, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés.
 - Les chiffres sont relus à l'ouverture de la page, après chaque action, au retour sur l'onglet après plus d'une minute et par « Actualiser ». « Chiffres relus à HH:MM » est l'heure de la dernière lecture par la page.
 
 ## Les repères d'une carte de pièce
 
-La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont ceux de la fenêtre de la pièce, à une différence près : la fenêtre ne les affiche qu'au fur et à mesure de ses lectures.
+La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont **les mêmes** que ceux de l'arbre de la vue de travail (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
 
 ## La ligne des états (sous le titre de la pièce)
 
-Elle comporte un chiffre et un mot court pour chaque état **non nul**, toujours dans cet ordre : **publié**, **à appliquer**, **bloqué**, **exclu**, **désactivé**, **rien à publier**. Un état à zéro n'est pas affiché. Le mot est au singulier pour 1, au pluriel au-delà (« 1 publié », « 9 publiés », « 2 à appliquer »). La somme des chiffres est le nombre d'équipements lus : chaque équipement est compté une fois, dans son seul état.
+Elle comporte un chiffre et un mot court pour chaque état **non nul**, toujours dans cet ordre : **publié**, **à appliquer**, **bloqué**, **exclu**, **désactivé**, **rien à publier**. Un état à zéro n'est pas affiché. Le mot est au singulier pour 1, au pluriel au-delà (« 1 publié », « 9 publiés », « 2 à appliquer »). La somme des chiffres est le nombre d'équipements lus : chaque équipement est compté une fois, dans son seul état. Chaque compteur est un filtre de l'arbre (un clic le pose, un second le retire), le même que celui de la page principale.
 
 Il n'y a **pas de compteur de commandes au niveau de la pièce** : l'unité de décision est l'équipement.
 
-Pendant la lecture, la ligne affiche « Chargement des compteurs… ». Si aucun équipement de la pièce n'a pu être lu, elle affiche « Compteurs indisponibles : la configuration des équipements de cette pièce n’a pas pu être lue. »
+Ces chiffres viennent de la lecture des états de la page principale : ils ne demandent aucune lecture de plus et sont présents dès l'ouverture de la vue. Tant que cette lecture n'a pas eu lieu ou a échoué, les compteurs ne sont pas affichés et la mention de la page principale (« Aucune synchronisation n'a encore eu lieu », « Mise à jour en cours… » ou « Chiffres indisponibles ») s'affiche aussi dans la vue ; jamais de « NaN » ni de faux « non lus ».
 
-Tant que certains équipements de la pièce ne sont pas lus — pendant le chargement, ou parce que leur lecture a échoué — la ligne se termine par « 1 équipement non lu » ou « 2 équipements non lus » : ils ne sont pas comptés, et s'ajoutent à mesure que les lectures aboutissent. Si le démon est une version plus ancienne qui n'indique pas la présence dans Home Assistant, la ligne le dit (« … dont la présence dans Home Assistant est inconnue (démon plus ancien) ») et ces équipements ne sont jamais comptés « publiés ».
+Quand certains équipements de la pièce ne sont pas lus — le démon ne les connaît pas encore, ou leur lecture a échoué — la ligne se termine par « 1 équipement non lu » ou « 2 équipements non lus » : ils ne sont pas comptés. Si le démon est une version plus ancienne qui n'indique pas la présence dans Home Assistant, la ligne le dit (« … dont la présence dans Home Assistant est inconnue (démon plus ancien) ») et ces équipements ne sont jamais comptés « publiés ».
 
-## La ligne d'un équipement déplié
+## La liste « À traiter dans cette pièce »
 
-Quand vous dépliez un équipement, une ligne s'affiche au début de son panneau : **son état** (le même mot que le badge), puis le détail de **ses commandes**, par exemple :
+Sous les compteurs, la vue liste les équipements **bloqués** et **à appliquer** de la pièce, et seulement eux : état, nom, nombre de commandes concernées et cause dite une seule fois. Elle est produite avec les mêmes règles d'état et de cause que le détail d'un équipement, à partir de la même lecture que les compteurs : elle ne demande aucune lecture de la configuration des équipements.
+
+## La ligne d'un équipement affiché
+
+Quand vous choisissez un équipement, une ligne s'affiche au début de son détail : **son état** (le même mot que le badge), puis le détail de **ses commandes**, par exemple :
 
 > Publié · 3 publiées · 1 bloquée · 5 ignorées
 

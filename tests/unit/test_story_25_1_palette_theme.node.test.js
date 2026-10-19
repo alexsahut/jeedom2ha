@@ -87,14 +87,16 @@ describe('25.1 / AC17 — aucune couleur en dur hors des blocs de variables --j2
     }
   });
 
-  it('la largeur de la fenêtre se règle par une classe CSS ; plus d’appel .css(\'width\') en ligne', () => {
+  it('la largeur se règle par des classes CSS ; plus d’appel .css(\'width\') en ligne (Story 25.4 : vue C, plus de fenêtre)', () => {
     assert.doesNotMatch(stripJsComments(jsSources['jeedom2ha_mapping_surface.js']), /\.css\(\s*'width'/);
-    const dialog = rules.find((r) => r.selector === '.modal-j2ha-room .modal-dialog');
-    assert.ok(dialog && /width:\s*90%/.test(dialog.body));
+    assert.doesNotMatch(stripJsComments(jsSources['jeedom2ha_workview.js']), /\.css\(\s*'(width|height)'/);
+    // Remplace la largeur de 90 % de la fenêtre : la largeur de l'arbre de la vue C est portée par une règle CSS.
+    const nav = rules.find((r) => r.selector === '.j2ha-wv-nav' && r.atRule);
+    assert.ok(nav && /flex:\s*0 0 320px/.test(nav.body), 'largeur de l’arbre en disposition large');
   });
 
   it('toute variable de couleur du core est suivie d’un repli --j2ha-*', () => {
-    const core = ['al-success-color', 'al-warning-color', 'al-danger-color', 'al-info-color', 'txt-color', 'bg-modal-color', 'link-color', 'logo-primary-color'];
+    const core = ['al-success-color', 'al-warning-color', 'al-danger-color', 'al-info-color', 'txt-color', 'bg-modal-color', 'bg-color', 'link-color', 'logo-primary-color'];
     const text = stripCssComments(css);
     for (const name of core) {
       for (const m of text.matchAll(new RegExp('var\\(--' + name + '(.{0,40})', 'g'))) {
@@ -167,7 +169,7 @@ describe('25.1 / AC18 — quatre teintes sémantiques, fonds translucides, repli
       if (isVariableBlock(rule)) continue;
       for (const d of declarations(rule.body)) {
         if (!/^background(-color)?$/.test(d.property)) continue;
-        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|var\(--bg-modal-color, var\(--j2ha-menu-bg\)\)|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
+        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|var\(--(bg-modal-color|bg-color), var\(--j2ha-menu-bg\)\)|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
       }
     }
   });
@@ -304,12 +306,12 @@ describe('25.1 / AC19 (R2-1) — texte du contrôle segmenté lisible dans les t
 });
 
 describe('25.1 / AC20 — ne jamais restyler le core ; arrondi du thème', () => {
-  it('tous les sélecteurs sont préfixés .j2ha- ou limités à .modal-j2ha-room / #j2ha_roomCards', () => {
+  it('tous les sélecteurs sont préfixés .j2ha- ou limités à #j2ha_roomCards (Story 25.4 : plus de fenêtre de pièce)', () => {
     const offenders = [];
     for (const rule of rules) {
       if (isVariableBlock(rule)) continue;
       for (const selector of rule.selector.split(',').map((s) => s.trim())) {
-        if (!/\.j2ha-|\.modal-j2ha-room|#j2ha_roomCards/.test(selector)) offenders.push(selector);
+        if (!/\.j2ha-|#j2ha_roomCards/.test(selector)) offenders.push(selector);
         // Aucune règle ne cible seule .label, .btn, .panel, .modal, .objectDisplayCard.
         assert.doesNotMatch(selector, /^\.(label|btn|panel|modal|objectDisplayCard)(?![\w-])/, selector);
       }
@@ -344,7 +346,11 @@ describe('25.1 / AC20 — ne jamais restyler le core ; arrondi du thème', () =>
 describe('25.1 / AC21 — thème : bascule et état initial', () => {
   it('aucune couleur n’est calculée ni figée en JS : uniquement des variables CSS', () => {
     for (const [file, source] of Object.entries(jsSources)) {
-      assert.doesNotMatch(stripJsComments(source), /getComputedStyle|matchMedia|data-theme|\.css\(\s*['"](color|background)/, file);
+      const code = stripJsComments(source);
+      assert.doesNotMatch(code, /getComputedStyle|prefers-color-scheme|data-theme|\.css\(\s*['"](color|background)/, file);
+      // Story 25.4 : seule la vue de travail interroge matchMedia, pour la DISPOSITION (largeur), jamais pour un thème.
+      if (file !== 'jeedom2ha_workview.js') assert.doesNotMatch(code, /matchMedia/, file);
+      else assert.deepEqual([...code.matchAll(/matchMedia\(([^)]*)\)/g)].map((m) => /min-width/.test(m[1])), [true]);
     }
   });
 
