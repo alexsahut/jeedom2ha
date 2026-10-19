@@ -36,7 +36,8 @@ describe('25.6 / AC14 — documentation de la portée', () => {
   });
 
   it('changelog_beta.md : une entrée annonce la pièce seule, sans nom réel', () => {
-    const entry = changelog.split('---')[1];
+    const entry = changelog.split('---').find((part) => /Vue de travail : une carte ouvre la pièce seule/.test(part));
+    assert.ok(entry, 'entrée présente');
     assert.match(entry, /Vue de travail : une carte ouvre la pièce seule/);
     assert.match(entry, /« Toutes les pièces »/);
     assert.match(entry, /« Page principale »/);

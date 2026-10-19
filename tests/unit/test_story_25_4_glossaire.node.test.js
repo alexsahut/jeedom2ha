@@ -26,7 +26,7 @@ function labels(code) {
 describe('25.4 / AC26 — libellés de la vue', () => {
   it('les libellés exigés par la story passent par {{…}} et aucun fichier core/i18n n’existe', () => {
     const found = labels(source);
-    for (const label of ['Toutes les pièces', 'Page principale', 'Pièces', 'Masquer les pièces', 'Rechercher une pièce ou un équipement', 'À traiter dans cette pièce',
+    for (const label of ['Toutes les pièces', 'Page principale', 'Exclus', 'Pièces', 'Masquer les pièces', 'Rechercher une pièce ou un équipement', 'À traiter dans cette pièce',
       'Rien à traiter dans cette pièce', 'Aucun résultat', 'Sélectionnez une pièce ou un équipement', 'Pièces et équipements', 'Indicateurs de la pièce',
       "Fil d'Ariane", 'Replier', 'Déplier', 'Appliquer', 'Ouvrir les types génériques']) {
       assert.ok(found.includes(label), label);
