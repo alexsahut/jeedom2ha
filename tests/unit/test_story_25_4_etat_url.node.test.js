@@ -7,7 +7,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const W = require('../../desktop/js/jeedom2ha_workview.js');
-const { startWorkview, startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startWorkview, startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { tree, ok, READY } = require('./helpers/ui_harness');
 
 const maybe = phpAvailable ? it : it.skip;
@@ -56,7 +56,7 @@ describe('25.4 / AC18, AC17 — historique et « Précédent »', () => {
   maybe('carte → équipement : l’URL suit ; « Précédent » remonte équipement → pièce → page principale', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     const before = ui.calls.length;
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10');
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
@@ -73,7 +73,7 @@ describe('25.4 / AC18, AC17 — historique et « Précédent »', () => {
 
   maybe('« Toutes les pièces » revient sur l’entrée précédant l’ouverture ; sans historique (lien profond) : fragment retiré sur place', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     ui.click('.j2ha-wv-back');
     assert.equal(ui.isOpen(), false);
@@ -90,7 +90,7 @@ describe('25.4 / AC18, AC17 — historique et « Précédent »', () => {
 
   maybe('filtre : remplace l’entrée courante (pas de niveau de plus) ; la recherche n’est pas mémorisée', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const pushes = ui.win.historyWrites.push;
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
     assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10;f:published');
@@ -105,7 +105,7 @@ describe('25.4 / AC18, AC17 — historique et « Précédent »', () => {
   maybe('la mise à jour de l’URL ne déclenche ni rechargement ni requête', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     const before = ui.calls.length;
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
     assert.equal(ui.calls.length, before);
@@ -146,7 +146,7 @@ describe('25.4 / Q1 — repli sessionStorage si le fragment est inutilisable', (
     // Un cœur qui intercepte / interdit le fragment : toute écriture d'historique échoue.
     ui.win.history.pushState = () => { throw new Error('interdit'); };
     ui.win.history.replaceState = () => { throw new Error('interdit'); };
-    assert.doesNotThrow(() => openCard(ui, 10));
+    assert.doesNotThrow(() => openCardWide(ui, 10));
     assert.equal(ui.isOpen(), true);
     assert.match(ui.win.sessionStorage.getItem('j2ha-vue') || '', /"piece":10/);
     ui.click('.j2ha-wv-back');
@@ -168,7 +168,7 @@ describe('25.4 / AC18 — cohabitation avec le popstate du cœur Jeedom', () => 
   maybe('aucune entrée d’historique de la vue ne déclenche le rechargement du cœur ; « Précédent » remonte toujours', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     const loads = coreListener(ui.win);
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(ui.win.history.state, null);
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
@@ -190,7 +190,7 @@ describe('25.4 / AC18 — cohabitation avec le popstate du cœur Jeedom', () => 
 describe('25.4 / AC17 — « Suivant » après un retour à la page principale (relecture Codex #302)', () => {
   maybe('Précédent ×2, Suivant, nouvel équipement, « Toutes les pièces » : retour à la page principale', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const eqs = ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list.map((n) => Number(n.attrs['data-eq-id']));
     ui.selectEquipment(eqs[0], ok(tree(eqs[0], [READY])));
     ui.win.history.back();

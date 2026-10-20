@@ -45,8 +45,9 @@ test('25.3 gate — la politique ne change pas d’action autorisée : getEquipm
   const policy = await import(gate('lib', 'policy.mjs'));
   const plugin = policy.ALLOWED_READS.find((entry) => entry.pathname === '/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php');
   assert.deepEqual(plugin.actions, ['getMqttConfig', 'getBridgeStatus', 'getMappingOverrides', 'getEquipmentStates', 'previewMappingOverride']);
+  // Story 25.8 : `saveRoomExclusion` est ajoutée à la politique (écriture simulée déclarée) ; AJOUT SEUL, jamais une ligne retirée.
   const diff = diffAgainstMain('tests/e2e/gate/lib/policy.mjs');
-  if (diff !== null) assert.equal(diff, '', 'policy.mjs inchangé');
+  if (diff !== null) assert.deepEqual(removedLines(diff), [], 'policy.mjs : aucune ligne retirée ou modifiée');
   const base = { method: 'POST', resourceType: 'xhr', headers: { 'content-type': 'application/x-www-form-urlencoded' } };
   const url = 'https://domobox.famille-sahut.fr/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   for (const postData of ['action=getEquipmentStates', 'action=getEquipmentStates&refresh=1']) {
@@ -66,8 +67,9 @@ test('25.3 gate — les parcours existants et la politique n’ont perdu aucune 
     assert.deepEqual(removedLines(diff), [], `${name} : aucune ligne retirée ou modifiée`);
   }
   for (const file of ['tests/e2e/gate/run-gate.mjs', 'tests/e2e/gate/lib/policy.mjs', 'tests/e2e/gate/lib/interceptor.mjs', 'tests/e2e/gate/lib/simulate.mjs']) {
+    // Story 25.8 : ajouts seulement (politique, simulation, intercepteur, lanceur) ; aucune ligne existante retirée.
     const diff = diffAgainstMain(file);
-    if (diff !== null) assert.equal(diff, '', file + ' inchangé');
+    if (diff !== null) assert.deepEqual(removedLines(diff), [], file + ' : aucune ligne retirée ou modifiée');
   }
 });
 

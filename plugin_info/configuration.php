@@ -22,6 +22,24 @@ if (!isConnect()) {
   include_file('desktop', '404', 'php');
   die();
 }
+
+// Story 25.9 — « Plugins exclus » : liste à cocher des plugins qui ont au moins un équipement (hors jeedom2ha), noms affichés lus
+// dans le cœur (repli sur l'identifiant). Aides pures partagées avec la page principale (25.7) : réutilisées sans modification.
+require_once dirname(__FILE__) . '/../desktop/php/jeedom2ha_overview_helpers.php';
+require_once dirname(__FILE__) . '/../core/php/jeedom2ha_excluded_plugins.php';
+$j2haPresentPlugins = array();
+foreach (eqLogic::all() as $j2haEq) {
+  $j2haPluginId = j2ha_plugin_id($j2haEq->getEqType_name());
+  if ($j2haPluginId !== '' && $j2haPluginId !== 'jeedom2ha') {
+    $j2haPresentPlugins[$j2haPluginId] = true;
+  }
+}
+$j2haPluginNames = j2ha_plugin_names(array_keys($j2haPresentPlugins), function ($pluginId) {
+  return plugin::byId($pluginId)->getName();
+});
+$j2haExcludedPluginsValue = (string) config::byKey('excludedPlugins', 'jeedom2ha', '');
+$j2haPluginList = jeedom2ha_build_excluded_plugins_list($j2haPluginNames, $j2haExcludedPluginsValue);
+$j2haExcludedRoomsCount = jeedom2ha_excluded_rooms_count();
 ?>
 
 <!-- Bandeau d'auto-détection MQTT -->
@@ -112,24 +130,25 @@ if (!isConnect()) {
     <legend><i class="fas fa-filter"></i> {{Filtrage &amp; Publication}}</legend>
 
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Plugins exclus}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Noms des plugins à exclure de la publication (eq_type_name)}}"></i></sup>
+      <label class="col-md-4 control-label" id="lbl_excludedPlugins">{{Plugins exclus}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Les équipements des plugins cochés ne sont pas publiés dans Home Assistant.}}"></i></sup>
       </label>
-      <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="excludedPlugins"
-               placeholder="virtual,zwave,rfxcom"/>
-        <span class="help-block">{{Noms de plugins séparés par des virgules (eq_type_name). Laisser vide = aucune exclusion.}}</span>
+      <div class="col-md-6">
+        <?php /* Champ porteur masqué : lu par « Sauvegarder » du cœur et par « Appliquer… » ; tenu à jour par les cases (JS ci-dessous). */ ?>
+        <input type="hidden" class="configKey" data-l1key="excludedPlugins" value="<?php echo jeedom2ha_html_attr($j2haExcludedPluginsValue); ?>"/>
+        <?php echo jeedom2ha_render_excluded_plugins_checklist($j2haPluginList); ?>
       </div>
     </div>
 
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Pièces exclues}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{IDs numériques des objets/pièces Jeedom à exclure}}"></i></sup>
-      </label>
-      <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="excludedObjects"
-               placeholder="1,5,12"/>
-        <span class="help-block">{{IDs d'objets Jeedom séparés par des virgules. Laisser vide = aucune exclusion.}}</span>
+      <div class="col-md-offset-4 col-md-6">
+        <p class="form-control-static">
+          {{Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce).}}
+          <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha">{{Ouvrir la page du plugin}}</a>
+        </p>
+        <?php if ($j2haExcludedRoomsCount > 0) { ?>
+        <p class="help-block"><?php echo (int) $j2haExcludedRoomsCount . ' ' . ($j2haExcludedRoomsCount > 1 ? '{{pièces exclues}}' : '{{pièce exclue}}'); ?></p>
+        <?php } ?>
       </div>
     </div>
 
@@ -160,7 +179,76 @@ if (!isConnect()) {
 // JS inline dans configuration.php — NE PAS déplacer dans desktop/js/jeedom2ha.js
 // Ce fichier n'est pas chargé sur la vue de configuration plugin.
 
+/* j2ha-excluded-plugins:begin */
+// Story 25.9 (D2) — valeur de `excludedPlugins` écrite par les cases à cocher : MÊME clé, MÊME format (CSV d'identifiants).
+// Rien n'a changé : la valeur chargée est rendue VERBATIM (aucune normalisation, Q4). Sinon : les identifiants déjà présents gardent
+// leur ordre, un identifiant coché en plus est ajouté EN FIN, un identifiant décoché est retiré (toutes ses occurrences) ; joints par
+// « , » sans espace ; liste vide = chaîne vide.
+function j2haComputeExcludedPlugins(initialCsv, initiallyChecked, nowChecked) {
+  var before = initiallyChecked.slice().sort().join('\n');
+  var after = nowChecked.slice().sort().join('\n');
+  if (before === after) {
+    return initialCsv;
+  }
+  var tokens = String(initialCsv).split(',').map(function(token) { return token.trim(); }).filter(function(token) { return token !== ''; });
+  var kept = tokens.filter(function(token) { return initiallyChecked.indexOf(token) === -1 || nowChecked.indexOf(token) !== -1; });
+  nowChecked.forEach(function(id) {
+    if (initiallyChecked.indexOf(id) === -1 && kept.indexOf(id) === -1) {
+      kept.push(id);
+    }
+  });
+  return kept.join(',');
+}
+/* j2ha-excluded-plugins:end */
+
+// Valeur courante : lue dans les cases (jamais dans le champ porteur, que le cœur remplit de façon asynchrone).
+function j2haExcludedPluginsValue() {
+  var initialChecked = [];
+  var nowChecked = [];
+  $('#div_excludedPluginsList input.j2ha-excluded-plugin').each(function() {
+    var $box = $(this);
+    if ($box.attr('data-initial') === '1') {
+      initialChecked.push($box.val());
+    }
+    if ($box.is(':checked')) {
+      nowChecked.push($box.val());
+    }
+  });
+  var $carrier = $('.configKey[data-l1key=excludedPlugins]');
+  return j2haComputeExcludedPlugins($carrier.attr('value') || '', initialChecked, nowChecked);
+}
+
+// Résumé des plugins cochés, au-dessus de la liste (même texte que le rendu PHP) : ce qui est coché reste visible sans défiler.
+function j2haRefreshExcludedPluginsSummary() {
+  var names = [];
+  $('#div_excludedPluginsList input.j2ha-excluded-plugin:checked').each(function() {
+    names.push($(this).closest('label').find('span').first().text());
+  });
+  $('#p_excludedPluginsSummary').text(names.length === 0 ? '{{Aucun plugin coché.}}' : '{{Plugins cochés}} (' + names.length + ') : ' + names.join(', ') + '.');
+}
+
 $(function() {
+  // ---- Plugins exclus : le champ porteur masqué (configKey) suit les cases (Q3) ----
+  // « Sauvegarder » du cœur et « Appliquer… » écrivent donc la même clé au même format. Le cœur remplit les `configKey` après le
+  // chargement de la page : les cases, rendues cochées côté serveur depuis la même valeur, sont resynchronisées après ce remplissage
+  // (événement change du champ porteur) sans jamais perdre un identifiant de la valeur chargée.
+  var $excludedPlugins = $('.configKey[data-l1key=excludedPlugins]');
+  $('#div_excludedPluginsList').on('change', 'input.j2ha-excluded-plugin', function() {
+    $excludedPlugins.val(j2haExcludedPluginsValue());
+    j2haRefreshExcludedPluginsSummary();
+  });
+  $excludedPlugins.on('change', function() {
+    // La valeur remplie par le cœur devient la valeur de référence (« chargée ») : cases, état initial et valeur d'origine.
+    var loaded = String($(this).val() || '');
+    var wanted = loaded.split(',').map(function(token) { return token.trim(); });
+    $(this).attr('value', loaded);
+    $('#div_excludedPluginsList input.j2ha-excluded-plugin').each(function() {
+      var isExcluded = wanted.indexOf($(this).val()) !== -1;
+      $(this).prop('checked', isExcluded).attr('data-initial', isExcluded ? '1' : '0');
+    });
+    j2haRefreshExcludedPluginsSummary();
+  });
+
   // ---- Auto-détection MQTT Manager au chargement ----
   $.ajax({
     type: 'POST',
@@ -300,8 +388,7 @@ $(function() {
       url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
       data: {
         action:           'saveFilteringConfig',
-        excludedPlugins:  $('.configKey[data-l1key=excludedPlugins]').val(),
-        excludedObjects:  $('.configKey[data-l1key=excludedObjects]').val(),
+        excludedPlugins:  j2haExcludedPluginsValue(),
         confidencePolicy: $('.configKey[data-l1key=confidencePolicy]').val()
       },
       dataType: 'json',

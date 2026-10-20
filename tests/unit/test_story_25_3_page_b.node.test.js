@@ -421,12 +421,16 @@ describe('25.3 / AC13 — icône, couleur Jeedom, regroupement par objet parent'
     assert.match(html, /Parent sans équipement<\/h4>[\s\S]*data-object_id="12"[\s\S]*data-object_id="11"/);
   });
 
-  maybe('l’extension de j2haRoomsTree est additive : champs historiques inchangés, deux variables JS', () => {
+  maybe('l’extension de j2haRoomsTree est additive : champs historiques inchangés, deux variables JS (+ eq_type et j2haPluginNames de 25.7)', () => {
     const { vars } = renderPhp(SCENE);
     const room = vars.j2haRoomsTree.find((r) => r.object_id === 3);
-    assert.deepEqual(Object.keys(room).sort(), ['color', 'equipments', 'father_id', 'icon_classes', 'object_id', 'object_name', 'parent_number']);
+    // Story 25.8 : `excluded` est ajouté (champ additif) ; les sept champs historiques sont inchangés.
+    assert.deepEqual(Object.keys(room).sort(), ['color', 'equipments', 'excluded', 'father_id', 'icon_classes', 'object_id', 'object_name', 'parent_number']);
+    assert.equal(typeof room.excluded, 'boolean');
     assert.equal(typeof room.object_id, 'number');
-    assert.deepEqual(Object.keys(room.equipments[0]).sort(), ['enabled', 'eq_id', 'eq_name']);
+    // Story 25.7 : `eq_type` est ajouté (identifiant du plugin) ; les trois champs historiques sont inchangés.
+    assert.deepEqual(Object.keys(room.equipments[0]).sort(), ['enabled', 'eq_id', 'eq_name', 'eq_type']);
+    assert.equal(typeof vars.j2haPluginNames, 'object');
     assert.deepEqual(vars.j2haAncestors, [{ object_id: 1, name: 'Maison fictive', father_id: 0 }]);
   });
 

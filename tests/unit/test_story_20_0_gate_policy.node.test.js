@@ -456,3 +456,94 @@ test('story 20-0 — politique du gate (classifyRequest)', async (t) => {
     }
   });
 });
+
+// Story 25.8 (AC14) — `saveRoomExclusion` est UNE écriture simulée de plus, déclarée par le parcours ; rien d'autre ne change.
+test('story 25-8 — saveRoomExclusion : écriture simulée si déclarée, bloquée sinon', async (t) => {
+  const { classifyRequest, ALLOWED_READS } = await loadPolicy();
+  const post = (body, extra) => req({
+    method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: body, ...extra,
+  });
+  const ctx = (declared) => baseCtx({ declaredRoomExclusions: declared });
+
+  await t.test('écriture déclarée (objectId et excluded identiques) -> simulate / exclusion-piece-declaree', () => {
+    for (const excluded of ['1', '0']) {
+      const result = classifyRequest(post(`action=saveRoomExclusion&objectId=7&excluded=${excluded}`), ctx({ 7: { excluded } }));
+      assert.equal(result.verdict, 'simulate', excluded);
+      assert.equal(result.reason, 'exclusion-piece-declaree');
+      assert.equal(result.action, 'saveRoomExclusion');
+      assert.equal(result.params.objectId, '7');
+    }
+  });
+
+  await t.test('non déclarée -> block-fail / exclusion-piece-non-declaree', () => {
+    const cases = {
+      'ctx sans déclaration': [post('action=saveRoomExclusion&objectId=7&excluded=1'), baseCtx()],
+      'déclarations vides': [post('action=saveRoomExclusion&objectId=7&excluded=1'), ctx({})],
+      'autre pièce': [post('action=saveRoomExclusion&objectId=8&excluded=1'), ctx({ 7: { excluded: '1' } })],
+      'valeur différente': [post('action=saveRoomExclusion&objectId=7&excluded=0'), ctx({ 7: { excluded: '1' } })],
+      'valeur hors 0/1': [post('action=saveRoomExclusion&objectId=7&excluded=2'), ctx({ 7: { excluded: '2' } })],
+      'objectId non numérique': [post('action=saveRoomExclusion&objectId=abc&excluded=1'), ctx({ abc: { excluded: '1' } })],
+      'objectId nul': [post('action=saveRoomExclusion&objectId=0&excluded=1'), ctx({ 0: { excluded: '1' } })],
+      'objectId absent': [post('action=saveRoomExclusion&excluded=1'), ctx({ 7: { excluded: '1' } })],
+      'excluded absent': [post('action=saveRoomExclusion&objectId=7'), ctx({ 7: { excluded: '1' } })],
+      'paramètre en plus': [post('action=saveRoomExclusion&objectId=7&excluded=1&extra=1'), ctx({ 7: { excluded: '1' } })],
+      'clé héritée du prototype': [post('action=saveRoomExclusion&objectId=constructor&excluded=1'), ctx({})],
+      'ctx absent': [post('action=saveRoomExclusion&objectId=7&excluded=1'), undefined],
+    };
+    for (const [label, [request, context]] of Object.entries(cases)) {
+      const result = classifyRequest(request, context);
+      assert.equal(result.verdict, 'block-fail', label);
+      assert.equal(result.reason, 'exclusion-piece-non-declaree', label);
+    }
+  });
+
+  await t.test('méthode autre que POST (GET, corps dans l\'URL) -> block-fail, jamais simulée', () => {
+    const result = classifyRequest(req({
+      method: 'GET', url: `${ORIGIN}${PLUGIN_AJAX}?action=saveRoomExclusion&objectId=7&excluded=1`, resourceType: 'xhr',
+    }), ctx({ 7: { excluded: '1' } }));
+    assert.equal(result.verdict, 'block-fail');
+    assert.equal(result.reason, 'exclusion-piece-non-declaree');
+  });
+
+  await t.test('paramètres dupliqués ou invalides -> block-fail', () => {
+    for (const body of [
+      'action=saveRoomExclusion&objectId=7&excluded=1&excluded=1',
+      'action=saveRoomExclusion&objectId=7&objectId=8&excluded=1',
+      'action=saveRoomExclusion&action=saveRoomExclusion&objectId=7&excluded=1',
+      'action=saveRoomExclusion&objectId=7&1bad=1&excluded=1',
+    ]) {
+      const result = classifyRequest(post(body), ctx({ 7: { excluded: '1' }, 8: { excluded: '1' } }));
+      assert.equal(result.verdict, 'block-fail', body);
+    }
+  });
+
+  await t.test('autre chemin que la route du plugin -> jamais simulée', () => {
+    const result = classifyRequest(post('action=saveRoomExclusion&objectId=7&excluded=1', { url: `${ORIGIN}/core/ajax/other.ajax.php` }), ctx({ 7: { excluded: '1' } }));
+    assert.notEqual(result.verdict, 'simulate');
+  });
+
+  await t.test('content-type obligatoire pour un corps vers une route AJAX', () => {
+    const result = classifyRequest(post('action=saveRoomExclusion&objectId=7&excluded=1', { headers: { 'content-type': 'application/json' } }), ctx({ 7: { excluded: '1' } }));
+    assert.equal(result.verdict, 'block-fail');
+  });
+
+  await t.test('les autres actions de la politique sont inchangées', () => {
+    // Effets de bord toujours bloqués, lectures toujours les mêmes, scanTopology seulement avec declaredRescan.
+    for (const action of ['executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport', 'testMqttConnection']) {
+      assert.equal(classifyRequest(post(`action=${action}`), ctx({ 7: { excluded: '1' } })).verdict, 'block-fail', action);
+    }
+    assert.equal(classifyRequest(post('action=scanTopology'), ctx({ 7: { excluded: '1' } })).verdict, 'block-fail');
+    assert.equal(classifyRequest(post('action=scanTopology'), baseCtx({ declaredRescan: true })).verdict, 'simulate');
+    const pluginReads = ALLOWED_READS.find((entry) => entry.pathname === PLUGIN_AJAX).actions;
+    assert.deepEqual([...pluginReads], ['getMqttConfig', 'getBridgeStatus', 'getMappingOverrides', 'getEquipmentStates', 'previewMappingOverride']);
+    assert.ok(!pluginReads.includes('saveRoomExclusion'));
+    assert.equal(ALLOWED_READS.length, 3);
+  });
+
+  await t.test('politique : diff limité à l\'ajout (aucune ligne existante retirée ni modifiée)', async () => {
+    const { diffAgainstBase, removedLines } = require('./helpers/git_base');
+    const diff = diffAgainstBase(['-U0'], ['tests/e2e/gate/lib/policy.mjs']);
+    if (diff === null) return;
+    assert.deepEqual(removedLines(diff), []);
+  });
+});

@@ -64,6 +64,41 @@ function j2ha_color_hex($raw) {
 	return preg_match('/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/', $raw) ? $raw : '';
 }
 
+/**
+ * Story 25.7 (Q1 A) — identifiant technique d'un plugin (`getEqType_name()`), réduit à une liste blanche de caractères :
+ * sinon chaîne vide. Valeur NON FIABLE tant qu'elle n'est pas passée ici.
+ */
+function j2ha_plugin_id($raw) {
+	if (!is_string($raw)) {
+		return '';
+	}
+	return preg_match('/^[A-Za-z0-9_-]{1,64}$/', $raw) ? $raw : '';
+}
+
+/**
+ * Story 25.7 (Q1 A) — table { identifiant: nom affiché } des seuls plugins présents. `$resolver` rend le nom affiché d'un
+ * identifiant (lève une exception ou rend une valeur vide si le plugin est inconnu) ; repli sur l'identifiant. Le nom reste
+ * un texte brut : l'interface l'insère par `.text()`, jamais par `.html()`.
+ */
+function j2ha_plugin_names($pluginIds, $resolver) {
+	$names = array();
+	foreach ((array) $pluginIds as $raw) {
+		$id = j2ha_plugin_id($raw);
+		if ($id === '' || isset($names[$id])) {
+			continue;
+		}
+		$name = '';
+		try {
+			$resolved = call_user_func($resolver, $id);
+			$name = is_string($resolved) ? trim($resolved) : '';
+		} catch (Throwable $e) {
+			$name = '';
+		}
+		$names[$id] = ($name !== '') ? $name : $id;
+	}
+	return $names;
+}
+
 function j2ha_html($text) {
 	return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
 }
@@ -157,6 +192,28 @@ function j2ha_group_rooms(array $rooms, array $ancestors) {
 	return $groups;
 }
 
+/**
+ * Menu « ⋯ » d'une carte de pièce (Story 25.8, AC6) : une seule entrée, « Exclure la pièce… » ou « Ne plus exclure la
+ * pièce… ». Réutilise le composant `.j2ha-menu-*` de 25.1 sans en modifier les règles. L'entrée porte `data-ha-action` : elle est
+ * grisée par le même gating que les autres actions (pont indisponible, relecture en cours). Jamais pour « Sans pièce ».
+ */
+function j2ha_render_room_menu(array $room) {
+	$name = j2ha_html($room['object_name']);
+	$excluded = !empty($room['excluded']);
+	$label = $excluded ? '{{Ne plus exclure la pièce…}}' : '{{Exclure la pièce…}}';
+	$html = '<span class="j2ha-menu-wrap j2ha-room-menu">';
+	$html .= '<button type="button" class="j2ha-menu-toggle j2ha-room-menu-toggle" aria-haspopup="menu" aria-expanded="false"'
+		. ' aria-label="{{Actions de la pièce}} ' . $name . '" title="{{Actions de la pièce}}">'
+		. '<i class="fas fa-ellipsis-h"></i></button>';
+	$html .= '<ul class="j2ha-menu j2ha-room-menu-list" role="menu"><li role="none">'
+		. '<button type="button" class="j2ha-menu-item j2ha-room-exclude" role="menuitem" data-ha-action="exclure-piece"'
+		. ' data-excluded="' . ($excluded ? '1' : '0') . '" disabled>'
+		. '<i class="fas fa-eye-slash"></i><span class="j2ha-room-exclude-label">' . $label . '</span></button>'
+		. '</li></ul>';
+	$html .= '</span>';
+	return $html;
+}
+
 /** Carte de pièce : conserve `objectDisplayCard`, `j2ha-room-card`, `data-object_id` et `onclick` (jamais `eqLogicDisplayCard`). */
 function j2ha_render_room_card(array $room) {
 	$id = (int) $room['object_id'];
@@ -165,6 +222,9 @@ function j2ha_render_room_card(array $room) {
 	$html = '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $id . '" tabindex="0" role="button"'
 		. ($color !== '' ? ' data-color="' . j2ha_html($color) . '"' : '')
 		. ' onclick="j2haOpenRoom(' . $id . ')">';
+	if ($id > 0) {
+		$html .= j2ha_render_room_menu($room);
+	}
 	$html .= '<i class="' . j2ha_html($icon) . ' j2ha-room-icon"></i>';
 	$html .= '<br>';
 	$html .= '<span class="name' . ($id > 0 ? ' j2ha-free-name' : '') . '">' . j2ha_html($room['object_name']) . '</span>';

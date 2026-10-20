@@ -39,11 +39,26 @@ class eqLogic {
     }
 }
 class J2haFakePlugin {
-    public function getId() { return 'jeedom2ha'; }
+    private $id;
+    public function __construct($id = 'jeedom2ha') { $this->id = $id; }
+    public function getId() { return $this->id; }
+    // Plugins fictifs : noms lus dans la fixture (`plugin_names`) ; absent = plugin inconnu du cœur (exception).
+    public function getName() {
+        $names = isset($GLOBALS['j2ha_fixture']['plugin_names']) ? $GLOBALS['j2ha_fixture']['plugin_names'] : array();
+        if (!isset($names[$this->id])) { throw new Exception('plugin introuvable'); }
+        return $names[$this->id];
+    }
     public function getDocumentation() { return isset($GLOBALS['j2ha_fixture']['doc']) ? $GLOBALS['j2ha_fixture']['doc'] : ''; }
 }
-class plugin { public static function byId($id) { return new J2haFakePlugin(); } }
+class plugin { public static function byId($id) { return new J2haFakePlugin($id); } }
 class jeedom { public static function getConfiguration($k) { return array(); } }
+// Story 25.8 : configuration du plugin lue dans la fixture (`config`) ; clé absente = valeur par défaut.
+class config {
+    public static function byKey($key, $plugin = 'core', $default = '') {
+        $values = isset($GLOBALS['j2ha_fixture']['config']) ? $GLOBALS['j2ha_fixture']['config'] : array();
+        return array_key_exists($key, $values) ? $values[$key] : $default;
+    }
+}
 function isConnect($right = '') { return true; }
 function sendVarToJS($name, $value) { $GLOBALS['j2ha_vars'][$name] = $value; }
 function __($text, $file = '') { return $text; }

@@ -88,7 +88,7 @@ async function withRealView(t, options, fn) {
       .map((src) => `<script src="${src}"></script>`).join('');
     const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>'
       + css + '</style></head><body>' + mainPart(rendered.html).replace(/\{\{([^}]*)\}\}/g, '$1') + '<div id="div_alert"></div>'
-      + `<script>window.j2haRoomsTree = ${JSON.stringify(rooms)}; window.j2haAncestors = ${JSON.stringify(rendered.vars.j2haAncestors)};</script>`
+      + `<script>window.j2haRoomsTree = ${JSON.stringify(rooms)}; window.j2haAncestors = ${JSON.stringify(rendered.vars.j2haAncestors)}; window.j2haPluginNames = ${JSON.stringify(rendered.vars.j2haPluginNames || {})};</script>`
       + scriptTags + '</body></html>';
     await page.route('http://gate.test/**', async (route) => {
       const request = route.request();
@@ -106,8 +106,18 @@ async function withRealView(t, options, fn) {
         const params = new URLSearchParams(raw);
         const action = params.get('action');
         const eqId = Number(params.get('eqId'));
-        journal.push({ action, eqId: Number.isFinite(eqId) ? eqId : null, verdict: 'lecture', method: 'POST', resourceType: request.resourceType(), path: url.pathname, at: Date.now() });
+        const entry = { action, eqId: Number.isFinite(eqId) ? eqId : null, verdict: 'lecture', method: 'POST', resourceType: request.resourceType(), path: url.pathname, at: Date.now() };
+        journal.push(entry);
         bodies.push(raw);
+        // Story 25.8 : `opts.gate` applique la VRAIE politique du gate (policy.mjs) et la VRAIE simulation (simulate.mjs) aux
+        // écritures déclarées : `handleWrite(action, request)` rend { verdict, body } ('simulee') ou { verdict: 'block-fail' } (refus).
+        if (opts.gate && opts.gate.isWrite(action)) {
+          const outcome = opts.gate.handleWrite(action, { method: request.method(), url: request.url(), postData: raw, headers: request.headers(), resourceType: request.resourceType() });
+          entry.verdict = outcome.verdict;
+          if (outcome.verdict !== 'simulee') { await route.abort(); return; }
+          await route.fulfill({ contentType: 'application/json', body: JSON.stringify(outcome.body) });
+          return;
+        }
         let body = { state: 'error', result: 'écriture interdite en test' };
         if (action === 'getBridgeStatus') body = { state: 'ok', result: { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } };
         else if (action === 'getEquipmentStates') body = states;

@@ -1,6 +1,6 @@
 # Story 25.7 : Cause d'exclusion affichée
 
-Status: ready-for-dev
+Status: ready-for-UX-validation
 
 > **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, point 3 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 
@@ -175,22 +175,22 @@ Pour une pièce, la **ventilation des exclus** est le décompte, par `kind` (et,
 
 ## Tasks / Subtasks
 
-- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48)]**
+- [ ] Task 0 — Pre-flight terrain (DEV/TEST ONLY) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48)]**
   - [ ] Dry-run `./scripts/deploy-to-box.sh --dry-run` ; déploiement `--sha <complet> --restart-daemon` depuis un worktree neuf ; `Deploy complete.`
   - [ ] Relever (identifiants seuls) le nombre d'équipements exclus par cause sur la box, depuis le journal ou le gate, pour comparer à la Task 6.
-- [ ] Task 1 — Tests d'abord (AC: 1, 2, 5, 6)
-  - [ ] 1.1 `test_story_25_7_cause_exclusion` (table D1), parité agrégé / unitaire, `…_ventilation` (invariant), test PHP de la donnée de Q1.
-- [ ] Task 2 — Fonctions pures (AC: 1, 2, 7)
-  - [ ] 2.1 `exclusionCauseOf` et la fonction de libellé, **ajoutées** et exportées dans `jeedom2ha_mapping_override.js`.
-- [ ] Task 3 — Donnée « plugin X » (AC: 6) — selon Q1
-  - [ ] 3.1 (Q1 = A) champ additif dans `j2haRoomsTree` et table des noms, échappés.
-- [ ] Task 4 — Affichage (AC: 3, 4, 5, 8)
-  - [ ] 4.1 Ligne d'arbre (`buildTreeModel` / `buildEquipmentItem`), encart du détail d'équipement, ventilation du détail de pièce, repère de carte (`renderCards`).
-  - [ ] 4.2 CSS, contrastes, nom accessible.
-- [ ] Task 5 — Gate, documentation, non-régression (AC: 9 à 14)
-  - [ ] 5.1 Étape `cause-exclusion` de `vue-maitre-detail-c` ; registres verts ; `policy.mjs` intact.
-  - [ ] 5.2 `index.md`, `compteurs.md`, `changelog_beta.md`, test de documentation ; mesure Node ; suites complètes.
-- [ ] Task 6 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; sautée par une session cloud (CC-48)]**
+- [x] Task 1 — Tests d'abord (AC: 1, 2, 5, 6)
+  - [x] 1.1 `test_story_25_7_cause_exclusion` (table D1), parité agrégé / unitaire, `…_ventilation` (invariant), test PHP de la donnée de Q1.
+- [x] Task 2 — Fonctions pures (AC: 1, 2, 7)
+  - [x] 2.1 `exclusionCauseOf` et la fonction de libellé, **ajoutées** et exportées dans `jeedom2ha_mapping_override.js`.
+- [x] Task 3 — Donnée « plugin X » (AC: 6) — selon Q1
+  - [x] 3.1 (Q1 = A) champ additif dans `j2haRoomsTree` et table des noms, échappés.
+- [x] Task 4 — Affichage (AC: 3, 4, 5, 8)
+  - [x] 4.1 Ligne d'arbre (`buildTreeModel` / `buildEquipmentItem`), encart du détail d'équipement, ventilation du détail de pièce, repère de carte (`renderCards`).
+  - [x] 4.2 CSS, contrastes, nom accessible.
+- [x] Task 5 — Gate, documentation, non-régression (AC: 9 à 14)
+  - [x] 5.1 Étape `cause-exclusion` de `vue-maitre-detail-c` ; registres verts ; `policy.mjs` intact.
+  - [x] 5.2 `index.md`, `compteurs.md`, `changelog_beta.md`, test de documentation ; mesure Node ; suites complètes.
+- [ ] Task 6 — Preuve terrain (après fusion) **[réservée à ClaudeBox ; SAUTÉE par cette session cloud (CC-48)]**
   - [ ] 6.1 Gate 20-0 contre la box, dont l'étape `cause-exclusion` ; contrôle négatif en échec attendu ; `25-7-preuve-terrain-<date>.md` (identifiants seuls).
   - [ ] 6.2 Vérifier sur la box que les équipements des deux pièces déjà exclues affichent « par la pièce », et qu'un équipement réglé « Jamais » affiche « individuelle » ; 0 ligne `ERROR` ; taille de la réponse inchangée ; statut `ready-for-UX-validation`.
 
@@ -239,13 +239,37 @@ AC1 à AC14 tenus ; suites vertes ; PR relue par ClaudeBox ; preuve terrain (Tas
 
 ### Agent Model Used
 
-_(à remplir au `dev-story`)_
+Claude (session cloud déléguée, branche `claude/stories-25-6-25-7-aebjpn`, 2026-10-19), après 25.6 (statut `review`, même branche).
 
 ### Debug Log References
 
+- Task 1 : `test_story_25_7_cause_exclusion`, `…_ventilation` et le test PHP ont été commités rouges (32 tests Node en échec, test PHP en erreur fatale) avant le code. `test_story_25_7_detail_equipement` (AC4) a été écrit APRÈS l'affichage du détail (il est vert dès sa première exécution).
+- Le premier essai de contrôle négatif du gate (patch de la bibliothèque dans la page) ne rejetait pas : l'étape 6 du parcours recharge la page, ce qui effaçait le patch. Le patch est désormais posé par `addInitScript` à l'affectation de `Jeedom2haMappingOverride`, avant chaque chargement.
+- Tests de 25.x échoués après l'ajout puis adaptés PAR AJOUT (liste ci-dessous) : `test_story_25_4_ecritures_deplacees` interdit de modifier `renderSummary` (comparé à main) : l'encart est donc rendu par une fonction nouvelle `renderExclusion`, appelée par `renderEquipmentTree` (colle) et `refreshEquipmentState`.
+- `scripts/ci-local.sh` (relancé en fin de story, après les deux stories) : flake8, pytest 3.9 / 3.11 / 3.12 (2404 passed, 2 skipped), node (1022 tests), `bash -n`, `php -l`, tests PHP : tout vert. `make test` (pytest direct) : 778 passed, 2 skipped.
+
 ### Completion Notes List
 
+- **D1** : `exclusionCauseOf(tree, enabled)` (ajout pur à `jeedom2ha_mapping_override.js`, `git diff` : aucune ligne supprimée) : `null` hors état « Exclu » (donc jamais pour « Désactivé » ni « non lu ») ; sinon la raison d'exclusion de `equipment_decision`, sinon la raison commune des commandes exclues ; jamais de cause cumulée. Parité agrégé / unitaire (`deepEqual`) sur les fixtures de 25.2 et sur des cas fictifs. `exclusionCauseText(cause, nom, 'short'|'sentence')` produit les libellés `{{…}}` (repli « son plugin ») ; `exclusionBreakdown` / `exclusionBreakdownText` (D2, Q6 : « N autre »).
+- **Q1 = A (page)** : `eq_type` (identifiant validé par liste blanche) ajouté à chaque équipement de `j2haRoomsTree` et table `j2haPluginNames` {identifiant: nom affiché} pour les seuls plugins présents, repli sur l'identifiant (`j2ha_plugin_id`, `j2ha_plugin_names` dans `jeedom2ha_overview_helpers.php` ; `jeedom2ha.php`). Aucun champ existant renommé ni retypé (test 25.3 étendu par ajout). Aucune modification du démon ni de la liste blanche de la route ; la table servira à 25.9.
+- **Affichage** : ligne d'arbre (`.j2ha-wv-cause`, après le nom, ellipse avant le nom) ; détail d'équipement (encart neutre `.j2ha-eq-exclusion .j2ha-notice-neutral`, `role="status"`, icône `fa-eye-slash`, lien « Ouvrir la configuration du plugin » pour une cause de plugin seulement, aucune écriture — Q4 ; pour « par la pièce », le renvoi vers le contrôle de 25.8 viendra avec 25.8) ; détail de pièce (ligne « Exclus : » sous les KPI, `computeOverview` calcule la ventilation) ; carte (repère gris `.j2ha-mark-excluded` « N exclus », en dernier, infobulle + `aria-label` = ventilation, ajoutée aussi au nom accessible de la carte). Aucune requête (espion ajax).
+- **CSS** : sous `.j2ha-wv` / `.j2ha-wv-*` ; la seule règle hors `.j2ha-wv` est `.j2ha-room-groups .j2ha-mark.j2ha-mark-excluded` (prévue par l'AC8) : les listes blanches de `test_story_25_4_css_collision` et `…_palette_theme` sont étendues PAR AJOUT d'exactement cette entrée. Couleurs : `--j2ha-neutral`, `--j2ha-line`, `--j2ha-surface-strong` seulement.
+- **Gate 20-0** : étape 10 `cause-exclusion` ajoutée à `vue-maitre-detail-c` (lecture seule : arbre élargi filtré sur « exclus et autres », étiquettes `cause-exclusion-hors-glossaire`, `cause-sur-desactive`, `exclus-carte-differents-de-l-arbre`, `requete-pendant-cause-exclusion` ; `record` `exclus_par_plugin`, `exclus_par_piece`, `exclus_individuels`, `exclus_sans_cause`). `readCards` ignore désormais aussi le repère « N exclus » dans la comparaison des repères carte / arbre (comme « non lus » ; la somme des repères est vérifiée par la nouvelle étape). `policy.mjs`, lanceur, interception inchangés ; registre de 25.4 vert. Contrôles négatifs en vrai Chromium (mention hors glossaire, somme des repères). La branche « cause-sur-desactive » n'a pas de contrôle négatif automatisable (le code ne rend jamais de cause pour un désactivé) : elle garde la garde-fou côté box.
+- **AC13 (mesure Node, fixture 40 pièces / 292 équipements fictifs dont 21 exclus)** : `computeOverview` complet 0,94 ms ; `resolveEquipmentState` seul sur les 292 : 0,25 ms ; surcoût de `exclusionCauseOf` (appelé une fois par équipement « Exclu », seulement) : 0,06 ms ; ventilation des 40 pièces : 0,01 ms. Aucun seuil inventé.
+- **AC12** : `git diff --stat origin/main...HEAD -- resources/daemon core plugin_info tests/e2e/gate/lib scripts` vide ; seul `desktop/php/` modifié : ajout de la donnée de Q1 (+47 lignes, aucune suppression) ; aucun champ ajouté à la liste blanche de `getEquipmentStates`.
+- **Tests existants adaptés PAR AJOUT (AC11)** : `test_story_25_3_page_b` (champs de `j2haRoomsTree` : + `eq_type`, + `j2haPluginNames`) ; `test_story_25_4_recherche_filtres` (la comparaison des repères carte / arbre ignore aussi « N exclus ») ; `test_story_25_4_css_collision`, `…_palette_theme` (une entrée autorisée en plus, voir CSS) ; `test_story_25_4_glossaire` (+ « Exclus ») ; `test_story_25_6_documentation` (retrouve son entrée de changelog par son titre) ; `tests/unit/helpers/render_page.php` (faux plugin à nom lu dans la fixture), `ui_harness.js`, `workview_harness.js`, `workview_browser.js` (`pluginNames`). Aucune assertion retirée.
+- **Tâches sautées** : Task 0 (pre-flight, relevé des exclus par cause sur la box) et Task 6 (preuve terrain, vérification des « par la pièce » sur la box, passage à `ready-for-UX-validation`) sont réservées à ClaudeBox (CC-48). Statut courant `review`.
+
 ### File List
+
+- `desktop/js/jeedom2ha_mapping_override.js` (ajouts), `desktop/js/jeedom2ha_overview.js`, `desktop/js/jeedom2ha_workview.js`, `desktop/js/jeedom2ha_mapping_surface.js`, `desktop/css/jeedom2ha.css` (modifiés)
+- `desktop/php/jeedom2ha.php`, `desktop/php/jeedom2ha_overview_helpers.php` (modifiés)
+- `docs/fr_FR/index.md`, `docs/fr_FR/compteurs.md`, `docs/fr_FR/changelog_beta.md` (modifiés)
+- `tests/e2e/gate/parcours/vue-maitre-detail-c.mjs` (modifié)
+- `tests/unit/helpers/render_page.php`, `ui_harness.js`, `workview_harness.js`, `workview_browser.js` (modifiés)
+- `tests/unit/test_story_25_3_page_b.node.test.js`, `test_story_25_4_recherche_filtres`, `…_css_collision`, `…_palette_theme`, `…_glossaire`, `test_story_25_6_documentation` (modifiés)
+- `tests/unit/test_story_25_7_cause_exclusion.node.test.js`, `…_ventilation…`, `…_detail_equipement…`, `…_gate…`, `…_documentation…`, `test_story_25_7_php_plugin_names.php` (nouveaux)
+- `_bmad-output/implementation-artifacts/25-7-cause-exclusion-affichee.md`, `sprint-status.yaml` (statuts, Dev Agent Record)
 
 ## Décisions (ClaudeBox, 2026-10-19 17:40)
 
@@ -300,3 +324,4 @@ Ni l'entrée agrégée, ni l'arbre unitaire, ni `j2haRoomsTree` ne portent le ty
 
 - 2026-10-19 — Création (`create-story`, session cloud déléguée) depuis le sprint change du 19/10 (point 3) : statut `backlog`, 14 AC, 10 décisions déjà arbitrées, 7 questions ouvertes avec recommandation ; constat consigné : le nom du plugin n'est pas disponible côté interface (Q1) ; `ready-for-dev` non accordé ; statut cible `ready-for-UX-validation` (validation UX finale en 25.5).
 - 2026-10-19 17:40 — Relecture ClaudeBox : recommandations retenues (§ Décisions) ; `ready-for-dev`.
+- 2026-10-19 — dev-story (session cloud déléguée, après 25.6) : Tasks 1 à 5 faites, Tasks 0 et 6 sautées (CC-48) ; statut `review` ; preuve terrain et `ready-for-UX-validation` à ClaudeBox.

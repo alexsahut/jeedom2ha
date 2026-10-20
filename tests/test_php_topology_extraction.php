@@ -206,6 +206,25 @@ try {
         assertTrueTopology(is_array($eqScopeEntry), 'Target equipment still has a published_scope entry after excludedObjects change');
         assertSameTopology('inherit', $eqScopeEntry['raw_state'] ?? null, 'Equipment raw_state remains inherit in producer payload');
         assertSameTopology('default_inherit', $eqScopeEntry['source'] ?? null, 'Equipment source remains default_inherit in producer payload');
+
+        // Story 25.8 (AC20) : la chaîne produite par la fonction de la route `saveRoomExclusion` est lue par la MÊME
+        // extraction (même clé, même lecture) : exclusion_source=object, puis plus d'exclusion après « ne plus exclure ».
+        requireFirstExisting(
+            array(
+                __DIR__ . '/../core/php/jeedom2ha_room_exclusion.php',
+                __DIR__ . '/../../plugins/jeedom2ha/core/php/jeedom2ha_room_exclusion.php',
+            ),
+            'jeedom2ha room exclusion functions'
+        );
+        $viaRoute = jeedom2ha_toggle_excluded_object('', $targetObjectId, true);
+        config::save('excludedObjects', $viaRoute['csv'], 'jeedom2ha');
+        $eqViaRoute = mapEqById(jeedom2ha::getFullTopology()['eq_logics'] ?? array())[$targetEqId] ?? null;
+        assertSameTopology(true, (bool)($eqViaRoute['is_excluded'] ?? false), 'room added through the saveRoomExclusion function marks the equipment as excluded');
+        assertSameTopology('object', $eqViaRoute['exclusion_source'] ?? null, 'room added through the saveRoomExclusion function maps to exclusion_source=object');
+        $viaRoute = jeedom2ha_toggle_excluded_object($viaRoute['csv'], $targetObjectId, false);
+        config::save('excludedObjects', $viaRoute['csv'], 'jeedom2ha');
+        $eqViaRoute = mapEqById(jeedom2ha::getFullTopology()['eq_logics'] ?? array())[$targetEqId] ?? null;
+        assertSameTopology(false, (bool)($eqViaRoute['is_excluded'] ?? false), 'room removed through the saveRoomExclusion function is no longer excluded');
     }
 } catch (Throwable $e) {
     $failures[] = 'Unhandled exception: ' . $e->getMessage();

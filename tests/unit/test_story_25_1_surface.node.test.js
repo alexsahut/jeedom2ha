@@ -253,13 +253,15 @@ describe('25.1 / AC10 — réglage de publication segmenté', () => {
     assert.equal(ui.pending('revertPublicationOverride').length, 0);
   });
 
+  // Story 25.8 : « Exclure la pièce… » est le libellé de l'exclusion de pièce (menu de pièce) ; le motif `Exclure l` ne vise que
+  // les anciens boutons d'équipement (« Exclure l'équipement… »).
   it('les anciens boutons Exclure / Forcer / Revenir au mode automatique n’existent plus', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY]))]);
     const text = ui.$('.j2ha-wv').text();
-    assert.doesNotMatch(text, /Revenir au mode automatique|Forcer l|Exclure l|Exclure cette|Forcer cette/);
+    assert.doesNotMatch(text, /Revenir au mode automatique|Forcer l|Exclure l(?!a pièce)|Exclure cette|Forcer cette/);
     const walk = (dir) => fs.readdirSync(dir).flatMap((f) => (fs.statSync(dir + '/' + f).isDirectory() ? walk(dir + '/' + f) : [dir + '/' + f]));
     for (const file of walk('desktop')) {
-      assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /Revenir au mode automatique|Forcer l|Exclure l|Exclure cette|Forcer cette/, file);
+      assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /Revenir au mode automatique|Forcer l|Exclure l(?!a pièce)|Exclure cette|Forcer cette/, file);
     }
   });
 

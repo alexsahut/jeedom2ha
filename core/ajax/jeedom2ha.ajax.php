@@ -842,20 +842,46 @@ try {
       ]);
     }
     else if ($action == 'saveFilteringConfig') {
-      $excludedPlugins  = init('excludedPlugins', '');
-      $excludedObjects  = init('excludedObjects', '');
-      $confidencePolicy = init('confidencePolicy', 'sure_probable');
-      // Validation : valeurs autorisées uniquement
-      if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
-        $confidencePolicy = 'sure_probable';
-      }
-      config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');
-      config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');
-      config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');
-      log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins="'
-        . $excludedPlugins . '" excludedObjects="' . $excludedObjects
-        . '" confidencePolicy="' . $confidencePolicy . '"');
+      // Story 25.9 : seules `excludedPlugins` et `confidencePolicy` sont écrites. La clé des pièces exclues n'est ni écrite ni
+      // effacée ici (elle ne s'écrit que depuis la surface, route saveRoomExclusion) : une ancienne page restée ouverte ne la
+      // périme plus.
+      require_once __DIR__ . '/../php/jeedom2ha_excluded_plugins.php'; // fonctions pures, sans cœur Jeedom
+      jeedom2ha_save_filtering_config(
+        array(
+          'excludedPlugins'  => init('excludedPlugins', ''),
+          'confidencePolicy' => init('confidencePolicy', 'sure_probable'),
+        ),
+        function (string $key, string $value) {
+          config::save($key, $value, 'jeedom2ha');
+        },
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        }
+      );
       ajax::success(['saved' => true]);
+    }
+    else if ($action == 'saveRoomExclusion') {
+      // Story 25.8 (D2) — exclusion d'une pièce depuis la surface : lit, modifie puis écrit la SEULE clé
+      // `excludedObjects` (jamais excludedPlugins ni confidencePolicy). Aucun appel au démon, aucune relecture
+      // implicite : l'interface enchaîne explicitement la relecture après la confirmation chiffrée.
+      require_once __DIR__ . '/../php/jeedom2ha_room_exclusion.php'; // fonctions pures, sans cœur Jeedom
+      $result = jeedom2ha_save_room_exclusion(
+        init('objectId', ''),
+        init('excluded', ''),
+        function (int $objectId) {
+          return is_object(jeeObject::byId($objectId));
+        },
+        function () {
+          return (string) config::byKey('excludedObjects', 'jeedom2ha', '');
+        },
+        function (string $value) {
+          config::save('excludedObjects', $value, 'jeedom2ha');
+        },
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        }
+      );
+      ajax::success($result);
     }
     else if ($action == 'executeHaAction') {
       // Story 5.1 — Relay strict de la façade backend unique /action/execute.

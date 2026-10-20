@@ -29,6 +29,11 @@ function fileAtBase(file) {
   return git(['show', '{base}:' + file]);
 }
 
-const removedLines = (diff) => diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+/* Seule ligne retirée admise dans jeedom2ha_mapping_override.js : le JSDoc `@returns {{…}|null}` de 25.7, dont le `{{` était
+ * apparié par le traducteur du cœur Jeedom avec le `}}` d'un libellé plus bas (« {{par le plugin X » sur la box, gate 25.6).
+ * Commentaire seul : aucune règle d'état n'est touchée. Voir test_jeedom_traducteur_marqueurs. */
+const ALLOWED_REMOVED = new Set(['-   * @returns {{kind: string, code: string}|null}']);
 
-module.exports = { diffAgainstBase, fileAtBase, removedLines, BASES };
+const removedLines = (diff) => diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---') && !ALLOWED_REMOVED.has(l));
+
+module.exports = { diffAgainstBase, fileAtBase, removedLines, BASES, ALLOWED_REMOVED };

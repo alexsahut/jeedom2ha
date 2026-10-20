@@ -14,6 +14,32 @@
 
 ---
 
+# 2026-10-19 — Exclure une pièce depuis la surface ; configuration : plugins à cocher
+
+- Une pièce entière s'exclut (et ne s'exclut plus) **depuis sa carte** (menu « ⋯ ») ou **depuis le détail de la pièce**. La confirmation annonce combien d'entités vont quitter Home Assistant (« 5 entités seront retirées de Home Assistant. »), puis le plugin enregistre l'exclusion et relit Jeedom aussitôt, sans état « À appliquer ». La carte affiche « Pièce exclue ». La pièce prime sur « Toujours » ; « Sans pièce » ne s'exclut pas ; les sous-pièces ne sont pas exclues avec leur parent.
+- Dans la configuration du plugin, « Plugins exclus » devient une **liste à cocher** des plugins présents dans Jeedom (même réglage, même format, rien n'est perdu : un plugin exclu mais absent de Jeedom reste coché « (absent de Jeedom) »). Le champ de saisie « Pièces exclues » disparaît au profit d'un renvoi vers la page du plugin ; les pièces déjà exclues sont reprises telles quelles.
+- La route agrégée du démon ajoute `present_in_ha` à chaque entité (un seul champ, aucune décision modifiée) pour que le nombre d'entités annoncé soit exact. Aucune autre modification du démon.
+
+---
+
+# 2026-10-19 — Cause d'exclusion affichée
+
+- Un équipement « Exclu » dit maintenant **pourquoi** : « par le plugin X », « par la pièce » ou « individuelle », sur sa ligne dans l'arbre de la vue de travail ; sa phrase complète et l'endroit où agir sont dans son détail, avec un bouton qui ouvre la configuration du plugin.
+- Le détail d'une pièce ajoute une ligne « Exclus : » (par exemple « 2 par le plugin X, 1 individuelle »), et la carte de la pièce un repère gris « N exclus » dont l'infobulle donne la même ventilation.
+- Ce n'est pas un état de plus, et un équipement désactivé n'affiche jamais de cause d'exclusion. Le nom du plugin est lu par la page dans Jeedom.
+- Aucune modification du démon, ni de ce qui est publié dans Home Assistant. Aucune requête de plus.
+
+---
+
+# 2026-10-19 — Vue de travail : une carte ouvre la pièce seule
+
+- Un clic sur une carte de pièce ouvre la vue de travail sur **cette pièce seule** : elle est tout de suite visible, même dans une maison de plus de vingt pièces. Le bouton « Toutes les pièces », en tête de l'arbre, élargit à toute la maison en gardant votre choix.
+- Depuis une puce, un segment de la jauge ou une ligne de la liste filtrée, la vue s'ouvre sur toutes les pièces, comme avant.
+- Le bouton qui ramène à la page principale s'appelle désormais « Page principale ». L'adresse de la page garde la portée (`seule:1`) ; « Précédent » garde ses trois niveaux.
+- Aucune modification du démon, ni de ce qui est publié dans Home Assistant. Aucune requête de plus.
+
+---
+
 # 2026-10-19 — Vue de travail : l'arbre des pièces et le détail, sans fenêtre
 
 - Un clic sur une carte de pièce, sur une puce ou un segment de la jauge, ou sur une ligne de la liste filtrée ouvre une **vue de travail** dans la page du plugin, à la place de l'ancienne fenêtre de pièce : l'arbre des pièces et de leurs équipements à gauche (recherche, filtres), le détail à droite.

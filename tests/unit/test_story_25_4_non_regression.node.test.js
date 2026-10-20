@@ -22,15 +22,49 @@ const maybe = phpAvailable ? it : it.skip;
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne changent pas', () => {
+  // Stories 25.8 et 25.9 (adaptation par ajout) : seules ces lignes existantes ont été remplacées — la liste blanche de la route agrégée
+  // gagne `present_in_ha` (25.8, Q1 B) et `saveFilteringConfig` n'écrit plus la clé des pièces exclues (25.9, AC6). Tout autre
+  // retrait dans ces fichiers fait échouer le garde.
+  const REPLACED_BY_25_8_25_9 = [
+    '"entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],',
+    'equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,',
+    'assert all(set(e) == {"override_pending"} for e in entry["entities"])', // test de la liste blanche de 25.2, mis à jour avec elle
+    "$excludedPlugins  = init('excludedPlugins', '');",
+    "$excludedObjects  = init('excludedObjects', '');",
+    "$confidencePolicy = init('confidencePolicy', 'sure_probable');",
+    '// Validation : valeurs autorisées uniquement',
+    "if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {",
+    "$confidencePolicy = 'sure_probable';",
+    '}',
+    "config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');",
+    "config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');",
+    "config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');",
+    "log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins=\"'",
+    '. $excludedPlugins . \'" excludedObjects="\' . $excludedObjects',
+    '. \'" confidencePolicy="\' . $confidencePolicy . \'"\');',
+  ];
+
   // Story 24.2 (autorisée par ClaudeBox) : l'export de décision ajoute une route du démon, une action ajax et deux clés de
-  // sync_config. Le gel de resources/daemon/, core/ajax/ et core/class/ est donc levé ; ce que 25.4 protège vraiment (la liste
-  // blanche et le budget de getEquipmentStates, le relais de cette lecture) reste gardé à l'octet près par AC32 ci-dessous.
-  it('git diff --stat sur les scripts de déploiement et lib/policy.mjs : vide', () => {
+  // sync_config. Seules ces deux lignes existantes sont remplacées (sync_config étendu ; condition de périmètre du sync calculée
+  // une fois dans `scope_included`) ; core/class/ passe donc du « diff vide » au garde « aucune ligne retirée » ci-dessous.
+  const REPLACED_BY_24_2 = [
+    "$result['sync_config'] = array('confidence_policy' => $confidencePolicy);",
+    'if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):',
+  ];
+
+  it('git diff --stat sur les scripts de déploiement : vide', () => {
     const diff = diffAgainstBase(['--stat'], [
-      'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh',
-      'scripts/deploy-inventory-diff.sh', 'tests/e2e/gate/lib/policy.mjs',
+      'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh',
     ]);
     if (diff !== null) assert.equal(diff, '');
+  });
+
+  it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
+    const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'core/class/', 'tests/e2e/gate/lib/policy.mjs']);
+    if (diff === null) return;
+    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2];
+    const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !allowed.includes(line));
+    assert.deepEqual(unexpected, []);
   });
 
   it('aucun fichier core/i18n n’est créé', () => {
@@ -75,6 +109,8 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     assert.equal(constants(py), constants(pyBase), 'constantes de la route modifiées');
     const relay = ["$action == 'getEquipmentStates'", 'else if ($action =='];
     assert.equal(slice(php, ...relay), slice(phpBase, ...relay), 'relais getEquipmentStates modifié');
+    // Story 25.8 (Q1 B) : la projection porte `present_in_ha` (état final, base déjà porteuse de 25.8).
+    assert.ok(py.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));
   });
 
   it('292 équipements de la forme la plus lourde : calcul de l’arbre, des KPI et des filtres mesuré (consigné, sans seuil)', (t) => {

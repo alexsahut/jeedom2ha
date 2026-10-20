@@ -9,7 +9,7 @@ const path = require('node:path');
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const W = require('../../desktop/js/jeedom2ha_workview.js');
-const { startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { tree, ok, READY } = require('./helpers/ui_harness');
 
 const maybe = phpAvailable ? it : it.skip;
@@ -72,7 +72,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
 
   maybe('data-j2ha-layout vaut « split » à partir du seuil, « compact » en dessous', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 1280 } });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(layout(ui), 'split');
     ui.win.setSize(W.LAYOUT_SPLIT_MIN_WIDTH - 1, 800);
     assert.equal(layout(ui), 'compact');
@@ -82,7 +82,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
 
   maybe('sans matchMedia : repli sur resize', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 1280, noMatchMedia: true } });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(layout(ui), 'split');
     ui.win.setSize(700, 900);
     assert.equal(layout(ui), 'compact');
@@ -90,7 +90,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
 
   maybe('changer de disposition (rotation) conserve sélection, filtre, recherche ; aucune requête', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 1280, height: 800 } });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
@@ -113,6 +113,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
   maybe('compact : bouton « Pièces » (aria-expanded, aria-controls), replié si une sélection existe, ouvert sinon ; sélectionner referme', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 800, height: 1000 } });
     ui.openRoom(10);
+    ui.click('.j2ha-wv-widen'); // Story 25.6 : la carte ouvre la pièce seule ; l'arbre complet s'obtient en élargissant
     const toggle = ui.$('.j2ha-wv-drawer-toggle');
     const nav = ui.$('.j2ha-wv-nav');
     assert.equal(toggle.length, 1);
@@ -131,7 +132,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
 
   maybe('le changement de disposition est annoncé dans une zone role="status" aria-live="polite"', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 1280 } });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.win.setSize(700, 900);
     const live = ui.$('.j2ha-wv-live');
     assert.equal(live.attr('role'), 'status');
@@ -143,7 +144,7 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
 describe('25.4 / AC9, Q12 — hauteur mesurée à l’exécution', () => {
   maybe('hauteur = fenêtre − décalage haut mesuré, minimum 480 px ; recalculée sur resize et orientationchange', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 1280, height: 900 }, offsetTop: 150 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     assert.equal(ui.wv.height(), 750);
     ui.win.setSize(1280, 500);
     assert.equal(ui.wv.height(), 480, 'hauteur minimale utile');

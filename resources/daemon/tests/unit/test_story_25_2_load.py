@@ -38,6 +38,9 @@ N_EQUIPMENTS = 292
 BUDGET_COLD_MS = 4000
 BUDGET_HIT_MS = 50
 BUDGET_BYTES = 1_500_000
+# Story 25.8 (Q1 B) : seuil de vigilance de la charge utile (la box a mesuré 1 342 346 octets en 25.4) ; le dépasser est
+# consigné par la preuve terrain (le champ `present_in_ha` est conservé), le budget ci-dessus reste le seuil bloquant.
+VIGILANCE_BYTES = 1_350_000
 
 
 def _many_commands(eq_id, object_id):
@@ -137,3 +140,5 @@ async def test_ac15_budgets_route_agregee(aiohttp_client, tmp_path):
     assert cold_ms <= BUDGET_COLD_MS, f"construction à froid projetée {cold_ms:.0f} ms > {BUDGET_COLD_MS}"
     assert hit_ms <= BUDGET_HIT_MS, f"appel à chaud projeté {hit_ms:.0f} ms > {BUDGET_HIT_MS}"
     assert nbytes <= BUDGET_BYTES, f"charge utile {nbytes} octets > {BUDGET_BYTES}"
+    if nbytes > VIGILANCE_BYTES:
+        print(f"[25.8 Q1] ATTENTION charge utile {nbytes} octets > seuil de vigilance {VIGILANCE_BYTES}")

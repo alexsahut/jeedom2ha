@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { startWorkview, startBig, openCard, phpAvailable } = require('./helpers/workview_harness');
+const { startWorkview, startBig, openCardWide, phpAvailable } = require('./helpers/workview_harness');
 const { okBody } = require('./helpers/page_b_harness');
 
 const maybe = phpAvailable ? it : it.skip;
@@ -18,7 +18,7 @@ describe('25.4 / AC5 — navigation sans lecture d’état', () => {
   maybe('ouvrir, naviguer, filtrer, chercher, replier le panneau, revenir, rouvrir : zéro getEquipmentStates', () => {
     const ui = startBig({ rooms: 4, equipments: 44, seed: 7 });
     assert.deepEqual(ui.reads(), { states: 1, trees: 0 }, 'une seule lecture d’état au chargement de la page B');
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle');
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
@@ -29,7 +29,7 @@ describe('25.4 / AC5 — navigation sans lecture d’état', () => {
     ui.advance(400);
     ui.click('.j2ha-wv-drawer-toggle');
     ui.click('.j2ha-wv-back');
-    openCard(ui, 12);
+    openCardWide(ui, 12);
     assert.equal(ui.count('getEquipmentStates'), 1, 'aucune lecture d’état supplémentaire');
     assert.equal(ui.calls.filter((c) => String(c.data.refresh || '') !== '').length, 0, 'aucun paramètre refresh');
     assert.equal(ui.count('getMappingOverrides'), 0, 'aucun arbre lu sans sélection d’équipement');
@@ -37,7 +37,7 @@ describe('25.4 / AC5 — navigation sans lecture d’état', () => {
 
   maybe('une relecture déclenchée (fin d’action) = un appel sans refresh, coalescé ; la vue suit sans perdre la sélection', () => {
     const ui = startBig({ rooms: 3, equipments: 20, seed: 3 });
-    openCard(ui, 10);
+    openCardWide(ui, 10);
     const eqId = ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id'];
     ui.sandbox.window.j2haNotifyStatesChanged = ui.sandbox.window.j2haNotifyStatesChanged || (() => ui.page.reader.trigger());
     ui.page.reader.trigger();
@@ -74,7 +74,7 @@ describe('25.4 / AC5 — états de lecture dégradés : mêmes mentions que la p
   maybe('jamais synchronisé : la vue s’ouvre, l’arbre est rendu sans état, la mention de B est visible, ni NaN ni « non lu »', () => {
     const ui = startWorkview({ states: false });
     ui.respond('getEquipmentStates', { state: 'ok', result: { status: 'ok', payload: { schema_version: 1, available: false, equipments: {}, unread: [] } } });
-    openCard(ui, 3);
+    openCardWide(ui, 3);
     const status = ui.text('.j2ha-wv-read-status');
     assert.equal(status, "Aucune synchronisation n'a encore eu lieu");
     assert.equal(ui.$('.j2ha-wv-read-status').attr('role'), 'status');
@@ -90,11 +90,11 @@ describe('25.4 / AC5 — états de lecture dégradés : mêmes mentions que la p
   maybe('lecture en erreur : « Chiffres indisponibles » ; opération en cours : « Mise à jour en cours… » (les libellés de B)', () => {
     const ui = startWorkview({ states: false });
     ui.respond('getEquipmentStates', { state: 'error', result: 'x' });
-    openCard(ui, 3);
+    openCardWide(ui, 3);
     assert.equal(ui.text('.j2ha-wv-read-status'), 'Chiffres indisponibles');
     const busy = startWorkview({ states: false });
     busy.respond('getEquipmentStates', { state: 'ok', result: { status: 'ok', payload: { schema_version: 1, available: false, reason: 'action_in_progress', equipments: {}, unread: [] } } });
-    openCard(busy, 3);
+    openCardWide(busy, 3);
     assert.equal(busy.text('.j2ha-wv-read-status'), 'Mise à jour en cours…');
   });
 });
