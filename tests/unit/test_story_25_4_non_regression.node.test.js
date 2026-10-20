@@ -99,6 +99,8 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     const slice = (text, from, to) => text.slice(text.indexOf(from), text.indexOf(to, text.indexOf(from)));
     const pyBase = fileAtBase('resources/daemon/transport/http_server.py');
     const phpBase = fileAtBase('core/ajax/jeedom2ha.ajax.php');
+    // Une base disponible pour `git diff` l'est aussi pour `git show <base>:<fichier>` : sinon le garde serait muet.
+    if (diffAgainstBase(['--stat'], ['core/ajax/']) !== null) assert.ok(pyBase !== null && phpBase !== null, 'fileAtBase sans contenu');
     if (pyBase === null || phpBase === null) return; // aucune base : garde sans effet
     const py = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
     const php = fs.readFileSync(path.join(root, 'core/ajax/jeedom2ha.ajax.php'), 'utf8');
@@ -108,6 +110,7 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     const constants = (text) => text.split('\n').filter((l) => /^_EQUIPMENT_STATES_/.test(l)).join('\n');
     assert.equal(constants(py), constants(pyBase), 'constantes de la route modifiées');
     const relay = ["$action == 'getEquipmentStates'", 'else if ($action =='];
+    assert.ok(php.includes(relay[0]) && phpBase.includes(relay[0]), 'relais getEquipmentStates introuvable');
     assert.equal(slice(php, ...relay), slice(phpBase, ...relay), 'relais getEquipmentStates modifié');
     // Story 25.8 (Q1 B) : la projection porte `present_in_ha` (état final, base déjà porteuse de 25.8).
     assert.ok(py.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));

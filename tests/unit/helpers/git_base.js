@@ -13,7 +13,7 @@ const BASES = ['main', 'origin/main', '4ff80cdbb04532ff01d7d6fbe6ee640333a21898'
 function git(args) {
   for (const base of BASES) {
     try {
-      return execFileSync('git', args.map((a) => (a === '{base}' ? base : a)), { encoding: 'utf8', cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] });
+      return execFileSync('git', args.map((a) => a.split('{base}').join(base)), { encoding: 'utf8', cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] });
     } catch { /* base suivante */ }
   }
   return null;
