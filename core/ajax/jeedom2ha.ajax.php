@@ -42,6 +42,28 @@ function _jeedom2ha_run_parc_relay(string $relais, callable $call): array {
 }
 
 /**
+ * Story 24.2 — extrait le document d'export de décision de la réponse du démon.
+ * Fonction pure (chargeable sans le cœur Jeedom) : le document est rendu tel quel, jamais
+ * retraité ; un démon sans donnée en mémoire ou une réponse inattendue lève une erreur pour l'UI.
+ *
+ * @throws Exception message destiné à l'UI
+ */
+function _jeedom2ha_decision_export_payload(array $daemonResult): array {
+  $payload = $daemonResult['payload'] ?? null;
+  if (($daemonResult['status'] ?? '') !== 'ok' || !is_array($payload) || ($payload['schema_version'] ?? null) === null) {
+    throw new Exception('Aucune donnée en mémoire : lancez « Relire Jeedom » avant de télécharger l\'export de décision.');
+  }
+  // json_decode(..., true) transforme l'objet vide `{}` en tableau vide `[]` : on rend `overrides.types`
+  // vide comme un objet, pour que le document téléchargé reste identique à celui du démon.
+  foreach ($payload['equipments'] ?? array() as $i => $equipment) {
+    if (isset($equipment['overrides']['types']) && $equipment['overrides']['types'] === array()) {
+      $payload['equipments'][$i]['overrides']['types'] = new stdClass();
+    }
+  }
+  return $payload;
+}
+
+/**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
  * Story 15.1/15.2 — passthrough additif de state_class/unit_of_measurement et
@@ -673,6 +695,15 @@ try {
         return jeedom2ha::callDaemon('/system/diagnostics', null, 'GET', $timeoutS, 1);
       });
       ajax::success($result);
+    }
+    else if ($action == 'getDecisionExport') {
+      // Story 24.2 — export JSON versionné du contrat de décision (identifiants seulement, aucun nom).
+      // Lecture seule, réservée à l'administrateur (garde ci-dessus). Payload proportionnel au parc →
+      // budget fixe R, une seule tentative (motif A1) ; la route du démon reste interne.
+      $result = _jeedom2ha_run_parc_relay('DECISION_EXPORT', function (int $timeoutS) {
+        return jeedom2ha::callDaemon('/system/decision_export', null, 'GET', $timeoutS, 1);
+      });
+      ajax::success(_jeedom2ha_decision_export_payload($result));
     }
     else if ($action == 'getPublishedScopeForConsole') {
       $result = jeedom2ha::getPublishedScopeForConsole();

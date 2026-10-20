@@ -658,6 +658,43 @@ $(function() {
       }
     });
   });
+
+  // Export de décision — Story 24.2 (lecture seule : identifiants seulement, aucun nom)
+  $('#bt_exportDecision').on('click', function () {
+    var $btn    = $(this);
+    var $status = $('#span_decisionExportResult');
+    $btn.prop('disabled', true);
+    $status.removeClass('label-success label-danger').addClass('label').text('{{Export en cours…}}').show();
+
+    $.ajax({
+      type:     'POST',
+      url:      'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+      data:     { action: 'getDecisionExport' },
+      dataType: 'json',
+      timeout:  (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
+      success: function (data) {
+        $btn.prop('disabled', false);
+        if (data.state !== 'ok') {
+          $status.removeClass('label').addClass('label label-danger').text(data.result || '{{Erreur export}}');
+          return;
+        }
+        var json   = JSON.stringify(data.result, null, 2);
+        var blob   = new Blob([json], {type: 'application/json'});
+        var url    = URL.createObjectURL(blob);
+        var today  = new Date().toISOString().slice(0, 10);
+        var anchor = document.createElement('a');
+        anchor.href     = url;
+        anchor.download = 'jeedom2ha-decision-export-' + today + '.json';
+        anchor.click();
+        URL.revokeObjectURL(url);
+        $status.removeClass('label').addClass('label label-success').text('{{Export de décision téléchargé}}');
+      },
+      error: function () {
+        $btn.prop('disabled', false);
+        $status.removeClass('label').addClass('label label-danger').text('{{Erreur de communication}}');
+      }
+    });
+  });
 });
 
 /* Permet la réorganisation des commandes dans l'équipement */

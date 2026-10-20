@@ -56,13 +56,14 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     assert.ok(!main.includes('{{Actions Home Assistant}}'), 'plus de zone « Actions Home Assistant »');
   });
 
-  maybe('menu : « Télécharger le diagnostic… », séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
+  maybe('menu : « Télécharger le diagnostic… », « Télécharger l’export de décision… » (24.2), séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
     const ui = startPage();
     const items = ui.$('#j2ha_moreMenu .j2ha-menu li').list.map((li) => ({
       role: li.attrs.role, text: plain(ui.$(li).text()).trim(),
     }));
     assert.deepEqual(items, [
       { role: 'none', text: 'Télécharger le diagnostic…' },
+      { role: 'none', text: 'Télécharger l\'export de décision…' },
       { role: 'separator', text: '' },
       { role: 'none', text: 'Supprimer tout de Home Assistant…' },
     ]);

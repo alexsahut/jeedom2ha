@@ -920,7 +920,12 @@ class jeedom2ha extends eqLogic {
     $result['scenarios_complete'] = $scenariosPayload['complete'];
 
     // Ajout de sync_config pour la politique de confiance (Story 4.3)
-    $result['sync_config'] = array('confidence_policy' => $confidencePolicy);
+    // Story 24.2 — réglages de filtrage (identifiants seulement) pour l'export de décision.
+    $result['sync_config'] = array(
+      'confidence_policy' => $confidencePolicy,
+      'excluded_plugins' => array_values($excludedPlugins),
+      'excluded_piece_ids' => array_values($excludedObjects),
+    );
     $result['published_scope'] = $publishedScope;
 
     log::add(__CLASS__, 'info', '[TOPOLOGY] Scan complet : ' . count($result['objects']) . ' objets, ' . count($result['eq_logics']) . ' eqLogics, ' . count($result['scenarios']) . ' scénarios');

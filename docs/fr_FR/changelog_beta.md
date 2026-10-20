@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-10-20 — Export de décision : ce que le plugin a décidé, dans un fichier
+
+- Le menu « ⋯ » de la page principale propose « Télécharger l'export de décision… » : un fichier JSON qui dit, pour chaque équipement, chaque commande et chaque scénario, ce que le plugin a décidé (publié ou non, et pourquoi), d'après la dernière synchronisation ou le dernier « Publier ».
+- Le fichier ne contient que des identifiants : aucun nom d'équipement, de pièce, de commande ni de scénario, aucun secret. Il est réservé à l'administrateur.
+- Lecture seule : rien de ce qui est publié dans Home Assistant ne change.
+
+---
+
 # 2026-10-19 — Exclure une pièce depuis la surface ; configuration : plugins à cocher
 
 - Une pièce entière s'exclut (et ne s'exclut plus) **depuis sa carte** (menu « ⋯ ») ou **depuis le détail de la pièce**. La confirmation annonce combien d'entités vont quitter Home Assistant (« 5 entités seront retirées de Home Assistant. »), puis le plugin enregistre l'exclusion et relit Jeedom aussitôt, sans état « À appliquer ». La carte affiche « Pièce exclue ». La pièce prime sur « Toujours » ; « Sans pièce » ne s'exclut pas ; les sous-pièces ne sont pas exclues avec leur parent.

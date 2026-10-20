@@ -735,6 +735,23 @@
       }
     }
 
+    // « Télécharger l'export de décision… » (story 24.2) : même mécanique que le diagnostic, contenu du bouton de
+    // téléchargement (lecture seule, identifiants seulement) déplacé dans une boîte puis rendu à sa place à la fermeture.
+    function openDecisionExportDialog() {
+      var $holder = $('#div_decisionExportDialog');
+      var $content = $holder.children();
+      var dialog = env.bootbox.dialog({
+        title: w('Télécharger l\'export de décision'),
+        message: $content,
+        onEscape: true,
+        backdrop: true,
+        buttons: { close: { label: w('Fermer'), className: 'btn-default' } },
+      });
+      if (dialog && typeof dialog.on === 'function') {
+        dialog.on('hidden.bs.modal', function () { $holder.append($content); });
+      }
+    }
+
     function init() {
       $('#bt_refreshStates').on('click', function () { reader.refresh(); });
       $('#bt_clearFilter').on('click', function () { setFilter(null); });
@@ -742,6 +759,7 @@
       $('#j2ha_moreMenu .j2ha-menu-wrap').each(function (_i, el) { bindMenu($(el)); });
       $('#j2ha_roomCards .j2ha-room-menu').each(function (_i, el) { bindRoomMenu($(el)); });
       $('#bt_openDiagnostic').on('click', openDiagnosticDialog);
+      $('#bt_openDecisionExport').on('click', openDecisionExportDialog);
       $('#j2ha_roomCards .j2ha-room-card').each(function (_i, el) {
         $(el).on('keydown', function (event) {
           if (event && (event.key === 'Enter' || event.key === ' ')) {

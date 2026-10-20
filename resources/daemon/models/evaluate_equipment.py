@@ -229,6 +229,14 @@ def _step_for_decision(decision: PublicationDecision) -> str:
     return "3"
 
 
+def step_for_decision(decision: PublicationDecision) -> str:
+    """Story 24.2 — niveau I4 (step) d'une décision déjà résolue, pour l'export de décision.
+
+    Même résolveur que `evaluate_equipment()` (aucune seconde table de correspondance).
+    """
+    return _step_for_decision(decision)
+
+
 def _decide_for_mapping(
     mapping: MappingResult,
     *,

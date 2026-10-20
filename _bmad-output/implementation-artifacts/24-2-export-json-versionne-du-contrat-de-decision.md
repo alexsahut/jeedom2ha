@@ -1,6 +1,6 @@
 # Story 24.2 : Export JSON versionné du contrat de décision
 
-Status: ready-for-dev
+Status: review
 
 > **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Q5 A et Q6 A tranchées). Brouillon de cadrage initial rédigé par une session cloud déléguée, documentaire ; décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
 >
@@ -107,13 +107,13 @@ Choix de conception à confirmer :
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Figer le schéma** avec ClaudeBox (champs, noms, tri) avant tout code ; confirmer Q5 et Q6.
-- [ ] **Task 1 — Mémoriser** les décisions par commande au sync et au « Publier » (RAM), sans changer ce qui est publié.
-- [ ] **Task 2 — Module d'export** (nouveau, propre, motif atomique repris sans modifier `overrides.py` ni `disk_cache.py`) et appels aux points d'écriture.
-- [ ] **Task 3 — Route du démon** et relais PHP ; bouton de téléchargement.
-- [ ] **Task 4 — Tests** : schéma, parité avec le diagnostic, confidentialité, déterminisme, collision équipement/scénario, paquet Market.
-- [ ] **Task 5 — Gate 20-0 + déploiement standard (humain) + baseline « avant »** ; mesure des écarts de la section 3 de la proposition.
-- [ ] **Task 6 — Documentation** du schéma.
+- [x] **Task 0 — Figer le schéma** avec ClaudeBox (champs, noms, tri) avant tout code ; confirmer Q5 et Q6. *Tranchée par ClaudeBox le 2026-10-20 à 01:00, voir le Journal des décisions.*
+- [x] **Task 1 — Mémoriser** les décisions par commande au sync et au « Publier » (RAM), sans changer ce qui est publié. *`DecisionMemo` ; la publication est prouvée identique avec et sans export (`test_ac9_publication_unchanged_with_and_without_export`).*
+- [x] **Task 2 — Module d'export** (nouveau, propre, motif atomique repris sans modifier `overrides.py` ni `disk_cache.py`) et appels aux points d'écriture. *`resources/daemon/export/decision_export.py` ; appelé au sync, au « Publier » et au « Supprimer ».*
+- [x] **Task 3 — Route du démon** et relais PHP ; bouton de téléchargement.
+- [x] **Task 4 — Tests** : schéma, parité avec le diagnostic, confidentialité, déterminisme, collision équipement/scénario, paquet Market.
+- [ ] **Task 5 — Gate 20-0 + déploiement standard (humain) + baseline « avant »** ; mesure des écarts de la section 3 de la proposition. *À faire par ClaudeBox après fusion (pas de box, pas de SSH, pas de `deploy-to-box.sh` en session cloud).*
+- [x] **Task 6 — Documentation** du schéma. *`docs/dev-decision-export.md` ; entrée `changelog_beta.md`.*
 
 ## Garde-fous
 
@@ -131,3 +131,57 @@ Taille réelle du document sur 292 équipements ; coût de mémorisation des dé
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, midi — R1 (ClaudeBox) : règle d'exposition de Homebridge, scénarios dans l'export, `logicalId` vide pour 65 accessoires sur 123.
 - 2026-10-12, 13:22 — Décisions d'Alexandre (relayées par ClaudeBox) : Q5 A, Q6 A, Q1 « exclu par plugin » conservé (pas de `voie_native`), Q11 oui. `ready-for-dev` accordé par ClaudeBox ; démarrage après 22.2 `done` conservé, ClaudeBox peut le lever.
+- 2026-10-20, 01:00 — **Task 0 tranchée par ClaudeBox** (consignée par la session de dev) : schéma `schema_version: 1` tel que proposé dans la story, champs et tri inchangés ; horodatage en tête seulement (`generated_at`, `sync_at`) ; pas de champ `native_test_mode` ; `config.excluded_piece_ids` = identifiants de `excludedObjects` ; décisions **mémorisées** au sync et au « Publier » (pas recalculées à l'export) ; **Q5 A** (identifiants seulement, aucun nom) et **Q6 A** (action AJAX d'administrateur `getDecisionExport` + téléchargement). Emplacement du bouton : une entrée « Télécharger l'export de décision » dans le menu « ⋯ » du bandeau de la page principale, juste après « Télécharger le diagnostic », même mécanique que lui. **22.2 est clos** (remplacé par l'epic 25) : la dépendance « démarre après 22.2 `done` » est levée.
+- 2026-10-20 — Dev (session cloud déléguée) : AC1 à AC10 et AC12 faits ; AC11 (gate 20-0 vert sur le bouton, baseline « avant » et comparaison au cache de Homebridge, AC11 bis) à ClaudeBox après fusion. Statut `review`.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Session cloud déléguée (Claude Code), branche `claude/export-decision-json-5p5l9r`.
+
+### Fichiers
+
+Création :
+- `resources/daemon/export/__init__.py`, `resources/daemon/export/decision_export.py` — `DecisionMemo`, `make_equipment_record`, `make_ineligible_record`, `index_overrides`, `build_decision_export`, `normalize_export_config`, `write_decision_export` (fichier temporaire + `fsync` + `os.replace`, mode 600, ne lève jamais).
+- `docs/dev-decision-export.md` — schéma, politique de version, confidentialité, taille.
+- `tests/unit/test_story_24_2_decision_export.py` (29 tests), `tests/unit/test_story_24_2_php_export.php` (18 contrôles), `tests/unit/test_story_24_2_bouton_export.node.test.js` (7 tests).
+
+Modification (additive, sauf mention) :
+- `resources/daemon/transport/http_server.py` — mémorisation des verdicts dans le sync et « Publier » ; `_refresh_decision_export` (jamais bloquant) au sync, au « Publier » et au « Supprimer » ; route `GET /system/decision_export`. Le bloc `if mapping is None: continue` / filtre de périmètre du sync a été réordonné pour calculer `scope_included` une fois (même logique, mêmes appels).
+- `resources/daemon/models/evaluate_equipment.py` — alias public `step_for_decision` (aucun changement de comportement).
+- `resources/daemon/discovery/publisher.py` — méthode pure `build_discovery_payload` (même constructeurs que `publish_*`) : l'export lit `unique_id` et `default_entity_id` dans le payload réel (AC6).
+- `resources/daemon/main.py` — `app["plugin_version"]` pour le champ `producer`.
+- `core/class/jeedom2ha.class.php` — `sync_config` porte `excluded_plugins` et `excluded_piece_ids` (identifiants seulement ; clés additives, `confidence_policy` inchangée).
+- `core/ajax/jeedom2ha.ajax.php` — action `getDecisionExport` (relais de parc `DECISION_EXPORT`, budget R, une tentative) et `_jeedom2ha_decision_export_payload` (rend `overrides.types` vide comme `{}`).
+- `desktop/php/jeedom2ha.php`, `desktop/js/jeedom2ha_overview.js`, `desktop/js/jeedom2ha.js` — entrée de menu, boîte et gestionnaire de téléchargement. Aucun CSS ajouté (classes `j2ha-diagnostic-dialog` / `j2ha-export` réutilisées), aucune couleur littérale. `desktop/js/jeedom2ha_mapping_override.js` : **inchangé**.
+- `.github/market-package/manifest.txt` (`forbid data/jeedom2ha_decision_export.json`, `require resources/daemon/export/decision_export.py`), `.gitignore`, `docs/fr_FR/changelog_beta.md`.
+- Tests existants adaptés (voir « Écarts ») : `tests/unit/test_story_25_3_page_b.node.test.js`, `tests/e2e/gate/parcours/page-principale-b.mjs`, `tests/unit/test_story_25_4_non_regression.node.test.js`, `tests/unit/helpers/git_base.js`, `tests/test_market_package.py`.
+
+### Choix de réalisation (à relire par ClaudeBox)
+
+1. **Valeurs de `decision`** : `published` (le principal est à publier), `partial` (principal refusé, au moins un secondaire à publier : forme 579/585), `not_published`. `decision` est le **verdict** ; l'exécution est `entities[].discovery_published`. « Supprimer » ne change pas le verdict.
+2. **Périmètre publié** : un équipement éligible refusé par le filtre de périmètre (appliqué après la décision, comme le fait le sync) porte `decision: not_published`, `reason: excluded`, `step: "scope"`, et ses commandes aussi (même verdict que `_scope_excluded_decision`). `scope` est une valeur de `step` propre à l'export.
+3. **Scénarios** : actif → `published` / `scenario_button` ; inactif → `not_published` / `scenario_inactive` (code propre à l'export, le pipeline n'en produit pas). L'entité d'un scénario inactif est décrite avec `discovery_published: false`.
+4. **Équipement sans verdict mémorisé** (jamais synchronisé) : `not_published`, `reason: no_sync_decision`, `step: null`.
+5. **`state_source`** : `streamed` si `list_state_targets()` contient `(eq_id, cmd_id, ha_type)` d'une commande de l'entité ; `optimistic` si l'entité est publiée, de domaine à commande (`light`, `cover`, `switch`, `climate`, `alarm_control_panel`) et non écoutée ; `none` sinon.
+6. **`overrides` / `pending_changes`** : `overrides` = ceux appliqués au dernier sync (ou « Publier » de l'équipement) ; `pending_changes` = différence avec ceux du disque au moment de l'export.
+7. **Inéligibles** : verdict par le chemin I1 d'`evaluate_equipment()` appelé depuis le module d'export (pas depuis `transport.http_server`, dont les tests espionnent `evaluate_equipment`), éligibilité consommée telle quelle. Les raisons sont celles du résolveur (par exemple `no_generic_type_configured`, alias de 19.0), pas celles du diagnostic UX (`no_supported_generic_type`, `no_projection_possible`) ; le test de parité fait la correspondance explicitement.
+8. **`producer.plugin_version`** : lue par `main.py` dans `plugin_info/info.json`.
+
+### Écarts par rapport à la story et aux gardes existantes
+
+- **Garde 25.4 AC31/AC32 (« diff vide » du démon, de `core/ajax/` et de `core/class/`)** : la story ajoute par construction une route du démon, une action ajax et deux clés de `sync_config` ; ces deux tests échouaient donc. Ils sont **resserrés, pas supprimés** : le gel porte désormais sur ce que 25.4 protège vraiment, à l'octet près contre `main` : la projection de liste blanche `_project_equipment_state`, les constantes `_EQUIPMENT_STATES_*` et le bloc ajax `getEquipmentStates` ; `lib/policy.mjs` et les scripts de déploiement restent en « diff vide ». Aucune ligne de `jeedom2ha_mapping_override.js` n'est retirée (garde conservée). Liste blanche de `getEquipmentStates` inchangée : taille 1 348 557 o non touchée, seuil 1 350 000.
+- **Menu « ⋯ »** : le test 25.3 et le parcours du gate `page-principale-b.mjs` attendaient exactement deux entrées ; ils en attendent trois (l'entrée est voulue). `lib/policy.mjs` n'est **pas** modifié : `getDecisionExport` n'y est pas inscrite comme lecture (comme `exportDiagnostic`), la page ne l'appelle qu'au clic.
+- **Libellé du menu** : « Télécharger l'export de décision… » avec points de suspension (la boîte s'ouvre, comme pour le diagnostic) ; le bouton dans la boîte porte « Télécharger l'export de décision ».
+- **Task 5** (gate 20-0, déploiement, baseline) et **AC11 / AC11 bis** : à ClaudeBox.
+
+### Preuves
+
+- **Rouge avant** : sur un arbre propre au commit `b0c6afa` additionné des seuls fichiers de test, `test_story_24_2_decision_export.py` ne se collecte pas (module `export.decision_export` absent), `test_story_24_2_php_export.php` s'arrête en erreur fatale (code 255), les tests Node 24.2 et 25.3 menu échouent (7 en échec).
+- **Vert après** : voir ci-dessous la sortie de `scripts/ci-local.sh`.
+- **Taille et coût** (parc synthétique de 295 équipements, 870 commandes, 120 scénarios) : fichier de 694 572 octets (480 196 compact), construction du document 9 ms, sync complet 0,14 s avec export. Taille réelle sur 292 équipements : à mesurer par ClaudeBox à la baseline.
+
+### Vérifications non faites (CC-48 / cloud)
+
+Aucun accès à la box, à SSH, à Home Assistant ni à `deploy-to-box.sh`. La comparaison de `homekit_exposed` au cache de Homebridge (AC11 bis), l'inventaire MQTT et les registres de HA inchangés, et le gate 20-0 sur le bouton sont à faire par ClaudeBox. Aucun nom réel dans le code, les fixtures, les tests ni la PR : noms sentinelles et identifiants génériques seulement.

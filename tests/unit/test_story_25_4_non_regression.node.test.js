@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
 const O = require('../../desktop/js/jeedom2ha_overview.js');
 const W = require('../../desktop/js/jeedom2ha_workview.js');
-const { diffAgainstBase, removedLines } = require('./helpers/git_base');
+const { diffAgainstBase, fileAtBase, removedLines } = require('./helpers/git_base');
 const { FIXTURE, phpAvailable, SCENE, clone } = require('./helpers/page_b_harness');
 const { startWorkview, openCard } = require('./helpers/workview_harness');
 const { makeScene } = require('./helpers/big_scene');
@@ -44,17 +44,26 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     '. \'" confidencePolicy="\' . $confidencePolicy . \'"\');',
   ];
 
-  it('git diff --stat sur core/class/ et les scripts de déploiement : vide', () => {
+  // Story 24.2 (autorisée par ClaudeBox) : l'export de décision ajoute une route du démon, une action ajax et deux clés de
+  // sync_config. Seules ces deux lignes existantes sont remplacées (sync_config étendu ; condition de périmètre du sync calculée
+  // une fois dans `scope_included`) ; core/class/ passe donc du « diff vide » au garde « aucune ligne retirée » ci-dessous.
+  const REPLACED_BY_24_2 = [
+    "$result['sync_config'] = array('confidence_policy' => $confidencePolicy);",
+    'if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):',
+  ];
+
+  it('git diff --stat sur les scripts de déploiement : vide', () => {
     const diff = diffAgainstBase(['--stat'], [
-      'core/class/', 'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh',
+      'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh',
     ]);
     if (diff !== null) assert.equal(diff, '');
   });
 
-  it('resources/daemon/, core/ajax/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8 et 25.9', () => {
-    const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'tests/e2e/gate/lib/policy.mjs']);
+  it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
+    const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'core/class/', 'tests/e2e/gate/lib/policy.mjs']);
     if (diff === null) return;
-    const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !REPLACED_BY_25_8_25_9.includes(line));
+    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2];
+    const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !allowed.includes(line));
     assert.deepEqual(unexpected, []);
   });
 
@@ -86,23 +95,25 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     }
   });
 
-  it('la liste blanche et le budget de la route : le seul changement est l\'ajout de `present_in_ha` aux entités (Story 25.8, Q1 B)', () => {
-    const diff = diffAgainstBase(['-U0'], ['resources/daemon/transport/http_server.py']);
-    if (diff === null) return;
-    const removed = removedLines(diff).map((line) => line.slice(1).trim());
-    if (diff === '') {
-      // Base déjà porteuse de 25.8 (CI de `main` après la fusion de #309) : le diff est vide, on vérifie l'état final.
-      const source = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
-      assert.ok(source.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));
-      assert.doesNotMatch(diff, /BUDGET|1_500_000|1500000/);
-      return;
-    }
-    assert.deepEqual(removed, [
-      '"entities": [{"override_pending": e["override_pending"]} for e in tree["entities"]],',
-      'equipment_decision, entities[{override_pending}], commands[{jeedom_cmd_id, covered,',
-    ]);
-    assert.ok(diff.includes('"present_in_ha": e["present_in_ha"]'));
-    assert.doesNotMatch(diff, /BUDGET|1_500_000|1500000/);
+  it('la liste blanche et le budget de la route ne sont pas touchés (projection, durée de cache, relais ajax de la lecture)', () => {
+    const slice = (text, from, to) => text.slice(text.indexOf(from), text.indexOf(to, text.indexOf(from)));
+    const pyBase = fileAtBase('resources/daemon/transport/http_server.py');
+    const phpBase = fileAtBase('core/ajax/jeedom2ha.ajax.php');
+    // Une base disponible pour `git diff` l'est aussi pour `git show <base>:<fichier>` : sinon le garde serait muet.
+    if (diffAgainstBase(['--stat'], ['core/ajax/']) !== null) assert.ok(pyBase !== null && phpBase !== null, 'fileAtBase sans contenu');
+    if (pyBase === null || phpBase === null) return; // aucune base : garde sans effet
+    const py = fs.readFileSync(path.join(root, 'resources/daemon/transport/http_server.py'), 'utf8');
+    const php = fs.readFileSync(path.join(root, 'core/ajax/jeedom2ha.ajax.php'), 'utf8');
+    const projection = ['def _project_equipment_state', 'def _build_equipment_states'];
+    assert.ok(py.includes(projection[0]));
+    assert.equal(slice(py, ...projection), slice(pyBase, ...projection), 'liste blanche (projection) modifiée');
+    const constants = (text) => text.split('\n').filter((l) => /^_EQUIPMENT_STATES_/.test(l)).join('\n');
+    assert.equal(constants(py), constants(pyBase), 'constantes de la route modifiées');
+    const relay = ["$action == 'getEquipmentStates'", 'else if ($action =='];
+    assert.ok(php.includes(relay[0]) && phpBase.includes(relay[0]), 'relais getEquipmentStates introuvable');
+    assert.equal(slice(php, ...relay), slice(phpBase, ...relay), 'relais getEquipmentStates modifié');
+    // Story 25.8 (Q1 B) : la projection porte `present_in_ha` (état final, base déjà porteuse de 25.8).
+    assert.ok(py.includes('{"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}'));
   });
 
   it('292 équipements de la forme la plus lourde : calcul de l’arbre, des KPI et des filtres mesuré (consigné, sans seuil)', (t) => {
