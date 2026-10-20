@@ -1,9 +1,20 @@
 'use strict';
 
-/* Aide de test (audit UX du 2026-10-19) : règles du CSS du cœur Jeedom (desktop.main.css, thème Core 2021, Jeedom 4.6.1) qui
- * touchent la surface du plugin, RECOPIÉES TELLES QUELLES (seuls les commentaires sont retirés), plus une scène fictive aux noms
- * longs. Sans elles, le harnais ne voit pas les défauts propres à la box : carte de 130 × 130 px en overflow:hidden (jauge rognée),
- * `.btn:not(.cmdName)` qui donne un fond de bouton à tout `.btn-link`, cases à cocher en position absolue.
+/* Aide de test (audit UX du 2026-10-19) : règles du CSS du cœur Jeedom qui touchent la surface du plugin, plus une scène
+ * fictive aux noms longs.
+ *
+ * PROVENANCE : Jeedom core 4.6.1, desktop/css/desktop.main.css et deprecated.main.css (thème Core 2021), relevés sur la box.
+ * Sélecteurs et déclarations RECOPIÉS TELS QU'ON LES CONNAÎT (seuls les commentaires sont retirés). Ce n'est PAS une copie
+ * intégrale du fichier du cœur : seulement les règles qui ont mordu la surface du plugin sur la box.
+ * LICENCE : le cœur Jeedom est un logiciel libre sous licence GNU GPL (https://github.com/jeedom/core). Ce fichier sert
+ * uniquement aux tests ; il n'est PAS dans le paquet Market (`exclude tests/` du manifeste, contrôlé par
+ * tests/test_market_package.py).
+ *
+ * Depuis la PR test(ui) « charger par défaut les règles du cœur », workview_browser.withRealView injecte CORE_CSS AVANT le
+ * CSS du plugin dès que l'appelant ne fournit pas son propre CSS (désactivable par `coreCss: false`). Sans ces règles, le
+ * harnais ne voyait pas les défauts propres à la box : icône de carte à 38 px, carte de 130 × 130 px en overflow:hidden
+ * (jauge rognée), `.btn:not(.cmdName)` qui donne un fond de bouton à tout `.btn-link`, bouton `confirm` de bootbox forcé en
+ * vert, bordures supprimées dans les conteneurs de cartes, cases à cocher en position absolue.
  * Données fictives (CC-48) : aucun nom de la maison réelle. */
 
 const fs = require('node:fs');
@@ -15,10 +26,10 @@ const ROOT = path.join(__dirname, '..', '..', '..');
 
 /** Variables du thème sombre de la box (relevées sur Jeedom 4.6.1) dont dépendent les règles ci-dessous. */
 const CORE_VARS = `
-:root { --border-radius: 4px; --btn-default-color: #3a3a3a; --linkHoverLight-color: #e0e0e0; --link-color: #94ca02; --txt-color: #e0e0e0; --bg-color: 25, 25, 25; --form-bg-color: #2c2c2c; }
+:root { --border-radius: 4px; --btn-default-color: #3a3a3a; --linkHoverLight-color: #e0e0e0; --link-color: #94ca02; --txt-color: #e0e0e0; --bg-color: 25, 25, 25; --form-bg-color: #2c2c2c; --al-success-color: #60a725; --al-danger-color: #b93a3e; }
 `;
 
-/** Extrait de desktop.main.css (cœur Jeedom) — sélecteurs et déclarations recopiés tels quels. */
+/** Extrait de desktop.main.css et deprecated.main.css (cœur Jeedom 4.6.1) — sélecteurs et déclarations recopiés tels quels. */
 const CORE_RULES = `
 .btn:not(.cmdName), .btn:not(.cmdName):active, .btn:not(.cmdName).active { color: var(--linkHoverLight-color) !important; background-color: var(--btn-default-color) !important; }
 .btn { font-size: 12px; border: none; padding: 7px 8px; height: 32px; line-height: 18px; }
@@ -27,6 +38,7 @@ div[class*="ListContainer"], div.eqLogicThumbnailContainer { display: flex !impo
 div[class*="ListContainer"] > div.cursor { width : 130px !important; font-size: 14px !important; position: relative; }
 div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div.cursor, .eqLogicDisplayCard div.cursor { margin-bottom: 5px !important; padding: 5px !important; }
 .eqLogicDisplayCard, .eqLogicThumbnailContainer div, .interactDisplayCard, div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) { border: none !important; background: transparent !important; padding-top: 0!important; text-align: center; }
+div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div { border: none !important; }
 div[class*="ListContainer"] div[class*="DisplayCard"], div.eqLogicThumbnailContainer div[class*="DisplayCard"] { flex: 0 0 auto; }
 .objectDisplayCard i { font-size: 38px !important; }
 div[class*="DisplayCard"] { height: 130px !important; overflow: hidden; }
@@ -36,6 +48,8 @@ div[class*="DisplayCard"] .name { top: 5px !important; position: relative; displ
 div.objectDisplayCard .name { display: inline-block; padding: 4px 12px; border-radius: var(--border-radius) !important; }
 input[type=checkbox] { position: relative; margin: 0 1rem 0 0; cursor: pointer; min-height : 0px !important; vertical-align: middle; }
 .checkbox input[type=checkbox], .checkbox-inline input[type=checkbox], .radio input[type=radio], .radio-inline input[type=radio] { position: absolute; margin-top: 6px !important; margin-left: -20px; }
+.modal-footer .btn.bootbox-accept { background-color: var(--al-success-color) !important; }
+.modal-footer .btn.bootbox-cancel { background-color: var(--al-danger-color) !important; }
 `;
 
 /** Bootstrap 3 (embarqué par le cœur) : marges des cases à cocher. */
