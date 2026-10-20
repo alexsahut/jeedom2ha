@@ -1238,3 +1238,14 @@ body[data-theme*="Dark"] {
     flex-basis: clamp(320px, 30%, 420px);
   }
 }
+
+/* Cartes de pièce : le cœur efface toute bordure des div de la liste
+   (`div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div { border: none !important }`,
+   spécificité 0,3,2). Le filet de couleur de la pièce et le liseré orange des pièces bloquées (25.3) sont rétablis avec une
+   spécificité supérieure (0,4,0 et 0,5,0). */
+.j2ha-room-groups .objectListContainer > .j2ha-room-card.objectDisplayCard {
+  border-top: 3px solid var(--j2ha-room-color, var(--j2ha-line)) !important;
+}
+.j2ha-room-groups .objectListContainer > .j2ha-room-card.objectDisplayCard.j2ha-room-blocked {
+  border-left: 4px solid var(--j2ha-warn) !important;
+}

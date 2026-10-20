@@ -66,11 +66,11 @@ test('harnais — bootbox factice fidèle : `.modal-footer`, `bootbox-accept` / 
   });
 });
 
-// TODO défaut réel révélé par le CSS du cœur (non corrigé ici, PR de test seulement) : la règle du cœur
+// Défaut révélé par le CSS du cœur, corrigé dans desktop/css/jeedom2ha.css : la règle du cœur
 // `div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div { border: none !important; }` efface,
 // dans desktop/css/jeedom2ha.css, le filet de couleur de pièce (`.j2ha-room-groups .j2ha-room-card { border-top: 3px … }`)
 // et le liseré orange des pièces bloquées (`.j2ha-room-card.j2ha-room-blocked { border-left: 4px … }`).
-test('défaut réel — filet de couleur et liseré « bloqué » des cartes de pièce visibles avec le CSS du cœur', { todo: 'défaut produit : bordures des cartes effacées par le cœur' }, async (t) => {
+test('filet de couleur et liseré « bloqué » des cartes de pièce visibles avec le CSS du cœur', async (t) => {
   await withRealView(t, {}, async (page) => {
     const r = await page.evaluate(() => {
       const card = document.querySelector('.j2ha-room-groups .j2ha-room-card');

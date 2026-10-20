@@ -67,7 +67,7 @@ describe('25.3 / AC15 — variables --j2ha-* et replis', () => {
         const [prop, ...rest] = decl.split(':');
         const value = rest.join(':').trim();
         if (prop.trim() === 'border-radius' || !/color|background|border|outline/.test(prop)) continue;
-        const colors = value.replace(/var\(--[a-z0-9-]+(?:,\s*var\(--[a-z0-9-]+\))?\)/gi, '').replace(/\b(solid|dashed|none|transparent|currentColor|\d+px|0|repeating-linear-gradient|135deg|\(|\)|,|\s)+/gi, ' ').trim();
+        const colors = value.replace(/var\(--[a-z0-9-]+(?:,\s*var\(--[a-z0-9-]+\))?\)/gi, '').replace(/!important/g, ' ').replace(/\b(solid|dashed|none|transparent|currentColor|\d+px|0|repeating-linear-gradient|135deg|\(|\)|,|\s)+/gi, ' ').trim();
         if (colors !== '') offenders.push(`${rule.selector} { ${decl} }`);
       }
     }
