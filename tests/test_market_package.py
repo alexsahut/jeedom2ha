@@ -118,6 +118,10 @@ def test_real_repo_package_has_no_dev_files(tmp_path):
     for name in DEV_FILES:
         assert not (out / name).exists(), name
     assert (out / "docs/fr_FR/index.md").exists()
+    # Extrait du CSS du cœur Jeedom (GPL) recopié pour le harnais Chromium : outil de test, jamais livré au Market.
+    assert (REPO / "tests/unit/helpers/core_css_reel.js").exists()
+    assert not (out / "tests/unit/helpers/core_css_reel.js").exists()
+    assert [rel for rel in mp.list_files(str(out)) if "core_css_reel" in rel] == []
 
 
 def test_ac1_ac3_build_matches_filtered_source(fixture_repo, tmp_path):

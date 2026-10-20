@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { SCENE, phpAvailable, renderPhp, mainPart, equipmentsFor, FIXTURE, clone } = require('./page_b_harness');
+const { CORE_CSS } = require('./core_css_reel');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const gate = (...parts) => pathToFileURL(path.join(ROOT, 'tests', 'e2e', 'gate', ...parts)).href;
@@ -16,21 +17,28 @@ const JQUERY = [process.env.JEEDOM2HA_JQUERY, '/usr/share/javascript/jquery/jque
   .filter(Boolean).find((file) => fs.existsSync(file));
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
+// Faux bootbox au DOM fidèle à bootbox 5 (celui du cœur) : boutons dans `.modal-footer`, `data-bb-handler` = clé, classe
+// `bootbox-accept` sur les clés `ok` / `confirm` et `bootbox-cancel` sur `cancel` (les règles du cœur s'y accrochent), et la
+// boîte rendue est l'objet jQuery de la modale (`on`, `find`), comme le vrai `bootbox.dialog`.
 const BOOTBOX_STUB = `
 window.bootbox = { dialog: function (o) {
   var $m = $('<div class="bootbox modal"></div>');
   $m.append($('<div class="modal-title"></div>').html(o.title || ''));
   $m.append($('<div class="bootbox-body"></div>').append(o.message));
-  var handlers = {};
-  function close() { $m.detach(); if (handlers['hidden.bs.modal']) handlers['hidden.bs.modal'](); }
+  var $footer = $('<div class="modal-footer"></div>');
+  function close() { $m.detach(); $m.triggerHandler('hidden.bs.modal'); }
   Object.keys(o.buttons || {}).forEach(function (k) {
     var b = o.buttons[k];
-    $m.append($('<button type="button"></button>').addClass('btn ' + (b.className || '')).text(b.label).on('click', function () { if (b.callback) b.callback(); close(); }));
+    var $b = $('<button type="button"></button>').attr('data-bb-handler', k).addClass('btn ' + (b.className || '')).text(b.label);
+    if (k === 'ok' || k === 'confirm') $b.addClass('bootbox-accept');
+    else if (k === 'cancel') $b.addClass('bootbox-cancel');
+    $footer.append($b.on('click', function () { if (b.callback) b.callback(); close(); }));
   });
+  $m.append($footer);
   $m.addClass(o.className || '');
   $(document.body).append($m);
   if (o.onEscape) $(document).on('keydown.bb', function (e) { if (e.key === 'Escape') { $(document).off('keydown.bb'); if (typeof o.onEscape === 'function') o.onEscape(); close(); } });
-  return { on: function (ev, cb) { handlers[ev] = cb; } };
+  return $m;
 } };
 $.fn.sortable = function () { return this; };
 $.fn.showAlert = function () { return this; };
@@ -59,8 +67,10 @@ function unitTreeFor(equipments, eqId) {
 
 /**
  * @param {object} t contexte node:test (pour `t.skip`)
- * @param {object} options { css (texte CSS de remplacement), width, height, hash, scene, equipments, delay (action, eqId) -> ms,
- *                           treeFor (eqId) -> corps, extraCss }
+ * @param {object} options { css (texte CSS de remplacement), coreCss, width, height, hash, scene, equipments,
+ *                           delay (action, eqId) -> ms, treeFor (eqId) -> corps, extraCss }
+ *   Par défaut (aucun `css` fourni), l'extrait du CSS du cœur Jeedom 4.6.1 (core_css_reel.CORE_CSS) est chargé AVANT le CSS
+ *   du plugin, comme sur la box. `coreCss: false` le retire explicitement ; `coreCss: true` le force devant un `css` fourni.
  * @param {Function} fn (page, ctx) => Promise
  */
 async function withRealView(t, options, fn) {
@@ -82,7 +92,8 @@ async function withRealView(t, options, fn) {
     const journal = [];
     const bodies = [];
     const errors = [];
-    const css = (opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css')) + (opts.extraCss || '');
+    const withCore = opts.coreCss !== undefined ? opts.coreCss !== false : opts.css === undefined;
+    const css = (withCore ? CORE_CSS : '') + (opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css')) + (opts.extraCss || '');
     // Les scripts sont SERVIS (balises <script src>) pour que `page.reload()` rejoue la page entière, lien profond compris.
     const scriptTags = ['/assets/jquery.js', '/assets/bootbox-stub.js', ...SCRIPTS.map((file) => `/assets/${file}.js`)]
       .map((src) => `<script src="${src}"></script>`).join('');
@@ -140,4 +151,4 @@ async function withRealView(t, options, fn) {
 
 function read0(file) { return fs.readFileSync(file, 'utf8'); }
 
-module.exports = { withRealView, treeBody, phpAvailable, JQUERY, gate, read, SCRIPTS };
+module.exports = { withRealView, treeBody, phpAvailable, JQUERY, gate, read, SCRIPTS, CORE_CSS };
