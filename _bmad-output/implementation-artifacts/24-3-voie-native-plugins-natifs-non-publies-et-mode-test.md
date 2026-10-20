@@ -1,6 +1,6 @@
 # Story 24.3 : Mode « plugins en test » (à justifier) ; plugins natifs restent « exclus par plugin »
 
-Status: draft
+Status: done
 
 > **create-story du 2026-10-20 (session cloud déléguée, documentaire).** Verdict ci-dessous : **aucune garantie supplémentaire démontrable ; recommandation d'ABANDONNER la story.** Le statut reste `draft` : l'abandon n'est pas décidé ici, il revient à Alexandre / ClaudeBox. `ready-for-dev` n'est **pas** accordé. Chiffres tirés de `24-2-preuve-terrain-2026-10-20.md` (baseline du 20/10, `ff2fe0d`).
 
@@ -125,3 +125,5 @@ Puisque « exclu par plugin » est conservé, **retirer un plugin de la liste `e
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft` avec la raison `voie_native` (Q1 A recommandée).
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q1 « exclu par plugin » conservé (A, B, C écartées) ; Q2 B. La raison `voie_native` et la modification des artefacts figés sont retirées ; le mode test est à justifier au `create-story`, sinon la story est abandonnée.
 - 2026-10-20 — **create-story** (session cloud déléguée, documentaire) : à la lumière de la baseline du 20/10 (41 équipements exposés non publiés pour cause de plugin exclu, dont 38 deconz et xiaomihome écartés par la décision du 01/10 ; 3 seuls candidats réels), aucune garantie supplémentaire démontrable par rapport au retrait de `excludedPlugins` ; **recommandation : abandonner**. Story laissée `draft` : décision à Alexandre / ClaudeBox. Questions Q3-1 à Q3-6 consignées avec recommandation.
+- 2026-10-21, 00:10 — **Abandon décidé par ClaudeBox**, en application de la règle d'Alexandre du 12/10 (story maintenue seulement si le mode « plugins en test » se justifie au create-story) : aucune garantie démontrée. Q3-1 abandon ; Q3-2 procédure de test par retrait de `excludedPlugins` documentée dans la PR de 24.4 ; Q3-3 essai terrain d'un retrait propre adossé à la preuve de 24.4 (AC10) ; Q3-6 nom de fichier conservé ; statut `done` (abandonnée, sans livraison), comme 22-2 « superseded », pour rester dans les statuts BMAD.
+
