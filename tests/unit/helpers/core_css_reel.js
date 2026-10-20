@@ -26,7 +26,7 @@ const ROOT = path.join(__dirname, '..', '..', '..');
 
 /** Variables du thème sombre de la box (relevées sur Jeedom 4.6.1) dont dépendent les règles ci-dessous. */
 const CORE_VARS = `
-:root { --border-radius: 4px; --btn-default-color: #3a3a3a; --linkHoverLight-color: #e0e0e0; --link-color: #94ca02; --txt-color: #e0e0e0; --bg-color: 25, 25, 25; --form-bg-color: #2c2c2c; --al-success-color: #60a725; --al-danger-color: #b93a3e; }
+:root { --border-radius: 4px; --btn-default-color: #3a3a3a; --linkHoverLight-color: #e0e0e0; --link-color: #94ca02; --txt-color: #e0e0e0; --bg-color: 25, 25, 25; --form-bg-color: #2c2c2c; --al-success-color: rgb(50, 130, 60); --al-warning-color: rgb(195, 125, 40); --al-danger-color: rgb(185, 58, 62); --sc-lightTxt-color: rgb(230, 230, 230); }
 `;
 
 /** Extrait de desktop.main.css et deprecated.main.css (cœur Jeedom 4.6.1) — sélecteurs et déclarations recopiés tels quels. */
@@ -37,8 +37,7 @@ const CORE_RULES = `
 div[class*="ListContainer"], div.eqLogicThumbnailContainer { display: flex !important; flex-wrap: wrap; flex-direction: row; }
 div[class*="ListContainer"] > div.cursor { width : 130px !important; font-size: 14px !important; position: relative; }
 div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div.cursor, .eqLogicDisplayCard div.cursor { margin-bottom: 5px !important; padding: 5px !important; }
-.eqLogicDisplayCard, .eqLogicThumbnailContainer div, .interactDisplayCard, div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) { border: none !important; background: transparent !important; padding-top: 0!important; text-align: center; }
-div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div { border: none !important; }
+.eqLogicDisplayCard, .eqLogicThumbnailContainer div, .interactDisplayCard, div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div, .scenarioDisplayCard, .widgetDisplayCard, .pluginDisplayCard { text-align: center; border: none !important; background: transparent !important; padding-top: 0px !important; }
 div[class*="ListContainer"] div[class*="DisplayCard"], div.eqLogicThumbnailContainer div[class*="DisplayCard"] { flex: 0 0 auto; }
 .objectDisplayCard i { font-size: 38px !important; }
 div[class*="DisplayCard"] { height: 130px !important; overflow: hidden; }
@@ -49,7 +48,8 @@ div.objectDisplayCard .name { display: inline-block; padding: 4px 12px; border-r
 input[type=checkbox] { position: relative; margin: 0 1rem 0 0; cursor: pointer; min-height : 0px !important; vertical-align: middle; }
 .checkbox input[type=checkbox], .checkbox-inline input[type=checkbox], .radio input[type=radio], .radio-inline input[type=radio] { position: absolute; margin-top: 6px !important; margin-left: -20px; }
 .modal-footer .btn.bootbox-accept { background-color: var(--al-success-color) !important; }
-.modal-footer .btn.bootbox-cancel { background-color: var(--al-danger-color) !important; }
+.modal-footer .btn.bootbox-cancel { background-color: var(--al-warning-color) !important; }
+.btn.btn-danger { color: var(--sc-lightTxt-color) !important; background-color: var(--al-danger-color) !important; }
 `;
 
 /** Bootstrap 3 (embarqué par le cœur) : marges des cases à cocher. */
