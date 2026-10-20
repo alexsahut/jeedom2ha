@@ -7,9 +7,10 @@ présumée <= 3x plus lente que la VM de mesure).
 
 Méthode de mesure (robuste aux pics du runner, sans relever les budgets) :
 - un échauffement (une construction à froid, un appel à chaud) non compté ;
-- chaque mesure est précédée de `gc.collect()` et prise GC désactivé (`_mesure_ms`) : une passe
-  complète du GC sur le tas laissé par les tests précédents coûtait jusqu'à ~1 s sur une seule
-  construction (4,4x la valeur normale), en local comme sur le runner GitHub ;
+- chaque mesure est précédée de `gc.collect()` puis `gc.freeze()` (`_Chrono`) et prise GC ACTIF :
+  le tas laissé par les tests précédents est gelé (une passe complète du GC sur ce tas coûtait jusqu'à
+  ~1 s sur une seule construction, 4,4x la valeur normale), mais les allocations de la route restent
+  collectées comme en production ;
 - la durée retenue pour le budget est le maximum HORS PIC ISOLÉ (`_max_hors_pic` : la plus haute
   mesure écartée, la deuxième plus haute retenue) sur `COLD_ITERATIONS` constructions — un
   quantile élevé, donc toujours conservateur, mais qu'un seul pic (voisin bruyant) ne fait pas
@@ -122,19 +123,23 @@ def _mediane(values):
 
 
 class _Chrono:
-    """Mesure GC désactivé, après un `gc.collect()` (le GC est rétabli dans son état d'origine)."""
+    """Mesure GC ACTIF (comportement de production), tas hérité des tests précédents gelé.
+
+    `gc.collect()` puis `gc.freeze()` déplacent les objets déjà vivants (tas laissé par les tests 19-6)
+    vers la génération permanente : le GC ne les parcourt plus, mais il collecte normalement tout ce
+    que la route alloue pendant la mesure. Une régression qui augmente les allocations ou le coût du GC
+    reste donc visible (relevé Codex sur la PR). `gc.unfreeze()` rétablit l'état à la sortie.
+    """
 
     def __enter__(self):
         gc.collect()
-        self._gc_was_enabled = gc.isenabled()
-        gc.disable()
+        gc.freeze()
         self._start = time.perf_counter()
         return self
 
     def __exit__(self, *exc):
         self.ms = (time.perf_counter() - self._start) * 1000
-        if self._gc_was_enabled:
-            gc.enable()
+        gc.unfreeze()
         return False
 
 
