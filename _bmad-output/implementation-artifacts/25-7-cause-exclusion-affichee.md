@@ -1,6 +1,6 @@
 # Story 25.7 : Cause d'exclusion affichée
 
-Status: ready-for-UX-validation
+Status: done
 
 > **Statut : `ready-for-dev` (2026-10-19 17:40, relecture et décisions ClaudeBox ; Alexandre présent, peut revenir sur une décision).** Précédemment : **`backlog` (2026-10-19).** Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun test, aucune fixture, aucun accès box / VM / Home Assistant / SSH / secret, CC-48), à partir du sprint change `sprint-change-proposal-2026-10-19-revue-ux-25.md` (statut **decided**, point 3 du déclencheur). **`ready-for-dev` n'est pas accordé** : relecture de la story par ClaudeBox, puis décisions sur Q1 à Q7 (§ Questions ouvertes, chacune avec une recommandation argumentée ; la session n'en tranche aucune). **Statut cible après implémentation et preuve terrain : `ready-for-UX-validation`** ; validation UX finale en **25.5**. Les points de § Décisions déjà arbitrées sont **fermés**. Pointeurs de code pris sur `main` à `731be8d` ; **à re-vérifier au SHA courant** (après 25.6) avant le `dev-story`. Aucun nom réel d'équipement, de pièce, d'objet, de plugin installé chez Alexandre, de scénario ou de personne : identifiants et données fictifs seulement (CC-48).
 

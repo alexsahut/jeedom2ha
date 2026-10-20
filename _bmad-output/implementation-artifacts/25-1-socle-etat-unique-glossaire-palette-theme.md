@@ -1,6 +1,6 @@
 # Story 25.1 : Socle A — état unique, glossaire, palette et thème
 
-Status: ready-for-UX-validation
+Status: done
 
 > **Statut : `ready-for-UX-validation` (2026-10-18, preuve terrain ClaudeBox : `25-1-preuve-terrain-2026-10-18.md` ; validation UX finale portée par 25.5).** Précédemment : `review` (2026-10-18) — implémentation livrée par une session cloud déléguée (hors Task 0 et Task 8, réservées à l'humain / ClaudeBox).** Historique : `ready-for-dev` (2026-10-18, 19:20). Story rédigée par une session cloud déléguée (`create-story`, documentaire : aucun code, aucun accès box / VM / Home Assistant / secret, CC-48), relue et approuvée par ClaudeBox (PR #277, R1 éditoriale appliquée), puis les 11 questions tranchées par décision d'Alexandre (« je valide toutes les recommandations ») et les relevés terrain de ClaudeBox (Q5, Q10) — voir § Décisions. Pointeurs de code pris sur `main` à `d417f08`. Aucun nom réel d'équipement, de pièce, de scénario ou de personne : identifiants et données fictives seulement (CC-48).
 
