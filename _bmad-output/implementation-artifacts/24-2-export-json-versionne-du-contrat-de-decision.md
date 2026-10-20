@@ -1,6 +1,6 @@
 # Story 24.2 : Export JSON versionné du contrat de décision
 
-Status: ready-for-UX-validation
+Status: done
 
 > **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Q5 A et Q6 A tranchées). Brouillon de cadrage initial rédigé par une session cloud déléguée, documentaire ; décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
 >

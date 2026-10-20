@@ -662,14 +662,16 @@ BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_backup_out
 echo ""
 
 # 1b — promotion staging → plugin dir + permissions (sudo requis)
+# resources/python_venv/ est créé par le cœur Jeedom (dépendances pip3 de packages.json) et sert à lancer le démon :
+# ni supprimé par --delete, ni chmod 644 (VM de démo 20/10 : démon « python_venv/bin/python3: not found »).
 echo "  1b. sudo promote → ${JEEDOM_BOX_PATH}/"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
 set -e
 sudo mkdir -p "${JEEDOM_BOX_PATH}"
-sudo rsync -a --delete --exclude 'data/' "${JEEDOM_STAGING_DIR}/" "${JEEDOM_BOX_PATH}/"
+sudo rsync -a --delete --exclude 'data/' --exclude '/resources/python_venv/' "${JEEDOM_STAGING_DIR}/" "${JEEDOM_BOX_PATH}/"
 sudo chown -R www-data:www-data "${JEEDOM_BOX_PATH}"
-sudo find "${JEEDOM_BOX_PATH}" -type d -exec chmod 755 {} \;
-sudo find "${JEEDOM_BOX_PATH}" -type f -exec chmod 644 {} \;
+sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type d -exec chmod 755 {} \;
+sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type f -exec chmod 644 {} \;
 sudo chmod +x "${JEEDOM_BOX_PATH}/resources/daemon/main.py"
 echo "  Permissions OK (www-data, 755/644, main.py +x)."
 REMOTE
