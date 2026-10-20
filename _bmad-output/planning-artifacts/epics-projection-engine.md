@@ -2576,7 +2576,7 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 - l'export `schema_version: 1` est lisible sans SSH ; une capture « avant » et une capture « après » encadrent chaque story qui change la production (conservées hors dépôt) ;
 - tout équipement exposé à HomeKit a une décision et une raison canonique ; chaque commande d'un tel équipement a une ligne avec sa raison dans l'export ;
 - les plugins natifs restent « exclus par plugin » (`excluded_plugin`, `exclu_par_plugin`), sans changement de libellé ni de contrat figé ; l'export porte leurs `logicalId` ; le mode « plugins en test », **s'il est maintenu (abandon recommandé le 2026-10-20)**, est vide par défaut et marqué dans l'export ;
-- un équipement exposé à HomeKit n'est jamais écarté par sa pièce ; seules l'exclusion explicite de l'équipement et une impossibilité technique l'écartent ;
+- un équipement **effectivement** exposé à HomeKit (`homekit_exposed` ET `enabled`) n'est jamais écarté par sa pièce ; seules l'exclusion explicite de l'équipement et une impossibilité technique l'écartent ;
 - le plugin n'écrit ni la configuration Homebridge, ni un type générique Jeedom, ni une exposition Assist ;
 - pour chaque type ouvert : entrée `HA_COMPONENT_REGISTRY`, mapper, cas nominal et d'échec de `validate_projection()`, contrat 4D non régressé, `SWITCH_*`/`ENERGY_*` non régressés, inventaire avant/après et liste des références à l'ancien `entity_id` ;
 - gate 20-0 vert avant chaque `done` qui touche l'écran ; golden et contrat 4D verts (champs additifs justifiés) ; aucun nom réel dans le dépôt (CC-48).
