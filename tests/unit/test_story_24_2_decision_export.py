@@ -480,6 +480,31 @@ async def test_export_failure_never_breaks_sync(cli, app, monkeypatch):
     assert body["status"] == "ok"
 
 
+async def test_memorization_failure_never_breaks_sync_nor_publier(cli, app, monkeypatch):
+    """Revue PR #320 : un verdict impossible à mémoriser n'interrompt ni le sync ni « Publier »."""
+    import transport.http_server as hs
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("enregistrement en échec")
+
+    monkeypatch.setattr(hs, "make_equipment_record", _boom)
+    monkeypatch.setattr(hs, "make_ineligible_record", _boom)
+    body = await (await _sync(cli)).json()
+    assert body["status"] == "ok"
+    assert any(
+        c.args[0].startswith("homeassistant/") and c.args[0].endswith("/config")
+        for c in app["mqtt_bridge"].publish_message.call_args_list
+    )
+    resp = await cli.post(
+        "/action/execute",
+        json={"intention": "publier", "portee": "global", "selection": ["all"]},
+        headers=HEADERS,
+    )
+    assert resp.status == 200
+    doc = await _route_doc(cli)
+    assert {r["reason"] for r in doc["equipments"]} == {"no_sync_decision"}
+
+
 # --- Fonctions pures ---------------------------------------------------------------
 
 def test_index_overrides_canonical_form_ignores_unknown_values():

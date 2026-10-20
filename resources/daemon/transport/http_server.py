@@ -498,6 +498,19 @@ def _build_decision_export_document(
     )
 
 
+def _memorize_decision(memo_equipments: Dict[int, Dict[str, Any]], eq_id: int, build, *args, **kwargs) -> None:
+    """Story 24.2 — mémorise le verdict d'un équipement pour l'export ; ne lève jamais.
+
+    Un enregistrement en échec ne doit ni faire échouer un sync ni un « Publier » : l'équipement
+    est alors rendu par l'export avec `no_sync_decision` (aucun verdict mémorisé).
+    """
+    try:
+        memo_equipments[eq_id] = build(*args, **kwargs)
+    except Exception as exc:
+        memo_equipments.pop(eq_id, None)
+        _LOGGER.error("[EXPORT] Verdict non mémorisé pour eq_id=%s : %s", eq_id, type(exc).__name__)
+
+
 def _refresh_decision_export(
     app,
     data_dir: str,
@@ -1997,7 +2010,8 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         if not result.is_eligible:
             ineligible_eq = snapshot.eq_logics.get(eq_id)
             if ineligible_eq is not None:
-                decision_records[eq_id] = make_ineligible_record(
+                _memorize_decision(
+                    decision_records, eq_id, make_ineligible_record,
                     ineligible_eq, snapshot, result,
                     applied_overrides=export_overrides.get(eq_id),
                 )
@@ -2024,7 +2038,8 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         scope_included = mapping is None or _scope_entry_is_included(
             eq_id, scope_entries.get(eq_id), eligibility
         )
-        decision_records[eq_id] = make_equipment_record(
+        _memorize_decision(
+            decision_records, eq_id, make_equipment_record,
             evaluation,
             eligible=True,
             scope_excluded=not scope_included,
@@ -4810,7 +4825,8 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 mapping = mappings.get(eq_id)
             is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
             if evaluation is not None:
-                decision_memo.equipments[eq_id] = make_equipment_record(
+                _memorize_decision(
+                    decision_memo.equipments, eq_id, make_equipment_record,
                     evaluation,
                     eligible=True,
                     scope_excluded=not is_included and evaluation.mapping is not None,
