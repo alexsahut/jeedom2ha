@@ -52,11 +52,34 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     'if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):',
   ];
 
-  it('git diff --stat sur les scripts de déploiement : vide', () => {
-    const diff = diffAgainstBase(['--stat'], [
-      'scripts/deploy-to-box.sh', 'scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh',
-    ]);
+  // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
+  // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
+  // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
+  // sont remplacées (rsync + deux find) et seules ces lignes sont ajoutées ; tout autre changement des scripts de déploiement
+  // fait échouer le garde.
+  const DEPLOY_VENV_FIX = {
+    removed: [
+      `sudo rsync -a --delete --exclude 'data/' "\${JEEDOM_STAGING_DIR}/" "\${JEEDOM_BOX_PATH}/"`,
+      'sudo find "${JEEDOM_BOX_PATH}" -type d -exec chmod 755 {} \\;',
+      'sudo find "${JEEDOM_BOX_PATH}" -type f -exec chmod 644 {} \\;',
+    ],
+    added: [
+      '# resources/python_venv/ est créé par le cœur Jeedom (dépendances pip3 de packages.json) et sert à lancer le démon :',
+      '# ni supprimé par --delete, ni chmod 644 (VM de démo 20/10 : démon « python_venv/bin/python3: not found »).',
+      `sudo rsync -a --delete --exclude 'data/' --exclude '/resources/python_venv/' "\${JEEDOM_STAGING_DIR}/" "\${JEEDOM_BOX_PATH}/"`,
+      'sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type d -exec chmod 755 {} \\;',
+      'sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type f -exec chmod 644 {} \\;',
+    ],
+  };
+
+  it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
+    const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
     if (diff !== null) assert.equal(diff, '');
+    const deploy = diffAgainstBase(['-U0'], ['scripts/deploy-to-box.sh']);
+    if (deploy === null || deploy === '') return;
+    const lines = deploy.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+    assert.deepEqual(lines.filter((l) => l.startsWith('-')).map((l) => l.slice(1)), DEPLOY_VENV_FIX.removed);
+    assert.deepEqual(lines.filter((l) => l.startsWith('+')).map((l) => l.slice(1)), DEPLOY_VENV_FIX.added);
   });
 
   it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
