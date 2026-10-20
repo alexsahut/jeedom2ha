@@ -1,6 +1,6 @@
 # Story 24.2 : Export JSON versionné du contrat de décision
 
-Status: review
+Status: ready-for-UX-validation
 
 > **Statut : `ready-for-dev` (2026-10-12), accordé par ClaudeBox au nom des décisions d'Alexandre du 12/10 à 13:22** (Q5 A et Q6 A tranchées). Brouillon de cadrage initial rédigé par une session cloud déléguée, documentaire ; décisions : `sprint-change-proposal-2026-10-12-parite-homekit.md`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48) : identifiants seulement.
 >
@@ -112,7 +112,7 @@ Choix de conception à confirmer :
 - [x] **Task 2 — Module d'export** (nouveau, propre, motif atomique repris sans modifier `overrides.py` ni `disk_cache.py`) et appels aux points d'écriture. *`resources/daemon/export/decision_export.py` ; appelé au sync, au « Publier » et au « Supprimer ».*
 - [x] **Task 3 — Route du démon** et relais PHP ; bouton de téléchargement.
 - [x] **Task 4 — Tests** : schéma, parité avec le diagnostic, confidentialité, déterminisme, collision équipement/scénario, paquet Market.
-- [ ] **Task 5 — Gate 20-0 + déploiement standard (humain) + baseline « avant »** ; mesure des écarts de la section 3 de la proposition. *À faire par ClaudeBox après fusion (pas de box, pas de SSH, pas de `deploy-to-box.sh` en session cloud).*
+- [x] **Task 5 — Gate 20-0 + déploiement standard (humain) + baseline « avant »** ; mesure des écarts de la section 3 de la proposition. *Faite par ClaudeBox le 2026-10-20 : `24-2-preuve-terrain-2026-10-20.md`.*
 - [x] **Task 6 — Documentation** du schéma. *`docs/dev-decision-export.md` ; entrée `changelog_beta.md`.*
 
 ## Garde-fous
