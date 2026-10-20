@@ -93,7 +93,7 @@ describe('25.4 / AC23 — accent d’objet, rayon, replis', () => {
       // Story 25.8 : menu « ⋯ » de la carte et ligne « Pièce exclue » (classes nouvelles, sous .j2ha-room-groups).
       if (/^\.j2ha-room-groups \.j2ha-room-(card\.j2ha-room-has-menu|card \.j2ha-room-menu(-toggle|-list)?|excluded-line)/.test(selector)) continue;
       // Audit UX du 2026-10-19 : carte de pièce qui grandit avec son nom (le cœur la fige à 130 px), sous .j2ha-room-groups.
-      if (/^\.j2ha-room-groups \.objectListContainer > \.j2ha-room-card( > \.j2ha-room-state| \.j2ha-room-marks \.j2ha-mark)?$/.test(selector)) continue;
+      if (/^\.j2ha-room-groups \.objectListContainer > \.j2ha-room-card(\.objectDisplayCard(\.j2ha-room-blocked)?| > \.j2ha-room-state| \.j2ha-room-marks \.j2ha-mark)?$/.test(selector)) continue;
       assert.match(selector, /^\.j2ha-wv/, selector);
     }
   });

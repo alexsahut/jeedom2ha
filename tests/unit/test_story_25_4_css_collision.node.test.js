@@ -25,7 +25,7 @@ const OUTSIDE_ALLOWED = ['.j2ha-room-groups .j2ha-mark.j2ha-mark-excluded'];
 const ROOM_CARD_25_8 = /^\.j2ha-room-groups \.j2ha-room-(card\.j2ha-room-has-menu|card \.j2ha-room-menu(-toggle|-list)?|excluded-line)/;
 // Audit UX du 2026-10-19 : carte de pièce qui grandit avec son nom (le cœur la fige à 130 px) — sous .j2ha-room-groups, sur la
 // carte de la liste du plugin seulement.
-const ROOM_CARD_AUDIT_UX = /^\.j2ha-room-groups \.objectListContainer > \.j2ha-room-card( > \.j2ha-room-state| \.j2ha-room-marks \.j2ha-mark)?$/;
+const ROOM_CARD_AUDIT_UX = /^\.j2ha-room-groups \.objectListContainer > \.j2ha-room-card(\.objectDisplayCard(\.j2ha-room-blocked)?| > \.j2ha-room-state| \.j2ha-room-marks \.j2ha-mark)?$/;
 
 test('25.4 / AC25 (1) portée — tout sélecteur ajouté commence par .j2ha-wv ou contient .j2ha-wv-', () => {
   const added = Object.keys(finalTable).filter((key) => !(key in baseline.selectors));
