@@ -662,11 +662,16 @@ BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_backup_out
 echo ""
 
 # 1b — promotion staging → plugin dir + permissions (sudo requis)
+# resources/python_venv/ est exclu du --delete au même titre que data/ : ce
+# venv est construit par le mécanisme de dépendances de Jeedom
+# (plugin_info/packages.json), jamais versionné ni présent dans le staging —
+# sans cette exclusion, chaque déploiement le supprimait et deamon_start()
+# échouait ensuite ("python_venv/bin/python3: not found").
 echo "  1b. sudo promote → ${JEEDOM_BOX_PATH}/"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
 set -e
 sudo mkdir -p "${JEEDOM_BOX_PATH}"
-sudo rsync -a --delete --exclude 'data/' "${JEEDOM_STAGING_DIR}/" "${JEEDOM_BOX_PATH}/"
+sudo rsync -a --delete --exclude 'data/' --exclude 'resources/python_venv/' "${JEEDOM_STAGING_DIR}/" "${JEEDOM_BOX_PATH}/"
 sudo chown -R www-data:www-data "${JEEDOM_BOX_PATH}"
 sudo find "${JEEDOM_BOX_PATH}" -type d -exec chmod 755 {} \;
 sudo find "${JEEDOM_BOX_PATH}" -type f -exec chmod 644 {} \;
