@@ -8,9 +8,9 @@
 
 import path from 'node:path';
 
-export const REQUIRED_KEYS = Object.freeze([
-  'JEEDOM_URL', 'JEEDOM_USER', 'JEEDOM_PASSWORD', 'HA_URL', 'HA_USER', 'HA_PASSWORD', 'JEEDOM_DEMO_TARGET',
-]);
+export const JEEDOM_KEYS = Object.freeze(['JEEDOM_URL', 'JEEDOM_USER', 'JEEDOM_PASSWORD', 'JEEDOM_DEMO_TARGET']);
+export const HA_KEYS = Object.freeze(['HA_URL', 'HA_USER', 'HA_PASSWORD']);
+export const REQUIRED_KEYS = Object.freeze([...JEEDOM_KEYS, ...HA_KEYS]);
 
 export function parseEnvText(raw) {
   const values = {};
@@ -26,27 +26,27 @@ export function parseEnvText(raw) {
 }
 
 /** Valide la configuration ; les erreurs ne citent que des NOMS de clés, jamais de valeurs. */
-export function validateConfig(values) {
-  const missing = REQUIRED_KEYS.filter((key) => !values[key]);
+export function validateConfig(values, { requireHa = true } = {}) {
+  const missing = (requireHa ? REQUIRED_KEYS : JEEDOM_KEYS).filter((key) => !values[key]);
   if (missing.length) throw new Error(`cles-manquantes: ${missing.join(', ')}`);
   if (values.JEEDOM_DEMO_TARGET !== 'demo') throw new Error('cible-non-confirmee-demo');
-  for (const key of ['JEEDOM_URL', 'HA_URL']) {
+  for (const key of requireHa ? ['JEEDOM_URL', 'HA_URL'] : ['JEEDOM_URL']) {
     let url;
     try { url = new URL(values[key]); } catch { throw new Error(`url-invalide: ${key}`); }
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`url-invalide: ${key}`);
   }
   const origins = {
     jeedom: new URL(values.JEEDOM_URL).origin,
-    homeAssistant: new URL(values.HA_URL).origin,
+    homeAssistant: requireHa ? new URL(values.HA_URL).origin : null,
   };
   // Valeurs à ne jamais laisser apparaître dans une capture, un journal ou le manifeste.
   const secrets = [
     values.JEEDOM_USER, values.JEEDOM_PASSWORD, values.HA_USER, values.HA_PASSWORD,
-    new URL(values.JEEDOM_URL).host, new URL(values.HA_URL).host,
+    new URL(values.JEEDOM_URL).host, requireHa ? new URL(values.HA_URL).host : null,
   ].filter((value, index, all) => value && all.indexOf(value) === index);
   return {
     jeedom: { origin: origins.jeedom, user: values.JEEDOM_USER, password: values.JEEDOM_PASSWORD },
-    homeAssistant: { origin: origins.homeAssistant, user: values.HA_USER, password: values.HA_PASSWORD },
+    homeAssistant: requireHa ? { origin: origins.homeAssistant, user: values.HA_USER, password: values.HA_PASSWORD } : null,
     secrets,
   };
 }

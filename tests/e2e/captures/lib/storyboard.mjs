@@ -47,6 +47,8 @@ export const EXTRA_SHOTS = Object.freeze([
 ]);
 
 /** Storyboard vidéo : durées de pause (ms) par étape, en plus des temps de chargement réels. */
+export const HA_VIDEO_STEP_IDS = Object.freeze(['ha-appareils', 'ha-pilotage', 'retour']);
+
 export const VIDEO_STEPS = Object.freeze([
   { id: 'plugins', label: 'Page Plugins : le plugin installé', holdMs: 4000 },
   { id: 'dependances', label: 'Configuration : dépendances OK et démon OK', holdMs: 6000 },
@@ -59,6 +61,11 @@ export const VIDEO_STEPS = Object.freeze([
 ]);
 
 /** Borne basse sur la durée prévue (pauses seules) : doit rester très en dessous de VIDEO_MAX_SECONDS. */
+/** Étapes vidéo retenues ; `--skip-ha` retire Home Assistant et le retour d'état qui en dépend. */
+export function videoSteps({ skipHa = false } = {}) {
+  return skipHa ? VIDEO_STEPS.filter((step) => !HA_VIDEO_STEP_IDS.includes(step.id)) : VIDEO_STEPS;
+}
+
 export function plannedHoldSeconds(steps = VIDEO_STEPS) {
   return steps.reduce((total, step) => total + step.holdMs, 0) / 1000;
 }

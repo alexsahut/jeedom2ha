@@ -24,10 +24,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPlaywright } from '../gate/lib/playwright.mjs';
 import { assertEnvOutsideRepo, parseEnvText, redact, validateConfig } from './lib/config.mjs';
-import { assertManifestClean, buildManifest, findLeaks, isLightBackground, sha256 } from './lib/safety.mjs';
+import { assertManifestClean, buildManifest, findLeaks, isLightBackground, mergeManifest, sha256 } from './lib/safety.mjs';
 import {
   COLOR_SCHEME, DEMO, EXTRA_SHOTS, LOCALE, MANIFEST_FILE, SHOTS, TIMEZONE, VIDEO_FILE, VIDEO_MAX_SECONDS,
-  VIDEO_STEPS, VIEWPORT, plannedHoldSeconds,
+  VIEWPORT, plannedHoldSeconds, videoSteps,
 } from './lib/storyboard.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -36,7 +36,16 @@ const PLUGIN_CONFIG_PATH = '/index.php?v=d&p=plugin&id=jeedom2ha';
 const PLUGINS_PATH = '/index.php?v=d&p=plugin';
 const WV = '#j2ha_workView';
 const STEP_TIMEOUT_MS = 30_000;
+const RESCAN_TIMEOUT_MS = 90_000;
 const FREEZE_CSS = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
+// CC-48 : injecté dès la création de chaque page (captures ET vidéo), donc actif avant le premier rendu : les champs du
+// broker, leurs indications et la note « broker » de la barre d'état ne sont jamais dessinés, donc jamais enregistrés.
+const MASK_CSS = [
+  '.configKey[data-l1key="mqttHost"],.configKey[data-l1key="mqttPort"],.configKey[data-l1key="mqttUser"],',
+  '#in_mqttPassword{color:transparent!important;text-shadow:none!important;-webkit-text-security:none}',
+  '.configKey[data-l1key^="mqtt"]::placeholder,#in_mqttPassword::placeholder{color:transparent!important}',
+  '#span_healthMqttBroker{visibility:hidden!important}',
+].join('');
 
 function parseArgs(argv) {
   const args = { only: null, skipHa: false, plan: false, out: path.join(REPO_ROOT, 'docs/fr_FR/images'), videoOut: null, envFile: null };
@@ -59,7 +68,10 @@ export function buildPlan(args) {
   return {
     viewport: VIEWPORT, locale: LOCALE, theme: COLOR_SCHEME,
     shots: args.only === 'video' ? [] : shots.map((s) => ({ id: s.id, file: s.file, marker: s.marker })),
-    video: args.only === 'shots' ? null : { file: VIDEO_FILE, max_seconds: VIDEO_MAX_SECONDS, hold_seconds: plannedHoldSeconds(), steps: VIDEO_STEPS.map((s) => s.label) },
+    video: args.only === 'shots' ? null : {
+      file: VIDEO_FILE, max_seconds: VIDEO_MAX_SECONDS, hold_seconds: plannedHoldSeconds(videoSteps(args)),
+      steps: videoSteps(args).map((s) => s.label),
+    },
   };
 }
 
@@ -77,7 +89,7 @@ async function atStep(label, operation) {
 }
 
 /** Contexte déterministe : taille, langue, fuseau, thème clair, mouvements réduits ; vidéo si demandée. */
-async function newContext(browser, videoDir) {
+async function newContext(browser, videoDir, cfg) {
   const options = {
     viewport: VIEWPORT, locale: LOCALE, timezoneId: TIMEZONE, colorScheme: COLOR_SCHEME, reducedMotion: 'reduce',
     deviceScaleFactor: 1, serviceWorkers: 'block',
@@ -92,7 +104,15 @@ async function newContext(browser, videoDir) {
       (document.head || document.documentElement).appendChild(style);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
-  }, { css: FREEZE_CSS });
+  }, { css: `${FREEZE_CSS}${MASK_CSS}` });
+  if (cfg.homeAssistant) {
+    // Home Assistant mémorise son thème côté navigateur : on le fixe en clair avant le premier chargement de son origine.
+    // NON DÉMONTRÉ : le contrôle `assertLightTheme` reste le garde-fou si la clé change ou si le profil l'écrase.
+    await context.addInitScript(({ origin }) => {
+      if (location.origin !== origin) return;
+      try { localStorage.setItem('selectedTheme', JSON.stringify({ dark: false })); } catch { /* stockage indisponible */ }
+    }, { origin: cfg.homeAssistant.origin });
+  }
   return context;
 }
 
@@ -105,6 +125,7 @@ async function loginJeedom(page, cfg) {
     await page.locator('#bt_login').click();
   }
   await page.locator('#bt_getHelp, #bt_getHelpTop, .navbar').first().waitFor({ state: 'attached' });
+  await forceJeedomLightTheme(page, cfg);
 }
 
 async function loginHomeAssistant(page, cfg) {
@@ -116,6 +137,23 @@ async function loginHomeAssistant(page, cfg) {
     await page.locator('mwc-button, ha-button, button').filter({ hasText: /connexion|log in|sign in/i }).first().click();
   }
   await page.locator('home-assistant').waitFor({ state: 'attached' });
+}
+
+/**
+ * (D1) Thème clair indépendant du compte : en plus de `colorScheme: light`, choisit « clair » dans le profil Jeedom si le
+ * compte est réglé autrement. NON DÉMONTRÉ (sélecteurs du profil Jeedom) : `assertLightTheme` reste le garde-fou fermé,
+ * contrôlé à chaque écran de la vidéo comme de chaque capture.
+ */
+async function forceJeedomLightTheme(page, cfg) {
+  await page.goto(`${cfg.jeedom.origin}/index.php?v=d&p=profils`, { waitUntil: 'domcontentloaded' });
+  const select = page.locator('select').filter({ has: page.locator('option', { hasText: /light|clair/i }) }).first();
+  if (!(await select.count())) return;
+  const light = select.locator('option', { hasText: /light|clair/i }).first();
+  if (await light.evaluate((option) => option.selected)) return;
+  await select.selectOption({ label: ((await light.textContent()) ?? '').trim() });
+  await page.locator('#bt_saveProfils, .bt_saveProfils').first().click();
+  await settle(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
 /** (D1) Thème clair prouvé : le fond effectif de la page doit être clair, sinon on n'enregistre rien. */
@@ -184,7 +222,7 @@ async function saveShot(page, outDir, shot, secrets, files, clip) {
 
 /** Captures 1 à 8 (Jeedom) selon le storyboard, puis la capture Home Assistant. */
 async function runShots(browser, cfg, args, files) {
-  const context = await newContext(browser, null);
+  const context = await newContext(browser, null, cfg);
   const page = await context.newPage();
   const byId = Object.fromEntries([...SHOTS, ...EXTRA_SHOTS].map((s) => [String(s.id), s]));
   try {
@@ -254,9 +292,14 @@ async function runShots(browser, cfg, args, files) {
 /** Vidéo : un seul contexte enregistré, étapes du storyboard vidéo, durée contrôlée (≤ 2 min). */
 async function runVideo(browser, cfg, args) {
   await mkdir(args.videoOut, { recursive: true });
-  const context = await newContext(browser, args.videoOut);
+  const context = await newContext(browser, args.videoOut, cfg);
   const page = await context.newPage();
-  const hold = (id) => page.waitForTimeout(VIDEO_STEPS.find((s) => s.id === id).holdMs);
+  const steps = videoSteps(args);
+  // Thème clair vérifié à chaque écran filmé, pas seulement au premier ; la pause suit le storyboard vidéo.
+  const hold = async (id) => {
+    await assertLightTheme(page);
+    await page.waitForTimeout(steps.find((s) => s.id === id).holdMs);
+  };
   const started = Date.now();
   let video;
   try {
@@ -277,8 +320,16 @@ async function runVideo(browser, cfg, args) {
     await atStep('vidéo : relire Jeedom', async () => {
       await openPluginPage(page, cfg);
       await page.locator('#bt_rescanTopology').click();
+      // « Relire Jeedom » ouvre une confirmation : sans clic sur « Relire », aucune relecture n'a lieu.
+      const confirm = page.locator('.bootbox button[data-bb-handler="confirm"], .bootbox .btn.bootbox-accept').first();
+      await confirm.waitFor({ state: 'visible' });
+      const scan = page.waitForResponse((r) => r.url().includes('/plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php')
+        && (r.request().postData() ?? '').includes('scanTopology'), { timeout: RESCAN_TIMEOUT_MS });
+      await confirm.click();
+      await scan;
+      await page.locator('#div_alert .alert').first().waitFor({ state: 'visible', timeout: RESCAN_TIMEOUT_MS });
+      await page.locator('#bt_rescanTopology:not([disabled])').waitFor({ state: 'visible', timeout: RESCAN_TIMEOUT_MS });
       await settle(page);
-      await page.locator('#j2ha_houseNumber').waitFor({ state: 'visible' });
       await hold('relire');
     });
     await atStep('vidéo : pièce', async () => {
@@ -289,24 +340,26 @@ async function runVideo(browser, cfg, args) {
       await selectEquipment(page, page.locator(`${WV} .j2ha-wv-eq`).filter({ hasText: DEMO.publishedEquipment }).first());
       await hold('equipement');
     });
-    await atStep('vidéo : Home Assistant appareils', async () => {
-      await loginHomeAssistant(page, cfg);
-      await page.goto(`${cfg.homeAssistant.origin}/config/devices/dashboard`, { waitUntil: 'domcontentloaded' });
-      await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
-      await hold('ha-appareils');
-    });
-    await atStep('vidéo : pilotage Home Assistant', async () => {
-      await page.getByText(DEMO.haLight).first().click();
-      const toggle = page.getByRole('switch').first();
-      await toggle.waitFor({ state: 'visible' });
-      await toggle.click();
-      await hold('ha-pilotage');
-    });
-    await atStep('vidéo : retour d’état dans Jeedom', async () => {
-      await openPluginPage(page, cfg);
-      await openRoom(page, DEMO.searchRoom);
-      await hold('retour');
-    });
+    if (!args.skipHa) {
+      await atStep('vidéo : Home Assistant appareils', async () => {
+        await loginHomeAssistant(page, cfg);
+        await page.goto(`${cfg.homeAssistant.origin}/config/devices/dashboard`, { waitUntil: 'domcontentloaded' });
+        await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
+        await hold('ha-appareils');
+      });
+      await atStep('vidéo : pilotage Home Assistant', async () => {
+        await page.getByText(DEMO.haLight).first().click();
+        const toggle = page.getByRole('switch').first();
+        await toggle.waitFor({ state: 'visible' });
+        await toggle.click();
+        await hold('ha-pilotage');
+      });
+      await atStep('vidéo : retour d’état dans Jeedom', async () => {
+        await openPluginPage(page, cfg);
+        await openRoom(page, DEMO.searchRoom);
+        await hold('retour');
+      });
+    }
   } finally {
     await context.close(); // finalise le fichier vidéo
   }
@@ -330,7 +383,7 @@ export async function main(argv) {
   }
   if (!args.envFile) throw new Error('env-file-requis');
   assertEnvOutsideRepo(args.envFile, REPO_ROOT);
-  const cfg = validateConfig(parseEnvText(await readFile(args.envFile, 'utf8')));
+  const cfg = validateConfig(parseEnvText(await readFile(args.envFile, 'utf8')), { requireHa: !args.skipHa });
   if (args.only !== 'shots' && !args.videoOut) throw new Error('video-out-requis');
   const info = JSON.parse(await readFile(path.join(REPO_ROOT, 'plugin_info/info.json'), 'utf8'));
   const { chromium } = loadPlaywright();
@@ -348,13 +401,17 @@ export async function main(argv) {
   } finally {
     await browser.close();
   }
-  if (files.length) {
-    const manifest = buildManifest({
+  if (files.length || video) {
+    // Aussi pour `--only video` : la vidéo régénérée ne laisse jamais un manifeste périmé ou absent.
+    await mkdir(args.out, { recursive: true });
+    const manifestPath = path.join(args.out, MANIFEST_FILE);
+    const previous = await readFile(manifestPath, 'utf8').then(JSON.parse, () => null);
+    const manifest = mergeManifest(previous, buildManifest({
       pluginVersion: info.pluginVersion, sourceCommit: gitValue(['rev-parse', '--short', 'HEAD']),
       date: new Date().toISOString().slice(0, 10), files, command: regenerateCommand(), video,
-    });
+    }));
     assertManifestClean(manifest, cfg.secrets);
-    await writeFile(path.join(args.out, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   }
   process.stdout.write(`captures: ${files.length} fichier(s)${video ? `, vidéo ${video.seconds} s` : ''} — relecture CC-48 et concordance (Task 5) à faire\n`);
 }

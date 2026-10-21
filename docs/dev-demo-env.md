@@ -138,15 +138,17 @@ node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> \
 node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> --only shots   # captures seules
 ```
 
-`--only shots|video` et `--skip-ha` limitent le parcours. Aucun identifiant n'est passé en argument.
+`--only shots|video` limite le parcours ; `--skip-ha` retire la capture 9 et les étapes vidéo Home Assistant (dont le retour d'état), et rend les clés `HA_*` facultatives. Aucun identifiant n'est passé en argument.
 
 ### Ce que garantit le parcours
 
 - Fenêtre 1280×720, `fr-FR`, fuseau Europe/Paris, animations coupées, attente des rafraîchissements par sélecteur.
-- **Thème clair forcé** (D1) quel que soit le thème du compte : `colorScheme: light` et contrôle du fond effectif
-  de la page avant chaque capture ; un fond sombre ou illisible interrompt le parcours (aucun fichier écrit).
-- **CC-48** : avant chaque capture, les champs du broker (hôte, port, utilisateur, mot de passe) de la page de
-  configuration sont vidés à l'écran et le texte visible est refusé s'il contient une adresse IP, un nom d'hôte
+- **Thème clair forcé** (D1) quel que soit le thème du compte : `colorScheme: light`, sélection du thème clair dans le profil
+  Jeedom et réglage clair côté navigateur pour Home Assistant (**non démontrés**, à ajuster au premier passage), puis contrôle
+  du fond effectif avant chaque capture et à chaque écran de la vidéo ; un fond sombre ou illisible interrompt le parcours.
+- **CC-48** : dès la création de chaque page (captures **et** vidéo, donc avant le premier rendu enregistré), les champs du
+  broker (hôte, port, utilisateur, mot de passe, indications) et la note « broker » de la barre d'état sont masqués ; avant
+  chaque capture, le texte visible est refusé s'il contient une adresse IP, un nom d'hôte
   local, une URL, un jeton long ou une valeur du `.env` ; les erreurs ne citent jamais de valeur.
 - **Vidéo** ≤ 2 min (échec au-delà), étapes : page Plugins, dépendances/démon, « Relire Jeedom », pièce,
   équipement, Home Assistant (mêmes équipements et pièces), pilotage d'une lumière, retour d'état dans Jeedom.
@@ -165,7 +167,7 @@ node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> --only s
 | 8 | `configuration.png` | `index.md` « page de configuration » |
 | 9 | `home-assistant-appareils.png` | aucun (site et fiche Market) |
 
-Le parcours écrit `docs/fr_FR/images/captures-manifest.json` (version du plugin, commit source, date, viewport,
+Le parcours écrit `docs/fr_FR/images/captures-manifest.json`, y compris pour `--only video` (une section non régénérée est conservée avec sa propre version et sa propre date) (version du plugin, commit source, date, viewport,
 langue, thème, empreinte SHA-256 de chaque fichier, commande de régénération ; aucune URL ni identifiant). La
 vidéo (`jeedom2ha-presentation.webm`) est écrite dans `--video-out` et **n'est pas versionnée** : l'hébergement
 du lien « vidéo » de la fiche Market est choisi par Alexandre ; consigner ici l'emplacement retenu.

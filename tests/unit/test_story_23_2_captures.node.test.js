@@ -101,3 +101,43 @@ test('plan hors-ligne : aucune connexion, aucun navigateur', async () => {
   assert.equal(run.buildPlan({ only: 'video', skipHa: false }).shots.length, 0);
   assert.equal(run.buildPlan({ only: 'shots', skipHa: true }).video, null);
 });
+
+test('--skip-ha : clés HA facultatives, étapes vidéo HA retirées', async () => {
+  const cfg = await load('lib/config.mjs');
+  const sb = await load('lib/storyboard.mjs');
+  const run = await load('run-captures.mjs');
+  const jeedomOnly = ENV.split('\n').filter((line) => !line.startsWith('HA_')).join('\n');
+  assert.throws(() => cfg.validateConfig(cfg.parseEnvText(jeedomOnly)), /cles-manquantes: HA_URL, HA_USER, HA_PASSWORD/);
+  const parsed = cfg.validateConfig(cfg.parseEnvText(jeedomOnly), { requireHa: false });
+  assert.equal(parsed.homeAssistant, null);
+  assert.ok(!parsed.secrets.some((s) => s.includes('demo-ha')));
+  const ids = sb.videoSteps({ skipHa: true }).map((s) => s.id);
+  assert.deepEqual(ids, ['plugins', 'dependances', 'relire', 'piece', 'equipement']);
+  assert.equal(sb.videoSteps({}).length, sb.VIDEO_STEPS.length);
+  const plan = run.buildPlan({ only: 'video', skipHa: true });
+  assert.equal(plan.video.steps.length, 5);
+});
+
+test('manifeste : une régénération partielle conserve la section précédente avec sa propre date', async () => {
+  const s = await load('lib/safety.mjs');
+  const files = [{ id: 1, file: 'a.png', sha256: 'x', bytes: 1 }];
+  const first = s.buildManifest({ pluginVersion: '1.2.0', sourceCommit: 'aaa', date: '2026-10-21', files, command: 'c' });
+  const videoOnly = s.mergeManifest(first, s.buildManifest({
+    pluginVersion: '1.3.0', sourceCommit: 'bbb', date: '2026-10-22', files: [], command: 'c', video: { file: 'v.webm', seconds: 90 },
+  }));
+  assert.deepEqual(videoOnly.files, files);
+  assert.equal(videoOnly.files_generated.plugin_version, '1.2.0');
+  assert.equal(videoOnly.video.generated.generated_on, '2026-10-22');
+  assert.equal(videoOnly.plugin_version, '1.3.0');
+  const shotsOnly = s.mergeManifest(videoOnly, s.buildManifest({ pluginVersion: '1.4.0', date: '2026-10-23', files, command: 'c' }));
+  assert.equal(shotsOnly.video.generated.generated_on, '2026-10-22');
+  assert.equal(s.mergeManifest(null, first).files.length, 1);
+});
+
+test('CC-48 : le masquage du broker est injecté dès la création des pages (avant tout rendu enregistré)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.ok(/addInitScript\([\s\S]*?MASK_CSS/.test(src));
+  for (const hidden of ['mqttHost', 'mqttUser', 'in_mqttPassword', 'span_healthMqttBroker']) assert.ok(src.includes(hidden), hidden);
+  // la confirmation de « Relire Jeedom » est cliquée et la requête scanTopology attendue
+  assert.ok(src.includes('data-bb-handler="confirm"') && src.includes('scanTopology'));
+});

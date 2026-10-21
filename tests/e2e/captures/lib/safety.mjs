@@ -62,6 +62,27 @@ export function buildManifest({ pluginVersion, sourceCommit, date, files, comman
   return manifest;
 }
 
+/**
+ * Fusionne le manifeste précédent : une régénération partielle (`--only shots|video`) ne laisse jamais une section
+ * périmée sans date ni version. Chaque section porte ses propres métadonnées ; les fichiers repris restent ceux
+ * de l'exécution précédente, avec leur manifeste d'origine pour la version et la date.
+ */
+export function mergeManifest(previous, next) {
+  const merged = { ...next };
+  const old = previous && typeof previous === 'object' ? previous : {};
+  const origin = { plugin_version: old.plugin_version, source_commit: old.source_commit, generated_on: old.generated_on };
+  if (!next.files.length && Array.isArray(old.files) && old.files.length) {
+    merged.files = old.files;
+    merged.files_generated = origin;
+  }
+  if (!next.video && old.video) {
+    merged.video = { ...old.video, generated: old.video.generated || origin };
+  } else if (next.video) {
+    merged.video = { ...next.video, generated: { plugin_version: next.plugin_version, source_commit: next.source_commit, generated_on: next.generated_on } };
+  }
+  return merged;
+}
+
 /** Garde finale : le manifeste sérialisé ne doit contenir ni fuite ni secret. */
 export function assertManifestClean(manifest, secrets) {
   const findings = findLeaks(JSON.stringify(manifest), secrets).filter((f) => f !== 'jeton-long');
