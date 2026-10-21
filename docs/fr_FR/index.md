@@ -52,7 +52,7 @@ Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom.
 
 **Prérequis**
 
-- Jeedom en version 4.4 ou supérieure.
+- Jeedom en version 4.5 ou supérieure.
 - Un système Debian 12.
 - Python 3, que Jeedom gère pour le plugin (si Python 3 est introuvable, Jeedom affiche le message « Python3 introuvable pour le plugin »).
 - Un broker MQTT : le plugin **MQTT Manager** (recommandé) ou un broker externe (Mosquitto, par exemple).

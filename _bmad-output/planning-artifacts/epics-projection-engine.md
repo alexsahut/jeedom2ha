@@ -2624,6 +2624,6 @@ afin de ne pas ouvrir un composant HA à vide et de ne pas confondre parité tec
 
 - une seule fonction d'état (plan + réalité → état) pilote la fenêtre de pièce, la page principale et la vue maître-détail ; aucune des trois vérités contradictoires actuelles ne subsiste.
 - le glossaire du `CADRAGE.md` est respecté à l'écran et dans les tests de libellés ; aucun « override » ni terme franglais résiduel.
-- aucune couleur en dur : toutes les teintes d'état viennent des variables `--j2ha-*`, correctes en clair et en sombre (bascule auto comprise) et sur Jeedom 4.4 et 4.6.1.
+- aucune couleur en dur : toutes les teintes d'état viennent des variables `--j2ha-*`, correctes en clair et en sombre (bascule auto comprise) et sur Jeedom 4.4 et 4.6.1. *(Amendé le 2026-10-21, décision d'Alexandre : le plugin exige Jeedom 4.5 ; la preuve sur Jeedom 4.4 sort du périmètre et l'epic est clos sur la box Jeedom 4.6.1.)*
 - B et C sont servis par la route agrégée de 25.2 ; pas de régression du nombre de requêtes à l'ouverture de la page.
 - gate 20-0 vert avant chaque `done` qui touche l'écran ; validation UX d'Alexandre avant le `done` de 25.5 ; aucun nom réel dans le dépôt (CC-48).

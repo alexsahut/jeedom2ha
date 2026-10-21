@@ -155,7 +155,7 @@ describe('25.3 / AC15 — contrastes des nouveaux éléments dans les deux thèm
   });
 });
 
-describe('25.3 / AC15 — compatibilité Jeedom 4.4 (pas d’API ni de variable propre à 4.6)', () => {
+describe('25.3 / AC15 — compatibilité Jeedom 4.5 (pas d’API ni de variable propre à 4.6)', () => {
   it('aucune dépendance nouvelle : ni jeeDialog, ni fetch(), ni framework, ni police ou bibliothèque externe', () => {
     for (const [file, source] of Object.entries(newSources)) {
       assert.doesNotMatch(stripComments(source), /jeeDialog|\bfetch\(|new Vue|React\.|<script[^>]+src="https?:|fonts\.googleapis|cdn\./i, file);

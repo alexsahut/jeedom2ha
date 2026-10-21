@@ -367,9 +367,11 @@ describe('25.1 / AC21 — thème : bascule et état initial', () => {
   });
 });
 
-describe('25.1 / AC25 — compatibilité Jeedom 4.4', () => {
-  it('plugin_info/info.json exige toujours 4.4', () => {
-    assert.equal(JSON.parse(fs.readFileSync('plugin_info/info.json', 'utf8')).require, '4.4');
+describe('25.1 / AC25 — compatibilité Jeedom (minimum 4.5 depuis le 2026-10-21)', () => {
+  // Décision d'Alexandre 2026-10-21 08:36 : le plugin exige la version de Jeedom installable sur Debian 12, soit 4.5.
+  // Raison technique en plus : le démon est lancé par system::getCmdPython3(), absent du cœur avant 4.4.7.
+  it('plugin_info/info.json exige 4.5', () => {
+    assert.equal(JSON.parse(fs.readFileSync('plugin_info/info.json', 'utf8')).require, '4.5');
   });
 
   it('seulement jQuery, Bootstrap 3, bootbox, jeedomUtils et Font Awesome 5 ; jeeDialog n’est pas introduit', () => {
