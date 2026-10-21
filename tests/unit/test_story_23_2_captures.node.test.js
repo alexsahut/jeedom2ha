@@ -162,4 +162,6 @@ test('23.2 — les noms de clés du .env créé par clawbox sont acceptés comme
   // Sans le garde-fou de cible, refus (le fichier de clawbox doit recevoir la ligne JEEDOM_DEMO_TARGET=demo).
   assert.throws(() => cfg.validateConfig(cfg.parseEnvText(clawboxEnv.replace('JEEDOM_DEMO_TARGET=demo', ''))),
     /cles-manquantes: JEEDOM_DEMO_TARGET/);
+  // Une clé canonique présente mais vide l'emporte sur l'alias : refus, jamais de repli silencieux sur l'ancienne cible.
+  assert.throws(() => cfg.validateConfig(cfg.parseEnvText(clawboxEnv + '\nJEEDOM_URL=')), /cles-manquantes: JEEDOM_URL/);
 });

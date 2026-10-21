@@ -37,11 +37,11 @@ export const KEY_ALIASES = Object.freeze({
   HOME_ASSISTANT_PASSWORD: 'HA_PASSWORD',
 });
 
-/** Ramène les alias à leur nom canonique ; la clé canonique, si présente, l'emporte. */
+/** Ramène les alias à leur nom canonique ; une clé canonique présente l'emporte, même vide (la validation la rejette alors). */
 export function normalizeKeys(values) {
   const out = { ...values };
   for (const [alias, canonical] of Object.entries(KEY_ALIASES)) {
-    if (!out[canonical] && out[alias]) out[canonical] = out[alias];
+    if (!Object.prototype.hasOwnProperty.call(out, canonical) && alias in out) out[canonical] = out[alias];
     delete out[alias];
   }
   return out;
