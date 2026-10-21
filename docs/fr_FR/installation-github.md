@@ -14,7 +14,7 @@ Pour une installation depuis le Market, voir [Prérequis et installation](index.
 
 ## Prérequis
 
-- Jeedom en version 4.4 ou supérieure, sur Debian 12.
+- Jeedom en version 4.5 ou supérieure, sur Debian 12.
 - Un **broker MQTT** : un Mosquitto local ou un broker déjà en service. Les réglages de connexion sont décrits dans la section [Connexion au broker MQTT](index.md#connexion-au-broker-mqtt) du guide.
 - **Home Assistant** avec l'intégration MQTT en service et la découverte automatique (*discovery*) activée.
 - Un accès en ligne de commande à la machine Jeedom, avec les droits d'administration (`sudo`).

@@ -6,6 +6,12 @@
 
 ---
 
+# 2026-10-21 — Jeedom 4.5 minimum
+
+- Le plugin exige désormais **Jeedom 4.5 ou supérieur** (Debian 12). Jeedom 4.4 n'est pas prévu pour Debian 12, et le démon du plugin s'appuie sur l'environnement Python isolé géré par le cœur, absent des premières versions 4.4.
+
+---
+
 # 2026-10-20 — Export de décision : ce que le plugin a décidé, dans un fichier
 
 - Le menu « ⋯ » de la page principale propose « Télécharger l'export de décision… » : un fichier JSON qui dit, pour chaque équipement, chaque commande et chaque scénario, ce que le plugin a décidé (publié ou non, et pourquoi), d'après la dernière synchronisation ou le dernier « Publier ».
