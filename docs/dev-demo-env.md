@@ -117,7 +117,7 @@ sont des écritures voulues, réservées aux comptes dédiés `j2ha-captures` (D
 Prérequis : démo VM 122 démarrée et peuplée (`populate_demo.py` rejoué avec la version D2, puis scan jeedom2ha),
 comptes `j2ha-captures` Jeedom et Home Assistant créés par clawbox.
 
-Fichier `.env` **hors dépôt** (refusé s'il est dans le dépôt) ; noms de clés à confirmer avec clawbox :
+Fichier `.env` **hors dépôt** (refusé s'il est dans le dépôt) ; noms de clés canoniques :
 
 ```
 JEEDOM_URL=<url de la démo Jeedom>
@@ -128,6 +128,8 @@ HA_USER=<compte j2ha-captures>
 HA_PASSWORD=<…>
 JEEDOM_DEMO_TARGET=demo
 ```
+
+Le `.env` créé par clawbox le 2026-10-21 (`/home/asahut/.openclaw/agents/clawcode/secrets/j2ha-captures.env`, 0600, hors dépôt) emploie les noms `JEEDOM_BASE_URL`, `JEEDOM_USERNAME`, `JEEDOM_PASSWORD`, `HOME_ASSISTANT_BASE_URL`, `HOME_ASSISTANT_USERNAME`, `HOME_ASSISTANT_PASSWORD` : le script les accepte comme alias. Il faut seulement y ajouter la ligne non secrète `JEEDOM_DEMO_TARGET=demo` avant la première exécution.
 
 Commande de régénération (depuis la racine du dépôt) :
 
