@@ -141,3 +141,25 @@ test('CC-48 : le masquage du broker est injecté dès la création des pages (av
   // la confirmation de « Relire Jeedom » est cliquée et la requête scanTopology attendue
   assert.ok(src.includes('data-bb-handler="confirm"') && src.includes('scanTopology'));
 });
+
+test('23.2 — les noms de clés du .env créé par clawbox sont acceptés comme alias', async () => {
+  const cfg = await load('lib/config.mjs');
+  const clawboxEnv = [
+    'JEEDOM_BASE_URL=http://demo-jeedom.invalid',
+    'JEEDOM_USERNAME=j2ha-captures',
+    'JEEDOM_PASSWORD=fake-password-jeedom',
+    'HOME_ASSISTANT_BASE_URL=http://demo-ha.invalid:8123',
+    'HOME_ASSISTANT_USERNAME=j2ha-captures',
+    'HOME_ASSISTANT_PASSWORD=fake-password-ha',
+    'JEEDOM_DEMO_TARGET=demo',
+  ].join('\n');
+  const out = cfg.validateConfig(cfg.parseEnvText(clawboxEnv));
+  assert.equal(out.jeedom.origin, 'http://demo-jeedom.invalid');
+  assert.equal(out.jeedom.user, 'j2ha-captures');
+  assert.equal(out.homeAssistant.origin, 'http://demo-ha.invalid:8123');
+  assert.equal(out.homeAssistant.password, 'fake-password-ha');
+  assert.ok(out.secrets.includes('fake-password-ha'));
+  // Sans le garde-fou de cible, refus (le fichier de clawbox doit recevoir la ligne JEEDOM_DEMO_TARGET=demo).
+  assert.throws(() => cfg.validateConfig(cfg.parseEnvText(clawboxEnv.replace('JEEDOM_DEMO_TARGET=demo', ''))),
+    /cles-manquantes: JEEDOM_DEMO_TARGET/);
+});
