@@ -38,6 +38,8 @@ const WV = '#j2ha_workView';
 const STEP_TIMEOUT_MS = 30_000;
 const RESCAN_TIMEOUT_MS = 90_000;
 export const JEEDOM_LOGIN_FORM = '#in_login_username';
+export const HA_LOGIN_FORM = 'input[name="username"]';
+export const HA_APP = 'home-assistant';
 export const JEEDOM_LOGIN_BUTTON = '#bt_login_validate';
 const FREEZE_CSS = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
 // CC-48 : injecté dès la création de chaque page (captures ET vidéo), donc actif avant le premier rendu : les champs du
@@ -147,13 +149,22 @@ async function loginJeedom(page, cfg) {
 
 async function loginHomeAssistant(page, cfg) {
   await page.goto(cfg.homeAssistant.origin, { waitUntil: 'domcontentloaded' });
-  const user = page.locator('input[name="username"]');
-  if (await user.count()) {
+  // HA rend son formulaire de connexion après le chargement (redirection JS vers /auth/authorize) : un `count()` immédiat
+  // vaut 0 et sautait la connexion (VM 122, 2026-10-31). On attend donc l'un ou l'autre : formulaire, ou application.
+  const user = page.locator(HA_LOGIN_FORM);
+  const app = page.locator(HA_APP);
+  await Promise.race([
+    user.waitFor({ state: 'visible' }),
+    app.waitFor({ state: 'attached' }),
+  ]).catch(() => {});
+  if (await user.isVisible()) {
     await user.fill(cfg.homeAssistant.user);
-    await page.locator('input[name="password"]').fill(cfg.homeAssistant.password);
-    await page.locator('mwc-button, ha-button, button').filter({ hasText: /connexion|log in|sign in/i }).first().click();
+    const password = page.locator('input[name="password"]');
+    await password.fill(cfg.homeAssistant.password);
+    // Entrée plutôt qu'un bouton : son libellé dépend de la langue (« Se connecter » en français).
+    await password.press('Enter');
   }
-  await page.locator('home-assistant').waitFor({ state: 'attached' });
+  await app.waitFor({ state: 'attached' });
 }
 
 /**

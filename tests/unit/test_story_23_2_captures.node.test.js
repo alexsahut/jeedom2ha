@@ -181,3 +181,11 @@ test('23.2 — page de connexion Jeedom : masquage CC-48 oui, gel des animations
   assert.match(src, /\{ freeze: FREEZE_CSS, mask: MASK_CSS, loginSelector: JEEDOM_LOGIN_FORM \}/);
   assert.doesNotMatch(src, /css: `\$\{FREEZE_CSS\}\$\{MASK_CSS\}`/);
 });
+
+test('23.2 — connexion Home Assistant : attend le formulaire rendu après chargement, valide par Entrée (libellé localisé)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /HA_LOGIN_FORM = 'input\[name="username"\]'/);
+  assert.match(src, /user\.waitFor\(\{ state: 'visible' \}\),\s*app\.waitFor\(\{ state: 'attached' \}\),/);
+  assert.match(src, /await password\.press\('Enter'\);/);
+  assert.doesNotMatch(src, /connexion\|log in\|sign in/);
+});
