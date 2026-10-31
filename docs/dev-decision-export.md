@@ -109,6 +109,8 @@ Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `nu
 
 Tous les scénarios, actifs et inactifs. `kind` `"scenario"`, `key` `"scenario:<scenario_id>"`, `scenario_id`, `active`. `entity` : le bouton HA du scénario (mêmes champs qu'une entité, sans `role`, `state_source` toujours `none`), décrit même pour un scénario inactif. `decision` `published` et `reason` `scenario_button` pour un scénario actif ; `not_published` et `scenario_inactive` pour un inactif (aucun bouton dans HA). `homekit_exposed` vient de la story 24.1.
 
+**Scénarios « non projetés » : un artefact de mesure (story 24.5).** Avant 24.2, la mesure de parité HomeKit comptait comme non projetés les scénarios déclenchés à la voix dans Apple Maison. Cet écart venait de l'outil de mesure, pas du plugin : il ne lisait pas les boutons de scénario. Ces scénarios restaient en plus hors du contrat de décision. Un scénario **actif** est toujours projeté en `button` (`jeedom2ha_scenario_<id>`). Pour comparer avec Home Assistant, on joint sur `kind` + `key` (`scenario:<id>`) ou sur `unique_id`, jamais sur le nom. L'exposition d'un de ces boutons à Assist se règle dans Home Assistant : le plugin n'y touche pas.
+
 ## D'où viennent les décisions
 
 - Le sync et « Publier » **mémorisent** le verdict d'`evaluate_equipment()` (RAM, `DecisionMemo`) au moment où ils décident ; l'export ne recalcule rien. Après « Publier », seuls les équipements traités voient leur verdict renouvelé ; les autres gardent celui du dernier sync (c'est ce que `pending_changes` rend visible).
