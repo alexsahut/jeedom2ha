@@ -165,3 +165,11 @@ test('23.2 — les noms de clés du .env créé par clawbox sont acceptés comme
   // Une clé canonique présente mais vide l'emporte sur l'alias : refus, jamais de repli silencieux sur l'ancienne cible.
   assert.throws(() => cfg.validateConfig(cfg.parseEnvText(clawboxEnv + '\nJEEDOM_URL=')), /cles-manquantes: JEEDOM_URL/);
 });
+
+test('23.2 — connexion Jeedom : bouton du cœur 4.6.1 (#bt_login_validate), jamais #bt_login', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /JEEDOM_LOGIN_BUTTON = '#bt_login_validate'/);
+  assert.doesNotMatch(src, /'#bt_login'/);
+  assert.match(src, /jeedom-changement-mot-de-passe-exige/);
+});
+
