@@ -220,6 +220,8 @@ $ cat plugin_info/info.json
 }
 ```
 
+> Relevé historique (version 0.3.0). Depuis le 18/10/2026 (#274), `os` vaut `{ "min" : 12, "max" : 12.99 }` : Debian 12 seulement.
+
 Champ qui porte la version affichée/comparée par le Market : `pluginVersion`
 (actuellement `"0.3.0"`, semver — voir entrée changelog du 2026-09-27 :
 « Version lisible : `pluginVersion` passé en semver »).
