@@ -1,9 +1,12 @@
 // tests/e2e/captures/lib/config.mjs
 /** Story 23.2 — lecture du `.env` des comptes `j2ha-captures` (D3), hors dépôt, sans jamais journaliser une valeur.
  *
- * Noms de clés : ceux de l'outillage du gate 20-0 pour Jeedom (JEEDOM_USER, JEEDOM_PASSWORD) ; les autres sont
- * proposés ici et À CONFIRMER avec clawbox (qui a créé le `.env`) : JEEDOM_URL, HA_URL, HA_USER, HA_PASSWORD.
- * `JEEDOM_DEMO_TARGET=demo` est exigé comme pour `populate_demo.py` (garde-fou : jamais la box de production).
+ * Noms de clés canoniques : JEEDOM_URL, JEEDOM_USER, JEEDOM_PASSWORD, HA_URL, HA_USER, HA_PASSWORD.
+ * Le `.env` créé par clawbox le 2026-10-21 emploie d'autres noms (JEEDOM_BASE_URL, JEEDOM_USERNAME,
+ * HOME_ASSISTANT_BASE_URL, HOME_ASSISTANT_USERNAME, HOME_ASSISTANT_PASSWORD) : ils sont acceptés comme alias
+ * (`KEY_ALIASES`) ; une clé canonique présente l'emporte sur son alias.
+ * `JEEDOM_DEMO_TARGET=demo` est exigé comme pour `populate_demo.py` (garde-fou : jamais la box de production) ;
+ * il n'est pas secret et s'ajoute au `.env` par une ligne.
  */
 
 import path from 'node:path';
@@ -25,8 +28,28 @@ export function parseEnvText(raw) {
   return values;
 }
 
+/** Alias acceptés (noms du `.env` créé par clawbox) → nom canonique. */
+export const KEY_ALIASES = Object.freeze({
+  JEEDOM_BASE_URL: 'JEEDOM_URL',
+  JEEDOM_USERNAME: 'JEEDOM_USER',
+  HOME_ASSISTANT_BASE_URL: 'HA_URL',
+  HOME_ASSISTANT_USERNAME: 'HA_USER',
+  HOME_ASSISTANT_PASSWORD: 'HA_PASSWORD',
+});
+
+/** Ramène les alias à leur nom canonique ; une clé canonique présente l'emporte, même vide (la validation la rejette alors). */
+export function normalizeKeys(values) {
+  const out = { ...values };
+  for (const [alias, canonical] of Object.entries(KEY_ALIASES)) {
+    if (!Object.prototype.hasOwnProperty.call(out, canonical) && alias in out) out[canonical] = out[alias];
+    delete out[alias];
+  }
+  return out;
+}
+
 /** Valide la configuration ; les erreurs ne citent que des NOMS de clés, jamais de valeurs. */
-export function validateConfig(values, { requireHa = true } = {}) {
+export function validateConfig(rawValues, { requireHa = true } = {}) {
+  const values = normalizeKeys(rawValues);
   const missing = (requireHa ? REQUIRED_KEYS : JEEDOM_KEYS).filter((key) => !values[key]);
   if (missing.length) throw new Error(`cles-manquantes: ${missing.join(', ')}`);
   if (values.JEEDOM_DEMO_TARGET !== 'demo') throw new Error('cible-non-confirmee-demo');
