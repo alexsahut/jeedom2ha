@@ -372,7 +372,10 @@ async function runVideo(browser, cfg, args) {
         && (r.request().postData() ?? '').includes('scanTopology'), { timeout: RESCAN_TIMEOUT_MS });
       await confirm.click();
       await scan;
-      await page.locator('#div_alert .alert').first().waitFor({ state: 'visible', timeout: RESCAN_TIMEOUT_MS });
+      // Jeedom 4.5+ affiche `showAlert` en notification (`#jeeToastContainer`), plus dans `#div_alert` (VM 122,
+      // 2026-10-31 : attente de 90 s épuisée). Même double lecture que le parcours de gate rescan-page-principale.
+      await page.locator('#jeeToastContainer .jeeToast, #jeeToastContainer > *, #div_alert .alert').first()
+        .waitFor({ state: 'visible', timeout: RESCAN_TIMEOUT_MS });
       await page.locator('#bt_rescanTopology:not([disabled])').waitFor({ state: 'visible', timeout: RESCAN_TIMEOUT_MS });
       await settle(page);
       await hold('relire');
