@@ -71,5 +71,9 @@ test('25.6/25.8 gate — l\'arbre lit « Pièce exclue » quand une pièce n\'a 
 });
 
 test('25.8 gate — la carte ignore le suffixe « pas encore retirés » pour comparer « Pièce exclue » à l\'arbre', () => {
-  assert.match(source, /\.filter\(\(node\) => !\(node\.classList && node\.classList\.contains\('j2ha-room-notyet'\)\)\)/);
+  assert.match(source, /node\.classList\.contains\('j2ha-room-notyet'\)/);
+});
+
+test('24.4 gate — la carte ignore aussi « · N gardés (HomeKit) » pour comparer « Pièce exclue » à l\'arbre', () => {
+  assert.match(source, /\.filter\(\(node\) => !\(node\.classList && \(node\.classList\.contains\('j2ha-room-notyet'\) \|\| node\.classList\.contains\('j2ha-room-homekit-kept'\)\)\)\)/);
 });
