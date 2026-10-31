@@ -419,8 +419,10 @@ async function runVideo(browser, cfg, args) {
         await page.getByText(DEMO.haLight).first().click();
         // Une lumière à l'état « Inconnu » (cas de la démo : jamais pilotée) n'a pas d'interrupteur dans HA, mais deux
         // boutons « Éteindre » / « Allumer » (VM 122, 2026-10-31). On accepte les deux formes.
+        // Libellé selon la langue (« Activer » en français) ; à défaut, le dernier bouton du contrôle d'entité (= marche).
         const toggle = page.getByRole('switch')
-          .or(page.getByRole('button', { name: /^(allumer|turn on)$/i })).first();
+          .or(page.getByRole('button', { name: /^(allumer|activer|turn on)$/i }))
+          .or(page.locator('ha-entity-toggle ha-icon-button').last()).first();
         await toggle.waitFor({ state: 'visible' });
         await toggle.click();
         await hold('ha-pilotage');

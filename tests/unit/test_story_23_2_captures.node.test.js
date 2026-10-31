@@ -218,7 +218,8 @@ test('23.2 — capture HA filtrée sur Jeedom (sans broker ni appareils par déf
 
 test('23.2 — vidéo : pilotage HA accepte l\'interrupteur ou le bouton « Allumer » (état inconnu)', () => {
   const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
-  assert.match(src, /getByRole\('switch'\)\s*\.or\(page\.getByRole\('button', \{ name: \/\^\(allumer\|turn on\)\$\/i \}\)\)\.first\(\)/);
+  assert.match(src, /getByRole\('button', \{ name: \/\^\(allumer\|activer\|turn on\)\$\/i \}\)/);
+  assert.match(src, /\.or\(page\.locator\('ha-entity-toggle ha-icon-button'\)\.last\(\)\)\.first\(\)/);
 });
 
 test('23.2 — settle borné à quelques secondes (Jeedom n\'atteint jamais networkidle)', async () => {
