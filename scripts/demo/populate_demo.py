@@ -287,6 +287,12 @@ class JeedomAdapter:
 # Réconciliation idempotente
 # ---------------------------------------------------------------------------
 
+def _config_matches(current: Any, wanted: str) -> bool:
+    if str(current) == wanted:
+        return True
+    return wanted == "0" and current == "ok"
+
+
 def _bool(value: Any) -> bool:
     return str(value).lower() in ("1", "true")
 
@@ -435,9 +441,11 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
                                  "scenarios": []}
 
     for key, wanted in THEME_CONFIG:
-        # `config::byKey` renvoie la chaîne « ok » (makeSuccess) pour une valeur vide : écart.
+        # `config::byKey` passe par jsonrpc::makeSuccess(), qui renvoie la chaîne « ok » pour toute
+        # valeur vide au sens de PHP, y compris "0" (constaté sur la VM 122 le 2026-10-31 : sans
+        # cette règle, le second passage restait « updated »). « ok » ne vaut donc que pour "0".
         current = adapter.config(key) if live else None
-        changed = live and str(current) != wanted
+        changed = live and not _config_matches(current, wanted)
         if write and changed:
             adapter.save_config(key, wanted)
         inventory["theme"].append({"key": key, "value": wanted, "status": _status(True, changed)})
