@@ -170,6 +170,14 @@ SCENARIOS: List[Dict[str, str]] = [
 ]
 SCENARIO_GROUP = "Démo"
 
+# D1 (thème clair) : réglages globaux du cœur. Jeedom 4.6.1 bascule par défaut sur le thème
+# alterné (sombre) le soir (`theme_changeAccordingTime`) : constaté sur la VM 122 le 2026-10-31,
+# toutes les captures prises après 20 h échouaient en « theme-clair-non-obtenu ».
+THEME_CONFIG = (
+    ("jeedom_theme_main", "core2019_Light"),
+    ("theme_changeAccordingTime", "0"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Adaptateur JSON-RPC Jeedom (seul endroit qui connaît les méthodes/champs)
@@ -190,6 +198,8 @@ class JsonRpcContract:
     CMD_BY_EQ = "cmd::byEqLogicId"
     SCENARIO_ALL = "scenario::all"
     SCENARIO_SAVE = "scenario::save"
+    CONFIG_GET = "config::byKey"
+    CONFIG_SAVE = "config::save"
 
 
 class JeedomRpc:
@@ -265,6 +275,12 @@ class JeedomAdapter:
     def save_scenario(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
         return self._saved_result(self.rpc.call(self.c.SCENARIO_SAVE, **scenario),
                                   self.c.SCENARIO_SAVE)
+
+    def config(self, key: str) -> Any:
+        return self.rpc.call(self.c.CONFIG_GET, key=key, plugin="core")
+
+    def save_config(self, key: str, value: str) -> None:
+        self.rpc.call(self.c.CONFIG_SAVE, key=key, value=value, plugin="core")
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +431,16 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
         return "updated" if exists and changed else ("exists" if exists else "created")
 
     inventory: Dict[str, Any] = {"schema": INVENTORY_SCHEMA, "dry_run": dry_run,
-                                 "connected": live, "parents": [], "rooms": [], "equipments": [], "scenarios": []}
+                                 "connected": live, "theme": [], "parents": [], "rooms": [], "equipments": [],
+                                 "scenarios": []}
+
+    for key, wanted in THEME_CONFIG:
+        # `config::byKey` renvoie la chaîne « ok » (makeSuccess) pour une valeur vide : écart.
+        current = adapter.config(key) if live else None
+        changed = live and str(current) != wanted
+        if write and changed:
+            adapter.save_config(key, wanted)
+        inventory["theme"].append({"key": key, "value": wanted, "status": _status(True, changed)})
 
     for kind, specs in (("parents", PARENTS), ("rooms", ROOMS)):
         for spec in specs:
@@ -505,7 +530,10 @@ def _summarize(inv: Dict[str, Any]) -> Dict[str, Any]:
             "excluded_equipments": sum(1 for e in inv["equipments"] if e["excluded"]),
             "untyped_equipments": sum(1 for e in inv["equipments"]
                                       if not any(c["generic_type"] for c in e["cmds"])),
-            "by_status": counts}
+            "by_status": counts,
+            # D1 : réglages du thème, comptés à part (ce ne sont pas des objets du jeu de démo).
+            "theme_by_status": {status: sum(1 for t in inv.get("theme", []) if t["status"] == status)
+                                for status in {t["status"] for t in inv.get("theme", [])}}}
 
 
 # ---------------------------------------------------------------------------

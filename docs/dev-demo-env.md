@@ -145,8 +145,10 @@ node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> --only s
 ### Ce que garantit le parcours
 
 - Fenêtre 1280×720, `fr-FR`, fuseau Europe/Paris, animations coupées, attente des rafraîchissements par sélecteur.
-- **Thème clair forcé** (D1) quel que soit le thème du compte : `colorScheme: light`, sélection du thème clair dans le profil
-  Jeedom et réglage clair côté navigateur pour Home Assistant (**non démontrés**, à ajuster au premier passage), puis contrôle
+- **Thème clair forcé** (D1) quel que soit le thème du compte : `colorScheme: light` ; côté Jeedom, `populate_demo.py`
+  règle le thème principal clair (`jeedom_theme_main=core2019_Light`) et coupe la bascule automatique du soir
+  (`theme_changeAccordingTime=0`, active par défaut : constaté sur la VM 122 le 2026-10-31, le profil Jeedom 4.6.1 n'a pas de
+  choix de thème) ; réglage clair côté navigateur pour Home Assistant (**non démontré**), puis contrôle
   du fond effectif avant chaque capture et à chaque écran de la vidéo ; un fond sombre ou illisible interrompt le parcours.
 - **CC-48** : dès la création de chaque page (captures **et** vidéo, donc avant le premier rendu enregistré), les champs du
   broker (hôte, port, utilisateur, mot de passe, indications) et la note « broker » de la barre d'état sont masqués ; avant
