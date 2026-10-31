@@ -37,6 +37,8 @@ const PLUGINS_PATH = '/index.php?v=d&p=plugin';
 const WV = '#j2ha_workView';
 const STEP_TIMEOUT_MS = 30_000;
 const RESCAN_TIMEOUT_MS = 90_000;
+export const JEEDOM_LOGIN_FORM = '#in_login_username';
+export const JEEDOM_LOGIN_BUTTON = '#bt_login_validate';
 const FREEZE_CSS = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
 // CC-48 : injecté dès la création de chaque page (captures ET vidéo), donc actif avant le premier rendu : les champs du
 // broker, leurs indications et la note « broker » de la barre d'état ne sont jamais dessinés, donc jamais enregistrés.
@@ -97,14 +99,16 @@ async function newContext(browser, videoDir, cfg) {
   if (videoDir) options.recordVideo = { dir: videoDir, size: VIEWPORT };
   const context = await browser.newContext(options);
   context.setDefaultTimeout(STEP_TIMEOUT_MS);
-  await context.addInitScript(({ css }) => {
+  await context.addInitScript(({ freeze, mask, loginSelector }) => {
     const apply = () => {
       const style = document.createElement('style');
-      style.textContent = css;
+      // Cœur Jeedom 4.6.1 : geler les animations sur la page de connexion empêche la connexion d'aboutir (constaté sur la
+      // VM 122 le 2026-10-31). Le gel ne s'applique donc pas à cette page ; le masquage CC-48, lui, s'applique partout.
+      style.textContent = document.querySelector(loginSelector) ? mask : `${freeze}${mask}`;
       (document.head || document.documentElement).appendChild(style);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
-  }, { css: `${FREEZE_CSS}${MASK_CSS}` });
+  }, { freeze: FREEZE_CSS, mask: MASK_CSS, loginSelector: JEEDOM_LOGIN_FORM });
   if (cfg.homeAssistant) {
     // Home Assistant mémorise son thème côté navigateur : on le fixe en clair avant le premier chargement de son origine.
     // NON DÉMONTRÉ : le contrôle `assertLightTheme` reste le garde-fou si la clé change ou si le profil l'écrase.
@@ -116,12 +120,12 @@ async function newContext(browser, videoDir, cfg) {
   return context;
 }
 
-export const JEEDOM_LOGIN_BUTTON = '#bt_login_validate';
+
 export const JEEDOM_PASSWORD_CHANGE = '#in_change_password';
 
 async function loginJeedom(page, cfg) {
   await page.goto(`${cfg.jeedom.origin}/index.php?v=d`, { waitUntil: 'domcontentloaded' });
-  const user = page.locator('#in_login_username');
+  const user = page.locator(JEEDOM_LOGIN_FORM);
   if (await user.count()) {
     await user.fill(cfg.jeedom.user);
     await page.locator('#in_login_password').fill(cfg.jeedom.password);

@@ -173,3 +173,11 @@ test('23.2 — connexion Jeedom : bouton du cœur 4.6.1 (#bt_login_validate), ja
   assert.match(src, /jeedom-changement-mot-de-passe-exige/);
 });
 
+
+test('23.2 — page de connexion Jeedom : masquage CC-48 oui, gel des animations non (sinon la connexion n\'aboutit pas)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /JEEDOM_LOGIN_FORM = '#in_login_username'/);
+  assert.match(src, /document\.querySelector\(loginSelector\) \? mask : `\$\{freeze\}\$\{mask\}`/);
+  assert.match(src, /\{ freeze: FREEZE_CSS, mask: MASK_CSS, loginSelector: JEEDOM_LOGIN_FORM \}/);
+  assert.doesNotMatch(src, /css: `\$\{FREEZE_CSS\}\$\{MASK_CSS\}`/);
+});
