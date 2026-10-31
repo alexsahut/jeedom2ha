@@ -263,8 +263,13 @@ async function runShots(browser, cfg, args, files) {
       // Relecture du 2026-10-31 : à 720 px de haut, la grille s'arrêtait au rez-de-chaussée (« Étage » absent).
       // `fullPage` ne suffit pas (Jeedom fait défiler un conteneur interne, pas le document) : on agrandit la fenêtre
       // le temps de la capture, à la hauteur du contenu, puis on revient à 1280×720.
-      const height = await page.evaluate(() => Math.max(
-        ...['#div_pageContainer', 'body', 'html'].map((s) => document.querySelector(s)?.scrollHeight ?? 0)));
+      // Hauteur = bas réel de la grille des cartes (+ marge) : les `scrollHeight` coupaient encore la carte « Bureau ».
+      const height = await page.evaluate(() => {
+        const grid = document.querySelector('#j2ha_roomCards');
+        const bottom = grid ? grid.getBoundingClientRect().bottom + window.scrollY : 0;
+        return Math.ceil(Math.max(bottom + 40,
+          ...['#div_pageContainer', 'body', 'html'].map((s) => document.querySelector(s)?.scrollHeight ?? 0)));
+      });
       await page.setViewportSize({ width: VIEWPORT.width, height: Math.min(Math.max(height, VIEWPORT.height), 2000) });
       await settle(page);
       try {
@@ -324,6 +329,11 @@ async function runShots(browser, cfg, args, files) {
       await atStep('9 Home Assistant', async () => {
         await loginHomeAssistant(page, cfg);
         await page.goto(`${cfg.homeAssistant.origin}/config/devices/dashboard`, { waitUntil: 'domcontentloaded' });
+        await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
+        // Relecture du 2026-10-31 : la liste montrait le broker (appareil « 127.0.0.1 ») et les appareils HA par défaut.
+        // On la filtre sur le fabricant « Jeedom » : seuls les équipements publiés par jeedom2ha restent.
+        await page.locator('input[placeholder*="Rechercher"], input[placeholder*="Search"]').first().fill(DEMO.haDeviceFilter);
+        await page.getByText('127.0.0.1').first().waitFor({ state: 'hidden' }).catch(() => {});
         await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
         await settle(page);
         await saveShot(page, args.out, byId[9], cfg.secrets, files);
@@ -392,6 +402,11 @@ async function runVideo(browser, cfg, args) {
       await atStep('vidéo : Home Assistant appareils', async () => {
         await loginHomeAssistant(page, cfg);
         await page.goto(`${cfg.homeAssistant.origin}/config/devices/dashboard`, { waitUntil: 'domcontentloaded' });
+        await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
+        // Relecture du 2026-10-31 : la liste montrait le broker (appareil « 127.0.0.1 ») et les appareils HA par défaut.
+        // On la filtre sur le fabricant « Jeedom » : seuls les équipements publiés par jeedom2ha restent.
+        await page.locator('input[placeholder*="Rechercher"], input[placeholder*="Search"]').first().fill(DEMO.haDeviceFilter);
+        await page.getByText('127.0.0.1').first().waitFor({ state: 'hidden' }).catch(() => {});
         await page.getByText(DEMO.haLight).first().waitFor({ state: 'visible' });
         await hold('ha-appareils');
       });

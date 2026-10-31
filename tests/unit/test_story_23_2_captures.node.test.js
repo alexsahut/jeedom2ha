@@ -207,3 +207,11 @@ test('23.2 — vidéo : le retour de « Relire Jeedom » est lu dans la notifica
   assert.match(src, /#jeeToastContainer \.jeeToast, #jeeToastContainer > \*, #div_alert \.alert/);
   assert.doesNotMatch(src, /locator\('#div_alert \.alert'\)/);
 });
+
+test('23.2 — capture HA filtrée sur Jeedom (sans broker ni appareils par défaut) ; page principale à la hauteur de la grille', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /input\[placeholder\*="Rechercher"\], input\[placeholder\*="Search"\]'\)\.first\(\)\.fill\(DEMO\.haDeviceFilter\)/);
+  assert.match(src, /querySelector\('#j2ha_roomCards'\)/);
+  const sb = await load('lib/storyboard.mjs');
+  assert.equal(sb.DEMO.haDeviceFilter, 'Jeedom');
+});
