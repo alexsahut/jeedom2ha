@@ -417,13 +417,14 @@ async function runVideo(browser, cfg, args) {
       });
       await atStep('vidéo : pilotage Home Assistant', async () => {
         await page.getByText(DEMO.haLight).first().click();
-        // Une lumière à l'état « Inconnu » (cas de la démo : jamais pilotée) n'a pas d'interrupteur dans HA, mais deux
-        // boutons « Éteindre » / « Allumer » (VM 122, 2026-10-31). On accepte les deux formes.
-        // Libellé selon la langue (« Activer » en français) ; à défaut, le dernier bouton du contrôle d'entité (= marche).
-        const toggle = page.getByRole('switch')
-          .or(page.getByRole('button', { name: /^(allumer|activer|turn on)$/i }))
-          .or(page.locator('ha-entity-toggle ha-icon-button').last()).first();
-        await toggle.waitFor({ state: 'visible' });
+        // Le contrôle d'entité de HA change de forme selon l'état : état « Inconnu » → deux boutons « Éteindre » /
+        // « Activer » ; état connu → un interrupteur, dont la case interne n'est pas cliquable directement (VM 122,
+        // 2026-10-31 : clic expiré). On vise donc le composant `ha-entity-toggle` : son dernier bouton s'il en a, sinon
+        // le composant lui-même.
+        const control = page.locator('ha-entity-toggle').first();
+        await control.waitFor({ state: 'visible' });
+        const buttons = control.locator('ha-icon-button');
+        const toggle = (await buttons.count()) > 0 ? buttons.last() : control;
         await toggle.click();
         await hold('ha-pilotage');
       });
