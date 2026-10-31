@@ -21,3 +21,5 @@ __pycache__/
 coverage.xml
 .pytest_cache/
 VERSION
+# Story 24.2 : export de décision (identifiants physiques bruts), fichier d'exécution du démon
+data/jeedom2ha_decision_export.json

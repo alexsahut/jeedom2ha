@@ -1,6 +1,6 @@
 // Story 21.1 (bloc B, CC-47) — une commande portée par un principal refusé ET par une entité
-// secondaire publiée s'affiche « Sera publié : <type du secondaire> », et la synthèse de
-// l'équipement comme les totaux de pièce la comptent « prête ». L'écran ne fait que consommer
+// secondaire publiée s'affiche « À appliquer → <type du secondaire> » (aperçu) ou « Publiée → … »
+// (tableau), et l'état de l'équipement comme les compteurs de pièce la comptent publiée (25.1). L'écran ne fait que consommer
 // la décision par commande du démon (aucun recalcul propre à l'UI) ; arbre de la forme d'un
 // équipement de terrain, identifiants synthétiques uniquement.
 'use strict';
@@ -53,63 +53,72 @@ function tree579() {
 }
 
 describe('21.1 / AC8 — ligne d’une commande publiée par une entité secondaire', () => {
-  it('la ligne affiche « Sera publié : binary_sensor », jamais « Ne sera pas publié »', () => {
+  it('la ligne affiche « À appliquer → Capteur binaire (binary_sensor) », jamais « Bloquée »', () => {
     const row = tree579().commands.find((c) => c.jeedom_cmd_id === STATE_CMD);
     const label = M.buildPublishCellLabel(row.diagnostic);
-    assert.equal(label, 'Sera publié : binary_sensor');
-    assert.doesNotMatch(label, /Ne sera pas publié/);
+    assert.equal(label, 'À appliquer → Capteur binaire (binary_sensor)');
+    assert.doesNotMatch(label, /Bloquée/);
     assert.equal(M.diagnosticState(row.diagnostic), 'ready');
     assert.equal(M.buildBlockingReason(row.diagnostic), '');
   });
 
-  it('la synthèse de l’équipement compte 5 prêtes, 0 bloquante, 1 non couverte', () => {
+  it('la synthèse de l’équipement compte 5 prêtes, 0 bloquée, 1 non couverte (ignorée)', () => {
     const s = M.summarizePublication(tree579());
     assert.equal(s.ready_count, 5);
     assert.equal(s.blocking_count, 0);
     assert.equal(s.uncovered_count, 1);
     assert.equal(s.will_publish, true);
     assert.equal(s.first_blocking_cmd_id, null);
-    assert.equal(M.buildPublicationSummaryLabel(s), 'Sera publié dans Home Assistant : 5 commande(s) prête(s).');
-    assert.doesNotMatch(M.buildPublicationSummaryLabel(s), /bloquante/);
+    const t = tree579();
+    t.sync_status = { synced_should_publish: true, current_should_publish: true, published_in_ha: true, override_pending: false };
+    t.commands.forEach((c) => { c.published_in_ha = c.jeedom_cmd_id !== 5368; });
+    assert.deepEqual(M.resolveEquipmentState(t), { state: 'published', blocked_mention: 0 });
+    assert.equal(M.buildEquipmentCounterLabels(t).text, '5 publiées · 1 ignorée');
+    assert.doesNotMatch(M.buildEquipmentCounterLabels(t).text, /bloquée/);
   });
 
-  it('les totaux de pièce comptent la commande d’état comme publiée (présente via le secondaire) et aucune non prise en charge', () => {
+  it('les compteurs comptent la commande d’état comme publiée (présente via le secondaire) et aucune bloquée', () => {
     // Story 22.2 (Q1 A) : « publié » = présence dans HA, plus le diagnostic de commande. Le démon
     // marque la commande d'état publiée (portée par le secondaire présent) ; la commande
     // non couverte reste hors de HA et est la seule « non prise en charge ».
     const t = tree579();
-    t.sync_status = { published_in_ha: true, override_pending: false };
+    t.sync_status = { synced_should_publish: true, current_should_publish: true, published_in_ha: true, override_pending: false };
     t.commands.forEach((c) => { c.published_in_ha = c.jeedom_cmd_id !== 5368; });
     t.entities[0].present_in_ha = false;
     t.entities[1].present_in_ha = true;
+    const counters = M.summarizeEquipmentCounters(t);
+    assert.equal(counters.commands.published, 5);
+    assert.equal(counters.commands.blocked, 0);
+    assert.equal(counters.commands.ignored, 1, 'la commande non couverte est la seule hors de HA');
+    assert.equal(counters.defects, 0);
     const s = M.summarizeRoom([t], 1);
-    assert.equal(s.commands_published, 5);
-    assert.equal(s.commands_unsupported, 1);
-    assert.equal(s.equipments_unsupported, 0);
-    assert.equal(s.equipments_published, 1);
+    assert.equal(s.by_state.blocked, 0);
+    assert.equal(s.by_state.published, 1);
   });
 
   it('l’entité principale refusée garde son propre libellé d’entité, sans bloquer la commande', () => {
     const entities = tree579().entities;
     const primary = entities[0];
     assert.equal(M.isReadyDiagnostic(primary.decision), false);
-    assert.match(M.buildPublishCellLabel(primary.decision), /^Ne sera pas publié — état sans ordre On\/Off/);
+    assert.match(M.buildPublishCellLabel(primary.decision), /^Bloquée → état sans ordre On\/Off/);
     // …mais ne se reporte pas sur la commande ni sur la synthèse (déjà vérifié ci-dessus).
     assert.equal(M.isReadyDiagnostic(entities[1].decision), true);
   });
 });
 
 describe('21.1 / AC12 — pas de régression de la surface', () => {
-  it('équipement à une seule entité refusée : la commande reste bloquante', () => {
+  it('équipement à une seule entité refusée : la commande reste bloquée', () => {
     const t = {
       jeedom_eq_id: 901, mapped: true, equipment_decision: REFUSED_PRIMARY,
-      commands: [{ jeedom_cmd_id: 9101, cmd_name: 'Etat', covered: true, diagnostic: REFUSED_PRIMARY }],
+      sync_status: { synced_should_publish: false, current_should_publish: false, published_in_ha: false, override_pending: false },
+      commands: [{ jeedom_cmd_id: 9101, cmd_name: 'Etat', covered: true, diagnostic: REFUSED_PRIMARY, published_in_ha: false }],
     };
     const s = M.summarizePublication(t);
     assert.equal(s.ready_count, 0);
     assert.equal(s.blocking_count, 1);
-    assert.match(M.buildPublishCellLabel(REFUSED_PRIMARY), /^Ne sera pas publié — /);
-    assert.match(M.buildPublicationSummaryLabel(s), /^Ne sera pas publié dans Home Assistant : 1 commande\(s\) bloquante\(s\)\./);
+    assert.match(M.buildPublishCellLabel(REFUSED_PRIMARY), /^Bloquée → /);
+    assert.deepEqual(M.resolveEquipmentState(t), { state: 'blocked', blocked_mention: 0 });
+    assert.equal(M.buildEquipmentCounterLabels(t).text, '1 bloquée');
   });
 
   it('commande non couverte, exclue, désactivée, forcée : comptées comme avant', () => {
@@ -123,17 +132,18 @@ describe('21.1 / AC12 — pas de régression de la surface', () => {
     assert.equal(s.disabled_count, 1);
     assert.equal(s.ready_count, 1);
     assert.equal(s.blocking_count, 0);
-    assert.equal(M.buildPublishCellLabel(FORCED), 'Sera publié : switch');
+    assert.equal(M.buildPublishCellLabel(FORCED), 'À appliquer → Interrupteur (switch)');
   });
 });
 
 describe('21.1 / AC11 — libellé honnête de la cause « état sans ordre On/Off »', () => {
-  it('dit état seul / rien à piloter, propose binary_sensor puis « Forcer », sans invitation aux types génériques', () => {
+  it('dit état seul / rien à piloter, propose binary_sensor puis « Toujours », sans invitation aux types génériques', () => {
     const label = M.buildPublishCellLabel(REFUSED_PRIMARY);
-    assert.match(label, /^Ne sera pas publié — état sans ordre On\/Off/);
+    assert.match(label, /^Bloquée → état sans ordre On\/Off/);
     assert.match(label, /rien à piloter/);
     assert.match(label, /binary_sensor/);
-    assert.match(label, /Forcer/);
+    assert.match(label, /« Type HA »/);
+    assert.match(label, /« Toujours »/);
     assert.doesNotMatch(label, /précisez/);
   });
 

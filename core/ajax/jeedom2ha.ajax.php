@@ -42,6 +42,28 @@ function _jeedom2ha_run_parc_relay(string $relais, callable $call): array {
 }
 
 /**
+ * Story 24.2 — extrait le document d'export de décision de la réponse du démon.
+ * Fonction pure (chargeable sans le cœur Jeedom) : le document est rendu tel quel, jamais
+ * retraité ; un démon sans donnée en mémoire ou une réponse inattendue lève une erreur pour l'UI.
+ *
+ * @throws Exception message destiné à l'UI
+ */
+function _jeedom2ha_decision_export_payload(array $daemonResult): array {
+  $payload = $daemonResult['payload'] ?? null;
+  if (($daemonResult['status'] ?? '') !== 'ok' || !is_array($payload) || ($payload['schema_version'] ?? null) === null) {
+    throw new Exception('Aucune donnée en mémoire : lancez « Relire Jeedom » avant de télécharger l\'export de décision.');
+  }
+  // json_decode(..., true) transforme l'objet vide `{}` en tableau vide `[]` : on rend `overrides.types`
+  // vide comme un objet, pour que le document téléchargé reste identique à celui du démon.
+  foreach ($payload['equipments'] ?? array() as $i => $equipment) {
+    if (isset($equipment['overrides']['types']) && $equipment['overrides']['types'] === array()) {
+      $payload['equipments'][$i]['overrides']['types'] = new stdClass();
+    }
+  }
+  return $payload;
+}
+
+/**
  * Helper — Extrait les commandes par allowlist (cmd_id, cmd_name, generic_type).
  * Story 4.4 — aucun champ hors allowlist ne passe.
  * Story 15.1/15.2 — passthrough additif de state_class/unit_of_measurement et
@@ -674,6 +696,15 @@ try {
       });
       ajax::success($result);
     }
+    else if ($action == 'getDecisionExport') {
+      // Story 24.2 — export JSON versionné du contrat de décision (identifiants seulement, aucun nom).
+      // Lecture seule, réservée à l'administrateur (garde ci-dessus). Payload proportionnel au parc →
+      // budget fixe R, une seule tentative (motif A1) ; la route du démon reste interne.
+      $result = _jeedom2ha_run_parc_relay('DECISION_EXPORT', function (int $timeoutS) {
+        return jeedom2ha::callDaemon('/system/decision_export', null, 'GET', $timeoutS, 1);
+      });
+      ajax::success(_jeedom2ha_decision_export_payload($result));
+    }
     else if ($action == 'getPublishedScopeForConsole') {
       $result = jeedom2ha::getPublishedScopeForConsole();
       // Story 3.4 — Option B : merge diagnostic data into scope response (soft-fail)
@@ -811,20 +842,46 @@ try {
       ]);
     }
     else if ($action == 'saveFilteringConfig') {
-      $excludedPlugins  = init('excludedPlugins', '');
-      $excludedObjects  = init('excludedObjects', '');
-      $confidencePolicy = init('confidencePolicy', 'sure_probable');
-      // Validation : valeurs autorisées uniquement
-      if (!in_array($confidencePolicy, ['sure_only', 'sure_probable'])) {
-        $confidencePolicy = 'sure_probable';
-      }
-      config::save('excludedPlugins',  $excludedPlugins,  'jeedom2ha');
-      config::save('excludedObjects',  $excludedObjects,  'jeedom2ha');
-      config::save('confidencePolicy', $confidencePolicy, 'jeedom2ha');
-      log::add('jeedom2ha', 'info', '[CONFIG] saveFilteringConfig: excludedPlugins="'
-        . $excludedPlugins . '" excludedObjects="' . $excludedObjects
-        . '" confidencePolicy="' . $confidencePolicy . '"');
+      // Story 25.9 : seules `excludedPlugins` et `confidencePolicy` sont écrites. La clé des pièces exclues n'est ni écrite ni
+      // effacée ici (elle ne s'écrit que depuis la surface, route saveRoomExclusion) : une ancienne page restée ouverte ne la
+      // périme plus.
+      require_once __DIR__ . '/../php/jeedom2ha_excluded_plugins.php'; // fonctions pures, sans cœur Jeedom
+      jeedom2ha_save_filtering_config(
+        array(
+          'excludedPlugins'  => init('excludedPlugins', ''),
+          'confidencePolicy' => init('confidencePolicy', 'sure_probable'),
+        ),
+        function (string $key, string $value) {
+          config::save($key, $value, 'jeedom2ha');
+        },
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        }
+      );
       ajax::success(['saved' => true]);
+    }
+    else if ($action == 'saveRoomExclusion') {
+      // Story 25.8 (D2) — exclusion d'une pièce depuis la surface : lit, modifie puis écrit la SEULE clé
+      // `excludedObjects` (jamais excludedPlugins ni confidencePolicy). Aucun appel au démon, aucune relecture
+      // implicite : l'interface enchaîne explicitement la relecture après la confirmation chiffrée.
+      require_once __DIR__ . '/../php/jeedom2ha_room_exclusion.php'; // fonctions pures, sans cœur Jeedom
+      $result = jeedom2ha_save_room_exclusion(
+        init('objectId', ''),
+        init('excluded', ''),
+        function (int $objectId) {
+          return is_object(jeeObject::byId($objectId));
+        },
+        function () {
+          return (string) config::byKey('excludedObjects', 'jeedom2ha', '');
+        },
+        function (string $value) {
+          config::save('excludedObjects', $value, 'jeedom2ha');
+        },
+        function (string $level, string $message) {
+          log::add('jeedom2ha', $level, $message);
+        }
+      );
+      ajax::success($result);
     }
     else if ($action == 'executeHaAction') {
       // Story 5.1 — Relay strict de la façade backend unique /action/execute.
@@ -933,6 +990,22 @@ try {
       $result = jeedom2ha::callDaemon('/system/mapping_overrides/' . (int)$eqId, null, 'GET', JEEDOM2HA_RELAY_BUDGET_SHORT_S);
       if ($result === null) {
         log::add('jeedom2ha', 'error', '[MAPPING-OVERRIDE] Le démon n\'a pas répondu (timeout 15s)');
+        throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+      }
+      ajax::success($result);
+    }
+    else if ($action == 'getEquipmentStates') {
+      // Story 25.2 — états de tous les équipements en un appel (lecture seule, cache côté démon).
+      // `refresh=1` est réservé au bouton « Actualiser » : le démon invalide son cache lui-même.
+      // Story A1 (audit) : lecture unique indépendante de la taille du parc (cache démon) → budget
+      // court fixe, comme getMappingOverrides.
+      $endpoint = '/system/equipment_states';
+      if (in_array((string)init('refresh', ''), array('1', 'true'), true)) {
+        $endpoint .= '?refresh=1';
+      }
+      $result = jeedom2ha::callDaemon($endpoint, null, 'GET', JEEDOM2HA_RELAY_BUDGET_SHORT_S);
+      if ($result === null) {
+        log::add('jeedom2ha', 'error', '[EQUIPMENT-STATES] Le démon n\'a pas répondu (timeout 15s)');
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
       }
       ajax::success($result);

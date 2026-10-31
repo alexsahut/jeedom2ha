@@ -5,6 +5,7 @@ Listens on 127.0.0.1 only, protected by a local_secret shared with the PHP plugi
 
 import asyncio
 import dataclasses
+import json
 import logging
 import os
 import socket
@@ -67,10 +68,20 @@ from mapping.overrides import (
     resolve_publication_override,
     save_equipment_override,
     save_override,
+    _overrides_path,
 )
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from cache.disk_cache import save_publications_cache
+from export.decision_export import (
+    DecisionMemo,
+    build_decision_export,
+    index_overrides,
+    make_equipment_record,
+    make_ineligible_record,
+    normalize_export_config,
+    write_decision_export,
+)
 from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
 
 # Résoudre le répertoire data/ relatif à ce fichier (data/ est un sibling de resources/)
@@ -451,6 +462,74 @@ def _scope_excluded_decision(
     _apply_availability_metadata(decision, mapping, topology)
     _sync_publication_decision_refs(mapping, decision)
     return decision
+
+
+def _build_decision_export_document(
+    app,
+    data_dir: str,
+    *,
+    overrides: Optional[Dict[str, dict]] = None,
+    equipment_overrides: Optional[Dict[str, dict]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Story 24.2 — document d'export de décision depuis la mémoire (None sans sync préalable).
+
+    Les décisions viennent du verdict mémorisé au sync / « Publier » (`app["decision_memo"]`),
+    jamais recalculées ici ; l'état d'exécution (`discovery_published`, streaming) est lu en direct.
+    Les overrides courants (pour `pending_changes`) sont ceux que l'appelant vient de lire, sinon
+    relus sur disque.
+    """
+    topology = app.get("topology")
+    if topology is None:
+        return None
+    state_sync = app.get("state_synchronizer")
+    return build_decision_export(
+        snapshot=topology,
+        memo=app["decision_memo"],
+        mappings=app.get("mappings") or {},
+        publications=app.get("publications") or {},
+        scenario_publications=app.get("scenario_publications") or {},
+        streaming_targets=state_sync.list_state_targets() if state_sync is not None else [],
+        current_overrides=index_overrides(
+            list_overrides(data_dir) if overrides is None else overrides,
+            list_equipment_overrides(data_dir) if equipment_overrides is None else equipment_overrides,
+        ),
+        plugin_version=str(app.get("plugin_version") or "inconnu"),
+        confidence_policy=app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY,
+    )
+
+
+def _memorize_decision(memo_equipments: Dict[int, Dict[str, Any]], eq_id: int, build, *args, **kwargs) -> None:
+    """Story 24.2 — mémorise le verdict d'un équipement pour l'export ; ne lève jamais.
+
+    Un enregistrement en échec ne doit ni faire échouer un sync ni un « Publier » : l'équipement
+    est alors rendu par l'export avec `no_sync_decision` (aucun verdict mémorisé).
+    """
+    try:
+        memo_equipments[eq_id] = build(*args, **kwargs)
+    except Exception as exc:
+        memo_equipments.pop(eq_id, None)
+        _LOGGER.error("[EXPORT] Verdict non mémorisé pour eq_id=%s : %s", eq_id, type(exc).__name__)
+
+
+def _refresh_decision_export(
+    app,
+    data_dir: str,
+    *,
+    overrides: Optional[Dict[str, dict]] = None,
+    equipment_overrides: Optional[Dict[str, dict]] = None,
+) -> None:
+    """Story 24.2 (AC1) — réécrit le fichier d'export aux points d'écriture du cache disque.
+
+    Ne lève jamais : un export en échec ne doit ni faire échouer un sync ni un « Publier ».
+    """
+    try:
+        document = _build_decision_export_document(
+            app, data_dir, overrides=overrides, equipment_overrides=equipment_overrides,
+        )
+        if document is not None:
+            write_decision_export(document, data_dir)
+    except Exception as exc:
+        _LOGGER.error("[EXPORT] Export de décision non produit : %s", type(exc).__name__)
 
 
 def _secondary_discovery_published(decision: Optional[PublicationDecision]) -> bool:
@@ -1159,6 +1238,15 @@ async def _detect_lifecycle_changes(
 
 
 async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
+    """Story 25.2 (Q5) — la republication peut rejouer des dépublications différées : le cache
+    des états agrégés est invalidé à la fin, quelle que soit l'issue."""
+    try:
+        await _republish_all_from_cache_body(app, reason)
+    finally:
+        _invalidate_equipment_states(app)
+
+
+async def _republish_all_from_cache_body(app: web.Application, reason: str) -> None:
     """Republish all published entities from the RAM cache (app["publications"]).
 
     Called on:
@@ -1801,6 +1889,7 @@ async def _do_handle_action_sync(request: web.Request) -> web.Response:
         except Exception:
             return _build_sync_failure_response(request)
         finally:
+            _invalidate_equipment_states(request.app)
             action_lock.release()
 
     task = asyncio.create_task(_run_sync())
@@ -1906,6 +1995,9 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     overrides_cache = list_overrides(data_dir)
     # Story 16.3 — même principe pour les overrides de politique de publication (équipement).
     equipment_overrides_cache = list_equipment_overrides(data_dir)
+    # Story 24.2 — verdicts mémorisés pour l'export de décision (overrides appliqués par eq_id).
+    export_overrides = index_overrides(overrides_cache, equipment_overrides_cache)
+    decision_records: Dict[int, Dict[str, Any]] = {}
 
     # Story 19.4 (AC3) — filtre de scope unique, appliqué APRÈS la décision, comme « Publier ».
     scope_entries = {
@@ -1916,6 +2008,13 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     for eq_id, result in eligibility.items():
         if not result.is_eligible:
+            ineligible_eq = snapshot.eq_logics.get(eq_id)
+            if ineligible_eq is not None:
+                _memorize_decision(
+                    decision_records, eq_id, make_ineligible_record,
+                    ineligible_eq, snapshot, result,
+                    applied_overrides=export_overrides.get(eq_id),
+                )
             continue
 
         eq = snapshot.eq_logics.get(eq_id)
@@ -1936,6 +2035,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
             persisted_equipment_overrides=equipment_overrides_cache,
         )
         mapping = evaluation.mapping
+        scope_included = mapping is None or _scope_entry_is_included(
+            eq_id, scope_entries.get(eq_id), eligibility
+        )
+        _memorize_decision(
+            decision_records, eq_id, make_equipment_record,
+            evaluation,
+            eligible=True,
+            scope_excluded=not scope_included,
+            applied_overrides=export_overrides.get(eq_id),
+        )
         if mapping is None:
             continue  # Not mapped by any mapper
 
@@ -1945,7 +2054,7 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         # Story 19.4 (AC3) — hors périmètre publié : jamais publié, quelle que soit la
         # décision. L'équipement n'entre pas dans `nouveaux_eq_ids` : la purge plus bas
         # (équipements retirés) dépublie ce qui l'était encore et efface sa disponibilité.
-        if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):
+        if not scope_included:
             publications[eq_id] = _scope_excluded_decision(mapping, snapshot)
             scope_excluded_eq_ids.add(eq_id)
             continue
@@ -2200,6 +2309,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     # Story 5.1 — Task 1.2: persister le cache disque après chaque sync réussi
     save_publications_cache(request.app["publications"], data_dir)
+
+    # Story 24.2 (AC1) — verdicts du sync mémorisés, puis export de décision (fichier séparé).
+    decision_memo = request.app["decision_memo"]
+    decision_memo.equipments = decision_records
+    decision_memo.config = normalize_export_config(sync_config)
+    decision_memo.sync_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _refresh_decision_export(
+        request.app, data_dir,
+        overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
+    )
 
     # Story 5.1 — Task 7.3: purger boot_cache après le premier sync (rôle accompli)
     if is_first_sync and request.app.get("boot_cache"):
@@ -3079,6 +3198,9 @@ def _build_mapping_override_tree(
     synced_decision=None,
     scope_included=True,
     pending_discovery_unpublish=None,
+    overrides_cache=None,
+    equipment_overrides_cache=None,
+    include_override_types=True,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -3107,9 +3229,17 @@ def _build_mapping_override_tree(
     l'aperçu — plus de logique `is_covered`/`is_secondary` dupliquée ici (qui coïncidait déjà
     avec la priorité primaire-d'abord du contrat, mais était une SECONDE implémentation à
     maintenir en cohérence avec l'aperçu).
+
+    Story 25.2 (AC9, paramètres additifs — valeurs par défaut = comportement historique) :
+      `overrides_cache` / `equipment_overrides_cache` : dictionnaires d'overrides déjà chargés
+      (la route agrégée lit le fichier une seule fois pour toute la passe) ;
+      `include_override_types=False` : omet `override_types_allowed` (coûteux, lu par aucune
+      règle d'état).
     """
-    overrides_cache = list_overrides(data_dir)
-    equipment_overrides_cache = list_equipment_overrides(data_dir)
+    if overrides_cache is None:
+        overrides_cache = list_overrides(data_dir)
+    if equipment_overrides_cache is None:
+        equipment_overrides_cache = list_equipment_overrides(data_dir)
     proposed_eq = resolve_expected_ha(eq, snapshot).get("proposed_ha_entity_type")
 
     eligibility = assess_eligibility(eq)
@@ -3156,7 +3286,7 @@ def _build_mapping_override_tree(
         # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
         # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
         # commandes dont l'entité est évaluable ; absent sinon (le sélecteur y est de toute façon grisé).
-        if diag_mapping is not None:
+        if include_override_types and diag_mapping is not None:
             group = id(diag_mapping)
             if group not in allowed_by_mapping:
                 allowed_by_mapping[group] = _projection_valid_override_types(
@@ -3304,6 +3434,232 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok", "payload": payload})
 
 
+# ---------------------------------------------------------------------------
+# Story 25.2 — GET /system/equipment_states : états agrégés par équipement (lecture seule)
+# ---------------------------------------------------------------------------
+
+_EQUIPMENT_STATES_CACHE_KEY = "equipment_states_cache"
+_EQUIPMENT_STATES_SCHEMA_VERSION = 1
+# Q8 : plafond de sécurité (borne l'effet d'un chemin d'écriture oublié) ; `refresh=1` le contourne.
+_EQUIPMENT_STATES_MAX_AGE_SECONDS = 300.0
+
+
+def _new_equipment_states_cache() -> Dict[str, Any]:
+    return {"generation": 0, "entry": None}
+
+
+def _invalidate_equipment_states(app) -> None:
+    """Invalidation totale du cache des états agrégés (Q4 A) ; reconstruction paresseuse.
+
+    Appelée à la fin de chaque synchro / action, après chaque écriture d'override et après une
+    republication. Fait avancer la génération : une construction démarrée avant l'invalidation
+    ne sera jamais stockée. N'écrit rien d'autre que cet état en mémoire.
+    """
+    try:
+        cache = app.get(_EQUIPMENT_STATES_CACHE_KEY)
+    except Exception:
+        return
+    if isinstance(cache, dict):
+        cache["generation"] = cache.get("generation", 0) + 1
+        cache["entry"] = None
+
+
+def _overrides_file_signature(data_dir: str):
+    """Signature (mtime_ns, size) du fichier d'overrides, `None` s'il est absent : filet de
+    sécurité contre une écriture hors des handlers qui invalident explicitement."""
+    try:
+        st = os.stat(_overrides_path(data_dir))
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:
+    """Liste blanche (Q1 A) des champs de l'arbre unitaire lus par `resolveEquipmentState` /
+    `summarizeEquipmentCounters`. Projection pure : aucune valeur n'est recalculée."""
+    return {
+        "jeedom_eq_id": tree["jeedom_eq_id"],
+        "equipment_decision": tree["equipment_decision"],
+        # Story 25.8 (Q1 B) : `present_in_ha` (champ additif de 22.2, déjà calculé par le constructeur) rejoint la liste
+        # blanche pour que la surface annonce un nombre d'ENTITÉS exact avant d'exclure une pièce.
+        "entities": [
+            {"override_pending": e["override_pending"], "present_in_ha": e["present_in_ha"]}
+            for e in tree["entities"]
+        ],
+        "commands": [
+            {
+                "jeedom_cmd_id": c["jeedom_cmd_id"],
+                "covered": c["covered"],
+                "published_in_ha": c["published_in_ha"],
+                "diagnostic": c["diagnostic"],
+            }
+            for c in tree["commands"]
+        ],
+        "sync_status": tree["sync_status"],
+    }
+
+
+def _build_equipment_states(app, data_dir: str) -> Dict[str, Any]:
+    """Une passe sur tous les équipements du démon, avec le MÊME constructeur que le GET
+    unitaire. Les overrides sont chargés une seule fois ; `override_types_allowed` n'est pas
+    calculé. Un équipement dont la construction échoue est isolé dans `unread`."""
+    snapshot = app["topology"]
+    confidence_policy = app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
+    publications = app.get("publications") or {}
+    pending_unpublish = app.get("pending_discovery_unpublish") or {}
+    eligibility = app.get("eligibility")
+    published_scope = app.get("published_scope")
+    scope_by_eq: Dict[int, Dict[str, Any]] = {}
+    if published_scope:
+        for entry in published_scope.get("equipements", []):
+            scope_by_eq.setdefault(_to_int(entry.get("eq_id"), default=0), entry)
+    overrides_cache = list_overrides(data_dir)
+    equipment_overrides_cache = list_equipment_overrides(data_dir)
+
+    equipments: Dict[str, Any] = {}
+    unread = []
+    for eq_id, eq in snapshot.eq_logics.items():
+        try:
+            scope_included = True
+            if published_scope:
+                scope_included = _scope_entry_is_included(eq_id, scope_by_eq.get(eq_id), eligibility)
+            tree = _build_mapping_override_tree(
+                eq, snapshot, data_dir, confidence_policy, publications.get(eq_id),
+                scope_included=scope_included,
+                pending_discovery_unpublish=pending_unpublish,
+                overrides_cache=overrides_cache,
+                equipment_overrides_cache=equipment_overrides_cache,
+                include_override_types=False,
+            )
+            equipments[str(eq_id)] = _project_equipment_state(tree)
+        except Exception:
+            # Détail dans le journal seulement ; la réponse ne porte ni nom ni message.
+            _LOGGER.exception("[AGGREGATE] construction impossible eq_id=%s", eq_id)
+            unread.append({"eq_id": eq_id, "reason": "build_error"})
+    return {"equipments": equipments, "unread": unread, "total": len(snapshot.eq_logics)}
+
+
+def _equipment_states_response(app, built, *, hit: bool, generation: int,
+                               build_ms: float, action_in_progress: bool) -> web.Response:
+    # Le corps volumineux (`equipments`, `unread`) est sérialisé une seule fois par entrée de
+    # cache ; seul l'en-tête (`meta`) est recalculé à chaque appel (budget « à chaud », Q10).
+    if "equipments_json" not in built:
+        built["equipments_json"] = json.dumps(built["equipments"])
+        built["unread_json"] = json.dumps(built["unread"])
+    head = json.dumps({
+        "schema_version": _EQUIPMENT_STATES_SCHEMA_VERSION,
+        "available": True,
+        "meta": {
+            "generated_at": built["generated_at"],
+            "generation": generation,
+            "cache": {"hit": hit, "build_ms": build_ms},
+            "equipments_total": built["total"],
+            "equipments_read": built["total"] - len(built["unread"]),
+            "action_in_progress": action_in_progress,
+        },
+    })
+    return web.Response(
+        text=(
+            '{"status": "ok", "payload": ' + head[:-1]
+            + ', "equipments": ' + built["equipments_json"]
+            + ', "unread": ' + built["unread_json"] + "}}"
+        ),
+        content_type="application/json",
+    )
+
+
+def _equipment_states_unavailable(reason: Optional[str] = None) -> web.Response:
+    payload: Dict[str, Any] = {
+        "schema_version": _EQUIPMENT_STATES_SCHEMA_VERSION,
+        "available": False,
+        "equipments": {},
+        "unread": [],
+    }
+    if reason:
+        payload["reason"] = reason
+    return web.json_response({"status": "ok", "payload": payload})
+
+
+async def _handle_equipment_states_get(request: web.Request) -> web.Response:
+    """GET /system/equipment_states[?refresh=1] — Story 25.2 : états de tous les équipements en un appel.
+
+    Lecture seule stricte. Auth `X-Local-Secret` (401 sinon). Réponse 200 `{status, payload}` :
+    `payload = {schema_version, available, meta{generated_at, generation, cache{hit, build_ms},
+    equipments_total, equipments_read, action_in_progress}, equipments{"<eq_id>": {jeedom_eq_id,
+    equipment_decision, entities[{override_pending, present_in_ha}], commands[{jeedom_cmd_id, covered,
+    published_in_ha, diagnostic}], sync_status}}, unread[{eq_id, reason:"build_error"}]}`.
+    Chaque entrée est la projection (liste blanche) de ce que renvoie
+    `GET /system/mapping_overrides/{eq_id}` (même constructeur) : ni état résolu, ni compteur, ni
+    `enabled`, ni index par pièce — le JS indexe avec `j2haRoomsTree` et calcule l'état avec
+    `resolveEquipmentState`. Avant la première synchro : `available:false`, collections vides.
+    Jamais de construction pendant `action_lock` (cohérence topologie / publications) : l'entrée
+    de cache valide est servie avec `action_in_progress:true`, sinon `available:false` et
+    `reason:"action_in_progress"`. Cache en mémoire : invalidé par synchro, action, écriture
+    d'override, changement du fichier d'overrides, de la topologie, ou après 300 s ; `refresh=1`
+    force la reconstruction. Ne prend aucun verrou.
+    """
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+    app = request.app
+    if app.get("topology") is None:
+        return _equipment_states_unavailable()
+
+    cache = app[_EQUIPMENT_STATES_CACHE_KEY]
+    data_dir = _resolve_data_dir(request)
+    now = time.monotonic()
+    signature = _overrides_file_signature(data_dir)
+    entry = cache["entry"]
+    entry_valid = (
+        entry is not None
+        and entry["complete"]
+        and entry["generation"] == cache["generation"]
+        and entry["signature"] == signature
+        and entry["topology"] is app["topology"]
+        and now - entry["stored_at"] < _EQUIPMENT_STATES_MAX_AGE_SECONDS
+    )
+    refresh = request.query.get("refresh") == "1"
+    action_in_progress = app["action_lock"].locked()
+
+    if action_in_progress:
+        if entry_valid:
+            return _equipment_states_response(
+                app, entry["built"], hit=True, generation=entry["generation"],
+                build_ms=entry["build_ms"], action_in_progress=True)
+        return _equipment_states_unavailable("action_in_progress")
+    if entry_valid and not refresh:
+        return _equipment_states_response(
+            app, entry["built"], hit=True, generation=entry["generation"],
+            build_ms=entry["build_ms"], action_in_progress=False)
+
+    # Construction synchrone (aucun `await`) : single-flight par construction sur la boucle ;
+    # deux requêtes concurrentes ne reconstruisent donc pas, la seconde trouve l'entrée stockée.
+    if refresh:
+        # AC14 : un rafraîchissement forcé attribue une nouvelle génération (l'entrée remplacée
+        # n'est plus valide) ; la comparaison ci-dessous protège toujours contre une invalidation
+        # survenue pendant la construction.
+        cache["generation"] += 1
+    generation = cache["generation"]
+    started = time.perf_counter()
+    built = _build_equipment_states(app, data_dir)
+    build_ms = round((time.perf_counter() - started) * 1000, 1)
+    built["generated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    response = _equipment_states_response(
+        app, built, hit=False, generation=generation, build_ms=build_ms, action_in_progress=False)
+    _LOGGER.info(
+        "[AGGREGATE] build equipments=%d unread=%d build_ms=%s bytes=%d generation=%d",
+        built["total"], len(built["unread"]), build_ms, len(response.body), generation,
+    )
+    # Un résultat périmé (invalidation survenue pendant la construction) est rendu à son
+    # appelant mais jamais stocké ; un résultat incomplet (`unread`) non plus comme valide.
+    if cache["generation"] == generation:
+        cache["entry"] = {
+            "built": built, "generation": generation, "signature": signature,
+            "topology": app["topology"], "stored_at": now, "build_ms": build_ms,
+            "complete": not built["unread"],
+        }
+    return response
+
+
 async def _handle_mapping_override_save(request: web.Request) -> web.Response:
     """POST /action/mapping_override — Story 16.5 (AC9) : persiste un override de type.
 
@@ -3358,6 +3714,7 @@ async def _handle_mapping_override_save(request: web.Request) -> web.Response:
             {"status": "error", "message": str(exc)}, status=500
         )
 
+    _invalidate_equipment_states(request.app)
     _LOGGER.info(
         "[OVERRIDES] Override HA sauvegardé via UI eq_id=%d cmd_id=%d type=%s",
         eq_id, cmd_id, ha_entity_type,
@@ -3409,6 +3766,7 @@ async def _handle_publication_override_save(request: web.Request) -> web.Respons
             saved = save_override(eq_id, cmd_id, {"publication_override": policy}, data_dir)
     except ValueError as exc:
         return web.json_response({"status": "error", "message": str(exc)}, status=500)
+    _invalidate_equipment_states(request.app)
     return web.json_response({"status": "ok", "payload": {"jeedom_eq_id": eq_id,
         "jeedom_cmd_id": cmd_id, "publication_policy": policy, "saved": saved}})
 
@@ -3506,6 +3864,7 @@ async def _handle_mapping_override_revert(
         removed = remove_equipment_override_fields(eq_id, fields, data_dir)
         scope = "equipment"
 
+    _invalidate_equipment_states(request.app)
     _LOGGER.info(
         "[OVERRIDES] Retour mode auto via UI eq_id=%d scope=%s removed=%s removed_commands=%s",
         eq_id, scope, removed, removed_commands,
@@ -3835,6 +4194,42 @@ async def _handle_system_diagnostics(request: web.Request) -> web.Response:
     })
 
 
+async def _handle_system_decision_export(request: web.Request) -> web.Response:
+    """Handle GET /system/decision_export — Story 24.2 : contrat de décision versionné (JSON).
+
+    Même document que le fichier ``jeedom2ha_decision_export.json``, construit depuis la
+    mémoire. Route interne (secret requis) : l'administrateur passe par l'action AJAX
+    ``getDecisionExport``.
+    """
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response(
+            {"status": "error", "message": "Unauthorized"},
+            status=401,
+        )
+
+    try:
+        document = _build_decision_export_document(request.app, _resolve_data_dir(request))
+    except Exception as exc:
+        _LOGGER.error("[EXPORT] Export de décision non produit : %s", type(exc).__name__)
+        return web.json_response({
+            "status": "error",
+            "message": "Export de décision indisponible : construction du document en échec.",
+        })
+    if document is None:
+        return web.json_response({
+            "status": "error",
+            "message": "Export de décision indisponible : aucune donnée en mémoire (appelez /action/sync d'abord)."
+        })
+
+    return web.json_response({
+        "action": "system.decision_export",
+        "status": "ok",
+        "payload": document,
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 async def _handle_system_published_scope(request: web.Request) -> web.Response:
     """Handle GET /system/published_scope — return canonical backend scope contract."""
     local_secret = request.app["local_secret"]
@@ -4145,6 +4540,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         try:
             return await _run_action_body()
         finally:
+            _invalidate_equipment_states(request.app)
             # Story 19.6 (AC8) — libéré ici (jamais dans le handler) : le verrou reste tenu
             # tant que l'action protégée tourne, y compris après une déconnexion client, et
             # il est libéré même en cas d'exception.
@@ -4291,6 +4687,7 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 pending_discovery_unpublish,
             )
             save_publications_cache(publications, _resolve_data_dir(request))
+            _refresh_decision_export(request.app, _resolve_data_dir(request))
             _supprimer_msg = _build_supprimer_message(
                 resultat=resultat,
                 equipements_supprimes=equipements_supprimes,
@@ -4343,6 +4740,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
         data_dir = _resolve_data_dir(request)
         overrides_cache = list_overrides(data_dir)
         equipment_overrides_cache = list_equipment_overrides(data_dir)
+        # Story 24.2 — verdicts « Publier » mémorisés pour l'export de décision.
+        export_overrides = index_overrides(overrides_cache, equipment_overrides_cache)
+        decision_memo = request.app["decision_memo"]
         mapper_registry = MapperRegistry()
         confidence_policy = request.app.get("confidence_policy") or _DEFAULT_CONFIDENCE_POLICY
         if confidence_policy not in _VALID_CONFIDENCE_POLICIES:
@@ -4424,6 +4824,14 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             if mapping is None:
                 mapping = mappings.get(eq_id)
             is_included = _scope_entry_is_included(eq_id, scope_entry, eligibility)
+            if evaluation is not None:
+                _memorize_decision(
+                    decision_memo.equipments, eq_id, make_equipment_record,
+                    evaluation,
+                    eligible=True,
+                    scope_excluded=not is_included and evaluation.mapping is not None,
+                    applied_overrides=export_overrides.get(eq_id),
+                )
             if deadline_s is not None and (
                 is_included
                 or _is_currently_published_in_ha(eq_id, previous_decision, pending_discovery_unpublish)
@@ -4596,6 +5004,10 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
             pending_discovery_unpublish,
         )
         save_publications_cache(publications, _resolve_data_dir(request))
+        _refresh_decision_export(
+            request.app, data_dir,
+            overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
+        )
         _publier_msg = _build_publier_message(
             resultat=resultat,
             equipements_publies_ou_crees=equipements_publies_ou_crees,
@@ -4714,6 +5126,7 @@ def create_app(local_secret: str) -> web.Application:
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
+    app["decision_memo"] = DecisionMemo()  # Story 24.2 — verdicts mémorisés au sync / « Publier »
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
     app["pending_local_availability_cleanup"] = {}  # Dict[int, str]
@@ -4732,6 +5145,7 @@ def create_app(local_secret: str) -> web.Application:
     # Codex P1) : évite la collecte prématurée par le garbage collector d'une tâche
     # `asyncio.ensure_future` non référencée ailleurs si le handler est annulé.
     app["action_tasks"] = set()
+    app[_EQUIPMENT_STATES_CACHE_KEY] = _new_equipment_states_cache()
     app.router.add_get("/system/status", _handle_system_status)
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
@@ -4741,11 +5155,15 @@ def create_app(local_secret: str) -> web.Application:
     # Story 16.5 — UI de configuration par équipement : arbre par commande (GET),
     # persistance override (POST) et retour au mode auto (POST).
     app.router.add_get("/system/mapping_overrides/{eq_id}", _handle_mapping_overrides_get)
+    # Story 25.2 — états agrégés par équipement (lecture seule, cache en mémoire).
+    app.router.add_get("/system/equipment_states", _handle_equipment_states_get)
     app.router.add_post("/action/mapping_override", _handle_mapping_override_save)
     app.router.add_post("/action/mapping_override_revert", _handle_mapping_override_revert)
     app.router.add_post("/action/publication_override", _handle_publication_override_save)
     app.router.add_post("/action/publication_override_revert", _handle_publication_override_revert)
     app.router.add_get("/system/published_scope", _handle_system_published_scope)
+    # Story 24.2 — export JSON versionné du contrat de décision (route interne, secret requis).
+    app.router.add_get("/system/decision_export", _handle_system_decision_export)
     # Story 5.1 — Façade backend unique des opérations HA
     app.router.add_post("/action/execute", _handle_action_execute)
     # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)

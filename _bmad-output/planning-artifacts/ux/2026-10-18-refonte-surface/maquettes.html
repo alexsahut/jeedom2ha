@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refonte écran jeedom2ha</title>
+<script defer data-auto-replace-svg="nest" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+<style>
+/* ---------- Jetons ---------- */
+:root, :root[data-theme="dark"] {
+  --bg:#1e1e1e; --nav:#141414; --surface:#2a2a2a; --surface-2:#313131; --surface-3:#3a3a3a;
+  --line:#424242; --line-soft:#343434;
+  --text:#e6e6e6; --text-2:#bdbdbd; --muted:#909090;
+  --accent:#94ca02; --accent-ink:#17200a;
+  --ok:#94ca02; --warn:#f2a33a; --pend:#5fb0ec; --off:#8c8c8c; --danger:#e5534b;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+  --scrim:rgba(0,0,0,.55);
+}
+:root[data-theme="light"] {
+  --bg:#eceff1; --nav:#f8f8f8; --surface:#ffffff; --surface-2:#f6f7f8; --surface-3:#e9ecee;
+  --line:#d5d9dc; --line-soft:#e6e9eb;
+  --text:#1f2326; --text-2:#3f464b; --muted:#687076;
+  --accent:#6c9600; --accent-ink:#ffffff;
+  --ok:#4b860c; --warn:#b4630a; --pend:#1d6fb0; --off:#767c81; --danger:#c8302b;
+  --shadow:0 8px 30px rgba(20,30,40,.18);
+  --scrim:rgba(30,35,40,.35);
+}
+* { box-sizing:border-box; }
+html, body { margin:0; }
+body {
+  background:var(--bg); color:var(--text);
+  font:14px/1.45 Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-variant-numeric:tabular-nums;
+}
+button { font:inherit; color:inherit; }
+a { color:var(--accent); }
+
+/* ---------- Chrome du document de maquettes ---------- */
+.doc-head { max-width:1400px; margin:0 auto; padding:24px 16px 8px; display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; }
+.doc-head h1 { font-size:22px; margin:0 0 4px; font-weight:600; }
+.doc-head p { margin:0; color:var(--muted); max-width:70ch; }
+.tabs { display:flex; gap:4px; flex-wrap:wrap; }
+.tab { border:1px solid var(--line); background:var(--surface); padding:8px 14px; border-radius:6px; cursor:pointer; color:var(--text-2); }
+.tab[aria-selected="true"] { border-color:var(--accent); color:var(--text); box-shadow:inset 0 -2px 0 var(--accent); }
+.theme-switch { border:1px solid var(--line); background:var(--surface); padding:8px 12px; border-radius:6px; cursor:pointer; }
+.panel { display:none; max-width:1400px; margin:0 auto; padding:8px 16px 48px; }
+.panel.active { display:block; }
+.brief { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin:8px 0 20px; }
+.brief div { background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; padding:12px 14px; }
+.brief b { display:block; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:2px; }
+.frame-title { font-size:13px; color:var(--muted); margin:22px 0 8px; }
+.frame { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--bg); }
+.frame-scroll { overflow-x:auto; }
+.frame-inner { min-width:1060px; position:relative; }
+@media (max-width:760px){ .brief { grid-template-columns:1fr; } }
+
+/* ---------- Barre Jeedom simulée ---------- */
+.jnav { background:var(--nav); border-bottom:1px solid var(--line-soft); height:40px; display:flex; align-items:center; gap:18px; padding:0 14px; color:var(--text-2); font-size:13px; }
+.jnav .logo { color:var(--accent); font-weight:700; letter-spacing:.5px; }
+.jnav .sp { flex:1; }
+
+/* ---------- Composants partagés ---------- */
+.page { padding:14px 18px 22px; }
+.btn { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--surface-2); color:var(--text); padding:5px 11px; border-radius:4px; font-size:13px; cursor:pointer; white-space:nowrap; }
+.btn:hover { border-color:var(--muted); }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+.btn.ghost { background:transparent; }
+.btn.icon { padding:5px 8px; }
+.btn.sm { padding:3px 8px; font-size:12px; }
+.btn:focus-visible, .tab:focus-visible, .seg button:focus-visible, .chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+.pill { --c:var(--off); display:inline-flex; align-items:center; gap:6px; padding:2px 9px 2px 8px; border-radius:11px; font-size:12px; font-weight:600; color:var(--c); background:color-mix(in srgb, var(--c) 15%, transparent); white-space:nowrap; }
+.pill::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--c); }
+.ok { --c:var(--ok); } .warn { --c:var(--warn); } .pend { --c:var(--pend); } .off { --c:var(--off); }
+.pill.off { font-weight:500; }
+.pill.dis { font-style:italic; font-weight:500; }
+.dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--c, var(--off)); flex:none; }
+.dot.hollow { background:transparent; box-shadow:inset 0 0 0 2px var(--c, var(--off)); }
+.muted { color:var(--muted); }
+.t2 { color:var(--text-2); }
+.num { font-weight:600; color:var(--text); }
+.ha { color:var(--muted); font-size:12px; }
+
+.health { display:flex; align-items:center; flex-wrap:wrap; gap:6px 22px; padding:10px 14px; background:var(--surface); border:1px solid var(--line-soft); border-radius:6px; }
+.health .item { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--text-2); }
+.health .item b { color:var(--text); font-weight:600; }
+.health .sp { flex:1; }
+.health .acts { display:flex; gap:6px; }
+
+.gauge { display:flex; height:6px; border-radius:3px; overflow:hidden; background:var(--surface-3); }
+.gauge span { display:block; height:100%; }
+.gauge .g-ok { background:var(--ok); } .gauge .g-pend { background:var(--pend); } .gauge .g-warn { background:var(--warn); } .gauge .g-off { background:color-mix(in srgb, var(--off) 45%, transparent); }
+
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+.seg button { background:transparent; border:0; border-right:1px solid var(--line); padding:4px 11px; font-size:12px; cursor:pointer; color:var(--text-2); }
+.seg button:last-child { border-right:0; }
+.seg button[aria-pressed="true"] { background:color-mix(in srgb, var(--accent) 22%, transparent); color:var(--text); font-weight:600; }
+.seg.sm button { padding:2px 8px; font-size:11.5px; }
+.seg-label { font-size:12px; color:var(--muted); margin-right:8px; }
+
+.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:transparent; border-radius:14px; padding:3px 11px; font-size:12.5px; cursor:pointer; color:var(--text-2); }
+.chip b { color:var(--text); font-weight:600; }
+.chip[aria-pressed="true"] { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, transparent); color:var(--text); }
+
+.search { display:flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--surface-2); border-radius:4px; padding:4px 9px; color:var(--muted); font-size:13px; min-width:200px; }
+
+.section-h { display:flex; align-items:baseline; gap:12px; margin:22px 0 10px; }
+.section-h h2 { font-size:16px; font-weight:600; margin:0; }
+.section-h .help { color:var(--muted); font-size:12.5px; }
+.group-h { font-size:12.5px; color:var(--muted); margin:14px 0 6px; font-weight:600; }
+
+/* Modale simulée */
+.scrim { background:var(--scrim); padding:26px 40px 40px; }
+.modal { background:var(--surface); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); max-width:1180px; margin:0 auto; }
+.modal-h { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line-soft); }
+.modal-h h3 { margin:0; font-size:17px; font-weight:600; display:flex; align-items:center; gap:9px; }
+.modal-h .sp { flex:1; }
+.modal-b { padding:12px 16px 16px; }
+
+/* Menu « ⋯ » ouvert (montré figé) */
+.menu-wrap { position:relative; }
+.menu { position:absolute; right:0; top:calc(100% + 4px); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; box-shadow:var(--shadow); min-width:240px; padding:4px 0; z-index:5; font-size:13px; white-space:nowrap; }
+.menu div { padding:6px 12px; display:flex; gap:9px; align-items:center; }
+.menu hr { border:0; border-top:1px solid var(--line); margin:4px 0; }
+.menu .danger { color:var(--danger); }
+
+/* Tableau des commandes (partagé) */
+.cmd { width:100%; border-collapse:collapse; font-size:13px; }
+.cmd th { text-align:left; font-weight:600; font-size:12px; color:var(--muted); padding:6px 10px; border-bottom:1px solid var(--line); }
+.cmd td { padding:6px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.cmd .grp td { background:var(--surface-3); color:var(--text); font-weight:600; padding:6px 10px; border-bottom:0; }
+.cmd .grp .ha { font-weight:400; }
+.cmd .grp .seg { float:right; }
+.cmd .res { display:flex; align-items:center; gap:7px; }
+.cmd .res i { width:14px; text-align:center; }
+.cmd .r-ok { color:var(--ok); } .cmd .r-warn { color:var(--warn); } .cmd .r-off { color:var(--muted); }
+.cmd .tj { color:var(--text-2); font-size:12px; }
+.cmd .set { color:var(--muted); font-size:12px; cursor:pointer; border-bottom:1px dashed var(--line); }
+.cmd .set.forced { color:var(--pend); border-bottom-color:var(--pend); font-weight:600; }
+.cmd tr.ign td { color:var(--muted); }
+.cmd .ign-toggle td { color:var(--muted); font-size:12.5px; cursor:pointer; }
+.cmd .ign-toggle td:hover { color:var(--text-2); }
+.cmd tr.changed td:first-child { box-shadow:inset 3px 0 0 var(--pend); }
+
+.cause { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:6px; background:color-mix(in srgb, var(--warn) 12%, transparent); border:1px solid color-mix(in srgb, var(--warn) 35%, transparent); margin:4px 0 10px; }
+.cause i { color:var(--warn); margin-top:2px; }
+.cause .txt { flex:1; }
+.cause.pend { background:color-mix(in srgb, var(--pend) 12%, transparent); border-color:color-mix(in srgb, var(--pend) 35%, transparent); }
+.cause.pend i { color:var(--pend); }
+
+/* ---------- Direction A ---------- */
+.a-gestion { display:flex; align-items:center; gap:10px; color:var(--text-2); margin-bottom:12px; }
+.a-gestion .conf { display:inline-flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; padding:8px 14px; border:1px solid var(--line-soft); border-radius:6px; background:var(--surface); }
+.a-rooms { display:flex; flex-wrap:wrap; gap:10px; }
+.a-room { width:132px; background:var(--surface); border:1px solid var(--line-soft); border-radius:6px; padding:10px 10px 9px; cursor:pointer; text-align:center; }
+.a-room:hover { border-color:var(--muted); }
+.a-room i.ic { font-size:20px; color:var(--rc, var(--text-2)); }
+.a-room .nm { font-weight:600; margin:5px 0 2px; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.a-room .st { font-size:12px; color:var(--muted); }
+.a-room .flag { font-size:11.5px; font-weight:600; margin-top:3px; min-height:17px; }
+.a-room .flag.w { color:var(--warn); } .a-room .flag.p { color:var(--pend); }
+
+.a-summary { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; margin:0 0 12px; font-size:13px; color:var(--text-2); }
+.a-summary .s { display:inline-flex; align-items:center; gap:6px; }
+.a-list { border-top:1px solid var(--line-soft); }
+.a-row { display:grid; grid-template-columns:118px minmax(0,1fr) 240px 26px; gap:12px; align-items:center; padding:6px 8px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
+.a-row:hover { background:var(--surface-2); }
+.a-row .pill { justify-self:start; }
+.a-row .nm { font-weight:600; }
+.a-row .info { font-size:12.5px; color:var(--muted); text-align:right; }
+.a-row .info.w { color:var(--warn); }
+.a-row .chev { color:var(--muted); text-align:center; }
+.a-row.open { background:var(--surface-2); position:sticky; top:0; z-index:2; border-bottom-color:transparent; }
+.a-row.dim .nm { color:var(--muted); font-weight:500; }
+.a-detail { background:var(--surface-2); border-left:3px solid var(--accent); padding:4px 14px 14px 16px; border-bottom:1px solid var(--line); }
+.a-detail .bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0 10px; }
+.a-detail .bar .sp { flex:1; }
+.a-detail .cnt { font-size:12.5px; color:var(--text-2); }
+
+/* ---------- Direction B ---------- */
+.b-house { display:grid; grid-template-columns:260px minmax(0,1fr); gap:24px; align-items:center; background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; padding:16px 18px; margin-top:12px; }
+.b-house .big { font-size:30px; font-weight:600; line-height:1; }
+.b-house .big small { font-size:15px; color:var(--muted); font-weight:400; }
+.b-house .gauge { height:10px; border-radius:5px; margin:10px 0 10px; }
+.b-house .legend { display:flex; flex-wrap:wrap; gap:6px; }
+.b-rooms { display:grid; grid-template-columns:repeat(auto-fill, minmax(212px,1fr)); gap:10px; }
+.b-room { background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; padding:11px 13px 12px; cursor:pointer; position:relative; }
+.b-room:hover { border-color:var(--muted); }
+.b-room.has-warn { border-left:3px solid var(--warn); }
+.b-room .top { display:flex; align-items:center; gap:9px; }
+.b-room .top i { width:18px; text-align:center; color:var(--rc, var(--text-2)); }
+.b-room .top .nm { font-weight:600; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.b-room .top .ratio { font-size:13px; color:var(--text-2); }
+.b-room .gauge { margin:9px 0 7px; }
+.b-room .tags { display:flex; flex-wrap:wrap; gap:2px 10px; font-size:12px; min-height:18px; }
+.b-room .tags span { white-space:nowrap; }
+.b-room .tags .w { color:var(--warn); font-weight:600; } .b-room .tags .p { color:var(--pend); font-weight:600; } .b-room .tags .o { color:var(--muted); }
+.b-mh-gauge { width:200px; }
+.b-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; }
+.b-toolbar .sp { flex:1; }
+.b-table { width:100%; border-collapse:collapse; font-size:13px; }
+.b-table th { text-align:left; font-size:12px; font-weight:600; color:var(--muted); padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.b-table td { padding:7px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.b-table tbody tr.eq { cursor:pointer; }
+.b-table tbody tr.eq:hover td { background:var(--surface-2); }
+.b-table tr.eq.open td { background:var(--surface-2); border-bottom-color:transparent; }
+.b-table .nm { font-weight:600; }
+.b-table tr.dim .nm { color:var(--muted); font-weight:500; }
+.b-table .ratio { width:170px; }
+.b-table .ratio .gauge { height:4px; margin-top:4px; }
+.b-table .note { color:var(--muted); font-size:12.5px; }
+.b-table .note.w { color:var(--warn); }
+.b-table .note.p { color:var(--pend); }
+.b-table td.det { background:var(--surface-2); border-left:3px solid var(--accent); padding:4px 16px 14px; }
+.b-detail-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0 10px; }
+.b-detail-bar .sp { flex:1; }
+
+/* ---------- Direction C ---------- */
+.c-app { display:grid; grid-template-columns:330px minmax(0,1fr); height:640px; border-top:1px solid var(--line-soft); }
+.c-left { border-right:1px solid var(--line); background:var(--surface); display:flex; flex-direction:column; min-height:0; }
+.c-left .tools { padding:10px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--line-soft); }
+.c-left .tools .chips { display:flex; flex-wrap:wrap; gap:5px; }
+.c-left .tools .chip { padding:2px 9px; font-size:12px; }
+.c-tree { overflow:auto; flex:1; padding:4px 0 10px; }
+.c-grp { font-size:11.5px; color:var(--muted); padding:10px 12px 4px; font-weight:600; }
+.c-room { display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer; }
+.c-room:hover { background:var(--surface-2); }
+.c-room .car { width:10px; color:var(--muted); font-size:11px; }
+.c-room i.ic { width:16px; text-align:center; color:var(--rc, var(--text-2)); }
+.c-room .nm { flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.c-room .cnt { font-size:12px; color:var(--muted); }
+.c-room .w { color:var(--warn); font-size:12px; font-weight:600; }
+.c-room.sel, .c-eq.sel { background:color-mix(in srgb, var(--accent) 16%, transparent); box-shadow:inset 3px 0 0 var(--accent); }
+.c-eq { display:flex; align-items:center; gap:9px; padding:4px 12px 4px 40px; cursor:pointer; font-size:13px; }
+.c-eq:hover { background:var(--surface-2); }
+.c-eq .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.c-eq.dim .nm { color:var(--muted); }
+.c-eq .r { font-size:11.5px; color:var(--muted); }
+.c-right { overflow:auto; padding:16px 22px 24px; min-width:0; }
+.crumb { font-size:12.5px; color:var(--muted); margin-bottom:6px; }
+.c-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.c-head h3 { margin:0; font-size:20px; font-weight:600; }
+.c-head .sp { flex:1; }
+.c-meta { display:flex; flex-wrap:wrap; gap:8px 26px; align-items:center; padding:10px 0 12px; border-bottom:1px solid var(--line-soft); margin-bottom:12px; }
+.c-kpis { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin:6px 0 16px; }
+.c-kpi { background:var(--surface); border:1px solid var(--line-soft); border-radius:6px; padding:10px 12px; cursor:pointer; }
+.c-kpi .v { font-size:22px; font-weight:600; line-height:1.1; }
+.c-kpi .l { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.c-todo { border:1px solid var(--line-soft); border-radius:6px; overflow:hidden; }
+.c-todo .row { display:grid; grid-template-columns:110px minmax(0,1fr) auto; gap:12px; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line-soft); background:var(--surface); }
+.c-todo .row:last-child { border-bottom:0; }
+</style>
+</head>
+<body>
+
+<header class="doc-head">
+  <div>
+    <h1>Configuration Home Assistant : trois directions de refonte</h1>
+    <p>Données fictives. Chaque direction montre la page principale, puis une pièce avec un équipement déplié. Le thème suit Jeedom (sombre) ; le bouton de droite bascule en clair.</p>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-panel="pA">A · Nettoyage</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="pB">B · Tableau de bord</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="pC">C · Maître-détail</button>
+    </div>
+    <button class="theme-switch" id="themeSwitch"><i class="fas fa-adjust"></i> Thème clair</button>
+  </div>
+</header>
+
+<!-- =====================================================================
+     DIRECTION A — NETTOYAGE
+     ===================================================================== -->
+<section class="panel active" id="pA" role="tabpanel">
+  <div class="brief">
+    <div><b>Ce qu'elle résout</b>Un seul état par équipement, un seul vocabulaire, des couleurs qui disent l'urgence, l'état visible sur chaque carte de pièce, les actions rangées par fréquence d'usage.</div>
+    <div><b>Coût estimé</b>S, environ 3 à 5 jours : CSS du plugin, libellés, une fonction d'état unique, réordonnancement des colonnes. Structure, routes et modale inchangées.</div>
+    <div><b>Risque</b>Faible. Le gros du risque est dans les tests de libellés et la doc à réaligner. L'état des pièces sur la page principale demande une petite route agrégée côté démon.</div>
+  </div>
+
+  <div class="frame-title">Page principale</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="jnav"><span class="logo">JEEDOM</span><span>Accueil</span><span>Analyse</span><span>Outils</span><span>Plugins</span><span>Réglages</span><span class="sp"></span><span>17:59</span></div>
+    <div class="page">
+      <div class="a-gestion"><span class="conf"><i class="fas fa-wrench" style="font-size:20px"></i>Configuration</span></div>
+      <div class="health">
+        <span class="item"><span class="dot ok"></span>Démon <b>actif</b></span>
+        <span class="item" title="Broker 127.0.0.1:1883"><span class="dot ok"></span>MQTT <b>connecté</b></span>
+        <span class="item"><i class="fas fa-sync-alt muted"></i>Dernière synchro <b>il y a 4 min</b></span>
+        <span class="item"><span class="dot ok"></span>Dernière opération <b>réussie</b></span>
+        <span class="sp"></span>
+        <span class="acts">
+          <button class="btn"><i class="fas fa-upload"></i>Republier tout</button>
+          <button class="btn"><i class="fas fa-redo"></i>Relire Jeedom</button>
+          <span class="menu-wrap"><button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button></span>
+        </span>
+      </div>
+      <div class="section-h"><h2>Pièces</h2><span class="help">Cliquez une pièce pour voir ce qui est publié dans Home Assistant, et pourquoi le reste ne l'est pas. <a href="#">Aide</a></span></div>
+      <div id="aRooms"></div>
+    </div>
+  </div></div></div>
+
+  <div class="frame-title">Fenêtre d'une pièce, équipement à plusieurs entités déplié</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="scrim">
+      <div class="modal">
+        <div class="modal-h">
+          <h3><i class="fas fa-couch" style="color:#d9a441"></i>Salon</h3>
+          <span class="muted" style="font-size:13px">14 équipements</span>
+          <span class="sp"></span>
+          <button class="btn"><i class="fas fa-upload"></i>Republier la pièce</button>
+          <span class="menu-wrap"><button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button></span>
+          <button class="btn ghost icon" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-b">
+          <div class="a-summary">
+            <span class="s"><span class="dot ok"></span><span class="num">7</span> publiés</span>
+            <span class="s"><span class="dot pend"></span><span class="num">1</span> à appliquer</span>
+            <span class="s"><span class="dot warn"></span><span class="num">2</span> bloqués</span>
+            <span class="s"><span class="dot off"></span><span class="num">2</span> exclus</span>
+            <span class="s"><span class="dot off hollow"></span><span class="num">1</span> désactivé</span>
+            <span class="s"><span class="dot off hollow"></span><span class="num">1</span> sans rien à publier</span>
+          </div>
+          <div class="a-list" id="aList"></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- =====================================================================
+     DIRECTION B — TABLEAU DE BORD
+     ===================================================================== -->
+<section class="panel" id="pB" role="tabpanel">
+  <div class="brief">
+    <div><b>Ce qu'elle résout</b>Tout ce que fait A, plus la vue d'ensemble : la maison et chaque pièce ont leur jauge, les problèmes se repèrent sans rien ouvrir, et la liste d'une pièce se filtre par état (Tous, Publiés, Bloqués, Exclus).</div>
+    <div><b>Coût estimé</b>M, environ 1,5 à 2 semaines : nouvelle grille et nouvelle liste, filtres côté client, route agrégée par pièce dans le démon, réécriture de la doc et des tests de surface.</div>
+    <div><b>Risque</b>Moyen. Les jauges doivent rester justes sans 300 lectures au chargement (cache plus route agrégée). La liste en tableau remplace l'accordéon Bootstrap, ce qui demande de reprendre le gating des boutons.</div>
+  </div>
+
+  <div class="frame-title">Page principale</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="jnav"><span class="logo">JEEDOM</span><span>Accueil</span><span>Analyse</span><span>Outils</span><span>Plugins</span><span>Réglages</span><span class="sp"></span><span>17:59</span></div>
+    <div class="page">
+      <div class="health">
+        <span class="item"><span class="dot ok"></span>Démon <b>actif</b></span>
+        <span class="item" title="Broker 127.0.0.1:1883"><span class="dot ok"></span>MQTT <b>connecté</b></span>
+        <span class="item"><i class="fas fa-sync-alt muted"></i>Synchro <b>il y a 4 min</b></span>
+        <span class="item"><span class="dot ok"></span>Dernière opération <b>réussie</b></span>
+        <span class="sp"></span>
+        <span class="acts">
+          <button class="btn"><i class="fas fa-upload"></i>Republier tout</button>
+          <button class="btn"><i class="fas fa-redo"></i>Relire Jeedom</button>
+          <span class="menu-wrap"><button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button>
+            <div class="menu">
+              <div><i class="fas fa-download muted"></i>Télécharger le diagnostic…</div>
+              <div><i class="fas fa-wrench muted"></i>Configuration du plugin</div>
+              <hr>
+              <div class="danger"><i class="fas fa-trash"></i>Supprimer tout de Home Assistant…</div>
+            </div>
+          </span>
+        </span>
+      </div>
+
+      <div class="b-house">
+        <div>
+          <div class="big">76 <small>publiés sur 114</small></div>
+          <div class="muted" style="font-size:12.5px; margin-top:6px">équipements Jeedom, 16 pièces</div>
+        </div>
+        <div>
+          <div class="gauge"><span class="g-ok" style="width:66.7%"></span><span class="g-pend" style="width:1.8%"></span><span class="g-warn" style="width:5.3%"></span><span class="g-off" style="width:26.2%"></span></div>
+          <div class="legend">
+            <button class="chip" aria-pressed="false"><span class="dot ok"></span><b>76</b> publiés</button>
+            <button class="chip" aria-pressed="false"><span class="dot warn"></span><b>6</b> bloqués</button>
+            <button class="chip" aria-pressed="false"><span class="dot pend"></span><b>2</b> à appliquer</button>
+            <button class="chip" aria-pressed="false"><span class="dot off"></span><b>30</b> exclus ou désactivés</button>
+            <span class="muted" style="font-size:12px; align-self:center; margin-left:4px">Un clic liste les équipements concernés, toutes pièces confondues.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-h"><h2>Pièces</h2><span class="help">Les pièces à traiter ont un liseré orange.</span></div>
+      <div id="bRooms"></div>
+    </div>
+  </div></div></div>
+
+  <div class="frame-title">Fenêtre d'une pièce, liste filtrable, équipement bloqué déplié</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="scrim">
+      <div class="modal">
+        <div class="modal-h">
+          <h3><i class="fas fa-couch" style="color:#d9a441"></i>Salon</h3>
+          <span class="t2" style="font-size:13px"><span class="num">7</span> publiés sur 14</span>
+          <div class="gauge b-mh-gauge"><span class="g-ok" style="width:50%"></span><span class="g-pend" style="width:7.1%"></span><span class="g-warn" style="width:14.3%"></span><span class="g-off" style="width:28.6%"></span></div>
+          <span class="sp"></span>
+          <button class="btn"><i class="fas fa-upload"></i>Republier la pièce</button>
+          <span class="menu-wrap"><button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button></span>
+          <button class="btn ghost icon" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-b">
+          <div class="b-toolbar" id="bFilters">
+            <button class="chip" data-f="all" aria-pressed="true">Tous <b>14</b></button>
+            <button class="chip" data-f="ok" aria-pressed="false"><span class="dot ok"></span>Publiés <b>7</b></button>
+            <button class="chip" data-f="warn" aria-pressed="false"><span class="dot warn"></span>Bloqués <b>2</b></button>
+            <button class="chip" data-f="pend" aria-pressed="false"><span class="dot pend"></span>À appliquer <b>1</b></button>
+            <button class="chip" data-f="off" aria-pressed="false"><span class="dot off"></span>Exclus et autres <b>4</b></button>
+            <span class="sp"></span>
+            <span class="search"><i class="fas fa-search"></i>Rechercher un équipement</span>
+          </div>
+          <table class="b-table">
+            <thead><tr><th style="width:120px">État</th><th>Équipement</th><th>Dans Home Assistant</th><th class="ratio">Commandes publiées</th><th>À savoir</th><th style="width:28px"></th></tr></thead>
+            <tbody id="bList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- =====================================================================
+     DIRECTION C — MAÎTRE-DÉTAIL
+     ===================================================================== -->
+<section class="panel" id="pC" role="tabpanel">
+  <div class="brief">
+    <div><b>Ce qu'elle résout</b>L'échelle : 300 équipements parcourus sans ouvrir ni fermer de fenêtre, une recherche et des filtres globaux, l'arbre pièces → équipements toujours visible, le détail jamais tronqué.</div>
+    <div><b>Coût estimé</b>L, environ 3 à 4 semaines : nouvelle page pleine hauteur, navigation clavier, état d'URL (pièce et équipement sélectionnés), réécriture complète de la surface et de ses tests.</div>
+    <div><b>Risque</b>Élevé. Elle sort du motif grille + modale des plugins Jeedom, elle est fragile sur tablette et iPad mural, et elle oblige à tout réécrire d'un coup.</div>
+  </div>
+
+  <div class="frame-title">Page principale : une pièce sélectionnée (vue de la pièce dans le panneau droit)</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="jnav"><span class="logo">JEEDOM</span><span>Accueil</span><span>Analyse</span><span>Outils</span><span>Plugins</span><span>Réglages</span><span class="sp"></span><span>17:59</span></div>
+    <div class="page" style="padding-bottom:0">
+      <div class="health">
+        <span class="item"><span class="dot ok"></span>Démon <b>actif</b></span>
+        <span class="item"><span class="dot ok"></span>MQTT <b>connecté</b></span>
+        <span class="item"><i class="fas fa-sync-alt muted"></i>Synchro <b>il y a 4 min</b></span>
+        <span class="item"><span class="t2">Maison</span> <b>76/114</b> publiés, <b style="color:var(--warn)">6 bloqués</b></span>
+        <span class="sp"></span>
+        <span class="acts">
+          <button class="btn"><i class="fas fa-upload"></i>Republier tout</button>
+          <button class="btn"><i class="fas fa-redo"></i>Relire Jeedom</button>
+          <button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button>
+        </span>
+      </div>
+    </div>
+    <div class="c-app" style="margin-top:12px">
+      <aside class="c-left">
+        <div class="tools">
+          <span class="search"><i class="fas fa-search"></i>Rechercher pièce ou équipement</span>
+          <div class="chips">
+            <button class="chip" aria-pressed="true">Tous</button>
+            <button class="chip" aria-pressed="false"><span class="dot warn"></span>Bloqués 6</button>
+            <button class="chip" aria-pressed="false"><span class="dot pend"></span>À appliquer 2</button>
+            <button class="chip" aria-pressed="false"><span class="dot off"></span>Exclus</button>
+          </div>
+        </div>
+        <div class="c-tree" id="cTree1"></div>
+      </aside>
+      <main class="c-right">
+        <div class="crumb">Rez-de-chaussée</div>
+        <div class="c-head">
+          <i class="fas fa-couch" style="color:#d9a441; font-size:20px"></i><h3>Salon</h3>
+          <span class="sp"></span>
+          <button class="btn"><i class="fas fa-upload"></i>Republier la pièce</button>
+          <button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button>
+        </div>
+        <div class="c-kpis">
+          <div class="c-kpi"><div class="v">7</div><div class="l"><span class="dot ok"></span>publiés</div></div>
+          <div class="c-kpi"><div class="v" style="color:var(--warn)">2</div><div class="l"><span class="dot warn"></span>bloqués</div></div>
+          <div class="c-kpi"><div class="v" style="color:var(--pend)">1</div><div class="l"><span class="dot pend"></span>à appliquer</div></div>
+          <div class="c-kpi"><div class="v">3</div><div class="l"><span class="dot off"></span>exclus ou désactivés</div></div>
+          <div class="c-kpi"><div class="v">1</div><div class="l"><span class="dot off hollow"></span>rien à publier</div></div>
+        </div>
+        <div class="group-h" style="margin-top:0">À traiter dans cette pièce</div>
+        <div class="c-todo">
+          <div class="row"><span class="pill warn">Bloqué</span><span><b>Enceinte connectée</b> <span class="muted">· 11 commandes</span><br><span class="muted" style="font-size:12.5px">Types génériques non configurés dans Jeedom</span></span><button class="btn sm">Ouvrir les types génériques</button></div>
+          <div class="row"><span class="pill warn">Bloqué</span><span><b>Afficheur LED</b> <span class="muted">· 34 commandes</span><br><span class="muted" style="font-size:12.5px">Types génériques non configurés dans Jeedom</span></span><button class="btn sm">Ouvrir les types génériques</button></div>
+          <div class="row"><span class="pill pend">À appliquer</span><span><b>Volet baie</b><br><span class="muted" style="font-size:12.5px">Type HA modifié sur 1 commande, pas encore dans Home Assistant</span></span><button class="btn sm primary">Appliquer</button></div>
+        </div>
+        <p class="muted" style="font-size:12.5px; margin-top:14px">Les 7 équipements publiés et les 4 autres n'appellent aucune action. Ils restent dans l'arbre à gauche.</p>
+      </main>
+    </div>
+  </div></div></div>
+
+  <div class="frame-title">Équipement sélectionné : réglage modifié, en attente d'application</div>
+  <div class="frame"><div class="frame-scroll"><div class="frame-inner">
+    <div class="c-app">
+      <aside class="c-left">
+        <div class="tools">
+          <span class="search"><i class="fas fa-search"></i>Rechercher pièce ou équipement</span>
+          <div class="chips">
+            <button class="chip" aria-pressed="true">Tous</button>
+            <button class="chip" aria-pressed="false"><span class="dot warn"></span>Bloqués 6</button>
+            <button class="chip" aria-pressed="false"><span class="dot pend"></span>À appliquer 2</button>
+            <button class="chip" aria-pressed="false"><span class="dot off"></span>Exclus</button>
+          </div>
+        </div>
+        <div class="c-tree" id="cTree2"></div>
+      </aside>
+      <main class="c-right">
+        <div class="crumb">Rez-de-chaussée › Salon</div>
+        <div class="c-head">
+          <h3>Volet baie</h3><span class="pill pend">À appliquer</span>
+          <span class="sp"></span>
+          <button class="btn primary"><i class="fas fa-check"></i>Appliquer</button>
+          <span class="menu-wrap"><button class="btn icon" aria-label="Plus d'actions"><i class="fas fa-ellipsis-h"></i></button>
+          </span>
+        </div>
+        <div class="c-meta">
+          <span><span class="seg-label">Publication dans Home Assistant</span>
+            <span class="seg" role="group"><button aria-pressed="true">Automatique</button><button aria-pressed="false" title="Publier même si le plugin a un doute">Toujours</button><button aria-pressed="false">Jamais</button></span></span>
+          <span class="t2" style="font-size:13px"><span class="num">4</span> commandes publiées <span class="muted">· 1 ignorée</span></span>
+          <span class="t2" style="font-size:13px">Entité : Volet <span class="ha">cover</span></span>
+        </div>
+        <div class="cause pend"><i class="fas fa-clock"></i><div class="txt"><b>1 réglage pas encore dans Home Assistant.</b> Le type HA de « Position » passe de <i>auto</i> à <i>capteur</i>. Cliquez « Appliquer » pour l'envoyer.</div></div>
+        <table class="cmd">
+          <thead><tr><th>Commande</th><th>Dans Home Assistant</th><th>Type Jeedom</th><th>Type HA</th></tr></thead>
+          <tbody>
+            <tr><td>Monter</td><td><span class="res r-ok"><i class="fas fa-check"></i>Volet <span class="ha">cover</span></span></td><td class="tj">Volet bouton monter</td><td><span class="set">auto</span></td></tr>
+            <tr><td>Descendre</td><td><span class="res r-ok"><i class="fas fa-check"></i>Volet <span class="ha">cover</span></span></td><td class="tj">Volet bouton descendre</td><td><span class="set">auto</span></td></tr>
+            <tr><td>Stop</td><td><span class="res r-ok"><i class="fas fa-check"></i>Volet <span class="ha">cover</span></span></td><td class="tj">Volet bouton stop</td><td><span class="set">auto</span></td></tr>
+            <tr class="changed"><td>Position</td><td><span class="res" style="color:var(--pend)"><i class="fas fa-clock"></i>Capteur <span class="ha">sensor</span><span class="muted" style="font-size:12px">après application</span></span></td><td class="tj">Volet état</td><td><span class="set forced">capteur (imposé)</span></td></tr>
+            <tr class="ign-toggle"><td colspan="4"><i class="fas fa-caret-right"></i> 1 commande ignorée, sans équivalent dans Home Assistant : Rafraîchir</td></tr>
+          </tbody>
+        </table>
+      </main>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- =====================================================================
+     Gabarits de détail
+     ===================================================================== -->
+<template id="tplA">
+  <div class="a-detail">
+    <div class="bar">
+      <span><span class="seg-label">Publication dans Home Assistant</span>
+        <span class="seg" role="group"><button aria-pressed="true">Automatique</button><button aria-pressed="false" title="Publier même si le plugin a un doute">Toujours</button><button aria-pressed="false">Jamais</button></span></span>
+      <span class="cnt"><span class="num">7</span> commandes publiées <span class="muted">· 5 ignorées</span></span>
+      <span class="sp"></span>
+      <span class="menu-wrap"><button class="btn sm"><i class="fas fa-ellipsis-h"></i> Plus</button>
+      </span>
+    </div>
+    <table class="cmd">
+      <thead><tr><th style="width:26%">Commande</th><th style="width:32%">Dans Home Assistant</th><th>Type Jeedom</th><th style="width:16%">Type HA</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">Interrupteur <span class="ha">switch</span>
+          <span class="seg sm" role="group"><button aria-pressed="true">Auto</button><button aria-pressed="false">Toujours</button><button aria-pressed="false">Jamais</button></span></td></tr>
+        <tr><td>État</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Prise état</td><td><span class="set">auto</span></td></tr>
+        <tr><td>On</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Prise bouton on</td><td><span class="set">auto</span></td></tr>
+        <tr><td>Off</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Prise bouton off</td><td><span class="set">auto</span></td></tr>
+        <tr class="grp"><td colspan="4">Capteurs <span class="ha">sensor ×4</span>
+          <span class="seg sm" role="group"><button aria-pressed="true">Auto</button><button aria-pressed="false">Toujours</button><button aria-pressed="false">Jamais</button></span></td></tr>
+        <tr><td>Puissance</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Puissance électrique</td><td><span class="set">auto</span></td></tr>
+        <tr><td>Consommation</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Consommation électrique</td><td><span class="set">auto</span></td></tr>
+        <tr><td>Courant</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Courant</td><td><span class="set">auto</span></td></tr>
+        <tr><td>Tension</td><td><span class="res r-ok"><i class="fas fa-check"></i>Publiée</span></td><td class="tj">Tension</td><td><span class="set forced">capteur (imposé)</span></td></tr>
+        <tr class="ign-toggle"><td colspan="4"><i class="fas fa-caret-right"></i> 5 commandes ignorées, sans équivalent dans Home Assistant : Pinguer nœud, Soigner nœud, Statut nœud, Tester nœud, Remise à zéro</td></tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<template id="tplB">
+  <div class="b-detail-bar">
+    <span><span class="seg-label">Publication dans Home Assistant</span>
+      <span class="seg" role="group"><button aria-pressed="true">Automatique</button><button aria-pressed="false">Toujours</button><button aria-pressed="false">Jamais</button></span></span>
+    <span class="sp"></span>
+    <button class="btn sm"><i class="fas fa-ellipsis-h"></i> Plus</button>
+  </div>
+  <div class="cause"><i class="fas fa-exclamation-triangle"></i>
+    <div class="txt"><b>Aucune des 11 commandes n'est publiable : leurs types génériques ne sont pas configurés dans Jeedom.</b><br><span class="t2">Le plugin ne devine pas le rôle d'une commande sans type générique. Renseignez-les (par exemple « Volume », « Lecture », « Pause »), puis revenez ici : l'état se mettra à jour.</span></div>
+    <button class="btn sm">Ouvrir les types génériques</button>
+  </div>
+  <table class="cmd">
+    <thead><tr><th style="width:30%">Commande</th><th style="width:30%">Dans Home Assistant</th><th>Type Jeedom</th><th style="width:16%">Type HA</th></tr></thead>
+    <tbody>
+      <tr><td>Volume</td><td><span class="res r-warn"><i class="fas fa-exclamation-triangle"></i>Bloquée</span></td><td class="tj muted">aucun</td><td><span class="set">auto</span></td></tr>
+      <tr><td>Lecture</td><td><span class="res r-warn"><i class="fas fa-exclamation-triangle"></i>Bloquée</span></td><td class="tj muted">aucun</td><td><span class="set">auto</span></td></tr>
+      <tr><td>Pause</td><td><span class="res r-warn"><i class="fas fa-exclamation-triangle"></i>Bloquée</span></td><td class="tj muted">aucun</td><td><span class="set">auto</span></td></tr>
+      <tr><td>Dire un texte</td><td><span class="res r-warn"><i class="fas fa-exclamation-triangle"></i>Bloquée</span></td><td class="tj muted">aucun</td><td><span class="set">auto</span></td></tr>
+      <tr class="ign-toggle"><td colspan="4"><i class="fas fa-caret-right"></i> 7 autres commandes bloquées pour la même raison</td></tr>
+    </tbody>
+  </table>
+</template>
+
+<script>
+/* ---------- Données fictives ---------- */
+var ROOMS = [
+  { g:'Rez-de-chaussée', n:'Salon', i:'fa-couch', c:'#d9a441', ok:7, pend:1, warn:2, total:14 },
+  { g:'Rez-de-chaussée', n:'Cuisine', i:'fa-utensils', c:'#e07a5f', ok:9, pend:0, warn:0, total:11 },
+  { g:'Rez-de-chaussée', n:'Entrée', i:'fa-door-closed', c:'#9c8cd9', ok:4, pend:0, warn:0, total:4 },
+  { g:'Rez-de-chaussée', n:'Bureau', i:'fa-laptop', c:'#5fb0ec', ok:5, pend:0, warn:1, total:7 },
+  { g:'Rez-de-chaussée', n:'Buanderie', i:'fa-tshirt', c:'#7fc8b0', ok:3, pend:0, warn:0, total:5 },
+  { g:'Rez-de-chaussée', n:"Salle d'eau", i:'fa-shower', c:'#6cc4d9', ok:2, pend:0, warn:0, total:3 },
+  { g:'Étage', n:'Chambre parentale', i:'fa-bed', c:'#c48fd9', ok:5, pend:0, warn:0, total:6 },
+  { g:'Étage', n:'Chambre enfant', i:'fa-child', c:'#e6a0b8', ok:4, pend:0, warn:0, total:5 },
+  { g:'Étage', n:'Salle de bain', i:'fa-bath', c:'#6cc4d9', ok:5, pend:0, warn:0, total:6 },
+  { g:'Étage', n:'Palier', i:'fa-stream', c:'#a0a0a0', ok:2, pend:0, warn:0, total:2 },
+  { g:'Extérieur', n:'Jardin', i:'fa-tree', c:'#8fc45a', ok:8, pend:0, warn:1, total:12 },
+  { g:'Extérieur', n:'Garage', i:'fa-car', c:'#a0a0a0', ok:6, pend:0, warn:0, total:9 },
+  { g:'Extérieur', n:'Piscine', i:'fa-swimming-pool', c:'#4fb3e8', ok:6, pend:1, warn:0, total:8 },
+  { g:'Extérieur', n:'Portail', i:'fa-dungeon', c:'#b8a07a', ok:3, pend:0, warn:0, total:3 },
+  { g:'Autres', n:'Réseau', i:'fa-network-wired', c:'#a0a0a0', ok:4, pend:0, warn:0, total:7 },
+  { g:'Autres', n:'Sans pièce', i:'fa-question', c:'#a0a0a0', ok:3, pend:0, warn:2, total:12 }
+];
+// s: ok | pend | warn | off | dis | none
+var EQS = [
+  { id:1, n:'Lampe plafond', s:'ok', ha:'Lumière', hat:'light', p:3, t:3 },
+  { id:2, n:'Spots canapé', s:'ok', ha:'Lumière', hat:'light', p:3, t:4, note:'1 ignorée' },
+  { id:3, n:'Volet baie', s:'pend', ha:'Volet', hat:'cover', p:4, t:5, note:'Type HA modifié, à appliquer', nc:'p' },
+  { id:4, n:'Prise TV', s:'ok', ha:'Interrupteur + 4 capteurs', hat:'', p:7, t:12, note:'5 ignorées' },
+  { id:5, n:'Thermostat', s:'ok', ha:'Thermostat', hat:'climate', p:2, t:2 },
+  { id:6, n:'Capteur température', s:'ok', ha:'Capteur', hat:'sensor', p:1, t:1 },
+  { id:7, n:'Enceinte connectée', s:'warn', ha:'', hat:'', p:0, t:11, note:'Types génériques manquants', nc:'w' },
+  { id:8, n:'Afficheur LED', s:'warn', ha:'', hat:'', p:0, t:34, note:'Types génériques manquants', nc:'w' },
+  { id:9, n:'Détecteur de fumée', s:'ok', ha:'Capteur binaire', hat:'binary_sensor', p:1, t:1 },
+  { id:10, n:'Lampadaire', s:'off', ha:'', hat:'', p:0, t:3, note:'Exclu le 12/10' },
+  { id:11, n:'Capteur porte-fenêtre', s:'ok', ha:'Capteur binaire', hat:'binary_sensor', p:2, t:2 },
+  { id:12, n:'Aspirateur robot', s:'dis', ha:'', hat:'', p:0, t:6, note:'Désactivé dans Jeedom' },
+  { id:13, n:"Prise lampe d'appoint", s:'off', ha:'', hat:'', p:0, t:3 },
+  { id:14, n:'Télécommande murale', s:'none', ha:'', hat:'', p:0, t:4, note:"Aucune commande n'a d'équivalent HA" }
+];
+var LABEL = { ok:'Publié', pend:'À appliquer', warn:'Bloqué', off:'Exclu', dis:'Désactivé', none:'Rien à publier' };
+var PILL = { ok:'ok', pend:'pend', warn:'warn', off:'off', dis:'off dis', none:'off' };
+function pill(s){ return '<span class="pill ' + PILL[s] + '">' + LABEL[s] + '</span>'; }
+function gauge(r){
+  var f = function(v){ return (100 * v / r.total).toFixed(1) + '%'; };
+  var rest = r.total - r.ok - r.pend - r.warn;
+  return '<div class="gauge"><span class="g-ok" style="width:' + f(r.ok) + '"></span><span class="g-pend" style="width:' + f(r.pend) + '"></span><span class="g-warn" style="width:' + f(r.warn) + '"></span><span class="g-off" style="width:' + f(rest) + '"></span></div>';
+}
+function groups(){ var out = {}; ROOMS.forEach(function(r){ (out[r.g] = out[r.g] || []).push(r); }); return out; }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+
+/* ---------- A : cartes de pièce ---------- */
+(function(){
+  var g = groups(), html = '';
+  Object.keys(g).forEach(function(k){
+    html += '<div class="group-h">' + k + '</div><div class="a-rooms">';
+    g[k].forEach(function(r){
+      var flag = r.warn ? '<div class="flag w"><i class="fas fa-exclamation-triangle"></i> ' + r.warn + ' bloqué' + (r.warn > 1 ? 's' : '') + '</div>'
+               : r.pend ? '<div class="flag p"><i class="fas fa-clock"></i> ' + r.pend + ' à appliquer</div>' : '<div class="flag"></div>';
+      html += '<div class="a-room" style="--rc:' + r.c + '"><i class="fas ' + r.i + ' ic"></i><div class="nm">' + esc(r.n) + '</div><div class="st"><span class="num">' + r.ok + '</span>/' + r.total + ' publiés</div>' + flag + '</div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('aRooms').innerHTML = html;
+})();
+
+/* ---------- A : liste de la pièce ---------- */
+(function(){
+  var host = document.getElementById('aList'), html = '';
+  EQS.forEach(function(e){
+    var info = e.s === 'warn' ? '<span class="info w">' + e.note + '</span>'
+             : (e.s === 'ok' || e.s === 'pend') ? '<span class="info">' + e.p + '/' + e.t + ' commandes</span>'
+             : '<span class="info"></span>';
+    var open = e.id === 4;
+    var dim = (e.s === 'off' || e.s === 'dis' || e.s === 'none') ? ' dim' : '';
+    html += '<div class="a-row' + dim + (open ? ' open' : '') + '">' + pill(e.s) + '<span class="nm">' + esc(e.n) + '</span>' + info + '<span class="chev"><i class="fas fa-chevron-' + (open ? 'up' : 'down') + '"></i></span></div>';
+    if (open) html += document.getElementById('tplA').innerHTML;
+  });
+  host.innerHTML = html;
+})();
+
+/* ---------- B : cartes de pièce ---------- */
+(function(){
+  var g = groups(), html = '';
+  Object.keys(g).forEach(function(k){
+    html += '<div class="group-h">' + k + '</div><div class="b-rooms">';
+    g[k].forEach(function(r){
+      var rest = r.total - r.ok - r.pend - r.warn, tags = '';
+      if (r.warn) tags += '<span class="w"><i class="fas fa-exclamation-triangle"></i> ' + r.warn + ' bloqué' + (r.warn > 1 ? 's' : '') + '</span>';
+      if (r.pend) tags += '<span class="p"><i class="fas fa-clock"></i> ' + r.pend + ' à appliquer</span>';
+      if (rest) tags += '<span class="o">' + rest + ' autre' + (rest > 1 ? 's' : '') + '</span>';
+      if (!r.warn && !r.pend && !rest) tags += '<span class="o"><i class="fas fa-check" style="color:var(--ok)"></i> tout est publié</span>';
+      html += '<div class="b-room' + (r.warn ? ' has-warn' : '') + '" style="--rc:' + r.c + '"><div class="top"><i class="fas ' + r.i + '"></i><span class="nm">' + esc(r.n) + '</span><span class="ratio"><span class="num">' + r.ok + '</span>/' + r.total + '</span></div>' + gauge(r) + '<div class="tags">' + tags + '</div></div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('bRooms').innerHTML = html;
+})();
+
+/* ---------- B : tableau filtrable ---------- */
+(function(){
+  var body = document.getElementById('bList'), current = 'all', openId = 7;
+  function group(s){ return (s === 'dis' || s === 'none') ? 'off' : s; }
+  function render(){
+    var html = '';
+    EQS.forEach(function(e){
+      if (current !== 'all' && group(e.s) !== current) return;
+      var dim = group(e.s) === 'off' ? ' dim' : '';
+      var ha = e.ha ? esc(e.ha) + (e.hat ? ' <span class="ha">' + e.hat + '</span>' : '') : '<span class="muted">—</span>';
+      var ratio = e.t ? '<span class="num">' + e.p + '</span><span class="muted">/' + e.t + '</span>' + gauge({ ok:e.p, pend:0, warn:e.s === 'warn' ? e.t : 0, total:e.t }) : '';
+      if (group(e.s) === 'off') ratio = '<span class="muted">—</span>';
+      var note = e.note ? '<span class="note ' + (e.nc || '') + '">' + esc(e.note) + '</span>' : '';
+      var open = e.id === openId;
+      html += '<tr class="eq' + dim + (open ? ' open' : '') + '" data-id="' + e.id + '"><td>' + pill(e.s) + '</td><td class="nm">' + esc(e.n) + '</td><td>' + ha + '</td><td class="ratio">' + ratio + '</td><td>' + note + '</td><td class="muted"><i class="fas fa-chevron-' + (open ? 'up' : 'down') + '"></i></td></tr>';
+      if (open) html += '<tr><td class="det" colspan="6">' + document.getElementById('tplB').innerHTML + '</td></tr>';
+    });
+    body.innerHTML = html || '<tr><td colspan="6" class="muted" style="padding:16px">Aucun équipement dans cet état.</td></tr>';
+  }
+  document.getElementById('bFilters').addEventListener('click', function(ev){
+    var b = ev.target.closest('.chip'); if (!b) return;
+    current = b.getAttribute('data-f');
+    this.querySelectorAll('.chip').forEach(function(c){ c.setAttribute('aria-pressed', c === b ? 'true' : 'false'); });
+    render();
+  });
+  body.addEventListener('click', function(ev){
+    var tr = ev.target.closest('tr.eq'); if (!tr) return;
+    var id = +tr.getAttribute('data-id');
+    openId = (openId === id) ? null : id;
+    render();
+  });
+  render();
+})();
+
+/* ---------- C : arbre ---------- */
+function tree(selRoom, selEq){
+  var g = groups(), html = '';
+  Object.keys(g).forEach(function(k){
+    html += '<div class="c-grp">' + k + '</div>';
+    g[k].forEach(function(r){
+      var isSalon = r.n === 'Salon';
+      var w = r.warn ? '<span class="w">' + r.warn + ' <i class="fas fa-exclamation-triangle"></i></span>' : '';
+      html += '<div class="c-room' + (isSalon && selRoom ? ' sel' : '') + '" style="--rc:' + r.c + '"><span class="car"><i class="fas fa-caret-' + (isSalon ? 'down' : 'right') + '"></i></span><i class="fas ' + r.i + ' ic"></i><span class="nm">' + esc(r.n) + '</span>' + w + '<span class="cnt">' + r.ok + '/' + r.total + '</span></div>';
+      if (isSalon) {
+        EQS.forEach(function(e){
+          var dim = (e.s === 'off' || e.s === 'dis' || e.s === 'none') ? ' dim' : '';
+          var cls = { ok:'ok', pend:'pend', warn:'warn', off:'off', dis:'off hollow', none:'off hollow' }[e.s];
+          var r2 = e.s === 'warn' ? 'bloqué' : e.s === 'pend' ? 'à appliquer' : e.s === 'off' ? 'exclu' : e.s === 'dis' ? 'désactivé' : '';
+          html += '<div class="c-eq' + dim + (selEq === e.id ? ' sel' : '') + '"><span class="dot ' + cls + '"></span><span class="nm">' + esc(e.n) + '</span><span class="r">' + r2 + '</span></div>';
+        });
+      }
+    });
+  });
+  return html;
+}
+document.getElementById('cTree1').innerHTML = tree(true, null);
+document.getElementById('cTree2').innerHTML = tree(false, 3);
+
+/* ---------- Onglets et thème ---------- */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('active', p.id === t.getAttribute('data-panel')); });
+  });
+});
+var sw = document.getElementById('themeSwitch');
+sw.addEventListener('click', function(){
+  var r = document.documentElement, dark = r.getAttribute('data-theme') !== 'light';
+  r.setAttribute('data-theme', dark ? 'light' : 'dark');
+  sw.innerHTML = '<i class="fas fa-adjust"></i> ' + (dark ? 'Thème sombre' : 'Thème clair');
+});
+// Les segments sont cliquables pour montrer l'état qui change.
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest('.seg button'); if (!b) return;
+  b.parentNode.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+});
+</script>
+</body>
+</html>

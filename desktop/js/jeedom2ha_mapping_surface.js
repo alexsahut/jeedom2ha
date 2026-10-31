@@ -1,7 +1,10 @@
-/* Story 16.8 — Surface de mapping HA par pièce (modèle Homebridge).
+/* Story 16.8 / 25.1 / 25.4 — Surface de mapping HA : détail d'un équipement et actions de pièce.
  *
- * Navigation : page plugin -> cartes pièces -> modale par pièce -> accordéon
- * équipements -> triptyque + diagnostic par commande + synthèse « sera publié ».
+ * Navigation (25.4) : page plugin -> vue de travail maître-détail (jeedom2ha_workview.js) -> détail de
+ * l'équipement sélectionné : état unique, réglage de publication et tableau des commandes regroupé par
+ * entité. La fenêtre de pièce et son accordéon n'existent plus ; ce module expose `window.Jeedom2haSurface`
+ * (voir la fin du fichier) que la vue appelle. Les fonctions d'écriture sont DÉPLACÉES telles quelles, pas
+ * réécrites (AC8).
  *
  * Ce contrôleur ne réinvente aucune logique métier : il réutilise strictement le
  * module pur Jeedom2haMappingOverride (état diagnostic, auto-validation, synthèse
@@ -17,32 +20,23 @@
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   var DEBOUNCE_MS = 400;
 
-  // État volatil de la surface courante (une modale pièce ouverte à la fois).
-  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null };
+  // État volatil de la surface courante (un seul équipement affiché à la fois, dans la vue de travail).
+  // `current` : l'équipement sélectionné { eqId, $panel } ; `reads` : lectures d'arbre en vol, par eqId.
+  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null, current: null, reads: {} };
 
-  function normalizedRooms() {
-    return M.normalizeRoomsTree(window.j2haRoomsTree || []);
-  }
+  // La vue de travail dit si la pièce est toujours affichée (retour d'une action, R1-D de 20.3).
+  var host = { isRoomShown: function () { return false; } };
 
-  function findRoom(objectId) {
-    var rooms = normalizedRooms();
-    for (var i = 0; i < rooms.length; i++) {
-      if (rooms[i].object_id === objectId) {
-        return rooms[i];
-      }
-    }
-    return null;
-  }
-
-  // --- Tableau des commandes (16.8) : une ligne par commande, colonnes
-  //     Commande | generic_type | Override HA | Diagnostic. Plus d'accordéon par
-  //     commande : toute l'info utile est directement sur la ligne. ---
+  // --- Tableau des commandes (16.8, 25.1) : colonnes
+  //     Commande | Dans Home Assistant | Type Jeedom | Type HA, regroupées par entité.
+  //     Les commandes ignorées ne sont pas des lignes : elles sont repliées sous le tableau. ---
 
   // `row` : la ligne de commande (types proposés filtrés par le démon, AC6) ; sans lui, liste complète.
   function buildOptions(selected, row) {
     var opts = row ? M.getOverrideTypeOptions(row) : M.getHaEntityTypeOptions();
     var $sel = $('<select class="form-control input-sm mapping-override-select"></select>');
-    $sel.append($('<option value="">{{— mode automatique —}}</option>'));
+    $sel.attr('aria-label', '{{Type HA}}');
+    $sel.append($('<option value="">{{auto}}</option>'));
     for (var i = 0; i < opts.length; i++) {
       var $o = $('<option></option>').attr('value', opts[i]).text(opts[i]);
       if (opts[i] === selected) {
@@ -53,39 +47,87 @@
     return $sel;
   }
 
-  function renderDiagnosticCell($cell, view, covered) {
-    $cell.removeClass('j2ha-diag-ready j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered j2ha-diag-excluded j2ha-diag-disabled');
-    // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié,
-    // jamais un flash vert trompeur ni une cellule vide (cf. #871 température sur DAAF).
-    // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
-    // systématiquement « aucun mapping ne couvre cette commande » — une exclusion/inéligibilité
-    // amont (I1/I4) porte aussi `covered:false` avec un VRAI diagnostic à afficher. Le libellé
-    // générique ne sort que si `shouldShowUncoveredLabel` confirme l'absence de cause réelle.
+  // Q5 (décision 2026-10-18) : écran « Types d'équipement » du core Jeedom, ouvert sans rien écrire (D10).
+  var GENERIC_TYPES_URL = 'index.php?v=d&p=types';
+  // Story 25.7 (Q4) : page de configuration du plugin, où se règle « Plugins exclus » ; ouverture seule, aucune écriture.
+  var PLUGIN_CONFIG_URL = 'index.php?v=d&p=plugin&id=jeedom2ha';
+  var CELL_CLASSES = 'j2ha-diag-ready j2ha-diag-todo j2ha-diag-blocking j2ha-diag-unknown j2ha-diag-uncovered '
+    + 'j2ha-diag-excluded j2ha-diag-disabled';
+
+  function haTypeOfRow(row, entities) {
+    var list = Array.isArray(entities) ? entities : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && Array.isArray(list[i].command_ids) && list[i].command_ids.indexOf(row.jeedom_cmd_id) !== -1
+        && list[i].ha_entity_type) {
+        return list[i].ha_entity_type;
+      }
+    }
+    var d = M.readDiagnosticView(row.diagnostic);
+    return row.effective_ha || (d && d.ha_entity_type) || row.attendu_ha || null;
+  }
+
+  function iconTextCell($cell, cssClass, icon, text) {
+    $cell.removeClass(CELL_CLASSES).addClass(cssClass).empty();
+    if (icon) {
+      $cell.append($('<i class="fas"></i>').addClass(icon)).append(document.createTextNode(' '));
+    }
+    $cell.append($('<span></span>').text(text));
+  }
+
+  // Aperçu d'un type imposé (dry-run, 16.8) : « À appliquer → Capteur (sensor) », « Bloquée → cause »,
+  // ou « Ignorée → … » ; jamais une cellule vide.
+  // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié.
+  // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
+  // systématiquement « aucun mapping ne couvre cette commande » — une exclusion/inéligibilité
+  // amont (I1/I4) porte aussi `covered:false` avec un VRAI diagnostic à afficher. Le libellé
+  // générique ne sort que si `shouldShowUncoveredLabel` confirme l'absence de cause réelle.
+  function renderPreviewCell($cell, view, covered) {
     if (covered === false && M.shouldShowUncoveredLabel(view)) {
-      $cell.addClass('j2ha-diag-uncovered').html('<i class="fas fa-ban"></i> ');
-      $cell.append($('<span></span>').text(M.buildUncoveredLabel()));
+      iconTextCell($cell, 'j2ha-diag-uncovered', 'fa-ban', M.buildUncoveredLabel());
       return;
     }
     if (M.isExcludedDiagnostic(view)) {
-      $cell.addClass('j2ha-diag-excluded').html('<i class="fas fa-eye-slash"></i> ');
-      $cell.append($('<span></span>').text(M.buildExcludedLabel(view)));
+      iconTextCell($cell, 'j2ha-diag-excluded', 'fa-eye-slash', M.buildExcludedLabel(view));
       return;
     }
     if (M.isDisabledDiagnostic(view)) {
-      $cell.addClass('j2ha-diag-disabled').html('<i class="fas fa-pause-circle"></i> ');
-      $cell.append($('<span></span>').text(M.buildDisabledLabel(view)));
+      iconTextCell($cell, 'j2ha-diag-disabled', 'fa-pause-circle', M.buildDisabledLabel(view));
       return;
     }
     var state = M.diagnosticState(view);
     var msg = M.buildPublishCellLabel(view);
     if (state === 'ready') {
-      $cell.addClass('j2ha-diag-ready').html('<i class="fas fa-check-circle"></i> ');
+      iconTextCell($cell, 'j2ha-diag-todo', 'fa-clock', msg);
     } else if (state === 'blocking') {
-      $cell.addClass('j2ha-diag-blocking').html('<i class="fas fa-exclamation-triangle"></i> ');
+      iconTextCell($cell, 'j2ha-diag-blocking', 'fa-exclamation-triangle', msg);
     } else {
-      $cell.addClass('j2ha-diag-unknown').empty();
+      iconTextCell($cell, 'j2ha-diag-unknown', null, msg);
     }
-    $cell.append($('<span></span>').text(msg));
+  }
+
+  // Cellule « Dans Home Assistant » d'une ligne du tableau (catégorie D2). Une commande bloquée ne
+  // répète pas sa cause : elle est dite une fois dans l'encart de l'équipement (AC14).
+  function renderHaCell($cell, row, category, entities) {
+    var type = haTypeOfRow(row, entities);
+    if (category === 'published') {
+      iconTextCell($cell, 'j2ha-diag-ready', 'fa-check-circle', '{{Publiée}} → ' + M.formatHaDomain(type));
+    } else if (category === 'to_apply') {
+      iconTextCell($cell, 'j2ha-diag-todo', 'fa-clock', '{{À appliquer}} → ' + M.formatHaDomain(type));
+    } else if (category === 'blocked') {
+      iconTextCell($cell, 'j2ha-diag-blocking', 'fa-exclamation-triangle', '{{Bloquée}}');
+      var code = M.resolveCauseCode(row.diagnostic);
+      if (code && !M.REASON_LABELS[code]) {
+        $cell.attr('title', code);
+      }
+    } else if (category === 'excluded') {
+      iconTextCell($cell, 'j2ha-diag-excluded', 'fa-eye-slash', '{{Exclue}}');
+      $cell.attr('title', M.buildExcludedLabel(row.diagnostic));
+    } else if (category === 'disabled') {
+      iconTextCell($cell, 'j2ha-diag-disabled', null, '—');
+      $cell.attr('title', M.buildDisabledLabel(row.diagnostic));
+    } else {
+      iconTextCell($cell, 'j2ha-diag-unknown', null, '—');
+    }
   }
 
   function maybeShowReassurance(isBlocking) {
@@ -95,76 +137,120 @@
     }
   }
 
+  // Colonne « Type HA » : lien discret « auto » / « imposé (sensor) ». Le sélecteur n'existe qu'après
+  // un clic sur le lien (jamais rendu en permanence, jamais proposé quand le réglage est indisponible).
+  function renderTypeCell(eqId, row, entities, $haCell) {
+    var cmdId = row.jeedom_cmd_id;
+    var $td = $('<td class="mo-td-override"></td>');
+    var selectorState = M.getOverrideSelectorState(row, entities);
+    var forced = row.override_applied;
+    var linkText = forced ? '{{imposé}} (' + (row.effective_ha || '') + ')' : '{{auto}}';
+    var $revertError = $('<span class="mo-revert-error text-danger"></span>').hide();
+
+    if (!selectorState.active) {
+      $td.append($('<span class="j2ha-type-link j2ha-type-unavailable" aria-disabled="true"></span>')
+        .attr('title', selectorState.reason).text(linkText));
+    } else {
+      var $link = $('<a class="j2ha-type-link cursor" role="button" tabindex="0"></a>')
+        .attr('title', '{{Choisir le type HA de cette commande}}').text(linkText);
+      if (forced) {
+        $link.addClass('j2ha-type-forced');
+      }
+      var $spinner = $('<span class="mo-spinner"><i class="fas fa-spinner fa-spin"></i></span>').hide();
+      var opened = false;
+      var openSelector = function () {
+        if (opened) {
+          return;
+        }
+        opened = true;
+        var $select = buildOptions(forced ? row.effective_ha : '', row);
+        $link.hide();
+        $td.append($select);
+        $select.on('change', function () {
+          var type = $(this).val();
+          if (ctx.timers[cmdId]) {
+            clearTimeout(ctx.timers[cmdId]);
+          }
+          if (!type) {
+            revertCommand(eqId, cmdId);
+            return;
+          }
+          ctx.timers[cmdId] = setTimeout(function () {
+            runDryRun(eqId, cmdId, type, $haCell, $spinner);
+          }, DEBOUNCE_MS);
+        });
+        $select.on('keydown', function (event) {
+          if (event && event.key === 'Escape') {
+            $select.remove();
+            $link.show();
+            opened = false;
+          }
+        });
+        $select.focus();
+      };
+      $link.on('click', function (event) {
+        if (event && event.preventDefault) event.preventDefault();
+        openSelector();
+      });
+      $link.on('keydown', function (event) {
+        if (event && (event.key === 'Enter' || event.key === ' ')) {
+          if (event.preventDefault) event.preventDefault();
+          openSelector();
+        }
+      });
+      $td.append($link).append($spinner);
+    }
+    if (forced) {
+      // Story 20-2 (P1, relecture indépendante PR #210) : ce lien ne porte que sur le type de cette seule
+      // commande (route TYPE, 16-8) — jamais sur les réglages de publication de toute l'entité.
+      // Reprise X5d (P3) : en cas d'échec, on réaffiche une cause lisible dans `$revertError` et on
+      // réattache le gestionnaire pour permettre un nouvel essai.
+      var $revertLink = $('<a class="mo-revert-cmd cursor" role="button" tabindex="0"></a>')
+        .attr('title', '{{Retirer le type imposé}}').attr('aria-label', '{{Retirer le type imposé}}')
+        .append('<i class="fas fa-undo"></i>');
+      $td.append($revertLink).append($revertError);
+      var attachRevertHandler = function () {
+        var run = function () {
+          clearRequestError($revertError);
+          $revertLink.prop('disabled', true);
+          revertCommand(eqId, cmdId, $revertLink, $revertError, attachRevertHandler);
+        };
+        $revertLink.one('click', run);
+        $revertLink.off('keydown');
+        onActivationKey($revertLink, function () { if (!$revertLink.prop('disabled')) run(); });
+      };
+      attachRevertHandler();
+    }
+    return $td;
+  }
+
+  // Éléments `role=button` non natifs : Entrée et Espace valent un clic.
+  function onActivationKey($el, handler) {
+    $el.on('keydown', function (event) {
+      var key = event && event.key;
+      if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+        if (event.preventDefault) event.preventDefault();
+        handler();
+      }
+    });
+  }
+
   function renderCommandRow(eqId, row, entities) {
     var cmdId = row.jeedom_cmd_id;
-    var $tr = $('<tr class="mapping-override-cmd"></tr>').attr('data-cmd-id', cmdId);
+    var category = M.classifyCommandCategory(row);
+    var $tr = $('<tr class="mapping-override-cmd"></tr>').attr('data-cmd-id', cmdId).addClass('j2ha-cat-' + category);
 
-    // Colonne 1 : nom de commande.
     $tr.append($('<td class="mo-td-name"></td>').text(row.cmd_name || ('#' + cmdId)));
 
-    // Colonne 2 : generic_type natif Jeedom, lecture seule (D10, jamais écrit).
+    var $haCell = $('<td class="mo-td-diag mo-diag-cell"></td>');
+    renderHaCell($haCell, row, category, entities);
+    $tr.append($haCell);
+
+    // generic_type natif Jeedom, lecture seule (D10, jamais écrit).
     $tr.append($('<td class="mo-td-generic"></td>')
       .append($('<span class="mo-native-value" aria-readonly="true"></span>').text(row.generic_type || '—')));
 
-    // Colonne 3 : override HA — menu déroulant inline + spinner + retour auto.
-    var $tdOverride = $('<td class="mo-td-override"></td>');
-    var $select = buildOptions(row.override_applied ? row.effective_ha : '', row);
-    var selectorState = M.getOverrideSelectorState(row, entities);
-    if (!selectorState.active) {
-      $select.prop('disabled', true).attr('title', selectorState.reason);
-      $tdOverride.attr('title', selectorState.reason);
-    }
-    $tdOverride.append($select);
-    var $spinner = $('<span class="mo-spinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>');
-    $tdOverride.append($spinner);
-    var $revertError = $('<span class="mo-revert-error text-danger" style="display:none;margin-left:6px;"></span>');
-    if (row.override_applied) {
-      $tdOverride.append($('<a class="mo-revert-cmd cursor" title="{{Revenir au type automatique}}"><i class="fas fa-undo"></i></a>'));
-      $tdOverride.append($revertError);
-    }
-    $tr.append($tdOverride);
-
-    // Colonne 4 : diagnostic — « ce qui sera publié » / « ne sera pas publié + raison ».
-    var $diagCell = $('<td class="mo-td-diag mo-diag-cell"></td>');
-    renderDiagnosticCell($diagCell, row.diagnostic, row.covered);
-    $tr.append($diagCell);
-
-    // Débounce dry-run instantané + auto-validation (logique 16.5 inchangée).
-    if (selectorState.active) {
-      $select.on('change', function () {
-        var type = $(this).val();
-        if (ctx.timers[cmdId]) {
-          clearTimeout(ctx.timers[cmdId]);
-        }
-        if (!type) {
-          revertCommand(eqId, cmdId);
-          return;
-        }
-        ctx.timers[cmdId] = setTimeout(function () {
-          runDryRun(eqId, cmdId, type, $diagCell, $spinner);
-        }, DEBOUNCE_MS);
-      });
-    }
-
-    // Story 20-2 (P1, relecture indépendante PR #210) : ce lien ne porte que sur l'override de
-    // TYPE de cette seule commande (route TYPE, 16-8) — jamais sur l'override de publication de
-    // toute l'entité. `revertPublication` (revertPublicationOverride) retirerait exclusion et
-    // forçage de l'entité entière sans confirmation, ce que ce lien ne doit jamais faire (AC5).
-    // Reprise X5d (P3, relecture indépendante PR #210) : en cas d'échec (démon en erreur ou
-    // requête réseau), le lien restait inerte pour le reste de la session (`.off('click')` sans
-    // jamais être réattaché). On réaffiche une cause lisible dans `$revertError` et on réattache
-    // le gestionnaire pour permettre un nouvel essai ; en cas de succès, on recharge l'équipement
-    // comme avant.
-    var $revertLink = $tr.find('.mo-revert-cmd');
-    function attachRevertHandler() {
-      $revertLink.one('click', function () {
-        clearRequestError($revertError);
-        $revertLink.prop('disabled', true);
-        revertCommand(eqId, cmdId, $revertLink, $revertError, attachRevertHandler);
-      });
-    }
-    attachRevertHandler();
-
+    $tr.append(renderTypeCell(eqId, row, entities, $haCell));
     return $tr;
   }
 
@@ -185,14 +271,14 @@
         // NE persiste PAS (un override sur une commande non couverte est un no-op qui, après
         // reload, laisse la cellule vide — la cause exacte du #871).
         // Story 19.3 (P1) : on transmet la vue `auto` (raison réelle éventuelle — exclusion,
-        // inéligibilité amont) plutôt que `null`, pour que `renderDiagnosticCell` puisse
+        // inéligibilité amont) plutôt que `null`, pour que `renderPreviewCell` puisse
         // distinguer « vraiment non couverte » d'une cause amont à afficher (I4).
         if (!covered) {
-          renderDiagnosticCell($diagCell, M.readPreviewAuto(result), false);
+          renderPreviewCell($diagCell, M.readPreviewAuto(result), false);
           return;
         }
         var view = M.readPreviewOverridden(result);
-        renderDiagnosticCell($diagCell, view, true);
+        renderPreviewCell($diagCell, view, true);
         maybeShowReassurance(M.isBlockingDiagnostic(view) && !M.isExcludedDiagnostic(view));
         if (M.shouldAutoValidate(view)) {
           saveOverride(eqId, cmdId, type);
@@ -369,7 +455,7 @@
       ? '{{Commandes qui recevront les ordres : }}' + state.command_names.join(', ')
       : '{{Aucune commande ne recevra d’ordre.}}'));
     if (state.can_confirm) {
-      $wrap.append($('<p></p>').text('{{Cette entité sera publiée dans Home Assistant.}}'));
+      $wrap.append($('<p></p>').text('{{Le forçage publie cette entité dans Home Assistant.}}'));
     } else {
       $wrap.append($('<p class="text-danger"></p>')
         .text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
@@ -397,7 +483,7 @@
     });
     $wrap.append($ul);
     if (state.can_confirm) {
-      $wrap.append($('<p></p>').text('{{Au moins une entité sera publiée dans Home Assistant.}}'));
+      $wrap.append($('<p></p>').text('{{Le forçage publie au moins une entité dans Home Assistant.}}'));
     } else {
       $wrap.append($('<p class="text-danger"></p>').text('{{Le forçage serait refusé : }}' + (state.refusal_reason || '')));
     }
@@ -407,7 +493,7 @@
   function buildEquipmentExcludeContent(entities, commands) {
     var leaving = M.entitiesLeavingHomeAssistant(entities, commands);
     var $wrap = $('<div></div>');
-    $wrap.append($('<p></p>').text('{{Exclure cet équipement de Home Assistant ?}}'));
+    $wrap.append($('<p></p>').text('{{Régler cet équipement sur « Jamais » (exclu de Home Assistant) ?}}'));
     if (leaving.length) {
       $wrap.append($('<p></p>').text('{{Entités qui quitteront Home Assistant : }}'));
       var $ul = $('<ul></ul>');
@@ -437,7 +523,7 @@
       disableButtons($buttons);
       var excludeContent = equipment
         ? buildEquipmentExcludeContent(entities, commands)
-        : '{{Exclure cette entité de Home Assistant ?}}';
+        : '{{Régler cette entité sur « Jamais » (exclue de Home Assistant) ?}}';
       confirmPublicationDialog(excludeContent, save, release);
       return;
     }
@@ -499,6 +585,7 @@
         // Story 22.2 (Q8 A, P3 de 20-3) : le bandeau de santé est relu quelle que soit l'issue
         // (succès, échec ou réponse refusée) — une opération ratée change le dernier résultat affiché.
         refreshBridgeStatus();
+        if (typeof notifyStatesChanged === 'function') notifyStatesChanged();
       })
       .done(function (resp) {
         var error = M.readPublicationRequestError(resp);
@@ -516,75 +603,77 @@
       .fail(function () { showRequestError($errorSlot, '{{Le démon ne répond pas.}}'); });
   }
 
-  // --- Story 20.3 (Q1=A) — compteurs de la pièce ouverte ---
-  // Lus uniquement dans les arbres déjà chargés pour cette pièce (aucune autre lecture) ;
-  // le dénombrement vit dans le module pur (M.summarizeRoom), jamais de décision recalculée.
+  // Un état = un mot + une icône + une teinte (la couleur ne porte jamais seule le sens).
+  var STATE_ICONS = {
+    published: 'fa-check-circle',
+    to_apply: 'fa-clock',
+    blocked: 'fa-exclamation-triangle',
+    excluded: 'fa-eye-slash',
+    disabled: 'fa-pause-circle',
+    nothing_to_publish: 'fa-minus-circle',
+  };
 
-  function roomEquipmentCount() {
-    return ctx.room ? ctx.room.equipments.length : 0;
+  function stateWord(state) {
+    return $('<span class="j2ha-state-word"></span>').addClass('j2ha-state-' + state)
+      .append($('<i class="fas"></i>').addClass(STATE_ICONS[state]))
+      .append($('<span class="j2ha-state-text"></span>').text(' ' + M.EQUIPMENT_STATE_LABELS[state]));
   }
 
-  function readRoomTrees() {
-    var trees = [];
-    var errors = 0;
-    if (!ctx.room) {
-      return { trees: trees, errors: errors };
-    }
-    for (var i = 0; i < ctx.room.equipments.length; i++) {
-      var eqId = ctx.room.equipments[i].eq_id;
-      if (ctx.trees[eqId]) {
-        trees.push(ctx.trees[eqId]);
-      } else if (ctx.treeErrors[eqId]) {
-        errors += 1;
-      }
-    }
-    return { trees: trees, errors: errors };
+  // Ligne de l'équipement déplié : son état (le même mot que le badge) puis ses commandes
+  // « 3 publiées · 1 bloquée · 5 ignorées », lues dans son propre arbre.
+  // { eq_id: enabled } lu dans `j2haRoomsTree` : « Désactivé » prime sur « Exclu » (R3).
+  function roomEnabledById() {
+    var map = {};
+    ((ctx.room && ctx.room.equipments) || []).forEach(function (eq) {
+      map[eq.eq_id] = eq.enabled;
+    });
+    return map;
   }
 
-  function renderRoomCounters() {
-    var $host = $('.modal-j2ha-room .j2ha-room-counters').first();
-    if ($host.length === 0 || !ctx.room) {
+  function roomEqTypeById() {
+    var map = {};
+    ((ctx.room && ctx.room.equipments) || []).forEach(function (eq) {
+      map[eq.eq_id] = eq.eq_type || '';
+    });
+    return map;
+  }
+
+  // Story 25.7 (AC4) : la cause d'exclusion, dite UNE fois, sous le badge. Neutre (gris), jamais un état de plus ; absente
+  // pour tout état autre que « Exclu » (y compris « Désactivé »). Le lien d'action n'écrit rien (Q4).
+  function renderExclusion($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-exclusion').first().empty();
+    var eqId = tree.jeedom_eq_id;
+    var cause = M.exclusionCauseOf(tree, roomEnabledById()[eqId]);
+    if (!cause) {
       return;
     }
-    var read = readRoomTrees();
-    var trees = read.trees;
-    $host.empty();
-    if (trees.length === 0) {
-      // R1-E : si plus aucune lecture ne peut aboutir, un message d'erreur remplace le chargement.
-      if (read.errors >= roomEquipmentCount() && read.errors > 0) {
-        $host.text('{{Compteurs indisponibles : la configuration des équipements de cette pièce n’a pas pu être lue.}}');
-      } else {
-        $host.text('{{Chargement des compteurs…}}');
-      }
-      return;
+    var name = M.exclusionPluginName(roomEqTypeById()[eqId], window.j2haPluginNames);
+    var $notice = $('<div class="j2ha-notice j2ha-notice-neutral" role="status"></div>');
+    $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + M.exclusionCauseText(cause, name, 'sentence')));
+    if (cause.kind === 'plugin') {
+      $notice.append($('<a class="btn btn-default btn-xs j2ha-open-plugin-config" target="_blank" rel="noopener"></a>')
+        .attr('href', PLUGIN_CONFIG_URL).text('{{Ouvrir la configuration du plugin}}'));
     }
-    var labels = M.buildRoomCounterLabels(M.summarizeRoom(trees, ctx.room.equipments.length));
-    $host.append(counterLine(labels.equipments, [labels.unread, labels.presence_unknown]));
-    $host.append(counterLine(labels.commands));
+    $host.append($notice);
   }
 
-  // `extras` : textes neutres ajoutés après les pastilles (lectures manquantes, présence inconnue).
-  function counterLine(items, extras, lineClass, itemClass) {
-    var $line = $('<div></div>').addClass(lineClass || 'j2ha-room-counter-line');
-    items.forEach(function (item) {
-      $line.append($('<span class="label label-default"></span>').addClass(itemClass || 'j2ha-room-counter').text(item));
-    });
-    (extras || []).forEach(function (text) {
-      if (text) {
-        $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(text));
-      }
-    });
-    return $line;
-  }
-
-  // Story 22.2 (Q3 A) : ligne de compteurs de l'équipement déplié, lue dans son propre arbre.
   function renderEquipmentCounters($panel, tree) {
     var $host = $panel.find('.j2ha-eq-counters').first().empty();
     if (!tree) {
       return;
     }
-    var labels = M.buildEquipmentCounterLabels(tree);
-    $host.append(counterLine(labels.items, [labels.presence_unknown], 'j2ha-eq-counter-line', 'j2ha-eq-counter'));
+    var resolved = M.resolveEquipmentState(tree, roomEnabledById()[tree.jeedom_eq_id]);
+    var labels = M.buildEquipmentCounterLabels(tree, roomEnabledById()[tree.jeedom_eq_id]);
+    var $line = $('<div class="j2ha-eq-counter-line"></div>');
+    $line.append(stateWord(resolved.state).addClass('j2ha-eq-head-state'));
+    labels.items.forEach(function (item) {
+      $line.append($('<span class="j2ha-eq-counter"></span>').text(item));
+    });
+    if (labels.presence_unknown) {
+      $line.append($('<span class="text-muted j2ha-room-counter-unread"></span>').text(labels.presence_unknown));
+    }
+    $host.append($line);
   }
 
   // --- Story 20.3 (Q2=A) — actions ciblées déplacées dans la surface ---
@@ -611,31 +700,27 @@
     }
   }
 
-  function updateRoomActionsGating() {
-    var $republish = $('.modal-j2ha-room .j2ha-room-republish').first();
-    var $recreate = $('.modal-j2ha-room .j2ha-room-recreate').first();
-    if (!ctx.room || ($republish.length === 0 && $recreate.length === 0)) {
+  // Gating d'état des actions de pièce, lu dans les entrées agrégées de la pièce (copie unique de la page B) :
+  // aucune lecture, aucune décision recalculée (`M.roomActionState`, R2-3 : actives tant que tout n'est pas lu).
+  function refreshRoomGating(room, entries) {
+    var $republish = $('.j2ha-wv .j2ha-room-republish').first();
+    var $recreate = $('.j2ha-wv .j2ha-room-recreate').first();
+    if (!room || ($republish.length === 0 && $recreate.length === 0)) {
       return;
     }
-    var read = readRoomTrees();
-    var state = M.roomActionState(read.trees, roomEquipmentCount(), read.trees.length + read.errors);
+    var list = Array.isArray(entries) ? entries : [];
+    var state = M.roomActionState(list, room.equipments.length, list.length);
     if ($republish.length > 0) setStateGate($republish, state.can_republish, state.republish_reason);
     if ($recreate.length > 0) setStateGate($recreate, state.can_recreate, state.recreate_reason);
     reapplyBridgeGating();
   }
 
-  function refreshRoomView() {
-    renderRoomCounters();
-    updateRoomActionsGating();
-  }
-
   function isRoomOpen(room) {
-    return !!room && !!ctx.room && ctx.room.object_id === room.object_id
-      && $('.modal-j2ha-room .j2ha-room-surface').length > 0;
+    return !!room && host.isRoomShown(room.object_id) === true;
   }
 
   function showRoomFeedback(message, level) {
-    var $slot = $('.modal-j2ha-room .j2ha-room-feedback').first();
+    var $slot = $('.j2ha-wv .j2ha-room-feedback').first();
     if ($slot.length === 0) {
       return;
     }
@@ -643,8 +728,8 @@
       .addClass('alert-' + level).text(message)).show();
   }
 
-  // R1-D : le résultat d'une action est rendu dans la modale seulement si cette pièce y est
-  // toujours ouverte ; sinon (modale fermée, autre pièce ouverte), dans la zone d'alerte de la page.
+  // R1-D : le résultat d'une action est rendu dans le détail de la vue seulement si cette pièce y est
+  // toujours affichée ; sinon (autre pièce ou vue refermée), dans la zone d'alerte de la page.
   function showActionFeedback(room, message, level) {
     if (isRoomOpen(room)) {
       showRoomFeedback(message, level);
@@ -654,11 +739,16 @@
     $('#div_alert').showAlert({ message: escapeHtml(message), level: level });
   }
 
+  // Story 25.4 : les états de la vue suivent la relecture de la page B ; seul l'arbre de l'équipement sélectionné
+  // de cette pièce est relu après une action de pièce (D2).
   function reloadRoom(room) {
-    if (!isRoomOpen(room)) {
+    if (!isRoomOpen(room) || !ctx.current) {
       return;
     }
-    room.equipments.forEach(function (eq) { reloadEquipment(eq.eq_id); });
+    var eqId = ctx.current.eqId;
+    if (room.equipments.some(function (eq) { return eq.eq_id === eqId; })) {
+      reloadEquipment(eqId);
+    }
   }
 
   function hasValidSelection(selection) {
@@ -685,11 +775,13 @@
           onSuccess();
         }
         refreshBridgeStatus();
+        notifyOverview();
       },
       onError: function (message) {
         showActionFeedback(room, message, 'danger');
         // Story 22.2 (Q8 A, P3 de 20-3) : une action de pièce en échec rafraîchit aussi le bandeau.
         refreshBridgeStatus();
+        notifyOverview();
       },
       onComplete: function () {
         restoreHaActionPendingState($button, pendingState);
@@ -697,15 +789,113 @@
     });
   }
 
-  // Story 22.2 (Q5 A, CC-55) : « Supprimer de Home Assistant » retire seulement ; rien n'est recréé
-  // ensuite. « Republier » remet l'équipement (ou le prochain rescan s'il est publiable).
+  // --- Menu d'actions secondaires « ⋯ » (25.1, AC12) ---
+  // « Republier » puis, séparé par un trait, « Supprimer de Home Assistant… » (rouge dans le menu
+  // seulement). Fermeture : Échap, clic extérieur, choix d'une entrée.
+  var openMenu = null;
+
+  function closeMenu() {
+    if (!openMenu) {
+      return;
+    }
+    openMenu.removeClass('j2ha-menu-open').find('.j2ha-menu-toggle').attr('aria-expanded', 'false');
+    openMenu = null;
+  }
+
+  $(document).on('click', function (event) {
+    if (openMenu && $(event && event.target).closest('.j2ha-menu-wrap').length === 0) {
+      closeMenu();
+    }
+  });
+
+  function enabledMenuItems($menu) {
+    var items = [];
+    $menu.find('.j2ha-menu-item').each(function (index, el) {
+      if (!$(el).prop('disabled')) {
+        items.push(el);
+      }
+    });
+    return items;
+  }
+
+  function buildMenu(label, entries) {
+    var $wrap = $('<span class="j2ha-menu-wrap"></span>');
+    var $toggle = $('<button type="button" class="btn btn-default btn-xs j2ha-menu-toggle" aria-haspopup="menu"></button>')
+      .attr('aria-expanded', 'false').attr('aria-label', label).attr('title', label)
+      .append('<i class="fas fa-ellipsis-h"></i>');
+    var $menu = $('<ul class="j2ha-menu" role="menu"></ul>');
+    var buttons = {};
+    entries.forEach(function (entry) {
+      if (entry.separator) {
+        $menu.append('<li class="j2ha-menu-sep" role="separator"></li>');
+        return;
+      }
+      var $button = $('<button type="button" class="j2ha-menu-item" role="menuitem"></button>')
+        .addClass(entry.className || '').attr('data-ha-action', entry.haAction)
+        .append($('<i class="fas"></i>').addClass(entry.icon))
+        .append(document.createTextNode(entry.label));
+      $button.on('click', function (event) {
+        if (event && event.stopPropagation) event.stopPropagation();
+        closeMenu();
+        entry.onClick($button);
+      });
+      buttons[entry.key] = $button;
+      $menu.append($('<li role="none"></li>').append($button));
+    });
+    function open() {
+      closeMenu();
+      $wrap.addClass('j2ha-menu-open');
+      $toggle.attr('aria-expanded', 'true');
+      openMenu = $wrap;
+      var first = enabledMenuItems($menu)[0];
+      if (first) {
+        $(first).focus();
+      }
+    }
+    $toggle.on('click', function (event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      if (openMenu && openMenu.get(0) === $wrap.get(0)) {
+        closeMenu();
+      } else {
+        open();
+      }
+    });
+    function onKey(event) {
+      var key = event && event.key;
+      if (key === 'Escape') {
+        closeMenu();
+        $toggle.focus();
+        return;
+      }
+      if (key !== 'ArrowDown' && key !== 'ArrowUp') {
+        return;
+      }
+      if (event.preventDefault) event.preventDefault();
+      if (!$wrap.hasClass('j2ha-menu-open')) {
+        open();
+        return;
+      }
+      var items = enabledMenuItems($menu);
+      if (items.length === 0) {
+        return;
+      }
+      var at = items.indexOf(event.target);
+      var next = key === 'ArrowDown' ? (at + 1) % items.length : (at <= 0 ? items.length - 1 : at - 1);
+      $(items[next]).focus();
+    }
+    $toggle.on('keydown', onKey);
+    $menu.on('keydown', onKey);
+    $wrap.append($toggle).append($menu);
+    return { $wrap: $wrap, $toggle: $toggle, $menu: $menu, buttons: buttons };
+  }
+
+  // Story 22.2 (Q5 A, CC-55) : « Supprimer de Home Assistant… » retire seulement ; rien n'est recréé
+  // ensuite. « Republier » remet l'équipement (ou le prochain relevé de Jeedom s'il est publiable).
   var DELETE_WARNING = '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}'
     + '<br>{{Rien n\'est recréé automatiquement : utilisez « Republier » pour remettre dans Home Assistant ce qui a été supprimé.}}';
 
-  function appendEquipmentDeleteButton($host, eqId, eqName) {
-    var $button = $('<button type="button" class="btn btn-danger btn-xs j2ha-eq-recreate" data-ha-action="supprimer"></button>')
-      .text('{{Supprimer de Home Assistant}}');
-    $button.on('click', function () {
+  function equipmentDeleteHandler(eqId, eqName) {
+    return function ($button) {
       if ($button.prop('disabled')) {
         return;
       }
@@ -724,13 +914,46 @@
           restoreHaActionPendingState($button, reservation);
         }
       );
+    };
+  }
+
+  // Story 25.8 : élément qui reprend le focus quand la confirmation d'exclusion se referme. Résolu à l'instant du besoin (le
+  // détail de la pièce est redessiné après une écriture réussie) : le bouton de l'encart « Pièce exclue » s'il vient de là,
+  // sinon le bouton « ⋯ » des actions de la pièce.
+  function roomActionsFocus(origin) {
+    return function () {
+      if (origin === 'notice') {
+        var $notice = $('.j2ha-wv .j2ha-wv-room-excluded .j2ha-room-exclude').first();
+        if ($notice.length > 0) return $notice;
+      }
+      return $('.j2ha-wv .j2ha-room-actions .j2ha-menu-toggle').first();
+    };
+  }
+
+  // Story 25.8 (AC7) : encart neutre du détail d'une pièce exclue, avec « Ne plus exclure la pièce… » (jamais pour « Sans pièce »).
+  function buildRoomExcludedNotice(room) {
+    if (!room || room.object_id <= 0 || room.excluded !== true) {
+      return null;
+    }
+    var $notice = $('<div class="j2ha-notice j2ha-notice-neutral j2ha-wv-room-excluded" role="status"></div>');
+    $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' {{Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant.}}'));
+    var $button = $('<button type="button" class="btn btn-default btn-sm j2ha-room-exclude" data-ha-action="exclure-piece"></button>')
+      .text('{{Ne plus exclure la pièce…}}');
+    $button.on('click', function () {
+      if ($button.prop('disabled')) {
+        return;
+      }
+      if (typeof requestRoomExclusion === 'function') {
+        requestRoomExclusion(room.object_id, room.object_name, false, $button, roomActionsFocus('notice'));
+      }
     });
-    $host.append($button);
-    return $button;
+    $notice.append($button);
+    return $notice;
   }
 
   function buildRoomActions(room) {
-    var $wrap = $('<div class="j2ha-room-actions" style="margin:6px 0;"></div>');
+    var $wrap = $('<div class="j2ha-room-actions"></div>');
     // La convention daemon object_id=0 (« Sans pièce ») n'est pas une pièce adressable par la
     // portée `piece` (le démon la refuse) : actions de pièce indisponibles, actions par
     // équipement conservées.
@@ -739,9 +962,12 @@
         .text('{{Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement.}}'));
       return $wrap;
     }
-    var $republish = $('<button type="button" class="btn btn-default btn-sm j2ha-room-republish" data-ha-action="republier"></button>')
-      .append('<i class="fas fa-upload"></i> ').append(document.createTextNode('{{Republier la pièce}}'));
-    $republish.on('click', function () {
+    // Story 25.4 (AC14) : « Republier la pièce » est un bouton du détail ; « Supprimer de Home Assistant… » reste
+    // dans le menu « ⋯ » (rouge dans le menu seulement). Mêmes écritures qu'en 25.1 (executeHaAction publier /
+    // supprimer, portée `piece`), mêmes confirmations, mêmes réservations de bouton.
+    var $republishButton = $('<button type="button" class="btn btn-default btn-sm j2ha-room-republish" data-ha-action="republier"></button>')
+      .append($('<i class="fas fa-upload"></i>')).append(document.createTextNode('{{Republier la pièce}}'));
+    var onRepublish = function ($republish) {
       if ($republish.prop('disabled')) {
         return;
       }
@@ -759,176 +985,255 @@
           restoreHaActionPendingState($republish, reservation);
         }
       );
-    });
-    var $recreate = $('<button type="button" class="btn btn-danger btn-sm j2ha-room-recreate" data-ha-action="supprimer" style="margin-left:8px;"></button>')
-      .append('<i class="fas fa-trash"></i> ').append(document.createTextNode('{{Supprimer la pièce de Home Assistant}}'));
-    $recreate.on('click', function () {
-      if ($recreate.prop('disabled')) {
-        return;
-      }
-      var reservation = setHaActionPendingState($recreate, '{{Confirmation en cours…}}');
-      confirmHaSupprimerAction(
-        '{{Supprimer de Home Assistant}}',
-        '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + DELETE_WARNING,
-        '{{Supprimer la pièce}}',
-        function () {
-          runHaAction(room, 'supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reservation, function () {
-            reloadRoom(room);
-          });
+    };
+    $republishButton.on('click', function () { onRepublish($republishButton); });
+    // Story 25.8 (AC7) : l'exclusion de la pièce est la première entrée du menu, AVANT le séparateur et « Supprimer de Home
+    // Assistant… ». Elle ne dépend d'aucun état d'équipement : seul le gating du pont (data-ha-action) la grise.
+    var roomExcluded = room.excluded === true;
+    var menu = buildMenu('{{Autres actions}}', [
+      {
+        key: 'exclusion', className: 'j2ha-room-exclude', icon: 'fa-eye-slash', haAction: 'exclure-piece',
+        label: roomExcluded ? '{{Ne plus exclure la pièce…}}' : '{{Exclure la pièce…}}',
+        onClick: function ($item) {
+          if (typeof requestRoomExclusion === 'function') {
+            requestRoomExclusion(room.object_id, room.object_name, !roomExcluded, $item, roomActionsFocus('toggle'));
+          }
         },
-        function () {
-          restoreHaActionPendingState($recreate, reservation);
-        }
-      );
-    });
+      },
+      { separator: true },
+      {
+        key: 'recreate', className: 'j2ha-room-recreate j2ha-menu-danger', icon: 'fa-trash',
+        label: '{{Supprimer de Home Assistant…}}', haAction: 'supprimer',
+        onClick: function ($recreate) {
+          if ($recreate.prop('disabled')) {
+            return;
+          }
+          var reservation = setHaActionPendingState($recreate, '{{Confirmation en cours…}}');
+          confirmHaSupprimerAction(
+            '{{Supprimer de Home Assistant}}',
+            '{{Supprimer}} "' + escapeHtml(room.object_name) + '" {{de Home Assistant : tous les équipements publiés de cette pièce.}}' + DELETE_WARNING,
+            '{{Supprimer la pièce}}',
+            function () {
+              runHaAction(room, 'supprimer', 'piece', [room.object_id], $recreate, '{{Suppression...}}', reservation, function () {
+                reloadRoom(room);
+              });
+            },
+            function () {
+              restoreHaActionPendingState($recreate, reservation);
+            }
+          );
+        },
+      },
+    ]);
     // Actifs par défaut (R2-3) : grisés seulement quand toutes les lectures ont abouti sans erreur
-    // et qu'aucun équipement ne justifie l'action (voir updateRoomActionsGating).
-    $wrap.append($republish).append($recreate);
+    // et qu'aucun équipement ne justifie l'action (voir refreshRoomGating).
+    $wrap.append($republishButton);
+    $wrap.append(menu.$wrap);
     return $wrap;
   }
 
-  // --- Synthèse de publication par équipement (Bloc C) ---
+  // --- État unique de l'équipement (25.1) : badge, encarts de cause, ligne des ignorées ---
 
+  var ALL_STATE_CLASSES = M.EQUIPMENT_STATES.map(function (state) { return 'j2ha-state-' + state; }).join(' ');
+
+  // Le même mot que les compteurs de la pièce et que la ligne de l'équipement déplié :
+  // tous lisent `M.resolveEquipmentState` (aucune règle d'état n'est écrite ici).
   function renderSummary($panel, tree) {
-    var summary = M.summarizePublication(tree);
-    var state = M.publicationSummaryState(summary);
-    var label = M.buildPublicationSummaryLabel(summary);
+    var resolved = M.resolveEquipmentState(tree, roomEnabledById()[tree.jeedom_eq_id]);
+    $panel.removeClass(ALL_STATE_CLASSES).addClass('j2ha-state-' + resolved.state);
 
     var $badge = $panel.find('.j2ha-eq-publish-badge').first();
-    $badge.removeClass('j2ha-publish-ok j2ha-publish-partial j2ha-publish-blocked j2ha-publish-empty j2ha-publish-excluded j2ha-publish-disabled');
-    var icon;
-    if (state === 'publish') {
-      $badge.addClass('j2ha-publish-ok');
-      icon = 'fa-check-circle';
-    } else if (state === 'partial') {
-      $badge.addClass('j2ha-publish-partial');
-      icon = 'fa-adjust';
-    } else if (state === 'blocked') {
-      $badge.addClass('j2ha-publish-blocked');
-      icon = 'fa-exclamation-triangle';
-    } else if (state === 'excluded') {
-      $badge.addClass('j2ha-publish-excluded');
-      icon = 'fa-eye-slash';
-    } else if (state === 'disabled') {
-      $badge.addClass('j2ha-publish-disabled');
-      icon = 'fa-pause-circle';
-    } else {
-      $badge.addClass('j2ha-publish-empty');
-      icon = 'fa-minus-circle';
-    }
+    $badge.removeClass(ALL_STATE_CLASSES).addClass('j2ha-state-' + resolved.state);
     $badge.empty()
-      .append($('<i class="fas"></i>').addClass(icon))
-      .append($('<span></span>').text(' ' + label));
+      .append($('<i class="fas"></i>').addClass(STATE_ICONS[resolved.state]))
+      .append($('<span class="j2ha-state-text"></span>').text(' ' + M.EQUIPMENT_STATE_LABELS[resolved.state]));
 
-    // Ancre vers la première commande bloquante (AC10).
-    var $anchorHost = $panel.find('.j2ha-eq-blocking-anchor').first().empty();
-    if (summary.first_blocking_cmd_id !== null) {
-      var $anchor = $('<a class="cursor j2ha-goto-blocking"><i class="fas fa-arrow-down"></i> {{Voir la première commande bloquante}}</a>');
-      $anchor.on('click', function () {
-        var $target = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + summary.first_blocking_cmd_id + '"]');
-        if ($target.length > 0) {
-          var $scroll = $target.closest('.j2ha-eq-cmdlist');
-          if ($scroll.length > 0) {
-            var top = $target.position() ? $target.position().top : 0;
-            $scroll.scrollTop($scroll.scrollTop() + top - 10);
-          }
-          $target.addClass('j2ha-diag-target-highlight');
-          setTimeout(function () { $target.removeClass('j2ha-diag-target-highlight'); }, 2000);
+    var $mention = $panel.find('.j2ha-eq-blocked-mention').first().empty();
+    if (resolved.blocked_mention > 0) {
+      $mention.append($('<i class="fas fa-exclamation-triangle"></i>'))
+        .append($('<span></span>').text(' ' + resolved.blocked_mention + ' '
+          + (resolved.blocked_mention > 1 ? 'bloquées' : 'bloquée')));
+    }
+    return resolved;
+  }
+
+  function scrollToCommand($panel, cmdId) {
+    var $target = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + cmdId + '"]');
+    if ($target.length > 0) {
+      // Le seul défilement est celui de la fenêtre (AC16) ; `scroll-margin-top` (CSS) réserve la place
+      // de l'en-tête collant.
+      var node = $target.get(0);
+      if (node && typeof node.scrollIntoView === 'function') {
+        node.scrollIntoView({ block: 'center' });
+      }
+      $target.addClass('j2ha-diag-target-highlight');
+      setTimeout(function () { $target.removeClass('j2ha-diag-target-highlight'); }, 2000);
+    }
+  }
+
+  // AC14 : la cause d'un blocage est dite UNE fois par cause distincte, avec le nombre de commandes
+  // concernées et, quand le blocage se corrige dans Jeedom, le lien vers l'écran des types génériques
+  // (ouverture seule : le type natif n'est jamais écrit, D10). L'ancre vers la première commande
+  // bloquée n'a de sens que si toutes les commandes ne le sont pas.
+  function renderNotices($panel, tree) {
+    var $host = $panel.find('.j2ha-eq-notices').first().empty();
+    var groups = M.groupBlockedCauses(tree);
+    var summary = M.summarizePublication(tree);
+    groups.forEach(function (group, index) {
+      var $notice = $('<div class="j2ha-notice j2ha-notice-warn" role="status"></div>');
+      $notice.append($('<i class="fas fa-exclamation-triangle"></i>'));
+      var $text = $('<span class="j2ha-notice-text"></span>').text(' ' + M.buildCauseNoticeText(group));
+      if (group.raw_code) {
+        $text.attr('title', group.raw_code);
+      }
+      $notice.append($text);
+      if (group.generic_types_link) {
+        $notice.append($('<a class="btn btn-default btn-xs j2ha-open-generic-types" target="_blank" rel="noopener"></a>')
+          .attr('href', GENERIC_TYPES_URL).text('{{Ouvrir les types génériques}}'));
+      }
+      if (index === 0 && summary.first_blocking_cmd_id !== null && !M.allCommandsBlocked(tree)) {
+        var $anchor = $('<a class="cursor j2ha-goto-blocking" role="button" tabindex="0"></a>')
+          .append('<i class="fas fa-arrow-down"></i>')
+          .append(document.createTextNode('{{Voir la première commande bloquée}}'));
+        $anchor.on('click', function () { scrollToCommand($panel, summary.first_blocking_cmd_id); });
+        onActivationKey($anchor, function () { scrollToCommand($panel, summary.first_blocking_cmd_id); });
+        $notice.append($anchor);
+      }
+      $host.append($notice);
+    });
+  }
+
+  // AC15 : les commandes sans équivalent HA ne sont pas des lignes du tableau mais une ligne repliée,
+  // dépliable au clic et au clavier.
+  function renderIgnored($host, eqId, tree) {
+    var summary = M.buildIgnoredSummary(tree);
+    if (summary.count === 0) {
+      return;
+    }
+    var listId = 'j2haIgnored_' + eqId;
+    var $wrap = $('<div class="j2ha-ignored"></div>');
+    var $toggle = $('<button type="button" class="j2ha-ignored-toggle" aria-expanded="false"></button>')
+      .attr('aria-controls', listId)
+      .append($('<i class="fas fa-caret-right"></i>'))
+      .append($('<span class="j2ha-ignored-summary"></span>').text(' ' + summary.text));
+    var $list = $('<ul class="j2ha-ignored-list"></ul>').attr('id', listId);
+    summary.items.forEach(function (item) {
+      var $li = $('<li></li>').append($('<span class="j2ha-free-name"></span>').text(item.name));
+      if (item.not_supported_by_plugin) {
+        $li.append(document.createTextNode(' — {{non pris en charge par le plugin}}'));
+      }
+      $list.append($li);
+    });
+    $toggle.on('click', function () {
+      var open = $wrap.hasClass('j2ha-open');
+      $wrap.toggleClass('j2ha-open', !open);
+      $toggle.attr('aria-expanded', open ? 'false' : 'true');
+      $toggle.find('i').first().toggleClass('fa-caret-right', open).toggleClass('fa-caret-down', !open);
+    });
+    $wrap.append($toggle).append($list);
+    $host.append($wrap);
+  }
+
+  // --- Réglage de publication : contrôle segmenté Automatique | Toujours | Jamais (25.1, AC10) ---
+  // Mêmes routes d'écriture qu'avant (exclure / forcer / revenir) ; le contrôle montre la position
+  // courante (jamais déduite de boutons grisés).
+
+  var SEGMENTS = [
+    { key: 'auto', label: '{{Automatique}}' },
+    { key: 'always', label: '{{Toujours}}' },
+    { key: 'never', label: '{{Jamais}}' },
+  ];
+
+  function activeSegmentOf(policy) {
+    if (policy === 'exclude_eqlogic' || policy === 'exclude_command') return 'never';
+    if (policy === 'force_publish') return 'always';
+    return 'auto';
+  }
+
+  // `state` : M.publicationActionState ; les segments non actifs indisponibles portent leur cause.
+  function buildSegmented(ariaLabel, active, state, onSelect, compact) {
+    var $group = $('<div class="j2ha-seg" role="radiogroup"></div>').attr('aria-label', ariaLabel);
+    if (compact) {
+      $group.addClass('j2ha-seg-compact');
+    }
+    var availability = {
+      auto: { allowed: state.can_revert, reason: state.revert_reason },
+      always: { allowed: state.can_force, reason: state.force_reason },
+      never: { allowed: state.can_exclude, reason: state.exclude_reason },
+    };
+    var buttons = [];
+    SEGMENTS.forEach(function (segment) {
+      var isActive = segment.key === active;
+      var $button = $('<button type="button" class="j2ha-seg-btn" role="radio"></button>')
+        .addClass('j2ha-seg-' + segment.key).attr('data-value', segment.key)
+        .attr('aria-checked', isActive ? 'true' : 'false').attr('tabindex', isActive ? '0' : '-1')
+        .text(segment.label);
+      if (isActive) {
+        $button.addClass('j2ha-seg-active');
+      }
+      // Le segment actif n'écrit jamais : le retour en automatique de tout l'équipement est dans le menu
+      // « ⋯ » (« Tout remettre en automatique… »), avec confirmation.
+      var usable = !isActive && availability[segment.key].allowed;
+      if (!isActive && !usable) {
+        $button.prop('disabled', true).addClass('j2ha-seg-disabled').attr('aria-disabled', 'true')
+          .attr('title', availability[segment.key].reason || '{{Cette action est sans effet dans l’état courant.}}');
+      }
+      $button.on('click', function () {
+        if ($button.prop('disabled') || isActive) {
+          return;
         }
+        onSelect(segment.key, $group.find('button'));
       });
-      $anchorHost.append($anchor);
-    }
+      $button.on('keydown', function (event) {
+        var key = event && event.key;
+        var at = buttons.indexOf($button.get(0));
+        var next = -1;
+        // Une position indisponible (bouton désactivé) ne peut pas recevoir le focus : on la saute.
+        function enabledFrom(from, step) {
+          for (var i = 1; i <= buttons.length; i++) {
+            var index = (from + step * i + buttons.length * 2) % buttons.length;
+            if (!$(buttons[index]).prop('disabled')) return index;
+          }
+          return -1;
+        }
+        if (key === 'ArrowRight' || key === 'ArrowDown') next = enabledFrom(at, 1);
+        else if (key === 'ArrowLeft' || key === 'ArrowUp') next = enabledFrom(at, -1);
+        else if (key === 'Home') next = enabledFrom(-1, 1);
+        else if (key === 'End') next = enabledFrom(buttons.length, -1);
+        else return;
+        if (event.preventDefault) event.preventDefault();
+        if (next < 0) {
+          return;
+        }
+        // Roving tabindex : seule la position courante est dans l'ordre de tabulation, les flèches
+        // déplacent le focus sans écrire ; Espace / Entrée valident (clic natif du bouton).
+        buttons.forEach(function (el) { $(el).attr('tabindex', el === buttons[next] ? '0' : '-1'); });
+        $(buttons[next]).focus();
+      });
+      $group.append($('<span class="j2ha-seg-item"></span>').attr('title', $button.attr('title') || '').append($button));
+      buttons.push($button.get(0));
+    });
+    return $group;
   }
 
-  // Story 19.3 (AC6) — badge « override en attente » : signale que la dernière
-  // publication synchronisée (MQTT) ne reflète pas encore l'état courant des overrides
-  // (l'utilisateur doit resynchroniser). Purement informatif, ne bloque aucune action.
-  function renderSyncBadge($panel, tree) {
-    var $badge = $panel.find('.j2ha-eq-sync-badge').first().empty();
-    if (!M.shouldShowOverridePendingBadge(tree)) {
-      return;
-    }
-    $badge.append($('<span class="label label-warning"></span>')
-      .append($('<i class="fas fa-clock"></i> '))
-      .append(document.createTextNode('{{Override en attente — pas encore republié vers Home Assistant}}')));
-  }
-
-  // Renvoie le slot d'erreur créé, pour que l'appelant (ex. le bouton « Appliquer »
-  // équipement) puisse y afficher ses propres erreurs dans le même emplacement visuel.
-  // `entities` (Story 20-2, P2, relecture indépendante PR #210) : l'arbre complet des
-  // entités, utilisé uniquement à la portée équipement pour la confirmation d'exclusion
-  // (AC5) — ignoré à la portée entité.
-  function appendPublicationActions($host, eqId, target, equipment, commands, entities) {
+  // Branche le contrôle segmenté d'une cible (équipement ou entité) sur les écritures existantes.
+  function buildPublicationControl(eqId, target, equipment, commands, entities, $error, compact) {
     var state = M.publicationActionState(target, equipment);
-    var $group = $('<span class="j2ha-publication-actions" style="margin-left:6px;"></span>');
-    var $error = $('<div class="j2ha-publication-error text-danger" style="display:none;margin-top:4px;"></div>');
-    // Story 20-2 (P2, relecture ClaudeBox) : chaque bouton grisé porte SA cause propre
-    // (déjà publiée, déjà forcée, projection invalide, type hors périmètre, pas de mapping,
-    // pas de commande clé) — plus de tooltip générique partagé entre boutons.
-    function button(label, policy, enabled, reason) {
-      var $button = $('<button type="button" class="btn btn-default btn-xs"></button>').text(label);
-      if (!enabled) $button.prop('disabled', true).attr('title', reason || '{{Cette action est sans effet dans l’état courant.}}');
-      $button.on('click', function () { requestPublication(eqId, target, equipment, policy, $group.find('button'), commands, $error, entities); });
-      $group.append($button);
-    }
-    // Story 22.2 (Q4 B, CC-51) : la portée est dite dans chaque libellé — « équipement entier »
-    // ou « cette entité » — et rappelée par l'infobulle du bouton « Revenir ».
-    if (equipment) {
-      button('{{Exclure l’équipement}}', 'exclude', state.can_exclude, state.exclude_reason);
-      button('{{Forcer l’équipement}}', 'force_publish', state.can_force, state.force_reason);
-    } else {
-      button('{{Exclure cette entité}}', 'exclude', state.can_exclude, state.exclude_reason);
-      button('{{Forcer cette entité}}', 'force_publish', state.can_force, state.force_reason);
-    }
-    var $revert = $('<button type="button" class="btn btn-default btn-xs"></button>')
-      .text(equipment ? '{{Revenir au mode automatique (équipement entier)}}' : '{{Revenir au mode automatique (cette entité)}}');
-    if (!state.can_revert) {
-      $revert.prop('disabled', true).attr('title', state.revert_reason || '{{Aucun override de publication à retirer.}}');
-    } else {
-      $revert.attr('title', equipment
-        ? '{{Retire tous les réglages de cet équipement : exclusion, forçage et types Home Assistant des commandes.}}'
-        : '{{Retire l’exclusion, le forçage et les types Home Assistant choisis pour les commandes de cette entité.}}');
-    }
-    $revert.on('click', function () { revertPublication(eqId, equipment ? null : target.override_command_id, $group.find('button'), $error); });
-    $group.append($revert);
-    $host.append($group);
-    $host.append($error);
-    return $error;
-  }
-
-  // Story 20-2 (P2, relecture ClaudeBox AC7) : badge « pas encore appliqué » par entité,
-  // miroir du badge équipement (renderSyncBadge) mais lu sur `entity.override_pending`.
-  function appendEntityPendingBadge($row, entity) {
-    if (!M.shouldShowEntityPendingBadge(entity)) {
-      return;
-    }
-    $row.append($('<span class="label label-warning" style="margin-left:6px;"></span>')
-      .append($('<i class="fas fa-clock"></i> '))
-      .append(document.createTextNode('{{pas encore appliqué}}')));
-  }
-
-  function renderEntities($panel, tree) {
-    var $host = $panel.find('.j2ha-eq-entities').first().empty();
-    for (var i = 0; i < tree.entities.length; i++) {
-      var entity = tree.entities[i];
-      var $row = $('<div class="j2ha-entity-row"></div>');
-      $row.append($('<strong></strong>').text(entity.ha_entity_type || '{{Entité HA}}'));
-      // Libellé statique ; seuls les noms de commande (texte libre Jeedom) sont marqués `j2ha-free-name`.
-      var commandIds = Array.isArray(entity.command_ids) ? entity.command_ids : [];
-      if (commandIds.length === 0) {
-        $row.append(document.createTextNode(' — {{Aucune commande regroupée}}'));
+    var active = activeSegmentOf(target.publication_override || null);
+    var ariaLabel = equipment ? '{{Publication dans Home Assistant}}' : '{{Publication de cette entité}}';
+    return buildSegmented(ariaLabel, active, state, function (key, $buttons) {
+      if (key === 'auto') {
+        revertPublication(eqId, equipment ? null : target.override_command_id, $buttons, $error);
       } else {
-        $row.append(document.createTextNode(' — {{Commandes : }}'));
-        $row.append($('<span class="j2ha-free-name"></span>').text(M.resolveCommandNames(tree.commands, commandIds).join(', ')));
+        requestPublication(eqId, target, equipment, key === 'never' ? 'exclude' : 'force_publish', $buttons, commands, $error, entities);
       }
-      appendEntityPendingBadge($row, entity);
-      // Story 22.2 (Q4 B) : sur un équipement à une seule entité, les actions d'entité qui
-      // doublent celles de l'équipement ne sont pas affichées (mêmes routes, aucune fonction perdue).
-      if (!M.entityActionsDuplicateEquipment(tree, entity)) {
-        appendPublicationActions($row, tree.jeedom_eq_id, entity, false, tree.commands);
-      }
-      $host.append($row);
-    }
+    }, compact);
+  }
+
+  // Story 20-2 (P2, relecture ClaudeBox AC7) : une entité dont le réglage n'est pas encore appliqué
+  // porte l'état « À appliquer » (jamais pour un équipement jamais synchronisé, voir D1).
+  function entityIsPendingForDisplay(tree, entity) {
+    return M.shouldShowEntityPendingBadge(entity) && tree.sync_status.synced_should_publish !== null;
   }
 
   // --- Chargement paresseux d'un équipement (un GET par équipement déplié) ---
@@ -940,15 +1245,192 @@
       delete ctx.trees[eqId];
       ctx.treeErrors[eqId] = true;
     }
-    $panel.find('.j2ha-eq-actions').first().empty();
-    $panel.find('.j2ha-eq-entities').first().empty();
+    $panel.removeClass(ALL_STATE_CLASSES);
+    $panel.find('.j2ha-eq-controls').first().empty();
     $panel.find('.j2ha-eq-cmdlist').first().empty();
-    $panel.find('.j2ha-eq-sync-badge').first().empty();
+    $panel.find('.j2ha-eq-notices').first().empty();
+    $panel.find('.j2ha-eq-exclusion').first().empty();
     $panel.find('.j2ha-eq-counters').first().empty();
-    $panel.find('.j2ha-eq-blocking-anchor').first().empty();
+    $panel.find('.j2ha-eq-blocked-mention').first().empty();
     $panel.find('.j2ha-eq-publish-badge').first().empty();
     $panel.find('.j2ha-eq-status').first().text(message);
-    refreshRoomView();
+  }
+
+  // Groupes du tableau : une entité = un groupe (ses commandes, dans l'ordre de l'entité). Une commande
+  // portée par plusieurs entités n'apparaît que dans la première. Les commandes ignorées en sont exclues
+  // (ligne repliée) ; celles qu'aucune entité ne porte forment le groupe « sans entité ».
+  function groupCommandRows(tree) {
+    var rows = tree.commands.filter(function (row) { return M.classifyCommandCategory(row) !== 'ignored'; });
+    var placed = {};
+    var groups = tree.entities.map(function (entity) {
+      var members = [];
+      (entity.command_ids || []).forEach(function (id) {
+        rows.forEach(function (row) {
+          if (row.jeedom_cmd_id === id && !placed[id]) {
+            placed[id] = true;
+            members.push(row);
+          }
+        });
+      });
+      return { entity: entity, rows: members };
+    });
+    var rest = rows.filter(function (row) { return !placed[row.jeedom_cmd_id]; });
+    return { groups: groups, rest: rest };
+  }
+
+  // En-tête de groupe (équipement à plusieurs entités) : domaine traduit + terme technique en petit,
+  // effectif, état « À appliquer » de l'entité, contrôle segmenté compact.
+  function renderGroupHead(eqId, tree, group) {
+    var entity = group.entity;
+    var domain = M.translateHaDomain(entity.ha_entity_type);
+    var $td = $('<td class="j2ha-group-cell" colspan="4"></td>');
+    var $name = $('<span class="j2ha-group-name"></span>').append($('<strong></strong>').text(domain.label));
+    if (domain.technical) {
+      $name.append(document.createTextNode(' ')).append($('<small class="j2ha-tech"></small>').text(domain.technical));
+    }
+    $td.append($name);
+    $td.append($('<span class="j2ha-group-count text-muted"></span>')
+      .text(' ' + group.rows.length + ' ' + (group.rows.length > 1 ? '{{commandes}}' : '{{commande}}')));
+    if (entityIsPendingForDisplay(tree, entity)) {
+      $td.append($('<span class="j2ha-chip j2ha-chip-to_apply j2ha-entity-pending"></span>')
+        .append($('<i class="fas fa-clock"></i>')).append(document.createTextNode(' {{À appliquer}}')));
+    }
+    var $error = $('<div class="j2ha-publication-error text-danger"></div>').hide();
+    $td.append(buildPublicationControl(eqId, entity, false, tree.commands, undefined, $error, true));
+    $td.append($error);
+    return $('<tr class="j2ha-group-head"></tr>').attr('data-entity-type', entity.ha_entity_type || '').append($td);
+  }
+
+  function renderCommandTable($list, eqId, tree) {
+    var $table = $('<table class="table table-condensed j2ha-cmd-table"></table>');
+    var $thead = $('<thead></thead>');
+    $thead.append($('<tr></tr>')
+      .append($('<th class="mo-th-name"></th>').text('{{Commande}}'))
+      .append($('<th class="mo-th-diag"></th>').text('{{Dans Home Assistant}}'))
+      .append($('<th class="mo-th-generic"></th>').text('{{Type Jeedom}}'))
+      .append($('<th class="mo-th-override"></th>').text('{{Type HA}}')));
+    $table.append($thead);
+    var $tbody = $('<tbody></tbody>');
+    var grouped = groupCommandRows(tree);
+    // L'en-tête de groupe n'existe que s'il porte une information : plusieurs entités, ou une entité
+    // unique dont le réglage de publication (posé sur sa commande) n'est pas celui de l'équipement.
+    var withHeads = tree.entities.length > 1
+      || (tree.entities.length === 1 && !M.entityActionsDuplicateEquipment(tree, tree.entities[0]));
+    grouped.groups.forEach(function (group) {
+      if (withHeads) {
+        $tbody.append(renderGroupHead(eqId, tree, group));
+      }
+      group.rows.forEach(function (row) { $tbody.append(renderCommandRow(eqId, row, tree.entities)); });
+    });
+    if (grouped.rest.length > 0) {
+      if (withHeads) {
+        $tbody.append($('<tr class="j2ha-group-head"></tr>').append(
+          $('<td class="j2ha-group-cell" colspan="4"></td>').append($('<strong></strong>').text('{{Sans entité Home Assistant}}'))));
+      }
+      grouped.rest.forEach(function (row) { $tbody.append(renderCommandRow(eqId, row, tree.entities)); });
+    }
+    $table.append($tbody);
+    $list.append($table);
+  }
+
+  // « Tout remettre en automatique… » : même route que l'ancien clic sur « Automatique » actif
+  // (revertPublicationOverride sans commande), désormais derrière une confirmation qui liste ce qui
+  // sera retiré : exclusions, forçages, types Home Assistant imposés.
+  function revertAllHandler(eqId, normalized, $button, $error) {
+    if ($button.prop('disabled')) {
+      return;
+    }
+    var entities = normalized.entities || [];
+    var exclusions = entities.filter(function (e) { return e.publication_override === 'exclude_eqlogic' || e.publication_override === 'exclude_command'; }).length;
+    var forcings = entities.filter(function (e) { return e.publication_override === 'force_publish'; }).length;
+    var types = normalized.commands.filter(function (c) { return c.override_applied; }).length;
+    var eqOverride = normalized.equipment_publication_override || null;
+    var $content = $('<div></div>');
+    $content.append($('<p></p>').text('{{Tout remettre en automatique : les réglages manuels de cet équipement seront retirés.}}'));
+    var $list = $('<ul></ul>');
+    if (eqOverride === 'exclude') $list.append($('<li></li>').text('{{Exclusion de l’équipement}}'));
+    if (eqOverride === 'force_publish') $list.append($('<li></li>').text('{{Forçage de l’équipement}}'));
+    if (exclusions > 0) $list.append($('<li></li>').text('{{Exclusions d’entités}} : ' + exclusions));
+    if (forcings > 0) $list.append($('<li></li>').text('{{Forçages d’entités}} : ' + forcings));
+    if (types > 0) $list.append($('<li></li>').text('{{Types Home Assistant imposés}} : ' + types));
+    $content.append($list);
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    confirmPublicationDialog($content, function () {
+      restoreHaActionPendingState($button, reservation);
+      revertPublication(eqId, null, $button, $error);
+    }, function () {
+      restoreHaActionPendingState($button, reservation);
+    });
+  }
+
+  // Story 25.8 (D1, Q10) : une pièce exclue prime sur « Toujours ». Les segments grisés « Toujours » / « Jamais » d'un équipement
+  // exclu PAR SA PIÈCE le disent (cause lue par `exclusionCauseOf`, 25.7) ; `publicationActionState` (25.1) n'est pas modifié et un
+  // réglage « Toujours » déjà posé reste la position courante (aucune écriture ici).
+  var ROOM_PRECEDENCE_REASON = '{{Pièce exclue : elle prime sur ce réglage.}}';
+
+  function applyRoomExclusionPrecedence($group, tree, eqId) {
+    var cause = M.exclusionCauseOf(tree, roomEnabledById()[eqId]);
+    if (!cause || cause.kind !== 'piece') {
+      return;
+    }
+    $group.find('.j2ha-seg-btn').each(function (_i, el) {
+      var $button = $(el);
+      var key = $button.attr('data-value');
+      if ((key === 'always' || key === 'never') && $button.hasClass('j2ha-seg-disabled')) {
+        $button.attr('title', ROOM_PRECEDENCE_REASON);
+        $button.closest('.j2ha-seg-item').attr('title', ROOM_PRECEDENCE_REASON);
+      }
+    });
+  }
+
+  // En-tête collant de l'équipement déplié : réglage de publication (contrôle segmenté), « Appliquer »
+  // seulement quand un réglage attend, menu « ⋯ » (Republier, Supprimer de Home Assistant…).
+  function renderControls($panel, eqId, normalized, resolved) {
+    var $host = $panel.find('.j2ha-eq-controls').first().empty();
+    // X6b (P2, relecture indépendante PR #215) : la cible équipement est construite par
+    // `equipmentPublicationTarget` (lit `eligible` + `equipment_publication_override` de l'arbre, en
+    // plus du veto porté par les entités/commandes).
+    var $error = $('<div class="j2ha-publication-error text-danger"></div>').hide();
+    var target = M.equipmentPublicationTarget(normalized);
+    $host.append($('<span class="j2ha-control-label"></span>').text('{{Publication dans Home Assistant}}'));
+    var $publicationControl = buildPublicationControl(eqId, target, true, normalized.commands, normalized.entities, $error, false);
+    applyRoomExclusionPrecedence($publicationControl, normalized, eqId);
+    $host.append($publicationControl);
+    var actionState = M.equipmentActionState(normalized);
+    var eqName = normalized.eq_name || $panel.find('.j2ha-eq-name').first().text();
+    if (resolved.state === 'to_apply') {
+      // Même route que « Republier » (executeHaAction publier/equipement), même rechargement.
+      var $apply = $('<button type="button" class="btn btn-primary btn-xs j2ha-eq-apply" data-ha-action="republier"></button>')
+        .text('{{Appliquer}}');
+      $apply.on('click', function () { applyEquipment(eqId, $apply, $error); });
+      $host.append($apply);
+    }
+    var menu = buildMenu('{{Autres actions}}', [
+      {
+        key: 'republish', className: 'j2ha-eq-republish', icon: 'fa-upload', label: '{{Republier}}', haAction: 'republier',
+        onClick: function ($button) { applyEquipment(eqId, $button, $error); },
+      },
+      {
+        key: 'revert', className: 'j2ha-eq-revert-all', icon: 'fa-undo', label: '{{Tout remettre en automatique…}}',
+        haAction: 'revert', onClick: function ($button) { revertAllHandler(eqId, normalized, $button, $error); },
+      },
+      { separator: true },
+      {
+        key: 'recreate', className: 'j2ha-eq-recreate j2ha-menu-danger', icon: 'fa-trash',
+        label: '{{Supprimer de Home Assistant…}}', haAction: 'supprimer', onClick: equipmentDeleteHandler(eqId, eqName),
+      },
+    ]);
+    // Un réglage en attente reste applicable (y compris une exclusion à appliquer) ; hors de ce cas,
+    // un équipement désactivé ou exclu n'a rien à republier.
+    setStateGate(menu.buttons.republish, resolved.state === 'to_apply' || actionState.can_republish, actionState.republish_reason);
+    setStateGate(menu.buttons.recreate, actionState.can_recreate, actionState.recreate_reason);
+    var revertState = M.publicationActionState(target, true);
+    setStateGate(menu.buttons.revert, revertState.can_revert, revertState.revert_reason);
+    $host.append(menu.$wrap);
+    $host.append($error);
+    // Les boutons viennent d'être ajoutés après l'ouverture de la vue : ils suivent le même gating
+    // que les boutons globaux (pont indisponible, relecture en cours), sinon ils resteraient actifs.
+    reapplyBridgeGating();
   }
 
   function renderEquipmentTree($panel, tree) {
@@ -960,90 +1442,67 @@
       return;
     }
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
-    var $actions = $panel.find('.j2ha-eq-actions').first().empty();
 
     ctx.trees[eqId] = normalized;
     delete ctx.treeErrors[eqId];
-    refreshRoomView();
 
-    renderSyncBadge($panel, normalized);
+    var resolved = renderSummary($panel, normalized);
+    renderExclusion($panel, normalized);
     renderEquipmentCounters($panel, normalized);
-    renderEntities($panel, normalized);
-
-    // X6b (P2, relecture indépendante PR #215) : la cible équipement est construite par
-    // `equipmentPublicationTarget` (lit `eligible` + `equipment_publication_override` de
-    // l'arbre, en plus du veto porté par les entités/commandes) — remplace la construction
-    // inline qui ignorait les deux champs additifs du démon sur un équipement inéligible ou
-    // sans entité (AC1/AC6).
-    //
-    // Fusion des deux boutons « Revenir au mode automatique » de l'équipement (le lien CC-19
-    // historique, affiché sur un override de type, et celui des actions de publication) :
-    // un seul bouton, actif s'il existe un override de type OU de publication. Il appelle
-    // `revertPublicationOverride` sans `cmdId` — cette route purge déjà les deux catégories
-    // d'override pour tout l'équipement (`_handle_publication_override_revert`, CC-19).
-    var $equipmentError = appendPublicationActions($actions, eqId, M.equipmentPublicationTarget(normalized),
-      true, normalized.commands, normalized.entities);
-    // R1-A (AC4, Q2=A) : la publication ciblée d'un équipement reste toujours disponible, sans
-    // bouton de plus : « Appliquer » (warning) quand un override attend d'être appliqué,
-    // « Republier » (default) sinon. Même route, même rechargement.
-    var actionState = M.equipmentActionState(normalized);
-    var pending = normalized.entities.some(function (entity) { return entity.override_pending; });
-    var $apply = $('<button type="button" class="btn btn-xs j2ha-eq-republish" data-ha-action="republier" style="margin-left:6px;"></button>')
-      .addClass(pending ? 'btn-warning' : 'btn-default')
-      .text(pending ? '{{Appliquer}}' : '{{Republier}}');
-    $apply.on('click', function () { applyEquipment(eqId, $apply, $equipmentError); });
-    // Un override en attente (y compris une exclusion à appliquer) reste applicable ; hors de ce cas,
-    // un équipement désactivé ou exclu n'a rien à republier.
-    setStateGate($apply, pending || actionState.can_republish, actionState.republish_reason);
-    $actions.append($apply);
-    var $recreate = appendEquipmentDeleteButton($actions, eqId, normalized.eq_name || $panel.find('.j2ha-eq-name').first().text());
-    setStateGate($recreate, actionState.can_recreate, actionState.recreate_reason);
-    // Les boutons viennent d'être ajoutés après l'ouverture de la modale : ils suivent le même gating
-    // que les boutons globaux (pont indisponible, rescan en cours), sinon ils resteraient actifs.
-    reapplyBridgeGating();
+    renderNotices($panel, normalized);
+    renderControls($panel, eqId, normalized, resolved);
 
     if (!normalized.mapped && normalized.commands.length === 0) {
-      $list.append($('<div class="text-muted" style="padding:8px;"></div>')
+      $list.append($('<div class="text-muted j2ha-empty"></div>')
         .text('{{Aucune commande à configurer pour cet équipement.}}'));
-      renderSummary($panel, normalized);
       return;
     }
 
-    var $table = $('<table class="table table-condensed j2ha-cmd-table"></table>');
-    var $thead = $('<thead></thead>');
-    $thead.append($('<tr></tr>')
-      .append($('<th class="mo-th-name"></th>').text('{{Commande}}'))
-      .append($('<th class="mo-th-generic"></th>').text('{{Type Jeedom}}'))
-      .append($('<th class="mo-th-override"></th>').text('{{Override HA}}'))
-      .append($('<th class="mo-th-diag"></th>').text('{{Diagnostic}}')));
-    $table.append($thead);
-    var $tbody = $('<tbody></tbody>');
-    for (var i = 0; i < normalized.commands.length; i++) {
-      $tbody.append(renderCommandRow(eqId, normalized.commands[i], normalized.entities));
+    renderCommandTable($list, eqId, normalized);
+    renderIgnored($list, eqId, normalized);
+  }
+
+  function isCurrent(eqId) {
+    return !!ctx.current && ctx.current.eqId === eqId;
+  }
+
+  // UNIQUE site de lecture d'un arbre unitaire (Story 25.4, AC6, D3) : appelée à la SÉLECTION d'un équipement et
+  // après une écriture sur lui, jamais pour remplir l'arbre ni à la sélection d'une pièce. Une lecture en vol pour
+  // le même équipement n'est pas doublée (`again` : une écriture a eu lieu pendant la lecture, une relecture suit) ;
+  // une réponse qui arrive après que la sélection a changé est ignorée, sans erreur et sans toucher l'affichage.
+  function loadEquipment(eqId, again) {
+    if (!isCurrent(eqId)) {
+      return;
     }
-    $table.append($tbody);
-    $list.append($table);
-
-    renderSummary($panel, normalized);
-  }
-
-  function roomHasEquipment(eqId) {
-    return !!ctx.room && ctx.room.equipments.some(function (eq) { return eq.eq_id === eqId; });
-  }
-
-  function loadEquipment($panel, eqId) {
-    var $status = $panel.find('.j2ha-eq-status').first();
-    $status.text('{{Chargement…}}');
+    ctx.current.$panel.find('.j2ha-eq-status').first().text('{{Chargement…}}');
+    if (ctx.reads[eqId]) {
+      if (again) {
+        ctx.reads[eqId].again = true;
+      }
+      return;
+    }
+    var slot = { again: false };
+    ctx.reads[eqId] = slot;
+    // Rend `true` si une relecture suit (l'écriture est postérieure à cette lecture) : rien n'est alors rendu.
+    function settle() {
+      delete ctx.reads[eqId];
+      if (slot.again && isCurrent(eqId)) {
+        loadEquipment(eqId);
+        return true;
+      }
+      return false;
+    }
     $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'getMappingOverrides', eqId: eqId },
       dataType: 'json',
       success: function (data) {
-        // Réponse tardive d'une pièce refermée : ignorée (elle ne doit pas toucher le cache d'une autre pièce).
-        if (!roomHasEquipment(eqId)) {
+        if (settle() || !isCurrent(eqId)) {
           return;
         }
+        var $panel = ctx.current.$panel;
+        var $status = $panel.find('.j2ha-eq-status').first();
         var result = data && data.result ? data.result : data;
         var payload = result && result.payload ? result.payload : result;
         var failed = (data && data.state && data.state !== 'ok')
@@ -1057,140 +1516,115 @@
         renderEquipmentTree($panel, payload);
       },
       error: function () {
-        if (!roomHasEquipment(eqId)) {
+        if (settle() || !isCurrent(eqId)) {
           return;
         }
-        markTreeError($panel, eqId, '{{Impossible de charger la configuration HA (daemon indisponible).}}');
+        markTreeError(ctx.current.$panel, eqId, '{{Impossible de charger la configuration HA (démon indisponible).}}');
       },
     });
   }
 
+  // Story 25.3 (AC6, Q7) : une écriture terminée peut avoir changé les chiffres de la page derrière la vue ;
+  // la relecture (sans refresh, coalescée) est portée par la page principale, ici on la signale seulement.
+  function notifyOverview() {
+    if (typeof notifyStatesChanged === 'function') {
+      notifyStatesChanged();
+    }
+  }
+
   function reloadEquipment(eqId) {
-    var $panel = $('.j2ha-eq-panel[data-eq-id="' + eqId + '"]');
-    if ($panel.length > 0) {
-      $panel.data('loaded', true);
-      loadEquipment($panel, eqId);
+    notifyOverview();
+    if (isCurrent(eqId)) {
+      loadEquipment(eqId, true);
     }
   }
 
-  // --- Modale par pièce : accordéon des équipements ---
+  // --- Détail d'un équipement (Story 25.4) : le panneau remplace l'ancien accordéon de la fenêtre de pièce ---
 
-  function buildRoomModalHtml(room) {
-    var $wrap = $('<div class="j2ha-room-surface"></div>');
-    $wrap.append($('<div id="j2haSurface_reassurance" class="alert alert-warning" role="status" aria-live="polite" style="display:none;">' +
-      '<i class="fas fa-shield-alt"></i> {{Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha.}}</div>'));
-
-    $wrap.append($('<div class="j2ha-room-counters text-muted" role="status" aria-live="polite" style="margin:6px 0;"></div>'));
-    $wrap.append(buildRoomActions(room));
-    $wrap.append($('<div class="j2ha-room-feedback" role="status" style="display:none;margin:6px 0;"></div>'));
-
-    var $accordion = $('<div class="panel-group j2ha-eq-accordion" role="tablist" aria-multiselectable="true"></div>');
-    for (var i = 0; i < room.equipments.length; i++) {
-      var eq = room.equipments[i];
-      var panelId = 'j2haEqBody_' + room.object_id + '_' + eq.eq_id;
-      var headId = 'j2haEqHead_' + room.object_id + '_' + eq.eq_id;
-
-      var $panel = $('<div class="panel panel-default j2ha-eq-panel"></div>')
-        .attr('data-eq-id', eq.eq_id);
-      if (!eq.enabled) {
-        $panel.addClass('j2ha-eq-disabled');
-      }
-
-      var $head = $('<div class="panel-heading" role="tab"></div>').attr('id', headId);
-      var $toggle = $('<a class="j2ha-eq-toggle" role="button" data-toggle="collapse"></a>')
-        .attr('href', '#' + panelId)
-        .attr('aria-expanded', 'false')
-        .attr('aria-controls', panelId);
-      $toggle.append($('<span class="j2ha-eq-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
-      if (!eq.enabled) {
-        $toggle.append($('<span class="text-muted"></span>').text(' {{(désactivé dans Jeedom)}}'));
-      }
-      $toggle.append($('<span class="j2ha-eq-publish-badge label"></span>'));
-      $head.append($('<h4 class="panel-title"></h4>').append($toggle));
-      $panel.append($head);
-
-      var $collapse = $('<div class="panel-collapse collapse" role="tabpanel"></div>')
-        .attr('id', panelId)
-        .attr('aria-labelledby', headId);
-      var $body = $('<div class="panel-body"></div>');
-      $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
-      $body.append($('<div class="j2ha-eq-sync-badge" style="margin:4px 0;"></div>'));
-      $body.append($('<div class="j2ha-eq-counters text-muted" role="status" style="margin:4px 0;"></div>'));
-      $body.append($('<div class="j2ha-eq-blocking-anchor" style="margin:4px 0;"></div>'));
-      $body.append($('<div class="j2ha-eq-actions" style="margin:4px 0;"></div>'));
-      $body.append($('<div class="j2ha-eq-entities" style="margin:4px 0;"></div>'));
-      $body.append($('<div class="j2ha-eq-cmdlist panel-group" role="tablist" aria-multiselectable="true" style="max-height:calc(100vh - 320px); overflow-y:auto;"></div>'));
-      $collapse.append($body);
-      $panel.append($collapse);
-      $accordion.append($panel);
+  // En-tête collant (titre, badge d'état, mention des bloquées, contrôles) puis corps : état de chargement,
+  // compteurs, encart de cause, tableau des commandes. Mêmes classes qu'en 25.1 (tests, gate, scrollToCommand),
+  // sans accordéon : `.j2ha-eq-toggle` et `.panel-collapse` n'existent plus.
+  function buildEquipmentPanel(eq) {
+    var $panel = $('<div class="j2ha-eq-panel j2ha-eq-open"></div>').attr('data-eq-id', eq.eq_id);
+    if (!eq.enabled) {
+      $panel.addClass('j2ha-eq-disabled');
     }
-    $wrap.append($accordion);
-    return $wrap;
+    var $head = $('<div class="j2ha-eq-head"></div>');
+    var $title = $('<h3 class="j2ha-eq-title j2ha-wv-title" tabindex="-1"></h3>');
+    $title.append($('<span class="j2ha-eq-name j2ha-free-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
+    if (!eq.enabled) {
+      $title.append($('<span class="text-muted"></span>').text(' {{(désactivé dans Jeedom)}}'));
+    }
+    $title.append($('<span class="j2ha-eq-publish-badge j2ha-badge"></span>'));
+    $title.append($('<span class="j2ha-eq-blocked-mention"></span>'));
+    $head.append($title);
+    $head.append($('<div class="j2ha-eq-controls"></div>'));
+    var $body = $('<div class="j2ha-eq-body"></div>');
+    $body.append($('<div class="j2ha-eq-status text-muted"></div>'));
+    $body.append($('<div class="j2ha-eq-exclusion"></div>'));
+    $body.append($('<div class="j2ha-eq-counters text-muted" role="status"></div>'));
+    $body.append($('<div class="j2ha-eq-notices"></div>'));
+    $body.append($('<div class="j2ha-eq-cmdlist"></div>'));
+    $panel.append($head).append($body);
+    return $panel;
   }
 
-  function openRoom(objectId) {
-    var room = findRoom(objectId);
-    if (!room) {
-      return;
-    }
-    // Réinitialise l'état réassurance par pièce (une fois par ouverture).
-    ctx.reassurance = M.initReassuranceState();
+  function clearEquipment() {
+    closeMenu();
+    Object.keys(ctx.timers).forEach(function (cmdId) {
+      if (ctx.timers[cmdId]) clearTimeout(ctx.timers[cmdId]);
+    });
+    Object.keys(ctx.xhr).forEach(function (cmdId) {
+      if (ctx.xhr[cmdId] && typeof ctx.xhr[cmdId].abort === 'function') ctx.xhr[cmdId].abort();
+    });
     ctx.timers = {};
     ctx.xhr = {};
     ctx.trees = {};
     ctx.treeErrors = {};
-    ctx.room = room;
-
-    var $content = buildRoomModalHtml(room);
-
-    bootbox.dialog({
-      // « Sans pièce » est un libellé statique ; le nom d'une vraie pièce est un nom libre.
-      title: '<i class="fas fa-home"></i> ' + (room.object_id > 0
-        ? '<span class="j2ha-free-name">' + escapeHtml(room.object_name) + '</span>'
-        : escapeHtml(room.object_name)),
-      message: $content,
-      size: 'large',
-      className: 'modal-j2ha-room',
-      onEscape: true,
-      backdrop: true,
-    });
-    $('.modal-j2ha-room .modal-dialog').css('width', '90%').css('max-width', '1100px');
-    renderRoomCounters();
-    // Les boutons d'action créés après le chargement de la page suivent le même gating que
-    // les boutons globaux (pont indisponible, rescan en cours).
-    if (typeof applyHAGating === 'function') {
-      applyHAGating(window.jeedom2haLastBridgeStatus || null);
-    }
-
-    // Garde-fou dépliage : si un panneau n'a pas encore été chargé (ex. échec
-    // réseau initial), on le charge à la première ouverture.
-    $content.on('shown.bs.collapse', '.j2ha-eq-panel > .panel-collapse', function () {
-      var $panel = $(this).closest('.j2ha-eq-panel');
-      if ($panel.data('loaded')) {
-        return;
-      }
-      $panel.data('loaded', true);
-      loadEquipment($panel, parseInt($panel.attr('data-eq-id'), 10));
-    });
-
-    // Synthèse de publication immédiate (AC9) : on charge le diagnostic de chaque
-    // équipement de la pièce dès l'ouverture pour que le badge « sera / ne sera
-    // pas publié » soit visible sans déplier l'accordéon. La lazyness reste au
-    // niveau page/pièce (AC5) : jamais les 290 équipements, seulement ceux de la
-    // pièce ouverte (une poignée), et le fetch n'a lieu qu'après ouverture.
-    $content.find('.j2ha-eq-panel').each(function () {
-      var $panel = $(this);
-      $panel.data('loaded', true);
-      loadEquipment($panel, parseInt($panel.attr('data-eq-id'), 10));
-    });
+    ctx.current = null;
   }
 
-  // Point d'entrée appelé par l'onclick inline des cartes pièce (pattern Homebridge éprouvé :
-  // objectDisplayCard + onclick, jamais eqLogicDisplayCard que le core Jeedom hijacke sur la page plugin).
-  window.j2haOpenRoom = function (objectId) {
-    var id = parseInt(objectId, 10);
-    if (!isNaN(id)) {
-      openRoom(id);
+  // Affiche le détail de l'équipement `eq` ({ eq_id, eq_name, enabled }) de la pièce `room` dans `$host` et lit son
+  // arbre unitaire (une lecture, D3). Rend le panneau.
+  function openEquipment($host, room, eq) {
+    clearEquipment();
+    ctx.room = room;
+    var $panel = buildEquipmentPanel(eq);
+    ctx.current = { eqId: eq.eq_id, $panel: $panel };
+    $host.empty().append($panel);
+    loadEquipment(eq.eq_id);
+    return $panel;
+  }
+
+  // Les états suivent la relecture de la page B (jamais un recalcul local) : badge, mention et compteurs de l'équipement
+  // affiché sont relus dans l'entrée agrégée (mêmes fonctions que l'arbre unitaire, parité prouvée en 25.2).
+  function refreshEquipmentState(entry) {
+    if (!ctx.current || !entry || entry.jeedom_eq_id !== ctx.current.eqId || !ctx.trees[ctx.current.eqId]) {
+      return;
     }
+    renderSummary(ctx.current.$panel, entry);
+    renderExclusion(ctx.current.$panel, entry);
+    renderEquipmentCounters(ctx.current.$panel, entry);
+  }
+
+  // Réassurance Homebridge : réinitialisée à l'entrée dans la vue.
+  function resetSession() {
+    ctx.reassurance = M.initReassuranceState();
+    $('#j2haSurface_reassurance').hide();
+  }
+
+  window.Jeedom2haSurface = {
+    openEquipment: openEquipment,
+    clearEquipment: clearEquipment,
+    refreshEquipmentState: refreshEquipmentState,
+    refreshRoomGating: refreshRoomGating,
+    buildRoomActions: buildRoomActions,
+    buildRoomExcludedNotice: buildRoomExcludedNotice,
+    applyEquipment: applyEquipment,
+    stateWord: stateWord,
+    resetSession: resetSession,
+    setRoom: function (room) { ctx.room = room; },
+    setHost: function (next) { host = next; },
+    genericTypesUrl: GENERIC_TYPES_URL,
   };
 })();

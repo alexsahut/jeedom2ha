@@ -225,7 +225,7 @@ $ cat plugin_info/info.json
 Champ qui porte la version affichée/comparée par le Market : `pluginVersion`
 (actuellement `"0.3.0"`, semver — voir entrée changelog du 2026-09-27 :
 « Version lisible : `pluginVersion` passé en semver »).
-Champ de compatibilité comparé au core Jeedom de la box : `require` (`"4.4"`).
+Champ de compatibilité comparé au core Jeedom de la box : `require` (`"4.5"` depuis le 2026-10-21 ; l'extrait ci-dessus date de la 0.3.0).
 Champ de compatibilité OS : `os.min` / `os.max` (`11` / `12.99`).
 
 **Point d'attention factuel (PROUVÉ par lecture directe, à corriger avant
@@ -480,7 +480,7 @@ réellement — pas une réaction instantanée garantie.
 > }
 > ```
 
-Le champ `require` de `plugin_info/info.json` (`"4.4"` pour `jeedom2ha`, voir
+Le champ `require` de `plugin_info/info.json` (`"4.5"` pour `jeedom2ha` depuis le 2026-10-21, voir
 1.4) est comparé à la version du cœur Jeedom **avant** que le contenu
 téléchargé ne remplace quoi que ce soit sur la box : en cas d'incompatibilité,
 l'installation est annulée (`rrmdir($cibDir)`) avant tout remplacement. Un

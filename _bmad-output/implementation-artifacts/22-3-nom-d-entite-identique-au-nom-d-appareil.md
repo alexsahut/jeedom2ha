@@ -40,6 +40,8 @@ afin qu'Assist la retrouve sous le nom Jeedom que je connais.
 - [x] **Task 4 — Suites complètes** comme la CI (pytest `tests` + `resources/daemon/tests`, tests `load`, `flake8`, `node --test`, tests PHP autonomes).
 - [x] **Task 5 — Documentation** : entrée dans `docs/fr_FR/changelog_beta.md`.
 - [ ] **Task 6 — Preuve terrain (ClaudeBox puis Alexandre, après fusion et déploiement)** : voir ci-dessous.
+  - [x] Part ClaudeBox (2026-10-20, `ae84d6e`, lecture seule) : `22-3-preuve-terrain-2026-10-20.md`.
+  - [ ] Essai vocal du scénario 38 par Alexandre.
 
 ## Preuve attendue (ClaudeBox, après déploiement)
 

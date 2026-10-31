@@ -1,0 +1,97 @@
+{
+  "description": "Story 25.4 (AC8) : corps sérialisés (clés triées) des écritures de l'écran d'équipement et de pièce, relevés sur la fenêtre de pièce de main.",
+  "scenarios": {
+    "type-impose-apercu-puis-enregistrement": [
+      {
+        "action": "previewMappingOverride",
+        "body": "action=previewMappingOverride&cmdId=100&eqId=1&haEntityType=cover"
+      },
+      {
+        "action": "saveMappingOverride",
+        "body": "action=saveMappingOverride&cmdId=100&eqId=1&haEntityType=cover"
+      }
+    ],
+    "retour-type-commande": [
+      {
+        "action": "revertMappingOverride",
+        "body": "action=revertMappingOverride&cmdId=100&eqId=1"
+      }
+    ],
+    "toujours-equipement-apercu-puis-confirmation": [
+      {
+        "action": "previewMappingOverride",
+        "body": "action=previewMappingOverride&eqId=1&publicationPolicy=force_publish"
+      },
+      {
+        "action": "savePublicationOverride",
+        "body": "action=savePublicationOverride&eqId=1&publicationPolicy=force_publish"
+      }
+    ],
+    "jamais-equipement-publie-avec-confirmation": [
+      {
+        "action": "savePublicationOverride",
+        "body": "action=savePublicationOverride&eqId=1&publicationPolicy=exclude"
+      }
+    ],
+    "jamais-equipement-non-publie-sans-confirmation": [
+      {
+        "action": "savePublicationOverride",
+        "body": "action=savePublicationOverride&eqId=1&publicationPolicy=exclude"
+      }
+    ],
+    "automatique-equipement": [
+      {
+        "action": "revertPublicationOverride",
+        "body": "action=revertPublicationOverride&eqId=1"
+      }
+    ],
+    "tout-remettre-en-automatique": [
+      {
+        "action": "revertPublicationOverride",
+        "body": "action=revertPublicationOverride&eqId=1"
+      }
+    ],
+    "jamais-entite": [
+      {
+        "action": "savePublicationOverride",
+        "body": "action=savePublicationOverride&cmdId=100&eqId=1&publicationPolicy=exclude"
+      }
+    ],
+    "automatique-entite": [
+      {
+        "action": "revertPublicationOverride",
+        "body": "action=revertPublicationOverride&cmdId=100&eqId=1"
+      }
+    ],
+    "appliquer-equipement": [
+      {
+        "action": "executeHaAction",
+        "body": "action=executeHaAction&intention=publier&portee=equipement&selection=[1]"
+      }
+    ],
+    "republier-equipement-menu": [
+      {
+        "action": "executeHaAction",
+        "body": "action=executeHaAction&intention=publier&portee=equipement&selection=[1]"
+      }
+    ],
+    "supprimer-equipement": [
+      {
+        "action": "executeHaAction",
+        "body": "action=executeHaAction&intention=supprimer&portee=equipement&selection=[1]"
+      }
+    ],
+    "republier-piece": [
+      {
+        "action": "executeHaAction",
+        "body": "action=executeHaAction&intention=publier&portee=piece&selection=[7]"
+      }
+    ],
+    "supprimer-piece": [
+      {
+        "action": "executeHaAction",
+        "body": "action=executeHaAction&intention=supprimer&portee=piece&selection=[7]"
+      }
+    ]
+  }
+}

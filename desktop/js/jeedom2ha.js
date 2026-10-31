@@ -17,6 +17,8 @@
 
 /* Statut du pont MQTT et santé globale (Story 2.2) */
 function refreshBridgeStatus() {
+  // Story 25.8 : compteur d'appels, pour qu'une fin de relecture enchaînée ne relise pas deux fois la santé du pont.
+  window.jeedom2haBridgeRefreshes = (window.jeedom2haBridgeRefreshes || 0) + 1;
   $.ajax({
     type: 'POST',
     url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -39,7 +41,7 @@ function refreshBridgeStatus() {
       var $op = $('#span_healthOp');
       var $opMsg = $('#span_healthOpMsg');
 
-      // 1. Bridge (Démon)
+      // 1. Démon
       if (!r.daemon) {
         // Incident d'infrastructure -> ROUGE
         $bridge.removeClass().addClass('label label-danger').text('{{Arrêté}}');
@@ -92,11 +94,11 @@ function refreshBridgeStatus() {
           break;
         case 'partiel':
           // Problème de configuration -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').text('{{Partiel}}').css('background-color', '#e67e22');
+          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Partiel}}');
           break;
         case 'echec':
           // Problème de configuration complet -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').text('{{Échec}}').css('background-color', '#e67e22');
+          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Échec}}');
           break;
         case 'aucun':
           $op.removeClass().addClass('label label-default').text('{{Aucune}}');
@@ -114,6 +116,14 @@ function refreshBridgeStatus() {
       applyHAGating(null);
     }
   });
+}
+
+/* Story 25.3 (AC6) : une action terminée (succès ou échec) peut avoir changé les états ; la page principale
+ * relit alors les chiffres (sans refresh, coalescée) — voir jeedom2ha_overview.js. Sans effet si la page B est absente. */
+function notifyStatesChanged() {
+  if (typeof window !== 'undefined' && typeof window.j2haNotifyStatesChanged === 'function') {
+    window.j2haNotifyStatesChanged();
+  }
 }
 
 /* Gating des actions Home Assistant selon la santé du pont (Story 2.3) */
@@ -141,6 +151,7 @@ function applyHAGating(r) {
   var $haActions = $('[data-ha-action]').not('[data-ha-pending="1"]');
   if (window.jeedom2haRescanInProgress === true) {
     $haActions.prop('disabled', true);
+    syncRoomExclusionHints('{{Une opération est déjà en cours.}}');
     return;
   }
   var available = r ? isHABridgeAvailable(r) : false;
@@ -150,23 +161,38 @@ function applyHAGating(r) {
     $haActions.not('[data-ha-state-blocked="1"]').prop('disabled', false).removeClass('j2ha-ha-gated');
     $haActions.filter('[data-ha-state-blocked="1"]').removeClass('j2ha-ha-gated');
     $reason.hide();
+    syncRoomExclusionHints('');
   } else {
     $haActions.prop('disabled', true).addClass('j2ha-ha-gated');
-    var reason = '{{Bridge ou MQTT indisponible — actions Home Assistant bloquées.}}';
+    var reason = '{{Démon ou MQTT indisponible — actions Home Assistant bloquées.}}';
     if (r && !r.daemon) {
-      reason = '{{Daemon arrêté — actions Home Assistant bloquées.}}';
+      reason = '{{Démon arrêté — actions Home Assistant bloquées.}}';
     } else if (r) {
       reason = '{{MQTT déconnecté — actions Home Assistant bloquées.}}';
     }
     $reason.text(reason).show();
+    syncRoomExclusionHints(reason);
   }
+}
+
+/* Story 25.8 (AC11) : les entrées « Exclure la pièce… » suivent le gating des actions Home Assistant ; grisées, elles disent pourquoi
+ * (relecture en cours, ou la raison du gating du pont), comme « Relire Jeedom ». */
+function syncRoomExclusionHints(reason) {
+  $('.j2ha-room-exclude').each(function() {
+    var $item = $(this);
+    if ($item.prop('disabled') && reason) {
+      $item.attr('title', reason);
+    } else {
+      $item.removeAttr('title');
+    }
+  });
 }
 
 function confirmTopologyRescan(onConfirm, onCancel) {
   confirmHaPublishAction(
-    '{{Rescanner la topologie Jeedom}}',
-    '{{Un sync complet peut publier ou retirer des entités Home Assistant et applique les overrides persistés. Confirmer ?}}',
-    '{{Rescanner}}',
+    '{{Relire Jeedom}}',
+    '{{Une relecture complète peut publier ou retirer des entités Home Assistant et applique les réglages enregistrés. Confirmer ?}}',
+    '{{Relire}}',
     onConfirm,
     onCancel
   );
@@ -288,6 +314,12 @@ function confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCance
     if (typeof onCancel === 'function' && dialog && typeof dialog.on === 'function') {
       dialog.on('hidden.bs.modal', cancelConfirmation);
     }
+    // Preuve terrain 25.8 (AC8) : le thème du cœur force `.modal-footer .btn.bootbox-accept` en vert (`!important`), quelle que
+    // soit la classe btn-*. Une confirmation qui retire de Home Assistant garde le rouge du thème : on retire au bouton la seule
+    // classe `bootbox-accept` (aucun CSS ajouté, aucun composant du cœur restylé, la clé `confirm` et son rappel inchangés).
+    if (confirmClass === 'btn-danger' && dialog && typeof dialog.find === 'function') {
+      dialog.find('.modal-footer .btn-danger.bootbox-accept').removeClass('bootbox-accept');
+    }
     return;
   }
   if (window.confirm(message)) onConfirm();
@@ -345,9 +377,11 @@ function executeHaAction(intention, portee, selection, handlers) {
   });
 }
 
-function triggerTopologyRescan($button, snapshot, owner) {
+function triggerTopologyRescan($button, snapshot, owner, chain) {
   if (window.jeedom2haRescanOwner !== owner) return;
-  $button.html('<i class="fas fa-spinner fa-spin"></i> {{Rescan en cours…}}');
+  // Story 25.8 : `chain` (facultatif) = { onComplete(failed) } — relecture enchaînée après une exclusion de pièce, même chemin.
+  var outcome = {failed: false};
+  $button.html('<i class="fas fa-spinner fa-spin"></i> {{Relecture en cours…}}');
   $('[data-ha-action]').not('[data-ha-pending="1"]').prop('disabled', true);
   $.ajax({
     type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
@@ -355,8 +389,9 @@ function triggerTopologyRescan($button, snapshot, owner) {
     timeout: (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
     success: function(data) {
       var result = data && data.result;
+      outcome.failed = !(data && data.state === 'ok' && result && result.status === 'ok' && result.operation_result !== 'echec');
       if (data.state !== 'ok') {
-        $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+        $('#div_alert').showAlert({message: (typeof result === 'string' && result) || '{{Une opération est déjà en cours ou la relecture a échoué.}}', level: 'danger'});
         return;
       }
       if (result && result.status === 'ok') {
@@ -372,18 +407,103 @@ function triggerTopologyRescan($button, snapshot, owner) {
         refreshBridgeStatus();
         return;
       }
-      $('#div_alert').showAlert({message: (result && (result.message || result.operation_message)) || '{{Une opération est déjà en cours ou le rescan a échoué.}}', level: 'danger'});
+      $('#div_alert').showAlert({message: (result && (result.message || result.operation_message)) || '{{Une opération est déjà en cours ou la relecture a échoué.}}', level: 'danger'});
       if (result && typeof result.operation_result === 'string') {
         refreshBridgeStatus();
       }
     },
     error: function() {
+      outcome.failed = true;
       $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
+      notifyStatesChanged();
+      if (chain && typeof chain.onComplete === 'function') {
+        chain.onComplete(outcome.failed);
+      }
     },
   });
+}
+
+/* Story 25.8 (D3, D4) — exclusion d'une pièce depuis la surface (carte de la page principale, détail de pièce) :
+ *   1. confirmation chiffrée (annuler n'écrit rien) ; 2. `saveRoomExclusion` (échec : message, AUCUNE relecture) ;
+ *   3. drapeaux « pièce exclue » mis à jour en mémoire depuis `excluded_objects` ; 4. relecture EXPLICITE par le chemin de
+ *   « Relire Jeedom » (`triggerTopologyRescan` : même réservation, même budget client, mêmes messages), sans sa confirmation ;
+ *   5. fin de relecture (succès ou échec) : `refreshBridgeStatus()` et relecture des états.
+ * Pendant 1 à 5, « Relire Jeedom » et toutes les entrées [data-ha-action] (dont l'exclusion des autres pièces) sont réservées. */
+function escapeRoomExclusionText(value) {
+  return $('<span></span>').text(String(value)).html();
+}
+
+function requestRoomExclusion(roomId, roomName, excluded, $trigger, $returnFocus) {
+  var page = window.Jeedom2haOverviewPage;
+  var $rescan = $('#bt_rescanTopology');
+  if (!page || typeof page.exclusionDialog !== 'function' || $rescan.length === 0) return;
+  if (window.jeedom2haRescanInProgress === true || ($trigger && $trigger.prop('disabled'))) return;
+  var snapshot = setHaActionPendingState($rescan, '{{Confirmation en cours…}}');
+  var owner = {};
+  window.jeedom2haRescanInProgress = true;
+  window.jeedom2haRescanOwner = owner;
+  applyHAGating(window.jeedom2haLastBridgeStatus || null);
+  var giveBackFocus = function() {
+    // `$returnFocus` peut être une fonction : le détail d'une pièce est redessiné après une écriture réussie.
+    var $target = typeof $returnFocus === 'function' ? $returnFocus() : $returnFocus;
+    if ($target && $target.length) {
+      $target.focus();
+    }
+  };
+  var dialog = page.exclusionDialog(roomId, roomName, excluded);
+  var message = dialog.lines.map(function(line) {
+    return '<p>' + escapeRoomExclusionText(line) + '</p>';
+  }).join('');
+  confirmHaPublishAction(
+    escapeRoomExclusionText(dialog.title),
+    message,
+    dialog.confirmLabel,
+    function() {
+      updateHaActionPendingLabel($rescan, '{{Enregistrement…}}');
+      var failSave = function(text) {
+        $('#div_alert').showAlert({message: text, level: 'danger'});
+        releaseTopologyRescanReservation($rescan, snapshot, owner);
+        giveBackFocus();
+      };
+      $.ajax({
+        type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+        data: {action: 'saveRoomExclusion', objectId: String(roomId), excluded: excluded ? '1' : '0'}, dataType: 'json',
+        timeout: 20000,
+        success: function(data) {
+          var result = data && data.state === 'ok' ? data.result : null;
+          if (!result || !Array.isArray(result.excluded_objects)) {
+            failSave((data && typeof data.result === 'string' && data.result) || '{{L\'exclusion de la pièce n\'a pas été enregistrée.}}');
+            return;
+          }
+          page.setExcludedObjects(result.excluded_objects);
+          var refreshesBefore = window.jeedom2haBridgeRefreshes || 0;
+          triggerTopologyRescan($rescan, snapshot, owner, {
+            onComplete: function(failed) {
+              if (failed) {
+                $('#div_alert').showAlert({message: '{{Relancez « Relire Jeedom » pour retirer les entités.}}', level: 'warning'});
+              }
+              // La relecture relit déjà la santé du pont dans la plupart des issues ; sinon, c'est fait ici (une seule fois).
+              if ((window.jeedom2haBridgeRefreshes || 0) === refreshesBefore) {
+                refreshBridgeStatus();
+              }
+              giveBackFocus();
+            },
+          });
+        },
+        error: function() {
+          failSave('{{Erreur de communication : l\'exclusion de la pièce n\'a pas pu être confirmée. Vérifiez l\'état de la pièce avant de recommencer.}}');
+        },
+      });
+    },
+    function() {
+      releaseTopologyRescanReservation($rescan, snapshot, owner);
+      giveBackFocus();
+    },
+    dialog.danger ? 'btn-danger' : 'btn-primary'
+  );
 }
 
 function triggerPublierAction($button, portee, selection, reservation) {
@@ -403,6 +523,7 @@ function triggerPublierAction($button, portee, selection, reservation) {
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
+      notifyStatesChanged();
     },
   });
 }
@@ -424,6 +545,7 @@ function triggerSupprimerAction($button, portee, selection, reservation) {
     },
     onComplete: function() {
       restoreHaActionPendingState($button, pendingState);
+      notifyStatesChanged();
     },
   });
 }
@@ -529,6 +651,43 @@ $(function() {
         anchor.click();
         URL.revokeObjectURL(url);
         $status.removeClass('label').addClass('label label-success').text('{{Diagnostic téléchargé}}');
+      },
+      error: function () {
+        $btn.prop('disabled', false);
+        $status.removeClass('label').addClass('label label-danger').text('{{Erreur de communication}}');
+      }
+    });
+  });
+
+  // Export de décision — Story 24.2 (lecture seule : identifiants seulement, aucun nom)
+  $('#bt_exportDecision').on('click', function () {
+    var $btn    = $(this);
+    var $status = $('#span_decisionExportResult');
+    $btn.prop('disabled', true);
+    $status.removeClass('label-success label-danger').addClass('label').text('{{Export en cours…}}').show();
+
+    $.ajax({
+      type:     'POST',
+      url:      'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
+      data:     { action: 'getDecisionExport' },
+      dataType: 'json',
+      timeout:  (typeof Jeedom2haActionBudget !== 'undefined' && Jeedom2haActionBudget.CLIENT_TIMEOUT_MS) || 90000,
+      success: function (data) {
+        $btn.prop('disabled', false);
+        if (data.state !== 'ok') {
+          $status.removeClass('label').addClass('label label-danger').text(data.result || '{{Erreur export}}');
+          return;
+        }
+        var json   = JSON.stringify(data.result, null, 2);
+        var blob   = new Blob([json], {type: 'application/json'});
+        var url    = URL.createObjectURL(blob);
+        var today  = new Date().toISOString().slice(0, 10);
+        var anchor = document.createElement('a');
+        anchor.href     = url;
+        anchor.download = 'jeedom2ha-decision-export-' + today + '.json';
+        anchor.click();
+        URL.revokeObjectURL(url);
+        $status.removeClass('label').addClass('label label-success').text('{{Export de décision téléchargé}}');
       },
       error: function () {
         $btn.prop('disabled', false);

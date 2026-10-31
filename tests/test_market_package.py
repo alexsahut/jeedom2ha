@@ -51,7 +51,8 @@ def fixture_repo(tmp_path):
     git(repo, "branch", "beta")
     git(repo, "rm", "-q", "OLD_ONLY.txt")
     for rel in ["plugin_info/info.json", "plugin_info/install.php", "core/php/a.php",
-                "desktop/js/a.js", "resources/daemon/main.py", "resources/daemon/tests/t.py",
+                "desktop/js/a.js", "resources/daemon/main.py", "resources/daemon/export/decision_export.py",
+                "resources/daemon/tests/t.py",
                 "docs/fr_FR/changelog.md", "docs/fr_FR/changelog_beta.md", "docs/fr_FR/index.md",
                 "docs/git-strategy.md", "docs/ci.md", "docs/index.md", ".github/ci.yml",
                 ".claude/x.md", ".agent/x.md", ".agents/x.md", "_bmad/x.md", "_bmad-output/x.md",
@@ -90,6 +91,26 @@ def test_dev_files_forbidden_in_manifest():
         assert name in m["forbid"], name
 
 
+def test_story_24_2_decision_export_module_shipped_but_export_file_never(tmp_path):
+    """AC9 : le module d'export part dans le paquet (le démon l'importe) ; le fichier d'export, jamais."""
+    out = tmp_path / "pkg"
+    sh("build", "HEAD", "--output", str(out))
+    assert (out / "resources/daemon/export/decision_export.py").exists()
+    assert (out / "resources/daemon/export/__init__.py").exists()
+    shipped = [rel for rel in mp.list_files(str(out)) if rel.endswith("jeedom2ha_decision_export.json")]
+    assert shipped == []
+    assert not (out / "data").exists()
+    manifest = mp.load_manifest()
+    assert "data/jeedom2ha_decision_export.json" in manifest["forbid"]
+    assert "resources/daemon/export/decision_export.py" in manifest["require"]
+
+
+def test_story_24_2_export_file_is_not_tracked_by_git():
+    tracked = git(REPO, "ls-files").splitlines()
+    assert [p for p in tracked if p.endswith("jeedom2ha_decision_export.json")] == []
+    assert not any(p.startswith("data/") for p in tracked)
+
+
 def test_real_repo_package_has_no_dev_files(tmp_path):
     """Paquet construit sur le vrai dépôt (HEAD) : aucun fichier de dev ne doit réapparaître."""
     out = tmp_path / "pkg"
@@ -97,6 +118,10 @@ def test_real_repo_package_has_no_dev_files(tmp_path):
     for name in DEV_FILES:
         assert not (out / name).exists(), name
     assert (out / "docs/fr_FR/index.md").exists()
+    # Extrait du CSS du cœur Jeedom (GPL) recopié pour le harnais Chromium : outil de test, jamais livré au Market.
+    assert (REPO / "tests/unit/helpers/core_css_reel.js").exists()
+    assert not (out / "tests/unit/helpers/core_css_reel.js").exists()
+    assert [rel for rel in mp.list_files(str(out)) if "core_css_reel" in rel] == []
 
 
 def test_ac1_ac3_build_matches_filtered_source(fixture_repo, tmp_path):

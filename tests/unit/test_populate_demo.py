@@ -135,7 +135,8 @@ def adapter_for(state, key=API_KEY):
 def test_dataset_covers_acceptance_criteria():
     inv = pd.populate(None, dry_run=True)
     s = inv["summary"]
-    assert s["rooms"] == 5 and s["scenarios"] == 3 and 14 <= s["equipments"] <= 17
+    assert s["rooms"] == 5 and s["parents"] == 2 and s["scenarios"] == 3
+    assert 14 <= s["equipments"] <= 17
     types = {c["generic_type"] for e in inv["equipments"] for c in e["cmds"]}
     assert {"LIGHT_STATE", "LIGHT_SLIDER", "FLAP_SLIDER", "POWER", "TEMPERATURE", "HUMIDITY",
             "OPENING", "OPENING_WINDOW", "PRESENCE", "CONSUMPTION"} <= types
@@ -146,11 +147,11 @@ def test_dataset_covers_acceptance_criteria():
 
 def test_populate_creates_everything(server):
     inv = pd.populate(adapter_for(server), dry_run=False)
-    assert len(server.rooms) == 5 and len(server.eqs) == 16 and len(server.scenarios) == 3
+    assert len(server.rooms) == 7 and len(server.eqs) == 16 and len(server.scenarios) == 3
     assert len(server.cmds) == inv["summary"]["cmds"] + len(server.eqs)  # Rafraichir
     assert all(e["eqType_name"] == "virtual" and e["object_id"] for e in server.eqs)
     assert sum(1 for e in server.eqs if e["configuration"]["jeedom2ha_excluded"] == 1) == 1
-    assert inv["summary"]["by_status"] == {"created": 69}
+    assert inv["summary"]["by_status"] == {"created": 71}
 
 
 def test_empty_jeedom_lists_are_ok_and_fresh_box_creates_everything(server):
@@ -158,7 +159,7 @@ def test_empty_jeedom_lists_are_ok_and_fresh_box_creates_everything(server):
     assert server.dispatch(pd.JsonRpcContract.ROOM_ALL, {}) == []
     assert pd.JeedomAdapter._list_result("ok") == []
     inv = pd.populate(adapter_for(server), dry_run=False)
-    assert inv["summary"]["by_status"] == {"created": 69}
+    assert inv["summary"]["by_status"] == {"created": 71}
 
 
 def test_rerun_is_idempotent(server):
@@ -286,9 +287,9 @@ def test_main_end_to_end(server, tmp_path, capsys):
     env = _env(tmp_path, JEEDOM_API_URL=server.url, JEEDOM_API_KEY=API_KEY)
     assert pd.main(["--env-file", str(env)]) == 0
     first = json.loads(capsys.readouterr().out)
-    assert first["summary"]["by_status"] == {"created": 69}
+    assert first["summary"]["by_status"] == {"created": 71}
     assert pd.main(["--env-file", str(env)]) == 0
-    assert json.loads(capsys.readouterr().out)["summary"]["by_status"] == {"exists": 69}
+    assert json.loads(capsys.readouterr().out)["summary"]["by_status"] == {"exists": 71}
     assert len(server.eqs) == 16
 
 
@@ -332,6 +333,141 @@ def test_new_equipment_command_payload_has_no_parent_override_or_null():
     payload = pd._eqlogic_payload(spec, room_id=101, existing=None, existing_cmds={})
     assert all("eqLogic_id" not in cmd and all(value is not None for value in cmd.values())
                for cmd in payload["cmd"])
+
+
+# ---------------------------------------------------------------------------
+# Story 23.2 — D2 : démo embellie (icônes, couleurs, parents, accents)
+# ---------------------------------------------------------------------------
+
+def _room(server, name):
+    return next(r for r in server.rooms if r["name"] == name)
+
+
+def _display(row):
+    value = row.get("display")
+    return json.loads(value) if isinstance(value, str) else (value or {})
+
+
+def _legacy_snapshot(server):
+    """Ramène l'état de la box à la démo 23.1 : noms ASCII, pièces à plat, sans icône."""
+    parent_ids = {r["id"] for r in server.rooms if r["name"] in pd.PARENT_NAMES}
+    server.rooms[:] = [r for r in server.rooms if r["id"] not in parent_ids]
+    for room in server.rooms:
+        room.pop("father_id", None)
+        room.pop("display", None)
+    for eq in server.eqs:
+        eq["name"] = pd.ascii_fold(eq["name"])
+    for cmd in server.cmds:
+        cmd["name"] = pd.ascii_fold(cmd["name"])
+        info = cmd.get("configuration", {}).get("infoName")
+        if info:
+            cmd["configuration"]["infoName"] = pd.ascii_fold(info)
+    for scenario in server.scenarios:
+        scenario["name"] = pd.ascii_fold(scenario["name"])
+        scenario["group"] = pd.ascii_fold(scenario["group"])
+        scenario["description"] = pd.ascii_fold(scenario["description"])
+
+
+def test_rooms_have_icon_color_and_parent():
+    assert [p["name"] for p in pd.PARENTS] == ["Rez-de-chaussée", "Étage"]
+    assert {r["name"]: r["parent"] for r in pd.ROOMS} == {
+        "Salon": "Rez-de-chaussée", "Cuisine": "Rez-de-chaussée", "Garage": "Rez-de-chaussée",
+        "Chambre": "Étage", "Bureau": "Étage"}
+    for item in pd.PARENTS + pd.ROOMS:
+        assert item["icon"].startswith('<i class="fas fa-') and item["icon"].endswith("</i>")
+        assert len(item["tagColor"]) == 7 and item["tagColor"].startswith("#")
+        assert len(item["tagTextColor"]) == 7 and item["tagTextColor"].startswith("#")
+    assert len({r["tagColor"] for r in pd.ROOMS}) == len(pd.ROOMS)
+
+
+def test_populate_applies_icons_colors_and_hierarchy(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    rdc, etage = _room(server, "Rez-de-chaussée"), _room(server, "Étage")
+    assert rdc.get("father_id") in (None, "") and etage.get("father_id") in (None, "")
+    for name, parent in (("Salon", rdc), ("Garage", rdc), ("Bureau", etage), ("Chambre", etage)):
+        room = _room(server, name)
+        assert room["father_id"] == parent["id"]
+        assert _display(room)["icon"].startswith('<i class="fas fa-')
+        assert _display(room)["tagColor"].startswith("#")
+
+
+def test_french_accents_in_names():
+    assert pd.ascii_fold("Lumière Étage Cinéma") == "Lumiere Etage Cinema"
+    assert {e["name"] for e in pd.EQUIPMENTS} >= {
+        "Lumière Salon", "Prise Cafetière", "Compteur Énergie", "Fenêtre Cuisine",
+        "Présence Chambre", "Équipement Libre Bureau", "Lumière Garage Exclue"}
+    assert [s["name"] for s in pd.SCENARIOS] == ["Scénario Cinéma", "Scénario Départ", "Scénario Nuit"]
+    cmd_names = {c["name"] for e in pd.EQUIPMENTS for c in e["cmds"]}
+    assert {"État", "Luminosité", "Régler luminosité", "Température", "Humidité", "Énergie"} <= cmd_names
+    for action in (c for e in pd.EQUIPMENTS for c in e["cmds"] if c["type"] == "action"):
+        info = action["configuration"]["infoName"]
+        assert any(c["name"] == info for e in pd.EQUIPMENTS for c in e["cmds"] if c["type"] == "info")
+
+
+def test_migration_from_23_1_state_renames_without_duplicates(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    _legacy_snapshot(server)
+    eq_ids = {e["configuration"][pd.OWNER_MARKER]: e["id"] for e in server.eqs}
+    cmd_ids = {(c["eqLogic_id"], pd.ascii_fold(c["name"])): c["id"] for c in server.cmds}
+    scenario_ids = [s["id"] for s in server.scenarios]
+    room_ids = {r["name"]: r["id"] for r in server.rooms}
+    counts = (len(server.eqs), len(server.cmds), len(server.scenarios))
+
+    inv = pd.populate(adapter_for(server), dry_run=False)
+
+    assert (len(server.eqs), len(server.cmds), len(server.scenarios)) == counts
+    assert len(server.rooms) == 7
+    assert {e["configuration"][pd.OWNER_MARKER]: e["id"] for e in server.eqs} == eq_ids
+    assert {(c["eqLogic_id"], pd.ascii_fold(c["name"])): c["id"] for c in server.cmds} == cmd_ids
+    assert [s["id"] for s in server.scenarios] == scenario_ids
+    assert all(room_ids[r["name"]] == r["id"] for r in server.rooms if r["name"] in room_ids)
+    assert {e["name"] for e in server.eqs} == {e["name"] for e in pd.EQUIPMENTS}
+    assert {s["name"] for s in server.scenarios} == {s["name"] for s in pd.SCENARIOS}
+    states = [c for c in server.cmds if c["name"] == "État"]
+    assert states and all(c.get("configuration", {}).get("infoName") != "Etat" for c in server.cmds)
+    assert "updated" in inv["summary"]["by_status"] and "created" in inv["summary"]["by_status"]
+
+    server.calls.clear()
+    again = pd.populate(adapter_for(server), dry_run=False)
+    assert server.writes == [] and set(again["summary"]["by_status"]) == {"exists"}
+
+
+def test_dry_run_on_23_1_state_reports_updates_and_writes_nothing(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    _legacy_snapshot(server)
+    server.calls.clear()
+    inv = pd.populate(adapter_for(server), dry_run=True)
+    assert server.writes == []
+    assert {"would_update", "would_create"} <= set(inv["summary"]["by_status"])
+    assert "updated" not in inv["summary"]["by_status"]
+
+
+def test_room_drift_is_repaired_in_place(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    salon = _room(server, "Salon")
+    salon["display"] = {"icon": '<i class="fas fa-bug"></i>', "tagColor": "#000000",
+                        "tagTextColor": "#ffffff"}
+    salon["father_id"] = None
+    inv = pd.populate(adapter_for(server), dry_run=False)
+    assert len(server.rooms) == 7
+    assert _display(salon)["icon"] == next(r for r in pd.ROOMS if r["name"] == "Salon")["icon"]
+    assert salon["father_id"] == _room(server, "Rez-de-chaussée")["id"]
+    assert inv["summary"]["by_status"].get("updated") == 1
+
+
+def test_display_json_string_from_jeedom_is_understood(server):
+    pd.populate(adapter_for(server), dry_run=False)
+    for room in server.rooms:
+        room["display"] = json.dumps(room["display"])
+        room["father_id"] = None if room.get("father_id") is None else str(room["father_id"])
+    server.calls.clear()
+    inv = pd.populate(adapter_for(server), dry_run=False)
+    assert server.writes == [] and set(inv["summary"]["by_status"]) == {"exists"}
+
+
+def test_inventory_stays_anonymised_with_icons(server):
+    text = json.dumps(pd.populate(adapter_for(server), dry_run=False))
+    assert API_KEY not in text and "127.0.0.1" not in text and '"id"' not in text
 
 
 def test_compose_requires_pinned_tag():

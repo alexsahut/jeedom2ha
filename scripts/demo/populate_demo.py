@@ -2,7 +2,11 @@
 """Peuple une box Jeedom *vierge* avec le jeu de démonstration synthétique (Story 23.1).
 
 Crée, de façon idempotente, via l'API JSON-RPC Jeedom (`core/api/jeeApi.php`) :
-5 pièces, 16 équipements Virtuel (types génériques posés), 3 scénarios.
+2 objets parents (« Rez-de-chaussée », « Étage »), 5 pièces avec icône et couleur,
+16 équipements Virtuel (types génériques posés), 3 scénarios, noms en français accentué
+(Story 23.2, décision D2). Un second passage sur une démo 23.1 déjà peuplée (noms ASCII,
+pièces à plat) renomme et range les objets existants par leur clé `jeedom2ha_demo_key`,
+sans doublon ni changement d'identifiant.
 Le jeu contient volontairement un équipement sans type générique et un
 équipement exclu (`jeedom2ha_excluded`) pour les écrans « Ne sera pas publié »
 et « Exclu ».
@@ -30,6 +34,7 @@ import os
 import socket
 import stat
 import sys
+import unicodedata
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -50,7 +55,34 @@ class DemoError(Exception):
 # Jeu de démonstration (100 % synthétique : aucune donnée maison)
 # ---------------------------------------------------------------------------
 
-ROOMS = ["Salon", "Cuisine", "Chambre", "Bureau", "Garage"]
+def ascii_fold(text: str) -> str:
+    """Nom de la démo 23.1 (sans accent) : sert à retrouver un objet à renommer."""
+    return "".join(ch for ch in unicodedata.normalize("NFD", text)
+                   if not unicodedata.combining(ch))
+
+
+def _place(name, icon, tag_color, parent=None, tag_text_color="#ffffff"):
+    item = {"name": name, "icon": '<i class="fas fa-%s"></i>' % icon,
+            "tagColor": tag_color, "tagTextColor": tag_text_color}
+    if parent:
+        item["parent"] = parent
+    return item
+
+
+# Objets parents (étages) puis pièces ; ordre de création : parents d'abord.
+PARENTS: List[Dict[str, Any]] = [
+    _place("Rez-de-chaussée", "home", "#2c3e50"),
+    _place("Étage", "layer-group", "#34495e"),
+]
+PARENT_NAMES = [p["name"] for p in PARENTS]
+ROOMS: List[Dict[str, Any]] = [
+    _place("Salon", "couch", "#2980b9", "Rez-de-chaussée"),
+    _place("Cuisine", "utensils", "#d35400", "Rez-de-chaussée"),
+    _place("Garage", "warehouse", "#7f8c8d", "Rez-de-chaussée"),
+    _place("Chambre", "bed", "#8e44ad", "Étage"),
+    _place("Bureau", "laptop", "#16a085", "Étage"),
+]
+ROOM_NAMES = [r["name"] for r in ROOMS]
 
 
 def _info(name, generic, sub="binary", unite="", history=False):
@@ -72,15 +104,15 @@ def _act(name, generic, sub="other", info=None, value=None):
     return cmd
 
 
-def _light(on_off_state="Etat"):
+def _light(on_off_state="État"):
     return [_info(on_off_state, "LIGHT_STATE"),
             _act("On", "LIGHT_ON", info=on_off_state, value="1"),
             _act("Off", "LIGHT_OFF", info=on_off_state, value="0")]
 
 
 def _dimmer():
-    return _light() + [_info("Luminosite", "LIGHT_BRIGHTNESS", "numeric", "%"),
-                       _act("Regler luminosite", "LIGHT_SLIDER", "slider", info="Luminosite")]
+    return _light() + [_info("Luminosité", "LIGHT_BRIGHTNESS", "numeric", "%"),
+                       _act("Régler luminosité", "LIGHT_SLIDER", "slider", info="Luminosité")]
 
 
 def _cover():
@@ -91,52 +123,52 @@ def _cover():
 
 
 def _plug():
-    return [_info("Etat", "ENERGY_STATE"),
-            _act("On", "ENERGY_ON", info="Etat", value="1"),
-            _act("Off", "ENERGY_OFF", info="Etat", value="0"),
+    return [_info("État", "ENERGY_STATE"),
+            _act("On", "ENERGY_ON", info="État", value="1"),
+            _act("Off", "ENERGY_OFF", info="État", value="0"),
             _info("Puissance", "POWER", "numeric", "W", history=True)]
 
 
 def _temp_hum():
-    return [_info("Temperature", "TEMPERATURE", "numeric", "°C", history=True),
-            _info("Humidite", "HUMIDITY", "numeric", "%", history=True)]
+    return [_info("Température", "TEMPERATURE", "numeric", "°C", history=True),
+            _info("Humidité", "HUMIDITY", "numeric", "%", history=True)]
 
 
 EQUIPMENTS: List[Dict[str, Any]] = [
-    {"key": "salon-lumiere", "room": "Salon", "name": "Lumiere Salon", "cmds": _light()},
+    {"key": "salon-lumiere", "room": "Salon", "name": "Lumière Salon", "cmds": _light()},
     {"key": "salon-lampe-variable", "room": "Salon", "name": "Lampe Variable Salon", "cmds": _dimmer()},
     {"key": "salon-volet", "room": "Salon", "name": "Volet Salon", "cmds": _cover()},
     {"key": "salon-climat", "room": "Salon", "name": "Climat Salon", "cmds": _temp_hum()},
-    {"key": "cuisine-lumiere", "room": "Cuisine", "name": "Lumiere Cuisine", "cmds": _light()},
-    {"key": "cuisine-prise", "room": "Cuisine", "name": "Prise Cafetiere", "cmds": _plug()},
-    {"key": "cuisine-compteur", "room": "Cuisine", "name": "Compteur Energie",
-     "cmds": [_info("Energie", "CONSUMPTION", "numeric", "kWh", history=True)]},
-    {"key": "cuisine-fenetre", "room": "Cuisine", "name": "Fenetre Cuisine",
+    {"key": "cuisine-lumiere", "room": "Cuisine", "name": "Lumière Cuisine", "cmds": _light()},
+    {"key": "cuisine-prise", "room": "Cuisine", "name": "Prise Cafetière", "cmds": _plug()},
+    {"key": "cuisine-compteur", "room": "Cuisine", "name": "Compteur Énergie",
+     "cmds": [_info("Énergie", "CONSUMPTION", "numeric", "kWh", history=True)]},
+    {"key": "cuisine-fenetre", "room": "Cuisine", "name": "Fenêtre Cuisine",
      "cmds": [_info("Ouverture", "OPENING_WINDOW")]},
     {"key": "chambre-lampe-variable", "room": "Chambre", "name": "Lampe Variable Chambre",
      "cmds": _dimmer()},
     {"key": "chambre-volet", "room": "Chambre", "name": "Volet Chambre", "cmds": _cover()},
     {"key": "chambre-climat", "room": "Chambre", "name": "Climat Chambre", "cmds": _temp_hum()},
-    {"key": "chambre-presence", "room": "Chambre", "name": "Presence Chambre",
+    {"key": "chambre-presence", "room": "Chambre", "name": "Présence Chambre",
      "cmds": [_info("Presence", "PRESENCE")]},
     {"key": "bureau-prise", "room": "Bureau", "name": "Prise Bureau", "cmds": _plug()},
     # Sans aucun type générique : « Ne sera pas publié — et pourquoi ».
-    {"key": "bureau-sans-type", "room": "Bureau", "name": "Equipement Libre Bureau",
+    {"key": "bureau-sans-type", "room": "Bureau", "name": "Équipement Libre Bureau",
      "cmds": [_info("Mesure libre", "", "numeric"),
               _act("Action libre", "", info="Mesure libre", value="1")]},
     {"key": "garage-porte", "room": "Garage", "name": "Porte Garage",
      "cmds": [_info("Ouverture", "OPENING")]},
     # Exclu côté jeedom2ha : « Exclu ».
-    {"key": "garage-lumiere-exclue", "room": "Garage", "name": "Lumiere Garage Exclue",
+    {"key": "garage-lumiere-exclue", "room": "Garage", "name": "Lumière Garage Exclue",
      "excluded": True, "cmds": _light()},
 ]
 
 SCENARIOS: List[Dict[str, str]] = [
-    {"key": "scenario-cinema", "name": "Scenario Cinema", "description": "Demo : ambiance cinema"},
-    {"key": "scenario-depart", "name": "Scenario Depart", "description": "Demo : tout eteindre au depart"},
-    {"key": "scenario-nuit", "name": "Scenario Nuit", "description": "Demo : mode nuit"},
+    {"key": "scenario-cinema", "name": "Scénario Cinéma", "description": "Démo : ambiance cinéma"},
+    {"key": "scenario-depart", "name": "Scénario Départ", "description": "Démo : tout éteindre au départ"},
+    {"key": "scenario-nuit", "name": "Scénario Nuit", "description": "Démo : mode nuit"},
 ]
-SCENARIO_GROUP = "Demo"
+SCENARIO_GROUP = "Démo"
 
 
 # ---------------------------------------------------------------------------
@@ -215,9 +247,8 @@ class JeedomAdapter:
     def rooms(self) -> List[Dict[str, Any]]:
         return self._list_result(self.rpc.call(self.c.ROOM_ALL))
 
-    def save_room(self, name: str) -> Dict[str, Any]:
-        return self._saved_result(self.rpc.call(self.c.ROOM_SAVE, name=name, isVisible=1),
-                                  self.c.ROOM_SAVE)
+    def save_room(self, room: Dict[str, Any]) -> Dict[str, Any]:
+        return self._saved_result(self.rpc.call(self.c.ROOM_SAVE, **room), self.c.ROOM_SAVE)
 
     def eqlogics(self) -> List[Dict[str, Any]]:
         return self._list_result(self.rpc.call(self.c.EQ_ALL))
@@ -257,10 +288,52 @@ def _eq_excluded(eq: Dict[str, Any]) -> bool:
 
 
 def _cmd_drift(existing: Dict[str, Any], wanted: Dict[str, Any]) -> bool:
-    for field in ("type", "subType", "unite"):
+    for field in ("type", "subType", "unite", "name"):
         if str(existing.get(field) or "") != str(wanted.get(field) or ""):
             return True
+    cfg = existing.get("configuration")
+    wanted_info = (wanted.get("configuration") or {}).get("infoName")
+    if wanted_info and (not isinstance(cfg, dict) or cfg.get("infoName") != wanted_info):
+        return True
     return str(existing.get("generic_type") or "") != str(wanted.get("generic_type") or "")
+
+
+def _match_cmd(existing_cmds: Dict[str, Dict[str, Any]], wanted: Dict[str, Any]
+               ) -> Optional[Dict[str, Any]]:
+    """Retrouve une commande par son nom, sinon par son nom 23.1 (sans accent)."""
+    return existing_cmds.get(wanted["name"]) or existing_cmds.get(ascii_fold(wanted["name"]))
+
+
+def _display(row: Dict[str, Any]) -> Dict[str, Any]:
+    """`display` d'un objet Jeedom : tableau, ou chaîne JSON selon la lecture."""
+    value = row.get("display")
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = {}
+    return value if isinstance(value, dict) else {}
+
+
+def _room_drift(existing: Dict[str, Any], spec: Dict[str, Any], father_id: Any) -> bool:
+    display = _display(existing)
+    if any(str(display.get(k) or "") != spec[k] for k in ("icon", "tagColor", "tagTextColor")):
+        return True
+    if not _bool(existing.get("isVisible", 1)):
+        return True
+    return str(existing.get("father_id") or "") != str(father_id or "")
+
+
+def _room_payload(spec: Dict[str, Any], father_id: Any, existing: Optional[Dict[str, Any]]
+                  ) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "name": spec["name"], "isVisible": 1,
+        "display": {k: spec[k] for k in ("icon", "tagColor", "tagTextColor")},
+        "father_id": father_id if father_id is not None else "",
+    }
+    if existing:
+        payload["id"] = existing.get("id")
+    return payload
 
 
 def _without_none(value: Any) -> Any:
@@ -293,7 +366,7 @@ def _eqlogic_payload(spec: Dict[str, Any], room_id: Any, existing: Optional[Dict
         # jeeApi.php rattache lui-même chaque virtualCmd au nouvel eqLogic avant a2o().
         # Envoyer eqLogic_id=null le réinitialiserait ensuite via utils::a2o().
         cmd = dict(wanted, isVisible=1)
-        previous = existing_cmds.get(wanted["name"])
+        previous = _match_cmd(existing_cmds, wanted)
         if previous:
             cmd["id"] = previous.get("id")
         payload["cmd"].append(cmd)
@@ -308,14 +381,16 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
     """
     live = adapter is not None
     write = live and not dry_run
-    demo_names = {e["name"] for e in EQUIPMENTS}
+    demo_names = {e["name"] for e in EQUIPMENTS} | {ascii_fold(e["name"]) for e in EQUIPMENTS}
 
     rooms_by_name: Dict[str, Any] = {}
-    eq_by_key: Dict[Any, Dict[str, Any]] = {}
+    room_rows: Dict[str, Dict[str, Any]] = {}
+    eq_by_key: Dict[str, Dict[str, Any]] = {}
     scen_by_name: Dict[str, Any] = {}
     if live:
         for r in adapter.rooms():
             rooms_by_name[r.get("name")] = r.get("id")
+            room_rows[r.get("name")] = r
         existing_eqs = adapter.eqlogics()
         owned = [e for e in existing_eqs if _owner_key(e)]
         foreign = [e for e in existing_eqs if not _owner_key(e)]
@@ -328,7 +403,7 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
             raise DemoError("%d équipement(s) hors jeu de démo détecté(s) : cette box n'est pas "
                             "vierge. Abandon (--allow-non-empty pour forcer)." % len(foreign))
         for e in owned:
-            eq_by_key[(str(e.get("object_id")), _owner_key(e))] = e
+            eq_by_key[_owner_key(e)] = e
         for s in adapter.scenarios():
             scen_by_name[s.get("name")] = s
 
@@ -340,27 +415,42 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
         return "updated" if exists and changed else ("exists" if exists else "created")
 
     inventory: Dict[str, Any] = {"schema": INVENTORY_SCHEMA, "dry_run": dry_run,
-                                 "connected": live, "rooms": [], "equipments": [], "scenarios": []}
+                                 "connected": live, "parents": [], "rooms": [], "equipments": [], "scenarios": []}
 
-    for name in ROOMS:
-        exists = name in rooms_by_name
-        if write and not exists:
-            saved = adapter.save_room(name)
-            rooms_by_name[name] = (saved or {}).get("id")
-        inventory["rooms"].append({"name": name, "status": _status(exists)})
+    for kind, specs in (("parents", PARENTS), ("rooms", ROOMS)):
+        for spec in specs:
+            name = spec["name"]
+            existing_room = room_rows.get(name)
+            father_name = spec.get("parent")
+            father_id = rooms_by_name.get(father_name) if father_name else None
+            exists = existing_room is not None
+            # Parent encore à créer (dry-run) : le rangement sera forcément à faire.
+            changed = exists and (_room_drift(existing_room, spec, father_id)
+                                  or (father_name is not None and father_id is None))
+            if write and (not exists or changed):
+                saved = adapter.save_room(_room_payload(spec, father_id, existing_room))
+                rooms_by_name[name] = (saved or {}).get("id", rooms_by_name.get(name))
+            item = {"name": name, "icon": spec["icon"], "tagColor": spec["tagColor"],
+                    "status": _status(exists, changed)}
+            if father_name:
+                item["parent"] = father_name
+            inventory[kind].append(item)
 
     for spec in EQUIPMENTS:
         room_id = rooms_by_name.get(spec["room"])
-        existing = eq_by_key.get((str(room_id), spec["key"])) if room_id is not None else None
+        existing = eq_by_key.get(spec["key"])
         excluded = bool(spec.get("excluded"))
         changed = existing is not None and (_eq_excluded(existing) != excluded
-                                            or not _bool(existing.get("isEnable", 1)))
+                                            or not _bool(existing.get("isEnable", 1))
+                                            or existing.get("name") != spec["name"]
+                                            or (room_id is not None and str(
+                                                existing.get("object_id")) != str(room_id)))
         eq_id = existing.get("id") if existing else None
         existing_cmds = {}
         if live and existing is not None:
             existing_cmds = {c.get("name"): c for c in adapter.cmds(eq_id)}
         command_changed = any(
-            cmd["name"] not in existing_cmds or _cmd_drift(existing_cmds[cmd["name"]], cmd)
+            _match_cmd(existing_cmds, cmd) is None or _cmd_drift(_match_cmd(existing_cmds, cmd), cmd)
             for cmd in spec["cmds"]
         )
         if write and (existing is None or changed or command_changed):
@@ -369,7 +459,7 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
             eq_id = (saved or {}).get("id", eq_id)
         cmd_report = []
         for cmd in spec["cmds"]:
-            ex = existing_cmds.get(cmd["name"])
+            ex = _match_cmd(existing_cmds, cmd)
             drift = ex is not None and _cmd_drift(ex, cmd)
             cmd_report.append({"name": cmd["name"], "type": cmd["type"], "subType": cmd["subType"],
                                "generic_type": cmd["generic_type"] or None,
@@ -381,13 +471,21 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
             "cmds": cmd_report})
 
     for spec in SCENARIOS:
-        exists = spec["name"] in scen_by_name
-        if write and not exists:
-            adapter.save_scenario({"name": spec["name"], "group": SCENARIO_GROUP,
-                                   "description": spec["description"], "isActive": 1,
-                                   "mode": "provoke"})
+        existing_scen = scen_by_name.get(spec["name"]) or scen_by_name.get(ascii_fold(spec["name"]))
+        exists = existing_scen is not None
+        changed = exists and (existing_scen.get("name") != spec["name"]
+                              or existing_scen.get("group") != SCENARIO_GROUP
+                              or existing_scen.get("description") != spec["description"])
+        if write and (not exists or changed):
+            payload = {"name": spec["name"], "group": SCENARIO_GROUP,
+                       "description": spec["description"]}
+            if exists:
+                payload["id"] = existing_scen.get("id")
+            else:
+                payload.update(isActive=1, mode="provoke")
+            adapter.save_scenario(payload)
         inventory["scenarios"].append({"key": spec["key"], "name": spec["name"],
-                                       "status": _status(exists)})
+                                       "status": _status(exists, changed)})
 
     inventory["summary"] = _summarize(inventory)
     return inventory
@@ -395,12 +493,13 @@ def populate(adapter: Optional[JeedomAdapter], dry_run: bool,
 
 def _summarize(inv: Dict[str, Any]) -> Dict[str, Any]:
     counts: Dict[str, int] = {}
-    for item in inv["rooms"] + inv["scenarios"] + inv["equipments"]:
+    for item in inv["parents"] + inv["rooms"] + inv["scenarios"] + inv["equipments"]:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
         for cmd in item.get("cmds", []):
             counts[cmd["status"]] = counts.get(cmd["status"], 0) + 1
     typed = [c for e in inv["equipments"] for c in e["cmds"] if c["generic_type"]]
-    return {"rooms": len(inv["rooms"]), "equipments": len(inv["equipments"]),
+    return {"parents": len(inv["parents"]), "rooms": len(inv["rooms"]),
+            "equipments": len(inv["equipments"]),
             "cmds": sum(len(e["cmds"]) for e in inv["equipments"]), "cmds_typed": len(typed),
             "scenarios": len(inv["scenarios"]),
             "excluded_equipments": sum(1 for e in inv["equipments"] if e["excluded"]),

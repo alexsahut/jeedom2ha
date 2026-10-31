@@ -6,7 +6,7 @@ export const declaredEquipments = {
 };
 export const declaredPublicationOverrides = {};
 
-// La seule commande bloquante de l'équipement 380 est la cible de l'ancre.
+// La seule commande bloquée de l'équipement 380 est la cible de l'ancre.
 // Story 22.2 (R2) : `cover` est le seul type encore proposé pour 2971 (sensor et binary_sensor sont
 // retirés, refusés par la validation de projection) ; son aperçu réel reste bloquant (ambiguïté).
 const BASCULE_TYPE = 'cover';
@@ -24,16 +24,22 @@ async function atStep(helpers, index, label, operation) {
   }
 }
 
+// Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C. « modale » = la vue est visible ; « depliage » =
+// sélection de l'équipement dans l'arbre (clic réel sur sa ligne) ; son détail est déjà déplié. Mêmes étiquettes de suivi.
 async function openEq380(page, helpers) {
   const room = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]');
   await atStep(helpers, 1, 'carte-piece-4', () => room.click());
-  const modal = page.locator('.modal-j2ha-room');
-  await atStep(helpers, 2, 'modale', () => modal.waitFor({ state: 'visible' }));
-  const panel = modal.locator('.j2ha-eq-panel[data-eq-id="380"]');
-  await atStep(helpers, 3, 'panneau-eq-380', () => panel.waitFor({ state: 'visible' }));
+  const view = page.locator('#j2ha_workView');
+  await atStep(helpers, 2, 'modale', () => view.waitFor({ state: 'visible' }));
+  const row = view.locator('.j2ha-wv-eq[data-eq-id="380"]');
+  const panel = view.locator('.j2ha-eq-panel[data-eq-id="380"]');
+  await atStep(helpers, 3, 'panneau-eq-380', () => row.waitFor({ state: 'visible' }));
   await atStep(helpers, 4, 'depliage', async () => {
-    await panel.locator('.j2ha-eq-toggle').click();
-    await panel.locator('.panel-collapse').waitFor({ state: 'visible' });
+    const started = Date.now();
+    await row.locator('.j2ha-wv-row').click();
+    await panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' });
+    // Chronométrage du chargement d'un équipement sélectionné (valeur seulement, aucun seuil) : réserve de 25.3.
+    helpers.record('temps_chargement_eq_selectionne_ms', Date.now() - started);
   });
   await atStep(helpers, 5, 'table', () => panel.locator('.j2ha-cmd-table').waitFor({ state: 'visible' }));
   await atStep(helpers, 6, 'ancre-bloquante', () => panel.locator('.j2ha-goto-blocking').waitFor({ state: 'visible' }));
@@ -52,22 +58,27 @@ async function waitForTarget(page, panel) {
   return { target: panel.locator(`tr.mapping-override-cmd[data-cmd-id="${cmdId}"]`), cmdId };
 }
 
+// Story 25.1 : vocabulaire du glossaire (Publiée / À appliquer / Bloquée / Ignorée / Exclue). Une commande
+// dont le type vient d'être imposé et pas encore appliqué est « à appliquer » ; « publiée » si elle est déjà
+// présente dans Home Assistant : les deux sont un état affirmatif (jamais bloquée).
 async function diagnosticState(row) {
   return row.locator('.mo-diag-cell').evaluate((cell) => {
-    if (cell.classList.contains('j2ha-diag-ready')) return 'prete';
-    if (cell.classList.contains('j2ha-diag-blocking')) return 'bloquante';
-    if (cell.classList.contains('j2ha-diag-uncovered')) return 'non-couverte';
+    if (cell.classList.contains('j2ha-diag-ready')) return 'publiee';
+    if (cell.classList.contains('j2ha-diag-todo')) return 'a-appliquer';
+    if (cell.classList.contains('j2ha-diag-blocking')) return 'bloquee';
+    if (cell.classList.contains('j2ha-diag-uncovered')) return 'ignoree';
     if (cell.classList.contains('j2ha-diag-excluded')) return 'exclue';
     if (cell.classList.contains('j2ha-diag-unknown')) return 'inconnue';
     return 'inconnu';
   });
 }
 
+/** État de l'équipement : le mot du badge (Publié, À appliquer, Bloqué, …), sans la mention des bloquées. */
 async function summary(panel) {
   return (await panel.locator('.j2ha-eq-publish-badge').innerText()).trim();
 }
 
-/** Story 22.2 (AC2) : compteurs de l'équipement déplié (texte rendu, identifiants seulement). */
+/** Story 22.2 / 25.1 (AC2) : compteurs de l'équipement déplié (texte rendu, identifiants seulement). */
 async function counters(panel) {
   return panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 }
@@ -102,7 +113,7 @@ export async function run(page, { helpers }) {
   helpers.record('synthese_initiale', initialSummary);
 
   const initialCounters = await atStep(helpers, '7a', 'compteurs-initiaux', () => counters(panel));
-  if (initialCounters.length < 3 || !initialCounters.slice(0, 3).every((text) => /^\d+ commandes? /.test(text))) {
+  if (initialCounters.length < 1 || !initialCounters.every((text) => /^\d+ (publiées?|à appliquer|bloquées?|ignorées?|exclues?)$/.test(text))) {
     throw new Error('compteurs-eq-380-illisibles');
   }
   initialCounters.forEach((text, index) => helpers.record(`compteur_initial_${index + 1}`, text));
@@ -111,22 +122,26 @@ export async function run(page, { helpers }) {
   helpers.record('cmd_cible_id', Number(cmdId));
   helpers.record('cmd_cible_initial', await diagnosticState(target));
 
-  // Story 22.2 (R2, AC6 option A) : la liste « Override HA » ne propose plus que les types dont la
+  // Story 22.2 (R2, AC6 option A) : la liste « Type HA » ne propose plus que les types dont la
   // projection peut aboutir. Pour 2971 (état d'un cover orphelin) `sensor` et `binary_sensor` sont
   // refusés par la validation même forcés : ils ne sont plus proposés, seul `cover` (type
   // automatique, valide mais refusé pour ambiguïté) reste. Plus d'aperçu réel d'un type refusé :
   // le parcours vérifie la liste et la cause lisible, puis bascule simulée sur `cover`.
   const journalA = helpers.journalEntries().length;
-  const offered = await atStep(helpers, 9, 'liste-types-filtree', () => target.locator('select option')
-    .evaluateAll((options) => options.map((option) => option.getAttribute('value') ?? '')));
+  // Story 25.1 : le sélecteur n'existe qu'après un clic sur le lien « auto » de la colonne « Type HA ».
+  const offered = await atStep(helpers, 9, 'liste-types-filtree', async () => {
+    await target.locator('.j2ha-type-link').click();
+    return target.locator('select option').evaluateAll((options) => options.map((option) => option.getAttribute('value') ?? ''));
+  });
   helpers.record('etape_a_types_proposes', offered.filter(Boolean).join(','));
-  if (offered[0] !== '') throw new Error('mode-automatique-absent');
+  if (offered[0] !== '') throw new Error('mode-automatique-absent'); // l'option « auto »
   if (offered.includes('sensor') || offered.includes('binary_sensor')) throw new Error('type-refuse-encore-propose');
   if (JSON.stringify(offered.filter(Boolean)) !== JSON.stringify([BASCULE_TYPE])) throw new Error('liste-types-inattendue');
   // Cause lisible du refus : la voie normale reste de préciser les types génériques dans Jeedom.
   const stateA = await diagnosticState(target);
-  if (stateA !== 'bloquante') throw new Error('cmd-cible-non-bloquante');
-  const causeA = (await target.locator('.mo-diag-cell').innerText()).trim();
+  if (stateA !== 'bloquee') throw new Error('cmd-cible-non-bloquante');
+  // Story 25.1 : la cause est dite une fois, dans l'encart de l'équipement (plus sur la ligne).
+  const causeA = (await panel.locator('.j2ha-notice-text').first().innerText()).trim();
   if (!/précisez les types génériques dans Jeedom/.test(causeA)) throw new Error('cause-refus-illisible');
   // Le texte complet de la cause (environ 90 caractères) dépasse la limite des observations
   // (80 caractères, `normalizeParcoursRecord`) : on n'enregistre que le constat.
@@ -146,15 +161,20 @@ export async function run(page, { helpers }) {
     ]);
     await page.waitForFunction((id) => {
       const row = document.querySelector(`tr.mapping-override-cmd[data-cmd-id="${id}"]`);
-      return row?.querySelector('.mo-diag-cell')?.classList.contains('j2ha-diag-ready')
+      const cell = row?.querySelector('.mo-diag-cell');
+      return Boolean(cell) && (cell.classList.contains('j2ha-diag-todo') || cell.classList.contains('j2ha-diag-ready'))
         && Boolean(row.querySelector('.mo-revert-cmd'));
     }, cmdId);
   });
   const stateB = await diagnosticState(target);
   const summaryB = await summary(panel);
   helpers.record('etape_b_synthese', summaryB);
-  if (stateB !== 'prete') throw new Error('bascule-simulee-non-prete');
-  if (!/^Sera publié dans Home Assistant : \d+ commande\(s\) prête\(s\)\.$/.test(summaryB)) {
+  if (stateB !== 'a-appliquer' && stateB !== 'publiee') throw new Error('bascule-simulee-non-prete');
+  // L'équipement n'est plus « Bloqué ». Son état final (« À appliquer ») dépend de sync_status, que la
+  // lecture dérivée ne recalcule jamais (simulate.mjs, arbitrage du 2026-10-02) : avec le sync_status
+  // réel d'avant la bascule, l'écran dit « Rien à publier ». Ce badge n'est pas prouvé par le gate ;
+  // le démon réel pose current_should_publish et override_pending après un enregistrement.
+  if (!['À appliquer', 'Publié', 'Rien à publier'].includes(summaryB)) {
     throw new Error('synthese-bascule-encore-bloquante');
   }
   helpers.record('etape_b_cellule', stateB);
@@ -176,7 +196,7 @@ export async function run(page, { helpers }) {
   const stateC = await diagnosticState(target);
   const summaryC = await summary(panel);
   helpers.record('etape_c_synthese', summaryC);
-  if (stateC !== 'bloquante' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
+  if (stateC !== 'bloquee' || summaryC !== initialSummary) throw new Error('retour-automatique-incomplet');
   // Story 22.2 : le retour au mode automatique restitue aussi les compteurs de l'équipement.
   const finalCounters = await atStep(helpers, '11a', 'compteurs-finaux', () => counters(panel));
   if (JSON.stringify(finalCounters) !== JSON.stringify(initialCounters)) throw new Error('compteurs-non-restitues');

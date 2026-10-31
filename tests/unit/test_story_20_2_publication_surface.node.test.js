@@ -35,7 +35,7 @@ test('20-2 — P2 revue : chaque bouton porte sa propre cause de blocage', () =>
 
   const alreadyForced = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: 'force_publish' });
   assert.equal(alreadyForced.can_force, false);
-  assert.match(alreadyForced.force_reason, /déjà forcée|Publication déjà forcée/i);
+  assert.match(alreadyForced.force_reason, /Déjà réglé sur « Toujours »/);
 
   const noMapping = M.publicationActionState({ decision: { ha_entity_type: null, should_publish: false }, override_command_id: 8, publication_override: null });
   assert.equal(noMapping.can_force, false);
@@ -61,11 +61,11 @@ test('20-2 — P2 revue : chaque bouton porte sa propre cause de blocage', () =>
 
   const alreadyExcluded = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: 'exclude_command' });
   assert.equal(alreadyExcluded.can_exclude, false);
-  assert.match(alreadyExcluded.exclude_reason, /déjà exclue/i);
+  assert.match(alreadyExcluded.exclude_reason, /Déjà réglé sur « Jamais »/);
 
   const nothingToRevert = M.publicationActionState({ decision: blocked, override_command_id: 8, publication_override: null });
   assert.equal(nothingToRevert.can_revert, false);
-  assert.match(nothingToRevert.revert_reason, /Aucun override/);
+  assert.match(nothingToRevert.revert_reason, /Aucun réglage de publication/);
 });
 
 test('20-2 — P1 revue : exclude_eqlogic/exclude_command du démon restent lisibles après normalizeTree', () => {
@@ -170,10 +170,10 @@ test('20-2 — causes ambiguës : libellés spécifiques issus de reason_code', 
 test('20-2 — revue X4 (point 3) : exclusion posée sur l\'équipement vue au niveau équipement', () => {
   // renderEquipmentTree calcule désormais `publication_override: 'exclude_eqlogic'` pour la
   // cible équipement dès qu'une entité porte ce veto — même lecture que publicationActionState
-  // ferait pour une entité déjà exclue : « Exclure » devient sans effet.
+  // ferait pour une entité déjà exclue : le segment « Jamais » devient sans effet.
   const state = M.publicationActionState({ publication_override: 'exclude_eqlogic', has_publication_override: true }, true);
   assert.equal(state.can_exclude, false);
-  assert.match(state.exclude_reason, /déjà exclue/);
+  assert.match(state.exclude_reason, /Déjà réglé sur « Jamais »/);
 });
 
 test('20-2 — revue X4 (point 3) : bouton équipement « Revenir au mode automatique » fusionné', () => {
@@ -187,10 +187,10 @@ test('20-2 — revue X4 (point 3) : bouton équipement « Revenir au mode automa
 
   const withoutAnyOverride = M.publicationActionState({ publication_override: null, has_publication_override: false }, true);
   assert.equal(withoutAnyOverride.can_revert, false);
-  assert.match(withoutAnyOverride.revert_reason, /[Aa]ucun override/);
+  assert.match(withoutAnyOverride.revert_reason, /Aucun réglage de publication/);
 });
 
-test('20-2 — revue X4 (point 4) : entité héritant du veto d\'équipement — Forcer/Revenir grisés', () => {
+test('20-2 — revue X4 (point 4) : entité héritant du veto d\'équipement — « Toujours » et « Automatique » grisés', () => {
   // L'entité elle-même ne porte pas l'override (il vit sur l'équipement) : Forcer et
   // Revenir n'ont aucun effet à sa portée et doivent pointer vers l'équipement.
   const inherited = M.publicationActionState(
@@ -235,7 +235,7 @@ test('20-2 — P3 (reprise X5d) : entité non publiée qui le deviendrait, Confi
   const state = M.equipmentForcePreviewState(view, commands, currentEntities);
   assert.equal(state.items[0].already_published, false);
   assert.equal(state.items[0].changes, true);
-  assert.match(state.items[0].status_label, /Sera publiée/);
+  assert.match(state.items[0].status_label, /À appliquer/);
   assert.equal(state.can_confirm, true);
   assert.equal(state.refusal_reason, null);
 });
@@ -255,7 +255,7 @@ test('20-2 — P3 (reprise X5d) : mix d\'entités déjà publiées et bloquées,
   assert.equal(state.items[0].changes, false);
   assert.equal(state.items[1].already_published, false);
   assert.equal(state.items[1].changes, false);
-  assert.match(state.items[1].status_label, /Ne sera pas publié/);
+  assert.match(state.items[1].status_label, /Bloquée/);
   assert.equal(state.can_confirm, false);
 });
 
@@ -292,6 +292,6 @@ test('20-2 — P3 (reprise X5e) : entités avec commande d\'action partagée, pa
   assert.equal(state.items[0].changes, false);
   assert.equal(state.items[1].already_published, false);
   assert.equal(state.items[1].changes, true);
-  assert.match(state.items[1].status_label, /Sera publiée/);
+  assert.match(state.items[1].status_label, /À appliquer/);
   assert.equal(state.can_confirm, true);
 });

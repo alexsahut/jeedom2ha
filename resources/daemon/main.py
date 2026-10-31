@@ -206,6 +206,7 @@ class Jeedom2haDaemon(BaseDaemon):
             _LOGGER.warning("[DAEMON] No local_secret provided — HTTP API will reject all requests")
 
         self._app = create_app(local_secret=local_secret)
+        self._app["plugin_version"] = _VERSION  # Story 24.2 — champ `producer` de l'export de décision
 
         # Story 5.1 — Task 1.3: Load disk cache before MQTT connects
         boot_cache = load_publications_cache(_DAEMON_DATA_DIR)
