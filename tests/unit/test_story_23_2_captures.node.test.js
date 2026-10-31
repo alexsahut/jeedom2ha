@@ -215,3 +215,14 @@ test('23.2 — capture HA filtrée sur Jeedom (sans broker ni appareils par déf
   const sb = await load('lib/storyboard.mjs');
   assert.equal(sb.DEMO.haDeviceFilter, 'Jeedom');
 });
+
+test('23.2 — vidéo : pilotage HA accepte l\'interrupteur ou le bouton « Allumer » (état inconnu)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /getByRole\('switch'\)\s*\.or\(page\.getByRole\('button', \{ name: \/\^\(allumer\|turn on\)\$\/i \}\)\)\.first\(\)/);
+});
+
+test('23.2 — settle borné à quelques secondes (Jeedom n\'atteint jamais networkidle)', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /export const SETTLE_MS = 3000;/);
+  assert.match(src, /waitForLoadState\('networkidle', \{ timeout: SETTLE_MS \}\)/);
+});
