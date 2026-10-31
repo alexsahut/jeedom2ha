@@ -644,6 +644,14 @@
     var $host = $panel.find('.j2ha-eq-exclusion').first().empty();
     var eqId = tree.jeedom_eq_id;
     var cause = M.exclusionCauseOf(tree, roomEnabledById()[eqId]);
+    // `tree` est ici l'entrée agrégée (champ additif de la route 25.2, via `refreshEquipmentState`).
+    if (!cause && tree.homekit_kept_in_excluded_room === true) {
+      // Story 24.4 (R1) : la cause de « non écarté » est dite, jamais un septième état.
+      $host.append($('<div class="j2ha-notice j2ha-notice-neutral j2ha-eq-homekit-kept" role="status"></div>')
+        .append($('<i class="fas fa-home" aria-hidden="true"></i>'))
+        .append($('<span class="j2ha-notice-text"></span>').text(' ' + '{{Exposé à HomeKit : non écarté par sa pièce}}')));
+      return;
+    }
     if (!cause) {
       return;
     }

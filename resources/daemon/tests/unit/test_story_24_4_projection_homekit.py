@@ -315,3 +315,41 @@ async def test_export_four_truth_table_lines_and_unchanged_fields(cli, tmp_path)
     sc = {r["scenario_id"]: r for r in doc["scenarios"]}
     assert sc[7]["homekit_exposed_effective"] is True
     assert sc[8]["homekit_exposed_effective"] is False and sc[8]["homekit_exposed"] is True
+
+
+# ---------------------------------------------------------------------------
+# R1 (PR #335) — champs additifs de la route agrégée, un seul calcul
+# ---------------------------------------------------------------------------
+
+def test_r1_kept_flag_reads_the_scope_decision_only():
+    from models.published_scope import (
+        equipment_scope_inherits,
+        is_homekit_kept_in_excluded_room,
+    )
+
+    assert is_homekit_kept_in_excluded_room({"decision_source": "exception_homekit"}) is True
+    for source in ("piece", "global", "equipement", "exception_equipement"):
+        assert is_homekit_kept_in_excluded_room({"decision_source": source}) is False
+    assert is_homekit_kept_in_excluded_room(None) is False
+    for source in ("piece", "global", "exception_homekit"):
+        assert equipment_scope_inherits({"decision_source": source}) is True
+    for source in ("equipement", "exception_equipement"):
+        assert equipment_scope_inherits({"decision_source": source}) is False
+    assert equipment_scope_inherits(None) is False
+
+
+def test_r1_projection_carries_additive_fields():
+    from transport.http_server import _project_equipment_state
+
+    tree = {
+        "jeedom_eq_id": 1, "equipment_decision": {}, "entities": [], "commands": [],
+        "sync_status": {},
+    }
+    kept = _project_equipment_state(tree, {"decision_source": "exception_homekit"}, True)
+    assert kept["homekit_kept_in_excluded_room"] is True
+    assert kept["homekit_exposed_effective"] is True
+    assert kept["scope_inherit"] is True
+    plain = _project_equipment_state(tree, {"decision_source": "piece"}, False)
+    assert plain["homekit_kept_in_excluded_room"] is False
+    assert plain["homekit_exposed_effective"] is False
+    assert plain["scope_inherit"] is True

@@ -61,6 +61,21 @@ def _normalized_state_and_explicit(scope_map: Any, identifier: int) -> tuple[str
     return normalized_state, is_explicit
 
 
+def is_homekit_kept_in_excluded_room(entry: Any) -> bool:
+    """Story 24.4 (R1) : vrai quand l'équipement est relevé de sa pièce exclue par l'exposition HomeKit.
+
+    Lecture unique de la décision calculée par `resolve_published_scope` (aucun second calcul).
+    """
+    return isinstance(entry, dict) and entry.get("decision_source") == DECISION_SOURCE_EXCEPTION_HOMEKIT
+
+
+def equipment_scope_inherits(entry: Any) -> bool:
+    """Vrai quand l'état d'équipement du périmètre est `inherit` (pas de règle propre à l'équipement)."""
+    return isinstance(entry, dict) and entry.get("decision_source") in {
+        "global", "piece", DECISION_SOURCE_EXCEPTION_HOMEKIT,
+    }
+
+
 def _new_counts() -> Dict[str, int]:
     return {
         "total": 0,

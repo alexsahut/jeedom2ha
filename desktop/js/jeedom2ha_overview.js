@@ -96,7 +96,7 @@
           eq_id: eq.eq_id, eq_name: eq.eq_name, room_id: room.object_id, room_name: room.object_name,
           state: null, blocked_mention: 0, group: 'unread',
           // Story 25.7 : cause d'exclusion (mention à côté du mot « Exclu », jamais un état) et plugin de l'équipement.
-          cause: null, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
+          cause: null, homekit_kept: false, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
         };
         if (entry && typeof entry === 'object') {
           // `summarizeRoom` lit l'identifiant dans l'entrée : on le garantit sans cloner l'entrée.
@@ -105,6 +105,8 @@
           row.state = resolved.state;
           row.blocked_mention = resolved.blocked_mention;
           row.group = GROUP_OF_STATE[resolved.state];
+          // Story 24.4 (R1) : relevé de sa pièce exclue par HomeKit (champ additif de la route agrégée).
+          row.homekit_kept = entry.homekit_kept_in_excluded_room === true;
           if (resolved.state === 'excluded') row.cause = M.exclusionCauseOf(entry, eq.enabled);
         }
         counts[row.group] += 1;
@@ -178,6 +180,10 @@
     (Array.isArray(room.equipments) ? room.equipments : []).forEach(function (eq) {
       var key = String(eq.eq_id);
       if (!Object.prototype.hasOwnProperty.call(view.equipments, key)) { out.unread += 1; return; }
+      // Story 24.4 (R1) : un équipement actif, exposé à HomeKit et d'état d'équipement `inherit` sera relevé de la pièce
+      // exclue (même règle que le démon) : ses entités ne seront pas retirées.
+      var entry = view.equipments[key];
+      if (eq.enabled !== false && entry && entry.homekit_exposed_effective === true && entry.scope_inherit === true) return;
       var entities = view.equipments[key] && Array.isArray(view.equipments[key].entities) ? view.equipments[key].entities : [];
       entities.forEach(function (entity) {
         if (entity && entity.present_in_ha === true) out.entities += 1;
@@ -486,15 +492,23 @@
     // Équipements de la pièce pas encore exclus dans la copie des états (relecture à faire ou échouée) : ni « Exclu », ni
     // « Désactivé » (qui prime et le reste), ni non lu.
     function notYetRemovedCount(room) {
-      return room.equipments.filter(function (row) { return row.state !== null && row.state !== 'excluded' && row.state !== 'disabled'; }).length;
+      return room.equipments.filter(function (row) { return row.state !== null && row.state !== 'excluded' && row.state !== 'disabled' && row.homekit_kept !== true; }).length;
     }
 
-    function excludedLine(notYet) {
+    // Story 24.4 (R1) : équipements gardés dans la pièce exclue par l'exposition HomeKit (jamais « pas encore retirés »).
+    function keptHomekitCount(room) {
+      return room.equipments.filter(function (row) { return row.homekit_kept === true; }).length;
+    }
+
+    function excludedLine(notYet, kept) {
       var $line = $('<div class="j2ha-room-ratio j2ha-room-excluded-line"></div>')
         .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'))
         .append(document_text(' ' + w('Pièce exclue')));
       if (notYet > 0) {
         $line.append($('<span class="j2ha-room-notyet"></span>').text(' · ' + notYet + ' ' + w(notYet > 1 ? 'pas encore retirés' : 'pas encore retiré')));
+      }
+      if (kept > 0) {
+        $line.append($('<span class="j2ha-room-homekit-kept"></span>').text(' · ' + kept + ' ' + w(kept > 1 ? 'gardés (HomeKit)' : 'gardé (HomeKit)')));
       }
       return $line;
     }
@@ -524,7 +538,7 @@
         // Story 25.8 (AC12, Q4) : « Pièce exclue » REMPLACE seulement le ratio ; la jauge et les repères sont conservés.
         if (excluded) {
           $card.addClass('j2ha-room-excluded');
-          $slot.append(excludedLine(notYetRemovedCount(room)));
+          $slot.append(excludedLine(notYetRemovedCount(room), keptHomekitCount(room)));
         } else {
           $slot.append($('<div class="j2ha-room-ratio"></div>').text(c.published + ' / ' + total + ' ' + w(c.published > 1 ? 'publiés' : 'publié')));
         }

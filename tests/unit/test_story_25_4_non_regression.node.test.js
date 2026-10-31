@@ -52,6 +52,22 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     'if not _scope_entry_is_included(eq_id, scope_entries.get(eq_id), eligibility):',
   ];
 
+  // Story 24.4 (projection HomeKit) et sa relecture R1 : lignes existantes remplacées dans le démon (résolution du périmètre, lecture de
+  // l'exclusion historique, import et signature/appel de la projection agrégée, qui gagne trois champs additifs).
+  const REPLACED_BY_24_4 = [
+    'effective_state = piece_effective',
+    'decision_source = "piece" if piece_state != STATE_INHERIT else "global"',
+    'if eq.is_excluded:',
+    'source = eq.exclusion_source or "eqlogic"  # défaut rétro-compatible',
+    'from models.published_scope import resolve_published_scope',
+    'def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:',
+    'equipments[str(eq_id)] = _project_equipment_state(tree)',
+    // test de la route agrégée (25.2) : les trois champs additifs sont écartés de la comparaison à l'arbre unitaire
+    'EQUIPMENT_KEYS = {"jeedom_eq_id", "equipment_decision", "entities", "commands", "sync_status"}',
+    'assert payload["equipments"][str(eq_id)] == _project(unit)',
+    'assert after["equipments"]["101"] == _project(unit)',
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -85,7 +101,7 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
     const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'core/class/', 'tests/e2e/gate/lib/policy.mjs']);
     if (diff === null) return;
-    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2];
+    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2, ...REPLACED_BY_24_4];
     const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !allowed.includes(line));
     assert.deepEqual(unexpected, []);
   });
@@ -129,7 +145,11 @@ describe('25.4 / AC32 — aucune copie ni re-sérialisation des états', () => {
     const php = fs.readFileSync(path.join(root, 'core/ajax/jeedom2ha.ajax.php'), 'utf8');
     const projection = ['def _project_equipment_state', 'def _build_equipment_states'];
     assert.ok(py.includes(projection[0]));
-    assert.equal(slice(py, ...projection), slice(pyBase, ...projection), 'liste blanche (projection) modifiée');
+    // Story 24.4 (R1) : la signature gagne deux paramètres et la projection trois champs additifs (bloc commenté « Story 24.4 »).
+    const unchanged = (text) => slice(text, ...projection)
+      .replace(/def _project_equipment_state\([^)]*\) -> Dict\[str, Any\]:/, 'def _project_equipment_state')
+      .replace(/ {8}# Story 24\.4 \(R1, additif\)[\s\S]*?"scope_inherit": [^\n]*\n/, '');
+    assert.equal(unchanged(py), unchanged(pyBase).replace(/def _project_equipment_state[^\n]*/, 'def _project_equipment_state'), 'liste blanche (projection) modifiée');
     const constants = (text) => text.split('\n').filter((l) => /^_EQUIPMENT_STATES_/.test(l)).join('\n');
     assert.equal(constants(py), constants(pyBase), 'constantes de la route modifiées');
     const relay = ["$action == 'getEquipmentStates'", 'else if ($action =='];

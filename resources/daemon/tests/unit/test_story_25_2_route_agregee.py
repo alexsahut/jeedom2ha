@@ -24,7 +24,13 @@ H = {"X-Local-Secret": SECRET}
 URL = "/system/equipment_states"
 EQ_IDS = sorted(build_corpus_topology().eq_logics)
 
-EQUIPMENT_KEYS = {"jeedom_eq_id", "equipment_decision", "entities", "commands", "sync_status"}
+# Story 24.4 (R1, additif) : trois champs de la route agrégée, calculés depuis le périmètre (absents de l'arbre unitaire).
+HOMEKIT_ADDITIVE_KEYS = {"homekit_kept_in_excluded_room", "homekit_exposed_effective", "scope_inherit"}
+EQUIPMENT_KEYS = {"jeedom_eq_id", "equipment_decision", "entities", "commands", "sync_status"} | HOMEKIT_ADDITIVE_KEYS
+
+
+def _without_homekit(entry):
+    return {k: v for k, v in entry.items() if k not in HOMEKIT_ADDITIVE_KEYS}
 COMMAND_KEYS = {"jeedom_cmd_id", "covered", "published_in_ha", "diagnostic"}
 ENTITY_KEYS = {"override_pending", "present_in_ha"}  # Story 25.8 (Q1 B) : ajout de `present_in_ha`
 SYNC_KEYS = {"synced_should_publish", "current_should_publish", "override_pending", "published_in_ha"}
@@ -109,7 +115,7 @@ async def test_ac2_forme_et_liste_blanche(cli):
 async def test_ac3_identique_a_la_projection_de_l_arbre_unitaire(cli, eq_id):
     payload = await _get(cli)
     unit = (await (await cli.get(f"/system/mapping_overrides/{eq_id}", headers=H)).json())["payload"]
-    assert payload["equipments"][str(eq_id)] == _project(unit)
+    assert _without_homekit(payload["equipments"][str(eq_id)]) == _project(unit)
 
 
 @pytest.mark.parametrize("raw_scope", [None, {"equipements": {"101": {"state": "exclude"}}},
@@ -119,7 +125,7 @@ async def test_ac3_parite_avec_un_perimetre_publie(cli, app, raw_scope):
     payload = await _get(cli)
     for eq_id in EQ_IDS:
         unit = (await (await cli.get(f"/system/mapping_overrides/{eq_id}", headers=H)).json())["payload"]
-        assert payload["equipments"][str(eq_id)] == _project(unit)
+        assert _without_homekit(payload["equipments"][str(eq_id)]) == _project(unit)
 
 
 async def test_ac3_ordre_natif_des_commandes(cli, app):
@@ -385,7 +391,7 @@ async def test_ac12_publication_override_save_puis_get(cli):
     assert after["meta"]["cache"]["hit"] is False
     assert after["equipments"]["101"]["sync_status"]["override_pending"] is True
     unit = (await (await cli.get("/system/mapping_overrides/101", headers=H)).json())["payload"]
-    assert after["equipments"]["101"] == _project(unit)
+    assert _without_homekit(after["equipments"]["101"]) == _project(unit)
 
 
 async def test_ac12_mapping_override_save_et_reverts(cli):
