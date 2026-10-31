@@ -88,7 +88,8 @@ class FakeJeedom:
         if method == c.CONFIG_GET:
             assert p.get("plugin") == "core"
             value = self.config.get(p["key"])
-            return "ok" if value in (None, "") else value  # jsonrpc::makeSuccess() d'une valeur vide
+            # jsonrpc::makeSuccess() : toute valeur vide au sens de PHP, y compris "0", devient « ok ».
+            return "ok" if value in (None, "", "0") else value
         if method == c.CONFIG_SAVE:
             assert p.get("plugin") == "core"
             self.config[p["key"]] = p["value"]
@@ -503,3 +504,13 @@ def test_d1_theme_dry_run_n_ecrit_rien_et_valeur_vide_est_un_ecart(server):
     inv = pd.populate(adapter_for(server), dry_run=True)
     assert inv["summary"]["theme_by_status"] == {"would_update": 2}
     assert pd.JsonRpcContract.CONFIG_SAVE not in server.calls
+
+
+def test_d1_theme_zero_relu_comme_ok_reste_exists(server):
+    """« 0 » relu « ok » (PHP empty) : le second passage ne doit pas réécrire en boucle."""
+    adapter = adapter_for(server)
+    pd.populate(adapter, dry_run=False)
+    again = pd.populate(adapter, dry_run=False)
+    assert again["summary"]["theme_by_status"] == {"exists": 2}
+    # Mais « ok » ne vaut pas une vraie valeur attendue non nulle.
+    assert not pd._config_matches("ok", "core2019_Light")
