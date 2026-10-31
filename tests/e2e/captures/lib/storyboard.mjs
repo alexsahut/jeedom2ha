@@ -52,18 +52,19 @@ export const EXTRA_SHOTS = Object.freeze([
   { id: '2b', file: 'cartes-de-piece-garage.png', app: 'jeedom', doc: null, marker: null },
 ]);
 
-/** Storyboard vidéo : durées de pause (ms) par étape, en plus des temps de chargement réels. */
+/** Storyboard vidéo : durées de pause (ms) par étape, en plus des temps de chargement réels.
+ * Ramenées de 55 à 43,5 s le 2026-10-31 : le premier enregistrement complet (VM 122) atteignait 120 s, la limite. */
 export const HA_VIDEO_STEP_IDS = Object.freeze(['ha-appareils', 'ha-pilotage', 'retour']);
 
 export const VIDEO_STEPS = Object.freeze([
-  { id: 'plugins', label: 'Page Plugins : le plugin installé', holdMs: 4000 },
-  { id: 'dependances', label: 'Configuration : dépendances OK et démon OK', holdMs: 6000 },
-  { id: 'relire', label: 'Page principale puis « Relire Jeedom »', holdMs: 8000 },
-  { id: 'piece', label: 'Ouverture d’une pièce', holdMs: 6000 },
-  { id: 'equipement', label: 'Ouverture d’un équipement', holdMs: 6000 },
-  { id: 'ha-appareils', label: 'Home Assistant : mêmes équipements, mêmes pièces', holdMs: 9000 },
-  { id: 'ha-pilotage', label: 'Pilotage d’une lumière depuis Home Assistant', holdMs: 8000 },
-  { id: 'retour', label: 'Retour d’état dans Jeedom', holdMs: 8000 },
+  { id: 'plugins', label: 'Page Plugins : le plugin installé', holdMs: 3500 },
+  { id: 'dependances', label: 'Configuration : dépendances OK et démon OK', holdMs: 5000 },
+  { id: 'relire', label: 'Page principale puis « Relire Jeedom »', holdMs: 6000 },
+  { id: 'piece', label: 'Ouverture d’une pièce', holdMs: 5000 },
+  { id: 'equipement', label: 'Ouverture d’un équipement', holdMs: 5000 },
+  { id: 'ha-appareils', label: 'Home Assistant : mêmes équipements, mêmes pièces', holdMs: 7000 },
+  { id: 'ha-pilotage', label: 'Pilotage d’une lumière depuis Home Assistant', holdMs: 6000 },
+  { id: 'retour', label: 'Retour d’état dans Jeedom', holdMs: 6000 },
 ]);
 
 /** Borne basse sur la durée prévue (pauses seules) : doit rester très en dessous de VIDEO_MAX_SECONDS. */
