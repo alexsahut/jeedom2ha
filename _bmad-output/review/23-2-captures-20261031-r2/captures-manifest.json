@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "plugin_version": "1.2.0",
+  "source_commit": "000a7ce",
+  "generated_on": "2026-10-31",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "locale": "fr-FR",
+  "theme": "light",
+  "data": "démo synthétique 23.1/23.2 (CC-48)",
+  "regenerate": "node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> --out docs/fr_FR/images --video-out <dossier>",
+  "files": [
+    {
+      "id": 1,
+      "file": "page-principale.png",
+      "sha256": "db7fc898d1e0925a32d15966fb2629ac29bdcde22f8cd04b456950de573c0a43",
+      "bytes": 51636
+    },
+    {
+      "id": 2,
+      "file": "cartes-de-piece.png",
+      "sha256": "d7f6e1d110bc50e689fe88f0e9eebd96123cefb3dc265d6667efe670e30d86b1",
+      "bytes": 18094
+    },
+    {
+      "id": "2b",
+      "file": "cartes-de-piece-garage.png",
+      "sha256": "a69298e3fa3a8e445fb5a418cd659622d5e13c350ba65b3c107904a4f1337167",
+      "bytes": 3645
+    },
+    {
+      "id": 3,
+      "file": "vue-de-travail.png",
+      "sha256": "26f0931cc68a18137b961de83cde7c399f5b4680cafec3af5219ed3bc05df8a9",
+      "bytes": 76270
+    },
+    {
+      "id": 4,
+      "file": "detail-equipement.png",
+      "sha256": "08b01b1b09bab4a12b8522fa28e9f0032bf342078e8bd287dbd1370f552aa1b7",
+      "bytes": 27393
+    },
+    {
+      "id": 5,
+      "file": "tableau-des-commandes.png",
+      "sha256": "ca4fb2be6504851f489eca6656ac7d39460ee1a187d4257f06c4271da3bb0174",
+      "bytes": 80105
+    },
+    {
+      "id": 6,
+      "file": "compteurs-detail-piece.png",
+      "sha256": "ce75951b5372da278976f362502e8f64feb80b692b63ce41517603bb7b473a1b",
+      "bytes": 54758
+    },
+    {
+      "id": 7,
+      "file": "compteurs-equipement-deplie.png",
+      "sha256": "3a60efd8a3a8820950c991af9a037596f51fe157650a8d74e23c00308b952561",
+      "bytes": 65485
+    },
+    {
+      "id": 8,
+      "file": "configuration.png",
+      "sha256": "c982f5a68ff7475b7bb707ad35215209615df86ae3c1b41275646069a37ef531",
+      "bytes": 49762
+    }
+  ]
+}
