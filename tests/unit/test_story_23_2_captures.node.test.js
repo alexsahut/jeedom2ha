@@ -227,3 +227,8 @@ test('23.2 — settle borné à quelques secondes (Jeedom n\'atteint jamais netw
   assert.match(src, /export const SETTLE_MS = 3000;/);
   assert.match(src, /waitForLoadState\('networkidle', \{ timeout: SETTLE_MS \}\)/);
 });
+
+test('23.2 — pauses vidéo ramenées sous 45 s (premier enregistrement complet à 120 s)', async () => {
+  const sb = await load('lib/storyboard.mjs');
+  assert.ok(sb.plannedHoldSeconds() <= 45, `pauses ${sb.plannedHoldSeconds()} s`);
+});
