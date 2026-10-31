@@ -29,6 +29,8 @@ export const DEMO = Object.freeze({
   // Capture 3 : « Volet Salon » (3e), distinct de la capture 4 (« Lumière Salon ») et de la capture 5.
   workViewEquipmentIndex: 2,
   haLight: 'Lumière Salon',
+  // Filtre de la liste des appareils HA (capture 9) : fabricant « Jeedom (virtual) » de la démo.
+  haDeviceFilter: 'Jeedom',
 });
 
 /** Lignes 1 à 8 du storyboard, plus la capture Home Assistant. `marker` = marqueur de la doc à remplacer. */
