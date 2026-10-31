@@ -216,11 +216,11 @@ test('23.2 — capture HA filtrée sur Jeedom (sans broker ni appareils par déf
   assert.equal(sb.DEMO.haDeviceFilter, 'Jeedom');
 });
 
-test('23.2 — vidéo : pilotage HA accepte l\'interrupteur ou le bouton « Allumer » (état inconnu)', () => {
+test('23.2 — vidéo : pilotage HA par le composant ha-entity-toggle (boutons à l\'état inconnu, interrupteur sinon)', () => {
   const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
-  assert.match(src, /getByRole\('button', \{ name: \/\^\(allumer\|activer\|turn on\)\$\/i \}\)/);
-  assert.match(src, /\.or\(page\.locator\('ha-entity-toggle ha-icon-button'\)\.last\(\)\)\.first\(\)/);
-});
+  assert.match(src, /const control = page\.locator\('ha-entity-toggle'\)\.first\(\);/);
+  assert.match(src, /const toggle = \(await buttons\.count\(\)\) > 0 \? buttons\.last\(\) : control;/);
+})
 
 test('23.2 — settle borné à quelques secondes (Jeedom n\'atteint jamais networkidle)', async () => {
   const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
