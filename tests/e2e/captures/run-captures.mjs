@@ -242,7 +242,10 @@ async function selectEquipment(page, locator) {
 async function saveShot(page, outDir, shot, secrets, files, clip) {
   await assertLightTheme(page);
   await scrubAndAssertClean(page, secrets);
-  const buffer = clip ? await clip.screenshot({ animations: 'disabled' }) : await page.screenshot({ animations: 'disabled' });
+  // `clip` : un locator (gros plan), 'fullPage' (page entière), ou rien (fenêtre 1280×720).
+  const buffer = clip === 'fullPage'
+    ? await page.screenshot({ animations: 'disabled', fullPage: true })
+    : clip ? await clip.screenshot({ animations: 'disabled' }) : await page.screenshot({ animations: 'disabled' });
   const file = path.join(outDir, shot.file);
   await writeFile(file, buffer);
   files.push({ id: shot.id, file: shot.file, sha256: sha256(buffer), bytes: buffer.length });
@@ -257,11 +260,13 @@ async function runShots(browser, cfg, args, files) {
     await atStep('connexion Jeedom', () => loginJeedom(page, cfg));
     await atStep('1 page principale', async () => {
       await openPluginPage(page, cfg);
-      await saveShot(page, args.out, byId[1], cfg.secrets, files);
+      // Relecture du 2026-10-31 : à 720 px de haut, la grille s'arrêtait au rez-de-chaussée (« Étage » absent).
+      await saveShot(page, args.out, byId[1], cfg.secrets, files, 'fullPage');
     });
     await atStep('2 cartes de pièce', async () => {
-      const card = page.locator('#j2ha_roomCards .j2ha-room-card').filter({ hasText: DEMO.blockedRoom }).first();
-      await saveShot(page, args.out, byId[2], cfg.secrets, files, card);
+      // Une carte seule ne mesure que 130×180 px (relecture du 2026-10-31) : le gros plan prend toute la grille,
+      // groupée par étage, où « Bureau » (1 bloqué) et « Garage » (1 exclu) sont visibles.
+      await saveShot(page, args.out, byId[2], cfg.secrets, files, page.locator('#j2ha_roomCards'));
       const garage = page.locator('#j2ha_roomCards .j2ha-room-card').filter({ hasText: DEMO.excludedRoom }).first();
       await saveShot(page, args.out, byId['2b'], cfg.secrets, files, garage);
     });
@@ -271,14 +276,16 @@ async function runShots(browser, cfg, args, files) {
       await page.locator(`${WV} .j2ha-wv-search`).fill(DEMO.searchRoom);
       await page.locator(`${WV} .j2ha-wv-room`).first().waitFor({ state: 'visible' });
       const rows = page.locator(`${WV} .j2ha-wv-eq`);
-      await selectEquipment(page, rows.first());
+      // Un autre équipement que celui de la capture 4 (les deux images étaient identiques le 2026-10-31).
+      await selectEquipment(page, rows.nth(DEMO.workViewEquipmentIndex));
       await saveShot(page, args.out, byId[3], cfg.secrets, files);
     });
     await atStep('4 détail d’un équipement', async () => {
       const row = page.locator(`${WV} .j2ha-wv-eq`).filter({ hasText: DEMO.publishedEquipment }).first();
       await selectEquipment(page, row);
       await page.locator(`${WV} .j2ha-eq-panel .j2ha-eq-controls`).waitFor({ state: 'visible' });
-      await saveShot(page, args.out, byId[4], cfg.secrets, files);
+      // Gros plan sur le détail, pour se distinguer de la vue de travail (capture 3).
+      await saveShot(page, args.out, byId[4], cfg.secrets, files, page.locator(`${WV} .j2ha-eq-panel`));
     });
     await atStep('5 tableau des commandes', async () => {
       await selectEquipment(page, page.locator(`${WV} .j2ha-wv-eq`).nth(DEMO.commandsEquipmentIndex));

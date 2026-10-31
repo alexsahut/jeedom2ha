@@ -23,7 +23,11 @@ export const DEMO = Object.freeze({
   publishedEquipment: 'Lumière Salon',
   // « équipement 4 » du storyboard : 4e équipement de l'arbre filtré sur « Salon » (Climat Salon).
   // Lecture à valider par ClaudeBox lors de la Task 5.
-  commandsEquipmentIndex: 3,
+  // Relecture du 2026-10-31 : « Climat Salon » (4e) n'a qu'une commande publiée ; « Lampe Variable Salon » (2e) en montre
+  // davantage (état, on/off, luminosité).
+  commandsEquipmentIndex: 1,
+  // Capture 3 : « Volet Salon » (3e), distinct de la capture 4 (« Lumière Salon ») et de la capture 5.
+  workViewEquipmentIndex: 2,
   haLight: 'Lumière Salon',
 });
 

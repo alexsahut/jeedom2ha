@@ -189,3 +189,14 @@ test('23.2 — connexion Home Assistant : attend le formulaire rendu après char
   assert.match(src, /await password\.press\('Enter'\);/);
   assert.doesNotMatch(src, /connexion\|log in\|sign in/);
 });
+
+test('23.2 — cadrage après relecture du 2026-10-31 : page entière, grille des cartes, captures 3 et 4 distinctes', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /byId\[1\], cfg\.secrets, files, 'fullPage'\)/);
+  assert.match(src, /byId\[2\], cfg\.secrets, files, page\.locator\('#j2ha_roomCards'\)\)/);
+  assert.match(src, /byId\[4\], cfg\.secrets, files, page\.locator\(`\$\{WV\} \.j2ha-eq-panel`\)\)/);
+  assert.match(src, /rows\.nth\(DEMO\.workViewEquipmentIndex\)/);
+  const sb = await load('lib/storyboard.mjs');
+  assert.notEqual(sb.DEMO.workViewEquipmentIndex, 0); // 0 = « Lumière Salon », déjà la capture 4
+  assert.notEqual(sb.DEMO.workViewEquipmentIndex, sb.DEMO.commandsEquipmentIndex);
+});
