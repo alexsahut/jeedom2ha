@@ -212,8 +212,13 @@ async function scrubAndAssertClean(page, secrets) {
   if (findings.length) throw new Error(`fuite-cc48: ${findings.join(', ')}`);
 }
 
+// Jeedom interroge le serveur en continu : `networkidle` n'arrive jamais et chaque attente consommait le délai complet
+// (captures espacées de 30 s, vidéo de plus de 4 min le 2026-10-31). Les vraies attentes passent par des sélecteurs ;
+// `settle` ne laisse qu'un court répit au rendu.
+export const SETTLE_MS = 3000;
+
 async function settle(page) {
-  await page.waitForLoadState('networkidle', { timeout: STEP_TIMEOUT_MS }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => {});
 }
 
 async function openPluginPage(page, cfg) {
@@ -412,7 +417,10 @@ async function runVideo(browser, cfg, args) {
       });
       await atStep('vidéo : pilotage Home Assistant', async () => {
         await page.getByText(DEMO.haLight).first().click();
-        const toggle = page.getByRole('switch').first();
+        // Une lumière à l'état « Inconnu » (cas de la démo : jamais pilotée) n'a pas d'interrupteur dans HA, mais deux
+        // boutons « Éteindre » / « Allumer » (VM 122, 2026-10-31). On accepte les deux formes.
+        const toggle = page.getByRole('switch')
+          .or(page.getByRole('button', { name: /^(allumer|turn on)$/i })).first();
         await toggle.waitFor({ state: 'visible' });
         await toggle.click();
         await hold('ha-pilotage');
