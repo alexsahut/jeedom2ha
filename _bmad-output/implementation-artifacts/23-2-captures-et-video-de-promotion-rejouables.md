@@ -1,6 +1,6 @@
 # Story 23.2 : Captures et vidéo de promotion rejouables
 
-Status: in-progress
+Status: ready-for-UX-validation
 
 > `ready-for-dev` accordé par ClaudeBox le 2026-10-21 après revue de la démo avec Alexandre (VM 122, plugin `68560b7`, Jeedom 4.6.1). Dépendances levées : 23.1 `done`, 22.2 `done` (superseded par l'epic 25, clos le 2026-10-21).
 
@@ -46,22 +46,24 @@ En plus, hors marqueurs : une capture Home Assistant (appareils jeedom2ha rangé
 
 ## Tâches
 
-- [ ] **Task 0 — Prérequis** : fichier `.env` des comptes `j2ha-captures` présent (D3, clawbox) ; démo VM 122 démarrée (Zone labo).
-- [ ] **Task 1 — Démo embellie (D2)** : `populate_demo.py` (icônes, couleurs, parents « Rez-de-chaussée » / « Étage », accents), tests unitaires mis à jour, exécution sur la VM 122 par clawcode.
+- [x] **Task 0 — Prérequis** : fichier `.env` des comptes `j2ha-captures` présent (D3, clawbox) ; démo VM 122 démarrée (Zone labo).
+- [x] **Task 1 — Démo embellie (D2)** : `populate_demo.py` (icônes, couleurs, parents « Rez-de-chaussée » / « Étage », accents), tests unitaires mis à jour, exécution sur la VM 122 par clawcode.
   - [x] 1.1 `populate_demo.py` : parents, icônes, couleurs, accents, renommage idempotent par `jeedom2ha_demo_key` (code livré)
   - [x] 1.2 Tests unitaires : enrichissements D2, migration d'une démo 23.1, dérive de pièce, idempotence (34 tests verts)
-  - [ ] 1.3 Exécution sur la VM 122 par clawcode (dry-run, application, second passage `exists`) — **terrain, hors cloud**
-- [ ] **Task 2 — Parcours de captures** : scénarios Playwright déterministes (attente des rafraîchissements, thème clair, viewport 1280×720), réutilisant l'outillage du gate 20-0 quand c'est possible.
+  - [x] 1.3 Exécution sur la VM 122 par clawcode : second passage entièrement `exists` (2026-10-31)
+- [x] **Task 2 — Parcours de captures** : scénarios Playwright déterministes (attente des rafraîchissements, thème clair, viewport 1280×720), réutilisant l'outillage du gate 20-0 quand c'est possible.
   - [x] 2.1 `tests/e2e/captures/run-captures.mjs` + `lib/` : captures 1 à 8 + Home Assistant, thème clair prouvé (D1), contrôle CC-48, manifeste (réutilise `gate/lib/playwright.mjs`)
   - [x] 2.2 Tests Node de la logique pure (storyboard ↔ marqueurs, config, CC-48, thème, manifeste, plan hors-ligne)
-  - [ ] 2.3 Première exécution réelle et ajustement des sélecteurs — **terrain, hors cloud**
-- [ ] **Task 3 — Vidéo** : enregistrement Playwright selon le storyboard vidéo.
+  - [x] 2.3 Première exécution réelle et ajustement des sélecteurs (2026-10-31, #336 à #350)
+- [x] **Task 3 — Vidéo** : enregistrement Playwright selon le storyboard vidéo.
   - [x] 3.1 Étapes vidéo du storyboard, durée contrôlée ≤ 2 min, fichier hors dépôt (code livré)
-  - [ ] 3.2 Enregistrement réel et relecture — **terrain, hors cloud**
+  - [x] 3.2 Enregistrement réel (109 s) et relecture ClaudeBox (2026-11-01)
 - [ ] **Task 4 — Documentation** : remplacement des marqueurs, commande de régénération documentée (`docs/dev-demo-env.md`).
   - [x] 4.1 Section « Captures et vidéo de promotion » de `docs/dev-demo-env.md` : commande, `.env`, garanties, métadonnées, protection des secrets
   - [ ] 4.2 Remplacement des marqueurs `CAPTURE-A-PRENDRE` — **volontairement non fait** (AC4) : seulement après médias réels validés
 - [ ] **Task 5 — Validation** : ClaudeBox relit les médias (CC-48, concordance) ; Alexandre valide le rendu (`ready-for-UX-validation`).
+  - [x] 5.1 Relecture ClaudeBox (2026-11-01), voir « Exécution terrain du 2026-10-31 »
+  - [ ] 5.2 Validation du rendu par Alexandre, puis Task 4.2 (marqueurs) et choix de l'hébergement de la vidéo
 
 ## Notes
 
@@ -104,3 +106,29 @@ Session cloud déléguée (Claude Code), branche `story/23-2-captures-video`.
 ### Change Log
 
 - 2026-10-21 — dev-story cloud : démo embellie D2 (code + tests), outillage de captures et vidéo, documentation de régénération ; terrain et marqueurs reportés.
+
+## Exécution terrain du 2026-10-31
+
+Exécutée par clawcode sur la VM 122 (mandat de nuit NUIT-20261031), relue par ClaudeBox.
+
+- **Médias retenus** : passage r9, plugin `2a247c5`, version 1.2.0, viewport 1280×720, fr-FR, thème clair.
+  - Ils comprennent 10 PNG, `captures-manifest.json` et `jeedom2ha-presentation.webm` (109 s, 4,7 Mo, non versionnée).
+  - Ils se trouvent sur la branche de relecture `chore/23-2-captures-relecture`, dossier `_bmad-output/review/23-2-captures-20261031-r9/` (sans PR). Ce dossier n'est pas destiné à `main`.
+- **Correctifs nés du terrain**, tous sur `main`, chacun avec son test Node :
+  - #336 : bouton de connexion du cœur 4.6.1 ;
+  - #339 : pas de gel des animations sur la page de connexion, sinon la connexion n'aboutit pas ;
+  - #340 et #342 : thème clair sans bascule automatique du soir (`theme_changeAccordingTime=0`) ;
+  - #343 : connexion à HA, avec formulaire différé et validation par Entrée ;
+  - #344, #345 et #346 : cadrage (page entière, grille des cartes, captures 3 et 4 distinctes) et capture HA filtrée sur Jeedom ;
+  - #347 : `settle` borné à 3 s, car `networkidle` n'arrive jamais dans Jeedom ;
+  - #348 et #350 : pilotage HA par `ha-entity-toggle` ;
+  - #349 : pauses de la vidéo raccourcies.
+- **Comptes `j2ha-captures`** : mots de passe changés par clawbox le 31/10 à 22:32, sur go d'Alexandre. HA a ensuite été redémarré : il gardait en mémoire l'ancien mot de passe.
+- **Relecture ClaudeBox (CC-48)**
+  - Aucune IP privée, aucun nom de la maison, aucune donnée de la maison, champs du broker masqués sur les captures. Compteurs à 0 pour « 192.168. », « famille-sahut » et « asahut » sur les 10 PNG, le manifeste et la vidéo.
+  - La vidéo suit le storyboard : connexion, Plugins, dépendances et démon, « Relire Jeedom », pièce, équipement, appareils HA rangés par pièce, pilotage d'une lumière, retour dans Jeedom.
+- **Réserves pour la validation d'Alexandre**
+  1. Dans la vidéo, page Plugins, la valeur « Hôte MQTT » de la démo (`127.0.0.1`) reste visible : le masquage CC-48 n'y est pas appliqué. La valeur n'est pas sensible ici, mais le masquage est à corriger avant toute régénération ailleurs que sur la démo.
+  2. Dans HA, l'appareil est « Connecté via 127.0.0.1 » : le pont MQTT porte le nom d'hôte du broker. Chez un utilisateur, ce serait son IP ou son nom d'hôte (point produit).
+  3. Un badge rouge « 1 » (message Jeedom de la démo) apparaît dans la barre de navigation.
+  4. `cartes-de-piece-garage.png` (2b) reste une carte seule de 130×180 px, hors documentation.
