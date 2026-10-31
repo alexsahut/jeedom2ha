@@ -23,6 +23,8 @@ class FakeJeedom:
         self.next_id = 100
         self.calls = []
         self.unsupported = set()
+        # Défauts du cœur Jeedom 4.6.1 constatés sur la VM 122 (2026-10-31) : thème alterné le soir.
+        self.config = {"jeedom_theme_main": "core2019_Light", "theme_changeAccordingTime": "1"}
 
     def _id(self):
         self.next_id += 1
@@ -83,6 +85,14 @@ class FakeJeedom:
             return self.scenarios
         if method == c.SCENARIO_SAVE:
             return self._upsert(self.scenarios, p)
+        if method == c.CONFIG_GET:
+            assert p.get("plugin") == "core"
+            value = self.config.get(p["key"])
+            return "ok" if value in (None, "") else value  # jsonrpc::makeSuccess() d'une valeur vide
+        if method == c.CONFIG_SAVE:
+            assert p.get("plugin") == "core"
+            self.config[p["key"]] = p["value"]
+            return "ok"
         raise KeyError(method)
 
     @property
@@ -473,3 +483,23 @@ def test_inventory_stays_anonymised_with_icons(server):
 def test_compose_requires_pinned_tag():
     text = (SCRIPT.parent / "docker-compose.ha.yml").read_text()
     assert "${HA_IMAGE_TAG:?" in text and ":-stable" not in text
+
+
+def test_d1_theme_clair_force_sans_bascule_jour_nuit(server):
+    """D1 : la démo reste en thème clair à toute heure (bascule du soir désactivée), de façon idempotente."""
+    adapter = adapter_for(server)
+    first = pd.populate(adapter, dry_run=False)
+    assert server.config["theme_changeAccordingTime"] == "0"
+    assert server.config["jeedom_theme_main"] == "core2019_Light"
+    assert first["summary"]["theme_by_status"] == {"exists": 1, "updated": 1}
+    assert server.calls.count(pd.JsonRpcContract.CONFIG_SAVE) == 1
+    again = pd.populate(adapter, dry_run=False)
+    assert again["summary"]["theme_by_status"] == {"exists": 2}
+    assert server.calls.count(pd.JsonRpcContract.CONFIG_SAVE) == 1
+
+
+def test_d1_theme_dry_run_n_ecrit_rien_et_valeur_vide_est_un_ecart(server):
+    server.config["jeedom_theme_main"] = ""  # config::byKey renvoie alors « ok »
+    inv = pd.populate(adapter_for(server), dry_run=True)
+    assert inv["summary"]["theme_by_status"] == {"would_update": 2}
+    assert pd.JsonRpcContract.CONFIG_SAVE not in server.calls
