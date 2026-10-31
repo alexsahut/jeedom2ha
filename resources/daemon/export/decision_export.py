@@ -335,6 +335,7 @@ def _equipment_row(eq, record, mapping, publication, snapshot, publisher, stream
         "generic_type": eq.generic_type,
         "homekit_exposed": eq.homekit_exposed,
         "homekit_exposed_source": eq.homekit_exposed_source,
+        "homekit_exposed_effective": eq.homekit_exposed_effective,
         "decision": DECISION_NOT_PUBLISHED if missing else record["decision"],
         "reason": REASON_NO_SYNC_DECISION if missing else record["reason"],
         "step": None if missing else record["step"],
@@ -362,6 +363,7 @@ def _scenario_row(scenario, scenario_publication, snapshot, publisher) -> Dict[s
         "active": scenario.is_active,
         "homekit_exposed": scenario.homekit_exposed,
         "homekit_exposed_source": scenario.homekit_exposed_source,
+        "homekit_exposed_effective": scenario.homekit_exposed_effective,
         "decision": DECISION_PUBLISHED if scenario.is_active else DECISION_NOT_PUBLISHED,
         "reason": REASON_SCENARIO_BUTTON if scenario.is_active else REASON_SCENARIO_INACTIVE,
         "entity": {

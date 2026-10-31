@@ -95,8 +95,9 @@ describe('24.2 / AC9 — séparation avec getEquipmentStates et gardes « diff v
   it('la liste blanche de getEquipmentStates ne porte aucun champ de l\'export : route et fichier séparés', () => {
     const src = read('resources/daemon/transport/http_server.py');
     const projection = src.slice(src.indexOf('def _project_equipment_state'), src.indexOf('def _build_equipment_states'));
-    for (const field of ['decision_export', 'homekit_exposed', 'logical_id', 'schema_version', 'pending_changes']) {
-      assert.ok(!projection.includes(field), field);
+    // Story 24.4 (R1) : `homekit_exposed_effective` est un booléen additif voulu de la route agrégée (pas le champ d'export `homekit_exposed`).
+    for (const field of ['decision_export', 'homekit_exposed(?!_effective)', 'logical_id', 'schema_version', 'pending_changes']) {
+      assert.ok(!new RegExp(field).test(projection), field);
     }
     assert.match(src, /app\.router\.add_get\("\/system\/decision_export", _handle_system_decision_export\)/);
     const ajax = read('core/ajax/jeedom2ha.ajax.php');

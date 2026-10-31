@@ -28,7 +28,11 @@ from models.availability import (
     build_local_availability_topic,
 )
 from models.topology import TopologySnapshot, assess_all, assess_eligibility
-from models.published_scope import resolve_published_scope
+from models.published_scope import (
+    equipment_scope_inherits,
+    is_homekit_kept_in_excluded_room,
+    resolve_published_scope,
+)
 from models.decide_publication import (
     DEFAULT_CONFIDENCE_POLICY,
     VALID_CONFIDENCE_POLICIES,
@@ -3474,7 +3478,11 @@ def _overrides_file_signature(data_dir: str):
     return (st.st_mtime_ns, st.st_size)
 
 
-def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:
+def _project_equipment_state(
+    tree: Dict[str, Any],
+    scope_entry: Optional[Dict[str, Any]] = None,
+    homekit_exposed_effective: bool = False,
+) -> Dict[str, Any]:
     """Liste blanche (Q1 A) des champs de l'arbre unitaire lus par `resolveEquipmentState` /
     `summarizeEquipmentCounters`. Projection pure : aucune valeur n'est recalculée."""
     return {
@@ -3496,6 +3504,13 @@ def _project_equipment_state(tree: Dict[str, Any]) -> Dict[str, Any]:
             for c in tree["commands"]
         ],
         "sync_status": tree["sync_status"],
+        # Story 24.4 (R1, additif) : l'écran ne compte pas « pas encore retiré » un équipement relevé de sa
+        # pièce exclue par HomeKit, et n'annonce pas ses entités comme retirées à l'exclusion d'une pièce.
+        # `homekit_kept_in_excluded_room` : décision du périmètre (`exception_homekit`) ;
+        # `homekit_exposed_effective` + `scope_inherit` : de quoi prévoir ce cas avant l'exclusion.
+        "homekit_kept_in_excluded_room": is_homekit_kept_in_excluded_room(scope_entry),
+        "homekit_exposed_effective": bool(homekit_exposed_effective),
+        "scope_inherit": equipment_scope_inherits(scope_entry),
     }
 
 
@@ -3531,7 +3546,8 @@ def _build_equipment_states(app, data_dir: str) -> Dict[str, Any]:
                 equipment_overrides_cache=equipment_overrides_cache,
                 include_override_types=False,
             )
-            equipments[str(eq_id)] = _project_equipment_state(tree)
+            equipments[str(eq_id)] = _project_equipment_state(
+                tree, scope_by_eq.get(eq_id), eq.is_homekit_exposed_effective)
         except Exception:
             # Détail dans le journal seulement ; la réponse ne porte ni nom ni message.
             _LOGGER.exception("[AGGREGATE] construction impossible eq_id=%s", eq_id)

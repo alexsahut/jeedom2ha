@@ -9,6 +9,7 @@ from models.topology import TopologySnapshot
 STATE_INHERIT = "inherit"
 STATE_INCLUDE = "include"
 STATE_EXCLUDE = "exclude"
+DECISION_SOURCE_EXCEPTION_HOMEKIT = "exception_homekit"  # Story 24.4 (additif)
 _SUPPORTED_STATES = {STATE_INHERIT, STATE_INCLUDE, STATE_EXCLUDE}
 
 
@@ -58,6 +59,21 @@ def _normalized_state_and_explicit(scope_map: Any, identifier: int) -> tuple[str
     )
     is_explicit = has_supported_raw_state and not is_default_inherit_marker
     return normalized_state, is_explicit
+
+
+def is_homekit_kept_in_excluded_room(entry: Any) -> bool:
+    """Story 24.4 (R1) : vrai quand l'équipement est relevé de sa pièce exclue par l'exposition HomeKit.
+
+    Lecture unique de la décision calculée par `resolve_published_scope` (aucun second calcul).
+    """
+    return isinstance(entry, dict) and entry.get("decision_source") == DECISION_SOURCE_EXCEPTION_HOMEKIT
+
+
+def equipment_scope_inherits(entry: Any) -> bool:
+    """Vrai quand l'état d'équipement du périmètre est `inherit` (pas de règle propre à l'équipement)."""
+    return isinstance(entry, dict) and entry.get("decision_source") in {
+        "global", "piece", DECISION_SOURCE_EXCEPTION_HOMEKIT,
+    }
 
 
 def _new_counts() -> Dict[str, int]:
@@ -124,10 +140,25 @@ def resolve_published_scope(
             # Compatibilité technique testée: exclusions legacy eqlogic/plugin => équipement "exclude".
             eq_state = STATE_EXCLUDE
 
+        # Story 24.4 (Q3 A) — un équipement effectivement exposé à HomeKit n'hérite pas de
+        # l'exclusion de sa pièce (état explicite ou exclusion historique par objet) : il retombe
+        # sur l'état global, qui reste respecté. Un état d'équipement explicite prime toujours.
+        eq_piece_state, eq_piece_effective = piece_state, piece_effective
+        homekit_relieved = (
+            eq_state == STATE_INHERIT
+            and piece_state == STATE_EXCLUDE
+            and eq.is_homekit_exposed_effective
+        )
+        if homekit_relieved:
+            eq_piece_state, eq_piece_effective = STATE_INHERIT, global_effective
+
         if eq_state == STATE_INHERIT:
-            effective_state = piece_effective
-            decision_source = "piece" if piece_state != STATE_INHERIT else "global"
+            effective_state = eq_piece_effective
+            decision_source = "piece" if eq_piece_state != STATE_INHERIT else "global"
             is_exception = False
+            if homekit_relieved and effective_state != piece_effective:
+                decision_source = DECISION_SOURCE_EXCEPTION_HOMEKIT
+                is_exception = True
         else:
             effective_state = eq_state
             if piece_effective != eq_state:
