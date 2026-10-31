@@ -46,6 +46,18 @@ def _to_tristate(value: Any) -> Optional[bool]:
     return None
 
 
+def compute_homekit_exposed_effective(
+    homekit_exposed: Optional[bool], enabled: bool
+) -> Optional[bool]:
+    """Story 24.4 — table de vérité unique de l'exposition HomeKit effective.
+
+    enabled=False => False ; enabled=True => le réglage (True / False / None inconnu).
+    """
+    if not enabled:
+        return False
+    return homekit_exposed
+
+
 def _normalize_logical_id(value: Any) -> Optional[str]:
     """Story 24.1 — identifiant physique : chaîne non vide, sinon None (jamais "").
 
@@ -143,6 +155,20 @@ class JeedomEqLogic:
     homekit_exposed_source: Optional[str] = None
     logical_id: Optional[str] = field(default=None, repr=False)
 
+    @property
+    def homekit_exposed_effective(self) -> Optional[bool]:
+        """Story 24.4 — exposition HomeKit effective (point de calcul unique).
+
+        ``homekit_exposed`` ET ``is_enable`` : un équipement désactivé n'est jamais exposé
+        (Homebridge ne l'expose pas). Signal inconnu (None) => None, jamais traité comme exposé.
+        """
+        return compute_homekit_exposed_effective(self.homekit_exposed, self.is_enable)
+
+    @property
+    def is_homekit_exposed_effective(self) -> bool:
+        """Vrai uniquement si l'exposition effective est explicitement True."""
+        return self.homekit_exposed_effective is True
+
 @dataclass
 class JeedomScenario:
     """Jeedom scenario — mapped to HA button (Story 10.1)."""
@@ -152,6 +178,11 @@ class JeedomScenario:
     # Story 24.1 — signal d'exposition HomeKit du scénario (lecture seule, tri-état)
     homekit_exposed: Optional[bool] = None
     homekit_exposed_source: Optional[str] = None
+
+    @property
+    def homekit_exposed_effective(self) -> Optional[bool]:
+        """Story 24.4 (Q4-5) — même règle que pour les équipements, avec ``is_active``."""
+        return compute_homekit_exposed_effective(self.homekit_exposed, self.is_active)
 
 @dataclass
 class EligibilityResult:
@@ -356,9 +387,15 @@ def assess_eligibility(eq: JeedomEqLogic) -> EligibilityResult:
     Évalue l'éligibilité d'un équipement selon les règles métier.
     Ordre de priorité : Exclu > Désactivé > Sans commandes > Sans type générique.
     """
-    if eq.is_excluded:
+    source = eq.exclusion_source or "eqlogic"  # défaut rétro-compatible
+    # Story 24.4 (Q3 A) — un équipement effectivement exposé à HomeKit n'est jamais écarté par sa
+    # pièce (source "object"). Les exclusions équipement / plugin restent prioritaires. Un
+    # équipement désactivé n'est pas effectivement exposé : il garde excluded_object (AC12).
+    exempted_from_object = (
+        eq.is_excluded and source == "object" and eq.is_homekit_exposed_effective
+    )
+    if eq.is_excluded and not exempted_from_object:
         # Story 4.3 : utiliser exclusion_source pour affiner le reason_code
-        source = eq.exclusion_source or "eqlogic"  # défaut rétro-compatible
         reason_code = _EXCLUSION_SOURCE_TO_REASON.get(source, "excluded_eqlogic")
         return EligibilityResult(is_eligible=False, reason_code=reason_code, confidence="sure")
 

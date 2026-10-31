@@ -146,6 +146,7 @@ $j2haExcludedRoomsCount = jeedom2ha_excluded_rooms_count();
           {{Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce).}}
           <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha">{{Ouvrir la page du plugin}}</a>
         </p>
+        <p class="help-block">{{Pièces exclues : sauf équipements exposés à HomeKit (actifs), qui restent publiés. L'exclusion de l'équipement lui-même est toujours respectée.}}</p>
         <?php if ($j2haExcludedRoomsCount > 0) { ?>
         <p class="help-block"><?php echo (int) $j2haExcludedRoomsCount . ' ' . ($j2haExcludedRoomsCount > 1 ? '{{pièces exclues}}' : '{{pièce exclue}}'); ?></p>
         <?php } ?>
