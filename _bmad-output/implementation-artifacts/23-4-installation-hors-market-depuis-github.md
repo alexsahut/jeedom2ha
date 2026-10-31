@@ -1,6 +1,6 @@
 # Story 23.4 : Installation hors Market depuis GitHub
 
-Status: in-progress (partie documentaire livrée ; AC2 non fait)
+Status: review (AC2 fait le 2026-10-31, preuve 23-4-preuve-terrain-2026-10-31.md ; AC5 documenté non testé)
 
 > Cadrage approuvé par ClaudeBox le 2026-10-12. Brouillon. Relecture ClaudeBox obligatoire; test sur VM vierge 23.1 seulement.
 
@@ -19,7 +19,7 @@ En tant que bêta-testeur, je veux une installation GitHub vérifiée, afin de t
 ## Avancement
 
 - AC1 : documenté dans `docs/fr_FR/installation-github.md` (archive de `main`, extraction, droits, activation, dépendances).
-- AC2 : **NON FAIT, hors périmètre de cette tâche documentaire.** Aucune exécution sur VM, aucune preuve terrain.
+- AC2 : **fait le 2026-10-31** sur une copie jetable de la VM de démo : voir `23-4-preuve-terrain-2026-10-31.md` (3 écarts de doc corrigés).
 - AC3 : README et `docs/fr_FR/index.md` pointent vers la nouvelle page et nomment `main` ; `beta` n'est pas présentée comme livrée.
 - AC4 : prérequis Mosquitto/HA renvoient à `docs/fr_FR/index.md`, sans secret.
 - AC5 : mise à niveau et rollback **documentés mais non testés** (mention explicite dans la page).
@@ -28,6 +28,6 @@ En tant que bêta-testeur, je veux une installation GitHub vérifiée, afin de t
 
 - [ ] **Prérequis :** snapshot vierge A66/23.1 confirmé; branche = `main` jusqu'à C1, aucune promesse `beta` avant cette bascule.
 - [ ] ClaudeBox confirme snapshot vierge et bascule de branche après C1.
-- [ ] Exécuter la procédure sur VM vierge et conserver une preuve anonymisée (AC2 — non fait).
+- [x] Exécuter la procédure sur VM vierge et conserver une preuve anonymisée (AC2 — fait le 2026-10-31).
 - [x] Écrire la procédure (`docs/fr_FR/installation-github.md`).
 - [x] Aligner README et `docs/fr_FR/index.md` (aucune référence `beta` obsolète trouvée) ; site non concerné par cette tâche.

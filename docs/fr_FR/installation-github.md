@@ -49,7 +49,9 @@ Dans Jeedom : **Plugins → Gestion des plugins → jeedom2ha → Activer**.
 
 ### 4. Installer les dépendances
 
-Si l'activation demande d'installer les dépendances, cliquez sur le bouton **« Relancer »** de la zone « Dépendances » et attendez la fin de l'opération (suivie dans le journal `jeedom2ha`).
+L'activation lance d'elle-même l'installation des dépendances : comptez quelques minutes. Suivez-la dans le journal `jeedom2ha_packages`, jusqu'à la ligne « End of package installation ». Ne cliquez sur **« Relancer »** de la zone « Dépendances » que si leur état reste « NOK » une fois l'installation terminée : un second lancement pendant l'installation est refusé (« une installation est déjà en cours »).
+
+Pendant cette installation, Jeedom peut tenter de démarrer le démon trop tôt : le journal `jeedom2ha` affiche alors « Failed to start daemon within 20s », et le journal `jeedom2ha_daemon` « No module named 'jeedomdaemon' ». C'est sans conséquence : le démon démarre normalement dès que les dépendances sont installées.
 
 ### 5. Configurer le broker MQTT
 
@@ -64,7 +66,7 @@ Saisissez l'hôte et le port du broker, puis cliquez sur « Sauvegarder » et d�
 
 ## Contrôle de réussite
 
-L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Rescanner la topologie Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres → Appareils et services → MQTT** pour retrouver vos équipements (voir [Première synchronisation](index.md#première-synchronisation)).
+L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Relire Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres → Appareils et services → MQTT** pour retrouver vos équipements (voir [Première synchronisation](index.md#première-synchronisation)).
 
 ---
 
