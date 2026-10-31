@@ -127,10 +127,15 @@ async function loginJeedom(page, cfg) {
     await page.locator('#in_login_password').fill(cfg.jeedom.password);
     // Cœur Jeedom 4.6.1 (desktop/php/connection.php) : le bouton est `#bt_login_validate`.
     await page.locator(JEEDOM_LOGIN_BUTTON).click();
-    // Première connexion d'un compte : le cœur peut imposer un changement de mot de passe. Échec fermé, explicite.
-    if (await page.locator(JEEDOM_PASSWORD_CHANGE).isVisible().catch(() => false)) {
-      throw new Error('jeedom-changement-mot-de-passe-exige');
-    }
+    // Première connexion d'un compte : le cœur peut imposer un changement de mot de passe. On attend l'un ou l'autre
+    // (connecté, ou formulaire de changement visible) avant de décider : échec fermé, explicite.
+    const connected = page.locator('#bt_getHelp, #bt_getHelpTop, .navbar').first();
+    const passwordChange = page.locator(JEEDOM_PASSWORD_CHANGE);
+    await Promise.race([
+      connected.waitFor({ state: 'attached' }),
+      passwordChange.waitFor({ state: 'visible' }),
+    ]);
+    if (await passwordChange.isVisible()) throw new Error('jeedom-changement-mot-de-passe-exige');
   }
   await page.locator('#bt_getHelp, #bt_getHelpTop, .navbar').first().waitFor({ state: 'attached' });
   await forceJeedomLightTheme(page, cfg);
