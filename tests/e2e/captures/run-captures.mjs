@@ -261,7 +261,17 @@ async function runShots(browser, cfg, args, files) {
     await atStep('1 page principale', async () => {
       await openPluginPage(page, cfg);
       // Relecture du 2026-10-31 : à 720 px de haut, la grille s'arrêtait au rez-de-chaussée (« Étage » absent).
-      await saveShot(page, args.out, byId[1], cfg.secrets, files, 'fullPage');
+      // `fullPage` ne suffit pas (Jeedom fait défiler un conteneur interne, pas le document) : on agrandit la fenêtre
+      // le temps de la capture, à la hauteur du contenu, puis on revient à 1280×720.
+      const height = await page.evaluate(() => Math.max(
+        ...['#div_pageContainer', 'body', 'html'].map((s) => document.querySelector(s)?.scrollHeight ?? 0)));
+      await page.setViewportSize({ width: VIEWPORT.width, height: Math.min(Math.max(height, VIEWPORT.height), 2000) });
+      await settle(page);
+      try {
+        await saveShot(page, args.out, byId[1], cfg.secrets, files);
+      } finally {
+        await page.setViewportSize(VIEWPORT);
+      }
     });
     await atStep('2 cartes de pièce', async () => {
       // Une carte seule ne mesure que 130×180 px (relecture du 2026-10-31) : le gros plan prend toute la grille,

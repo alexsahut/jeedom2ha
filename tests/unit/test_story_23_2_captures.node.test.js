@@ -192,7 +192,8 @@ test('23.2 — connexion Home Assistant : attend le formulaire rendu après char
 
 test('23.2 — cadrage après relecture du 2026-10-31 : page entière, grille des cartes, captures 3 et 4 distinctes', async () => {
   const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
-  assert.match(src, /byId\[1\], cfg\.secrets, files, 'fullPage'\)/);
+  assert.match(src, /setViewportSize\(\{ width: VIEWPORT\.width, height: Math\.min\(Math\.max\(height, VIEWPORT\.height\), 2000\) \}\)/);
+  assert.match(src, /finally \{\s*await page\.setViewportSize\(VIEWPORT\);/);
   assert.match(src, /byId\[2\], cfg\.secrets, files, page\.locator\('#j2ha_roomCards'\)\)/);
   assert.match(src, /byId\[4\], cfg\.secrets, files, page\.locator\(`\$\{WV\} \.j2ha-eq-panel`\)\)/);
   assert.match(src, /rows\.nth\(DEMO\.workViewEquipmentIndex\)/);
