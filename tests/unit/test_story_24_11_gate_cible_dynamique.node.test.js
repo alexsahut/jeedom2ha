@@ -185,3 +185,17 @@ test('24.11 cadre — la cible apparaît dans le rapport : declareTarget reçoit
   // La déclaration statique reste contrôlée contre le témoin « avant », comme avant la story.
   assert.match(source, /assertNoOverrideOn\(before, Object\.keys\(parcours\.declaredEquipments\)\);/);
 });
+
+test('24.11 revue Codex P2 — isDeclarableTarget dit, sans rien consommer, si declareTarget accepterait l’id', async () => {
+  const { createDeclareTarget, isDeclarableTarget } = await import(gate('run-gate.mjs'));
+  const s = setup();
+  // Réglage de commande seul (type HA forcé, '12:34') et réglage d'équipement (287) : refusés.
+  assert.equal(isDeclarableTarget(s.before, '12'), false);
+  assert.equal(isDeclarableTarget(s.before, '287'), false);
+  assert.equal(isDeclarableTarget(s.before, 'abc'), false);
+  assert.equal(isDeclarableTarget(s.before, '42'), true);
+  assert.equal(isDeclarableTarget(s.before, 42), true);
+  // La vérification ne consomme pas la déclaration unique.
+  assert.equal(createDeclareTarget(s)('42'), '42');
+  assert.deepEqual(s.records, [['cible', '42']]);
+});

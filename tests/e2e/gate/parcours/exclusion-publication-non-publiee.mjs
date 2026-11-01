@@ -130,7 +130,10 @@ async function panelEligible(panel) {
  * Un candidat est sélectionné par un vrai clic (relecture `getMappingOverrides`, lecture autorisée) ; rien
  * n'est écrit. Rend l'id de la première cible éligible, ou null.
  */
-async function scanOpenView(page, view, seen) {
+async function scanOpenView(page, view, seen, helpers) {
+  // Revue Codex P2 : un réglage de commande (type HA forcé) n'apparaît pas dans le contrôle de publication ;
+  // le lanceur dit, d'après le témoin « avant », si la déclaration serait acceptée.
+  const declarable = typeof helpers?.canDeclareTarget === 'function' ? helpers.canDeclareTarget : () => true;
   const items = view.locator('.j2ha-wv-eq[data-eq-id]');
   const count = await items.count();
   for (let i = 0; i < count; i += 1) {
@@ -139,6 +142,7 @@ async function scanOpenView(page, view, seen) {
     if (!eqId || !/^[0-9]+$/.test(eqId) || seen.has(eqId)) continue;
     seen.add(eqId);
     if (EXCLUDED_TARGETS.includes(eqId)) continue;
+    if (!declarable(eqId)) continue;
     if (!ELIGIBLE_STATES.includes(await rowState(item))) continue;
     await item.locator('.j2ha-wv-row').click();
     const panel = page.locator(`#j2ha_workView .j2ha-eq-panel[data-eq-id="${eqId}"]`);
@@ -161,7 +165,7 @@ async function findTarget(page, helpers) {
     const eqId = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
       await knownCard.click();
       await view.waitFor({ state: 'visible' });
-      return scanOpenView(page, view, seen);
+      return scanOpenView(page, view, seen, helpers);
     });
     if (eqId) return eqId;
     await waitAtStep(helpers, 2, 'fermeture-piece-connue', () => closeRoomModal(view));
@@ -173,7 +177,7 @@ async function findTarget(page, helpers) {
     const eqId = await waitAtStep(helpers, `3_${i}`, `ouverture-piece-${i}`, async () => {
       await roomCards.nth(i).click();
       await view.waitFor({ state: 'visible' });
-      return scanOpenView(page, view, seen);
+      return scanOpenView(page, view, seen, helpers);
     });
     if (eqId) return eqId;
     await waitAtStep(helpers, `4_${i}`, `fermeture-piece-${i}`, () => closeRoomModal(view));

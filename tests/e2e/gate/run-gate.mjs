@@ -204,6 +204,23 @@ export function createDeclareTarget({ before, ctx, journal, record }) {
   };
 }
 
+/**
+ * Story 24.11 (revue Codex P2) : vrai si `declareTarget(eqId)` accepterait cet id d'après le témoin « avant »
+ * (id numérique, aucun réglage d'équipement NI de commande). Lecture seule : ne consomme pas la déclaration.
+ * Permet au parcours d'écarter pendant la recherche un candidat portant un réglage invisible dans la vue
+ * (type HA forcé sur une commande), au lieu d'échouer sur la déclaration et d'interrompre le parcours.
+ */
+export function isDeclarableTarget(before, eqId) {
+  const id = typeof eqId === 'number' && Number.isSafeInteger(eqId) ? String(eqId) : eqId;
+  if (typeof id !== 'string' || !TARGET_ID.test(id)) return false;
+  try {
+    assertNoOverrideOn(before, [id]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Story 20-2 (point 8, revue P2) : `declaredPublicationOverrides` est optionnel — un parcours
 // qui ne teste aucun override de publication n'a pas à le déclarer (défaut `{}` au call site).
 export function isValidParcours(parcours) {
@@ -545,6 +562,7 @@ async function main() {
           record,
           journalEntries: () => journalEntriesSnapshot(journal),
           declareTarget: createDeclareTarget({ before, ctx, journal, record }),
+          canDeclareTarget: (eqId) => isDeclarableTarget(before, eqId),
         },
       }), 180_000, 'parcours-timeout');
     } else

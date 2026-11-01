@@ -431,7 +431,7 @@ function htmlDynamic(rooms) {
 
 const eligible = (id, extra = {}) => ({ id, state: 'blocked', cmds: 1, ...extra });
 
-async function withDynamicPage(t, rooms, fn) {
+async function withDynamicPage(t, rooms, fn, { notDeclarable = [] } = {}) {
   let playwright;
   try {
     const { loadPlaywright } = await import(gate('lib', 'playwright.mjs'));
@@ -462,6 +462,8 @@ async function withDynamicPage(t, rooms, fn) {
         declared.push({ eqId, writesBefore: journal.filter((entry) => entry.verdict === 'simulee').length });
         record('cible', eqId);
       },
+      // Double de `helpers.canDeclareTarget` (témoin « avant ») : ids portant un réglage invisible dans la vue.
+      canDeclareTarget: (eqId) => !notDeclarable.includes(String(eqId)),
     };
     await fn(page, helpers, { recorded, declared, journal });
   } finally {
@@ -531,4 +533,14 @@ test('24.11 gate simulé — aucune ligne éligible : échec explicite aucune-ci
     assert.deepEqual(declared, []);
     assert.deepEqual(journal.filter((entry) => entry.verdict === 'simulee'), []);
   });
+});
+
+test('24.11 revue Codex P2 — un candidat portant un réglage de commande (témoin « avant ») est écarté, la recherche continue', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [{ objectId: 25, eqs: [eligible(261), eligible(262)] }];
+  await withDynamicPage(t, rooms, async (page, helpers, { recorded, declared }) => {
+    await parcours.run(page, { helpers });
+    assert.deepEqual(declared.map((entry) => entry.eqId), ['262']);
+    assert.equal(recorded.cible, '262');
+  }, { notDeclarable: ['261'] });
 });
