@@ -48,7 +48,7 @@ afin de comprendre d'où ils viennent et de voir d'un coup d'œil si le pont est
 - [x] Task 1 : publication de la découverte du pont (AC1, AC2)
 - [x] Task 2 : exclusions (AC3) et tests (AC4)
 - [x] Task 3 : documentation (AC6)
-- [ ] Task 4 : preuve terrain sur la démo, puis en production (AC5), par ClaudeBox et clawcode
+- [x] Task 4 : preuve terrain sur la démo, puis en production (AC5), par ClaudeBox et clawcode — production : contrôle visuel dans HA restant (voir Preuve terrain)
 
 ## Dev Agent Record
 
@@ -68,9 +68,26 @@ afin de comprendre d'où ils viennent et de voir d'un coup d'œil si le pont est
 - `node --test tests/unit/*.node.test.js` : 1198 tests, 1195 pass, 0 fail, 3 skipped.
 - `scripts/deploy-to-box.sh`, SSH, box et Home Assistant non utilisés (session cloud). Task 4 / AC5 non faits.
 
+### Preuve terrain (2026-11-01, ClaudeBox et clawcode)
+
+**Démo (VM 122), captures relues par ClaudeBox** (branche de relecture `chore/23-2-captures-relecture`, `_bmad-output/review/22-4-20261101/`) :
+- appareil « Jeedom (jeedom2ha) » présent (fabricant jeedom2ha, modèle « Pont Jeedom → Home Assistant », version 1.2.0) ; l'ancien appareil nommé d'après l'hôte du broker a disparu de la liste ;
+- un appareil publié affiche « Connecté via Jeedom (jeedom2ha) » ;
+- « État du pont » : Connecté, puis Déconnecté à l'arrêt du démon, puis Connecté à son redémarrage (27 s plus tard).
+- Le relevé textuel automatique des pages HA est resté vide (sélecteurs de la sonde) : les captures font foi.
+
+**Production (box, go d'Alexandre 2026-11-01 12:08), clawcode, run `22-4-prod-20261101-r2`** :
+- déploiement de `689c5fe` (main, avec 24-11) depuis `b72af70`, retour arrière prêt, non déclenché ;
+- export de décision avant/après : **0 changement** (AC2) ;
+- MQTT : `homeassistant/binary_sensor/jeedom2ha_bridge/config` retenu, `unique_id` `jeedom2ha_bridge_status`, appareil « Jeedom (jeedom2ha) » ; `jeedom2ha/bridge/status` = `online` ; sujets `homeassistant/` : +1 (AC1) ;
+- `getEquipmentStates` : 1 377 812 octets (inchangé, budget 1,5 Mo) ; 0 ERROR du démon depuis le redémarrage ;
+- gate 20-0 complet : vert (détail dans la story 24-11).
+- **Reste (AC5 en production)** : contrôle visuel dans le HA de production (appareil « Jeedom (jeedom2ha) », « Connecté via », ancien appareil du broker) par Alexandre ; ClaudeBox ne saisit pas d'identifiants HA. L'aller-retour Déconnecté/Connecté n'est pas rejoué en production (prouvé sur la démo, même code).
+
 ### Change Log
 
 - 2026-11-01 : dev-story (session cloud déléguée) ; Tasks 1 à 3 ; statut `review`. Task 4 (preuve terrain) à ClaudeBox et clawcode.
+- 2026-11-01 : preuve terrain démo et production (ClaudeBox, clawcode) ; reste le contrôle visuel dans le HA de production ; statut `review`.
 
 ### File List
 
