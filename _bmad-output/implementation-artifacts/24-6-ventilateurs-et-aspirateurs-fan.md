@@ -1,6 +1,6 @@
 # Story 24.6 : Ventilateurs (et aspirateurs) : équivalents fonctionnels
 
-Status: review
+Status: done
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **R1 (ClaudeBox, 12/10) intégrée : story réduite.** *Établi par ClaudeBox le 12/10* : 8 équipements exposés à HomeKit portent `FAN_*` (marche, arrêt, état ; 5 aspirateurs compris), **aucun n'a de commande de vitesse**. Avec **Q7 A**, aucun ne change de type : la story devient un classement « équivalents fonctionnels » dans l'export. **`fan` n'est plus ouvert ici**, sauf apparition d'un ventilateur à vitesse. Décisions : **Q7** et **Q9** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 
@@ -64,7 +64,7 @@ afin de ne pas changer le domaine d'entités qui fonctionnent par la voix, et d'
 - [x] **Task 1 — `parity_class` / `parity_alert`** : fonction pure (près de `compute_homekit_exposed_effective` ou dans `export/`), champ additif dans `export/decision_export.py`, tests unitaires (AC1, AC4, AC5).
 - [x] **Task 2 — Documentation** `docs/dev-decision-export.md` (AC2).
 - [x] **Task 3 — Non-régression** (AC3) : aucun changement de mapping, de publication, de `PRODUCT_SCOPE` ; garde 25.4 si elle s'applique ; `flake8`, suite complète.
-- [ ] **Task 4 — Preuve terrain** (AC6) : ClaudeBox et clawcode, après fusion.
+- [x] **Task 4 — Preuve terrain** (AC6) : ClaudeBox et clawcode, 2026-11-01 (voir « Preuve terrain »).
 
 ## Garde-fous
 
@@ -113,3 +113,12 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 - `docs/dev-decision-export.md` (modifié)
 - `_bmad-output/implementation-artifacts/24-6-ventilateurs-et-aspirateurs-fan.md` (modifié)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié)
+
+## Preuve terrain (2026-11-01, clawcode, relue par ClaudeBox)
+
+Run `24-6-prod-20261101` (VM openclaw, hors dépôt) : déploiement de `57f961b` (#366) depuis `689c5fe`, retour arrière prêt, non déclenché.
+- Export de décision avant/après : **0 changement de décision** (AC3).
+- Inventaire MQTT : sujets `homeassistant/` delta **0** (AC3).
+- `parity_class == "functional_equivalent"` sur exactement **67, 506, 516, 519, 520, 521, 522, 523** ; `null` sur 165 et sur tous les autres équipements ; **aucune** entrée `parity_alert` (AC1, AC4, AC6).
+- `getEquipmentStates` : 1 377 812 octets (inchangé) ; 0 ERROR du démon depuis le redémarrage.
+- Relecture de la PR : ClaudeBox seul (Codex sans quota ce soir-là).
