@@ -52,19 +52,28 @@ export const EXTRA_SHOTS = Object.freeze([
   { id: '2b', file: 'cartes-de-piece-garage.png', app: 'jeedom', doc: null, marker: null },
 ]);
 
-/** Storyboard vidéo : durées de pause (ms) par étape, en plus des temps de chargement réels.
+/** Storyboard vidéo : durées de pause (ms) par étape, en plus des temps de chargement réels. `caption` = sous-titre
+ * incrusté pendant la pause (demande d'Alexandre du 2026-11-01 : sans texte, « on ne comprend rien »).
  * Ramenées de 55 à 43,5 s le 2026-10-31 : le premier enregistrement complet (VM 122) atteignait 120 s, la limite. */
 export const HA_VIDEO_STEP_IDS = Object.freeze(['ha-appareils', 'ha-pilotage', 'retour']);
 
 export const VIDEO_STEPS = Object.freeze([
-  { id: 'plugins', label: 'Page Plugins : le plugin installé', holdMs: 3500 },
-  { id: 'dependances', label: 'Configuration : dépendances OK et démon OK', holdMs: 5000 },
-  { id: 'relire', label: 'Page principale puis « Relire Jeedom »', holdMs: 6000 },
-  { id: 'piece', label: 'Ouverture d’une pièce', holdMs: 5000 },
-  { id: 'equipement', label: 'Ouverture d’un équipement', holdMs: 5000 },
-  { id: 'ha-appareils', label: 'Home Assistant : mêmes équipements, mêmes pièces', holdMs: 7000 },
-  { id: 'ha-pilotage', label: 'Pilotage d’une lumière depuis Home Assistant', holdMs: 6000 },
-  { id: 'retour', label: 'Retour d’état dans Jeedom', holdMs: 6000 },
+  { id: 'plugins', label: 'Page Plugins : le plugin installé', holdMs: 3500,
+    caption: 'Le plugin jeedom2ha s’installe comme n’importe quel plugin Jeedom.' },
+  { id: 'dependances', label: 'Configuration : dépendances OK et démon OK', holdMs: 5000,
+    caption: 'Dépendances installées, démon actif : le pont MQTT vers Home Assistant est prêt.' },
+  { id: 'relire', label: 'Page principale puis « Relire Jeedom »', holdMs: 6000,
+    caption: '« Relire Jeedom » : le plugin lit vos pièces, équipements et commandes, et publie ce qui peut l’être.' },
+  { id: 'piece', label: 'Ouverture d’une pièce', holdMs: 5000,
+    caption: 'Chaque pièce montre ce qui est publié dans Home Assistant, et pourquoi le reste ne l’est pas.' },
+  { id: 'equipement', label: 'Ouverture d’un équipement', holdMs: 5000,
+    caption: 'Pour chaque équipement : ses commandes Jeedom et leur équivalent dans Home Assistant.' },
+  { id: 'ha-appareils', label: 'Home Assistant : mêmes équipements, mêmes pièces', holdMs: 7000,
+    caption: 'Dans Home Assistant : les mêmes équipements, rangés dans les mêmes pièces, sans rien ressaisir.' },
+  { id: 'ha-pilotage', label: 'Pilotage d’une lumière depuis Home Assistant', holdMs: 6000,
+    caption: 'On pilote une lumière depuis Home Assistant…' },
+  { id: 'retour', label: 'Retour d’état dans Jeedom', holdMs: 6000,
+    caption: '… et Jeedom suit : la commande passe par Jeedom, l’état revient dans le plugin.' },
 ]);
 
 /** Borne basse sur la durée prévue (pauses seules) : doit rester très en dessous de VIDEO_MAX_SECONDS. */
