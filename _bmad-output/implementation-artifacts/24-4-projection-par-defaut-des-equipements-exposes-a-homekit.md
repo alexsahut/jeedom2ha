@@ -1,6 +1,6 @@
 # Story 24.4 : Projection par défaut des équipements exposés à HomeKit
 
-Status: review
+Status: done
 
 > **create-story du 2026-10-20 (session cloud déléguée, documentaire).** Intègre la baseline de `24-2-preuve-terrain-2026-10-20.md` (`ff2fe0d`) et la correction d'**exposition effective** (AC11 bis de 24.2). **Reste `draft` : `ready-for-dev` n'est pas accordé** (relecture ClaudeBox / décision d'Alexandre requises, questions Q4-1 à Q4-9 ci-dessous). Dépendance 24.3 : la recommandation est de l'abandonner ; 24.4 suivrait alors directement la baseline.
 
@@ -99,7 +99,7 @@ L'état global « exclure » reste respecté (Q3 A, ce n'est pas une exclusion d
 - [x] **Task 1 — Démon** : règle dans `assess_eligibility` et dans `resolve_published_scope` ; source de décision additive ; un seul point de calcul partagé par sync, « Publier », aperçu, diagnostic.
 - [x] **Task 2 — Libellés** (configuration, écran, `docs/fr_FR`).
 - [x] **Task 3 — Tests** : exposé / non exposé / inconnu / **désactivé** × pièce exclue × exclusion explicite × état global ; parité sync / « Publier » / aperçu ; golden ; export.
-- [ ] **Task 4 — Gate 20-0 + déploiement + preuve terrain (humain)**.
+- [x] **Task 4 — Gate 20-0 + déploiement + preuve terrain (humain)**.
 
 ## Baseline du 20/10 : ce qu'elle dit et ce qu'elle ne dit pas
 
@@ -172,3 +172,4 @@ Légende : « change » = le statut de publication (`not_published` → `publish
 - 2026-10-21, 00:10 — **Décisions ClaudeBox** (délégation d'Alexandre sur les décisions de story selon recommandations) : **Q4-1 à Q4-9 = recommandations** (champ additif `homekit_exposed_effective`, `schema_version` 1 ; calcul au démon seul ; `enabled` illisible = actif ; raison `excluded_object` conservée ; champ aussi sur les scénarios ; Q3 A maintenue ; Q4-8 vérifiée au dev, un seul calcul ; 24.4 suit directement la baseline). **`ready-for-dev` accordé.**
 - 2026-10-31 — **Dev (session cloud déléguée), Tasks 1 bis, 1, 2, 3** : `JeedomEqLogic.homekit_exposed_effective` / `JeedomScenario.homekit_exposed_effective` (helper `compute_homekit_exposed_effective`, `topology.py`) ; règle Q3 A dans `assess_eligibility` (source `object` ignorée pour un équipement effectivement exposé) et `resolve_published_scope` (la pièce exclue ne s'applique pas ; l'état global et l'état d'équipement explicite restent respectés ; `decision_source` additive `exception_homekit`, `is_exception` vrai seulement si l'état change) ; champ additif `homekit_exposed_effective` dans l'export (équipements et scénarios), `schema_version` 1. Libellés : `plugin_info/configuration.php`, `docs/fr_FR/index.md`, `docs/dev-decision-export.md`. Tests : `resources/daemon/tests/unit/test_story_24_4_projection_homekit.py`. **Q4-8** : l'écran de l'epic 25 (25.1/25.2) ne lit pas `decision_source` / `is_exception` (grep sur `desktop/`, `core/`) : aucune intégration devinée, `exception_homekit` n'est pas affiché ; un équipement relevé apparaît « Publié » dans l'état unique. Task 4 (gate 20-0, déploiement, preuve terrain) hors périmètre de la session.
 - 2026-10-31 — **Preuve terrain (ClaudeBox, exécution clawcode)** : déployée en production (`b72af70`) ; 502, 503 et 516 publiés, 165 et 550 inchangés, aucun changement sans lien ; gate 20-0 vert (le parcours de l'eq 287 ne peut pas s'exécuter : réglage déjà présent sur la box) ; `getEquipmentStates` 1 377 812 octets ; 0 ERROR. Restent le retour arrière et les registres HA d'AC10, avec Alexandre. Détail : `24-4-preuve-terrain-2026-10-31.md`.
+- 2026-11-01 — **AC10 faite avec Alexandre** sur l'eq 502 (suppression, « Jamais », retour en automatique, « Appliquer ») ; story `done`. Détail : `24-4-preuve-terrain-2026-10-31.md`.
