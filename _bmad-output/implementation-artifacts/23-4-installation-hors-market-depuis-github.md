@@ -1,6 +1,6 @@
 # Story 23.4 : Installation hors Market depuis GitHub
 
-Status: review (AC2 fait le 2026-10-31, preuve 23-4-preuve-terrain-2026-10-31.md ; AC5 documenté non testé)
+Status: done
 
 > Cadrage approuvé par ClaudeBox le 2026-10-12. Brouillon. Relecture ClaudeBox obligatoire; test sur VM vierge 23.1 seulement.
 
@@ -31,3 +31,7 @@ En tant que bêta-testeur, je veux une installation GitHub vérifiée, afin de t
 - [x] Exécuter la procédure sur VM vierge et conserver une preuve anonymisée (AC2 — fait le 2026-10-31).
 - [x] Écrire la procédure (`docs/fr_FR/installation-github.md`).
 - [x] Aligner README et `docs/fr_FR/index.md` (aucune référence `beta` obsolète trouvée) ; site non concerné par cette tâche.
+
+### Change Log
+
+- 2026-11-01 — Story clôturée sur la preuve terrain VM 123, PR #337 ; AC5 documenté, non testé (réserve acceptée à la clôture).

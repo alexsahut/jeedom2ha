@@ -424,7 +424,7 @@ development_status:
   23-1-environnement-de-demonstration-rejouable: done  # preuve terrain 2026-10-13 : VM demo, peuplement et snapshot demo verifies
   23-2-captures-et-video-de-promotion-rejouables: done  # rendu validé par Alexandre le 2026-11-01 09:22 ; médias publiés par #353/#357 ; précédemment ready-for-UX-validation après terrain 2026-10-31
   23-3-remontee-d-etat-lumieres-et-volets: done  # preuve terrain 2026-10-13 : etat, luminosite et position verifies via HA/MQTT/Jeedom
-  23-4-installation-hors-market-depuis-github: done  # preuve terrain 2026-10-31 sur VM 123, PR #337 fusionnée
+  23-4-installation-hors-market-depuis-github: done  # preuve terrain 2026-10-31 sur VM 123, PR #337 fusionnée ; AC5 documenté, non testé (réserve acceptée à la clôture)
   23-5-choix-et-coherence-de-la-licence: done  # AGPL-3.0-or-later fusionnée par PR #273
 
   # ==============================================================

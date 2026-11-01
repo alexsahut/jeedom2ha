@@ -1,6 +1,6 @@
 # Story 23.2 : Captures et vidéo de promotion rejouables
 
-Status: ready-for-UX-validation
+Status: done
 
 > `ready-for-dev` accordé par ClaudeBox le 2026-10-21 après revue de la démo avec Alexandre (VM 122, plugin `68560b7`, Jeedom 4.6.1). Dépendances levées : 23.1 `done`, 22.2 `done` (superseded par l'epic 25, clos le 2026-10-21).
 
@@ -105,6 +105,7 @@ Session cloud déléguée (Claude Code), branche `story/23-2-captures-video`.
 
 ### Change Log
 
+- 2026-11-01 — Rendu validé par Alexandre à 09:22 ; médias publiés par #353/#357 ; story clôturée.
 - 2026-10-21 — dev-story cloud : démo embellie D2 (code + tests), outillage de captures et vidéo, documentation de régénération ; terrain et marqueurs reportés.
 
 ## Exécution terrain du 2026-10-31

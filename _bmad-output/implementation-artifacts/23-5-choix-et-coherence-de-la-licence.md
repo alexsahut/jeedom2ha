@@ -1,6 +1,6 @@
 # Story 23.5 : Choix et cohérence de la licence
 
-Status: review
+Status: done
 
 > Décision écrite d'Alexandre reçue le 2026-10-12 à 19:21 : AGPL-3.0-or-later. Alignement soumis à relecture.
 
@@ -30,3 +30,7 @@ d'AGPL-3.0 et les en-têtes des 12 fichiers du gabarit (11 PHP + `desktop/js/jee
 
 Le Market Jeedom attend et a déjà validé la chaîne `AGPL` : `plugin_info/info.json` la
 conserve, avec cette décision consignée pour lever toute ambiguïté avec la licence complète.
+
+### Change Log
+
+- 2026-11-01 — Story clôturée : alignement AGPL-3.0-or-later fusionné par PR #273.
