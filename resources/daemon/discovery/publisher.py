@@ -14,6 +14,9 @@ import re
 from typing import List, Optional, Set
 
 from models.availability import (
+    AVAILABILITY_OFFLINE,
+    AVAILABILITY_ONLINE,
+    BRIDGE_AVAILABILITY_TOPIC,
     EntityAvailability,
     availability_from_snapshot,
     build_discovery_availability_fields,
@@ -29,6 +32,16 @@ from sync.readback import (
 _LOGGER = logging.getLogger(__name__)
 
 _SW_VERSION = "0.2.0"
+
+# Story 22.4 — appareil du pont, cible du ``via_device`` de chaque appareil publié.
+BRIDGE_DEVICE_ID = "jeedom2ha_bridge"
+BRIDGE_DEVICE_NAME = "Jeedom (jeedom2ha)"
+BRIDGE_DEVICE_MANUFACTURER = "jeedom2ha"
+BRIDGE_DEVICE_MODEL = "Pont Jeedom → Home Assistant"
+BRIDGE_STATUS_UNIQUE_ID = "jeedom2ha_bridge_status"
+BRIDGE_STATUS_NAME = "État du pont"
+# Valeur sentinelle de main._read_plugin_version quand la version est illisible.
+_UNKNOWN_PLUGIN_VERSION = "inconnu"
 
 
 class DiscoveryPublisher:
@@ -396,6 +409,63 @@ class DiscoveryPublisher:
             if await self.unpublish(node_id):
                 purged.append(scenario_id)
         return sorted(set(purged))
+
+    def bridge_topic(self) -> str:
+        """Story 22.4 — topic de découverte de l'entité « État du pont »."""
+        return f"{self._topic_prefix}/binary_sensor/{BRIDGE_DEVICE_ID}/config"
+
+    @staticmethod
+    def build_bridge_payload(plugin_version: Optional[str] = None) -> dict:
+        """Story 22.4 — charge de découverte du pont (fonction pure).
+
+        Publie l'appareil ``jeedom2ha_bridge`` que référence le ``via_device`` de chaque
+        appareil, avec un ``binary_sensor`` de connectivité lu sur le topic de
+        disponibilité du pont. Pas d'``availability_topic`` : l'entité reste lisible
+        (« Déconnecté ») quand le pont est hors ligne. Aucune valeur de broker (CC-48).
+        ``sw_version`` est omis si la version du plugin est inconnue.
+        """
+        device = {
+            "identifiers": [BRIDGE_DEVICE_ID],
+            "name": BRIDGE_DEVICE_NAME,
+            "manufacturer": BRIDGE_DEVICE_MANUFACTURER,
+            "model": BRIDGE_DEVICE_MODEL,
+        }
+        version = str(plugin_version or "").strip()
+        if version and version != _UNKNOWN_PLUGIN_VERSION:
+            device["sw_version"] = version
+
+        payload = {
+            "name": BRIDGE_STATUS_NAME,
+            "unique_id": BRIDGE_STATUS_UNIQUE_ID,
+            "object_id": BRIDGE_STATUS_UNIQUE_ID,
+            "state_topic": BRIDGE_AVAILABILITY_TOPIC,
+            "payload_on": AVAILABILITY_ONLINE,
+            "payload_off": AVAILABILITY_OFFLINE,
+            "device_class": "connectivity",
+            "platform": "mqtt",
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        DiscoveryPublisher._add_default_entity_id(payload, "binary_sensor")
+        return payload
+
+    async def publish_bridge(self, plugin_version: Optional[str] = None) -> bool:
+        """Story 22.4 — publie (retenu) la découverte de l'appareil du pont.
+
+        Le pont n'est pas un équipement : il n'entre ni dans ``publications`` ni dans
+        les compteurs, et aucune dépublication par équipement ou par pièce ne vise son topic.
+        """
+        topic = self.bridge_topic()
+        payload_json = json.dumps(self.build_bridge_payload(plugin_version), ensure_ascii=False)
+        _LOGGER.info("[DISCOVERY] Publishing bridge device config: topic=%s", topic)
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error("[DISCOVERY] Failed to publish bridge device config (bridge unavailable)")
+        return ok
 
     def build_discovery_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> Optional[dict]:
         """Story 24.2 — payload de découverte d'un mapping, sans publication (fonction pure).
