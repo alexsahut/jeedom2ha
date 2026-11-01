@@ -1241,6 +1241,25 @@ async def _detect_lifecycle_changes(
                 )
 
 
+async def _publish_bridge_discovery(app: web.Application) -> bool:
+    """Story 22.4 — publie (retenu) l'appareil du pont « Jeedom (jeedom2ha) ».
+
+    Appelée à chaque connexion MQTT (y compris la première, au démarrage) et au birth HA,
+    avant la republication des équipements. Le pont n'est pas un équipement : rien n'est
+    écrit dans ``publications``, les compteurs, l'export ou les états agrégés.
+    Une erreur est journalisée sans bloquer la republication des équipements.
+    """
+    mqtt_bridge = app.get("mqtt_bridge")
+    if not mqtt_bridge or not mqtt_bridge.is_connected:
+        _LOGGER.warning("[DISCOVERY] Publication du pont annulée — broker non connecté")
+        return False
+    try:
+        return await DiscoveryPublisher(mqtt_bridge).publish_bridge(app.get("plugin_version"))
+    except Exception as exc:
+        _LOGGER.error("[DISCOVERY] Échec de publication du pont — %s", exc)
+        return False
+
+
 async def _republish_all_from_cache(app: web.Application, reason: str) -> None:
     """Story 25.2 (Q5) — la republication peut rejouer des dépublications différées : le cache
     des états agrégés est invalidé à la fin, quelle que soit l'issue."""
@@ -1620,6 +1639,8 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
     async def _reconnect_cb():
         """Called when broker reconnects — republish from RAM cache if non-empty."""
+        # Story 22.4 — appareil du pont d'abord, à chaque connexion (première comprise).
+        await _publish_bridge_discovery(app)
         if app.get("publications"):
             await _republish_all_from_cache(app, "broker_reconnect")
         else:
@@ -1629,6 +1650,8 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
     async def _ha_birth_cb():
         """Called when homeassistant/status = online — republish from RAM cache."""
+        # Story 22.4 — appareil du pont d'abord.
+        await _publish_bridge_discovery(app)
         await _republish_all_from_cache(app, "ha_birth")
 
     # Start the persistent bridge with new params and republication callbacks

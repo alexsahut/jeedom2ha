@@ -6,6 +6,13 @@
 
 ---
 
+# 2026-11-01 — Le pont apparaît sous son nom dans Home Assistant
+
+- Home Assistant affiche désormais vos appareils « Connectés via Jeedom (jeedom2ha) » au lieu de l'adresse du broker MQTT. L'appareil « Jeedom (jeedom2ha) » porte une entité « État du pont » (« Connecté » / « Déconnecté ») qui suit le démon.
+- Aucun appareil ni aucune entité existants ne changent d'identifiant ; le pont n'entre dans aucun compteur ni dans l'export de décision.
+
+---
+
 # 2026-10-21 — Jeedom 4.5 minimum
 
 - Le plugin exige désormais **Jeedom 4.5 ou supérieur** (Debian 12). Jeedom 4.4 n'est pas prévu pour Debian 12, et le démon du plugin s'appuie sur l'environnement Python isolé géré par le cœur, absent des premières versions 4.4.
