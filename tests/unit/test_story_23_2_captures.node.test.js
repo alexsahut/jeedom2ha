@@ -236,3 +236,13 @@ test('23.2 — pauses vidéo ramenées sous 45 s (premier enregistrement complet
   const sb = await load('lib/storyboard.mjs');
   assert.ok(sb.plannedHoldSeconds() <= 45, `pauses ${sb.plannedHoldSeconds()} s`);
 });
+
+test('23.2 — vidéo sous-titrée : chaque étape a un sous-titre court en français, incrusté pendant sa pause', async () => {
+  const sb = await load('lib/storyboard.mjs');
+  for (const step of sb.VIDEO_STEPS) {
+    assert.ok(typeof step.caption === 'string' && step.caption.length >= 20 && step.caption.length <= 110, step.id);
+  }
+  const src = fs.readFileSync(path.join(ROOT, 'tests/e2e/captures/run-captures.mjs'), 'utf8');
+  assert.match(src, /await showCaption\(page, step\.caption\);\s*await page\.waitForTimeout\(step\.holdMs\);/);
+  assert.match(src, /pointer-events:none/);
+});

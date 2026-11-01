@@ -349,6 +349,28 @@ async function runShots(browser, cfg, args, files) {
   }
 }
 
+/** Sous-titre incrusté dans la vidéo (bandeau en bas d'écran), remplacé à chaque étape, effacé à chaque navigation. */
+export const CAPTION_ID = 'j2ha-video-caption';
+
+async function showCaption(page, text) {
+  if (!text) return;
+  await page.evaluate(({ id, value }) => {
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = id;
+      el.setAttribute('style', [
+        'position:fixed', 'left:50%', 'bottom:28px', 'transform:translateX(-50%)', 'z-index:2147483647',
+        'max-width:1080px', 'padding:12px 22px', 'border-radius:10px', 'background:rgba(20,20,20,0.82)',
+        'color:#fff', 'font:600 22px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif', 'text-align:center',
+        'box-shadow:0 4px 18px rgba(0,0,0,0.35)', 'pointer-events:none',
+      ].join(';'));
+      document.body.appendChild(el);
+    }
+    el.textContent = value;
+  }, { id: CAPTION_ID, value: text });
+}
+
 /** Vidéo : un seul contexte enregistré, étapes du storyboard vidéo, durée contrôlée (≤ 2 min). */
 async function runVideo(browser, cfg, args) {
   await mkdir(args.videoOut, { recursive: true });
@@ -358,7 +380,9 @@ async function runVideo(browser, cfg, args) {
   // Thème clair vérifié à chaque écran filmé, pas seulement au premier ; la pause suit le storyboard vidéo.
   const hold = async (id) => {
     await assertLightTheme(page);
-    await page.waitForTimeout(steps.find((s) => s.id === id).holdMs);
+    const step = steps.find((s) => s.id === id);
+    await showCaption(page, step.caption);
+    await page.waitForTimeout(step.holdMs);
   };
   const started = Date.now();
   let video;
