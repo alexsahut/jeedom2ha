@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "plugin_version": "1.2.0",
+  "source_commit": "2a247c5",
+  "generated_on": "2026-10-31",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "locale": "fr-FR",
+  "theme": "light",
+  "data": "démo synthétique 23.1/23.2 (CC-48)",
+  "regenerate": "node tests/e2e/captures/run-captures.mjs --env-file <chemin-hors-depot> --out docs/fr_FR/images --video-out <dossier>",
+  "files": [
+    {
+      "id": 1,
+      "file": "page-principale.png",
+      "sha256": "80dcc27c776611933296edc0c9c40bfe15762c07e2c9afb16b3df8f89172d931",
+      "bytes": 59699
+    },
+    {
+      "id": 2,
+      "file": "cartes-de-piece.png",
+      "sha256": "d7f6e1d110bc50e689fe88f0e9eebd96123cefb3dc265d6667efe670e30d86b1",
+      "bytes": 18094
+    },
+    {
+      "id": "2b",
+      "file": "cartes-de-piece-garage.png",
+      "sha256": "a69298e3fa3a8e445fb5a418cd659622d5e13c350ba65b3c107904a4f1337167",
+      "bytes": 3645
+    },
+    {
+      "id": 3,
+      "file": "vue-de-travail.png",
+      "sha256": "e047d3f58c69fdd0d7fa75ca3127e9b76d3e12a813e1d1a68a9c4d0ae8603800",
+      "bytes": 76220
+    },
+    {
+      "id": 4,
+      "file": "detail-equipement.png",
+      "sha256": "08b01b1b09bab4a12b8522fa28e9f0032bf342078e8bd287dbd1370f552aa1b7",
+      "bytes": 27393
+    },
+    {
+      "id": 5,
+      "file": "tableau-des-commandes.png",
+      "sha256": "fb514c78c4ca79be6aa98222d5d34692d4c6058884def3456d90b82b1003fd41",
+      "bytes": 80136
+    },
+    {
+      "id": 6,
+      "file": "compteurs-detail-piece.png",
+      "sha256": "a15d0e5c8f303304616b44062b87a2a192120e82b8b3f57f16f72a7ec27f57f8",
+      "bytes": 54576
+    },
+    {
+      "id": 7,
+      "file": "compteurs-equipement-deplie.png",
+      "sha256": "cd075427bf10959f9ad9ac0c59ad5a9265a74374e2c081310df34722719e0153",
+      "bytes": 65423
+    },
+    {
+      "id": 8,
+      "file": "configuration.png",
+      "sha256": "a884093c8e99800d006fc7f38cc6e7862e58c9b467b14ece69571eea0a4d27d8",
+      "bytes": 49729
+    },
+    {
+      "id": 9,
+      "file": "home-assistant-appareils.png",
+      "sha256": "c2b4e0ade51424a1786a27d56361b490ff0a20a27c99aaabf506214f91723924",
+      "bytes": 70388
+    }
+  ],
+  "video": {
+    "file": "jeedom2ha-presentation.webm",
+    "seconds": 109,
+    "bytes": 4715379,
+    "versioned": false,
+    "generated": {
+      "plugin_version": "1.2.0",
+      "source_commit": "2a247c5",
+      "generated_on": "2026-10-31"
+    }
+  }
+}

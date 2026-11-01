@@ -28,7 +28,11 @@ test('storyboard : 8 lignes + capture HA, marqueurs présents dans la documentat
   assert.equal(new Set([...sb.SHOTS, ...sb.EXTRA_SHOTS].map((s) => s.file)).size, sb.SHOTS.length + sb.EXTRA_SHOTS.length);
   for (const shot of sb.SHOTS.filter((s) => s.marker)) {
     const doc = fs.readFileSync(path.join(ROOT, 'docs/fr_FR', shot.doc), 'utf8');
-    assert.ok(doc.includes(`<!-- CAPTURE-A-PRENDRE: ${shot.marker} -->`), `marqueur absent : ${shot.marker}`);
+    // Marqueurs remplacés après validation (AC4, 2026-11-01) : l'emplacement reste repéré, suivi de l'image.
+    assert.ok(doc.includes(`<!-- CAPTURE: ${shot.marker} -->\n![`), `emplacement absent : ${shot.marker}`);
+    assert.ok(doc.includes(`](images/${shot.file})`), `image absente : ${shot.file}`);
+    assert.ok(fs.existsSync(path.join(ROOT, 'docs/fr_FR/images', shot.file)), `fichier absent : ${shot.file}`);
+    assert.ok(!doc.includes('CAPTURE-A-PRENDRE'), `marqueur non remplacé dans ${shot.doc}`);
   }
   assert.ok(sb.plannedHoldSeconds() > 0 && sb.plannedHoldSeconds() <= sb.VIDEO_MAX_SECONDS - 30);
   assert.equal(sb.VIDEO_MAX_SECONDS, 120);
