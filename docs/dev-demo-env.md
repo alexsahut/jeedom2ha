@@ -181,7 +181,9 @@ du lien « vidéo » de la fiche Market est choisi par Alexandre ; consigner ici
 Les marqueurs `<!-- CAPTURE-A-PRENDRE: … -->` de `docs/fr_FR/` ont été remplacés le 2026-11-01 par
 `<!-- CAPTURE: … -->` suivi de `![…](images/<fichier>)`, après la relecture de ClaudeBox (CC-48, concordance) et à la
 demande d'Alexandre. Images : passage r9 (plugin `2a247c5`, 1.2.0), manifeste `docs/fr_FR/images/captures-manifest.json`.
-Pour régénérer, relancer le script avec `--out docs/fr_FR/images` puis relire avant de committer. Un test
+Pour régénérer, relancer le script avec `--out docs/fr_FR/images` puis relire avant de committer.
+Vidéo de présentation : `docs/media/jeedom2ha-presentation.mp4` (MP4 H.264 de 1 Mo, 110 s), réencodée depuis le webm r9
+(`ffmpeg -c:v libx264 -crf 30 -an -movflags +faststart`), pour la fiche Market et le site jeedom2ha. Un test
 (`test_story_23_2_captures.node.test.js`) garantit que chaque ligne du storyboard a son emplacement et son image.
 
 ### État de la preuve
