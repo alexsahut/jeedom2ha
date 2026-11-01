@@ -1,6 +1,6 @@
 # Story 22.4 : le pont jeedom2ha apparaît sous son nom dans Home Assistant
 
-Status: review
+Status: done
 
 > Créée par ClaudeBox le 2026-11-01 après la relecture des médias de 23.2. `ready-for-dev` accordé par Alexandre (« ok pour la petite story de correction », 01/11 à 09:55). Petite story corrective (S) de l'epic 22, consacré aux noms dans Home Assistant.
 
@@ -48,7 +48,7 @@ afin de comprendre d'où ils viennent et de voir d'un coup d'œil si le pont est
 - [x] Task 1 : publication de la découverte du pont (AC1, AC2)
 - [x] Task 2 : exclusions (AC3) et tests (AC4)
 - [x] Task 3 : documentation (AC6)
-- [x] Task 4 : preuve terrain sur la démo, puis en production (AC5), par ClaudeBox et clawcode — production : contrôle visuel dans HA restant (voir Preuve terrain)
+- [x] Task 4 : preuve terrain sur la démo, puis en production (AC5), par ClaudeBox et clawcode ; contrôle visuel du HA de production par Alexandre
 
 ## Dev Agent Record
 
@@ -82,12 +82,12 @@ afin de comprendre d'où ils viennent et de voir d'un coup d'œil si le pont est
 - MQTT : `homeassistant/binary_sensor/jeedom2ha_bridge/config` retenu, `unique_id` `jeedom2ha_bridge_status`, appareil « Jeedom (jeedom2ha) » ; `jeedom2ha/bridge/status` = `online` ; sujets `homeassistant/` : +1 (AC1) ;
 - `getEquipmentStates` : 1 377 812 octets (inchangé, budget 1,5 Mo) ; 0 ERROR du démon depuis le redémarrage ;
 - gate 20-0 complet : vert (détail dans la story 24-11).
-- **Reste (AC5 en production)** : contrôle visuel dans le HA de production (appareil « Jeedom (jeedom2ha) », « Connecté via », ancien appareil du broker) par Alexandre ; ClaudeBox ne saisit pas d'identifiants HA. L'aller-retour Déconnecté/Connecté n'est pas rejoué en production (prouvé sur la démo, même code).
+- **AC5 en production** : contrôle visuel dans le HA de production (appareil « Jeedom (jeedom2ha) », « Connecté via », ancien appareil du broker) validé par Alexandre le 2026-11-01 à 19:33 (« c'est ok dans HA ») ; ClaudeBox ne saisit pas d'identifiants HA. L'aller-retour Déconnecté/Connecté n'est pas rejoué en production (prouvé sur la démo, même code).
 
 ### Change Log
 
 - 2026-11-01 : dev-story (session cloud déléguée) ; Tasks 1 à 3 ; statut `review`. Task 4 (preuve terrain) à ClaudeBox et clawcode.
-- 2026-11-01 : preuve terrain démo et production (ClaudeBox, clawcode) ; reste le contrôle visuel dans le HA de production ; statut `review`.
+- 2026-11-01 : preuve terrain démo et production (ClaudeBox, clawcode) ; contrôle visuel du HA de production validé par Alexandre (19:33) ; statut `done`.
 
 ### File List
 
