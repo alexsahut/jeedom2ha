@@ -137,7 +137,7 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 ### Tests
 
 - `resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py` (83 cas, identifiants synthétiques 7001/7002) : portail `GB_OPEN`+`GB_CLOSE`+`GB_TOGGLE`+`BARRIER_STATE` numérique ; garage `GB_TOGGLE`+`GARAGE_STATE` numérique ; bascule seule sans état (reste `button`) ; état binaire (comportement inchangé, `binary_sensor` `garage_door`) ; formes ambiguës ; pas d'heuristique de nom ; `FLAP_*` + `GB_*` garde le chemin volet ; payloads de découverte (gate, garage, sans état, volet inchangé) ; table d'état et valeurs hors table ; écouteur et publication d'état, état initial ; ordres directs quel que soit l'état ; matrice complète de la bascule (0/252/253/254/255/inconnu/hors table) et refus journalisés ; dernier événement prioritaire sur la topologie ; refus non rejoué ; cohérence commande/état ; retypage `button` → `cover` à chaud et au démarrage ; override vers `button` et retour.
-- `python -m pytest` : voir le rapport de PR. `flake8 resources/daemon tests` : 0. `node --test tests/unit/*.node.test.js` : voir le rapport de PR.
+- `python -m pytest` : 2 647 passés, 9 désélectionnés (marqueur `load`) ; 2 échecs intermittents dans `tests/unit/test_deploy_safety_rollback.py` (délais du script de déploiement simulé, sans lien : le même fichier échoue aussi par intermittence sans les changements de la story et passe seul, 24/24, quatre fois de suite). `flake8 resources/daemon tests` : 0. `node --test tests/unit/*.node.test.js` : 1 214 / 1 214 (le garde CC-48 du changelog refuse le mot « garage » : l'entrée parle de « portes motorisées »).
 
 ### File List
 
