@@ -1,6 +1,6 @@
 # Story 24.5 : Scénarios exposés à HomeKit
 
-Status: draft
+Status: done
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **R1 (ClaudeBox, 12/10) intégrée : la cause de l'écart est établie, la story se réduit à documenter et à vérifier que les scénarios sont dans l'export (24.2).** Aucun changement de production. Décision d'Alexandre : **Q8 A** (garder `button`) est confirmée par les faits ; B et C ne sont plus à l'ordre du jour. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel de scénario (CC-48) : identifiants seulement.
 
@@ -45,8 +45,8 @@ Les cinq scénarios 20, 38, 50, 57 et 150 sont **actifs** dans Jeedom et **leurs
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Vérifier sur l'export « avant »** (ClaudeBox) : les cinq lignes de AC1.
-- [ ] **Task 1 — Documentation** (AC2) et clôture ; mise à jour du référentiel de parité de ClaudeBox hors dépôt (lecture des boutons de scénario).
+- [x] **Task 0 — Vérifier sur l'export** (ClaudeBox) : les cinq lignes de AC1, vérifiées le 2026-11-01 sur l'export « après » de la preuve 24.4.
+- [x] **Task 1 — Documentation** (AC2) : `docs/dev-decision-export.md`, section Scénario. La mise à jour du référentiel de parité hors dépôt reste à faire par ClaudeBox ou clawbox.
 
 ## Garde-fous
 
@@ -61,3 +61,4 @@ Le traitement par Assist d'un `button` (D4) : seulement utile si B ou C est un j
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q8 A ; Q11 oui (les 5 boutons exposés à Assist, fait par ClaudeBox à 13:30).
+- 2026-11-01 — **Clôture (ClaudeBox, mandat de nuit)**. AC1 vérifié en production, sur l'export « après » de la preuve 24.4 (`b72af70`) : les scénarios 20, 38, 50, 57 et 150 sont `active`, `homekit_exposed` (source `scenario_configuration`) et `homekit_exposed_effective`, avec `decision` `published` et `reason` `scenario_button`. Pour chacun, `unique_id` `jeedom2ha_scenario_<id>`, `ha_type` `button`, `entity_id_expected` `button.jeedom2ha_scenario_<id>` et `discovery_published` vrai. AC2 : documentation ajoutée. AC3 : aucun changement de production. AC4 : sans objet, les cinq sont actifs. AC5 : aucun nom dans le dépôt.
