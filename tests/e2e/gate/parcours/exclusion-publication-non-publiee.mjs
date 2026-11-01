@@ -121,6 +121,12 @@ async function panelEligible(panel) {
     (node) => node.textContent.trim() === label && node.getAttribute('aria-checked') === 'true',
   ), REVERT_LABEL);
   if (!automatic) return false;
+  // Gate 01/11 (eq 598) : « Jamais » peut être désactivé (équipement non éligible, `can_exclude` faux) ;
+  // le clic d'exclusion attendrait alors 30 s puis échouerait. Le candidat est écarté pendant la recherche.
+  const excludeUsable = await panel.locator('.j2ha-eq-controls .j2ha-seg-btn').evaluateAll((nodes, label) => nodes.some(
+    (node) => node.textContent.trim() === label && !node.disabled && node.getAttribute('aria-disabled') !== 'true',
+  ), EXCLUDE_LABEL);
+  if (!excludeUsable) return false;
   if (await panel.locator('.j2ha-group-head').count() !== 0) return false;
   return await panel.locator('tr.mapping-override-cmd').count() >= 1;
 }
