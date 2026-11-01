@@ -200,7 +200,9 @@ async def test_reconnect_and_ha_birth_republish_bridge_first(cli, app):
         assert len(topics) > 1  # les équipements suivent, inchangés
 
 
-async def test_bridge_not_published_when_broker_disconnected(app):
+async def test_bridge_not_published_when_broker_disconnected(cli, app):
+    # `cli` d'abord : sous Python 3.9, la fixture `app` seule est créée hors boucle (RuntimeError en CI).
+    del cli
     app["mqtt_bridge"].is_connected = False
     assert await http_server._publish_bridge_discovery(app) is False
     app["mqtt_bridge"].publish_message.assert_not_called()
