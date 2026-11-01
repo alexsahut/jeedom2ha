@@ -1,6 +1,6 @@
 # Story 24.7 : Portail et garage : `cover`
 
-Status: draft
+Status: review
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production** (des entités `button` ou `binary_sensor` deviennent un `cover`). Ne rouvre pas `PRODUCT_SCOPE` (`cover` y est déjà). Décision attendue d'Alexandre : **Q10** (remplacement d'entités existantes, option C pour un `cover` optimiste) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -43,7 +43,36 @@ afin de les consulter et de les piloter par Assist.
 | F6 | Le `cover` actuel traduit `OPEN`/`CLOSE`/`STOP` vers `FLAP_UP`/`FLAP_DOWN`/`FLAP_STOP` ; `GB_*` n'y est pas. | `sync/command.py:283-330` |
 | F7 | Le `cover` est optimiste aujourd'hui ; son état réel relève de 23.3. | `sync/state.py:33-48` ; `sync/command.py:403-430` |
 
-## Critères d'acceptation proposés (figés sur Q10 A)
+## Task 0 faite par ClaudeBox le 2026-11-01 (export de production `57f961b` + lecture des commandes dans Jeedom)
+
+| eq | plugin | exposé (effectif) | aujourd'hui dans HA | commandes typées |
+|---|---|---|---|---|
+| **496** (portail) | `virtual` | oui | `button` `jeedom2ha_eq_496` (GB_TOGGLE) | `GB_OPEN` 4545, `GB_CLOSE` 4546, `GB_TOGGLE` 4542, `BARRIER_STATE` 4543 (**info numérique**) |
+| **199** (garage) | `virtual` | oui | `button` `jeedom2ha_eq_199` (GB_TOGGLE) | `GB_TOGGLE` 1624, `GARAGE_STATE` 1626 (**info numérique**) |
+| 455 | `zwavejs` | non | rien (pièce exclue) | `BARRIER_STATE` binaire, 2× `GB_TOGGLE` : **hors périmètre** (équipement physique, non exposé ; règle d'Alexandre du 01/10 : pas de publication jeedom2ha de ce que HA atteint par sa propre intégration) |
+
+- **Les états ne sont pas binaires** : `BARRIER_STATE` et `GARAGE_STATE` sont des infos **numériques** à la convention « barrière » de Z-Wave (celle du plugin Homebridge de Jeedom) : `0` fermé, `252` en fermeture, `253` arrêté, `254` en ouverture, `255` ouvert. Relevés : portail `255` (HA montre aussi un capteur d'ouverture « portail » à `on`), garage `0`. `GB_OPEN` / `GB_CLOSE` du portail écrivent respectivement `254` / `252` dans son état (`updateCmdId`).
+- `GB_TOGGLE` de chaque virtuel écrit `1` dans une info `SCENARIO` : l'ordre réel est porté par un scénario Jeedom. jeedom2ha appelle la commande Jeedom, comme HomeKit, sans connaître le scénario.
+- Aujourd'hui, les états numériques ne sont **pas publiés** (le `binary_sensor` `garage_door` de `mapping/binary_sensor.py:41-42` ne vaut que pour une info binaire) ; seul le `GB_TOGGLE` sort, en `button`.
+
+### Faits établis sur la box après la relecture de la PR #368 (ClaudeBox, 2026-11-01, lecture des scénarios Jeedom)
+
+- L'ordre physique du portail **et** du garage n'est porté que par la bascule `GB_TOGGLE` : elle écrit `1` dans une info `SCENARIO`, qui déclenche un scénario « machine d'état » pour moteur à impulsion unique : fermé → impulsion ; ouvert → impulsion et écriture de `252` ; `252` ou `254` → impulsion = arrêt, le sens est mémorisé ; `253` → repart selon le sens mémorisé.
+- `GB_OPEN` / `GB_CLOSE` du portail virtuel n'actionnent **rien** physiquement : ils n'écrivent que `254` / `252` dans l'état (`updateCmdId`). Les appeler depuis HA afficherait « en ouverture » sans mouvement : état menteur.
+
+## Décisions de ClaudeBox pour le `ready-for-dev` (2026-11-01, go d'Alexandre 22:11)
+
+- **D1. État** : une info `BARRIER_STATE` / `GARAGE_STATE` **numérique** se traduit en état de `cover` par la table `0→closed`, `252→closing`, `253→stopped`, `254→opening`, `255→open` ; toute autre valeur → aucun état publié (jamais d'invention). Une info **binaire** reste traitée comme aujourd'hui (`binary_sensor` `garage_door`), hors de cette story.
+- **D2. Classe d'appareil** : `gate` pour un équipement dont l'état est `BARRIER_STATE` (ou, sans état, porteur de `GB_OPEN`/`GB_CLOSE`), `garage` pour `GARAGE_STATE`. Vérifier que HA 2026.9.4 accepte ces deux valeurs de `device_class` pour `cover`.
+- **D3. Ordres** : avec `GB_OPEN` **et** `GB_CLOSE`, `open`/`close` les appellent directement, `GB_TOGGLE` n'est pas utilisé, pas de `stop` (aucun `GB_STOP` sur la box). Avec `GB_TOGGLE` seul : `open` n'envoie la bascule que si le dernier état connu vaut `0` (fermé) ou `253` (arrêté) ; `close` seulement s'il vaut `255` (ouvert) ou `253` ; état inconnu ou mouvement en cours (`252`, `254`) : **aucun ordre**, refus journalisé. Jamais de bascule à l'aveugle (AC2).
+- **D4. Éligibilité** (AC2) : `cover` seulement si (`GB_OPEN` et `GB_CLOSE`) ou (`GB_TOGGLE` et un état numérique D1). Sinon comportement actuel inchangé.
+- **D5. `optimistic: false`** quand un état D1 existe (règle de 23.3) ; pas de `cover` optimiste.
+- **D6. Remplacement** (Q10 A) : la découverte `button` de `jeedom2ha_eq_496` et `jeedom2ha_eq_199` est vidée (retenu vide) quand le `cover` est publié ; l'inventaire des références HA est relevé avec Alexandre avant le déploiement.
+- **D7. Preuve terrain** : ouverture puis fermeture **réelles** du portail et du garage **en présence d'Alexandre** (organe de sécurité) ; pas d'équipement de test équivalent sur la box.
+- **D3 bis (2026-11-01, ClaudeBox, révise D3)** : quand `GB_TOGGLE` et un état numérique D1 existent, le mode est **toujours** la bascule (`toggle_on_state`), même si `GB_OPEN` / `GB_CLOSE` existent (ils sont ignorés). Bascule : `OPEN` seulement depuis `0`, `CLOSE` seulement depuis `255` ; **refus depuis `253`** dans les deux sens (le sens dépend d'une mémoire interne au scénario, invisible pour jeedom2ha, I1), refus en mouvement (`252`, `254`) et sur état inconnu. Verrou « ordre en vol » par équipement (B1) : après l'envoi d'une bascule, ou un timeout / une erreur RPC de l'envoi, toute nouvelle bascule est refusée (`barrier_toggle_in_flight`) jusqu'à un événement d'état différent de la valeur lue à l'envoi, ou 60 s. Fraîcheur (I3) : relecture de l'info d'état dans Jeedom juste avant l'envoi, refus si elle échoue ou contredit la garde ; la valeur relue fait foi. Le mode direct n'existe que sans `GB_TOGGLE`, et il est gardé par l'état : `OPEN` refusé depuis ouvert / en ouverture, `CLOSE` depuis fermé / en fermeture, refus sur état inconnu. Commandes retenues ignorées (I4, `retained_command_ignored`). Une seule source de la nature barrière, `barrier_mode` (M1).
+- **D4 bis (2026-11-01, ClaudeBox, révise D4, M3)** : pas de `cover` sans état numérique D1 ; sans état, comportement actuel inchangé.
+
+## Critères d'acceptation (figés sur Q10 A)
 
 - **AC1.** Un équipement qui porte `GB_OPEN` et `GB_CLOSE` (ou `GB_TOGGLE`) est projeté en `cover` de classe portail ou garage (valeurs exactes lues dans la documentation de HA, D4), avec ses commandes d'ouverture et de fermeture traduites par `sync/command.py`.
 - **AC1 bis.** Cas de référence : le portail (`GB_OPEN`, `GB_CLOSE`, `GB_TOGGLE`, `BARRIER_STATE`) donne un `cover` avec ordres d'ouverture et de fermeture directs, `GB_TOGGLE` non utilisé pour l'ouverture ; le garage (`GB_TOGGLE`, `GARAGE_STATE`) donne un `cover` dont l'ordre d'ouverture envoie la bascule **seulement si** l'état dit fermé, et inversement, jamais en aveugle.
@@ -58,13 +87,14 @@ afin de les consulter et de les piloter par Assist.
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Gel du référentiel** : matrice `GB_*` / `BARRIER_STATE` / `GARAGE_STATE` → `cover` (classes de HA 2026.9.4, charge utile d'ordre, topic d'état) ; liste, par ClaudeBox, des équipements concernés, de leurs commandes réelles et de leur chemin actuel (`binary_sensor` ou `button`).
-- [ ] **Task 1 — Mapper** : étendre `CoverMapper` ou créer un mapper de portail partageant `CoverCapabilities` (choix au `create-story`).
-- [ ] **Task 2 — Commande** : traduction des ordres, logique de bascule fondée sur l'état (AC2).
-- [ ] **Task 3 — Publication** : classe d'appareil, `default_entity_id`.
-- [ ] **Task 4 — État** : après 23.3 (une entrée).
-- [ ] **Task 5 — Tests** : portail avec ouvrir/fermer, avec bascule + état, avec bascule seule (refus), non-régression des volets.
-- [ ] **Task 6 — Gate, déploiement, preuve terrain (humain)** ; **Task 7 — documentation**.
+- [x] **Task 0 — Gel du référentiel** (ClaudeBox, 01/11 : voir « Task 0 » et D1-D7) : matrice `GB_*` / `BARRIER_STATE` / `GARAGE_STATE` → `cover` (classes de HA 2026.9.4, charge utile d'ordre, topic d'état) ; liste, par ClaudeBox, des équipements concernés, de leurs commandes réelles et de leur chemin actuel (`binary_sensor` ou `button`).
+- [x] **Task 1 — Mapper** : `CoverMapper` étendu (`_map_barrier`), partage `CoverCapabilities`.
+- [x] **Task 2 — Commande** : traduction des ordres, logique de bascule fondée sur l'état (AC2).
+- [x] **Task 3 — Publication** : classe d'appareil, `default_entity_id`.
+- [x] **Task 4 — État** : après 23.3 (une entrée).
+- [x] **Task 5 — Tests** : portail avec ouvrir/fermer, avec bascule + état, avec bascule seule (refus), non-régression des volets.
+- [ ] **Task 6 — Gate, déploiement, preuve terrain (humain)** : à ClaudeBox et Alexandre (D7), non faite par la session cloud.
+- [x] **Task 7 — documentation**.
 
 ## Garde-fous
 
@@ -81,3 +111,83 @@ Le chemin actuel de chaque équipement mesuré (D5) ; les classes d'appareil acc
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q10 A (remplacement) ; option C écartée : la story attend 23.3.
+- 2026-11-01 — Task 0 (ClaudeBox) : états numériques à la convention barrière ; décisions D1-D7 ; 23.3 `done` ; `ready-for-dev` (go d'Alexandre 22:11).
+- 2026-11-01 — dev-story (session cloud déléguée) : Tasks 1 à 5 et 7 ; `review`. Task 6 (terrain) reste à ClaudeBox / Alexandre.
+- 2026-11-01 — relecture de la PR #368 et faits de la box (ClaudeBox) : D3 bis, D4 bis ; corrections appliquées (section « Corrections après relecture »), story toujours `review`.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Opus 5.5 (session Claude Code cloud déléguée).
+
+### Implementation Notes
+
+> Version initiale (commit `b0adfe2`). Les points sur l'éligibilité sans état, le mode direct prioritaire et la bascule depuis `253` sont **remplacés** par la section « Corrections après relecture » ci-dessous (D3 bis, D4 bis).
+
+- **Mapper** (`mapping/cover.py`, `_map_barrier`) : appelé seulement si l'équipement n'a **aucun** `FLAP_*` ni type « anti-cover » ; le chemin `FLAP_*` est intact. Commandes lues : actions `GB_OPEN` / `GB_CLOSE` / `GB_TOGGLE`, infos `BARRIER_STATE` / `GARAGE_STATE`. Éligibilité D4 : (`GB_OPEN` et `GB_CLOSE`) ou (`GB_TOGGLE` et état **numérique**). Sinon `None` : la chaîne continue, comportement actuel inchangé (`button`, ou `binary_sensor` `garage_door` pour un état binaire), raison journalisée (`barrier_not_eligible`, état non numérique, doublon). Toutes les commandes `GB_*` et l'état sont consommés par le `cover` (pas de `button` ni de `binary_sensor` en double, AC3). `reason_code` : `cover_barrier_open_close` / `cover_barrier_toggle_state` ; `reason_details` : `barrier_mode` (`direct` / `toggle_on_state`), `cover_device_class` (`gate` / `garage`), `barrier_state`. Confiance `sure` avec état, `probable` sans état (ouvrir/fermer directs). Aucune heuristique sur les noms.
+- **Classe d'appareil (D2)** : `garage` si l'état est `GARAGE_STATE`, `gate` pour `BARRIER_STATE` ou sans état. **Vérifié dans le code source de HA 2026.9.4** (tag `2026.9.4`, `homeassistant/components/cover/const.py` : `CoverDeviceClass.GARAGE = "garage"`, `GATE = "gate"`).
+- **Publication** (`discovery/publisher.py`) : pour un `cover` barrière seulement, `device_class` gate/garage, `state_opening` / `state_closing` / `state_stopped` explicites, `payload_stop: null` (sans `GB_STOP` ; dans HA 2026.9.4 `mqtt/cover.py` accepte `None` et retire alors la fonction STOP, sinon le défaut est `"STOP"`). `default_entity_id = cover.jeedom2ha_<id>`, `unique_id` `jeedom2ha_eq_<id>`, `object_id` `jeedom2ha_<id>` (conventions inchangées). `optimistic: false` dès qu'un état numérique existe (D5, `has_reliable_channel`).
+- **État (D1)** (`sync/readback.py`, `sync/state.py`) : une entrée ajoutée, sans toucher aux lignes light/cover de 23.3 : quand un `cover` n'a pas d'état `FLAP_*`, `readback_commands` prend une info `BARRIER_STATE` / `GARAGE_STATE` **numérique** ; `_translate_value` la traduit par la table `0→closed`, `252→closing`, `253→stopped`, `254→opening`, `255→open` (`barrier_state`) ; toute autre valeur (y compris décimale, hors table, vide) ne publie rien. L'écouteur PHP est inscrit automatiquement (`list_state_targets`).
+- **Ordres (D3)** (`sync/command.py`, `_translate_barrier_command`) : avec `GB_OPEN` et `GB_CLOSE`, appel direct, `GB_TOGGLE` jamais utilisé. Avec `GB_TOGGLE` seul : `OPEN` seulement depuis `closed`/`stopped` (0/253), `CLOSE` seulement depuis `open`/`stopped` (255/253) ; sinon aucun ordre, refus journalisé en WARNING (`action=refuse_barrier_toggle`, `reason_code` `barrier_state_unknown` / `barrier_in_motion` / `barrier_already_open` / `barrier_already_closed`, avec l'état et la valeur brute), puis le rejet habituel `reject_command`. `STOP` refusé (`missing_action_command`). **Dernier état connu** : la dernière valeur reçue de Jeedom par `StateSynchronizer` (nouvel accesseur en lecture `last_event_value`, alimenté par chaque événement, publié ou non), à défaut la valeur de la topologie de la dernière synchronisation. Un refus n'est **jamais mis en attente** : un changement d'état ultérieur ne déclenche rien, HA doit redonner l'ordre. Politique de confirmation : `real_state_confirmation` (aucun état optimiste publié) quand l'état existe.
+- **Cycle de vie (D6)** : aucun code nouveau. Le retypage `button` → `cover` est déjà traité par `_detect_lifecycle_changes` (`transport/http_server.py`), à chaud et au démarrage (cache disque) : la découverte `homeassistant/button/jeedom2ha_<id>/config` est vidée (retenu vide) avant la publication du `cover`, avec report en cas d'échec. Testé.
+- **Override (AC8)** : un override « Type HA » `button` sur une commande de l'équipement redonne le `button` (projection valide, payload `button.jeedom2ha_<id>`) ; le retrait de l'override redonne le `cover`.
+- **Garde 25.4 (AC31)** : diff de `resources/daemon/` en ajouts seuls (le `return None  # Not a cover` et l'import de `sync/command.py` sont conservés).
+- `PRODUCT_SCOPE` inchangé ; golden inchangé (aucun `GB_*` dans le corpus).
+
+### Points tranchés
+
+1. **`GB_OPEN` + `GB_CLOSE` avec un état binaire** : pas de `cover` (D1 prime : une info binaire reste traitée comme aujourd'hui, hors story). Le `cover` ne consommerait pas l'état et la chaîne s'arrêtant au premier mapper, le `binary_sensor` existant disparaîtrait.
+2. **`GB_OPEN` + `GB_CLOSE` sans état** : `cover` `gate` publié (D4), confiance `probable`, optimiste comme un volet sans état (règle de 23.3). Aucun équipement de la box dans ce cas (Task 0).
+3. **Doublons** (ex. deux `GB_TOGGLE`, `BARRIER_STATE` et `GARAGE_STATE` ensemble) : pas de `cover`, comportement actuel.
+4. **Course d'état** : si l'état change entre la lecture du dernier état connu et l'exécution de la bascule (actionnement par un autre moyen pas encore signalé par Jeedom), la bascule peut partir dans le mauvais sens : limite inhérente à toute bascule, documentée.
+5. **253 « arrêté »** : HA 2026.9.4 affiche `stopped` comme « ouvert » (ou « fermé » si l'état précédent était fermé/en fermeture) ; les deux sens restent permis par la bascule (D3).
+6. Constat hors périmètre : la commande d'un `button` d'équipement (`jeedom2ha/<id>/cmd`) n'est routée par `sync/command.py` que pour les scénarios ; un override vers `button` reproduit donc exactement le comportement actuel du bouton, sans plus.
+
+### Tests
+
+- `resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py` (83 cas, identifiants synthétiques 7001/7002) : portail `GB_OPEN`+`GB_CLOSE`+`GB_TOGGLE`+`BARRIER_STATE` numérique ; garage `GB_TOGGLE`+`GARAGE_STATE` numérique ; bascule seule sans état (reste `button`) ; état binaire (comportement inchangé, `binary_sensor` `garage_door`) ; formes ambiguës ; pas d'heuristique de nom ; `FLAP_*` + `GB_*` garde le chemin volet ; payloads de découverte (gate, garage, sans état, volet inchangé) ; table d'état et valeurs hors table ; écouteur et publication d'état, état initial ; ordres directs quel que soit l'état ; matrice complète de la bascule (0/252/253/254/255/inconnu/hors table) et refus journalisés ; dernier événement prioritaire sur la topologie ; refus non rejoué ; cohérence commande/état ; retypage `button` → `cover` à chaud et au démarrage ; override vers `button` et retour.
+- `python -m pytest` : 2 647 passés, 9 désélectionnés (marqueur `load`) ; 2 échecs intermittents dans `tests/unit/test_deploy_safety_rollback.py` (délais du script de déploiement simulé, sans lien : le même fichier échoue aussi par intermittence sans les changements de la story et passe seul, 24/24, quatre fois de suite). `flake8 resources/daemon tests` : 0. `node --test tests/unit/*.node.test.js` : 1 214 / 1 214 (le garde CC-48 du changelog refuse le mot « garage » : l'entrée parle de « portes motorisées »).
+
+### Corrections après relecture (2026-11-01, relecture indépendante de la PR #368 et faits de la box)
+
+- **Mapper (D3 bis, D4 bis, M3)** : un état numérique est obligatoire ; sans état, ou avec un état binaire, l'équipement garde **exactement** le comportement de `main` (test comparé aux valeurs relevées sur `origin/main` : `binary_sensor_garage_state`, `binary_sensor_barrier_state`, `button_gb_open`, `button_gb_toggle`). `GB_TOGGLE` présent ⇒ `barrier_mode: toggle_on_state` (`GB_OPEN` / `GB_CLOSE` consommés mais jamais appelés) ; mode `direct` seulement sans bascule. Confiance toujours `sure`.
+- **Bascule (I1, B1, I3)** (`sync/command.py`) : la traduction ne nomme que `GB_TOGGLE` (famille `barrier_toggle`) ; la garde s'exécute dans `handle_command_message`, juste avant l'envoi, dans `_guard_barrier_toggle` :
+  1. verrou par `eq_id` (`barrier_toggle_in_flight`) ;
+  2. relecture de l'info d'état par `cmd::execCmd` sur la commande info (méthode JSON-RPC déjà utilisée par le démon ; réponse `{"value": …}`), refus `barrier_state_read_failed` si elle échoue ;
+  3. garde sur la valeur relue : `OPEN` depuis `0`, `CLOSE` depuis `255` ; sinon `barrier_in_motion` (252/254), `barrier_stopped_direction_unknown` (253), `barrier_already_open` / `barrier_already_closed`, `barrier_state_unknown` ;
+  4. le verrou est armé **avant** l'appel RPC : un timeout ou une erreur de l'envoi laisse l'équipement verrouillé. Il est levé par un événement d'état reçu après l'envoi dont la valeur diffère de celle relue (`StateSynchronizer.last_event`), ou à l'expiration de `BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S = 60.0`.
+  Refus journalisés en WARNING (`action=refuse_barrier_order`), puis `reject_command`.
+- **Mode direct** : gardé par le dernier état connu (dernier événement, à défaut topologie) : `OPEN` permis depuis fermé / en fermeture / arrêté, `CLOSE` depuis ouvert / en ouverture / arrêté ; refus sur état inconnu. Pas de relecture ni de verrou (décisions limitées à la bascule).
+- **Commandes retenues (I4)** (`transport/mqtt_client.py`) : tout message `retain=True` sur un topic de commande (`COMMAND_SUBSCRIPTION_TOPICS` : `set`, `<cmd>/set`, `brightness/set`, `position/set`, `cmd`) est ignoré avec `reason_code=retained_command_ignored`. Étendu à tous les topics de commande : HA ne publie pas ses commandes en retenu (nos découvertes ne posent pas `retain`), donc pas de régression ; le message de naissance `homeassistant/status` (retenu) et la collecte des retenus de 21.1 gardent leur chemin. Testé.
+- **Source unique (M1)** : `sync/readback.barrier_mode(mapping)` lit `reason_details["barrier_mode"]` ; la découverte (classe, états intermédiaires, `payload_stop: null`) et la commande (routage) l'utilisent toutes deux.
+- **Corpus golden (I5)** : un équipement barrière synthétique a été essayé dans `golden_corpus/sync_payload.json` ; il fait échouer le golden 8.4 et les gardes d'appels du publisher 19.4 (S1, S2, S3, S5), dont les captures figées devraient être régénérées. **Non ajouté** (« sans casser les gardes ») : la couverture reste dans le fichier de tests de la story.
+- Point à vérifier par ClaudeBox au terrain : `cmd::execCmd` sur une info du plugin virtuel renvoie sa valeur sans effet de bord (comportement du cœur Jeedom ; aucune info calculée sur les deux équipements d'après la Task 0).
+- Tests : 101 cas dans `test_story_24_7_portail_garage_cover.py` (ajouts : mode bascule prioritaire ; état binaire et absence d'état comparés à `main` ; refus en 253 ; relecture qui fait foi et relecture en échec ; 2 `OPEN` en rafale ⇒ 1 seul `execCmd` ; timeout puis `OPEN` ⇒ refus ; événement `254` puis `255` ⇒ verrou levé ; même valeur ⇒ verrou maintenu ; expiration à 60 s ; verrou par équipement ; format de la relecture JSON-RPC ; mode direct gardé ; source unique M1 ; commandes retenues ignorées, commande vivante et naissance HA inchangées).
+- Fichier ajouté à la File List : `resources/daemon/transport/mqtt_client.py` (modifié, ajouts seuls).
+- Suites après corrections : `python -m pytest` 2 667 passés, 9 désélectionnés, 0 échec ; `flake8 resources/daemon tests` 0 ; `node --test tests/unit/*.node.test.js` 1 214 / 1 214.
+
+### Corrections après 2e relecture (2026-11-01, relecture indépendante de la tête `1417223`)
+
+- **B-1** (`transport/mqtt_client.py`) : paho-mqtt 1.x donne `message.retain` = entier `1`, 2.x un booléen, et `packages.json` ne fixe pas la version. Le test est désormais « entier non nul » (`isinstance(retain, int) and bool(retain)`, `bool` étant un `int`) au lieu de `is True`. Un simple `bool(getattr(...))` aurait aussi traité comme retenus les messages des doubles de test `MagicMock` sans `retain` (attribut `MagicMock`, vrai) et cassé les tests existants de `test_mqtt_bridge.py`. Testé avec `True` et `1` (ignorés), `False` et `0` (exécutés).
+- **I-1** : le verrou n'est levé **que** par l'effet attendu reçu après l'envoi : après `OPEN` (depuis 0) un événement `254` ou `255`, après `CLOSE` (depuis 255) un `252` ou `0` (`_BARRIER_EXPECTED_EFFECT`). Une valeur antérieure retardée (`252` ou `0` après un `OPEN`), hors table, vide ou `None` le laisse en place.
+- **I-2** : à l'expiration de `BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S = 60.0` sans l'effet attendu, le verrou **n'est pas libéré** : refus `barrier_no_effect` (WARNING) jusqu'à un événement reçu après l'envoi dont l'état (de la table) diffère de celui lu à l'envoi. Le verrou vit en mémoire du démon : un redémarrage le perd (documenté).
+- **I-3** : garde atomique par équipement, indépendante du transport : `_guard_barrier_toggle` vérifie le verrou et arme un marqueur « en cours » (`sent_at is None`) **sans await entre les deux** ; un ordre concurrent du même équipement est refusé (`barrier_toggle_in_flight`). Le marqueur est retiré sur refus, et sur annulation de la tâche pendant la relecture ; sur succès il devient le verrou avant le RPC.
+- **M-3** (`sync/readback.barrier_state`) : seuls les entiers décimaux de la table sont acceptés, après `strip`, avec `.0` / `,0` optionnel (`255.0`, `255,0`) ; notation exponentielle (`2.55e2`), signe, hexadécimal, fraction refusés.
+- Suites : `python -m pytest` 2 697 passés, 9 désélectionnés, 0 échec ; flake8 0 ; node 1 214 / 1 214.
+- Tests : 131 cas dans le fichier de la story (ajouts : `252` retardé, hors table, vide, `None`, `0` après `OPEN` ⇒ verrou maintenu ; `254`/`255` ⇒ levé ; effets de `CLOSE` ; 60 s sans effet ⇒ `barrier_no_effect`, valeur identique ⇒ maintenu, `254` ou autre état ⇒ levé ; deux appels concurrents ⇒ un seul `execCmd` ; marqueur retiré sur refus ; valeurs `255,0`, `2.55e2`, `+255`, `0x0` ; `retain` `1`/`0`).
+
+### File List
+
+- `resources/daemon/mapping/cover.py` (modifié, ajouts seuls)
+- `resources/daemon/discovery/publisher.py` (modifié, ajouts seuls)
+- `resources/daemon/sync/readback.py` (modifié, ajouts seuls)
+- `resources/daemon/sync/state.py` (modifié, ajouts seuls)
+- `resources/daemon/sync/command.py` (modifié, ajouts seuls)
+- `resources/daemon/transport/mqtt_client.py` (modifié, ajouts seuls)
+- `resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py` (nouveau)
+- `docs/fr_FR/index.md` (modifié)
+- `docs/fr_FR/changelog_beta.md` (modifié)
+- `README.md` (modifié)
+- `_bmad-output/implementation-artifacts/24-7-portail-et-garage-cover.md` (modifié)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié)

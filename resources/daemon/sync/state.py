@@ -45,7 +45,9 @@ from sync.readback import (
     CHANNEL_POSITION,
     CHANNEL_STATE,
     STATE_KEYS,
+    barrier_state,
     channel_topic,
+    is_barrier_state_command,
     readback_commands,
 )
 
@@ -216,6 +218,28 @@ class StateSynchronizer:
                       reason_code="state_published", action="publish_state",
                       state_topic=binding.topic, ha_type=mapping.ha_entity_type)
         return published > 0 and failed == 0
+
+    def last_event_value(self, eq_id: Any, cmd_id: Any) -> Any:
+        """Story 24.7 — last value received from Jeedom for ``(eq_id, cmd_id)``, or None.
+
+        Read-only view of the events recorded by ``handle_state_message`` (every inbound
+        event, published or not). Used by ``CommandSynchronizer`` to gate a gate/garage
+        toggle on the last known state (D3); never published, never invented.
+        """
+        try:
+            key = (int(eq_id), int(cmd_id))
+        except (TypeError, ValueError):
+            return None
+        pending = self._pending_click_values.get(key)
+        return None if pending is None else pending[1]
+
+    def last_event(self, eq_id: Any, cmd_id: Any) -> Optional[Tuple[float, Any]]:
+        """Story 24.7 — ``(monotonic time, value)`` of the last Jeedom event, or None."""
+        try:
+            key = (int(eq_id), int(cmd_id))
+        except (TypeError, ValueError):
+            return None
+        return self._pending_click_values.get(key)
 
     def list_state_targets(self) -> list:
         """Enumerate the published streamed ``(eq_id, cmd_id)`` info commands.
@@ -699,6 +723,11 @@ class StateSynchronizer:
         if channel in (CHANNEL_BRIGHTNESS, CHANNEL_POSITION):
             level = self._parse_percent(text)
             return None if level is None else str(level)
+
+        if ha_type == "cover" and is_barrier_state_command(cmd):
+            # Story 24.7 (D1): gate / garage barrier value -> closed/closing/stopped/
+            # opening/open; any other value publishes nothing.
+            return barrier_state(text)
 
         if ha_type == "cover":
             if str(getattr(cmd, "sub_type", "")).lower() == "numeric":

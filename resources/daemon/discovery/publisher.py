@@ -28,6 +28,7 @@ from sync.readback import (
     CHANNEL_STATE,
     has_reliable_channel,
 )
+from sync.readback import barrier_mode  # Story 24.7 (M1)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -637,6 +638,18 @@ class DiscoveryPublisher:
         # Story 23.3 (Q1 b) — ``optimistic: false`` only when a real open/closed state
         # is streamed (FLAP_STATE / FLAP_BSO_STATE info); otherwise it is explicit.
         payload["optimistic"] = not has_reliable_channel("cover", mapping, CHANNEL_STATE)
+
+        # Story 24.7 — portail / garage : classe gate/garage (HA 2026.9.4), états
+        # intermédiaires de la convention barrière, et pas d'arrêt (aucun GB_STOP) :
+        # ``payload_stop: null`` retire STOP des fonctions (défaut HA : "STOP").
+        barrier_class = (mapping.reason_details or {}).get("cover_device_class")
+        if barrier_mode(mapping) is not None and barrier_class in ("gate", "garage"):
+            payload["device_class"] = barrier_class
+            payload["state_opening"] = "opening"
+            payload["state_closing"] = "closing"
+            payload["state_stopped"] = "stopped"
+            if not getattr(caps, "has_stop", False):
+                payload["payload_stop"] = None
 
         # Conditional: Stop
         if getattr(caps, "has_stop", False):

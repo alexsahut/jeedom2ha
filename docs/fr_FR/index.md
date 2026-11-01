@@ -389,7 +389,7 @@ Le plugin publie huit types d'entités Home Assistant. Le type est choisi à par
 | Type Home Assistant | Ce que le plugin en fait |
 |---|---|
 | `light` | Lumières : allumer/éteindre et variation de luminosité, avec l'état réel quand Jeedom le fournit (voir [Limites](#limites--état-réel-des-lumières-et-des-volets)). La couleur n'est pas reprise, et une lumière qui n'a que des commandes de couleur n'est pas prise en charge. |
-| `cover` | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent, avec l'état et la position réels quand Jeedom les fournit. |
+| `cover` | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent, avec l'état et la position réels quand Jeedom les fournit. Portails et portes de garage : ouverture et fermeture, avec l'état réel (voir [Portails et portes de garage](#portails-et-portes-de-garage)). |
 | `switch` | Prises et interrupteurs (commandes d'énergie On/Off, familles « interrupteur » et « ventilateur » de Jeedom), ainsi que les équipements de présence actionnables (information de présence + actions pour l'activer et la désactiver). |
 | `sensor` | Informations numériques. |
 | `binary_sensor` | Informations binaires. |
@@ -422,6 +422,40 @@ Autres limites à connaître :
 - **Valeur illisible ou hors de 0 à 100 :** rien n'est publié, Home Assistant garde la dernière valeur connue.
 - **Retrait d'une commande d'information :** le plugin garde la liste des états qu'il a lui-même publiés (fichier du démon). À la synchronisation ou à la republication suivante, il efface l'état mémorisé par le broker pour ce canal, afin que Home Assistant ne le relise pas. Un état publié par une version qui ne tenait pas cette liste ne peut pas être effacé automatiquement.
 - La couleur d'une lumière, les thermostats et les alarmes ne sont pas concernés par cette remontée d'état.
+
+### Portails et portes de garage
+
+Un équipement Jeedom qui porte les types « Portail ou garage » est publié comme un **ouvrant** (`cover`) de classe **portail** (`gate`) ou **porte de garage** (`garage`), au lieu d'un simple bouton, seulement s'il a un **état numérique** (« Portail (ouvrant) Etat » ou « Garage (ouvrant) Etat ») et :
+
+| Commandes de l'équipement Jeedom | Ce que Home Assistant reçoit |
+|---|---|
+| un bouton de bascule (toggle), avec ou sans boutons d'ouverture et de fermeture | un ouvrant piloté **par la bascule seule** : « Ouvrir » ne l'envoie que si le portail est **fermé**, « Fermer » que s'il est **ouvert**. Les boutons d'ouverture et de fermeture sont ignorés (sur un équipement virtuel, ils peuvent n'écrire que l'état, sans rien actionner). |
+| des boutons d'ouverture **et** de fermeture, sans bascule | un ouvrant dont « Ouvrir » et « Fermer » appellent ces boutons, sauf vers la position déjà atteinte ou en cours d'atteinte (« Ouvrir » refusé s'il est ouvert ou en ouverture, « Fermer » s'il est fermé ou en fermeture) et sauf état inconnu |
+
+La classe vient de la commande d'état : « Garage (ouvrant) Etat » donne une porte de garage, « Portail (ouvrant) Etat » un portail. Les commandes de l'équipement sont toutes reprises par l'ouvrant : il n'y a pas de bouton ni de capteur en double.
+
+L'état numérique suit la convention « barrière » (celle de Z-Wave et du plugin Homebridge de Jeedom) :
+
+| Valeur Jeedom | État dans Home Assistant |
+|---|---|
+| 0 | fermé |
+| 252 | en fermeture |
+| 253 | arrêté (Home Assistant l'affiche « ouvert », ou « fermé » s'il était en fermeture) |
+| 254 | en ouverture |
+| 255 | ouvert |
+
+Limites à connaître :
+
+- **Jamais de bascule à l'aveugle.** Juste avant d'envoyer la bascule, le plugin **relit l'état dans Jeedom** ; c'est cette valeur qui décide. L'ordre est **refusé** si la relecture échoue, si l'état est inconnu ou hors de la table, ou si le portail est déjà dans la position demandée. Chaque refus est écrit dans le journal du démon.
+- **Refus pendant un mouvement** (252, 254) : une bascule à ce moment arrêterait le moteur au lieu de l'inverser.
+- **Refus quand le portail est arrêté** (253), dans les deux sens : le sens que prendrait la bascule dépend de la mémoire du scénario Jeedom, que le plugin ne voit pas. Ouvrez ou fermez depuis Jeedom ou la télécommande pour le ramener en position ouverte ou fermée.
+- **Une bascule à la fois.** Après l'envoi d'une bascule (ou un échec de l'envoi vers Jeedom), toute nouvelle bascule du même équipement est refusée jusqu'à ce que Jeedom signale **le mouvement attendu** : en ouverture ou ouvert après « Ouvrir », en fermeture ou fermé après « Fermer ». Une autre valeur (ancienne valeur arrivée en retard, valeur illisible) ne débloque rien. Deux appuis rapides n'envoient donc qu'une impulsion.
+- **Sans mouvement après 60 secondes**, le plugin considère que la bascule n'a pas eu d'effet : les ordres restent refusés (raison « sans effet » dans le journal) jusqu'à ce que Jeedom signale un état différent de celui lu à l'envoi, par exemple après une manœuvre depuis Jeedom ou la télécommande. Ce blocage est gardé en mémoire par le démon : un redémarrage du démon le lève.
+- Un refus n'est **pas mis en attente** : quand l'état change ensuite, rien n'est envoyé ; il faut redonner l'ordre depuis Home Assistant.
+- **Commandes retenues ignorées** : un ordre resté mémorisé par le broker MQTT (message « retenu ») n'est jamais exécuté, pour aucun équipement ; le démon l'écrit dans son journal.
+- **Pas d'arrêt** : aucun type Jeedom « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop. **Pas de position.**
+- Sans état, ou avec un état **binaire** (0/1), l'équipement ne devient pas un ouvrant : il garde son comportement précédent (bouton, ou capteur d'ouverture de classe « porte de garage »).
+- Au passage du bouton à l'ouvrant, le bouton disparaît de Home Assistant et l'ouvrant apparaît avec un nouvel identifiant (`cover.jeedom2ha_<id>` au lieu de `button.jeedom2ha_<id>`) : les automatisations et tableaux de bord qui visaient le bouton sont à reprendre. Imposer le type « button » sur une commande de l'équipement (voir [Choisir le type Home Assistant d'une commande](#choisir-le-type-home-assistant-dune-commande)) permet de garder le bouton.
 
 ### Les badges de synthèse
 
