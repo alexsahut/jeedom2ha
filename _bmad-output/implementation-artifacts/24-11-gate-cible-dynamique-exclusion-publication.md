@@ -1,6 +1,6 @@
 # Story 24.11 : gate 20-0, cible choisie à l'exécution pour `exclusion-publication-non-publiee`
 
-Status: review
+Status: done
 
 > Créée par ClaudeBox le 2026-11-01. Décision d'Alexandre (01/11 à 09:55) : option **b**, le parcours choisit lui-même son équipement. Rattachée à l'epic 24 parce qu'elle conditionne les preuves de gate de ses stories (24.4 et suivantes). Taille : S/M. Elle touche le cadre de sûreté du gate : relecture ClaudeBox obligatoire.
 
@@ -89,6 +89,17 @@ Claude Opus 5.5 (session Claude Code cloud déléguée), 2026-11-01.
 - `node --test tests/unit/*.node.test.js` : 1211 tests, 1211 verts (deux exécutions complètes). Une première exécution complète a montré 1 échec non reproduit (sortie non conservée) ; les fichiers 20.3 et 24.11, relancés trois fois en parallèle, sont verts.
 - `make test-unit` : 792 verts.
 - `flake8` : aucun constat.
+
+### Relecture ClaudeBox (2026-11-01)
+
+- Points 1 à 4 ci-dessus : choix de la session acceptés tels quels.
+- Revue Codex P2 (#359) : un candidat portant un réglage de commande (type HA forcé) paraissait « Automatique » ; corrigé par `helpers.canDeclareTarget` / `isDeclarableTarget` (lecture seule, témoin « avant »).
+- Gate de production : l'eq 598, non éligible, avait son segment « Jamais » désactivé et le clic d'exclusion a expiré ; corrigé par #360 (`b087609`), la recherche exige « Jamais » utilisable.
+
+### Preuve terrain (2026-11-01, clawcode, box de production en `689c5fe`)
+
+- **AC5** — gate 20-0 complet (run `22-4-prod-20261101-r2`, outillage `689c5fe`) : `decouverte-piece-25-eq-579`, `exclusion-piece-simulee`, `page-principale-b`, `rescan-page-principale`, `vue-maitre-detail-c` PASS ; `controle-ecriture-non-declaree` et `controle-exclusion-piece-non-declaree` en échec attendu (`block-fail`) ; `exclusion-publication-non-publiee` en échec (eq 598, voir ci-dessus) ; `reference-bascule-eq-380` en échec sur le témoin seul (troncature du journal du démon, piège connu), toutes ses étapes passées.
+- **AC1** — relance r3 sans redéploiement, outillage `b087609` : `exclusion-publication-non-publiee` **PASS**, cible retenue **460** (≠ 287), interception active, aucun refus, aucune écriture transmise, 5/5 contrôles ; `reference-bascule-eq-380` **PASS**.
 
 ### File List
 
