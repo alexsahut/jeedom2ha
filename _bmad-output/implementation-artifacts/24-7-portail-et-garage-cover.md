@@ -167,6 +167,16 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 - Fichier ajouté à la File List : `resources/daemon/transport/mqtt_client.py` (modifié, ajouts seuls).
 - Suites après corrections : `python -m pytest` 2 667 passés, 9 désélectionnés, 0 échec ; `flake8 resources/daemon tests` 0 ; `node --test tests/unit/*.node.test.js` 1 214 / 1 214.
 
+### Corrections après 2e relecture (2026-11-01, relecture indépendante de la tête `1417223`)
+
+- **B-1** (`transport/mqtt_client.py`) : paho-mqtt 1.x donne `message.retain` = entier `1`, 2.x un booléen, et `packages.json` ne fixe pas la version. Le test est désormais « entier non nul » (`isinstance(retain, int) and bool(retain)`, `bool` étant un `int`) au lieu de `is True`. Un simple `bool(getattr(...))` aurait aussi traité comme retenus les messages des doubles de test `MagicMock` sans `retain` (attribut `MagicMock`, vrai) et cassé les tests existants de `test_mqtt_bridge.py`. Testé avec `True` et `1` (ignorés), `False` et `0` (exécutés).
+- **I-1** : le verrou n'est levé **que** par l'effet attendu reçu après l'envoi : après `OPEN` (depuis 0) un événement `254` ou `255`, après `CLOSE` (depuis 255) un `252` ou `0` (`_BARRIER_EXPECTED_EFFECT`). Une valeur antérieure retardée (`252` ou `0` après un `OPEN`), hors table, vide ou `None` le laisse en place.
+- **I-2** : à l'expiration de `BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S = 60.0` sans l'effet attendu, le verrou **n'est pas libéré** : refus `barrier_no_effect` (WARNING) jusqu'à un événement reçu après l'envoi dont l'état (de la table) diffère de celui lu à l'envoi. Le verrou vit en mémoire du démon : un redémarrage le perd (documenté).
+- **I-3** : garde atomique par équipement, indépendante du transport : `_guard_barrier_toggle` vérifie le verrou et arme un marqueur « en cours » (`sent_at is None`) **sans await entre les deux** ; un ordre concurrent du même équipement est refusé (`barrier_toggle_in_flight`). Le marqueur est retiré sur refus, et sur annulation de la tâche pendant la relecture ; sur succès il devient le verrou avant le RPC.
+- **M-3** (`sync/readback.barrier_state`) : seuls les entiers décimaux de la table sont acceptés, après `strip`, avec `.0` / `,0` optionnel (`255.0`, `255,0`) ; notation exponentielle (`2.55e2`), signe, hexadécimal, fraction refusés.
+- Suites : `python -m pytest` 2 697 passés, 9 désélectionnés, 0 échec ; flake8 0 ; node 1 214 / 1 214.
+- Tests : 131 cas dans le fichier de la story (ajouts : `252` retardé, hors table, vide, `None`, `0` après `OPEN` ⇒ verrou maintenu ; `254`/`255` ⇒ levé ; effets de `CLOSE` ; 60 s sans effet ⇒ `barrier_no_effect`, valeur identique ⇒ maintenu, `254` ou autre état ⇒ levé ; deux appels concurrents ⇒ un seul `execCmd` ; marqueur retiré sur refus ; valeurs `255,0`, `2.55e2`, `+255`, `0x0` ; `retain` `1`/`0`).
+
 ### File List
 
 - `resources/daemon/mapping/cover.py` (modifié, ajouts seuls)
