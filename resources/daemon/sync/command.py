@@ -13,6 +13,7 @@ import aiohttp
 from models.availability import AVAILABILITY_OFFLINE
 from models.mapping import MappingResult, PublicationDecision
 from sync.readback import CHANNEL_STATE, has_reliable_channel
+from sync.readback import barrier_state, is_barrier_state_command  # Story 24.7
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +22,29 @@ _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
+
+# Story 24.7 — gate / garage cover (GB_* commands, no FLAP_*).
+_BARRIER_ACTION_KEYS = ("GB_OPEN", "GB_CLOSE", "GB_TOGGLE")
+# Barrier states from which a lone GB_TOGGLE may be sent for each direction (D3).
+_BARRIER_TOGGLE_ALLOWED = {
+    "OPEN": ("closed", "stopped"),
+    "CLOSE": ("open", "stopped"),
+}
+
+
+def _is_barrier_cover(commands: Mapping[str, Any]) -> bool:
+    return (
+        any(key in commands for key in _BARRIER_ACTION_KEYS)
+        and not any(str(key).startswith("FLAP_") for key in commands)
+    )
+
+
+def _barrier_refusal_reason(requested: str, state: Optional[str]) -> str:
+    if state is None:
+        return "barrier_state_unknown"
+    if state in ("opening", "closing"):
+        return "barrier_in_motion"
+    return "barrier_already_open" if requested == "OPEN" else "barrier_already_closed"
 
 
 @dataclass(frozen=True)
@@ -316,6 +340,10 @@ class CommandSynchronizer:
                     optimistic_state_payload=payload_upper,
                 ), None
 
+            if mapping.ha_entity_type == "cover" and _is_barrier_cover(commands):
+                # Story 24.7 — portail / garage (D3).
+                return self._translate_barrier_command(mapping, parsed, payload_upper)
+
             if mapping.ha_entity_type == "cover":
                 command_by_payload = {
                     "OPEN": "FLAP_UP",
@@ -371,6 +399,73 @@ class CommandSynchronizer:
             ), None
 
         return None, "invalid_command_topic"
+
+    def _translate_barrier_command(
+        self,
+        mapping: MappingResult,
+        parsed: ParsedTopic,
+        payload_upper: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.7 (D3) — OPEN / CLOSE of a gate or garage ``cover``.
+
+        - ``GB_OPEN`` **and** ``GB_CLOSE``: called directly, ``GB_TOGGLE`` never used.
+        - ``GB_TOGGLE`` alone: sent only when the last known barrier state allows the
+          requested direction (OPEN from 0 / 253, CLOSE from 255 / 253). Unknown state or
+          movement in progress (252 / 254): no order, refusal logged. Never a blind toggle.
+        No stop (no ``GB_STOP`` command, discovery publishes ``payload_stop: null``).
+        """
+        commands = mapping.commands or {}
+        if payload_upper not in ("OPEN", "CLOSE"):
+            if payload_upper == "STOP":
+                return None, "missing_action_command"
+            return None, "invalid_command_payload"
+
+        if "GB_OPEN" in commands and "GB_CLOSE" in commands:
+            cmd = commands["GB_OPEN"] if payload_upper == "OPEN" else commands["GB_CLOSE"]
+        else:
+            cmd = commands.get("GB_TOGGLE")
+            if cmd is None:
+                return None, "missing_action_command"
+            state_cmd = next(
+                (c for c in commands.values() if is_barrier_state_command(c)), None
+            )
+            if state_cmd is None:
+                return None, "barrier_toggle_without_state"
+            raw_value = self._last_known_barrier_value(parsed.eq_id, state_cmd)
+            state = barrier_state(raw_value)
+            allowed = _BARRIER_TOGGLE_ALLOWED[payload_upper]
+            if state not in allowed:
+                reason = _barrier_refusal_reason(payload_upper, state)
+                self._log_cmd(
+                    logging.WARNING,
+                    eq_id=parsed.eq_id,
+                    topic=f"jeedom2ha/{parsed.eq_id}/set",
+                    reason_code=reason,
+                    action="refuse_barrier_toggle",
+                    requested=payload_upper,
+                    last_state=state or "unknown",
+                    raw_value=raw_value,
+                )
+                return None, reason
+
+        try:
+            cmd_id = int(cmd.id)
+        except (TypeError, ValueError):
+            return None, "missing_action_command"
+        return CommandTranslation(cmd_id=cmd_id, options={}, command_family="cover_motion"), None
+
+    def _last_known_barrier_value(self, eq_id: int, state_cmd: Any) -> Any:
+        """Last known barrier value: last Jeedom event received, else the topology value."""
+        state_sync = self._app.get("state_synchronizer") if hasattr(self._app, "get") else None
+        reader = getattr(state_sync, "last_event_value", None)
+        if callable(reader):
+            try:
+                value = reader(eq_id, getattr(state_cmd, "id", None))
+            except Exception:
+                value = None
+            if value is not None:
+                return value
+        return getattr(state_cmd, "current_value", None)
 
     def _normalize_slider_payload(self, payload: str) -> Optional[int]:
         if payload == "":

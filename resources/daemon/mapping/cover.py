@@ -61,6 +61,15 @@ _NON_COVER_KEYWORDS = {
 }
 
 
+# Story 24.7 — portail et garage (types génériques du core Jeedom).
+_BARRIER_ACTION_TYPES = ("GB_OPEN", "GB_CLOSE", "GB_TOGGLE")
+# Info d'état -> device_class HA (valeurs vérifiées dans HA 2026.9.4 :
+# CoverDeviceClass.GATE = "gate", CoverDeviceClass.GARAGE = "garage").
+_BARRIER_STATE_DEVICE_CLASS = {"BARRIER_STATE": "gate", "GARAGE_STATE": "garage"}
+BARRIER_MODE_DIRECT = "direct"
+BARRIER_MODE_TOGGLE = "toggle_on_state"
+
+
 def _min_confidence(*confidences: str) -> str:
     """Return the worst confidence among the given values.
 
@@ -146,6 +155,11 @@ class CoverMapper:
             elif cmd.generic_type and cmd.generic_type in _ANTI_COVER_GENERIC_TYPES:
                 anti_cover_cmds.add(cmd.generic_type)
 
+        if not flap_cmds and not anti_cover_cmds:
+            # Story 24.7 — portail / garage (GB_*), seulement si l'équipement n'a aucun FLAP_*.
+            barrier = self._map_barrier(eq, snapshot)
+            if barrier is not None:
+                return barrier
         if not flap_cmds:
             return None  # Not a cover
 
@@ -383,3 +397,98 @@ class CoverMapper:
 
         # FLAP_SLIDER sans FLAP_STATE numérique → probable
         return True, "probable", "slider_without_numeric_state"
+
+    # ------------------------------------------------------------------
+    # Story 24.7 — portail et garage (GB_* + BARRIER_STATE / GARAGE_STATE)
+    # ------------------------------------------------------------------
+
+    def _map_barrier(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
+        """Projette un portail / garage en ``cover`` (décisions D1-D5 de la story 24.7).
+
+        Éligibilité (D4) : ``GB_OPEN`` **et** ``GB_CLOSE``, ou ``GB_TOGGLE`` **et** un état
+        ``BARRIER_STATE`` / ``GARAGE_STATE`` **numérique** (convention barrière 0/252/253/254/255).
+        Tout autre cas renvoie ``None`` : la chaîne continue et l'équipement garde son
+        comportement actuel (``button`` / ``binary_sensor``). Aucune heuristique sur les noms.
+        """
+        actions: Dict[str, JeedomCmd] = {}
+        states: Dict[str, JeedomCmd] = {}
+        for cmd in eq.cmds:
+            generic_type = cmd.generic_type
+            if generic_type in _BARRIER_ACTION_TYPES and (cmd.type or "").lower() == "action":
+                target = actions
+            elif generic_type in _BARRIER_STATE_DEVICE_CLASS and (cmd.type or "").lower() == "info":
+                target = states
+            else:
+                continue
+            if generic_type in target:
+                # Doublon (ex. deux GB_TOGGLE) : quelle commande appeler n'est pas décidable.
+                _LOGGER.info(
+                    "[MAPPING] eq_id=%d: barrier duplicate %s (cmd %s, cmd %s) → not a cover",
+                    eq.id, generic_type, target[generic_type].id, cmd.id,
+                )
+                return None
+            target[generic_type] = cmd
+
+        if not actions:
+            return None
+
+        if len(states) > 1:
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d: BARRIER_STATE and GARAGE_STATE both present → not a cover",
+                eq.id,
+            )
+            return None
+
+        state_type, state_cmd = next(iter(states.items()), (None, None))
+        if state_cmd is not None and (state_cmd.sub_type or "").lower() != "numeric":
+            # D1 : une info binaire reste un binary_sensor garage_door (comportement inchangé).
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d: %s is not numeric (sub_type=%s) → not a cover",
+                eq.id, state_type, state_cmd.sub_type,
+            )
+            return None
+
+        has_direct = "GB_OPEN" in actions and "GB_CLOSE" in actions
+        has_toggle_on_state = "GB_TOGGLE" in actions and state_cmd is not None
+        if not has_direct and not has_toggle_on_state:
+            # AC2 : jamais de cover à deux sens inventés (bascule sans état fiable).
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d: barrier_not_eligible (actions=%s, numeric_state=%s) → not a cover",
+                eq.id, sorted(actions), state_type,
+            )
+            return None
+
+        mode = BARRIER_MODE_DIRECT if has_direct else BARRIER_MODE_TOGGLE
+        device_class = _BARRIER_STATE_DEVICE_CLASS.get(state_type, "gate")
+        commands: Dict[str, JeedomCmd] = dict(actions)
+        if state_cmd is not None:
+            commands[state_type] = state_cmd
+
+        confidence = "sure" if state_cmd is not None else "probable"
+        reason_code = "cover_barrier_open_close" if has_direct else "cover_barrier_toggle_state"
+        reason_details = {
+            "barrier_mode": mode,
+            "cover_device_class": device_class,
+        }
+        if state_type:
+            reason_details["barrier_state"] = state_type
+
+        _LOGGER.info(
+            "[MAPPING] eq_id=%d: %s confidence=%s device_class=%s mode=%s",
+            eq.id, reason_code, confidence, device_class, mode,
+        )
+        return MappingResult(
+            ha_entity_type="cover",
+            confidence=confidence,
+            reason_code=reason_code,
+            jeedom_eq_id=eq.id,
+            ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+            ha_name=eq.name,
+            suggested_area=snapshot.get_suggested_area(eq.id),
+            commands=commands,
+            capabilities=CoverCapabilities(
+                has_open_close=True,
+                open_close_confidence=confidence,
+            ),
+            reason_details=reason_details,
+        )

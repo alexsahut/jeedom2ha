@@ -33,6 +33,10 @@ BRIGHTNESS_KEYS: Tuple[str, ...] = ("LIGHT_BRIGHTNESS",)
 # LIGHT_BRIGHTNESS feeds the brightness; a numeric LIGHT_STATE is the fallback (see
 # ``readback_commands``). A numeric FLAP_STATE is the cover position (``_detect_position`` in mapping/cover.py).
 POSITION_KEYS: Tuple[str, ...] = ("FLAP_STATE",)
+# Story 24.7 — state of a gate / garage ``cover``: a NUMERIC info at the barrier
+# convention (0 closed, 252 closing, 253 stopped, 254 opening, 255 open). Only read
+# when the cover has no FLAP_* state; a binary one is never a cover readback (D1).
+BARRIER_STATE_KEYS: Tuple[str, ...] = ("BARRIER_STATE", "GARAGE_STATE")
 
 
 def is_info_command(cmd: Any) -> bool:
@@ -67,6 +71,10 @@ def readback_commands(ha_type: Any, mapping: Any) -> List[Tuple[str, Any]]:
         return channels
 
     state_cmd = _first_info(commands, state_keys)
+    if state_cmd is None and ha_type == "cover":
+        barrier_cmd = _first_info(commands, BARRIER_STATE_KEYS)
+        if barrier_cmd is not None and _is_numeric(barrier_cmd):
+            state_cmd = barrier_cmd  # Story 24.7 (D1)
     if state_cmd is not None:
         channels.append((CHANNEL_STATE, state_cmd))
 
@@ -86,6 +94,42 @@ def readback_commands(ha_type: Any, mapping: Any) -> List[Tuple[str, Any]]:
             channels.append((CHANNEL_POSITION, position_cmd))
 
     return channels
+
+
+def is_barrier_state_command(cmd: Any) -> bool:
+    """Story 24.7 — a numeric BARRIER_STATE / GARAGE_STATE info (barrier convention)."""
+    return (
+        is_info_command(cmd)
+        and getattr(cmd, "generic_type", None) in BARRIER_STATE_KEYS
+        and _is_numeric(cmd)
+    )
+
+
+# Story 24.7 (D1) — barrier numeric value -> HA MQTT cover state payload (defaults of
+# ``state_closed`` / ``state_closing`` / ``state_stopped`` / ``state_opening`` / ``state_open``).
+BARRIER_STATE_TABLE: Dict[int, str] = {
+    0: "closed",
+    252: "closing",
+    253: "stopped",
+    254: "opening",
+    255: "open",
+}
+
+
+def barrier_state(value: Any) -> Optional[str]:
+    """Translate a barrier value to its cover state; anything else -> None (never invented)."""
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    if text == "":
+        return None
+    try:
+        number = float(text.replace(",", "."))
+    except ValueError:
+        return None
+    if not number.is_integer():
+        return None
+    return BARRIER_STATE_TABLE.get(int(number))
 
 
 def has_reliable_channel(ha_type: Any, mapping: Any, channel: str) -> bool:
