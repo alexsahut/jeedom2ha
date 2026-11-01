@@ -1,6 +1,6 @@
 # Story 24.11 : gate 20-0, cible choisie à l'exécution pour `exclusion-publication-non-publiee`
 
-Status: ready-for-dev
+Status: review
 
 > Créée par ClaudeBox le 2026-11-01. Décision d'Alexandre (01/11 à 09:55) : option **b**, le parcours choisit lui-même son équipement. Rattachée à l'epic 24 parce qu'elle conditionne les preuves de gate de ses stories (24.4 et suivantes). Taille : S/M. Elle touche le cadre de sûreté du gate : relecture ClaudeBox obligatoire.
 
@@ -54,3 +54,49 @@ afin que le gate reste vérifiable quel que soit l'état réel de la box, sans j
 - Aucune écriture réelle : la politique et l'intercepteur ne changent pas.
 - Aucun nom d'équipement dans le dépôt ni dans le rapport : seulement des ids (CC-48).
 - L'eq 287 n'est jamais touché.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Opus 5.5 (session Claude Code cloud déléguée), 2026-11-01.
+
+### Implémentation
+
+- **Lanceur (`run-gate.mjs`), modifié uniquement par ajout** (le test 25.4 interdit toute ligne retirée ou modifiée) :
+  - `createDeclareTarget({ before, ctx, journal, record })` fabrique `helpers.declareTarget(eqId)`. Ordre des refus : deuxième appel (`cible-deja-declaree` ; un premier appel refusé consomme aussi le droit), écriture déjà interceptée ou journal en échec (`cible-apres-ecriture`), id non numérique (`cible-id-invalide`, motif `^[1-9][0-9]{0,9}$`, un entier sûr est accepté sous forme décimale), réglage dans le témoin « avant » (`assertNoOverrideOn(before, [eqId])` → `override-declare: …`). Ensuite seulement : `record('cible', eqId)`, puis ajout de l'id à `ctx.declaredEquipments` et `ctx.declaredPublicationOverrides` avec `{ commands: [] }`. Rien d'autre n'est touché (exclusions de pièce, rescan, bascules).
+  - « Écriture interceptée » = une entrée de journal au verdict `simulee`, ou portant une action d'écriture ou d'effet de bord de `policy.mjs` (quel que soit le verdict, donc aussi une écriture refusée), ou un journal déjà en échec (`hasInterceptedWrite`, exportée).
+  - Un parcours `dynamicTarget === true` part de déclarations neuves et vides propres à l'exécution (`ctx.declaredEquipments = {}` et `ctx.declaredPublicationOverrides = {}` avant l'installation de l'intercepteur) et reçoit seul `declareTarget`. Les autres parcours gardent l'appel d'origine, inchangé (branche `else`).
+  - `isValidDynamicTargetDeclaration` : `dynamicTarget` absent, ou exactement `true` avec `declaredEquipments` et `declaredPublicationOverrides` objets simples vides. `isValidParcours` l'appelle en tête.
+- **Politique (`lib/policy.mjs`) et intercepteur : inchangés.** Test ajouté : avant déclaration, `savePublicationOverride` sur la cible est `block-fail` ; après, seule la cible est simulée (une autre, et 287, restent `block-fail`).
+- **Parcours** : `dynamicTarget = true`, déclarations `{}`, `EXCLUDED_TARGETS = ['287']`. Recherche en lecture seule : pièce connue (objet 25, étapes 1 et 2 conservées) puis toutes les cartes (étapes `3_i` et `4_i`), lignes déjà vues ignorées. Une ligne est candidate si son mot d'état est `blocked` ou `nothing_to_publish` et si elle n'est pas désactivée dans Jeedom ; elle est alors sélectionnée (vrai clic, relecture `getMappingOverrides` autorisée) et retenue si « Automatique » est coché, sans `.j2ha-group-head`, avec au moins une `tr.mapping-override-cmd`. Puis `declareTarget`, puis les étapes 5 à 12 d'origine, sur l'id retenu. Les contrôles d'origine (`eq-introuvable`, `eq-sans-entite`, plusieurs entités, compteurs, modale de confirmation) sont gardés. Aucune cible : `aucune-cible-eligible`.
+- **Registre 25.4** : renommages explicites `eq-287-plusieurs-entites` → `eq-cible-plusieurs-entites`, `compteurs-eq-287-illisibles` → `compteurs-eq-cible-illisibles`, `eq_287_compteur_${index + 1}` → `eq_cible_compteur_${index + 1}` ; déclarations passées à `{}` (conception, point 2) ; ajouts : `aucune-cible-eligible` et la déclaration `dynamicTarget: "true"` (le relevé `registryOf` lit maintenant `dynamicTarget`). Aucune étiquette, clé ni étape retirée ; les quatre autres parcours sont inchangés.
+
+### Points à trancher en relecture
+
+1. **AC2, « `isValidParcours` refuse `{}` sans `dynamicTarget` ».** Pris à la lettre, ce refus invaliderait les six parcours en lecture seule qui déclarent légitimement `declaredEquipments = {}` (`decouverte-piece-25-eq-579`, `page-principale-b`, `vue-maitre-detail-c`, `rescan-page-principale`, `exclusion-piece-simulee`, `controle-exclusion-piece-non-declaree`) et casserait les tests 25.3, 25.4 et 25.8, ce que AC4 interdit. Choix retenu, plus strict que l'existant sans rien casser : `{}` reste valide sans `dynamicTarget`, mais un tel parcours ne reçoit jamais `declareTarget` et ne peut donc rien écrire ; à l'inverse, `dynamicTarget` doit valoir exactement `true` et n'est accepté qu'avec des déclarations vides (test : `{}` accompagné de `dynamicTarget` `false`, `'true'`, `1`, `null` ou `{}` est refusé). À confirmer par ClaudeBox ; si le refus littéral est voulu, il faut d'abord décider du sort des parcours en lecture seule.
+2. **« Ligne non publiée ».** Interprétée comme mot d'état `Bloqué` ou `Rien à publier` (ligne non désactivée). `À appliquer` est écarté (une exclusion y demande confirmation), comme `Exclu` et `Désactivé` (réglage neutralisé ailleurs ou indisponible). Plus étroit que « tout sauf Publié » : à élargir si la box n'offre aucun candidat.
+3. **Pièce connue (objet 25).** Gardée en premier pour ne retirer aucune étape (1 et 2) ; « première cible éligible » s'entend donc : d'abord la pièce 25, puis les cartes dans l'ordre de la page.
+4. **`run-gate.mjs` modifié par ajout seulement** : l'appel du parcours dynamique est une branche `if … else` placée devant l'appel d'origine, laissé intact.
+
+### Non démontré ici (hors périmètre cloud)
+
+- AC1 et AC5 : exécution sur la box de production (cible ≠ 287 choisie, interception active, 0 écriture transmise, rapport `PASS`, gate 20-0 complet). À faire par clawcode.
+- Le DOM réel de la vue C n'a été simulé que dans `test_story_20_3_gate_parcours` (mots d'état `j2ha-state-*`, classe `j2ha-wv-eq-disabled`, contrôle segmenté) ; l'ordre réel de l'arbre et le temps de rendu du détail (attente bornée à 10 s par candidat, dans le budget de 180 s du parcours) restent à constater sur la box.
+
+### Tests lancés
+
+- `node --test tests/unit/*.node.test.js` : 1211 tests, 1211 verts (deux exécutions complètes). Une première exécution complète a montré 1 échec non reproduit (sortie non conservée) ; les fichiers 20.3 et 24.11, relancés trois fois en parallèle, sont verts.
+- `make test-unit` : 792 verts.
+- `flake8` : aucun constat.
+
+### File List
+
+- `tests/e2e/gate/run-gate.mjs` (modifié, ajouts uniquement)
+- `tests/e2e/gate/parcours/exclusion-publication-non-publiee.mjs` (modifié)
+- `tests/fixtures/story_25_4_gate_assertions.json` (modifié : renommages et déclarations)
+- `tests/unit/helpers/capture_story_25_4_references.js` (modifié : relevé de `dynamicTarget`)
+- `tests/unit/test_story_20_3_gate_parcours.node.test.js` (modifié : AC3)
+- `tests/unit/test_story_24_11_gate_cible_dynamique.node.test.js` (nouveau : AC2)
+- `_bmad-output/implementation-artifacts/24-11-gate-cible-dynamique-exclusion-publication.md` (statut, Dev Agent Record)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (24-11 → review)

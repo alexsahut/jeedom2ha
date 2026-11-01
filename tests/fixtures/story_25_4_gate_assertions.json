@@ -92,15 +92,16 @@
         "etape ${label} : ${message}",
         "eq-introuvable",
         "eq-sans-entite",
-        "eq-287-plusieurs-entites",
+        "eq-cible-plusieurs-entites",
         "actions-entite-doublons-visibles",
-        "compteurs-eq-287-illisibles",
-        "modale-confirmation-inattendue"
+        "compteurs-eq-cible-illisibles",
+        "modale-confirmation-inattendue",
+        "aucune-cible-eligible"
       ],
       "records": [
         "etape_${index}",
         "actions_entite_masquees",
-        "eq_287_compteur_${index + 1}"
+        "eq_cible_compteur_${index + 1}"
       ],
       "steps": [
         "1:ouverture-piece-connue",
@@ -118,9 +119,10 @@
         "12:etat-bouton-final"
       ],
       "declared": {
-        "declaredEquipments": "{ '287': { commands: [] } }",
+        "dynamicTarget": "true",
+        "declaredEquipments": "{}",
         "declaredBascules": "[]",
-        "declaredPublicationOverrides": "{ '287': { commands: [] } }"
+        "declaredPublicationOverrides": "{}"
       }
     },
     "reference-bascule-eq-380": {

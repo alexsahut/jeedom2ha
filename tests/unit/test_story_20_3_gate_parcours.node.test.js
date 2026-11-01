@@ -363,3 +363,184 @@ test('22.2 gate simulé — le rapport refuse bien une observation de plus de 80
   assert.throws(() => normalizeParcoursRecord('etape_a_cause', LONG_CAUSE), /parcours-record-valeur-invalide/);
   assert.deepEqual(normalizeParcoursRecord('etape_a_cause_lisible', true), ['etape_a_cause_lisible', true]);
 });
+
+// --- Story 24.11 (AC3) : parcours exclusion-publication-non-publiee à cible choisie à l'exécution ---
+// Page simulée de la vue de travail C : cartes de pièce, arbre de la pièce ouverte (mot d'état par ligne), détail
+// d'équipement rendu à la sélection (contrôle segmenté, en-têtes de groupe, commandes). Le journal de l'intercepteur
+// est simulé par les gestionnaires de la page. `declareTarget` est un double qui consigne ses appels.
+
+function htmlDynamic(rooms) {
+  const cards = rooms.map((room) => `<div class="j2ha-room-card" data-object_id="${room.objectId}">Pièce</div>`).join('');
+  return `<body><div id="j2ha_mainView"><div id="j2ha_roomCards">${cards}</div></div>
+    <div id="j2ha_workView" class="j2ha-wv" style="display:none"><div class="j2ha-wv-bar"><button class="j2ha-wv-back">Toutes les pièces</button></div>
+      <ul class="j2ha-wv-tree"></ul><div class="j2ha-wv-detail"><div class="j2ha-wv-pane"></div></div></div>
+    <script>
+      var rooms = ${JSON.stringify(rooms)};
+      var policy = {};
+      var view = document.getElementById('j2ha_workView');
+      var tree = view.querySelector('.j2ha-wv-tree');
+      var pane = view.querySelector('.j2ha-wv-pane');
+      function push(action, verdict) { window.__pushNode(action, verdict); }
+      function seg(eq) {
+        return '<span class="j2ha-seg" role="radiogroup">' + ['Automatique', 'Toujours', 'Jamais'].map(function (label) {
+          return '<button class="j2ha-seg-btn" role="radio" aria-checked="' + (policy[eq.id] === label) + '">' + label + '</button>';
+        }).join('') + '</span>';
+      }
+      function renderPanel(eq) {
+        var cmds = '';
+        if (eq.groupHead) cmds += '<tr class="j2ha-group-head"><td>Groupe</td></tr>';
+        for (var i = 0; i < eq.cmds; i += 1) cmds += '<tr class="mapping-override-cmd" data-cmd-id="' + eq.id + i + '"><td>x</td></tr>';
+        pane.innerHTML = '<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="' + eq.id + '"><div class="j2ha-eq-body">'
+          + '<div class="j2ha-eq-counters"><span class="j2ha-eq-counter">1 bloquée</span></div>'
+          + '<div class="j2ha-eq-controls">' + seg(eq) + '</div>'
+          + '<table class="j2ha-cmd-table"><tbody>' + cmds + '</tbody></table></div></div>';
+        pane.querySelectorAll('.j2ha-eq-controls .j2ha-seg-btn').forEach(function (button) {
+          button.onclick = function () {
+            var label = button.textContent;
+            if (label === 'Jamais') { push('savePublicationOverride', 'simulee'); push('getMappingOverrides', 'lecture-derivee'); }
+            if (label === 'Automatique') { push('revertPublicationOverride', 'simulee'); push('getMappingOverrides', 'read'); }
+            policy[eq.id] = label;
+            renderPanel(eq);
+          };
+        });
+      }
+      function openRoom(room) {
+        document.getElementById('j2ha_mainView').style.display = 'none';
+        view.style.display = 'block';
+        pane.innerHTML = '';
+        tree.innerHTML = '<li class="j2ha-wv-room" data-object_id="' + room.objectId + '"><div class="j2ha-wv-row">Pièce</div><ul>'
+          + room.eqs.map(function (eq) {
+            return '<li class="j2ha-wv-eq' + (eq.disabled ? ' j2ha-wv-eq-disabled' : '') + '" data-eq-id="' + eq.id + '"><div class="j2ha-wv-row">'
+              + '<span class="j2ha-wv-state"><span class="j2ha-state-word j2ha-state-' + eq.state + '">x</span></span></div></li>';
+          }).join('') + '</ul></li>';
+        tree.querySelectorAll('.j2ha-wv-eq > .j2ha-wv-row').forEach(function (row) {
+          row.onclick = function () {
+            push('getMappingOverrides', 'read');
+            var id = Number(row.parentNode.getAttribute('data-eq-id'));
+            renderPanel(room.eqs.find(function (eq) { return eq.id === id; }));
+          };
+        });
+      }
+      rooms.forEach(function (room) { room.eqs.forEach(function (eq) { policy[eq.id] = eq.seg || 'Automatique'; }); });
+      document.querySelectorAll('.j2ha-room-card').forEach(function (card) {
+        card.onclick = function () { openRoom(rooms.find(function (room) { return String(room.objectId) === card.getAttribute('data-object_id'); })); };
+      });
+      view.querySelector('.j2ha-wv-back').onclick = function () { view.style.display = 'none'; document.getElementById('j2ha_mainView').style.display = 'block'; };
+    </script></body>`;
+}
+
+const eligible = (id, extra = {}) => ({ id, state: 'blocked', cmds: 1, ...extra });
+
+async function withDynamicPage(t, rooms, fn, { notDeclarable = [] } = {}) {
+  let playwright;
+  try {
+    const { loadPlaywright } = await import(gate('lib', 'playwright.mjs'));
+    playwright = loadPlaywright();
+  } catch {
+    t.skip('Playwright indisponible : gate simulé ignoré');
+    return;
+  }
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    const journal = [];
+    const page = await browser.newPage();
+    await page.exposeFunction('__pushNode', (action, verdict) => { journal.push({ action, verdict }); });
+    await page.setContent(htmlDynamic(rooms));
+    const recorded = {};
+    const declared = [];
+    const { normalizeParcoursRecord } = await import(gate('lib', 'report.mjs'));
+    const record = (key, value) => {
+      const [safeKey, safeValue] = normalizeParcoursRecord(key, value);
+      assert.equal(Object.hasOwn(recorded, safeKey), false, `clé dupliquée ${safeKey}`);
+      recorded[safeKey] = safeValue;
+    };
+    const helpers = {
+      record,
+      journalEntries: () => journal,
+      // Double de `helpers.declareTarget` : consigne l'id et l'état du journal au moment de l'appel.
+      declareTarget: (eqId) => {
+        declared.push({ eqId, writesBefore: journal.filter((entry) => entry.verdict === 'simulee').length });
+        record('cible', eqId);
+      },
+      // Double de `helpers.canDeclareTarget` (témoin « avant ») : ids portant un réglage invisible dans la vue.
+      canDeclareTarget: (eqId) => !notDeclarable.includes(String(eqId)),
+    };
+    await fn(page, helpers, { recorded, declared, journal });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('24.11 gate simulé — le parcours retient la PREMIÈRE cible éligible, jamais 287, et la déclare avant toute écriture', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [
+    { objectId: 25, eqs: [
+      eligible(287), // sans réglage et éligible par ailleurs : exclu en permanence
+      eligible(101, { state: 'published' }), // ligne publiée
+      eligible(102, { seg: 'Toujours' }), // réglage enregistré
+      eligible(103, { groupHead: true }), // plusieurs entités
+      eligible(104, { state: 'nothing_to_publish', cmds: 0 }), // aucune commande
+      eligible(105, { state: 'to_apply' }), // à appliquer : écarté
+      eligible(106, { disabled: true }), // désactivé dans Jeedom
+    ] },
+    { objectId: 4, eqs: [eligible(201, { state: 'nothing_to_publish' }), eligible(202)] },
+  ];
+  await withDynamicPage(t, rooms, async (page, helpers, { recorded, declared, journal }) => {
+    await parcours.run(page, { helpers });
+    assert.deepEqual(declared, [{ eqId: '201', writesBefore: 0 }]);
+    assert.equal(recorded.cible, '201');
+    assert.equal(recorded.eq_cible_compteur_1, '1 bloquée');
+    assert.equal(recorded.actions_entite_masquees, true);
+    assert.equal(recorded.etape_12, 'etat-bouton-final');
+    // Aucune écriture simulée ne vise un autre équipement que la cible (une seule exclusion, un seul retrait).
+    assert.deepEqual(journal.filter((entry) => entry.verdict === 'simulee').map((entry) => entry.action),
+      ['savePublicationOverride', 'revertPublicationOverride']);
+  });
+});
+
+test('24.11 gate simulé — dans la pièce connue, la première ligne éligible de l’arbre est retenue', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [
+    { objectId: 4, eqs: [eligible(401)] },
+    { objectId: 25, eqs: [eligible(251, { state: 'excluded' }), eligible(252), eligible(253)] },
+  ];
+  await withDynamicPage(t, rooms, async (page, helpers, { recorded, declared }) => {
+    await parcours.run(page, { helpers });
+    assert.deepEqual(declared.map((entry) => entry.eqId), ['252']);
+    assert.equal(recorded.etape_1, 'ouverture-piece-connue');
+    assert.equal(Object.hasOwn(recorded, 'etape_2'), false);
+  });
+});
+
+test('24.11 gate simulé — l’eq 287 n’est jamais retenu, même seul éligible : échec aucune-cible-eligible', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  assert.deepEqual(parcours.EXCLUDED_TARGETS, ['287']);
+  await withDynamicPage(t, [{ objectId: 25, eqs: [eligible(287)] }, { objectId: 7, eqs: [eligible(287)] }], async (page, helpers, { declared, journal }) => {
+    await assert.rejects(() => parcours.run(page, { helpers }), /aucune-cible-eligible/);
+    assert.deepEqual(declared, []);
+    assert.deepEqual(journal.filter((entry) => entry.verdict === 'simulee'), []);
+  });
+});
+
+test('24.11 gate simulé — aucune ligne éligible : échec explicite aucune-cible-eligible, sans déclaration ni écriture', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [
+    { objectId: 3, eqs: [eligible(31, { state: 'published' }), eligible(32, { seg: 'Jamais' }), eligible(33, { groupHead: true })] },
+    { objectId: 5, eqs: [eligible(51, { cmds: 0 }), eligible(52, { state: 'disabled' })] },
+  ];
+  await withDynamicPage(t, rooms, async (page, helpers, { declared, journal }) => {
+    await assert.rejects(() => parcours.run(page, { helpers }), /aucune-cible-eligible/);
+    assert.deepEqual(declared, []);
+    assert.deepEqual(journal.filter((entry) => entry.verdict === 'simulee'), []);
+  });
+});
+
+test('24.11 revue Codex P2 — un candidat portant un réglage de commande (témoin « avant ») est écarté, la recherche continue', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [{ objectId: 25, eqs: [eligible(261), eligible(262)] }];
+  await withDynamicPage(t, rooms, async (page, helpers, { recorded, declared }) => {
+    await parcours.run(page, { helpers });
+    assert.deepEqual(declared.map((entry) => entry.eqId), ['262']);
+    assert.equal(recorded.cible, '262');
+  }, { notDeclarable: ['261'] });
+});

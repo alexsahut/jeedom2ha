@@ -147,9 +147,85 @@ export async function loadParcours(modulePath) {
   return import(pathToFileURL(resolved).href);
 }
 
+// Story 24.11 : déclaration d'une cible à l'exécution, bornée. Un parcours qui exporte `dynamicTarget`
+// doit l'exporter à `true` exactement, avec `declaredEquipments` et `declaredPublicationOverrides` vides :
+// la seule cible possible est alors celle que `helpers.declareTarget` accepte (voir `createDeclareTarget`).
+// Un parcours sans `dynamicTarget` garde ses déclarations statiques (y compris `{}` en lecture seule) et ne
+// reçoit jamais `declareTarget`.
+function isEmptyPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype && Object.keys(value).length === 0;
+}
+
+export function isValidDynamicTargetDeclaration(parcours) {
+  if (parcours.dynamicTarget === undefined) return true;
+  if (parcours.dynamicTarget !== true) return false;
+  return isEmptyPlainObject(parcours.declaredEquipments) && isEmptyPlainObject(parcours.declaredPublicationOverrides);
+}
+
+// Actions d'écriture ou d'effet de bord (policy.mjs) : leur présence au journal, simulée ou refusée,
+// interdit toute déclaration de cible après coup.
+const TARGET_WRITE_ACTIONS = new Set([
+  'saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride',
+  'saveRoomExclusion', 'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport',
+  'testMqttConnection',
+]);
+const TARGET_ID = /^[1-9][0-9]{0,9}$/;
+
+/** Vrai si le journal contient déjà une écriture interceptée (simulée ou refusée). */
+export function hasInterceptedWrite(entries) {
+  return (entries ?? []).some((entry) => !!entry
+    && (entry.verdict === 'simulee' || TARGET_WRITE_ACTIONS.has(entry.action)));
+}
+
+/**
+ * Story 24.11 : fabrique `helpers.declareTarget(eqId)`. Utilisable une seule fois (un appel refusé
+ * consomme aussi le droit), avant toute écriture interceptée, pour un id numérique sans réglage dans le
+ * témoin « avant ». N'ajoute l'id qu'aux deux déclarations d'écriture de publication, avec
+ * `{ commands: [] }`, et l'écrit dans le rapport (`cible`). La politique d'interception n'est pas touchée :
+ * elle continue de n'admettre, en simulation, que les écritures d'un équipement déclaré.
+ */
+export function createDeclareTarget({ before, ctx, journal, record }) {
+  let used = false;
+  return (eqId) => {
+    if (used) throw new Error('cible-deja-declaree');
+    used = true;
+    if (journal?.failed || hasInterceptedWrite(journal?.entries)) throw new Error('cible-apres-ecriture');
+    const id = typeof eqId === 'number' && Number.isSafeInteger(eqId) ? String(eqId) : eqId;
+    if (typeof id !== 'string' || !TARGET_ID.test(id)) throw new Error('cible-id-invalide');
+    assertNoOverrideOn(before, [id]);
+    if (!isEmptyPlainObject(ctx?.declaredEquipments) || !isEmptyPlainObject(ctx?.declaredPublicationOverrides)) {
+      throw new Error('cible-declarations-non-vides');
+    }
+    record('cible', id);
+    ctx.declaredEquipments[id] = { commands: [] };
+    ctx.declaredPublicationOverrides[id] = { commands: [] };
+    return id;
+  };
+}
+
+/**
+ * Story 24.11 (revue Codex P2) : vrai si `declareTarget(eqId)` accepterait cet id d'après le témoin « avant »
+ * (id numérique, aucun réglage d'équipement NI de commande). Lecture seule : ne consomme pas la déclaration.
+ * Permet au parcours d'écarter pendant la recherche un candidat portant un réglage invisible dans la vue
+ * (type HA forcé sur une commande), au lieu d'échouer sur la déclaration et d'interrompre le parcours.
+ */
+export function isDeclarableTarget(before, eqId) {
+  const id = typeof eqId === 'number' && Number.isSafeInteger(eqId) ? String(eqId) : eqId;
+  if (typeof id !== 'string' || !TARGET_ID.test(id)) return false;
+  try {
+    assertNoOverrideOn(before, [id]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Story 20-2 (point 8, revue P2) : `declaredPublicationOverrides` est optionnel — un parcours
 // qui ne teste aucun override de publication n'a pas à le déclarer (défaut `{}` au call site).
 export function isValidParcours(parcours) {
+  // Story 24.11 : une cible choisie à l'exécution exige `dynamicTarget === true` ET des déclarations vides.
+  if (parcours && !isValidDynamicTargetDeclaration(parcours)) return false;
   return !!(parcours
     && parcours.name
     && parcours.declaredEquipments
@@ -434,6 +510,11 @@ async function main() {
       declaredRescan: parcours.declaredRescan === true,
       lastPreviewType: simState.lastPreviewType,
     };
+    // Story 24.11 : un parcours à cible dynamique part de déclarations vides, propres à cette exécution.
+    if (parcours.dynamicTarget === true) {
+      ctx.declaredEquipments = {};
+      ctx.declaredPublicationOverrides = {};
+    }
     await installInterceptor(context, { ctx, simState, journal, declaredBascules: parcours.declaredBascules });
     installNavigationGuard(context, ctx, journal);
     context.on('request', (request) => {
@@ -472,6 +553,19 @@ async function main() {
     if (!expectedUrl(page) || !redirectsStayOnOrigin(navigation)) {
       throw new Error('navigation-finale-invalide');
     }
+    // Story 24.11 : seul un parcours à cible dynamique reçoit `declareTarget` ; les autres gardent l'appel
+    // d'origine, inchangé (branche `else` : le lanceur n'est modifié que par ajout, cf. test 25.4).
+    if (parcours.dynamicTarget === true) {
+      const record = createRecorder(data.parcours);
+      await withTimeout(parcours.run(page, {
+        helpers: {
+          record,
+          journalEntries: () => journalEntriesSnapshot(journal),
+          declareTarget: createDeclareTarget({ before, ctx, journal, record }),
+          canDeclareTarget: (eqId) => isDeclarableTarget(before, eqId),
+        },
+      }), 180_000, 'parcours-timeout');
+    } else
     await withTimeout(parcours.run(page, {
       helpers: { record: createRecorder(data.parcours), journalEntries: () => journalEntriesSnapshot(journal) },
     }), 180_000, 'parcours-timeout');
