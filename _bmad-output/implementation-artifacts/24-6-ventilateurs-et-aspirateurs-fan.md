@@ -1,6 +1,6 @@
 # Story 24.6 : Ventilateurs (et aspirateurs) : équivalents fonctionnels
 
-Status: ready-for-dev
+Status: review
 
 > **Brouillon de cadrage (2026-10-12), `draft`, jamais `ready-for-dev`.** Rédigé par une session cloud déléguée, documentaire. **R1 (ClaudeBox, 12/10) intégrée : story réduite.** *Établi par ClaudeBox le 12/10* : 8 équipements exposés à HomeKit portent `FAN_*` (marche, arrêt, état ; 5 aspirateurs compris), **aucun n'a de commande de vitesse**. Avec **Q7 A**, aucun ne change de type : la story devient un classement « équivalents fonctionnels » dans l'export. **`fan` n'est plus ouvert ici**, sauf apparition d'un ventilateur à vitesse. Décisions : **Q7** et **Q9** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire avant `ready-for-dev`. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 
@@ -61,9 +61,9 @@ afin de ne pas changer le domaine d'entités qui fonctionnent par la voix, et d'
 ## Tâches
 
 - [x] **Task 0 — Vérifier sur l'export « avant »** (ClaudeBox, 01/11) : voir ci-dessus.
-- [ ] **Task 1 — `parity_class` / `parity_alert`** : fonction pure (près de `compute_homekit_exposed_effective` ou dans `export/`), champ additif dans `export/decision_export.py`, tests unitaires (AC1, AC4, AC5).
-- [ ] **Task 2 — Documentation** `docs/dev-decision-export.md` (AC2).
-- [ ] **Task 3 — Non-régression** (AC3) : aucun changement de mapping, de publication, de `PRODUCT_SCOPE` ; garde 25.4 si elle s'applique ; `flake8`, suite complète.
+- [x] **Task 1 — `parity_class` / `parity_alert`** : fonction pure (près de `compute_homekit_exposed_effective` ou dans `export/`), champ additif dans `export/decision_export.py`, tests unitaires (AC1, AC4, AC5).
+- [x] **Task 2 — Documentation** `docs/dev-decision-export.md` (AC2).
+- [x] **Task 3 — Non-régression** (AC3) : aucun changement de mapping, de publication, de `PRODUCT_SCOPE` ; garde 25.4 si elle s'applique ; `flake8`, suite complète.
 - [ ] **Task 4 — Preuve terrain** (AC6) : ClaudeBox et clawcode, après fusion.
 
 ## Garde-fous
@@ -81,3 +81,35 @@ Que la mesure du 12/10 (aucune vitesse) reste vraie sur l'export ; la forme exac
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q7 A, Q9 A (ajustée R1 : l'epic 18 garde 18-1).
 - 2026-11-01 — Task 0 sur l'export de production et décisions D1-D3 (ClaudeBox) ; `ready-for-dev` (go d'Alexandre 21:10 « on attaque la prochaine story »).
+- 2026-11-01 — dev-story (session cloud déléguée) : Tasks 1 à 3 livrées, statut `review` ; Task 4 (AC6) à ClaudeBox et clawcode après fusion.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Opus 5.5 (session Claude Code cloud déléguée).
+
+### Implementation Notes
+
+- **Fonction pure** `compute_parity_class(homekit_exposed_effective, commands) -> (parity_class, parity_alert)` dans `resources/daemon/export/decision_export.py`, juste avant `_equipment_row`. Elle lit les lignes `commands[]` déjà construites pour l'équipement (`generic_type`, `decision`, `ha_type`) : aucune décision n'est recalculée, rien d'autre ne l'appelle (test AST).
+- **Règle exacte** : exposition effective différente de `True` ⇒ `(null, absent)`. Exposé et au moins une commande `FAN_SPEED`, `FAN_SPEED_STATE`, `ROTATION` ou `ROTATION_STATE` (publiée ou non) ⇒ `(null, "fan_speed_present")`. Exposé, sans vitesse, et au moins une commande `FAN_STATE`/`FAN_ON`/`FAN_OFF` avec `decision: "published"` et `ha_type: "switch"` ⇒ `("functional_equivalent", absent)`. Sinon `(null, absent)`.
+- **Points tranchés** :
+  1. « Entité publiée » (D1) est lue sur le **verdict** de la commande (`commands[].decision == "published"`), pas sur l'état d'exécution `entities[].discovery_published` : le classement reste stable si le broker est momentanément indisponible et ne demande pas de jointure `entity_unique_id` ↔ `unique_id`. Un équipement désactivé, exclu ou refusé par le périmètre a ses commandes en `not_published` : `null`.
+  2. Le type de vitesse déclenche l'alerte **qu'il soit publié ou non** (le `FAN_SPEED_STATE` est aujourd'hui un `sensor`, F2), et même sans trio `FAN_*` sur l'équipement (D2 : « porte un type de vitesse »).
+  3. Un trio `FAN_*` dont un override de type sort de `switch` n'est pas classé (`null`).
+  4. `parity_alert` est **absent** hors alerte (D2) ; c'est la seule exception documentée à « clés toujours présentes ».
+- **Garde 25.4 (AC31)** : elle refuse toute ligne existante retirée dans `resources/daemon/`. Le `return {` de `_equipment_row` est donc conservé ; `parity_alert` est ajouté par décompactage conditionnel en fin de dictionnaire (diff 100 % ajout).
+- Aucun changement de mapping, de publication, de `PRODUCT_SCOPE` ni du payload MQTT ; `schema_version` reste 1.
+
+### Tests
+
+- `resources/daemon/tests/unit/test_story_24_6_parity_class_fan.py` (29 cas) : fonction pure (non exposé / inconnu, trio publié en `switch`, aspirateur avec `BATTERY`, une seule commande `FAN_*` suffit, chaque type de vitesse publié ou non, vitesse sans trio, trio non publié, trio sorti de `switch`, autres familles `SWITCH_*`, `LIGHT_*`, `DOCK_*`, aucune commande) ; export de bout en bout par `/action/sync` sur 10 équipements anonymes (601-610 : ventilateur, aspirateur, désactivé exposé en pièce exclue façon 165, `FAN_SPEED`, non exposé, inconnu, exclu, `SWITCH_*`, vitesse non exposée, vitesse désactivée) ; `parity_alert` seulement sur 604 ; pas de champ sur les scénarios ; `schema_version == 1` ; AC5 (restent `switch`, aucun `fan` ni `vacuum`) ; AC3 (publications MQTT identiques avec le classement neutralisé ; aucun module hors export n'appelle le classement).
+- `python -m pytest` : 2 566 passés, 9 désélectionnés (marqueur `load`). `flake8 resources/daemon tests` : 0. `node --test tests/unit/*.node.test.js` : tout vert.
+
+### File List
+
+- `resources/daemon/export/decision_export.py` (modifié, ajouts seuls)
+- `resources/daemon/tests/unit/test_story_24_6_parity_class_fan.py` (nouveau)
+- `docs/dev-decision-export.md` (modifié)
+- `_bmad-output/implementation-artifacts/24-6-ventilateurs-et-aspirateurs-fan.md` (modifié)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié)
