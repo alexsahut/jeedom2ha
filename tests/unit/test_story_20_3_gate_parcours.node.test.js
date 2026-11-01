@@ -383,7 +383,8 @@ function htmlDynamic(rooms) {
       function push(action, verdict) { window.__pushNode(action, verdict); }
       function seg(eq) {
         return '<span class="j2ha-seg" role="radiogroup">' + ['Automatique', 'Toujours', 'Jamais'].map(function (label) {
-          return '<button class="j2ha-seg-btn" role="radio" aria-checked="' + (policy[eq.id] === label) + '">' + label + '</button>';
+          var off = label === 'Jamais' && eq.neverDisabled ? ' disabled aria-disabled="true"' : '';
+          return '<button class="j2ha-seg-btn" role="radio" aria-checked="' + (policy[eq.id] === label) + '"' + off + '>' + label + '</button>';
         }).join('') + '</span>';
       }
       function renderPanel(eq) {
@@ -543,4 +544,14 @@ test('24.11 revue Codex P2 — un candidat portant un réglage de commande (tém
     assert.deepEqual(declared.map((entry) => entry.eqId), ['262']);
     assert.equal(recorded.cible, '262');
   }, { notDeclarable: ['261'] });
+});
+
+test('24.11 gate 01/11 — un candidat dont « Jamais » est désactivé (non éligible) est écarté, la recherche continue', async (t) => {
+  const parcours = await import(gate('parcours', 'exclusion-publication-non-publiee.mjs'));
+  const rooms = [{ objectId: 25, eqs: [eligible(598, { neverDisabled: true }), eligible(599)] }];
+  await withDynamicPage(t, rooms, async (page, helpers, { recorded, declared }) => {
+    await parcours.run(page, { helpers });
+    assert.deepEqual(declared.map((entry) => entry.eqId), ['599']);
+    assert.equal(recorded.cible, '599');
+  });
 });
