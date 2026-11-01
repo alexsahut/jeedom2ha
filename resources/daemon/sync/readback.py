@@ -16,6 +16,7 @@ its own.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 CHANNEL_STATE = "state"
@@ -132,20 +133,19 @@ def barrier_mode(mapping: Any) -> Optional[str]:
     return mode if mode in BARRIER_MODES else None
 
 
+# M-3 — only a plain decimal integer (optionally ``.0`` / ``,0``) is a barrier value:
+# no sign, no exponent (``2.55e2``), no fraction.
+_BARRIER_VALUE_RE = re.compile(r"(\d+)(?:[.,]0+)?")
+
+
 def barrier_state(value: Any) -> Optional[str]:
     """Translate a barrier value to its cover state; anything else -> None (never invented)."""
     if value is None or isinstance(value, bool):
         return None
-    text = str(value).strip()
-    if text == "":
+    match = _BARRIER_VALUE_RE.fullmatch(str(value).strip())
+    if match is None:
         return None
-    try:
-        number = float(text.replace(",", "."))
-    except ValueError:
-        return None
-    if not number.is_integer():
-        return None
-    return BARRIER_STATE_TABLE.get(int(number))
+    return BARRIER_STATE_TABLE.get(int(match.group(1)))
 
 
 def has_reliable_channel(ha_type: Any, mapping: Any, channel: str) -> bool:

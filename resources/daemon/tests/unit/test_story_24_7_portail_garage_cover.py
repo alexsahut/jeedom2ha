@@ -266,14 +266,16 @@ def test_flap_discovery_payload_is_unchanged():
 
 @pytest.mark.parametrize("value,expected", [
     ("0", "closed"), ("252", "closing"), ("253", "stopped"), ("254", "opening"),
-    ("255", "open"), (255, "open"), ("255.0", "open"), (0, "closed"),
+    ("255", "open"), (255, "open"), ("255.0", "open"), ("255,0", "open"), (255.0, "open"),
+    (" 254 ", "opening"), (0, "closed"),
 ])
 def test_barrier_value_table(value, expected):
     assert readback.barrier_state(value) == expected
 
 
 @pytest.mark.parametrize("value", [None, "", "1", "100", "251", "256", "-1", "254.5", "abc",
-                                   "nan", "inf", True])
+                                   "nan", "inf", True, "2.55e2", "255e0", "+255", "0x0",
+                                   "255.5", "25 5"])
 def test_barrier_value_outside_table_is_never_invented(value):
     assert readback.barrier_state(value) is None
 
@@ -473,19 +475,113 @@ async def test_state_events_release_the_lock():
     assert sync._execute_exec_cmd.await_count == 2
 
 
+def _locked_garage():
+    state_sync = StateSynchronizer(app={"publications": {}}, mqtt_bridge=_Bridge())
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), state_sync, fresh="0")
+    return sync, state_sync, f"jeedom2ha/{GARAGE_ID}/set"
+
+
 @pytest.mark.asyncio
-async def test_lock_expires_after_the_named_delay(monkeypatch):
+@pytest.mark.parametrize("late_value", ["252", "100", "", None, "2.55e2", "0"])
+async def test_only_the_expected_effect_releases_the_lock(late_value):
+    # OPEN depuis 0 : seul 254 ou 255 prouve l'effet ; un 252 retardé, une valeur hors
+    # table, vide ou None ne lèvent pas le verrou (I-1).
+    sync, state_sync, topic = _locked_garage()
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    await state_sync.handle_state_message(GARAGE_ID, 70022, late_value)
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    assert sync._execute_exec_cmd.await_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("effect", ["254", "255"])
+async def test_expected_effect_of_open_releases_the_lock(effect):
+    sync, state_sync, topic = _locked_garage()
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    await state_sync.handle_state_message(GARAGE_ID, 70022, effect)
+    sync._read_info_value = AsyncMock(return_value=(True, "255"))
+    assert await sync.handle_command_message(topic, "CLOSE") is True
+    assert sync._execute_exec_cmd.await_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("effect,held", [("252", False), ("0", False), ("254", True),
+                                         ("255", True)])
+async def test_expected_effect_of_close(effect, held):
+    state_sync = StateSynchronizer(app={"publications": {}}, mqtt_bridge=_Bridge())
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), state_sync, fresh="255")
+    topic = f"jeedom2ha/{GARAGE_ID}/set"
+    assert await sync.handle_command_message(topic, "CLOSE") is True
+    await state_sync.handle_state_message(GARAGE_ID, 70022, effect)
+    sync._read_info_value = AsyncMock(return_value=(True, "0"))
+    assert await sync.handle_command_message(topic, "OPEN") is (not held)
+
+
+@pytest.mark.asyncio
+async def test_no_effect_after_the_delay_keeps_refusing(monkeypatch, caplog):
     import sync.command as command_module
 
     assert command_module.BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S == 60.0
-    sync, _bridge = _cmd_sync(_map(_garage_eq()), fresh="0")
-    topic = f"jeedom2ha/{GARAGE_ID}/set"
+    sync, state_sync, topic = _locked_garage()
     assert await sync.handle_command_message(topic, "OPEN") is True
-    assert await sync.handle_command_message(topic, "OPEN") is False
     now = command_module.time.monotonic()
     monkeypatch.setattr(command_module.time, "monotonic", lambda: now + 61.0)
+    with caplog.at_level(logging.WARNING):
+        assert await sync.handle_command_message(topic, "OPEN") is False
+    assert "reason_code=barrier_no_effect action=refuse_barrier_order" in caplog.text
+    # Une valeur identique à celle lue à l'envoi ne lève toujours rien.
+    state_sync._pending_click_values[(GARAGE_ID, 70022)] = (now + 62.0, "0")
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    # Un état de la table différent de celui lu à l'envoi lève le verrou.
+    state_sync._pending_click_values[(GARAGE_ID, 70022)] = (now + 63.0, "253")
+    sync._read_info_value = AsyncMock(return_value=(True, "0"))
     assert await sync.handle_command_message(topic, "OPEN") is True
     assert sync._execute_exec_cmd.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_no_effect_lock_released_by_254(monkeypatch):
+    import sync.command as command_module
+
+    sync, state_sync, topic = _locked_garage()
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    now = command_module.time.monotonic()
+    monkeypatch.setattr(command_module.time, "monotonic", lambda: now + 61.0)
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    state_sync._pending_click_values[(GARAGE_ID, 70022)] = (now + 62.0, "254")
+    sync._read_info_value = AsyncMock(return_value=(True, "255"))
+    assert await sync.handle_command_message(topic, "CLOSE") is True
+
+
+@pytest.mark.asyncio
+async def test_concurrent_orders_send_a_single_toggle():
+    import asyncio
+
+    sync, _state_sync, topic = _locked_garage()
+    gate = asyncio.Event()
+
+    async def _slow_read(cmd_id):  # noqa: ARG001
+        await gate.wait()
+        return True, "0"
+
+    sync._read_info_value = AsyncMock(side_effect=_slow_read)
+    first = asyncio.create_task(sync.handle_command_message(topic, "OPEN"))
+    second = asyncio.create_task(sync.handle_command_message(topic, "OPEN"))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    gate.set()
+    results = await asyncio.gather(first, second)
+    assert sorted(results) == [False, True]
+    sync._execute_exec_cmd.assert_awaited_once_with(70021, {})
+
+
+@pytest.mark.asyncio
+async def test_refused_guard_removes_its_marker():
+    sync, _state_sync, topic = _locked_garage()
+    sync._read_info_value = AsyncMock(return_value=(True, "254"))
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    sync._read_info_value = AsyncMock(return_value=(True, "0"))
+    assert await sync.handle_command_message(topic, "OPEN") is True
 
 
 @pytest.mark.asyncio
@@ -622,7 +718,8 @@ def _message(topic, payload, retain):
     f"jeedom2ha/{GARAGE_ID}/set", "jeedom2ha/12/34/set", "jeedom2ha/12/position/set",
     "jeedom2ha/12/brightness/set", "jeedom2ha/scenario_5/cmd",
 ])
-async def test_retained_command_is_ignored(caplog, topic):
+@pytest.mark.parametrize("retain", [True, 1])
+async def test_retained_command_is_ignored(caplog, topic, retain):
     import asyncio
 
     from transport.mqtt_client import MqttBridge
@@ -632,7 +729,7 @@ async def test_retained_command_is_ignored(caplog, topic):
     handler = AsyncMock()
     bridge.set_command_handler(handler)
     with caplog.at_level(logging.INFO):
-        bridge._on_message(None, None, _message(topic, "OPEN", True))
+        bridge._on_message(None, None, _message(topic, "OPEN", retain))
         await asyncio.sleep(0)
         await asyncio.sleep(0)
     handler.assert_not_awaited()
@@ -640,7 +737,8 @@ async def test_retained_command_is_ignored(caplog, topic):
 
 
 @pytest.mark.asyncio
-async def test_live_command_is_still_dispatched():
+@pytest.mark.parametrize("retain", [False, 0])
+async def test_live_command_is_still_dispatched(retain):
     import asyncio
 
     from transport.mqtt_client import MqttBridge
@@ -649,7 +747,7 @@ async def test_live_command_is_still_dispatched():
     bridge._loop = asyncio.get_running_loop()
     handler = AsyncMock()
     bridge.set_command_handler(handler)
-    bridge._on_message(None, None, _message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN", False))
+    bridge._on_message(None, None, _message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN", retain))
     await asyncio.sleep(0)
     await asyncio.sleep(0)
     handler.assert_awaited_once_with(f"jeedom2ha/{GARAGE_ID}/set", "OPEN")

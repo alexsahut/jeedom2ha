@@ -54,20 +54,27 @@ def _barrier_refusal_reason(requested: str, state: Optional[str]) -> str:
     return "barrier_already_open" if requested == "OPEN" else "barrier_already_closed"
 
 
-def _barrier_value_key(value: Any) -> str:
-    """Comparable form of a barrier value (``"255"`` and ``255.0`` are the same state)."""
-    state = barrier_state(value)
-    return state if state is not None else str(value).strip()
+# I-1 — the only events that prove the toggle had its expected effect, per direction.
+_BARRIER_EXPECTED_EFFECT = {
+    "OPEN": ("opening", "open"),
+    "CLOSE": ("closing", "closed"),
+}
 
 
 @dataclass
 class _BarrierToggleInFlight:
-    """B1 — one toggle sent for an equipment, awaiting the state change it should cause."""
+    """B1 — one toggle of an equipment, from its guard until the expected state change.
 
-    state_cmd_id: Optional[int]
-    sent_value: str
-    sent_at: float
-    expires_at: float
+    ``sent_at is None`` while the guard is still running (I-3 marker armed before any
+    await, so a concurrent order of the same equipment is refused, whatever the transport).
+    Kept in memory only: a daemon restart forgets it.
+    """
+
+    requested: str
+    state_cmd_id: Optional[int] = None
+    sent_state: Optional[str] = None
+    sent_at: Optional[float] = None
+    expires_at: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -504,30 +511,47 @@ class CommandSynchronizer:
             (c for c in (mapping.commands or {}).values() if is_barrier_state_command(c)), None
         )
 
-    def _barrier_lock_active(self, eq_id: int) -> bool:
-        """B1 — True while a previous toggle of ``eq_id`` is still awaiting its effect."""
+    def _barrier_lock_refusal(self, eq_id: int) -> Optional[str]:
+        """B1 / I-1 / I-2 — refusal reason while a previous toggle of ``eq_id`` holds the lock.
+
+        - guard still running (``sent_at`` None): ``barrier_toggle_in_flight``;
+        - released ONLY by the expected effect (OPEN: 254/255, CLOSE: 252/0) received
+          after the send; any other event (late older value, out of table, empty) keeps it;
+        - before the delay: ``barrier_toggle_in_flight``;
+        - after the delay without the expected effect: NOT released (``barrier_no_effect``)
+          until an event received after the send differs from the state read at send time.
+        """
         lock = self._barrier_in_flight().get(eq_id)
         if lock is None:
-            return False
-        now = time.monotonic()
-        if now >= lock.expires_at:
+            return None
+        if lock.sent_at is None:
+            return "barrier_toggle_in_flight"
+        event_state = self._barrier_event_state_since(eq_id, lock)
+        if event_state in _BARRIER_EXPECTED_EFFECT[lock.requested]:
             self._barrier_in_flight().pop(eq_id, None)
-            return False
+            return None
+        if time.monotonic() < float(lock.expires_at or 0.0):
+            return "barrier_toggle_in_flight"
+        if event_state is not None and event_state != lock.sent_state:
+            self._barrier_in_flight().pop(eq_id, None)
+            return None
+        return "barrier_no_effect"
+
+    def _barrier_event_state_since(self, eq_id: int, lock: _BarrierToggleInFlight) -> Optional[str]:
+        """Barrier state of the last Jeedom event received AFTER the send, else None."""
         state_sync = self._app.get("state_synchronizer") if hasattr(self._app, "get") else None
         reader = getattr(state_sync, "last_event", None)
-        if callable(reader) and lock.state_cmd_id is not None:
-            try:
-                event = reader(eq_id, lock.state_cmd_id)
-            except Exception:
-                event = None
-            if (
-                isinstance(event, tuple) and len(event) == 2
-                and event[0] > lock.sent_at
-                and _barrier_value_key(event[1]) != lock.sent_value
-            ):
-                self._barrier_in_flight().pop(eq_id, None)
-                return False
-        return True
+        if not callable(reader) or lock.state_cmd_id is None:
+            return None
+        try:
+            event = reader(eq_id, lock.state_cmd_id)
+        except Exception:
+            return None
+        if not (isinstance(event, tuple) and len(event) == 2):
+            return None
+        if lock.sent_at is None or not event[0] > lock.sent_at:
+            return None
+        return barrier_state(event[1])
 
     def _barrier_in_flight(self) -> Dict[int, _BarrierToggleInFlight]:
         locks = getattr(self, "_barrier_in_flight_locks", None)
@@ -539,34 +563,50 @@ class CommandSynchronizer:
     async def _guard_barrier_toggle(
         self, mapping: MappingResult, eq_id: int, requested: str,
     ) -> Optional[str]:
-        """B1 + I3 — returns a refusal reason, or None when the toggle may be sent now.
+        """B1 + I3 + I-3 — returns a refusal reason, or None when the toggle may be sent now.
 
-        On success the in-flight lock is armed BEFORE the RPC, so a timeout / RPC error of
-        the send still locks the equipment (the order may have reached Jeedom).
+        Atomic per equipment: the lock check and the arming of the "in progress" marker run
+        with no await in between, so two concurrent orders cannot both pass. The marker is
+        removed on refusal; on success it becomes the in-flight lock BEFORE the RPC, so a
+        timeout / RPC error of the send still locks the equipment.
         """
-        if self._barrier_lock_active(eq_id):
-            self._log_barrier_refusal(eq_id, "barrier_toggle_in_flight", requested, None, None)
-            return "barrier_toggle_in_flight"
+        refusal = self._barrier_lock_refusal(eq_id)
+        if refusal is not None:
+            self._log_barrier_refusal(eq_id, refusal, requested, None, None)
+            return refusal
+        locks = self._barrier_in_flight()
+        marker = _BarrierToggleInFlight(requested=requested)
+        locks[eq_id] = marker
+
+        def _refuse(reason: str, state: Optional[str], raw: Any) -> str:
+            if locks.get(eq_id) is marker:
+                locks.pop(eq_id, None)
+            self._log_barrier_refusal(eq_id, reason, requested, state, raw)
+            return reason
+
         state_cmd = self._barrier_state_cmd(mapping)
         state_cmd_id = self._coerce_int(getattr(state_cmd, "id", None))
         if state_cmd_id is None:
-            return "barrier_without_state"
-        ok, raw_value = await self._read_info_value(state_cmd_id)
+            return _refuse("barrier_without_state", None, None)
+        try:
+            ok, raw_value = await self._read_info_value(state_cmd_id)
+        except asyncio.CancelledError:
+            # Nothing was sent: never leave a stale "in progress" marker behind.
+            if locks.get(eq_id) is marker:
+                locks.pop(eq_id, None)
+            raise
+        except Exception:
+            ok, raw_value = False, None
         if not ok:
-            self._log_barrier_refusal(eq_id, "barrier_state_read_failed", requested, None, None)
-            return "barrier_state_read_failed"
+            return _refuse("barrier_state_read_failed", None, None)
         state = barrier_state(raw_value)
         if state not in _BARRIER_TOGGLE_ALLOWED[requested]:
-            reason = _barrier_refusal_reason(requested, state)
-            self._log_barrier_refusal(eq_id, reason, requested, state, raw_value)
-            return reason
+            return _refuse(_barrier_refusal_reason(requested, state), state, raw_value)
         now = time.monotonic()
-        self._barrier_in_flight()[eq_id] = _BarrierToggleInFlight(
-            state_cmd_id=state_cmd_id,
-            sent_value=_barrier_value_key(raw_value),
-            sent_at=now,
-            expires_at=now + float(BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S),
-        )
+        marker.state_cmd_id = state_cmd_id
+        marker.sent_state = state
+        marker.sent_at = now
+        marker.expires_at = now + float(BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S)
         return None
 
     @staticmethod

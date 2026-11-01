@@ -193,7 +193,10 @@ class MqttBridge:
         # Story 24.7 (I4) — un message retenu sur un topic de commande est un ordre périmé
         # (HA publie ses commandes sans retain) : rejoué à la (re)connexion, il actionnerait un
         # portail sans demande. Ignoré pour tous les topics de commande, jamais exécuté.
-        if getattr(message, "retain", False) is True and any(
+        # B-1 : paho 2.x donne un bool, paho 1.x l'entier 1 ; un attribut non entier
+        # (double de test) n'est pas un indicateur de retenue.
+        retain_flag = getattr(message, "retain", False)
+        if isinstance(retain_flag, int) and bool(retain_flag) and any(
             mqtt.topic_matches_sub(sub, topic) for sub in COMMAND_SUBSCRIPTION_TOPICS
         ):
             _LOGGER.warning(
