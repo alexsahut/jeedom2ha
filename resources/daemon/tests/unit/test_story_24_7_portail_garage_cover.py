@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -67,6 +68,15 @@ def _garage_eq(state_sub="numeric", state_value="0", with_state=True):
     return _eq(GARAGE_ID, cmds)
 
 
+def _direct_eq(state_value="0"):
+    """Ouvrant à boutons directs : GB_OPEN + GB_CLOSE + BARRIER_STATE numérique, sans bascule."""
+    return _eq(GATE_ID, [
+        _cmd(70011, "GB_OPEN"),
+        _cmd(70012, "GB_CLOSE"),
+        _cmd(70014, "BARRIER_STATE", "info", "numeric", state_value),
+    ])
+
+
 def _map(eq):
     return MapperRegistry().map(eq, _snapshot(eq))
 
@@ -96,16 +106,18 @@ def _payload(mapping):
     return DiscoveryPublisher(MagicMock()).build_discovery_payload(mapping, _snapshot(eq))
 
 
-# --- mapping : éligibilité (D4), classe (D2), consommation (AC3) --------------------
+# --- mapping : éligibilité (D4 bis), mode (D3 bis), classe (D2), consommation (AC3) --
 
-def test_gate_with_open_close_and_numeric_state_is_a_gate_cover():
+def test_gate_with_toggle_open_close_and_state_uses_the_toggle_mode():
     mapping = _map(_gate_eq())
     assert mapping.ha_entity_type == "cover"
     assert mapping.confidence == "sure"
-    assert mapping.reason_code == "cover_barrier_open_close"
-    assert mapping.reason_details["cover_device_class"] == "gate"
-    assert mapping.reason_details["barrier_mode"] == "direct"
-    # Toutes les commandes sont consommées : aucune entité secondaire (pas de doublon).
+    assert mapping.reason_code == "cover_barrier_toggle_state"
+    assert mapping.reason_details == {
+        "barrier_mode": "toggle_on_state", "cover_device_class": "gate",
+        "barrier_state": "BARRIER_STATE",
+    }
+    # GB_OPEN / GB_CLOSE ignorés pour l'ordre mais consommés : aucun button en double.
     assert set(mapping.commands) == {"GB_OPEN", "GB_CLOSE", "GB_TOGGLE", "BARRIER_STATE"}
     assert not mapping.additional_mappings
     caps = mapping.capabilities
@@ -124,49 +136,58 @@ def test_garage_with_toggle_and_numeric_state_is_a_garage_cover():
     assert not mapping.additional_mappings
 
 
-def test_open_close_without_state_is_a_probable_gate_cover():
-    eq = _eq(GATE_ID, [_cmd(70011, "GB_OPEN"), _cmd(70012, "GB_CLOSE")])
-    mapping = _map(eq)
+def test_open_close_without_toggle_and_with_state_uses_the_direct_mode():
+    mapping = _map(_direct_eq())
     assert mapping.ha_entity_type == "cover"
-    assert mapping.confidence == "probable"
+    assert mapping.reason_code == "cover_barrier_open_close"
+    assert mapping.reason_details["barrier_mode"] == "direct"
     assert mapping.reason_details["cover_device_class"] == "gate"
 
 
-def test_toggle_alone_without_state_is_not_a_cover_and_stays_a_button():
-    eq = _garage_eq(with_state=False)
+# Comportement EXACT de main (relevé sur origin/main, story 24.7 non appliquée).
+_MAIN_BEHAVIOUR = {
+    "toggle_binary_state": ("binary_sensor", "sure", "binary_sensor_garage_state",
+                            ["GARAGE_STATE"], {"device_class": "garage_door"}),
+    "gate_binary_state": ("binary_sensor", "sure", "binary_sensor_barrier_state",
+                          ["BARRIER_STATE"], {"device_class": "garage_door"}),
+    "open_close_without_state": ("button", "sure", "button_gb_open", ["GB_OPEN"],
+                                 {"command_topic": f"jeedom2ha/{GATE_ID}/cmd"}),
+    "toggle_without_state": ("button", "sure", "button_gb_toggle", ["GB_TOGGLE"],
+                             {"command_topic": f"jeedom2ha/{GARAGE_ID}/cmd"}),
+}
+
+
+def _shape(name):
+    if name == "toggle_binary_state":
+        return _garage_eq(state_sub="binary", state_value="1")
+    if name == "gate_binary_state":
+        return _gate_eq(state_sub="binary", state_value="1")
+    if name == "open_close_without_state":
+        return _eq(GATE_ID, [_cmd(70011, "GB_OPEN"), _cmd(70012, "GB_CLOSE")])
+    return _garage_eq(with_state=False)
+
+
+@pytest.mark.parametrize("name", sorted(_MAIN_BEHAVIOUR))
+def test_ineligible_shapes_keep_exactly_the_main_behaviour(name):
+    eq = _shape(name)
     assert CoverMapper().map(eq, _snapshot(eq)) is None
     mapping = _map(eq)
-    assert mapping.ha_entity_type == "button"
-    assert mapping == ButtonMapper().map(eq, _snapshot(eq))
-
-
-def test_toggle_with_binary_state_keeps_the_current_behaviour():
-    eq = _garage_eq(state_sub="binary", state_value="1")
-    assert CoverMapper().map(eq, _snapshot(eq)) is None
-    mapping = _map(eq)
-    assert mapping.ha_entity_type != "cover"
-    # Comportement inchangé : même résultat que la chaîne sans le cas barrière.
-    assert mapping.ha_entity_type in ("binary_sensor", "button")
-
-
-def test_binary_state_alone_stays_a_garage_door_binary_sensor():
-    eq = _eq(GARAGE_ID, [_cmd(70022, "GARAGE_STATE", "info", "binary", "1")])
-    mapping = _map(eq)
-    assert mapping.ha_entity_type == "binary_sensor"
-    assert mapping.reason_details["device_class"] == "garage_door"
-
-
-def test_open_close_with_binary_state_keeps_the_current_behaviour():
-    eq = _gate_eq(state_sub="binary", state_value="1")
-    assert CoverMapper().map(eq, _snapshot(eq)) is None
+    ha_type, confidence, reason_code, commands, details = _MAIN_BEHAVIOUR[name]
+    assert (mapping.ha_entity_type, mapping.confidence, mapping.reason_code) == (
+        ha_type, confidence, reason_code)
+    assert sorted(mapping.commands) == commands
+    assert mapping.reason_details == details
+    assert not mapping.additional_mappings
 
 
 @pytest.mark.parametrize("cmds", [
     [_cmd(1, "GB_TOGGLE"), _cmd(2, "GB_TOGGLE"), _cmd(3, "BARRIER_STATE", "info", "numeric", "0")],
     [_cmd(1, "GB_TOGGLE"), _cmd(3, "BARRIER_STATE", "info", "numeric", "0"),
      _cmd(4, "GARAGE_STATE", "info", "numeric", "0")],
-    [_cmd(1, "GB_OPEN"), _cmd(2, "GB_CLOSE"), _cmd(5, "LIGHT_ON")],
-    [_cmd(1, "GB_OPEN")],
+    [_cmd(1, "GB_OPEN"), _cmd(2, "GB_CLOSE"), _cmd(5, "LIGHT_ON"),
+     _cmd(3, "BARRIER_STATE", "info", "numeric", "0")],
+    [_cmd(1, "GB_OPEN"), _cmd(3, "BARRIER_STATE", "info", "numeric", "0")],
+    [_cmd(3, "BARRIER_STATE", "info", "numeric", "0")],
 ])
 def test_ambiguous_barrier_shapes_are_never_a_cover(cmds):
     eq = _eq(GATE_ID, cmds)
@@ -184,7 +205,7 @@ def test_flap_equipment_with_gb_commands_keeps_the_flap_path():
                        _cmd(3, "FLAP_STATE", "info", "binary", "1"), _cmd(4, "GB_TOGGLE")])
     mapping = CoverMapper().map(eq, _snapshot(eq))
     assert mapping.reason_code == "cover_open_close"
-    assert "barrier_mode" not in (mapping.reason_details or {})
+    assert readback.barrier_mode(mapping) is None
     assert "GB_TOGGLE" not in mapping.commands
 
 
@@ -220,11 +241,15 @@ def test_garage_discovery_payload():
     assert payload["optimistic"] is False
 
 
-def test_gate_without_state_stays_optimistic():
-    eq = _eq(GATE_ID, [_cmd(70011, "GB_OPEN"), _cmd(70012, "GB_CLOSE")])
-    payload = _payload(_map(eq))
-    assert payload["device_class"] == "gate"
-    assert payload["optimistic"] is True
+def test_barrier_nature_has_a_single_source():
+    # M1 : découverte et commande lisent toutes deux reason_details["barrier_mode"].
+    mapping = _map(_garage_eq())
+    stripped = replace(mapping, reason_details={"cover_device_class": "garage"})
+    assert readback.barrier_mode(stripped) is None
+    payload = DiscoveryPublisher(MagicMock()).build_discovery_payload(
+        stripped, _snapshot(_garage_eq()))
+    assert payload["device_class"] == "shutter"
+    assert "payload_stop" not in payload
 
 
 def test_flap_discovery_payload_is_unchanged():
@@ -293,9 +318,10 @@ def test_binary_barrier_state_is_never_a_cover_readback():
     assert readback.readback_commands("cover", mapping) == []
 
 
-# --- commandes (D3) -----------------------------------------------------------------
+# --- commandes (D3 bis, B1, I3) -----------------------------------------------------
 
-def _cmd_sync(mapping, state_sync=None):
+def _cmd_sync(mapping, state_sync=None, fresh=None, fresh_ok=True):
+    """CommandSynchronizer avec RPC simulés. ``fresh`` : valeur relue dans Jeedom (I3)."""
     decision = _decision(mapping)
     bridge = MagicMock()
     bridge.is_connected = True
@@ -305,36 +331,56 @@ def _cmd_sync(mapping, state_sync=None):
                                jeedom_api_endpoint="http://127.0.0.1/core/api/jeeApi.php",
                                jeedom_core_apikey="core-apikey")
     sync._execute_exec_cmd = AsyncMock(return_value=True)
+    sync._read_info_value = AsyncMock(return_value=(fresh_ok, fresh))
     return sync, bridge
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("state_value", ["0", "252", "253", "254", "255", None])
-@pytest.mark.parametrize("payload,cmd_id", [("OPEN", 70011), ("CLOSE", 70012)])
-async def test_gate_orders_are_direct_whatever_the_state(payload, cmd_id, state_value):
-    sync, bridge = _cmd_sync(_map(_gate_eq(state_value=state_value)))
-    assert await sync.handle_command_message(f"jeedom2ha/{GATE_ID}/set", payload) is True
-    sync._execute_exec_cmd.assert_awaited_once_with(cmd_id, {})
-    bridge.publish_message.assert_not_called()  # pas d'état optimiste (D5)
+@pytest.mark.parametrize("payload,state_value,allowed", [
+    ("OPEN", "0", True), ("OPEN", "252", True), ("OPEN", "253", True),
+    ("OPEN", "254", False), ("OPEN", "255", False), ("OPEN", None, False), ("OPEN", "7", False),
+    ("CLOSE", "255", True), ("CLOSE", "254", True), ("CLOSE", "253", True),
+    ("CLOSE", "252", False), ("CLOSE", "0", False), ("CLOSE", None, False),
+])
+async def test_direct_mode_is_guarded_by_the_state(payload, state_value, allowed):
+    sync, bridge = _cmd_sync(_map(_direct_eq(state_value=state_value)))
+    ok = await sync.handle_command_message(f"jeedom2ha/{GATE_ID}/set", payload)
+    assert ok is allowed
+    if allowed:
+        sync._execute_exec_cmd.assert_awaited_once_with(70011 if payload == "OPEN" else 70012, {})
+    else:
+        sync._execute_exec_cmd.assert_not_awaited()
+    sync._read_info_value.assert_not_awaited()
+    bridge.publish_message.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_gate_stop_is_refused():
-    sync, _bridge = _cmd_sync(_map(_gate_eq()))
+@pytest.mark.parametrize("payload", ["OPEN", "CLOSE"])
+async def test_gate_with_toggle_never_calls_gb_open_or_gb_close(payload):
+    fresh = "0" if payload == "OPEN" else "255"
+    sync, _bridge = _cmd_sync(_map(_gate_eq(state_value=fresh)), fresh=fresh)
+    assert await sync.handle_command_message(f"jeedom2ha/{GATE_ID}/set", payload) is True
+    sync._execute_exec_cmd.assert_awaited_once_with(70013, {})  # GB_TOGGLE uniquement
+    sync._read_info_value.assert_awaited_once_with(70014)
+
+
+@pytest.mark.asyncio
+async def test_stop_is_refused():
+    sync, _bridge = _cmd_sync(_map(_gate_eq()), fresh="255")
     assert await sync.handle_command_message(f"jeedom2ha/{GATE_ID}/set", "STOP") is False
     sync._execute_exec_cmd.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("payload,state_value,allowed", [
-    ("OPEN", "0", True), ("OPEN", "253", True),
+@pytest.mark.parametrize("payload,fresh,allowed", [
+    ("OPEN", "0", True), ("OPEN", 0, True), ("OPEN", "253", False),
     ("OPEN", "255", False), ("OPEN", "252", False), ("OPEN", "254", False),
-    ("CLOSE", "255", True), ("CLOSE", "253", True),
+    ("CLOSE", "255", True), ("CLOSE", "253", False),
     ("CLOSE", "0", False), ("CLOSE", "252", False), ("CLOSE", "254", False),
-    ("OPEN", None, False), ("CLOSE", None, False), ("OPEN", "1", False), ("CLOSE", "", False),
+    ("OPEN", "1", False), ("CLOSE", "", False),
 ])
-async def test_garage_toggle_is_sent_only_in_the_right_direction(payload, state_value, allowed):
-    sync, bridge = _cmd_sync(_map(_garage_eq(state_value=state_value)))
+async def test_toggle_is_sent_only_from_a_settled_end_position(payload, fresh, allowed):
+    sync, bridge = _cmd_sync(_map(_garage_eq()), fresh=fresh)
     ok = await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", payload)
     assert ok is allowed
     if allowed:
@@ -345,42 +391,155 @@ async def test_garage_toggle_is_sent_only_in_the_right_direction(payload, state_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("state_value,reason", [
-    (None, "barrier_state_unknown"), ("252", "barrier_in_motion"),
-    ("254", "barrier_in_motion"), ("255", "barrier_already_open"),
+@pytest.mark.parametrize("fresh,reason", [
+    ("252", "barrier_in_motion"), ("254", "barrier_in_motion"),
+    ("253", "barrier_stopped_direction_unknown"), ("255", "barrier_already_open"),
+    ("9", "barrier_state_unknown"),
 ])
-async def test_garage_refusal_is_logged(caplog, state_value, reason):
-    sync, _bridge = _cmd_sync(_map(_garage_eq(state_value=state_value)))
+async def test_toggle_refusal_is_logged(caplog, fresh, reason):
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), fresh=fresh)
     with caplog.at_level(logging.INFO):
         assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN") is False
-    assert f"reason_code={reason} action=refuse_barrier_toggle" in caplog.text
+    assert f"reason_code={reason} action=refuse_barrier_order" in caplog.text
     assert f"reason_code={reason} action=reject_command" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_last_jeedom_event_wins_over_the_topology_value():
-    # Topologie : fermé (0). Événement Jeedom reçu depuis : ouvert (255).
-    mapping = _map(_garage_eq(state_value="0"))
+async def test_failed_fresh_read_refuses_the_toggle(caplog):
+    sync, _bridge = _cmd_sync(_map(_garage_eq(state_value="0")), fresh=None, fresh_ok=False)
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert "reason_code=barrier_state_read_failed" in caplog.text
+    # Rien n'est parti : pas de verrou.
+    sync._read_info_value = AsyncMock(return_value=(True, "0"))
+    assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN") is True
+
+
+@pytest.mark.asyncio
+async def test_fresh_read_wins_over_event_and_topology():
+    # Topologie : fermé (0) ; événement : fermé (0) ; Jeedom relu : ouvert (255).
     state_sync = StateSynchronizer(app={"publications": {}}, mqtt_bridge=_Bridge())
-    await state_sync.handle_state_message(GARAGE_ID, 70022, "255")
-    sync, _bridge = _cmd_sync(mapping, state_sync)
+    await state_sync.handle_state_message(GARAGE_ID, 70022, "0")
+    sync, _bridge = _cmd_sync(_map(_garage_eq(state_value="0")), state_sync, fresh="255")
     assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN") is False
     assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "CLOSE") is True
     sync._execute_exec_cmd.assert_awaited_once_with(70021, {})
 
 
 @pytest.mark.asyncio
-async def test_refusal_is_not_replayed_when_the_state_changes_later():
-    # Refus pendant le mouvement : aucun ordre mis en attente ; l'état qui arrive ensuite
-    # ne déclenche rien, un nouvel ordre de HA est nécessaire.
-    mapping = _map(_garage_eq(state_value="254"))
+async def test_two_open_in_a_row_send_a_single_toggle(caplog):
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), StateSynchronizer(
+        app={"publications": {}}, mqtt_bridge=_Bridge()), fresh="0")
+    topic = f"jeedom2ha/{GARAGE_ID}/set"
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(topic, "OPEN") is True
+        assert await sync.handle_command_message(topic, "OPEN") is False
+    sync._execute_exec_cmd.assert_awaited_once_with(70021, {})
+    assert "reason_code=barrier_toggle_in_flight" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_rpc_timeout_still_locks_the_equipment():
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), StateSynchronizer(
+        app={"publications": {}}, mqtt_bridge=_Bridge()), fresh="0")
+    topic = f"jeedom2ha/{GARAGE_ID}/set"
+
+    async def _timeout(cmd_id, options):  # noqa: ARG001
+        sync._last_exec_error_reason = "jeedom_rpc_timeout"
+        return False
+
+    sync._execute_exec_cmd = AsyncMock(side_effect=_timeout)
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    sync._execute_exec_cmd = AsyncMock(return_value=True)
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_state_events_release_the_lock():
     state_sync = StateSynchronizer(app={"publications": {}}, mqtt_bridge=_Bridge())
-    sync, _bridge = _cmd_sync(mapping, state_sync)
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), state_sync, fresh="0")
+    topic = f"jeedom2ha/{GARAGE_ID}/set"
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    # Même valeur que celle lue à l'envoi : le verrou tient.
+    await state_sync.handle_state_message(GARAGE_ID, 70022, "0")
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    # 254 puis 255 : le verrou est levé ; l'état relu (255) autorise alors la fermeture.
+    await state_sync.handle_state_message(GARAGE_ID, 70022, "254")
+    await state_sync.handle_state_message(GARAGE_ID, 70022, "255")
+    sync._read_info_value = AsyncMock(return_value=(True, "255"))
+    assert await sync.handle_command_message(topic, "CLOSE") is True
+    assert sync._execute_exec_cmd.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_lock_expires_after_the_named_delay(monkeypatch):
+    import sync.command as command_module
+
+    assert command_module.BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S == 60.0
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), fresh="0")
+    topic = f"jeedom2ha/{GARAGE_ID}/set"
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    now = command_module.time.monotonic()
+    monkeypatch.setattr(command_module.time, "monotonic", lambda: now + 61.0)
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    assert sync._execute_exec_cmd.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_lock_is_per_equipment():
+    garage = _map(_garage_eq())
+    other = _map(_eq(7003, [_cmd(70031, "GB_TOGGLE"),
+                            _cmd(70032, "GARAGE_STATE", "info", "numeric", "0")]))
+    sync, _bridge = _cmd_sync(garage, fresh="0")
+    sync._app["publications"][other.ha_unique_id] = _decision(other)
+    assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN") is True
+    assert await sync.handle_command_message("jeedom2ha/7003/set", "OPEN") is True
+
+
+@pytest.mark.asyncio
+async def test_refusal_is_not_replayed_when_the_state_changes_later():
+    state_sync = StateSynchronizer(app={"publications": {}}, mqtt_bridge=_Bridge())
+    sync, _bridge = _cmd_sync(_map(_garage_eq()), state_sync, fresh="254")
     assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "CLOSE") is False
     await state_sync.handle_state_message(GARAGE_ID, 70022, "255")
     sync._execute_exec_cmd.assert_not_awaited()
-    assert await sync.handle_command_message(f"jeedom2ha/{GARAGE_ID}/set", "CLOSE") is True
-    sync._execute_exec_cmd.assert_awaited_once_with(70021, {})
+
+
+@pytest.mark.asyncio
+async def test_fresh_read_uses_cmd_exec_cmd_on_the_info_command():
+    class _Resp:
+        status = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def json(self, content_type=None):  # noqa: ARG002
+            return {"jsonrpc": "2.0", "result": {"value": "255", "collectDate": "x"}}
+
+    class _Session:
+        closed = False
+
+        def __init__(self):
+            self.calls = []
+
+        def post(self, endpoint, json):
+            self.calls.append((endpoint, json))
+            return _Resp()
+
+    sync = CommandSynchronizer(app={}, mqtt_bridge=MagicMock(),
+                               jeedom_api_endpoint="http://127.0.0.1/core/api/jeeApi.php",
+                               jeedom_core_apikey="core-apikey")
+    sync._session = _Session()
+    assert await sync._read_info_value(70022) == (True, "255")
+    _endpoint, body = sync._session.calls[0]
+    assert body["method"] == "cmd::execCmd"
+    assert body["params"]["id"] == 70022 and body["params"]["options"] == {}
 
 
 def test_command_and_state_sync_agree_on_reliability():
@@ -448,3 +607,65 @@ def test_removing_the_override_gives_the_cover_back(tmp_path):
     mapping = apply_type_override(_map(_gate_eq()), str(tmp_path))
     assert mapping.ha_entity_type == "cover"
     assert validate_projection("cover", mapping.capabilities).is_valid
+
+
+# --- commandes retenues (I4) --------------------------------------------------------
+
+def _message(topic, payload, retain):
+    message = MagicMock(topic=topic, payload=payload.encode())
+    message.retain = retain
+    return message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topic", [
+    f"jeedom2ha/{GARAGE_ID}/set", "jeedom2ha/12/34/set", "jeedom2ha/12/position/set",
+    "jeedom2ha/12/brightness/set", "jeedom2ha/scenario_5/cmd",
+])
+async def test_retained_command_is_ignored(caplog, topic):
+    import asyncio
+
+    from transport.mqtt_client import MqttBridge
+
+    bridge = MqttBridge()
+    bridge._loop = asyncio.get_running_loop()
+    handler = AsyncMock()
+    bridge.set_command_handler(handler)
+    with caplog.at_level(logging.INFO):
+        bridge._on_message(None, None, _message(topic, "OPEN", True))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    handler.assert_not_awaited()
+    assert "reason_code=retained_command_ignored" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_live_command_is_still_dispatched():
+    import asyncio
+
+    from transport.mqtt_client import MqttBridge
+
+    bridge = MqttBridge()
+    bridge._loop = asyncio.get_running_loop()
+    handler = AsyncMock()
+    bridge.set_command_handler(handler)
+    bridge._on_message(None, None, _message(f"jeedom2ha/{GARAGE_ID}/set", "OPEN", False))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    handler.assert_awaited_once_with(f"jeedom2ha/{GARAGE_ID}/set", "OPEN")
+
+
+@pytest.mark.asyncio
+async def test_retained_ha_birth_message_is_still_honoured():
+    import asyncio
+
+    from transport.mqtt_client import MqttBridge
+
+    bridge = MqttBridge()
+    bridge._loop = asyncio.get_running_loop()
+    bridge._trigger_ha_birth_republish = MagicMock()
+    bridge._on_ha_birth_cb = MagicMock()
+    bridge.set_command_handler(AsyncMock())
+    bridge._on_message(None, None, _message("homeassistant/status", "online", True))
+    await asyncio.sleep(0)
+    bridge._trigger_ha_birth_republish.assert_called_once()

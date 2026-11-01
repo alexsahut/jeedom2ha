@@ -405,8 +405,9 @@ class CoverMapper:
     def _map_barrier(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> Optional[MappingResult]:
         """Projette un portail / garage en ``cover`` (décisions D1-D5 de la story 24.7).
 
-        Éligibilité (D4) : ``GB_OPEN`` **et** ``GB_CLOSE``, ou ``GB_TOGGLE`` **et** un état
-        ``BARRIER_STATE`` / ``GARAGE_STATE`` **numérique** (convention barrière 0/252/253/254/255).
+        Éligibilité (D4 bis) : un état ``BARRIER_STATE`` / ``GARAGE_STATE`` **numérique**
+        (convention barrière 0/252/253/254/255) **et** soit ``GB_TOGGLE`` (mode bascule, prioritaire :
+        ``GB_OPEN`` / ``GB_CLOSE`` sont alors ignorés, D3 bis), soit ``GB_OPEN`` et ``GB_CLOSE`` (mode direct).
         Tout autre cas renvoie ``None`` : la chaîne continue et l'équipement garde son
         comportement actuel (``button`` / ``binary_sensor``). Aucune heuristique sur les noms.
         """
@@ -440,7 +441,14 @@ class CoverMapper:
             return None
 
         state_type, state_cmd = next(iter(states.items()), (None, None))
-        if state_cmd is not None and (state_cmd.sub_type or "").lower() != "numeric":
+        if state_cmd is None:
+            # D4 bis : pas de cover sans état numérique D1 (comportement actuel inchangé).
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d: barrier_without_state (actions=%s) → not a cover",
+                eq.id, sorted(actions),
+            )
+            return None
+        if (state_cmd.sub_type or "").lower() != "numeric":
             # D1 : une info binaire reste un binary_sensor garage_door (comportement inchangé).
             _LOGGER.info(
                 "[MAPPING] eq_id=%d: %s is not numeric (sub_type=%s) → not a cover",
@@ -448,30 +456,32 @@ class CoverMapper:
             )
             return None
 
-        has_direct = "GB_OPEN" in actions and "GB_CLOSE" in actions
-        has_toggle_on_state = "GB_TOGGLE" in actions and state_cmd is not None
-        if not has_direct and not has_toggle_on_state:
-            # AC2 : jamais de cover à deux sens inventés (bascule sans état fiable).
+        # D3 bis : la bascule, quand elle existe, porte seule l'ordre physique ; GB_OPEN /
+        # GB_CLOSE sont alors ignorés (sur un virtuel, ils peuvent n'écrire que l'état).
+        if "GB_TOGGLE" in actions:
+            mode = BARRIER_MODE_TOGGLE
+            commands: Dict[str, JeedomCmd] = dict(actions)
+        elif "GB_OPEN" in actions and "GB_CLOSE" in actions:
+            mode = BARRIER_MODE_DIRECT
+            commands = dict(actions)
+        else:
             _LOGGER.info(
-                "[MAPPING] eq_id=%d: barrier_not_eligible (actions=%s, numeric_state=%s) → not a cover",
-                eq.id, sorted(actions), state_type,
+                "[MAPPING] eq_id=%d: barrier_not_eligible (actions=%s) → not a cover",
+                eq.id, sorted(actions),
             )
             return None
+        commands[state_type] = state_cmd
 
-        mode = BARRIER_MODE_DIRECT if has_direct else BARRIER_MODE_TOGGLE
-        device_class = _BARRIER_STATE_DEVICE_CLASS.get(state_type, "gate")
-        commands: Dict[str, JeedomCmd] = dict(actions)
-        if state_cmd is not None:
-            commands[state_type] = state_cmd
-
-        confidence = "sure" if state_cmd is not None else "probable"
-        reason_code = "cover_barrier_open_close" if has_direct else "cover_barrier_toggle_state"
+        device_class = _BARRIER_STATE_DEVICE_CLASS[state_type]
+        confidence = "sure"
+        reason_code = (
+            "cover_barrier_toggle_state" if mode == BARRIER_MODE_TOGGLE else "cover_barrier_open_close"
+        )
         reason_details = {
             "barrier_mode": mode,
             "cover_device_class": device_class,
+            "barrier_state": state_type,
         }
-        if state_type:
-            reason_details["barrier_state"] = state_type
 
         _LOGGER.info(
             "[MAPPING] eq_id=%d: %s confidence=%s device_class=%s mode=%s",

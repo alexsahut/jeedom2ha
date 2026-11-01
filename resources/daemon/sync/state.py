@@ -233,6 +233,14 @@ class StateSynchronizer:
         pending = self._pending_click_values.get(key)
         return None if pending is None else pending[1]
 
+    def last_event(self, eq_id: Any, cmd_id: Any) -> Optional[Tuple[float, Any]]:
+        """Story 24.7 — ``(monotonic time, value)`` of the last Jeedom event, or None."""
+        try:
+            key = (int(eq_id), int(cmd_id))
+        except (TypeError, ValueError):
+            return None
+        return self._pending_click_values.get(key)
+
     def list_state_targets(self) -> list:
         """Enumerate the published streamed ``(eq_id, cmd_id)`` info commands.
 

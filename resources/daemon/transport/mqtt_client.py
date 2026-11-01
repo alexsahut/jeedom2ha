@@ -190,6 +190,17 @@ class MqttBridge:
                     collector["topics"].append(topic)
                 return
 
+        # Story 24.7 (I4) — un message retenu sur un topic de commande est un ordre périmé
+        # (HA publie ses commandes sans retain) : rejoué à la (re)connexion, il actionnerait un
+        # portail sans demande. Ignoré pour tous les topics de commande, jamais exécuté.
+        if getattr(message, "retain", False) is True and any(
+            mqtt.topic_matches_sub(sub, topic) for sub in COMMAND_SUBSCRIPTION_TOPICS
+        ):
+            _LOGGER.warning(
+                "[MQTT] reason_code=retained_command_ignored topic=%s action=ignore_command", topic,
+            )
+            return
+
         # Story 5.1 — Task 3.2: détecter le birth message Home Assistant
         if topic == HA_STATUS_TOPIC and payload == "online":
             if self._loop is not None and self._on_ha_birth_cb is not None:

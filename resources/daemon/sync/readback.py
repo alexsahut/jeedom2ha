@@ -116,6 +116,22 @@ BARRIER_STATE_TABLE: Dict[int, str] = {
 }
 
 
+BARRIER_MODES: Tuple[str, ...] = ("direct", "toggle_on_state")
+
+
+def barrier_mode(mapping: Any) -> Optional[str]:
+    """Story 24.7 (M1) — the single source of the barrier nature of a ``cover``.
+
+    ``reason_details["barrier_mode"]`` set by ``CoverMapper._map_barrier``; read by the
+    discovery (``device_class``, no stop) and the command sync (order routing). None for
+    every other mapping (FLAP_* covers, overrides from another type).
+    """
+    if getattr(mapping, "ha_entity_type", None) != "cover":
+        return None
+    mode = (getattr(mapping, "reason_details", None) or {}).get("barrier_mode")
+    return mode if mode in BARRIER_MODES else None
+
+
 def barrier_state(value: Any) -> Optional[str]:
     """Translate a barrier value to its cover state; anything else -> None (never invented)."""
     if value is None or isinstance(value, bool):
