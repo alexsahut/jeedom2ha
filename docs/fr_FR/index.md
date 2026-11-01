@@ -425,14 +425,14 @@ Autres limites à connaître :
 
 ### Portails et portes de garage
 
-Un équipement Jeedom qui porte les types « Portail ou garage » est publié comme un **ouvrant** (`cover`) de classe **portail** (`gate`) ou **porte de garage** (`garage`), au lieu d'un simple bouton, dans deux cas seulement :
+Un équipement Jeedom qui porte les types « Portail ou garage » est publié comme un **ouvrant** (`cover`) de classe **portail** (`gate`) ou **porte de garage** (`garage`), au lieu d'un simple bouton, seulement s'il a un **état numérique** (« Portail (ouvrant) Etat » ou « Garage (ouvrant) Etat ») et :
 
 | Commandes de l'équipement Jeedom | Ce que Home Assistant reçoit |
 |---|---|
-| bouton d'ouverture **et** bouton de fermeture (avec ou sans état) | un ouvrant dont « Ouvrir » et « Fermer » appellent directement ces boutons ; le bouton de bascule éventuel n'est pas utilisé |
-| bouton de bascule (toggle) **et** un état **numérique** (portail ou garage) | un ouvrant dont « Ouvrir » n'envoie la bascule que si le dernier état connu est **fermé** ou **arrêté**, et « Fermer » que s'il est **ouvert** ou **arrêté** |
+| un bouton de bascule (toggle), avec ou sans boutons d'ouverture et de fermeture | un ouvrant piloté **par la bascule seule** : « Ouvrir » ne l'envoie que si le portail est **fermé**, « Fermer » que s'il est **ouvert**. Les boutons d'ouverture et de fermeture sont ignorés (sur un équipement virtuel, ils peuvent n'écrire que l'état, sans rien actionner). |
+| des boutons d'ouverture **et** de fermeture, sans bascule | un ouvrant dont « Ouvrir » et « Fermer » appellent ces boutons, sauf vers la position déjà atteinte ou en cours d'atteinte (« Ouvrir » refusé s'il est ouvert ou en ouverture, « Fermer » s'il est fermé ou en fermeture) et sauf état inconnu |
 
-La classe vient de la commande d'état : « Garage (ouvrant) Etat » donne une porte de garage, « Portail (ouvrant) Etat » ou l'absence d'état donne un portail. Les commandes de l'équipement sont toutes reprises par l'ouvrant : il n'y a pas de bouton ni de capteur en double.
+La classe vient de la commande d'état : « Garage (ouvrant) Etat » donne une porte de garage, « Portail (ouvrant) Etat » un portail. Les commandes de l'équipement sont toutes reprises par l'ouvrant : il n'y a pas de bouton ni de capteur en double.
 
 L'état numérique suit la convention « barrière » (celle de Z-Wave et du plugin Homebridge de Jeedom) :
 
@@ -446,12 +446,14 @@ L'état numérique suit la convention « barrière » (celle de Z-Wave et du plu
 
 Limites à connaître :
 
-- **Jamais de bascule à l'aveugle.** Avec une bascule seule, si l'état est inconnu, hors de la table ci-dessus, déjà dans le sens demandé, ou si le portail est **en mouvement** (252, 254), l'ordre est **refusé** et le refus est écrit dans le journal du démon. Il n'est pas mis en attente : quand l'état change ensuite, rien n'est envoyé ; il faut redonner l'ordre depuis Home Assistant.
-- Le dernier état connu est la dernière valeur reçue de Jeedom par le démon ; à défaut, celle de la dernière synchronisation. Si quelqu'un actionne le portail par un autre moyen juste avant l'ordre et que Jeedom ne l'a pas encore signalé, la bascule peut partir dans le mauvais sens : c'est la limite de toute bascule.
-- **Pas d'arrêt** : aucun type Jeedom « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop.
-- **Pas de position.**
-- Une bascule **sans état**, ou avec un état **binaire** (0/1), ne devient pas un ouvrant : l'équipement garde son comportement précédent (bouton, ou capteur d'ouverture de classe « porte de garage »).
-- Avec boutons d'ouverture et de fermeture mais sans état, l'état affiché est supposé (celui du dernier ordre).
+- **Jamais de bascule à l'aveugle.** Juste avant d'envoyer la bascule, le plugin **relit l'état dans Jeedom** ; c'est cette valeur qui décide. L'ordre est **refusé** si la relecture échoue, si l'état est inconnu ou hors de la table, ou si le portail est déjà dans la position demandée. Chaque refus est écrit dans le journal du démon.
+- **Refus pendant un mouvement** (252, 254) : une bascule à ce moment arrêterait le moteur au lieu de l'inverser.
+- **Refus quand le portail est arrêté** (253), dans les deux sens : le sens que prendrait la bascule dépend de la mémoire du scénario Jeedom, que le plugin ne voit pas. Ouvrez ou fermez depuis Jeedom ou la télécommande pour le ramener en position ouverte ou fermée.
+- **Une bascule à la fois, délai de 60 secondes.** Après l'envoi d'une bascule (ou un échec de l'envoi vers Jeedom), toute nouvelle bascule du même équipement est refusée jusqu'à ce que Jeedom signale un état différent de celui lu à l'envoi, ou pendant au plus **60 secondes**. Deux appuis rapides n'envoient donc qu'une impulsion.
+- Un refus n'est **pas mis en attente** : quand l'état change ensuite, rien n'est envoyé ; il faut redonner l'ordre depuis Home Assistant.
+- **Commandes retenues ignorées** : un ordre resté mémorisé par le broker MQTT (message « retenu ») n'est jamais exécuté, pour aucun équipement ; le démon l'écrit dans son journal.
+- **Pas d'arrêt** : aucun type Jeedom « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop. **Pas de position.**
+- Sans état, ou avec un état **binaire** (0/1), l'équipement ne devient pas un ouvrant : il garde son comportement précédent (bouton, ou capteur d'ouverture de classe « porte de garage »).
 - Au passage du bouton à l'ouvrant, le bouton disparaît de Home Assistant et l'ouvrant apparaît avec un nouvel identifiant (`cover.jeedom2ha_<id>` au lieu de `button.jeedom2ha_<id>`) : les automatisations et tableaux de bord qui visaient le bouton sont à reprendre. Imposer le type « button » sur une commande de l'équipement (voir [Choisir le type Home Assistant d'une commande](#choisir-le-type-home-assistant-dune-commande)) permet de garder le bouton.
 
 ### Les badges de synthèse
