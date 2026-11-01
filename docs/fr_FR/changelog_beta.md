@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-01 — Portails et portes motorisées : des ouvrants dans Home Assistant
+
+- Un portail ou une porte motorisée Jeedom (types `GB_OPEN`, `GB_CLOSE`, `GB_TOGGLE` avec un état `BARRIER_STATE` ou `GARAGE_STATE`) qui a des boutons d'ouverture et de fermeture, ou une bascule et un état numérique, est publié comme un ouvrant (`cover`, classe portail `gate` ou porte de stationnement) avec son état réel (ouvert, fermé, en ouverture, en fermeture), au lieu d'un simple bouton. Il devient pilotable par Assist.
+- Avec une bascule seule, l'ordre n'est envoyé que dans le bon sens d'après le dernier état connu ; un état inconnu ou un mouvement en cours fait refuser l'ordre (jamais de bascule à l'aveugle).
+- **Changement d'identifiant** : le bouton `button.jeedom2ha_<id>` est retiré et remplacé par `cover.jeedom2ha_<id>`. Pensez à reprendre les automatisations qui utilisaient le bouton. Détail dans la section « Portails » de la documentation (ce que le plugin publie).
+
+---
+
 # 2026-11-01 — Le pont apparaît sous son nom dans Home Assistant
 
 - Home Assistant affiche désormais vos appareils « Connectés via Jeedom (jeedom2ha) » au lieu de l'adresse du broker MQTT. L'appareil « Jeedom (jeedom2ha) » porte une entité « État du pont » (« Connecté » / « Déconnecté ») qui suit le démon.

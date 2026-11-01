@@ -9,6 +9,7 @@ Jeedom2HA est un plugin Jeedom qui publie vos équipements dans Home Assistant p
 - Vos équipements Jeedom apparaissent dans Home Assistant comme des appareils natifs, rangés dans les mêmes pièces.
 - Les états remontent en continu de Jeedom vers Home Assistant.
 - Les lumières (état, luminosité) et les volets (ouvert/fermé, position) remontent leur état réel dès que l'équipement Jeedom a une commande d'information ; sans elle, Home Assistant affiche un état supposé. Limites notables : un volet à état binaire avec curseur ne remonte pas sa position, et la position n'est jamais inversée. Détail dans la section « Limites » de la [documentation](docs/fr_FR/index.md#limites--état-réel-des-lumières-et-des-volets).
+- Les portails et portes de garage deviennent des ouvrants (ouvrir, fermer, état réel) ; une bascule seule n'est envoyée que dans le bon sens d'après l'état connu, jamais à l'aveugle. Détail dans la section « Portails et portes de garage » de la [documentation](docs/fr_FR/index.md#portails-et-portes-de-garage).
 - Vous pilotez ces équipements depuis Home Assistant, et c'est Jeedom qui exécute l'ordre.
 - Pour chaque équipement, le plugin indique s'il sera publié dans Home Assistant et, sinon, pourquoi, avec la piste pour y remédier.
 - Vous gardez la main : vous pouvez exclure un équipement ou une pièce, ou forcer le type d'un équipement.
