@@ -1,6 +1,6 @@
 # Story 24.7 : Portail et garage : `cover`
 
-Status: draft
+Status: ready-for-dev
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production** (des entités `button` ou `binary_sensor` deviennent un `cover`). Ne rouvre pas `PRODUCT_SCOPE` (`cover` y est déjà). Décision attendue d'Alexandre : **Q10** (remplacement d'entités existantes, option C pour un `cover` optimiste) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -43,7 +43,29 @@ afin de les consulter et de les piloter par Assist.
 | F6 | Le `cover` actuel traduit `OPEN`/`CLOSE`/`STOP` vers `FLAP_UP`/`FLAP_DOWN`/`FLAP_STOP` ; `GB_*` n'y est pas. | `sync/command.py:283-330` |
 | F7 | Le `cover` est optimiste aujourd'hui ; son état réel relève de 23.3. | `sync/state.py:33-48` ; `sync/command.py:403-430` |
 
-## Critères d'acceptation proposés (figés sur Q10 A)
+## Task 0 faite par ClaudeBox le 2026-11-01 (export de production `57f961b` + lecture des commandes dans Jeedom)
+
+| eq | plugin | exposé (effectif) | aujourd'hui dans HA | commandes typées |
+|---|---|---|---|---|
+| **496** (portail) | `virtual` | oui | `button` `jeedom2ha_eq_496` (GB_TOGGLE) | `GB_OPEN` 4545, `GB_CLOSE` 4546, `GB_TOGGLE` 4542, `BARRIER_STATE` 4543 (**info numérique**) |
+| **199** (garage) | `virtual` | oui | `button` `jeedom2ha_eq_199` (GB_TOGGLE) | `GB_TOGGLE` 1624, `GARAGE_STATE` 1626 (**info numérique**) |
+| 455 | `zwavejs` | non | rien (pièce exclue) | `BARRIER_STATE` binaire, 2× `GB_TOGGLE` : **hors périmètre** (équipement physique, non exposé ; règle d'Alexandre du 01/10 : pas de publication jeedom2ha de ce que HA atteint par sa propre intégration) |
+
+- **Les états ne sont pas binaires** : `BARRIER_STATE` et `GARAGE_STATE` sont des infos **numériques** à la convention « barrière » de Z-Wave (celle du plugin Homebridge de Jeedom) : `0` fermé, `252` en fermeture, `253` arrêté, `254` en ouverture, `255` ouvert. Relevés : portail `255` (HA montre aussi un capteur d'ouverture « portail » à `on`), garage `0`. `GB_OPEN` / `GB_CLOSE` du portail écrivent respectivement `254` / `252` dans son état (`updateCmdId`).
+- `GB_TOGGLE` de chaque virtuel écrit `1` dans une info `SCENARIO` : l'ordre réel est porté par un scénario Jeedom. jeedom2ha appelle la commande Jeedom, comme HomeKit, sans connaître le scénario.
+- Aujourd'hui, les états numériques ne sont **pas publiés** (le `binary_sensor` `garage_door` de `mapping/binary_sensor.py:41-42` ne vaut que pour une info binaire) ; seul le `GB_TOGGLE` sort, en `button`.
+
+## Décisions de ClaudeBox pour le `ready-for-dev` (2026-11-01, go d'Alexandre 22:11)
+
+- **D1. État** : une info `BARRIER_STATE` / `GARAGE_STATE` **numérique** se traduit en état de `cover` par la table `0→closed`, `252→closing`, `253→stopped`, `254→opening`, `255→open` ; toute autre valeur → aucun état publié (jamais d'invention). Une info **binaire** reste traitée comme aujourd'hui (`binary_sensor` `garage_door`), hors de cette story.
+- **D2. Classe d'appareil** : `gate` pour un équipement dont l'état est `BARRIER_STATE` (ou, sans état, porteur de `GB_OPEN`/`GB_CLOSE`), `garage` pour `GARAGE_STATE`. Vérifier que HA 2026.9.4 accepte ces deux valeurs de `device_class` pour `cover`.
+- **D3. Ordres** : avec `GB_OPEN` **et** `GB_CLOSE`, `open`/`close` les appellent directement, `GB_TOGGLE` n'est pas utilisé, pas de `stop` (aucun `GB_STOP` sur la box). Avec `GB_TOGGLE` seul : `open` n'envoie la bascule que si le dernier état connu vaut `0` (fermé) ou `253` (arrêté) ; `close` seulement s'il vaut `255` (ouvert) ou `253` ; état inconnu ou mouvement en cours (`252`, `254`) : **aucun ordre**, refus journalisé. Jamais de bascule à l'aveugle (AC2).
+- **D4. Éligibilité** (AC2) : `cover` seulement si (`GB_OPEN` et `GB_CLOSE`) ou (`GB_TOGGLE` et un état numérique D1). Sinon comportement actuel inchangé.
+- **D5. `optimistic: false`** quand un état D1 existe (règle de 23.3) ; pas de `cover` optimiste.
+- **D6. Remplacement** (Q10 A) : la découverte `button` de `jeedom2ha_eq_496` et `jeedom2ha_eq_199` est vidée (retenu vide) quand le `cover` est publié ; l'inventaire des références HA est relevé avec Alexandre avant le déploiement.
+- **D7. Preuve terrain** : ouverture puis fermeture **réelles** du portail et du garage **en présence d'Alexandre** (organe de sécurité) ; pas d'équipement de test équivalent sur la box.
+
+## Critères d'acceptation (figés sur Q10 A)
 
 - **AC1.** Un équipement qui porte `GB_OPEN` et `GB_CLOSE` (ou `GB_TOGGLE`) est projeté en `cover` de classe portail ou garage (valeurs exactes lues dans la documentation de HA, D4), avec ses commandes d'ouverture et de fermeture traduites par `sync/command.py`.
 - **AC1 bis.** Cas de référence : le portail (`GB_OPEN`, `GB_CLOSE`, `GB_TOGGLE`, `BARRIER_STATE`) donne un `cover` avec ordres d'ouverture et de fermeture directs, `GB_TOGGLE` non utilisé pour l'ouverture ; le garage (`GB_TOGGLE`, `GARAGE_STATE`) donne un `cover` dont l'ordre d'ouverture envoie la bascule **seulement si** l'état dit fermé, et inversement, jamais en aveugle.
@@ -58,7 +80,7 @@ afin de les consulter et de les piloter par Assist.
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Gel du référentiel** : matrice `GB_*` / `BARRIER_STATE` / `GARAGE_STATE` → `cover` (classes de HA 2026.9.4, charge utile d'ordre, topic d'état) ; liste, par ClaudeBox, des équipements concernés, de leurs commandes réelles et de leur chemin actuel (`binary_sensor` ou `button`).
+- [x] **Task 0 — Gel du référentiel** (ClaudeBox, 01/11 : voir « Task 0 » et D1-D7) : matrice `GB_*` / `BARRIER_STATE` / `GARAGE_STATE` → `cover` (classes de HA 2026.9.4, charge utile d'ordre, topic d'état) ; liste, par ClaudeBox, des équipements concernés, de leurs commandes réelles et de leur chemin actuel (`binary_sensor` ou `button`).
 - [ ] **Task 1 — Mapper** : étendre `CoverMapper` ou créer un mapper de portail partageant `CoverCapabilities` (choix au `create-story`).
 - [ ] **Task 2 — Commande** : traduction des ordres, logique de bascule fondée sur l'état (AC2).
 - [ ] **Task 3 — Publication** : classe d'appareil, `default_entity_id`.
@@ -81,3 +103,4 @@ Le chemin actuel de chaque équipement mesuré (D5) ; les classes d'appareil acc
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q10 A (remplacement) ; option C écartée : la story attend 23.3.
+- 2026-11-01 — Task 0 (ClaudeBox) : états numériques à la convention barrière ; décisions D1-D7 ; 23.3 `done` ; `ready-for-dev` (go d'Alexandre 22:11).
