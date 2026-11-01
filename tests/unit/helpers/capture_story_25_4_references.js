@@ -130,7 +130,9 @@ function registryOf(source) {
   const stepRe = /\b(?:atStep|waitAtStep)\(\s*helpers\s*,\s*(['"`]?)([A-Za-z0-9_${}]+)\1\s*,\s*(['"`])((?:\\.|(?!\3)[\s\S])*?)\3/g;
   while ((m = stepRe.exec(source))) steps.push(`${m[2]}:${m[4]}`);
   const declared = {};
-  ['declaredEquipments', 'declaredBascules', 'declaredPublicationOverrides', 'declaredRescan'].forEach((name) => {
+  // Story 24.11 : `dynamicTarget` est relevé comme une déclaration (une cible choisie à l'exécution ne peut pas
+  // redevenir silencieusement statique, ni l'inverse).
+  ['declaredEquipments', 'declaredBascules', 'declaredPublicationOverrides', 'declaredRescan', 'dynamicTarget'].forEach((name) => {
     const re = new RegExp('export const ' + name + ' = ([\\s\\S]*?);\\n');
     const found = re.exec(source);
     if (found) declared[name] = found[1].replace(/\s+/g, ' ').trim();

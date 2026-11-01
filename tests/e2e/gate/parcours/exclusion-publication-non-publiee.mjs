@@ -1,5 +1,8 @@
 /** Story 20-2 : exclusion simulée puis retrait, sur un eq id non publié.
  *
+ * Story 24.11 : l'équipement est choisi à l'exécution (premier éligible, jamais l'eq 287) puis déclaré
+ * par `helpers.declareTarget` avant toute écriture ; les mentions de l'eq 287 ci-dessous sont historiques.
+ *
  * Revue ClaudeBox X4 (point 2) : la surface ne demande confirmation (modale
  * Bootbox) que pour une entité DÉJÀ PUBLIÉE (`shouldConfirmPublication`) — un
  * clic sur « Confirmer » après « Exclure » sur un équipement non publié
@@ -30,14 +33,25 @@
 export const name = 'exclusion-publication-non-publiee';
 
 // Story 25.1 : le réglage de publication est un contrôle segmenté « Automatique | Toujours | Jamais »
-// (il remplace « Exclure », « Forcer » et « Revenir au mode automatique »). L'équipement 287 n'a
+// (il remplace « Exclure », « Forcer » et « Revenir au mode automatique »). L'équipement cible n'a
 // qu'une entité : pas d'en-tête de groupe, seul le contrôle d'équipement existe. Les positions sont des
 // radios ; la position active porte `aria-checked="true"`.
 const EXCLUDE_LABEL = 'Jamais';
 const REVERT_LABEL = 'Automatique';
-export const declaredEquipments = { '287': { commands: [] } };
+// Story 24.11 : la cible n'est plus figée (l'eq 287 porte depuis le 19/10 un réglage posé à la main). Le
+// parcours la choisit à l'exécution, en lecture seule, puis la déclare par `helpers.declareTarget` AVANT
+// toute écriture ; le lanceur refuse un id portant un réglage dans le témoin « avant ». Les déclarations
+// statiques restent donc vides.
+export const dynamicTarget = true;
+export const declaredEquipments = {};
 export const declaredBascules = [];
-export const declaredPublicationOverrides = { '287': { commands: [] } };
+export const declaredPublicationOverrides = {};
+// Exclusion permanente : l'eq 287 n'est jamais retenu, même sans réglage (consigne du mainteneur).
+export const EXCLUDED_TARGETS = ['287'];
+// « Ligne non publiée » : seuls ces mots d'état de l'arbre sont retenus. « Publié » et « À appliquer » sont
+// écartés (une exclusion y demanderait confirmation), comme « Exclu » et « Désactivé » (réglage indisponible
+// ou déjà neutralisé ailleurs) : le parcours ne prouverait rien de fiable sur ces lignes.
+const ELIGIBLE_STATES = ['blocked', 'nothing_to_publish'];
 
 /** Attend une séquence ordonnée d'entrées de l'intercepteur, sans délai implicite. */
 async function waitForJournal(journalEntries, start, expected) {
@@ -88,45 +102,92 @@ async function closeRoomModal(view) {
   await view.waitFor({ state: 'hidden' });
 }
 
-// Story 20-2 (point 4) : l'eq 287 n'est désigné que par son id, jamais par un
-// nom de pièce. On tente d'abord directement la carte de son objet connu
-// (id d'objet 25) ; à défaut on revient à la page et on retombe sur le parcours de
-// toutes les cartes, en revenant à la page après chaque pièce sans résultat avant de
-// passer à la suivante. Story 25.4 : la pièce s'ouvre dans la vue de travail ; l'équipement est une ligne de l'arbre.
-async function findEquipmentRow(page, helpers, eqId) {
+/** Story 24.11 : mot d'état de la ligne d'arbre (classe `j2ha-state-<état>`), ou null. */
+async function rowState(item) {
+  return item.evaluate((node) => {
+    if (node.classList.contains('j2ha-wv-eq-disabled')) return null;
+    const word = node.querySelector(':scope > .j2ha-wv-row .j2ha-state-word');
+    if (!word) return null;
+    const match = Array.from(word.classList).find((name) => name.startsWith('j2ha-state-') && name !== 'j2ha-state-word');
+    return match ? match.slice('j2ha-state-'.length) : null;
+  });
+}
+
+/** Story 24.11 : vrai si le détail affiché remplit toutes les conditions (lecture seule, aucune écriture). */
+async function panelEligible(panel) {
+  await panel.waitFor({ state: 'visible', timeout: 10_000 });
+  await panel.locator('.j2ha-eq-controls .j2ha-seg-btn').first().waitFor({ state: 'attached', timeout: 10_000 });
+  const automatic = await panel.locator('.j2ha-eq-controls .j2ha-seg-btn').evaluateAll((nodes, label) => nodes.some(
+    (node) => node.textContent.trim() === label && node.getAttribute('aria-checked') === 'true',
+  ), REVERT_LABEL);
+  if (!automatic) return false;
+  if (await panel.locator('.j2ha-group-head').count() !== 0) return false;
+  return await panel.locator('tr.mapping-override-cmd').count() >= 1;
+}
+
+/**
+ * Story 24.11 : examine, dans la vue ouverte, les lignes d'équipement pas encore vues, dans l'ordre de l'arbre.
+ * Un candidat est sélectionné par un vrai clic (relecture `getMappingOverrides`, lecture autorisée) ; rien
+ * n'est écrit. Rend l'id de la première cible éligible, ou null.
+ */
+async function scanOpenView(page, view, seen) {
+  const items = view.locator('.j2ha-wv-eq[data-eq-id]');
+  const count = await items.count();
+  for (let i = 0; i < count; i += 1) {
+    const item = items.nth(i);
+    const eqId = await item.getAttribute('data-eq-id');
+    if (!eqId || !/^[0-9]+$/.test(eqId) || seen.has(eqId)) continue;
+    seen.add(eqId);
+    if (EXCLUDED_TARGETS.includes(eqId)) continue;
+    if (!ELIGIBLE_STATES.includes(await rowState(item))) continue;
+    await item.locator('.j2ha-wv-row').click();
+    const panel = page.locator(`#j2ha_workView .j2ha-eq-panel[data-eq-id="${eqId}"]`);
+    if (await panelEligible(panel).catch(() => false)) return eqId;
+  }
+  return null;
+}
+
+// Story 20-2 (point 4) : l'équipement n'est désigné que par son id, jamais par un nom de pièce.
+// Story 24.11 : la cible est la PREMIÈRE ligne éligible. On examine d'abord la carte de l'objet
+// historiquement connu (id d'objet 25) ; à défaut on revient à la page et on parcourt toutes les cartes,
+// en revenant à la page après chaque pièce sans résultat avant de passer à la suivante (les lignes déjà
+// examinées ne le sont pas deux fois). Story 25.4 : la pièce s'ouvre dans la vue de travail ; l'équipement
+// est une ligne de l'arbre. Aucune cible : échec explicite `aucune-cible-eligible`.
+async function findTarget(page, helpers) {
   const view = page.locator('#j2ha_workView');
+  const seen = new Set();
   const knownCard = page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="25"]');
   if (await knownCard.count() > 0) {
-    const row = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
+    const eqId = await waitAtStep(helpers, 1, 'ouverture-piece-connue', async () => {
       await knownCard.click();
       await view.waitFor({ state: 'visible' });
-      return view.locator(`.j2ha-wv-eq[data-eq-id="${eqId}"]`);
+      return scanOpenView(page, view, seen);
     });
-    if (await row.count() > 0) {
-      return row;
-    }
+    if (eqId) return eqId;
     await waitAtStep(helpers, 2, 'fermeture-piece-connue', () => closeRoomModal(view));
   }
 
   const roomCards = page.locator('#j2ha_roomCards .j2ha-room-card');
   const roomCount = await roomCards.count();
   for (let i = 0; i < roomCount; i += 1) {
-    await waitAtStep(helpers, `3_${i}`, `ouverture-piece-${i}`, async () => {
+    const eqId = await waitAtStep(helpers, `3_${i}`, `ouverture-piece-${i}`, async () => {
       await roomCards.nth(i).click();
       await view.waitFor({ state: 'visible' });
+      return scanOpenView(page, view, seen);
     });
-    const row = view.locator(`.j2ha-wv-eq[data-eq-id="${eqId}"]`);
-    if (await row.count() > 0) {
-      return row;
-    }
+    if (eqId) return eqId;
     await waitAtStep(helpers, `4_${i}`, `fermeture-piece-${i}`, () => closeRoomModal(view));
   }
-  throw new Error('eq-introuvable');
+  throw new Error('aucune-cible-eligible');
 }
 
 export async function run(page, { helpers }) {
-  const row = await findEquipmentRow(page, helpers, '287');
-  const panel = page.locator('#j2ha_workView .j2ha-eq-panel[data-eq-id="287"]');
+  const eqId = await findTarget(page, helpers);
+  // Déclaration AVANT toute écriture : sans elle, la politique refuse l'exclusion simulée.
+  helpers.declareTarget(eqId);
+  const row = page.locator(`#j2ha_workView .j2ha-wv-eq[data-eq-id="${eqId}"]`);
+  if (await row.count() === 0) throw new Error('eq-introuvable');
+  const panel = page.locator(`#j2ha_workView .j2ha-eq-panel[data-eq-id="${eqId}"]`);
   // « depliage » : sélection de l'équipement dans l'arbre (clic réel) ; son détail est déjà déplié.
   await waitAtStep(helpers, 5, 'depliage', async () => {
     await row.locator('.j2ha-wv-row').click();
@@ -151,15 +212,15 @@ export async function run(page, { helpers }) {
   // Story 22.2 / 25.1 (AC3) : équipement à une seule entité — aucun en-tête de groupe (donc aucun
   // contrôle d'entité en doublon), les trois positions du contrôle d'équipement, compteurs de
   // l'équipement lus (zéros masqués).
-  if (await panel.locator('.j2ha-group-head').count() !== 0) throw new Error('eq-287-plusieurs-entites');
+  if (await panel.locator('.j2ha-group-head').count() !== 0) throw new Error('eq-cible-plusieurs-entites');
   if (await panel.locator('.j2ha-group-head button').count() !== 0) throw new Error('actions-entite-doublons-visibles');
   helpers.record('actions_entite_masquees', true);
   await waitAtStep(helpers, '6a', 'compteurs-equipement', () => panel.locator('.j2ha-eq-counter').first().waitFor({ state: 'visible' }));
   const counterTexts = await panel.locator('.j2ha-eq-counter').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
   if (counterTexts.length < 1 || !counterTexts.every((text) => /^\d+ (publiées?|à appliquer|bloquées?|ignorées?|exclues?)$/.test(text))) {
-    throw new Error('compteurs-eq-287-illisibles');
+    throw new Error('compteurs-eq-cible-illisibles');
   }
-  counterTexts.forEach((text, index) => helpers.record(`eq_287_compteur_${index + 1}`, text));
+  counterTexts.forEach((text, index) => helpers.record(`eq_cible_compteur_${index + 1}`, text));
 
   const controls = panel.locator('.j2ha-eq-controls');
   // La modale de pièce de Jeedom reste `aria-hidden="true"` une fois ouverte,
@@ -198,8 +259,8 @@ export async function run(page, { helpers }) {
   // l'équipement : « Jamais » devient la position courante (déjà exclu), « Automatique »
   // reste le moyen de retirer l'exclusion (point 3).
   await waitAtStep(helpers, 9, 'etat-boutons-apres-exclusion', async () => {
-    await waitForSegmentState(page, '287', EXCLUDE_LABEL, { checked: true, disabled: false });
-    await waitForSegmentState(page, '287', REVERT_LABEL, { checked: false, disabled: false });
+    await waitForSegmentState(page, eqId, EXCLUDE_LABEL, { checked: true, disabled: false });
+    await waitForSegmentState(page, eqId, REVERT_LABEL, { checked: false, disabled: false });
   });
 
   const afterSave = helpers.journalEntries().length;
@@ -213,7 +274,7 @@ export async function run(page, { helpers }) {
   ]));
   // Après le retrait : « Jamais » n'est plus la position courante mais redevient choisissable.
   await waitAtStep(helpers, 12, 'etat-bouton-final', async () => {
-    await waitForSegmentState(page, '287', EXCLUDE_LABEL, { checked: false, disabled: false });
-    await waitForSegmentState(page, '287', REVERT_LABEL, { checked: true, disabled: false });
+    await waitForSegmentState(page, eqId, EXCLUDE_LABEL, { checked: false, disabled: false });
+    await waitForSegmentState(page, eqId, REVERT_LABEL, { checked: true, disabled: false });
   });
 }
