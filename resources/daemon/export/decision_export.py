@@ -58,6 +58,12 @@ _ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_contr
 
 _PUBLICATION_VALUES = frozenset({"exclude", "force_publish"})
 
+# Story 24.6 — classement de parité des ventilateurs et aspirateurs (D1, D2).
+PARITY_CLASS_FUNCTIONAL_EQUIVALENT = "functional_equivalent"
+PARITY_ALERT_FAN_SPEED_PRESENT = "fan_speed_present"
+_FAN_ONOFF_GENERIC_TYPES = frozenset({"FAN_STATE", "FAN_ON", "FAN_OFF"})
+_FAN_SPEED_GENERIC_TYPES = frozenset({"FAN_SPEED", "FAN_SPEED_STATE", "ROTATION", "ROTATION_STATE"})
+
 
 @dataclass
 class DecisionMemo:
@@ -290,6 +296,34 @@ def _command_override(applied: Dict[str, Any], cmd_id: int) -> Optional[Dict[str
     return {"ha_type": entry.get("ha_type"), "publication": entry.get("publication")}
 
 
+def compute_parity_class(
+    homekit_exposed_effective: Optional[bool], commands: Iterable[Dict[str, Any]]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Story 24.6 — ``(parity_class, parity_alert)`` d'un équipement, calcul pur (D1, D2).
+
+    ``commands`` : lignes ``commands`` de l'export (``generic_type``, ``decision``, ``ha_type``).
+    Hors exposition HomeKit effective (``False`` ou ``None``) : ``(None, None)``.
+    Exposé avec un type de vitesse (``FAN_SPEED``, ``FAN_SPEED_STATE``, ``ROTATION``,
+    ``ROTATION_STATE``), publié ou non : ``(None, "fan_speed_present")``.
+    Exposé, sans vitesse, avec au moins une commande ``FAN_STATE``/``FAN_ON``/``FAN_OFF``
+    publiée en ``switch`` : ``("functional_equivalent", None)``. Sinon ``(None, None)``.
+    Lecture seule : aucune décision de mapping ni de publication n'en dépend.
+    """
+    if homekit_exposed_effective is not True:
+        return None, None
+    rows = list(commands)
+    if any(row.get("generic_type") in _FAN_SPEED_GENERIC_TYPES for row in rows):
+        return None, PARITY_ALERT_FAN_SPEED_PRESENT
+    if any(
+        row.get("generic_type") in _FAN_ONOFF_GENERIC_TYPES
+        and row.get("decision") == DECISION_PUBLISHED
+        and row.get("ha_type") == "switch"
+        for row in rows
+    ):
+        return PARITY_CLASS_FUNCTIONAL_EQUIVALENT, None
+    return None, None
+
+
 def _equipment_row(eq, record, mapping, publication, snapshot, publisher, streamed, current_overrides):
     missing = record is None
     applied = (record or {}).get("overrides") or _empty_overrides()
@@ -324,6 +358,7 @@ def _equipment_row(eq, record, mapping, publication, snapshot, publisher, stream
             "override": _command_override(applied, cmd.id),
         })
 
+    parity_class, parity_alert = compute_parity_class(eq.homekit_exposed_effective, commands)
     return {
         "kind": "equipment",
         "key": f"eq:{eq.id}",
@@ -336,6 +371,7 @@ def _equipment_row(eq, record, mapping, publication, snapshot, publisher, stream
         "homekit_exposed": eq.homekit_exposed,
         "homekit_exposed_source": eq.homekit_exposed_source,
         "homekit_exposed_effective": eq.homekit_exposed_effective,
+        "parity_class": parity_class,
         "decision": DECISION_NOT_PUBLISHED if missing else record["decision"],
         "reason": REASON_NO_SYNC_DECISION if missing else record["reason"],
         "step": None if missing else record["step"],
@@ -344,6 +380,8 @@ def _equipment_row(eq, record, mapping, publication, snapshot, publisher, stream
         "pending_changes": now_overrides != applied,
         "entities": _equipment_entities(publisher, eq.id, mapping, publication, snapshot, streamed),
         "commands": commands,
+        # champ additif, absent hors alerte (D2)
+        **({"parity_alert": parity_alert} if parity_alert is not None else {}),
     }
 
 

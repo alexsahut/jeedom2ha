@@ -33,6 +33,7 @@ Documentation de développement (interne). L'export rend lisible, sans SSH, **ce
     "kind": "equipment", "key": "eq:67", "eq_id": 67, "logical_id": null,
     "plugin": "<eq_type>", "piece_id": 12, "enabled": true, "generic_type": null,
     "homekit_exposed": true, "homekit_exposed_source": "equipement",
+    "homekit_exposed_effective": true, "parity_class": null,
     "decision": "published", "reason": "sure", "step": "4",
     "exclusion_source": null,
     "overrides": { "publication": null, "types": {} },
@@ -54,7 +55,7 @@ Documentation de développement (interne). L'export rend lisible, sans SSH, **ce
 }
 ```
 
-Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `null`.
+Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `null`. **Seule exception** : `parity_alert` (story 24.6), présent uniquement quand l'alerte est levée.
 
 ### En-tête
 
@@ -74,6 +75,8 @@ Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `nu
 | `eq_id`, `logical_id`, `plugin`, `piece_id`, `enabled`, `generic_type` | Lus dans le snapshot de topologie (`plugin` = `eq_type`, identifiant de plugin ; `piece_id` `null` sans pièce). |
 | `homekit_exposed`, `homekit_exposed_source` | Signal de la story 24.1 (tri-état : `true`, `false`, `null` inconnu). |
 | `homekit_exposed_effective` | Story 24.4 (champ additif, `schema_version` reste 1) : `homekit_exposed` ET `enabled`. `enabled=false` ⇒ `false` ; `enabled=true` ⇒ le réglage (`true`, `false`, `null` inconnu, jamais traité comme exposé). Sur un scénario : même règle avec `active`. |
+| `parity_class` | Story 24.6 (champ additif, `schema_version` reste 1) : `"functional_equivalent"` ou `null`. Vaut `"functional_equivalent"` quand `homekit_exposed_effective` est `true` ET qu'au moins une commande `FAN_STATE`, `FAN_ON` ou `FAN_OFF` a `decision: "published"` et `ha_type: "switch"` ET qu'aucune commande ne porte `FAN_SPEED`, `FAN_SPEED_STATE`, `ROTATION` ni `ROTATION_STATE`. `null` sinon : non exposé, exposition inconnue ou non effective (équipement désactivé), non publié, autre famille, ou présence d'un type de vitesse. Calcul pur (`compute_parity_class`, `export/decision_export.py`) sur les lignes `commands[]` du même équipement ; lecture seule, aucune décision n'en dépend. Absent des scénarios. |
+| `parity_alert` | Story 24.6 (champ additif, **absent sinon**) : `"fan_speed_present"` quand `homekit_exposed_effective` est `true` et qu'une commande de l'équipement porte `FAN_SPEED`, `FAN_SPEED_STATE`, `ROTATION` ou `ROTATION_STATE`, publiée ou non. `parity_class` vaut alors `null`. Voir « Ventilateurs et aspirateurs » ci-dessous. |
 | `decision` | `published` : le principal est à publier. `partial` : principal refusé mais au moins un secondaire à publier (forme 579/585). `not_published` sinon. C'est le **verdict** (étapes 1 à 4 et périmètre), pas l'exécution : voir `discovery_published`. |
 | `reason`, `step` | Code canonique tel que produit, sans traduction (`excluded_plugin`, `disabled_eqlogic`, `no_mapping`, `ambiguous_skipped`, `publication_excluded_eqlogic`, `sure`…) et niveau du premier échec : `"1"` éligibilité, `"2"` mapping, `"2b"` override d'exclusion, `"3"` projection HA, `"4"` périmètre produit, politique de confiance ou nominal, `"scope"` filtre de périmètre publié (alors `reason: "excluded"`). `reason: "no_sync_decision"` et `step: null` : équipement sans verdict mémorisé (jamais synchronisé). |
 | `exclusion_source` | `eqlogic`, `plugin`, `object` ou `null` (priorité eqlogic > plugin > object, inchangée ; pas de raison `voie_native`). |
@@ -110,6 +113,12 @@ Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `nu
 Tous les scénarios, actifs et inactifs. `kind` `"scenario"`, `key` `"scenario:<scenario_id>"`, `scenario_id`, `active`. `entity` : le bouton HA du scénario (mêmes champs qu'une entité, sans `role`, `state_source` toujours `none`), décrit même pour un scénario inactif. `decision` `published` et `reason` `scenario_button` pour un scénario actif ; `not_published` et `scenario_inactive` pour un inactif (aucun bouton dans HA). `homekit_exposed` vient de la story 24.1.
 
 **Scénarios « non projetés » : un artefact de mesure (story 24.5).** Avant 24.2, la mesure de parité HomeKit comptait comme non projetés les scénarios déclenchés à la voix dans Apple Maison. Cet écart venait de l'outil de mesure, pas du plugin : il ne lisait pas les boutons de scénario. Ces scénarios restaient en plus hors du contrat de décision. Un scénario **actif** est toujours projeté en `button` (`jeedom2ha_scenario_<id>`). Pour comparer avec Home Assistant, on joint sur `kind` + `key` (`scenario:<id>`) ou sur `unique_id`, jamais sur le nom. L'exposition d'un de ces boutons à Assist se règle dans Home Assistant : le plugin n'y touche pas.
+
+### Ventilateurs et aspirateurs : équivalents fonctionnels (story 24.6)
+
+Un équipement `FAN_*` sans ordre de vitesse (marche, arrêt, état ; aspirateurs compris) **reste publié en `switch`** : il est fonctionnellement équivalent à ce qu'expose HomeKit, d'où `parity_class: "functional_equivalent"`. Le plugin n'ouvre ni `fan` ni `vacuum` pour ces équipements, et aucun `entity_id` ni `unique_id` ne change.
+
+La présence de `FAN_SPEED`, `FAN_SPEED_STATE`, `ROTATION` ou `ROTATION_STATE` sur un équipement exposé (effectif) est **le seul déclencheur** d'une nouvelle story : l'ouverture gouvernée du composant `fan` (story 18-1). L'export la signale par `parity_alert: "fan_speed_present"`, visible sans lire le code ; le classement ne change rien à la publication.
 
 ## D'où viennent les décisions
 
