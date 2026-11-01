@@ -69,7 +69,8 @@ Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom.
 ## Configuration
 
 Depuis la page du plugin, cliquez sur la vignette **« Configuration »** (bloc « Gestion »).
-<!-- CAPTURE-A-PRENDRE: page de configuration -->
+<!-- CAPTURE: page de configuration -->
+![Page de configuration du plugin](images/configuration.png)
 
 ### Connexion au broker MQTT
 
@@ -124,7 +125,8 @@ Si, après un redémarrage du broker MQTT, Home Assistant ne retrouve pas ses en
 ## La page principale
 
 La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « Configuration »), la barre de santé et ses actions, puis la configuration par pièce (une ligne d'aide, le bloc de la maison et les cartes de pièce). Aucun bandeau bleu n'ouvre plus la page.
-<!-- CAPTURE-A-PRENDRE: page principale du plugin -->
+<!-- CAPTURE: page principale du plugin -->
+![Page principale du plugin : état, jauge maison et cartes de pièce par étage](images/page-principale.png)
 
 ### La barre de santé
 
@@ -210,7 +212,8 @@ Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-j
 Chaque pièce qui contient au moins un équipement a une carte portant l'icône et la couleur choisies dans Jeedom pour l'objet, son nom, « n / t publiés », une petite jauge segmentée et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange), « N à appliquer » (bleu), « N non lus » (gris) et « N exclus » (gris, après les autres : l'infobulle et le nom accessible de la carte donnent la ventilation par cause, comme dans le détail de la pièce). Une carte qui contient au moins un équipement bloqué porte un liseré orange. Les cartes sont **regroupées par objet parent** (sous-titre du groupe, ordre de Jeedom conservé). La carte **« Sans pièce »** rassemble les équipements qui n'ont pas de pièce, en dernier. Les équipements **désactivés dans Jeedom sont comptés et listés**. Les équipements du plugin jeedom2ha lui-même sont écartés. Chaque carte (sauf « Sans pièce ») a un menu « ⋯ » pour exclure la pièce ou ne plus l'exclure (voir [Exclure une pièce](#exclure-une-pièce)) ; une pièce exclue affiche « Pièce exclue » à la place de « n / t publiés ». S'il n'y a aucune pièce avec équipement, la page affiche « Aucune pièce avec équipement trouvée. »
 
 Les cartes sont opérables au clavier (Entrée ou Espace ouvre la vue de travail sur la pièce, seule dans l'arbre). Un équipement dont la lecture a échoué, ou que le démon ne connaît pas encore, est compté **« non lu »** : il n'est jamais compté publié, bloqué, exclu ni désactivé.
-<!-- CAPTURE-A-PRENDRE: cartes de pièce -->
+<!-- CAPTURE: cartes de pièce -->
+![Cartes de pièce groupées par étage](images/cartes-de-piece.png)
 
 ### La vue de travail
 
@@ -229,7 +232,8 @@ Cliquer sur une carte de pièce, sur une puce ou un segment de la jauge de la ma
 **Le détail d'un équipement** s'affiche quand vous choisissez un équipement dans l'arbre ou dans la liste « À traiter dans cette pièce ». Le plugin ne lit la configuration **que de cet équipement** et seulement à ce moment (« Chargement… » s'affiche) ; choisir de nouveau le même équipement la relit. Si la lecture échoue, le détail indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). » et n'offre aucune action. Un seul équipement est affiché à la fois ; son en-tête (nom, badge, réglage de publication, « Appliquer » et menu « ⋯ ») reste collé en haut pendant que vous faites défiler le tableau, sans autre barre de défilement dans le détail. Son contenu est décrit ci-dessous.
 
 **Sur tablette et petit écran** (en dessous de 980 pixels de large), l'arbre devient un **tiroir** : le bouton **« Pièces »** l'ouvre au-dessus du détail, un autre clic ou le choix d'une pièce ou d'un équipement le referme ; le tiroir est ouvert tant que rien n'est choisi. Le détail occupe toute la largeur, sans défilement horizontal. Tourner la tablette ne perd ni la sélection, ni le filtre, ni la recherche, ni votre position, et ne refait aucune requête. Les lignes, les puces et les boutons sont assez grands pour le doigt.
-<!-- CAPTURE-A-PRENDRE: vue de travail -->
+<!-- CAPTURE: vue de travail -->
+![Vue de travail filtrée sur une pièce, un équipement sélectionné](images/vue-de-travail.png)
 
 ### Le détail d'un équipement
 
@@ -249,7 +253,8 @@ Dessous, de haut en bas :
 - **Une ligne repliée pour les commandes ignorées** : « 5 commandes ignorées, sans équivalent dans Home Assistant : … ». Elle se déplie au clic ou au clavier. Pour une commande qui n'est pas prise en charge par le plugin, la ligne ajoute « non pris en charge par le plugin ».
 
 Un équipement sans commande affiche « Aucune commande à configurer pour cet équipement. »
-<!-- CAPTURE-A-PRENDRE: détail d'un équipement -->
+<!-- CAPTURE: détail d'un équipement -->
+![Détail d'un équipement publié et son réglage Automatique / Toujours / Jamais](images/detail-equipement.png)
 
 ### Le tableau des commandes
 
@@ -265,7 +270,8 @@ Le tableau a **quatre colonnes**, une ligne par commande, dans l'ordre de Jeedom
 **Regroupement par entité.** Quand l'équipement a plusieurs entités Home Assistant, chaque entité forme un groupe : une ligne d'en-tête (le domaine en français avec le terme technique en petit, par exemple « Lumière *light* », le nombre de commandes, le contrôle « Automatique | Toujours | Jamais » de **cette entité**), puis ses commandes. Les domaines sont traduits : Lumière (`light`), Interrupteur (`switch`), Capteur (`sensor`), Capteur binaire (`binary_sensor`), Volet (`cover`), Thermostat (`climate`), Bouton (`button`), Alarme (`alarm_control_panel`). Sur un équipement qui n'a qu'une seule entité, il n'y a pas d'en-tête de groupe : le réglage de l'équipement suffit. L'en-tête reste affiché si un réglage a été posé sur la commande de cette seule entité.
 
 Les commandes **ignorées** (qu'aucun type Home Assistant ne prend en charge) n'apparaissent pas dans le tableau : elles sont repliées sous lui.
-<!-- CAPTURE-A-PRENDRE: tableau des commandes -->
+<!-- CAPTURE: tableau des commandes -->
+![Tableau des commandes et leur projection dans Home Assistant](images/tableau-des-commandes.png)
 
 ### Choisir le type Home Assistant d'une commande
 

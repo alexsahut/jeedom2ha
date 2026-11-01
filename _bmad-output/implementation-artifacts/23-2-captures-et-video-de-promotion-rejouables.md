@@ -60,7 +60,7 @@ En plus, hors marqueurs : une capture Home Assistant (appareils jeedom2ha rangé
   - [x] 3.2 Enregistrement réel (109 s) et relecture ClaudeBox (2026-11-01)
 - [ ] **Task 4 — Documentation** : remplacement des marqueurs, commande de régénération documentée (`docs/dev-demo-env.md`).
   - [x] 4.1 Section « Captures et vidéo de promotion » de `docs/dev-demo-env.md` : commande, `.env`, garanties, métadonnées, protection des secrets
-  - [ ] 4.2 Remplacement des marqueurs `CAPTURE-A-PRENDRE` — **volontairement non fait** (AC4) : seulement après médias réels validés
+  - [x] 4.2 Remplacement des marqueurs `CAPTURE-A-PRENDRE` (2026-11-01, à la demande d'Alexandre, pour valider le rendu en ligne) : images r9 dans `docs/fr_FR/images/`
 - [ ] **Task 5 — Validation** : ClaudeBox relit les médias (CC-48, concordance) ; Alexandre valide le rendu (`ready-for-UX-validation`).
   - [x] 5.1 Relecture ClaudeBox (2026-11-01), voir « Exécution terrain du 2026-10-31 »
   - [ ] 5.2 Validation du rendu par Alexandre, puis Task 4.2 (marqueurs) et choix de l'hébergement de la vidéo
@@ -132,3 +132,5 @@ Exécutée par clawcode sur la VM 122 (mandat de nuit NUIT-20261031), relue par 
   2. Dans HA, l'appareil est « Connecté via 127.0.0.1 » : le pont MQTT porte le nom d'hôte du broker. Chez un utilisateur, ce serait son IP ou son nom d'hôte (point produit).
   3. Un badge rouge « 1 » (message Jeedom de la démo) apparaît dans la barre de navigation.
   4. `cartes-de-piece-garage.png` (2b) reste une carte seule de 130×180 px, hors documentation.
+
+- **2026-11-01** : à la demande d'Alexandre (« les mettre en ligne directement pour voir »), les captures r9 sont versionnées dans `docs/fr_FR/images/` et les marqueurs remplacés. La vidéo (MP4 de 1 Mo, réencodé depuis le webm r9) est confiée au site jeedom2ha (NanoCorp). La validation du rendu se fait en ligne.

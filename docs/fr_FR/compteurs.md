@@ -32,7 +32,8 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 Retour à la [documentation](index.md#la-vue-de-travail).
 
 Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la vue de travail, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
-<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->
+<!-- CAPTURE: compteurs du détail de pièce -->
+![Compteurs du détail de pièce](images/compteurs-detail-piece.png)
 
 ## Comment lire un état
 
@@ -114,6 +115,7 @@ Quand vous choisissez un équipement, une ligne s'affiche au début de son déta
 > Publié · 3 publiées · 1 bloquée · 5 ignorées
 
 Les zéros sont masqués, les pluriels accordés (« 1 publiée », « 3 publiées »). Les catégories apparaissent dans cet ordre : publiées, à appliquer (publiables mais pas encore dans Home Assistant), bloquées, ignorées, exclues. Seules les commandes **bloquées** comptent comme défaut : dans l'exemple, le défaut de l'équipement vaut 1, et les 5 commandes ignorées n'y comptent pas.
-<!-- CAPTURE-A-PRENDRE: ligne de compteurs d'un équipement déplié -->
+<!-- CAPTURE: ligne de compteurs d'un équipement déplié -->
+![Équipement bloqué déplié : pourquoi et quoi faire](images/compteurs-equipement-deplie.png)
 
 <!-- COMPTEURS:FIN -->

@@ -57,10 +57,11 @@ describe('25.4 / AC30 — index.md décrit la vue de travail', () => {
 
   it('les emplacements de capture sont conservés, sans image', () => {
     for (const slot of ['page principale du plugin', 'cartes de pièce', 'vue de travail', 'détail d\'un équipement', 'tableau des commandes']) {
-      assert.ok(index.includes(`<!-- CAPTURE-A-PRENDRE: ${slot} -->`), slot);
+      assert.ok(index.includes(`<!-- CAPTURE: ${slot} -->`), slot);
     }
-    assert.ok(compteurs.includes('<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->'));
-    assert.doesNotMatch(index + compteurs, /!\[[^\]]*\]\([^)]*\.(png|jpg|gif)\)/);
+    assert.ok(compteurs.includes('<!-- CAPTURE: compteurs du détail de pièce -->'));
+    // 23.2 (2026-11-01) : les captures remplacent les marqueurs ; seules les images versionnées de docs/fr_FR/images sont admises.
+    for (const m of (index + compteurs).matchAll(/!\[[^\]]*\]\(([^)]*\.(?:png|jpg|gif))\)/g)) assert.match(m[1], /^images\/[a-z0-9-]+\.png$/);
   });
 
   it('les liens internes pointent vers des titres existants', () => {

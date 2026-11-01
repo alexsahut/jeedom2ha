@@ -20,7 +20,7 @@ describe('22.2 / AC9 — docs/fr_FR/compteurs.md', () => {
   });
 
   it('emplacements de captures conservés', () => {
-    assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->/);
+    assert.match(compteurs, /<!-- CAPTURE: compteurs du détail de pièce -->/);
   });
 
   it('décrit la notion « publié = présent dans Home Assistant » et chaque état rendu par l’interface (25.1 : un état unique)', () => {

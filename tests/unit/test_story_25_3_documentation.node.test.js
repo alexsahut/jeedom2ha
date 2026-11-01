@@ -46,8 +46,9 @@ describe('25.3 / AC14 — index.md décrit la nouvelle page principale', () => {
   });
 
   it('les emplacements de capture sont conservés, sans image', () => {
-    for (const slot of ['page principale du plugin', 'cartes de pièce']) assert.ok(index.includes(`<!-- CAPTURE-A-PRENDRE: ${slot} -->`), slot);
-    assert.doesNotMatch(index + compteurs, /!\[[^\]]*\]\([^)]*\.(png|jpg|gif)\)/);
+    for (const slot of ['page principale du plugin', 'cartes de pièce']) assert.ok(index.includes(`<!-- CAPTURE: ${slot} -->`), slot);
+    // 23.2 (2026-11-01) : les captures remplacent les marqueurs ; seules les images versionnées de docs/fr_FR/images sont admises.
+    for (const m of (index + compteurs).matchAll(/!\[[^\]]*\]\(([^)]*\.(?:png|jpg|gif))\)/g)) assert.match(m[1], /^images\/[a-z0-9-]+\.png$/);
   });
 });
 

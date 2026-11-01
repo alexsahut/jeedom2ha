@@ -36,12 +36,13 @@ describe('25.1 / AC23 — vocabulaire des deux pages', () => {
   });
 
   it('les emplacements de capture sont conservés (pas de captures, décision 20-5 Q3)', () => {
-    assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: compteurs du détail de pièce -->/);
-    assert.match(compteurs, /<!-- CAPTURE-A-PRENDRE: ligne de compteurs d'un équipement déplié -->/);
+    assert.match(compteurs, /<!-- CAPTURE: compteurs du détail de pièce -->/);
+    assert.match(compteurs, /<!-- CAPTURE: ligne de compteurs d'un équipement déplié -->/);
     for (const slot of ['page principale du plugin', 'cartes de pièce', 'vue de travail', 'tableau des commandes']) {
-      assert.ok(index.includes(`<!-- CAPTURE-A-PRENDRE: ${slot} -->`), slot);
+      assert.ok(index.includes(`<!-- CAPTURE: ${slot} -->`), slot);
     }
-    assert.doesNotMatch(index + compteurs, /!\[[^\]]*\]\([^)]*\.(png|jpg|gif)\)/);
+    // 23.2 (2026-11-01) : les captures remplacent les marqueurs ; seules les images versionnées de docs/fr_FR/images sont admises.
+    for (const m of (index + compteurs).matchAll(/!\[[^\]]*\]\(([^)]*\.(?:png|jpg|gif))\)/g)) assert.match(m[1], /^images\/[a-z0-9-]+\.png$/);
   });
 
   it('les liens internes de index.md et de compteurs.md pointent vers des titres existants', () => {
