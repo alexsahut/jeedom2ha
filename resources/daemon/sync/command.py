@@ -532,13 +532,19 @@ class CommandSynchronizer:
             return None
         if time.monotonic() < float(lock.expires_at or 0.0):
             return "barrier_toggle_in_flight"
-        if event_state is not None and event_state != lock.sent_state:
+        # Relecture 3 (résidu I-2) : après le délai, seul un événement reçu APRÈS l'expiration peut
+        # libérer le verrou ; un événement antérieur et retardé (ex. 252 arrivé juste après un OPEN)
+        # ne doit pas le lever à l'expiration.
+        late_state = self._barrier_event_state_since(eq_id, lock, since=float(lock.expires_at or 0.0))
+        if late_state is not None and late_state != lock.sent_state:
             self._barrier_in_flight().pop(eq_id, None)
             return None
         return "barrier_no_effect"
 
-    def _barrier_event_state_since(self, eq_id: int, lock: _BarrierToggleInFlight) -> Optional[str]:
-        """Barrier state of the last Jeedom event received AFTER the send, else None."""
+    def _barrier_event_state_since(
+        self, eq_id: int, lock: _BarrierToggleInFlight, since: Optional[float] = None
+    ) -> Optional[str]:
+        """Barrier state of the last Jeedom event received AFTER the send (or after ``since``), else None."""
         state_sync = self._app.get("state_synchronizer") if hasattr(self._app, "get") else None
         reader = getattr(state_sync, "last_event", None)
         if not callable(reader) or lock.state_cmd_id is None:
@@ -550,6 +556,8 @@ class CommandSynchronizer:
         if not (isinstance(event, tuple) and len(event) == 2):
             return None
         if lock.sent_at is None or not event[0] > lock.sent_at:
+            return None
+        if since is not None and not event[0] > since:
             return None
         return barrier_state(event[1])
 

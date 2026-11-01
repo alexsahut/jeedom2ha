@@ -767,3 +767,18 @@ async def test_retained_ha_birth_message_is_still_honoured():
     bridge._on_message(None, None, _message("homeassistant/status", "online", True))
     await asyncio.sleep(0)
     bridge._trigger_ha_birth_republish.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_late_event_before_expiry_does_not_release_after_the_delay(monkeypatch):
+    # Relecture 3 (résidu I-2) : un 252 retardé reçu AVANT l'expiration, puis aucun
+    # mouvement pendant 60 s : à l'expiration, le verrou reste (barrier_no_effect).
+    import sync.command as command_module
+
+    sync, state_sync, topic = _locked_garage()
+    assert await sync.handle_command_message(topic, "OPEN") is True
+    now = command_module.time.monotonic()
+    state_sync._pending_click_values[(GARAGE_ID, 70022)] = (now + 1.0, "252")
+    monkeypatch.setattr(command_module.time, "monotonic", lambda: now + 61.0)
+    assert await sync.handle_command_message(topic, "OPEN") is False
+    assert sync._execute_exec_cmd.await_count == 1
