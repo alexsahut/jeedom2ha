@@ -127,6 +127,9 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
             and mapping.ha_entity_type not in _TYPES_WITHOUT_STATE_TOPIC):
         reason_details = mapping.reason_details or {}
         state_topic = reason_details.get("state_topic")
+        # Story 24.8 — a valve has its own node-scoped topic, like a multi-switch.
+        if mapping.ha_entity_type == "valve" and isinstance(state_topic, str) and state_topic:
+            return state_topic
         if mapping.ha_entity_type == "switch" and isinstance(state_topic, str) and state_topic:
             return state_topic
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"

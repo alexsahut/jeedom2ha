@@ -1,5 +1,6 @@
 """registry.py - Ordered registry for Jeedom -> Home Assistant mappers."""
 
+from dataclasses import replace
 from typing import Any, Dict, Iterator, List, Optional
 
 from mapping.alarm_control_panel import AlarmControlPanelMapper
@@ -12,6 +13,7 @@ from mapping.light import LightMapper
 from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
+from mapping.valve import ValveMapper
 from models.mapping import MappingResult
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
@@ -33,6 +35,10 @@ class MapperRegistry:
             ButtonMapper(),
             FallbackMapper(),
         ]
+        # Story 24.8 (D6) — la vanne est reconnue avant tous les mappers (avant switch et
+        # le repli) par une passe dédiée de ``map_all``, hors de la liste ordonnée : un
+        # équipement sans type de vanne garde exactement sa projection d'avant.
+        self._valve_mapper = ValveMapper()
 
     @property
     def mappers(self) -> List[object]:
@@ -71,7 +77,30 @@ class MapperRegistry:
         plusieurs entités pour le même eqLogic (multi-switch et/ou multi-domaine),
         on agrège ces résultats au lieu d'utiliser une allowlist d'IDs.
         """
+        valve_results = self._valve_mapper.map_all(eq, snapshot)
+        if valve_results:
+            return self._with_valves(eq, snapshot, valve_results)
         return self._apply_entity_name_rule(eq, self._map_all_raw(eq, snapshot))
+
+    def _with_valves(
+        self, eq: JeedomEqLogic, snapshot: TopologySnapshot, valve_results: List[MappingResult]
+    ) -> List[MappingResult]:
+        """Story 24.8 — ajoute les vannes aux entités que l'équipement avait déjà.
+
+        Les commandes des trios de vanne sont consommées (une commande, une entité) ; le
+        reste de l'équipement est projeté comme avant, règle du nom comprise, puis les
+        vannes s'y ajoutent en secondaires. Sans autre entité, les vannes seules suivent la
+        règle du nom (une seule vanne : nom de l'équipement).
+        """
+        consumed = {int(cmd.id) for result in valve_results for cmd in result.commands.values()}
+        rest_cmds = [cmd for cmd in eq.cmds if int(cmd.id) not in consumed]
+        rest: List[MappingResult] = []
+        if rest_cmds:
+            rest_eq = replace(eq, cmds=rest_cmds)
+            rest = self._apply_entity_name_rule(rest_eq, self._map_all_raw(rest_eq, snapshot))
+        if not rest:
+            return self._apply_entity_name_rule(eq, valve_results)
+        return [*rest, *valve_results]
 
     def _map_all_raw(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         structural_results = self._map_structural_multi_entity(eq, snapshot)

@@ -85,6 +85,21 @@ class AlarmCapabilities:
     has_command: bool = False
 
 
+@dataclass
+class ValveCapabilities:
+    """Valve capabilities for watering valves / faucets (Story 24.8).
+
+    One ValveCapabilities per valve entity: a complete ``<FAMILY>_STATE/ON/OFF`` trio
+    (FAMILY = IRRIG, FAUCET or VALVE). No position command exists in the frozen
+    referential (Task 0), so ``has_position`` stays False (``reports_position: false``).
+    device_class: "water" for IRRIG_* / FAUCET_*, None for VALVE_* (D5).
+    """
+    has_open_close: bool = False
+    has_state: bool = False
+    has_position: bool = False
+    device_class: Optional[str] = None
+
+
 MappingCapabilities = Union[
     LightCapabilities,
     CoverCapabilities,
@@ -92,6 +107,7 @@ MappingCapabilities = Union[
     SwitchCapabilities,
     ClimateCapabilities,
     AlarmCapabilities,
+    ValveCapabilities,
 ]
 
 

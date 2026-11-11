@@ -54,7 +54,7 @@ STATE_OPTIMISTIC = "optimistic"
 STATE_NONE = "none"
 
 # Domaines HA dotés d'un command_topic : sans retour d'état en streaming, ils restent optimistes.
-_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel"})
+_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel", "valve"})
 
 _PUBLICATION_VALUES = frozenset({"exclude", "force_publish"})
 

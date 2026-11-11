@@ -211,7 +211,7 @@ def test_flap_equipment_with_gb_commands_keeps_the_flap_path():
 
 def test_product_scope_unchanged():
     assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button",
-                             "climate", "alarm_control_panel"]
+                             "climate", "alarm_control_panel", "valve"]
 
 
 # --- discovery : payload (D2, D5, AC4) ----------------------------------------------

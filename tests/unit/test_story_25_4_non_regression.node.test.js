@@ -68,6 +68,23 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     'assert after["equipments"]["101"] == _project(unit)',
   ];
 
+  // Story 24.8 (ouverture gouvernée de `valve`, AR13) : les listes figées des composants ouverts et des publishers gagnent
+  // `valve` (code et tests qui les vérifient), `valve` est un actionneur de l'export de décision, et le golden 8.4 gagne les
+  // compteurs `valves_*` à 0 (seule la virgule après `switches_sure` change). Le reste du démon est en ajouts seuls.
+  const REPLACED_BY_24_8 = [
+    'PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10',
+    '_known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    '_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel"})',
+    'assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
+    'assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
+    '"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"',
+    '"climate", "alarm_control_panel"]',
+    'assert len(PRODUCT_SCOPE) == 8',
+    '"switches_sure": 3',
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -101,7 +118,7 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
     const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'core/class/', 'tests/e2e/gate/lib/policy.mjs']);
     if (diff === null) return;
-    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2, ...REPLACED_BY_24_4];
+    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2, ...REPLACED_BY_24_4, ...REPLACED_BY_24_8];
     const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !allowed.includes(line));
     assert.deepEqual(unexpected, []);
   });

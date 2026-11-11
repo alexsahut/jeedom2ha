@@ -29,6 +29,9 @@ STATE_KEYS: Dict[str, Tuple[str, ...]] = {
     "switch": ("ENERGY_STATE", "SWITCH_STATE", "PRESENCE"),
     "light": ("LIGHT_STATE",),
     "cover": ("FLAP_STATE", "FLAP_BSO_STATE"),
+    # Story 24.8 — open/closed of a valve: the STATE of its trio (mapping/valve.py
+    # ``VALVE_STATE_KEYS``, Homebridge types frozen in Task 0).
+    "valve": ("IRRIG_STATE", "FAUCET_STATE", "VALVE_STATE"),
 }
 BRIGHTNESS_KEYS: Tuple[str, ...] = ("LIGHT_BRIGHTNESS",)
 # LIGHT_BRIGHTNESS feeds the brightness; a numeric LIGHT_STATE is the fallback (see
@@ -146,6 +149,40 @@ def barrier_state(value: Any) -> Optional[str]:
     if match is None:
         return None
     return BARRIER_STATE_TABLE.get(int(match.group(1)))
+
+
+# Story 24.8 (D4) — binary STATE of a valve -> HA MQTT valve state (``state_open: open`` /
+# ``state_closed: closed``). Anything else publishes nothing (never invented).
+_VALVE_OPEN_VALUES = frozenset({"1", "true", "on", "open", "opened"})
+_VALVE_CLOSED_VALUES = frozenset({"0", "false", "off", "closed", "close"})
+
+
+def valve_state(value: Any, invert_binary: bool = False) -> Optional[str]:
+    """Translate a valve STATE value to ``open`` / ``closed``; unknown -> None.
+
+    ``invert_binary`` is the Jeedom display option ``invertBinary`` of the STATE command
+    (exported in the topology as ``invert_binary``): 1 then means closed.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        value = "1" if value else "0"
+    text = str(value).strip().lower()
+    if text in _VALVE_OPEN_VALUES:
+        is_open = True
+    elif text in _VALVE_CLOSED_VALUES:
+        is_open = False
+    else:
+        try:
+            number = float(text.replace(",", "."))
+        except ValueError:
+            return None
+        if number not in (0.0, 1.0):
+            return None
+        is_open = number == 1.0
+    if invert_binary:
+        is_open = not is_open
+    return "open" if is_open else "closed"
 
 
 def has_reliable_channel(ha_type: Any, mapping: Any, channel: str) -> bool:

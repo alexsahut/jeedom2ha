@@ -133,6 +133,8 @@ class JeedomCmd:
     is_historized: bool = False
     # Story 24.1 — identifiant physique (jamais dans un journal info+ ni dans le repr)
     logical_id: Optional[str] = field(default=None, repr=False)
+    # Story 24.8 — option d'affichage Jeedom ``invertBinary`` (lue pour l'état d'une vanne)
+    invert_binary: bool = False
 
 @dataclass
 class JeedomEqLogic:
@@ -239,6 +241,7 @@ class TopologySnapshot:
                             is_visible=_to_bool(cmd_raw.get("is_visible"), default=True),
                             is_historized=_to_bool(cmd_raw.get("is_historized"), default=False),
                             logical_id=_normalize_logical_id(cmd_raw.get("logical_id")),
+                            invert_binary=_to_bool(cmd_raw.get("invert_binary"), default=False),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue

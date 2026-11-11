@@ -21,6 +21,7 @@ from models.mapping import (
     ProjectionValidity,
     SensorCapabilities,
     SwitchCapabilities,
+    ValveCapabilities,
 )
 
 HA_COMPONENT_REGISTRY = {
@@ -65,9 +66,15 @@ HA_COMPONENT_REGISTRY = {
         "required_fields": ["state_topic", "command_topic", "platform", "availability"],
         "required_capabilities": ["has_state", "has_command"],
     },
+    # Story 24.8 — vanne sans position : ordres OPEN/CLOSE et état réel obligatoires (un trio
+    # incomplet n'est jamais projeté en valve, D2/D4).
+    "valve": {
+        "required_fields": ["state_topic", "command_topic", "platform", "availability"],
+        "required_capabilities": ["has_state", "has_command"],
+    },
 }
 
-PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10
+PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10 # valve ouvert Story 24.8 sous FR40/NFR10
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,
@@ -110,6 +117,8 @@ def _resolve_capability(abstract: str, capabilities: object) -> bool:
             return capabilities.has_open_close
         if isinstance(capabilities, SwitchCapabilities):
             return capabilities.has_on_off
+        if isinstance(capabilities, ValveCapabilities):
+            return capabilities.has_open_close
         # Fallback pour les capabilities futures non encore dataclassées
         return bool(
             getattr(capabilities, "has_on_off", False)
@@ -141,6 +150,14 @@ def _cross_family_action_mismatch(ha_entity_type: str, capabilities: object) -> 
     la commande d'action requise est absente → la projection doit être refusée plutôt que
     publiée comme entité non-actionnable (D11, pas de bypass).
     """
+    # Story 24.8 — une vanne ne se pilote que par ses actions <FAMILLE>_ON/OFF, routées par
+    # `_translate_command` pour le seul type `valve` (OPEN/CLOSE) : aucun autre type
+    # actionnable ne sait les router (seule une lecture de l'état, sensor/binary_sensor,
+    # reste honnête), et `valve` ne sait router aucune autre famille.
+    if isinstance(capabilities, ValveCapabilities):
+        return ha_entity_type not in ("valve", "sensor", "binary_sensor")
+    if ha_entity_type == "valve":
+        return True
     if ha_entity_type in ("light", "switch"):
         return isinstance(capabilities, CoverCapabilities)
     if ha_entity_type == "cover":
