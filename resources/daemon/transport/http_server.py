@@ -1157,6 +1157,46 @@ async def _replay_deferred_discovery_unpublish(
             pending_unpublish.pop(pending_eq_id, None)
 
 
+async def _unpublish_boot_removed_topics(
+    eq_id: int,
+    boot_type: str,
+    boot_node_ids: list,
+    mapping,
+    publisher,
+    pending_discovery_unpublish: dict,
+) -> None:
+    """Story 24.8 (AC5) — au boot, dépublie les topics du cache disque disparus.
+
+    ``boot_node_ids`` : node_ids persistés (chaîne = domaine ``boot_type``, ou couple
+    ``(type, node_id)``). Chaque topic absent des topics de tous les candidats de la
+    nouvelle projection est vidé (même mécanisme que le retypage), reporté en cas d'échec.
+    """
+    current = set()
+    for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
+        current.update(_candidate_topic_entries(mapping, candidate))
+    removed: list = []
+    for entry in boot_node_ids:
+        if isinstance(entry, (tuple, list)) and len(entry) == 2:
+            key = (str(entry[0]), str(entry[1]))
+        elif isinstance(entry, str) and entry:
+            key = (str(boot_type), entry)
+        else:
+            continue
+        if key not in current and key not in removed:
+            removed.append(key)
+    if not removed:
+        return
+    _LOGGER.info(
+        "[LIFECYCLE] eq_id=%d: %d topic(s) du cache disque absent(s) de la projection → unpublish %s",
+        eq_id, len(removed), removed,
+    )
+    unpublish_ok = False
+    if publisher is not None:
+        unpublish_ok = await publisher.unpublish_by_eq_id(eq_id, entity_type=boot_type, node_ids=removed)
+    if not unpublish_ok:
+        _merge_deferred_candidate_unpublish(pending_discovery_unpublish, eq_id, boot_type, removed)
+
+
 async def _detect_lifecycle_changes(
     eq_id: int,
     mapping,
@@ -1236,6 +1276,15 @@ async def _detect_lifecycle_changes(
                     _defer_discovery_unpublish(
                         pending_discovery_unpublish, eq_id, boot_type, node_ids=boot_node_ids
                     )
+            elif boot_type and boot_entry.get("published", False):
+                # Story 24.8 (AC5) — principal gardé au boot : un secondaire du cache disque
+                # absent de la nouvelle projection (ex. remplacé par une vanne) est dépublié.
+                # À chaud, `_unpublish_refused_candidates` (19.4 C1) le fait déjà ; au premier
+                # sync après un redémarrage il n'y a pas de décision précédente en RAM.
+                await _unpublish_boot_removed_topics(
+                    eq_id, boot_type, boot_entry.get("node_ids", []) or [], mapping,
+                    publisher, pending_discovery_unpublish,
+                )
             # Rename au boot
             if boot_name and boot_name != mapping.ha_name:
                 _LOGGER.info(

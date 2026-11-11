@@ -2,7 +2,7 @@
 
 Identifiants et noms synthétiques uniquement (CC-48). Couvre : ouverture gouvernée de
 ``valve`` (AR13 : registre, cas nominal et cas d'échec, PRODUCT_SCOPE), mono-vanne, deux
-zones sur un même équipement (D2, appariement par ordre d'id), trio incomplet ou ambigu
+zones sur un même équipement (D2, appariement par l'info liée), trio incomplet ou ambigu
 (aucune vanne, projection d'avant), vanne ajoutée aux entités existantes, payload
 (D4/D5, ``default_entity_id`` 22-1), traduction des ordres OPEN/CLOSE, état 0/1 avec
 ``invertBinary``, override pe-epic-16, export de décision et non-régression switch/cover.
@@ -669,3 +669,158 @@ def test_switch_and_cover_projection_is_unchanged(cmds):
     eq = _eq(MONO_ID, cmds)
     assert [_shape(r) for r in _all(eq)] == [_shape(r) for r in _pre_story_projection(eq)]
     assert all(r.ha_entity_type != "valve" for r in _all(eq))
+
+
+# --- AC5 : secondaire retiré, principal gardé -----------------------------------------
+# Couvert par le chemin existant du sync (`_unpublish_refused_candidates`, Story 19.4 C1) :
+# un secondaire publié dont la clé (cmd_id, node_id, domaine) n'existe plus dans la
+# nouvelle projection est dépublié, avec report en cas d'échec. Ces tests le prouvent sur
+# les formes de 24.8 (aucun code de cycle de vie ajouté : un second mécanisme dépublierait
+# deux fois, cf. test_t8 de 19.4).
+
+def _published(mapping):
+    """Projection publiée : principal et secondaires ``discovery_published``."""
+    decision = _decision(mapping)
+    for secondary in mapping.additional_mappings:
+        _decision(secondary)
+    return decision
+
+
+def _button_secondary():
+    button = _map(_eq(MIXED_ID, [_cmd(80032, "IRRIG_ON")]))
+    button.reason_details = {**button.reason_details, "cmd_id": 80032,
+                             "node_id": f"jeedom2ha_{MIXED_ID}_btn"}
+    return button
+
+
+def _sensor_with(*secondaries):
+    primary = _map(_eq(MIXED_ID, [_power_cmd()], eq_type="zwavejs"))
+    primary.additional_mappings = list(secondaries)
+    return primary
+
+
+async def _unpublish_refused(previous, current, ok=True, pending=None, connected=True):
+    publisher = MagicMock()
+    publisher.unpublish_by_eq_id = AsyncMock(return_value=ok)
+    bridge = MagicMock()
+    bridge.is_connected = connected
+    pending = {} if pending is None else pending
+    outcome = await http_server._unpublish_refused_candidates(
+        MIXED_ID, _published(previous), _published(current), publisher=publisher,
+        mqtt_bridge=bridge, pending_discovery_unpublish=pending, pending_local_cleanup={})
+    return outcome, publisher, pending
+
+
+@pytest.mark.asyncio
+async def test_secondary_replaced_by_the_valve_is_unpublished_and_the_kept_primary_is_not():
+    outcome, publisher, pending = await _unpublish_refused(
+        _sensor_with(_button_secondary()), _map(_mixed_eq()))
+    assert outcome == "unpublished"
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(
+        MIXED_ID, entity_type="sensor", node_ids=[("button", f"jeedom2ha_{MIXED_ID}_btn")])
+    assert pending == {}
+
+
+@pytest.mark.asyncio
+async def test_nothing_removed_means_no_unpublish():
+    outcome, publisher, _pending = await _unpublish_refused(_map(_mixed_eq()), _map(_mixed_eq()))
+    assert outcome is None
+    publisher.unpublish_by_eq_id.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_failed_unpublish_of_a_removed_secondary_is_deferred():
+    pending = {MIXED_ID: {"entity_type": "sensor", "node_ids": [("sensor", "jeedom2ha_x")]}}
+    outcome, _publisher, pending = await _unpublish_refused(
+        _sensor_with(_button_secondary()), _map(_mixed_eq()), ok=False, pending=pending)
+    assert outcome == "deferred"
+    assert pending[MIXED_ID]["node_ids"] == [
+        ("sensor", "jeedom2ha_x"), ("button", f"jeedom2ha_{MIXED_ID}_btn")]
+
+
+@pytest.mark.asyncio
+async def test_removed_secondary_is_deferred_when_the_broker_is_down():
+    outcome, publisher, pending = await _unpublish_refused(
+        _sensor_with(_button_secondary()), _map(_mixed_eq()), connected=False)
+    assert outcome == "deferred"
+    publisher.unpublish_by_eq_id.assert_not_awaited()
+    assert pending[MIXED_ID]["node_ids"] == [("button", f"jeedom2ha_{MIXED_ID}_btn")]
+
+
+def _boot_entry(node_ids, entity_type="sensor"):
+    return {MIXED_ID: {"entity_type": entity_type, "ha_name": f"Equipement {MIXED_ID}",
+                       "published": True, "node_ids": node_ids}}
+
+
+async def _boot_lifecycle(boot_cache, ok=True, pending=None, publisher_present=True):
+    publisher = MagicMock()
+    publisher.unpublish_by_eq_id = AsyncMock(return_value=ok)
+    pending = {} if pending is None else pending
+    await http_server._detect_lifecycle_changes(
+        MIXED_ID, _map(_mixed_eq()), None, boot_cache, True,
+        publisher if publisher_present else None, pending)
+    return publisher, pending
+
+
+@pytest.mark.asyncio
+async def test_boot_removed_secondary_is_unpublished(caplog):
+    # Cache disque d'avant redémarrage : sensor principal + bouton secondaire (multi-domaine).
+    sensor_nid = _map(_mixed_eq()).reason_details["node_id"]
+    boot = _boot_entry([("sensor", sensor_nid), ("button", f"jeedom2ha_{MIXED_ID}_btn")])
+    with caplog.at_level("INFO"):
+        publisher, pending = await _boot_lifecycle(boot)
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(
+        MIXED_ID, entity_type="sensor", node_ids=[("button", f"jeedom2ha_{MIXED_ID}_btn")])
+    assert pending == {}
+    assert "[LIFECYCLE]" in caplog.text and "cache disque" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_boot_nothing_removed_means_no_unpublish():
+    current = _map(_mixed_eq())
+    boot = _boot_entry([
+        ("sensor", current.reason_details["node_id"]),
+        ("valve", current.additional_mappings[0].reason_details["node_id"]),
+    ])
+    publisher, pending = await _boot_lifecycle(boot)
+    publisher.unpublish_by_eq_id.assert_not_awaited()
+    assert pending == {}
+
+
+@pytest.mark.asyncio
+async def test_boot_homogeneous_cache_entries_use_the_cached_type():
+    sensor_nid = _map(_mixed_eq()).reason_details["node_id"]
+    publisher, _pending = await _boot_lifecycle(_boot_entry([sensor_nid, f"jeedom2ha_{MIXED_ID}_old"]))
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(
+        MIXED_ID, entity_type="sensor", node_ids=[("sensor", f"jeedom2ha_{MIXED_ID}_old")])
+
+
+@pytest.mark.asyncio
+async def test_boot_failed_unpublish_of_a_removed_secondary_is_deferred():
+    pending = {MIXED_ID: {"entity_type": "sensor", "node_ids": [("sensor", "jeedom2ha_x")]}}
+    boot = _boot_entry([("button", f"jeedom2ha_{MIXED_ID}_btn")])
+    _publisher, pending = await _boot_lifecycle(boot, ok=False, pending=pending)
+    assert pending[MIXED_ID]["node_ids"] == [
+        ("sensor", "jeedom2ha_x"), ("button", f"jeedom2ha_{MIXED_ID}_btn")]
+    _publisher, pending = await _boot_lifecycle(boot, publisher_present=False)
+    assert pending[MIXED_ID]["node_ids"] == [("button", f"jeedom2ha_{MIXED_ID}_btn")]
+
+
+@pytest.mark.asyncio
+async def test_boot_entry_not_published_is_ignored():
+    boot = _boot_entry([("button", f"jeedom2ha_{MIXED_ID}_btn")])
+    boot[MIXED_ID]["published"] = False
+    publisher, pending = await _boot_lifecycle(boot)
+    publisher.unpublish_by_eq_id.assert_not_awaited()
+    assert pending == {}
+
+
+@pytest.mark.asyncio
+async def test_retype_of_the_primary_keeps_its_previous_behaviour():
+    prev = _map(_eq(MONO_ID, [_cmd(80015, "IRRIG_ON")]))  # bouton principal
+    publisher = MagicMock()
+    publisher.unpublish_by_eq_id = AsyncMock(return_value=True)
+    await http_server._detect_lifecycle_changes(
+        MONO_ID, _map(_mono_eq()), _published(prev), {}, False, publisher, {})
+    publisher.unpublish_by_eq_id.assert_awaited_once_with(MONO_ID, entity_type="button", node_ids=[])
+
