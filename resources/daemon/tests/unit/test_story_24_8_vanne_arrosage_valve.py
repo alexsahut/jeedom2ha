@@ -44,10 +44,10 @@ MIXED_ID = 8003    # vanne + une mesure sans type générique déjà publiée en
 
 
 def _cmd(cmd_id, generic_type, type_="action", sub_type="other", value=None, unit=None,
-         invert=False, name=None):
+         invert=False, name=None, link=None):
     return JeedomCmd(id=cmd_id, name=name or f"Cmd {cmd_id}", generic_type=generic_type,
                      type=type_, sub_type=sub_type, current_value=value, unit=unit,
-                     invert_binary=invert)
+                     invert_binary=invert, linked_value=link)
 
 
 def _state(cmd_id, family="IRRIG", value="0", invert=False):
@@ -77,11 +77,15 @@ def _mono_eq(family="IRRIG", value="0", invert=False):
     ])
 
 
-def _zones_eq():
-    """Deux zones : trios 80021-80023 et 80024-80026 (STATE / ON / OFF)."""
+def _zones_eq(linked=True):
+    """Deux zones : trios 80021-80023 et 80024-80026 (STATE / ON / OFF), actions liées."""
+    def link(state_id):
+        return state_id if linked else None
     return _eq(ZONES_ID, [
-        _state(80021), _cmd(80022, "IRRIG_ON"), _cmd(80023, "IRRIG_OFF"),
-        _state(80024, value="1"), _cmd(80025, "IRRIG_ON"), _cmd(80026, "IRRIG_OFF"),
+        _state(80021), _cmd(80022, "IRRIG_ON", link=link(80021)),
+        _cmd(80023, "IRRIG_OFF", link=link(80021)),
+        _state(80024, value="1"), _cmd(80025, "IRRIG_ON", link=link(80024)),
+        _cmd(80026, "IRRIG_OFF", link=link(80024)),
     ], eq_type="zwavejs")
 
 
@@ -188,7 +192,7 @@ def test_single_valve_equipment():
         has_open_close=True, has_state=True, has_position=False, device_class="water")
     assert valve.reason_details == {
         "valve_family": "IRRIG",
-        "valve_pairing": "id_order",
+        "valve_pairing": "single_trio",
         "cmd_id": 80019,
         "object_id": f"jeedom2ha_{MONO_ID}_80019",
         "node_id": f"jeedom2ha_{MONO_ID}_80019",
@@ -197,8 +201,9 @@ def test_single_valve_equipment():
     }
 
 
-def test_two_zones_give_two_valves_paired_by_id_order():
+def test_two_linked_zones_give_two_valves():
     results = _all(_zones_eq())
+    assert [r.reason_details["valve_pairing"] for r in results] == ["linked", "linked"]
     assert [r.ha_entity_type for r in results] == ["valve", "valve"]
     assert [{k: c.id for k, c in r.commands.items()} for r in results] == [
         {"IRRIG_STATE": 80021, "IRRIG_ON": 80022, "IRRIG_OFF": 80023},
@@ -212,16 +217,68 @@ def test_two_zones_give_two_valves_paired_by_id_order():
     assert primary.additional_mappings == [results[1]]
 
 
-def test_pairing_follows_id_order_whatever_the_command_order():
-    eq = _eq(ZONES_ID, [
-        _cmd(80026, "IRRIG_OFF"), _cmd(80025, "IRRIG_ON"), _state(80024),
-        _cmd(80023, "IRRIG_OFF"), _cmd(80022, "IRRIG_ON"), _state(80021),
+def _interleaved(links):
+    """STATE1 10, STATE2 11, ON2 12, OFF2 13, ON1 14, OFF1 15 ; ``links`` : id -> lien."""
+    return _eq(ZONES_ID, [
+        _state(10), _state(11),
+        _cmd(12, "IRRIG_ON", link=links.get(12)), _cmd(13, "IRRIG_OFF", link=links.get(13)),
+        _cmd(14, "IRRIG_ON", link=links.get(14)), _cmd(15, "IRRIG_OFF", link=links.get(15)),
     ])
-    trios = valve_trios(eq)
-    assert [(f, {k: c.id for k, c in cmds.items()}) for f, cmds in trios] == [
-        ("IRRIG", {"IRRIG_STATE": 80021, "IRRIG_ON": 80022, "IRRIG_OFF": 80023}),
-        ("IRRIG", {"IRRIG_STATE": 80024, "IRRIG_ON": 80025, "IRRIG_OFF": 80026}),
+
+
+def _trio_ids(eq):
+    return [(f, {k: c.id for k, c in cmds.items()}, p) for f, cmds, p in valve_trios(eq)]
+
+
+def test_interleaved_ids_are_paired_by_the_linked_state():
+    eq = _interleaved({12: 11, 13: 11, 14: 10, 15: 10})
+    assert _trio_ids(eq) == [
+        ("IRRIG", {"IRRIG_STATE": 10, "IRRIG_ON": 14, "IRRIG_OFF": 15}, "linked"),
+        ("IRRIG", {"IRRIG_STATE": 11, "IRRIG_ON": 12, "IRRIG_OFF": 13}, "linked"),
     ]
+
+
+@pytest.mark.parametrize("links", [
+    {},                                   # aucun lien : jamais d'appariement par ordre d'id
+    {12: 11, 13: 11, 14: 10},             # un OFF sans lien
+    {12: 11, 13: 11, 14: 10, 15: 11},     # deux OFF sur la même zone, une zone sans OFF
+    {12: 11, 13: 11, 14: 10, 15: 99},     # lien hors famille
+    {12: 11, 13: 11, 14: 12, 15: 10},     # lien vers une action
+])
+def test_several_trios_without_concordant_links_give_no_valve(links, caplog):
+    eq = _interleaved(links)
+    with caplog.at_level("WARNING"):
+        assert valve_trios(eq) == []
+    assert f"eq_id={ZONES_ID}" in caplog.text and "STATE=[10, 11]" in caplog.text
+    assert all(r.ha_entity_type != "valve" for r in _all(eq))
+
+
+def test_two_zones_without_links_give_no_valve():
+    assert valve_trios(_zones_eq(linked=False)) == []
+
+
+@pytest.mark.parametrize("links,pairing", [
+    ({}, "single_trio"),
+    ({80015: 80019}, "single_trio"),
+    ({80015: 80019, 80018: 80019}, "linked"),
+])
+def test_single_trio_is_a_valve_with_or_without_links(links, pairing):
+    eq = _eq(MONO_ID, [
+        _cmd(80015, "IRRIG_ON", link=links.get(80015)),
+        _cmd(80018, "IRRIG_OFF", link=links.get(80018)),
+        _state(80019),
+    ])
+    assert [p for _f, _c, p in valve_trios(eq)] == [pairing]
+
+
+@pytest.mark.parametrize("links", [{80015: 4}, {80018: 80015}])
+def test_single_trio_linked_elsewhere_is_refused(links):
+    eq = _eq(MONO_ID, [
+        _cmd(80015, "IRRIG_ON", link=links.get(80015)),
+        _cmd(80018, "IRRIG_OFF", link=links.get(80018)),
+        _state(80019),
+    ])
+    assert valve_trios(eq) == []
 
 
 @pytest.mark.parametrize("family,device_class", [
@@ -266,13 +323,12 @@ def test_duration_commands_are_out_of_scope():
 
 def test_valve_is_added_to_the_entities_the_equipment_already_had():
     eq = _mixed_eq()
-    without_valve = _eq(MIXED_ID, [_power_cmd()], eq_type="zwavejs")
-    before = _pre_story_projection(without_valve)
+    before = _pre_story_projection(eq)  # projection d'avant du MÊME équipement
+    assert [r.ha_entity_type for r in before] == ["sensor"]
     results = _all(eq)
     assert [r.ha_entity_type for r in results] == ["sensor", "valve"]
     # L'entité existante est strictement celle d'avant (identifiants, nom, commandes).
     assert _shape(results[0]) == _shape(before[0])
-    assert results[0].ha_name == f"Equipement {MIXED_ID}"
     assert results[1].ha_unique_id == f"jeedom2ha_eq_{MIXED_ID}_cmd_80031"
     assert results[1].ha_name == "Etat 80031"
     primary = _map(eq)
@@ -280,12 +336,36 @@ def test_valve_is_added_to_the_entities_the_equipment_already_had():
     assert [m.ha_entity_type for m in primary.additional_mappings] == ["valve"]
 
 
-def test_valve_commands_are_not_reused_by_the_other_entities():
-    # Sans la vanne, le repli prendrait la commande d'état ; la vanne la consomme.
+def _all_cmd_ids(result):
+    return {c.id for c in result.commands.values()}
+
+
+def test_button_on_a_trio_action_is_replaced_by_the_valve_without_rebinding(caplog):
+    # Avant la story, le bouton « sure » prenait IRRIG_ON (unique_id jeedom2ha_eq_<id>).
+    eq = _eq(MONO_ID, _mono_eq().cmds + [_cmd(80060, "IRRIG_DURATION_UNKNOWN")])
+    before = _pre_story_projection(eq)
+    assert [(r.ha_entity_type, r.ha_unique_id, _all_cmd_ids(r)) for r in before] == [
+        ("button", f"jeedom2ha_eq_{MONO_ID}", {80015})]
+    with caplog.at_level("WARNING"):
+        results = _all(eq)
+    assert [r.ha_entity_type for r in results] == ["valve"]
+    assert "remplacée par la vanne" in caplog.text
+    # Aucune entité d'avant ne réapparaît sous son unique_id avec une autre commande.
+    before_ids = {r.ha_unique_id: _all_cmd_ids(r) for r in before}
+    for result in results:
+        if result.ha_unique_id in before_ids:
+            assert _all_cmd_ids(result) == before_ids[result.ha_unique_id]
+
+
+def test_other_commands_are_not_reprojected_after_a_removal():
+    # Avant : une seule entité (le bouton sur IRRIG_ON) ; l'info 80050 n'avait pas d'entité
+    # et n'en reçoit pas : la projection d'avant n'est jamais rejouée sur le reste.
     eq = _eq(MONO_ID, _mono_eq().cmds + [_cmd(80050, None, "info", "string", "x")])
+    before = _pre_story_projection(eq)
+    assert [_all_cmd_ids(r) for r in before] == [{80015}]
     results = _all(eq)
-    assert [r.ha_entity_type for r in results] == ["sensor", "valve"]
-    assert [c.id for c in results[0].commands.values()] == [80050]
+    assert [r.ha_entity_type for r in results] == ["valve"]
+    assert results[0].ha_name == f"Equipement {MONO_ID}"
 
 
 # --- AC4 / D4 / D5 : discovery -------------------------------------------------------
@@ -424,12 +504,15 @@ async def test_confirmation_uses_the_real_state_when_it_is_streamed():
     ("1", False, "open"), ("0", False, "closed"), (1, False, "open"), (0, False, "closed"),
     ("1.0", False, "open"), (True, False, "open"), ("on", False, "open"),
     ("1", True, "closed"), ("0", True, "open"), (1, True, "closed"),
+    # état numérique : 0 fermé, > 0 ouvert ; l'inversion s'applique au résultat
+    ("2", False, "open"), ("50", False, "open"), ("0.5", False, "open"), (12.5, False, "open"),
+    ("0.0", False, "closed"), ("0,0", False, "closed"), ("50", True, "closed"), ("0.0", True, "open"),
 ])
 def test_valve_state_table(value, invert, expected):
     assert readback.valve_state(value, invert_binary=invert) == expected
 
 
-@pytest.mark.parametrize("value", [None, "", "2", "50", "abc", "-1", "0.5", "nan"])
+@pytest.mark.parametrize("value", [None, "", "abc", "-1", "-0.5", "nan", "inf", "1e999"])
 def test_valve_state_outside_table_is_never_invented(value):
     assert readback.valve_state(value) is None
     assert readback.valve_state(value, invert_binary=True) is None
@@ -457,7 +540,7 @@ async def test_unknown_state_value_publishes_nothing():
     decision = _decision(_map(_mono_eq()))
     bridge = _Bridge()
     sync = StateSynchronizer(app={"publications": {MONO_ID: decision}}, mqtt_bridge=bridge)
-    assert await sync.handle_state_message(MONO_ID, 80019, "7") is False
+    assert await sync.handle_state_message(MONO_ID, 80019, "-1") is False
     assert bridge.published == []
 
 
@@ -487,6 +570,21 @@ def test_invert_binary_is_read_from_the_topology_payload():
     }]})
     cmds = snapshot.eq_logics[MONO_ID].cmds
     assert [c.invert_binary for c in cmds] == [True, False, False]
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("4144", 4144), ("#4144#", 4144), (" #4144# ", 4144), (4144, 4144), (None, None),
+    ("", None), ("0", None), ("#4144# + 1", None), ("#4144##4145#", None), ("abc", None),
+    (True, None), (-3, None),
+])
+def test_linked_value_is_read_from_the_topology_payload(raw, expected):
+    snapshot = TopologySnapshot.from_jeedom_payload({"eq_logics": [{
+        "id": MONO_ID, "name": "Eq", "cmds": [
+            {"id": 2, "name": "B", "generic_type": "IRRIG_ON", "type": "action",
+             "linked_value": raw},
+        ],
+    }]})
+    assert snapshot.eq_logics[MONO_ID].cmds[0].linked_value == expected
 
 
 # --- AC6 : override pe-epic-16 ------------------------------------------------------

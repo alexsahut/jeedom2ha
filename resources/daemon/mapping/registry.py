@@ -1,6 +1,6 @@
 """registry.py - Ordered registry for Jeedom -> Home Assistant mappers."""
 
-from dataclasses import replace
+import logging
 from typing import Any, Dict, Iterator, List, Optional
 
 from mapping.alarm_control_panel import AlarmControlPanelMapper
@@ -17,6 +17,8 @@ from mapping.valve import ValveMapper
 from models.mapping import MappingResult
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from validation.ha_component_registry import PRODUCT_SCOPE, validate_projection
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MapperRegistry:
@@ -85,22 +87,45 @@ class MapperRegistry:
     def _with_valves(
         self, eq: JeedomEqLogic, snapshot: TopologySnapshot, valve_results: List[MappingResult]
     ) -> List[MappingResult]:
-        """Story 24.8 — ajoute les vannes aux entités que l'équipement avait déjà.
+        """Story 24.8 (Q10 A) — les vannes remplacent les entités qui utilisaient leurs commandes.
 
-        Les commandes des trios de vanne sont consommées (une commande, une entité) ; le
-        reste de l'équipement est projeté comme avant, règle du nom comprise, puis les
-        vannes s'y ajoutent en secondaires. Sans autre entité, les vannes seules suivent la
-        règle du nom (une seule vanne : nom de l'équipement).
+        La projection d'avant est calculée sur l'équipement COMPLET. Ses entités qui
+        n'utilisent aucune commande d'un trio publié en vanne sont gardées à l'identique ;
+        celles qui en utilisent une sont retirées (WARNING), jamais re-projetées : aucune
+        entité ne réapparaît sous un unique_id existant avec une autre commande. Les vannes
+        s'ajoutent ensuite. Sans entité gardée, les vannes seules suivent la règle du nom
+        (une seule vanne : nom de l'équipement).
         """
         consumed = {int(cmd.id) for result in valve_results for cmd in result.commands.values()}
-        rest_cmds = [cmd for cmd in eq.cmds if int(cmd.id) not in consumed]
-        rest: List[MappingResult] = []
-        if rest_cmds:
-            rest_eq = replace(eq, cmds=rest_cmds)
-            rest = self._apply_entity_name_rule(rest_eq, self._map_all_raw(rest_eq, snapshot))
-        if not rest:
+        before = self._apply_entity_name_rule(eq, self._map_all_raw(eq, snapshot))
+        kept: List[MappingResult] = []
+        for result in before:
+            used = self._result_cmd_ids(result)
+            if used & consumed:
+                _LOGGER.warning(
+                    "[MAPPING] eq_id=%d: entité %s %s retirée, remplacée par la vanne "
+                    "(commandes %s reprises par un trio de vanne)",
+                    eq.id, result.ha_entity_type, result.ha_unique_id, sorted(used & consumed),
+                )
+                continue
+            kept.append(result)
+        if not kept:
             return self._apply_entity_name_rule(eq, valve_results)
-        return [*rest, *valve_results]
+        return [*kept, *valve_results]
+
+    @staticmethod
+    def _result_cmd_ids(result: MappingResult) -> set:
+        """Ids des commandes Jeedom portées par une entité (commandes + ``cmd_id`` de détail)."""
+        ids = set()
+        for cmd in (result.commands or {}).values():
+            try:
+                ids.add(int(cmd.id))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        raw = (result.reason_details or {}).get("cmd_id")
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            ids.add(raw)
+        return ids
 
     def _map_all_raw(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         structural_results = self._map_structural_multi_entity(eq, snapshot)

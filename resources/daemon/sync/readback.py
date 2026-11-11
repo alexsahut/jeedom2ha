@@ -16,8 +16,11 @@ its own.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
+
+from mapping.valve import VALVE_STATE_KEYS  # Story 24.8
 
 CHANNEL_STATE = "state"
 CHANNEL_BRIGHTNESS = "brightness"
@@ -29,9 +32,9 @@ STATE_KEYS: Dict[str, Tuple[str, ...]] = {
     "switch": ("ENERGY_STATE", "SWITCH_STATE", "PRESENCE"),
     "light": ("LIGHT_STATE",),
     "cover": ("FLAP_STATE", "FLAP_BSO_STATE"),
-    # Story 24.8 — open/closed of a valve: the STATE of its trio (mapping/valve.py
-    # ``VALVE_STATE_KEYS``, Homebridge types frozen in Task 0).
-    "valve": ("IRRIG_STATE", "FAUCET_STATE", "VALVE_STATE"),
+    # Story 24.8 — open/closed of a valve: the STATE of its trio (single source:
+    # ``mapping.valve.VALVE_STATE_KEYS``, Homebridge types frozen in Task 0).
+    "valve": VALVE_STATE_KEYS,
 }
 BRIGHTNESS_KEYS: Tuple[str, ...] = ("LIGHT_BRIGHTNESS",)
 # LIGHT_BRIGHTNESS feeds the brightness; a numeric LIGHT_STATE is the fallback (see
@@ -161,7 +164,8 @@ def valve_state(value: Any, invert_binary: bool = False) -> Optional[str]:
     """Translate a valve STATE value to ``open`` / ``closed``; unknown -> None.
 
     ``invert_binary`` is the Jeedom display option ``invertBinary`` of the STATE command
-    (exported in the topology as ``invert_binary``): 1 then means closed.
+    (exported in the topology as ``invert_binary``): applied to the result (1, or any
+    number > 0, then means closed). A numeric state reads 0 = closed, > 0 = open.
     """
     if value is None:
         return None
@@ -173,13 +177,15 @@ def valve_state(value: Any, invert_binary: bool = False) -> Optional[str]:
     elif text in _VALVE_CLOSED_VALUES:
         is_open = False
     else:
+        # Numeric state: 0 = closed, > 0 = open (e.g. a flow or an opening level);
+        # negative or non-finite -> nothing.
         try:
             number = float(text.replace(",", "."))
         except ValueError:
             return None
-        if number not in (0.0, 1.0):
+        if not math.isfinite(number) or number < 0:
             return None
-        is_open = number == 1.0
+        is_open = number > 0
     if invert_binary:
         is_open = not is_open
     return "open" if is_open else "closed"

@@ -70,19 +70,24 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
 
   // Story 24.8 (ouverture gouvernée de `valve`, AR13) : les listes figées des composants ouverts et des publishers gagnent
   // `valve` (code et tests qui les vérifient), `valve` est un actionneur de l'export de décision, et le golden 8.4 gagne les
-  // compteurs `valves_*` à 0 (seule la virgule après `switches_sure` change). Le reste du démon est en ajouts seuls.
+  // compteurs `valves_*` à 0 (seule la virgule après `switches_sure` change). Le reste du démon est en ajouts seuls. Chaque
+  // remplacement est admis dans SON fichier seulement (« fichier::ligne »), pas comme texte libre.
   const REPLACED_BY_24_8 = [
-    'PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10',
-    '_known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
-    '_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel"})',
-    'assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
-    'assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
-    'assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
-    'assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
-    '"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"',
-    '"climate", "alarm_control_panel"]',
-    'assert len(PRODUCT_SCOPE) == 8',
-    '"switches_sure": 3',
+    'resources/daemon/validation/ha_component_registry.py::PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10',
+    'resources/daemon/discovery/registry.py::_known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/export/decision_export.py::_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel"})',
+    'resources/daemon/tests/unit/test_ha_component_registry.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_7_2_wave_registry.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
+    'resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert len(PRODUCT_SCOPE) == 8',
+    'resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"}',
+    'resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_9_2_binary_sensor_mapper.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]',
+    'resources/daemon/tests/unit/test_story_9_3_button_mapper.py::"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"',
+    'resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::"climate", "alarm_control_panel"]',
+    'resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::"switches_sure": 3',
   ];
 
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
@@ -118,8 +123,17 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   it('resources/daemon/, core/ajax/, core/class/, lib/policy.mjs : aucune ligne existante retirée, hors les remplacements de 25.8, 25.9 et 24.2', () => {
     const diff = diffAgainstBase(['-U0'], ['resources/daemon/', 'core/ajax/', 'core/class/', 'tests/e2e/gate/lib/policy.mjs']);
     if (diff === null) return;
-    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2, ...REPLACED_BY_24_4, ...REPLACED_BY_24_8];
-    const unexpected = removedLines(diff).map((line) => line.slice(1).trim()).filter((line) => !allowed.includes(line));
+    const allowed = [...REPLACED_BY_25_8_25_9, ...REPLACED_BY_24_2, ...REPLACED_BY_24_4];
+    // Ligne retirée -> « fichier::ligne » (fichier lu dans l'en-tête `diff --git` qui la précède).
+    let file = null;
+    const removed = [];
+    for (const l of diff.split('\n')) {
+      if (l.startsWith('diff --git ')) file = l.split(' b/').pop();
+      else if (removedLines(l).length) removed.push({ file, line: l.slice(1).trim() });
+    }
+    const unexpected = removed
+      .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`))
+      .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });
 
