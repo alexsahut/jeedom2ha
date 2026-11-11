@@ -1,6 +1,6 @@
 # Story 24.8 : Vanne d'arrosage : `valve`
 
-Status: draft
+Status: ready-for-dev
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production et ouvre un composant** (`valve`, FR40/NFR10). Décisions attendues d'Alexandre : **Q9** (relation avec l'epic 18) et **Q10** (remplacement d'entités existantes) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -31,6 +31,35 @@ afin de la piloter par Assist.
 - **Deux vannes** portent `IRRIG_ON`, `IRRIG_OFF`, `IRRIG_STATE` (trio complet : ordres + état), dont **une appartient à un plugin Z-Wave**.
 - **Point à trancher avant le `create-story`** : si ce plugin Z-Wave figure dans la liste `excludedPlugins` (plugins natifs : « exclu par plugin », décision Q1), cette vanne **n'est pas publiée par jeedom2ha** et sort de cette story (sa voie est l'intégration native de HA) ; seule l'autre vanne la concerne. À confirmer par ClaudeBox à partir de l'export (champ `plugin` et `reason: excluded_plugin`).
 - `IRRIG_*` n'est pas un type du core (famille Homebridge) : le gel du référentiel (Task 0) reste nécessaire.
+
+## Task 0 faite par ClaudeBox le 2026-11-11 (export de production, lecture seule)
+
+Source : `/system/decision_export` et `/system/state_listeners` du démon de production, relevés par la sonde CC-48 v2 (11/11, 19:44). Catalogue des types gelé par clawcode à partir des sources du plugin Homebridge installé ; aucune occurrence côté core.
+
+**Types génériques de vanne (Homebridge, gelés)** : `IRRIG_STATE/ON/OFF`, `FAUCET_STATE/ON/OFF`, `VALVE_STATE/ON/OFF` (+ `VALVE_SET_DURATION`, `VALVE_REMAINING_DURATION`, hors périmètre par AC7). Aucun type de position : `reports_position: false`.
+
+**Équipements concernés (3, tous `published`, `homekit_exposed_effective: true`, pièce 11)** :
+
+| eq | plugin | Trios de vanne (STATE / ON / OFF) | Publication actuelle |
+|---|---|---|---|
+| 461 | zwavejs | 4144 / 4145 / 4146 | `sensor` sur 4147 (sans type générique) ; commandes IRRIG en `command_not_covered` |
+| 462 | zwavejs | zone 1 : 4156 / 4157 / 4158 ; zone 2 : 4159 / 4160 / 4161 | publié, commandes IRRIG en `command_not_covered` |
+| 527 | virtual | 4849 / 4845 / 4848 | publié, commandes IRRIG en `command_not_covered` |
+
+- `zwavejs` **n'est pas** dans `excludedPlugins` : les deux vannes Z-Wave sont dans le périmètre (le point « voie native » de R1 est levé). Côté HA, les entités Z-Wave natives sont toutes `unavailable` le 11/11.
+- Aucune commande de vanne n'a d'entité HA aujourd'hui : la story est **additive** pour ces commandes (pas de remplacement d'entité vanne existante) ; Q10 A s'applique aux autres entités des mêmes équipements seulement si le mapping les modifie (inventaire avant/après exigé, AC5).
+
+## Décisions d'Alexandre (2026-11-11, ~20:00)
+
+- **D1 — Vannes Z-Wave portées par jeedom2ha** : 461, 462 et 527 sont projetées en `valve` par le plugin.
+- **D2 — Une vanne par zone** : un équipement qui porte plusieurs trios `*_STATE/ON/OFF` produit une entité `valve` par trio (agrégation multi-entité structurelle, comme le multi-switch de 11.3) ; appariement des trios par l'info liée des actions (`value` de l'action = id de la commande STATE), à défaut par ordre d'id ; un trio incomplet n'est pas publié en `valve` (pas d'ordre deviné).
+- **D3 — Preuve terrain sur le virtuel 527 seulement** : ouverture/fermeture réelles uniquement sur 527 ; pour 461 et 462, vérification en lecture seule (entités, topics, `optimistic: false`, état retenu = état Jeedom), **aucun ordre envoyé**.
+
+## Décisions techniques ClaudeBox (2026-11-11)
+
+- **D4** — `valve` sans position : `payload_open`/`payload_close` traduits par `sync/command.py` vers les actions ON/OFF ; `state_topic` + `state_open: open` / `state_closed: closed` ; état binaire 0/1 traduit avec `invertBinary` comme pour `switch` ; `optimistic: false` quand STATE existe, sinon le trio est incomplet (D2) et rien n'est publié en `valve`.
+- **D5** — `device_class: water` pour `IRRIG_*` et `FAUCET_*`, aucune `device_class` pour `VALVE_*`.
+- **D6** — Ordre des mappers : la vanne est reconnue avant `switch` et le repli, sans changer la projection des équipements qui n'ont aucun type de vanne (golden inchangés).
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -71,3 +100,4 @@ Les types génériques exacts de vanne présents dans l'installation ; les champ
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q9 A (absorbe 18-4), Q10 A ; Q1 « exclu par plugin » conservé.
+- 2026-11-11 — Task 0 (ClaudeBox, export de production) ; décisions D1-D3 d'Alexandre, D4-D6 ClaudeBox ; `ready-for-dev` accordé par ClaudeBox.
