@@ -384,7 +384,7 @@ Deux expressions de ces motifs méritent une explication. Une **« commande clé
 
 ### Ce que le plugin sait publier
 
-Le plugin publie huit types d'entités Home Assistant. Le type est choisi à partir des types Jeedom des commandes de l'équipement.
+Le plugin publie neuf types d'entités Home Assistant. Le type est choisi à partir des types Jeedom des commandes de l'équipement.
 
 | Type Home Assistant | Ce que le plugin en fait |
 |---|---|
@@ -396,6 +396,7 @@ Le plugin publie huit types d'entités Home Assistant. Le type est choisi à par
 | `button` | Actions ponctuelles sans valeur, et **scénarios Jeedom actifs** (un bouton par scénario actif). |
 | `climate` | Thermostats, pour la consigne et la température. |
 | `alarm_control_panel` | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
+| `valve` | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
 
 Le plugin ne publie pas les équipements sans type Jeedom reconnu : il l'indique alors dans l'encart de cause de l'équipement.
 
@@ -456,6 +457,19 @@ Limites à connaître :
 - **Pas d'arrêt** : aucun type Jeedom « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop. **Pas de position.**
 - Sans état, ou avec un état **binaire** (0/1), l'équipement ne devient pas un ouvrant : il garde son comportement précédent (bouton, ou capteur d'ouverture de classe « porte de garage »).
 - Au passage du bouton à l'ouvrant, le bouton disparaît de Home Assistant et l'ouvrant apparaît avec un nouvel identifiant (`cover.jeedom2ha_<id>` au lieu de `button.jeedom2ha_<id>`) : les automatisations et tableaux de bord qui visaient le bouton sont à reprendre. Imposer le type « button » sur une commande de l'équipement (voir [Choisir le type Home Assistant d'une commande](#choisir-le-type-home-assistant-dune-commande)) permet de garder le bouton.
+
+### Vannes d'arrosage
+
+Un équipement Jeedom qui porte les types de vanne du plugin Homebridge (« Arrosage » `IRRIG_STATE` / `IRRIG_ON` / `IRRIG_OFF`, « Robinet » `FAUCET_*`, « Vanne générique » `VALVE_*`) est publié avec une **vanne** (`valve`) par trio complet : une information d'état, une action pour ouvrir, une action pour fermer.
+
+- **Une vanne par zone** : un programmateur à deux zones (deux trios) donne deux vannes. Les actions sont rattachées à leur état par le champ « Valeur » de l'action dans Jeedom (la commande d'état liée).
+  - Un seul trio dans la famille : la vanne est publiée même si ce champ est vide ; s'il désigne une autre commande, aucune vanne.
+  - Plusieurs trios : **chaque** action d'ouverture et de fermeture doit désigner l'état de sa zone (une ouverture et une fermeture par état). Sinon, aucune vanne pour cette famille (le journal du démon le dit) : le plugin ne devine jamais quelle action pilote quelle zone.
+- **Trio incomplet, pas de vanne** : sans l'état, sans l'ouverture ou sans la fermeture, ou si les nombres d'états et d'actions d'une même famille diffèrent, aucune vanne n'est publiée ; l'équipement garde exactement ce qu'il avait.
+- **La vanne remplace les entités qui utilisaient ses commandes** : une entité publiée avant sur une commande du trio (par exemple un bouton sur l'action d'ouverture) est retirée et remplacée par la vanne ; pensez à reprendre les automatisations qui l'utilisaient. Les autres entités de l'équipement (par exemple une mesure) restent publiées comme avant, avec les mêmes identifiants.
+- **État réel** : 1 ou toute valeur positive ouvert, 0 fermé (inversé si l'option « Inverser » est cochée sur la commande d'état dans Jeedom) ; toute autre valeur ne change rien dans Home Assistant. Pas d'état supposé (`optimistic: false`).
+- Classe « eau » (`water`) pour l'arrosage et le robinet, aucune classe pour la vanne générique. **Pas de position, pas de minuterie, pas de programme d'arrosage** : les durées (`VALVE_SET_DURATION`, `VALVE_REMAINING_DURATION`) ne sont pas reprises.
+- Identifiant de l'entité : `valve.jeedom2ha_<équipement>_<commande d'état>`.
 
 ### Les badges de synthèse
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+import re
 import unicodedata
 
 from models.availability import (
@@ -69,6 +70,25 @@ def _normalize_logical_id(value: Any) -> Optional[str]:
     return clean or None
 
 
+_LINKED_CMD_ID_RE = re.compile(r"#?(\d+)#?")
+
+
+def normalize_linked_cmd_id(value: Any) -> Optional[int]:
+    """Story 24.8 (D2) — id de commande lié d'une action : "4144", "#4144#" ou 4144 -> 4144.
+
+    Toute autre forme (vide, expression, plusieurs ids, booléen) -> None : jamais deviné.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    match = _LINKED_CMD_ID_RE.fullmatch(str(value).strip())
+    if match is None:
+        return None
+    cmd_id = int(match.group(1))
+    return cmd_id if cmd_id > 0 else None
+
+
 def _normalize_homekit_source(value: Any) -> Optional[str]:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -133,6 +153,11 @@ class JeedomCmd:
     is_historized: bool = False
     # Story 24.1 — identifiant physique (jamais dans un journal info+ ni dans le repr)
     logical_id: Optional[str] = field(default=None, repr=False)
+    # Story 24.8 — option d'affichage Jeedom ``invertBinary`` (lue pour l'état d'une vanne)
+    invert_binary: bool = False
+    # Story 24.8 (D2) — id de la commande info liée à une action (« Valeur » du cœur Jeedom,
+    # exportée telle quelle : "4144" ou "#4144#") ; None si absente ou illisible.
+    linked_value: Optional[int] = None
 
 @dataclass
 class JeedomEqLogic:
@@ -239,6 +264,8 @@ class TopologySnapshot:
                             is_visible=_to_bool(cmd_raw.get("is_visible"), default=True),
                             is_historized=_to_bool(cmd_raw.get("is_historized"), default=False),
                             logical_id=_normalize_logical_id(cmd_raw.get("logical_id")),
+                            invert_binary=_to_bool(cmd_raw.get("invert_binary"), default=False),
+                            linked_value=normalize_linked_cmd_id(cmd_raw.get("linked_value")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue

@@ -107,6 +107,7 @@ def _mapping_fingerprint(mapping: Any) -> dict[str, Any]:
 _KNOWN_TYPES = [
     "light", "cover", "switch", "sensor",
     "binary_sensor", "button", "climate", "alarm_control_panel",
+    "valve",  # Story 24.8
 ]
 
 

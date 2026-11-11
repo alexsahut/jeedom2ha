@@ -295,6 +295,33 @@ class DiscoveryPublisher:
             )
         return ok
 
+    async def publish_valve(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a valve discovery config to MQTT (Story 24.8).
+
+        One topic per valve (node-scoped by its STATE command): an equipment may carry
+        several valves (zones, D2) next to its other entities.
+        """
+        reason_details = mapping.reason_details or {}
+        _nid = reason_details.get("node_id")
+        node_id = _nid if isinstance(_nid, str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="valve", node_id=node_id)
+        payload = self._build_valve_payload(mapping, snapshot)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing valve config: topic=%s eq_id=%d name='%s' confidence=%s",
+            topic, mapping.jeedom_eq_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish valve config for eq_id=%d (bridge unavailable)",
+                mapping.jeedom_eq_id,
+            )
+        return ok
+
     async def unpublish(self, ha_unique_id: str) -> bool:
         """Remove a discovery config by publishing empty payload with retain.
 
@@ -702,6 +729,49 @@ class DiscoveryPublisher:
         # getattr: a type override (D11) may keep non-Switch detected capabilities.
         if getattr(caps, "device_class", None) == "outlet":
             payload["device_class"] = "outlet"
+
+        return payload
+
+    def _build_valve_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build the MQTT Discovery JSON payload for a valve entity (Story 24.8, D4/D5).
+
+        No position (``reports_position: false``): OPEN/CLOSE orders translated by
+        ``sync/command.py`` to the trio's ON/OFF actions, open/closed state from its STATE
+        info. ``device_class: water`` for IRRIG_* / FAUCET_*, absent for VALVE_*.
+        """
+        eq_id = mapping.jeedom_eq_id
+        device = self._build_device_block(mapping, snapshot)
+        caps = mapping.capabilities
+        reason_details = mapping.reason_details or {}
+        object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
+        command_topic = reason_details.get("command_topic") or f"jeedom2ha/{eq_id}/set"
+        state_topic = reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state"
+
+        payload = {
+            "name": self._entity_name_for_payload(mapping, device),
+            "unique_id": mapping.ha_unique_id,
+            "object_id": object_id,
+            "command_topic": command_topic,
+            "payload_open": "OPEN",
+            "payload_close": "CLOSE",
+            "state_topic": state_topic,
+            "state_open": "open",
+            "state_closed": "closed",
+            "reports_position": False,
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        self._add_default_entity_id(payload, "valve")
+        payload.update(self._build_availability_fields(mapping, snapshot))
+        # Story 23.3 rule (AC3) — ``optimistic: false`` only when the STATE info is streamed.
+        payload["optimistic"] = not has_reliable_channel("valve", mapping, CHANNEL_STATE)
+
+        device_class = getattr(caps, "device_class", None)
+        if device_class == "water":
+            payload["device_class"] = "water"
 
         return payload
 

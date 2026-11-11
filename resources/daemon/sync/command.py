@@ -346,6 +346,12 @@ class CommandSynchronizer:
         if mapping.ha_entity_type == "cover" and bool(getattr(mapping.capabilities, "has_position", False)):
             topics["position"] = f"jeedom2ha/{eq_id}/position/set"
 
+        if mapping.ha_entity_type == "valve":
+            # Story 24.8 — one command topic per valve (node-scoped by its STATE command).
+            command_topic = (mapping.reason_details or {}).get("command_topic")
+            if isinstance(command_topic, str) and command_topic:
+                topics["set"] = command_topic
+
         return topics
 
     def _translate_command(
@@ -382,6 +388,9 @@ class CommandSynchronizer:
                     command_family="on_off",
                     optimistic_state_payload=payload_upper,
                 ), None
+
+            if mapping.ha_entity_type == "valve":
+                return self._translate_valve_command(mapping, payload_upper)
 
             if barrier_mode(mapping) is not None:
                 # Story 24.7 — portail / garage (D3 bis).
@@ -442,6 +451,30 @@ class CommandSynchronizer:
             ), None
 
         return None, "invalid_command_topic"
+
+    @staticmethod
+    def _translate_valve_command(
+        mapping: MappingResult,
+        payload_upper: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.8 (D4) — valve OPEN / CLOSE -> the ON / OFF action of its own trio.
+
+        The family comes from the mapping (``reason_details["valve_family"]``); only the
+        trio's own commands are ever used, so no order is sent without its Jeedom command
+        (AC4). No STOP and no position: anything else is refused.
+        """
+        family = (mapping.reason_details or {}).get("valve_family")
+        suffix = {"OPEN": "ON", "CLOSE": "OFF"}.get(payload_upper)
+        if suffix is None:
+            return None, "invalid_command_payload"
+        cmd = (mapping.commands or {}).get(f"{family}_{suffix}") if isinstance(family, str) else None
+        if cmd is None or str(getattr(cmd, "type", "")).lower() != "action":
+            return None, "missing_action_command"
+        try:
+            cmd_id = int(cmd.id)
+        except (TypeError, ValueError):
+            return None, "missing_action_command"
+        return CommandTranslation(cmd_id=cmd_id, options={}, command_family="valve_open_close"), None
 
     def _translate_barrier_command(
         self,
@@ -699,6 +732,12 @@ class CommandSynchronizer:
 
         if translation.command_family == "barrier_toggle" and mapping.ha_entity_type == "cover":
             # Story 24.7 — a toggle is only ever sent with a numeric barrier state.
+            if self._has_reliable_state(mapping, decision):
+                return "real_state_confirmation"
+            return "stateless"
+
+        if translation.command_family == "valve_open_close" and mapping.ha_entity_type == "valve":
+            # Story 24.8 — ``optimistic: false`` at discovery: never an invented state.
             if self._has_reliable_state(mapping, decision):
                 return "real_state_confirmation"
             return "stateless"

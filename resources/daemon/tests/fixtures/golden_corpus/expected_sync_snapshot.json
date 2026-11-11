@@ -12704,7 +12704,12 @@
       "switches_probable": 11,
       "switches_published": 14,
       "switches_skipped": 1,
-      "switches_sure": 3
+      "switches_sure": 3,
+      "valves_ambiguous": 0,
+      "valves_probable": 0,
+      "valves_published": 0,
+      "valves_skipped": 0,
+      "valves_sure": 0
     },
     "mappings": {
       "1000": {
@@ -16900,7 +16905,12 @@
         "switches_probable": 11,
         "switches_published": 14,
         "switches_skipped": 1,
-        "switches_sure": 3
+        "switches_sure": 3,
+        "valves_ambiguous": 0,
+        "valves_probable": 0,
+        "valves_published": 0,
+        "valves_skipped": 0,
+        "valves_sure": 0
       },
       "published_scope": {
         "equipements": [

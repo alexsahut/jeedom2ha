@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-11 — Vannes d'arrosage : des vannes dans Home Assistant
+
+- Une vanne d'arrosage, un robinet ou une vanne générique Jeedom (types Homebridge `IRRIG_*`, `FAUCET_*`, `VALVE_*` : état, ouvrir, fermer) est publié comme une vanne (`valve`) avec son état réel, pilotable par Assist. Un programmateur à plusieurs zones donne une vanne par zone.
+- Sans trio complet (état, ouverture et fermeture), rien ne change. Avec plusieurs zones, chaque action doit désigner l'état de sa zone (champ « Valeur » de l'action dans Jeedom), sinon aucune vanne n'est publiée.
+- **Changement d'identifiant possible** : une entité qui utilisait une commande du trio (par exemple un bouton sur l'action d'ouverture) est retirée et remplacée par la vanne (`valve.jeedom2ha_<équipement>_<commande d'état>`). Les autres entités de l'équipement restent les mêmes. Pas de position, de minuterie ni de programme d'arrosage. Détail dans la section « Vannes d'arrosage » de la documentation.
+
+---
+
 # 2026-11-01 — Portails et portes motorisées : des ouvrants dans Home Assistant
 
 - Un portail ou une porte motorisée Jeedom (types `GB_TOGGLE`, ou `GB_OPEN` et `GB_CLOSE`, avec un état numérique `BARRIER_STATE` ou `GARAGE_STATE`) est publié comme un ouvrant (`cover`, classe portail `gate` ou porte de stationnement) avec son état réel (ouvert, fermé, en ouverture, en fermeture), au lieu d'un simple bouton. Il devient pilotable par Assist.

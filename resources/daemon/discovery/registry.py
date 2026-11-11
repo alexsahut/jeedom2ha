@@ -28,7 +28,7 @@ class UnknownPublisherError(KeyError):
 class PublisherRegistry:
     """Fixed dispatch table for existing discovery publishers."""
 
-    _known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]
+    _known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]
 
     def __init__(self, publisher: DiscoveryPublisher) -> None:
         self._publishers: Dict[str, PublishMethod] = {
@@ -40,6 +40,7 @@ class PublisherRegistry:
             "button": publisher.publish_button,
             "climate": publisher.publish_climate,
             "alarm_control_panel": publisher.publish_alarm_control_panel,
+            "valve": publisher.publish_valve,  # Story 24.8
         }
 
     @classmethod

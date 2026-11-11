@@ -78,7 +78,7 @@ def test_product_scope_snapshot_with_wave_open():
     Story 10.2 a ouvert climate sous FR40/NFR10.
     Story 10.3 a ouvert alarm_control_panel sous FR40/NFR10.
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]
     for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 

@@ -49,6 +49,7 @@ from sync.readback import (
     channel_topic,
     is_barrier_state_command,
     readback_commands,
+    valve_state,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +62,10 @@ _VAGUE2_ACTIONABLE = ("switch",)
 _VAGUE3_ACTIONABLE = ("light", "cover")
 _ACTIONABLE_STREAMED = _VAGUE2_ACTIONABLE + _VAGUE3_ACTIONABLE
 _STREAMED_TYPES = _VAGUE1_TYPES + _ACTIONABLE_STREAMED
+# Story 24.8: valve open/closed from the STATE of its trio (state entry of 23.3, D4).
+_VALVE_ACTIONABLE = ("valve",)
+_ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _VALVE_ACTIONABLE
+_STREAMED_TYPES = _STREAMED_TYPES + _VALVE_ACTIONABLE
 
 # Readback (info) command keys per actionable type — used to pick the state
 # command, NOT the action commands (e.g. switch ENERGY_ON/ENERGY_OFF).
@@ -74,6 +79,7 @@ _READBACK_KEYS = {
     "switch": STATE_KEYS["switch"],
     "light": STATE_KEYS["light"] + BRIGHTNESS_KEYS,
     "cover": STATE_KEYS["cover"],
+    "valve": STATE_KEYS["valve"],
 }
 
 # Strict shape of the retained channel topics this module may empty (never anything else).
@@ -723,6 +729,17 @@ class StateSynchronizer:
         if channel in (CHANNEL_BRIGHTNESS, CHANNEL_POSITION):
             level = self._parse_percent(text)
             return None if level is None else str(level)
+
+        if ha_type == "valve":
+            # Story 24.8 (D4): 0/1 -> closed/open, ``invertBinary`` of the STATE honored;
+            # any other value publishes nothing. A valve binding carries no ``cmd`` (it is
+            # command-scoped), so the STATE is read from the mapping.
+            state_cmd = cmd
+            if state_cmd is None:
+                for _channel, readback_cmd in readback_commands("valve", mapping):
+                    state_cmd = readback_cmd
+                    break
+            return valve_state(text, invert_binary=bool(getattr(state_cmd, "invert_binary", False)))
 
         if ha_type == "cover" and is_barrier_state_command(cmd):
             # Story 24.7 (D1): gate / garage barrier value -> closed/closing/stopped/

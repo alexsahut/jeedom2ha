@@ -833,6 +833,10 @@ class jeedom2ha extends eqLogic {
           'is_visible'    => (bool)$cmd->getIsVisible(),
           'is_historized' => (bool)$cmd->getIsHistorized(),
           'logical_id'    => jeedom2ha_normalize_logical_id(method_exists($cmd, 'getLogicalId') ? $cmd->getLogicalId() : null),
+          // Story 24.8 — option d'affichage « Inverser » (lue par le démon pour l'état d'une vanne)
+          'invert_binary' => method_exists($cmd, 'getDisplay') ? (bool)$cmd->getDisplay('invertBinary', 0) : false,
+          // Story 24.8 (D2) — info liée d'une action (« Valeur » du cœur : id de la commande d'état), pour apparier les vannes
+          'linked_value'  => ($cmd->getType() === 'action' && method_exists($cmd, 'getValue')) ? (string)$cmd->getValue() : null,
         );
       }
 

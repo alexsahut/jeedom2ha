@@ -119,6 +119,7 @@ _PROFILE_ALLOWED_ENTITY_TYPES = frozenset(
         "select",
         "climate",
         "alarm_control_panel",
+        "valve",  # Story 24.8
     }
 )
 
