@@ -675,8 +675,9 @@ def test_switch_and_cover_projection_is_unchanged(cmds):
 # Couvert par le chemin existant du sync (`_unpublish_refused_candidates`, Story 19.4 C1) :
 # un secondaire publié dont la clé (cmd_id, node_id, domaine) n'existe plus dans la
 # nouvelle projection est dépublié, avec report en cas d'échec. Ces tests le prouvent sur
-# les formes de 24.8 (aucun code de cycle de vie ajouté : un second mécanisme dépublierait
-# deux fois, cf. test_t8 de 19.4).
+# les formes de 24.8 (pas de second mécanisme à chaud : il dépublierait deux fois, cf.
+# test_t8 de 19.4). Le premier sync après redémarrage est couvert à part par
+# `_unpublish_boot_removed_topics` (tests « boot » plus bas).
 
 def _published(mapping):
     """Projection publiée : principal et secondaires ``discovery_published``."""
