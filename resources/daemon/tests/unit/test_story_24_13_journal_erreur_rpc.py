@@ -220,6 +220,23 @@ def test_motifs_masques_par_nom():
     assert sync._last_exec_error_detail == "apikey=*** token=*** password=*** Access_Token=***"
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        '{"password": "prefix\\"SECRET_SUFFIX"} fin',
+        '{"token": "a\\\\b\\"SECRET_SUFFIX"} fin',
+        "token='x\\'SECRET_SUFFIX' fin",
+    ],
+)
+def test_secret_avec_guillemet_echappe_entierement_masque(message):
+    # Revue Codex #374 : une valeur entre guillemets contenant un guillemet échappé
+    # ne doit laisser aucune partie du secret dans le journal.
+    sync, _ = _sync()
+    sync._set_exec_error_detail(message)
+    assert "SECRET_SUFFIX" not in sync._last_exec_error_detail
+    assert sync._last_exec_error_detail.endswith(" fin")
+
+
 def test_http_500(caplog):
     sync, _ = _sync((500, {"error": {"message": "corps ignoré"}}))
     with caplog.at_level(logging.INFO):

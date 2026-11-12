@@ -71,7 +71,7 @@ _RPC_ERROR_DETAIL_REASON_CODES = ("jeedom_rpc_error", "jeedom_rpc_timeout")
 _RPC_ERROR_DETAIL_ACTIONS = ("execute_command", "execute_scenario_command")
 _RPC_ERROR_SECRET_RE = re.compile(
     r"(?i)(apikey|api_key|token|password)[\"']?\s*[=:]\s*"
-    r"(?:\"[^\"]*\"?|'[^']*'?|[^\s&,;\"'}\]]*)"
+    r"(?:\"(?:[^\"\\]|\\.)*\"?|'(?:[^'\\]|\\.)*'?|[^\s&,;\"'}\]]*)"
 )
 _RPC_ERROR_WHITESPACE_RE = re.compile(r"\s+")
 
