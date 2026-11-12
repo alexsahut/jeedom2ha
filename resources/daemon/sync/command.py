@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import sys
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional, Tuple
@@ -59,6 +60,51 @@ _BARRIER_DIRECT_ALLOWED = {
 # equipment is refused until a state event differing from the value read at send time
 # arrives, or this delay expires (seconds).
 BARRIER_TOGGLE_IN_FLIGHT_TIMEOUT_S = 60.0
+
+
+# Story 24.13 — safe detail of a failed Jeedom RPC, appended to the existing WARNING
+# [SYNC-CMD] line as ``error_detail=...`` (``reason_code`` itself is unchanged). Only the
+# JSON-RPC ``error`` code and message, the HTTP status or the exception type are kept:
+# never the request body, never a traceback, secrets masked, one line, bounded length.
+RPC_ERROR_DETAIL_MAX_LEN = 200
+_RPC_ERROR_DETAIL_REASON_CODES = ("jeedom_rpc_error", "jeedom_rpc_timeout")
+_RPC_ERROR_DETAIL_ACTIONS = ("execute_command", "execute_scenario_command")
+_RPC_ERROR_SECRET_RE = re.compile(
+    r"(?i)(apikey|api_key|token|password)[\"']?\s*[=:]\s*"
+    r"(?:\"[^\"]*\"?|'[^']*'?|[^\s&,;\"'}\]]*)"
+)
+_RPC_ERROR_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _sanitize_rpc_error_detail(raw: Any, secrets: Tuple[str, ...] = ()) -> str:
+    """Story 24.13 — one masked, single-line, truncated detail for the log."""
+    text = str(raw)
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "***")
+    text = _RPC_ERROR_SECRET_RE.sub(lambda m: f"{m.group(1)}=***", text)
+    text = _RPC_ERROR_WHITESPACE_RE.sub(" ", text).strip()
+    if len(text) > RPC_ERROR_DETAIL_MAX_LEN:
+        text = text[: RPC_ERROR_DETAIL_MAX_LEN - 3].rstrip() + "..."
+    return text
+
+
+def _rpc_error_payload_detail(error: Any) -> str:
+    """Story 24.13 — ``code=... message=...`` from a JSON-RPC ``error`` member."""
+    if isinstance(error, Mapping):
+        parts = []
+        if error.get("code") is not None:
+            parts.append(f"code={error.get('code')}")
+        if error.get("message") is not None:
+            parts.append(f"message={error.get('message')}")
+        return " ".join(parts) or "rpc_error"
+    return f"message={error}"
+
+
+def _rpc_exception_detail() -> str:
+    """Story 24.13 — type of the exception being handled (no message, no traceback)."""
+    exc = sys.exc_info()[1]
+    return f"exception={type(exc).__name__}" if exc is not None else "exception=unknown"
 
 
 def _barrier_refusal_reason(requested: str, state: Optional[str]) -> str:
@@ -131,6 +177,7 @@ class CommandSynchronizer:
         self._request_timeout = max(0.5, float(request_timeout))
         self._session: Optional[aiohttp.ClientSession] = None
         self._last_exec_error_reason: str = ""
+        self._last_exec_error_detail: str = ""  # Story 24.13
 
     async def stop(self) -> None:
         """Close the underlying HTTP session."""
@@ -1001,9 +1048,11 @@ class CommandSynchronizer:
 
     async def _execute_exec_cmd(self, cmd_id: int, options: Dict[str, str]) -> bool:
         self._last_exec_error_reason = ""
+        self._last_exec_error_detail = ""  # Story 24.13
 
         if not self._jeedom_api_endpoint or not self._jeedom_core_api_key:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail("jeedom_api_not_configured")  # Story 24.13
             return False
 
         if self._session is None or self._session.closed:
@@ -1026,20 +1075,25 @@ class CommandSynchronizer:
             async with self._session.post(self._jeedom_api_endpoint, json=request_payload) as response:
                 if response.status != 200:
                     self._last_exec_error_reason = "jeedom_rpc_error"
+                    self._set_exec_error_detail(f"http_status={response.status}")  # Story 24.13
                     return False
                 payload = await response.json(content_type=None)
         except asyncio.TimeoutError:
             self._last_exec_error_reason = "jeedom_rpc_timeout"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
         except aiohttp.ClientError:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
         except Exception:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
 
         if isinstance(payload, Mapping) and payload.get("error"):
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_error_payload_detail(payload.get("error")))  # Story 24.13
             return False
 
         return True
@@ -1072,9 +1126,11 @@ class CommandSynchronizer:
     async def _execute_scenario_start(self, scenario_id: int) -> bool:
         """Call scenario::changeState run on Jeedom for a scenario button (Story 10.1)."""
         self._last_exec_error_reason = ""
+        self._last_exec_error_detail = ""  # Story 24.13
 
         if not self._jeedom_api_endpoint or not self._jeedom_core_api_key:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail("jeedom_api_not_configured")  # Story 24.13
             return False
 
         if self._session is None or self._session.closed:
@@ -1097,20 +1153,25 @@ class CommandSynchronizer:
             async with self._session.post(self._jeedom_api_endpoint, json=request_payload) as response:
                 if response.status != 200:
                     self._last_exec_error_reason = "jeedom_rpc_error"
+                    self._set_exec_error_detail(f"http_status={response.status}")  # Story 24.13
                     return False
                 result = await response.json(content_type=None)
         except asyncio.TimeoutError:
             self._last_exec_error_reason = "jeedom_rpc_timeout"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
         except aiohttp.ClientError:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
         except Exception:
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_exception_detail())  # Story 24.13
             return False
 
         if isinstance(result, Mapping) and result.get("error"):
             self._last_exec_error_reason = "jeedom_rpc_error"
+            self._set_exec_error_detail(_rpc_error_payload_detail(result.get("error")))  # Story 24.13
             return False
 
         return True
@@ -1124,6 +1185,14 @@ class CommandSynchronizer:
         action: str,
         **extra: Any,
     ) -> None:
+        # Story 24.13 — the failed RPC's safe detail joins the existing WARNING line.
+        if (
+            reason_code in _RPC_ERROR_DETAIL_REASON_CODES
+            and action in _RPC_ERROR_DETAIL_ACTIONS
+            and self._last_exec_error_detail
+            and "error_detail" not in extra
+        ):
+            extra["error_detail"] = self._last_exec_error_detail
         details = " ".join(f"{key}={value}" for key, value in extra.items())
         suffix = f" {details}" if details else ""
         _LOGGER.log(
@@ -1135,3 +1204,7 @@ class CommandSynchronizer:
             action,
             suffix,
         )
+
+    def _set_exec_error_detail(self, raw: Any) -> None:
+        """Story 24.13 — keep a masked, single-line, truncated detail of the last RPC failure."""
+        self._last_exec_error_detail = _sanitize_rpc_error_detail(raw, (self._jeedom_core_api_key,))
