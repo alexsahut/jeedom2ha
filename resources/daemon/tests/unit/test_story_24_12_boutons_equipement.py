@@ -417,6 +417,43 @@ async def test_action_only_sensitive_pairs_are_not_pressable(first, second, capl
     assert f"cmd_id=91341 generic_type={first}" in message
 
 
+def _button_with(eq, info_cmd, action_cmd):
+    """Bouton construit comme la discovery le publierait, portant une info ET une action.
+
+    Aucun mapper natif ne produit aujourd'hui cette forme (l'info seule part en
+    binary_sensor / sensor) : c'est la défense en profondeur demandée en relecture R2 (P4).
+    """
+    return MappingResult(
+        ha_entity_type="button", confidence="sure", reason_code="button_probe",
+        jeedom_eq_id=eq.id, ha_unique_id=f"jeedom2ha_eq_{eq.id}", ha_name=eq.name,
+        suggested_area="Salon",
+        commands={info_cmd.generic_type or "info": info_cmd, action_cmd.generic_type or "fallback": action_cmd},
+        capabilities=SwitchCapabilities(has_on_off=True),
+        reason_details={"command_topic": f"jeedom2ha/{eq.id}/cmd"},
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state_type", ["LOCK_STATE", "IRRIG_STATE"])
+async def test_untyped_action_next_to_a_sensitive_info_is_refused(state_type, caplog):
+    """R2 (P4) — le scan des préfixes couvre toutes les commandes, info comprises."""
+    info = _cmd(91361, state_type, "info", "binary", name="Etat", value="0")
+    action = _cmd(91362, None, name="Action")
+    eq = _eq(SENSITIVE_ID, [info, action])
+    message = await _assert_press_refused(_button_with(eq, info, action), eq, caplog)
+    assert f"cmd_id=91361 generic_type={state_type}" in message
+
+
+@pytest.mark.asyncio
+async def test_neutral_info_next_to_a_generic_action_is_still_executed():
+    info = _cmd(91371, None, "info", "numeric", name="Mesure", value="0")
+    action = _cmd(91372, "GENERIC_ACTION", name="Action")
+    eq = _eq(SENSITIVE_ID, [info, action])
+    sync, _bridge = _cmd_sync(_button_with(eq, info, action))
+    assert await sync.handle_command_message(f"jeedom2ha/{SENSITIVE_ID}/cmd", "PRESS") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(91372, {})
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("generic_type", ["GENERIC_ACTION", "MEDIA_PLAY", "MEDIA_PAUSE", "MEDIA_STOP"])
 async def test_neutral_button_is_still_executed(generic_type):

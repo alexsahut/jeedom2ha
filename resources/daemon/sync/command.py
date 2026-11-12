@@ -522,8 +522,10 @@ class CommandSynchronizer:
         - only ``PRESS`` triggers, compared exactly on the raw payload (no strip, no case
           folding); the discovery publishes no ``payload_press`` (P3);
         - D-sensibles: a mapping carrying ``barrier_mode`` / ``valve_family`` (override of a
-          24.7 cover or 24.8 valve) or a candidate command whose generic type starts with one
-          of ``BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES`` is refused
+          24.7 cover or 24.8 valve) or any command whose generic type starts with one
+          of ``BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES`` is refused; the prefix scan covers
+          EVERY command of the mapping (info and action, any sub-type), before the
+          candidate filter (R2, P4)
           (``button_sensitive_family_refused``, WARNING), never executed;
         - only the button's own commands are considered, and among them only ``action``
           commands of sub-type ``other`` (a press has no value to give a slider, a
@@ -546,6 +548,19 @@ class CommandSynchronizer:
                 )
                 return None, "button_sensitive_family_refused"
 
+        # R2 (P4) — every command of the mapping is scanned (info and action, any
+        # sub-type) BEFORE the candidate filter: an untyped action next to a LOCK_STATE /
+        # IRRIG_STATE info belongs to a sensitive device and is refused as well.
+        for cmd in sorted((mapping.commands or {}).values(), key=lambda c: str(getattr(c, "id", ""))):
+            generic_type = str(getattr(cmd, "generic_type", "") or "")
+            if generic_type.upper().startswith(BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES):
+                _LOGGER.warning(
+                    "[SYNC-CMD] eq_id=%s reason_code=button_sensitive_family_refused "
+                    "action=reject_command cmd_id=%s generic_type=%s",
+                    eq_id, getattr(cmd, "id", "-"), generic_type,
+                )
+                return None, "button_sensitive_family_refused"
+
         candidates: Dict[int, str] = {}
         for cmd in (mapping.commands or {}).values():
             if str(getattr(cmd, "type", "") or "").lower() != "action":
@@ -556,14 +571,6 @@ class CommandSynchronizer:
                 candidates[int(cmd.id)] = str(getattr(cmd, "generic_type", "") or "")
             except (TypeError, ValueError):
                 continue
-        for cmd_id, generic_type in sorted(candidates.items()):
-            if generic_type.upper().startswith(BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES):
-                _LOGGER.warning(
-                    "[SYNC-CMD] eq_id=%s reason_code=button_sensitive_family_refused "
-                    "action=reject_command cmd_id=%s generic_type=%s",
-                    eq_id, cmd_id, generic_type,
-                )
-                return None, "button_sensitive_family_refused"
         if not candidates:
             return None, "missing_action_command"
         if len(candidates) > 1:

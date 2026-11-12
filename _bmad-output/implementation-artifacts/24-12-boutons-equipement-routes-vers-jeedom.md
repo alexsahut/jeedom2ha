@@ -30,7 +30,7 @@ afin que le bouton fasse ce qu'il annonce, comme les boutons de scénario.
 4. **AC4 — message retenu** : un message retenu sur le topic d'un bouton (mono ou secondaire) est ignoré (même garde que 24.7, `retained_command_ignored`), un message direct passe.
 5. **AC5 — commande liée** : seules les commandes du mapping du bouton sont candidates, et parmi elles seules les commandes `action` de sous-type `other` (un appui ne porte pas de valeur) ; jamais une commande `info`. Aucune candidate → `missing_action_command` ; plusieurs (ex. switch forcé en bouton : ON et OFF) → `ambiguous_button_action`, jamais devinée.
 6. **AC6 — cible inconnue ou non publiée** : équipement inconnu, bouton non publié ou non vivant, entité indisponible → rien n'est exécuté (codes existants).
-7. **AC8 — familles sensibles (R1, D-sensibles)** : un appui est refusé, jamais exécuté, avec `reason_code=button_sensitive_family_refused` (WARNING portant `eq_id`, `cmd_id`, `generic_type`, ou le marqueur) si le mapping porte `barrier_mode` ou `valve_family` dans `reason_details` (override « Type HA → button » d'un cover 24.7 ou d'une vanne 24.8), ou si une commande candidate a un type générique préfixé `GB_`, `LOCK_`, `ALARM_`, `SIREN_`, `IRRIG_`, `FAUCET_`, `VALVE_`, `BARRIER_`, `GARAGE_` (constante `BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES`). Un bouton neutre (`GENERIC_ACTION`, `MEDIA_*`) reste exécuté.
+7. **AC8 — familles sensibles (R1, D-sensibles)** : un appui est refusé, jamais exécuté, avec `reason_code=button_sensitive_family_refused` (WARNING portant `eq_id`, `cmd_id`, `generic_type`, ou le marqueur) si le mapping porte `barrier_mode` ou `valve_family` dans `reason_details` (override « Type HA → button » d'un cover 24.7 ou d'une vanne 24.8), ou si **une commande quelconque du mapping** (info et action, tous sous-types ; scan fait avant le filtre des candidates, R2 P4) a un type générique préfixé `GB_`, `LOCK_`, `ALARM_`, `SIREN_`, `IRRIG_`, `FAUCET_`, `VALVE_`, `BARRIER_`, `GARAGE_` (constante `BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES`). Un bouton neutre (`GENERIC_ACTION`, `MEDIA_*`) reste exécuté.
 8. **AC7 — non-régression** : boutons de scénario inchangés (`scenario::changeState`), switch, cover, vanne et portail inchangés ; les suites existantes restent vertes.
 
 ## Tâches
@@ -45,6 +45,7 @@ afin que le bouton fasse ce qu'il annonce, comme les boutons de scénario.
 ## Décisions de relecture (R1, coordinateur, 2026-11-12)
 
 - **D-sensibles (P1, bloquant)** : `ButtonMapper` prend la première action `other` de n'importe quel type générique et la publie `sure`. Router les boutons sans garde réactivait donc des ordres que 24.7 / 24.8 avaient gardés (verrou B1 et relecture fraîche des barrières, fermeture des vannes) ou jamais modélisés (serrure, alarme, sirène). Cas prouvés par la relecture : barrière refusée en cover (état chaîne, `GB_TOGGLE` en double, `BARRIER_STATE` + `GARAGE_STATE`, `GB_OPEN` sans `GB_CLOSE`), override « Type HA → button » sur un garage cover (la branche bouton passe avant `barrier_mode`, `_guard_barrier_toggle` sauté), irrigation refusée en vanne, paires `LOCK_*`, `ALARM_*`, `SIREN_*`. Décision : refus explicite (AC8), sur une liste fermée et testée.
+- **D-sensibles, complément R2 (P4)** : le scan des préfixes porte sur TOUTES les commandes du mapping, pas seulement sur les candidates action/other. Cas visé : une info `LOCK_STATE` (ou `IRRIG_STATE`) à côté d'une action sans type générique ; l'appui exécuterait sinon l'action du verrou. Même `reason_code`, même WARNING (`cmd_id` et `generic_type` de la commande qui déclenche le refus). Les mappers natifs ne produisent pas cette forme aujourd'hui (l'info seule part en binary_sensor / sensor) : défense en profondeur, prouvée par tests sur un mapping construit.
 - **P3** : comparaison exacte du payload brut ; `payload_press` du mapping n'est plus lu (le plus simple : la discovery n'en publie pas, `PRESS` seul).
 - La découverte et la publication des boutons ne changent pas dans cette story : ces boutons restent visibles dans HA, mais un appui y est refusé et journalisé.
 
@@ -72,7 +73,7 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 
 ### Tests
 
-- `python -m pytest` : 2890 passed, 9 deselected (dont 56 dans `resources/daemon/tests/unit/test_story_24_12_boutons_equipement.py`, après R1).
+- `python -m pytest` : 2893 passed, 9 deselected (dont 59 dans `resources/daemon/tests/unit/test_story_24_12_boutons_equipement.py`, après R2).
 - `flake8 resources/daemon tests` : 0 erreur.
 - `node --test tests/unit/*.node.test.js` : 1214 tests, 1214 pass, 0 fail (garde 25.4 vert : aucune ligne retirée sous `resources/daemon/`).
 
