@@ -1,6 +1,6 @@
 # Story 24.13 : Journaliser le motif d'échec d'un ordre renvoyé par Jeedom
 
-Status: review
+Status: done
 
 > Correctif court rédigé et implémenté par une session cloud déléguée (2026-11-12), à partir d'un constat de production : un ordre HA vers un équipement a été refusé par Jeedom et le démon n'a journalisé aucune cause. Aucun nom réel, aucune IP, aucune marque (CC-48). Aucun déploiement ni accès à la box : la preuve terrain reste à ClaudeBox.
 
@@ -72,3 +72,9 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 
 - Le message d'erreur JSON-RPC vient de Jeedom ou d'un plugin tiers : au-delà des motifs masqués, il peut contenir des noms d'équipements. Il est journalisé au niveau WARNING du démon, comme le reste de la ligne.
 - Les autres appels JSON-RPC du démon (lecture fraîche d'état, synchronisation) ne sont pas concernés par ce correctif.
+
+## Preuve terrain (ClaudeBox, 2026-11-12)
+
+- Déploiement production `e78f727` (run r2, 20:43 heure de Paris) : entités HA identiques (355/355), 0 ERROR, compteur de fuite de secret à 0. Seul écart de décision toléré : l'eq 408 (`no_generic_type_configured` → `disabled_eqlogic`, non publié avant et après, sans effet HA ; analyse à mener avec la variation des scénarios au redémarrage).
+- Échec réel d'un ordre (20:50) : la ligne porte `error_detail=exception=JSONDecodeError`, ce qui a permis d'identifier en minutes la cause en aval (plugin tiers renvoyant une page d'erreur). Aucune clé ni aucun jeton dans le journal.
+- Suite possible : journaliser le début (masqué, tronqué) d'une réponse non JSON pour lire directement l'erreur renvoyée.
