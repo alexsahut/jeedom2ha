@@ -25,7 +25,11 @@ from mapping.button import ScenarioButtonMapper
 from mapping.registry import MapperRegistry
 from models.mapping import MappingResult, PublicationDecision, SwitchCapabilities
 from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, JeedomScenario, TopologySnapshot
-from sync.command import CommandSynchronizer
+from sync.command import (
+    BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES,
+    BUTTON_SENSITIVE_REASON_DETAILS_KEYS,
+    CommandSynchronizer,
+)
 
 BUTTON_ID = 9120     # équipement mono-entité : un seul bouton
 MULTI_ID = 9121      # équipement multi-entité : switch principal + bouton secondaire
@@ -184,12 +188,25 @@ async def test_unexpected_payload_is_refused(payload, caplog):
 
 
 @pytest.mark.asyncio
-async def test_payload_configured_in_the_discovery_is_honoured():
+@pytest.mark.parametrize("payload", [" PRESS", "PRESS ", "PRESS\n", "PRESS\r\n", "\tPRESS"])
+async def test_payload_is_compared_exactly_without_strip(payload):
+    """P3 — comparaison exacte du payload brut, sans strip ni changement de casse."""
     button = _map(_button_eq())
-    button.reason_details["payload_press"] = "GO"
     sync, _bridge = _cmd_sync(button)
-    assert await sync.handle_command_message(f"jeedom2ha/{BUTTON_ID}/cmd", "PRESS") is False
-    assert await sync.handle_command_message(f"jeedom2ha/{BUTTON_ID}/cmd", "GO") is True
+    assert await sync.handle_command_message(f"jeedom2ha/{BUTTON_ID}/cmd", payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_payload_press_in_reason_details_is_never_read():
+    """P3 — la discovery ne publie aucun payload_press : seul PRESS déclenche, jamais une valeur du mapping."""
+    eq = _button_eq()
+    button = _map(eq)
+    button.reason_details["payload_press"] = "GO"
+    assert "payload_press" not in DiscoveryPublisher(MagicMock()).build_discovery_payload(button, _snapshot(eq))
+    sync, _bridge = _cmd_sync(button)
+    assert await sync.handle_command_message(f"jeedom2ha/{BUTTON_ID}/cmd", "GO") is False
+    assert await sync.handle_command_message(f"jeedom2ha/{BUTTON_ID}/cmd", "PRESS") is True
     sync._execute_exec_cmd.assert_awaited_once_with(91201, {})
 
 
@@ -297,6 +314,118 @@ async def test_live_press_reaches_the_command_handler():
     await asyncio.sleep(0)
     await asyncio.sleep(0)
     handler.assert_awaited_once_with(f"jeedom2ha/{BUTTON_ID}/cmd", "PRESS")
+
+
+# --- D-sensibles : familles gardées par 24.7 / 24.8 ou jamais modélisées (AC8) ---------
+
+SENSITIVE_ID = 9130
+
+
+def test_sensitive_family_lists_are_fixed():
+    assert BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES == (
+        "GB_", "LOCK_", "ALARM_", "SIREN_", "IRRIG_", "FAUCET_", "VALVE_", "BARRIER_", "GARAGE_",
+    )
+    assert BUTTON_SENSITIVE_REASON_DETAILS_KEYS == ("barrier_mode", "valve_family")
+
+
+async def _assert_press_refused(button, eq, caplog):
+    sync, _bridge = _cmd_sync(button)
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(_command_topic(button, eq), "PRESS") is False
+        assert await sync.handle_command_message(_command_topic(button, eq), "PRESS") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    warnings = [r for r in caplog.records
+                if r.levelno == logging.WARNING and "reason_code=button_sensitive_family_refused" in r.getMessage()]
+    assert warnings, caplog.text
+    assert f"eq_id={button.jeedom_eq_id}" in warnings[0].getMessage()
+    return warnings[0].getMessage()
+
+
+# Barrières refusées en cover par 24.7 : ButtonMapper en fait un bouton GB_* (sonde de relecture).
+_BARRIER_REFUSED_AS_COVER = {
+    "state_string": [_cmd(91301, "GB_TOGGLE", name="Bascule"),
+                     _cmd(91302, "GARAGE_STATE", "info", "string", value="0")],
+    "toggle_twice": [_cmd(91301, "GB_TOGGLE", name="Bascule"), _cmd(91303, "GB_TOGGLE", name="Bascule 2"),
+                     _cmd(91302, "BARRIER_STATE", "info", "numeric", value="252")],
+    "barrier_and_garage": [_cmd(91301, "GB_TOGGLE", name="Bascule"),
+                           _cmd(91302, "BARRIER_STATE", "info", "numeric", value="252"),
+                           _cmd(91304, "GARAGE_STATE", "info", "numeric", value="252")],
+    "open_without_close": [_cmd(91301, "GB_OPEN", name="Ouvrir"),
+                           _cmd(91302, "BARRIER_STATE", "info", "numeric", value="252")],
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shape", sorted(_BARRIER_REFUSED_AS_COVER))
+async def test_barrier_refused_as_cover_is_not_pressable(shape, caplog):
+    eq = _eq(SENSITIVE_ID, _BARRIER_REFUSED_AS_COVER[shape])
+    button = _map(eq)
+    assert button.ha_entity_type == "button"
+    message = await _assert_press_refused(button, eq, caplog)
+    assert "cmd_id=91301" in message and "generic_type=GB_" in message
+
+
+@pytest.mark.asyncio
+async def test_garage_cover_overridden_to_button_is_refused(caplog):
+    """Override « Type HA -> button » sur un garage GB_TOGGLE + GARAGE_STATE : pas de bascule sans verrou B1."""
+    eq = _eq(SENSITIVE_ID, [_cmd(91311, "GB_TOGGLE", name="Bascule"),
+                            _cmd(91312, "GARAGE_STATE", "info", "numeric", value="252")])
+    cover = _map(eq)
+    assert cover.ha_entity_type == "cover"
+    assert cover.reason_details["barrier_mode"] == "toggle_on_state"
+    details = dict(cover.reason_details, override_applied=True, override_source="user")
+    button = replace(cover, ha_entity_type="button", reason_details=details)
+    assert _command_topic(button, eq) == f"jeedom2ha/{SENSITIVE_ID}/cmd"
+    message = await _assert_press_refused(button, eq, caplog)
+    assert "marker=barrier_mode" in message
+
+
+@pytest.mark.asyncio
+async def test_valve_overridden_to_button_is_refused(caplog):
+    eq = _eq(SENSITIVE_ID, [_cmd(91321, "IRRIG_STATE", "info", "binary", value="0"),
+                            _cmd(91322, "IRRIG_ON"), _cmd(91323, "IRRIG_OFF")])
+    valve = _map(eq)
+    assert valve.ha_entity_type == "valve"
+    button = replace(valve, ha_entity_type="button")
+    message = await _assert_press_refused(button, eq, caplog)
+    assert "marker=valve_family" in message
+
+
+@pytest.mark.asyncio
+async def test_irrigation_refused_as_valve_is_not_pressable(caplog):
+    """Deux trios d'arrosage sans liens : refusés en vanne par 24.8, ButtonMapper en fait un bouton IRRIG_ON."""
+    eq = _eq(SENSITIVE_ID, [
+        _cmd(91331, "IRRIG_STATE", "info", "binary", value="0"), _cmd(91332, "IRRIG_ON"), _cmd(91333, "IRRIG_OFF"),
+        _cmd(91334, "IRRIG_STATE", "info", "binary", value="0"), _cmd(91335, "IRRIG_ON"), _cmd(91336, "IRRIG_OFF"),
+    ])
+    button = _map(eq)
+    assert button.ha_entity_type == "button"
+    message = await _assert_press_refused(button, eq, caplog)
+    assert "cmd_id=91332 generic_type=IRRIG_ON" in message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first,second", [
+    ("LOCK_OPEN", "LOCK_CLOSE"), ("ALARM_RELEASED", "ALARM_ARMED"), ("SIREN_ON", "SIREN_OFF"),
+    ("GB_OPEN", "GB_CLOSE"), ("FAUCET_ON", "FAUCET_OFF"), ("VALVE_ON", "VALVE_OFF"),
+])
+async def test_action_only_sensitive_pairs_are_not_pressable(first, second, caplog):
+    eq = _eq(SENSITIVE_ID, [_cmd(91341, first), _cmd(91342, second)], name="Porte")
+    button = _map(eq)
+    assert button.ha_entity_type == "button"
+    message = await _assert_press_refused(button, eq, caplog)
+    assert f"cmd_id=91341 generic_type={first}" in message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("generic_type", ["GENERIC_ACTION", "MEDIA_PLAY", "MEDIA_PAUSE", "MEDIA_STOP"])
+async def test_neutral_button_is_still_executed(generic_type):
+    eq = _eq(SENSITIVE_ID, [_cmd(91351, generic_type, name="Action")])
+    button = _map(eq)
+    assert button.ha_entity_type == "button"
+    sync, _bridge = _cmd_sync(button)
+    assert await sync.handle_command_message(_command_topic(button, eq), "PRESS") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(91351, {})
 
 
 # --- non-régression (AC7) -------------------------------------------------------------
