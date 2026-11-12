@@ -1,6 +1,6 @@
 # Story 24.14 : Décision de publication stable entre deux synchros (scénarios, raison des équipements)
 
-Status: ready-for-dev
+Status: review
 
 > Analyse et story rédigées par une session cloud déléguée (2026-11-12), en lecture seule du code (`origin/main` e78f727), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : les constats de production ne citent que des identifiants. **Draft** : la cause est établie dans le code avec une forte confiance, mais l'origine des changements d'état côté Jeedom reste à confirmer sur la box (Task 0), et deux décisions d'Alexandre sont requises (D1, D2) avant tout `ready-for-dev`.
 
@@ -120,7 +120,7 @@ Les AC marqués **[D1 A]** ou **[D2 A]** suivent les recommandations ; ils sont 
 
 ## Tâches
 
-- [ ] **Task 0 — Confirmer la cause sur la box (ClaudeBox, lecture seule, avant tout dev).** Heures du journal du démon en UTC, journaux de scénarios en heure locale.
+- [x] **Task 0 — Confirmer la cause sur la box (ClaudeBox, lecture seule, avant tout dev).** Faite par ClaudeBox (voir « Résultat de la Task 0 »). Heures du journal du démon en UTC, journaux de scénarios en heure locale.
   - [ ] 0.1 Scénarios 2, 39, 72, 129, 147 : dans la table `scenario`, relever `isActive`, `mode`, `schedule`, `state`, `lastLaunch`, `isVisible` et `configuration` (bloc JSON, sans le recopier dans le dépôt).
   - [ ] 0.2 Trouver qui bascule `isActive` : dans `scenarioExpression`, les actions `scenario` dont les options visent ces ids avec `activate` / `deactivate` ; les blocs `code` qui appellent `setIsActive` ou `changeState` ; les plugins qui pilotent des scénarios (agenda, modes…). Lire les journaux de ces scénarios et des scénarios appelants autour de 06:53, 07:24, 08:38, 19:08, 19:09 et 19:42 UTC (lignes d'activation / désactivation).
   - [ ] 0.3 Dans le journal du démon, pour chaque démarrage : `[SCENARIO] Unpublished N scenario button(s) (x inactive, y from broker): ids=[…]`, `[SCENARIO] Scenario purge skipped`, `[SCENARIO] Failed to publish`, et dans le journal du plugin `[TOPOLOGY] Scan complet : … scénarios`. Vérifier que l'ensemble des inactifs de chaque démarrage explique exactement le tableau A.
@@ -128,11 +128,11 @@ Les AC marqués **[D1 A]** ou **[D2 A]** suivent les recommandations ; ils sont 
   - [ ] 0.5 Dans les deux exports conservés (avant / après chaque redémarrage), ligne `eq:408` : `enabled`, `reason`, `step`, et `sync_at` du document. **`enabled=true` avant** → B-1 confirmée (l'équipement était lu actif). **`enabled=false` avec `no_generic_type_configured`** → B-2 : chercher un échec de synchro (réponse d'échec, `[SYNC]`, `Runtime bootstrap failed`) entre 19:09 et 19:42.
   - [ ] 0.6 Trouver qui bascule `isEnable` de 408 : actions `equipement` (activer / désactiver) visant cet équipement dans `scenarioExpression`, comportement de son plugin, journaux autour des heures ci-dessus. Relever aussi tout « Relire Jeedom » entre 19:09 et 19:42 (journal du plugin, `scanTopology`).
   - [ ] 0.7 Consigner le résultat dans un fichier `24-14-task0-releves-<date>.md` (identifiants seulement), puis faire trancher D1, D2 (et D3 si un équipement bascule) par Alexandre.
-- [ ] **Task 1 — Instantané atomique (AC7, AC8, AC9).** Construire la nouvelle topologie, les décisions et le mémo dans des variables locales, les publier dans `app` en une seule étape à la fin de `_do_handle_action_sync_body` ; ajouter l'origine de la synchro à l'export (en-tête `X-Jeedom2ha-Sync-Mode` déjà présent pour le rescan, à étendre au démarrage et au service).
-- [ ] **Task 2 — [D1 A] Boutons de scénario stables (AC2 à AC6).** Publier tout scénario lisible ; disponibilité propre au scénario (topic dédié, retenu) via `_build_availability_fields` ; refus `scenario_inactive` dans `sync/command.py` ; export ; la purge ne retire plus que les supprimés. Mettre à jour `docs/dev-decision-export.md` et la doc utilisateur (`docs/fr_FR`) sur le comportement d'un scénario désactivé.
-- [ ] **Task 3 — [D2 A] Réévaluation sur changement (AC10).** Fonction PHP pure d'empreinte (testable sans le cœur), branchement dans un cron à créer (le plugin n'en déclare aucun aujourd'hui : ni méthode `cron*()` dans la classe, ni entrée dans `plugin_info/info.json`), requêtes DB minimales, appel `/action/sync` en mode service quand l'empreinte change ; empreinte gardée en `config` du plugin (pas de table).
-- [ ] **Task 4 — Tests (voir ci-dessous).**
-- [ ] **Task 5 — Preuve terrain (AC12, ClaudeBox) après fusion et déploiement par `scripts/deploy-to-box.sh`.**
+- [x] **Task 1 — Instantané atomique (AC7, AC8, AC9).** Construire la nouvelle topologie, les décisions et le mémo dans des variables locales, les publier dans `app` en une seule étape à la fin de `_do_handle_action_sync_body` ; ajouter l'origine de la synchro à l'export (en-tête `X-Jeedom2ha-Sync-Mode` déjà présent pour le rescan, à étendre au démarrage et au service).
+- [x] **Task 2 — [D1 A] Boutons de scénario stables (AC2 à AC6).** Publier tout scénario lisible ; disponibilité propre au scénario (topic dédié, retenu) via `_build_availability_fields` ; refus `scenario_inactive` dans `sync/command.py` ; export ; la purge ne retire plus que les supprimés. Mettre à jour `docs/dev-decision-export.md` et la doc utilisateur (`docs/fr_FR`) sur le comportement d'un scénario désactivé.
+- [x] **Task 3 — [D2 A] Réévaluation sur changement (AC10).** Fonction PHP pure d'empreinte (testable sans le cœur), branchement dans un cron à créer (le plugin n'en déclare aucun aujourd'hui : ni méthode `cron*()` dans la classe, ni entrée dans `plugin_info/info.json`), requêtes DB minimales, appel `/action/sync` en mode service quand l'empreinte change ; empreinte gardée en `config` du plugin (pas de table).
+- [x] **Task 4 — Tests (voir ci-dessous).**
+- [ ] **Task 5 — Preuve terrain (AC12, ClaudeBox) après fusion et déploiement par `scripts/deploy-to-box.sh`.** À faire par ClaudeBox (hors session cloud).
 
 ## Tests à écrire
 
@@ -165,7 +165,37 @@ PHP (`tests/test_php_24_14_*.php`) :
 - HA garde dans `deleted_entities` les réglages d'une entité retirée et les lui rend si elle revient avec le même `unique_id` (constat 21-1) : c'est ce qui masque aujourd'hui une partie de l'effet des bascules, mais les automatisations qui citent le bouton échouent pendant l'absence.
 - Comportement de Jeedom lors du lancement d'un scénario désactivé par `scenario::changeState` : à vérifier dans le cœur à l'implémentation (le refus côté démon, AC4, ne dépend pas de cette réponse).
 
+## Dev Agent Record (session cloud déléguée, 2026-11-12)
+
+Branche `story/analyse-reevaluation-au-demarrage` (PR #376), `origin/main` ecedde5 fusionné. Aucun accès box ni HA.
+
+### Ce qui est livré
+
+- **Task 2 — D1 A.** `transport/http_server.py` : tout scénario lisible est publié en bouton, actif ou non ; `PublicationDecision.active_or_alive` porte `is_active` ; après une configuration publiée, la disponibilité retenue `jeedom2ha/scenario_<id>/availability` (`online` / `offline`, qos 1) est publiée à chaque synchro. `discovery/publisher.py` : la charge d'un bouton de scénario porte `availability: [pont, scenario_<id>]`, `availability_mode: all`, `payload_available` / `payload_not_available` ; le topic vient de `models/availability.py` (`build_scenario_availability_topic`) et n'est jamais celui d'un équipement de même id (garde 21-1 C8 conservée : appareil et fabricant neutres). La purge « le broker fait foi » reçoit tous les scénarios lisibles et ne retire donc plus que les supprimés ; un retrait vide aussi la disponibilité retenue du scénario (aucun orphelin). Garde-fous 21-1 inchangés (liste complète, motif strict, broker déconnecté : rien). `sync/command.py` : appui sur un scénario inactif refusé `reason_code=scenario_inactive`, ligne `[SYNC-CMD]` INFO, aucun JSON-RPC. `export/decision_export.py` : `decision=published`, `reason=scenario_button` pour tout scénario lisible, `active` = `is_active`, `discovery_published` = publication effective ; **`schema_version` reste 1** (aucun champ retiré, sens des champs inchangé, seule la règle de publication change), documenté dans `docs/dev-decision-export.md`. Doc utilisateur `docs/fr_FR/index.md` et `changelog_beta.md`.
+- **Task 3 — D2 A.** `core/php/jeedom2ha_reevaluation.php` (fonctions pures, sans cœur) : `jeedom2ha_decision_fingerprint()` (SHA-256 de `id:isEnable:source d'exclusion effective` par équipement, `id:isActive` par scénario, plugins et pièces exclus triés ; aucun nom ; indépendante de l'ordre ; équipements du plugin ignorés) et `jeedom2ha_reevaluation_tick()` (empreinte lue avant la topologie ; inchangée → aucun appel au démon ; démon non prêt → rien ; sinon synchro de service ; `action_in_progress` (409) → INFO, empreinte non mémorisée ; succès → empreinte mémorisée puis listeners réalignés). `core/class/jeedom2ha.class.php` : `cron5()` (Jeedom 4.5 détecte la méthode `cron5` de la classe du plugin ; la fonctionnalité apparaît dans la page du plugin et peut y être désactivée ; aucune clé `info.json` n'existe pour cela, donc `info.json` n'est pas modifié), `reevaluateDecisionsIfChanged()`, `readDecisionFingerprint()` (deux requêtes : `SELECT id, isEnable, eqType_name, object_id, configuration FROM eqLogic` et `SELECT id, isActive FROM scenario`, aucune colonne de nom), empreinte gardée en configuration du plugin (`decisionFingerprint`, pas de table). Le démarrage du démon mémorise l'empreinte lue avant sa topologie quand sa synchro réussit : le cron ne relance rien tant que l'état ne change pas.
+- **Task 1 — AC7, AC8, AC9.** `app["topology"]`, `app["eligibility"]`, le nettoyage de `mappings` / `publications`, `scenario_publications` et le mémo sont remplacés ensemble en fin de `_do_handle_action_sync_body`, après tout ce qui peut lever (dont la purge des scénarios) : une synchro en échec laisse l'ensemble précédent intact (les effets MQTT déjà émis restent, idempotents, et sont rejoués à la synchro suivante). Origine de la synchro (`boot`, `rescan`, `service`, défaut `service`) lue dans `X-Jeedom2ha-Sync-Mode`, mémorisée et exportée en `sync_origin` (champ additif) ; la synchro de démarrage envoie désormais `boot`. AC7 : l'ordre Exclu > Désactivé > Sans commandes > Sans type générique n'est pas touché ; il est figé par une matrice de tests sur toutes les vues.
+
+### Tests
+
+- Démon : `resources/daemon/tests/unit/test_story_24_14_decision_stable.py` (15 tests : déterminisme AC1, bascule actif/inactif AC2-AC3, charge à deux disponibilités sans homonyme, appui refusé sans RPC AC4, purge des seuls supprimés et liste incomplète AC5, export AC6, matrice de raison sur `assess_eligibility`, mémo, export, diagnostic, états agrégés AC7, bascule entre deux synchros pour chaque origine AC7/AC9, en-tête absent ou inconnu, échec injecté au milieu de la synchro AC8, invariant `enabled == false` AC8).
+- PHP : `tests/test_php_story_24_14_reevaluation.php` (44 vérifications, sans cœur Jeedom : empreinte, pas de la tâche, 409, câblage du cron, `buildScenariosPayload` identique à `origin/main`).
+
+### Tests et listes figées mis à jour (D1 A), justification
+
+- `tests/unit/test_story_21_1_cc44_scenario_lifecycle.py` : la règle 21-1 Q2 A (« un inactif n'a plus de bouton ») est remplacée par D1 A. Réécrits : retrait d'un inactif → bouton conservé et grisé ; réactivation → bascule sans vidage, identité constante ; référence figée de la charge du bouton → pont + disponibilité propre (`availability_mode: all`), seul écart admis ; homonyme → toujours jamais la disponibilité ni l'appareil de l'équipement ; les attentes de purge comptent aussi le vidage de la disponibilité du supprimé ; le test d'homonymie de purge utilise un scénario supprimé. **Aucun garde-fou de sécurité affaibli** : liste incomplète, section absente ou mal formée, entrée illisible, motif strict des topics, broker déconnecté, absence de report par `eq_id` et collecte en échec restent testés à l'identique.
+- `tests/unit/test_story_24_2_decision_export.py` : la ligne du scénario inactif attend `published` / `scenario_button` / `discovery_published: true`.
+- `tests/unit/test_story_25_4_non_regression.node.test.js` : liste `REPLACED_BY_24_14` (« fichier::ligne ») des lignes remplacées dans `resources/daemon/` et `core/class/` par rapport à `origin/main`.
+- Golden 8.4 : inchangé (le corpus doré ne contient aucun scénario). `desktop/js/jeedom2ha_mapping_override.js` : non modifié (garde 24.2).
+
+### Points ouverts
+
+- Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.
+- Dans le diagnostic, `traceability.decision_trace.reason_code` nomme `excluded` pour toute exclusion (le `reason_code` du diagnostic, l'export et les états agrégés portent la source exacte) : vocabulaire de trace antérieur, laissé tel quel et documenté par le test AC7.
+- Ce qui reste hors empreinte, donc toujours appliqué au prochain démarrage ou « Relire Jeedom » seulement : périmètre publié (« Toujours » / « Jamais », appliqué par l'interface), types génériques, ajout ou suppression de commandes, renommages, exemption HomeKit d'une pièce exclue (24.4).
+- D3 (équipement désactivé publié grisé) reste hors périmètre, comme décidé.
+
 ## Journal
 
 - 2026-11-12 — Analyse et story en draft par une session cloud déléguée (lecture seule du code, aucun accès à la box). Task 0 et décisions D1, D2 à faire avant `ready-for-dev`.
 - 2026-11-12 21:41 — Task 0 faite par ClaudeBox ; décisions d'Alexandre D1 A (toujours publié, grisé si inactif) et D2 A ; story `ready-for-dev`.
+- 2026-11-12 — Tasks 1 à 4 livrées par une session cloud déléguée (PR #376) ; story en `review`. Reste la preuve terrain (Task 5, ClaudeBox).

@@ -1112,6 +1112,13 @@ class CommandSynchronizer:
                           reason_code="unknown_runtime_entity", action="reject_scenario_command")
             return False
 
+        # Story 24.14 (D1 A) — le bouton d'un scénario inactif reste publié (grisé) : un appui
+        # qui l'atteint malgré tout est refusé sans aucun appel à Jeedom.
+        if not getattr(decision, "active_or_alive", True):
+            self._log_cmd(logging.INFO, eq_id=f"scenario_{scenario_id}", topic=topic,
+                          reason_code="scenario_inactive", action="reject_scenario_command")
+            return False
+
         executed = await self._execute_scenario_start(scenario_id)
         if not executed:
             reason = self._last_exec_error_reason or "jeedom_rpc_error"

@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-12 — Scénarios : des boutons qui ne disparaissent plus
+
+- Un scénario Jeedom désactivé garde son bouton dans Home Assistant : le bouton est **grisé** (indisponible) et un appui est refusé sans rien lancer dans Jeedom. Avant, le bouton disparaissait et revenait au gré des activations, ce qui cassait les automatisations et tableaux de bord qui le citaient. Seul un scénario supprimé de Jeedom perd son bouton.
+- Le plugin réévalue toutes les 5 minutes, sans redémarrage ni « Relire Jeedom », l'état actif ou désactivé des scénarios et des équipements et les exclusions ; il ne relit Jeedom que si quelque chose a changé. La raison affichée pour un équipement non publié suit ainsi l'état réel (par exemple « désactivé » au lieu d'une raison périmée).
+- L'export de décision indique l'origine de la synchro (`sync_origin` : démarrage, relecture ou réévaluation).
+
+---
+
 # 2026-11-12 — Serrures : des serrures dans Home Assistant
 
 - Une serrure Jeedom (types `LOCK_STATE`, `LOCK_CLOSE`, `LOCK_OPEN` : état, verrouiller, déverrouiller) est publiée comme une serrure (`lock`) avec son état réel (verrouillé, déverrouillé, bloqué), lu comme le fait le plugin Homebridge. Il faut un état et au moins une des deux actions ; sans action `LOCK_OPEN`, aucun déverrouillage n'est jamais envoyé.
