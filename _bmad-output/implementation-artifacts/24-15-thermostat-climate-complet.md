@@ -1,6 +1,6 @@
 # Story 24.15 : Thermostat : `climate` complet (état, consigne, mode)
 
-Status: draft
+Status: ready-for-dev
 
 > **Story rédigée par une session cloud déléguée (2026-11-12), documentaire**, en lecture seule du code (`origin/main` `ecedde5`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48). **Draft** : cinq décisions reviennent à Alexandre (D1 à D5, recommandations ci-dessous). **Change la production** : les 7 entités `climate` existantes changent de payload, de topics et deviennent pilotables. Une autre story (24-14) est en développement sur une autre branche : recouvrements listés en fin de Dev Notes.
 
@@ -82,7 +82,17 @@ Le code du plugin Homebridge installé sur la box n'est pas dans ce dépôt ; la
 - **Verrou** : `THERMOSTAT_LOCK` donne la caractéristique `LockPhysicalControls` **sur le même service** (verrouillage enfant), pilotée par `THERMOSTAT_SET_LOCK` / `THERMOSTAT_SET_UNLOCK`.
 - **Température extérieure** : `THERMOSTAT_TEMPERATURE_OUTDOOR` n'est lue nulle part : ignorée.
 
-## Décisions proposées (à trancher par Alexandre)
+## Décisions (2026-11-12 22:13)
+
+- **D1 A** (Alexandre) : HA expose `heat`/`off`. Le mode d'arrêt Jeedom, reconnu par son identifiant logique et jamais par son nom, donne `off`. Les autres modes nommés deviennent des `preset_modes`. D1-c suit la recommandation : sans info de mode, aucun `mode_state_topic`.
+- **D2** (ClaudeBox, parité Homebridge) : `hvac_action` vaut `heating` ou `idle` d'après `THERMOSTAT_STATE` ; il vaut `off` quand le mode est l'arrêt.
+- **D3** (ClaudeBox, parité Homebridge) : les bornes sont lues sur la commande de consigne et ne s'appliquent que si les deux sont valides ; le pas est de 0,5 ; une valeur hors bornes est refusée, sans écrêtage.
+- **D4 A** (Alexandre) : le verrou est publié comme un `switch` « Verrouillage » séparé, de catégorie configuration, jamais comme un `lock`.
+- **D5** (Alexandre) : la température extérieure est ignorée.
+- Task 0 bis (ClaudeBox) : la version de `homebridge-jeedom` installée sur la box est bien la 1.9.0, celle qui a été lue.
+- Ordre de développement : après la fusion de 24-14, qui touche `transport/http_server.py`. Rebaser la branche sur main avant de commencer.
+
+## Décisions proposées (historique)
 
 ### D1 — Correspondance des modes
 
@@ -204,3 +214,4 @@ Les valeurs réelles des commandes sur la box ; le `logical_id` et le nom des or
 - 2026-06-09 — Story 10-2 : `climate` ouvert, validé sur la structure de la discovery seulement.
 - 2026-11-12 — Constat de production et Task 0 (ClaudeBox) : 7 thermostats inutilisables, commandes typées relevées.
 - 2026-11-12 — Story rédigée (session cloud déléguée, documentaire) : faits du code, lecture des sources publiques du plugin thermostat et de `homebridge-jeedom`, D1 à D5 avec recommandations ; `draft` en attente des décisions d'Alexandre.
+- 2026-11-12 22:13 — Décisions d'Alexandre : D1 A, D4 A, D5 ignorée (« ok recos ») ; D2 et D3 tranchées par ClaudeBox selon la parité Homebridge ; Task 0 bis faite (homebridge-jeedom 1.9.0) ; story `ready-for-dev`, développement après 24-14.
