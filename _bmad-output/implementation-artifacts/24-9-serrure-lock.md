@@ -1,6 +1,6 @@
 # Story 24.9 : Serrure : `lock`
 
-Status: draft
+Status: ready-for-dev
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -30,6 +30,32 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 
 - **Une serrure** porte `LOCK_OPEN`, `LOCK_CLOSE`, `LOCK_STATE` : état + deux ordres, donc l'AC3 est satisfaite sur le cas réel.
 - Reste à établir (Task 0) : la polarité de `LOCK_STATE` ; le plugin d'origine (si c'est un plugin de la liste `excludedPlugins`, l'équipement est « exclu par plugin » et sort de cette story).
+
+## Task 0 faite par ClaudeBox le 2026-11-12 (export de production + sources Homebridge, lecture seule)
+
+**Équipements portant `LOCK_*`** (export de décision de production, 11/11) :
+
+| eq | plugin | Commandes | Décision actuelle |
+|---|---|---|---|
+| 508 | virtual | 4626 `LOCK_CLOSE`, 4627 `LOCK_OPEN`, 4628 `LOCK_STATE` | `published` (`sure`), `homekit_exposed_effective: true` |
+| 421 | myBMW | 3494 `LOCK_STATE`, 3518 `LOCK_CLOSE`, 3519 `LOCK_OPEN` | `not_published`, `excluded_plugin` (plugin exclu) → **hors story** |
+
+**Polarité de `LOCK_STATE` (source : plugin Homebridge installé, `homebridge-jeedom/index.js`, caractéristique `LockCurrentState`)** :
+- cas général : valeur vraie (`1`, `true`, `on`) = **verrouillé** (`SECURED`), valeur fausse = **déverrouillé** (`UNSECURED`) ;
+- équipements `nuki` (et `jeelink` relayant un `nuki`) : `0` = verrouillé, `1` = déverrouillé, `2` = bloqué (`JAMMED`), autre = inconnu.
+- Aucune déduction depuis un nom (garde-fou) : un équipement dont la polarité ne relève d'aucun de ces deux cas n'est pas publié en `lock`.
+
+## Décisions techniques ClaudeBox (2026-11-12)
+
+- **D1 — Polarité** : celle de Homebridge ci-dessus, pour garder la parité HomeKit ; `nuki` traité à part ; `JAMMED` publié comme état `jammed` ; valeur non reconnue → aucun état publié.
+- **D2 — Publication** : `lock` seulement si `LOCK_STATE` + au moins une des deux actions (AC3). `payload_lock`/`payload_unlock` → actions `LOCK_CLOSE`/`LOCK_OPEN` ; `state_locked: LOCKED`, `state_unlocked: UNLOCKED`, `state_jammed: JAMMED` ; `optimistic: false` ; pas de `code`.
+- **D3 — Remplacement (Q10 A)** : le `binary_sensor` `lock` et les boutons portant les commandes `LOCK_*` du même équipement sont remplacés explicitement par la `lock` (mécanisme de 24-8 : aucune réutilisation silencieuse d'un `unique_id`).
+- **D4 — Sécurité (AC7)** : le plugin ne touche jamais l'exposition à Assist ; la documentation dit que déverrouiller par la voix est un choix de l'utilisateur dans HA.
+
+## Décisions qui restent à Alexandre (avant le déploiement, pas avant le développement)
+
+- **Q-L1** : l'équipement 508 (serrure virtuelle) actionne-t-il une serrure réelle (scénario, autre plugin) ? Le publier en `lock` dans HA : oui / non.
+- **Q-L2** : preuve terrain : lecture seule (état, entité) recommandée ; essai réel de verrouillage/déverrouillage seulement en sa présence.
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -71,3 +97,4 @@ La polarité réelle de `LOCK_STATE` sur les équipements mesurés ; les champs 
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q9 A (absorbe 18-2), Q10 A ; Q1 « exclu par plugin » conservé.
+- 2026-11-12 — Task 0 (ClaudeBox : eq 508 seul concerné, 421 exclu par plugin ; polarité Homebridge) ; D1-D4 ClaudeBox ; `ready-for-dev` pour le développement, déploiement soumis à Q-L1/Q-L2.
