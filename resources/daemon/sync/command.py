@@ -23,6 +23,12 @@ _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
+# Story 24.12 — equipment button (ButtonMapper / FallbackMapper): jeedom2ha/{eq_id}/cmd.
+_BUTTON_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/cmd$")
+# Story 24.12 — HA's default ``payload_press`` (the discovery publishes none).
+_BUTTON_DEFAULT_PAYLOAD_PRESS = "PRESS"
+# Story 24.12 — a press carries no value: only an action of this sub-type can be pressed.
+_BUTTON_PRESSABLE_SUB_TYPES = ("other",)
 
 # Story 24.7 — gate / garage cover (``barrier_mode`` set by CoverMapper, M1).
 # States from which an order may be sent, per mode and direction.
@@ -243,6 +249,11 @@ class CommandSynchronizer:
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="position"), None
 
+        match = _BUTTON_CMD_TOPIC_RE.match(topic)
+        if match:
+            # Story 24.12 — routed only if a published button of this equipment exposes it.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel="press"), None
+
         return None, "invalid_command_topic"
 
     def _resolve_runtime_target(
@@ -352,6 +363,14 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "button":
+            # Story 24.12 — the exact topic the discovery publishes (publisher
+            # ``_build_button_payload``): ``command_topic`` of the mapping, else the
+            # equipment ``/cmd`` topic. A node-scoped secondary keeps its own topic.
+            command_topic = (mapping.reason_details or {}).get("command_topic", f"jeedom2ha/{eq_id}/cmd")
+            if isinstance(command_topic, str) and command_topic:
+                topics["press"] = command_topic
+
         return topics
 
     def _translate_command(
@@ -363,6 +382,11 @@ class CommandSynchronizer:
         commands = mapping.commands or {}
         payload = str(raw_payload).strip()
         payload_upper = payload.upper()
+
+        if mapping.ha_entity_type == "button":
+            # Story 24.12 — whatever the topic shape (/cmd or node-scoped /set): the topic
+            # was already matched against this button's own discovery topic.
+            return self._translate_button_command(mapping, payload)
 
         if parsed.channel == "set":
             if mapping.ha_entity_type in ("light", "switch"):
@@ -475,6 +499,45 @@ class CommandSynchronizer:
         except (TypeError, ValueError):
             return None, "missing_action_command"
         return CommandTranslation(cmd_id=cmd_id, options={}, command_family="valve_open_close"), None
+
+    @staticmethod
+    def _translate_button_command(
+        mapping: MappingResult,
+        payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.12 — a press on an equipment button runs ITS Jeedom action, once.
+
+        - only the configured ``payload_press`` (``reason_details``, else HA's default
+          ``PRESS``) triggers, compared exactly (no case folding);
+        - only the button's own commands are considered, and among them only ``action``
+          commands of sub-type ``other`` (a press has no value to give a slider, a
+          message, a colour or a list); an ``info`` command is never executed;
+        - exactly one such action is required: none -> ``missing_action_command``,
+          several (e.g. a switch forced to button: ON and OFF) -> ``ambiguous_button_action``,
+          never guessed.
+        """
+        configured = (mapping.reason_details or {}).get("payload_press")
+        expected = configured if isinstance(configured, str) and configured else _BUTTON_DEFAULT_PAYLOAD_PRESS
+        if payload != expected:
+            return None, "invalid_command_payload"
+
+        candidate_ids = set()
+        for cmd in (mapping.commands or {}).values():
+            if str(getattr(cmd, "type", "") or "").lower() != "action":
+                continue
+            if str(getattr(cmd, "sub_type", "") or "").lower() not in _BUTTON_PRESSABLE_SUB_TYPES:
+                continue
+            try:
+                candidate_ids.add(int(cmd.id))
+            except (TypeError, ValueError):
+                continue
+        if not candidate_ids:
+            return None, "missing_action_command"
+        if len(candidate_ids) > 1:
+            return None, "ambiguous_button_action"
+        return CommandTranslation(
+            cmd_id=next(iter(candidate_ids)), options={}, command_family="button_press",
+        ), None
 
     def _translate_barrier_command(
         self,
