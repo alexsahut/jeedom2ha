@@ -18,6 +18,7 @@ from models.mapping import (
     ClimateCapabilities,
     CoverCapabilities,
     LightCapabilities,
+    LockCapabilities,
     ProjectionValidity,
     SensorCapabilities,
     SwitchCapabilities,
@@ -72,9 +73,15 @@ HA_COMPONENT_REGISTRY = {
         "required_fields": ["state_topic", "command_topic", "platform", "availability"],
         "required_capabilities": ["has_state", "has_command"],
     },
+    # Story 24.9 — serrure : état réel (polarité établie, D1) et au moins un ordre
+    # LOCK_CLOSE / LOCK_OPEN obligatoires (AC3) ; sans l'un d'eux, jamais de lock.
+    "lock": {
+        "required_fields": ["state_topic", "command_topic", "platform", "availability"],
+        "required_capabilities": ["has_state", "has_command"],
+    },
 }
 
-PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10 # valve ouvert Story 24.8 sous FR40/NFR10
+PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10 # valve ouvert Story 24.8 sous FR40/NFR10 # lock ouvert Story 24.9 sous FR40/NFR10
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,
@@ -119,6 +126,8 @@ def _resolve_capability(abstract: str, capabilities: object) -> bool:
             return capabilities.has_on_off
         if isinstance(capabilities, ValveCapabilities):
             return capabilities.has_open_close
+        if isinstance(capabilities, LockCapabilities):
+            return capabilities.has_command
         # Fallback pour les capabilities futures non encore dataclassées
         return bool(
             getattr(capabilities, "has_on_off", False)
@@ -157,6 +166,14 @@ def _cross_family_action_mismatch(ha_entity_type: str, capabilities: object) -> 
     if isinstance(capabilities, ValveCapabilities):
         return ha_entity_type not in ("valve", "sensor", "binary_sensor")
     if ha_entity_type == "valve":
+        return True
+    # Story 24.9 — une serrure ne se pilote que par LOCK_CLOSE / LOCK_OPEN, routées par
+    # `_translate_command` pour le seul type `lock` (LOCK/UNLOCK) : forcée vers un autre
+    # actionneur, elle serait impilotable (ou pilotée sans garde) ; seule une lecture de
+    # l'état (sensor/binary_sensor) reste honnête, et `lock` ne sait router aucune autre famille.
+    if isinstance(capabilities, LockCapabilities):
+        return ha_entity_type not in ("lock", "sensor", "binary_sensor")
+    if ha_entity_type == "lock":
         return True
     if ha_entity_type in ("light", "switch"):
         return isinstance(capabilities, CoverCapabilities)

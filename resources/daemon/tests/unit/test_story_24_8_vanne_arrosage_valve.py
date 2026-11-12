@@ -151,8 +151,8 @@ def test_valve_is_known_and_open_in_the_same_increment():
         "required_fields": ["state_topic", "command_topic", "platform", "availability"],
         "required_capabilities": ["has_state", "has_command"],
     }
-    assert PRODUCT_SCOPE[-1] == "valve"
-    assert PublisherRegistry.known_types()[-1] == "valve"
+    assert "valve" in PRODUCT_SCOPE  # Story 24.9 : lock ouvert après valve
+    assert "valve" in PublisherRegistry.known_types()
 
 
 def test_validate_projection_nominal_case():

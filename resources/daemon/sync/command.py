@@ -374,6 +374,12 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "lock":
+            # Story 24.9 — one command topic per lock (node-scoped by its LOCK_STATE).
+            command_topic = (mapping.reason_details or {}).get("command_topic")
+            if isinstance(command_topic, str) and command_topic:
+                topics["set"] = command_topic
+
         if mapping.ha_entity_type == "button":
             # Story 24.12 — the exact topic the discovery publishes (publisher
             # ``_build_button_payload``): ``command_topic`` of the mapping, else the
@@ -427,6 +433,10 @@ class CommandSynchronizer:
 
             if mapping.ha_entity_type == "valve":
                 return self._translate_valve_command(mapping, payload_upper)
+
+            if mapping.ha_entity_type == "lock":
+                # Exact payloads only (case-sensitive): no case folding on a lock.
+                return self._translate_lock_command(mapping, payload)
 
             if barrier_mode(mapping) is not None:
                 # Story 24.7 — portail / garage (D3 bis).
@@ -511,6 +521,34 @@ class CommandSynchronizer:
         except (TypeError, ValueError):
             return None, "missing_action_command"
         return CommandTranslation(cmd_id=cmd_id, options={}, command_family="valve_open_close"), None
+
+    @staticmethod
+    def _translate_lock_command(
+        mapping: MappingResult,
+        payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.9 (D2, AC4) — lock ``LOCK`` / ``UNLOCK`` -> ``LOCK_CLOSE`` / ``LOCK_OPEN``.
+
+        Only the exact discovery payloads are accepted (``payload_lock`` / ``payload_unlock``,
+        case-sensitive); ``OPEN`` (no ``payload_open`` published) and anything else are
+        refused. Only the lock's own action commands are used: no ``LOCK_OPEN`` command, no
+        unlock order is ever sent (``missing_action_command``).
+        """
+        key = {"LOCK": "LOCK_CLOSE", "UNLOCK": "LOCK_OPEN"}.get(payload)
+        if key is None:
+            return None, "invalid_command_payload"
+        cmd = (mapping.commands or {}).get(key)
+        if (
+            cmd is None
+            or str(getattr(cmd, "type", "")).lower() != "action"
+            or getattr(cmd, "generic_type", None) != key
+        ):
+            return None, "missing_action_command"
+        try:
+            cmd_id = int(cmd.id)
+        except (TypeError, ValueError):
+            return None, "missing_action_command"
+        return CommandTranslation(cmd_id=cmd_id, options={}, command_family="lock_lock_unlock"), None
 
     @staticmethod
     def _translate_button_command(
@@ -841,6 +879,12 @@ class CommandSynchronizer:
 
         if translation.command_family == "valve_open_close" and mapping.ha_entity_type == "valve":
             # Story 24.8 — ``optimistic: false`` at discovery: never an invented state.
+            if self._has_reliable_state(mapping, decision):
+                return "real_state_confirmation"
+            return "stateless"
+
+        if translation.command_family == "lock_lock_unlock" and mapping.ha_entity_type == "lock":
+            # Story 24.9 — ``optimistic: false`` at discovery: never an invented state.
             if self._has_reliable_state(mapping, decision):
                 return "real_state_confirmation"
             return "stateless"

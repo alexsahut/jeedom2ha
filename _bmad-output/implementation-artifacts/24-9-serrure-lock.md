@@ -1,6 +1,6 @@
 # Story 24.9 : Serrure : `lock`
 
-Status: ready-for-dev
+Status: review
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -38,7 +38,7 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 | eq | plugin | Commandes | Décision actuelle |
 |---|---|---|---|
 | 508 | virtual | 4626 `LOCK_CLOSE`, 4627 `LOCK_OPEN`, 4628 `LOCK_STATE` | `published` (`sure`), `homekit_exposed_effective: true` |
-| 421 | myBMW | 3494 `LOCK_STATE`, 3518 `LOCK_CLOSE`, 3519 `LOCK_OPEN` | `not_published`, `excluded_plugin` (plugin exclu) → **hors story** |
+| 421 | plugin de véhicule | 3494 `LOCK_STATE`, 3518 `LOCK_CLOSE`, 3519 `LOCK_OPEN` | `not_published`, `excluded_plugin` (plugin exclu) → **hors story** |
 
 **Polarité de `LOCK_STATE` (source : plugin Homebridge installé, `homebridge-jeedom/index.js`, caractéristique `LockCurrentState`)** :
 - cas général : valeur vraie (`1`, `true`, `on`) = **verrouillé** (`SECURED`), valeur fausse = **déverrouillé** (`UNSECURED`) ;
@@ -52,10 +52,14 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 - **D3 — Remplacement (Q10 A)** : le `binary_sensor` `lock` et les boutons portant les commandes `LOCK_*` du même équipement sont remplacés explicitement par la `lock` (mécanisme de 24-8 : aucune réutilisation silencieuse d'un `unique_id`).
 - **D4 — Sécurité (AC7)** : le plugin ne touche jamais l'exposition à Assist ; la documentation dit que déverrouiller par la voix est un choix de l'utilisateur dans HA.
 
-## Décisions qui restent à Alexandre (avant le déploiement, pas avant le développement)
+## Décisions d'Alexandre (2026-11-12 à 07:51)
 
-- **Q-L1** : l'équipement 508 (serrure virtuelle) actionne-t-il une serrure réelle (scénario, autre plugin) ? Le publier en `lock` dans HA : oui / non.
-- **Q-L2** : preuve terrain : lecture seule (état, entité) recommandée ; essai réel de verrouillage/déverrouillage seulement en sa présence.
+- **Q-L1 : OUI**, l'équipement 508 est publié en `lock` dans HA. Règle de projection : ce qui est dans l'app Maison (HomeKit) doit être dans HA.
+- **Q-L2** : preuve terrain **réelle** (verrouiller puis déverrouiller) autorisée, **en présence d'Alexandre**.
+
+## Fait établi (2026-11-12, relayé par ClaudeBox)
+
+- L'équipement 508 est un **virtuel** dont les actions `LOCK_OPEN` / `LOCK_CLOSE` exécutent les commandes d'un autre plugin (un véhicule, piloté via un service en ligne). Son `LOCK_STATE` est un **calcul** qui vaut `1` quand l'état source vaut « sécurisé » (`SECURED`) : polarité du **cas général** (1 = verrouillé), aucun traitement particulier.
 
 ## Faits relevés dans le code (lecture seule, `main` `b1acad7`)
 
@@ -79,8 +83,9 @@ afin de la consulter et, si je l'ai voulu, de la piloter par Assist.
 
 ## Tâches proposées
 
-- [ ] **Task 0 — Gel du référentiel pour `lock`** : polarité de `LOCK_STATE`, sens de `LOCK_OPEN` / `LOCK_CLOSE`, champs de `lock.mqtt` (documentation officielle HA 2026.9.4, D4) ; liste, par ClaudeBox, des équipements concernés et de leurs commandes réelles.
-- [ ] **Task 1 à 7** : registre, mapper, publication, commande, état (après 23.3), override, tests (dont polarité) ; **gate, déploiement, preuve terrain (humain)** ; **documentation**.
+- [x] **Task 0 — Gel du référentiel pour `lock`** (ClaudeBox, 2026-11-12) : polarité de `LOCK_STATE`, sens de `LOCK_OPEN` / `LOCK_CLOSE`, champs de `lock.mqtt` (documentation officielle HA 2026.9.4, D4) ; liste, par ClaudeBox, des équipements concernés et de leurs commandes réelles.
+- [x] **Task 1 à 7 (développement)** : registre, mapper, publication, commande, état (après 23.3), override, tests (dont polarité), **documentation** — session cloud déléguée, voir Dev Agent Record.
+- [ ] **Gate, déploiement, preuve terrain (humain)** : ClaudeBox et Alexandre (Q-L2 : essai réel en sa présence).
 
 ## Garde-fous
 
@@ -98,3 +103,59 @@ La polarité réelle de `LOCK_STATE` sur les équipements mesurés ; les champs 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : Q9 A (absorbe 18-2), Q10 A ; Q1 « exclu par plugin » conservé.
 - 2026-11-12 — Task 0 (ClaudeBox : eq 508 seul concerné, 421 exclu par plugin ; polarité Homebridge) ; D1-D4 ClaudeBox ; `ready-for-dev` pour le développement, déploiement soumis à Q-L1/Q-L2.
+- 2026-11-12, 07:51 — **Décisions d'Alexandre** : Q-L1 oui (508 publié en `lock`, règle « ce qui est dans l'app Maison doit être dans HA ») ; Q-L2 preuve terrain réelle (verrouiller/déverrouiller) en sa présence. Fait établi : 508 est un virtuel relayant un autre plugin, `LOCK_STATE` calculé à 1 quand la source est sécurisée → polarité du cas général.
+- 2026-11-12 — Développement (session cloud déléguée) : Tasks 1 à 7 hors terrain ; story en `review`.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Opus 5.5 (session Claude Code cloud déléguée, sans accès à la box).
+
+### Implementation Notes
+
+- **Mapper** (`mapping/lock.py`, nouveau) : une serrure par équipement = **un** `LOCK_STATE` de type `info` et au moins une action `LOCK_CLOSE` (verrouiller) ou `LOCK_OPEN` (déverrouiller) de type `action` / sous-type `other` (un ordre de serrure ne porte pas de valeur). Refus (WARNING, projection d'avant gardée) : aucun état ou plusieurs états, plusieurs actions de même sens, action liée (« Valeur », `linked_value` de 24.8) à une autre commande que l'état, polarité non établie. État seul : rien ne change (AC3). Entité : `ha_unique_id` `jeedom2ha_eq_<eq>_cmd_<LOCK_STATE>`, `object_id`/`node_id` `jeedom2ha_<eq>_<LOCK_STATE>`, topics `jeedom2ha/<eq>/<LOCK_STATE>/state|set` (convention de 24.8), confiance `sure`, `reason_code` `lock_state_open_close`, `reason_details.lock_polarity`.
+- **Polarité (D1, AC2)** : lue du **plugin** seulement (`lock_polarity`), jamais d'un nom : `nuki` → `0` verrouillé / `1` déverrouillé / `2` bloqué ; `jeelink` → **non établie** (Homebridge lit un `jeelink` selon l'équipement relayé, information que le plugin ne reçoit pas) → pas de `lock` ; tout autre plugin (dont `virtual`, cas de 508) → cas général : `1`/`true`/`on` (ou `1.0`) verrouillé, `0`/`false`/`off` (ou `0.0`) déverrouillé. `sync.readback.lock_state` : toute autre valeur → `None`, aucun état publié.
+- **Ordre et remplacement (D3, Q10 A)** (`mapping/registry.py`, `_with_locks`) : la serrure passe par la même passe dédiée que la vanne, **avant** tous les mappers (donc avant le `binary_sensor` de classe `lock` et avant le bouton, dont l'appui sur `LOCK_*` est refusé par 24.12). La projection d'avant est calculée sur l'équipement complet ; ses entités qui utilisent une commande de la serrure (ou d'une vanne du même équipement) sont retirées (WARNING « remplacée par la serrure »), jamais re-projetées ; les autres sont gardées à l'identique. Le `unique_id` de la serrure est nouveau (`…_cmd_<LOCK_STATE>`, domaine `lock`) : aucun `unique_id` existant n'est réutilisé, testé sur les trois formes (binary_sensor, bouton, switch + serrure). `_with_valves` de 24.8 n'est pas modifié (ajouts seuls).
+- **Registre (AR13, AC1)** : `lock` connu (`state_topic`, `command_topic`, `platform`, `availability` ; `has_state`, `has_command`) et ouvert dans `PRODUCT_SCOPE` ; `LockCapabilities` (`has_state`, `has_command`, `has_lock`, `has_unlock`) ; preuve `test_governance_fr40_proof_lock` ; `PublisherRegistry` (`publish_lock`). `LOCK_*` restent dans les listes « anti » de `switch`, `cover`, `light` (inchangées).
+- **Payload (D2, AC5)** : `payload_lock: LOCK`, `payload_unlock: UNLOCK`, `state_locked: LOCKED`, `state_unlocked: UNLOCKED`, `state_jammed: JAMMED`, `optimistic: false` (fixe : une serrure a toujours son état), `default_entity_id = lock.<object_id>`, ni `code_format`, ni `payload_open`. Topic `homeassistant/lock/jeedom2ha_<eq>_<LOCK_STATE>/config`.
+- **Ordres (AC4)** (`sync/command.py`) : topic de la serrure dans `_expected_command_topics` ; `LOCK` → `LOCK_CLOSE`, `UNLOCK` → `LOCK_OPEN` de la serrure, payload **exact** (sensible à la casse ; `OPEN`, `lock`, `ON`… refusés) ; la commande doit être une `action` portant le type attendu, sinon `missing_action_command` : **sans `LOCK_OPEN`, aucun déverrouillage n'est envoyé**. Confirmation `real_state_confirmation` si l'état est streamé, sinon `stateless` : aucun état optimiste. Les messages retenus restent ignorés (garde 24.7, générique).
+- **État** (`sync/readback.py`, `sync/state.py`) : `STATE_KEYS["lock"]` = `mapping.lock.LOCK_STATE_KEYS` ; `lock` streamé ; traduction par `lock_state(valeur, reason_details.lock_polarity)`.
+- **Override pe-epic-16** : des capacités de serrure forcées vers tout autre actionneur (switch, light, cover, button, valve, …) sont refusées ; `sensor` / `binary_sensor` (lecture) restent valides ; une autre famille forcée en `lock` est refusée. `lock` ajouté aux types autorisés d'un profil. `desktop/js/jeedom2ha_mapping_override.js` non modifié (garde 24.2).
+- **Export de décision** : `lock` dans `_ACTUATOR_TYPES` ; `entity_id_expected` lu dans le payload réel. `_resolve_state_topic` rend le topic de la serrure.
+- **Cycle de vie (AC6)** : pour 508, le principal change de type (`binary_sensor` → `lock`) : le topic d'équipement du `binary_sensor` est vidé par le retypage existant de `_detect_lifecycle_changes`, à chaud comme au premier sync après redémarrage (report si échec) ; un secondaire remplacé sous un principal gardé suit les chemins de 24.8 (`_unpublish_refused_candidates` à chaud, `_unpublish_boot_removed_topics` au boot). Prouvé par tests ; aucun code de cycle de vie ajouté.
+- **Sécurité (D4, AC7)** : aucun code ne touche l'exposition à Assist (rien de tel n'existe dans la discovery MQTT) ; la documentation utilisateur le dit et renvoie le choix à l'utilisateur dans HA.
+- **Golden 8.4** : seuls les compteurs `locks_*` à 0 apparaissent (ajouts seuls) ; le corpus ne contient qu'un `LOCK_STATE` sans action, qui garde son `binary_sensor` (AC3). Contrat 4D inchangé.
+- **Garde 25.4** : lignes remplacées (listes figées qui gagnent `lock`, leurs assertions, `len(PRODUCT_SCOPE)`, test 24.8 « valve en dernier ») déclarées dans `REPLACED_BY_24_9` (`fichier::ligne`).
+- Champs `lock.mqtt` non revérifiés dans le source de HA 2026.9.4 par cette session (pas d'accès) : à confirmer à la preuve terrain (entité créée, états `LOCKED` / `UNLOCKED`, aucun code demandé).
+
+### Tests
+
+- `resources/daemon/tests/unit/test_story_24_9_serrure_lock.py` (identifiants synthétiques 9001-9003) : registre et preuves `validate_projection` ; serrure nominale ; un seul ordre suffit ; absence de serrure (état seul, ordres seuls, deux états, deux ordres de même sens, mauvais genres, ordre à valeur, lien ailleurs) avec projection d'avant inchangée ; liens acceptés ; polarité par plugin, jamais par nom ; `jeelink` refusé ; tables cas général et `nuki` ; valeurs et polarités non reconnues → aucun état ; remplacement du `binary_sensor` et du bouton ; aucun `unique_id` réutilisé ; serrure ajoutée à côté d'un `switch` ; vanne et serrure sur le même équipement ; payload (pas de code, pas d'ouverture, rien sur Assist) ; topics ; ordres (LOCK/UNLOCK, payloads refusés, pas de déverrouillage sans `LOCK_OPEN`, commande étrangère refusée, topic d'équipement refusé, secondaire routé) ; confirmation ; refus 24.12 conservé ; état streamé et initial ; overrides croisés ; attendu HA ; export de décision ; cycle de vie (retypage à chaud et au boot, secondaire au boot) ; non-régression.
+- Mis à jour : listes figées de `PRODUCT_SCOPE` / `known_types` (7.2, 7.3, 7.4, 8.2, 9.1, 9.2, 9.3, 24.7, 24.8, registre), preuve FR40, faux publisher de 19.4, golden 8.4, garde 25.4.
+- `python -m pytest` : 3 032 passés, 9 désélectionnés (marqueur `load`), 0 échec. `flake8 resources/daemon tests` : 0. `node --test tests/unit/*.node.test.js` : 1 214 / 1 214 (dont la garde 25.4).
+
+### File List
+
+- `resources/daemon/mapping/lock.py` (nouveau)
+- `resources/daemon/mapping/registry.py`, `resources/daemon/mapping/overrides.py`
+- `resources/daemon/models/mapping.py`
+- `resources/daemon/validation/ha_component_registry.py`
+- `resources/daemon/discovery/publisher.py`, `resources/daemon/discovery/registry.py`
+- `resources/daemon/sync/readback.py`, `resources/daemon/sync/command.py`, `resources/daemon/sync/state.py`
+- `resources/daemon/transport/http_server.py`
+- `resources/daemon/export/decision_export.py`
+- `resources/daemon/tests/unit/test_story_24_9_serrure_lock.py` (nouveau)
+- `resources/daemon/tests/unit/test_step3_governance_fr40.py`, `test_story_19_4_guard_publisher_calls.py`, `test_ha_component_registry.py`, `test_story_7_2_wave_registry.py`, `test_story_7_3_projection_validation_wave.py`, `test_story_7_4_governance_product_scope.py`, `test_story_8_2_publisher_registry.py`, `test_story_9_1_sensor_mapper.py`, `test_story_9_2_binary_sensor_mapper.py`, `test_story_9_3_button_mapper.py`, `test_story_24_7_portail_garage_cover.py`, `test_story_24_8_vanne_arrosage_valve.py`
+- `resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json`
+- `tests/unit/test_story_25_4_non_regression.node.test.js`
+- `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md`, `README.md`
+- `_bmad-output/implementation-artifacts/24-9-serrure-lock.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Points ouverts
+
+1. **Preuve terrain (Q-L2)** : sur 508, inventaire avant/après (le `binary_sensor` `jeedom2ha_eq_508` disparaît, `lock.jeedom2ha_508_4628` apparaît), état lu, puis verrouiller/déverrouiller **en présence d'Alexandre**. L'ordre passe par un service en ligne : délai possible avant le retour d'état (aucun état n'est affiché entre-temps).
+2. **`jeelink`** : refusé faute de savoir quel équipement il relaie ; une évolution exigerait d'exporter cette information (hors périmètre).
+3. **`invertBinary`** : non appliqué à la serrure (D1 = parité Homebridge) ; à revoir si un équipement réel l'utilise.
+4. **Interface** : `lock` absent du sélecteur d'override et sans libellé français (fichier JS sous garde 24.2), comme `valve`.
+5. **Polarité du `binary_sensor` de classe `lock` existant** (hors story) : pour HA, `ON` signifie « déverrouillé » ; le cas général publie `1` → `ON`, soit l'inverse de Homebridge. Ne concerne plus que les serrures restées en lecture seule (sans action) ; à trancher séparément.

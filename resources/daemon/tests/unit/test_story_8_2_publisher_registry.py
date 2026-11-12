@@ -38,11 +38,11 @@ def _make_mapping(ha_entity_type: str, eq_id: int = 10) -> MappingResult:
 def test_ac1_registry_contains_exact_current_publishers():
     registry = PublisherRegistry(_make_publisher())
 
-    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"}
+    assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock"}
 
 
 def test_known_types_classmethod_returns_static_types_without_instance():
-    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]
+    assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock"]
 
 
 def test_known_types_matches_publishers_dict():

@@ -10,6 +10,7 @@ from mapping.climate import ClimateMapper
 from mapping.cover import CoverMapper
 from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
+from mapping.lock import LockMapper
 from mapping.presence_switch import PresenceSwitchMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
@@ -41,6 +42,10 @@ class MapperRegistry:
         # le repli) par une passe dédiée de ``map_all``, hors de la liste ordonnée : un
         # équipement sans type de vanne garde exactement sa projection d'avant.
         self._valve_mapper = ValveMapper()
+        # Story 24.9 (D3) — la serrure aussi, par la même passe dédiée : elle doit être
+        # reconnue avant le binary_sensor `lock` et avant le bouton (24.12 refuse l'appui
+        # sur les familles LOCK_*), qu'elle remplace explicitement.
+        self._lock_mapper = LockMapper()
 
     @property
     def mappers(self) -> List[object]:
@@ -80,6 +85,9 @@ class MapperRegistry:
         on agrège ces résultats au lieu d'utiliser une allowlist d'IDs.
         """
         valve_results = self._valve_mapper.map_all(eq, snapshot)
+        lock_results = self._lock_mapper.map_all(eq, snapshot)
+        if lock_results:
+            return self._with_locks(eq, snapshot, [*valve_results, *lock_results])
         if valve_results:
             return self._with_valves(eq, snapshot, valve_results)
         return self._apply_entity_name_rule(eq, self._map_all_raw(eq, snapshot))
@@ -112,6 +120,40 @@ class MapperRegistry:
         if not kept:
             return self._apply_entity_name_rule(eq, valve_results)
         return [*kept, *valve_results]
+
+    def _with_locks(
+        self, eq: JeedomEqLogic, snapshot: TopologySnapshot, dedicated: List[MappingResult]
+    ) -> List[MappingResult]:
+        """Story 24.9 (D3, Q10 A) — la serrure remplace les entités qui utilisaient ses commandes.
+
+        Même règle que les vannes (24.8), dont elle reprend le mécanisme : la projection
+        d'avant est calculée sur l'équipement COMPLET ; ses entités qui n'utilisent aucune
+        commande de la serrure (ni d'une vanne du même équipement, ``dedicated``) sont
+        gardées à l'identique ; celles qui en utilisent une (le ``binary_sensor`` de classe
+        ``lock``, un bouton sur ``LOCK_OPEN`` / ``LOCK_CLOSE``) sont retirées (WARNING),
+        jamais re-projetées : aucun ``unique_id`` existant n'est réutilisé pour une autre
+        commande, la serrure a le sien (``jeedom2ha_eq_<eq>_cmd_<LOCK_STATE>``).
+        """
+        consumed_by: Dict[int, str] = {}
+        for result in dedicated:
+            for cmd in result.commands.values():
+                consumed_by[int(cmd.id)] = result.ha_entity_type
+        before = self._apply_entity_name_rule(eq, self._map_all_raw(eq, snapshot))
+        kept: List[MappingResult] = []
+        for result in before:
+            taken = sorted(self._result_cmd_ids(result) & set(consumed_by))
+            if taken:
+                by = "la serrure" if any(consumed_by[i] == "lock" for i in taken) else "la vanne"
+                _LOGGER.warning(
+                    "[MAPPING] eq_id=%d: entité %s %s retirée, remplacée par %s "
+                    "(commandes %s reprises)",
+                    eq.id, result.ha_entity_type, result.ha_unique_id, by, taken,
+                )
+                continue
+            kept.append(result)
+        if not kept:
+            return self._apply_entity_name_rule(eq, dedicated)
+        return [*kept, *dedicated]
 
     @staticmethod
     def _result_cmd_ids(result: MappingResult) -> set:

@@ -51,6 +51,7 @@ from sync.readback import (
     readback_commands,
     valve_state,
 )
+from sync.readback import lock_state  # Story 24.9
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +67,10 @@ _STREAMED_TYPES = _VAGUE1_TYPES + _ACTIONABLE_STREAMED
 _VALVE_ACTIONABLE = ("valve",)
 _ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _VALVE_ACTIONABLE
 _STREAMED_TYPES = _STREAMED_TYPES + _VALVE_ACTIONABLE
+# Story 24.9: lock locked/unlocked/jammed from its LOCK_STATE (polarity D1).
+_LOCK_ACTIONABLE = ("lock",)
+_ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _LOCK_ACTIONABLE
+_STREAMED_TYPES = _STREAMED_TYPES + _LOCK_ACTIONABLE
 
 # Readback (info) command keys per actionable type — used to pick the state
 # command, NOT the action commands (e.g. switch ENERGY_ON/ENERGY_OFF).
@@ -80,6 +85,7 @@ _READBACK_KEYS = {
     "light": STATE_KEYS["light"] + BRIGHTNESS_KEYS,
     "cover": STATE_KEYS["cover"],
     "valve": STATE_KEYS["valve"],
+    "lock": STATE_KEYS["lock"],
 }
 
 # Strict shape of the retained channel topics this module may empty (never anything else).
@@ -740,6 +746,12 @@ class StateSynchronizer:
                     state_cmd = readback_cmd
                     break
             return valve_state(text, invert_binary=bool(getattr(state_cmd, "invert_binary", False)))
+
+        if ha_type == "lock":
+            # Story 24.9 (D1): LOCK_STATE -> LOCKED / UNLOCKED / JAMMED with the polarity
+            # fixed by the mapper (Homebridge); any other value publishes nothing.
+            polarity = (mapping.reason_details or {}).get("lock_polarity")
+            return lock_state(text, polarity)
 
         if ha_type == "cover" and is_barrier_state_command(cmd):
             # Story 24.7 (D1): gate / garage barrier value -> closed/closing/stopped/

@@ -21,6 +21,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from mapping.valve import VALVE_STATE_KEYS  # Story 24.8
+from mapping.lock import LOCK_POLARITY_NUKI, LOCK_POLARITY_STANDARD, LOCK_STATE_KEYS  # Story 24.9
 
 CHANNEL_STATE = "state"
 CHANNEL_BRIGHTNESS = "brightness"
@@ -35,6 +36,8 @@ STATE_KEYS: Dict[str, Tuple[str, ...]] = {
     # Story 24.8 — open/closed of a valve: the STATE of its trio (single source:
     # ``mapping.valve.VALVE_STATE_KEYS``, Homebridge types frozen in Task 0).
     "valve": VALVE_STATE_KEYS,
+    # Story 24.9 — locked/unlocked/jammed of a lock: its LOCK_STATE (mapping.lock).
+    "lock": LOCK_STATE_KEYS,
 }
 BRIGHTNESS_KEYS: Tuple[str, ...] = ("LIGHT_BRIGHTNESS",)
 # LIGHT_BRIGHTNESS feeds the brightness; a numeric LIGHT_STATE is the fallback (see
@@ -189,6 +192,52 @@ def valve_state(value: Any, invert_binary: bool = False) -> Optional[str]:
     if invert_binary:
         is_open = not is_open
     return "open" if is_open else "closed"
+
+
+# Story 24.9 (D1) — LOCK_STATE value -> HA MQTT lock state (``state_locked: LOCKED`` /
+# ``state_unlocked: UNLOCKED`` / ``state_jammed: JAMMED``), Homebridge polarity
+# (``LockCurrentState``). Anything else publishes nothing (never invented).
+_LOCK_TRUE_VALUES = frozenset({"1", "true", "on"})
+_LOCK_FALSE_VALUES = frozenset({"0", "false", "off"})
+_LOCK_NUKI_TABLE = {"0": "LOCKED", "1": "UNLOCKED", "2": "JAMMED"}
+
+
+def lock_state(value: Any, polarity: Any) -> Optional[str]:
+    """Translate a ``LOCK_STATE`` value to ``LOCKED`` / ``UNLOCKED`` / ``JAMMED``; else None.
+
+    ``standard`` polarity (general case): true value = locked, false value = unlocked.
+    ``nuki`` polarity: 0 = locked, 1 = unlocked, 2 = jammed. An unknown polarity, or a
+    value outside these tables, gives None: no state is published.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        value = "1" if value else "0"
+    text = str(value).strip().lower()
+    if polarity == LOCK_POLARITY_NUKI:
+        # Integer forms only ("1", "1.0"); never a rounding of another number.
+        try:
+            number = float(text.replace(",", "."))
+        except ValueError:
+            return None
+        if not math.isfinite(number) or number != int(number):
+            return None
+        return _LOCK_NUKI_TABLE.get(str(int(number)))
+    if polarity != LOCK_POLARITY_STANDARD:
+        return None
+    if text in _LOCK_TRUE_VALUES:
+        return "LOCKED"
+    if text in _LOCK_FALSE_VALUES:
+        return "UNLOCKED"
+    try:
+        number = float(text.replace(",", "."))
+    except ValueError:
+        return None
+    if number == 1:
+        return "LOCKED"
+    if number == 0:
+        return "UNLOCKED"
+    return None
 
 
 def has_reliable_channel(ha_type: Any, mapping: Any, channel: str) -> bool:

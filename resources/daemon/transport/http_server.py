@@ -130,6 +130,9 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
         # Story 24.8 — a valve has its own node-scoped topic, like a multi-switch.
         if mapping.ha_entity_type == "valve" and isinstance(state_topic, str) and state_topic:
             return state_topic
+        # Story 24.9 — a lock too (node-scoped by its LOCK_STATE command).
+        if mapping.ha_entity_type == "lock" and isinstance(state_topic, str) and state_topic:
+            return state_topic
         if mapping.ha_entity_type == "switch" and isinstance(state_topic, str) and state_topic:
             return state_topic
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
