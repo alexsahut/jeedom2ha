@@ -100,6 +100,20 @@ class ValveCapabilities:
     device_class: Optional[str] = None
 
 
+@dataclass
+class LockCapabilities:
+    """Lock capabilities (Story 24.9).
+
+    has_state: one ``LOCK_STATE`` info (polarity established, D1).
+    has_command: at least one order (``has_lock`` or ``has_unlock``, AC3).
+    has_lock: a ``LOCK_CLOSE`` action; has_unlock: a ``LOCK_OPEN`` action.
+    """
+    has_state: bool = False
+    has_command: bool = False
+    has_lock: bool = False
+    has_unlock: bool = False
+
+
 MappingCapabilities = Union[
     LightCapabilities,
     CoverCapabilities,
@@ -108,6 +122,7 @@ MappingCapabilities = Union[
     ClimateCapabilities,
     AlarmCapabilities,
     ValveCapabilities,
+    LockCapabilities,
 ]
 
 

@@ -108,6 +108,7 @@ _KNOWN_TYPES = [
     "light", "cover", "switch", "sensor",
     "binary_sensor", "button", "climate", "alarm_control_panel",
     "valve",  # Story 24.8
+    "lock",  # Story 24.9
 ]
 
 

@@ -397,6 +397,7 @@ Le plugin publie neuf types d'entités Home Assistant. Le type est choisi à par
 | `climate` | Thermostats, pour la consigne et la température. |
 | `alarm_control_panel` | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
 | `valve` | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
+| `lock` | Serrures : verrouiller, déverrouiller et état réel (voir [Serrures](#serrures)). |
 
 Le plugin ne publie pas les équipements sans type Jeedom reconnu : il l'indique alors dans l'encart de cause de l'équipement.
 
@@ -470,6 +471,20 @@ Un équipement Jeedom qui porte les types de vanne du plugin Homebridge (« Arro
 - **État réel** : 1 ou toute valeur positive ouvert, 0 fermé (inversé si l'option « Inverser » est cochée sur la commande d'état dans Jeedom) ; toute autre valeur ne change rien dans Home Assistant. Pas d'état supposé (`optimistic: false`).
 - Classe « eau » (`water`) pour l'arrosage et le robinet, aucune classe pour la vanne générique. **Pas de position, pas de minuterie, pas de programme d'arrosage** : les durées (`VALVE_SET_DURATION`, `VALVE_REMAINING_DURATION`) ne sont pas reprises.
 - Identifiant de l'entité : `valve.jeedom2ha_<équipement>_<commande d'état>`.
+
+### Serrures
+
+Un équipement Jeedom qui porte les types « Serrure » du cœur (`LOCK_STATE` pour l'état, `LOCK_CLOSE` pour verrouiller, `LOCK_OPEN` pour déverrouiller) est publié comme une **serrure** (`lock`) s'il a **un** état et **au moins une** des deux actions.
+
+- **État réel uniquement**, lu comme le plugin Homebridge (parité avec HomeKit) :
+  - cas général : 1 (ou `true`, `on`) **verrouillé**, 0 (ou `false`, `off`) **déverrouillé** ;
+  - équipements du plugin `nuki` : 0 verrouillé, 1 déverrouillé, 2 **bloqué** ;
+  - toute autre valeur ne change rien dans Home Assistant. Pas d'état supposé (`optimistic: false`).
+- **Pas de serrure** (l'équipement garde exactement ce qu'il avait, par exemple un capteur binaire de classe « serrure » en lecture seule) quand : l'état manque, aucune action n'existe, il y a plusieurs états ou plusieurs actions de même sens, une action est liée (champ « Valeur ») à une autre commande que l'état, ou la lecture de l'état n'est pas établie (plugin `jeelink`, dont Homebridge lit l'état selon l'équipement relayé). Le journal du démon dit pourquoi. Le sens n'est jamais déduit d'un nom.
+- **Ordres** : « Verrouiller » envoie `LOCK_CLOSE`, « Déverrouiller » envoie `LOCK_OPEN`. Sans action `LOCK_OPEN`, aucun ordre de déverrouillage n'est jamais envoyé. Pas de code, pas d'ordre « ouvrir la porte ».
+- **La serrure remplace les entités qui utilisaient ses commandes** : le capteur binaire de classe « serrure » (`binary_sensor`) ou un bouton sur `LOCK_OPEN` / `LOCK_CLOSE` est retiré et remplacé par la serrure, sous un nouvel identifiant ; pensez à reprendre les automatisations qui l'utilisaient. Les autres entités de l'équipement restent publiées comme avant, avec les mêmes identifiants.
+- **Assist et commande vocale** : le plugin ne règle jamais l'exposition des entités à Assist. Exposer la serrure à Assist, et donc permettre de la déverrouiller à la voix, est un choix que vous faites dans Home Assistant (Paramètres > Assistants vocaux > Exposer) ; aucune valeur par défaut du plugin ne l'expose.
+- Identifiant de l'entité : `lock.jeedom2ha_<équipement>_<commande d'état>`.
 
 ### Les badges de synthèse
 

@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-12 — Serrures : des serrures dans Home Assistant
+
+- Une serrure Jeedom (types `LOCK_STATE`, `LOCK_CLOSE`, `LOCK_OPEN` : état, verrouiller, déverrouiller) est publiée comme une serrure (`lock`) avec son état réel (verrouillé, déverrouillé, bloqué), lu comme le fait le plugin Homebridge. Il faut un état et au moins une des deux actions ; sans action `LOCK_OPEN`, aucun déverrouillage n'est jamais envoyé.
+- Le plugin ne règle pas l'exposition à Assist : déverrouiller à la voix reste un choix à faire dans Home Assistant.
+- **Changement d'identifiant** : le capteur binaire de classe « serrure » (ou un bouton sur une action de la serrure) est retiré et remplacé par `lock.jeedom2ha_<équipement>_<commande d'état>`. Pensez à reprendre les automatisations qui l'utilisaient. Détail dans la section « Serrures » de la documentation.
+
+---
+
 # 2026-11-11 — Vannes d'arrosage : des vannes dans Home Assistant
 
 - Une vanne d'arrosage, un robinet ou une vanne générique Jeedom (types Homebridge `IRRIG_*`, `FAUCET_*`, `VALVE_*` : état, ouvrir, fermer) est publié comme une vanne (`valve`) avec son état réel, pilotable par Assist. Un programmateur à plusieurs zones donne une vanne par zone.

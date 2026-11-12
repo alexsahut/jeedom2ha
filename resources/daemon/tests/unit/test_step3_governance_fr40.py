@@ -59,6 +59,7 @@ _GOVERNED_SCOPE = {
     "climate": "test_governance_fr40_proof_climate",
     "alarm_control_panel": "test_governance_fr40_proof_alarm_control_panel",
     "valve": "test_governance_fr40_proof_valve",  # Story 24.8
+    "lock": "test_governance_fr40_proof_lock",  # Story 24.9
 }
 # 3 conditions FR40 — mécanismes d'enforcement (AR13) :
 #
@@ -333,5 +334,26 @@ def test_governance_fr40_proof_valve():
     assert result_fail_state.reason_code == "ha_missing_state_topic"
 
     result_fail_cmd = validate_projection("valve", ValveCapabilities(has_open_close=False, has_state=True))
+    assert result_fail_cmd.is_valid is False
+    assert result_fail_cmd.reason_code == "ha_missing_command_topic"
+
+
+# ---------------------------------------------------------------------------
+# Preuve de gouvernance FR40 : lock (Story 24.9)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_lock():
+    """Preuve de gouvernance FR40 pour lock (Story 24.9) : LOCK_STATE + au moins un ordre."""
+    from models.mapping import LockCapabilities
+
+    result_nominal = validate_projection("lock", LockCapabilities(has_state=True, has_command=True, has_lock=True))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail_state = validate_projection("lock", LockCapabilities(has_state=False, has_command=True))
+    assert result_fail_state.is_valid is False
+    assert result_fail_state.reason_code == "ha_missing_state_topic"
+
+    result_fail_cmd = validate_projection("lock", LockCapabilities(has_state=True, has_command=False))
     assert result_fail_cmd.is_valid is False
     assert result_fail_cmd.reason_code == "ha_missing_command_topic"

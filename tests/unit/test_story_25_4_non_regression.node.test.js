@@ -90,6 +90,28 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     'resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::"switches_sure": 3',
   ];
 
+  // Story 24.9 (ouverture gouvernée de `lock`, AR13) : mêmes listes figées que 24.8, qui gagnent `lock` (code et tests qui les
+  // vérifient), `lock` est un actionneur de l'export de décision ; le test 24.8 « valve en dernier » devient « valve présent ».
+  // Le golden 8.4 gagne les compteurs `locks_*` à 0 en ajouts seuls. Le reste du démon est en ajouts seuls (« fichier::ligne »).
+  const REPLACED_BY_24_9 = [
+    'resources/daemon/validation/ha_component_registry.py::PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10 # valve ouvert Story 24.8 sous FR40/NFR10',
+    'resources/daemon/discovery/registry.py::_known_types = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/export/decision_export.py::_ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel", "valve"})',
+    'resources/daemon/tests/unit/test_ha_component_registry.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_7_2_wave_registry.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py::assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert set(PRODUCT_SCOPE) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"}',
+    'resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert len(PRODUCT_SCOPE) == 9',
+    'resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert set(registry.publishers.keys()) == {"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"}',
+    'resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_9_2_binary_sensor_mapper.py::assert PublisherRegistry.known_types() == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_9_3_button_mapper.py::"light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve"',
+    'resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::"climate", "alarm_control_panel", "valve"]',
+    'resources/daemon/tests/unit/test_story_24_8_vanne_arrosage_valve.py::assert PRODUCT_SCOPE[-1] == "valve"',
+    'resources/daemon/tests/unit/test_story_24_8_vanne_arrosage_valve.py::assert PublisherRegistry.known_types()[-1] == "valve"',
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -132,7 +154,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
       else if (removedLines(l).length) removed.push({ file, line: l.slice(1).trim() });
     }
     const unexpected = removed
-      .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`))
+      .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
+        && !REPLACED_BY_24_9.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });
