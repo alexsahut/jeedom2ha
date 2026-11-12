@@ -23,6 +23,23 @@ _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
+# Story 24.12 — equipment button (ButtonMapper / FallbackMapper): jeedom2ha/{eq_id}/cmd.
+_BUTTON_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/cmd$")
+# Story 24.12 — the only accepted press payload: HA's default ``payload_press``. The
+# discovery publishes no ``payload_press`` (publisher ``_build_button_payload``), so HA
+# always sends exactly this value; nothing else is ever read from the mapping.
+_BUTTON_PAYLOAD_PRESS = "PRESS"
+# Story 24.12 — a press carries no value: only an action of this sub-type can be pressed.
+_BUTTON_PRESSABLE_SUB_TYPES = ("other",)
+# Story 24.12 (D-sensibles) — families whose orders need a guard a button does not have
+# (24.7 barrier lock / fresh read, 24.8 valve close, lock, alarm, siren): a press on such
+# a command is refused, never executed (``button_sensitive_family_refused``).
+BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES = (
+    "GB_", "LOCK_", "ALARM_", "SIREN_", "IRRIG_", "FAUCET_", "VALVE_", "BARRIER_", "GARAGE_",
+)
+# Story 24.12 (D-sensibles) — markers left in ``reason_details`` by the cover (24.7) and
+# valve (24.8) mappers: an override « Type HA -> button » keeps them, and is refused.
+BUTTON_SENSITIVE_REASON_DETAILS_KEYS = ("barrier_mode", "valve_family")
 
 # Story 24.7 — gate / garage cover (``barrier_mode`` set by CoverMapper, M1).
 # States from which an order may be sent, per mode and direction.
@@ -243,6 +260,11 @@ class CommandSynchronizer:
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="position"), None
 
+        match = _BUTTON_CMD_TOPIC_RE.match(topic)
+        if match:
+            # Story 24.12 — routed only if a published button of this equipment exposes it.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel="press"), None
+
         return None, "invalid_command_topic"
 
     def _resolve_runtime_target(
@@ -352,6 +374,14 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "button":
+            # Story 24.12 — the exact topic the discovery publishes (publisher
+            # ``_build_button_payload``): ``command_topic`` of the mapping, else the
+            # equipment ``/cmd`` topic. A node-scoped secondary keeps its own topic.
+            command_topic = (mapping.reason_details or {}).get("command_topic", f"jeedom2ha/{eq_id}/cmd")
+            if isinstance(command_topic, str) and command_topic:
+                topics["press"] = command_topic
+
         return topics
 
     def _translate_command(
@@ -363,6 +393,12 @@ class CommandSynchronizer:
         commands = mapping.commands or {}
         payload = str(raw_payload).strip()
         payload_upper = payload.upper()
+
+        if mapping.ha_entity_type == "button":
+            # Story 24.12 — whatever the topic shape (/cmd or node-scoped /set): the topic
+            # was already matched against this button's own discovery topic.
+            # P3 — exact comparison on the raw payload (no strip, no case folding).
+            return self._translate_button_command(mapping, str(raw_payload))
 
         if parsed.channel == "set":
             if mapping.ha_entity_type in ("light", "switch"):
@@ -475,6 +511,73 @@ class CommandSynchronizer:
         except (TypeError, ValueError):
             return None, "missing_action_command"
         return CommandTranslation(cmd_id=cmd_id, options={}, command_family="valve_open_close"), None
+
+    @staticmethod
+    def _translate_button_command(
+        mapping: MappingResult,
+        payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.12 — a press on an equipment button runs ITS Jeedom action, once.
+
+        - only ``PRESS`` triggers, compared exactly on the raw payload (no strip, no case
+          folding); the discovery publishes no ``payload_press`` (P3);
+        - D-sensibles: a mapping carrying ``barrier_mode`` / ``valve_family`` (override of a
+          24.7 cover or 24.8 valve) or any command whose generic type starts with one
+          of ``BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES`` is refused; the prefix scan covers
+          EVERY command of the mapping (info and action, any sub-type), before the
+          candidate filter (R2, P4)
+          (``button_sensitive_family_refused``, WARNING), never executed;
+        - only the button's own commands are considered, and among them only ``action``
+          commands of sub-type ``other`` (a press has no value to give a slider, a
+          message, a colour or a list); an ``info`` command is never executed;
+        - exactly one such action is required: none -> ``missing_action_command``,
+          several (e.g. a switch forced to button: ON and OFF) -> ``ambiguous_button_action``,
+          never guessed.
+        """
+        if payload != _BUTTON_PAYLOAD_PRESS:
+            return None, "invalid_command_payload"
+
+        eq_id = getattr(mapping, "jeedom_eq_id", None)
+        reason_details = mapping.reason_details or {}
+        for key in BUTTON_SENSITIVE_REASON_DETAILS_KEYS:
+            if reason_details.get(key) is not None:
+                _LOGGER.warning(
+                    "[SYNC-CMD] eq_id=%s reason_code=button_sensitive_family_refused "
+                    "action=reject_command cmd_id=- generic_type=- marker=%s",
+                    eq_id, key,
+                )
+                return None, "button_sensitive_family_refused"
+
+        # R2 (P4) — every command of the mapping is scanned (info and action, any
+        # sub-type) BEFORE the candidate filter: an untyped action next to a LOCK_STATE /
+        # IRRIG_STATE info belongs to a sensitive device and is refused as well.
+        for cmd in sorted((mapping.commands or {}).values(), key=lambda c: str(getattr(c, "id", ""))):
+            generic_type = str(getattr(cmd, "generic_type", "") or "")
+            if generic_type.upper().startswith(BUTTON_SENSITIVE_GENERIC_TYPE_PREFIXES):
+                _LOGGER.warning(
+                    "[SYNC-CMD] eq_id=%s reason_code=button_sensitive_family_refused "
+                    "action=reject_command cmd_id=%s generic_type=%s",
+                    eq_id, getattr(cmd, "id", "-"), generic_type,
+                )
+                return None, "button_sensitive_family_refused"
+
+        candidates: Dict[int, str] = {}
+        for cmd in (mapping.commands or {}).values():
+            if str(getattr(cmd, "type", "") or "").lower() != "action":
+                continue
+            if str(getattr(cmd, "sub_type", "") or "").lower() not in _BUTTON_PRESSABLE_SUB_TYPES:
+                continue
+            try:
+                candidates[int(cmd.id)] = str(getattr(cmd, "generic_type", "") or "")
+            except (TypeError, ValueError):
+                continue
+        if not candidates:
+            return None, "missing_action_command"
+        if len(candidates) > 1:
+            return None, "ambiguous_button_action"
+        return CommandTranslation(
+            cmd_id=next(iter(candidates)), options={}, command_family="button_press",
+        ), None
 
     def _translate_barrier_command(
         self,
