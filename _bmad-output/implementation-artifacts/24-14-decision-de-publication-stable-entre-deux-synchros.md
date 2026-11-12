@@ -1,6 +1,6 @@
 # Story 24.14 : Décision de publication stable entre deux synchros (scénarios, raison des équipements)
 
-Status: draft
+Status: ready-for-dev
 
 > Analyse et story rédigées par une session cloud déléguée (2026-11-12), en lecture seule du code (`origin/main` e78f727), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : les constats de production ne citent que des identifiants. **Draft** : la cause est établie dans le code avec une forte confiance, mais l'origine des changements d'état côté Jeedom reste à confirmer sur la box (Task 0), et deux décisions d'Alexandre sont requises (D1, D2) avant tout `ready-for-dev`.
 
@@ -71,7 +71,25 @@ L'hypothèse « désactivé depuis longtemps, réévalué seulement au boot » n
 3. **Raison cohérente quel que soit le chemin** : synchro au démarrage, « Relire Jeedom », « Publier », diagnostic, états agrégés et export de décision donnent la même raison pour le même équipement et le même état Jeedom, dans l'ordre documenté (Exclu > Désactivé > Sans commandes > Sans type générique).
 4. **Pas de vérité périmée silencieuse** : si l'état Jeedom a changé depuis la dernière évaluation, soit la décision est réévaluée sans redémarrage, soit l'export dit sur quel instantané il repose.
 
-## Décisions requises d'Alexandre (avant `ready-for-dev`)
+## Décisions d'Alexandre (2026-11-12 21:41, relayées par ClaudeBox)
+
+- **D1 A** : un scénario reste toujours publié en bouton ; inactif, son bouton est **grisé** (indisponible) et l'appui est refusé (`scenario_inactive`). Cette décision remplace celle de 21-1 (Q2 A, CC-44) pour les scénarios.
+- **D2 A** (conséquence de D1 A, posée par ClaudeBox) : le grisé doit suivre l'état réel sans attendre de redémarrage. Il faut donc réévaluer quand `isActive`, `isEnable` ou une exclusion change (tâche périodique et empreinte).
+- **D3** : hors périmètre. Un équipement désactivé reste non publié ; la Task 0 montre qu'un équipement peut basculer automatiquement par planning. Si le besoin se confirme, une autre story s'en chargera.
+
+## Résultat de la Task 0 (ClaudeBox, 2026-11-12, lecture seule via l'agent d'exploitation)
+
+Toutes les bascules viennent de la configuration Jeedom de l'installation : agenda, modes, action sur valeur d'une commande, autre scénario. Aucun bloc code n'appelle `setIsActive` / `setIsEnable`.
+- Les scénarios 2 et 72 sont activés puis désactivés par des événements d'agenda, en semaine et en début de matinée.
+- Le scénario 147 est actif sur une plage quotidienne fixée par un agenda, lui-même lié au mode « absent ».
+- Le scénario 129 est activé et désactivé par un autre scénario (présence), plusieurs fois par heure.
+- Le scénario 39 est activé par l'action sur valeur d'une commande de puissance ; il se désactive lui-même.
+- L'équipement 408 est désactivé puis réactivé par un événement d'agenda hebdomadaire et par un mode.
+- Les exports de décision confirment B-1 : le champ `enabled` de 408 vaut true, puis false, puis true selon le moment de la synchro.
+
+Conclusion : `isActive` / `isEnable` servent ici de **planning** et non d'état « hors service ». Une décision lue seulement au démarrage dépend donc de l'heure du dernier redémarrage.
+
+## Décisions demandées (historique de l'analyse)
 
 - **D1 — Scénario désactivé.** La règle actuelle (21-1, Q2 A, CC-44 : « un scénario inactif n'a plus de bouton dans HA ») fait apparaître et disparaître l'entité à chaque bascule de `isActive`.
   - **A (recommandée)** : le bouton existe pour tout scénario lisible, quel que soit `isActive` ; `isActive` est porté par la **disponibilité** de l'entité (bouton « indisponible » dans HA quand le scénario est désactivé) et un appui sur un scénario désactivé est refusé par le démon avec un motif explicite, sans appel à Jeedom. L'entité, son `entity_id` et ses réglages HA ne bougent plus. Revient sur 21-1 Q2 A (le bouton ne disparaît plus) : décision explicite requise.
@@ -150,3 +168,4 @@ PHP (`tests/test_php_24_14_*.php`) :
 ## Journal
 
 - 2026-11-12 — Analyse et story en draft par une session cloud déléguée (lecture seule du code, aucun accès à la box). Task 0 et décisions D1, D2 à faire avant `ready-for-dev`.
+- 2026-11-12 21:41 — Task 0 faite par ClaudeBox ; décisions d'Alexandre D1 A (toujours publié, grisé si inactif) et D2 A ; story `ready-for-dev`.
