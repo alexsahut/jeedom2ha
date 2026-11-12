@@ -261,8 +261,9 @@ async def test_ac4_covers_every_equipment_command_and_scenario(cli):
     assert active["entity"]["unique_id"] == "jeedom2ha_scenario_5"
     assert active["entity"]["entity_id_expected"] == "button.jeedom2ha_scenario_5"
     assert active["entity"]["discovery_published"] is True
-    assert inactive["active"] is False and inactive["decision"] == "not_published"
-    assert inactive["reason"] == "scenario_inactive" and inactive["entity"]["discovery_published"] is False
+    # Story 24.14 (D1 A) : un scénario inactif garde son bouton (grisé) ; `active` porte la disponibilité.
+    assert inactive["active"] is False and inactive["decision"] == "published"
+    assert inactive["reason"] == "scenario_button" and inactive["entity"]["discovery_published"] is True
     assert inactive["homekit_exposed"] is False
 
 

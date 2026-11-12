@@ -39,7 +39,7 @@ SCHEMA_VERSION = 1
 
 # Raisons propres à l'export (aucune n'existe dans le pipeline de décision).
 REASON_SCENARIO_BUTTON = "scenario_button"      # code déjà produit par le sync pour un scénario actif
-REASON_SCENARIO_INACTIVE = "scenario_inactive"  # scénario inactif : jamais de bouton dans HA
+REASON_SCENARIO_INACTIVE = "scenario_inactive"  # appui refusé sur un scénario inactif (24.14 : plus une raison d'export)
 REASON_NO_SYNC_DECISION = "no_sync_decision"    # équipement sans verdict mémorisé (jamais synchronisé)
 REASON_SCOPE_EXCLUDED = "excluded"              # hors périmètre publié (identique à `_scope_excluded_decision`)
 STEP_SCOPE = "scope"                            # filtre de périmètre publié, appliqué après étape 4
@@ -74,6 +74,8 @@ class DecisionMemo:
     """
 
     sync_at: Optional[str] = None
+    # Story 24.14 (AC9) — origine de la synchro qui a produit ces verdicts : boot, rescan, service.
+    sync_origin: Optional[str] = None
     config: Dict[str, Any] = field(default_factory=lambda: {
         "excluded_plugins": [], "excluded_piece_ids": [],
     })
@@ -393,7 +395,8 @@ def _scenario_row(scenario, scenario_publication, snapshot, publisher) -> Dict[s
     except Exception:
         payload = None
     payload = payload or {}
-    published = bool(scenario.is_active and getattr(scenario_publication, "discovery_published", False))
+    # Story 24.14 (D1 A) — tout scénario lisible a son bouton ; `active` porte sa disponibilité.
+    published = bool(getattr(scenario_publication, "discovery_published", False))
     return {
         "kind": "scenario",
         "key": f"scenario:{scenario.id}",
@@ -402,8 +405,8 @@ def _scenario_row(scenario, scenario_publication, snapshot, publisher) -> Dict[s
         "homekit_exposed": scenario.homekit_exposed,
         "homekit_exposed_source": scenario.homekit_exposed_source,
         "homekit_exposed_effective": scenario.homekit_exposed_effective,
-        "decision": DECISION_PUBLISHED if scenario.is_active else DECISION_NOT_PUBLISHED,
-        "reason": REASON_SCENARIO_BUTTON if scenario.is_active else REASON_SCENARIO_INACTIVE,
+        "decision": DECISION_PUBLISHED,
+        "reason": REASON_SCENARIO_BUTTON,
         "entity": {
             "unique_id": payload.get("unique_id", mapping.ha_unique_id),
             "ha_type": mapping.ha_entity_type,
@@ -449,6 +452,7 @@ def build_decision_export(
         "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_z(generated_at),
         "sync_at": memo.sync_at,
+        "sync_origin": memo.sync_origin,  # Story 24.14 (AC9), champ additif
         "producer": {"plugin_version": plugin_version, "confidence_policy": confidence_policy},
         "config": {
             "excluded_plugins": list(config.get("excluded_plugins", [])),

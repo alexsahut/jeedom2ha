@@ -112,6 +112,53 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     'resources/daemon/tests/unit/test_story_24_8_vanne_arrosage_valve.py::assert PublisherRegistry.known_types()[-1] == "valve"',
   ];
 
+  // Story 24.14 (décisions D1 A et D2 A d'Alexandre) : le bouton d'un scénario n'est plus retiré quand le scénario devient
+  // inactif, il est grisé par une disponibilité propre (`jeedom2ha/scenario_<id>/availability`, `availability_mode: all`) ;
+  // la purge « le broker fait foi » ne retire plus que les scénarios supprimés ; l'export ne donne plus `scenario_inactive`.
+  // L'instantané (topologie, éligibilité, `mappings`, `publications`, `scenario_publications`) n'est remplacé qu'en fin de
+  // synchro réussie (AC8). La synchro de démarrage porte l'en-tête `boot` (AC9). Seules ces lignes sont remplacées
+  // (« fichier::ligne ») ; le reste du démon et de core/class/ est en ajouts seuls.
+  const REPLACED_BY_24_14 = [
+    "core/class/jeedom2ha.class.php::return self::callDaemon('/action/sync', $topology, 'POST', 15);",
+    "resources/daemon/discovery/publisher.py::EntityAvailability,",
+    "resources/daemon/discovery/publisher.py::# Story 21.1 (C8) — pont seul : jamais la disponibilité d'un eqLogic homonyme.",
+    "resources/daemon/discovery/publisher.py::return build_discovery_availability_fields(EntityAvailability())",
+    "resources/daemon/export/decision_export.py::REASON_SCENARIO_INACTIVE = \"scenario_inactive\"  # scénario inactif : jamais de bouton dans HA",
+    "resources/daemon/export/decision_export.py::published = bool(scenario.is_active and getattr(scenario_publication, \"discovery_published\", False))",
+    "resources/daemon/export/decision_export.py::\"decision\": DECISION_PUBLISHED if scenario.is_active else DECISION_NOT_PUBLISHED,",
+    "resources/daemon/export/decision_export.py::\"reason\": REASON_SCENARIO_BUTTON if scenario.is_active else REASON_SCENARIO_INACTIVE,",
+    "resources/daemon/transport/http_server.py::request.app[\"topology\"] = snapshot",
+    "resources/daemon/transport/http_server.py::request.app[\"eligibility\"] = eligibility",
+    "resources/daemon/transport/http_server.py::# Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)",
+    "resources/daemon/transport/http_server.py::request.app[\"mappings\"].pop(old_eq_id, None)",
+    "resources/daemon/transport/http_server.py::request.app[\"publications\"].pop(old_eq_id, None)",
+    "resources/daemon/transport/http_server.py::unpublished_scenario_ids: Set[int] = set()",
+    "resources/daemon/transport/http_server.py::if not scenario.is_active:",
+    "resources/daemon/transport/http_server.py::# Story 21.1 (CC-44) — un scénario inactif n'a plus de bouton dans HA.",
+    "resources/daemon/transport/http_server.py::# Pas de report si le broker est injoignable : la purge « le broker fait foi »",
+    "resources/daemon/transport/http_server.py::# ci-dessous reprend au sync suivant (aucun passage par pending_discovery_unpublish,",
+    "resources/daemon/transport/http_server.py::# indexé par eq_id).",
+    "resources/daemon/transport/http_server.py::if broker_ready and await publisher.unpublish(f\"jeedom2ha_scenario_{scenario_id}\"):",
+    "resources/daemon/transport/http_server.py::unpublished_scenario_ids.add(scenario_id)",
+    "resources/daemon/transport/http_server.py::continue",
+    "resources/daemon/transport/http_server.py::active_or_alive=True,",
+    "resources/daemon/transport/http_server.py::# Purge scenarios that disappeared or became inactive since last sync (M1 fix).",
+    "resources/daemon/transport/http_server.py::for stale_id in stale_scenario_ids:",
+    "resources/daemon/transport/http_server.py::request.app[\"scenario_publications\"].pop(stale_id, None)",
+    "resources/daemon/transport/http_server.py::request.app[\"scenario_publications\"].update(scenario_publications)",
+    "resources/daemon/transport/http_server.py::# qui ne sont pas actifs (inactifs, supprimés, fantômes déjà présents). Garde-fou : la",
+    "resources/daemon/transport/http_server.py::# section `scenarios` doit être une liste, lue en entier côté démon et déclarée complète",
+    "resources/daemon/transport/http_server.py::# par le producteur PHP (`scenarios_complete`), sinon le défaut « liste vide » ou un",
+    "resources/daemon/transport/http_server.py::# scénario illisible ferait vider des boutons encore actifs.",
+    "resources/daemon/transport/http_server.py::result = await publisher.purge_orphan_scenario_buttons(",
+    "resources/daemon/transport/http_server.py::set(scenario_publications), unpublished_scenario_ids",
+    "resources/daemon/transport/http_server.py::)",
+    "resources/daemon/transport/http_server.py::emptied_ids = sorted(unpublished_scenario_ids | set(purged_ids))",
+    "resources/daemon/transport/http_server.py::if emptied_ids:",
+    "resources/daemon/transport/http_server.py::\"[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker): ids=%s\",",
+    "resources/daemon/transport/http_server.py::len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,",
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -155,7 +202,7 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     }
     const unexpected = removed
       .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
-        && !REPLACED_BY_24_9.includes(`${f}::${line}`))
+        && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

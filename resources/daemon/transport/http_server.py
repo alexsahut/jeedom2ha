@@ -26,6 +26,8 @@ from models.availability import (
     AVAILABILITY_ONLINE,
     availability_from_snapshot,
     build_local_availability_topic,
+    build_scenario_availability_topic,
+    scenario_availability_state,
 )
 from models.topology import TopologySnapshot, assess_all, assess_eligibility
 from models.published_scope import (
@@ -1947,6 +1949,25 @@ async def apply_publication_decision(
 
 _SYNC_ACTION_LOCK_WAIT_SECONDS = 7
 
+# Story 24.14 (AC9) — origine d'une synchro, lue dans l'en-tête `X-Jeedom2ha-Sync-Mode` :
+# `boot` (démarrage du démon), `rescan` (« Relire Jeedom »), `service` (réévaluation périodique
+# du plugin, et défaut de tout appel sans en-tête reconnu).
+_SYNC_ORIGINS = frozenset({"boot", "rescan", "service"})
+
+
+def _sync_origin(request: web.Request) -> str:
+    mode = request.headers.get("X-Jeedom2ha-Sync-Mode")
+    return mode if mode in _SYNC_ORIGINS else "service"
+
+
+def _publish_scenario_availability(mqtt_bridge: MqttBridge, scenario_id: int, is_active: bool) -> bool:
+    """Story 24.14 (D1 A) — disponibilité retenue du bouton d'un scénario (`online` / `offline`)."""
+    topic = build_scenario_availability_topic(scenario_id)
+    ok = bool(mqtt_bridge.publish_message(topic, scenario_availability_state(is_active), qos=1, retain=True))
+    if not ok:
+        _LOGGER.warning("[SCENARIO] Failed to publish availability for scenario_id=%d", scenario_id)
+    return ok
+
 
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
     """Serialize sync with HA actions; rescans fail fast, service syncs wait briefly."""
@@ -2009,7 +2030,8 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
     # 1. Normalize and store snapshot
     snapshot = TopologySnapshot.from_jeedom_payload(payload)
-    request.app["topology"] = snapshot
+    # Story 24.14 (AC8) — `app["topology"]` n'est remplacé qu'à la fin d'une synchro réussie,
+    # avec le mémo, `mappings`, `publications` et `scenario_publications` (voir plus bas).
 
     # Story 1.1 — resolver canonique du périmètre publié (global -> piece -> equipement).
     published_scope_raw = payload.get("published_scope", {})
@@ -2017,7 +2039,6 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     
     # 2. Assess eligibility
     eligibility = assess_all(snapshot)
-    request.app["eligibility"] = eligibility
     
     # 3. Build eligibility summary
     eligible_count = sum(1 for res in eligibility.values() if res.is_eligible)
@@ -2313,30 +2334,24 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
                 availability_action,
             )
                 
-        # Nettoyage de la RAM pour éviter les données obsolètes (fuite pour Diagnostics)
-        request.app["mappings"].pop(old_eq_id, None)
-        request.app["publications"].pop(old_eq_id, None)
+        # Nettoyage de la RAM (fuite pour Diagnostics) : fait à la fin, avec le reste de
+        # l'instantané (Story 24.14, AC8).
     
     # Story 10.1 — Publish Jeedom scenarios as HA button entities
+    # Story 24.14 (D1 A) — tout scénario lisible garde son bouton, actif ou non : `is_active`
+    # porte la disponibilité propre du bouton (topic `scenario_<id>`, retenu), jamais sa présence.
+    # Le passage actif <-> inactif ne vide donc plus le topic de configuration ; un appui sur un
+    # scénario inactif est refusé par le routeur de commandes (`scenario_inactive`).
     scenario_mapper = ScenarioButtonMapper()
     scenario_publications: Dict[int, PublicationDecision] = {}
     broker_ready = bool(publisher and mqtt_bridge and mqtt_bridge.is_connected)
-    unpublished_scenario_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
-        if not scenario.is_active:
-            # Story 21.1 (CC-44) — un scénario inactif n'a plus de bouton dans HA.
-            # Pas de report si le broker est injoignable : la purge « le broker fait foi »
-            # ci-dessous reprend au sync suivant (aucun passage par pending_discovery_unpublish,
-            # indexé par eq_id).
-            if broker_ready and await publisher.unpublish(f"jeedom2ha_scenario_{scenario_id}"):
-                unpublished_scenario_ids.add(scenario_id)
-            continue
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
             should_publish=True,
             reason="scenario_button",
             mapping_result=sc_mapping,
-            active_or_alive=True,
+            active_or_alive=bool(scenario.is_active),
             discovery_published=False,
         )
         sc_mapping.publication_decision_ref = sc_decision
@@ -2345,20 +2360,20 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
             ok = await publisher_registry.publish(sc_mapping, snapshot)
             if ok:
                 sc_decision.discovery_published = True
+                _publish_scenario_availability(mqtt_bridge, scenario_id, bool(scenario.is_active))
             else:
                 _LOGGER.warning("[SCENARIO] Failed to publish button for scenario_id=%d", scenario_id)
-    # Purge scenarios that disappeared or became inactive since last sync (M1 fix).
+    # Scénarios disparus depuis la synchro précédente (M1 fix) : retirés de la mémoire à la fin.
     stale_scenario_ids = set(request.app["scenario_publications"]) - set(scenario_publications)
-    for stale_id in stale_scenario_ids:
-        request.app["scenario_publications"].pop(stale_id, None)
+    for stale_id in sorted(stale_scenario_ids):
         _LOGGER.info("[SCENARIO] Purged stale scenario_id=%d from scenario_publications", stale_id)
-    request.app["scenario_publications"].update(scenario_publications)
 
     # Story 21.1 (CC-44, Q2b C) — le broker fait foi : vider les boutons de scénario retenus
-    # qui ne sont pas actifs (inactifs, supprimés, fantômes déjà présents). Garde-fou : la
-    # section `scenarios` doit être une liste, lue en entier côté démon et déclarée complète
-    # par le producteur PHP (`scenarios_complete`), sinon le défaut « liste vide » ou un
-    # scénario illisible ferait vider des boutons encore actifs.
+    # dont l'id n'est plus un scénario lisible (supprimés, fantômes déjà présents). Story 24.14
+    # (D1 A) : un scénario inactif n'est plus jamais retiré. Garde-fou : la section `scenarios`
+    # doit être une liste, lue en entier côté démon et déclarée complète par le producteur PHP
+    # (`scenarios_complete`), sinon le défaut « liste vide » ou un scénario illisible ferait
+    # vider des boutons encore présents dans Jeedom.
     raw_scenarios = payload.get("scenarios")
     scenarios_section_complete = (
         isinstance(raw_scenarios, list)
@@ -2367,18 +2382,26 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     )
     purged_ids: list = []
     if broker_ready and scenarios_section_complete:
-        result = await publisher.purge_orphan_scenario_buttons(
-            set(scenario_publications), unpublished_scenario_ids
-        )
+        result = await publisher.purge_orphan_scenario_buttons(set(scenario_publications))
         purged_ids = result if isinstance(result, list) else []
     elif broker_ready:
         _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
-    emptied_ids = sorted(unpublished_scenario_ids | set(purged_ids))
-    if emptied_ids:
+    if purged_ids:
         _LOGGER.info(
-            "[SCENARIO] Unpublished %d scenario button(s) (%d inactive, %d from broker): ids=%s",
-            len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,
+            "[SCENARIO] Unpublished %d deleted scenario button(s) from broker: ids=%s",
+            len(purged_ids), sorted(purged_ids),
         )
+
+    # Story 24.14 (AC8) — instantané et mémo indissociables : la topologie, l'éligibilité,
+    # `mappings`, `publications`, `scenario_publications` et le mémo de décision sont remplacés
+    # ensemble ici, après tout ce qui peut lever ; une synchro en échec laisse l'ensemble précédent.
+    request.app["topology"] = snapshot
+    request.app["eligibility"] = eligibility
+    for old_eq_id in eq_ids_supprimes:
+        request.app["mappings"].pop(old_eq_id, None)
+        request.app["publications"].pop(old_eq_id, None)
+    request.app["scenario_publications"].clear()
+    request.app["scenario_publications"].update(scenario_publications)
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
@@ -2397,6 +2420,7 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     decision_memo.equipments = decision_records
     decision_memo.config = normalize_export_config(sync_config)
     decision_memo.sync_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    decision_memo.sync_origin = _sync_origin(request)  # Story 24.14 (AC9)
     _refresh_decision_export(
         request.app, data_dir,
         overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
