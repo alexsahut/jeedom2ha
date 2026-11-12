@@ -1,6 +1,6 @@
 # Story 24.12 : Boutons d'équipement routés vers Jeedom
 
-Status: review
+Status: done
 
 > Correctif court rédigé et implémenté par une session cloud déléguée (2026-11-12), à partir d'un constat de ClaudeBox du 01/11 (« non prouvé »). Le défaut est désormais **prouvé par test** avant correction. Aucun nom réel ni IP (CC-48). Aucun déploiement ni accès à la box : la preuve terrain (appui réel dans HA) reste à ClaudeBox et Alexandre.
 
@@ -91,3 +91,9 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 - **P2 (story séparée)** : le bouton porte le nom de l'équipement (règle 22.1, une seule entité) alors qu'une seule commande est exécutée ; sur un équipement à plusieurs actions, le nom ne dit pas laquelle. À traiter dans une story dédiée (nom, ou une entité par action), hors de ce correctif de routage.
 - **Familles sensibles publiées en bouton** : elles restent visibles dans HA (appui refusé). Ne plus les publier en bouton changerait la discovery : story séparée si souhaité.
 - Preuve terrain T5 à faire après fusion, sur un bouton neutre.
+
+## Preuve terrain (ClaudeBox, 2026-11-12)
+
+- Déploiement production `91705da` (run r2, 08:24 heure de Paris) : 0 décision changée, 0 topic d'équipement ajouté ou retiré, 0 ERROR, compteurs `button_sensitive_family_refused` / `ambiguous_button_action` à 0.
+- La production ne compte que deux équipements à bouton d'équipement : 104 (plusieurs `MODE_SET_STATE` → `ambiguous_button_action`) et 508 (`LOCK_*` → famille sensible, depuis remplacé par la serrure de 24-9). Aucun bouton neutre n'existe : l'appui réel sur un bouton neutre (T5) n'est pas réalisable en production ; l'exécution et les refus sont prouvés par les 59 tests unitaires.
+- Constat annexe (story séparée à créer) : l'ensemble des boutons de scénario publiés varie d'un redémarrage du démon à l'autre.

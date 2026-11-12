@@ -1,6 +1,6 @@
 # Story 24.9 : Serrure : `lock`
 
-Status: review
+Status: done
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production, ouvre un composant** (`lock`, FR40/NFR10) et touche à la sécurité. Décisions attendues d'Alexandre : **Q9** et **Q10** de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -159,3 +159,10 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, sans accès à la box).
 3. **`invertBinary`** : non appliqué à la serrure (D1 = parité Homebridge) ; à revoir si un équipement réel l'utilise.
 4. **Interface** : `lock` absent du sélecteur d'override et sans libellé français (fichier JS sous garde 24.2), comme `valve`.
 5. **Polarité du `binary_sensor` de classe `lock` existant** (hors story) : pour HA, `ON` signifie « déverrouillé » ; le cas général publie `1` → `ON`, soit l'inverse de Homebridge. Ne concerne plus que les serrures restées en lecture seule (sans action) ; à trancher séparément.
+
+## Preuve terrain (ClaudeBox, 2026-11-12)
+
+- Déploiement production `a6d8e95` (09:38 heure de Paris) : seule la décision de l'eq 508 change ; le bouton d'équipement est remplacé par `lock.jeedom2ha_508_4628` ; configuration retenue conforme (`unique_id`, topics, `LOCK`/`UNLOCK`, `optimistic: false`, aucun `code`) ; état retenu `LOCKED` ; 0 ERROR démon.
+- Essai réel en présence d'Alexandre (Q-L2), 17:35 et 20:50 : l'ordre `UNLOCK` part de HA, est reçu par le démon et transmis à Jeedom (`cmd::execCmd` sur 4627). Jeedom échoue en aval : le plugin tiers du véhicule, passé à l'API de données officielle du constructeur (lecture seule), n'implémente plus les ordres à distance (méthode appelée absente → réponse non JSON, motif visible grâce à 24-13 : `error_detail=exception=JSONDecodeError`). Même échec depuis l'interface Jeedom : hors périmètre du plugin.
+- Décision d'Alexandre (21:21) : garder la serrure telle quelle dans HA et HomeKit (état affiché, ordres sans effet), en attendant un éventuel retour des ordres côté constructeur.
+- Point ouvert hors story : un `binary_sensor` de classe lock publie 1 → ON, soit « déverrouillé » pour HA, l'inverse de Homebridge (à traiter dans une story dédiée si un LOCK_STATE seul est un jour publié).
