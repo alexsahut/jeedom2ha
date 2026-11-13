@@ -1,6 +1,6 @@
 # Story 24.15 : Thermostat : `climate` complet (état, consigne, mode)
 
-Status: review
+Status: done
 
 > **Story rédigée par une session cloud déléguée (2026-11-12), documentaire**, en lecture seule du code (`origin/main` `ecedde5`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48). **Draft** : cinq décisions reviennent à Alexandre (D1 à D5, recommandations ci-dessous). **Change la production** : les 7 entités `climate` existantes changent de payload, de topics et deviennent pilotables. Une autre story (24-14) est en développement sur une autre branche : recouvrements listés en fin de Dev Notes.
 
@@ -163,7 +163,7 @@ Le code du plugin Homebridge installé sur la box n'est pas dans ce dépôt ; la
 - [x] **Task 6 — Verrou** (selon D4) : secondaire `switch`, remplacement et cycle de vie.
 - [x] **Task 7 — Override, export, registre** (AC1, AC9).
 - [x] **Task 8 — Tests et documentation** (AC10, AC11).
-- [ ] **Gate, déploiement, preuve terrain** (ClaudeBox et Alexandre, AC12).
+- [x] **Gate, déploiement, preuve terrain** (ClaudeBox et Alexandre, AC12) : faits le 13/11 (voir « Preuves terrain (13/11/2026) »).
 
 ## Tests attendus (`resources/daemon/tests/unit/test_story_24_15_thermostat_climate_complet.py`, identifiants synthétiques)
 
@@ -234,7 +234,8 @@ Branche `story/24-15-thermostat-climate-complet` rebasée sur `origin/main` `61f
 - **Diagnostic** : le drill-down « commandes couvertes / non couvertes » ne lit que l'entité principale ; les trois commandes du verrou y apparaissent « non couvertes » bien qu'elles soient publiées par l'interrupteur (comportement existant pour tout secondaire, hors périmètre).
 - **Preset `none`** : HA ajoute toujours « aucun » à la liste ; le choisir est refusé sans ordre (AC6), la carte garde le preset réel.
 - **Task 0 bis** (ClaudeBox, lecture seule, avant le déploiement) : vérifier sur les 7 thermostats que l'ordre d'arrêt a bien le `logical_id` `off` et que son nom est la valeur prise par l'info de mode à l'arrêt (sinon « arrêt » n'est pas proposé ou jamais affiché), et que `minValue` / `maxValue` sont renseignés sur l'ordre de consigne (sinon bornes par défaut de HA, ordre accepté sans contrôle de bornes).
-- **AC12** : preuve terrain à faire (humain / ClaudeBox) ; arrêt et reprise seulement avec l'accord d'Alexandre.
+- **AC12** : faite le 13/11 (voir « Preuves terrain (13/11/2026) »).
+- **Confirmation du verrou** : à la recette, l'interrupteur de verrouillage a la politique `optimistic_controlled` et non une confirmation par l'état réel ; suite dans la story 24-16.
 
 ## Vérifications non faites par cette session
 
@@ -247,3 +248,20 @@ Les valeurs réelles des commandes sur la box ; le `logical_id` et le nom des or
 - 2026-11-12 — Story rédigée (session cloud déléguée, documentaire) : faits du code, lecture des sources publiques du plugin thermostat et de `homebridge-jeedom`, D1 à D5 avec recommandations ; `draft` en attente des décisions d'Alexandre.
 - 2026-11-12 22:13 — Décisions d'Alexandre : D1 A, D4 A, D5 ignorée (« ok recos ») ; D2 et D3 tranchées par ClaudeBox selon la parité Homebridge ; Task 0 bis faite (homebridge-jeedom 1.9.0) ; story `ready-for-dev`, développement après 24-14.
 - 2026-11-13 — Développement (session cloud déléguée, TDD) sur `origin/main` `61f42f5` : Tasks 1 à 8 ; story en `review`. Reste : vérifications Task 0 bis sur la box, gate, déploiement et preuve terrain (AC12).
+- 2026-11-13 — Premier déploiement à 02:55 UTC en échec (413, limite aiohttp de 1 Mio), retour arrière automatique, corrigé par la PR #378 ; déployée en production à 06:50 UTC (575dc58) ; preuve terrain AC12 faite par ClaudeBox ; story `done`. Suite : 24-16 (confirmation du verrou par l'état réel).
+
+## Preuves terrain (13/11/2026)
+
+Heures UTC, identifiants seulement.
+
+- **Premier essai de déploiement** à 02:55 UTC : échec, réponse 413 (limite aiohttp de 1 Mio sur la taille d'une requête de synchro) ; retour arrière automatique. Corrigé par la PR #378.
+- **Déploiement en production** le 13/11 à 06:50 UTC (`575dc58`). Script de déploiement : 7 décisions thermostat changées ; +7 interrupteurs de verrouillage ; état de 7 thermostats vérifié ; ERROR=0.
+- **AC12 — ordres réels sur l'eq 219**, entre 07:41 et 07:43 UTC :
+  - consigne → cmd 1780, avec confirmation par l'état réel ;
+  - `off` → cmd 1795 ;
+  - `heat` → cmd 1780, consigne courante renvoyée ;
+  - preset Absent → cmd 1801 ;
+  - verrou on / off → cmds 1784 / 1785 ;
+  - preset Nuit → cmd 1800 ;
+  - état initial restauré ; aucune erreur.
+- **Constat** : l'interrupteur de verrouillage a la politique de confirmation `optimistic_controlled` (journal `[SYNC-CMD] ... 1783/set reason_code=optimistic_controlled`), et non une confirmation par l'état réel. Contraire au principe « jamais d'état supposé » de la story ; traité dans la story 24-16.
