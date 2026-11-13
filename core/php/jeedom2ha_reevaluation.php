@@ -167,6 +167,19 @@ function jeedom2ha_reevaluation_invalidate_before_sync(callable $store): void {
 }
 
 /**
+ * Story 24.14 (revue P2, 5e passe) — empreinte à mémoriser après une synchro : celle lue AVANT l'extraction de la
+ * topologie, seulement si une relecture APRÈS l'extraction donne la même valeur. Sinon l'état a changé pendant la
+ * lecture et la topologie envoyée peut ne pas correspondre à l'empreinte : on ne mémorise rien (l'empreinte, déjà
+ * invalidée avant l'envoi, reste vide) et le pas suivant resynchronise.
+ */
+function jeedom2ha_reevaluation_stable_fingerprint(?string $before, ?string $after): ?string {
+  if ($before === null || $before === '' || $after === null || !hash_equals($before, $after)) {
+    return null;
+  }
+  return $before;
+}
+
+/**
  * Story 24.14 (revue P2) — après une synchro complète hors tâche périodique (démarrage du démon, « Relire Jeedom »),
  * mémorise l'empreinte lue AVANT la topologie, si la réponse le permet. `$fingerprint` null (illisible) : rien.
  *
@@ -197,7 +210,7 @@ function jeedom2ha_reevaluation_remember_after_sync(?string $fingerprint, $resul
  * `partial` : synchro aboutie mais partielle (publication d'équipement ou de scénario en échec) ; empreinte non
  * mémorisée, nouvel essai à l'échéance suivante.
  * Un refus 409 (`action_in_progress`) n'est pas une erreur : rien n'est mémorisé, nouvel essai à l'échéance suivante.
- * L'empreinte est lue AVANT la topologie : un changement survenu pendant la synchro sera vu au pas suivant.
+ * L'empreinte est lue AVANT la topologie et relue APRÈS : elle n'est mémorisée que si les deux lectures concordent.
  */
 function jeedom2ha_reevaluation_tick(array $deps): array {
   $log = $deps['log'];
@@ -229,6 +242,13 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
     $log('warning', '[REEVAL] Topologie illisible, réévaluation reportée');
     return array('status' => 'skipped', 'reason' => 'topology_unavailable');
   }
+  // Revue P2 (5e passe) — relecture après l'extraction : l'empreinte mémorisée doit être celle de la topologie envoyée.
+  try {
+    $after = (string) $deps['fingerprint']();
+  } catch (\Throwable $e) {
+    $after = null;
+  }
+  $stable = jeedom2ha_reevaluation_stable_fingerprint($current, $after);
   $log('info', '[REEVAL] État Jeedom changé (actif / désactivé / exclusion) : synchro de service');
   jeedom2ha_reevaluation_invalidate_before_sync($deps['store']);
   try {
@@ -249,8 +269,10 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
   $partial = !jeedom2ha_reevaluation_sync_can_remember($result);
   if ($partial) {
     $log('warning', '[REEVAL] Synchro de service incomplète (publication partielle) : nouvel essai à la prochaine échéance');
+  } elseif ($stable !== null) {
+    $deps['store']($stable);
   } else {
-    $deps['store']($current);
+    $log('info', '[REEVAL] État Jeedom modifié pendant la lecture : empreinte non mémorisée, nouvelle synchro à la prochaine échéance');
   }
   try {
     $deps['listeners']();

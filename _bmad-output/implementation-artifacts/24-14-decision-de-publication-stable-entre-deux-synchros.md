@@ -202,6 +202,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 
 - **Quatrième relecture (P2)** : une purge des boutons supprimés en échec (collecte des topics retenus impossible ou vidage refusé) donne `scenario_availability_complete: false`, donc nouvelle synchro au pas suivant, qui rejoue la purge. La republication des boutons de scénario (reconnexion du broker, redémarrage de HA) prend le verrou `action_lock` de la synchro **bouton par bouton** et relit sous ce verrou la décision et la topologie courantes : aucune décision ni disponibilité périmée ne peut être publiée après une synchro concurrente, et une synchro n'attend jamais plus d'une publication.
 
+- **Cinquième relecture (P2)** : l'empreinte est relue après l'extraction de la topologie (cron, démarrage, « Relire Jeedom ») et n'est mémorisée que si les deux lectures concordent (`jeedom2ha_reevaluation_stable_fingerprint`) ; sinon elle reste vide et le pas suivant resynchronise.
+
 ### Points ouverts
 
 - Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.

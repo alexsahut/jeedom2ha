@@ -227,7 +227,27 @@ list($deps, $st) = make_deps(array(
     'topology' => function () use (&$order) { $order[] = 'topology'; return array(); },
 ));
 jeedom2ha_reevaluation_tick($deps);
-check('empreinte lue avant la topologie', $order === array('fingerprint', 'topology'));
+check('empreinte lue avant la topologie puis relue après', $order === array('fingerprint', 'topology', 'fingerprint'));
+
+// Revue P2 (5e passe) — A lue, B extraite : rien n'est mémorisé, puis le pas suivant resynchronise.
+$reads = array('A', 'B');
+$cur5 = null;
+list($deps, $st) = make_deps(array(
+    'stored' => function () use (&$st) { return $st->stored; },
+    'fingerprint' => function () use (&$reads, &$cur5) { $cur5 = count($reads) ? array_shift($reads) : $cur5; return $cur5; },
+));
+$st->stored = 'old';
+$r = jeedom2ha_reevaluation_tick($deps);
+check('état changé entre l\'empreinte et la topologie : synchro faite, rien de mémorisé (empreinte vide)',
+    $r['status'] === 'synced' && $st->stored === '' && in_array('sync', $st->calls, true));
+$reads = array('A', 'A');
+$st->calls = array();
+$r = jeedom2ha_reevaluation_tick($deps);
+check('retour à A avant le pas suivant : resynchro (pas de faux « unchanged »), puis A mémorisée',
+    $r['status'] === 'synced' && in_array('sync', $st->calls, true) && $st->stored === 'A');
+check('lectures concordantes : empreinte retenue', jeedom2ha_reevaluation_stable_fingerprint('A', 'A') === 'A');
+check('lectures discordantes ou illisibles : rien', jeedom2ha_reevaluation_stable_fingerprint('A', 'B') === null
+    && jeedom2ha_reevaluation_stable_fingerprint('A', null) === null && jeedom2ha_reevaluation_stable_fingerprint(null, 'A') === null);
 
 list($deps, $st) = make_deps();
 jeedom2ha_reevaluation_tick($deps);
@@ -269,6 +289,11 @@ check('« Relire Jeedom » : empreinte invalidée avant l\'envoi de la synchro',
 $bootStart = strpos($class, '$syncResult = $syncCaller($topology);');
 $bootInval = strpos($class, 'self::invalidateDecisionFingerprintBeforeSync();');
 check('démarrage : empreinte invalidée avant l\'envoi de la synchro', $bootInval !== false && $bootStart !== false && $bootInval < $bootStart);
+$posStable = strpos($scan, '$fingerprint = jeedom2ha_reevaluation_stable_fingerprint($fingerprint, jeedom2ha::safeDecisionFingerprint());');
+check('« Relire Jeedom » : empreinte relue après la topologie, avant l\'envoi',
+    $posStable !== false && $posTopo !== false && $posStable > $posTopo && $posStable < $posSync);
+$bootStable = strpos($class, '$bootFingerprint = jeedom2ha_reevaluation_stable_fingerprint($bootFingerprint, self::safeDecisionFingerprint());');
+check('démarrage : empreinte relue après la topologie, avant l\'envoi', $bootStable !== false && $bootStable < $bootStart);
 check('« Relire Jeedom » : empreinte lue avant la topologie, mémorisée après la synchro',
     $posFp !== false && $posTopo !== false && $posRemember !== false && $posSync !== false
     && $posFp < $posTopo && $posSync < $posRemember);

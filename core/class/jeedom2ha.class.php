@@ -369,6 +369,8 @@ class jeedom2ha extends eqLogic {
         }
 
         if ($_topologyFetcher === null) {
+          // Revue P2 (5e passe) — mémorisable seulement si l'état n'a pas bougé pendant l'extraction.
+          $bootFingerprint = jeedom2ha_reevaluation_stable_fingerprint($bootFingerprint, self::safeDecisionFingerprint());
           self::invalidateDecisionFingerprintBeforeSync();
         }
         try {
