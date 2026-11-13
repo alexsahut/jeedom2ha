@@ -143,6 +143,7 @@ async function withConfigurationPage(t, fixture, fn, options = {}) {
         const params = new URLSearchParams(route.request().postData() || '');
         requests.push(Object.fromEntries(params.entries()));
         const action = params.get('action');
+        if (action === 'testMqttConnection' && options.mqttDelayMs) await new Promise((resolve) => setTimeout(resolve, options.mqttDelayMs));
         let body = { state: 'error', result: 'inattendu' };
         if (action === 'getMqttConfig') body = { state: 'ok', result: { source: 'none', has_password: false } };
         else if (action === 'saveFilteringConfig') body = { state: 'ok', result: { saved: true } };
@@ -233,6 +234,7 @@ function loadMessages() {
     describe: (data) => { const o = sandbox.j2haDescribeMqttTest(data); return { kind: o.kind, code: o.code, message: strip(o.message), remedy: strip(o.remedy) }; },
     check: (h, p) => sandbox.j2haCheckMqttForm(h, p),
     done: (n) => strip(sandbox.j2haRereadDoneLabel(n)),
+    normalize: (c) => sandbox.j2haNormalizeMqttConfiguration(c),
   };
 }
 
@@ -297,7 +299,8 @@ test('Lot 4 / glossaire — plus de « rescanner » ni de « Rescan » dans les 
 });
 
 test('Lot 4 / E8 — chaîne du cœur : jeedom.config.save puis jeedom.plugin.deamonStart({forceRestart: 1}) ; aucune action ajax ajoutée', () => {
-  assert.match(config, /jeedom\.config\.save\(\{\s*configuration: container\.getJeeValues\('\.configKey'\)\[0\],\s*plugin: J2HA_PLUGIN_ID,/);
+  assert.match(config, /jeedom\.config\.save\(\{\s*configuration: snapshot\.configuration,\s*plugin: J2HA_PLUGIN_ID,/);
+  assert.match(config, /configuration = j2haNormalizeMqttConfiguration\(container\.getJeeValues\('\.configKey'\)\[0\]\);/);
   assert.match(config, /jeedom\.plugin\.deamonStart\(\{\s*id: J2HA_PLUGIN_ID,\s*forceRestart: 1,/);
   const actions = [...new Set([...config.matchAll(/action:\s*'([A-Za-z]+)'/g)].map((m) => m[1]))].sort();
   assert.deepEqual(actions, ['forceMqttManagerImport', 'getMqttConfig', 'saveFilteringConfig', 'scanTopology', 'testMqttConnection']);
@@ -456,4 +459,68 @@ test('Lot 4 réel — en-tête, retour à la page du plugin, phrase HomeKit cond
   await withConfigurationPage(t, Object.assign({}, FIXTURE, { active_plugins: ['homebridge'] }), async (page) => {
     assert.match(await page.locator('#p_homekitRoomNote').innerText(), /exposés à HomeKit/);
   });
+});
+
+test('Lot 4 / revue — port vide enregistré à 1883 (comme le test), instantané non modifié', () => {
+  const m = loadMessages();
+  for (const empty of ['', '   ', undefined, null]) {
+    const input = { mqttHost: 'broker.test', mqttPort: empty, mqttUser: 'jeedom' };
+    const out = m.normalize(input);
+    assert.equal(out.mqttPort, '1883', JSON.stringify(empty));
+    assert.equal(input.mqttPort, empty, 'copie : l\'entrée n\'est pas modifiée');
+  }
+  assert.equal(m.normalize({ mqttPort: '8883' }).mqttPort, '8883');
+  assert.equal(m.normalize({}).mqttPort, '1883');
+});
+
+test('Lot 4 / revue réel — port laissé vide : testé ET enregistré à 1883', async (t) => {
+  await withConfigurationPage(t, MQTT_FIXTURE, async (page, ctx) => {
+    await fill(page);
+    assert.equal(await page.locator('.configKey[data-l1key=mqttPort]').inputValue(), '');
+    await page.locator('#bt_mqttTestSaveRestart').click();
+    await page.waitForFunction(() => document.querySelector('#ul_mqttGuidedSteps li[data-step=restart]').dataset.state === 'done');
+    const core = await page.evaluate(() => window.__core);
+    assert.equal(core.saves[0].configuration.mqttPort, '1883');
+    assert.equal(ctx.requests.find((r) => r.action === 'testMqttConnection').port, '1883');
+  }, { initScript: FAKE_CORE_JS('ok') });
+});
+
+test('Lot 4 / revue réel — réglages figés au clic : le broker testé est celui enregistré ; champs verrouillés pendant la chaîne puis rendus', async (t) => {
+  const locked = (page) => page.evaluate(() => ({
+    host: document.querySelector('.configKey[data-l1key=mqttHost]').disabled,
+    port: document.querySelector('.configKey[data-l1key=mqttPort]').disabled,
+    password: document.querySelector('#in_mqttPassword').disabled,
+    tls: document.querySelector('.configKey[data-l1key=mqttTls]').disabled,
+    main: document.querySelector('#bt_mqttTestSaveRestart').disabled,
+    testOnly: document.querySelector('#bt_testMqttConnection').getAttribute('aria-disabled'),
+    reset: document.querySelector('#lnk_resetMqttForm').getAttribute('aria-disabled'),
+  }));
+  for (const mqttTest of [undefined, { state: 'ok', result: { status: 'error', error_code: 'auth_failed', message: 'x' } }]) {
+    await withConfigurationPage(t, MQTT_FIXTURE, async (page, ctx) => {
+      await fill(page);
+      await page.locator('#bt_mqttTestSaveRestart').click();
+      assert.deepEqual(await locked(page), { host: true, port: true, password: true, tls: true, main: true, testOnly: 'true', reset: 'true' });
+      // Modification pendant la chaîne (script ou extension) : sans effet sur ce qui est testé et enregistré.
+      await page.evaluate(() => { $('.configKey[data-l1key=mqttHost]').val('broker-b.test'); $('.configKey[data-l1key=mqttUser]').val('autre'); });
+      // « Tester seulement » et la réinitialisation sont inopérants pendant la chaîne.
+      await page.evaluate(() => { $('#bt_testMqttConnection').trigger('click'); $('#lnk_resetMqttForm').trigger('click'); });
+      await page.waitForFunction(() => {
+        const s = [...document.querySelectorAll('#ul_mqttGuidedSteps li')].map((li) => li.dataset.state);
+        return s[2] === 'done' || s[0] === 'failed';
+      });
+      const tests = ctx.requests.filter((r) => r.action === 'testMqttConnection');
+      assert.equal(tests.length, 1, 'un seul test : « Tester seulement » ignoré');
+      assert.equal(tests[0].host, 'broker.test');
+      assert.equal(tests[0].user, 'jeedom');
+      const core = await page.evaluate(() => window.__core);
+      if (mqttTest) {
+        assert.deepEqual(core.saves, [], 'test en échec : rien enregistré');
+      } else {
+        assert.equal(core.saves[0].configuration.mqttHost, 'broker.test', 'le broker enregistré est le broker testé');
+        assert.equal(core.saves[0].configuration.mqttUser, 'jeedom');
+      }
+      assert.deepEqual(await locked(page), { host: false, port: false, password: false, tls: false, main: false, testOnly: 'false', reset: 'false' });
+      assert.deepEqual(ctx.errors, []);
+    }, { initScript: FAKE_CORE_JS('ok'), mqttDelayMs: 400, mqttTest });
+  }
 });

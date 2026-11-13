@@ -335,6 +335,16 @@ function j2haLocalMqttCheck(code) {
 function j2haRereadDoneLabel(published) {
   return '{{Relecture terminée}} : ' + published + ' ' + (published > 1 ? '{{équipements publiés}}' : '{{équipement publié}}');
 }
+// Valeurs enregistrées par la chaîne guidée : port vide → 1883, comme pour le test (sinon le démon lirait intval('') = 0).
+// Copie superficielle : l'instantané d'origine n'est pas modifié.
+function j2haNormalizeMqttConfiguration(configuration) {
+  var out = {};
+  Object.keys(configuration || {}).forEach(function(key) { out[key] = configuration[key]; });
+  if (out.mqttPort === undefined || out.mqttPort === null || String(out.mqttPort).trim() === '') {
+    out.mqttPort = '1883';
+  }
+  return out;
+}
 /* j2ha-mqtt-test-messages:end */
 
 // Confirmation : même boîte que la page du plugin (bootbox du cœur), repli sur la confirmation du navigateur.
@@ -377,10 +387,11 @@ function j2haShowMqttOutcome(outcome) {
   $('#div_mqttNoDaemon').toggle(outcome.kind === 'no_daemon');
 }
 
-// Test seul : testMqttConnection existant, aucune écriture.
-function j2haTestMqtt(onOutcome) {
-  var params = j2haMqttFormParams();
-  var localCode = j2haCheckMqttForm(params.host, $('.configKey[data-l1key=mqttPort]').val());
+// Test seul : testMqttConnection existant, aucune écriture. `snapshot` (facultatif) : valeurs figées au clic de la chaîne guidée.
+function j2haTestMqtt(onOutcome, snapshot) {
+  var params = snapshot ? snapshot.test : j2haMqttFormParams();
+  var rawPort = snapshot ? snapshot.rawPort : $('.configKey[data-l1key=mqttPort]').val();
+  var localCode = j2haCheckMqttForm(params.host, rawPort);
   if (localCode) {
     onOutcome(j2haLocalMqttCheck(localCode));
     return;
@@ -446,14 +457,39 @@ function j2haRefreshDaemonBlock() {
   } catch (e) { /* le bloc Démon se rafraîchit seul toutes les 5 s */ }
 }
 
-function j2haSavePluginConfig(onSaved, onFailed) {
+// Instantané pris au clic, AVANT de verrouiller les champs : le même relevé sert au test et à l'enregistrement, si bien qu'un
+// test réussi sur un broker ne peut pas enregistrer un autre broker saisi entre-temps. `configuration` = valeurs `.configKey`
+// lues comme le cœur (getJeeValues), dont l'hôte, le port (normalisé) et l'utilisateur sont ceux envoyés au test.
+function j2haSnapshotMqttSettings() {
+  var test = j2haMqttFormParams();
+  var rawPort = $('.configKey[data-l1key=mqttPort]').val();
   var container = document.getElementById('div_plugin_configuration');
-  if (!container || typeof container.getJeeValues !== 'function' || typeof jeedom === 'undefined' || !jeedom.config || typeof jeedom.config.save !== 'function') {
+  var configuration = null;
+  if (container && typeof container.getJeeValues === 'function') {
+    configuration = j2haNormalizeMqttConfiguration(container.getJeeValues('.configKey')[0]);
+    configuration.mqttHost = test.host;
+    configuration.mqttUser = test.user;
+    test.port = configuration.mqttPort;
+  }
+  return { test: test, rawPort: rawPort, configuration: configuration };
+}
+
+// Verrou des réglages du broker pendant la chaîne (levé à la fin, succès ou échec).
+var j2haGuidedBusy = false;
+function j2haLockMqttForm(locked) {
+  j2haGuidedBusy = locked;
+  $('.configKey[data-l1key^=mqtt], #in_mqttPassword, #bt_importMqttManager, #bt_mqttTestSaveRestart').prop('disabled', locked);
+  $('#bt_testMqttConnection, #lnk_resetMqttForm, #lnk_mqttSaveRestartWithoutTest')
+    .toggleClass('disabled', locked).attr('aria-disabled', locked ? 'true' : 'false').css('pointer-events', locked ? 'none' : '');
+}
+
+function j2haSavePluginConfig(snapshot, onSaved, onFailed) {
+  if (!snapshot.configuration || typeof jeedom === 'undefined' || !jeedom.config || typeof jeedom.config.save !== 'function') {
     onFailed(null);
     return;
   }
   jeedom.config.save({
-    configuration: container.getJeeValues('.configKey')[0],
+    configuration: snapshot.configuration,
     plugin: J2HA_PLUGIN_ID,
     error: function(error) { onFailed(error && error.message ? String(error.message) : null); },
     success: function() {
@@ -485,13 +521,13 @@ function j2haRestartDaemon(onDone, onFailed) {
 }
 
 function j2haRunGuidedConnection(skipTest) {
-  var $btn = $('#bt_mqttTestSaveRestart');
-  if ($btn.prop('disabled')) return;
-  $btn.prop('disabled', true);
+  if (j2haGuidedBusy || $('#bt_mqttTestSaveRestart').prop('disabled')) return;
+  var snapshot = j2haSnapshotMqttSettings();
+  j2haLockMqttForm(true);
   $('#div_mqttGuidedFallback, #div_mqttNoDaemon').hide();
   ['test', 'save', 'restart'].forEach(function(step) { j2haSetStep(step, 'pending'); });
   $('#ul_mqttGuidedSteps').show();
-  var finish = function() { $btn.prop('disabled', false); };
+  var finish = function() { j2haLockMqttForm(false); };
 
   var restart = function() {
     j2haSetStep('restart', 'running');
@@ -511,7 +547,7 @@ function j2haRunGuidedConnection(skipTest) {
 
   var save = function() {
     j2haSetStep('save', 'running');
-    j2haSavePluginConfig(function() {
+    j2haSavePluginConfig(snapshot, function() {
       j2haSetStep('save', 'done');
       // Le mot de passe saisi est maintenant enregistré : il quitte le formulaire.
       if ($('#in_mqttPassword').val() !== '') {
@@ -542,7 +578,7 @@ function j2haRunGuidedConnection(skipTest) {
     }
     j2haSetStep('test', 'done');
     save();
-  });
+  }, snapshot);
 }
 
 $(function() {
@@ -631,6 +667,7 @@ $(function() {
   // ---- Import forcé depuis MQTT Manager (bouton rendu seulement si MQTT Manager est installé et actif) ----
   // forceMqttManagerImport enregistre aussitôt côté serveur : confirmation avant d'écraser les réglages.
   $('#bt_importMqttManager').on('click', function() {
+    if (j2haGuidedBusy) return;
     var $btn = $(this);
     j2haConfirm(
       '{{Récupérer depuis MQTT Manager}}',
@@ -691,6 +728,7 @@ $(function() {
   // ---- Réinitialiser le formulaire (front uniquement, sans sauvegarder) ----
   $('#lnk_resetMqttForm').on('click', function(e) {
     e.preventDefault();
+    if (j2haGuidedBusy) return;
     $('.configKey[data-l1key=mqttHost]').val('');
     $('.configKey[data-l1key=mqttPort]').val('');
     $('.configKey[data-l1key=mqttUser]').val('');
@@ -787,6 +825,7 @@ $(function() {
   });
   $('#lnk_mqttSaveRestartWithoutTest').on('click', function(e) {
     e.preventDefault();
+    if (j2haGuidedBusy) return;
     j2haConfirm(
       '{{Enregistrer sans tester}}',
       '{{Le démon ne répond pas, la connexion ne peut donc pas être testée. Enregistrer ces réglages et redémarrer le démon quand même ?}}',
@@ -800,7 +839,7 @@ $(function() {
   $('#bt_testMqttConnection').on('click', function(e) {
     e.preventDefault();
     var $link = $(this);
-    if ($link.attr('data-busy') === '1') return;
+    if (j2haGuidedBusy || $link.attr('data-busy') === '1') return;
     $link.attr('data-busy', '1');
     $('#ul_mqttGuidedSteps, #div_mqttGuidedFallback').hide();
     $('#span_mqttTestResult').removeClass('text-success text-danger text-warning').text('{{Test en cours...}}');
