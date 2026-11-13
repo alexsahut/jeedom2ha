@@ -1,6 +1,6 @@
 # Story 24.7 : Portail et garage : `cover`
 
-Status: review
+Status: done
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production** (des entités `button` ou `binary_sensor` deviennent un `cover`). Ne rouvre pas `PRODUCT_SCOPE` (`cover` y est déjà). Décision attendue d'Alexandre : **Q10** (remplacement d'entités existantes, option C pour un `cover` optimiste) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -93,7 +93,7 @@ afin de les consulter et de les piloter par Assist.
 - [x] **Task 3 — Publication** : classe d'appareil, `default_entity_id`.
 - [x] **Task 4 — État** : après 23.3 (une entrée).
 - [x] **Task 5 — Tests** : portail avec ouvrir/fermer, avec bascule + état, avec bascule seule (refus), non-régression des volets.
-- [ ] **Task 6 — Gate, déploiement, preuve terrain (humain)** : à ClaudeBox et Alexandre (D7), non faite par la session cloud.
+- [x] **Task 6 — Gate, déploiement, preuve terrain (humain)** : à ClaudeBox et Alexandre (D7), non faite par la session cloud.
 - [x] **Task 7 — documentation**.
 
 ## Garde-fous
@@ -191,3 +191,13 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 - `README.md` (modifié)
 - `_bmad-output/implementation-artifacts/24-7-portail-et-garage-cover.md` (modifié)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié)
+
+## Preuves terrain (Task 6, D7)
+
+- **Déploiement** : 53a6cda le 2026-11-02 (run r2), rollback non nécessaire ; 2 décisions changées (le portail et le garage passent en `cover`), validation `cover` PASS, ERROR=0.
+- **Sonde d'ordre des états (CC-48 v2, lecture seule, 11-12/11, 104 passes)** : aucun écart réel. Les 4 écarts « stables » relevés sont des vannes `IRRIG_STATE` (Jeedom 0, MQTT `closed`) : c'est la traduction attendue, que le script de comparaison n'appliquait pas. Le portail et le garage n'ont jamais été candidats.
+- **D7, ouverture et fermeture réelles depuis HA, en présence d'Alexandre (2026-11-13, heures UTC)** :
+  - Portail (`gate`, initialement ouvert) : FERMER à 20:32:57 → `command_executed` cmd 4542 puis `real_state_confirmation` ; `closing` après environ 1 s, `closed` après 16 s ; le capteur d'ouverture indépendant concorde. OUVRIR à 20:34:21 → cmd 4542, `real_state_confirmation` ; `opening` à 3 s, `open` à 14 s. État initial restauré (ouvert).
+  - Garage (`garage`, initialement fermé) : OUVRIR à 20:35:17 → cmd 1624, `real_state_confirmation` ; le capteur d'ouverture indépendant passe à ouvert à 2 s, le `cover` passe à `open` à 23 s. FERMER à 20:36:14 → cmd 1624, `real_state_confirmation` ; `closing` à 1 s, `closed` à 22 s, capteur concordant. État initial restauré (fermé).
+  - Délai entre l'impulsion et le premier changement d'état : 1 à 3 s, bien en dessous du seuil de 60 s (`barrier_no_effect`). Aucun refus, aucune erreur dans le journal du démon.
+  - Constat mineur, hors périmètre : à l'ouverture du garage, le `cover` ne passe pas par `opening` (de `closed` directement à `open` après 23 s) alors que le capteur physique s'ouvre dès 2 s. Cela dépend de la machine d'état du scénario Jeedom qui calcule l'état du garage.
