@@ -9,6 +9,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
+from dataclasses import replace  # Story 24.16
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 import aiohttp
@@ -1090,6 +1091,16 @@ class CommandSynchronizer:
         decision: PublicationDecision,
         translation: CommandTranslation,
     ) -> str:
+        if mapping.ha_entity_type == "switch" and (mapping.reason_details or {}).get("thermostat_lock"):
+            # Story 24.16 — « Verrouillage » d'un thermostat : jamais d'état supposé. C'est un
+            # secondaire du climate, et la décision d'un secondaire (evaluate_equipment) ne porte
+            # pas de state_topic : on lit le topic propre de l'interrupteur, celui sur lequel
+            # StateSynchronizer publie THERMOSTAT_LOCK (``_candidate_state_topic``).
+            own_topic = (mapping.reason_details or {}).get("state_topic")
+            if own_topic and self._has_reliable_state(mapping, replace(decision, state_topic=own_topic)):
+                return "real_state_confirmation"
+            return "stateless"
+
         if translation.command_family == "on_off" and mapping.ha_entity_type in ("light", "switch"):
             if self._has_reliable_state(mapping, decision):
                 return "real_state_confirmation"
