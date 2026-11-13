@@ -2034,6 +2034,15 @@ async def apply_publication_decision(
 
 _SYNC_ACTION_LOCK_WAIT_SECONDS = 7
 
+# Correctif fix/daemon-sync-body-limit — taille maximale d'une requête reçue par le démon.
+# La topologie complète est envoyée en un seul corps JSON à chaque /action/sync ; elle grandit
+# avec le nombre d'équipements et de commandes, et avec chaque champ ajouté par une story
+# (24.15 : bornes des actions). La limite par défaut d'aiohttp (1 Mio) a été dépassée en
+# production : toutes les synchros répondaient 413 (500 côté Jeedom). 32 Mio laisse une
+# large marge aux grosses installations tout en bornant la mémoire d'une requête.
+# Le serveur n'écoute que localement et chaque route vérifie le secret local.
+SYNC_REQUEST_MAX_BYTES = 32 * 1024 * 1024
+
 # Story 24.14 (AC9) — origine d'une synchro, lue dans l'en-tête `X-Jeedom2ha-Sync-Mode` :
 # `boot` (démarrage du démon), `rescan` (« Relire Jeedom »), `service` (réévaluation périodique
 # du plugin, et défaut de tout appel sans en-tête reconnu).
@@ -5363,7 +5372,7 @@ async def _handle_action_state_update(request: web.Request) -> web.Response:
 
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
-    app = web.Application()
+    app = web.Application(client_max_size=SYNC_REQUEST_MAX_BYTES)
     app["local_secret"] = local_secret
     app["start_time"] = time.monotonic()
     # Pre-initialize bridge to avoid DeprecationWarning when re-assigning app keys later

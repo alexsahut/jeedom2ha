@@ -21,6 +21,7 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
 require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
 require_once __DIR__  . '/../php/jeedom2ha_homekit_exposure.php';
 require_once __DIR__  . '/../php/jeedom2ha_reevaluation.php';
+require_once __DIR__  . '/../php/jeedom2ha_command_bounds.php'; // correctif fix/daemon-sync-body-limit
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -956,6 +957,8 @@ class jeedom2ha extends eqLogic {
           'min_value'     => ($cmd->getType() === 'action' && method_exists($cmd, 'getConfiguration')) ? $cmd->getConfiguration('minValue', null) : null,
           'max_value'     => ($cmd->getType() === 'action' && method_exists($cmd, 'getConfiguration')) ? $cmd->getConfiguration('maxValue', null) : null,
         );
+        // Correctif fix/daemon-sync-body-limit — pas de clé de borne vide sur chaque commande (payload de synchro allégé).
+        $cmds[count($cmds) - 1] = jeedom2ha_drop_empty_bounds($cmds[count($cmds) - 1]);
       }
 
       // Calcul de l'exclusion avec priorité : eqlogic > plugin > object (Story 4.3)
