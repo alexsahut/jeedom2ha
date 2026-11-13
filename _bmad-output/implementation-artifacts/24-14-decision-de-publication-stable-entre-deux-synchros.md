@@ -198,6 +198,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 
 - **Seconde relecture (P2)** : l'empreinte n'est mémorisée (cron, démarrage, « Relire Jeedom ») que si la synchro a complètement réussi : `status` ok, `operation_result` `succes` (le démon y reporte déjà tout échec de publication d'équipement, de secondaire ou de disponibilité, et toute dépublication différée) et scénarios complets. Un parc qui ne publie que des boutons de scénario est republié à la reconnexion du broker et au redémarrage de HA. Conséquence assumée : un échec de publication durable relance une synchro de service à chaque échéance (5 min) tant qu'il dure.
 
+- **Troisième relecture (P2)** : l'empreinte mémorisée est **invalidée avant chaque envoi** de synchro (cron, démarrage, « Relire Jeedom ») ; seule une synchro complète en remémorise une. Une synchro partielle, en échec, refusée ou sans réponse force donc la resynchro au pas suivant, même si l'état Jeedom est revenu à l'ancienne empreinte. Côté démon, une lecture des scénarios incomplète (`scenarios_complete` faux, section absente ou mal formée) donne `scenario_availability_complete: false` : un scénario illisible n'est jamais validé (au prix d'une synchro de service à chaque échéance tant qu'il le reste).
+
 ### Points ouverts
 
 - Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.

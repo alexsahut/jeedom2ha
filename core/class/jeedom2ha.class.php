@@ -368,6 +368,9 @@ class jeedom2ha extends eqLogic {
           return array('status' => 'skipped', 'reason' => 'topology_unavailable');
         }
 
+        if ($_topologyFetcher === null) {
+          self::invalidateDecisionFingerprintBeforeSync();
+        }
         try {
           $syncResult = $syncCaller($topology);
         } catch (\Throwable $e) {
@@ -480,6 +483,16 @@ class jeedom2ha extends eqLogic {
    * avant la topologie si la synchro a abouti sans bouton ni disponibilité de scénario manquant : la tâche
    * périodique ne relance alors rien tant que l'état ne change pas.
    */
+  /**
+   * Story 24.14 (revue P2, 3e passe) — invalide l'empreinte mémorisée avant d'envoyer une synchro (démarrage,
+   * « Relire Jeedom ») : seule une synchro complète en remémorise une ; sinon le pas suivant du cron resynchronise.
+   */
+  public static function invalidateDecisionFingerprintBeforeSync(): void {
+    jeedom2ha_reevaluation_invalidate_before_sync(function (string $fingerprint) {
+      config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+    });
+  }
+
   public static function rememberDecisionFingerprintAfterSync(?string $_fingerprint, $_syncResult): bool {
     return jeedom2ha_reevaluation_remember_after_sync($_fingerprint, $_syncResult, function (string $fingerprint) {
       config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);

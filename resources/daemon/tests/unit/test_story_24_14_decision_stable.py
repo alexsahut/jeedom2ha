@@ -577,3 +577,31 @@ async def test_p2_reconnect_callback_republishes_a_scenarios_only_park(aiohttp_c
     topics = [(t, p) for (t, p, q, r) in bridge.published]
     assert any(t == _scenario_topic(47) and p for (t, p) in topics)
     assert (_scenario_avail(47), "online") in topics
+
+
+# ---------------------------------------------------------------------------
+# Revue P2 (3e passe) — lecture des scénarios incomplète côté PHP
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("complete", [False, None])
+async def test_p2_incomplete_scenario_read_is_never_a_complete_sync(aiohttp_client, complete):
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge)
+    body = _body(scenarios=[{"id": 48, "name": "S48", "is_active": True}], complete=complete)
+    data = await _sync(cli, body, mode="service")
+    # Tout ce qui a été lu est publié, mais l'empreinte ne doit pas être mémorisée.
+    assert data["status"] == "ok"
+    assert data["scenario_availability_complete"] is False
+    assert (_scenario_avail(48), "online") in {(t, p) for (t, p, q, r) in bridge.published}
+
+    data = await _sync(cli, _body(scenarios=[{"id": 48, "name": "S48", "is_active": True}]), mode="service")
+    assert data["scenario_availability_complete"] is True
+
+
+async def test_p2_missing_scenarios_section_is_never_a_complete_sync(aiohttp_client):
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge)
+    body = _body()
+    del body["payload"]["scenarios"]
+    data = await _sync(cli, body, mode="service")
+    assert data["scenario_availability_complete"] is False

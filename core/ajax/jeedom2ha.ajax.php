@@ -675,6 +675,8 @@ try {
       // Story 24.14 (revue P2) — empreinte lue AVANT la topologie, mémorisée si la relecture aboutit.
       $fingerprint = jeedom2ha::safeDecisionFingerprint();
       $topology = jeedom2ha::getFullTopology();
+      // Revue P2 (3e passe) — empreinte invalidée avant l'envoi : échec, délai dépassé ou résultat partiel → resynchro au pas suivant.
+      jeedom2ha::invalidateDecisionFingerprintBeforeSync();
       // Story A1 : durée proportionnelle au parc → budget fixe R (motif (b') de 19-6).
       // Le sync démon ne fait aucune pause de lissage : pas de deadline_s à transmettre.
       $result = _jeedom2ha_run_parc_relay('TOPOLOGY', function (int $timeoutS) use ($topology) {

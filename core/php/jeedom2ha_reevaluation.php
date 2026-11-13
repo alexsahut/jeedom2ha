@@ -154,6 +154,19 @@ function jeedom2ha_reevaluation_sync_can_remember($result): bool {
 }
 
 /**
+ * Story 24.14 (revue P2, 3e passe) — invalide l'empreinte mémorisée AVANT d'envoyer une synchro (tâche périodique,
+ * démarrage, « Relire Jeedom »). Une synchro partielle, en échec, refusée, sans réponse ou interrompue laisse ainsi
+ * une empreinte vide : le pas suivant resynchronise quoi qu'il arrive, même si l'état Jeedom est revenu entre-temps à
+ * celui de l'ancienne empreinte (actif -> désactivé -> synchro partielle -> réactivé). Seule une synchro complète
+ * mémorise ensuite la nouvelle empreinte.
+ *
+ * @param callable $store (string) => void
+ */
+function jeedom2ha_reevaluation_invalidate_before_sync(callable $store): void {
+  $store('');
+}
+
+/**
  * Story 24.14 (revue P2) — après une synchro complète hors tâche périodique (démarrage du démon, « Relire Jeedom »),
  * mémorise l'empreinte lue AVANT la topologie, si la réponse le permet. `$fingerprint` null (illisible) : rien.
  *
@@ -217,6 +230,7 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
     return array('status' => 'skipped', 'reason' => 'topology_unavailable');
   }
   $log('info', '[REEVAL] État Jeedom changé (actif / désactivé / exclusion) : synchro de service');
+  jeedom2ha_reevaluation_invalidate_before_sync($deps['store']);
   try {
     $result = $deps['sync']($topology);
   } catch (\Throwable $e) {

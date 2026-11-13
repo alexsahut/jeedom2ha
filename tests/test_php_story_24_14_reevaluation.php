@@ -116,7 +116,7 @@ check('empreinte inchangée : aucun appel au démon ni synchro', $r['status'] ==
 list($deps, $st) = make_deps();
 $r = jeedom2ha_reevaluation_tick($deps);
 check('empreinte changée : synchro de service puis mémorisation et listeners',
-    $r['status'] === 'synced' && $st->calls === array('ready', 'topology', 'sync', 'store', 'listeners') && $st->stored === 'new');
+    $r['status'] === 'synced' && $st->calls === array('ready', 'topology', 'store', 'sync', 'store', 'listeners') && $st->stored === 'new');
 
 list($deps, $st) = make_deps(array('stored' => function () { return ''; }));
 check('aucune empreinte mémorisée : une synchro a lieu', jeedom2ha_reevaluation_tick($deps)['status'] === 'synced');
@@ -132,19 +132,19 @@ check('démon injoignable (exception) : jamais de synchro',
 $conflict = array('status' => 'error', 'code' => 'action_in_progress', 'message' => 'opération en cours');
 list($deps, $st) = make_deps(array('sync' => function ($t) use ($conflict) { return $conflict; }));
 $r = jeedom2ha_reevaluation_tick($deps);
-check('refus 409 : reporté, pas une erreur, empreinte non mémorisée',
-    $r['status'] === 'deferred' && $st->stored === 'old' && levels($st, 'warning') === 0 && levels($st, 'error') === 0);
+check('refus 409 : reporté, pas une erreur, empreinte invalidée (nouvel essai assuré)',
+    $r['status'] === 'deferred' && $st->stored === '' && levels($st, 'warning') === 0 && levels($st, 'error') === 0);
 list($deps2, $st2) = make_deps(array('stored' => function () use ($st) { return $st->stored; }));
 check('nouvel essai à l\'échéance suivante après un 409', jeedom2ha_reevaluation_tick($deps2)['status'] === 'synced');
 
 list($deps, $st) = make_deps(array('sync' => function ($t) { return null; }));
 $r = jeedom2ha_reevaluation_tick($deps);
 check('démon muet pendant la synchro : échec journalisé, empreinte non mémorisée',
-    $r['status'] === 'failed' && $st->stored === 'old' && levels($st, 'warning') === 1);
+    $r['status'] === 'failed' && $st->stored === '' && levels($st, 'warning') === 1);
 list($deps, $st) = make_deps(array('sync' => function ($t) { return array('status' => 'error', 'message' => 'x'); }));
-check('synchro en échec (500) : empreinte non mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'failed' && $st->stored === 'old');
+check('synchro en échec (500) : empreinte non mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'failed' && $st->stored === '');
 list($deps, $st) = make_deps(array('sync' => function ($t) { throw new Exception('boom'); }));
-check('exception pendant la synchro : rattrapée, non mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'failed' && $st->stored === 'old');
+check('exception pendant la synchro : rattrapée, non mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'failed' && $st->stored === '');
 
 // Revue P2 (1) — bouton ou disponibilité de scénario non publié : synchro incomplète, empreinte non mémorisée.
 list($deps, $st) = make_deps(array('sync' => function ($t) {
@@ -152,8 +152,8 @@ list($deps, $st) = make_deps(array('sync' => function ($t) {
 }));
 $r = jeedom2ha_reevaluation_tick($deps);
 check('disponibilité de scénario non publiée : statut partial, empreinte non mémorisée',
-    $r['status'] === 'partial' && $r['reason'] === 'sync_incomplete' && $st->stored === 'old'
-    && !in_array('store', $st->calls, true) && levels($st, 'warning') === 1 && levels($st, 'error') === 0);
+    $r['status'] === 'partial' && $r['reason'] === 'sync_incomplete' && $st->stored === ''
+    && count(array_keys($st->calls, 'store', true)) === 1 && levels($st, 'warning') === 1 && levels($st, 'error') === 0);
 check('synchro incomplète : les listeners sont quand même réalignés', in_array('listeners', $st->calls, true));
 list($deps2, $st2) = make_deps(array('stored' => function () use ($st) { return $st->stored; }));
 check('nouvel essai à l\'échéance suivante après une synchro incomplète', jeedom2ha_reevaluation_tick($deps2)['status'] === 'synced');
@@ -163,10 +163,30 @@ foreach (array('partiel', 'echec') as $res) {
     }));
     $r = jeedom2ha_reevaluation_tick($deps);
     check("publication d'équipement en échec (operation_result $res) : partial, empreinte non mémorisée",
-        $r['status'] === 'partial' && $st->stored === 'old');
+        $r['status'] === 'partial' && $st->stored === '');
 }
 list($deps, $st) = make_deps(array('sync' => function ($t) { return array('status' => 'ok', 'operation_result' => 'succes', 'scenario_availability_complete' => true); }));
 check('synchro complète (champ vrai) : empreinte mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'synced' && $st->stored === 'new');
+
+// Revue P2 (3e passe) — actif -> désactivé -> synchro partielle -> réactivé avant le pas suivant :
+// l'empreinte courante redevient égale à l'ancienne, mais la synchro partielle l'a invalidée, donc on resynchronise.
+$cur = 'A';
+list($deps, $st) = make_deps(array(
+    'stored' => function () use (&$st) { return $st->stored; },
+    'fingerprint' => function () use (&$cur) { return $cur; },
+));
+$st->stored = 'A';
+$cur = 'B';
+$deps['sync'] = function ($t) use ($st) { $st->calls[] = 'sync'; return array('status' => 'ok', 'operation_result' => 'partiel'); };
+check('A -> B : synchro partielle, empreinte invalidée', jeedom2ha_reevaluation_tick($deps)['status'] === 'partial' && $st->stored === '');
+$cur = 'A';
+$deps['sync'] = function ($t) use ($st) { $st->calls[] = 'sync'; return array('status' => 'ok', 'operation_result' => 'succes'); };
+check('B -> A avant le pas suivant : pas de faux « unchanged », resynchro puis mémorisation',
+    jeedom2ha_reevaluation_tick($deps)['status'] === 'synced' && $st->stored === 'A');
+check('puis, sans changement : unchanged', jeedom2ha_reevaluation_tick($deps)['status'] === 'unchanged');
+$saved = array();
+jeedom2ha_reevaluation_invalidate_before_sync(function ($f) use (&$saved) { $saved[] = $f; });
+check('invalidation avant envoi : empreinte vide mémorisée', $saved === array(''));
 
 echo "Mémorisation après démarrage ou « Relire Jeedom »\n";
 $saved = array();
@@ -243,6 +263,12 @@ $posFp = strpos($scan, '$fingerprint = jeedom2ha::safeDecisionFingerprint();');
 $posTopo = strpos($scan, '$topology = jeedom2ha::getFullTopology();');
 $posRemember = strpos($scan, 'jeedom2ha::rememberDecisionFingerprintAfterSync($fingerprint, $result);');
 $posSync = strpos($scan, "'X-Jeedom2ha-Sync-Mode' => 'rescan'");
+$posInval = strpos($scan, 'jeedom2ha::invalidateDecisionFingerprintBeforeSync();');
+check('« Relire Jeedom » : empreinte invalidée avant l\'envoi de la synchro',
+    $posInval !== false && $posSync !== false && $posInval < $posSync);
+$bootStart = strpos($class, '$syncResult = $syncCaller($topology);');
+$bootInval = strpos($class, 'self::invalidateDecisionFingerprintBeforeSync();');
+check('démarrage : empreinte invalidée avant l\'envoi de la synchro', $bootInval !== false && $bootStart !== false && $bootInval < $bootStart);
 check('« Relire Jeedom » : empreinte lue avant la topologie, mémorisée après la synchro',
     $posFp !== false && $posTopo !== false && $posRemember !== false && $posSync !== false
     && $posFp < $posTopo && $posSync < $posRemember);

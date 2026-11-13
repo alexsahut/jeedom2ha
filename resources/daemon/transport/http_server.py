@@ -2576,7 +2576,9 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         "operation_message": _SYNC_MESSAGES[_snap_res],
         # Story 24.14 (revue P2) — faux si un bouton ou une disponibilité de scénario n'a pas été
         # publié (échec MQTT ou broker injoignable) : le cron du plugin réessaie au pas suivant.
-        "scenario_availability_complete": scenario_availability_complete,
+        # Revue P2 (3) : une lecture incomplète des scénarios côté PHP (`scenarios_complete` faux,
+        # section absente ou mal formée) n'est jamais une synchro complète des scénarios.
+        "scenario_availability_complete": scenario_availability_complete and scenarios_section_complete,
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
