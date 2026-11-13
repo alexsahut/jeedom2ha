@@ -200,6 +200,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 
 - **Troisième relecture (P2)** : l'empreinte mémorisée est **invalidée avant chaque envoi** de synchro (cron, démarrage, « Relire Jeedom ») ; seule une synchro complète en remémorise une. Une synchro partielle, en échec, refusée ou sans réponse force donc la resynchro au pas suivant, même si l'état Jeedom est revenu à l'ancienne empreinte. Côté démon, une lecture des scénarios incomplète (`scenarios_complete` faux, section absente ou mal formée) donne `scenario_availability_complete: false` : un scénario illisible n'est jamais validé (au prix d'une synchro de service à chaque échéance tant qu'il le reste).
 
+- **Quatrième relecture (P2)** : une purge des boutons supprimés en échec (collecte des topics retenus impossible ou vidage refusé) donne `scenario_availability_complete: false`, donc nouvelle synchro au pas suivant, qui rejoue la purge. La republication des boutons de scénario (reconnexion du broker, redémarrage de HA) prend le verrou `action_lock` de la synchro **bouton par bouton** et relit sous ce verrou la décision et la topologie courantes : aucune décision ni disponibilité périmée ne peut être publiée après une synchro concurrente, et une synchro n'attend jamais plus d'une publication.
+
 ### Points ouverts
 
 - Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.

@@ -605,3 +605,66 @@ async def test_p2_missing_scenarios_section_is_never_a_complete_sync(aiohttp_cli
     del body["payload"]["scenarios"]
     data = await _sync(cli, body, mode="service")
     assert data["scenario_availability_complete"] is False
+
+
+# ---------------------------------------------------------------------------
+# Revue P2 (4e passe) — purge en échec, republication sérialisée avec la synchro
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("failure", ["collect_none", "collect_raises", "empty_refused"])
+async def test_p2_failed_purge_is_never_a_complete_sync(aiohttp_client, failure):
+    bridge = _bridge(retained=[_scenario_topic(60)])  # bouton d'un scénario supprimé
+    if failure == "collect_none":
+        bridge.collect_retained_topics = AsyncMock(return_value=None)
+    elif failure == "collect_raises":
+        bridge.collect_retained_topics = AsyncMock(side_effect=RuntimeError("boom"))
+    else:
+        def _publish(topic, payload, qos=1, retain=False):
+            bridge.published.append((topic, payload, qos, retain))
+            return not (topic == _scenario_topic(60) and payload == "")
+        bridge.publish_message.side_effect = _publish
+    app, cli = await _client(aiohttp_client, bridge)
+    scenarios = [{"id": 61, "name": "S61", "is_active": True}]
+
+    data = await _sync(cli, _body(scenarios=scenarios), mode="service")
+    assert data["status"] == "ok"
+    assert data["scenario_availability_complete"] is False  # le cron réessaiera
+
+    # Broker rétabli : la purge rejouée aboutit, la synchro redevient complète.
+    bridge.collect_retained_topics = AsyncMock(return_value=[_scenario_topic(60)])
+    bridge.publish_message.side_effect = lambda t, p, qos=1, retain=False: bridge.published.append((t, p, qos, retain)) or True
+    data = await _sync(cli, _body(scenarios=scenarios), mode="service")
+    assert data["scenario_availability_complete"] is True
+    assert (_scenario_topic(60), "") in {(t, p) for (t, p, q, r) in bridge.published}
+
+
+async def test_p2_republication_waits_for_the_sync_lock_and_publishes_the_current_decision(aiohttp_client):
+    from transport.http_server import _republish_all_from_cache
+
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge)
+    await _sync(cli, _body(scenarios=[{"id": 62, "name": "S62", "is_active": True}]))
+    bridge.published.clear()
+    real_sleep = asyncio.sleep
+
+    async def _fast_sleep(_delay):
+        await real_sleep(0)
+
+    with patch("transport.http_server.asyncio.sleep", new=_fast_sleep):
+        await app["action_lock"].acquire()  # une synchro est en cours
+        task = asyncio.ensure_future(_republish_all_from_cache(app, "ha_birth"))
+        for _ in range(5):
+            await real_sleep(0)
+        assert bridge.published == []  # rien de publié tant que la synchro tient le verrou
+        # La synchro remplace la décision (scénario devenu inactif) puis rend le verrou.
+        stale = app["scenario_publications"][62]
+        fresh = PublicationDecision(
+            should_publish=True, reason="scenario_button", mapping_result=stale.mapping_result,
+            active_or_alive=False, discovery_published=True,
+        )
+        app["scenario_publications"][62] = fresh
+        app["action_lock"].release()
+        await task
+
+    avail = [p for (t, p, q, r) in bridge.published if t == _scenario_avail(62)]
+    assert avail == ["offline"]  # jamais la disponibilité périmée « online »

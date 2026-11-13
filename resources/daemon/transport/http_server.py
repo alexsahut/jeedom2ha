@@ -1491,18 +1491,35 @@ async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, 
         "[DISCOVERY] Republication des boutons de scénario (reason=%s) : %d, délai=%.2fs",
         reason, len(entries), delay,
     )
-    for scenario_id, decision in entries:
-        try:
-            ok = await publisher_registry.publish(decision.mapping_result, topology)
-        except Exception as exc:
-            ok = False
-            _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — %s", scenario_id, exc)
-        if ok:
-            _publish_scenario_availability(
-                mqtt_bridge, scenario_id, bool(getattr(decision, "active_or_alive", False))
-            )
-        else:
-            _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — bridge indisponible", scenario_id)
+    # Revue P2 (4e passe) — sérialisée avec les synchros : chaque bouton est republié sous le verrou
+    # `action_lock` (celui de la synchro et des actions HA), en relisant SOUS le verrou sa décision et
+    # la topologie courantes. Une synchro concurrente ne peut donc ni s'intercaler au milieu d'une
+    # republication, ni être suivie d'une décision ou d'une disponibilité périmée. Verrou pris par
+    # bouton (pause de lissage hors verrou) : une synchro n'attend jamais plus d'une publication.
+    # Pas d'interblocage : la republication n'est lancée que par les rappels MQTT (tâches à part),
+    # jamais depuis un chemin qui tient déjà le verrou.
+    action_lock = app.get("action_lock") or asyncio.Lock()
+    for scenario_id, _stale in entries:
+        async with action_lock:
+            decision = (app.get("scenario_publications") or {}).get(scenario_id)
+            if (
+                decision is None
+                or not getattr(decision, "discovery_published", False)
+                or getattr(decision, "mapping_result", None) is None
+            ):
+                _LOGGER.info("[DISCOVERY] scenario_id=%d : plus publié depuis la dernière synchro, ignoré", scenario_id)
+                continue
+            try:
+                ok = await publisher_registry.publish(decision.mapping_result, app.get("topology"))
+            except Exception as exc:
+                ok = False
+                _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — %s", scenario_id, exc)
+            if ok:
+                _publish_scenario_availability(
+                    mqtt_bridge, scenario_id, bool(getattr(decision, "active_or_alive", False))
+                )
+            else:
+                _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — bridge indisponible", scenario_id)
         await asyncio.sleep(delay)
 
 
@@ -2464,9 +2481,11 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         and len(raw_scenarios) == len(snapshot.scenarios)
     )
     purged_ids: list = []
+    scenario_purge_complete = True
     if broker_ready and scenarios_section_complete:
         result = await publisher.purge_orphan_scenario_buttons(set(scenario_publications))
         purged_ids = result if isinstance(result, list) else []
+        scenario_purge_complete = getattr(publisher, "scenario_purge_complete", True) is not False
     elif broker_ready:
         _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
     if purged_ids:
@@ -2578,7 +2597,11 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         # publié (échec MQTT ou broker injoignable) : le cron du plugin réessaie au pas suivant.
         # Revue P2 (3) : une lecture incomplète des scénarios côté PHP (`scenarios_complete` faux,
         # section absente ou mal formée) n'est jamais une synchro complète des scénarios.
-        "scenario_availability_complete": scenario_availability_complete and scenarios_section_complete,
+        # Revue P2 (4e passe) : un retrait de bouton supprimé en échec (collecte impossible ou vidage
+        # refusé) n'est pas validé non plus : la synchro suivante, relancée par le cron, rejoue la purge.
+        "scenario_availability_complete": (
+            scenario_availability_complete and scenarios_section_complete and scenario_purge_complete
+        ),
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

@@ -438,6 +438,9 @@ class DiscoveryPublisher:
         ``active_scenario_ids``, so only the buttons of scenarios deleted from Jeedom are
         emptied, together with their retained availability topic.
         """
+        # Revue P2 (4e passe) — vrai seulement si la collecte a pu se faire et que chaque vidage a
+        # réussi ; lu par la synchro, qui ne valide alors pas l'empreinte (nouvel essai au pas suivant).
+        self.scenario_purge_complete = True
         collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
         if collect is None:
             return []
@@ -447,9 +450,11 @@ class DiscoveryPublisher:
             retained = await collect(f"{self._topic_prefix}/button/+/config")
         except Exception:
             _LOGGER.exception("[SCENARIO] Retained topics collection failed, no purge")
+            self.scenario_purge_complete = False
             return []
         if not isinstance(retained, list):
             _LOGGER.info("[SCENARIO] Retained topics collection unavailable, no purge")
+            self.scenario_purge_complete = False
             return []
         pattern = re.compile(
             rf"{re.escape(self._topic_prefix)}/button/(jeedom2ha_scenario_([0-9]+))/config"
@@ -470,6 +475,8 @@ class DiscoveryPublisher:
                 continue
             if await self.unpublish(node_id):
                 purged.append(scenario_id)
+            else:
+                self.scenario_purge_complete = False
         return sorted(set(purged))
 
     def _clear_scenario_availability(self, ha_unique_id: str) -> bool:
