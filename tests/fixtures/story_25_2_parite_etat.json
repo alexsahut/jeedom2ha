@@ -75,6 +75,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -93,6 +95,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1011,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -104,6 +107,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -122,6 +127,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1012,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -151,7 +157,19 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "on_off",
+      "brightness",
+      "read"
+     ],
+     "ha_controllable": true,
+     "ha_default_entity_id": "light.jeedom2ha_101",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-101",
      "ha_entity_type": "light",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_101",
+     "ha_unit": null,
      "override_command_id": 1011,
      "override_pending": false,
      "present_in_ha": true,
@@ -177,6 +195,7 @@
     "should_publish": true
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 101,
    "mapped": true,
    "sync_status": {
@@ -343,6 +362,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "On",
+     "cmd_sub_type": "other",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -361,6 +382,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_ON",
      "jeedom_cmd_id": 1021,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -372,6 +394,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Off",
+     "cmd_sub_type": "other",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -390,6 +414,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_OFF",
      "jeedom_cmd_id": 1022,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -401,6 +426,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -419,6 +446,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1023,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -430,6 +458,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Niveau",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -448,6 +478,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1024,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -459,6 +490,8 @@
     {
      "attendu_ha": "sensor",
      "cmd_name": "Puissance",
+     "cmd_sub_type": "numeric",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -477,6 +510,7 @@
      "effective_ha": "sensor",
      "generic_type": "POWER",
      "jeedom_cmd_id": 1025,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "binary_sensor",
@@ -488,6 +522,8 @@
     {
      "attendu_ha": "sensor",
      "cmd_name": "Conso",
+     "cmd_sub_type": "numeric",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -506,6 +542,7 @@
      "effective_ha": "sensor",
      "generic_type": "CONSUMPTION",
      "jeedom_cmd_id": 1026,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "binary_sensor",
@@ -537,7 +574,19 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "on_off",
+      "brightness",
+      "read"
+     ],
+     "ha_controllable": true,
+     "ha_default_entity_id": "light.jeedom2ha_102",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-102",
      "ha_entity_type": "light",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_102",
+     "ha_unit": null,
      "override_command_id": 1021,
      "override_pending": false,
      "present_in_ha": true,
@@ -564,7 +613,17 @@
       "reason_code": "sensor_multi_routeur_solaire",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "read"
+     ],
+     "ha_controllable": false,
+     "ha_default_entity_id": "sensor.jeedom2ha_102_1025",
+     "ha_device_class": "power",
+     "ha_device_name": "Eq-102",
      "ha_entity_type": "sensor",
+     "ha_name": "Puissance",
+     "ha_unique_id": "jeedom2ha_eq_102_cmd_1025",
+     "ha_unit": "W",
      "override_command_id": 1025,
      "override_pending": false,
      "present_in_ha": false,
@@ -596,7 +655,17 @@
       "reason_code": "sensor_multi_routeur_solaire",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "read"
+     ],
+     "ha_controllable": false,
+     "ha_default_entity_id": "sensor.jeedom2ha_102_1026",
+     "ha_device_class": "energy",
+     "ha_device_name": "Eq-102",
      "ha_entity_type": "sensor",
+     "ha_name": "Conso",
+     "ha_unique_id": "jeedom2ha_eq_102_cmd_1026",
+     "ha_unit": "kWh",
      "override_command_id": 1026,
      "override_pending": false,
      "present_in_ha": false,
@@ -627,6 +696,7 @@
     "should_publish": true
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 102,
    "mapped": true,
    "sync_status": {
@@ -685,6 +755,7 @@
     "should_publish": false
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 103,
    "mapped": false,
    "sync_status": {
@@ -766,6 +837,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": false,
      "diagnostic": {
@@ -784,12 +857,15 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1041,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     },
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": false,
      "diagnostic": {
@@ -808,6 +884,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1042,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     }
@@ -829,6 +906,7 @@
     "should_publish": false
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 104,
    "mapped": false,
    "sync_status": {
@@ -915,6 +993,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -933,6 +1013,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1051,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -944,6 +1025,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -962,6 +1045,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1052,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -991,7 +1075,19 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": false
      },
+     "ha_capabilities": [
+      "on_off",
+      "brightness",
+      "read"
+     ],
+     "ha_controllable": true,
+     "ha_default_entity_id": "light.jeedom2ha_105",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-105",
      "ha_entity_type": "light",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_105",
+     "ha_unit": null,
      "override_command_id": 1051,
      "override_pending": true,
      "present_in_ha": true,
@@ -1017,6 +1113,7 @@
     "should_publish": false
    },
    "equipment_publication_override": "exclude",
+   "hints": [],
    "jeedom_eq_id": 105,
    "mapped": true,
    "sync_status": {
@@ -1098,6 +1195,8 @@
     {
      "attendu_ha": "sensor",
      "cmd_name": "Inconnue",
+     "cmd_sub_type": "string",
+     "cmd_type": "info",
      "coverable": false,
      "covered": false,
      "diagnostic": {
@@ -1116,12 +1215,15 @@
      "effective_ha": "sensor",
      "generic_type": null,
      "jeedom_cmd_id": 1061,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     },
     {
      "attendu_ha": "sensor",
      "cmd_name": "Autre",
+     "cmd_sub_type": "other",
+     "cmd_type": "action",
      "coverable": false,
      "covered": false,
      "diagnostic": {
@@ -1140,6 +1242,7 @@
      "effective_ha": "sensor",
      "generic_type": null,
      "jeedom_cmd_id": 1062,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     }
@@ -1161,6 +1264,7 @@
     "should_publish": false
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 106,
    "mapped": false,
    "sync_status": {
@@ -1247,6 +1351,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1265,6 +1371,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1071,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -1276,6 +1383,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1294,6 +1403,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1072,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -1323,7 +1433,19 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "on_off",
+      "brightness",
+      "read"
+     ],
+     "ha_controllable": true,
+     "ha_default_entity_id": "light.jeedom2ha_107",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-107",
      "ha_entity_type": "light",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_107",
+     "ha_unit": null,
      "override_command_id": 1071,
      "override_pending": true,
      "present_in_ha": false,
@@ -1349,6 +1471,7 @@
     "should_publish": true
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 107,
    "mapped": true,
    "sync_status": {
@@ -1435,6 +1558,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1453,6 +1578,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1081,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -1464,6 +1590,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1482,6 +1610,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1082,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -1511,7 +1640,19 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": true
      },
+     "ha_capabilities": [
+      "on_off",
+      "brightness",
+      "read"
+     ],
+     "ha_controllable": true,
+     "ha_default_entity_id": "light.jeedom2ha_108",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-108",
      "ha_entity_type": "light",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_108",
+     "ha_unit": null,
      "override_command_id": 1081,
      "override_pending": false,
      "present_in_ha": false,
@@ -1537,6 +1678,7 @@
     "should_publish": true
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 108,
    "mapped": true,
    "sync_status": {
@@ -1635,6 +1777,8 @@
     {
      "attendu_ha": "binary_sensor",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1657,6 +1801,7 @@
      "effective_ha": "binary_sensor",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1091,
+     "linked_state_cmd_id": null,
      "override_applied": true,
      "override_source": "user",
      "override_types_allowed": [
@@ -1669,6 +1814,8 @@
     {
      "attendu_ha": "binary_sensor",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": true,
      "diagnostic": {
@@ -1691,6 +1838,7 @@
      "effective_ha": "binary_sensor",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1092,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "override_types_allowed": [
       "button",
@@ -1724,7 +1872,17 @@
       "reason_code": "light_on_off_brightness",
       "should_publish": false
      },
+     "ha_capabilities": [
+      "read"
+     ],
+     "ha_controllable": false,
+     "ha_default_entity_id": "binary_sensor.jeedom2ha_109",
+     "ha_device_class": null,
+     "ha_device_name": "Eq-109",
      "ha_entity_type": "binary_sensor",
+     "ha_name": null,
+     "ha_unique_id": "jeedom2ha_eq_109",
+     "ha_unit": null,
      "override_command_id": 1091,
      "override_pending": true,
      "present_in_ha": true,
@@ -1756,6 +1914,7 @@
     "should_publish": false
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 109,
    "mapped": true,
    "sync_status": {
@@ -1837,6 +1996,8 @@
     {
      "attendu_ha": "light",
      "cmd_name": "Etat",
+     "cmd_sub_type": "binary",
+     "cmd_type": "info",
      "coverable": true,
      "covered": false,
      "diagnostic": {
@@ -1855,12 +2016,15 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_STATE",
      "jeedom_cmd_id": 1101,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     },
     {
      "attendu_ha": "light",
      "cmd_name": "Slider",
+     "cmd_sub_type": "slider",
+     "cmd_type": "action",
      "coverable": true,
      "covered": false,
      "diagnostic": {
@@ -1879,6 +2043,7 @@
      "effective_ha": "light",
      "generic_type": "LIGHT_SLIDER",
      "jeedom_cmd_id": 1102,
+     "linked_state_cmd_id": null,
      "override_applied": false,
      "published_in_ha": false
     }
@@ -1900,6 +2065,7 @@
     "should_publish": false
    },
    "equipment_publication_override": null,
+   "hints": [],
    "jeedom_eq_id": 110,
    "mapped": false,
    "sync_status": {

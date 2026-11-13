@@ -655,6 +655,9 @@ try {
             'demon'  => array(),
             'broker' => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
             'derniere_synchro_terminee' => null,
+            // Front v2 Lot 3 (additif) : birth de HA et dénombrement de la publication, null si absents.
+            'ha' => null,
+            'publication' => null,
             'derniere_operation_resultat' => 'aucun'
         ));
       }
@@ -663,12 +666,17 @@ try {
       $broker = (isset($status['payload']['broker'])) ? $status['payload']['broker'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
       $derniere_synchro_terminee = (isset($status['payload']['derniere_synchro_terminee'])) ? $status['payload']['derniere_synchro_terminee'] : null;
       $derniere_operation_resultat = (isset($status['payload']['derniere_operation_resultat'])) ? $status['payload']['derniere_operation_resultat'] : 'aucun';
+      // Front v2 Lot 3 (additif) : relayés tels quels, null si le démon ne les fournit pas.
+      $ha = (isset($status['payload']['ha']) && is_array($status['payload']['ha'])) ? $status['payload']['ha'] : null;
+      $publication = (isset($status['payload']['publication']) && is_array($status['payload']['publication'])) ? $status['payload']['publication'] : null;
       ajax::success(array(
         'daemon' => true,
         'mqtt' => $mqtt,
         'demon' => $demon,
         'broker' => $broker,
         'derniere_synchro_terminee' => $derniere_synchro_terminee,
+        'ha' => $ha,
+        'publication' => $publication,
         'derniere_operation_resultat' => $derniere_operation_resultat
       ));
     }

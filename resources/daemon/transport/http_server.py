@@ -61,6 +61,7 @@ from models.ui_contract_4d import (
     compute_home_statut,
 )
 from models.actions_ha import build_actions_ha
+from models import ha_side  # Front v2 Lot 3 — côté HA, lecture seule
 from mapping.registry import MapperRegistry, resolve_expected_ha
 from mapping.button import ScenarioButtonMapper
 from mapping.overrides import (
@@ -1548,6 +1549,49 @@ async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, 
         await asyncio.sleep(delay)
 
 
+def _present_discovery_entries_by_eq(app) -> Dict[int, set]:
+    """Front v2 Lot 3 — topics de découverte encore dans HA, par équipement (lecture seule).
+
+    Équipement retenu : `_is_currently_published_in_ha` (même prédicat que
+    `sync_status.published_in_ha`, dépublication différée comprise). Topics : ceux des candidats
+    publiés (`_candidate_topic_entries`, principal publié ou vivant comme dans
+    `_previous_present_cmd_ids`) unis à ceux en attente de dépublication
+    (`_pending_unpublish_parts`, ce que rejouera `_replay_deferred_discovery_unpublish`).
+    """
+    publications = app.get("publications") or {}
+    pending = app.get("pending_discovery_unpublish") or {}
+    present: Dict[int, set] = {}
+    for eq_id in set(publications) | set(pending):
+        decision = publications.get(eq_id)
+        if not _is_currently_published_in_ha(eq_id, decision, pending):
+            continue
+        entries: set = set()
+        mapping = getattr(decision, "mapping_result", None)
+        if mapping is not None:
+            for candidate in [mapping, *(mapping.additional_mappings or [])]:
+                if candidate is mapping:
+                    alive = bool(
+                        getattr(decision, "discovery_published", False)
+                        or getattr(decision, "active_or_alive", False)
+                    )
+                else:
+                    ref = getattr(candidate, "publication_decision_ref", None)
+                    alive = bool(getattr(ref, "discovery_published", False))
+                if alive:
+                    entries.update(_candidate_topic_entries(mapping, candidate))
+        if eq_id in pending:
+            entity_type, node_ids = _pending_unpublish_parts(pending[eq_id])
+            if not node_ids:
+                entries.add((entity_type, f"jeedom2ha_{eq_id}"))
+            for entry in node_ids:
+                if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                    entries.add((str(entry[0]), str(entry[1])))
+                else:
+                    entries.add((entity_type, str(entry)))
+        present[eq_id] = entries
+    return present
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -1584,6 +1628,11 @@ async def _handle_system_status(request: web.Request) -> web.Response:
             "broker": mqtt_section,
             "derniere_synchro_terminee": request.app.get("derniere_synchro_terminee"),
             "derniere_operation_resultat": request.app.get("derniere_operation_resultat", "aucun"),
+            # Front v2 Lot 3 (additif) : birth de HA et dénombrement de ce qui est publié.
+            "ha": ha_side.ha_status(request.app.get("ha_birth_seen_at")),
+            "publication": ha_side.publication_counts(
+                _present_discovery_entries_by_eq(request.app), request.app.get("scenario_publications"),
+            ),
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1817,6 +1866,8 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
     async def _ha_birth_cb():
         """Called when homeassistant/status = online — republish from RAM cache."""
+        # Front v2 Lot 3 (additif) : horodatage du dernier `online` de HA, lu par /system/status.
+        app["ha_birth_seen_at"] = datetime.now(timezone.utc).isoformat()
         # Story 22.4 — appareil du pont d'abord.
         await _publish_bridge_discovery(app)
         await _republish_all_from_cache(app, "ha_birth")
@@ -3265,6 +3316,10 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
                 "auto": no_mapping_view,
                 "overridden": no_mapping_view,
                 "native_generic_types": native_generic_types,
+                # Front v2 Lot 3 (additif) : aucun mapping, donc aucune entité avant comme après.
+                "entities_before": [],
+                "entities_after": [],
+                "entity_id_changes": [],
             },
         })
 
@@ -3288,6 +3343,10 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
                 "auto": _view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id),
                 "overridden": None,
                 "native_generic_types": native_generic_types,
+                # Front v2 Lot 3 (additif) : commande non couverte, pas d'aperçu « après ».
+                "entities_before": ha_side.preview_entities(auto_evaluation, snapshot),
+                "entities_after": None,
+                "entity_id_changes": None,
             },
         })
 
@@ -3409,8 +3468,21 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             "overridden": over_view,
             "native_generic_types": native_generic_types,
             "support_export": support_export,
+            # Front v2 Lot 3 (additif) : aperçu en entités, depuis les deux évaluations déjà calculées.
+            **_preview_entities_fields(auto_evaluation, over_evaluation, snapshot),
         },
     })
+
+
+def _preview_entities_fields(auto_evaluation, over_evaluation, snapshot) -> Dict[str, Any]:
+    """Front v2 Lot 3 — `entities_before` / `entities_after` / `entity_id_changes` (lecture seule)."""
+    before = ha_side.preview_entities(auto_evaluation, snapshot)
+    after = ha_side.preview_entities(over_evaluation, snapshot)
+    return {
+        "entities_before": before,
+        "entities_after": after,
+        "entity_id_changes": ha_side.entity_id_changes(before, after),
+    }
 
 
 def _resolve_data_dir(request: web.Request) -> str:
@@ -3471,6 +3543,7 @@ def _build_mapping_override_tree(
     overrides_cache=None,
     equipment_overrides_cache=None,
     include_override_types=True,
+    ha_side_fields=False,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -3564,6 +3637,9 @@ def _build_mapping_override_tree(
                     overrides_cache, equipment_overrides_cache, cmd.id,
                 )
             row["override_types_allowed"] = list(allowed_by_mapping[group])
+        # Front v2 Lot 3 (additif, route unitaire seulement) : type, sous-type et état relié.
+        if ha_side_fields:
+            row.update(ha_side.command_fields(cmd))
         commands.append(row)
 
     current_should_publish = bool(
@@ -3618,6 +3694,9 @@ def _build_mapping_override_tree(
                 or applied_decision.reason != current_decision.reason
             ),
         })
+        # Front v2 Lot 3 (additif, route unitaire seulement) : champs `ha_*` lus dans le payload réel.
+        if ha_side_fields:
+            entity_rows[-1].update(ha_side.entity_ha_fields(mapping, snapshot))
 
     # Story 22.2 (Q1 A, champ additif) : une commande est « publiée » quand au moins une entité
     # présente dans HA la porte (forme 579 : principal refusé, secondaire publié).
@@ -3656,6 +3735,8 @@ def _build_mapping_override_tree(
             "published_in_ha": published_in_ha,
         },
         "commands": commands,
+        # Front v2 Lot 3 (additif, route unitaire seulement) : conseils prudents.
+        **({"hints": ha_side.build_hints(eq, evaluation)} if ha_side_fields else {}),
     }
 
 
@@ -3700,6 +3781,7 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
     payload = _build_mapping_override_tree(
         eq, snapshot, data_dir, confidence_policy, synced_decision, scope_included=scope_included,
         pending_discovery_unpublish=request.app.get("pending_discovery_unpublish") or {},
+        ha_side_fields=True,
     )
     return web.json_response({"status": "ok", "payload": payload})
 
@@ -5416,6 +5498,7 @@ def create_app(local_secret: str) -> web.Application:
     # Story 2.1 — Etat minimal de santé du pont
     app["derniere_operation_resultat"] = _build_operation_snapshot(resultat="aucun")
     app["derniere_synchro_terminee"] = None
+    app["ha_birth_seen_at"] = None  # Front v2 Lot 3 — dernier `online` de HA sur <prefix>/status
 
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
     app["boot_cache"] = {}       # Dict[int, dict] — chargé du disque au boot, purgé après 1er sync
