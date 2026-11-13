@@ -59,8 +59,12 @@ HA_COMPONENT_REGISTRY = {
         "required_fields": ["command_topic", "options", "platform", "availability"],
         "required_capabilities": ["has_command", "has_options"],
     },
+    # Story 24.15 (AC1) — l'ordre de consigne reste la seule capacité exigée (un équipement
+    # portant THERMOSTAT_SET_SETPOINT reste un climate, AC2) ; les topics d'état, de mode,
+    # de preset et d'action ne sont déclarés que si une commande Jeedom les alimente
+    # (ClimateCapabilities.has_setpoint_state / has_mode / has_off / has_presets / has_action).
     "climate": {
-        "required_fields": ["availability"],
+        "required_fields": ["temperature_command_topic", "platform", "availability"],
         "required_capabilities": ["has_setpoint"],
     },
     "alarm_control_panel": {
@@ -175,6 +179,12 @@ def _cross_family_action_mismatch(ha_entity_type: str, capabilities: object) -> 
         return ha_entity_type not in ("lock", "sensor", "binary_sensor")
     if ha_entity_type == "lock":
         return True
+    # Story 24.15 (AC9) — un thermostat ne se pilote que par ses ordres de consigne et de
+    # mode, routés par `_translate_command` pour le seul type `climate` : forcé vers un autre
+    # actionneur, il serait impilotable. Forcer une autre famille vers `climate` reste refusé
+    # par la capacité `has_setpoint` (motif ha_missing_temperature_command_topic, inchangé).
+    if isinstance(capabilities, ClimateCapabilities):
+        return ha_entity_type not in ("climate", "sensor", "binary_sensor")
     if ha_entity_type in ("light", "switch"):
         return isinstance(capabilities, CoverCapabilities)
     if ha_entity_type == "cover":

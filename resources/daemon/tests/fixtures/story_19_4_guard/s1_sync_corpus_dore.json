@@ -1190,8 +1190,37 @@
       "reason_code": "climate_thermostat_setpoint",
       "reason_details": {
         "current_temperature_topic": "jeedom2ha/11000/current_temperature",
+        "off_mode_name": "Off",
+        "preset_commands": {
+          "Mode A": 110005,
+          "Mode B": 110006
+        },
+        "preset_modes": [
+          "Mode A",
+          "Mode B"
+        ],
         "temperature_command_topic": "jeedom2ha/11000/temperature/set",
-        "temperature_state_topic": "jeedom2ha/11000/temperature/state"
+        "temperature_state_topic": "jeedom2ha/11000/setpoint",
+        "temperature_unit": "C"
+      }
+    },
+    "op": "publish"
+  },
+  {
+    "entity_type": "switch",
+    "mapping": {
+      "confidence": "sure",
+      "ha_entity_type": "switch",
+      "ha_unique_id": "jeedom2ha_eq_11000_cmd_110009",
+      "jeedom_eq_id": 11000,
+      "reason_code": "climate_thermostat_lock",
+      "reason_details": {
+        "cmd_id": 110009,
+        "command_topic": "jeedom2ha/11000/110009/set",
+        "entity_category": "config",
+        "node_id": "jeedom2ha_11000_110009",
+        "object_id": "jeedom2ha_11000_110009",
+        "thermostat_lock": true
       }
     },
     "op": "publish"
@@ -1205,8 +1234,7 @@
       "jeedom_eq_id": 11001,
       "reason_code": "climate_thermostat_setpoint",
       "reason_details": {
-        "temperature_command_topic": "jeedom2ha/11001/temperature/set",
-        "temperature_state_topic": "jeedom2ha/11001/temperature/state"
+        "temperature_command_topic": "jeedom2ha/11001/temperature/set"
       }
     },
     "op": "publish"
@@ -1221,8 +1249,14 @@
       "reason_code": "climate_thermostat_setpoint",
       "reason_details": {
         "current_temperature_topic": "jeedom2ha/11002/current_temperature",
+        "preset_commands": {
+          "Mode A": 110025
+        },
+        "preset_modes": [
+          "Mode A"
+        ],
         "temperature_command_topic": "jeedom2ha/11002/temperature/set",
-        "temperature_state_topic": "jeedom2ha/11002/temperature/state"
+        "temperature_state_topic": "jeedom2ha/11002/setpoint"
       }
     },
     "op": "publish"

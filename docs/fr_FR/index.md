@@ -395,7 +395,7 @@ Le plugin publie neuf types d'entités Home Assistant. Le type est choisi à par
 | `sensor` | Informations numériques. |
 | `binary_sensor` | Informations binaires. |
 | `button` | Actions ponctuelles sans valeur, et **scénarios Jeedom** (un bouton par scénario, grisé quand le scénario est désactivé). |
-| `climate` | Thermostats, pour la consigne et la température. |
+| `climate` | Thermostats : température, consigne, mode, presets et chauffe en cours ; consigne, arrêt et presets pilotables (voir [Thermostats](#thermostats)). |
 | `alarm_control_panel` | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
 | `valve` | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
 | `lock` | Serrures : verrouiller, déverrouiller et état réel (voir [Serrures](#serrures)). |
@@ -424,7 +424,7 @@ Autres limites à connaître :
 - **Pas d'état intermédiaire** « en ouverture », « en fermeture » ou « arrêté » : seuls ouvert et fermé sont remontés.
 - **Valeur illisible ou hors de 0 à 100 :** rien n'est publié, Home Assistant garde la dernière valeur connue.
 - **Retrait d'une commande d'information :** le plugin garde la liste des états qu'il a lui-même publiés (fichier du démon). À la synchronisation ou à la republication suivante, il efface l'état mémorisé par le broker pour ce canal, afin que Home Assistant ne le relise pas. Un état publié par une version qui ne tenait pas cette liste ne peut pas être effacé automatiquement.
-- La couleur d'une lumière, les thermostats et les alarmes ne sont pas concernés par cette remontée d'état.
+- La couleur d'une lumière et les alarmes ne sont pas concernées par cette remontée d'état. Les thermostats ont leur propre remontée (voir [Thermostats](#thermostats)).
 
 ### Portails et portes de garage
 
@@ -472,6 +472,28 @@ Un équipement Jeedom qui porte les types de vanne du plugin Homebridge (« Arro
 - **État réel** : 1 ou toute valeur positive ouvert, 0 fermé (inversé si l'option « Inverser » est cochée sur la commande d'état dans Jeedom) ; toute autre valeur ne change rien dans Home Assistant. Pas d'état supposé (`optimistic: false`).
 - Classe « eau » (`water`) pour l'arrosage et le robinet, aucune classe pour la vanne générique. **Pas de position, pas de minuterie, pas de programme d'arrosage** : les durées (`VALVE_SET_DURATION`, `VALVE_REMAINING_DURATION`) ne sont pas reprises.
 - Identifiant de l'entité : `valve.jeedom2ha_<équipement>_<commande d'état>`.
+
+### Thermostats
+
+Un équipement Jeedom qui porte l'ordre de consigne `THERMOSTAT_SET_SETPOINT` (celui du plugin « Thermostat ») est publié comme un **thermostat** (`climate`). Le plugin lit les autres types génériques du thermostat ; ce qui manque n'est simplement pas affiché, jamais inventé.
+
+| Dans Home Assistant | Commande Jeedom lue | Détail |
+|---|---|---|
+| Température mesurée | `THERMOSTAT_TEMPERATURE` (info) | |
+| Consigne | `THERMOSTAT_SETPOINT` (info) | réglable par pas de 0,5 ; bornes reprises de l'ordre de consigne (« Min » et « Max ») |
+| Mode : chauffe ou arrêt | `THERMOSTAT_MODE` (info) | « arrêt » seulement si le mode est celui de l'ordre d'arrêt du thermostat |
+| Presets | `THERMOSTAT_SET_MODE` (actions) | un preset par mode du thermostat, avec son nom exact |
+| Chauffe en cours | `THERMOSTAT_STATE` (info) | « chauffe » (1) ou « au repos » (0) ; « arrêt » quand le thermostat est arrêté |
+| Verrouillage | `THERMOSTAT_LOCK`, `THERMOSTAT_SET_LOCK`, `THERMOSTAT_SET_UNLOCK` | interrupteur séparé « Verrouillage » sur le même appareil |
+
+- **Arrêt ou chauffe** : Home Assistant propose deux modes, « chauffe » (`heat`) et « arrêt » (`off`). L'ordre d'arrêt est reconnu par son identifiant interne dans le plugin « Thermostat » (`off`), **jamais par son nom** : vous pouvez le renommer. Un thermostat dont la chauffe est coupée parce que la consigne est atteinte, ou en mode nuit, reste en mode « chauffe » (et « au repos ») : seul l'arrêt du thermostat donne « arrêt ». Sans ordre d'arrêt, seul « chauffe » est proposé.
+- **Presets** : chaque mode du thermostat (par exemple confort ou éco, selon votre configuration) devient un preset, avec son nom exact (majuscules et accents compris). Choisir un preset envoie l'ordre de ce mode. Le preset affiché est « aucun » quand le thermostat suit une consigne réglée à la main ou qu'il est arrêté. Sans information de mode (`THERMOSTAT_MODE`), ni mode, ni arrêt, ni preset ne sont proposés.
+- **Régler la consigne** : la valeur est arrondie au pas de 0,5 et envoyée à l'ordre de consigne. Une valeur hors des bornes du thermostat est **refusée** (rien n'est envoyé, le journal du démon le dit), jamais ramenée dans les bornes. Comme dans Jeedom, régler une consigne fait passer le thermostat en consigne manuelle : le preset affiché devient « aucun ».
+- **Reprendre la chauffe depuis l'arrêt** : choisir « chauffe » renvoie la consigne courante au thermostat, qui reprend en consigne manuelle. Choisir « chauffe » sur un thermostat qui chauffe déjà n'envoie rien (le mode en cours n'est pas écrasé).
+- **Verrouillage** : l'interrupteur « Verrouillage » (catégorie configuration) affiche l'état du verrou et le pilote. **Un thermostat verrouillé ignore tous les ordres** (consigne, modes, arrêt) sans erreur : si un réglage reste sans effet, vérifiez ce verrou.
+- **Non repris** : la température extérieure (`THERMOSTAT_TEMPERATURE_OUTDOOR`, en général déjà publiée par sa propre sonde) et le statut en texte (`THERMOSTAT_STATE_NAME`).
+- Pas d'état supposé (`optimistic: false`) : Home Assistant affiche ce que Jeedom remonte. Les états sont publiés dès la synchronisation, puis à chaque changement.
+- Identifiants : `climate.jeedom2ha_<équipement>` (inchangé) et `switch.jeedom2ha_<équipement>_<commande de verrou>` pour le verrouillage.
 
 ### Serrures
 

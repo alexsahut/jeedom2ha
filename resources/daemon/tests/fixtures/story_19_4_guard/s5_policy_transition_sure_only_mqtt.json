@@ -2007,6 +2007,7 @@
   },
   {
     "payload": {
+      "action_topic": "jeedom2ha/11000/action",
       "availability": [
         {
           "topic": "jeedom2ha/bridge/status"
@@ -2028,12 +2029,15 @@
         "suggested_area": "Salon",
         "via_device": "jeedom2ha_bridge"
       },
+      "mode_command_topic": "jeedom2ha/11000/mode/set",
+      "mode_state_topic": "jeedom2ha/11000/mode",
       "modes": [
         "heat",
         "off"
       ],
       "name": null,
       "object_id": "jeedom2ha_11000",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2041,12 +2045,63 @@
       "payload_available": "online",
       "payload_not_available": "offline",
       "platform": "mqtt",
+      "precision": 0.1,
+      "preset_mode_command_topic": "jeedom2ha/11000/preset/set",
+      "preset_mode_state_topic": "jeedom2ha/11000/preset",
+      "preset_modes": [
+        "Mode A",
+        "Mode B"
+      ],
+      "temp_step": 0.5,
       "temperature_command_topic": "jeedom2ha/11000/temperature/set",
-      "temperature_state_topic": "jeedom2ha/11000/temperature/state",
+      "temperature_state_topic": "jeedom2ha/11000/setpoint",
+      "temperature_unit": "C",
       "unique_id": "jeedom2ha_eq_11000"
     },
     "retain": true,
     "topic": "homeassistant/climate/jeedom2ha_11000/config"
+  },
+  {
+    "payload": {
+      "availability": [
+        {
+          "topic": "jeedom2ha/bridge/status"
+        },
+        {
+          "topic": "jeedom2ha/11000/availability"
+        }
+      ],
+      "availability_mode": "all",
+      "command_topic": "jeedom2ha/11000/110009/set",
+      "default_entity_id": "switch.jeedom2ha_11000_110009",
+      "device": {
+        "identifiers": [
+          "jeedom2ha_11000"
+        ],
+        "manufacturer": "Jeedom (thermostat)",
+        "model": "thermostat",
+        "name": "Thermostat RDC",
+        "suggested_area": "Salon",
+        "via_device": "jeedom2ha_bridge"
+      },
+      "entity_category": "config",
+      "name": "Verrouillage",
+      "object_id": "jeedom2ha_11000_110009",
+      "origin": {
+        "name": "jeedom2ha",
+        "sw_version": "0.2.0"
+      },
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "payload_off": "OFF",
+      "payload_on": "ON",
+      "state_off": "OFF",
+      "state_on": "ON",
+      "state_topic": "jeedom2ha/11000/110009/state",
+      "unique_id": "jeedom2ha_eq_11000_cmd_110009"
+    },
+    "retain": true,
+    "topic": "homeassistant/switch/jeedom2ha_11000_110009/config"
   },
   {
     "payload": {
@@ -2071,11 +2126,11 @@
         "via_device": "jeedom2ha_bridge"
       },
       "modes": [
-        "heat",
-        "off"
+        "heat"
       ],
       "name": null,
       "object_id": "jeedom2ha_11001",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2083,8 +2138,9 @@
       "payload_available": "online",
       "payload_not_available": "offline",
       "platform": "mqtt",
+      "precision": 0.1,
+      "temp_step": 0.5,
       "temperature_command_topic": "jeedom2ha/11001/temperature/set",
-      "temperature_state_topic": "jeedom2ha/11001/temperature/state",
       "unique_id": "jeedom2ha_eq_11001"
     },
     "retain": true,
@@ -2092,6 +2148,7 @@
   },
   {
     "payload": {
+      "action_topic": "jeedom2ha/11002/action",
       "availability": [
         {
           "topic": "jeedom2ha/bridge/status"
@@ -2113,12 +2170,13 @@
         "suggested_area": "Chambre",
         "via_device": "jeedom2ha_bridge"
       },
+      "mode_state_topic": "jeedom2ha/11002/mode",
       "modes": [
-        "heat",
-        "off"
+        "heat"
       ],
       "name": null,
       "object_id": "jeedom2ha_11002",
+      "optimistic": false,
       "origin": {
         "name": "jeedom2ha",
         "sw_version": "0.2.0"
@@ -2126,8 +2184,15 @@
       "payload_available": "online",
       "payload_not_available": "offline",
       "platform": "mqtt",
+      "precision": 0.1,
+      "preset_mode_command_topic": "jeedom2ha/11002/preset/set",
+      "preset_mode_state_topic": "jeedom2ha/11002/preset",
+      "preset_modes": [
+        "Mode A"
+      ],
+      "temp_step": 0.5,
       "temperature_command_topic": "jeedom2ha/11002/temperature/set",
-      "temperature_state_topic": "jeedom2ha/11002/temperature/state",
+      "temperature_state_topic": "jeedom2ha/11002/setpoint",
       "unique_id": "jeedom2ha_eq_11002"
     },
     "retain": true,

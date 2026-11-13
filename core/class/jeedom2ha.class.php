@@ -952,6 +952,9 @@ class jeedom2ha extends eqLogic {
           'invert_binary' => method_exists($cmd, 'getDisplay') ? (bool)$cmd->getDisplay('invertBinary', 0) : false,
           // Story 24.8 (D2) — info liée d'une action (« Valeur » du cœur : id de la commande d'état), pour apparier les vannes
           'linked_value'  => ($cmd->getType() === 'action' && method_exists($cmd, 'getValue')) ? (string)$cmd->getValue() : null,
+          // Story 24.15 (D3) — bornes d'une action (configuration minValue / maxValue du cœur), pour la consigne d'un thermostat
+          'min_value'     => ($cmd->getType() === 'action' && method_exists($cmd, 'getConfiguration')) ? $cmd->getConfiguration('minValue', null) : null,
+          'max_value'     => ($cmd->getType() === 'action' && method_exists($cmd, 'getConfiguration')) ? $cmd->getConfiguration('maxValue', null) : null,
         );
       }
 

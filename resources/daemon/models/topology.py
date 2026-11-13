@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+import math
 import re
 import unicodedata
 
@@ -89,6 +90,23 @@ def normalize_linked_cmd_id(value: Any) -> Optional[int]:
     return cmd_id if cmd_id > 0 else None
 
 
+def normalize_finite_number(value: Any) -> Optional[float]:
+    """Story 24.15 (D3) — nombre fini ("7", "7,5", 7.5) -> float ; sinon None (jamais deviné)."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    else:
+        text = str(value).strip().replace(",", ".")
+        if not text:
+            return None
+        try:
+            number = float(text)
+        except ValueError:
+            return None
+    return number if math.isfinite(number) else None
+
+
 def _normalize_homekit_source(value: Any) -> Optional[str]:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -158,6 +176,10 @@ class JeedomCmd:
     # Story 24.8 (D2) — id de la commande info liée à une action (« Valeur » du cœur Jeedom,
     # exportée telle quelle : "4144" ou "#4144#") ; None si absente ou illisible.
     linked_value: Optional[int] = None
+    # Story 24.15 (D3) — bornes d'une action (configuration ``minValue`` / ``maxValue`` du
+    # cœur) ; None si absentes ou non numériques (jamais devinées).
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
 
 @dataclass
 class JeedomEqLogic:
@@ -266,6 +288,8 @@ class TopologySnapshot:
                             logical_id=_normalize_logical_id(cmd_raw.get("logical_id")),
                             invert_binary=_to_bool(cmd_raw.get("invert_binary"), default=False),
                             linked_value=normalize_linked_cmd_id(cmd_raw.get("linked_value")),
+                            min_value=normalize_finite_number(cmd_raw.get("min_value")),
+                            max_value=normalize_finite_number(cmd_raw.get("max_value")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue

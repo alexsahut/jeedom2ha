@@ -12,6 +12,7 @@ Jeedom2HA est un plugin Jeedom qui publie vos équipements dans Home Assistant p
 - Les portails et portes de garage à état numérique deviennent des ouvrants (ouvrir, fermer, état réel) ; la bascule n'est envoyée que depuis la position fermée ou ouverte relue dans Jeedom, jamais à l'aveugle. Détail dans la section « Portails et portes de garage » de la [documentation](docs/fr_FR/index.md#portails-et-portes-de-garage).
 - Les vannes d'arrosage et robinets (types Homebridge état / ouvrir / fermer) deviennent des vannes (ouvrir, fermer, état réel), une par zone. Détail dans la section « Vannes d'arrosage » de la [documentation](docs/fr_FR/index.md#vannes-darrosage).
 - Les serrures (état, verrouiller, déverrouiller) deviennent des serrures (état réel, jamais supposé) ; l'exposition à Assist reste votre choix dans Home Assistant. Détail dans la section « Serrures » de la [documentation](docs/fr_FR/index.md#serrures).
+- Les thermostats montrent la température, la consigne, le mode (chauffe ou arrêt), le preset et la chauffe en cours, et se pilotent (consigne, arrêt, presets) ; le verrouillage est un interrupteur séparé. Détail dans la section « Thermostats » de la [documentation](docs/fr_FR/index.md#thermostats).
 - Vous pilotez ces équipements depuis Home Assistant, et c'est Jeedom qui exécute l'ordre.
 - Pour chaque équipement, le plugin indique s'il sera publié dans Home Assistant et, sinon, pourquoi, avec la piste pour y remédier.
 - Vous gardez la main : vous pouvez exclure un équipement ou une pièce, ou forcer le type d'un équipement.

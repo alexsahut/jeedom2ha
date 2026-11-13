@@ -159,6 +159,84 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/transport/http_server.py::len(emptied_ids), len(unpublished_scenario_ids), len(purged_ids), emptied_ids,",
   ];
 
+  // Story 24.15 (décisions D1 A, D4 A et D5 d'Alexandre ; D2 et D3 par parité Homebridge) : le climate d'un thermostat publie
+  // consigne, température, mode, presets et chauffe, et devient pilotable. Lignes remplacées : le mapper et le payload du
+  // climate (anciens topics `temperature/state`, `modes` fixes), l'entrée de registre (`required_fields`), la regex des canaux
+  // retenus de sync/state.py, trois assertions des tests 10-2, et les références du golden 8.4 et des gardes 19-4 régénérées
+  // (seuls les thermostats synthétiques changent). Admis dans leur fichier seulement (« fichier::ligne »).
+  const REPLACED_BY_24_15 = [
+    "resources/daemon/discovery/publisher.py::\"modes\": [\"heat\", \"off\"],",
+    "resources/daemon/discovery/publisher.py::\"temperature_command_topic\", f\"jeedom2ha/{eq_id}/temperature/set\"",
+    "resources/daemon/discovery/publisher.py::\"temperature_command_topic\": reason_details.get(",
+    "resources/daemon/discovery/publisher.py::\"temperature_state_topic\", f\"jeedom2ha/{eq_id}/temperature/state\"",
+    "resources/daemon/discovery/publisher.py::\"temperature_state_topic\": reason_details.get(",
+    "resources/daemon/discovery/publisher.py::),",
+    "resources/daemon/discovery/publisher.py::Minimal useful payload: temperature setpoint + current temperature when available.",
+    "resources/daemon/discovery/publisher.py::Scope: residential thermostat, no advanced HVAC modes (Story 10.2 guardrail).",
+    "resources/daemon/discovery/publisher.py::current_temperature_topic = reason_details.get(\"current_temperature_topic\")",
+    "resources/daemon/discovery/publisher.py::if current_temperature_topic:",
+    "resources/daemon/discovery/publisher.py::payload[\"current_temperature_topic\"] = current_temperature_topic",
+    "resources/daemon/mapping/climate.py::\"temperature_command_topic\": f\"jeedom2ha/{eq_id}/temperature/set\",",
+    "resources/daemon/mapping/climate.py::\"temperature_state_topic\": f\"jeedom2ha/{eq_id}/temperature/state\",",
+    "resources/daemon/mapping/climate.py::commands = {\"THERMOSTAT_SET_SETPOINT\": setpoint_cmd}",
+    "resources/daemon/mapping/climate.py::commands[\"THERMOSTAT_TEMPERATURE\"] = temp_cmd",
+    "resources/daemon/mapping/climate.py::from models.mapping import ClimateCapabilities, MappingResult",
+    "resources/daemon/mapping/climate.py::from typing import Optional",
+    "resources/daemon/mapping/climate.py::reason_details[\"current_temperature_topic\"] = f\"jeedom2ha/{eq_id}/current_temperature\"",
+    "resources/daemon/sync/state.py::(FR49).",
+    "resources/daemon/sync/state.py::Domains not yet streamed (climate, alarm_control_panel) are governed later waves",
+    "resources/daemon/sync/state.py::_CHANNEL_TOPIC_RE = re.compile(r\"jeedom2ha/\\d+/(?:state|brightness|position)\")",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"has_setpoint\": true",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"switches_published\": 14,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"switches_sure\": 3,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\",",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\"",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\"",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\"",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"total_cmds\": 174,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"unmatched_commands\": [],",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore.json::\"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore_mqtt.json::\"heat\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore_mqtt.json::\"off\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s1_sync_corpus_dore_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls.json::\"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls_mqtt.json::\"heat\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls_mqtt.json::\"off\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s2_second_sync_calls_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync.json::\"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync_mqtt.json::\"heat\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync_mqtt.json::\"off\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s3_publier_global_after_sync_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only.json::\"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only_mqtt.json::\"heat\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only_mqtt.json::\"off\"",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11000/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11001/temperature/state\",",
+    "resources/daemon/tests/fixtures/story_19_4_guard/s5_policy_transition_sure_only_mqtt.json::\"temperature_state_topic\": \"jeedom2ha/11002/temperature/state\",",
+    "resources/daemon/tests/unit/test_story_10_2_climate_opening.py::assert \"off\" in payload[\"modes\"]",
+    "resources/daemon/tests/unit/test_story_10_2_climate_opening.py::assert mapping.reason_details[\"temperature_state_topic\"] == \"jeedom2ha/5100/temperature/state\"",
+    "resources/daemon/tests/unit/test_story_10_2_climate_opening.py::assert payload[\"temperature_state_topic\"] == \"jeedom2ha/5100/temperature/state\"",
+    "resources/daemon/validation/ha_component_registry.py::\"required_fields\": [\"availability\"],",
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -202,7 +280,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     }
     const unexpected = removed
       .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
-        && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`))
+        && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`)
+        && !REPLACED_BY_24_15.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

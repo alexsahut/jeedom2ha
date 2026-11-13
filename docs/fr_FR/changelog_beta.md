@@ -6,6 +6,15 @@
 
 ---
 
+# 2026-11-13 — Thermostats : la carte de Home Assistant devient utilisable
+
+- Un thermostat Jeedom (plugin « Thermostat », ou tout équipement portant les mêmes types génériques) montre dans Home Assistant la température mesurée, la consigne, le mode (chauffe ou arrêt), le preset en cours et si le chauffage chauffe. Avant, il apparaissait éteint, sans température ni consigne.
+- La consigne se règle depuis Home Assistant (pas de 0,5, bornes du thermostat ; une valeur hors bornes est refusée). L'arrêt et la reprise de la chauffe, ainsi que chaque mode du thermostat (en preset, sous son nom exact), sont pilotables. L'arrêt est reconnu par l'identifiant de l'ordre d'arrêt, jamais par son nom.
+- Le verrouillage du thermostat devient un interrupteur « Verrouillage » sur le même appareil. Un thermostat verrouillé ignore tous les ordres.
+- L'identifiant du thermostat ne change pas (`climate.jeedom2ha_<équipement>`) ; l'interrupteur de verrouillage est une nouvelle entité. La température extérieure n'est pas reprise. Détail dans la section « Thermostats » de la documentation.
+
+---
+
 # 2026-11-12 — Scénarios : des boutons qui ne disparaissent plus
 
 - Un scénario Jeedom désactivé garde son bouton dans Home Assistant : le bouton est **grisé** (indisponible) et un appui est refusé sans rien lancer dans Jeedom. Avant, le bouton disparaissait et revenait au gré des activations, ce qui cassait les automatisations et tableaux de bord qui le citaient. Seul un scénario supprimé de Jeedom perd son bouton.
