@@ -1,6 +1,6 @@
 # Story 24.17 : Interrupteurs secondaires confirmés par l'état réel
 
-Status: ready-for-dev
+Status: review
 
 > Suite de 24-16 (point ouvert « défaut plus large, hors périmètre »). Rédaction validée par Alexandre le 13/11/2026. Story rédigée par une session cloud déléguée (2026-11-13), documentaire, en lecture seule du code (`origin/main` `180b3ab`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : identifiants seulement, ceux du corpus doré. **Draft** : la décision D1 (et le sous-point D2) revient à Alexandre avant `ready-for-dev`.
 
@@ -132,10 +132,10 @@ Aucun message n'est publié sur MQTT par le synchroniseur d'ordres. Le corpus do
   - les trios `FAN_*` publiés en `switch`, principaux et secondaires (pour D2) ;
   - dans le journal du démon : le nombre de lignes `reason_code=missing_state_topic_runtime` et `reason_code=optimistic_controlled` sur des topics d'ordre `jeedom2ha/<eq>/<cmd>/set`, sur une fenêtre récente ;
   - la prise multiple à utiliser pour AC9.
-- [ ] **T1** — Test rouge en forme de production : vraie synchro du corpus doré, ordre sur `jeedom2ha/583/6009/set` → aujourd'hui `optimistic_controlled` et `missing_state_topic_runtime`.
-- [ ] **T2** — Correctif selon D1 : A (tenue de la décision secondaire dans `transport/http_server.py`, topic propre seulement, tous les chemins de F2) ou B (décision effective dans `_select_confirmation_policy`).
-- [ ] **T3** — Selon D2 : `FAN_STATE` dans `STATE_KEYS["switch"]`, et vérification de chaque consommateur de `STATE_KEYS`.
-- [ ] **T4** — Tests (ci-dessous), golden 8.4 et garde 25.4.
+- [x] **T1** — Test rouge en forme de production : vraie synchro du corpus doré, ordre sur `jeedom2ha/583/6009/set` → aujourd'hui `optimistic_controlled` et `missing_state_topic_runtime`.
+- [x] **T2** — Correctif selon D1 : A (tenue de la décision secondaire dans `transport/http_server.py`, topic propre seulement, tous les chemins de F2) ou B (décision effective dans `_select_confirmation_policy`).
+- [x] **T3** — Selon D2 : `FAN_STATE` dans `STATE_KEYS["switch"]`, et vérification de chaque consommateur de `STATE_KEYS`.
+- [x] **T4** — Tests (ci-dessous), golden 8.4 et garde 25.4.
 - [ ] **T5** — Preuve terrain AC9 (ClaudeBox, hors session cloud).
 
 ## Tests attendus (`resources/daemon/tests/unit/test_story_24_17_switch_secondaires_confirmation.py`, identifiants synthétiques)
@@ -167,7 +167,67 @@ Peu pertinente pour cette story. Homebridge n'a pas de notion de « politique de
 - Le test de 24-16 (`test_story_24_16_verrou_thermostat_confirmation.py`) montre comment monter une vraie synchro du corpus doré et un `CommandSynchronizer` avec `_execute_exec_cmd` simulé : à réutiliser.
 - 24-16 est en `review` (preuve terrain AC7 restante) ; cette story ne la touche pas.
 
+## Dev Agent Record (2026-11-13, session cloud déléguée)
+
+Branche `story/24-17-switch-secondaires-confirmation` (depuis `origin/main` `345eb92`). Décisions appliquées : **D1 A**, **D2-a**. Task 0 et T5 laissées à ClaudeBox.
+
+### T1 — test rouge en forme de production
+
+Vraie synchro `/action/sync` du corpus doré, synchroniseur d'état actif, ordre `ON` sur `jeedom2ha/583/6009/set`. Avant correctif, le journal est exactement celui du constat : `command_executed` (cmd 5999), `reason_code=optimistic_controlled action=select_confirmation_policy`, puis WARNING `reason_code=missing_state_topic_runtime action=skip_optimistic_state`. Sans le correctif, 21 des 33 tests de la story échouent (vérifié en retirant le correctif puis en le réappliquant).
+
+### T2 — correctif à la source (D1 A), `transport/http_server.py`
+
+- Nouvelle fonction `_secondary_own_state_topic(secondary)` : rend `reason_details["state_topic"]` pour `switch`, `valve`, `lock` seulement, et seulement s'il est sous `jeedom2ha/<eq>/` ; sinon `""`. **Jamais** le repli `jeedom2ha/<eq>/state` de `_resolve_state_topic` (inchangée).
+- `_publish_additional_sensors` (chemin commun de la synchro et de « Publier », via `apply_publication_decision`) pose `sec_decision.state_topic` avec ce topic propre, à côté de `active_or_alive = False`. La décision stable entre deux synchros (24-14) et « Relire Jeedom » passent par ce même chemin.
+- `_reset_secondary_runtime_state` (appelé par `_sync_publication_decision_refs` : exclusion par le scope dans la synchro et dans « Publier », « Supprimer », dépublication) : la décision recopiée par `dataclasses.replace` reçoit le topic propre ; la décision neuve « jamais synchronisé » aussi, à la place du repli `_resolve_state_topic(secondary)` (seule ligne remplacée de la story).
+- `sync/command.py` n'est pas modifié : la branche 24-16 (`thermostat_lock`) est gardée telle quelle. `_has_reliable_state` et `_publish_optimistic_state` lisent désormais le topic propre de la décision secondaire.
+
+### T3 — `FAN_STATE` canal fiable du `switch` (D2-a), `sync/readback.py`
+
+`STATE_KEYS["switch"]` gagne `FAN_STATE` en dernière position (ajout, ordre des clés antérieures inchangé). Consommateurs vérifiés :
+
+- `has_reliable_channel` / `CommandSynchronizer._has_reliable_state` : un trio `FAN_*` (principal ou secondaire) passe en `real_state_confirmation` ; plus d'état supposé publié.
+- Discovery : le payload `switch` ne lit pas `has_reliable_channel` (pas de clé `optimistic`) : inchangé. `light`, `cover`, `valve` lisent leurs propres clés : inchangés.
+- `sync/state.py` `_READBACK_KEYS["switch"]` (dérivé de `STATE_KEYS`) : un trio porte `reason_details["cmd_id"]`, donc sa liaison de streaming reste l'unique liaison `cmd_id → topic propre` (inchangée). **Seul effet** : `_candidate_current_value` trouve désormais la valeur courante de `FAN_STATE`, donc l'**état initial** d'un trio `FAN_*` est publié à la synchro / au « Publier » (il ne l'était pas : la valeur restait inconnue jusqu'au premier événement Jeedom). Même comportement qu'un trio `SWITCH_*`. Aucun trio `FAN_*` dans le corpus doré.
+- `_PURGEABLE_CHANNELS` ne contient pas `switch` : aucune purge nouvelle. `reconcile_fresh_read` ne lit pas `STATE_KEYS` : inchangé.
+
+### T4 — tests, golden, gardes
+
+`resources/daemon/tests/unit/test_story_24_17_switch_secondaires_confirmation.py` — 33 tests, identifiants synthétiques (corpus doré + équipements 17000 deux vannes, 17100 prise + serrure, 17200 trio `FAN_*` seul, 17300 trio `SWITCH_*` + trio `FAN_*`) :
+
+- AC1 : `ON` puis `OFF` sur les 5 secondaires (583 : 6009, 6010 ; 628 : 5980, 5983, 6004) → `real_state_confirmation`, bonne commande exécutée, aucune publication MQTT par le synchroniseur d'ordres, aucun `missing_state_topic_runtime` ; état streamé sur le topic propre.
+- AC2 : après synchro, toute décision secondaire `switch` / `valve` / `lock` porte son topic propre, toute autre (capteurs) n'en porte aucun, jamais `jeedom2ha/<eq>/state` ; un `light` secondaire (cas de surcharge) n'obtient jamais le repli.
+- AC3 : « Publier », seconde synchro sans changement, exclusion par le scope puis réinclusion (aucun ordre routé pendant l'exclusion), « Supprimer » puis « Publier », décision recopiée → même topic, même politique.
+- AC4 : vanne et serrure secondaires → `real_state_confirmation` avec synchroniseur d'état, `stateless` sans ; vanne sans info d'état → `stateless` ; jamais `optimistic_controlled`.
+- AC5 : `FAN_STATE` dans `STATE_KEYS["switch"]` ; trio `FAN_*` principal et secondaire → `real_state_confirmation`, rien publié ; état initial et streaming sur le topic propre.
+- AC6 : secondaire sans info d'état → `optimistic_controlled`, état supposé publié sur **son seul** topic propre ; secondaire sans topic propre → rien publié (`missing_state_topic_runtime`) ; sans synchroniseur d'état → aucune `real_state_confirmation`.
+- AC7 : principaux 583 et 628 inchangés (`real_state_confirmation`), verrou de thermostat 24-16 inchangé, I11 (secondaire refusé sous un principal publié → non routé), topics et `unique_id` de discovery inchangés.
+
+**Golden 8.4** (`expected_sync_snapshot.json`) : **inchangé** (aucun fichier de fixture modifié ; `test_story_8_4` et gardes 19-4 verts).
+
+**Garde 25.4** : une seule ligne retirée sous `resources/daemon/` — `state_topic=_resolve_state_topic(secondary),` dans `_reset_secondary_runtime_state` — déclarée dans `REPLACED_BY_24_17` (`tests/unit/test_story_25_4_non_regression.node.test.js`, « fichier::ligne »). **Garde 24.2** : `desktop/js/jeedom2ha_mapping_override.js` non touché.
+
+### Fichiers modifiés
+
+- `resources/daemon/transport/http_server.py` (ajouts + 1 ligne remplacée)
+- `resources/daemon/sync/readback.py` (ajout)
+- `resources/daemon/tests/unit/test_story_24_17_switch_secondaires_confirmation.py` (nouveau)
+- `tests/unit/test_story_25_4_non_regression.node.test.js` (déclaration 25.4)
+- cette story, `sprint-status.yaml`
+
+### Résultats
+
+- `python3 -m pytest` : 3279 passés, 1 ignoré, 9 désélectionnés (charge).
+- `flake8 resources/daemon tests` : vert.
+- `node --test tests/unit/*.node.test.js` : 1211 passés, 3 ignorés, 0 échec.
+
+### Points d'attention pour la preuve terrain (T5)
+
+- Pour un `switch` secondaire **sans** synchroniseur d'état actif (démon sans clé API cœur), la politique reste `optimistic_controlled` et un état supposé est désormais publié sur le topic propre du secondaire, comme pour un principal (attendu par D1 A).
+- Trio `FAN_*` en production (Task 0) : son état initial est désormais publié à la synchro.
+
 ## Journal
 
 - 2026-11-13 — Story rédigée (session cloud déléguée, documentaire, `180b3ab`) : 5 `switch` secondaires concernés dans le corpus doré (583 : 2, 628 : 3) ; types secondaires actionnables relevés dans le code (`switch` `SWITCH_*` / `FAN_*`, verrou de thermostat, `valve`, `lock` ; `light` / `cover` seulement par surcharge) ; effet HA : aucun changement d'affichage pour un état streamé, la politique et le WARNING `missing_state_topic_runtime` étaient faux ; D1 (A à la source, recommandée / B dans la politique) et D2 (`FAN_STATE` fiable) à Alexandre ; Task 0 ClaudeBox en lecture seule.
 - 2026-11-13 — Décisions d'Alexandre 12:01 : D1 A, D2 oui (D2-a) ; story passée en ready-for-dev.
+- 2026-11-13 — Dev-story (session cloud déléguée, TDD, depuis `345eb92`) : D1 A (topic propre posé sur les décisions secondaires dans `_publish_additional_sensors` et `_reset_secondary_runtime_state`, jamais le repli `jeedom2ha/<eq>/state`), D2-a (`FAN_STATE` dans `STATE_KEYS["switch"]`) ; 33 tests ; golden 8.4 inchangé ; garde 25.4 : 1 ligne remplacée déclarée ; statut review, Task 0 et T5 à ClaudeBox.
