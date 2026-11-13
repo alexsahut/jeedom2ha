@@ -58,6 +58,23 @@ describe('Lot 2 — describeEntity / describeHaSide : priorité au démon, repli
     assert.deepEqual(cover.verbs, ['ouvrir', 'fermer', 'arrêter', 'régler la position']);
   });
 
+  it('repli aligné sur les mappers : une capacité exige son ordre (revue PR #390, fil 4569956454)', () => {
+    const light = (generics, types) => HS.describeEntity({ ha_entity_type: 'light', command_ids: generics.map((_, i) => i + 1) },
+      generics.map((g, i) => ({ jeedom_cmd_id: i + 1, generic_type: g, cmd_type: types ? types[i] : undefined })));
+    // LIGHT_BRIGHTNESS (retour d'état) sans LIGHT_SLIDER : aucun réglage de luminosité publié (LightMapper._detect_brightness).
+    assert.deepEqual(light(['LIGHT_STATE', 'LIGHT_ON', 'LIGHT_OFF', 'LIGHT_BRIGHTNESS']).verbs, ['allumer', 'éteindre']);
+    assert.deepEqual(light(['LIGHT_ON', 'LIGHT_OFF', 'LIGHT_SLIDER']).verbs, ['allumer', 'éteindre', 'régler la luminosité']);
+    // Une commande dite « info » par le démon n'ouvre aucune capacité.
+    assert.deepEqual(light(['LIGHT_ON', 'LIGHT_SLIDER'], ['action', 'info']).capabilities, ['on_off']);
+    // Ordres de portail reconnus par CoverMapper (GB_*), pas de capacité d'inclinaison inventée.
+    const gate = HS.describeEntity({ ha_entity_type: 'cover', command_ids: [1, 2] },
+      [{ jeedom_cmd_id: 1, generic_type: 'GB_OPEN' }, { jeedom_cmd_id: 2, generic_type: 'GB_CLOSE' }]);
+    assert.deepEqual(gate.capabilities, ['open_close']);
+    // Types génériques d'une autre famille que le type publié : ignorés.
+    const sw = HS.describeEntity({ ha_entity_type: 'switch', command_ids: [1] }, [{ jeedom_cmd_id: 1, generic_type: 'LIGHT_SLIDER' }]);
+    assert.deepEqual(sw.capabilities, ['on_off'], 'défaut du type, jamais « luminosité » sur un interrupteur');
+  });
+
   it('type inconnu sans champ du démon : capacité inconnue (null), aucune mention', () => {
     const t = { entities: [{ ha_entity_type: 'futur', command_ids: [1], present_in_ha: true }], commands: [{ jeedom_cmd_id: 1 }] };
     const side = HS.describeHaSide(t);
@@ -111,6 +128,21 @@ describe('Lot 2 — computeHints : les conseils, du démon ou par heuristique', 
     delete linked.hints;
     linked.commands.forEach((c) => { if (c.cmd_type === 'action') c.linked_state_cmd_id = 871; });
     assert.deepEqual(codes(linked), []);
+    // Capteur binaire d'une autre nature (présence) + ordres SWITCH_ON / SWITCH_OFF sans SWITCH_STATE : rien
+    // (revue PR #390, fil 4569956460 : SwitchMapper._group_switch_cmds exige un trio de la même famille).
+    const presence = {
+      entities: [{ ha_entity_type: 'binary_sensor', command_ids: [1], present_in_ha: true }],
+      commands: [{ jeedom_cmd_id: 1, generic_type: 'PRESENCE' }, { jeedom_cmd_id: 2, generic_type: 'SWITCH_ON' }, { jeedom_cmd_id: 3, generic_type: 'SWITCH_OFF' }],
+    };
+    assert.deepEqual(codes(presence), []);
+    // Famille différente entre l'état et les ordres (ENERGY_STATE + SWITCH_ON / OFF) : rien.
+    const mixed = DEMO.multiprise(false);
+    mixed.commands.forEach((c) => { if (c.generic_type === 'SWITCH_STATE') c.generic_type = 'ENERGY_STATE'; });
+    assert.deepEqual(codes(mixed), []);
+    // Portail avec un ordre GB_TOGGLE (ordre réel du mapper) : rien.
+    const toggle = DEMO.portail(false);
+    toggle.commands.push({ jeedom_cmd_id: 1504, cmd_name: 'Bascule', generic_type: 'GB_TOGGLE' });
+    assert.deepEqual(codes(toggle), []);
     // Ordres On sans ordres Off : rien.
     const onlyOn = DEMO.multiprise(false);
     onlyOn.commands = onlyOn.commands.filter((c) => c.generic_type !== 'SWITCH_OFF');

@@ -55,20 +55,27 @@
     return cmd && typeof cmd.generic_type === 'string' ? cmd.generic_type : '';
   }
 
-  // Capacités déduites des types génériques des commandes d'une entité (repli sans `ha_capabilities`).
-  function capabilitiesFromGenerics(generics) {
+  // Capacités déduites des types génériques des commandes d'une entité (repli sans `ha_capabilities`). Alignées sur les
+  // mappers du démon (resources/daemon/mapping/*.py) : une capacité n'est retenue que si l'ORDRE qui la porte existe
+  // (commande action), jamais sur le seul retour d'état. Ex. : la luminosité exige `LIGHT_SLIDER` (`_detect_brightness`),
+  // `LIGHT_BRIGHTNESS` seul (info) ne publie aucun réglage. Une commande dite `info` par le démon n'ouvre aucune capacité.
+  var ORDER_CAPABILITIES = {
+    light: [['on_off', /^LIGHT_(ON|OFF)$/], ['brightness', /^LIGHT_SLIDER$/]],
+    switch: [['on_off', /^(ENERGY|SWITCH|FAN)_(ON|OFF)$/]],
+    fan: [['on_off', /^FAN_(ON|OFF)$/]],
+    cover: [['open_close', /^(FLAP_(UP|DOWN)|FLAP_BSO_(UP|DOWN)|GB_(OPEN|CLOSE|TOGGLE))$/], ['stop', /^FLAP_STOP$/],
+      ['position', /^FLAP_SLIDER$/]],
+    climate: [['temperature', /^THERMOSTAT_SET_SETPOINT$/], ['mode', /^THERMOSTAT_SET_MODE$/]],
+    lock: [['lock', /^LOCK_(OPEN|CLOSE)$/]],
+    valve: [['open_close', /^(IRRIG|FAUCET|VALVE)_(ON|OFF)$/]],
+  };
+
+  function capabilitiesFromOrders(type, members) {
+    var rules = ORDER_CAPABILITIES[type] || [];
+    var orders = members.filter(function (cmd) { return cmd.cmd_type !== 'info'; }).map(genericOf).filter(Boolean);
     var caps = [];
-    function add(cap) { if (caps.indexOf(cap) === -1) caps.push(cap); }
-    generics.forEach(function (g) {
-      if (/^(LIGHT|ENERGY|SWITCH|FAN|HEATING)_(ON|OFF|TOGGLE)$/.test(g)) add('on_off');
-      if (g === 'LIGHT_SLIDER' || g === 'LIGHT_BRIGHTNESS') add('brightness');
-      if (/^(FLAP|FLAP_BSO|BARRIER|GARAGE)_(UP|DOWN|OPEN|CLOSE)$/.test(g)) add('open_close');
-      if (g === 'FLAP_STOP') add('stop');
-      if (g === 'FLAP_SLIDER') add('position');
-      if (g === 'FLAP_TILT_SLIDER') add('tilt');
-      if (g === 'THERMOSTAT_SET_SETPOINT') add('temperature');
-      if (g === 'THERMOSTAT_SET_MODE' || g === 'MODE_SET_STATE' || g === 'ALARM_SET_MODE') add('mode');
-      if (g === 'LOCK_OPEN' || g === 'LOCK_CLOSE') add('lock');
+    rules.forEach(function (rule) {
+      if (orders.some(function (g) { return rule[1].test(g); }) && caps.indexOf(rule[0]) === -1) caps.push(rule[0]);
     });
     return caps;
   }
@@ -84,7 +91,6 @@
     var byId = commandsById(commands);
     var ids = Array.isArray(e.command_ids) ? e.command_ids : [];
     var members = ids.map(function (id) { return byId[id]; }).filter(Boolean);
-    var generics = members.map(genericOf).filter(Boolean);
     var fromDaemon = typeof e.ha_controllable === 'boolean' || Array.isArray(e.ha_capabilities);
 
     var controllable = null;
@@ -102,7 +108,7 @@
     } else if (controllable === false) {
       capabilities = ['read'];
     } else {
-      capabilities = capabilitiesFromGenerics(generics);
+      capabilities = capabilitiesFromOrders(type, members);
       if (controllable === true && capabilities.length === 0 && DEFAULT_CAPABILITIES[type]) {
         capabilities = DEFAULT_CAPABILITIES[type].slice();
       }
@@ -210,22 +216,31 @@
     var typed = function (re) { return commands.filter(function (cmd) { return re.test(genericOf(cmd)); }); };
     var notLinked = function (cmd) { return cmd.linked_state_cmd_id === undefined || cmd.linked_state_cmd_id === null; };
 
-    // Multiprise : sorties en capteur binaire, ordres On / Off présents mais portés par aucune entité.
-    var binaries = entities.filter(function (e) {
-      return e.ha_entity_type === 'binary_sensor' && Array.isArray(e.command_ids) && e.command_ids.length > 0;
-    });
-    var family = /^(ENERGY|SWITCH|LIGHT)_(ON|OFF)$/;
-    var orphanOn = typed(/^(ENERGY|SWITCH|LIGHT)_ON$/).filter(function (cmd) { return !covered[cmd.jeedom_cmd_id] && notLinked(cmd); });
-    var orphanOff = typed(/^(ENERGY|SWITCH|LIGHT)_OFF$/).filter(function (cmd) { return !covered[cmd.jeedom_cmd_id] && notLinked(cmd); });
-    if (binaries.length > 0 && orphanOn.length > 0 && orphanOff.length > 0) {
-      hints.push({
-        code: 'actions_not_linked_to_state',
-        cmd_ids: commands.filter(function (cmd) { return family.test(genericOf(cmd)) && !covered[cmd.jeedom_cmd_id]; })
-          .map(function (cmd) { return cmd.jeedom_cmd_id; }),
-        details: {},
-        count: Math.min(binaries.length, orphanOn.length, orphanOff.length),
-        source: 'repli',
+    // Multiprise : sorties en capteur binaire, ordres On / Off présents mais portés par aucune entité. Comme
+    // `SwitchMapper._group_switch_cmds`, un trio se forme dans UNE famille (SWITCH ou FAN) : la sortie lue doit porter
+    // l'état de la même famille que les ordres (SWITCH_STATE pour SWITCH_ON / SWITCH_OFF). Un capteur binaire d'une autre
+    // nature (présence, ouverture…) ne compte jamais.
+    var outletCmdIds = [];
+    var outlets = 0;
+    ['SWITCH', 'FAN'].forEach(function (family) {
+      var outputs = entities.filter(function (e) {
+        return e.ha_entity_type === 'binary_sensor' && Array.isArray(e.command_ids) && e.command_ids.length > 0
+          && e.command_ids.some(function (id) { return genericOf(byId[id]) === family + '_STATE'; });
       });
+      var orphan = function (suffix) {
+        return commands.filter(function (cmd) {
+          return genericOf(cmd) === family + '_' + suffix && !covered[cmd.jeedom_cmd_id] && notLinked(cmd);
+        });
+      };
+      var ons = orphan('ON');
+      var offs = orphan('OFF');
+      if (outputs.length > 0 && ons.length > 0 && offs.length > 0) {
+        outlets += Math.min(outputs.length, ons.length, offs.length);
+        ons.concat(offs).forEach(function (cmd) { outletCmdIds.push(cmd.jeedom_cmd_id); });
+      }
+    });
+    if (outlets > 0) {
+      hints.push({ code: 'actions_not_linked_to_state', cmd_ids: outletCmdIds, details: {}, count: outlets, source: 'repli' });
     }
 
     // Portail ou garage : état binaire publié en capteur binaire, sans aucun ordre Ouvrir / Fermer typé.
@@ -236,7 +251,8 @@
         if (/^(BARRIER|GARAGE)_STATE$/.test(genericOf(byId[id]))) barrierStates.push(id);
       });
     });
-    if (barrierStates.length > 0 && typed(/^(BARRIER|GARAGE)_(OPEN|CLOSE)$/).length === 0) {
+    // Ordres reconnus par `CoverMapper` pour un portail ou un garage : GB_OPEN, GB_CLOSE, GB_TOGGLE.
+    if (barrierStates.length > 0 && typed(/^(GB_(OPEN|CLOSE|TOGGLE)|(BARRIER|GARAGE)_(OPEN|CLOSE))$/).length === 0) {
       hints.push({ code: 'binary_state_without_orders', cmd_ids: barrierStates, details: {}, count: null, source: 'repli' });
     }
 

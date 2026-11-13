@@ -312,8 +312,8 @@
         quoi: 'Publié comme capteur d’ouverture.',
         pourquoi: 'Sans ordres Ouvrir et Fermer typés, Home Assistant peut seulement lire son état.',
         actions: ['generic_types'],
-        aide: 'Typez les ordres Ouvrir et Fermer dans Jeedom (par exemple « Portail Bouton Ouvrir »), '
-          + 'puis cliquez sur Relire Jeedom.',
+        aide: 'Dans les types génériques de Jeedom, donnez aux ordres d’ouverture et de fermeture leur type de portail '
+          + 'ou de garage, puis cliquez sur Relire Jeedom.',
       };
     },
     speed_not_carried: function () {
@@ -404,6 +404,9 @@
     BARRIER_OPEN: 'Portail Bouton Ouvrir',
     BARRIER_CLOSE: 'Portail Bouton Fermer',
     GARAGE_STATE: 'Garage État',
+    GB_OPEN: 'Portail ou garage Bouton Ouvrir',
+    GB_CLOSE: 'Portail ou garage Bouton Fermer',
+    GB_TOGGLE: 'Portail ou garage Bouton Bascule',
     GARAGE_OPEN: 'Garage Bouton Ouvrir',
     GARAGE_CLOSE: 'Garage Bouton Fermer',
     LOCK_STATE: 'Serrure État',
