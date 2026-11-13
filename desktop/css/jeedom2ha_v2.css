@@ -323,3 +323,39 @@
 }
 
 /* --- Lot 1 et suivants : ajouter les règles ci-dessous, dans un bloc commenté par lot. --- */
+
+/* Lot 1 — démarrage guidé (E1), barre d'état (E0), « Vérifier l'installation… » (E7). */
+.j2ha-v2-guide-title {
+  font-size: 20px;
+  margin: 4px 0 6px;
+}
+.j2ha-v2-guide-head p { margin: 0; }
+.j2ha-v2-step-body { min-width: 0; }
+.j2ha-v2-step-cause { margin-top: 6px; }
+.j2ha-v2-guide-causes {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.j2ha-v2-guide-foot { margin-top: 10px; }
+.j2ha-v2-guide-foot .j2ha-v2-guide-dismiss { padding: 0; vertical-align: baseline; }
+.j2ha-v2-guide-done {
+  background: var(--j2ha-v2-card);
+  border: 1px solid var(--j2ha-ok);
+  border-left: 4px solid var(--j2ha-ok);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 12px 14px;
+}
+.j2ha-v2-checks .j2ha-v2-check.is-wait { opacity: 0.6; }
+.j2ha-v2-check-title { font-weight: 700; }
+.j2ha-v2-check-support {
+  border-top: 1px solid var(--j2ha-v2-line);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.j2ha-v2-check-head {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.j2ha-v2-check-advanced { padding: 0; margin-top: 6px; }
+.j2ha-v2-check-logs { padding-left: 18px; margin: 4px 0 0; }
