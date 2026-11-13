@@ -140,13 +140,16 @@ function jeedom2ha_decision_fingerprint(array $eqRows, array $scenarioRows, arra
 
 /**
  * Story 24.14 (revue P2) — une réponse de POST /action/sync permet-elle de mémoriser l'empreinte ?
- * Oui seulement si la synchro a abouti (`status` ok) et si tous les boutons de scénario et leurs disponibilités
+ * Oui seulement si la synchro a complètement réussi (`status` ok, `operation_result` `succes`) et si tous les boutons de scénario et leurs disponibilités
  * ont été publiés (`scenario_availability_complete` différent de false ; absent chez un démon plus ancien = oui).
  * Sinon l'empreinte n'est pas mémorisée : la tâche périodique réessaie à l'échéance suivante.
  */
 function jeedom2ha_reevaluation_sync_can_remember($result): bool {
   return is_array($result)
     && ($result['status'] ?? null) === 'ok'
+    // Revue P2 : synchro complètement réussie seulement (aucun échec de publication d'équipement, de secondaire,
+    // de disponibilité, ni de dépublication différée) ; champ absent chez un démon plus ancien = réussite.
+    && ($result['operation_result'] ?? 'succes') === 'succes'
     && ($result['scenario_availability_complete'] ?? true) !== false;
 }
 
@@ -178,7 +181,7 @@ function jeedom2ha_reevaluation_remember_after_sync(?string $fingerprint, $resul
  * - `log`         (string $level, string $message) => void
  *
  * Retour : `['status' => unchanged|synced|partial|deferred|skipped|failed, 'reason' => string]`.
- * `partial` : synchro aboutie mais un bouton ou une disponibilité de scénario n'a pas été publié ; empreinte non
+ * `partial` : synchro aboutie mais partielle (publication d'équipement ou de scénario en échec) ; empreinte non
  * mémorisée, nouvel essai à l'échéance suivante.
  * Un refus 409 (`action_in_progress`) n'est pas une erreur : rien n'est mémorisé, nouvel essai à l'échéance suivante.
  * L'empreinte est lue AVANT la topologie : un changement survenu pendant la synchro sera vu au pas suivant.
@@ -231,7 +234,7 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
   }
   $partial = !jeedom2ha_reevaluation_sync_can_remember($result);
   if ($partial) {
-    $log('warning', '[REEVAL] Synchro de service incomplète (bouton ou disponibilité de scénario non publié) : nouvel essai à la prochaine échéance');
+    $log('warning', '[REEVAL] Synchro de service incomplète (publication partielle) : nouvel essai à la prochaine échéance');
   } else {
     $deps['store']($current);
   }
@@ -241,7 +244,7 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
     $log('warning', '[REEVAL] Réenregistrement des listeners échoué : ' . $e->getMessage());
   }
   if ($partial) {
-    return array('status' => 'partial', 'reason' => 'scenario_availability_incomplete');
+    return array('status' => 'partial', 'reason' => 'sync_incomplete');
   }
   $log('info', '[REEVAL] Synchro de service terminée');
   return array('status' => 'synced', 'reason' => 'fingerprint_changed');

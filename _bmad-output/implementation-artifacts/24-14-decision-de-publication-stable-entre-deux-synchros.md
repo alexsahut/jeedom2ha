@@ -196,6 +196,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 - **Disponibilité de scénario non publiée** : l'échec n'était pas propagé, la synchro répondait `ok` et le cron mémorisait l'empreinte (bouton potentiellement figé `offline`). La synchro signale désormais `scenario_availability_complete: false` (et `operation_result` partiel) quand un bouton ou une disponibilité de scénario n'a pas été publié, ou que le broker était injoignable avec des scénarios à publier ; le cron, le démarrage et « Relire Jeedom » ne mémorisent alors pas l'empreinte (`jeedom2ha_reevaluation_sync_can_remember`), nouvel essai à l'échéance suivante. La reconnexion du broker et le redémarrage de HA republient aussi les boutons de scénario du dernier sync et leurs disponibilités retenues (`_republish_scenarios_from_cache`).
 - **« Relire Jeedom »** mémorise désormais l'empreinte lue avant sa topologie quand la synchro aboutit, comme le démarrage (`rememberDecisionFingerprintAfterSync`) : pas de synchro de service superflue au pas suivant.
 
+- **Seconde relecture (P2)** : l'empreinte n'est mémorisée (cron, démarrage, « Relire Jeedom ») que si la synchro a complètement réussi : `status` ok, `operation_result` `succes` (le démon y reporte déjà tout échec de publication d'équipement, de secondaire ou de disponibilité, et toute dépublication différée) et scénarios complets. Un parc qui ne publie que des boutons de scénario est republié à la reconnexion du broker et au redémarrage de HA. Conséquence assumée : un échec de publication durable relance une synchro de service à chaque échéance (5 min) tant qu'il dure.
+
 ### Points ouverts
 
 - Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.

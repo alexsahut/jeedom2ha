@@ -152,12 +152,20 @@ list($deps, $st) = make_deps(array('sync' => function ($t) {
 }));
 $r = jeedom2ha_reevaluation_tick($deps);
 check('disponibilité de scénario non publiée : statut partial, empreinte non mémorisée',
-    $r['status'] === 'partial' && $r['reason'] === 'scenario_availability_incomplete' && $st->stored === 'old'
+    $r['status'] === 'partial' && $r['reason'] === 'sync_incomplete' && $st->stored === 'old'
     && !in_array('store', $st->calls, true) && levels($st, 'warning') === 1 && levels($st, 'error') === 0);
 check('synchro incomplète : les listeners sont quand même réalignés', in_array('listeners', $st->calls, true));
 list($deps2, $st2) = make_deps(array('stored' => function () use ($st) { return $st->stored; }));
 check('nouvel essai à l\'échéance suivante après une synchro incomplète', jeedom2ha_reevaluation_tick($deps2)['status'] === 'synced');
-list($deps, $st) = make_deps(array('sync' => function ($t) { return array('status' => 'ok', 'scenario_availability_complete' => true); }));
+foreach (array('partiel', 'echec') as $res) {
+    list($deps, $st) = make_deps(array('sync' => function ($t) use ($res) {
+        return array('status' => 'ok', 'operation_result' => $res, 'scenario_availability_complete' => true);
+    }));
+    $r = jeedom2ha_reevaluation_tick($deps);
+    check("publication d'équipement en échec (operation_result $res) : partial, empreinte non mémorisée",
+        $r['status'] === 'partial' && $st->stored === 'old');
+}
+list($deps, $st) = make_deps(array('sync' => function ($t) { return array('status' => 'ok', 'operation_result' => 'succes', 'scenario_availability_complete' => true); }));
 check('synchro complète (champ vrai) : empreinte mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'synced' && $st->stored === 'new');
 
 echo "Mémorisation après démarrage ou « Relire Jeedom »\n";
@@ -168,6 +176,13 @@ check('synchro réussie : empreinte mémorisée',
 $saved = array();
 check('synchro réussie, scénarios complets : empreinte mémorisée',
     jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'scenario_availability_complete' => true), $store) && $saved === array('fp'));
+$saved = array();
+check('synchro partielle ou en échec (équipement) : rien de mémorisé',
+    !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'operation_result' => 'partiel'), $store)
+    && !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'operation_result' => 'echec'), $store)
+    && $saved === array());
+check('synchro réussie (operation_result succes) : empreinte mémorisée',
+    jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'operation_result' => 'succes'), $store) && $saved === array('fp'));
 $saved = array();
 check('synchro incomplète (disponibilité de scénario) : rien de mémorisé',
     !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'scenario_availability_complete' => false), $store) && $saved === array());

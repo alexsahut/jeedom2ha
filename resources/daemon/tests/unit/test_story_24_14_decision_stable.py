@@ -520,3 +520,60 @@ async def test_p2_reconnect_republishes_scenario_buttons_and_availability(aiohtt
     # Jamais la disponibilité de l'équipement de même id, jamais un vidage.
     assert all(p != "" for (t, p, q, r) in bridge.published)
     assert "jeedom2ha/44/availability" not in {t for (t, p, q, r) in bridge.published}
+
+
+# ---------------------------------------------------------------------------
+# Revue P2 (2) — synchro partielle côté équipement, parc de scénarios seuls
+# ---------------------------------------------------------------------------
+
+async def test_p2_equipment_publish_failure_makes_the_sync_not_successful(aiohttp_client):
+    bridge = _bridge()
+
+    def _publish(topic, payload, qos=1, retain=False):
+        bridge.published.append((topic, payload, qos, retain))
+        return "/sensor/" not in topic  # la configuration de l'équipement est refusée
+
+    bridge.publish_message.side_effect = _publish
+    app, cli = await _client(aiohttp_client, bridge)
+    data = await _sync(cli, _body(eq_logics=[_eq(5, cmds=[_cmd(51, "TEMPERATURE", unit="°C")])]), mode="service")
+    # Le cron du plugin ne mémorise l'empreinte que sur `succes` : ici, nouvel essai au pas suivant.
+    assert data["status"] == "ok"
+    assert data["operation_result"] in ("partiel", "echec")
+    assert data["scenario_availability_complete"] is True
+
+
+async def test_p2_scenarios_only_park_is_republished(aiohttp_client):
+    from transport.http_server import _republish_all_from_cache
+
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge)
+    await _sync(cli, _body(scenarios=[{"id": 46, "name": "S46", "is_active": False}]))
+    assert not any(getattr(d, "discovery_published", False) for d in app["publications"].values())
+    bridge.published.clear()
+
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+        await _republish_all_from_cache(app, "broker_reconnect")
+
+    topics = [(t, p) for (t, p, q, r) in bridge.published]
+    assert any(t == _scenario_topic(46) and p for (t, p) in topics)
+    assert (_scenario_avail(46), "offline") in topics
+
+
+async def test_p2_reconnect_callback_republishes_a_scenarios_only_park(aiohttp_client):
+    bridge = _bridge()
+    bridge.stop = AsyncMock()
+    bridge.start = AsyncMock()
+    bridge.broker_info = ""
+    app, cli = await _client(aiohttp_client, bridge)
+    await _sync(cli, _body(scenarios=[{"id": 47, "name": "S47", "is_active": True}]))
+    resp = await cli.post("/action/mqtt_connect", json={"payload": {"host": "broker.test"}}, headers=H)
+    assert resp.status == 200
+    on_reconnect = bridge.start.call_args.kwargs["on_reconnect_cb"]
+    bridge.published.clear()
+
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+        await on_reconnect()
+
+    topics = [(t, p) for (t, p, q, r) in bridge.published]
+    assert any(t == _scenario_topic(47) and p for (t, p) in topics)
+    assert (_scenario_avail(47), "online") in topics

@@ -1346,6 +1346,12 @@ async def _republish_all_from_cache_body(app: web.Application, reason: str) -> N
         if getattr(dec, "discovery_published", False)
     ]
 
+    # Story 24.14 (revue P2) — un parc sans équipement publié mais avec des boutons de scénario
+    # est republié lui aussi (boutons et disponibilités retenues).
+    if not published_entries and _scenario_republish_entries(app):
+        await _republish_scenarios_only(app, reason)
+        return
+
     if not published_entries:
         if reason == "ha_birth":
             _LOGGER.info(
@@ -1444,6 +1450,31 @@ async def _republish_all_from_cache_body(app: web.Application, reason: str) -> N
     await _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason)
 
 
+def _scenario_republish_entries(app) -> list:
+    """Story 24.14 — boutons de scénario publiés au dernier sync réussi (mémoire vive seulement)."""
+    return [
+        (scenario_id, decision)
+        for scenario_id, decision in sorted((app.get("scenario_publications") or {}).items())
+        if getattr(decision, "discovery_published", False)
+        and getattr(decision, "mapping_result", None) is not None
+    ]
+
+
+async def _republish_scenarios_only(app, reason: str) -> None:
+    """Story 24.14 (revue P2) — republication quand seuls des boutons de scénario sont publiés."""
+    mqtt_bridge = app.get("mqtt_bridge")
+    if not mqtt_bridge or not mqtt_bridge.is_connected:
+        _LOGGER.warning(
+            "[DISCOVERY] Republication annulée (reason=%s) — broker non connecté", reason
+        )
+        return
+    publisher = DiscoveryPublisher(mqtt_bridge)
+    publisher_registry = PublisherRegistry(publisher)
+    if reason == "broker_reconnect":
+        await _replay_deferred_discovery_unpublish(publisher, app.get("pending_discovery_unpublish", {}))
+    await _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, app.get("topology"), reason)
+
+
 async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason: str) -> None:
     """Story 24.14 (revue P2) — republie les boutons de scénario du dernier sync et leur disponibilité.
 
@@ -1452,12 +1483,7 @@ async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, 
     cela, un broker sans persistance perdait, à son redémarrage, les boutons de scénario et leurs
     disponibilités retenues jusqu'à la synchro suivante.
     """
-    entries = [
-        (scenario_id, decision)
-        for scenario_id, decision in sorted((app.get("scenario_publications") or {}).items())
-        if getattr(decision, "discovery_published", False)
-        and getattr(decision, "mapping_result", None) is not None
-    ]
+    entries = _scenario_republish_entries(app)
     if not entries:
         return
     delay = max(0.1, 10.0 / len(entries))
@@ -1736,6 +1762,10 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
         """Called when broker reconnects — republish from RAM cache if non-empty."""
         # Story 22.4 — appareil du pont d'abord, à chaque connexion (première comprise).
         await _publish_bridge_discovery(app)
+        # Story 24.14 (revue P2) — un parc qui ne publie que des boutons de scénario est republié aussi.
+        if not app.get("publications") and _scenario_republish_entries(app):
+            await _republish_all_from_cache(app, "broker_reconnect")
+            return
         if app.get("publications"):
             await _republish_all_from_cache(app, "broker_reconnect")
         else:
