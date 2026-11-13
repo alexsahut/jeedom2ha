@@ -1,6 +1,6 @@
 # Story 24.17 : Interrupteurs secondaires confirmés par l'état réel
 
-Status: review
+Status: done
 
 > Suite de 24-16 (point ouvert « défaut plus large, hors périmètre »). Rédaction validée par Alexandre le 13/11/2026. Story rédigée par une session cloud déléguée (2026-11-13), documentaire, en lecture seule du code (`origin/main` `180b3ab`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : identifiants seulement, ceux du corpus doré. **Draft** : la décision D1 (et le sous-point D2) revient à Alexandre avant `ready-for-dev`.
 
@@ -126,7 +126,7 @@ Aucun message n'est publié sur MQTT par le synchroniseur d'ordres. Le corpus do
 
 ## Tâches
 
-- [ ] **Task 0 (ClaudeBox, lecture seule, avant `ready-for-dev`)** — relevé en production des secondaires publiés, sans aucun ordre :
+- [x] **Task 0 (ClaudeBox, lecture seule, avant `ready-for-dev`)** — relevé en production des secondaires publiés, sans aucun ordre :
   - depuis l'export de décision (24-2) : le nombre de secondaires publiés par type (`switch`, `valve`, `lock`, `light`, `cover`), avec pour chacun l'équipement, le topic propre et la clé d'état (`SWITCH_STATE`, `FAN_STATE`, `THERMOSTAT_LOCK`, `VALVE_*`, `LOCK_STATE`…) ;
   - les secondaires dont le type vient d'une surcharge (`override_applied`) ;
   - les trios `FAN_*` publiés en `switch`, principaux et secondaires (pour D2) ;
@@ -136,7 +136,7 @@ Aucun message n'est publié sur MQTT par le synchroniseur d'ordres. Le corpus do
 - [x] **T2** — Correctif selon D1 : A (tenue de la décision secondaire dans `transport/http_server.py`, topic propre seulement, tous les chemins de F2) ou B (décision effective dans `_select_confirmation_policy`).
 - [x] **T3** — Selon D2 : `FAN_STATE` dans `STATE_KEYS["switch"]`, et vérification de chaque consommateur de `STATE_KEYS`.
 - [x] **T4** — Tests (ci-dessous), golden 8.4 et garde 25.4.
-- [ ] **T5** — Preuve terrain AC9 (ClaudeBox, hors session cloud).
+- [x] **T5** — Preuve terrain AC9 (ClaudeBox, hors session cloud).
 
 ## Tests attendus (`resources/daemon/tests/unit/test_story_24_17_switch_secondaires_confirmation.py`, identifiants synthétiques)
 
@@ -231,3 +231,9 @@ Vraie synchro `/action/sync` du corpus doré, synchroniseur d'état actif, ordre
 - 2026-11-13 — Story rédigée (session cloud déléguée, documentaire, `180b3ab`) : 5 `switch` secondaires concernés dans le corpus doré (583 : 2, 628 : 3) ; types secondaires actionnables relevés dans le code (`switch` `SWITCH_*` / `FAN_*`, verrou de thermostat, `valve`, `lock` ; `light` / `cover` seulement par surcharge) ; effet HA : aucun changement d'affichage pour un état streamé, la politique et le WARNING `missing_state_topic_runtime` étaient faux ; D1 (A à la source, recommandée / B dans la politique) et D2 (`FAN_STATE` fiable) à Alexandre ; Task 0 ClaudeBox en lecture seule.
 - 2026-11-13 — Décisions d'Alexandre 12:01 : D1 A, D2 oui (D2-a) ; story passée en ready-for-dev.
 - 2026-11-13 — Dev-story (session cloud déléguée, TDD, depuis `345eb92`) : D1 A (topic propre posé sur les décisions secondaires dans `_publish_additional_sensors` et `_reset_secondary_runtime_state`, jamais le repli `jeedom2ha/<eq>/state`), D2-a (`FAN_STATE` dans `STATE_KEYS["switch"]`) ; 33 tests ; golden 8.4 inchangé ; garde 25.4 : 1 ligne remplacée déclarée ; statut review, Task 0 et T5 à ClaudeBox.
+
+## Preuves terrain (13/11/2026)
+
+- **Task 0 (lecture seule, export de décision de production)** : 11 `switch` secondaires `SWITCH_*` sur 3 équipements virtuels (583 : 2, 594 : 5, 628 : 3, plus un principal par équipement), 2 `valve` secondaires (461, 462), 7 verrous de thermostat ; aucun `lock` secondaire, aucun secondaire issu d'une surcharge ; trios `FAN_*` : 10 principaux publiés, aucun secondaire. Journal du démon : 0 `missing_state_topic_runtime`, aucun ordre sur un secondaire dans la fenêtre relevée.
+- **Déploiement** : b5e11f9 le 13/11 à 16:55 UTC, rollback non nécessaire. 0 décision changée, 403 topics identiques, ERROR=0, 0 `missing_state_topic_runtime`, 125 scénarios et 7 thermostats conformes.
+- **AC9** (secondaire 6009 de l'équipement 583, depuis HA) : ON à 17:17:59 UTC → cmd 5999, `reason_code=real_state_confirmation` ; OFF à 17:23:53 UTC → cmd 6001, `real_state_confirmation`. Aucun `missing_state_topic_runtime`. L'état suit dans HA ; l'état initial (off) et le mode réel de l'équipement sont restaurés.
