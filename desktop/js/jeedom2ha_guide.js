@@ -27,6 +27,7 @@
     haSeen: 'jeedom2ha.guide.haSeen',
     choice: 'jeedom2ha.guide.choice',
     published: 'jeedom2ha.guide.published',
+    known: 'jeedom2ha.guide.known',
   };
 
   var STEP_KEYS = ['broker', 'ha', 'choice', 'publish'];
@@ -111,8 +112,41 @@
     return out;
   }
 
-  function synced(status, readState, local) {
-    return !!((readState && readState.kind === 'ok') || (status && status.derniere_synchro_terminee) || (local && local.published));
+  function lastOperation(status) {
+    var op = status && status.derniere_operation_resultat;
+    return op && typeof op === 'object' ? op : null;
+  }
+
+  /**
+   * Une publication a-t-elle RÉUSSI ? Une relecture terminée ne suffit pas : le démon renseigne
+   * `derniere_synchro_terminee` même quand la publication échoue (échec MQTT total). Sources, de la plus sûre à la moins
+   * sûre : `status.publication.equipments_published` (Lot 3, autoritaire s'il est présent), une lecture des états qui
+   * compte au moins un équipement publié, le résultat de la dernière opération (réussie ou partielle), la mémoire du
+   * navigateur.
+   */
+  function publishedOk(status, summary, local) {
+    var pub = publicationInfo(status);
+    if (pub && pub.equipments !== null) return pub.equipments > 0;
+    if (summary && summary.read && summary.published > 0) return true;
+    var op = lastOperation(status);
+    if (status && status.derniere_synchro_terminee && op && (op.resultat === 'succes' || op.resultat === 'partiel')) return true;
+    return !!(local && local.published);
+  }
+
+  /** Dernière relecture tentée mais en échec (le bouton de l'étape 4 devient « Réessayer »). */
+  function publishFailed(status) {
+    var op = lastOperation(status);
+    return !!(status && status.derniere_synchro_terminee && op && op.intention === 'sync' && op.resultat === 'echec');
+  }
+
+  /**
+   * Installation déjà connue : une relecture a déjà eu lieu (même en échec), une lecture des états a réussi, ou ce
+   * navigateur l'a déjà vue publiée. Une panne d'une installation connue n'affiche JAMAIS le guide plein écran : la barre
+   * d'état et « Vérifier l'installation… » suffisent.
+   */
+  function knownInstall(status, readState, local) {
+    return !!((local && (local.known || local.published)) || (status && status.derniere_synchro_terminee)
+      || (readState && readState.kind === 'ok') || publishedOk(status, null, null));
   }
 
   /**
@@ -125,7 +159,8 @@
     var loc = local || {};
     var sum = summary || {};
     var ha = haInfo(status);
-    var isSynced = synced(status, readState, loc);
+    var isSynced = publishedOk(status, sum, loc);
+    var failed = !isSynced && publishFailed(status);
     var broker = brokerState(status);
 
     var s1 = { key: 'broker', number: 1, done: bridgeUp(status), cause: '', remedy: 'config' };
@@ -139,6 +174,10 @@
     var s3 = { key: 'choice', number: 3, done: !!loc.choice || isSynced };
     var s4 = { key: 'publish', number: 4, done: isSynced, empty: sum.jeedom_equipments === 0 };
     if (s4.empty && !s4.done) s4.cause = '{{Jeedom ne contient encore aucun équipement à publier. Ajoutez des équipements dans Jeedom, puis revenez ici.}}';
+    else if (failed) {
+      s4.retry = true;
+      s4.cause = '{{La dernière publication a échoué : rien n\'est encore dans Home Assistant. Vérifiez le broker MQTT, puis réessayez.}}';
+    }
 
     var steps = [s1, s2, s3, s4];
     var firstOpen = -1;
@@ -166,10 +205,10 @@
     var kind = readState && readState.kind;
     if (!kind) return false;
     if (kind === 'ok') return false;
+    if (knownInstall(status, readState, loc)) return false;
     if (kind === 'never_synced') return true;
     if (status === undefined) return false;
-    var down = status === null || !bridgeUp(status);
-    return down && !loc.published && !(status && status.derniere_synchro_terminee);
+    return status === null || !bridgeUp(status);
   }
 
   /**
@@ -271,6 +310,7 @@
       haSeen: get(STORAGE_KEYS.haSeen) === '1',
       choice: get(STORAGE_KEYS.choice) === '1',
       published: get(STORAGE_KEYS.published) === '1',
+      known: get(STORAGE_KEYS.known) === '1',
     };
   }
 
@@ -327,7 +367,24 @@
       hidMain: false,
     };
 
-    function local() { return readLocal(env.storage); }
+    // Préférences gardées EN MÉMOIRE pour la page ; le stockage local n'est qu'une persistance au mieux (refusé en
+    // navigation privée : le guide avance quand même, le choix vaut alors pour cette page seulement).
+    var mem = {};
+    function local() {
+      var stored = readLocal(env.storage);
+      Object.keys(mem).forEach(function (key) { if (mem[key]) stored[key] = true; });
+      return stored;
+    }
+    function remember(key) {
+      mem[key] = true;
+      writeLocal(env.storage, key, true);
+    }
+    // Ce que la page apprend de l'état réel : installation connue, publication réussie (retenu pour les pannes futures).
+    function learn() {
+      var loc = local();
+      if (!loc.known && knownInstall(st.status, readState(), {})) remember('known');
+      if (!loc.published && publishedOk(st.status, summary(), {})) remember('published');
+    }
     function jeedomCount() {
       return (env.rooms || []).reduce(function (n, room) { return n + ((room && room.equipments) ? room.equipments.length : 0); }, 0);
     }
@@ -372,7 +429,7 @@
       }
       if (step.key === 'ha' && !step.done && step.state !== 'blocked') {
         $acts.append(button('{{Je l\'ai vu}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-haseen', function () {
-          writeLocal(env.storage, 'haSeen', true);
+          remember('haSeen');
           st.haHelp = false;
           render();
         }));
@@ -383,18 +440,18 @@
       }
       if (step.key === 'choice' && !step.done && step.state !== 'blocked') {
         $acts.append(button('{{Tout publier (recommandé)}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-all', function () {
-          writeLocal(env.storage, 'choice', true);
+          remember('choice');
           render();
         }));
         $acts.append(button('{{Choisir…}}', 'btn-default j2ha-v2-guide-choose', function () {
-          writeLocal(env.storage, 'choice', true);
+          remember('choice');
           if (actions.openChoose) actions.openChoose();
           render();
         }));
       }
       if (step.key === 'publish' && !step.done && !step.empty) {
         var publishing = st.phase === 'publishing';
-        var $pub = button(publishing ? '{{Publication en cours…}}' : '{{Publier dans Home Assistant}}', active ? 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-publish' : 'btn-default j2ha-v2-guide-publish', publish);
+        var $pub = button(publishing ? '{{Publication en cours…}}' : (step.retry ? '{{Réessayer de publier}}' : '{{Publier dans Home Assistant}}'), active ? 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-publish' : 'btn-default j2ha-v2-guide-publish', publish);
         if (publishing) $pub.prepend(' ').prepend($('<i class="fas fa-spinner fa-spin"></i>'));
         $pub.prop('disabled', !active || publishing);
         $acts.append($pub);
@@ -490,7 +547,7 @@
         var $foot = $('<p class="j2ha-v2-muted j2ha-v2-small j2ha-v2-guide-foot"></p>');
         var $never = $('<button type="button" class="btn btn-link btn-xs j2ha-v2-link j2ha-v2-guide-dismiss"></button>').text('{{Ne plus afficher ce guide}}');
         $never.on('click', function () {
-          writeLocal(env.storage, 'dismissed', true);
+          remember('dismissed');
           close();
         });
         $foot.append($never);
@@ -512,8 +569,8 @@
           st.phase = 'steps';
           st.error = '{{La publication n\'a pas abouti : lisez le message affiché, puis réessayez.}}';
         } else {
-          writeLocal(env.storage, 'published', true);
-          writeLocal(env.storage, 'choice', true);
+          remember('known');
+          remember('choice');
           st.phase = 'done';
         }
         render();
@@ -526,12 +583,21 @@
     }
 
     function evaluate() {
+      learn();
+      // L'écran de fin ne survit pas à un démon qui dit que la publication a échoué : retour à l'étape 4.
+      if (st.phase === 'done' && publishFailed(st.status) && !publishedOk(st.status, summary(), local())) {
+        st.phase = 'steps';
+        st.visible = true;
+        if (!st.mode) st.mode = 'auto';
+      }
       if (st.closed || st.mode === 'manual' || st.phase !== 'steps') { render(); return; }
       var show = shouldShow(st.status, readState(), local());
       if (show && (typeof env.canAutoShow !== 'function' || env.canAutoShow())) {
         st.visible = true;
         st.mode = 'auto';
-      } else if (!show && st.mode === 'auto') {
+      } else if (!show && st.mode === 'auto' && (local().dismissed || publishedOk(st.status, summary(), local()))) {
+        // Affiché seul, le guide reste là tant que rien n'est publié : une relecture terminée en échec rend
+        // l'installation « connue » mais l'étape 4 doit encore proposer de réessayer.
         st.visible = false;
         st.mode = null;
       }
@@ -670,6 +736,9 @@
     summaryFrom: summaryFrom,
     computeSteps: computeSteps,
     shouldShow: shouldShow,
+    publishedOk: publishedOk,
+    publishFailed: publishFailed,
+    knownInstall: knownInstall,
     checkInstall: checkInstall,
     readLocal: readLocal,
     createGuide: createGuide,

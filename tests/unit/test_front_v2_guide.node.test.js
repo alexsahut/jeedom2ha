@@ -24,6 +24,11 @@ const SYNCED = Object.assign({}, UP, {
   derniere_operation_resultat: { resultat: 'succes', intention: 'sync', message: 'Synchronisation terminée.' },
 });
 const NEVER = { kind: 'never_synced' };
+// Ce que renvoie le démon après `_build_sync_failure_response` : date de fin renseignée, résultat « echec ».
+const FAILED = Object.assign({}, UP, {
+  derniere_synchro_terminee: '2026-11-13T22:06:00+00:00',
+  derniere_operation_resultat: { resultat: 'echec', intention: 'sync', message: 'Synchronisation échouée — erreur inattendue.' },
+});
 const READ_OK = { kind: 'ok' };
 const NEVER_BODY = { state: 'ok', result: { status: 'ok', payload: { available: false, reason: 'never_synced' } } };
 
@@ -86,6 +91,34 @@ describe('Lot 1 — computeSteps : table de vérité', () => {
     const m = G.computeSteps(UP, NEVER, { jeedom_equipments: 0 }, { haSeen: true, choice: true });
     assert.equal(m.steps[3].state, 'error');
     assert.match(plain(m.steps[3].cause), /aucun équipement à publier/);
+  });
+});
+
+describe('Lot 1 — revue PR #391 : publication réussie, installation connue', () => {
+  it('relecture terminée en échec : pas de publication réussie, étape 4 en erreur avec « Réessayer »', () => {
+    assert.equal(G.publishedOk(FAILED, null, {}), false);
+    assert.equal(G.publishFailed(FAILED), true);
+    const m = G.computeSteps(FAILED, NEVER, {}, { haSeen: true, choice: true });
+    assert.deepEqual(states(m), ['done', 'done', 'done', 'error']);
+    assert.equal(m.steps[3].retry, true);
+  });
+
+  it('status.publication (Lot 3) fait foi : 0 équipement publié = pas encore publié, même après une relecture réussie', () => {
+    const zero = Object.assign({}, SYNCED, { publication: { equipments_published: 0, entities_published: 0, scenarios_published: 0 } });
+    assert.equal(G.publishedOk(zero, { read: true, published: 3 }, { published: true }), false);
+    const some = Object.assign({}, FAILED, { publication: { equipments_published: 12 } });
+    assert.equal(G.publishedOk(some, null, {}), true);
+    assert.equal(G.publishedOk(UP, { read: true, published: 1 }, {}), true, 'lecture des états avec un publié');
+    assert.equal(G.publishedOk(UP, { read: true, published: 0 }, {}), false);
+    assert.equal(G.publishedOk(SYNCED, null, {}), true, 'résultat « succes » sans le champ du Lot 3');
+  });
+
+  it('installation connue : jamais de guide sur une panne, ni sur une lecture « jamais relu » après une relecture', () => {
+    assert.equal(G.shouldShow(STOPPED, { kind: 'unavailable' }, { known: true }), false);
+    assert.equal(G.shouldShow(UP, NEVER, { known: true }), false);
+    assert.equal(G.shouldShow(FAILED, NEVER, {}), false, 'une relecture a déjà été tentée');
+    assert.equal(G.knownInstall(undefined, READ_OK, {}), true);
+    assert.equal(G.knownInstall(STOPPED, { kind: 'unavailable' }, {}), false);
   });
 });
 
@@ -207,12 +240,14 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     assert.equal(ui.dom.dialogs.length, dialogs, 'aucune confirmation');
     assert.equal(ui.$('#j2ha_v2_guide .j2ha-v2-guide-publish').prop('disabled'), true, 'pas de second envoi');
     ui.finishPublish(false);
-    assert.equal(ui.storage.data[G.STORAGE_KEYS.published], '1');
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], '1', 'installation connue dès la première relecture');
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.published], undefined, 'publication réussie : attestée par l’état réel, pas par la fin de la relecture');
     assert.match(ui.text('#j2ha_v2_guide'), /C'est fait : vos équipements sont dans Home Assistant\./);
     // Relecture des états après la publication : le nombre et trois noms publiés apparaissent.
     ui.page.reader.load();
     ui.answer(require('./helpers/page_b_harness').okBody(require('./helpers/page_b_harness').equipmentsFor(ui.rooms)));
     const view = ui.page.view().overview;
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.published], view.counts.published > 0 ? '1' : undefined);
     const text = ui.text('#j2ha_v2_guide');
     assert.match(text, new RegExp(`C'est fait : ${view.counts.published} équipements sont dans Home Assistant\\.`));
     assert.match(text, /Paramètres › Appareils et services › MQTT/);
@@ -256,11 +291,68 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     ui.click('#j2ha_v2_guide .j2ha-v2-guide-close');
     assert.equal(ui.$('#j2ha_v2_guide').children().length, 0);
 
+  });
+
+  // Revue PR #391 (point 3) : stockage refusé = préférences gardées en mémoire, le guide avance quand même.
+  maybe('stockage local refusé : « Je l’ai vu » et « Tout publier » font avancer le guide jusqu’à l’étape 4', () => {
     const broken = startGuide({ page: { answer: false }, brokenStorage: true });
     broken.guide.onStatus(UP);
     broken.answer(NEVER_BODY);
     broken.click('#j2ha_v2_guide .j2ha-v2-guide-haseen');
-    assert.match(broken.text('#j2ha_v2_guide'), /Bienvenue/);
+    assert.ok(broken.$('#j2ha_v2_guide .j2ha-v2-step[data-step="ha"]').hasClass('is-done'));
+    broken.click('#j2ha_v2_guide .j2ha-v2-guide-all');
+    assert.ok(broken.$('#j2ha_v2_guide .j2ha-v2-step[data-step="choice"]').hasClass('is-done'));
+    assert.ok(broken.$('#j2ha_v2_guide .j2ha-v2-step[data-step="publish"]').hasClass('is-current'));
+    assert.equal(broken.$('#j2ha_v2_guide .j2ha-v2-guide-publish').prop('disabled'), false);
+    broken.click('#j2ha_v2_guide .j2ha-v2-guide-dismiss');
+    broken.guide.onStatus(UP);
+    assert.equal(broken.$('#j2ha_v2_guide').children().length, 0, '« Ne plus afficher » tenu pour la page');
+  });
+
+  // Revue PR #391 (point 1) : une panne d'une installation connue n'affiche jamais le guide plein écran.
+  maybe('installation connue sans passage par le guide : une panne du démon n’affiche pas le guide, ni maintenant ni au rechargement', () => {
+    const ui = startGuide();
+    ui.guide.onStatus(SYNCED);
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], '1');
+    ui.guide.onStatus(STOPPED);
+    ui.guide.onSnapshot({ kind: 'unavailable', view: null });
+    assert.equal(ui.$('#j2ha_v2_guide').children().length, 0);
+    assert.notEqual(ui.$('#j2ha_mainView').list[0].visible, false, 'la maison reste affichée');
+    const reload = startGuide({ page: { answer: false }, storage: Object.assign({}, ui.storage.data) });
+    reload.guide.onStatus(STOPPED);
+    reload.answer({ state: 'ok', result: 'démon injoignable' });
+    assert.equal(reload.$('#j2ha_v2_guide').children().length, 0);
+    const fresh = startGuide({ page: { answer: false } });
+    fresh.guide.onStatus(STOPPED);
+    fresh.answer({ state: 'ok', result: 'démon injoignable' });
+    assert.match(fresh.text('#j2ha_v2_guide'), /Bienvenue/, 'premier lancement : le guide s’affiche');
+  });
+
+  // Revue PR #391 (point 2) : relecture terminée ≠ publication réussie.
+  maybe('relecture terminée en échec (échec MQTT total) : l’étape 4 reste ouverte, avec la cause et « Réessayer de publier »', () => {
+    const ui = startGuide({ page: { answer: false }, storage: { [G.STORAGE_KEYS.haSeen]: '1', [G.STORAGE_KEYS.choice]: '1' } });
+    ui.guide.onStatus(UP);
+    ui.answer(NEVER_BODY);
+    ui.click('#j2ha_v2_guide .j2ha-v2-guide-publish');
+    ui.finishPublish(false); // la relecture a « abouti » côté client…
+    ui.guide.onStatus(FAILED); // …mais le démon dit « echec » (date de fin renseignée quand même)
+    assert.equal(ui.guide.state().phase, 'steps', 'pas d’écran « C’est fait » sur un échec');
+    assert.equal(ui.guide.state().visible, true, 'le guide reste affiché');
+    const step = ui.$('#j2ha_v2_guide .j2ha-v2-step[data-step="publish"]');
+    assert.ok(step.hasClass('is-blocked'), 'étape 4 en erreur');
+    assert.match(plain(step.text()), /La dernière publication a échoué/);
+    assert.equal(plain(ui.$('#j2ha_v2_guide .j2ha-v2-guide-publish').text()), 'Réessayer de publier');
+    assert.equal(ui.$('#j2ha_v2_guide .j2ha-v2-guide-publish').prop('disabled'), false);
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.published], undefined);
+    // Chemin courant : la relecture revient en échec côté client, puis la barre relit le démon.
+    const direct = startGuide({ page: { answer: false }, storage: { [G.STORAGE_KEYS.haSeen]: '1', [G.STORAGE_KEYS.choice]: '1' } });
+    direct.guide.onStatus(UP);
+    direct.answer(NEVER_BODY);
+    direct.click('#j2ha_v2_guide .j2ha-v2-guide-publish');
+    direct.finishPublish(true);
+    direct.guide.onStatus(FAILED);
+    assert.equal(direct.guide.state().visible, true);
+    assert.equal(plain(direct.$('#j2ha_v2_guide .j2ha-v2-guide-publish').text()), 'Réessayer de publier');
   });
 
   maybe('une vue de travail ouverte par l’adresse n’est jamais recouverte par le guide', () => {
