@@ -1,6 +1,6 @@
 # Story 24.8 : Vanne d'arrosage : `valve`
 
-Status: review
+Status: done
 
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **Change la production et ouvre un composant** (`valve`, FR40/NFR10). Décisions attendues d'Alexandre : **Q9** (relation avec l'epic 18) et **Q10** (remplacement d'entités existantes) de `sprint-change-proposal-2026-10-12-parite-homekit.md`. Relecture de ClaudeBox obligatoire. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
@@ -91,7 +91,7 @@ Source : `/system/decision_export` et `/system/state_listeners` du démon de pro
 - [x] **Task 5 — État** : STATE 0/1 → `open`/`closed`, `invertBinary` lu, streaming (`sync/readback.py`, `sync/state.py`), `optimistic: false`.
 - [x] **Task 6 — Override et export** : familles de commandes (pe-epic-16), profil, `_ACTUATOR_TYPES` de l'export de décision.
 - [x] **Task 7 — Tests et documentation** : `test_story_24_8_vanne_arrosage_valve.py`, `docs/fr_FR/index.md`, `changelog_beta.md`.
-- [ ] **Gate, déploiement, preuve terrain (humain / ClaudeBox)** : D3 — ouverture/fermeture réelles sur le virtuel 527 seulement ; 461 et 462 en lecture seule ; inventaire avant/après (AC5).
+- [ ] **Gate, déploiement, preuve terrain (humain / ClaudeBox)** : D3 — ouverture/fermeture réelles sur le virtuel 527 seulement ; 461 et 462 en lecture seule ; inventaire avant/après (AC5). **Reportée au déshivernage (réserve acceptée à la clôture, décision d'Alexandre du 2026-11-13 22:46)** : voir « Réserve à la clôture ».
 
 ## Garde-fous
 
@@ -110,6 +110,7 @@ Les types génériques exacts de vanne présents dans l'installation ; les champ
 - 2026-11-11 — Task 0 (ClaudeBox, export de production) ; décisions D1-D3 d'Alexandre, D4-D6 ClaudeBox ; `ready-for-dev` accordé par ClaudeBox.
 - 2026-11-11 — dev-story (session cloud déléguée) : Tasks 1 à 7, story en `review` ; preuve terrain à ClaudeBox (D3).
 - 2026-11-11 — relecture indépendante de la PR #370 : P2-2 (appariement par l'info liée exportée, le repli « par ordre d'id » de D2 est **retiré** pour plusieurs trios : jamais de zone devinée), P2-1 (remplacement explicite Q10 A des entités qui utilisaient une commande du trio), P3 (source unique des clés d'état, état numérique, garde 25.4 par fichier).
+- 2026-11-13, 22:46 — **Décision d'Alexandre** : `done` avec réserve ; preuve D3 reportée au déshivernage (circuit hiverné), sur le précédent de 23-4.
 
 ## Dev Agent Record
 
@@ -171,3 +172,14 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, sans accès à la box).
 2. **Info liée sur la box** : l'appariement de 462 (deux zones) exige que ses quatre actions aient leur « Valeur » renseignée vers la STATE de leur zone ; sinon 462 n'aura **aucune** vanne. À vérifier dans l'export (`linked_value`) avant la preuve terrain.
 3. **Interface** : `valve` absent du sélecteur d'override et sans libellé français (« Vanne ») — le fichier JS est sous garde « aucune ligne modifiée » (24.2).
 4. **Preuve terrain (D3)** : 527 seul pour les ordres réels ; 461/462 en lecture seule ; vérifier aussi l'état inversé si l'option est cochée sur une des vannes.
+
+## Réserve à la clôture (2026-11-13)
+
+- **Décision d'Alexandre (2026-11-13, 22:46)** : la story passe `done` **avec réserve**, sur le précédent de 23-4 (AC5 documenté, non testé, réserve acceptée à la clôture).
+- **Livré** : Tasks 0 à 7 ; code fusionné par la PR #370 (`1664c2e`), contenu dans les déploiements de production ultérieurs de l'epic 24 (`a6d8e95` et suivants).
+- **Réservé** : la preuve D3 (ouverture/fermeture réelles sur le virtuel 527, vérification en lecture seule de 461 et 462, inventaire avant/après d'AC5) n'est pas faite : le circuit d'arrosage est hiverné. Elle est **reportée au déshivernage** et reste à consigner dans cette story (section « Preuve terrain ») le moment venu.
+- Les « Points ouverts » ci-dessus (info liée de 462, `invertBinary`, libellé d'interface) restent à vérifier lors de cette preuve.
+
+### Change Log
+
+- 2026-11-13 — Story clôturée `done` avec réserve (décision d'Alexandre 22:46) : preuve D3 reportée au déshivernage (circuit hiverné).
