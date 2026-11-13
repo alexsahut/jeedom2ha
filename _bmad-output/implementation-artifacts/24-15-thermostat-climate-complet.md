@@ -1,6 +1,6 @@
 # Story 24.15 : Thermostat : `climate` complet (état, consigne, mode)
 
-Status: ready-for-dev
+Status: review
 
 > **Story rédigée par une session cloud déléguée (2026-11-12), documentaire**, en lecture seule du code (`origin/main` `ecedde5`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48). **Draft** : cinq décisions reviennent à Alexandre (D1 à D5, recommandations ci-dessous). **Change la production** : les 7 entités `climate` existantes changent de payload, de topics et deviennent pilotables. Une autre story (24-14) est en développement sur une autre branche : recouvrements listés en fin de Dev Notes.
 
@@ -155,14 +155,14 @@ Le code du plugin Homebridge installé sur la box n'est pas dans ce dépôt ; la
   - `configuration.minValue` / `maxValue` présents sur les 7 ordres de consigne ;
   - valeurs observées de `THERMOSTAT_MODE` (dont « Aucun » après un réglage manuel) et de `THERMOSTAT_STATE` ;
   - version de `homebridge-jeedom` installée et passages thermostat identiques à la source publique lue ici ; présence ou non d'une configuration `thermoModes` sur ces équipements.
-- [ ] **Task 1 — Export PHP (ajout)** : `min_value` / `max_value` des actions `slider` (configuration du cœur), lus dans `JeedomCmd` (D3).
-- [ ] **Task 2 — Mapper** (`mapping/climate.py`) : commandes captées, presets, ordre d'arrêt par `logical_id`, topics par canal, capacités (D1, D2, D4, D5).
-- [ ] **Task 3 — Discovery** (`_build_climate_payload`) : `mode_*`, `preset_mode_*`, `action_topic`, `min_temp` / `max_temp` / `temp_step` / `precision` / `temperature_unit`, `optimistic: false`.
-- [ ] **Task 4 — État** (`sync/readback.py`, `sync/state.py`) : `climate` streamé, canaux (consigne, température, mode, preset, action), traduction (D1, D2), état initial, regex et purge des canaux retenus étendues.
-- [ ] **Task 5 — Ordres** (`sync/command.py`, `transport/mqtt_client.py` si besoin) : topics de consigne / mode / preset, `_expected_command_topics`, traduction (D1, D3), politique de confirmation.
-- [ ] **Task 6 — Verrou** (selon D4) : secondaire `switch`, remplacement et cycle de vie.
-- [ ] **Task 7 — Override, export, registre** (AC1, AC9).
-- [ ] **Task 8 — Tests et documentation** (AC10, AC11).
+- [x] **Task 1 — Export PHP (ajout)** : `min_value` / `max_value` des actions `slider` (configuration du cœur), lus dans `JeedomCmd` (D3).
+- [x] **Task 2 — Mapper** (`mapping/climate.py`) : commandes captées, presets, ordre d'arrêt par `logical_id`, topics par canal, capacités (D1, D2, D4, D5).
+- [x] **Task 3 — Discovery** (`_build_climate_payload`) : `mode_*`, `preset_mode_*`, `action_topic`, `min_temp` / `max_temp` / `temp_step` / `precision` / `temperature_unit`, `optimistic: false`.
+- [x] **Task 4 — État** (`sync/readback.py`, `sync/state.py`) : `climate` streamé, canaux (consigne, température, mode, preset, action), traduction (D1, D2), état initial, regex et purge des canaux retenus étendues.
+- [x] **Task 5 — Ordres** (`sync/command.py`, `transport/mqtt_client.py` si besoin) : topics de consigne / mode / preset, `_expected_command_topics`, traduction (D1, D3), politique de confirmation.
+- [x] **Task 6 — Verrou** (selon D4) : secondaire `switch`, remplacement et cycle de vie.
+- [x] **Task 7 — Override, export, registre** (AC1, AC9).
+- [x] **Task 8 — Tests et documentation** (AC10, AC11).
 - [ ] **Gate, déploiement, preuve terrain** (ClaudeBox et Alexandre, AC12).
 
 ## Tests attendus (`resources/daemon/tests/unit/test_story_24_15_thermostat_climate_complet.py`, identifiants synthétiques)
@@ -205,6 +205,32 @@ Le code du plugin Homebridge installé sur la box n'est pas dans ce dépôt ; la
 
 La synchro de service de 24-14 (sur changement d'empreinte) republie la discovery puis l'état initial : avec 24-15, un ajout ou un retrait de mode dans un thermostat sera repris sans redémarrage.
 
+## Dev Agent Record (2026-11-13, session cloud déléguée)
+
+Branche `story/24-15-thermostat-climate-complet` rebasée sur `origin/main` `61f42f5` (24-14 fusionnée). TDD : `resources/daemon/tests/unit/test_story_24_15_thermostat_climate_complet.py` écrit d'abord (identifiants synthétiques 1500 / 150xx), puis le code.
+
+### Ce qui est fait
+
+- **Export PHP (ajout)** : `min_value` / `max_value` des actions (`getConfiguration('minValue' / 'maxValue')`), lus dans `JeedomCmd` (`normalize_finite_number` : nombre fini, sinon `None`).
+- **Mapper** (`mapping/climate.py`) : capte en plus `THERMOSTAT_SETPOINT`, `THERMOSTAT_MODE`, chaque `THERMOSTAT_SET_MODE` (sous-type `other` ou vide) et `THERMOSTAT_STATE`. L'arrêt = l'unique `THERMOSTAT_SET_MODE` de `logical_id` `off` (plusieurs : aucun arrêt). Presets = les autres ordres, sous le nom de leur commande ; écartés (WARNING) : nom vide, `none`, égal au nom de l'arrêt, en double. Sans info de mode : ni arrêt ni preset. `ClimateCapabilities` gagne `has_setpoint_state`, `has_mode`, `has_off`, `has_presets`, `has_action`. `unique_id` inchangé. `THERMOSTAT_TEMPERATURE_OUTDOOR` et `THERMOSTAT_STATE_NAME` ignorées (D5).
+- **Verrou (D4 A)** : `ClimateMapper.map_all` rend le climate puis un `switch` « Verrouillage » (`jeedom2ha_eq_<eq>_cmd_<THERMOSTAT_LOCK>`, topics `jeedom2ha/<eq>/<lock>/state|set`, `entity_category: config`) quand l'info de verrou et ses deux ordres sont présents et uniques. État 1/0 (`true`/`on`…) → `ON`/`OFF`, autre valeur : rien. `ON` → `THERMOSTAT_SET_LOCK`, `OFF` → `THERMOSTAT_SET_UNLOCK`.
+- **Topics figés** : états `jeedom2ha/<eq>/setpoint`, `…/current_temperature`, `…/mode`, `…/preset`, `…/action` ; ordres `jeedom2ha/<eq>/temperature/set`, `…/mode/set`, `…/preset/set` (constantes et fonctions dans `mapping/climate.py`, seule source pour le mapper, la discovery et les ordres ; la synchro d'état les dérive de `jeedom2ha/<eq>/state` par `channel_topic`, même forme).
+- **Discovery** : `optimistic: false`, `modes` `["heat", "off"]` (ou `["heat"]` sans arrêt), `temp_step: 0.5`, `precision: 0.1`, `min_temp` / `max_temp` (si les deux bornes sont valides et `min < max`), `temperature_unit` (`°C` → `C`, `°F` → `F`, sinon absent) ; `temperature_state_topic`, `current_temperature_topic`, `mode_state_topic`, `mode_command_topic` (seulement avec un arrêt), `preset_modes` + `preset_mode_*`, `action_topic` : chacun déclaré seulement si une commande Jeedom l'alimente ou l'exécute (AC3). L'interrupteur de verrouillage porte `entity_category: config`.
+- **État** (`sync/readback.py`, `sync/state.py`) : `climate` streamé ; `climate_readback_commands` (consigne, température, mode, preset, action alimentée par `THERMOSTAT_STATE` **et** `THERMOSTAT_MODE`, pour qu'un changement de mode republie l'action). Traductions : `climate_number`, `climate_hvac_mode` (`off` seulement pour le nom exact de l'ordre d'arrêt, toute autre valeur non vide `heat`, vide rien), `climate_preset` (preset ou `none`), `climate_action` (arrêt → `off` prioritaire, puis 1 → `heating`, 0 → `idle`, sinon rien). La valeur de l'autre commande (mode ou chauffe) est lue à la même source que l'événement ou l'instantané publié (dernier événement Jeedom, sinon valeur de topologie ; valeur du clic pour « Publier »). État initial : un seul envoi par topic. Regex et purge des canaux retenus étendues aux canaux du climate (AC8).
+- **Ordres** (`sync/command.py`) : regex `jeedom2ha/<eq>/(temperature|mode|preset)/set` ; `_expected_command_topics` = exactement les topics de la discovery. Consigne : nombre fini (`.` ou `,`), arrondi au pas de 0,5, refusé hors bornes (`setpoint_out_of_range`), option `slider`. Mode : `off` → ordre d'arrêt ; `heat` depuis l'arrêt → consigne courante renvoyée à `THERMOSTAT_SET_SETPOINT` ; `heat` déjà en chauffe → aucun ordre (`mode_already_heat`) ; mode ou consigne inconnus → refus (`mode_state_unknown`, `setpoint_state_unknown`) ; autre payload refusé. Preset : nom exact (casse comprise, sans retrait d'espaces) → la commande de ce nom, vérifiée parmi les commandes du mapping ; `none` → `preset_none_refused`, inconnu → `unknown_preset`. Confirmation : `real_state_confirmation` si le canal (consigne, ou mode pour arrêt / chauffe / preset) est streamé, sinon `stateless` ; jamais d'état optimiste. `transport/mqtt_client.py` inchangé (abonnement `jeedom2ha/+/+/set` et garde des messages retenus déjà en place, prouvés par test).
+- **Override, registre, export** : `required_fields` du climate = `temperature_command_topic`, `platform`, `availability` ; capacité exigée inchangée (`has_setpoint`). Un thermostat forcé vers un autre actionneur est refusé (`_cross_family_action_mismatch`) ; forcer une autre famille vers `climate` reste refusé par `has_setpoint` (motif inchangé). Preuve FR40 complétée (ajouts). L'export de décision rend `state_source: streamed` pour un climate publié (aucun changement de code : il suit `list_state_targets`).
+- **Non-régression** : 3 assertions de 10-2 adaptées ; golden 8.4 enrichi (thermostat 11000 complet avec verrou, 11002 partiel, 11001 inchangé ; ajouts en tête des listes de commandes) et régénéré ; références des gardes 19-4 régénérées ; seuls les thermostats synthétiques changent. Garde 25.4 : `REPLACED_BY_24_15` (lignes remplacées, « fichier::ligne »). `desktop/js/jeedom2ha_mapping_override.js` non touché.
+- **Documentation** : section « Thermostats » de `docs/fr_FR/index.md`, `changelog_beta.md`, `README.md`.
+
+### Écarts et points ouverts
+
+- **AC8, topic de température** : `jeedom2ha/<eq>/current_temperature` garde le même nom qu'avant (c'est aussi le topic proposé en Dev Notes) ; il n'avait jamais été publié (F4), rien à purger. Seul `…/temperature/state` disparaît.
+- **AC1, capacité exigée** : l'état de consigne n'est pas rendu obligatoire, sinon un équipement sans `THERMOSTAT_SETPOINT` perdrait son climate (contraire à AC2) ; son topic n'est déclaré que si l'info existe.
+- **Diagnostic** : le drill-down « commandes couvertes / non couvertes » ne lit que l'entité principale ; les trois commandes du verrou y apparaissent « non couvertes » bien qu'elles soient publiées par l'interrupteur (comportement existant pour tout secondaire, hors périmètre).
+- **Preset `none`** : HA ajoute toujours « aucun » à la liste ; le choisir est refusé sans ordre (AC6), la carte garde le preset réel.
+- **Task 0 bis** (ClaudeBox, lecture seule, avant le déploiement) : vérifier sur les 7 thermostats que l'ordre d'arrêt a bien le `logical_id` `off` et que son nom est la valeur prise par l'info de mode à l'arrêt (sinon « arrêt » n'est pas proposé ou jamais affiché), et que `minValue` / `maxValue` sont renseignés sur l'ordre de consigne (sinon bornes par défaut de HA, ordre accepté sans contrôle de bornes).
+- **AC12** : preuve terrain à faire (humain / ClaudeBox) ; arrêt et reprise seulement avec l'accord d'Alexandre.
+
 ## Vérifications non faites par cette session
 
 Les valeurs réelles des commandes sur la box ; le `logical_id` et le nom des ordres d'arrêt ; la configuration du slider ; la version installée de `homebridge-jeedom` et sa configuration des modes ; les champs de `climate.mqtt` dans HA 2026.9.4.
@@ -215,3 +241,4 @@ Les valeurs réelles des commandes sur la box ; le `logical_id` et le nom des or
 - 2026-11-12 — Constat de production et Task 0 (ClaudeBox) : 7 thermostats inutilisables, commandes typées relevées.
 - 2026-11-12 — Story rédigée (session cloud déléguée, documentaire) : faits du code, lecture des sources publiques du plugin thermostat et de `homebridge-jeedom`, D1 à D5 avec recommandations ; `draft` en attente des décisions d'Alexandre.
 - 2026-11-12 22:13 — Décisions d'Alexandre : D1 A, D4 A, D5 ignorée (« ok recos ») ; D2 et D3 tranchées par ClaudeBox selon la parité Homebridge ; Task 0 bis faite (homebridge-jeedom 1.9.0) ; story `ready-for-dev`, développement après 24-14.
+- 2026-11-13 — Développement (session cloud déléguée, TDD) sur `origin/main` `61f42f5` : Tasks 1 à 8 ; story en `review`. Reste : vérifications Task 0 bis sur la box, gate, déploiement et preuve terrain (AC12).
