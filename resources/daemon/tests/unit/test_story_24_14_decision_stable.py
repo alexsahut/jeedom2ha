@@ -441,3 +441,82 @@ async def test_ac8_invariant_disabled_implies_exclusion_or_disabled_reason(aioht
     for row in (await _export(cli))["equipments"]:
         if row["enabled"] is False:
             assert row["reason"] in EXCLUSION_REASONS | {"disabled_eqlogic"}, row["eq_id"]
+
+
+# ---------------------------------------------------------------------------
+# Revue P2 — échec de publication d'une disponibilité de scénario, republication
+# ---------------------------------------------------------------------------
+
+def _failing_bridge(failing_topic):
+    """Broker qui refuse la publication d'un seul topic (les autres réussissent)."""
+    bridge = _bridge()
+
+    def _publish(topic, payload, qos=1, retain=False):
+        bridge.published.append((topic, payload, qos, retain))
+        return topic != failing_topic
+
+    bridge.publish_message.side_effect = _publish
+    return bridge
+
+
+async def test_p2_failed_scenario_availability_is_reported_as_incomplete(aiohttp_client):
+    bridge = _failing_bridge(_scenario_avail(41))
+    app, cli = await _client(aiohttp_client, bridge)
+    scenarios = [{"id": 40, "name": "S40", "is_active": True}, {"id": 41, "name": "S41", "is_active": False}]
+
+    data = await _sync(cli, _body(scenarios=scenarios), mode="service")
+
+    # La synchro aboutit mais signale le manque : le cron ne mémorise pas son empreinte.
+    assert data["status"] == "ok"
+    assert data["scenario_availability_complete"] is False
+    assert data["operation_result"] != "succes"
+
+    # Nouvel essai (broker rétabli) : complet.
+    bridge.publish_message.side_effect = lambda t, p, qos=1, retain=False: bridge.published.append((t, p, qos, retain)) or True
+    data = await _sync(cli, _body(scenarios=scenarios), mode="service")
+    assert data["scenario_availability_complete"] is True
+    assert data["operation_result"] == "succes"
+
+
+async def test_p2_failed_scenario_config_is_reported_as_incomplete(aiohttp_client):
+    bridge = _failing_bridge(_scenario_topic(42))
+    app, cli = await _client(aiohttp_client, bridge)
+    data = await _sync(cli, _body(scenarios=[{"id": 42, "name": "S42", "is_active": True}]))
+    assert data["scenario_availability_complete"] is False
+    # Pas de disponibilité sans configuration publiée.
+    assert [t for (t, p, q, r) in bridge.published if t == _scenario_avail(42)] == []
+
+
+async def test_p2_broker_down_with_scenarios_is_incomplete_without_scenarios_complete(aiohttp_client):
+    bridge = _bridge()
+    bridge.is_connected = False
+    app, cli = await _client(aiohttp_client, bridge)
+    data = await _sync(cli, _body(scenarios=[{"id": 43, "name": "S43", "is_active": True}]))
+    assert data["scenario_availability_complete"] is False
+    data = await _sync(cli, _body(scenarios=[]))
+    assert data["scenario_availability_complete"] is True
+
+
+async def test_p2_reconnect_republishes_scenario_buttons_and_availability(aiohttp_client):
+    from transport.http_server import _republish_all_from_cache
+
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge)
+    await _sync(cli, _body(
+        eq_logics=[_eq(5, cmds=[_cmd(51, "TEMPERATURE", unit="°C")])],
+        scenarios=[{"id": 44, "name": "S44", "is_active": True}, {"id": 45, "name": "S45", "is_active": False}],
+    ))
+    first_config = next(json.loads(p) for (t, p, q, r) in bridge.published if t == _scenario_topic(45))
+    bridge.published.clear()
+
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+        await _republish_all_from_cache(app, "broker_reconnect")
+
+    published = {(t, p) for (t, p, q, r) in bridge.published if r is True}
+    assert (_scenario_avail(44), "online") in published
+    assert (_scenario_avail(45), "offline") in published
+    configs = [json.loads(p) for (t, p, q, r) in bridge.published if t == _scenario_topic(45)]
+    assert configs == [first_config]
+    # Jamais la disponibilité de l'équipement de même id, jamais un vidage.
+    assert all(p != "" for (t, p, q, r) in bridge.published)
+    assert "jeedom2ha/44/availability" not in {t for (t, p, q, r) in bridge.published}

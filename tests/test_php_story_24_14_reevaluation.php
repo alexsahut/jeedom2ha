@@ -146,6 +146,38 @@ check('synchro en échec (500) : empreinte non mémorisée', jeedom2ha_reevaluat
 list($deps, $st) = make_deps(array('sync' => function ($t) { throw new Exception('boom'); }));
 check('exception pendant la synchro : rattrapée, non mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'failed' && $st->stored === 'old');
 
+// Revue P2 (1) — bouton ou disponibilité de scénario non publié : synchro incomplète, empreinte non mémorisée.
+list($deps, $st) = make_deps(array('sync' => function ($t) {
+    return array('status' => 'ok', 'operation_result' => 'partiel', 'scenario_availability_complete' => false);
+}));
+$r = jeedom2ha_reevaluation_tick($deps);
+check('disponibilité de scénario non publiée : statut partial, empreinte non mémorisée',
+    $r['status'] === 'partial' && $r['reason'] === 'scenario_availability_incomplete' && $st->stored === 'old'
+    && !in_array('store', $st->calls, true) && levels($st, 'warning') === 1 && levels($st, 'error') === 0);
+check('synchro incomplète : les listeners sont quand même réalignés', in_array('listeners', $st->calls, true));
+list($deps2, $st2) = make_deps(array('stored' => function () use ($st) { return $st->stored; }));
+check('nouvel essai à l\'échéance suivante après une synchro incomplète', jeedom2ha_reevaluation_tick($deps2)['status'] === 'synced');
+list($deps, $st) = make_deps(array('sync' => function ($t) { return array('status' => 'ok', 'scenario_availability_complete' => true); }));
+check('synchro complète (champ vrai) : empreinte mémorisée', jeedom2ha_reevaluation_tick($deps)['status'] === 'synced' && $st->stored === 'new');
+
+echo "Mémorisation après démarrage ou « Relire Jeedom »\n";
+$saved = array();
+$store = function ($f) use (&$saved) { $saved[] = $f; };
+check('synchro réussie : empreinte mémorisée',
+    jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok'), $store) === true && $saved === array('fp'));
+$saved = array();
+check('synchro réussie, scénarios complets : empreinte mémorisée',
+    jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'scenario_availability_complete' => true), $store) && $saved === array('fp'));
+$saved = array();
+check('synchro incomplète (disponibilité de scénario) : rien de mémorisé',
+    !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'ok', 'scenario_availability_complete' => false), $store) && $saved === array());
+check('synchro en échec, refusée (409) ou sans réponse : rien de mémorisé',
+    !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'error'), $store)
+    && !jeedom2ha_reevaluation_remember_after_sync('fp', array('status' => 'error', 'code' => 'action_in_progress'), $store)
+    && !jeedom2ha_reevaluation_remember_after_sync('fp', null, $store) && $saved === array());
+check('empreinte illisible (null) : rien de mémorisé',
+    !jeedom2ha_reevaluation_remember_after_sync(null, array('status' => 'ok'), $store) && $saved === array());
+
 list($deps, $st) = make_deps(array('fingerprint' => function () { throw new Exception('db'); }));
 $r = jeedom2ha_reevaluation_tick($deps);
 check('empreinte illisible : rien n\'est lancé', $r['reason'] === 'fingerprint_unreadable' && $st->calls === array());
@@ -187,6 +219,18 @@ check('requêtes minimales : aucune colonne de nom lue',
     && (bool) preg_match('/SELECT `id`, `isActive` FROM `scenario`/', $class));
 check('démon prêt = broker MQTT connecté (isDaemonMqttReady)',
     strpos($class, "self::isDaemonMqttReady(self::callDaemon('/system/status', null, 'GET', 3, 1))") !== false);
+check('démarrage : empreinte mémorisée par la règle commune (synchro aboutie et scénarios complets)',
+    strpos($class, 'self::rememberDecisionFingerprintAfterSync($bootFingerprint, $syncResult);') !== false);
+$ajax = file_get_contents($root . '/core/ajax/jeedom2ha.ajax.php');
+$scanStart = strpos($ajax, "\$action == 'scanTopology'");
+$scan = $scanStart === false ? '' : substr($ajax, $scanStart, strpos($ajax, "\$action == 'getDiagnostics'") - $scanStart);
+$posFp = strpos($scan, '$fingerprint = jeedom2ha::safeDecisionFingerprint();');
+$posTopo = strpos($scan, '$topology = jeedom2ha::getFullTopology();');
+$posRemember = strpos($scan, 'jeedom2ha::rememberDecisionFingerprintAfterSync($fingerprint, $result);');
+$posSync = strpos($scan, "'X-Jeedom2ha-Sync-Mode' => 'rescan'");
+check('« Relire Jeedom » : empreinte lue avant la topologie, mémorisée après la synchro',
+    $posFp !== false && $posTopo !== false && $posRemember !== false && $posSync !== false
+    && $posFp < $posTopo && $posSync < $posRemember);
 $info = json_decode(file_get_contents($root . '/plugin_info/info.json'), true);
 check('plugin_info/info.json reste un JSON valide', is_array($info) && ($info['id'] ?? null) === 'jeedom2ha');
 

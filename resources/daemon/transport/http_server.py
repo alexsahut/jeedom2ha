@@ -1441,6 +1441,44 @@ async def _republish_all_from_cache_body(app: web.Application, reason: str) -> N
                 )
             await asyncio.sleep(delay)
 
+    await _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason)
+
+
+async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason: str) -> None:
+    """Story 24.14 (revue P2) — republie les boutons de scénario du dernier sync et leur disponibilité.
+
+    Même garde-fou que les équipements : seule la mémoire vive du dernier sync réussi est lue
+    (`app["scenario_publications"]`), et seuls les boutons effectivement publiés sont repris. Sans
+    cela, un broker sans persistance perdait, à son redémarrage, les boutons de scénario et leurs
+    disponibilités retenues jusqu'à la synchro suivante.
+    """
+    entries = [
+        (scenario_id, decision)
+        for scenario_id, decision in sorted((app.get("scenario_publications") or {}).items())
+        if getattr(decision, "discovery_published", False)
+        and getattr(decision, "mapping_result", None) is not None
+    ]
+    if not entries:
+        return
+    delay = max(0.1, 10.0 / len(entries))
+    _LOGGER.info(
+        "[DISCOVERY] Republication des boutons de scénario (reason=%s) : %d, délai=%.2fs",
+        reason, len(entries), delay,
+    )
+    for scenario_id, decision in entries:
+        try:
+            ok = await publisher_registry.publish(decision.mapping_result, topology)
+        except Exception as exc:
+            ok = False
+            _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — %s", scenario_id, exc)
+        if ok:
+            _publish_scenario_availability(
+                mqtt_bridge, scenario_id, bool(getattr(decision, "active_or_alive", False))
+            )
+        else:
+            _LOGGER.error("[DISCOVERY] scenario_id=%d : échec publish — bridge indisponible", scenario_id)
+        await asyncio.sleep(delay)
+
 
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
@@ -2345,6 +2383,10 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     scenario_mapper = ScenarioButtonMapper()
     scenario_publications: Dict[int, PublicationDecision] = {}
     broker_ready = bool(publisher and mqtt_bridge and mqtt_bridge.is_connected)
+    # Story 24.14 (revue P2) — scénarios dont le bouton ou la disponibilité n'a pas été publié :
+    # la synchro le signale (`scenario_availability_complete`) et le cron du plugin ne mémorise
+    # alors pas son empreinte, pour réessayer à l'échéance suivante.
+    scenario_publication_failed_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
@@ -2360,9 +2402,20 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
             ok = await publisher_registry.publish(sc_mapping, snapshot)
             if ok:
                 sc_decision.discovery_published = True
-                _publish_scenario_availability(mqtt_bridge, scenario_id, bool(scenario.is_active))
+                if not _publish_scenario_availability(mqtt_bridge, scenario_id, bool(scenario.is_active)):
+                    scenario_publication_failed_ids.add(scenario_id)
             else:
                 _LOGGER.warning("[SCENARIO] Failed to publish button for scenario_id=%d", scenario_id)
+                scenario_publication_failed_ids.add(scenario_id)
+    # Broker injoignable : aucun bouton ni aucune disponibilité de scénario n'a pu être publié.
+    scenario_availability_complete = not scenario_publication_failed_ids and (
+        broker_ready or not snapshot.scenarios
+    )
+    if scenario_publication_failed_ids:
+        _LOGGER.warning(
+            "[SCENARIO] %d scenario button(s) or availability not published: ids=%s",
+            len(scenario_publication_failed_ids), sorted(scenario_publication_failed_ids),
+        )
     # Scénarios disparus depuis la synchro précédente (M1 fix) : retirés de la mémoire à la fin.
     stale_scenario_ids = set(request.app["scenario_publications"]) - set(scenario_publications)
     for stale_id in sorted(stale_scenario_ids):
@@ -2463,7 +2516,7 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     _has_failures = any(
         _publication_has_technical_failure(d)
         for d in request.app["publications"].values()
-    )
+    ) or bool(scenario_publication_failed_ids)  # Story 24.14 (revue P2)
     _has_deferred = bool(request.app.get("pending_discovery_unpublish") or request.app.get("pending_local_availability_cleanup"))
     _has_successes = any(getattr(d, "active_or_alive", False) for d in request.app["publications"].values())
 
@@ -2491,6 +2544,9 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         "payload": summary,
         "operation_result": _snap_res,
         "operation_message": _SYNC_MESSAGES[_snap_res],
+        # Story 24.14 (revue P2) — faux si un bouton ou une disponibilité de scénario n'a pas été
+        # publié (échec MQTT ou broker injoignable) : le cron du plugin réessaie au pas suivant.
+        "scenario_availability_complete": scenario_availability_complete,
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

@@ -382,9 +382,7 @@ class jeedom2ha extends eqLogic {
         }
 
         log::add(__CLASS__, 'info', '[SYNC] Runtime bootstrap startup sync succeeded');
-        if ($bootFingerprint !== null) {
-          config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $bootFingerprint, __CLASS__);
-        }
+        self::rememberDecisionFingerprintAfterSync($bootFingerprint, $syncResult);
         // Story 12.1 — (ré)enregistre les listeners de streaming d'état sur le périmètre publié.
         try {
           self::syncStateListeners();
@@ -477,8 +475,19 @@ class jeedom2ha extends eqLogic {
     );
   }
 
-  /** Story 24.14 (D2 A) — empreinte courante, ou null si illisible (n'empêche jamais le démarrage). */
-  private static function safeDecisionFingerprint(): ?string {
+  /**
+   * Story 24.14 (revue P2) — après une synchro complète (démarrage, « Relire Jeedom »), mémorise l'empreinte lue
+   * avant la topologie si la synchro a abouti sans bouton ni disponibilité de scénario manquant : la tâche
+   * périodique ne relance alors rien tant que l'état ne change pas.
+   */
+  public static function rememberDecisionFingerprintAfterSync(?string $_fingerprint, $_syncResult): bool {
+    return jeedom2ha_reevaluation_remember_after_sync($_fingerprint, $_syncResult, function (string $fingerprint) {
+      config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+    });
+  }
+
+  /** Story 24.14 (D2 A) — empreinte courante, ou null si illisible (n'empêche jamais le démarrage ni la relecture). */
+  public static function safeDecisionFingerprint(): ?string {
     try {
       return self::readDecisionFingerprint();
     } catch (\Throwable $e) {
