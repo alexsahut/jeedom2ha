@@ -1,0 +1,325 @@
+/* Front v2 — Lot 0 (socle) : composants de la refonte (maquettes.html), chargés après jeedom2ha.css.
+ *
+ * Règle : AUCUNE couleur en dur. On lit seulement les variables de thème déjà posées par jeedom2ha.css
+ * (--j2ha-…, clair et sombre selon <body data-theme>) ou celles du cœur Jeedom, suivies d'un repli --j2ha-….
+ * Les fonds « inversés » (bandeau de résultat, bouton principal) croisent --j2ha-text et --j2ha-menu-bg,
+ * ce qui donne un contraste correct dans les deux thèmes.
+ *
+ * Tous les points de montage du socle sont invisibles tant qu'ils sont vides : la page s'affiche
+ * à l'identique d'avant tant qu'un lot ne les remplit pas.
+ *
+ * Cohabitation : un lot qui a besoin d'une règle de plus l'ajoute EN FIN DE FICHIER, dans un bloc
+ * commenté « Lot N », sans modifier les règles au-dessus. */
+
+/* Variables locales : alias des variables de thème (aucune valeur nouvelle). */
+.j2ha-v2-guide,
+.j2ha-v2-helpline,
+.j2ha-v2-todo,
+.j2ha-v2-legend,
+.j2ha-v2-toast,
+.j2ha-v2-choose,
+.j2ha-v2 {
+  --j2ha-v2-text: var(--txt-color, var(--j2ha-text));
+  --j2ha-v2-muted: var(--j2ha-neutral);
+  --j2ha-v2-line: var(--j2ha-line);
+  --j2ha-v2-card: var(--j2ha-surface);
+  --j2ha-v2-card-strong: var(--j2ha-surface-strong);
+  --j2ha-v2-accent: var(--j2ha-ok);
+  --j2ha-v2-accent-bg: var(--j2ha-ok-bg);
+  --j2ha-v2-on-accent: var(--j2ha-menu-bg);
+  --j2ha-v2-radius: var(--border-radius, 4px);
+}
+
+/* --- Points de montage : invisibles tant qu'ils sont vides --- */
+.j2ha-v2-guide:empty,
+.j2ha-v2-helpline:empty,
+.j2ha-v2-todo:empty,
+.j2ha-v2-legend:empty,
+.j2ha-v2-toast:empty {
+  display: none;
+}
+.j2ha-v2-choose {
+  display: flex;
+  justify-content: flex-end;
+}
+.j2ha-v2-reserved[hidden],
+#bt_j2haChoosePublished[hidden] {
+  display: none !important;
+}
+
+/* --- Phrase d'aide sous la barre d'état --- */
+.j2ha-v2-helpline {
+  font-size: 12.5px;
+  color: var(--j2ha-v2-muted);
+  margin: 2px 5px 6px 5px;
+}
+
+/* --- Étiquettes d'état (mot + teinte, jamais la teinte seule) --- */
+.j2ha-v2-lbl {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.j2ha-v2-lbl.is-ok { background: var(--j2ha-ok-bg); color: var(--j2ha-ok); }
+.j2ha-v2-lbl.is-todo { background: var(--j2ha-todo-bg); color: var(--j2ha-todo); }
+.j2ha-v2-lbl.is-warn { background: var(--j2ha-warn-bg); color: var(--j2ha-warn); }
+.j2ha-v2-lbl.is-off { background: var(--j2ha-neutral-bg); color: var(--j2ha-neutral); }
+.j2ha-v2-lbl.is-tip { background: transparent; color: var(--j2ha-todo); border: 1px solid var(--j2ha-todo); }
+
+.j2ha-v2-muted { color: var(--j2ha-v2-muted); }
+.j2ha-v2-small { font-size: 12.5px; }
+.j2ha-v2-link { color: var(--link-color, var(--j2ha-todo)); text-decoration: underline; cursor: pointer; }
+
+/* Bouton principal (vert) : texte de la couleur du fond de menu, lisible dans les deux thèmes. */
+.j2ha-v2-btn-primary,
+.j2ha-v2-btn-primary:hover,
+.j2ha-v2-btn-primary:focus {
+  background: var(--j2ha-v2-accent);
+  border-color: var(--j2ha-v2-accent);
+  color: var(--j2ha-v2-on-accent);
+  font-weight: 700;
+}
+
+/* --- Démarrage guidé : étapes --- */
+.j2ha-v2-guide {
+  margin: 8px 5px 12px 5px;
+  color: var(--j2ha-v2-text);
+}
+.j2ha-v2-guide-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.j2ha-v2-steps {
+  display: grid;
+  gap: 10px;
+}
+.j2ha-v2-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  background: var(--j2ha-v2-card);
+  border: 1px solid var(--j2ha-v2-line);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 12px;
+}
+.j2ha-v2-step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background: var(--j2ha-neutral-bg);
+  color: var(--j2ha-neutral);
+}
+.j2ha-v2-step.is-done .j2ha-v2-step-num { background: var(--j2ha-ok-bg); color: var(--j2ha-ok); }
+.j2ha-v2-step.is-current { border-color: var(--j2ha-v2-accent); box-shadow: 0 0 0 2px var(--j2ha-v2-accent-bg); }
+.j2ha-v2-step.is-current .j2ha-v2-step-num { background: var(--j2ha-v2-accent); color: var(--j2ha-v2-on-accent); }
+.j2ha-v2-step.is-blocked { border-color: var(--j2ha-warn); }
+.j2ha-v2-step.is-blocked .j2ha-v2-step-num { background: var(--j2ha-warn-bg); color: var(--j2ha-warn); }
+.j2ha-v2-step.is-wait { opacity: 0.6; }
+.j2ha-v2-step-title { font-weight: 700; margin: 0 0 4px; }
+.j2ha-v2-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+/* --- Bloc « À faire » et légende de la page --- */
+.j2ha-v2-todo {
+  margin: 10px 0;
+  background: var(--j2ha-v2-card);
+  border: 1px solid var(--j2ha-v2-line);
+  border-left: 4px solid var(--j2ha-todo);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 10px 12px;
+}
+.j2ha-v2-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--j2ha-v2-line);
+}
+.j2ha-v2-row:first-child { border-top: 0; }
+.j2ha-v2-row .j2ha-v2-grow { flex: 1 1 220px; min-width: 0; }
+.j2ha-v2-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--j2ha-v2-muted);
+  margin: 6px 0 10px;
+}
+
+/* --- Fiche équipement : les deux côtés (Jeedom → Home Assistant) --- */
+.j2ha-v2-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+.j2ha-v2-side {
+  border: 1px solid var(--j2ha-v2-line);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 10px 12px;
+  background: var(--j2ha-v2-card);
+  min-width: 0;
+}
+.j2ha-v2-side h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--j2ha-v2-muted);
+}
+.j2ha-v2-side.is-ha {
+  border-color: var(--j2ha-todo);
+  background: var(--j2ha-todo-bg);
+}
+.j2ha-v2-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--j2ha-v2-muted);
+}
+@media (max-width: 700px) {
+  .j2ha-v2-two { grid-template-columns: minmax(0, 1fr); }
+  .j2ha-v2-arrow { transform: rotate(90deg); }
+}
+
+/* --- Fiche de cause (pourquoi ce n'est pas publié / conseil) --- */
+.j2ha-v2-cause {
+  border: 1px solid var(--j2ha-v2-line);
+  border-left: 4px solid var(--j2ha-warn);
+  background: var(--j2ha-v2-card);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+.j2ha-v2-cause.is-advice { border-left-color: var(--j2ha-todo); }
+.j2ha-v2-cause.is-off { border-left-color: var(--j2ha-neutral); }
+.j2ha-v2-cause-title { font-weight: 700; margin: 0 0 4px; }
+
+/* --- Alertes en ligne --- */
+.j2ha-v2-alert {
+  border-radius: var(--j2ha-v2-radius);
+  padding: 8px 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.j2ha-v2-alert.is-warn { background: var(--j2ha-warn-bg); color: var(--j2ha-warn); }
+.j2ha-v2-alert.is-info { background: var(--j2ha-todo-bg); color: var(--j2ha-todo); }
+
+/* --- Panneau (corriger le type, choisir ce qui est publié) et son pied --- */
+.j2ha-v2-panel {
+  border: 2px solid var(--j2ha-v2-accent);
+  border-radius: var(--j2ha-v2-radius);
+  background: var(--j2ha-v2-card);
+  padding: 14px;
+  color: var(--j2ha-v2-text);
+}
+.j2ha-v2-seg {
+  display: inline-flex;
+  border: 1px solid var(--j2ha-v2-line);
+  border-radius: var(--j2ha-v2-radius);
+  overflow: hidden;
+}
+.j2ha-v2-seg > * {
+  padding: 4px 12px;
+  border: 0;
+  border-left: 1px solid var(--j2ha-v2-line);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+.j2ha-v2-seg > *:first-child { border-left: 0; }
+.j2ha-v2-seg > .is-on { background: var(--j2ha-v2-accent-bg); color: var(--j2ha-v2-accent); font-weight: 700; }
+.j2ha-v2-radio {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 0;
+}
+.j2ha-v2-radio.is-disabled { color: var(--j2ha-neutral); }
+.j2ha-v2-diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 10px 0;
+}
+.j2ha-v2-diff > div {
+  border: 1px dashed var(--j2ha-v2-line);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 8px 10px;
+  min-width: 0;
+}
+.j2ha-v2-diff > .is-after {
+  border: 1px solid var(--j2ha-ok);
+  background: var(--j2ha-ok-bg);
+}
+@media (max-width: 600px) {
+  .j2ha-v2-diff { grid-template-columns: minmax(0, 1fr); }
+}
+.j2ha-v2-changed { background: var(--j2ha-highlight); }
+.j2ha-v2-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 1px solid var(--j2ha-v2-line);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.j2ha-v2-foot .j2ha-v2-grow { flex: 1 1 240px; }
+
+/* --- Arbre à cocher (choisir ce qui est publié) --- */
+.j2ha-v2-tree { font-size: 13.5px; }
+.j2ha-v2-tree-node {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--j2ha-v2-line);
+}
+.j2ha-v2-tree-node.is-l2 { padding-left: 26px; }
+.j2ha-v2-tree-node.is-l3 { padding-left: 52px; }
+
+/* --- Bandeau de résultat (annonce aria-live) --- */
+.j2ha-v2-toast {
+  margin: 8px 5px;
+  background: var(--j2ha-text);
+  color: var(--j2ha-menu-bg);
+  border-radius: var(--j2ha-v2-radius);
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.j2ha-v2-toast .j2ha-v2-link,
+.j2ha-v2-toast button {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* --- Lot 1 et suivants : ajouter les règles ci-dessous, dans un bloc commenté par lot. --- */

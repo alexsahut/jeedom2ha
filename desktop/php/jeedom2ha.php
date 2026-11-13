@@ -93,6 +93,9 @@ sendVarToJS('j2haAncestors', $j2haAncestors);
 sendVarToJS('j2haPluginNames', j2ha_plugin_names($j2haPluginIds, function ($pluginId) {
 	return plugin::byId($pluginId)->getName();
 }));
+// Front v2 (Lot 0) : réglages courants de publication, lus tels quels (consommés par jeedom2ha_exclusions.js).
+sendVarToJS('j2haExcludedPlugins', (string) config::byKey('excludedPlugins', 'jeedom2ha', ''));
+sendVarToJS('j2haConfidencePolicy', (string) config::byKey('confidencePolicy', 'jeedom2ha', 'sure_probable'));
 
 // Story 25.3 (Q9) : lien « Aide » vers la documentation du plugin (API du cœur, repli sur le lien d'info.json).
 $j2haDocUrl = '';
@@ -136,6 +139,10 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 					<strong>{{Dernière opération}}</strong>
 					<span id="span_healthOp" class="label label-default j2ha-health-value">{{...}}</span>
 					<span id="span_healthOpMsg" class="j2ha-health-note"></span>
+				</div>
+				<!-- Front v2 (Lot 0) : état côté Home Assistant, masqué tant que le Lot 1 ne le remplit pas. -->
+				<div id="div_healthHa" class="j2ha-health-item" style="display:none;">
+					<span id="span_healthHa" class="label label-default j2ha-health-value"></span>
 				</div>
 			</div>
 			<div id="div_haActions" class="j2ha-health-actions j2ha-ha-actions">
@@ -185,6 +192,22 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 				</span>
 			</div>
 		</div>
+		<!-- Front v2 (Lot 0) : entrées réservées au menu « ⋯ », masquées et inactives. Le Lot 1 les déplace dans
+		     #j2ha_moreMenu en même temps qu'il réordonne le menu (et met à jour le parcours du gate qui l'énumère). -->
+		<ul id="j2ha_v2_menuReserved" class="j2ha-v2-reserved" hidden>
+			<li role="none">
+				<button type="button" id="bt_j2haCheckInstall" class="j2ha-v2-menu-item" role="menuitem" disabled>
+					<i class="fas fa-stethoscope"></i>{{Vérifier l'installation…}}
+				</button>
+			</li>
+			<li role="none">
+				<button type="button" id="bt_j2haOpenGuide" class="j2ha-v2-menu-item" role="menuitem" disabled>
+					<i class="fas fa-route"></i>{{Guide de démarrage}}
+				</button>
+			</li>
+		</ul>
+		<!-- Front v2 (Lot 0) : phrase d'aide sous la barre d'état (vide = invisible). -->
+		<div id="j2ha_v2_helpline" class="j2ha-v2-helpline"></div>
 		<div id="div_haGatingReason"
 		     class="text-muted j2ha-ha-gating-reason">
 		</div>
@@ -219,8 +242,16 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<!-- Story 16.8 / 25.3 — Surface de mapping HA par pièce (modèle Homebridge : pièce -> équipement -> commande).
 		     Story 25.4 : #j2ha_mainView regroupe titre, bloc maison, liste filtrée et cartes (masqués, non détruits, quand la
 		     vue de travail #j2ha_workView est ouverte) ; la barre de santé reste visible au-dessus. -->
+		<!-- Front v2 (Lot 0) : démarrage guidé (vide = invisible) ; résultat des actions annoncé par #j2ha_v2_toast. -->
+		<div id="j2ha_v2_guide" class="j2ha-v2-guide"></div>
+		<div id="j2ha_v2_toast" class="j2ha-v2-toast" role="status" aria-live="polite"></div>
 		<div id="j2ha_mainView">
 		<legend><i class="fas fa-home"></i> {{Configuration Home Assistant par pièce}}</legend>
+		<div class="j2ha-v2-choose">
+			<button type="button" id="bt_j2haChoosePublished" class="btn btn-default btn-sm" hidden>
+				<i class="fas fa-check-square"></i> {{Choisir ce qui est publié…}}
+			</button>
+		</div>
 		<p class="text-muted j2ha-help-line">{{Choisissez une pièce pour voir ses équipements et ce qui est publié dans Home Assistant.}} <a href="<?php echo j2ha_html($j2haDocUrl); ?>" target="_blank" rel="noopener">{{Aide}}</a></p>
 
 		<!-- Bloc maison : « N publiés sur M », jauge segmentée, puces = filtres globaux (sans requête réseau). -->
@@ -245,6 +276,9 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 			</div>
 			<ul id="j2ha_filterList" class="j2ha-filter-list"></ul>
 		</div>
+		<!-- Front v2 (Lot 0) : bloc « À faire » et légende (vides = invisibles). -->
+		<div id="j2ha_v2_todo" class="j2ha-v2-todo"></div>
+		<div id="j2ha_v2_legend" class="j2ha-v2-legend"></div>
 		<?php
 		if (count($j2haRoomsTree) == 0) {
 			echo '<div class="text-center j2ha-no-rooms">{{Aucune pièce avec équipement trouvée.}}</div>';
@@ -380,12 +414,18 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 
 <!-- Inclusion du fichier CSS du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha', 'css', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_v2', 'css', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha_mapping_override', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_lexique', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_ha_side', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_mapping_surface', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_type_panel', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_action_budget', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_overview', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_workview', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_guide', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_exclusions', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
