@@ -655,7 +655,6 @@ def _reset_secondary_runtime_state(
             previous,
             mapping_result=secondary,
             state_topic=_secondary_own_state_topic(secondary),  # Story 24.17 (D1 A)
-
             discovery_published=discovery_published,
             active_or_alive=active_or_alive,
         )
