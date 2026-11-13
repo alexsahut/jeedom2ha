@@ -237,6 +237,12 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/validation/ha_component_registry.py::\"required_fields\": [\"availability\"],",
   ];
 
+  // Correctif fix/daemon-sync-body-limit (incident de production après 24.15) : l'application aiohttp du démon reçoit une taille
+  // maximale de requête explicite (SYNC_REQUEST_MAX_BYTES), la limite par défaut de 1 Mio refusant la topologie complète.
+  const REPLACED_BY_FIX_SYNC_BODY_LIMIT = [
+    'resources/daemon/transport/http_server.py::app = web.Application()',
+  ];
+
   // Correctif fix/deploy-preserve-python-venv (défaut constaté le 20/10 sur la VM de démo, Jeedom 4.6.1 / Debian 12) : l'étape 1b
   // de deploy-to-box.sh supprimait (rsync --delete) puis passait en 644 `resources/python_venv/`, le venv que le cœur Jeedom crée
   // pour les dépendances pip3 et avec lequel il lance le démon → « python_venv/bin/python3: not found ». Seules ces trois lignes
@@ -281,7 +287,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     const unexpected = removed
       .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
         && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`)
-        && !REPLACED_BY_24_15.includes(`${f}::${line}`))
+        && !REPLACED_BY_24_15.includes(`${f}::${line}`)
+        && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });
