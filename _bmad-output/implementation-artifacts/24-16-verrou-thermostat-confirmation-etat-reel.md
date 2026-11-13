@@ -1,6 +1,6 @@
 # Story 24.16 : Verrou de thermostat confirmé par l'état réel
 
-Status: review
+Status: done
 
 > Correctif court, suite de la recette de 24-15 (13/11/2026). Story rédigée par une session cloud déléguée (2026-11-13), en lecture seule du code (`origin/main` `575dc58`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : identifiants seulement.
 
@@ -102,3 +102,8 @@ Suites : pytest 3246 passés, 1 ignoré ; `flake8 resources/daemon tests` vert ;
 
 - 2026-11-13 — Constat à la recette de 24-15 (ClaudeBox) ; story rédigée par une session cloud déléguée, `ready-for-dev`.
 - 2026-11-13 — Dev-story (session cloud déléguée, TDD) : cause trouvée (décision du secondaire sans `state_topic`), correctif en ajouts seuls, `review` ; reste la preuve terrain AC7.
+
+## Preuves terrain (13/11/2026)
+
+- Déployée en production le 13/11 à 10:12 UTC (180b3ab, après #380) : 0 changement de décision, 403 topics identiques avant/après, ERROR=0, 125 disponibilités de scénario et 7 états de thermostat vérifiés (0 écart).
+- AC7, eq 219, 10:32 UTC, depuis HA : verrouiller → cmd 1784, `reason_code=real_state_confirmation`, état publié par le streaming ; déverrouiller → cmd 1785, `real_state_confirmation`. Ce matin les mêmes ordres journalisaient `optimistic_controlled`. État initial restauré (verrou ouvert).

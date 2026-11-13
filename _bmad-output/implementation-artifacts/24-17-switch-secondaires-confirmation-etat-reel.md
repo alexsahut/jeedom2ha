@@ -1,6 +1,6 @@
 # Story 24.17 : Interrupteurs secondaires confirmés par l'état réel
 
-Status: draft
+Status: ready-for-dev
 
 > Suite de 24-16 (point ouvert « défaut plus large, hors périmètre »). Rédaction validée par Alexandre le 13/11/2026. Story rédigée par une session cloud déléguée (2026-11-13), documentaire, en lecture seule du code (`origin/main` `180b3ab`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : identifiants seulement, ceux du corpus doré. **Draft** : la décision D1 (et le sous-point D2) revient à Alexandre avant `ready-for-dev`.
 
@@ -70,6 +70,12 @@ Aucun message n'est publié sur MQTT par le synchroniseur d'ordres. Le corpus do
 - **Pour un secondaire dont l'état est streamé (les 5 cas du corpus)**, HA affiche **déjà** l'état réel : la discovery déclare le topic propre, sans `optimistic` (F8), le synchroniseur d'état y publie l'état Jeedom (F7), et aucun état supposé n'est publié faute de topic dans la décision (F6). Ce qui est faux aujourd'hui, c'est la **politique annoncée** (`optimistic_controlled`) et le WARNING `missing_state_topic_runtime` à chaque ordre. Après correction, le journal dit `real_state_confirmation` et le WARNING disparaît. L'état affiché dans HA ne change pas ; seul le comportement du démon est rendu cohérent avec le principal.
 - **Pour un secondaire sans état fiable** (trio `FAN_*`, F10 ; `light` obtenu par surcharge), l'effet dépend de l'option : voir les risques de D1 et le sous-point D2.
 - **Pour `valve` et `lock` secondaires**, la politique passe de `stateless` à `real_state_confirmation`. Aucun effet dans HA : `stateless` ne publie rien, et `real_state_confirmation` non plus.
+
+## Décisions d'Alexandre (13/11/2026, 12:01)
+
+- **D1 : A** — correction à la source (topic d'état propre posé sur les décisions secondaires, tous les chemins).
+- **D2 : oui (D2-a)** — `FAN_STATE` ajouté aux canaux d'état fiables du `switch` dans cette story.
+- Les AC rédigés pour A et D2-a s'appliquent tels quels. Task 0 (lecture seule) à ClaudeBox avant la preuve terrain.
 
 ## Décision D1 (Alexandre) — où corriger
 
@@ -164,3 +170,4 @@ Peu pertinente pour cette story. Homebridge n'a pas de notion de « politique de
 ## Journal
 
 - 2026-11-13 — Story rédigée (session cloud déléguée, documentaire, `180b3ab`) : 5 `switch` secondaires concernés dans le corpus doré (583 : 2, 628 : 3) ; types secondaires actionnables relevés dans le code (`switch` `SWITCH_*` / `FAN_*`, verrou de thermostat, `valve`, `lock` ; `light` / `cover` seulement par surcharge) ; effet HA : aucun changement d'affichage pour un état streamé, la politique et le WARNING `missing_state_topic_runtime` étaient faux ; D1 (A à la source, recommandée / B dans la politique) et D2 (`FAN_STATE` fiable) à Alexandre ; Task 0 ClaudeBox en lecture seule.
+- 2026-11-13 — Décisions d'Alexandre 12:01 : D1 A, D2 oui (D2-a) ; story passée en ready-for-dev.
