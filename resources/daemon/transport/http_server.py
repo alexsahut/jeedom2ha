@@ -1549,6 +1549,49 @@ async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, 
         await asyncio.sleep(delay)
 
 
+def _present_discovery_entries_by_eq(app) -> Dict[int, set]:
+    """Front v2 Lot 3 — topics de découverte encore dans HA, par équipement (lecture seule).
+
+    Équipement retenu : `_is_currently_published_in_ha` (même prédicat que
+    `sync_status.published_in_ha`, dépublication différée comprise). Topics : ceux des candidats
+    publiés (`_candidate_topic_entries`, principal publié ou vivant comme dans
+    `_previous_present_cmd_ids`) unis à ceux en attente de dépublication
+    (`_pending_unpublish_parts`, ce que rejouera `_replay_deferred_discovery_unpublish`).
+    """
+    publications = app.get("publications") or {}
+    pending = app.get("pending_discovery_unpublish") or {}
+    present: Dict[int, set] = {}
+    for eq_id in set(publications) | set(pending):
+        decision = publications.get(eq_id)
+        if not _is_currently_published_in_ha(eq_id, decision, pending):
+            continue
+        entries: set = set()
+        mapping = getattr(decision, "mapping_result", None)
+        if mapping is not None:
+            for candidate in [mapping, *(mapping.additional_mappings or [])]:
+                if candidate is mapping:
+                    alive = bool(
+                        getattr(decision, "discovery_published", False)
+                        or getattr(decision, "active_or_alive", False)
+                    )
+                else:
+                    ref = getattr(candidate, "publication_decision_ref", None)
+                    alive = bool(getattr(ref, "discovery_published", False))
+                if alive:
+                    entries.update(_candidate_topic_entries(mapping, candidate))
+        if eq_id in pending:
+            entity_type, node_ids = _pending_unpublish_parts(pending[eq_id])
+            if not node_ids:
+                entries.add((entity_type, f"jeedom2ha_{eq_id}"))
+            for entry in node_ids:
+                if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                    entries.add((str(entry[0]), str(entry[1])))
+                else:
+                    entries.add((entity_type, str(entry)))
+        present[eq_id] = entries
+    return present
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -1588,7 +1631,7 @@ async def _handle_system_status(request: web.Request) -> web.Response:
             # Front v2 Lot 3 (additif) : birth de HA et dénombrement de ce qui est publié.
             "ha": ha_side.ha_status(request.app.get("ha_birth_seen_at")),
             "publication": ha_side.publication_counts(
-                request.app.get("publications"), request.app.get("scenario_publications"),
+                _present_discovery_entries_by_eq(request.app), request.app.get("scenario_publications"),
             ),
         },
         "request_id": str(uuid.uuid4()),

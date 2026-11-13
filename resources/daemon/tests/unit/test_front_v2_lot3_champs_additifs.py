@@ -89,6 +89,55 @@ async def test_status_porte_ha_et_publication(synced):
         assert key in payload
 
 
+async def _published_in_ha_count(cli, app):
+    count = 0
+    for eq_id in sorted(app["topology"].eq_logics):
+        if (await _tree(cli, eq_id))["sync_status"]["published_in_ha"]:
+            count += 1
+    return count
+
+
+async def test_status_publication_coherent_avec_published_in_ha(synced):
+    app, _bridge, cli = synced
+    assert (await _status(cli))["publication"]["equipments_published"] == await _published_in_ha_count(cli, app)
+
+
+async def test_status_publication_depublication_differee(synced):
+    """Revue PR #389 (P2) : un équipement exclu pendant une coupure MQTT reste dans HA tant que sa
+    dépublication est en attente ; les compteurs suivent `sync_status.published_in_ha`, sans double compte."""
+    app, _bridge, cli = synced
+    before = (await _status(cli))["publication"]
+
+    # Lumière mono-entité exclue, dépublication différée (forme de test_story_20_3 `test_depublication_en_attente`).
+    excluded = app["publications"][1005]
+    excluded.should_publish = False
+    excluded.discovery_published = False
+    excluded.active_or_alive = False
+    app["pending_discovery_unpublish"] = {1005: "light"}
+    assert (await _tree(cli, 1005))["sync_status"]["published_in_ha"] is True
+    assert (await _status(cli))["publication"] == before
+
+    # Multi-entités encore publié ET en attente sur les mêmes topics : aucun double compte.
+    app["pending_discovery_unpublish"][457] = {
+        "entity_type": "light",
+        "node_ids": [("light", "jeedom2ha_457"), ("sensor", "jeedom2ha_457_45705"), ("sensor", "jeedom2ha_457_45706")],
+    }
+    assert (await _status(cli))["publication"] == before
+
+    # Équipement absent de la mémoire de publication mais en attente : compté une fois.
+    app["pending_discovery_unpublish"][MULTIPRISE_ID + 100] = {"entity_type": "switch", "node_ids": []}
+    after = (await _status(cli))["publication"]
+    assert after["equipments_published"] == before["equipments_published"] + 1
+    assert after["entities_published"] == before["entities_published"] + 1
+
+    # Dépublication rejouée : l'équipement exclu sort des compteurs.
+    app["pending_discovery_unpublish"] = {}
+    after = (await _status(cli))["publication"]
+    assert after["equipments_published"] == before["equipments_published"] - 1
+    assert after["entities_published"] == before["entities_published"] - 1
+    assert after["equipments_published"] == await _published_in_ha_count(cli, app)
+
+
 async def test_status_avant_tout_sync(aiohttp_client):
     cli = await aiohttp_client(create_app(local_secret=SECRET))
     payload = await _status(cli)

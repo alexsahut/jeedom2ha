@@ -327,20 +327,17 @@ def _published(decision) -> bool:
     return bool(getattr(decision, "discovery_published", False))
 
 
-def publication_counts(publications: Optional[dict], scenario_publications: Optional[dict]) -> Dict[str, int]:
-    """Dénombrement de ce qui est publié dans HA d'après la mémoire vive du démon.
+def publication_counts(present_entries_by_eq: Dict[int, set], scenario_publications: Optional[dict]) -> Dict[str, int]:
+    """Dénombrement de ce qui est dans HA d'après la mémoire vive du démon.
 
-    Équipement publié : son entité principale ou au moins une secondaire est publiée.
+    ``present_entries_by_eq`` : pour chaque équipement présent dans HA (même prédicat que
+    ``sync_status.published_in_ha``, dépublication différée comprise), l'ensemble des topics de
+    découverte ``(type, node_id)`` encore présents — calculé par l'appelant avec les helpers de
+    publication existants. Un ensemble évite tout double compte (entité publiée ET en attente de
+    dépublication). Un équipement présent compte au moins une entité.
     """
-    equipments = entities = 0
-    for decision in (publications or {}).values():
-        count = 1 if _published(decision) else 0
-        mapping = getattr(decision, "mapping_result", None)
-        for secondary in getattr(mapping, "additional_mappings", None) or []:
-            if _published(getattr(secondary, "publication_decision_ref", None)):
-                count += 1
-        entities += count
-        equipments += 1 if count else 0
+    equipments = len(present_entries_by_eq)
+    entities = sum(max(1, len(entries)) for entries in present_entries_by_eq.values())
     scenarios = sum(1 for decision in (scenario_publications or {}).values() if _published(decision))
     return {
         "equipments_published": equipments,
