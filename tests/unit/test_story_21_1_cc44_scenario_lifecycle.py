@@ -4,6 +4,11 @@ Couvre AC 1 à 6 bis : retrait d'un scénario inactif, réactivation, purge « l
 broker fait foi » (topics retenus) avec garde-fous, absence de report via
 ``pending_discovery_unpublish`` (clé ``eq_id``), disponibilité/appareil du bouton
 en pont seul. Identifiants numériques uniquement (CC-48).
+
+Story 24.14 (décision D1 A d'Alexandre) : la règle « un scénario inactif n'a plus de bouton »
+(21-1 Q2 A) est remplacée par « bouton toujours publié, grisé si inactif » ; les tests du retrait
+d'un inactif et de la disponibilité « pont seul » sont réécrits en conséquence. La purge « le
+broker fait foi » et tous ses garde-fous restent testés tels quels (seuls les supprimés partent).
 """
 
 from __future__ import annotations
@@ -24,6 +29,11 @@ SECRET = "test_secret"
 
 def _topic(sc_id) -> str:
     return f"homeassistant/button/jeedom2ha_scenario_{sc_id}/config"
+
+
+def _avail(sc_id) -> str:
+    """Story 24.14 (D1 A) — disponibilité retenue propre au bouton d'un scénario."""
+    return f"jeedom2ha/scenario_{sc_id}/availability"
 
 
 def _fake_bridge(connected=True, retained=None):
@@ -78,14 +88,21 @@ def _empties(bridge):
 
 
 def _configs(bridge):
-    return {t: json.loads(p) for (t, p, q, r) in bridge.published if p}
+    return {t: json.loads(p) for (t, p, q, r) in bridge.published if p and t.endswith("/config")}
+
+
+def _availability(bridge, sc_id):
+    """Dernière disponibilité retenue publiée pour un scénario (None si aucune)."""
+    values = [p for (t, p, q, r) in bridge.published if t == _avail(sc_id) and r is True]
+    return values[-1] if values else None
 
 
 # ---------------------------------------------------------------------------
-# AC 1 / AC 2 — inactif dépublié, actif publié, réactivation
+# AC 1 / AC 2 — Story 24.14 (D1 A) : un scénario inactif garde son bouton, grisé
+# (remplace la règle 21-1 Q2 A « un inactif n'a plus de bouton dans HA »).
 # ---------------------------------------------------------------------------
 
-async def test_inactive_scenario_is_unpublished_active_is_published(aiohttp_client):
+async def test_inactive_scenario_keeps_its_button_greyed_active_is_online(aiohttp_client):
     bridge = _fake_bridge(retained=[])
     app, cli = await _client(aiohttp_client, bridge)
 
@@ -94,32 +111,37 @@ async def test_inactive_scenario_is_unpublished_active_is_published(aiohttp_clie
         {"id": 72, "name": "S72", "is_active": False},
     ])
 
-    assert _topic(72) in _empties(bridge)
-    assert _topic(20) not in _empties(bridge)
+    assert _empties(bridge) == []
     assert _topic(20) in _configs(bridge)
-    assert _topic(72) not in _configs(bridge)
-    # Un inactif n'est pas enregistré comme bouton actif (appui rejeté).
-    assert 20 in app["scenario_publications"]
-    assert 72 not in app["scenario_publications"]
+    assert _topic(72) in _configs(bridge)
+    assert _availability(bridge, 20) == "online"
+    assert _availability(bridge, 72) == "offline"
+    # Les deux sont mémorisés ; l'inactif est marqué pour le refus d'appui (scenario_inactive).
+    assert app["scenario_publications"][20].active_or_alive is True
+    assert app["scenario_publications"][72].active_or_alive is False
 
 
-async def test_reactivated_scenario_is_republished_same_identity(aiohttp_client):
+async def test_toggled_scenario_never_empties_its_config_and_keeps_its_identity(aiohttp_client):
     bridge = _fake_bridge(retained=[])
     app, cli = await _client(aiohttp_client, bridge)
 
     await _sync(cli, scenarios=[{"id": 72, "name": "S72", "is_active": True}])
     first = _configs(bridge)[_topic(72)]
+    assert _availability(bridge, 72) == "online"
     await _sync(cli, scenarios=[{"id": 72, "name": "S72", "is_active": False}])
-    assert _topic(72) in _empties(bridge)
-    assert 72 not in app["scenario_publications"]
+    assert _topic(72) not in _empties(bridge)
+    assert _availability(bridge, 72) == "offline"
+    assert _configs(bridge)[_topic(72)] == first
 
     bridge.published.clear()
     await _sync(cli, scenarios=[{"id": 72, "name": "S72", "is_active": True}])
     again = _configs(bridge)[_topic(72)]
-    assert again["unique_id"] == first["unique_id"] == "jeedom2ha_scenario_72"
-    assert again["command_topic"] == first["command_topic"] == "jeedom2ha/scenario_72/cmd"
-    assert 72 in app["scenario_publications"]
-    assert _topic(72) not in _empties(bridge)
+    assert again == first
+    assert again["unique_id"] == "jeedom2ha_scenario_72"
+    assert again["default_entity_id"] == "button.jeedom2ha_scenario_72"
+    assert again["command_topic"] == "jeedom2ha/scenario_72/cmd"
+    assert _availability(bridge, 72) == "online"
+    assert _empties(bridge) == []
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +149,7 @@ async def test_reactivated_scenario_is_republished_same_identity(aiohttp_client)
 # ---------------------------------------------------------------------------
 
 async def test_broker_ghosts_are_purged_active_kept(aiohttp_client):
-    # 72 inactif (snapshot), 129 et 32 inconnus du snapshot, 20 actif.
+    # 72 inactif (snapshot), 129 et 32 inconnus du snapshot (supprimés), 20 actif.
     bridge = _fake_bridge(retained=[_topic(20), _topic(72), _topic(129), _topic(32)])
     app, cli = await _client(aiohttp_client, bridge)
 
@@ -137,10 +159,10 @@ async def test_broker_ghosts_are_purged_active_kept(aiohttp_client):
     ])
 
     empties = _empties(bridge)
-    assert _topic(129) in empties and _topic(32) in empties and _topic(72) in empties
-    assert _topic(20) not in empties
-    # Chaque topic est vidé une seule fois (72 : boucle + purge ne doublonnent pas).
-    assert len(empties) == len(set(empties)) == 3
+    # Story 24.14 (D1 A) : seuls les supprimés sont retirés, avec leur disponibilité retenue.
+    assert sorted(empties) == sorted([_topic(129), _avail(129), _topic(32), _avail(32)])
+    assert _topic(20) not in empties and _topic(72) not in empties
+    assert len(empties) == len(set(empties)) == 4
     bridge.collect_retained_topics.assert_awaited_once()
 
 
@@ -162,7 +184,7 @@ async def test_purge_never_touches_topics_outside_strict_pattern(aiohttp_client)
 
     await _sync(cli, scenarios=[{"id": 20, "name": "S20", "is_active": True}])
 
-    assert _empties(bridge) == [_topic(129)]
+    assert _empties(bridge) == [_topic(129), _avail(129)]
 
 
 @pytest.mark.parametrize("retained", [None, [], "garbage"])
@@ -247,7 +269,7 @@ async def test_present_but_empty_scenarios_section_purges_ghosts(aiohttp_client)
 
     await _sync(cli, scenarios=[])
 
-    assert _empties(bridge) == [_topic(129)]
+    assert _empties(bridge) == [_topic(129), _avail(129)]
 
 
 async def test_active_scenario_whose_publication_fails_is_never_purged(aiohttp_client):
@@ -263,8 +285,9 @@ async def test_active_scenario_whose_publication_fails_is_never_purged(aiohttp_c
     await _sync(cli, scenarios=[{"id": 20, "name": "S20", "is_active": True}])
 
     assert _topic(20) not in _empties(bridge)
-    assert _empties(bridge) == [_topic(129)]
+    assert _empties(bridge) == [_topic(129), _avail(129)]
     assert app["scenario_publications"][20].discovery_published is False
+    assert _availability(bridge, 20) is None  # pas de disponibilité sans configuration publiée
 
 
 async def test_logs_report_collected_count_and_emptied_ids_only(aiohttp_client, caplog):
@@ -286,7 +309,8 @@ async def test_logs_report_collected_count_and_emptied_ids_only(aiohttp_client, 
         if "[SCENARIO]" in r.getMessage() or "Unpublishing" in r.getMessage()
     )
     assert "Retained button topics collected: 4 (3 scenario button(s))" in text
-    assert "ids=[72, 129]" in text
+    # Story 24.14 (D1 A) : 72 (inactif) n'est plus retiré, seul le supprimé 129 l'est.
+    assert "Unpublished 1 deleted scenario button(s) from broker: ids=[129]" in text
     assert "NomReelSecret" not in text and "AutreNomReel" not in text
 
 
@@ -328,12 +352,16 @@ async def test_scenario_unpublish_does_not_touch_equipment_with_same_id(aiohttp_
     sentinel = {"entity_type": "light", "node_ids": []}
     app["pending_discovery_unpublish"][10] = sentinel
 
-    await _sync(cli, scenarios=[{"id": 10, "name": "S10", "is_active": False}])
+    # Story 24.14 (D1 A) : seul un scénario supprimé est retiré ; le scénario 10 n'existe plus.
+    await _sync(cli, scenarios=[{"id": 11, "name": "S11", "is_active": False}])
 
     empties = _empties(bridge)
     # Chacun suit son propre chemin : le report de l'équipement 10 est rejoué comme
-    # avant (topic light), le scénario 10 est vidé une seule fois (topic button).
+    # avant (topic light), le scénario 10 est vidé une seule fois (topic button) avec sa
+    # disponibilité propre, jamais celle de l'équipement 10.
     assert empties.count(_topic(10)) == 1
+    assert empties.count(_avail(10)) == 1
+    assert "jeedom2ha/10/availability" not in empties
     assert "homeassistant/light/jeedom2ha_10/config" in empties
     assert 10 not in app["pending_discovery_unpublish"]
 
@@ -350,12 +378,14 @@ async def test_press_accepted_for_active_rejected_for_inactive(aiohttp_client):
         {"id": 72, "name": "S72", "is_active": False},
     ])
     pubs = app["scenario_publications"]
-    assert pubs[20].should_publish is True
-    assert 72 not in pubs  # → `_handle_scenario_command` rejette (unknown_runtime_entity)
+    assert pubs[20].should_publish is True and pubs[20].active_or_alive is True
+    # Story 24.14 (D1 A) : 72 garde son bouton ; `_handle_scenario_command` rejette (scenario_inactive).
+    assert pubs[72].should_publish is True and pubs[72].active_or_alive is False
 
 
 # ---------------------------------------------------------------------------
-# AC 6 bis — disponibilité et appareil : pont seul
+# AC 6 bis — disponibilité et appareil : jamais ceux d'un équipement homonyme
+# (Story 24.14, D1 A : pont + disponibilité propre au scénario, `availability_mode: all`)
 # ---------------------------------------------------------------------------
 
 def _snapshot(with_homonym: bool) -> TopologySnapshot:
@@ -385,8 +415,12 @@ def test_scenario_button_ignores_homonym_equipment_availability_and_device():
 
     assert "jeedom2ha/110/availability" not in text
     assert "zigbee" not in text
-    assert with_eq["availability_topic"] == "jeedom2ha/bridge/status"
-    assert "availability" not in with_eq  # aucune entrée locale
+    assert "availability_topic" not in with_eq
+    assert with_eq["availability"] == [
+        {"topic": "jeedom2ha/bridge/status"},
+        {"topic": "jeedom2ha/scenario_110/availability"},
+    ]
+    assert with_eq["availability_mode"] == "all"
     assert with_eq["device"]["manufacturer"] == "Jeedom"
     assert with_eq["device"]["model"] == "Unknown"
     assert with_eq["device"]["identifiers"] == ["jeedom2ha_scenario_110"]
@@ -394,11 +428,19 @@ def test_scenario_button_ignores_homonym_equipment_availability_and_device():
 
 # Charge utile d'un bouton de scénario sans équipement homonyme, figée AVANT cette PR
 # (générée depuis `main` 078416a) : elle ne doit pas bouger, hors cas de collision d'id.
+# Story 24.14 (D1 A) : seul changement admis, la disponibilité du pont seul devient la liste
+# pont + disponibilité propre au scénario (`availability_mode: all`).
 def _frozen_pre_pr_scenario_button_payload() -> dict:
     from discovery.publisher import _SW_VERSION
 
     return {
-        "availability_topic": "jeedom2ha/bridge/status",
+        "availability": [
+            {"topic": "jeedom2ha/bridge/status"},
+            {"topic": "jeedom2ha/scenario_110/availability"},
+        ],
+        "availability_mode": "all",
+        "payload_available": "online",
+        "payload_not_available": "offline",
         "command_topic": "jeedom2ha/scenario_110/cmd",
         # Story 22.1 (Q7 B) : seul champ additif réaligné, avec device.name des équipements.
         "default_entity_id": "button.jeedom2ha_scenario_110",

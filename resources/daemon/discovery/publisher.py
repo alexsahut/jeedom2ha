@@ -17,9 +17,10 @@ from models.availability import (
     AVAILABILITY_OFFLINE,
     AVAILABILITY_ONLINE,
     BRIDGE_AVAILABILITY_TOPIC,
-    EntityAvailability,
     availability_from_snapshot,
     build_discovery_availability_fields,
+    build_scenario_availability_topic,
+    scenario_entity_availability,
 )
 from models.mapping import MappingResult
 from models.topology import TopologySnapshot
@@ -364,6 +365,8 @@ class DiscoveryPublisher:
             topic = self._build_topic(0, entity_type="button", node_id=ha_unique_id)
             _LOGGER.info("[DISCOVERY] Unpublishing scenario: topic=%s", topic)
             ok = self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True)
+            # Story 24.14 (D1 A) — vider aussi la disponibilité retenue du scénario (aucun orphelin).
+            ok = self._clear_scenario_availability(ha_unique_id) and ok
             if not ok:
                 _LOGGER.error("[DISCOVERY] Failed to unpublish scenario %s (bridge unavailable)", ha_unique_id)
             return ok
@@ -430,7 +433,14 @@ class DiscoveryPublisher:
         empty those whose id is not an active scenario of the snapshot. Nothing outside that
         pattern is ever touched, and only what was actually read is emptied.
         Returns the sorted ids emptied (empty when the collection is unavailable, empty or fails).
+
+        Story 24.14 (D1 A): the caller passes every readable scenario id (active or not) as
+        ``active_scenario_ids``, so only the buttons of scenarios deleted from Jeedom are
+        emptied, together with their retained availability topic.
         """
+        # Revue P2 (4e passe) — vrai seulement si la collecte a pu se faire et que chaque vidage a
+        # réussi ; lu par la synchro, qui ne valide alors pas l'empreinte (nouvel essai au pas suivant).
+        self.scenario_purge_complete = True
         collect = getattr(self._mqtt_bridge, "collect_retained_topics", None)
         if collect is None:
             return []
@@ -440,9 +450,11 @@ class DiscoveryPublisher:
             retained = await collect(f"{self._topic_prefix}/button/+/config")
         except Exception:
             _LOGGER.exception("[SCENARIO] Retained topics collection failed, no purge")
+            self.scenario_purge_complete = False
             return []
         if not isinstance(retained, list):
             _LOGGER.info("[SCENARIO] Retained topics collection unavailable, no purge")
+            self.scenario_purge_complete = False
             return []
         pattern = re.compile(
             rf"{re.escape(self._topic_prefix)}/button/(jeedom2ha_scenario_([0-9]+))/config"
@@ -463,7 +475,22 @@ class DiscoveryPublisher:
                 continue
             if await self.unpublish(node_id):
                 purged.append(scenario_id)
+            else:
+                self.scenario_purge_complete = False
         return sorted(set(purged))
+
+    def _clear_scenario_availability(self, ha_unique_id: str) -> bool:
+        """Story 24.14 (D1 A) — vide le topic retenu de disponibilité d'un scénario retiré."""
+        try:
+            scenario_id = int(ha_unique_id[len("jeedom2ha_scenario_"):])
+        except ValueError:
+            return True  # aucun topic de disponibilité dérivable : rien à vider
+        topic = build_scenario_availability_topic(scenario_id)
+        return bool(self._mqtt_bridge.publish_message(topic, "", qos=1, retain=True))
+
+    def scenario_availability_topic(self, scenario_id: int) -> str:
+        """Story 24.14 (D1 A) — topic retenu de disponibilité du bouton d'un scénario."""
+        return build_scenario_availability_topic(scenario_id)
 
     def bridge_topic(self) -> str:
         """Story 22.4 — topic de découverte de l'entité « État du pont »."""
@@ -606,8 +633,10 @@ class DiscoveryPublisher:
     def _build_availability_fields(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build availability payload fields (bridge-only or bridge+local)."""
         if (mapping.reason_details or {}).get("source_kind") == "scenario":
-            # Story 21.1 (C8) — pont seul : jamais la disponibilité d'un eqLogic homonyme.
-            return build_discovery_availability_fields(EntityAvailability())
+            # Story 21.1 (C8) — jamais la disponibilité d'un eqLogic homonyme.
+            # Story 24.14 (D1 A) — pont + disponibilité propre au scénario (topic `scenario_<id>`),
+            # `availability_mode: all` : le bouton d'un scénario inactif est grisé, jamais retiré.
+            return build_discovery_availability_fields(scenario_entity_availability(mapping.jeedom_eq_id, True))
         entity_availability = availability_from_snapshot(mapping.jeedom_eq_id, snapshot)
         return build_discovery_availability_fields(entity_availability)
 

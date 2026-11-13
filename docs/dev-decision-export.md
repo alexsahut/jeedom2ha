@@ -26,6 +26,7 @@ Documentation de développement (interne). L'export rend lisible, sans SSH, **ce
   "schema_version": 1,
   "generated_at": "2026-10-20T10:00:00Z",
   "sync_at": "2026-10-20T09:58:11Z",
+  "sync_origin": "service",
   "producer": { "plugin_version": "x.y.z", "confidence_policy": "sure_probable" },
   "config": { "excluded_plugins": ["<plugin>"], "excluded_piece_ids": [12] },
   "totals": { "equipments": 0, "commands": 0, "scenarios": 0 },
@@ -63,6 +64,7 @@ Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `nu
 |---|---|
 | `generated_at` | Instant de génération du document (UTC). Seule valeur qui change entre deux exports du même état. Horodatage **en tête seulement**, pas par ligne. |
 | `sync_at` | Instant de fin du dernier sync complet dont les décisions sont mémorisées (`null` seulement si le document est lu pendant le tout premier sync). |
+| `sync_origin` | Origine de la synchro qui a produit les décisions (story 24.14, champ additif) : `boot` (démarrage du démon), `rescan` (« Relire Jeedom »), `service` (réévaluation périodique du plugin quand l'état Jeedom qui pilote les décisions a changé). `null` avant le premier sync. Indique sur quelle lecture de Jeedom repose chaque raison. |
 | `producer` | `plugin_version` (lue dans `plugin_info/info.json`, `"inconnu"` si illisible) et `confidence_policy` appliquée au dernier sync. |
 | `config` | Réglages de filtrage du dernier sync, **identifiants seulement** : `excluded_plugins` (identifiants de plugins, triés) et `excluded_piece_ids` (identifiants de `excludedObjects`, triés). Vides si le payload du sync ne les porte pas. |
 | `totals` | Nombre d'équipements, de commandes (toutes) et de scénarios du document. |
@@ -110,9 +112,9 @@ Les clés sont toujours présentes (jamais omises) ; une valeur inconnue est `nu
 
 `equipments` et `scenarios` sont les deux seuls tableaux de premier niveau.
 
-Tous les scénarios, actifs et inactifs. `kind` `"scenario"`, `key` `"scenario:<scenario_id>"`, `scenario_id`, `active`. `entity` : le bouton HA du scénario (mêmes champs qu'une entité, sans `role`, `state_source` toujours `none`), décrit même pour un scénario inactif. `decision` `published` et `reason` `scenario_button` pour un scénario actif ; `not_published` et `scenario_inactive` pour un inactif (aucun bouton dans HA). `homekit_exposed` vient de la story 24.1.
+Tous les scénarios, actifs et inactifs. `kind` `"scenario"`, `key` `"scenario:<scenario_id>"`, `scenario_id`, `active`. `entity` : le bouton HA du scénario (mêmes champs qu'une entité, sans `role`, `state_source` toujours `none`), décrit même pour un scénario inactif. Depuis la story 24.14 (décision D1 A), `decision` vaut toujours `published` et `reason` toujours `scenario_button` : tout scénario lisible a son bouton dans HA, actif ou non. `active` reflète `isActive` lu à la dernière synchro et porte la **disponibilité** du bouton (grisé, « indisponible » dans HA, quand le scénario est inactif) ; `entity.discovery_published` reflète la publication effective de la configuration. Avant 24.14, un scénario inactif donnait `not_published` / `scenario_inactive` : le champ ne change pas de sens (il dit toujours si le bouton est publié), seule la règle de publication a changé, d'où `schema_version` maintenu à `1`. `scenario_inactive` reste le `reason_code` d'un appui refusé sur un scénario inactif (journal `[SYNC-CMD]`), plus une raison d'export. `homekit_exposed` vient de la story 24.1.
 
-**Scénarios « non projetés » : un artefact de mesure (story 24.5).** Avant 24.2, la mesure de parité HomeKit comptait comme non projetés les scénarios déclenchés à la voix dans Apple Maison. Cet écart venait de l'outil de mesure, pas du plugin : il ne lisait pas les boutons de scénario. Ces scénarios restaient en plus hors du contrat de décision. Un scénario **actif** est toujours projeté en `button` (`jeedom2ha_scenario_<id>`). Pour comparer avec Home Assistant, on joint sur `kind` + `key` (`scenario:<id>`) ou sur `unique_id`, jamais sur le nom. L'exposition d'un de ces boutons à Assist se règle dans Home Assistant : le plugin n'y touche pas.
+**Scénarios « non projetés » : un artefact de mesure (story 24.5).** Avant 24.2, la mesure de parité HomeKit comptait comme non projetés les scénarios déclenchés à la voix dans Apple Maison. Cet écart venait de l'outil de mesure, pas du plugin : il ne lisait pas les boutons de scénario. Ces scénarios restaient en plus hors du contrat de décision. Un scénario lisible est toujours projeté en `button` (`jeedom2ha_scenario_<id>`) ; depuis 24.14, un scénario inactif l'est aussi, bouton indisponible. Pour comparer avec Home Assistant, on joint sur `kind` + `key` (`scenario:<id>`) ou sur `unique_id`, jamais sur le nom. L'exposition d'un de ces boutons à Assist se règle dans Home Assistant : le plugin n'y touche pas.
 
 ### Ventilateurs et aspirateurs : équivalents fonctionnels (story 24.6)
 

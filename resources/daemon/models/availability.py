@@ -12,6 +12,10 @@ AVAILABILITY_UNKNOWN = "unknown"
 BRIDGE_AVAILABILITY_TOPIC = "jeedom2ha/bridge/status"
 LOCAL_AVAILABILITY_TOPIC_TEMPLATE = "jeedom2ha/{eq_id}/availability"
 AVAILABILITY_MODE_ALL = "all"
+# Story 24.14 (D1 A) — disponibilité propre à un bouton de scénario : `online` si le scénario est
+# actif, `offline` sinon. Espace de noms `scenario_<id>` (comme le command_topic du bouton), jamais
+# celui d'un équipement de même id (garde 21-1 C8).
+SCENARIO_AVAILABILITY_TOPIC_TEMPLATE = "jeedom2ha/scenario_{scenario_id}/availability"
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,26 @@ class EntityAvailability:
 def build_local_availability_topic(eq_id: int) -> str:
     """Build the frozen local availability topic contract for one eqLogic."""
     return LOCAL_AVAILABILITY_TOPIC_TEMPLATE.format(eq_id=int(eq_id))
+
+
+def build_scenario_availability_topic(scenario_id: int) -> str:
+    """Story 24.14 (D1 A) — topic retenu de disponibilité d'un bouton de scénario."""
+    return SCENARIO_AVAILABILITY_TOPIC_TEMPLATE.format(scenario_id=int(scenario_id))
+
+
+def scenario_availability_state(is_active: bool) -> str:
+    """Story 24.14 (D1 A) — `online` pour un scénario actif, `offline` sinon."""
+    return AVAILABILITY_ONLINE if is_active else AVAILABILITY_OFFLINE
+
+
+def scenario_entity_availability(scenario_id: int, is_active: bool) -> EntityAvailability:
+    """Story 24.14 (D1 A) — pont + disponibilité propre au scénario (`availability_mode: all`)."""
+    return EntityAvailability(
+        eqlogic_availability_topic=build_scenario_availability_topic(scenario_id),
+        local_availability_supported=True,
+        local_availability_state=scenario_availability_state(is_active),
+        availability_reason="scenario_is_active",
+    )
 
 
 def availability_from_eqlogic(eq_id: int, eqlogic: Any) -> EntityAvailability:

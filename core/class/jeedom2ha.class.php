@@ -20,6 +20,7 @@
 require_once __DIR__  . '/../../../../core/php/core.inc.php';
 require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
 require_once __DIR__  . '/../php/jeedom2ha_homekit_exposure.php';
+require_once __DIR__  . '/../php/jeedom2ha_reevaluation.php';
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -301,7 +302,8 @@ class jeedom2ha extends eqLogic {
       return self::getFullTopology();
     };
     $syncCaller = $_syncCaller ?: function(array $topology) {
-      return self::callDaemon('/action/sync', $topology, 'POST', 15);
+      // Story 24.14 (AC9) — origine `boot` portée par l'en-tête de mode de synchro.
+      return self::callDaemon('/action/sync', $topology, 'POST', 15, null, array('X-Jeedom2ha-Sync-Mode' => 'boot'));
     };
 
     $timeoutSeconds = max(0.0, $_timeoutSeconds);
@@ -324,6 +326,9 @@ class jeedom2ha extends eqLogic {
       }
 
       if (self::isDaemonMqttReady($status)) {
+        // Story 24.14 (D2 A) — empreinte lue AVANT la topologie (chemin réel seulement), mémorisée si
+        // la synchro réussit : la tâche périodique ne relance alors rien tant que l'état ne change pas.
+        $bootFingerprint = ($_topologyFetcher === null) ? self::safeDecisionFingerprint() : null;
         // Story 5.1 — Task 6.1: retry backoff borné 5s pour getFullTopology() (NFR2)
         // Budget total : 5s. Tentatives : 2 retries avec attente 1s puis 2s.
         $topologyBudgetSec = 5.0;
@@ -363,6 +368,11 @@ class jeedom2ha extends eqLogic {
           return array('status' => 'skipped', 'reason' => 'topology_unavailable');
         }
 
+        if ($_topologyFetcher === null) {
+          // Revue P2 (5e passe) — mémorisable seulement si l'état n'a pas bougé pendant l'extraction.
+          $bootFingerprint = jeedom2ha_reevaluation_stable_fingerprint($bootFingerprint, self::safeDecisionFingerprint());
+          self::invalidateDecisionFingerprintBeforeSync();
+        }
         try {
           $syncResult = $syncCaller($topology);
         } catch (\Throwable $e) {
@@ -377,6 +387,7 @@ class jeedom2ha extends eqLogic {
         }
 
         log::add(__CLASS__, 'info', '[SYNC] Runtime bootstrap startup sync succeeded');
+        self::rememberDecisionFingerprintAfterSync($bootFingerprint, $syncResult);
         // Story 12.1 — (ré)enregistre les listeners de streaming d'état sur le périmètre publié.
         try {
           self::syncStateListeners();
@@ -393,6 +404,110 @@ class jeedom2ha extends eqLogic {
       }
 
       usleep(min($pollMicros, $remainingMicros));
+    }
+  }
+
+  /**
+   * Story 24.14 (D2 A) — tâche périodique du plugin (toutes les 5 minutes).
+   *
+   * Jeedom 4.5 appelle `cron5()` de la classe du plugin dès qu'elle existe et que le plugin est actif ; la
+   * fonctionnalité apparaît dans la page du plugin (« Fonctionnalités ») et peut y être désactivée. Aucune entrée
+   * dans plugin_info/info.json n'est nécessaire. Le pas est léger : deux requêtes en base (`eqLogic`, `scenario`)
+   * et aucun appel au démon tant que l'empreinte ne change pas.
+   */
+  public static function cron5() {
+    try {
+      self::reevaluateDecisionsIfChanged();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'warning', '[REEVAL] Réévaluation périodique échouée : ' . $e->getMessage());
+    }
+  }
+
+  /**
+   * Story 24.14 (D2 A) — synchro de service seulement si l'état qui pilote les décisions a changé.
+   * Logique dans jeedom2ha_reevaluation_tick() (fonction pure, testée sans le cœur).
+   */
+  public static function reevaluateDecisionsIfChanged(): array {
+    return jeedom2ha_reevaluation_tick(array(
+      'fingerprint' => function () {
+        return self::readDecisionFingerprint();
+      },
+      'stored' => function () {
+        return (string) config::byKey(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, __CLASS__, '');
+      },
+      'store' => function (string $fingerprint) {
+        config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+      },
+      'ready' => function () {
+        return self::isDaemonMqttReady(self::callDaemon('/system/status', null, 'GET', 3, 1));
+      },
+      'topology' => function () {
+        return self::getFullTopology();
+      },
+      'sync' => function (array $topology) {
+        return self::callDaemon('/action/sync', $topology, 'POST', JEEDOM2HA_REEVALUATION_SYNC_TIMEOUT_S, null,
+          array('X-Jeedom2ha-Sync-Mode' => 'service'));
+      },
+      'listeners' => function () {
+        self::syncStateListeners();
+      },
+      'log' => function (string $level, string $message) {
+        log::add(__CLASS__, $level, $message);
+      },
+    ));
+  }
+
+  /**
+   * Story 24.14 (D2 A) — empreinte courante : deux requêtes minimales, aucun nom lu.
+   * La configuration JSON d'un équipement n'est rapatriée que si elle cite la clé d'exclusion du plugin
+   * (sinon NULL) : le pas reste léger même quand d'autres plugins stockent une configuration volumineuse.
+   */
+  public static function readDecisionFingerprint(): string {
+    $eqRows = DB::Prepare(
+      "SELECT `id`, `isEnable`, `eqType_name`, `object_id`, IF(`configuration` LIKE '%jeedom2ha_excluded%', `configuration`, NULL) AS `configuration` FROM `eqLogic`",
+      array(), DB::FETCH_TYPE_ALL);
+    $scenarioRows = class_exists('scenario')
+      ? DB::Prepare('SELECT `id`, `isActive` FROM `scenario`', array(), DB::FETCH_TYPE_ALL)
+      : array();
+    return jeedom2ha_decision_fingerprint(
+      is_array($eqRows) ? $eqRows : array(),
+      is_array($scenarioRows) ? $scenarioRows : array(),
+      array(
+        'excludedPlugins' => config::byKey('excludedPlugins', __CLASS__, ''),
+        'excludedObjects' => config::byKey('excludedObjects', __CLASS__, ''),
+      ),
+      __CLASS__
+    );
+  }
+
+  /**
+   * Story 24.14 (revue P2) — après une synchro complète (démarrage, « Relire Jeedom »), mémorise l'empreinte lue
+   * avant la topologie si la synchro a abouti sans bouton ni disponibilité de scénario manquant : la tâche
+   * périodique ne relance alors rien tant que l'état ne change pas.
+   */
+  /**
+   * Story 24.14 (revue P2, 3e passe) — invalide l'empreinte mémorisée avant d'envoyer une synchro (démarrage,
+   * « Relire Jeedom ») : seule une synchro complète en remémorise une ; sinon le pas suivant du cron resynchronise.
+   */
+  public static function invalidateDecisionFingerprintBeforeSync(): void {
+    jeedom2ha_reevaluation_invalidate_before_sync(function (string $fingerprint) {
+      config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+    });
+  }
+
+  public static function rememberDecisionFingerprintAfterSync(?string $_fingerprint, $_syncResult): bool {
+    return jeedom2ha_reevaluation_remember_after_sync($_fingerprint, $_syncResult, function (string $fingerprint) {
+      config::save(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+    });
+  }
+
+  /** Story 24.14 (D2 A) — empreinte courante, ou null si illisible (n'empêche jamais le démarrage ni la relecture). */
+  public static function safeDecisionFingerprint(): ?string {
+    try {
+      return self::readDecisionFingerprint();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'debug', '[REEVAL] Empreinte illisible au démarrage : ' . $e->getMessage());
+      return null;
     }
   }
 

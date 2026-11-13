@@ -20,6 +20,7 @@
 require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
 // Story 19.6 (AC1-AC5, AC8) — budget fixe du relais et orchestration pure (sans cœur Jeedom).
 require_once __DIR__ . '/../php/jeedom2ha_action_budget.php';
+require_once __DIR__ . '/../php/jeedom2ha_reevaluation.php'; // Story 24.14 — fonctions pures, sans cœur Jeedom
 
 /**
  * Story A1 — branche le relais borné sur le vrai callDaemon et le journal Jeedom.
@@ -672,12 +673,19 @@ try {
       ));
     }
     else if ($action == 'scanTopology') {
+      // Story 24.14 (revue P2) — empreinte lue AVANT la topologie, mémorisée si la relecture aboutit.
+      $fingerprint = jeedom2ha::safeDecisionFingerprint();
       $topology = jeedom2ha::getFullTopology();
+      // Revue P2 (5e passe) — empreinte mémorisable seulement si elle n'a pas bougé pendant l'extraction.
+      $fingerprint = jeedom2ha_reevaluation_stable_fingerprint($fingerprint, jeedom2ha::safeDecisionFingerprint());
+      // Revue P2 (3e passe) — empreinte invalidée avant l'envoi : échec, délai dépassé ou résultat partiel → resynchro au pas suivant.
+      jeedom2ha::invalidateDecisionFingerprintBeforeSync();
       // Story A1 : durée proportionnelle au parc → budget fixe R (motif (b') de 19-6).
       // Le sync démon ne fait aucune pause de lissage : pas de deadline_s à transmettre.
       $result = _jeedom2ha_run_parc_relay('TOPOLOGY', function (int $timeoutS) use ($topology) {
         return jeedom2ha::callDaemon('/action/sync', $topology, 'POST', $timeoutS, null, array('X-Jeedom2ha-Sync-Mode' => 'rescan'));
       });
+      jeedom2ha::rememberDecisionFingerprintAfterSync($fingerprint, $result);
       if (isset($result['status']) && $result['status'] === 'ok') {
         // Un résultat partiel a pu publier : réaligner dès que le sync est terminé.
         try {
