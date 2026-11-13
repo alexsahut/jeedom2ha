@@ -1,6 +1,6 @@
 # Story 24.16 : Verrou de thermostat confirmé par l'état réel
 
-Status: ready-for-dev
+Status: review
 
 > Correctif court, suite de la recette de 24-15 (13/11/2026). Story rédigée par une session cloud déléguée (2026-11-13), en lecture seule du code (`origin/main` `575dc58`), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : identifiants seulement.
 
@@ -46,10 +46,10 @@ La lecture statique ne dit pas laquelle des conditions de F3 est fausse en produ
 
 ## Tâches
 
-- [ ] T1 — Test rouge qui reproduit le constat : forme de production (climate + secondaire de verrou, synchroniseur d'état actif), ordre `ON` sur `jeedom2ha/<eq>/<lock_info>/set` → aujourd'hui `optimistic_controlled`. Identifier la condition de F3 qui échoue et la consigner dans le Dev Agent Record.
-- [ ] T2 — Corriger dans `sync/command.py` : famille de commande propre au verrou (par exemple `thermostat_lock`) ou branche dédiée dans `_select_confirmation_policy`, avec `real_state_confirmation` si l'état est fiable, sinon `stateless` ; corriger aussi la cause trouvée en T1 si elle empêche l'état fiable.
-- [ ] T3 — Valeur vide : vérifier (et corriger si besoin) que `''` ne publie rien à l'état initial ni au streaming.
-- [ ] T4 — Tests (voir ci-dessous) et garde 25.4.
+- [x] T1 — Test rouge qui reproduit le constat : forme de production (climate + secondaire de verrou, synchroniseur d'état actif), ordre `ON` sur `jeedom2ha/<eq>/<lock_info>/set` → aujourd'hui `optimistic_controlled`. Identifier la condition de F3 qui échoue et la consigner dans le Dev Agent Record.
+- [x] T2 — Corriger dans `sync/command.py` : famille de commande propre au verrou (par exemple `thermostat_lock`) ou branche dédiée dans `_select_confirmation_policy`, avec `real_state_confirmation` si l'état est fiable, sinon `stateless` ; corriger aussi la cause trouvée en T1 si elle empêche l'état fiable.
+- [x] T3 — Valeur vide : vérifier (et corriger si besoin) que `''` ne publie rien à l'état initial ni au streaming.
+- [x] T4 — Tests (voir ci-dessous) et garde 25.4.
 - [ ] T5 — Preuve terrain AC7 (ClaudeBox, hors session cloud).
 
 ## Tests attendus (`resources/daemon/tests/unit/test_story_24_16_verrou_thermostat_confirmation.py`, identifiants synthétiques)
@@ -67,6 +67,38 @@ La lecture statique ne dit pas laquelle des conditions de F3 est fausse en produ
 - `scripts/deploy-to-box.sh` jamais lancé par une session cloud ; aucun accès box ni HA.
 - Garde 25.4 : déclarer toute ligne remplacée dans `resources/daemon/`.
 
+## Dev Agent Record (2026-11-13, session cloud déléguée)
+
+Branche `story/24-16-verrou-thermostat-confirmation-etat-reel` depuis `origin/main` `be23478`. TDD : `resources/daemon/tests/unit/test_story_24_16_verrou_thermostat_confirmation.py` écrit d'abord, rouge sur le constat exact de production (`[SYNC-CMD] eq_id=11000 topic=jeedom2ha/11000/110009/set reason_code=optimistic_controlled action=select_confirmation_policy`), puis le code.
+
+### Cause (T1)
+
+Forme de production reproduite par une **vraie synchro** (`/action/sync` sur le corpus doré, thermostat synthétique 11000 avec verrou), synchroniseur d'état actif. La condition de F3 qui échoue est la **première** : `decision.state_topic` est vide.
+
+- L'interrupteur « Verrouillage » est un **secondaire** du climate (`additional_mappings`). Sa décision (`publication_decision_ref`) est produite par `evaluate_equipment()` (`decide_publication`) et ne reçoit **jamais** de `state_topic` : seul le principal le reçoit, dans `_prepare_publication_bookkeeping` (`http_server.py`). F5 ne vaut que pour les chemins d'action (`_scope_excluded_decision`, `_reset_secondary_runtime_state`), pas pour la synchro.
+- Relevé du test : décision du secondaire `state_topic=None` ; principal `jeedom2ha/11000/state` ; topic propre de l'interrupteur (`reason_details`) `jeedom2ha/11000/110009/state`.
+- `StateSynchronizer` lit d'abord le topic propre du candidat (`_candidate_state_topic`) : l'état du verrou est donc bien streamé (constat `initial_state_published` en production), alors que `CommandSynchronizer._has_reliable_state` ne lit que la décision → faux → `optimistic_controlled`.
+
+### Correctif (T2)
+
+`sync/command.py`, `_select_confirmation_policy` : branche dédiée à l'interrupteur `thermostat_lock`, placée avant la branche `on_off`. Elle évalue `_has_reliable_state` avec le topic propre de l'interrupteur (copie `dataclasses.replace` de la décision, jamais mutée) : `real_state_confirmation` si l'état est fiable, sinon `stateless` ; jamais `optimistic_controlled`. L'ordre n'ayant pas de `optimistic_state_payload`, rien n'est publié sur le topic d'état après l'ordre. **Ajouts seuls** (11 lignes, aucune ligne retirée sous `resources/daemon/`) : garde 25.4 inchangée. Traduction des ordres, discovery, `unique_id`, topics et autres `switch` non touchés.
+
+### Valeur vide (T3)
+
+Déjà conforme, aucun code : `_translate_value` rend `None` pour une valeur vide ou d'espaces, et la table du verrou rend `None` pour toute valeur non reconnue. Prouvé par test à l'état initial (synchro) et au streaming : `''`, `'   '`, `'abc'`, `'2'` → rien publié.
+
+### Tests (T4)
+
+21 tests : politique en forme de production (`ON` / `OFF` → `real_state_confirmation`, aucune publication MQTT par le synchroniseur d'ordres) ; sans synchroniseur d'état ou sans info de verrou → `stateless` ; états `1` / `0` / `true` / `off` streamés, valeurs vides ou inconnues → rien ; ordres `ON` / `OFF` vers les bonnes commandes, payload invalide (`invalid_command_payload`) et ordre absent (`missing_action_command`) refusés ; non-régression : `switch` ordinaire sans état fiable → `optimistic_controlled`, avec état fiable → `real_state_confirmation`, secondaire ordinaire sans `state_topic` de décision → `optimistic_controlled` (inchangé).
+
+Suites : pytest 3246 passés, 1 ignoré ; `flake8 resources/daemon tests` vert ; `node --test --test-concurrency=2` 1211 passés, 3 ignorés, 0 échec ; `php -l` 38/38 ; tests PHP 17 passés, 3 ignorés (cœur Jeedom requis).
+
+### Points ouverts
+
+- **Défaut plus large, hors périmètre (AC5)** : tout `switch` **secondaire** (prises multiples de `mapping/switch.py`, etc.) a la même décision sans `state_topic` après une synchro, donc `optimistic_controlled` même quand son état est streamé. Le corriger à la source (poser `state_topic` sur les décisions secondaires dans la synchro) changerait la politique de ces switch : à décider dans une story dédiée.
+- **T5 / AC7** : preuve terrain à ClaudeBox (verrou on puis off depuis HA, journal `reason_code=real_state_confirmation`, état initial restauré).
+
 ## Journal
 
 - 2026-11-13 — Constat à la recette de 24-15 (ClaudeBox) ; story rédigée par une session cloud déléguée, `ready-for-dev`.
+- 2026-11-13 — Dev-story (session cloud déléguée, TDD) : cause trouvée (décision du secondaire sans `state_topic`), correctif en ajouts seuls, `review` ; reste la preuve terrain AC7.
