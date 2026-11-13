@@ -55,6 +55,8 @@ STATE_KEYS: Dict[str, Tuple[str, ...]] = {
 # Story 24.15 (D4 A) — the lock of a thermostat is a ``switch`` fed by ``THERMOSTAT_LOCK``
 # (only the « Verrouillage » switch of ``mapping.climate`` carries this key).
 STATE_KEYS["switch"] = STATE_KEYS["switch"] + (THERMOSTAT_LOCK,)
+# Story 24.17 (D2-a) — a FAN_* trio published as ``switch`` (14.1) is fed by its FAN_STATE.
+STATE_KEYS["switch"] = STATE_KEYS["switch"] + ("FAN_STATE",)
 # Story 24.15 — info commands of a ``climate`` (channels: ``climate_readback_commands``).
 CLIMATE_READBACK_KEYS: Tuple[str, ...] = (
     THERMOSTAT_SETPOINT, THERMOSTAT_TEMPERATURE, THERMOSTAT_MODE, THERMOSTAT_STATE,

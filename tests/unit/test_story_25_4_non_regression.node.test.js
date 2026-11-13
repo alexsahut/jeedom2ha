@@ -237,6 +237,13 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/validation/ha_component_registry.py::\"required_fields\": [\"availability\"],",
   ];
 
+  // Story 24.17 (D1 A d'Alexandre) : la décision d'un secondaire jamais synchronisé reçoit son topic d'état PROPRE
+  // (`_secondary_own_state_topic`), plus le repli `jeedom2ha/<eq>/state` de `_resolve_state_topic`, qui désigne le topic du
+  // principal. Seule cette ligne existante est remplacée ; le reste de la story est en ajouts. Admise dans son fichier seulement.
+  const REPLACED_BY_24_17 = [
+    'resources/daemon/transport/http_server.py::state_topic=_resolve_state_topic(secondary),',
+  ];
+
   // Correctif fix/daemon-sync-body-limit (incident de production après 24.15) : l'application aiohttp du démon reçoit une taille
   // maximale de requête explicite (SYNC_REQUEST_MAX_BYTES), la limite par défaut de 1 Mio refusant la topologie complète.
   const REPLACED_BY_FIX_SYNC_BODY_LIMIT = [
@@ -288,7 +295,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
       .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
         && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`)
         && !REPLACED_BY_24_15.includes(`${f}::${line}`)
-        && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`))
+        && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`)
+        && !REPLACED_BY_24_17.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

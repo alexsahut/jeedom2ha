@@ -142,6 +142,27 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
     return ""
 
 
+# Story 24.17 (D1 A) — types whose secondary entity has its OWN state topic
+# (``reason_details["state_topic"]``, node-scoped by its state command).
+_SECONDARY_OWN_STATE_TOPIC_TYPES = frozenset({"switch", "valve", "lock"})
+
+
+def _secondary_own_state_topic(secondary: MappingResult) -> str:
+    """Story 24.17 (D1 A) — runtime state topic of a SECONDARY mapping's decision.
+
+    Only the secondary's own topic, for the types that have one (switch / valve / lock).
+    Never the ``jeedom2ha/<eq>/state`` fallback of ``_resolve_state_topic``: on a secondary
+    that topic belongs to the principal (an optimistic state would land on another entity).
+    Empty when the secondary has no own topic.
+    """
+    if secondary.ha_entity_type not in _SECONDARY_OWN_STATE_TOPIC_TYPES:
+        return ""
+    state_topic = (secondary.reason_details or {}).get("state_topic")
+    if isinstance(state_topic, str) and state_topic.startswith(f"jeedom2ha/{secondary.jeedom_eq_id}/"):
+        return state_topic
+    return ""
+
+
 def _apply_availability_metadata(
     decision: PublicationDecision,
     mapping: MappingResult,
@@ -261,6 +282,9 @@ async def _publish_additional_sensors(
         # `_prepare_publication_bookkeeping` pour le principal : False avant tentative
         # (y compris pour un secondaire refusé), True seulement en cas de succès.
         sec_decision.active_or_alive = False
+        # Story 24.17 (D1 A) — the secondary's decision carries its own state topic, like
+        # the principal's (``_prepare_publication_bookkeeping``): sync and « Publier ».
+        sec_decision.state_topic = _secondary_own_state_topic(secondary)
 
         if secondary.confidence in ("sure", "probable", "ambiguous"):
             _increment_mapping_counter(mapping_counters, secondary, secondary.confidence)
@@ -622,7 +646,7 @@ def _reset_secondary_runtime_state(
             should_publish=False,
             reason="no_sync_decision",
             mapping_result=secondary,
-            state_topic=_resolve_state_topic(secondary),
+            state_topic=_secondary_own_state_topic(secondary),  # Story 24.17 : jamais le repli du principal
             active_or_alive=active_or_alive,
             discovery_published=discovery_published,
         )
@@ -630,6 +654,8 @@ def _reset_secondary_runtime_state(
         decision = dataclasses.replace(
             previous,
             mapping_result=secondary,
+            state_topic=_secondary_own_state_topic(secondary),  # Story 24.17 (D1 A)
+
             discovery_published=discovery_published,
             active_or_alive=active_or_alive,
         )
