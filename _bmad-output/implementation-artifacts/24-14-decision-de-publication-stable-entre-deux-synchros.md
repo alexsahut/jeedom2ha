@@ -1,6 +1,6 @@
 # Story 24.14 : Décision de publication stable entre deux synchros (scénarios, raison des équipements)
 
-Status: review
+Status: done
 
 > Analyse et story rédigées par une session cloud déléguée (2026-11-12), en lecture seule du code (`origin/main` e78f727), sans accès à la box ni à Home Assistant. Aucun nom réel, aucune IP, aucune marque (CC-48) : les constats de production ne citent que des identifiants. **Draft** : la cause est établie dans le code avec une forte confiance, mais l'origine des changements d'état côté Jeedom reste à confirmer sur la box (Task 0), et deux décisions d'Alexandre sont requises (D1, D2) avant tout `ready-for-dev`.
 
@@ -132,7 +132,7 @@ Les AC marqués **[D1 A]** ou **[D2 A]** suivent les recommandations ; ils sont 
 - [x] **Task 2 — [D1 A] Boutons de scénario stables (AC2 à AC6).** Publier tout scénario lisible ; disponibilité propre au scénario (topic dédié, retenu) via `_build_availability_fields` ; refus `scenario_inactive` dans `sync/command.py` ; export ; la purge ne retire plus que les supprimés. Mettre à jour `docs/dev-decision-export.md` et la doc utilisateur (`docs/fr_FR`) sur le comportement d'un scénario désactivé.
 - [x] **Task 3 — [D2 A] Réévaluation sur changement (AC10).** Fonction PHP pure d'empreinte (testable sans le cœur), branchement dans un cron à créer (le plugin n'en déclare aucun aujourd'hui : ni méthode `cron*()` dans la classe, ni entrée dans `plugin_info/info.json`), requêtes DB minimales, appel `/action/sync` en mode service quand l'empreinte change ; empreinte gardée en `config` du plugin (pas de table).
 - [x] **Task 4 — Tests (voir ci-dessous).**
-- [ ] **Task 5 — Preuve terrain (AC12, ClaudeBox) après fusion et déploiement par `scripts/deploy-to-box.sh`.** À faire par ClaudeBox (hors session cloud).
+- [x] **Task 5 — Preuve terrain (AC12, ClaudeBox) après fusion et déploiement par `scripts/deploy-to-box.sh`.** Faite par ClaudeBox le 13/11 (voir « Preuves terrain (13/11/2026) »).
 
 ## Tests à écrire
 
@@ -208,8 +208,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 
 ### Points ouverts
 
-- Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.
-- **Réglages en attente** : une synchro de service passe par le même chemin qu'une relecture, donc applique les réglages en attente (types choisis, « Toujours » / « Jamais ») de tous les équipements dès que l'empreinte change. Documenté ; si Alexandre veut que seuls « Appliquer » et « Relire Jeedom » les appliquent, il faut une autre story (la synchro devrait alors reprendre les réglages déjà appliqués).
+- Preuve terrain AC12 (Task 5) : faite le 13/11 (voir « Preuves terrain (13/11/2026) »).
+- **Réglages en attente** (tranché le 13/11, voir les preuves terrain) : une synchro de service passe par le même chemin qu'une relecture, donc applique les réglages en attente (types choisis, « Toujours » / « Jamais ») de tous les équipements dès que l'empreinte change. Documenté ; si Alexandre veut que seuls « Appliquer » et « Relire Jeedom » les appliquent, il faut une autre story (la synchro devrait alors reprendre les réglages déjà appliqués).
 - La republication sur reconnexion du broker ou sur redémarrage de HA ne republie toujours pas les disponibilités retenues des **équipements** (comportement antérieur, hors périmètre) ; celles des scénarios le sont depuis la revue P2.
 - Le pas du cron tourne dans la boucle partagée `plugin::cron5` du cœur ; une synchro de service peut l'occuper jusqu'à 60 s (même budget que « Relire Jeedom »). Si une synchro dépasse ce délai, l'empreinte n'est pas mémorisée et le pas suivant relance une synchro.
 - Dans le diagnostic, `traceability.decision_trace.reason_code` nomme `excluded` pour toute exclusion (le `reason_code` du diagnostic, l'export et les états agrégés portent la source exacte) : vocabulaire de trace antérieur, laissé tel quel et documenté par le test AC7.
@@ -222,3 +222,12 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 - 2026-11-12 21:41 — Task 0 faite par ClaudeBox ; décisions d'Alexandre D1 A (toujours publié, grisé si inactif) et D2 A ; story `ready-for-dev`.
 - 2026-11-12 — Tasks 1 à 4 livrées par une session cloud déléguée (PR #376) ; story en `review`. Reste la preuve terrain (Task 5, ClaudeBox).
 - 2026-11-12 — Reprise du développement interrompu : relecture, corrections ci-dessus, suites vertes ; story en `review`.
+- 2026-11-13 — Déployée en production (61f42f5) et preuve terrain AC12 faite par ClaudeBox ; décision d'Alexandre sur les réglages en attente ; story `done`.
+
+## Preuves terrain (13/11/2026)
+
+Heures UTC, identifiants seulement.
+
+- **Déploiement en production** le 13/11 à 01:37 UTC (`61f42f5`). Script de déploiement : 0 changement de décision ; 41 boutons de scénario inactifs publiés, grisés ; 125 disponibilités vérifiées, 0 écart ; ERROR=0.
+- **AC12 — bascule d'un scénario sans redémarrage** : scénario 25 désactivé à 07:43:29 ; son bouton passe `unavailable` à 07:45:10, au passage de la tâche périodique (cron5), sans « Relire Jeedom ». Réactivé à 07:46:35 ; bouton de nouveau disponible à 07:50:07. Le scénario n'a jamais été lancé.
+- **Décision d'Alexandre (13/11)** : la synchro automatique (cron5) applique aussi les réglages en attente, comme « Relire Jeedom ». Ce comportement est accepté ; le point ouvert « Réglages en attente » est clos sans autre story.
