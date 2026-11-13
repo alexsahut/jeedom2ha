@@ -1,6 +1,6 @@
 # Story 8.1 : MapperRegistry — dispatch déterministe et slot terminal réservé
 
-Status: review
+Status: done
 
 ## Story
 
@@ -251,3 +251,4 @@ Story créée le 2026-05-02. Analyse exhaustive des sources :
 ## Change Log
 
 - 2026-05-02 — Implémentation Story 8.1 : `FallbackMapper` no-op, `MapperRegistry` ordonné, tests AC1/AC2/AC3 ; corpus daemon 657 passed ; statut prêt pour review
+- 2026-11-13 — Alignement documentaire (remise au propre BMAD) : statut du fichier passé de `review` à `done` pour suivre `sprint-status.yaml`, qui fait foi (PR #107 fusionnée le 2026-05-03).

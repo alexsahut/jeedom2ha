@@ -1,6 +1,6 @@
 # Story 4.2 : Diagnostic de la décision — l'utilisateur distingue un refus de politique produit d'un refus de gouvernance d'ouverture
 
-Status: review
+Status: done
 
 Epic: pe-epic-4 — Décision de publication explicite + contrat de testabilité/rétrocompatibilité garanti
 
@@ -350,3 +350,4 @@ gpt-5
 ### Change Log
 
 - 2026-04-14 — Story 4.2 implémentée : distinction visible politique produit vs gouvernance d'ouverture dans le diagnostic, contrat backend `cause_*` réaligné, surface UI bornée au contrat backend, couverture automatisée et gate terrain exécutés
+- 2026-11-13 — Alignement documentaire (remise au propre BMAD) : statut du fichier passé de `review` à `done` pour suivre `sprint-status.yaml`, qui fait foi (PR #86 fusionnée (squash 53d1c34), gate terrain exécuté).

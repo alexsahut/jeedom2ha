@@ -1,6 +1,6 @@
 # Story 8.2 : PublisherRegistry — dispatch table `ha_entity_type` vers methode publish
 
-Status: review
+Status: done
 
 ## Story
 
@@ -253,3 +253,4 @@ Execution dev 2026-05-03 :
 
 - 2026-05-03 — Creation de la Story 8.2 ready-for-dev : PublisherRegistry preparatoire, garde-fous pe-epic-8, tests unitaires cibles, zero modification code produit.
 - 2026-05-03 — Story 8.2 implementee: ajout de `PublisherRegistry` + `UnknownPublisherError`, 8 tests unitaires Story 8.2, non-regression daemon 665/665, statut passe a `review`.
+- 2026-11-13 — Alignement documentaire (remise au propre BMAD) : statut du fichier passé de `review` à `done` pour suivre `sprint-status.yaml`, qui fait foi (PR #108 fusionnée le 2026-05-03).

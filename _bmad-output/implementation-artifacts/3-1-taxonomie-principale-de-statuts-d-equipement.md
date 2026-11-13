@@ -1,6 +1,6 @@
 # Story 3.1 : Taxonomie principale de statuts d'équipement
 
-Status: review
+Status: done
 
 ---
 
@@ -627,4 +627,8 @@ claude-sonnet-4.6
 
 **Story revision date:** 2026-03-25
 **Cycle:** Post-MVP Phase 1 - V1.1 Pilotable
-**Status:** review
+**Status:** done
+
+## Change Log
+
+- 2026-11-13 — Alignement documentaire (remise au propre BMAD) : statut du fichier passé de `review` à `done` pour suivre `sprint-status.yaml`, qui fait foi (PR #44 fusionnée le 2026-03-25, terrain PASS (AC1/AC2/AC3/AC6), code review PASS).

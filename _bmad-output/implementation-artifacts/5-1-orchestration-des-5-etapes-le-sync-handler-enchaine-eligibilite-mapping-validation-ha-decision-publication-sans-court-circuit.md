@@ -1,6 +1,6 @@
 # Story 5.1 : Orchestration des 5 étapes — le sync handler enchaîne éligibilité → mapping → validation HA → décision → publication sans court-circuit
 
-Status: review
+Status: done
 
 ## Story
 
@@ -169,3 +169,4 @@ gpt-5-codex
 
 - 2026-04-16: Implémentation Story 5.1 réalisée (orchestration canonique 5 étapes, tests dédiés, non-régression complète), statut passé à `review`.
 - 2026-04-16: Closeout documentaire post-review (clarification alias contractuel `publication_decision` ↔ `publication_decision_ref`, tâche 5.2 réalignée), statut passé à `done`.
+- 2026-11-13 — Alignement documentaire (remise au propre BMAD) : statut du fichier passé de `review` à `done` pour suivre `sprint-status.yaml`, qui fait foi (PR #95 fusionnée (squash d3da08c), closeout post-review du 2026-04-16 qui annonçait déjà `done`).

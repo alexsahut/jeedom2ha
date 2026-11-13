@@ -1,7 +1,9 @@
 # Story 24.10 : Écarts résiduels après mesure
 
-Status: draft
+Status: backlog
 
+> **Reportée (2026-11-13, décision d'Alexandre 22:46)** : retirée de l'epic 24, qui est clos sans elle. Jamais cadrée (aucun `create-story`, Task 0 non faite). **À recadrer dans le prochain epic de revue fonctionnelle/UX**, à partir d'un export de production à jour (24.4 à 24.17 ont pu résorber une partie des écarts listés ci-dessous). Le contenu ci-dessous est conservé tel quel comme point de départ.
+>
 > **Brouillon de cadrage (2026-10-12), `draft` jusqu'à son `create-story`, après la baseline.** Rédigé par une session cloud déléguée, documentaire. **La portée n'est pas fixée** : elle dépend de la baseline de 24.2 et des stories 24.4 à 24.9. Ne passe pas à `ready-for-dev` avant que ClaudeBox ait classé chaque écart restant. Pointeurs pris sur `main` à `b1acad7`. Aucun nom réel (CC-48).
 >
 > **R1 (ClaudeBox, 12/10) intégrée** : types génériques des deux équipements établis ; une hypothèse de cause, fondée sur le code, est posée pour le capteur (à confirmer par l'export).
@@ -53,3 +55,4 @@ Tout ce qui est « Inconnue » ci-dessus ; le nombre d'écarts restants après 2
 
 - 2026-10-12 — Cadrage documentaire (session cloud déléguée) : story `draft`.
 - 2026-10-12, 13:22 — **Décisions d'Alexandre** (relayées par ClaudeBox) : aucune question ne porte sur cette story ; elle reste `draft`, portée à fixer sur la baseline.
+- 2026-11-13, 22:46 — **Décision d'Alexandre** : story reportée, statut `backlog`, retirée de l'epic 24 (clos le même jour) ; à recadrer dans le prochain epic de revue fonctionnelle/UX. Ni supprimée ni réalisée.
