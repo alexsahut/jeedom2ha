@@ -2056,6 +2056,13 @@ def _publish_scenario_availability(mqtt_bridge: MqttBridge, scenario_id: int, is
 
 async def _do_handle_action_sync(request: web.Request) -> web.Response:
     """Serialize sync with HA actions; rescans fail fast, service syncs wait briefly."""
+    # Story 24.15 (revue Codex) — instant de la lecture de Jeedom, relevé à l'arrivée de la
+    # requête (avant l'attente du verrou) : les événements reçus avant sont plus anciens que
+    # la topologie de cette synchro et sont remplacés par elle (``reconcile_fresh_read``).
+    try:
+        request["jeedom2ha_sync_read_at"] = time.monotonic()
+    except TypeError:
+        pass  # requête simulée sans stockage : le corps relève l'instant lui-même
     # Authentifier avant toute attente du verrou : une requête inconnue ne doit
     # jamais pouvoir être retardée par une opération légitime ni en apprendre l'état.
     if not _check_secret(request, request.app["local_secret"]):
@@ -2096,6 +2103,11 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
             status=401,
         )
 
+    # Story 24.15 (revue Codex) — instant relevé à l'arrivée de la requête (sinon maintenant).
+    _read_at_getter = getattr(request, "get", None)
+    sync_read_at = _read_at_getter("jeedom2ha_sync_read_at") if callable(_read_at_getter) else None
+    if isinstance(sync_read_at, bool) or not isinstance(sync_read_at, (int, float)):
+        sync_read_at = time.monotonic()
     data = await request.json()
     payload = data.get("payload", {})
 
@@ -2269,6 +2281,9 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         # Story 12.1 — snapshot initial : publier la valeur courante connue de Jeedom
         # sur le state_topic des entités vague 1 APRÈS la discovery (sinon HA l'ignore).
         state_sync = request.app.get("state_synchronizer")
+        # Story 24.15 (revue Codex) — la topologie fraîche remplace les événements plus anciens.
+        if state_sync is not None and callable(getattr(state_sync, "reconcile_fresh_read", None)):
+            state_sync.reconcile_fresh_read(decision, sync_read_at)
         if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
             await state_sync.publish_initial_states(decision)
 

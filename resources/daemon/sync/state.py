@@ -384,11 +384,57 @@ class StateSynchronizer:
                 return pending[1]
             return fresh_values.get(binding.cmd_id)
 
+        # Story 24.15 (revue Codex) — the click read replaces older stored events (an
+        # event stamped ``fresh_since`` never wins over the click value, see ``_resolve``).
+        self.reconcile_fresh_read(decision, fresh_since, fresh_values)
         return await self._publish_initial_states_loop(
             decision, _resolve,
             failure_reason_code="initial_state_publish_failed",
             no_value_reason_code="initial_state_no_click_value",
         )
+
+    def reconcile_fresh_read(
+        self,
+        decision: PublicationDecision,
+        read_at: float,
+        values: Optional[Mapping[int, Any]] = None,
+    ) -> None:
+        """Story 24.15 (revue Codex) — a fresh read of Jeedom replaces older stored events.
+
+        ``read_at`` is the monotonic time of the read (sync request or « Publier » click);
+        ``values`` the values read (``cmd_id -> value``), by default the topology values of
+        the mapping. For each command of the equipment, a stored event received BEFORE
+        ``read_at`` is replaced by the fresh value (or dropped when there is none); an event
+        received after the read is kept. Readers of the last known value (climate peer of
+        the action, ``heat`` order, barrier direct orders) then get the most recent one.
+        """
+        mapping = getattr(decision, "mapping_result", None)
+        eq_id = getattr(mapping, "jeedom_eq_id", None)
+        if mapping is None or eq_id is None:
+            return
+        try:
+            eq_id_int = int(eq_id)
+        except (TypeError, ValueError):
+            return
+        for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
+            for cmd in (getattr(candidate, "commands", None) or {}).values():
+                cmd_id = self._coerce_cmd_id(cmd)
+                if cmd_id is None:
+                    continue
+                if values is not None:
+                    if cmd_id not in values:
+                        continue
+                    value = values.get(cmd_id)
+                else:
+                    value = getattr(cmd, "current_value", None)
+                key = (eq_id_int, cmd_id)
+                stored = self._pending_click_values.get(key)
+                if stored is not None and stored[0] > read_at:
+                    continue
+                if value is None:
+                    self._pending_click_values.pop(key, None)
+                else:
+                    self._pending_click_values[key] = (read_at, value)
 
     async def _publish_initial_states_loop(
         self,
@@ -773,7 +819,9 @@ class StateSynchronizer:
         ha_type = mapping.ha_entity_type
         if ha_type == "climate":
             # Story 24.15 (D1, D2, D3).
-            return self._translate_climate_value(mapping, text, channel, cmd, peer)
+            # Raw value: a mode name is compared exactly (spaces included); blank and
+            # numeric checks strip on their own.
+            return self._translate_climate_value(mapping, value, channel, cmd, peer)
 
         if channel in (CHANNEL_BRIGHTNESS, CHANNEL_POSITION):
             level = self._parse_percent(text)
@@ -841,7 +889,7 @@ class StateSynchronizer:
     def _translate_climate_value(
         self,
         mapping: MappingResult,
-        text: str,
+        text: Any,
         channel: str,
         cmd: Any,
         peer: Any,

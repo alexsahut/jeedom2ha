@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -762,3 +764,91 @@ async def test_publish_climate_and_lock_switch_topics():
     topics = [call.args[0] for call in bridge.publish_message.call_args_list]
     assert topics == [f"homeassistant/climate/jeedom2ha_{EQ}/config",
                       f"homeassistant/switch/jeedom2ha_{EQ}_{LOCK}/config"]
+
+
+# --- Revue Codex (PR #377) : lecture fraîche contre événements stockés ; espaces des noms --
+
+@pytest.mark.asyncio
+async def test_fresh_sync_replaces_an_older_stored_event():
+    # Événement ancien : arrêt. Puis une synchro relit le thermostat en « Mode A ».
+    sync, bridge, _mapping = _state_sync(_map(_thermostat(mode_value="Off")))
+    await sync.handle_state_message(EQ, MODE, "Off")
+    fresh = _map(_thermostat(mode_value="Mode A"))
+    decision = _published(fresh)
+    sync._app["publications"] = {EQ: decision}
+    sync.reconcile_fresh_read(decision, time.monotonic())
+    bridge.published.clear()
+    # Un événement de chauffe ultérieur : l'action suit le mode frais, pas l'ancien arrêt.
+    assert await sync.handle_state_message(EQ, STATE, "1") is True
+    assert bridge.published == [(_topic("action"), "heating", 1, True)]
+
+
+def test_an_event_later_than_the_fresh_read_is_kept():
+    sync, _bridge, mapping = _state_sync()
+    read_at = time.monotonic()
+    sync._pending_click_values[(EQ, MODE)] = (read_at + 1.0, "Off")
+    sync.reconcile_fresh_read(mapping.publication_decision_ref, read_at)
+    assert sync.last_event_value(EQ, MODE) == "Off"
+    assert sync.last_event_value(EQ, SETPOINT) == "19.5"
+
+
+@pytest.mark.asyncio
+async def test_heat_after_a_fresh_sync_sends_the_fresh_setpoint():
+    state_sync = StateSynchronizer(app={}, mqtt_bridge=_Bridge())
+    state_sync._pending_click_values[(EQ, SETPOINT)] = (time.monotonic(), "17")  # ancien
+    fresh = _map(_thermostat(mode_value="Off", setpoint_value="19.5"))
+    sync, _bridge = _cmd_sync(fresh, state_sync=state_sync)
+    state_sync.reconcile_fresh_read(fresh.publication_decision_ref, time.monotonic())
+    assert await sync.handle_command_message(_topic("mode/set"), "heat") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(SET_SETPOINT, {"slider": "19.5"})
+
+
+@pytest.mark.asyncio
+async def test_publier_click_values_replace_older_stored_events():
+    sync, bridge, mapping = _state_sync()
+    sync._pending_click_values[(EQ, MODE)] = (time.monotonic(), "Off")  # ancien
+    fresh_since = time.monotonic()
+    await sync.publish_click_states(mapping.publication_decision_ref,
+                                    {MODE: "Mode B", STATE: "1"}, fresh_since)
+    bridge.published.clear()
+    assert await sync.handle_state_message(EQ, STATE, "1") is True
+    assert bridge.published == [(_topic("action"), "heating", 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_sync_request_replaces_older_stored_events(aiohttp_client):
+    payload = json.loads(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "golden_corpus" / "sync_payload.json")
+        .read_text(encoding="utf-8"))
+    app = http_server.create_app(local_secret="s")
+    bridge = _Bridge()
+    app["mqtt_bridge"] = bridge
+    state_sync = StateSynchronizer(app, bridge)
+    app["state_synchronizer"] = state_sync
+    state_sync._pending_click_values[(11000, 110004)] = (time.monotonic(), "Off")  # ancien
+    cli = await aiohttp_client(app)
+    body = {"action": "sync", "payload": payload, "request_id": "r",
+            "timestamp": "2026-11-13T00:00:00Z"}
+    resp = await cli.post("/action/sync", json=body, headers={"X-Local-Secret": "s"})
+    assert resp.status == 200
+    assert state_sync.last_event_value(11000, 110004) == "Mode A"
+
+
+@pytest.mark.asyncio
+async def test_preset_with_spaces_is_recognised():
+    names = (" Mode espace ", "Mode B", "Mode C")
+    sync, bridge, mapping = _state_sync(_map(_thermostat(mode_names=names, mode_value="Mode B")))
+    assert mapping.reason_details["preset_modes"] == list(names)
+    assert await sync.handle_state_message(EQ, MODE, " Mode espace ") is True
+    assert (_topic("preset"), " Mode espace ", 1, True) in bridge.published
+    assert (_topic("mode"), "heat", 1, True) in bridge.published
+    cmd_sync, _cmd_bridge = _cmd_sync(_map(_thermostat(mode_names=names)))
+    assert await cmd_sync.handle_command_message(_topic("preset/set"), " Mode espace ") is True
+    cmd_sync._execute_exec_cmd.assert_awaited_once_with(MODE_A, {})
+
+
+@pytest.mark.asyncio
+async def test_off_name_with_spaces_is_compared_exactly():
+    sync, bridge, _mapping = _state_sync(_map(_thermostat(off_name=" Arret ")))
+    assert await sync.handle_state_message(EQ, MODE, " Arret ") is True
+    assert (_topic("mode"), "off", 1, True) in bridge.published

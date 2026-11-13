@@ -222,6 +222,11 @@ Branche `story/24-15-thermostat-climate-complet` rebasée sur `origin/main` `61f
 - **Non-régression** : 3 assertions de 10-2 adaptées ; golden 8.4 enrichi (thermostat 11000 complet avec verrou, 11002 partiel, 11001 inchangé ; ajouts en tête des listes de commandes) et régénéré ; références des gardes 19-4 régénérées ; seuls les thermostats synthétiques changent. Garde 25.4 : `REPLACED_BY_24_15` (lignes remplacées, « fichier::ligne »). `desktop/js/jeedom2ha_mapping_override.js` non touché.
 - **Documentation** : section « Thermostats » de `docs/fr_FR/index.md`, `changelog_beta.md`, `README.md`.
 
+### Relecture Codex de la PR #377 (2026-11-13)
+
+- **Événements mémorisés contre lecture fraîche** : `StateSynchronizer.reconcile_fresh_read(decision, read_at, values)` remplace, pour chaque commande de l'équipement, un événement reçu **avant** la lecture par la valeur lue (ou le retire s'il n'y en a pas) ; un événement postérieur est gardé. Appelée par la synchro (instant relevé à l'arrivée de la requête, avant l'attente du verrou, avec les valeurs de topologie) et par « Publier » (`fresh_since`, valeurs lues au clic). Le pair de l'action, l'ordre `heat` et les ordres directs du portail (lecteur partagé `_last_known_barrier_value`) lisent ainsi la valeur la plus récente. Limite : un événement reçu entre la lecture PHP de la topologie et l'arrivée de la requête est remplacé par la topologie, plus ancienne de quelques instants.
+- **Espaces des noms de mode** : la valeur brute est comparée au nom de l'arrêt et aux presets ; `strip()` ne sert qu'à détecter une valeur vide et aux conversions numériques.
+
 ### Écarts et points ouverts
 
 - **AC8, topic de température** : `jeedom2ha/<eq>/current_temperature` garde le même nom qu'avant (c'est aussi le topic proposé en Dev Notes) ; il n'avait jamais été publié (F4), rien à purger. Seul `…/temperature/state` disparaît.
