@@ -72,6 +72,12 @@ class ClimateCapabilities:
     """
     has_setpoint: bool = False
     has_current_temperature: bool = False
+    # Story 24.15 — état, mode, presets et chauffe d'un thermostat (D1, D2, D3).
+    has_setpoint_state: bool = False   # THERMOSTAT_SETPOINT info : consigne courante
+    has_mode: bool = False             # THERMOSTAT_MODE info : mode_state_topic
+    has_off: bool = False              # ordre d'arrêt (logical_id ``off``) + info de mode
+    has_presets: bool = False          # ordres de mode nommés + info de mode
+    has_action: bool = False           # THERMOSTAT_STATE info : action_topic
 
 
 @dataclass

@@ -5912,6 +5912,54 @@
           "matched_commands": [
             {
               "attendu_ha": "climate",
+              "cmd_id": 110003,
+              "cmd_name": "Consigne courante",
+              "generic_type": "THERMOSTAT_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110004,
+              "cmd_name": "Mode",
+              "generic_type": "THERMOSTAT_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110005,
+              "cmd_name": "Mode A",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110006,
+              "cmd_name": "Mode B",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110007,
+              "cmd_name": "Off",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110008,
+              "cmd_name": "Chauffe",
+              "generic_type": "THERMOSTAT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
               "cmd_id": 110001,
               "cmd_name": "Consigne",
               "generic_type": "THERMOSTAT_SET_SETPOINT",
@@ -5943,6 +5991,51 @@
               "reason_code": "published"
             },
             "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SETPOINT",
+                "id": 110003,
+                "name": "Consigne courante"
+              },
+              {
+                "generic_type": "THERMOSTAT_MODE",
+                "id": 110004,
+                "name": "Mode"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110005,
+                "name": "Mode A"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110006,
+                "name": "Mode B"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110007,
+                "name": "Off"
+              },
+              {
+                "generic_type": "THERMOSTAT_STATE",
+                "id": 110008,
+                "name": "Chauffe"
+              },
+              {
+                "generic_type": "THERMOSTAT_LOCK",
+                "id": 110009,
+                "name": "Verrou"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_LOCK",
+                "id": 110010,
+                "name": "Verrouiller"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_UNLOCK",
+                "id": 110012,
+                "name": "Deverrouiller"
+              },
               {
                 "generic_type": "THERMOSTAT_SET_SETPOINT",
                 "id": 110001,
@@ -5976,10 +6069,71 @@
                 "configured_type": "THERMOSTAT_TEMPERATURE",
                 "logical_role": "THERMOSTAT_TEMPERATURE",
                 "used_type": "THERMOSTAT_TEMPERATURE"
+              },
+              {
+                "command_id": 110003,
+                "configured_type": "THERMOSTAT_SETPOINT",
+                "logical_role": "THERMOSTAT_SETPOINT",
+                "used_type": "THERMOSTAT_SETPOINT"
+              },
+              {
+                "command_id": 110008,
+                "configured_type": "THERMOSTAT_STATE",
+                "logical_role": "THERMOSTAT_STATE",
+                "used_type": "THERMOSTAT_STATE"
+              },
+              {
+                "command_id": 110004,
+                "configured_type": "THERMOSTAT_MODE",
+                "logical_role": "THERMOSTAT_MODE",
+                "used_type": "THERMOSTAT_MODE"
+              },
+              {
+                "command_id": 110007,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_OFF",
+                "used_type": "THERMOSTAT_SET_MODE"
+              },
+              {
+                "command_id": 110005,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110005",
+                "used_type": "THERMOSTAT_SET_MODE"
+              },
+              {
+                "command_id": 110006,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110006",
+                "used_type": "THERMOSTAT_SET_MODE"
               }
             ]
           },
-          "unmatched_commands": [],
+          "unmatched_commands": [
+            {
+              "attendu_ha": null,
+              "cmd_id": 110009,
+              "cmd_name": "Verrou",
+              "generic_type": "THERMOSTAT_LOCK",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 110010,
+              "cmd_name": "Verrouiller",
+              "generic_type": "THERMOSTAT_SET_LOCK",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 110012,
+              "cmd_name": "Deverrouiller",
+              "generic_type": "THERMOSTAT_SET_UNLOCK",
+              "mapping_decision": null,
+              "retained": false
+            }
+          ],
           "v1_compatibility": false,
           "v1_limitation": false
         },
@@ -6091,6 +6245,38 @@
           "matched_commands": [
             {
               "attendu_ha": "climate",
+              "cmd_id": 110023,
+              "cmd_name": "Consigne courante",
+              "generic_type": "THERMOSTAT_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110024,
+              "cmd_name": "Mode",
+              "generic_type": "THERMOSTAT_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110025,
+              "cmd_name": "Mode A",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110026,
+              "cmd_name": "Chauffe",
+              "generic_type": "THERMOSTAT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
               "cmd_id": 110021,
               "cmd_name": "Consigne",
               "generic_type": "THERMOSTAT_SET_SETPOINT",
@@ -6122,6 +6308,26 @@
               "reason_code": "published"
             },
             "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SETPOINT",
+                "id": 110023,
+                "name": "Consigne courante"
+              },
+              {
+                "generic_type": "THERMOSTAT_MODE",
+                "id": 110024,
+                "name": "Mode"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110025,
+                "name": "Mode A"
+              },
+              {
+                "generic_type": "THERMOSTAT_STATE",
+                "id": 110026,
+                "name": "Chauffe"
+              },
               {
                 "generic_type": "THERMOSTAT_SET_SETPOINT",
                 "id": 110021,
@@ -6155,6 +6361,30 @@
                 "configured_type": "THERMOSTAT_TEMPERATURE",
                 "logical_role": "THERMOSTAT_TEMPERATURE",
                 "used_type": "THERMOSTAT_TEMPERATURE"
+              },
+              {
+                "command_id": 110023,
+                "configured_type": "THERMOSTAT_SETPOINT",
+                "logical_role": "THERMOSTAT_SETPOINT",
+                "used_type": "THERMOSTAT_SETPOINT"
+              },
+              {
+                "command_id": 110026,
+                "configured_type": "THERMOSTAT_STATE",
+                "logical_role": "THERMOSTAT_STATE",
+                "used_type": "THERMOSTAT_STATE"
+              },
+              {
+                "command_id": 110024,
+                "configured_type": "THERMOSTAT_MODE",
+                "logical_role": "THERMOSTAT_MODE",
+                "used_type": "THERMOSTAT_MODE"
+              },
+              {
+                "command_id": 110025,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110025",
+                "used_type": "THERMOSTAT_SET_MODE"
               }
             ]
           },
@@ -12149,6 +12379,54 @@
           "matched_commands": [
             {
               "attendu_ha": "climate",
+              "cmd_id": 110003,
+              "cmd_name": "Consigne courante",
+              "generic_type": "THERMOSTAT_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110004,
+              "cmd_name": "Mode",
+              "generic_type": "THERMOSTAT_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110005,
+              "cmd_name": "Mode A",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110006,
+              "cmd_name": "Mode B",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110007,
+              "cmd_name": "Off",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110008,
+              "cmd_name": "Chauffe",
+              "generic_type": "THERMOSTAT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
               "cmd_id": 110001,
               "cmd_name": "Consigne",
               "generic_type": "THERMOSTAT_SET_SETPOINT",
@@ -12180,6 +12458,51 @@
               "reason_code": "published"
             },
             "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SETPOINT",
+                "id": 110003,
+                "name": "Consigne courante"
+              },
+              {
+                "generic_type": "THERMOSTAT_MODE",
+                "id": 110004,
+                "name": "Mode"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110005,
+                "name": "Mode A"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110006,
+                "name": "Mode B"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110007,
+                "name": "Off"
+              },
+              {
+                "generic_type": "THERMOSTAT_STATE",
+                "id": 110008,
+                "name": "Chauffe"
+              },
+              {
+                "generic_type": "THERMOSTAT_LOCK",
+                "id": 110009,
+                "name": "Verrou"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_LOCK",
+                "id": 110010,
+                "name": "Verrouiller"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_UNLOCK",
+                "id": 110012,
+                "name": "Deverrouiller"
+              },
               {
                 "generic_type": "THERMOSTAT_SET_SETPOINT",
                 "id": 110001,
@@ -12213,10 +12536,71 @@
                 "configured_type": "THERMOSTAT_TEMPERATURE",
                 "logical_role": "THERMOSTAT_TEMPERATURE",
                 "used_type": "THERMOSTAT_TEMPERATURE"
+              },
+              {
+                "command_id": 110003,
+                "configured_type": "THERMOSTAT_SETPOINT",
+                "logical_role": "THERMOSTAT_SETPOINT",
+                "used_type": "THERMOSTAT_SETPOINT"
+              },
+              {
+                "command_id": 110008,
+                "configured_type": "THERMOSTAT_STATE",
+                "logical_role": "THERMOSTAT_STATE",
+                "used_type": "THERMOSTAT_STATE"
+              },
+              {
+                "command_id": 110004,
+                "configured_type": "THERMOSTAT_MODE",
+                "logical_role": "THERMOSTAT_MODE",
+                "used_type": "THERMOSTAT_MODE"
+              },
+              {
+                "command_id": 110007,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_OFF",
+                "used_type": "THERMOSTAT_SET_MODE"
+              },
+              {
+                "command_id": 110005,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110005",
+                "used_type": "THERMOSTAT_SET_MODE"
+              },
+              {
+                "command_id": 110006,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110006",
+                "used_type": "THERMOSTAT_SET_MODE"
               }
             ]
           },
-          "unmatched_commands": [],
+          "unmatched_commands": [
+            {
+              "attendu_ha": null,
+              "cmd_id": 110009,
+              "cmd_name": "Verrou",
+              "generic_type": "THERMOSTAT_LOCK",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 110010,
+              "cmd_name": "Verrouiller",
+              "generic_type": "THERMOSTAT_SET_LOCK",
+              "mapping_decision": null,
+              "retained": false
+            },
+            {
+              "attendu_ha": null,
+              "cmd_id": 110012,
+              "cmd_name": "Deverrouiller",
+              "generic_type": "THERMOSTAT_SET_UNLOCK",
+              "mapping_decision": null,
+              "retained": false
+            }
+          ],
           "v1_compatibility": false,
           "v1_limitation": false
         },
@@ -12328,6 +12712,38 @@
           "matched_commands": [
             {
               "attendu_ha": "climate",
+              "cmd_id": 110023,
+              "cmd_name": "Consigne courante",
+              "generic_type": "THERMOSTAT_SETPOINT",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110024,
+              "cmd_name": "Mode",
+              "generic_type": "THERMOSTAT_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110025,
+              "cmd_name": "Mode A",
+              "generic_type": "THERMOSTAT_SET_MODE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
+              "cmd_id": 110026,
+              "cmd_name": "Chauffe",
+              "generic_type": "THERMOSTAT_STATE",
+              "mapping_decision": "climate",
+              "retained": true
+            },
+            {
+              "attendu_ha": "climate",
               "cmd_id": 110021,
               "cmd_name": "Consigne",
               "generic_type": "THERMOSTAT_SET_SETPOINT",
@@ -12359,6 +12775,26 @@
               "reason_code": "published"
             },
             "observed_commands": [
+              {
+                "generic_type": "THERMOSTAT_SETPOINT",
+                "id": 110023,
+                "name": "Consigne courante"
+              },
+              {
+                "generic_type": "THERMOSTAT_MODE",
+                "id": 110024,
+                "name": "Mode"
+              },
+              {
+                "generic_type": "THERMOSTAT_SET_MODE",
+                "id": 110025,
+                "name": "Mode A"
+              },
+              {
+                "generic_type": "THERMOSTAT_STATE",
+                "id": 110026,
+                "name": "Chauffe"
+              },
               {
                 "generic_type": "THERMOSTAT_SET_SETPOINT",
                 "id": 110021,
@@ -12392,6 +12828,30 @@
                 "configured_type": "THERMOSTAT_TEMPERATURE",
                 "logical_role": "THERMOSTAT_TEMPERATURE",
                 "used_type": "THERMOSTAT_TEMPERATURE"
+              },
+              {
+                "command_id": 110023,
+                "configured_type": "THERMOSTAT_SETPOINT",
+                "logical_role": "THERMOSTAT_SETPOINT",
+                "used_type": "THERMOSTAT_SETPOINT"
+              },
+              {
+                "command_id": 110026,
+                "configured_type": "THERMOSTAT_STATE",
+                "logical_role": "THERMOSTAT_STATE",
+                "used_type": "THERMOSTAT_STATE"
+              },
+              {
+                "command_id": 110024,
+                "configured_type": "THERMOSTAT_MODE",
+                "logical_role": "THERMOSTAT_MODE",
+                "used_type": "THERMOSTAT_MODE"
+              },
+              {
+                "command_id": 110025,
+                "configured_type": "THERMOSTAT_SET_MODE",
+                "logical_role": "THERMOSTAT_SET_MODE_110025",
+                "used_type": "THERMOSTAT_SET_MODE"
               }
             ]
           },
@@ -12707,9 +13167,9 @@
       "sensors_sure": 30,
       "switches_ambiguous": 1,
       "switches_probable": 11,
-      "switches_published": 14,
+      "switches_published": 15,
       "switches_skipped": 1,
-      "switches_sure": 3,
+      "switches_sure": 4,
       "valves_ambiguous": 0,
       "valves_probable": 0,
       "valves_published": 0,
@@ -13497,15 +13957,56 @@
       },
       "11000": {
         "capabilities": {
+          "has_action": true,
           "has_current_temperature": true,
-          "has_setpoint": true
+          "has_mode": true,
+          "has_off": true,
+          "has_presets": true,
+          "has_setpoint": true,
+          "has_setpoint_state": true
         },
         "commands": {
+          "THERMOSTAT_MODE": {
+            "generic_type": "THERMOSTAT_MODE",
+            "id": 110004,
+            "sub_type": "string",
+            "type": "info"
+          },
+          "THERMOSTAT_SETPOINT": {
+            "generic_type": "THERMOSTAT_SETPOINT",
+            "id": 110003,
+            "sub_type": "numeric",
+            "type": "info"
+          },
+          "THERMOSTAT_SET_MODE_110005": {
+            "generic_type": "THERMOSTAT_SET_MODE",
+            "id": 110005,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "THERMOSTAT_SET_MODE_110006": {
+            "generic_type": "THERMOSTAT_SET_MODE",
+            "id": 110006,
+            "sub_type": "other",
+            "type": "action"
+          },
+          "THERMOSTAT_SET_MODE_OFF": {
+            "generic_type": "THERMOSTAT_SET_MODE",
+            "id": 110007,
+            "sub_type": "other",
+            "type": "action"
+          },
           "THERMOSTAT_SET_SETPOINT": {
             "generic_type": "THERMOSTAT_SET_SETPOINT",
             "id": 110001,
             "sub_type": "slider",
             "type": "action"
+          },
+          "THERMOSTAT_STATE": {
+            "generic_type": "THERMOSTAT_STATE",
+            "id": 110008,
+            "sub_type": "binary",
+            "type": "info"
           },
           "THERMOSTAT_TEMPERATURE": {
             "generic_type": "THERMOSTAT_TEMPERATURE",
@@ -13546,15 +14047,30 @@
         "reason_code": "climate_thermostat_setpoint",
         "reason_details": {
           "current_temperature_topic": "jeedom2ha/11000/current_temperature",
+          "off_mode_name": "Off",
+          "preset_commands": {
+            "Mode A": 110005,
+            "Mode B": 110006
+          },
+          "preset_modes": [
+            "Mode A",
+            "Mode B"
+          ],
           "temperature_command_topic": "jeedom2ha/11000/temperature/set",
-          "temperature_state_topic": "jeedom2ha/11000/temperature/state"
+          "temperature_state_topic": "jeedom2ha/11000/setpoint",
+          "temperature_unit": "C"
         },
         "suggested_area": "Salon"
       },
       "11001": {
         "capabilities": {
+          "has_action": false,
           "has_current_temperature": false,
-          "has_setpoint": true
+          "has_mode": false,
+          "has_off": false,
+          "has_presets": false,
+          "has_setpoint": true,
+          "has_setpoint_state": false
         },
         "commands": {
           "THERMOSTAT_SET_SETPOINT": {
@@ -13595,22 +14111,50 @@
         },
         "reason_code": "climate_thermostat_setpoint",
         "reason_details": {
-          "temperature_command_topic": "jeedom2ha/11001/temperature/set",
-          "temperature_state_topic": "jeedom2ha/11001/temperature/state"
+          "temperature_command_topic": "jeedom2ha/11001/temperature/set"
         },
         "suggested_area": "Salon"
       },
       "11002": {
         "capabilities": {
+          "has_action": true,
           "has_current_temperature": true,
-          "has_setpoint": true
+          "has_mode": true,
+          "has_off": false,
+          "has_presets": true,
+          "has_setpoint": true,
+          "has_setpoint_state": true
         },
         "commands": {
+          "THERMOSTAT_MODE": {
+            "generic_type": "THERMOSTAT_MODE",
+            "id": 110024,
+            "sub_type": "string",
+            "type": "info"
+          },
+          "THERMOSTAT_SETPOINT": {
+            "generic_type": "THERMOSTAT_SETPOINT",
+            "id": 110023,
+            "sub_type": "numeric",
+            "type": "info"
+          },
+          "THERMOSTAT_SET_MODE_110025": {
+            "generic_type": "THERMOSTAT_SET_MODE",
+            "id": 110025,
+            "sub_type": "other",
+            "type": "action"
+          },
           "THERMOSTAT_SET_SETPOINT": {
             "generic_type": "THERMOSTAT_SET_SETPOINT",
             "id": 110021,
             "sub_type": "slider",
             "type": "action"
+          },
+          "THERMOSTAT_STATE": {
+            "generic_type": "THERMOSTAT_STATE",
+            "id": 110026,
+            "sub_type": "binary",
+            "type": "info"
           },
           "THERMOSTAT_TEMPERATURE": {
             "generic_type": "THERMOSTAT_TEMPERATURE",
@@ -13651,8 +14195,14 @@
         "reason_code": "climate_thermostat_setpoint",
         "reason_details": {
           "current_temperature_topic": "jeedom2ha/11002/current_temperature",
+          "preset_commands": {
+            "Mode A": 110025
+          },
+          "preset_modes": [
+            "Mode A"
+          ],
           "temperature_command_topic": "jeedom2ha/11002/temperature/set",
-          "temperature_state_topic": "jeedom2ha/11002/temperature/state"
+          "temperature_state_topic": "jeedom2ha/11002/setpoint"
         },
         "suggested_area": "Chambre"
       },
@@ -15036,8 +15586,13 @@
       },
       "6001": {
         "capabilities": {
+          "has_action": false,
           "has_current_temperature": false,
-          "has_setpoint": true
+          "has_mode": false,
+          "has_off": false,
+          "has_presets": false,
+          "has_setpoint": true,
+          "has_setpoint_state": false
         },
         "commands": {
           "LIGHT_OFF": {
@@ -16913,9 +17468,9 @@
         "sensors_sure": 30,
         "switches_ambiguous": 1,
         "switches_probable": 11,
-        "switches_published": 14,
+        "switches_published": 15,
         "switches_skipped": 1,
-        "switches_sure": 3,
+        "switches_sure": 4,
         "valves_ambiguous": 0,
         "valves_probable": 0,
         "valves_published": 0,
@@ -17506,7 +18061,7 @@
           }
         ]
       },
-      "total_cmds": 174,
+      "total_cmds": 187,
       "total_eq_logics": 59,
       "total_objects": 3
     },

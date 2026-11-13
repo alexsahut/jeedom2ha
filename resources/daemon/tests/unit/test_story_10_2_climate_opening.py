@@ -92,7 +92,8 @@ def test_climate_mapper_nominal_with_temperature():
     assert "THERMOSTAT_SET_SETPOINT" in mapping.commands
     assert "THERMOSTAT_TEMPERATURE" in mapping.commands
     assert mapping.reason_details["temperature_command_topic"] == "jeedom2ha/5100/temperature/set"
-    assert mapping.reason_details["temperature_state_topic"] == "jeedom2ha/5100/temperature/state"
+    # Story 24.15 : l'état de la consigne vient de THERMOSTAT_SETPOINT (absente ici) : aucun topic inventé.
+    assert "temperature_state_topic" not in mapping.reason_details
     assert mapping.reason_details["current_temperature_topic"] == "jeedom2ha/5100/current_temperature"
 
 
@@ -256,10 +257,11 @@ async def test_publish_climate_with_current_temperature():
     assert topic == "homeassistant/climate/jeedom2ha_5100/config"
     assert payload["unique_id"] == "jeedom2ha_eq_5100"
     assert payload["temperature_command_topic"] == "jeedom2ha/5100/temperature/set"
-    assert payload["temperature_state_topic"] == "jeedom2ha/5100/temperature/state"
+    assert "temperature_state_topic" not in payload  # Story 24.15 : pas de THERMOSTAT_SETPOINT
     assert payload["current_temperature_topic"] == "jeedom2ha/5100/current_temperature"
     assert "modes" in payload
-    assert "off" in payload["modes"]
+    # Story 24.15 (D1 A) : sans ordre d'arrêt ni info de mode, seul « heat » est proposé.
+    assert payload["modes"] == ["heat"]
 
 
 @pytest.mark.asyncio

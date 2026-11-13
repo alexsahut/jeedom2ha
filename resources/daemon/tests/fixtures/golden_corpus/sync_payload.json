@@ -1913,6 +1913,77 @@
     {
       "cmds": [
         {
+          "current_value": "19.5",
+          "generic_type": "THERMOSTAT_SETPOINT",
+          "id": 110003,
+          "name": "Consigne courante",
+          "sub_type": "numeric",
+          "type": "info",
+          "unit": "°C"
+        },
+        {
+          "current_value": "Mode A",
+          "generic_type": "THERMOSTAT_MODE",
+          "id": 110004,
+          "name": "Mode",
+          "sub_type": "string",
+          "type": "info"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_MODE",
+          "id": 110005,
+          "logical_id": "modeAction",
+          "name": "Mode A",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_MODE",
+          "id": 110006,
+          "logical_id": "modeAction",
+          "name": "Mode B",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_MODE",
+          "id": 110007,
+          "logical_id": "off",
+          "name": "Off",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "current_value": "1",
+          "generic_type": "THERMOSTAT_STATE",
+          "id": 110008,
+          "name": "Chauffe",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "current_value": "0",
+          "generic_type": "THERMOSTAT_LOCK",
+          "id": 110009,
+          "name": "Verrou",
+          "sub_type": "binary",
+          "type": "info"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_LOCK",
+          "id": 110010,
+          "name": "Verrouiller",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_UNLOCK",
+          "id": 110012,
+          "name": "Deverrouiller",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
           "generic_type": "THERMOSTAT_SET_SETPOINT",
           "id": 110001,
           "name": "Consigne",
@@ -1963,6 +2034,38 @@
     },
     {
       "cmds": [
+        {
+          "current_value": "18",
+          "generic_type": "THERMOSTAT_SETPOINT",
+          "id": 110023,
+          "name": "Consigne courante",
+          "sub_type": "numeric",
+          "type": "info"
+        },
+        {
+          "current_value": "Aucun",
+          "generic_type": "THERMOSTAT_MODE",
+          "id": 110024,
+          "name": "Mode",
+          "sub_type": "string",
+          "type": "info"
+        },
+        {
+          "generic_type": "THERMOSTAT_SET_MODE",
+          "id": 110025,
+          "logical_id": "modeAction",
+          "name": "Mode A",
+          "sub_type": "other",
+          "type": "action"
+        },
+        {
+          "current_value": "0",
+          "generic_type": "THERMOSTAT_STATE",
+          "id": 110026,
+          "name": "Chauffe",
+          "sub_type": "binary",
+          "type": "info"
+        },
         {
           "generic_type": "THERMOSTAT_SET_SETPOINT",
           "id": 110021,

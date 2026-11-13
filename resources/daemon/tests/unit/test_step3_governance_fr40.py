@@ -297,6 +297,17 @@ def test_governance_fr40_proof_climate():
     assert result_fail.reason_code == "ha_missing_temperature_command_topic"
     assert "has_setpoint" in result_fail.missing_capabilities
 
+    # Story 24.15 (AC1) — thermostat complet : nominal avec toutes les capacités d'état et de
+    # mode ; échec : l'état, le mode, les presets et la chauffe ne remplacent pas l'ordre de consigne.
+    full = ClimateCapabilities(has_setpoint=True, has_current_temperature=True, has_setpoint_state=True,
+                               has_mode=True, has_off=True, has_presets=True, has_action=True)
+    assert validate_projection("climate", full).is_valid is True
+    without_order = ClimateCapabilities(has_setpoint=False, has_current_temperature=True, has_setpoint_state=True,
+                                        has_mode=True, has_off=True, has_presets=True, has_action=True)
+    result_fail_full = validate_projection("climate", without_order)
+    assert result_fail_full.is_valid is False
+    assert result_fail_full.reason_code == "ha_missing_temperature_command_topic"
+
 
 # ---------------------------------------------------------------------------
 # Preuve de gouvernance FR40 : alarm_control_panel (Story 10.3)

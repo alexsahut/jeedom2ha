@@ -23,8 +23,9 @@ type-scoped ``streams_actionable_type`` is what ``CommandSynchronizer`` must
 honor: a streamed type flips to real-state confirmation only when the entity has
 a real readback info command (reliability is evaluated per channel); otherwise it
 keeps its optimistic / stateless path (no false readback — AC#6).
-Domains not yet streamed (climate, alarm_control_panel) are governed later waves
-(FR49).
+Story 24.15 adds ``climate``: setpoint, current temperature, mode, preset and action
+channels (``sync.readback.climate_readback_commands``). ``alarm_control_panel`` is not
+streamed yet (FR49).
 """
 
 from __future__ import annotations
@@ -52,6 +53,23 @@ from sync.readback import (
     valve_state,
 )
 from sync.readback import lock_state  # Story 24.9
+from sync.readback import (  # Story 24.15
+    CLIMATE_READBACK_KEYS,
+    climate_action,
+    climate_hvac_mode,
+    climate_number,
+    climate_preset,
+)
+from mapping.climate import (  # Story 24.15
+    CHANNEL_ACTION,
+    CHANNEL_CURRENT_TEMPERATURE,
+    CHANNEL_MODE,
+    CHANNEL_PRESET,
+    CHANNEL_SETPOINT,
+    CLIMATE_STATE_CHANNELS,
+    THERMOSTAT_MODE,
+    THERMOSTAT_STATE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,6 +89,10 @@ _STREAMED_TYPES = _STREAMED_TYPES + _VALVE_ACTIONABLE
 _LOCK_ACTIONABLE = ("lock",)
 _ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _LOCK_ACTIONABLE
 _STREAMED_TYPES = _STREAMED_TYPES + _LOCK_ACTIONABLE
+# Story 24.15: climate setpoint / temperature / mode / preset / action (D1, D2, D3).
+_CLIMATE_ACTIONABLE = ("climate",)
+_ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _CLIMATE_ACTIONABLE
+_STREAMED_TYPES = _STREAMED_TYPES + _CLIMATE_ACTIONABLE
 
 # Readback (info) command keys per actionable type — used to pick the state
 # command, NOT the action commands (e.g. switch ENERGY_ON/ENERGY_OFF).
@@ -86,10 +108,14 @@ _READBACK_KEYS = {
     "cover": STATE_KEYS["cover"],
     "valve": STATE_KEYS["valve"],
     "lock": STATE_KEYS["lock"],
+    "climate": CLIMATE_READBACK_KEYS,  # Story 24.15
 }
 
 # Strict shape of the retained channel topics this module may empty (never anything else).
-_CHANNEL_TOPIC_RE = re.compile(r"jeedom2ha/\d+/(?:state|brightness|position)")
+# Story 24.15: plus the climate channels (setpoint, current_temperature, mode, preset, action).
+_CHANNEL_TOPIC_RE = re.compile(
+    r"jeedom2ha/\d+/(?:state|brightness|position|setpoint|current_temperature|mode|preset|action)"
+)
 
 _RETAINED_CHANNELS_FILENAME = "jeedom2ha_retained_channels.json"
 # Registry writes are coalesced: one disk write per window, not one per new topic
@@ -101,6 +127,7 @@ _REGISTRY_SAVE_DELAY_S = 2.0
 _PURGEABLE_CHANNELS = {
     "light": (CHANNEL_STATE, CHANNEL_BRIGHTNESS),
     "cover": (CHANNEL_STATE, CHANNEL_POSITION),
+    "climate": CLIMATE_STATE_CHANNELS,  # Story 24.15 (AC8)
 }
 
 # Types whose value is translated to ON/OFF (vs raw passthrough for sensor).
@@ -113,6 +140,9 @@ _BINARY_TRUE = {"1", "true", "on", "open", "opened"}
 # Explicit "off" values for a cover state: anything unrecognised publishes nothing
 # (no value invented).
 _BINARY_FALSE = {"0", "false", "off", "closed", "close"}
+# Story 24.15 (D4 A) — thermostat lock values (1 = locked = ON); anything else: nothing.
+_LOCK_SWITCH_ON = frozenset({"1", "true", "on"})
+_LOCK_SWITCH_OFF = frozenset({"0", "false", "off"})
 
 
 class _Binding(NamedTuple):
@@ -399,7 +429,12 @@ class StateSynchronizer:
             # Story 23.3 (Q7): a light/cover channel that lost its readback must not
             # keep a stale retained real state next to the optimistic path.
             failed += self._purge_invalid_retained(candidate, str(state_topic), eq_id)
+            # Story 24.15: two commands feed the climate ``action`` topic (state, mode):
+            # one publication per topic, the first readable value wins.
+            done_topics: Set[str] = set()
             for binding in self._candidate_bindings(candidate, cand_decision, eq_id):
+                if binding.topic in done_topics:
+                    continue
                 raw_value = value_resolver(eq_id, binding)
                 if raw_value is None:
                     if no_value_reason_code:
@@ -409,11 +444,14 @@ class StateSynchronizer:
                     continue
                 payload = self._translate_value(
                     candidate, raw_value, binding.channel, binding.cmd,
+                    # Story 24.15: a peer command (climate action) is read from the same source.
+                    peer=lambda peer_cmd: value_resolver(eq_id, self._peer_binding(peer_cmd)),
                 )
                 if payload is None:
                     continue
                 if self._mqtt_bridge.publish_message(binding.topic, payload, qos=1, retain=True):
                     published += 1
+                    done_topics.add(binding.topic)
                     self._remember_retained(binding.topic)
                     self._log(logging.INFO, eq_id=eq_id, cmd_id=binding.cmd_id,
                               reason_code="initial_state_published", action="publish_snapshot",
@@ -713,6 +751,7 @@ class StateSynchronizer:
         value: Any,
         channel: str = CHANNEL_STATE,
         cmd: Any = None,
+        peer: Any = None,
     ) -> Optional[str]:
         """Translate a Jeedom info value to the MQTT payload of one channel.
 
@@ -732,6 +771,10 @@ class StateSynchronizer:
             return None
 
         ha_type = mapping.ha_entity_type
+        if ha_type == "climate":
+            # Story 24.15 (D1, D2, D3).
+            return self._translate_climate_value(mapping, text, channel, cmd, peer)
+
         if channel in (CHANNEL_BRIGHTNESS, CHANNEL_POSITION):
             level = self._parse_percent(text)
             return None if level is None else str(level)
@@ -782,9 +825,67 @@ class StateSynchronizer:
                 return None
             return "ON" if level > 0 else "OFF"
 
+        if ha_type == "switch" and (mapping.reason_details or {}).get("thermostat_lock"):
+            # Story 24.15 (D4 A): 1 = verrouillé = ON ; toute autre valeur : rien publié.
+            lowered = text.lower()
+            if lowered in _LOCK_SWITCH_ON:
+                return "ON"
+            if lowered in _LOCK_SWITCH_OFF:
+                return "OFF"
+            return None
+
         if ha_type in _ONOFF_TYPES or ha_type == "light":
             return "ON" if text.lower() in _BINARY_TRUE else "OFF"
         return text
+
+    def _translate_climate_value(
+        self,
+        mapping: MappingResult,
+        text: str,
+        channel: str,
+        cmd: Any,
+        peer: Any,
+    ) -> Optional[str]:
+        """Story 24.15 — one climate channel; None when nothing honest can be published.
+
+        ``action`` depends on two commands (D2: the stop wins over the heating state): the
+        value of the other one is read through ``peer`` (same source as the event or the
+        snapshot being published), by default the last Jeedom event, else the topology value.
+        """
+        caps = getattr(mapping, "capabilities", None)
+        details = mapping.reason_details or {}
+        off_name = details.get("off_mode_name") if getattr(caps, "has_off", False) else None
+        if channel in (CHANNEL_SETPOINT, CHANNEL_CURRENT_TEMPERATURE):
+            return climate_number(text)
+        if channel == CHANNEL_MODE:
+            return climate_hvac_mode(text, off_name)
+        if channel == CHANNEL_PRESET:
+            return climate_preset(text, details.get("preset_modes"))
+        if channel != CHANNEL_ACTION:
+            return None
+        commands = mapping.commands or {}
+        mode_cmd = commands.get(THERMOSTAT_MODE) if getattr(caps, "has_mode", False) else None
+        state_cmd = commands.get(THERMOSTAT_STATE)
+        read_peer = peer if callable(peer) else (
+            lambda peer_cmd: self._last_known_value(mapping.jeedom_eq_id, peer_cmd)
+        )
+        if mode_cmd is not None and self._coerce_cmd_id(cmd) == self._coerce_cmd_id(mode_cmd):
+            mode_value = text
+            state_value = read_peer(state_cmd) if state_cmd is not None else None
+        else:
+            state_value = text
+            mode_value = read_peer(mode_cmd) if mode_cmd is not None else None
+        return climate_action(state_value, mode_value, off_name)
+
+    def _last_known_value(self, eq_id: Any, cmd: Any) -> Any:
+        """Story 24.15 — last Jeedom event of ``cmd``, else its topology value (never invented)."""
+        value = self.last_event_value(eq_id, getattr(cmd, "id", None))
+        return value if value is not None else getattr(cmd, "current_value", None)
+
+    def _peer_binding(self, cmd: Any) -> "_Binding":
+        """Story 24.15 — a binding-shaped view of a peer command, for the value resolvers."""
+        return _Binding(CHANNEL_STATE, cmd, self._coerce_cmd_id(cmd), "",
+                        getattr(cmd, "current_value", None))
 
     @staticmethod
     def _parse_percent(text: str) -> Optional[int]:

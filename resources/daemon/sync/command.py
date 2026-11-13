@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 import sys
 import time
@@ -16,6 +17,24 @@ from models.availability import AVAILABILITY_OFFLINE
 from models.mapping import MappingResult, PublicationDecision
 from sync.readback import CHANNEL_STATE, has_reliable_channel
 from sync.readback import barrier_mode, barrier_state, is_barrier_state_command  # Story 24.7
+from sync.readback import climate_hvac_mode, climate_number  # Story 24.15
+from mapping.climate import (  # Story 24.15
+    CHANNEL_MODE as CLIMATE_CHANNEL_MODE,
+    CHANNEL_SETPOINT as CLIMATE_CHANNEL_SETPOINT,
+    COMMAND_CHANNEL_MODE,
+    COMMAND_CHANNEL_PRESET,
+    COMMAND_CHANNEL_TEMPERATURE,
+    HA_PRESET_NONE,
+    SETPOINT_STEP,
+    THERMOSTAT_MODE,
+    THERMOSTAT_SET_LOCK,
+    THERMOSTAT_SET_MODE,
+    THERMOSTAT_SET_MODE_OFF,
+    THERMOSTAT_SET_SETPOINT,
+    THERMOSTAT_SET_UNLOCK,
+    THERMOSTAT_SETPOINT,
+    climate_command_topic,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +42,10 @@ _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
 _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
+# Story 24.15 — climate orders: setpoint, mode (heat / off), preset.
+_CLIMATE_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<channel>temperature|mode|preset)/set$")
+# Story 24.15 — command families of a climate (confirmation by the streamed state only).
+_CLIMATE_FAMILIES = ("climate_setpoint", "climate_mode", "climate_preset")
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
 # Story 24.12 — equipment button (ButtonMapper / FallbackMapper): jeedom2ha/{eq_id}/cmd.
 _BUTTON_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/cmd$")
@@ -307,6 +330,11 @@ class CommandSynchronizer:
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="position"), None
 
+        match = _CLIMATE_TOPIC_RE.match(topic)
+        if match:
+            # Story 24.15 — routed only if a published climate of this equipment declares it.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel=match.group("channel")), None
+
         match = _BUTTON_CMD_TOPIC_RE.match(topic)
         if match:
             # Story 24.12 — routed only if a published button of this equipment exposes it.
@@ -427,6 +455,16 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "climate":
+            # Story 24.15 — exactly the order topics the discovery declares (publisher
+            # ``_build_climate_payload``): setpoint always, mode with a stop order, presets.
+            caps = mapping.capabilities
+            topics[COMMAND_CHANNEL_TEMPERATURE] = climate_command_topic(eq_id, COMMAND_CHANNEL_TEMPERATURE)
+            if getattr(caps, "has_mode", False) and getattr(caps, "has_off", False):
+                topics[COMMAND_CHANNEL_MODE] = climate_command_topic(eq_id, COMMAND_CHANNEL_MODE)
+            if getattr(caps, "has_mode", False) and getattr(caps, "has_presets", False):
+                topics[COMMAND_CHANNEL_PRESET] = climate_command_topic(eq_id, COMMAND_CHANNEL_PRESET)
+
         if mapping.ha_entity_type == "button":
             # Story 24.12 — the exact topic the discovery publishes (publisher
             # ``_build_button_payload``): ``command_topic`` of the mapping, else the
@@ -453,7 +491,15 @@ class CommandSynchronizer:
             # P3 — exact comparison on the raw payload (no strip, no case folding).
             return self._translate_button_command(mapping, str(raw_payload))
 
+        if mapping.ha_entity_type == "climate":
+            # Story 24.15 — the topic was already matched against this climate's discovery.
+            return self._translate_climate_command(mapping, parsed, str(raw_payload))
+
         if parsed.channel == "set":
+            if mapping.ha_entity_type == "switch" and (mapping.reason_details or {}).get("thermostat_lock"):
+                # Story 24.15 (D4 A) — « Verrouillage » : ON -> verrouiller, OFF -> déverrouiller.
+                return self._translate_thermostat_lock_command(mapping, payload_upper)
+
             if mapping.ha_entity_type in ("light", "switch"):
                 if payload_upper not in ("ON", "OFF"):
                     return None, "invalid_command_payload"
@@ -542,6 +588,137 @@ class CommandSynchronizer:
                 options={"slider": str(slider)},
                 command_family="slider",
             ), None
+
+        return None, "invalid_command_topic"
+
+    @staticmethod
+    def _own_action(mapping: MappingResult, key: str, generic_type: str) -> Optional[int]:
+        """Story 24.15 — id of the mapping's own action ``key`` of ``generic_type``, else None."""
+        cmd = (mapping.commands or {}).get(key)
+        if cmd is None or str(getattr(cmd, "type", "")).lower() != "action":
+            return None
+        if getattr(cmd, "generic_type", None) != generic_type:
+            return None
+        try:
+            return int(cmd.id)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _translate_thermostat_lock_command(
+        cls,
+        mapping: MappingResult,
+        payload_upper: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.15 (D4 A) — ON -> THERMOSTAT_SET_LOCK, OFF -> THERMOSTAT_SET_UNLOCK."""
+        generic_type = {"ON": THERMOSTAT_SET_LOCK, "OFF": THERMOSTAT_SET_UNLOCK}.get(payload_upper)
+        if generic_type is None:
+            return None, "invalid_command_payload"
+        cmd_id = cls._own_action(mapping, generic_type, generic_type)
+        if cmd_id is None:
+            return None, "missing_action_command"
+        return CommandTranslation(cmd_id=cmd_id, options={}, command_family="on_off"), None
+
+    @staticmethod
+    def _climate_setpoint_slider(mapping: MappingResult, value: Any) -> Tuple[Optional[str], Optional[str]]:
+        """Story 24.15 (D3) — setpoint value rounded to the 0.5 step, refused out of bounds.
+
+        ``.`` or ``,`` decimal; not a finite number -> ``invalid_command_payload``; outside
+        the bounds of the setpoint order (when both are known) -> ``setpoint_out_of_range``
+        (never clipped: a value nobody asked for is never sent).
+        """
+        text = climate_number(value)
+        if text is None:
+            return None, "invalid_command_payload"
+        rounded = math.floor(float(text) / SETPOINT_STEP + 0.5) * SETPOINT_STEP
+        details = mapping.reason_details or {}
+        low, high = details.get("min_temp"), details.get("max_temp")
+        if isinstance(low, (int, float)) and isinstance(high, (int, float)) and low < high:
+            if rounded < low or rounded > high:
+                return None, "setpoint_out_of_range"
+        return (str(int(rounded)) if float(rounded).is_integer() else str(rounded)), None
+
+    def _translate_climate_command(
+        self,
+        mapping: MappingResult,
+        parsed: ParsedTopic,
+        raw_payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """Story 24.15 — setpoint (D3), mode ``heat`` / ``off`` (D1), preset (D1).
+
+        Only the climate's own Jeedom commands are ever used; no order without its command
+        (``missing_action_command``); payloads are exact (HA sends exactly what the discovery
+        declares), anything else is refused.
+        """
+        caps = mapping.capabilities
+        details = mapping.reason_details or {}
+        payload = raw_payload.strip()
+
+        if parsed.channel == COMMAND_CHANNEL_TEMPERATURE:
+            slider, reason = self._climate_setpoint_slider(mapping, payload)
+            if slider is None:
+                return None, reason
+            cmd_id = self._own_action(mapping, THERMOSTAT_SET_SETPOINT, THERMOSTAT_SET_SETPOINT)
+            if cmd_id is None:
+                return None, "missing_action_command"
+            return CommandTranslation(
+                cmd_id=cmd_id, options={"slider": slider}, command_family="climate_setpoint",
+            ), None
+
+        if parsed.channel == COMMAND_CHANNEL_MODE:
+            if payload == "off":
+                cmd_id = (
+                    self._own_action(mapping, THERMOSTAT_SET_MODE_OFF, THERMOSTAT_SET_MODE)
+                    if getattr(caps, "has_off", False) else None
+                )
+                if cmd_id is None:
+                    return None, "missing_action_command"
+                return CommandTranslation(cmd_id=cmd_id, options={}, command_family="climate_mode"), None
+            if payload != "heat":
+                return None, "invalid_command_payload"
+            # D1 — « heat » from the stop: the current setpoint is sent again (the plugin goes
+            # back to a manual setpoint, Homebridge parity); already heating: no order (it
+            # would replace the current named mode by « no mode »).
+            mode_cmd = (mapping.commands or {}).get(THERMOSTAT_MODE)
+            off_name = details.get("off_mode_name") if getattr(caps, "has_off", False) else None
+            # Last Jeedom event, else the topology value (same reader as the barrier, 24.7).
+            current = climate_hvac_mode(self._last_known_barrier_value(parsed.eq_id, mode_cmd), off_name) \
+                if mode_cmd is not None else None
+            if current is None:
+                return None, "mode_state_unknown"
+            if current == "heat":
+                return None, "mode_already_heat"
+            setpoint_info = (mapping.commands or {}).get(THERMOSTAT_SETPOINT)
+            if setpoint_info is None:
+                return None, "setpoint_state_unknown"
+            slider, reason = self._climate_setpoint_slider(
+                mapping, self._last_known_barrier_value(parsed.eq_id, setpoint_info),
+            )
+            if slider is None:
+                return None, reason if reason == "setpoint_out_of_range" else "setpoint_state_unknown"
+            cmd_id = self._own_action(mapping, THERMOSTAT_SET_SETPOINT, THERMOSTAT_SET_SETPOINT)
+            if cmd_id is None:
+                return None, "missing_action_command"
+            return CommandTranslation(
+                cmd_id=cmd_id, options={"slider": slider}, command_family="climate_mode",
+            ), None
+
+        if parsed.channel == COMMAND_CHANNEL_PRESET:
+            # Exact name (case-sensitive, no stripping): the preset is the command's name.
+            if raw_payload == HA_PRESET_NONE:
+                return None, "preset_none_refused"
+            preset_commands = details.get("preset_commands") or {}
+            if not getattr(caps, "has_presets", False) or raw_payload not in preset_commands:
+                return None, "unknown_preset"
+            wanted = preset_commands[raw_payload]
+            for key, cmd in (mapping.commands or {}).items():
+                if getattr(cmd, "id", None) == wanted and key == f"{THERMOSTAT_SET_MODE}_{wanted}":
+                    cmd_id = self._own_action(mapping, key, THERMOSTAT_SET_MODE)
+                    if cmd_id is not None:
+                        return CommandTranslation(
+                            cmd_id=cmd_id, options={}, command_family="climate_preset",
+                        ), None
+            return None, "missing_action_command"
 
         return None, "invalid_command_topic"
 
@@ -936,6 +1113,16 @@ class CommandSynchronizer:
                 return "real_state_confirmation"
             return "stateless"
 
+        if translation.command_family in _CLIMATE_FAMILIES and mapping.ha_entity_type == "climate":
+            # Story 24.15 — ``optimistic: false``: confirmed by the streamed channel, never invented.
+            channel = (
+                CLIMATE_CHANNEL_SETPOINT if translation.command_family == "climate_setpoint"
+                else CLIMATE_CHANNEL_MODE
+            )
+            if self._has_reliable_climate_channel(mapping, decision, channel):
+                return "real_state_confirmation"
+            return "stateless"
+
         if translation.command_family == "cover_motion" and mapping.ha_entity_type == "cover":
             if self._has_reliable_state(mapping, decision):
                 return "real_state_confirmation"
@@ -962,6 +1149,19 @@ class CommandSynchronizer:
         # (open/closed) channel decides whether the optimistic publish is suppressed:
         # a brightness / position info command alone never makes it reliable (Q4).
         return has_reliable_channel(mapping.ha_entity_type, mapping, CHANNEL_STATE)
+
+    def _has_reliable_climate_channel(
+        self, mapping: MappingResult, decision: PublicationDecision, channel: str,
+    ) -> bool:
+        """Story 24.15 — a climate channel streamed from a real Jeedom info command."""
+        if not getattr(decision, "state_topic", ""):
+            return False
+        state_sync = self._app.get("state_synchronizer") if hasattr(self._app, "get") else None
+        if not self._is_state_sync_active(state_sync):
+            return False
+        if not self._state_sync_streams_type(state_sync, mapping.ha_entity_type):
+            return False
+        return has_reliable_channel(mapping.ha_entity_type, mapping, channel)
 
     @staticmethod
     def _state_sync_streams_type(state_sync: Any, ha_type: Any) -> bool:

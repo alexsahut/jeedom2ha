@@ -30,6 +30,19 @@ from sync.readback import (
     has_reliable_channel,
 )
 from sync.readback import barrier_mode  # Story 24.7 (M1)
+from mapping.climate import (  # Story 24.15
+    CHANNEL_ACTION,
+    CHANNEL_CURRENT_TEMPERATURE,
+    CHANNEL_MODE,
+    CHANNEL_PRESET,
+    CHANNEL_SETPOINT,
+    COMMAND_CHANNEL_MODE,
+    COMMAND_CHANNEL_PRESET,
+    COMMAND_CHANNEL_TEMPERATURE,
+    SETPOINT_STEP,
+    climate_command_topic,
+    climate_state_topic,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -781,6 +794,10 @@ class DiscoveryPublisher:
         self._add_default_entity_id(payload, "switch")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
+        # Story 24.15 (D4 A) — « Verrouillage » d'un thermostat : entité de configuration.
+        if reason_details.get("entity_category") == "config":
+            payload["entity_category"] = "config"
+
         # Conditional: device_class — add ONLY if confirmed outlet, NEVER add null or "switch".
         # getattr: a type override (D11) may keep non-Switch detected capabilities.
         if getattr(caps, "device_class", None) == "outlet":
@@ -946,24 +963,30 @@ class DiscoveryPublisher:
     def _build_climate_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the MQTT Discovery JSON payload for a climate (thermostat) entity.
 
-        Minimal useful payload: temperature setpoint + current temperature when available.
-        Scope: residential thermostat, no advanced HVAC modes (Story 10.2 guardrail).
+        Story 24.15 — every topic comes from ``mapping.climate`` (``jeedom2ha/<eq>/<canal>``
+        for states, ``jeedom2ha/<eq>/<canal>/set`` for orders) and is declared only when the
+        mapper found the Jeedom command that feeds or executes it (AC3: no invented state).
+        ``optimistic: false``: a state only comes from Jeedom. Modes ``heat`` / ``off`` (D1 A),
+        named modes as ``preset_modes``, bounds of the setpoint order (D3).
         """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
         reason_details = mapping.reason_details or {}
+        caps = mapping.capabilities
+        has_mode = bool(getattr(caps, "has_mode", False))
+        has_off = bool(getattr(caps, "has_off", False)) and has_mode
+        preset_modes = list(reason_details.get("preset_modes") or [])
+        has_presets = bool(getattr(caps, "has_presets", False)) and has_mode and bool(preset_modes)
 
         payload = {
             "name": self._entity_name_for_payload(mapping, device),
             "unique_id": mapping.ha_unique_id,
             "object_id": f"jeedom2ha_{eq_id}",
-            "temperature_command_topic": reason_details.get(
-                "temperature_command_topic", f"jeedom2ha/{eq_id}/temperature/set"
-            ),
-            "temperature_state_topic": reason_details.get(
-                "temperature_state_topic", f"jeedom2ha/{eq_id}/temperature/state"
-            ),
-            "modes": ["heat", "off"],
+            "temperature_command_topic": climate_command_topic(eq_id, COMMAND_CHANNEL_TEMPERATURE),
+            "modes": ["heat", "off"] if has_off else ["heat"],
+            "temp_step": SETPOINT_STEP,
+            "precision": 0.1,
+            "optimistic": False,
             "platform": "mqtt",
             "device": device,
             "origin": {
@@ -974,9 +997,26 @@ class DiscoveryPublisher:
         self._add_default_entity_id(payload, "climate")
         payload.update(self._build_availability_fields(mapping, snapshot))
 
-        current_temperature_topic = reason_details.get("current_temperature_topic")
-        if current_temperature_topic:
-            payload["current_temperature_topic"] = current_temperature_topic
+        if getattr(caps, "has_setpoint_state", False):
+            payload["temperature_state_topic"] = climate_state_topic(eq_id, CHANNEL_SETPOINT)
+        if getattr(caps, "has_current_temperature", False):
+            payload["current_temperature_topic"] = climate_state_topic(eq_id, CHANNEL_CURRENT_TEMPERATURE)
+        if has_mode:
+            payload["mode_state_topic"] = climate_state_topic(eq_id, CHANNEL_MODE)
+        if has_off:
+            payload["mode_command_topic"] = climate_command_topic(eq_id, COMMAND_CHANNEL_MODE)
+        if has_presets:
+            payload["preset_modes"] = preset_modes
+            payload["preset_mode_state_topic"] = climate_state_topic(eq_id, CHANNEL_PRESET)
+            payload["preset_mode_command_topic"] = climate_command_topic(eq_id, COMMAND_CHANNEL_PRESET)
+        if getattr(caps, "has_action", False):
+            payload["action_topic"] = climate_state_topic(eq_id, CHANNEL_ACTION)
+        min_temp, max_temp = reason_details.get("min_temp"), reason_details.get("max_temp")
+        if isinstance(min_temp, (int, float)) and isinstance(max_temp, (int, float)) and min_temp < max_temp:
+            payload["min_temp"] = min_temp
+            payload["max_temp"] = max_temp
+        if reason_details.get("temperature_unit") in ("C", "F"):
+            payload["temperature_unit"] = reason_details["temperature_unit"]
 
         return payload
 
