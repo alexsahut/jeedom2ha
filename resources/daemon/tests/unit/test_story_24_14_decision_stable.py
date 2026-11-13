@@ -493,6 +493,10 @@ async def test_p2_broker_down_with_scenarios_is_incomplete_without_scenarios_com
     app, cli = await _client(aiohttp_client, bridge)
     data = await _sync(cli, _body(scenarios=[{"id": 43, "name": "S43", "is_active": True}]))
     assert data["scenario_availability_complete"] is False
+    # Revue P2 (6e passe) : broker injoignable = purge non faite, même sans scénario restant.
+    data = await _sync(cli, _body(scenarios=[]))
+    assert data["scenario_availability_complete"] is False
+    bridge.is_connected = True
     data = await _sync(cli, _body(scenarios=[]))
     assert data["scenario_availability_complete"] is True
 
@@ -668,3 +672,26 @@ async def test_p2_republication_waits_for_the_sync_lock_and_publishes_the_curren
 
     avail = [p for (t, p, q, r) in bridge.published if t == _scenario_avail(62)]
     assert avail == ["offline"]  # jamais la disponibilité périmée « online »
+
+
+# ---------------------------------------------------------------------------
+# Revue P2 (6e passe) — purge sautée faute de broker
+# ---------------------------------------------------------------------------
+
+async def test_p2_purge_skipped_when_broker_down_is_never_a_complete_sync(aiohttp_client):
+    bridge = _bridge(retained=[_scenario_topic(70)])
+    app, cli = await _client(aiohttp_client, bridge)
+    data = await _sync(cli, _body(scenarios=[{"id": 70, "name": "S70", "is_active": True}]))
+    assert data["scenario_availability_complete"] is True
+
+    # Le dernier scénario est supprimé pendant que le broker est injoignable.
+    bridge.is_connected = False
+    data = await _sync(cli, _body(scenarios=[]))
+    assert data["scenario_availability_complete"] is False  # purge non faite : le cron réessaiera
+
+    # Broker revenu : la purge retire le bouton du supprimé, la synchro redevient complète.
+    bridge.is_connected = True
+    bridge.published.clear()
+    data = await _sync(cli, _body(scenarios=[]))
+    assert data["scenario_availability_complete"] is True
+    assert (_scenario_topic(70), "") in {(t, p) for (t, p, q, r) in bridge.published}

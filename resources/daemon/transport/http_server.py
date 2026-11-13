@@ -2488,6 +2488,10 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         scenario_purge_complete = getattr(publisher, "scenario_purge_complete", True) is not False
     elif broker_ready:
         _LOGGER.info("[SCENARIO] Scenario purge skipped: scenarios section missing or incomplete")
+    # Revue P2 (6e passe) — purge non faite (broker injoignable, ou section des scénarios incomplète) :
+    # des boutons de scénarios supprimés peuvent rester sur le broker, la synchro n'est pas complète.
+    if not (broker_ready and scenarios_section_complete):
+        scenario_purge_complete = False
     if purged_ids:
         _LOGGER.info(
             "[SCENARIO] Unpublished %d deleted scenario button(s) from broker: ids=%s",

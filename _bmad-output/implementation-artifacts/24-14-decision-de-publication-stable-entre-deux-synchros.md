@@ -204,6 +204,8 @@ Le développement, interrompu, a été relu ligne à ligne puis repris. Vérifi�
 
 - **Cinquième relecture (P2)** : l'empreinte est relue après l'extraction de la topologie (cron, démarrage, « Relire Jeedom ») et n'est mémorisée que si les deux lectures concordent (`jeedom2ha_reevaluation_stable_fingerprint`) ; sinon elle reste vide et le pas suivant resynchronise.
 
+- **Sixième relecture (P2)** : une purge non faite parce que le broker est injoignable (ou la section des scénarios incomplète) donne aussi `scenario_availability_complete: false`, même s'il ne reste aucun scénario : le bouton d'un scénario supprimé pendant la coupure sera retiré à la synchro suivante.
+
 ### Points ouverts
 
 - Preuve terrain AC12 (Task 5) à faire par ClaudeBox après fusion et déploiement.
