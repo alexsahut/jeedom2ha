@@ -243,14 +243,14 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
       assert.equal(text('.j2ha-eq-ha-empty'), 'Rien', label);
       assert.equal(ui.$(P + '.j2ha-eq-ha-entity.is-preview').length, 1, label + ' : aperçu de ce que publierait « Toujours »');
       assert.match(text('.j2ha-eq-ha-entity.is-preview'), /Interrupteur \(aperçu\)/, label);
-      assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 0);
+      assert.equal(ui.$('.j2ha-v3-type-modal .j2ha-v2-type-panel').length, 0);
       assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-correct-type').length, 0, label + ' : « Changer le type » ne débloquerait pas');
       assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway').text()), 'Publier en interrupteur', label);
       assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').text()).trim(), 'Renommer', label);
       assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').attr('title')), 'Renommer l’équipement dans Jeedom, puis Relire Jeedom', label);
       assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=231', label);
       ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
-      assert.equal(ui.$(P + 'tr[data-type-panel-for="2311"] .j2ha-v2-type-panel').length, 1, label + ' : le panneau est ouvert sous la première commande');
+      assert.equal(ui.$('.j2ha-v3-type-modal[data-type-panel-for="2311"] .j2ha-v2-type-panel').length, 1, label + ' : le panneau est ouvert pour la première commande (front v3, Lot 3 : fenêtre posée sur body)');
       assert.ok(ui.calls.every((c) => ['getBridgeStatus', 'getEquipmentStates', 'getMappingOverrides'].includes(c.action)), 'rien n’est écrit');
     }
   });

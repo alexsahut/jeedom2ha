@@ -106,7 +106,7 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     const link = ui.$(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
     assert.equal(plain(link.text()), 'Automatique');
     ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
-    const panel = `${P}tr[data-type-panel-for="2311"] `;
+    const panel = '.j2ha-v3-type-modal[data-eq-id="231"][data-type-panel-for="2311"] '; // Front v3 (Lot 3) : fenêtre posée sur body
     assert.equal(plain(ui.$(panel + '.j2ha-v2-type-title').text()), 'Type dans Home Assistant de « Lampe Chevet »');
     ui.$(`${panel}input[data-type="light"]`).prop('checked', true).trigger('change');
     await sleep(450);
@@ -118,9 +118,11 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     assert.equal(ui.$(panel + '.j2ha-v2-type-save').prop('disabled'), true, 'enregistrer reste impossible');
     const box = ui.$(panel + '.j2ha-v2-type-anyway-box');
     assert.equal(box.length, 1, 'jamais un bouton grisé muet');
-    assert.match(plain(box.text()), /Changer le type ne suffit pas ici/);
+    // Garde levée (front v3, Lot 3) : une ligne « Le type seul ne suffit pas » ; l'explication passe en info-bulle ⓘ.
+    assert.match(plain(box.text()), /Le type seul ne suffit pas/);
+    assert.match(plain(box.find('.j2ha-v3-info').attr('title')), /garde le type choisi et ajoute le réglage « Toujours »/);
     ui.click(panel + '.j2ha-v2-type-anyway');
-    assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 1, 'le panneau reste ouvert, le type choisi aussi');
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="231"] .j2ha-v2-type-panel').length, 1, 'le panneau reste ouvert, le type choisi aussi');
     assert.equal(ui.$(`${panel}input[data-type="light"]`).prop('checked'), true);
     const both = ui.pending('previewMappingOverride').slice(-1)[0];
     assert.deepEqual({ ...both.data }, { action: 'previewMappingOverride', eqId: 231, cmdId: 2311, haEntityType: 'light', publicationPolicy: 'force_publish' },
@@ -131,7 +133,8 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
       entities_before: [{ ha_entity_type: 'switch', ha_default_entity_id: 'switch.jeedom2ha_eq_231', will_publish: false }],
       entities_after: [{ ha_entity_type: 'light', ha_default_entity_id: 'light.jeedom2ha_eq_231', ha_controllable: true, ha_capabilities: ['on_off'], will_publish: true }] } } });
     assert.match(plain(ui.$(panel + '.j2ha-v2-diff').text()), /Après\s*1 lumière/);
-    assert.match(plain(ui.$(panel + '.j2ha-v2-type-anyway-on').text()), /type choisi et le réglage « Toujours »/);
+    // Garde levée (front v3, Lot 3) : libellé court, la suite en info-bulle.
+    assert.match(plain(ui.$(panel + '.j2ha-v2-type-anyway-on').text()), /type choisi \+ « Toujours »/);
     const save = ui.$(panel + '.j2ha-v2-type-save');
     assert.equal(plain(save.text()), 'Enregistrer et publier quand même');
     assert.equal(save.prop('disabled'), false);
@@ -157,7 +160,7 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
   it('changer de choix après « Publier quand même » revient à l’enregistrement simple', async () => {
     const { ui, P, done } = openFiche(lampeValide());
     ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
-    const panel = `${P}tr[data-type-panel-for="2311"] `;
+    const panel = '.j2ha-v3-type-modal[data-eq-id="231"][data-type-panel-for="2311"] '; // Front v3 (Lot 3) : fenêtre posée sur body
     ui.$(`${panel}input[data-type="light"]`).trigger('change');
     await sleep(450);
     const refused = diag('ambiguous_skipped', { code: 'name_heuristic_rejection', type: 'light', valid: true });

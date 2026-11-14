@@ -137,8 +137,8 @@ for (const theme of ['Light', 'Dark']) {
         assert.ok(visible, 'menu de la flèche entièrement visible');
         const type = await band.locator('.j2ha-eq-split-item').first().getAttribute('data-type');
         await band.locator('.j2ha-eq-split-item').first().click();
-        await page.locator(`${P(231)} .j2ha-v2-type-panel`).waitFor();
-        assert.equal(await page.locator(`${P(231)} .j2ha-v2-type-panel input[data-type="${type}"]`).isChecked(), true);
+        await page.locator('.j2ha-v3-type-modal[data-eq-id="231"] .j2ha-v2-type-panel').waitFor(); // front v3 (Lot 3) : fenêtre posée sur body
+        assert.equal(await page.locator(`.j2ha-v3-type-modal[data-eq-id="231"] .j2ha-v2-type-panel input[data-type="${type}"]`).isChecked(), true);
         await page.waitForFunction(() => true);
         const previews = ctx.bodies.filter((b) => /action=previewMappingOverride/.test(b));
         assert.ok(previews.some((b) => b.includes('publicationPolicy=force_publish') && b.includes('haEntityType=' + type)), 'aperçu type + Toujours');

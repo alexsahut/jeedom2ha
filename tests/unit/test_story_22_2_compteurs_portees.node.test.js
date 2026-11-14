@@ -241,9 +241,9 @@ describe('22.2 / AC5 (CC-58) — réglage « Type HA » d’une commande portée
     const own = typeLink(ui, 106);
     assert.ok(!own.hasClass('j2ha-type-unavailable'));
     // Front v2 (Lot 5) : le lien ouvre le panneau « Corriger le type » sous la ligne (plus de sélecteur dans la cellule).
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0, 'le panneau n’est pas rendu en permanence');
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="1"] .j2ha-v2-type-panel').length, 0, 'le panneau n’est pas rendu en permanence');
     ui.click('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] .j2ha-type-link');
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="106"] .j2ha-v2-type-panel').length, 1, 'ouvert par le lien');
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="1"][data-type-panel-for="106"] .j2ha-v2-type-panel').length, 1, 'ouvert par le lien');
   });
 
   it('R1 : indisponible aussi quand l’entité principale est elle-même publiée, avec la même explication', () => {
@@ -263,7 +263,7 @@ describe('22.2 / AC5 (CC-58) — réglage « Type HA » d’une commande portée
     const ui = openRoomWith([ok(tree579()), ok(tree(2, [READY]))]);
     const shared = typeLink(ui, 105).list[0];
     assert.equal(shared.handlers.click, undefined);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
     assert.equal(ui.pending('previewMappingOverride').length + ui.pending('saveMappingOverride').length, 0);
   });
 
@@ -379,7 +379,7 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
   }, extra || {});
   // Front v2 (Lot 5) : le panneau « Corriger le type » n'existe qu'après un clic sur le lien « auto » / « Personnalisé : … » ;
   // les types PROPOSÉS sont ses choix actifs (« Automatique » = ''), les autres y restent visibles mais grisés.
-  const panelInputs = (ui, cmdId) => ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="${cmdId}"] input`).list;
+  const panelInputs = (ui, cmdId) => ui.$(`.j2ha-v3-type-modal[data-eq-id="1"][data-type-panel-for="${cmdId}"] input`).list;
   const optionValues = (ui, cmdId) => {
     ui.click(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] .j2ha-type-link`);
     return panelInputs(ui, cmdId).filter((o) => o.props.disabled !== true).map((o) => o.attrs.value);
@@ -417,10 +417,10 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
     // Les types refusés restent visibles, repliés sous « Types impossibles pour cet équipement » : jamais proposés.
     // Garde levée (front v2, Lot 9a) : libellé du repli — le type vaut pour toute l'entité, pas pour une commande.
-    const refused = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-list li').list.map((li) => li.attrs['data-type']);
+    const refused = ui.$('.j2ha-v3-type-modal[data-eq-id="1"][data-type-panel-for="100"] .j2ha-v2-type-refused-list li').list.map((li) => li.attrs['data-type']);
     assert.ok(refused.includes('sensor') && refused.includes('binary_sensor'));
-    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /Types impossibles pour cet équipement/);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
+    assert.match(ui.$('.j2ha-v3-type-modal[data-eq-id="1"][data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /Types impossibles pour cet équipement/);
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="1"][data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });
 
@@ -430,7 +430,7 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
     const disabled = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] .j2ha-type-link');
     assert.ok(disabled.hasClass('j2ha-type-unavailable'));
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
     assert.match(disabled.attr('title'), /précisez les types génériques dans Jeedom/);
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

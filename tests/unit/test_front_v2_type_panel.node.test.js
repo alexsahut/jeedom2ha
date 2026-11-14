@@ -66,11 +66,15 @@ function openFiche(tree) {
   ui.openRoomWith(9, [{ state: 'ok', result: { payload: tree } }]);
   const P = `.j2ha-eq-panel[data-eq-id="${tree.jeedom_eq_id}"] `;
   const text = (selector) => plain(ui.$(P + selector).text());
-  const panel = (cmdId) => `${P}tr[data-type-panel-for="${cmdId}"] `;
+  const panel = (cmdId) => `${modalOf(P)}`.replace('] ', `][data-type-panel-for="${cmdId}"] `);
   const choose = (cmdId, type) => ui.$(`${panel(cmdId)}input[data-type="${type}"]`).trigger('change');
   const done = () => ui.win.Jeedom2haSurface.clearEquipment();
   return { ui, P, text, panel, choose, done };
 }
+
+// Front v3 (Lot 3) : le panneau s'ouvre en fenêtre posée sur `body` (.j2ha-v3-type-modal), plus dans le tableau de la fiche.
+// `modalOf(P)` : préfixe de la fenêtre de l'équipement de la fiche `P` (même identifiant d'équipement).
+const modalOf = (P) => `.j2ha-v3-type-modal[data-eq-id="${/data-eq-id="(\d+)"/.exec(P)[1]}"] `;
 
 const WRITES = ['saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride', 'executeHaAction'];
 const writes = (ui) => ui.calls.filter((c) => WRITES.includes(c.action));
@@ -210,9 +214,15 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     // Garde levée (front v2, Lot 9a, regard neuf v2) : le choix vaut pour toute l'ENTITÉ, pas pour la commande « État » :
     // le titre nomme l'entité, la ligne suivante liste ses commandes, les types refusés sont « impossibles pour cet équipement ».
     assert.equal(plain(box.find('.j2ha-v2-type-title').text()), 'Type dans Home Assistant de « Lampe Chevet »');
-    assert.equal(plain(box.find('.j2ha-v2-type-scope').text()), 'Ce choix vaut pour les commandes : État, On, Off');
+    // Garde levée (front v3, Lot 3) : sous-titre court « Pour : … » (cible.md) ; la portée « toute l'entité » passe en
+    // info-bulle ; le bandeau bleu « Le plus durable… » devient le lien icône « Types génériques » (même texte en info-bulle).
+    assert.equal(plain(box.find('.j2ha-v2-type-scope').text()), 'Pour : État, On, Off');
+    assert.match(plain(box.find('.j2ha-v2-type-scope').attr('title')), /toute l’entité Home Assistant/);
     assert.equal(plain(box.find('.j2ha-v2-type-legend').text()), 'Dans Home Assistant, cette entité est :');
-    assert.match(plain(box.text()), /Le plus durable est de corriger les types génériques dans Jeedom/);
+    assert.equal(box.find('.j2ha-v2-type-ways').length, 0, 'plus de bandeau bleu');
+    assert.doesNotMatch(plain(box.text()), /Le plus durable|Aperçu calculé par le plugin/);
+    assert.match(plain(box.find('a.j2ha-open-generic-types').attr('title')), /Le plus durable est de corriger les types génériques dans Jeedom/);
+    assert.equal(plain(box.find('a.j2ha-open-generic-types').text()), 'Types génériques');
     const offered = box.find('input').list.filter((i) => i.props.disabled !== true).map((i) => i.attrs['data-type']);
     assert.deepEqual(offered, ['auto', 'light', 'switch']);
     // Types refusés : repliés sous une ligne unique, noms seulement (revue du Lot 5).
@@ -247,7 +257,7 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
 
     // Fermer : rien n'est écrit, la fiche reste « Bloqué ».
     ui.click(`${panel(2311)}.j2ha-v2-type-cancel`);
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 0);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 0);
     assert.deepEqual(writes(ui), []);
     assert.equal(plain(ui.$(`${P}.j2ha-eq-publish-badge`).text()), 'Bloqué');
     done();
@@ -267,7 +277,7 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     assert.deepEqual({ ...publish.data }, { action: 'executeHaAction', intention: 'publier', portee: 'equipement', selection: '[231]' });
     assert.ok(publish.options.timeout > 0, 'délai client de la page (executeHaAction)');
     publish.respond(ACTION_OK);
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 0, 'panneau fermé');
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 0, 'panneau fermé');
     const toast = ui.$(`${P}.j2ha-eq-head .j2ha-v2-type-toast`);
     assert.equal(toast.length, 1);
     assert.equal(toast.attr('aria-live'), 'polite');
@@ -334,8 +344,12 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     choose(2311, 'light');
     await sleep(450);
     ui.respond('previewMappingOverride', previewLight({ entities_before: PUBLISHED_BEFORE.slice(0, 1), entity_id_changes: ID_CHANGES.slice(0, 1) }));
-    assert.match(plain(ui.$(`${panel(2311)}.j2ha-v2-type-idchange`).text()),
-      /^Attention : l’identifiant passe de switch\.jeedom2ha_eq_231 à light\.jeedom2ha_eq_231\. Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien seront à reprendre\.$/);
+    // Garde levée (front v3, Lot 3) : la phrase devient l'étiquette « ID modifié » + ⓘ (la conséquence reste dite, en info-bulle).
+    const idchange = ui.$(`${panel(2311)}.j2ha-v2-type-idchange`);
+    assert.equal(plain(idchange.text()), 'ID modifié switch.jeedom2ha_eq_231 → light.jeedom2ha_eq_231');
+    assert.equal(plain(idchange.find('.j2ha-v3-type-idlabel').text()), 'ID modifié');
+    assert.match(plain(idchange.find('.j2ha-v3-info').attr('title')), /automatisations et tableaux de bord Home Assistant qui utilisent l’ancien identifiant seront à reprendre/);
+    assert.equal(idchange.find('.j2ha-v3-info').attr('aria-label'), idchange.find('.j2ha-v3-info').attr('title'));
     done();
   });
 
@@ -426,16 +440,16 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
     ui.openRoomWith(9, [{ state: 'ok', result: { payload: lampe() } }, { state: 'ok', result: { payload: other } }]);
     ui.click('.j2ha-eq-panel[data-eq-id="231"] tr[data-cmd-id="2311"] .j2ha-type-link');
-    ui.$('tr[data-type-panel-for="2311"] input[data-type="light"]').trigger('change');
+    ui.$('.j2ha-v3-type-modal[data-type-panel-for="2311"] input[data-type="light"]').trigger('change');
     await sleep(450);
     ui.respond('previewMappingOverride', previewLight());
-    ui.click('tr[data-type-panel-for="2311"] .j2ha-v2-type-save');
+    ui.click('.j2ha-v3-type-modal[data-type-panel-for="2311"] .j2ha-v2-type-save');
     ui.show(200);
     ui.click('.j2ha-eq-panel[data-eq-id="200"] tr[data-cmd-id="2001"] .j2ha-type-link');
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="200"] .j2ha-v2-type-panel').length, 1);
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="200"] .j2ha-v2-type-panel').length, 1);
     ui.respond('saveMappingOverride', { state: 'ok', result: { status: 'ok' } });
     ui.respond('executeHaAction', ACTION_OK);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="200"] .j2ha-v2-type-panel').length, 1, 'le panneau de B reste ouvert');
+    assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="200"] .j2ha-v2-type-panel').length, 1, 'le panneau de B reste ouvert');
     assert.equal(ui.$('.j2ha-v2-type-toast').length, 0, 'aucun bandeau de A sur B');
     ui.win.Jeedom2haSurface.clearEquipment();
   });
@@ -448,7 +462,7 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
     choose(2311, 'switch');
     ui.key(`${panel(2311)}.j2ha-v2-type-panel`, 'Escape');
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 0);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 0);
     await sleep(450);
     assert.equal(ui.count('previewMappingOverride'), 0);
     done();
@@ -461,8 +475,8 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     await sleep(450);
     ui.click(`${panel(2311)}.j2ha-v2-type-cancel`);
     ui.respond('previewMappingOverride', previewLight());
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 0);
-    assert.equal(ui.$(`${P}.j2ha-v2-diff`).length, 0);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 0);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-diff`).length, 0);
     done();
   });
 
@@ -470,11 +484,11 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     const { ui, P, done } = openFiche(lampe());
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
     ui.click(`${P}tr[data-cmd-id="2312"] .j2ha-type-link`);
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 1);
-    assert.equal(ui.$(`${P}tr[data-type-panel-for="2312"]`).length, 1);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 1);
+    assert.equal(ui.$(`${modalOf(P)}`.replace('] ', '][data-type-panel-for="2312"]')).length, 1);
     assert.equal(ui.$(`${P}tr[data-cmd-id="2312"] .j2ha-type-link`).attr('aria-expanded'), 'true');
     ui.click(`${P}tr[data-cmd-id="2312"] .j2ha-type-link`);
-    assert.equal(ui.$(`${P}.j2ha-v2-type-panel`).length, 0);
+    assert.equal(ui.$(`${modalOf(P)}.j2ha-v2-type-panel`).length, 0);
     assert.equal(ui.$(`${P}tr[data-cmd-id="2312"] .j2ha-type-link`).attr('aria-expanded'), 'false');
     done();
   });
@@ -484,7 +498,7 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
   it('« Corriger le type… » de la fiche de cause ouvre le panneau via la surface (point d’entrée du Lot 2)', () => {
     const { ui, P, done } = openFiche(orphan());
     ui.click(`${P}.j2ha-v2-correct-type`);
-    assert.equal(ui.$(`${P}tr[data-type-panel-for="2311"] .j2ha-v2-type-panel`).length, 1);
+    assert.equal(ui.$(`${modalOf(P)}`.replace('] ', '][data-type-panel-for="2311"] ') + '.j2ha-v2-type-panel').length, 1);
     ui.win.Jeedom2haSurface.clearEquipment();
     assert.equal(ui.win.Jeedom2haSurface.openTypePanel({ eqId: 231, cmdIds: [2311] }), false, 'équipement fermé : rien');
     done();
@@ -620,7 +634,7 @@ describe('Lot 5 — vrai navigateur', () => {
           const P = '.j2ha-eq-panel[data-eq-id="102"]';
           await page.locator(`${P} .j2ha-cmd-table`).waitFor({ state: 'visible' });
           await page.locator(`${P} tr[data-cmd-id="2311"] .j2ha-type-link`).click();
-          const box = page.locator(`${P} tr.j2ha-v2-type-row[data-type-panel-for="2311"] .j2ha-v2-type-panel`);
+          const box = page.locator('body > .j2ha-v3-type-modal[data-type-panel-for="2311"] .j2ha-v2-type-panel');
           await box.waitFor({ state: 'visible' });
           assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-type')), 'auto', 'focus sur le choix actuel');
           assert.equal(await box.locator('input[data-type="button"]').count(), 0);
@@ -654,7 +668,7 @@ describe('Lot 5 — vrai navigateur', () => {
       await page.locator(`${P} .j2ha-cmd-table`).waitFor({ state: 'visible' });
       await page.locator(`${P} tr[data-cmd-id="2312"] .j2ha-type-link`).click();
       await page.keyboard.press('Escape');
-      assert.equal(await page.locator(`${P} .j2ha-v2-type-panel`).count(), 0);
+      assert.equal(await page.locator('.j2ha-v2-type-panel').count(), 0);
       assert.equal(await page.evaluate(() => document.activeElement.closest('tr').getAttribute('data-cmd-id')), '2312');
       assert.deepEqual(ctx.errors, []);
     });

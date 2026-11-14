@@ -1275,20 +1275,32 @@
     if (!diff.publishable && diff.publishAnyway && onPublishAnyway) {
       var $anyway = $('<button type="button" class="btn btn-primary btn-xs j2ha-v2-type-anyway"></button>').text('{{Publier quand même}}');
       $anyway.on('click', function () { onPublishAnyway(); });
+      // Front v3 (Lot 3) : une ligne ; l'explication passe dans l'info-bulle ⓘ.
       $preview.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-box"></div>')
-        .append(document.createTextNode('{{Changer le type ne suffit pas ici : le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » garde le type choisi et ajoute le réglage « Toujours » : l’aperçu se met à jour, rien n’est enregistré avant votre validation.}} '))
-        .append($anyway));
+        .append(document.createTextNode('{{Le type seul ne suffit pas}} '))
+        .append(typeInfo('{{Le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » garde le type choisi et ajoute le réglage « Toujours » : l’aperçu se met à jour, rien n’est enregistré avant votre validation.}}'))
+        .append(document.createTextNode(' ')).append($anyway));
     }
+    // Front v3 (Lot 3) : changement d'identifiant = étiquette « ID modifié » + ⓘ (la conséquence est dans l'info-bulle).
     diff.changes.forEach(function (c) {
-      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
-        .append(document.createTextNode('{{Attention : l’identifiant passe de}} ')).append($('<code></code>').text(c.from))
-        .append(document.createTextNode(' {{à}} ')).append($('<code></code>').text(c.to))
-        .append(document.createTextNode('. {{Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien seront à reprendre.}}')));
+      $preview.append($('<div class="j2ha-v2-type-idchange"></div>')
+        .append($('<span class="j2ha-v2-lbl is-warn j2ha-v3-type-idlabel"></span>').text('{{ID modifié}}')).append(document.createTextNode(' '))
+        .append(typeInfo('{{Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien identifiant seront à reprendre.}}'))
+        .append(document.createTextNode(' ')).append($('<code></code>').text(c.from))
+        .append(document.createTextNode(' → ')).append($('<code></code>').text(c.to)));
     });
     diff.removed.forEach(function (id) {
-      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
-        .append(document.createTextNode('{{Cette entité sera retirée de Home Assistant :}} ')).append($('<code></code>').text(id)));
+      $preview.append($('<div class="j2ha-v2-type-idchange"></div>')
+        .append($('<span class="j2ha-v2-lbl is-warn j2ha-v3-type-idlabel"></span>').text('{{Entité retirée}}')).append(document.createTextNode(' '))
+        .append(typeInfo('{{Cette entité sera retirée de Home Assistant.}}'))
+        .append(document.createTextNode(' ')).append($('<code></code>').text(id)));
     });
+  }
+
+  // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+  function typeInfo(text) {
+    return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').attr('title', text).attr('aria-label', text)
+      .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
   }
 
   // Choix possibles en boutons radio (« Automatique » et le choix courant toujours visibles) ; types refusés par le démon
@@ -1362,7 +1374,7 @@
     }
     if (value === '') {
       state.$preview.empty().append($('<div class="j2ha-v2-type-auto"></div>')
-        .text('{{Après : le plugin choisira seul le type de cette commande, comme si aucun réglage n’avait été fait.}}'));
+        .text('{{Après : le plugin choisira seul}}').attr('title', '{{Comme si aucun réglage n’avait été fait.}}'));
       setTypeSaveEnabled(state, true);
       return;
     }
@@ -1409,7 +1421,8 @@
       renderTypeDiff(tp, state.$preview, diff, null);
       if (diff.publishable) {
         state.$preview.prepend($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-on"></div>')
-          .text('{{Aperçu avec le type choisi et le réglage « Toujours » : les deux seront enregistrés ensemble, puis l’équipement sera publié.}}'));
+          .text('{{Aperçu : type choisi + « Toujours »}} ')
+          .append(typeInfo('{{Les deux seront enregistrés ensemble, puis l’équipement sera publié.}}')));
         setTypeAnyway(state, true);
       }
       setTypeSaveEnabled(state, diff.publishable);
@@ -1530,7 +1543,9 @@
     var state = { eqId: eqId, cmdId: cmdId, seq: typePanelSeq, current: built.current, choice: undefined, timer: null, busy: false,
       $origin: $origin };
 
-    var $box = $('<div class="j2ha-v2 j2ha-v2-panel j2ha-v2-type-panel" role="region"></div>').attr('aria-labelledby', titleId);
+    // Front v3 (Lot 3) : le panneau s'ouvre en fenêtre posée sur `body` (plus sous la ligne de la commande) : l'en-tête collant
+    // de la fiche ne peut plus passer dessus ni transparaître. Rôle « dialog », Échap et clic sur le fond referment.
+    var $box = $('<div class="j2ha-v2 j2ha-v2-panel j2ha-v2-type-panel" role="dialog" aria-modal="true"></div>').attr('aria-labelledby', titleId);
     // Front v2 (Lot 9a, regard neuf v2) : le choix vaut pour toute l'ENTITÉ Home Assistant, pas pour une commande : le titre
     // nomme l'entité et la ligne suivante liste les commandes qu'elle regroupe.
     var scope = typeof tp.scopeOf === 'function'
@@ -1538,26 +1553,25 @@
       : { name: equipmentName(eqId), commands: [], known: false };
     var $title = $('<h4 class="j2ha-v2-type-title" tabindex="-1"></h4>').attr('id', titleId)
       .text('{{Type dans Home Assistant de}} « ' + (scope.name || equipmentName(eqId)) + ' »');
-    $box.append($title);
-    var scopeText = scope.known && scope.commands.length > 1
-      ? '{{Ce choix vaut pour les commandes :}} ' + scope.commands.join(', ')
-      : (scope.known && scope.commands.length === 1
-        ? '{{Ce choix vaut pour la commande :}} ' + scope.commands[0]
-        : '{{Ce choix vaut pour toute l’entité Home Assistant de cet équipement, pas pour une commande seule.}}');
-    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-cmd j2ha-v2-type-scope"></div>').text(scopeText));
-    $box.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-ways"></div>')
-      .append(document.createTextNode('{{Le plus durable est de corriger les types génériques dans Jeedom. Ici, vous réglez seulement ce que voit Home Assistant.}} '))
-      .append($('<a class="j2ha-open-generic-types" target="_blank" rel="noopener"></a>').attr('href', GENERIC_TYPES_URL)
-        .text('{{Ouvrir les types génériques}}')));
+    // Front v3 (Lot 3) : le bandeau bleu « Le plus durable… » devient un lien icône « Types génériques » dans le coin du titre.
+    var waysTip = '{{Le plus durable est de corriger les types génériques dans Jeedom. Ici, vous réglez seulement ce que voit Home Assistant.}}';
+    $box.append($('<div class="j2ha-v3-type-head"></div>').append($title)
+      .append($('<a class="j2ha-open-generic-types j2ha-v3-type-generic" target="_blank" rel="noopener"></a>').attr('href', GENERIC_TYPES_URL)
+        .attr('title', waysTip).attr('aria-label', '{{Types génériques}}')
+        .append($('<i class="fas fa-tags" aria-hidden="true"></i>')).append(document.createTextNode(' {{Types génériques}}'))));
+    var scopeText = scope.known && scope.commands.length > 0
+      ? '{{Pour :}} ' + scope.commands.join(', ')
+      : '{{Pour toute l’entité de cet équipement}}';
+    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-cmd j2ha-v2-type-scope"></div>').text(scopeText)
+      .attr('title', '{{Le type se règle pour toute l’entité Home Assistant, pas pour une commande seule.}}'));
     $box.append(buildTypeChoices(tp, state, built.choices));
     state.$preview = $('<div class="j2ha-v2-type-preview" aria-live="polite"></div>');
     $box.append(state.$preview);
-    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-note"></div>')
-      .text('{{Aperçu calculé par le plugin. Rien n’est enregistré tant que vous n’avez pas validé.}}'));
     state.$error = $('<div class="j2ha-v2-type-error text-danger" role="alert"></div>').hide();
     $box.append(state.$error);
     state.$cancel = $('<button type="button" class="btn btn-default btn-sm j2ha-v2-type-cancel"></button>').text('{{Annuler}}');
-    state.$save = $('<button type="button" class="btn btn-success btn-sm j2ha-v2-type-save"></button>').text('{{Enregistrer et publier}}');
+    state.$save = $('<button type="button" class="btn btn-success btn-sm j2ha-v2-type-save"></button>').text('{{Enregistrer et publier}}')
+      .attr('title', '{{Rien n’est enregistré avant ce clic}}');
     setTypeSaveEnabled(state, false);
     state.$cancel.on('click', function () { if (!state.busy) closeTypePanel(true); });
     state.$save.on('click', function () { saveTypeChoice(tp, state); });
@@ -1569,9 +1583,11 @@
       }
     });
 
-    state.$row = $('<tr class="j2ha-v2-type-row"></tr>').attr('data-type-panel-for', cmdId)
-      .append($('<td colspan="4"></td>').append($box));
-    $tr.after(state.$row);
+    var $backdrop = $('<div class="j2ha-v3-type-backdrop" aria-hidden="true"></div>');
+    $backdrop.on('click', function () { if (!state.busy && ctx.typePanel === state) closeTypePanel(true); });
+    state.$row = $('<div class="j2ha-v3-type-modal"></div>').attr('data-type-panel-for', cmdId).attr('data-eq-id', String(eqId))
+      .append($backdrop).append($('<div class="j2ha-v3-type-dialog"></div>').append($box));
+    $(document.body).append(state.$row);
     ctx.typePanel = state;
     $origin.attr('aria-expanded', 'true');
     var $checked = $box.find('input[data-type="' + (state.current || 'auto') + '"]').first();
