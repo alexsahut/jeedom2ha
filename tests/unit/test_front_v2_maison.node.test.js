@@ -259,6 +259,29 @@ describe('Lot 7 / E3 — vue de travail', () => {
       'la pièce ouverte filtrée n’a aucune lampe bloquée ; les autres pièces montrent leurs lampes sans le filtre de la pièce');
   });
 
+  // Relecture Codex (PR #392, P2) : une pièce choisie dans « Dans les autres pièces » devient la pièce de la portée ; les
+  // puces doivent prendre ses effectifs.
+  maybe('portée pièce : choisir une autre pièce (ou un de ses équipements) depuis la recherche met les puces à ses effectifs', () => {
+    const O2 = require('../../desktop/js/jeedom2ha_overview.js');
+    const chipText = (ui) => ui.$('.j2ha-wv-chips .j2ha-chip-filter').list.map((n) => plain(ui.$(n).text()).trim());
+    for (const target of ['room', 'eq']) {
+      const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
+      openCard(ui, 11);
+      const rooms = ui.page.snapshot().view.overview.rooms;
+      const other = rooms.find((r) => r.object_id === 10);
+      assert.notDeepEqual(O2.chipsFor(other.counts).map((c) => plain(c.label)), O2.chipsFor(rooms.find((r) => r.object_id === 11).counts).map((c) => plain(c.label)), 'scène discriminante');
+      const search = ui.$('.j2ha-wv-search').list[0];
+      search.props.value = ui.rooms.find((r) => r.object_id === 10).object_name;
+      search.handlers.input.call(search, { target: search });
+      ui.advance(400);
+      if (target === 'room') ui.click('.j2ha-wv-room[data-object_id="10"] > .j2ha-wv-row');
+      else ui.click('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq .j2ha-wv-row');
+      assert.equal(ui.wv.state().room, 10);
+      assert.equal(ui.wv.state().scope, 'piece');
+      assert.deepEqual(chipText(ui), O2.chipsFor(other.counts).map((c) => plain(c.label)), target);
+    }
+  });
+
   maybe('« À traiter dans cette pièce » : une seule mention par ligne (pas de « N bloquées » à côté de « N commandes bloquées : … »)', () => {
     let checked = 0;
     for (let seed = 1; seed <= 6; seed += 1) {

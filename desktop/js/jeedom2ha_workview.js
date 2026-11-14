@@ -544,6 +544,7 @@
       surface.clearEquipment();
       surface.setRoom(room);
       renderTree();
+      if (changedRoom && st.scope === 'piece') renderChips(); // effectifs de la NOUVELLE pièce (recherche globale, Lot 7)
       renderPane();
       afterSelect(opts, changedRoom);
       if (changed) announce('{{Pièce}}' + ' ' + room.object_name);
@@ -560,6 +561,7 @@
       st.eq = eqId;
       st.expanded[roomId] = true;
       renderTree();
+      if (changedRoom && st.scope === 'piece') renderChips(); // effectifs de la NOUVELLE pièce (recherche globale, Lot 7)
       renderEquipmentPane(room, eq);
       afterSelect(opts, changedRoom);
       announce('{{Équipement}}' + ' ' + eq.eq_name);
