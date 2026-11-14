@@ -16,12 +16,13 @@ const desktop = ['desktop/js', 'desktop/php'].flatMap((dir) => fs.readdirSync(pa
 const section = index.slice(index.indexOf('### La vue de travail'), index.indexOf('**Le détail d\'une pièce**'));
 
 describe('25.6 / AC14 — documentation de la portée', () => {
-  it('index.md décrit : pièce seule depuis une carte, « Toutes les pièces », « Page principale », ouverture en portée toutes, seule:1, « Précédent »', () => {
+// Garde levée (front v2, Lot 7, spec E2/E3) : la puce filtre sur place, « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », la recherche est « Rechercher dans toute la maison » ; index.md suit.
+  it('index.md décrit : pièce seule depuis une carte, « Cette pièce | Toute la maison », « Page principale », ouverture en portée toutes, seule:1, « Précédent »', () => {
     assert.match(section, /\*\*La portée\.\*\*/);
     assert.match(section, /Depuis \*\*une carte de pièce\*\*, l'arbre n'affiche que \*\*cette pièce\*\*/);
-    assert.match(section, /\*\*« Toutes les pièces »\*\*/);
+    assert.match(section, /\*\*« Cette pièce \| Toute la maison »\*\*/);
     assert.match(section, /« Page principale »/);
-    assert.match(section, /Depuis une puce, un segment de la jauge ou une ligne de la liste filtrée, la vue s'ouvre directement sur \*\*toutes les pièces\*\*/);
+    assert.match(section, /Depuis une ligne de la liste filtrée, la vue s'ouvre directement sur \*\*toute la maison\*\*/);
     assert.match(section, /`seule:1`/);
     assert.match(section, /« Précédent »/);
     assert.doesNotMatch(section, /« Toutes les pièces » \(ou le bouton « Précédent »/, 'plus le libellé du retour');
@@ -29,10 +30,12 @@ describe('25.6 / AC14 — documentation de la portée', () => {
   });
 
   it('chaque libellé cité existe verbatim dans desktop/', () => {
-    for (const label of ['Toutes les pièces', 'Page principale', 'Pièces']) {
+    for (const label of ['Page principale', 'Pièces']) {
       assert.ok(section.includes(`« ${label} »`), `« ${label} » cité dans index.md`);
       assert.ok(desktop.includes(label), `« ${label} » absent de desktop/`);
     }
+    assert.ok(section.includes('« Cette pièce | Toute la maison »'));
+    for (const label of ['Cette pièce', 'Toute la maison']) assert.ok(desktop.includes(label), `« ${label} » absent de desktop/`);
   });
 
   it('changelog_beta.md : une entrée annonce la pièce seule, sans nom réel', () => {
