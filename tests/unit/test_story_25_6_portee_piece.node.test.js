@@ -1,6 +1,7 @@
 // ARTEFACT — Story 25.6 (D1, AC1, AC2, AC4, AC7, AC8, AC9) : la vue C a une PORTÉE. Depuis une carte, l'arbre ne contient
-// que la pièce d'entrée (`data-j2ha-scope="piece"`) ; depuis une puce, un segment ou une ligne de liste, toutes les pièces
-// (`toutes`) ; le bouton « Toutes les pièces » élargit en gardant la sélection. Vrai code sur faux DOM ; données fictives (CC-48).
+// que la pièce d'entrée (`data-j2ha-scope="piece"`) ; depuis une ligne de liste, toutes les pièces (`toutes`) ; la bascule
+// « Cette pièce | Toute la maison » (front v2, Lot 7 ; bouton « Toutes les pièces » en 25.6) change la portée en gardant la
+// sélection. Vrai code sur faux DOM ; données fictives (CC-48).
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -39,37 +40,73 @@ describe('25.6 / AC1 — depuis une carte : cette pièce seule', () => {
   });
 });
 
-describe('25.6 / AC2, Q2 — depuis un filtre ou une ligne de liste : toutes les pièces', () => {
-  maybe('puce, segment de la jauge, ligne de la liste filtrée : portée « toutes » et arbre complet', () => {
-    const openers = [
+// Garde levée (front v2, Lot 7, spec E2) : la puce et le segment de la jauge filtrent SUR PLACE (la vue ne s'ouvre plus) ;
+// la ligne de la liste filtrée ouvre la vue en portée « toutes », la bascule montrant « Toute la maison » enfoncé.
+describe('25.6 / AC2, Q2 — depuis une ligne de la liste filtrée : toutes les pièces', () => {
+  maybe('puce et segment : filtre sur place, vue fermée ; ligne de la liste filtrée : portée « toutes » et arbre complet', () => {
+    for (const filterOnPage of [
       (ui) => ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'),
       (ui) => ui.click('#j2ha_houseGauge .j2ha-seg-published'),
-      (ui) => { ui.page.setFilter('published'); ui.click('#j2ha_filterList .j2ha-frow-btn'); },
-    ];
-    for (const open of openers) {
+    ]) {
       const ui = startBig({ rooms: 5, equipments: 40, seed: 4 });
-      open(ui);
-      assert.equal(ui.isOpen(), true);
-      assert.equal(scope(ui), 'toutes');
-      assert.equal(ui.$('.j2ha-wv-widen').length, 0);
-      assert.ok(roomIds(ui).length > 1, 'plusieurs pièces dans l’arbre filtré');
+      filterOnPage(ui);
+      assert.equal(ui.isOpen(), false);
+      assert.equal(ui.page.filter(), 'published');
+      assert.ok(ui.$('#j2ha_filterList .j2ha-frow').length > 0, 'la liste est affichée sur la page');
     }
+    const ui = startBig({ rooms: 5, equipments: 40, seed: 4 });
+    ui.page.setFilter('published');
+    ui.click('#j2ha_filterList .j2ha-frow-btn');
+    assert.equal(ui.isOpen(), true);
+    assert.equal(scope(ui), 'toutes');
+    assert.equal(ui.$('.j2ha-wv-widen').attr('aria-pressed'), 'true', '« Toute la maison » enfoncé');
+    assert.equal(ui.$('.j2ha-wv-narrow').attr('aria-pressed'), 'false');
+    assert.ok(roomIds(ui).length > 1, 'plusieurs pièces dans l’arbre filtré');
   });
 });
 
-describe('25.6 / AC4 — bouton « Toutes les pièces » (élargir)', () => {
-  maybe('présent en portée pièce (avant la recherche), absent en portée toutes ; le retour s’appelle « Page principale »', () => {
+// Garde levée (front v2, Lot 7, spec E3) : le bouton « Toutes les pièces », présent seulement en portée pièce, devient la
+// bascule lisible « Cette pièce | Toute la maison », présente dès qu'une pièce est sélectionnée ; le bouton enfoncé dit la
+// portée. `.j2ha-wv-widen` garde son rôle (élargir) ; `.j2ha-wv-narrow` revient à la pièce seule.
+describe('25.6 / AC4 — bascule « Cette pièce | Toute la maison »', () => {
+  maybe('présente avant la recherche, bouton enfoncé = portée ; le retour s’appelle « Page principale »', () => {
     const ui = startBig({ rooms: 5, equipments: 40, seed: 11 });
     openCard(ui, 11);
     assert.equal(ui.$('.j2ha-wv-widen').length, 1);
-    assert.equal(plain(ui.$('.j2ha-wv-widen').text()).trim(), 'Toutes les pièces');
-    assert.equal(ui.$('.j2ha-wv-tools .j2ha-wv-widen').length, 1, 'dans la zone d’outils de l’arbre');
+    assert.equal(plain(ui.$('.j2ha-wv-widen').text()).trim(), 'Toute la maison');
+    assert.equal(plain(ui.$('.j2ha-wv-narrow').text()).trim(), 'Cette pièce');
+    assert.equal(ui.$('.j2ha-wv-tools .j2ha-wv-scope .j2ha-wv-widen').length, 1, 'dans la zone d’outils de l’arbre');
+    assert.equal(ui.$('.j2ha-wv-narrow').attr('aria-pressed'), 'true');
+    assert.equal(ui.$('.j2ha-wv-widen').attr('aria-pressed'), 'false');
     assert.equal(plain(ui.$('.j2ha-wv-back').text()).trim(), 'Page principale');
     ui.click('.j2ha-wv-widen');
     assert.equal(scope(ui), 'toutes');
-    assert.equal(ui.$('.j2ha-wv-widen').length, 0, 'absent du DOM en portée toutes');
+    assert.equal(ui.$('.j2ha-wv-widen').attr('aria-pressed'), 'true');
+    assert.equal(ui.$('.j2ha-wv-narrow').attr('aria-pressed'), 'false');
     const buttons = ui.$('#j2ha_workView button').list.map((n) => plain(ui.$(n).text()).trim());
-    assert.equal(buttons.filter((text) => text === 'Toutes les pièces').length, 0, 'plus aucun bouton « Toutes les pièces » une fois élargi');
+    assert.equal(buttons.filter((text) => text === 'Toutes les pièces').length, 0, 'l’ancien libellé a disparu');
+  });
+
+  maybe('« Cette pièce » revient à la pièce seule : entrée remplacée (seule:1), sélection gardée, annonce', () => {
+    const ui = startBig({ rooms: 5, equipments: 40, seed: 11 });
+    openCard(ui, 11);
+    ui.click('.j2ha-wv-widen');
+    assert.equal(roomIds(ui).length, 5);
+    const pushes = ui.win.historyWrites.push;
+    ui.click('.j2ha-wv-narrow');
+    assert.equal(scope(ui), 'piece');
+    assert.deepEqual(roomIds(ui), ['11']);
+    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:11;seule:1');
+    assert.equal(ui.win.historyWrites.push, pushes, 'remplacement, pas de nouvelle entrée');
+    assert.equal(plain(ui.$('.j2ha-wv-live').text()).trim(), 'Cette pièce');
+    assert.equal(ui.dom.document.activeElement, ui.$('.j2ha-wv-room[data-object_id="11"]').list[0], 'focus sur la ligne sélectionnée');
+  });
+
+  maybe('sans pièce sélectionnée, la bascule est absente', () => {
+    const ui = startBig({ rooms: 5, equipments: 40, seed: 11 });
+    ui.wv.open({ filter: 'published' });
+    assert.equal(ui.isOpen(), true);
+    assert.equal(ui.$('.j2ha-wv-scope').length, 0);
   });
 
   maybe('élargir : tout l’arbre, sélection (pièce ou équipement) conservée et dépliée, annonce, focus sur la ligne sélectionnée', () => {
@@ -79,7 +116,7 @@ describe('25.6 / AC4 — bouton « Toutes les pièces » (élargir)', () => {
     assert.equal(roomIds(ui).length, 5);
     assert.equal(ui.$('.j2ha-wv-room[data-object_id="11"]').attr('aria-selected'), 'true');
     assert.equal(ui.$('.j2ha-wv-room[data-object_id="11"]').attr('aria-expanded'), 'true');
-    assert.equal(plain(ui.$('.j2ha-wv-live').text()).trim(), 'Toutes les pièces');
+    assert.equal(plain(ui.$('.j2ha-wv-live').text()).trim(), 'Toute la maison');
     assert.equal(ui.dom.document.activeElement, ui.$('.j2ha-wv-room[data-object_id="11"]').list[0], 'focus sur la ligne sélectionnée');
 
     const eq = startBig({ rooms: 5, equipments: 40, seed: 11 });
@@ -113,19 +150,32 @@ describe('25.6 / AC4 — bouton « Toutes les pièces » (élargir)', () => {
 });
 
 describe('25.6 / AC7, Q5 — recherche, puces et KPI dans la portée', () => {
-  maybe('la recherche ne fait jamais apparaître une autre pièce ; « Aucun résultat » dans la pièce', () => {
+  // Garde levée (front v2, Lot 7, spec E3) : la recherche cherche toujours dans toute la maison ; en portée pièce, les
+  // pièces trouvées ailleurs sont groupées sous « Dans les autres pièces » (fin du faux « Aucun résultat »).
+  maybe('en portée pièce, la recherche trouve partout : autres pièces groupées sous « Dans les autres pièces »', () => {
     const ui = startBig({ rooms: 5, equipments: 40, seed: 11 });
     openCard(ui, 11);
     const search = ui.$('.j2ha-wv-search').list[0];
-    search.props.value = 'pièce 3';
+    assert.equal(plain(search.attrs.placeholder), 'Rechercher dans toute la maison');
+    const other = ui.rooms.find((r) => r.object_id !== 11 && r.object_id > 0);
+    search.props.value = other.object_name;
+    search.handlers.input.call(search, { target: search });
+    ui.advance(400);
+    assert.ok(roomIds(ui).includes(String(other.object_id)), 'la pièce cherchée apparaît');
+    assert.ok(!roomIds(ui).includes('11') || roomIds(ui)[0] === '11', 'la pièce ouverte, si elle correspond, vient en tête');
+    assert.equal(plain(ui.$('.j2ha-wv-tree .j2ha-wv-group-other').text()).trim(), 'Dans les autres pièces');
+    assert.equal(plain(ui.$('.j2ha-wv-search-status').text()).trim(), '', 'pas de faux « Aucun résultat »');
+    assert.equal(scope(ui), 'piece', 'la portée ne change pas');
+    search.props.value = 'zzz introuvable';
     search.handlers.input.call(search, { target: search });
     ui.advance(400);
     assert.equal(roomIds(ui).length, 0);
-    assert.equal(plain(ui.$('.j2ha-wv-search-status').text()).trim(), 'Aucun résultat');
-    search.props.value = 'Eq';
+    assert.equal(plain(ui.$('.j2ha-wv-search-status').text()).trim(), 'Aucun résultat', 'rien dans toute la maison');
+    search.props.value = '';
     search.handlers.input.call(search, { target: search });
     ui.advance(400);
-    assert.deepEqual(roomIds(ui), ['11']);
+    assert.deepEqual(roomIds(ui), ['11'], 'sans recherche : la pièce seule, sans groupe');
+    assert.equal(ui.$('.j2ha-wv-tree .j2ha-wv-group').length, 0);
   });
 
   maybe('effectifs des puces : ceux de la pièce en portée pièce, ceux de la maison en portée toutes ; page B inchangée', () => {
@@ -255,12 +305,15 @@ describe('25.6 / D1 — modèle d’arbre pur', () => {
 // seule avec ce filtre ; la puce active ne doit jamais être désactivée, sinon le filtre ne peut plus être retiré.
 describe('25.6 — puce active jamais désactivée (relecture #307)', () => {
   const O = require('../../desktop/js/jeedom2ha_overview.js');
-  it('chipsFor : la puce active à zéro reste cliquable ; les autres puces à zéro restent désactivées', () => {
+  // Garde levée (front v2, Lot 7, spec E2/E3) : les puces à zéro ne sont plus affichées (au lieu d'être grisées), sauf la
+  // puce active, qui reste cliquable pour retirer le filtre.
+  it('chipsFor : la puce active à zéro reste affichée et cliquable ; les autres puces à zéro sont masquées', () => {
     const counts = { published: 0, to_apply: 0, blocked: 2, other: 0, unread: 0 };
     const chips = O.chipsFor(counts, 'published');
     assert.equal(chips.find((c) => c.key === 'published').disabled, false);
-    assert.equal(chips.find((c) => c.key === 'to_apply').disabled, true);
+    assert.equal(chips.find((c) => c.key === 'to_apply'), undefined);
     assert.equal(chips.find((c) => c.key === 'blocked').disabled, false);
+    assert.deepEqual(chips.map((c) => c.key), ['published', 'blocked']);
   });
   it('chipsFor : la puce « non lus » active à zéro reste affichée', () => {
     const chips = O.chipsFor({ published: 1, to_apply: 0, blocked: 0, other: 0, unread: 0 }, 'unread');

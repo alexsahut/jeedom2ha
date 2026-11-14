@@ -144,12 +144,14 @@ describe('25.4 / AC12 — recherche', () => {
 });
 
 describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
-  maybe('mêmes puces, mêmes libellés et effectifs que la page B ; une puce à zéro est désactivée', () => {
+  // Garde levée (front v2, Lot 7, spec E2/E3) : une puce à zéro n'est plus grisée mais masquée, dans la page et dans la vue.
+  maybe('mêmes puces, mêmes libellés et effectifs que la page B ; une puce à zéro est masquée', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17, unread: 2 });
     openCardWide(ui, 10);
     const b = ui.$('#j2ha_houseChips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
     const c = ui.$('.j2ha-wv-chips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
     assert.deepEqual(c, b);
+    assert.ok(c.every((entry) => !entry[2] && !/^0 /.test(entry[1])), 'aucune puce à zéro, aucune puce grisée');
     assert.ok(c.some((entry) => entry[0] === 'unread'), 'non lus > 0');
   });
 

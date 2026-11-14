@@ -153,7 +153,8 @@ describe('20.3 / AC6 — libellés français d’usage', () => {
 
   it('table validée : libellés de remplacement présents', () => {
     const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
-    assert.match(php, /\{\{Configuration Home Assistant par pièce\}\}/);
+    // Garde levée (front v2, Lot 7, glossaire 3.2) : « Configuration Home Assistant par pièce » → « Ce que Jeedom publie dans Home Assistant ».
+    assert.match(php, /\{\{Ce que Jeedom publie dans Home Assistant\}\}/);
     assert.equal(M.buildUncoveredLabel(), 'Ignorée → sans équivalent dans Home Assistant');
     const reason = (code) => M.buildBlockingReason({
       publication_reason: code, should_publish: false, projection_validity: { is_valid: false },

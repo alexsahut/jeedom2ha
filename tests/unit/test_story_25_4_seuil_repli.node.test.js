@@ -126,7 +126,8 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
     assert.equal(toggle.attr('aria-expanded'), 'false', 'sélectionner referme le tiroir');
     assert.ok(!nav.hasClass('j2ha-wv-nav-open'));
     const none = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 800 } });
-    none.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'); // ouverture par un filtre : aucune sélection
+    // Garde levée (front v2, Lot 7) : la puce de la maison filtre sur place ; l'ouverture sans sélection passe par l'API de la vue.
+    none.wv.open({ filter: 'published' }); // ouverture par un filtre : aucune sélection
     assert.equal(none.$('.j2ha-wv-drawer-toggle').attr('aria-expanded'), 'true', 'aucune sélection : le panneau est ouvert');
   });
 

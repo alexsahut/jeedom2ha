@@ -7,11 +7,13 @@
  * le bouton « Actualiser ». Partie pure (testée sous Node) + partie navigateur en fin de fichier. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./jeedom2ha_mapping_override.js'));
+    module.exports = factory(require('./jeedom2ha_mapping_override.js'),
+      function () { return require('./jeedom2ha_lexique.js'); }, function () { return require('./jeedom2ha_ha_side.js'); });
     return;
   }
-  root.Jeedom2haOverview = factory(root.Jeedom2haMappingOverride);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (M) {
+  root.Jeedom2haOverview = factory(root.Jeedom2haMappingOverride,
+    function () { return root.Jeedom2haLexique || null; }, function () { return root.Jeedom2haHaSide || null; });
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (M, lexicon, haSide) {
   'use strict';
 
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
@@ -55,24 +57,25 @@
     { key: 'published', label: function (n) { return plural(n, 'publié', 'publiés'); } },
     { key: 'blocked', label: function (n) { return plural(n, 'bloqué', 'bloqués'); } },
     { key: 'to_apply', label: function (n) { return n + ' ' + w('à appliquer'); } },
-    { key: 'other', label: function (n) { return n + ' ' + w('exclus et autres'); } },
+    // Front v2 (Lot 7) : « exclus ou inactifs » (amendement du glossaire, spec 3.2) : exclus, désactivés et rien à publier.
+    { key: 'other', label: function (n) { return n + ' ' + w('exclus ou inactifs'); } },
     { key: 'unread', label: function (n) { return unreadLabel(n); } },
   ];
 
   function emptyCounts() { return { published: 0, to_apply: 0, blocked: 0, other: 0, unread: 0 }; }
 
   // Puces de filtre (Story 25.4) : calculées ICI pour la page principale ET pour la vue de travail, afin qu'aucun second
-  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée, SAUF la puce
-  // active (`active`) : elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la
-  // pièce ne compte aucun équipement du filtre hérité de la page B).
+  // calcul d'effectifs n'existe. Front v2 (Lot 7, E2) : une puce à zéro n'est PAS affichée, SAUF la puce active (`active`) :
+  // elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la pièce ne compte aucun
+  // équipement du filtre hérité de la page B). `disabled` reste dans le contrat (toujours faux).
   function chipsFor(counts, active) {
     var c = counts || emptyCounts();
     var chips = [];
     FILTERS.forEach(function (f) {
       var count = c[f.key] || 0;
       var isActive = active === f.key;
-      if (f.key === 'unread' && count === 0 && !isActive) return;
-      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 && !isActive });
+      if (count === 0 && !isActive) return;
+      chips.push({ key: f.key, count: count, label: f.label(count), disabled: false });
     });
     return chips;
   }
@@ -97,6 +100,8 @@
           state: null, blocked_mention: 0, group: 'unread',
           // Story 25.7 : cause d'exclusion (mention à côté du mot « Exclu », jamais un état) et plugin de l'équipement.
           cause: null, homekit_kept: false, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
+          // Front v2 (Lot 7) : conseil (mention dérivée, jamais un état) ; `null` = inconnu sans requête de plus.
+          advice: null,
         };
         if (entry && typeof entry === 'object') {
           // `summarizeRoom` lit l'identifiant dans l'entrée : on le garantit sans cloner l'entrée.
@@ -108,6 +113,7 @@
           // Story 24.4 (R1) : relevé de sa pièce exclue par HomeKit (champ additif de la route agrégée).
           row.homekit_kept = entry.homekit_kept_in_excluded_room === true;
           if (resolved.state === 'excluded') row.cause = M.exclusionCauseOf(entry, eq.enabled);
+          row.advice = adviceOfEntry(entry, resolved.state);
         }
         counts[row.group] += 1;
         rows.push(row);
@@ -117,6 +123,7 @@
       var exclusion = M.exclusionBreakdown(rows.filter(function (r) { return r.state === 'excluded'; }));
       out.rooms.push({
         object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows,
+        advice: adviceCount(rows),
         // Story 25.8 : la pièce est exclue (clé `excludedObjects`) — jamais pour « Sans pièce ».
         excluded: room.excluded === true && room.object_id > 0,
       });
@@ -125,18 +132,91 @@
       GROUP_KEYS.forEach(function (key) { out.counts[key] += counts[key]; });
     });
     out.house = M.summarizeHouse(summaries);
+    var all = [];
+    out.rooms.forEach(function (r) { all = all.concat(r.equipments); });
+    out.advice = adviceCount(all);
     return out;
+  }
+
+  // --- Front v2 (Lot 7) : conseils connus sans requête de plus ---
+  // Un conseil (« publié mais améliorable ») se lit dans les `hints` d'un arbre. La route agrégée `/system/equipment_states`
+  // ne les porte pas (liste blanche sous garde) et les fiches ne sont jamais lues une à une : le nombre n'est connu que si
+  // CHAQUE entrée lue porte `hints` (tableau, même vide). Sinon `null` : aucune puce, aucun bloc, aucune mention.
+  function adviceOfEntry(entry, state) {
+    if (!entry || !Array.isArray(entry.hints)) return null;
+    if (state !== 'published') return false;
+    var H = haSide();
+    var hints = H && typeof H.computeHints === 'function' ? H.computeHints(entry) : entry.hints;
+    return Array.isArray(hints) && hints.length > 0;
+  }
+
+  function adviceCount(rows) {
+    var read = rows.filter(function (row) { return row.state !== null; });
+    if (read.length === 0 || read.some(function (row) { return row.advice === null; })) return null;
+    return read.filter(function (row) { return row.advice === true; }).length;
+  }
+
+  function adviceLabel(count) { return plural(count, 'conseil', 'conseils'); }
+
+  // --- Front v2 (Lot 7) : bloc « À faire » (E2) ---
+  // Une ligne par équipement bloqué (puis par conseil connu), avec la cause en clair et l'action de sa fiche
+  // (`Jeedom2haLexique.causeSheet`). La cause est lue dans l'entrée AGRÉGÉE par `groupBlockedCauses` (source unique) : aucun
+  // arbre n'est lu. Rend toutes les lignes ; la page n'en affiche que les cinq premières.
+  function causeSentence(quoi) {
+    var text = String(quoi || '').replace(/^Non publié\s*:\s*/, '');
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function todoItems(overview, equipments) {
+    var items = [];
+    if (!overview) return items;
+    var byId = equipments && typeof equipments === 'object' ? equipments : {};
+    var L = lexicon();
+    var H = haSide();
+    var advice = [];
+    overview.rooms.forEach(function (room) {
+      room.equipments.forEach(function (row) {
+        var entry = Object.prototype.hasOwnProperty.call(byId, String(row.eq_id)) ? byId[String(row.eq_id)] : null;
+        if (!entry) return;
+        var base = { eq_id: row.eq_id, eq_name: row.eq_name, eq_type: row.eq_type, room_id: row.room_id, room_name: row.room_name };
+        if (row.state === 'blocked') {
+          var groups = M.groupBlockedCauses(entry);
+          var first = groups[0] || null;
+          var context = H && typeof H.nameTypeWords === 'function' ? H.nameTypeWords(entry, row.eq_name) || {} : {};
+          var sheet = first && first.code && L ? L.causeSheet(first.code, context) : null;
+          items.push(Object.assign(base, {
+            kind: 'blocked',
+            text: sheet && sheet.known ? causeSentence(sheet.quoi) : (first ? M.buildCauseNoticeText(first) : ''),
+            action: sheet && sheet.known && sheet.actions.length ? sheet.actions[0] : null,
+          }));
+        } else if (row.advice === true) {
+          var hints = H && typeof H.computeHints === 'function' ? H.computeHints(entry) : [];
+          var hint = hints[0] || null;
+          var tip = hint && L ? L.causeSheet(hint.code, { count: hint.count }) : null;
+          advice.push(Object.assign(base, { kind: 'advice', text: tip && tip.known ? tip.quoi : '', action: null }));
+        }
+      });
+    });
+    return items.concat(advice);
+  }
+
+  // --- Front v2 (Lot 7) : scénarios publiés (champ additif `status.publication`, Lot 3) ; absent = rien d'affiché ---
+  function scenarioMention(status) {
+    var publication = status && typeof status === 'object' ? status.publication : null;
+    var n = publication && typeof publication === 'object' ? publication.scenarios_published : null;
+    if (typeof n !== 'number' || !isFinite(n) || n <= 0) return '';
+    return '+ ' + Math.floor(n) + ' ' + w(n > 1 ? 'scénarios publiés comme boutons' : 'scénario publié comme bouton');
   }
 
   function filterRows(overview, key) {
     var rows = [];
     overview.rooms.forEach(function (room) {
-      room.equipments.forEach(function (row) { if (row.group === key) rows.push(row); });
+      room.equipments.forEach(function (row) { if (key === 'advice' ? row.advice === true : row.group === key) rows.push(row); });
     });
     return rows;
   }
 
-  // Segments de la jauge, dans l'ordre publiés / à appliquer / bloqués / exclus et autres / non lus.
+  // Segments de la jauge, dans l'ordre publiés / à appliquer / bloqués / exclus ou inactifs / non lus.
   var GAUGE_ORDER = ['published', 'to_apply', 'blocked', 'other', 'unread'];
 
   function gaugeSegments(counts, total) {
@@ -152,7 +232,7 @@
     var parts = [(counts.published || 0) + ' ' + w((counts.published || 0) > 1 ? 'publiés' : 'publié') + ' ' + w('sur') + ' ' + total];
     if (counts.to_apply > 0) parts.push(counts.to_apply + ' ' + w('à appliquer'));
     if (counts.blocked > 0) parts.push(plural(counts.blocked, 'bloqué', 'bloqués'));
-    if (counts.other > 0) parts.push(counts.other + ' ' + w('exclus et autres'));
+    if (counts.other > 0) parts.push(counts.other + ' ' + w('exclus ou inactifs'));
     if (counts.unread > 0) parts.push(unreadLabel(counts.unread));
     return parts.join(', ');
   }
@@ -452,12 +532,18 @@
       var head = houseHeadline(o.counts.published, o.total);
       setText('#j2ha_houseNumber', head.number);
       setText('#j2ha_houseSub', head.sub);
-      setText('#j2ha_houseMeta', o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces'));
+      renderMeta();
       $gaugeHost.append(buildGauge(o.counts, o.total));
-      chipsFor(o.counts, filter).forEach(function (chip) {
+      var chips = chipsFor(o.counts, filter);
+      // Front v2 (Lot 7) : puce « conseils » seulement si le nombre est connu sans requête de plus (voir adviceCount).
+      if (typeof o.advice === 'number' && (o.advice > 0 || filter === 'advice')) {
+        chips.push({ key: 'advice', count: o.advice, label: adviceLabel(o.advice), disabled: false });
+      }
+      chips.forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', filter === chip.key ? 'true' : 'false')
+          .attr('aria-controls', 'j2ha_filterPanel')
           .append($('<span class="j2ha-chip-dot"></span>'))
           .append(document_text(chip.label));
         if (chip.disabled) $chip.prop('disabled', true);
@@ -465,7 +551,29 @@
         $chip.on('keydown', onFilterKey);
         $chips.append($chip);
       });
+      renderChipsHint(chips.length > 0);
       if (focusKey) $chips.find(chipId(focusKey)).focus();
+    }
+
+    // « 38 équipements Jeedom, 7 pièces · + 12 scénarios publiés comme boutons » : la mention des scénarios n'apparaît que si
+    // le démon fournit le nombre (`status.publication.scenarios_published`, relais `getBridgeStatus`).
+    function renderMeta() {
+      var o = lastView && lastView.overview;
+      if (!o) return;
+      var text = o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces');
+      var scenarios = scenarioMention(typeof env.bridgeStatus === 'function' ? env.bridgeStatus() : null);
+      setText('#j2ha_houseMeta', scenarios ? text + ' · ' + scenarios : text);
+    }
+
+    // « Cliquez sur un chiffre pour voir la liste. » : sous les puces, en tête de la ligne de fraîcheur (maquette E2),
+    // seulement quand il y a au moins une puce.
+    function renderChipsHint(visible) {
+      var $hint = $('#j2ha_houseBlock .j2ha-v2-chips-hint');
+      if ($hint.length === 0) {
+        $hint = $('<span class="j2ha-v2-small j2ha-v2-chips-hint"></span>').text('{{Cliquez sur un chiffre pour voir la liste.}}');
+        $('#j2ha_houseBlock .j2ha-house-fresh').prepend($hint);
+      }
+      if (visible) $hint.show(); else $hint.hide();
     }
 
     function document_text(text) { return env.document.createTextNode(text); }
@@ -576,7 +684,11 @@
       }
       var rows = orderLikeGrid(filterRows(vm.overview, filter));
       var def = FILTERS.filter(function (f) { return f.key === filter; })[0];
-      setText('#j2ha_filterTitle', def.label(rows.length));
+      setText('#j2ha_filterTitle', def ? def.label(rows.length) : adviceLabel(rows.length));
+      if (rows.length === 0) {
+        // E2 : filtre sans résultat (par exemple après une relecture) ; « Tout afficher » est dans l'en-tête du panneau.
+        $list.append($('<li class="text-muted j2ha-v2-filter-empty"></li>').text('{{Aucun équipement dans cet état.}}'));
+      }
       rows.forEach(function (row) {
         var $btn = $('<button type="button" class="j2ha-frow-btn"></button>').attr('data-room-id', row.room_id);
         if (row.state) $btn.append(stateWord(row.state));
@@ -609,12 +721,118 @@
       }
     }
 
+    // --- Front v2 (Lot 7) : bloc « À faire » (#j2ha_v2_todo), absent s'il est vide ---
+    var TODO_LIMIT = 5;
+
+    function equipmentUrl(item) {
+      var type = typeof item.eq_type === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(item.eq_type) ? item.eq_type : '';
+      return type ? 'index.php?v=d&m=' + type + '&p=' + type + '&id=' + encodeURIComponent(String(item.eq_id)) : '';
+    }
+
+    // L'action de la fiche de cause (Jeedom2haLexique) : « Corriger le type… » et « Voir » ouvrent la fiche de l'équipement
+    // dans la page ; les types génériques et l'équipement s'ouvrent dans Jeedom (nouvel onglet).
+    function todoAction(item) {
+      var key = item.action && item.action.key;
+      var href = key === 'generic_types' ? 'index.php?v=d&p=types' : (key === 'equipment' ? equipmentUrl(item) : '');
+      if (href) {
+        return $('<a class="btn btn-default btn-xs j2ha-v2-todo-action" target="_blank" rel="noopener"></a>')
+          .attr('href', href).attr('data-action', key).text(item.action.label);
+      }
+      var label = key === 'correct_type' ? item.action.label : w('Voir');
+      var $btn = $('<button type="button" class="btn btn-xs j2ha-v2-todo-action"></button>')
+        .addClass(key === 'correct_type' ? 'btn-primary' : 'btn-default').attr('data-action', key || 'open').text(label);
+      $btn.attr('aria-label', label + ' : ' + item.eq_name);
+      $btn.on('click', function () { openEquipmentView(item.room_id, item.eq_id); });
+      return $btn;
+    }
+
+    function todoRow(item) {
+      var $row = $('<div class="j2ha-v2-row j2ha-v2-todo-row"></div>').attr('data-eq-id', item.eq_id).attr('data-kind', item.kind);
+      if (item.kind === 'blocked') {
+        $row.append($('<span class="j2ha-v2-lbl is-warn"></span>').append($('<i class="fas fa-exclamation-triangle" aria-hidden="true"></i>'))
+          .append(document_text(' ' + M.EQUIPMENT_STATE_LABELS.blocked)));
+      } else {
+        $row.append($('<span class="j2ha-v2-lbl is-tip"></span>').append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'))
+          .append(document_text(' ' + w('Conseil'))));
+      }
+      var $grow = $('<span class="j2ha-v2-grow"></span>')
+        .append($('<strong class="j2ha-free-name"></strong>').text(item.eq_name))
+        .append($('<span class="text-muted j2ha-free-name"></span>').text(' · ' + item.room_name));
+      if (item.text) $grow.append($('<br>')).append($('<span class="j2ha-v2-small j2ha-v2-todo-cause"></span>').text(item.text));
+      $row.append($grow).append(todoAction(item));
+      return $row;
+    }
+
+    function renderTodo(vm) {
+      var $host = $('#j2ha_v2_todo').empty();
+      if (!vm.overview) return;
+      var all = todoItems(vm.overview, vm.equipments);
+      var items = orderLikeGrid(all.filter(function (i) { return i.kind === 'blocked'; }))
+        .concat(orderLikeGrid(all.filter(function (i) { return i.kind !== 'blocked'; })));
+      if (items.length === 0) return;
+      var blocked = vm.overview.counts.blocked || 0;
+      var $head = $('<div class="j2ha-v2-todo-head"></div>').append($('<strong class="j2ha-v2-todo-title"></strong>').text('{{À faire}}'));
+      if (blocked > 1) {
+        var $all = $('<button type="button" class="j2ha-v2-link j2ha-v2-todo-all" aria-controls="j2ha_filterPanel"></button>')
+          .text(w('Voir les') + ' ' + blocked + ' ' + w('bloqués'));
+        $all.on('click', function () { showFilter('blocked'); });
+        $head.append($('<span class="text-muted j2ha-v2-small"></span>').append($all));
+      }
+      $host.append($head);
+      items.slice(0, TODO_LIMIT).forEach(function (item) { $host.append(todoRow(item)); });
+    }
+
+    // --- Front v2 (Lot 7) : légende repliable (#j2ha_v2_legend), construite une fois. Les six mots d'état sont ceux de
+    // M.EQUIPMENT_STATE_LABELS (jamais recopiés) ; viennent ensuite les trois mentions de capacité et de conseil. ---
+    var LEGEND = [
+      ['published', null, '{{l\'équipement est dans Home Assistant.}}'],
+      ['to_apply', null, '{{un réglage est enregistré, il reste à l\'envoyer à Home Assistant.}}'],
+      ['blocked', null, '{{le plugin ne peut pas le publier ; la cause et la solution sont dites dans sa fiche.}}'],
+      ['excluded', null, '{{vous avez choisi de ne pas le publier.}}'],
+      ['disabled', null, '{{l\'équipement est désactivé dans Jeedom.}}'],
+      ['nothing_to_publish', null, '{{aucune commande ne sert dans Home Assistant.}}'],
+      [null, '{{Pilotable}}', '{{Home Assistant peut agir sur l\'équipement (allumer, éteindre, régler…).}}'],
+      [null, '{{Lecture seule}}', '{{Home Assistant affiche son état sans pouvoir agir.}}'],
+      [null, '{{Conseil}}', '{{publié, mais il pourrait faire mieux ; ce n\'est pas un état.}}'],
+    ];
+
+    function renderLegend() {
+      var $host = $('#j2ha_v2_legend');
+      if ($host.length === 0 || $host.children().length > 0) return;
+      var $toggle = $('<button type="button" class="j2ha-v2-link j2ha-v2-legend-toggle" aria-expanded="false" aria-controls="j2ha_v2_legendList"></button>')
+        .text('{{Que veulent dire ces mots ?}}');
+      var $list = $('<dl id="j2ha_v2_legendList" class="j2ha-v2-legend-list"></dl>').hide();
+      LEGEND.forEach(function (entry) {
+        var $term = $('<dt></dt>');
+        if (entry[0]) $term.append($('<i class="fas" aria-hidden="true"></i>').addClass(STATE_ICONS[entry[0]])).append(document_text(' '));
+        $list.append($term.append(document_text(entry[0] ? M.EQUIPMENT_STATE_LABELS[entry[0]] : entry[1]))).append($('<dd></dd>').text(entry[2]));
+      });
+      $toggle.on('click', function () {
+        var open = $toggle.attr('aria-expanded') !== 'true';
+        $toggle.attr('aria-expanded', open ? 'true' : 'false');
+        if (open) $list.show(); else $list.hide();
+      });
+      $host.append($toggle).append($list);
+    }
+
+    // --- Front v2 (Lot 7) : phrase d'accueil (E2) ; le titre « Ce que Jeedom publie dans Home Assistant » est dans la page PHP. ---
+    function renderWelcome() {
+      // Phrase d'accueil en tête de la ligne d'aide (bloc à part, texte normal ; la consigne et le lien « Aide » suivent).
+      var $help = $('#j2ha_mainView .j2ha-help-line').first();
+      if ($help.length && $('#j2ha_mainView .j2ha-v2-welcome').length === 0) {
+        $help.prepend($('<span class="j2ha-v2-welcome"></span>')
+          .append($('<strong></strong>').text('{{jeedom2ha publie vos équipements Jeedom dans Home Assistant.}}'))
+          .append(document_text(' ' + '{{Jeedom reste la source : rien n\'y est modifié.}}')));
+      }
+    }
+
     function render() {
       lastView = buildViewModel(lastState && lastState.response, rooms, lastState && lastState.valid);
       renderHouse(lastView);
       renderFreshness(lastState);
       renderCards(lastView);
       renderList(lastView);
+      renderTodo(lastView);
       subscribers.slice().forEach(function (fn) { fn(); });
     }
 
@@ -631,13 +849,17 @@
       render();
     }
 
-    // Story 25.4 (AC1) : une puce ou un segment de la jauge ouvre la vue de travail avec ce filtre ; un second clic sur
-    // le filtre déjà actif le retire (la page principale reste affichée). Sans vue (env.openView absent ou refusé),
-    // le comportement de 25.3 est conservé : liste filtrée sur la page principale.
+    // Front v2 (Lot 7, E2) : une puce ou un segment de la jauge filtre SUR PLACE (liste #j2ha_filterPanel), sans changer de
+    // vue ; un second clic sur le filtre actif le retire. La vue de travail s'ouvre depuis une ligne de la liste ou une carte.
     function activateFilter(key) {
-      if (filter === key) { setFilter(null); return; }
-      if (typeof env.openView === 'function' && env.openView({ filter: key }) !== false) return;
       setFilter(key);
+    }
+
+    // « Voir les N bloqués » du bloc « À faire » : pose le filtre (jamais de bascule) et amène la liste à l'écran.
+    function showFilter(key) {
+      if (filter !== key) { filter = key; render(); }
+      var node = $('#j2ha_filterPanel').get(0);
+      if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
     }
 
     function openEquipmentView(roomId, eqId) {
@@ -790,6 +1012,8 @@
       $(env.document).on('click', function (event) {
         if (openMenuWrap && $(event && event.target).closest('.j2ha-menu-wrap').length === 0) closeMenu(false);
       });
+      renderWelcome();
+      renderLegend();
       render();
       reader.load();
     }
@@ -808,6 +1032,8 @@
       },
       filter: function () { return filter; },
       view: function () { return lastView; },
+      // Front v2 (Lot 7) : l'état du démon vient d'être relu (mention des scénarios), sans relire les équipements.
+      statusChanged: renderMeta,
       // Story 25.4 : ce que la vue de travail lit (copie unique en mémoire, agrégats dérivés) et abonnement aux rendus.
       snapshot: snapshotNow,
       subscribe: function (fn) {
@@ -826,6 +1052,11 @@
     chipsFor: chipsFor,
     roomExclusionImpact: roomExclusionImpact,
     roomExclusionDialog: roomExclusionDialog,
+    todoItems: todoItems,
+    causeSentence: causeSentence,
+    scenarioMention: scenarioMention,
+    adviceCount: adviceCount,
+    adviceLabel: adviceLabel,
     GROUP_KEYS: GROUP_KEYS,
     GROUP_OF_STATE: GROUP_OF_STATE,
     plural: plural,
@@ -856,6 +1087,8 @@
         openRoom: function (id) { if (typeof window.j2haOpenRoom === 'function') window.j2haOpenRoom(id); },
         // Story 25.8 : demande d'exclusion d'une pièce (confirmation chiffrée, écriture, relecture) — jeedom2ha.js.
         excludeRoom: function () { if (typeof window.requestRoomExclusion === 'function') return window.requestRoomExclusion.apply(window, arguments); },
+        // Front v2 (Lot 7) : dernier état du démon (relais getBridgeStatus de jeedom2ha.js), lu pour la mention des scénarios.
+        bridgeStatus: function () { return window.jeedom2haLastBridgeStatus || null; },
         // Story 25.4 : la vue de travail remplace la fenêtre de pièce ; `false` = vue indisponible (repli sur la page B).
         openView: function (target) {
           var view = window.Jeedom2haWorkviewInstance;
@@ -867,6 +1100,12 @@
       window.j2haNotifyStatesChanged = function () { page.reader.trigger(); };
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') page.reader.onVisible();
+      });
+      // Front v2 (Lot 7) : chaque réponse de getBridgeStatus (lue par jeedom2ha.js) met à jour la mention des scénarios ;
+      // aucune requête ajoutée, on écoute seulement la fin des appels existants.
+      window.$(document).on('ajaxComplete', function (_event, _xhr, settings) {
+        var data = settings && settings.data;
+        if (typeof data === 'string' && data.indexOf('action=getBridgeStatus') !== -1) page.statusChanged();
       });
       page.init();
     });
