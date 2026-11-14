@@ -43,22 +43,10 @@
     valve: { article: 'une', one: 'vanne', many: 'vannes' },
   };
 
-  // Pourquoi un type n'est pas possible pour cette commande : ce que le registre du démon exige pour ce type
-  // (validation/ha_component_registry.py). Le démon dit QUE le type est impossible ; ce texte dit ce qui manque.
-  var IMPOSSIBLE_REASONS = {
-    alarm_control_panel: 'il faut l’état de l’alarme et des ordres pour l’armer ou la désarmer',
-    binary_sensor: 'il faut une commande d’état à lire',
-    button: 'il faut un ordre à déclencher',
-    climate: 'il manque l’ordre qui règle la consigne de température',
-    cover: 'il manque les ordres Monter et Descendre (ou Ouvrir et Fermer)',
-    light: 'il manque les ordres Allumer et Éteindre',
-    lock: 'il faut l’état de la serrure et un ordre Verrouiller ou Déverrouiller',
-    sensor: 'il faut une commande d’état à lire',
-    switch: 'il manque les ordres Allumer et Éteindre',
-    valve: 'il faut l’état de la vanne et les ordres Ouvrir et Fermer',
-  };
-  var BUTTON_ON_STATE_REASON = 'une commande d’état ne peut pas devenir un bouton';
-  var DEFAULT_IMPOSSIBLE_REASON = 'le plugin ne peut pas publier cette commande sous ce type';
+  // Un type refusé : le démon dit seulement QUE le type ne peut pas aboutir (`override_types_allowed`, Story 22.2 : la
+  // projection rejouée avec ce type est invalide), pas POURQUOI. Aucune raison n'est devinée ici (revue du Lot 5) : sans
+  // raison fournie par le démon, une seule phrase vraie.
+  var NOT_OFFERED_REASON = 'non proposé par le plugin pour cette commande';
 
   function M() {
     return mapping();
@@ -90,10 +78,9 @@
     return r.override_applied === true ? 'Personnalisé : ' + typeLabel(r.effective_ha) : 'auto';
   }
 
-  /** Raison d'un type impossible (sans le préfixe « impossible : »). `cmdType` : 'info' | 'action' | null (Lot 3). */
-  function impossibleReason(type, cmdType) {
-    if (type === 'button' && cmdType === 'info') return BUTTON_ON_STATE_REASON;
-    return Object.prototype.hasOwnProperty.call(IMPOSSIBLE_REASONS, type) ? IMPOSSIBLE_REASONS[type] : DEFAULT_IMPOSSIBLE_REASON;
+  /** Raison affichée pour un type refusé par le démon (toujours la même : la raison exacte n'est pas fournie). */
+  function impossibleReason() {
+    return NOT_OFFERED_REASON;
   }
 
   // Ce que le plugin fait aujourd'hui de cette commande sans réglage : « non publié », « Lumière (light) », ou rien si inconnu.
@@ -111,17 +98,14 @@
 
   /**
    * Choix du panneau pour une ligne de commande de l'arbre (forme `commands[]`, normalisée ou brute).
-   * `options.cmdType` : type Jeedom de la commande (champ additif du Lot 3), pour une raison plus précise.
    * Rend { current, choices: [{ value, label, hint, disabled, reason, checked }] } — `value` = '' pour « Automatique ».
    * Ordre : Automatique, puis les types possibles (ordre de la liste d'interface), puis les types impossibles.
    */
-  function buildChoices(row, options) {
-    var o = options || {};
+  function buildChoices(row) {
     var r = M().normalizeCommandRow(row);
     var current = r.override_applied && r.effective_ha ? r.effective_ha : null;
     var allowed = M().getOverrideTypeOptions(r);
     var all = M().getHaEntityTypeOptions();
-    var cmdType = o.cmdType === 'info' || o.cmdType === 'action' ? o.cmdType : null;
     var today = autoToday(r);
     var choices = [{
       value: '',
@@ -137,7 +121,7 @@
     all.forEach(function (type) {
       if (allowed.indexOf(type) !== -1) return;
       choices.push({
-        value: type, label: typeLabel(type), hint: null, disabled: true, reason: impossibleReason(type, cmdType), checked: false,
+        value: type, label: typeLabel(type), hint: null, disabled: true, reason: impossibleReason(), checked: false,
       });
     });
     return { current: current, choices: choices };
@@ -245,14 +229,20 @@
     var refusal = null;
     if (!covered) refusal = 'cette commande n’a pas d’équivalent dans Home Assistant';
     else if (!publishable) refusal = refusalText(over);
+    // Changement d'identifiant : seulement pour une entité RÉELLEMENT publiée avant (Lot 3 : seules les entités publiées
+    // comptent ; `from: null` = apparition). Une entité absente de Home Assistant n'a ni automatisation ni tableau de bord
+    // à reprendre : aucun avertissement, même si le démon en signalait un.
+    var publishedBefore = {};
+    beforeLines.forEach(function (line) { if (line.publish && line.entity_id) publishedBefore[line.entity_id] = true; });
     var changes = [];
     var removed = [];
     (Array.isArray(p.entity_id_changes) ? p.entity_id_changes : []).forEach(function (c) {
       if (!isObject(c)) return;
       var from = typeof c.from === 'string' && c.from ? c.from : null;
       var to = typeof c.to === 'string' && c.to ? c.to : null;
-      if (from && to && from !== to) changes.push({ from: from, to: to });
-      else if (from && !to) removed.push(from);
+      if (!from || !Object.prototype.hasOwnProperty.call(publishedBefore, from)) return;
+      if (to && from !== to) changes.push({ from: from, to: to });
+      else if (!to) removed.push(from);
     });
     return {
       ok: true,

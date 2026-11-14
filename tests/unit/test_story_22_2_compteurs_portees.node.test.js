@@ -418,7 +418,7 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     // Les types refusés restent visibles, grisés avec leur raison (spec E5) : jamais proposés.
     const greyed = panelInputs(ui, 100).filter((o) => o.props.disabled === true).map((o) => o.attrs.value);
     assert.ok(greyed.includes('sensor') && greyed.includes('binary_sensor'));
-    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-radio.is-disabled').text(), /impossible :/);
+    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-radio.is-disabled').text(), /non proposé par le plugin pour cette commande/);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

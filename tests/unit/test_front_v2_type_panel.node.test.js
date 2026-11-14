@@ -26,6 +26,15 @@ function lampe(allowed) {
   return t;
 }
 
+/** Avant PUBLIÉ (un interrupteur et un capteur dans Home Assistant), pour les cas de changement d'identifiant. */
+const PUBLISHED_BEFORE = [
+  { ha_entity_type: 'switch', ha_unique_id: 'jeedom2ha_eq_231', ha_default_entity_id: 'switch.jeedom2ha_eq_231',
+    ha_controllable: true, ha_capabilities: ['on_off'], will_publish: true, reason: 'sure' },
+  { ha_entity_type: 'sensor', ha_unique_id: 'jeedom2ha_231_9', ha_default_entity_id: 'sensor.jeedom2ha_231_9',
+    ha_controllable: false, ha_capabilities: ['read'], will_publish: true, reason: 'sure' },
+];
+const ID_CHANGES = [{ from: 'switch.jeedom2ha_eq_231', to: 'light.jeedom2ha_eq_231' }, { from: 'sensor.jeedom2ha_231_9', to: null }];
+
 /** Réponse d'aperçu du démon (Lot 3) pour la lampe passée en lumière. */
 function previewLight(extra) {
   return { state: 'ok', result: { status: 'ok', payload: Object.assign({
@@ -65,16 +74,19 @@ describe('Lot 5 — module pur : choix possibles et impossibles', () => {
 
   it('types annoncés par le démon proposés, les autres visibles et grisés avec leur raison', () => {
     const row = lampe().commands[0];
-    const { current, choices } = TP.buildChoices(row, { cmdType: 'info' });
+    const { current, choices } = TP.buildChoices(row);
     assert.equal(current, null);
     assert.deepEqual(choices.filter((c) => !c.disabled).map((c) => c.value), ['', 'light', 'switch']);
     assert.equal(choices[0].label, 'Automatique');
     assert.match(choices[0].hint, /aujourd’hui : non publié/);
     assert.ok(choices[0].checked);
-    const button = choices.find((c) => c.value === 'button');
-    assert.equal(button.disabled, true);
-    assert.equal(button.reason, 'une commande d’état ne peut pas devenir un bouton');
-    assert.equal(choices.find((c) => c.value === 'cover').reason, 'il manque les ordres Monter et Descendre (ou Ouvrir et Fermer)');
+    // Revue du Lot 5 : le démon dit QUE le type est refusé, pas POURQUOI. Aucune raison devinée : une seule phrase vraie
+    // pour tous (jamais « il faut une commande d'état » sur une commande d'état, par exemple).
+    for (const type of ['button', 'cover', 'binary_sensor', 'sensor']) {
+      const c = choices.find((x) => x.value === type);
+      assert.equal(c.disabled, true, type);
+      assert.equal(c.reason, 'non proposé par le plugin pour cette commande', type);
+    }
     assert.equal(choices.length, 1 + M.getHaEntityTypeOptions().length, 'tous les types restent visibles');
     // Ordre : Automatique, possibles, puis impossibles.
     const firstDisabled = choices.findIndex((c) => c.disabled);
@@ -115,11 +127,24 @@ describe('Lot 5 — module pur : aperçu avant / après', () => {
     assert.deepEqual(diff.changes, [], 'une entité qui apparaît n’est pas un changement d’identifiant');
   });
 
-  it('identifiant qui change et entité qui disparaît', () => {
-    const diff = TP.buildDiff(previewLight({ entity_id_changes: [
-      { from: 'switch.jeedom2ha_eq_231', to: 'light.jeedom2ha_eq_231' }, { from: 'sensor.jeedom2ha_231_9', to: null }] }));
+  it('avant publié : identifiant qui change et entité qui disparaît sont signalés', () => {
+    const diff = TP.buildDiff(previewLight({ entities_before: PUBLISHED_BEFORE, entity_id_changes: ID_CHANGES }));
+    assert.equal(diff.before.headline, '1 interrupteur, 1 capteur');
     assert.deepEqual(diff.changes, [{ from: 'switch.jeedom2ha_eq_231', to: 'light.jeedom2ha_eq_231' }]);
     assert.deepEqual(diff.removed, ['sensor.jeedom2ha_231_9']);
+  });
+
+  it('avant NON publié : aucun changement d’identifiant signalé, même si le démon en liste un', () => {
+    const diff = TP.buildDiff(previewLight({ entity_id_changes: ID_CHANGES }));
+    assert.equal(diff.before.headline, 'Non publié');
+    assert.deepEqual(diff.changes, []);
+    assert.deepEqual(diff.removed, []);
+  });
+
+  it('repli sans entités « avant » (démon plus ancien) : aucun changement d’identifiant signalé', () => {
+    const p = previewLight({ entity_id_changes: ID_CHANGES });
+    delete p.result.payload.entities_before;
+    assert.deepEqual(TP.buildDiff(p).changes, []);
   });
 
   it('choix non publiable : refus dit en clair, rien d’annoncé « après »', () => {
@@ -174,7 +199,8 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     assert.match(plain(box.text()), /Le plus durable est de corriger les types génériques dans Jeedom/);
     const offered = box.find('input').list.filter((i) => i.props.disabled !== true).map((i) => i.attrs['data-type']);
     assert.deepEqual(offered, ['auto', 'light', 'switch']);
-    assert.match(plain(box.find('.j2ha-v2-radio.is-disabled').text()), /Bouton \(button\) — impossible : une commande d’état ne peut pas devenir un bouton/);
+    assert.match(plain(box.find('.j2ha-v2-radio.is-disabled').text()), /Bouton \(button\) — non proposé par le plugin pour cette commande/);
+    assert.doesNotMatch(plain(box.text()), /il faut une commande d’état|impossible :/, 'aucune raison devinée');
     assert.equal(ui.$(`${panel(2311)}.j2ha-v2-type-save`).prop('disabled'), true);
 
     choose(2311, 'light');
@@ -272,14 +298,25 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     done();
   });
 
-  it('identifiant qui change : avertissement sur les automatisations à reprendre', async () => {
+  it('identifiant qui change (avant publié) : avertissement sur les automatisations à reprendre', async () => {
     const { ui, P, panel, choose, done } = openFiche(lampe());
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
     choose(2311, 'light');
     await sleep(450);
-    ui.respond('previewMappingOverride', previewLight({ entity_id_changes: [{ from: 'switch.jeedom2ha_eq_231', to: 'light.jeedom2ha_eq_231' }] }));
+    ui.respond('previewMappingOverride', previewLight({ entities_before: PUBLISHED_BEFORE.slice(0, 1), entity_id_changes: ID_CHANGES.slice(0, 1) }));
     assert.match(plain(ui.$(`${panel(2311)}.j2ha-v2-type-idchange`).text()),
       /^Attention : l’identifiant passe de switch\.jeedom2ha_eq_231 à light\.jeedom2ha_eq_231\. Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien seront à reprendre\.$/);
+    done();
+  });
+
+  it('avant non publié : pas d’avertissement d’identifiant à l’écran', async () => {
+    const { ui, P, panel, choose, done } = openFiche(lampe());
+    ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
+    choose(2311, 'light');
+    await sleep(450);
+    ui.respond('previewMappingOverride', previewLight({ entity_id_changes: ID_CHANGES }));
+    assert.match(plain(ui.$(`${panel(2311)}.j2ha-v2-diff`).text()), /Avant\s*Non publié/);
+    assert.equal(ui.$(`${panel(2311)}.j2ha-v2-type-idchange`).length, 0);
     done();
   });
 });
@@ -380,12 +417,12 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     done();
   });
 
-  it('acceptation 3 : sur une commande d’état (Lot 3 : cmd_type info), « Bouton (button) » est grisé avec sa raison', () => {
+  it('acceptation 3 : sur une commande d’état, « Bouton (button) » refusé par le démon est grisé, avec la seule raison connue', () => {
     const { ui, P, panel, done } = openFiche(lampe());
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
     const input = ui.$(`${panel(2311)}input[data-type="button"]`);
     assert.equal(input.prop('disabled'), true);
-    assert.match(plain(input.closest('.j2ha-v2-radio').text()), /impossible : une commande d’état ne peut pas devenir un bouton/);
+    assert.match(plain(input.closest('.j2ha-v2-radio').text()), /— non proposé par le plugin pour cette commande/);
     done();
   });
 
@@ -476,7 +513,7 @@ describe('Lot 5 — vrai navigateur', () => {
       handleWrite: (action, request) => {
         writesSeen.push({ action, body: request.postData });
         if (action === 'previewMappingOverride') {
-          const body = previewLight({ jeedom_eq_id: eqId, entity_id_changes: [{ from: 'switch.jeedom2ha_eq_231', to: 'light.jeedom2ha_eq_231' }] });
+          const body = previewLight({ jeedom_eq_id: eqId });
           return { verdict: 'simulee', body };
         }
         if (action === 'executeHaAction') return { verdict: 'simulee', body: ACTION_OK };

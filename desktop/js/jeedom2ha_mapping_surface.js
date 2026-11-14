@@ -1109,16 +1109,6 @@
     return eq && eq.eq_name ? eq.eq_name : '#' + eqId;
   }
 
-  // Type Jeedom de la commande (« info » / « action ») : champ additif du Lot 3, lu dans l'arbre brut ; null si absent.
-  function rawCommandType(eqId, cmdId) {
-    var raw = ctx.raw[eqId];
-    var list = raw && Array.isArray(raw.commands) ? raw.commands : [];
-    for (var i = 0; i < list.length; i++) {
-      if (list[i] && list[i].jeedom_cmd_id === cmdId) return list[i].cmd_type || null;
-    }
-    return null;
-  }
-
   // Première commande de `cmdIds` dont le type peut être réglé ici (sinon le panneau n'est pas proposé).
   function typePanelTarget(eqId, cmdIds) {
     var tree = ctx.trees[eqId];
@@ -1302,7 +1292,7 @@
       }
       var $text = $('<span class="j2ha-v2-type-choice"></span>').text(choice.value === '' ? '{{Automatique}}' : choice.label);
       if (choice.hint) $text.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text(' — ' + choice.hint));
-      if (choice.reason) $text.append($('<span class="j2ha-v2-small"></span>').text(' — {{impossible :}} ' + choice.reason));
+      if (choice.reason) $text.append($('<span class="j2ha-v2-small"></span>').text(' — ' + choice.reason));
       $input.on('change', function () { chooseType(tp, state, choice.value); });
       $label.append($input).append($text);
       $fieldset.append($label);
@@ -1397,7 +1387,7 @@
     closeTypePanel(false);
     typePanelSeq += 1;
     var $origin = o.origin && o.origin.length ? o.origin : $tr.find('a.j2ha-type-link').first();
-    var built = tp.buildChoices(row, { cmdType: rawCommandType(eqId, cmdId) });
+    var built = tp.buildChoices(row);
     var titleId = 'j2haTypeTitle_' + typePanelSeq;
     var state = { eqId: eqId, cmdId: cmdId, seq: typePanelSeq, current: built.current, choice: undefined, timer: null, busy: false,
       $origin: $origin };
