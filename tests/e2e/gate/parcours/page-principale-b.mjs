@@ -133,7 +133,8 @@ async function checkRefresh(page, helpers) {
   helpers.record('refresh_emis', refreshed);
 }
 
-/** (6) Le menu « ⋯ Autres actions » (front v2, Lot 1) : « Vérifier l'installation… », « Guide de démarrage », puis la
+/** (6) Le menu « ⋯ Autres actions » (front v2, Lots 1 et 6) : « Vérifier l'installation… », « Guide de démarrage », « Choisir ce
+ * qui est publié… », puis la
  * suppression ; les exports (24.2) sont portés par la boîte « Vérifier l'installation… ». Fermer la boîte et la
  * confirmation n'écrit rien. */
 async function checkMenu(page, helpers) {
@@ -141,7 +142,9 @@ async function checkMenu(page, helpers) {
   await toggle.click();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') throw new Error('menu-non-ouvert');
   const items = await page.locator('#j2ha_moreMenu .j2ha-menu-item').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  if (items.length !== 3 || items[0] !== 'Vérifier l\'installation…' || items[1] !== 'Guide de démarrage' || items[2] !== 'Supprimer tout de Home Assistant…') {
+  // Front v2 (Lot 6) : « Choisir ce qui est publié… » (panneau E6) rejoint le menu, avant le séparateur.
+  if (items.length !== 4 || items[0] !== 'Vérifier l\'installation…' || items[1] !== 'Guide de démarrage' || items[2] !== 'Choisir ce qui est publié…'
+    || items[3] !== 'Supprimer tout de Home Assistant…') {
     throw new Error('entrees-menu-inattendues');
   }
   await page.locator('#bt_j2haCheckInstall').click();

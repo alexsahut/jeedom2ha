@@ -96,6 +96,17 @@ export function buildRoomExclusionResponse(state, { objectId, excluded }) {
   };
 }
 
+// --- Front v2 (Lot 6) : plugins exclus (saveFilteringConfig) depuis la page du plugin, écriture de configuration simulée ---
+
+/** Réponse de la route `saveFilteringConfig` (`ajax::success(['saved' => true])`). Jamais transmise à la box. */
+export function buildFilteringConfigResponse({ excludedPlugins, confidencePolicy }) {
+  if (typeof excludedPlugins !== 'string') throw new Error('buildFilteringConfigResponse: excludedPlugins invalide');
+  if (confidencePolicy !== 'sure_only' && confidencePolicy !== 'sure_probable') {
+    throw new Error('buildFilteringConfigResponse: confidencePolicy invalide');
+  }
+  return { state: 'ok', result: { saved: true } };
+}
+
 // Clé des simulations de publication (story 20-2, point 7) : une portée équipement
 // (cmdId absent, ex. "Exclure" dans la barre d'actions de l'équipement) partage l'espace
 // de clés avec les portées commande, sans jamais les confondre (suffixe "equipment" fixe,

@@ -498,12 +498,15 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     assert.equal(ui.lastConfirmation().options.buttons.confirm.className, 'btn-primary');
   });
 
-  it('boutons globaux : suppression en rouge, mise en garde forte, sans nombre', () => {
+  // Garde levée (front v2, Lot 6, spec E9) : le nombre vient de la copie des états en mémoire ; tant qu'elle n'est pas lue, la
+  // confirmation le DIT (« Nombre d'entités inconnu pour l'instant ») au lieu d'afficher un chiffre faux.
+  it('boutons globaux : suppression en rouge, mise en garde forte, nombre inconnu dit tel quel sans lecture', () => {
     const ui = openRoomWith(null);
     ui.click('.j2ha-ha-action[data-ha-action="supprimer-recreer"]');
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
-    assert.match(options.message, /Supprimer de Home Assistant tout le parc publié \?/);
+    assert.match(options.title, /Supprimer tout de Home Assistant/);
+    assert.match(options.message, /Nombre d(&#39;|')entités inconnu pour l(&#39;|')instant/);
     assert.doesNotMatch(options.message, /\d/);
     options.buttons.confirm.callback();
     const call = ui.pending('executeHaAction')[0];

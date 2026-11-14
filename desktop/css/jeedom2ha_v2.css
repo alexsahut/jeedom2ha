@@ -387,6 +387,38 @@
 .j2ha-v2-role-missing { color: var(--j2ha-warn); font-style: italic; }
 .j2ha-v2-retry { margin: 4px 0; }
 
+/* Lot 6 — Choisir ce qui est publié (E6) : arbre à cases, changements en attente, bandeau « Annuler ». */
+.j2ha-v2-excl .j2ha-v2-excl-mode { margin: 4px 0 8px; }
+.j2ha-v2-excl .j2ha-v2-excl-rule { margin: 0 0 8px; }
+.j2ha-v2-excl .j2ha-v2-excl-tree {
+  max-height: 55vh;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--j2ha-v2-line);
+}
+.j2ha-v2-excl .j2ha-v2-excl-node > .j2ha-v2-tree-node:first-child { border-top: 1px solid var(--j2ha-v2-line); }
+.j2ha-v2-excl .j2ha-v2-excl-cb {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+.j2ha-v2-excl .j2ha-v2-excl-cb:disabled { cursor: not-allowed; }
+.j2ha-v2-excl .j2ha-v2-excl-twisty,
+.j2ha-v2-excl .j2ha-v2-excl-twisty:hover,
+.j2ha-v2-excl .j2ha-v2-excl-twisty:focus {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  text-decoration: none;
+}
+.j2ha-v2-excl .j2ha-v2-tree-node.is-l2 { padding-left: 40px; }
+.j2ha-v2-excl .j2ha-v2-excl-change { font-weight: 600; }
+.j2ha-v2-toast .j2ha-v2-excl-undo { padding: 0 4px; }
+
 /* Lot 5 — Panneau « Corriger le type » (E5) sous la ligne de la commande, aperçu avant / après, bandeau « … · Annuler ». */
 .j2ha-v2-type-row > td { padding: 6px 0 10px 0; }
 .j2ha-v2-type-panel { margin: 0; }

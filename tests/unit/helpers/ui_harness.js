@@ -22,6 +22,8 @@ const W = require('../../../desktop/js/jeedom2ha_workview.js');
 // Front v2 (Lot 2) : modules purs chargés avant la surface dans la page (lexique, côté Home Assistant).
 const LEX = require('../../../desktop/js/jeedom2ha_lexique.js');
 const HA_SIDE = require('../../../desktop/js/jeedom2ha_ha_side.js');
+// Front v2 (Lot 6) : textes des confirmations chiffrées (E9), chargés avant jeedom2ha.js comme dans la page.
+const EXCL = require('../../../desktop/js/jeedom2ha_exclusions.js');
 // Front v2 (Lot 5) : panneau « Corriger le type » (module pur), lu par la surface au clic comme dans la page.
 const TYPE_PANEL = require('../../../desktop/js/jeedom2ha_type_panel.js');
 const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
@@ -124,6 +126,7 @@ function createUi(rooms, options) {
     bootbox: dom.bootbox,
     document: dom.document,
     Jeedom2haMappingOverride: M,
+    Jeedom2haExclusions: EXCL,
     setTimeout,
     clearTimeout,
     console,
@@ -133,6 +136,7 @@ function createUi(rooms, options) {
     Jeedom2haMappingOverride: M,
     Jeedom2haLexique: LEX,
     Jeedom2haHaSide: HA_SIDE,
+    Jeedom2haExclusions: EXCL,
     Jeedom2haTypePanel: TYPE_PANEL,
     j2haRoomsTree: rooms || [],
     j2haAncestors: opts.ancestors || [],

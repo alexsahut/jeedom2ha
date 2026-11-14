@@ -59,8 +59,14 @@ describe('25.8 / AC6 — balisage des cartes', () => {
     assert.ok(wrap.hasClass('j2ha-menu-wrap'));
     assert.equal(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-haspopup'), 'menu');
     assert.equal(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-expanded'), 'false');
-    assert.ok(plain(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-label')).startsWith('Actions de la pièce'));
-    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-item`).length, 1);
+    // Garde levée (front v2, Lot 6) : glossaire 3.1 « Actions de la pièce » → « Autres actions » ; le menu porte aussi
+    // « Choisir ce qui est publié… » (panneau E6, aucune écriture) et « Republier la pièce » (famille data-ha-action), puis un
+    // séparateur et l'exclusion, inchangée.
+    assert.ok(plain(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-label')).startsWith('Autres actions'));
+    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-item`).length, 3);
+    assert.equal(ui.$(`${CARD(3)} .j2ha-room-choose`).attr('data-ha-action'), undefined, 'ouvrir le panneau n\'écrit rien : jamais grisé');
+    assert.equal(ui.$(`${CARD(3)} .j2ha-card-republish`).attr('data-ha-action'), 'republier-piece');
+    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-sep`).length, 1);
     assert.equal(ui.$(`${CARD(3)} .j2ha-room-exclude`).attr('data-ha-action'), 'exclure-piece');
     assert.equal(ui.$(`${CARD(3)} .j2ha-room-exclude`).attr('role'), 'menuitem');
   });
