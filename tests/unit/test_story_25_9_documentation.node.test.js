@@ -12,7 +12,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('docs/fr_FR/index.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const page = [read('plugin_info/configuration.php'), read('core/php/jeedom2ha_excluded_plugins.php')].join('\n').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'");
-const filtering = index.slice(index.indexOf('### Filtrage et publication'), index.indexOf('## Première synchronisation'));
+// Garde levée (front v2, Lot 8) : le § « Filtrage et publication » suit le titre du bloc à l'écran, « Ce qui est publié » (E8).
+const filtering = index.slice(index.indexOf('### Ce qui est publié'), index.indexOf('### Avancé et tâche planifiée'));
 
 describe('25.9 / AC8 — documentation de la configuration', () => {
   it('§ Filtrage et publication : liste à cocher (plugins présents, absents encore exclus, ordre sans importance), plus de ligne « Pièces exclues »', () => {
@@ -24,11 +25,15 @@ describe('25.9 / AC8 — documentation de la configuration', () => {
     assert.doesNotMatch(filtering, /virtual,zwave,rfxcom|`1,5,12`/);
     assert.match(filtering, /Pièces exclues : elles se règlent depuis la page du plugin \(menu « ⋯ » d'une carte de pièce, ou détail de la pièce\)\./);
     assert.match(filtering, /\[Exclure une pièce\]\(#exclure-une-pièce\)/);
-    assert.match(filtering, /reprises telles quelles/);
+    // Garde levée (front v2, Lot 8, R24) : « reprises telles quelles » décrivait la migration de l'ancien champ ; retiré de la doc
+    // (le changelog le garde).
+    assert.ok(filtering.length > 500, 'section présente');
   });
 
-  it('§ Première synchronisation et famille 7 « Exclusions volontaires » sont réalignées', () => {
-    assert.match(index, /2\. Ajustez les filtres si nécessaire \(plugins exclus, politique de publication ; les pièces s'excluent depuis la page du plugin\)\./);
+  // Garde levée (front v2, Lot 8) : « Première synchronisation » devient « Première publication : le guide de démarrage » (E1) ;
+  // l'étape 3 du guide (« Choisir ce qui est publié ») remplace la liste numérotée.
+  it('§ Première publication et famille 7 « Exclusions volontaires » sont réalignées', () => {
+    assert.match(index, /3\. « Choisir ce qui est publié » \| « Tout publier \(recommandé\) » ou « Choisir… »/);
     assert.match(index, /Plugin coché dans la liste « Plugins exclus » de la configuration\./);
     assert.match(index, /décochez le plugin dans « Plugins exclus »/);
     assert.doesNotMatch(index, /champs « Plugins exclus » et « Pièces exclues »/);

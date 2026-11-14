@@ -41,7 +41,9 @@ describe('25.4 / AC30 — index.md décrit la vue de travail', () => {
     }
     assert.match(index, /carte de pièce ou sur une ligne de la liste filtrée ouvre la \*\*vue de travail\*\*/);
     assert.match(index, /La lecture de la configuration|ne lit la configuration \*\*que de cet équipement\*\*/);
-    assert.match(index, /partagé\*\* avec la page principale/);
+    // Garde levée (front v2, Lot 8, glossaire 3.1) : « page principale » devient « page du plugin » (seul le bouton de retour,
+    // libellé « Page principale » à l'écran, est encore cité sous ce nom).
+    assert.match(index, /partagé\*\* avec la page du plugin/);
     assert.match(index, new RegExp(`en dessous de ${W.LAYOUT_SPLIT_MIN_WIDTH} pixels`));
   });
 

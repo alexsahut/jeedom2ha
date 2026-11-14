@@ -55,18 +55,18 @@ Pendant cette installation, Jeedom peut tenter de démarrer le démon trop tôt 
 
 ### 5. Configurer le broker MQTT
 
-Saisissez l'hôte et le port du broker, puis cliquez sur « Sauvegarder » et démarrez (ou redémarrez) le démon. Tous les champs sont décrits dans [Configuration](index.md#configuration).
+Saisissez l'hôte et le port du broker, puis cliquez sur « Tester, enregistrer et redémarrer le démon ». Tous les champs sont décrits dans [Configuration](index.md#configuration) ; le pas-à-pas complet est dans [Premiers pas](premiers-pas.md).
 
 ### 6. Vérifier le démon
 
 - Sur la page du plugin, le démon doit être **« OK »**.
-- Le statut du pont `jeedom2ha/bridge/status` doit être publié sur le broker. Le bandeau de santé de la page principale doit alors afficher « Bridge » : « Actif » et « MQTT » : « Connecté ».
+- Le statut du pont `jeedom2ha/bridge/status` doit être publié sur le broker. La barre d'état de la page du plugin doit alors afficher « Démon » : « Actif » et « MQTT » : « Connecté ».
 
 ---
 
 ## Contrôle de réussite
 
-L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Relire Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres → Appareils et services → MQTT** pour retrouver vos équipements (voir [Première synchronisation](index.md#première-synchronisation)).
+L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Relire Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres → Appareils et services → MQTT** pour retrouver vos équipements (voir [Première publication](index.md#première-publication--le-guide-de-démarrage)).
 
 ---
 
