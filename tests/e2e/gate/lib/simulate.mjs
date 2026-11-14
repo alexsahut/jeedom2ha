@@ -378,6 +378,29 @@ export function deriveOverrideTree(state, eqId, realResponse) {
   return copy;
 }
 
+// Front v3 (Lot 4a) : réponse SIMULÉE de `saveScenarioPublication` (choix déclaré par le parcours) : forme de la route
+// (`saved`, listes demandées, relecture réussie). Rien n'est transmis à la box ; la configuration réelle n'est jamais écrite.
+export function buildScenarioPublicationResponse({ idsToPublish, idsToUnpublish }) {
+  const parse = (value) => {
+    if (typeof value !== 'string' || !/^\[(?:[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9})*)?\]$/.test(value)) {
+      throw new Error('buildScenarioPublicationResponse: liste invalide');
+    }
+    return JSON.parse(value).sort((a, b) => a - b);
+  };
+  return {
+    state: 'ok',
+    result: {
+      saved: true,
+      ids_to_publish: parse(idsToPublish),
+      ids_to_unpublish: parse(idsToUnpublish),
+      rescan: {
+        status: 'ok', operation_result: 'succes', operation_message: 'Synchronisation terminée.',
+        scenario_availability_complete: true,
+      },
+    },
+  };
+}
+
 // Front v2 (Lot 5) : réponse SIMULÉE de la publication d'un équipement déclaré (second temps de « Enregistrer et
 // publier »). Forme d'un succès du démon ; rien n'est transmis à la box.
 export function buildEquipmentPublicationResponse() {

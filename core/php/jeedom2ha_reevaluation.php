@@ -83,6 +83,32 @@ function jeedom2ha_reevaluation_eq_row(array $row): ?array {
 }
 
 /**
+ * Front v3 (Lot 4a) — liste d'identifiants de scénarios d'une clé de configuration (tableau déjà décodé par la lecture de configuration
+ * ou chaîne JSON), triée et dédoublonnée ; null si la clé est absente ou illisible. Même règle que
+ * jeedom2ha_scenario_id_list (core/php/jeedom2ha_scenario_publication.php), dupliquée pour garder ce fichier autonome.
+ */
+function jeedom2ha_reevaluation_scenario_ids($raw): ?array {
+  if (is_string($raw) && $raw !== '') {
+    $decoded = json_decode($raw, true);
+    $raw = is_array($decoded) ? $decoded : null;
+  }
+  if (!is_array($raw)) {
+    return null;
+  }
+  $ids = array();
+  foreach ($raw as $value) {
+    if (is_int($value) && $value > 0) {
+      $ids[$value] = true;
+    } elseif (is_string($value) && preg_match('/^[1-9][0-9]{0,9}$/', $value)) {
+      $ids[(int) $value] = true;
+    }
+  }
+  $ids = array_keys($ids);
+  sort($ids);
+  return $ids;
+}
+
+/**
  * Empreinte des décisions de publication (SHA-256 hexadécimal).
  *
  * Entrées :
@@ -135,6 +161,16 @@ function jeedom2ha_decision_fingerprint(array $eqRows, array $scenarioRows, arra
     'excluded_plugins' => $excludedPlugins,
     'excluded_objects' => $excludedObjects,
   ));
+  // Front v3 (Lot 4a) — choix de publication des scénarios (`publishedScenarios`, `knownScenarioIds`), ajouté
+  // seulement si au moins une des deux clés existe : sans elles, l'empreinte reste exactement celle d'avant (aucune
+  // resynchro à la mise à jour du code) ; avec elles, tout changement de choix relance la synchro de service.
+  $scenarioPublication = array(
+    'published' => jeedom2ha_reevaluation_scenario_ids($settings['publishedScenarios'] ?? null),
+    'known' => jeedom2ha_reevaluation_scenario_ids($settings['knownScenarioIds'] ?? null),
+  );
+  if ($scenarioPublication['published'] !== null || $scenarioPublication['known'] !== null) {
+    $canonical .= '|scenario_publication:' . json_encode($scenarioPublication);
+  }
   return hash('sha256', (string) $canonical);
 }
 

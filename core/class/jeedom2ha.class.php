@@ -22,6 +22,7 @@ require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
 require_once __DIR__  . '/../php/jeedom2ha_homekit_exposure.php';
 require_once __DIR__  . '/../php/jeedom2ha_reevaluation.php';
 require_once __DIR__  . '/../php/jeedom2ha_command_bounds.php'; // correctif fix/daemon-sync-body-limit
+require_once __DIR__  . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — publication des scénarios
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -476,6 +477,9 @@ class jeedom2ha extends eqLogic {
       array(
         'excludedPlugins' => config::byKey('excludedPlugins', __CLASS__, ''),
         'excludedObjects' => config::byKey('excludedObjects', __CLASS__, ''),
+        // Front v3 (Lot 4a) — choix de publication des scénarios : un changement relance la synchro de service.
+        'publishedScenarios' => config::byKey('publishedScenarios', __CLASS__, ''),
+        'knownScenarioIds' => config::byKey('knownScenarioIds', __CLASS__, ''),
       ),
       __CLASS__
     );
@@ -808,6 +812,106 @@ class jeedom2ha extends eqLogic {
   }
 
   /**
+   * Front v3 (Lot 4a) — groupe et mode de lancement d'un scénario (scenario::getGroup/getMode/getTrigger/getSchedule).
+   * Ne lève jamais : une valeur illisible vaut null.
+   */
+  public static function readScenarioLaunchInfo($_scenario): array {
+    $info = array('group' => null, 'mode' => null, 'has_trigger' => null, 'has_schedule' => null, 'manual' => null);
+    if (!is_object($_scenario)) {
+      return $info;
+    }
+    try {
+      if (method_exists($_scenario, 'getGroup')) {
+        $group = $_scenario->getGroup();
+        $info['group'] = is_string($group) ? $group : null;
+      }
+    } catch (Throwable $e) {
+    }
+    try {
+      if (method_exists($_scenario, 'getMode')) {
+        $info = array_merge($info, jeedom2ha_scenario_launch_info(
+          $_scenario->getMode(),
+          method_exists($_scenario, 'getTrigger') ? $_scenario->getTrigger() : null,
+          method_exists($_scenario, 'getSchedule') ? $_scenario->getSchedule() : null
+        ));
+      }
+    } catch (Throwable $e) {
+    }
+    return $info;
+  }
+
+  /**
+   * Front v3 (Lot 4a) — ajoute groupe et mode de lancement aux lignes de buildScenariosPayload (qui reste inchangé,
+   * garde 21-1 / 24-1). Lecture seule ; une valeur illisible vaut null et ne rend jamais la liste incomplète (la
+   * purge des boutons n'en dépend pas). Un scénario absent de `$_scenarios` garde des valeurs nulles.
+   *
+   * @param iterable|null $_scenarios scénarios (scenario::all())
+   */
+  public static function applyScenarioLaunchInfo(array $_rows, $_scenarios): array {
+    $byId = array();
+    foreach (is_iterable($_scenarios) ? $_scenarios : array() as $sc) {
+      try {
+        $byId[intval($sc->getId())] = self::readScenarioLaunchInfo($sc);
+      } catch (Throwable $e) {
+      }
+    }
+    foreach ($_rows as $index => $row) {
+      $id = is_array($row) && isset($row['id']) ? intval($row['id']) : 0;
+      $launch = isset($byId[$id]) ? $byId[$id] : self::readScenarioLaunchInfo(null);
+      $_rows[$index] = array_merge($row, $launch);
+    }
+    return $_rows;
+  }
+
+  /**
+   * Front v3 (Lot 4a) — ajoute `published` / `is_new` d'après `publishedScenarios` et `knownScenarioIds`.
+   * Clé `publishedScenarios` absente (migration pas encore faite) : lignes inchangées, le démon publie comme avant.
+   */
+  public static function applyScenarioPublication(array $_rows): array {
+    return jeedom2ha_scenario_publication_rows(
+      $_rows,
+      jeedom2ha_scenario_id_list(config::byKey(JEEDOM2HA_PUBLISHED_SCENARIOS_KEY, __CLASS__, '', true)),
+      jeedom2ha_scenario_id_list(config::byKey(JEEDOM2HA_KNOWN_SCENARIOS_KEY, __CLASS__, '', true))
+    );
+  }
+
+  /**
+   * Front v3 (Lot 4a) — identifiants des scénarios lisibles, ou null si la lecture est incomplète (migration reportée).
+   */
+  public static function readableScenarioIds(): ?array {
+    $payload = self::buildScenariosPayload(class_exists('scenario') ? scenario::all() : null);
+    if ($payload['complete'] !== true) {
+      return null;
+    }
+    return array_map(function ($row) {
+      return (int) $row['id'];
+    }, $payload['scenarios']);
+  }
+
+  /**
+   * Front v3 (Lot 4a) — dépendances des fonctions pures de jeedom2ha_scenario_publication.php (configuration réelle).
+   */
+  public static function scenarioPublicationDeps(?callable $_isFresh = null): array {
+    return array(
+      'read' => function (string $key) {
+        return config::byKey($key, __CLASS__, '', true);
+      },
+      'save' => function (string $key, string $value) {
+        config::save($key, $value, __CLASS__);
+      },
+      'readableIds' => function () {
+        return self::readableScenarioIds();
+      },
+      'isFresh' => $_isFresh !== null ? $_isFresh : function () {
+        return false;
+      },
+      'log' => function (string $level, string $message) {
+        log::add(__CLASS__, $level, $message);
+      },
+    );
+  }
+
+  /**
    * Story 24.1 — contexte de lecture (LECTURE SEULE) de la règle d'exposition HomeKit.
    * N'appelle jamais le plugin Homebridge : lit l'installation/activation du plugin, sa clé
    * `sendToHomebridgeDefault` (config::byKey) et la liste des plugins actifs.
@@ -1040,6 +1144,10 @@ class jeedom2ha extends eqLogic {
 
     // 3. Scenarios Jeedom (Story 10.1 — publiés comme HA button)
     $scenariosPayload = self::buildScenariosPayload(class_exists('scenario') ? scenario::all() : null);
+    // Front v3 (Lot 4a) — groupe et mode de lancement, lus à part (buildScenariosPayload reste inchangé).
+    $scenariosPayload['scenarios'] = self::applyScenarioLaunchInfo($scenariosPayload['scenarios'], class_exists('scenario') ? scenario::all() : null);
+    // Front v3 (Lot 4a, option B) — publication choisie par l'utilisateur (`published`, `is_new`), additive.
+    $scenariosPayload['scenarios'] = self::applyScenarioPublication($scenariosPayload['scenarios']);
     $result['scenarios'] = $scenariosPayload['scenarios'];
     // Story 21.1 — le démon ne purge les boutons de scénarios que si la lecture est complète.
     $result['scenarios_complete'] = $scenariosPayload['complete'];

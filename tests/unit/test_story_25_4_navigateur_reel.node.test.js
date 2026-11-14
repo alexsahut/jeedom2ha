@@ -33,7 +33,8 @@ test('25.4 réel — sélection d’un équipement : un getMappingOverrides, tab
     await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]').click();
     const row = page.locator('.j2ha-wv-eq').first();
     const eqId = await row.getAttribute('data-eq-id');
-    const treeWord = (await row.locator('.j2ha-state-word').first().innerText()).trim();
+    // Front v3 (Lot 2) : l'arbre montre l'icône seule ; le mot d'état est son nom accessible.
+    const treeWord = String(await row.locator('.j2ha-state-word').first().getAttribute('aria-label')).split(' · ')[0].trim();
     await row.locator('.j2ha-wv-row').click();
     await page.locator(`.j2ha-eq-panel[data-eq-id="${eqId}"] .j2ha-cmd-table`).waitFor({ state: 'visible' });
     assert.equal(actions(ctx, 'getMappingOverrides').length, 1);

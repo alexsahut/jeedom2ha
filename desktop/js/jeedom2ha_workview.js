@@ -266,7 +266,7 @@
     var st = {
       open: false, room: null, eq: null, search: '', expanded: {}, drawerOpen: false, layout: null,
       pushed: 0, hist: [''], savedScroll: 0, lastFilter: null, groupTitleOf: {}, searchTimer: null, built: false, focusTitle: false,
-      opening: false, trigger: null, live: {}, scope: 'toutes',
+      opening: false, trigger: null, live: {}, scope: 'toutes', resultsDismissed: false, pendingGroup: null, leaving: false,
     };
     var $root = null;
     var $main = null;
@@ -345,30 +345,26 @@
       $root.empty();
 
       var $bar = $('<div class="j2ha-wv-bar"></div>');
-      el.back = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-back"></button>')
-        .append($('<i class="fas fa-arrow-left"></i>')).append(doc.createTextNode(' ' + '{{Page principale}}'));
+      // Front v3 (Lot 2) : le fil d'Ariane cliquable `Maison › Niveau › Pièce` remplace les boutons « Page principale » et
+      // « Pièces ». « Maison » garde le rôle de l'ancien retour (`.j2ha-wv-back`, même historique) ; en disposition étroite,
+      // l'arbre s'ouvre par une icône (`.j2ha-wv-drawer-toggle`, masquée en deux colonnes).
+      el.back = $('<button type="button" class="j2ha-wv-crumb-link j2ha-wv-back"></button>')
+        .append($('<i class="fas fa-home" aria-hidden="true"></i>')).append($('<span></span>').text('{{Maison}}'));
       el.drawerToggle = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-drawer-toggle" aria-expanded="false" aria-controls="j2ha_wvNav"></button>')
-        .append($('<i class="fas fa-list"></i>')).append(doc.createTextNode(' ' + '{{Pièces}}'));
+        .attr('title', '{{Pièces}}').append($('<i class="fas fa-list" aria-hidden="true"></i>'));
+      el.crumb = $('<nav class="j2ha-wv-crumb"></nav>').attr('aria-label', "{{Fil d'Ariane}}");
       el.readStatus = $('<div class="text-muted j2ha-wv-read-status" role="status" aria-live="polite"></div>');
       el.live = $('<span class="j2ha-wv-live" role="status" aria-live="polite"></span>');
-      $bar.append(el.back).append(el.drawerToggle).append(el.readStatus).append(el.live);
+      $bar.append(el.drawerToggle).append(el.crumb).append(el.readStatus).append(el.live);
 
       var $body = $('<div class="j2ha-wv-body"></div>');
       el.nav = $('<aside class="j2ha-wv-nav" id="j2ha_wvNav"></aside>');
       var $tools = $('<div class="j2ha-wv-tools"></div>');
       el.tools = $tools;
-      // Portée de l'arbre (Story 25.6 ; Front v2 Lot 7, E3) : bascule lisible « Cette pièce | Toute la maison », dans le DOM
-      // dès qu'une pièce est sélectionnée (renderScope). `.j2ha-wv-widen` garde le rôle du bouton « élargir » de 25.6.
-      el.narrow = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-narrow"></button>')
-        .append($('<i class="fas fa-door-open" aria-hidden="true"></i>')).append(doc.createTextNode(' ' + '{{Cette pièce}}'));
-      el.widen = $('<button type="button" class="btn btn-default btn-sm j2ha-wv-widen"></button>')
-        .append($('<i class="fas fa-home" aria-hidden="true"></i>')).append(doc.createTextNode(' ' + '{{Toute la maison}}'));
-      el.scopeToggle = $('<div class="btn-group j2ha-wv-scope j2ha-v2-scope" role="group"></div>').attr('aria-label', "{{Portée de l'arbre}}")
-        .append(el.narrow).append(el.widen);
-      el.widen.on('click', widen);
-      el.narrow.on('click', narrow);
+      // Front v3 (Lot 2) : un seul arbre, toute la maison. La bascule « Cette pièce | Toute la maison » (25.6, Lot 7) est
+      // supprimée : la recherche filtre tout l'arbre, et le volet de droite dit « n résultats » pendant la recherche.
       el.search = $('<input type="search" class="form-control input-sm j2ha-wv-search" autocomplete="off"/>')
-        .attr('aria-label', '{{Rechercher dans toute la maison}}').attr('placeholder', '{{Rechercher dans toute la maison}}');
+        .attr('aria-label', '{{Rechercher}}').attr('placeholder', '{{Rechercher}}');
       el.chips = $('<div class="j2ha-wv-chips"></div>');
       el.searchStatus = $('<div class="text-muted j2ha-wv-search-status" role="status" aria-live="polite"></div>');
       $tools.append(el.search).append(el.chips).append(el.searchStatus);
@@ -383,7 +379,9 @@
       el.feedback = $('<div class="j2ha-room-feedback" role="status"></div>');
       el.feedback.hide();
       el.pane = $('<div class="j2ha-wv-pane"></div>');
-      el.detail.append(el.reassurance).append(el.feedback).append(el.pane);
+      // Front v3 (Lot 2) : pendant une recherche, le volet de droite affiche « n résultats » (la sélection reste intacte dessous).
+      el.results = $('<section class="j2ha-wv-results" role="region"></section>').attr('aria-label', '{{Résultats}}').hide();
+      el.detail.append(el.reassurance).append(el.feedback).append(el.results).append(el.pane);
       $body.append(el.nav).append(el.detail);
       $root.append($bar).append($body);
 
@@ -394,8 +392,11 @@
         if (st.searchTimer !== null) timeoutClear(st.searchTimer);
         st.searchTimer = timeoutSet(function () {
           st.searchTimer = null;
-          st.search = typeof value === 'string' ? value : '';
+          var next = typeof value === 'string' ? value : '';
+          if (next !== st.search) st.resultsDismissed = false;
+          st.search = next;
           renderTree();
+          renderResults();
           announceResults();
         }, SEARCH_DEBOUNCE_MS);
       });
@@ -512,6 +513,9 @@
 
     function goBack() {
       if (st.pushed > 0 && typeof win.history.go === 'function') {
+        // Front v3 (Lot 2) : « Maison » ramène TOUJOURS à la page du plugin, même quand la vue a été ouverte par un lien profond
+        // (l'entrée de départ est alors elle-même une entrée de la vue : onPop la remplace par l'adresse de la page).
+        st.leaving = true;
         win.history.go(-st.pushed);
         return;
       }
@@ -526,12 +530,21 @@
       if (st.pushed > 0 && st.hist[st.pushed - 1] === here) st.pushed -= 1;
       else if (st.hist[st.pushed + 1] === here) st.pushed += 1;
       else { st.hist = [here]; st.pushed = 0; }
+      if (st.leaving) {
+        st.leaving = false;
+        if (here !== '') {
+          try { win.history.replaceState(null, '', baseUrl()); } catch (e) { /* inutilisable */ }
+          st.hist[st.pushed] = '';
+        }
+        if (st.open) closeView();
+        return;
+      }
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (!parsed) {
         if (st.open) closeView();
         return;
       }
-      open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, scope: parsed.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
+      open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });
     }
 
     // --- Sélection ---
@@ -557,9 +570,11 @@
       st.expanded[id] = true;
       surface.clearEquipment();
       surface.setRoom(room);
+      st.resultsDismissed = true;
       renderTree();
-      if (changedRoom && st.scope === 'piece') renderChips(); // effectifs de la NOUVELLE pièce (recherche globale, Lot 7)
       renderPane();
+      renderCrumb();
+      renderResults();
       afterSelect(opts, changedRoom);
       if (changed) announce('{{Pièce}}' + ' ' + room.object_name);
       focusTitleIfAsked();
@@ -574,9 +589,11 @@
       st.room = roomId;
       st.eq = eqId;
       st.expanded[roomId] = true;
+      st.resultsDismissed = true;
       renderTree();
-      if (changedRoom && st.scope === 'piece') renderChips(); // effectifs de la NOUVELLE pièce (recherche globale, Lot 7)
       renderEquipmentPane(room, eq);
+      renderCrumb();
+      renderResults();
       afterSelect(opts, changedRoom);
       announce('{{Équipement}}' + ' ' + eq.eq_name);
       focusTitleIfAsked();
@@ -590,6 +607,8 @@
       surface.clearEquipment();
       renderTree();
       renderPane();
+      renderCrumb();
+      renderResults();
       if (st.layout === 'compact') setDrawer(true);
     }
 
@@ -629,13 +648,35 @@
       // position). Seule l'entrée courante est mise à jour (fermeture sans historique : fragment retiré sur place).
       st.hist[st.pushed] = currentHash();
       if (el.search) el.search.val('');
+      st.resultsDismissed = false;
+      if (el.results) el.results.empty().hide();
+      el.pane.show();
       el.pane.empty();
       resetFeedback();
       unstore();
       $root.hide();
       $main.show();
       if (typeof win.scrollTo === 'function') win.scrollTo(0, st.savedScroll);
+      var group = st.pendingGroup;
+      st.pendingGroup = null;
+      if (group !== null && revealGroup(group)) return;
       restoreFocus(lastRoom);
+    }
+
+    // Front v3 (Lot 2) : un niveau du fil d'Ariane ramène à la page principale, sur le groupe de pièces de ce niveau.
+    function revealGroup(title) {
+      var found = null;
+      $main.find('.j2ha-room-group').each(function () {
+        if (found) return;
+        var text = $(this).find('.j2ha-room-group-title').first().text();
+        if (text === title) found = $(this);
+      });
+      if (!found) return false;
+      var node = found.get(0);
+      if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start' });
+      var card = found.find('.j2ha-room-card').first();
+      if (card.length) card.focus();
+      return true;
     }
 
     // Retour : le déclencheur s'il est encore dans le document, sinon la carte de la pièce qui était ouverte.
@@ -674,7 +715,8 @@
         st.opening = false;
       }
       st.lastFilter = snap().filter;
-      st.scope = t.scope === 'piece' && roomId !== null ? 'piece' : 'toutes';
+      // Front v3 (Lot 2) : un seul arbre ; un ancien lien `seule:1` (25.6) s'ouvre sur toute la maison.
+      st.scope = 'toutes';
       var opts = { history: false, user: !t.fromHistory };
       if (roomId === null) clearSelection();
       else if (eqId !== null) selectEquipment(roomId, eqId, opts);
@@ -682,6 +724,7 @@
       renderScope();
       renderChips();
       renderStatus();
+      revealSelection();
       if (!t.fromHistory) syncUrl('push');
       return true;
     }
@@ -692,11 +735,10 @@
       indexRooms();
       if (!st.open) return;
       if (st.room !== null && !roomsById[st.room]) {
-        var wasNarrow = st.scope === 'piece';
         clearSelection();
         renderScope();
         renderChips();
-        if (wasNarrow) syncUrl('replace');
+        syncUrl('replace');
       } else if (st.eq !== null && !eqOf(roomsById[st.room], st.eq)) {
         selectRoom(st.room, { history: false });
       } else {
@@ -704,64 +746,95 @@
       }
     }
 
-    // --- Portée (Story 25.6) : attribut observable ; bascule « Cette pièce | Toute la maison » présente dès qu'une pièce est
-    // sélectionnée (Lot 7), le bouton de la portée en cours étant enfoncé (`aria-pressed`). ---
+    // --- Portée (Story 25.6) : attribut observable, toujours « toutes » depuis le front v3 (Lot 2) ---
     function renderScope() {
-      if (!$root) return;
-      $root.attr('data-j2ha-scope', st.scope);
-      if (st.room !== null) {
-        if (!el.scopeToggle.parent().length) el.tools.prepend(el.scopeToggle);
-        el.narrow.attr('aria-pressed', st.scope === 'piece' ? 'true' : 'false').toggleClass('active', st.scope === 'piece');
-        el.widen.attr('aria-pressed', st.scope === 'piece' ? 'false' : 'true').toggleClass('active', st.scope !== 'piece');
-      } else if (el.scopeToggle.parent().length) {
-        el.scopeToggle.detach();
+      if ($root) $root.attr('data-j2ha-scope', st.scope);
+    }
+
+    // Front v3 (Lot 2) : l'arbre contient toute la maison ; la ligne choisie (carte, lien profond) est amenée dans sa zone visible.
+    function revealSelection() {
+      if (!el.tree) return;
+      var node = el.tree.find('[aria-selected="true"]').first().get(0);
+      if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
+    }
+
+    // --- Fil d'Ariane (front v3, Lot 2) : Maison › Niveau › Pièce, chaque étage cliquable ---
+    function crumbLevels(room) {
+      var parent = groupTitleFor(room.object_id);
+      var levels = parent ? String(parent).split(' › ').filter(function (part) { return part !== ''; }) : [];
+      // « Maison » ouvre déjà la page principale : un objet racine du même nom n'est pas répété.
+      if (levels.length && foldText(levels[0]).trim() === foldText('{{Maison}}').trim()) levels = levels.slice(1);
+      var last = room.object_name;
+      if (levels.length && levels[levels.length - 1] === last) levels = levels.slice(0, -1);
+      return { parent: parent, levels: levels };
+    }
+
+    function renderCrumb() {
+      if (!el.crumb) return;
+      el.back.detach();
+      el.crumb.empty().append(el.back);
+      var room = st.room !== null ? roomsById[st.room] : null;
+      if (!room) {
+        el.back.attr('aria-current', 'page');
+        return;
+      }
+      el.back.removeAttr('aria-current');
+      var info = crumbLevels(room);
+      info.levels.forEach(function (level, index) {
+        el.crumb.append($('<span class="j2ha-wv-crumb-sep" aria-hidden="true"></span>').text(' › '));
+        // Le titre complet du groupe de la page principale (jusqu'à ce niveau) identifie le groupe à montrer.
+        var $level = $('<button type="button" class="j2ha-wv-crumb-link j2ha-wv-crumb-level j2ha-free-name"></button>').text(level);
+        var isLast = index === info.levels.length - 1;
+        $level.on('click', function () {
+          st.pendingGroup = isLast ? info.parent : null;
+          goBack();
+        });
+        el.crumb.append($level);
+      });
+      el.crumb.append($('<span class="j2ha-wv-crumb-sep" aria-hidden="true"></span>').text(' › '));
+      if (st.eq !== null) {
+        var $link = $('<button type="button" class="j2ha-wv-crumb-link j2ha-wv-crumb-room j2ha-free-name"></button>').text(room.object_name);
+        $link.on('click', function () { selectRoom(room.object_id, { user: true }); });
+        el.crumb.append($link);
+      } else {
+        el.crumb.append($('<span class="j2ha-wv-crumb-current j2ha-free-name" aria-current="page"></span>').text(room.object_name));
       }
     }
 
-    // Lot 7 : revenir à « Cette pièce » (pièce sélectionnée, ou pièce de l'équipement sélectionné). Comme élargir, l'entrée
-    // d'historique est REMPLACÉE (`seule:1` rajouté) : « Précédent » garde la profondeur de 25.4.
-    function narrow() {
-      if (st.scope === 'piece' || st.room === null) return;
-      st.scope = 'piece';
-      renderScope();
-      renderChips();
-      renderTree();
-      var $selected = el.tree.find('[aria-selected="true"]').first();
-      if ($selected.length) {
-        el.tree.find('[role=treeitem]').attr('tabindex', '-1');
-        $selected.attr('tabindex', '0');
-        $selected.focus();
-      } else {
-        el.narrow.focus();
+    // --- Résultats de recherche (front v3, Lot 2) : « n résultats » dans le volet de droite ---
+    function renderResults() {
+      if (!el.results) return;
+      var active = st.search.trim() !== '' && !st.resultsDismissed;
+      if (!active) {
+        el.results.empty().hide();
+        el.pane.show();
+        return;
       }
-      syncUrl('replace');
-      announce('{{Cette pièce}}');
-    }
-
-    // Élargit à toutes les pièces : la sélection est conservée (ligne ramenée dans la zone visible, focus dessus) ; l'entrée
-    // d'historique est REMPLACÉE (état `null`), comme un changement de filtre : « Précédent » garde la profondeur de 25.4.
-    function widen() {
-      if (st.scope !== 'piece') return;
-      st.scope = 'toutes';
-      renderScope();
-      renderChips();
-      renderTree();
-      var $selected = el.tree.find('[aria-selected="true"]').first();
-      if ($selected.length) {
-        el.tree.find('[role=treeitem]').attr('tabindex', '-1');
-        $selected.attr('tabindex', '0');
-        var node = $selected.get(0);
-        if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
-        $selected.focus();
-      } else {
-        // Sélection masquée par une recherche ou un filtre : le focus ne doit pas tomber sur `body` — repli sur le champ de
-        // recherche, sinon la première ligne.
-        var $first = el.tree.find('[role=treeitem]').first();
-        if (el.search && el.search.length) el.search.focus();
-        else if ($first.length) { $first.attr('tabindex', '0'); $first.focus(); }
-      }
-      syncUrl('replace');
-      announce('{{Toute la maison}}');
+      var model = buildTreeModel({ rooms: rooms, groups: groups, overview: overviewOf(), filter: snap().filter, search: st.search,
+        expanded: st.expanded, selectedRoom: st.room, selectedEq: st.eq, scope: 'toutes' });
+      el.results.empty();
+      var n = model.rowCount;
+      el.results.append($('<h2 class="j2ha-wv-title j2ha-wv-results-title" tabindex="-1"></h2>')
+        .text(n === 0 ? '{{Aucun résultat}}' : n + ' ' + (n > 1 ? '{{résultats}}' : '{{résultat}}')));
+      var $list = $('<ul class="j2ha-wv-results-list"></ul>');
+      model.groups.forEach(function (g) {
+        g.rooms.forEach(function (room) {
+          room.rows.forEach(function (row) {
+            var $item = $('<li class="j2ha-wv-result" tabindex="0" role="button"></li>').attr('data-eq-id', row.eq_id);
+            $item.append(stateIcon(row)).append($('<span class="j2ha-wv-name j2ha-free-name"></span>').text(row.name))
+              .append($('<span class="text-muted j2ha-wv-result-room j2ha-free-name"></span>').text(room.name));
+            var go = function () { selectEquipment(room.object_id, row.eq_id, { user: true }); };
+            $item.on('click', go);
+            $item.on('keydown', function (event) {
+              if (event && (event.key === 'Enter' || event.key === ' ')) { if (event.preventDefault) event.preventDefault(); go(); }
+            });
+            $list.append($item);
+          });
+        });
+      });
+      el.results.append($list);
+      el.pane.hide();
+      el.results.show();
     }
 
     // --- Rendu : puces, état de lecture, arbre ---
@@ -781,10 +854,8 @@
       if (focused && focused.classList && focused.classList.contains('j2ha-wv-chip')) focusKey = focused.getAttribute('data-filter');
       el.chips.empty();
       if (!overview) return;
-      // Effectifs : ceux de la pièce en portée « piece » (invariant « lignes de l'arbre = effectif de la puce »), ceux de la
-      // maison en portée « toutes » ; `computeOverview` les a déjà calculés, aucun second calcul.
-      var narrow = st.scope === 'piece' && overviewRoom(st.room);
-      O.chipsFor(narrow ? narrow.counts : overview.counts, active).forEach(function (chip) {
+      // Effectifs de la maison (un seul arbre depuis le front v3) ; `computeOverview` les a déjà calculés, aucun second calcul.
+      O.chipsFor(overview.counts, active).forEach(function (chip) {
         var $chip = $('<button type="button" class="j2ha-chip-filter j2ha-wv-chip"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', active === chip.key ? 'true' : 'false')
@@ -797,9 +868,36 @@
       if (focusKey) el.chips.find('.j2ha-wv-chip[data-filter="' + focusKey + '"]').focus();
     }
 
-    function stateCell(state) {
-      var $cell = $('<span class="j2ha-wv-state"></span>');
-      if (state) $cell.append(surface.stateWord(state));
+    // Icône d'état d'une ligne d'équipement (arbre, résultats) : `title` et `aria-label` disent le mot d'état (glossaire 25.1)
+    // et ses précisions ; la couleur n'est jamais seule (icône propre à chaque état).
+    function stateDescription(row) {
+      var parts = [];
+      if (row.state) parts.push(M.EQUIPMENT_STATE_LABELS[row.state]);
+      else if (row.unread) parts.push('{{Non lu}}');
+      if (row.cause) parts.push(M.exclusionCauseText(row.cause, M.exclusionPluginName(row.eq_type, pluginNames), 'short'));
+      if (row.enabled === false) parts.push('{{désactivé dans Jeedom}}');
+      if (row.mention > 0) parts.push(O.blockedMentionLabel(row.mention));
+      return parts.join(' · ');
+    }
+
+    function stateIcon(row) {
+      var text = stateDescription(row);
+      var $cell = $('<span class="j2ha-wv-state j2ha-wv-state-icon"></span>');
+      if (!text) return $cell;
+      var icon = 'fa-pause-circle';
+      if (row.state) {
+        // Le mot d'état est celui du badge du détail (parité 25.4, AC15), lu par le nom accessible de la pastille.
+        icon = STATE_ICON(row.state);
+        $cell.addClass('j2ha-state-word j2ha-state-' + row.state).attr('data-state', row.state);
+      } else if (row.unread) {
+        icon = 'fa-question-circle';
+        $cell.addClass('j2ha-wv-unread');
+      } else {
+        $cell.addClass('j2ha-wv-state-off');
+      }
+      $cell.attr('role', 'img').attr('title', text).attr('aria-label', text)
+        .append($('<i class="fas" aria-hidden="true"></i>').addClass(icon));
+      if (row.mention > 0) $cell.addClass('j2ha-wv-state-mention');
       return $cell;
     }
 
@@ -865,16 +963,10 @@
         .attr('aria-selected', row.selected ? 'true' : 'false').attr('tabindex', '-1');
       if (!row.enabled) $item.addClass('j2ha-wv-eq-disabled');
       var $row = $('<div class="j2ha-wv-row"></div>');
-      $row.append(stateCell(row.state));
+      // Front v3 (Lot 2) : l'état se lit à l'icône seule ; le mot, la cause d'exclusion (25.7), « désactivé dans Jeedom », « non
+      // lu » et la mention des bloquées passent dans l'info-bulle et le nom accessible de l'icône.
+      $row.append(stateIcon(row));
       $row.append($('<span class="j2ha-wv-name j2ha-free-name"></span>').text(row.name));
-      // Story 25.7 : la cause d'exclusion est une mention grise à côté du mot « Exclu », absente pour tout autre état.
-      if (row.cause) {
-        $row.append($('<span class="text-muted j2ha-wv-cause"></span>')
-          .text(' ' + M.exclusionCauseText(row.cause, M.exclusionPluginName(row.eq_type, pluginNames), 'short')));
-      }
-      if (!row.enabled) $row.append($('<span class="text-muted j2ha-wv-off"></span>').text(' ' + '{{(désactivé dans Jeedom)}}'));
-      if (row.unread) $row.append($('<span class="text-muted j2ha-wv-unread"></span>').text('{{non lu}}'));
-      if (row.mention > 0) $row.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(O.blockedMentionLabel(row.mention)));
       $row.on('click', function () { selectEquipment(room.object_id, row.eq_id, { user: true }); });
       $item.append($row);
       return $item;
@@ -959,25 +1051,6 @@
     }
 
     // --- Détail ---
-    function crumb(room, withEquipment) {
-      var $nav = $('<nav class="j2ha-wv-crumb text-muted"></nav>').attr('aria-label', "{{Fil d'Ariane}}");
-      var parent = groupTitleFor(room.object_id);
-      var last = parent && parent.slice(-room.object_name.length) === room.object_name ? '' : room.object_name;
-      if (parent) $nav.append($('<span class="j2ha-free-name"></span>').text(parent));
-      if (parent && last) $nav.append(doc.createTextNode(' › '));
-      if (last) {
-        if (withEquipment) {
-          // Lien, pas `.btn` : le cœur donne un fond de bouton à tout `.btn` (`.btn:not(.cmdName)`), même `.btn-link`.
-          var $link = $('<button type="button" class="j2ha-wv-crumb-link j2ha-wv-crumb-room j2ha-free-name"></button>').text(last);
-          $link.on('click', function () { selectRoom(room.object_id, { user: true }); });
-          $nav.append($link);
-        } else {
-          $nav.append($('<span class="j2ha-free-name"></span>').text(last));
-        }
-      }
-      return $nav;
-    }
-
     // « Appliquer » d'une ligne « À traiter » : la ligne dont l'écriture est en vol, ou dont l'erreur n'a pas été lue, est
     // détachée (jamais détruite) avant chaque rendu puis réinsérée telle quelle : son bouton reste réservé (un seul envoi)
     // et son message d'erreur reste lisible.
@@ -1001,7 +1074,6 @@
         el.pane.append($('<div class="text-muted j2ha-wv-empty"></div>').text('{{Sélectionnez une pièce ou un équipement}}'));
         return;
       }
-      el.pane.append(crumb(room, false));
       var $head = $('<div class="j2ha-wv-roomhead"></div>');
       $head.append($('<i class="j2ha-wv-roomicon"></i>').addClass(room.icon_classes).attr('aria-hidden', 'true'));
       var $title = $('<h2 class="j2ha-wv-title" tabindex="-1"></h2>');
@@ -1033,7 +1105,6 @@
       el.todo = null;
       detachLive();
       el.pane.empty();
-      el.pane.append(crumb(room, true));
       var $host = $('<div class="j2ha-wv-eqhost"></div>');
       el.pane.append($host);
       surface.openEquipment($host, room, eq);
@@ -1116,15 +1187,29 @@
           if (text) el.kpis.append($('<span class="text-muted j2ha-wv-kpi-note"></span>').text(text));
         });
       }
-      el.todo.append($('<h3 class="j2ha-wv-todo-title"></h3>').text('{{À traiter dans cette pièce}}'));
       if (!ov) return;
       var list = buildTreatList(ov, entriesOf(), room);
       if (list.length === 0) {
+        // Front v3 (Lot 2) : une pièce saine montre « ✓ Rien à faire » (la phrase passe en info-bulle) puis ses équipements,
+        // chacun avec son état (icône et mot), cliquables.
         var $empty = $('<div class="j2ha-wv-todo-empty"></div>');
-        $empty.append($('<p class="j2ha-wv-todo-none"></p>').text('{{Rien à traiter dans cette pièce}}'));
-        $empty.append($('<p class="text-muted j2ha-wv-todo-sentence"></p>').text(noActionSentence(ov.summary)));
-        el.todo.append($empty);
+        $empty.append($('<span class="j2ha-v2-lbl is-ok j2ha-wv-todo-none"></span>').attr('title', noActionSentence(ov.summary))
+          .append($('<i class="fas fa-check" aria-hidden="true"></i>')).append(doc.createTextNode(' {{Rien à faire}}')));
+        var $eqs = $('<ul class="j2ha-wv-todo-list j2ha-wv-room-eqs"></ul>');
+        ov.equipments.forEach(function (r) {
+          var eq = eqOf(room, r.eq_id);
+          if (!eq) return;
+          var $li = $('<li class="j2ha-wv-todo-row j2ha-wv-room-eq"></li>').attr('data-eq-id', r.eq_id);
+          var $main = $('<div class="j2ha-wv-todo-main"></div>');
+          if (r.state) $main.append($('<span class="j2ha-wv-state"></span>').append(surface.stateWord(r.state)));
+          $main.append($('<span class="j2ha-wv-todo-name j2ha-free-name"></span>').text(eq.eq_name));
+          $li.append($main);
+          $li.on('click', function () { selectEquipment(room.object_id, r.eq_id, { user: true }); });
+          $eqs.append($li);
+        });
+        el.todo.append($empty.append($eqs));
       } else {
+        el.todo.append($('<h3 class="j2ha-wv-todo-title"></h3>').text('{{À traiter dans cette pièce}}'));
         var $list = $('<ul class="j2ha-wv-todo-list"></ul>');
         var reinserted = {};
         list.forEach(function (item) {
@@ -1192,6 +1277,7 @@
       renderStatus();
       renderChips();
       renderTree();
+      renderResults();
       if (st.room !== null && st.eq === null) refreshRoomDynamic();
       if (st.room !== null) {
         var room = roomsById[st.room];
@@ -1213,7 +1299,7 @@
     // Point d'entrée des cartes (Q14) : `onclick="j2haOpenRoom(id)"` ; seul contrat : ouvrir la vue sur cette pièce.
     win.j2haOpenRoom = function (objectId) {
       var id = parseInt(objectId, 10);
-      if (!isNaN(id)) open({ room: id, scope: 'piece' });
+      if (!isNaN(id)) open({ room: id });
     };
 
     function start() {
@@ -1223,14 +1309,14 @@
       st.pushed = 0;
       var parsed = resolveFragment(parseFragment(currentHash()), rooms);
       if (parsed) {
-        open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, scope: parsed.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
+        open({ room: parsed.piece, eq: parsed.eq, filter: parsed.filter, fromHistory: true, exactFilter: true });
         return;
       }
       try {
         var saved = win.sessionStorage ? JSON.parse(win.sessionStorage.getItem(STORAGE_KEY) || 'null') : null;
         if (saved && saved.mode === 'storage' && currentHash() === '') {
           var again = resolveFragment({ piece: saved.piece === undefined ? null : saved.piece, eq: saved.eq === undefined ? null : saved.eq, filter: saved.filter || null, seule: saved.seule === true }, rooms);
-          if (again) open({ room: again.piece, eq: again.eq, filter: again.filter, scope: again.seule ? 'piece' : 'toutes', fromHistory: true, exactFilter: true });
+          if (again) open({ room: again.piece, eq: again.eq, filter: again.filter, fromHistory: true, exactFilter: true });
         }
       } catch (e) { /* stockage illisible : page principale */ }
     }

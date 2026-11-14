@@ -66,29 +66,33 @@ for (const width of [980, 1440]) {
     });
   });
 
-  test(`audit UX réel ${width} px — vue C : cause d'exclusion et « (désactivé dans Jeedom) » entières, sous le nom`, async (t) => {
+  // Garde levée (front v3, Lot 2) : l'arbre n'affiche plus que l'icône d'état ; la cause d'exclusion et « désactivé dans
+  // Jeedom » sont ENTIÈRES dans l'info-bulle et le nom accessible de l'icône. Le nom de l'équipement garde toute la ligne.
+  test(`audit UX réel ${width} px — vue C : icône d'état, cause d'exclusion et « désactivé dans Jeedom » entières en info-bulle`, async (t) => {
     const options = sceneOptions(width);
     if (!options) { t.skip('PHP indisponible'); return; }
     await withRealView(t, options, async (page) => {
       await page.locator(`${CARD(5)}`).click();
       await page.locator('.j2ha-wv-eq[data-eq-id="501"]').waitFor();
       const m = await page.evaluate(() => {
-        const box = (el) => el.getBoundingClientRect();
-        const lineOf = (eqId, cls) => {
+        const lineOf = (eqId) => {
           const row = document.querySelector(`.j2ha-wv-eq[data-eq-id="${eqId}"] > .j2ha-wv-row`);
-          const el = row.querySelector(cls);
+          const icon = row.querySelector('.j2ha-wv-state-icon');
           const name = row.querySelector('.j2ha-wv-name');
-          return { text: el.textContent.trim(), truncated: el.scrollWidth > el.clientWidth + 1, height: box(el).height,
-            below: box(el).top >= box(name).bottom - 1, alignedLeft: Math.abs(box(el).left + parseFloat(getComputedStyle(el).paddingLeft) - box(name).left) <= 2 };
+          return { label: icon.getAttribute('aria-label'), title: icon.getAttribute('title'), text: icon.textContent.trim(),
+            iconWidth: icon.getBoundingClientRect().width, rowHeight: row.getBoundingClientRect().height,
+            nameTruncated: name.scrollWidth > name.clientWidth + 1 };
         };
-        return { nav: box(document.querySelector('.j2ha-wv-nav')).width, cause: [lineOf(501, '.j2ha-wv-cause'), lineOf(505, '.j2ha-wv-cause')], off: lineOf(503, '.j2ha-wv-off') };
+        return { nav: document.querySelector('.j2ha-wv-nav').getBoundingClientRect().width, cause: [lineOf(501), lineOf(505)], off: lineOf(503) };
       });
       for (const line of m.cause.concat([m.off])) {
-        assert.ok(!line.truncated, `« ${line.text} » non tronquée`);
-        assert.ok(line.below && line.alignedLeft, `« ${line.text} » sous le nom, alignée sur lui`);
+        assert.equal(line.text, '', 'aucun mot affiché');
+        assert.equal(line.title, line.label);
+        assert.ok(line.iconWidth <= 24, `icône seule (${line.iconWidth}px)`);
+        assert.ok(line.rowHeight <= 44, `ligne d'une hauteur (${line.rowHeight}px)`);
       }
-      assert.match(m.cause[1].text, /par le plugin Bêta Sécurité Maison$/);
-      assert.ok(m.off.height <= 18, `« ${m.off.text} » sur une ligne, sans mot coupé (${m.off.height}px)`);
+      assert.match(m.cause[1].label, /^Exclu · par le plugin Bêta Sécurité Maison$/);
+      assert.match(m.off.label, /désactivé dans Jeedom/);
       if (width >= 1440) assert.ok(m.nav >= 400, `arbre élargi en grand écran (${m.nav}px)`);
       // Disposition large : le bouton du tiroir « Pièces » reste masqué (aucune règle ajoutée ne le réaffiche).
       assert.equal(await page.locator('.j2ha-wv-drawer-toggle').isVisible(), false, 'tiroir masqué en disposition large');
