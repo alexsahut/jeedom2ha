@@ -387,6 +387,20 @@
     return typeof n === 'number' && isFinite(n) && n >= 0 ? Math.floor(n) : null;
   }
 
+  /**
+   * Front v3 (Lot 4b) : texte du compte de l'onglet « Scénarios ». Avec la liste du démon (`status.scenarios`, Lot 4a) :
+   * « publiés/total », suivi de ✱ s'il y a des nouveaux. Sans elle (démon ancien) : le nombre publié d'avant, ou rien.
+   */
+  function scenarioTabText(status) {
+    var list = status && typeof status === 'object' && Array.isArray(status.scenarios) ? status.scenarios.filter(function (s) { return s && typeof s === 'object'; }) : null;
+    if (list) {
+      var published = list.filter(function (s) { return s.published === true; }).length;
+      return published + '/' + list.length + (list.some(function (s) { return s.is_new === true; }) ? ' ✱' : '');
+    }
+    var n = scenarioCount(status);
+    return n === null ? '' : String(n);
+  }
+
   // Cause d'une ligne « À faire » en quatre mots au plus ; la phrase complète de la fiche reste en info-bulle.
   var TODO_SHORT_CAUSES = {
     no_generic_type_configured: '{{Sans type générique}}',
@@ -733,8 +747,7 @@
     function renderTabs() {
       var total = rooms.reduce(function (n, room) { return n + (Array.isArray(room.equipments) ? room.equipments.length : 0); }, 0);
       setText('#j2ha_tabEquipmentsCount', String(total));
-      var scenarios = scenarioCount(currentStatus());
-      setText('#j2ha_tabScenariosCount', scenarios === null ? '' : String(scenarios));
+      setText('#j2ha_tabScenariosCount', scenarioTabText(currentStatus()));
     }
 
     var activeTab = 'equipments';
@@ -1249,6 +1262,7 @@
     statusVerdict: statusVerdict,
     rememberSync: rememberSync,
     scenarioCount: scenarioCount,
+    scenarioTabText: scenarioTabText,
     shortCause: shortCause,
     adviceCount: adviceCount,
     adviceLabel: adviceLabel,

@@ -435,6 +435,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 <?php include_file('desktop', 'jeedom2ha_workview', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_guide', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_exclusions', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_scenarios', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha', 'js', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>

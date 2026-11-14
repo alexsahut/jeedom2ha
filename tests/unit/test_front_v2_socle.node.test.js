@@ -43,6 +43,8 @@ describe('Front v2 — Lot 0 : include_file de la page', () => {
       'jeedom2ha_workview',
       'jeedom2ha_guide',
       'jeedom2ha_exclusions',
+      // Garde levée (front v3, Lot 4b) : onglet Scénarios, chargé après les modules dont il lit l'état et avant jeedom2ha.js.
+      'jeedom2ha_scenarios',
       'jeedom2ha',
     ]);
     assert.ok(php.indexOf("include_file('desktop', 'jeedom2ha', 'js'") < php.indexOf("include_file('core', 'plugin.template', 'js')"));

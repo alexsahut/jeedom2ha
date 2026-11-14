@@ -20,7 +20,7 @@ Cette documentation décrit chaque écran du plugin tel que vous le voyez, avec 
    - [La barre d'état](#la-barre-détat) · [Ses actions](#les-actions-de-la-barre-détat) · [Relire Jeedom ou Republier tout ?](#relire-jeedom-ou-republier-tout-) · [Relire Jeedom](#relire-jeedom)
    - [Choisir ce qui est publié](#choisir-ce-qui-est-publié) · [Exclure une pièce](#exclure-une-pièce) · [Vérifier l'installation](#vérifier-linstallation)
 7. [Ce que Jeedom publie dans Home Assistant](#ce-que-jeedom-publie-dans-home-assistant) (maison, pièces, équipements)
-   - [Le bloc de la maison](#le-bloc-de-la-maison) · [Les cartes de pièce](#les-cartes-de-pièce) · [La vue de travail](#la-vue-de-travail)
+   - [Les scénarios](#les-scénarios) · [Le bloc de la maison](#le-bloc-de-la-maison) · [Les cartes de pièce](#les-cartes-de-pièce) · [La vue de travail](#la-vue-de-travail)
    - [Le détail d'un équipement](#le-détail-dun-équipement) · [Le tableau des commandes](#le-tableau-des-commandes) · [Corriger le type d'une commande](#corriger-le-type-dune-commande)
    - [Deux familles de réglages](#deux-familles-de-réglages--type-et-publication) · [Réglages en attente](#réglages-en-attente-et-appliquer) · [Les actions de publication](#les-actions-de-publication)
 8. [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
@@ -39,6 +39,7 @@ Cette documentation décrit chaque écran du plugin tel que vous le voyez, avec 
 | Barre d'état (en haut de la page du plugin) | [La barre d'état](#la-barre-détat) |
 | Guide de démarrage | [Première publication : le guide de démarrage](#première-publication--le-guide-de-démarrage) |
 | Maison (chiffres, puces, « À faire », cartes de pièce) | [Le bloc de la maison](#le-bloc-de-la-maison) |
+| Onglet Scénarios | [Les scénarios](#les-scénarios) |
 | Pièce (arbre et recherche) | [La vue de travail](#la-vue-de-travail) |
 | Fiche d'un équipement | [Le détail d'un équipement](#le-détail-dun-équipement) |
 | Corriger le type | [Corriger le type d'une commande](#corriger-le-type-dune-commande) |
@@ -85,7 +86,7 @@ Quatre règles qui surprennent, rappelées chacune en tête de la section qui la
 - **Une seule installation jeedom2ha par broker MQTT.** Une deuxième installation branchée sur le même broker (box de test, sauvegarde restaurée ailleurs) retire les boutons de scénario de la première, et inversement. Voir [Connexion au broker MQTT](#connexion-au-broker-mqtt).
 - **Certains mots du nom d'un équipement écartent un type** (« garage », « eau », « portail » ou « prise » écartent le type Lumière, par exemple) : l'équipement est alors **Bloqué**. Voir [Nommage des équipements](#annexe--nommage-des-équipements).
 - **La pièce dans Home Assistant est fixée à la création** de l'appareil : déplacer ensuite l'équipement dans Jeedom ne le déplace pas dans Home Assistant. Voir [Pièces dans Home Assistant](#annexe--pièces-dans-home-assistant-zone-suggérée).
-- **Chaque scénario Jeedom est publié comme un bouton**, qu'il soit actif ou non (désactivé, son bouton est grisé). Voir [Relire Jeedom](#relire-jeedom).
+- **Un scénario Jeedom n'est publié comme bouton que si vous l'avez choisi.** Ceux déjà publiés avant la mise à jour le restent ; un nouveau scénario arrive non publié, marqué ✱. Voir [Les scénarios](#les-scénarios).
 
 ---
 
@@ -243,7 +244,7 @@ Vous n'avez rien à relancer quand un scénario ou un équipement est activé ou
 
 - **Ce qu'il fait** : relit tous les équipements de Jeedom, publie ou retire des entités Home Assistant en conséquence, et **applique d'un coup tous les réglages en attente** (types Home Assistant choisis, publication « Toujours » ou « Jamais ») de tous les équipements.
 - **Ce qu'il ne fait pas** : il ne modifie rien dans Jeedom.
-- **Scénarios** : chaque scénario Jeedom a son bouton dans Home Assistant, qu'il soit actif ou non. Un scénario **désactivé** garde son bouton, **grisé** (« indisponible ») : l'appui est refusé et rien n'est lancé dans Jeedom ; le bouton redevient utilisable dès que le scénario est réactivé. L'entité, son identifiant et ses réglages dans Home Assistant ne changent pas, et les automatisations qui la citent restent valides. Seul un scénario **supprimé** de Jeedom voit son bouton retiré. Les scénarios n'apparaissent pas dans les pièces ni dans « Choisir ce qui est publié » : leur nombre est donné par l'onglet « Scénarios ». Rappel : une seule installation jeedom2ha par broker MQTT (voir [Connexion au broker MQTT](#connexion-au-broker-mqtt)).
+- **Scénarios** : chaque scénario que vous avez choisi de publier (voir [Les scénarios](#les-scénarios)) a son bouton dans Home Assistant, qu'il soit actif ou non. Un scénario **désactivé** garde son bouton, **grisé** (« indisponible ») : l'appui est refusé et rien n'est lancé dans Jeedom ; le bouton redevient utilisable dès que le scénario est réactivé. L'entité, son identifiant et ses réglages dans Home Assistant ne changent pas, et les automatisations qui la citent restent valides. Seul un scénario **supprimé** de Jeedom voit son bouton retiré. Les scénarios n'apparaissent pas dans les pièces ni dans « Choisir ce qui est publié » : ils se choisissent dans l'onglet « Scénarios ». Rappel : une seule installation jeedom2ha par broker MQTT (voir [Connexion au broker MQTT](#connexion-au-broker-mqtt)).
 - **Réévaluation automatique** : vous n'avez pas besoin de relire Jeedom quand un scénario est activé ou désactivé, quand un équipement est activé ou désactivé, ou quand une exclusion change (par exemple par un agenda, un mode ou un autre scénario). Toutes les 5 minutes, le plugin vérifie si cet état a changé et, seulement dans ce cas, relit Jeedom et met Home Assistant à jour (bouton de scénario grisé ou non, équipement publié ou retiré, raison affichée). Rien n'est relu si rien n'a changé, si le démon n'est pas démarré ou si une autre opération est en cours (nouvel essai 5 minutes plus tard). Comme une relecture, cette réévaluation applique aussi les réglages en attente (voir [Réglages en attente](#réglages-en-attente-et-appliquer)). Cette tâche apparaît dans la page du plugin (« Fonctionnalités », `cron5`) et peut y être désactivée.
 - **Pendant l'opération** : le bouton affiche « Relecture en cours… » et les autres boutons d'action sont grisés.
 - **Résultat** : un message « Relecture terminée. » (vert), « Relecture terminée avec avertissements. » (orange) ou « Relecture échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un autre. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : vérifiez l'heure « Relu » de la barre d'état avant de relancer. » indique que la réponse n'est pas arrivée. La barre d'état est ensuite relue.
@@ -305,7 +306,19 @@ Ces fichiers sont des outils d'assistance. Pour comprendre l'état d'un équipem
 
 ## Ce que Jeedom publie dans Home Assistant
 
-Sous la barre d'état, l'onglet **« Équipements »** montre ce que Jeedom publie dans Home Assistant. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin. Il se lit à trois niveaux : la **maison**, la **pièce** (la vue de travail) et l'**équipement** (sa fiche). L'onglet **« Scénarios »** porte le nombre de scénarios publiés comme boutons (quand le démon le fournit).
+Sous la barre d'état, l'onglet **« Équipements »** montre ce que Jeedom publie dans Home Assistant. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin. Il se lit à trois niveaux : la **maison**, la **pièce** (la vue de travail) et l'**équipement** (sa fiche). L'onglet **« Scénarios »** affiche « publiés/total », suivi de ✱ s'il y a des nouveaux ; il est décrit dans [Les scénarios](#les-scénarios).
+
+### Les scénarios
+
+L'onglet **« Scénarios »** liste les scénarios de Jeedom et dit lesquels ont un bouton dans Home Assistant. Rien n'est publié sans votre choix.
+
+- **Puces** : « Publiés », « Non publiés », « Inactifs », « Nouveaux ✱ » (apparus depuis votre dernier choix). Un clic filtre la liste, un second clic retire le filtre.
+- **Filtres** : « Tous les groupes », « Tous les modes » (« Lancé à la main », « Programmé », « Déclenché ») et « Rechercher ».
+- **Colonnes** : le scénario et son groupe ; le mode ; l'état dans « Jeedom » (« Actif » ou « Inactif ») ; « Dans Home Assistant » : l'identifiant `button.…` avec son bouton copier, « Indisponible » pour un scénario publié mais inactif (le bouton existe, mais ne fait rien), « ◷ En attente de Home Assistant » quand le bouton ne suit pas encore votre choix (pas encore ajouté, ou pas encore retiré), « — » s'il n'est pas publié ; l'interrupteur « Publier », utilisable même pour un scénario inactif.
+- **Préparer puis appliquer** : un interrupteur changé marque la ligne ◷ « À appliquer ». Cochez plusieurs lignes pour « Publier (n) » ou « Ne pas publier (n) ». **« Appliquer (n) »** envoie le tout en une fois, puis le plugin relit Jeedom ; « Annuler » oublie les changements. Si une partie des boutons n'a pas pu être mise à jour, une ligne ambre l'indique : « Choix enregistré · n boutons pas encore à jour dans Home Assistant · Réessayer ». « Réessayer » renvoie le même choix.
+- **Retrait** : retirer des boutons demande confirmation, « Retirer n boutons de Home Assistant ? » : les automatisations Home Assistant qui les utilisent ne marcheront plus.
+- **Suggestion** : « n scénarios lancés à la main → Publier ces n » apparaît pour les nouveaux scénarios lancés à la main (ou pour tous, tant qu'aucun n'est publié). Elle prépare seulement : rien n'est envoyé avant « Appliquer ». Elle ne propose jamais un scénario programmé ou déclenché. L'étape 3 du [guide de démarrage](#première-publication--le-guide-de-démarrage) propose la même chose.
+- **États** : « Aucun scénario dans Jeedom » ; « Liste indisponible · Relire » si le démon ne fournit pas la liste (démon arrêté ou ancien).
 
 ### Le bloc de la maison
 

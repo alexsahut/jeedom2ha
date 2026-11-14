@@ -545,6 +545,32 @@
       return $acts.children().length ? $acts : null;
     }
 
+    function textSpan(text) { return el('<span></span>', text); }
+
+    // Front v3 (Lot 4b) : onglet Scénarios de la page (jeedom2ha_scenarios.js), injectable par `env.scenarios` ; absent = rien.
+    function scenarioHook() {
+      if (env.scenarios) return env.scenarios;
+      var g = typeof globalThis !== 'undefined' ? globalThis : null;
+      return g && g.Jeedom2haScenariosPage ? g.Jeedom2haScenariosPage : null;
+    }
+
+    // « n scénarios lancés à la main → [Publier ces n] » : ferme le guide et présélectionne ces scénarios dans l'onglet
+    // Scénarios ; rien n'est publié avant « Appliquer ». Jamais un scénario programmé ou déclenché (voir suggestionIds).
+    function scenarioSuggestion() {
+      var hook = scenarioHook();
+      var n = hook && typeof hook.suggestionCount === 'function' ? hook.suggestionCount() : 0;
+      if (!n || typeof hook.preselectSuggested !== 'function') return null;
+      var $line = $('<div class="j2ha-v2-small j2ha-v3-sc-guide-suggest"></div>');
+      $line.append($('<i class="fas fa-hand-pointer" aria-hidden="true"></i>'));
+      $line.append(textSpan(' ' + n + ' ' + (n > 1 ? '{{scénarios lancés à la main}}' : '{{scénario lancé à la main}}') + ' → '));
+      var $btn = button(n > 1 ? '{{Publier ces}} ' + n : '{{Publier ce scénario}}', 'btn-default btn-xs j2ha-v2-guide-scenarios', function () {
+        close();
+        hook.preselectSuggested();
+      });
+      $btn.attr('title', '{{Prépare la publication ; rien n’est envoyé avant « Appliquer »}}');
+      return $line.append($btn);
+    }
+
     // Front v3 (Lot 3) : UNE ligne par étape — pastille, titre de 3 mots, état, action(s), ⓘ — sans phrase permanente. La cause
     // d'un arrêt tient en quelques mots (`short`), la phrase entière est dans l'info-bulle de l'état.
     function renderStep(step, model) {
@@ -574,6 +600,11 @@
         var $help = $('<ul class="j2ha-v2-guide-causes j2ha-v2-small"></ul>');
         HA_CAUSES.forEach(function (cause) { $help.append(el('<li></li>', cause)); });
         $body.append($help);
+      }
+      // Front v3 (Lot 4b) : étape 3, même suggestion que l'onglet Scénarios (présélection seulement).
+      if (step.key === 'choice' && step.state !== 'blocked') {
+        var $scenarios = scenarioSuggestion();
+        if ($scenarios) $body.append($scenarios);
       }
       $step.append($body);
       var $acts = stepActions(step, model);
