@@ -8,6 +8,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const O = require('../../desktop/js/jeedom2ha_overview.js');
 const { SCENE, FIXTURE, plain, clone, phpAvailable, renderPhp, mainPart, equipmentsFor, okBody, startPage } = require('./helpers/page_b_harness');
+const { startGuide } = require('./helpers/guide_harness');
 
 const maybe = phpAvailable ? it : it.skip;
 
@@ -46,24 +47,29 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     for (const id of ['span_healthBridge', 'span_healthMqtt', 'span_healthMqttBroker', 'span_healthSync', 'span_healthOp', 'span_healthOpMsg', 'bt_rescanTopology', 'div_haGatingReason', 'div_haActions']) {
       assert.ok(main.includes(`id="${id}"`), id);
     }
+    // Garde levée (front v2, Lot 1) : glossaire 3.2 « Dernière synchro » → « Dernière relecture », et l'item
+    // « Home Assistant » (masqué tant que le démon ne fournit pas ha.birth_seen_at) entre MQTT et la relecture (spec E0).
     const labels = [...main.matchAll(/<strong>(\{\{[^}]+\}\})<\/strong>/g)].map((m) => plain(m[1]));
-    assert.deepEqual(labels, ['Démon', 'MQTT', 'Dernière synchro', 'Dernière opération']);
+    assert.deepEqual(labels, ['Démon', 'MQTT', 'Home Assistant', 'Dernière relecture', 'Dernière opération']);
     assert.match(main, /data-ha-action="republier"[\s\S]*?\{\{Republier tout\}\}/);
     assert.match(main, /data-ha-action="rescan"/);
-    assert.match(main, /aria-label="\{\{Plus d'actions\}\}"/);
+    // Garde levée (front v2, Lot 1) : glossaire 3.2 « Plus d'actions » → « Autres actions ».
+    assert.match(main, /aria-label="\{\{Autres actions\}\}"/);
     assert.match(main, /aria-haspopup="menu" aria-expanded="false"/);
     assert.doesNotMatch(main, /well/, 'plus de bloc « well » plein écran');
     assert.ok(!main.includes('{{Actions Home Assistant}}'), 'plus de zone « Actions Home Assistant »');
   });
 
-  maybe('menu : « Télécharger le diagnostic… », « Télécharger l’export de décision… » (24.2), séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
+  // Garde levée (front v2, Lot 1) : les deux exports quittent le menu pour « Vérifier l'installation… » (E7) ; le menu
+  // porte « Vérifier l'installation… » et « Guide de démarrage » (spec E0). « Choisir ce qui est publié… » viendra au Lot 6.
+  maybe('menu : « Vérifier l’installation… », « Guide de démarrage », séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
     const ui = startPage();
     const items = ui.$('#j2ha_moreMenu .j2ha-menu li').list.map((li) => ({
       role: li.attrs.role, text: plain(ui.$(li).text()).trim(),
     }));
     assert.deepEqual(items, [
-      { role: 'none', text: 'Télécharger le diagnostic…' },
-      { role: 'none', text: 'Télécharger l\'export de décision…' },
+      { role: 'none', text: 'Vérifier l\'installation…' },
+      { role: 'none', text: 'Guide de démarrage' },
       { role: 'separator', text: '' },
       { role: 'none', text: 'Supprimer tout de Home Assistant…' },
     ]);
@@ -82,7 +88,7 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     ui.click('.j2ha-menu-toggle');
     assert.ok(wrap().hasClass('j2ha-menu-open'));
     assert.equal(ui.$('.j2ha-menu-toggle').attr('aria-expanded'), 'true');
-    assert.equal(ui.dom.focused, ui.$('#bt_openDiagnostic').list[0], 'le premier élément actif prend le focus');
+    assert.equal(ui.dom.focused, ui.$('#bt_j2haCheckInstall').list[0], 'le premier élément actif prend le focus');
     ui.key('#j2ha_moreMenu .j2ha-menu', 'Escape');
     assert.ok(!wrap().hasClass('j2ha-menu-open'));
     assert.equal(ui.dom.focused, ui.$('.j2ha-menu-toggle').list[0], 'le focus revient au bouton');
@@ -92,13 +98,14 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     assert.ok(!wrap().hasClass('j2ha-menu-open'), 'clic extérieur');
   });
 
-  maybe('« Télécharger le diagnostic… » ouvre une boîte qui porte la case et le bouton ; fermer n’émet aucune écriture', () => {
-    const ui = startPage();
+  // Garde levée (front v2, Lot 1) : la case et le bouton du diagnostic sont portés par « Vérifier l'installation… ».
+  maybe('« Vérifier l’installation… » porte la case et le bouton du diagnostic ; fermer n’émet aucune écriture', () => {
+    const ui = startGuide();
     const before = ui.calls.length;
-    ui.click('#bt_openDiagnostic');
+    ui.guide.openCheck();
     assert.equal(ui.dom.dialogs.length, 1);
     const dialog = ui.dom.dialogs[0];
-    assert.match(plain(dialog.options.title), /diagnostic/i);
+    assert.match(plain(dialog.options.title), /Vérifier l'installation/);
     const modal = ui.$(dialog.modal);
     assert.equal(modal.find('#cb_pseudonymize').length, 1, 'la case « Pseudonymiser »');
     assert.equal(modal.find('#bt_exportDiagnostic').length, 1);

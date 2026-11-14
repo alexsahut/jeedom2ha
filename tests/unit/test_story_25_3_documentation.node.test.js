@@ -79,8 +79,10 @@ describe('25.3 / AC14 — libellés cités = libellés du code', () => {
     .join('\n');
 
   it('chaque libellé de la page B cité dans la documentation existe tel quel dans desktop/ ou core/', () => {
-    const labels = ['Republier tout', 'Relire Jeedom', 'Télécharger le diagnostic…', 'Supprimer tout de Home Assistant…', 'Actualiser',
-      'Tout afficher', 'Aide', 'Plus d\'actions', 'Télécharger le diagnostic support', 'Pseudonymiser les noms d\'équipements',
+    // Garde levée (front v2, Lot 1) : « Télécharger le diagnostic… » et « Plus d'actions » quittent l'écran (exports déplacés
+    // dans « Vérifier l'installation… », glossaire 3.2 « Autres actions ») ; la documentation cite les nouveaux libellés.
+    const labels = ['Republier tout', 'Relire Jeedom', 'Vérifier l\'installation…', 'Supprimer tout de Home Assistant…', 'Actualiser',
+      'Tout afficher', 'Aide', 'Autres actions', 'Télécharger le diagnostic support', 'Pseudonymiser les noms d\'équipements',
       'Aucune synchronisation n\'a encore eu lieu', 'Opération en cours : ces chiffres peuvent changer', 'Chiffres indisponibles',
       'Aucune pièce avec équipement trouvée.'];
     const text = index + compteurs + changelogBeta;

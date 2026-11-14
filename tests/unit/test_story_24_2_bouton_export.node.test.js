@@ -8,6 +8,7 @@ const path = require('node:path');
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { plain, startPage, phpAvailable } = require('./helpers/page_b_harness');
+const { startGuide } = require('./helpers/guide_harness');
 
 const root = path.join(__dirname, '..', '..');
 const maybe = phpAvailable ? it : it.skip;
@@ -18,24 +19,27 @@ function labels(code) {
   return [...code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').matchAll(/\{\{([^}]*)\}\}/g)].map((m) => m[1]);
 }
 
-describe('24.2 / AC3 — menu « ⋯ »', () => {
-  maybe('l\'entrée vient juste après « Télécharger le diagnostic… », avant le séparateur', () => {
+// Garde levée (front v2, Lot 1) : l'export de décision quitte le menu « ⋯ » pour « Vérifier l'installation… › Avancé »
+// (spec E0 / E7). Le bouton #bt_exportDecision, son gestionnaire et la mécanique « contenu déplacé puis rendu » sont
+// inchangés ; seule l'entrée change de place.
+describe('24.2 / AC3 — entrée de l\'export de décision', () => {
+  maybe('l\'entrée n\'est plus dans le menu « Autres actions » ; le rouge reste réservé à la suppression', () => {
     const ui = startPage();
     const items = ui.$('#j2ha_moreMenu .j2ha-menu li').list.map((li) => plain(ui.$(li).text()).trim());
-    assert.deepEqual(items.slice(0, 2), ['Télécharger le diagnostic…', 'Télécharger l\'export de décision…']);
-    assert.equal(ui.$('#bt_openDecisionExport').length, 1);
+    assert.ok(!items.includes('Télécharger l\'export de décision…'));
+    assert.equal(ui.$('#bt_exportDecision').length, 1);
     assert.equal(ui.$('.j2ha-menu-danger').length, 1, 'le rouge reste réservé à la suppression');
   });
 
-  maybe('l\'entrée ouvre une boîte portant le bouton de téléchargement ; fermer n\'émet aucune requête', () => {
-    const ui = startPage();
+  maybe('« Vérifier l\'installation… » porte le bouton de téléchargement sous « Avancé » ; fermer n\'émet aucune requête', () => {
+    const ui = startGuide();
     const before = ui.calls.length;
-    ui.click('#bt_openDecisionExport');
+    ui.guide.openCheck();
     assert.equal(ui.dom.dialogs.length, 1);
     const dialog = ui.dom.dialogs[0];
-    assert.equal(plain(dialog.options.title), 'Télécharger l\'export de décision');
+    assert.equal(plain(dialog.options.title), 'Vérifier l\'installation');
     const modal = ui.$(dialog.modal);
-    assert.equal(modal.find('#bt_exportDecision').length, 1);
+    assert.equal(modal.find('.j2ha-v2-check-advanced-body #bt_exportDecision').length, 1);
     assert.match(plain(modal.text()), /identifiants seulement/);
     dialog.close();
     assert.equal(ui.calls.length, before, 'fermer ne déclenche aucune requête');
@@ -64,7 +68,6 @@ describe('24.2 / libellés', () => {
     const js = read('desktop/js/jeedom2ha.js');
     const overview = read('desktop/js/jeedom2ha_overview.js');
     const added = [
-      php.slice(php.indexOf('id="bt_openDecisionExport"') - 120, php.indexOf('id="bt_openDecisionExport"') + 260),
       php.slice(php.indexOf('id="div_decisionExportDialog"'), php.indexOf('Story 16.8 / 25.3')),
       js.slice(js.indexOf("$('#bt_exportDecision')"), js.indexOf('/* Permet la réorganisation')),
       overview.slice(overview.indexOf('function openDecisionExportDialog'), overview.indexOf('function init()')),
@@ -72,7 +75,7 @@ describe('24.2 / libellés', () => {
     const withoutLabels = added.replace(/\{\{[^}\n]*\}\}/g, '');
     assert.doesNotMatch(withoutLabels, /\{\{|\}\}/, 'marqueur mal formé ou sur plusieurs lignes');
     const found = labels(added);
-    for (const label of ['Télécharger l\'export de décision…', 'Télécharger l\'export de décision', 'Export en cours…', 'Export de décision téléchargé']) {
+    for (const label of ['Télécharger l\'export de décision', 'Export en cours…', 'Export de décision téléchargé']) {
       assert.ok(found.includes(label), label);
     }
     for (const label of found) {
