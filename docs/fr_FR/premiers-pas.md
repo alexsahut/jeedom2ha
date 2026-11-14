@@ -22,7 +22,7 @@ Cette page suffit pour démarrer. La [documentation complète](index.md) détail
 > - pour une **prise ou un interrupteur** : lumière, lumiere, light, lampe, ampoule, volet, store, cover, blind, shutter, portail, garage, chauffage, radiateur, thermostat, heater, fumée, smoke, alarme, sirene ;
 > - pour un **volet** : lumière, lumiere, light, lampe, ampoule, chauffage, radiateur, thermostat, heater, prise, plug, socket, fumée, smoke, alarme, sirene.
 >
-> « Lumière garage », « Lampe salle d'eau » ou « Éclairage piscine » ne sont donc pas publiés comme lumières ; « Lampe tableau » l'est (« eau » n'y est pas un mot entier). Que faire : renommez l'équipement dans Jeedom puis cliquez sur **« Relire Jeedom »**, ou choisissez le type vous-même avec **« Corriger le type… »** (voir plus bas).
+> « Lumière garage », « Lampe salle d'eau » ou « Éclairage piscine » ne sont donc pas publiés comme lumières ; « Lampe tableau » l'est (« eau » n'y est pas un mot entier). Que faire : renommez l'équipement dans Jeedom puis cliquez sur **« Relire Jeedom »**, ou publiez-le quand même en réglant sa publication sur **« Toujours »**, puis **« Appliquer »**. Corriger le type ne suffit pas dans ce cas : le nom continue d'écarter le type.
 >
 > **3. La pièce dans Home Assistant est fixée à la création.** Home Assistant range chaque appareil dans la zone de sa pièce Jeedom **une seule fois**, quand il le découvre. Déplacer ensuite l'équipement dans une autre pièce de Jeedom ne le déplace pas dans Home Assistant : changez sa zone dans Home Assistant (la [documentation complète](index.md#annexe--pièces-dans-home-assistant-zone-suggérée) donne les deux façons de faire).
 

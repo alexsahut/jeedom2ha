@@ -733,7 +733,7 @@ Quand des commandes sont bloquées, l'équipement affiche une fiche par cause (v
 | type Home Assistant ambigu — précisez les types génériques dans Jeedom | Précisez les types génériques des commandes dans Jeedom (bouton « Ouvrir les types génériques »), ou choisissez le type ici (« Corriger le type… »). |
 | types génériques en conflit — précisez-les dans Jeedom | Idem. |
 | types génériques en double | Deux commandes portent le même type : retirez le doublon. |
-| un mot du nom de l’équipement écarte ce type | La fiche le dit en clair (« le nom dit « lampe », les types Jeedom disent « prise » »). Choisissez le type voulu (« Corriger le type… »), ou renommez l'équipement (voir [Nommage des équipements](#annexe--nommage-des-équipements)). |
+| un mot du nom de l’équipement écarte ce type | La fiche le dit en clair (« le nom dit « lampe », les types Jeedom disent « prise » »). Renommez l'équipement dans Jeedom puis « Relire Jeedom », ou publiez-le quand même : réglage de publication « Toujours », puis « Appliquer » (voir [Nommage des équipements](#annexe--nommage-des-équipements)). Corriger le type ne suffit pas pour cette cause. |
 | état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Avec « Corriger le type… », choisissez « Capteur binaire (binary_sensor) » pour cette commande (l'aperçu dit s'il sera publié ; sinon, réglez aussi la publication sur « Toujours »), ou ajoutez les ordres dans Jeedom. |
 
 **2. Blocages tels que l'équipement est configuré**
@@ -893,7 +893,7 @@ Le mot doit apparaître **en entier** dans le nom (la casse n'a pas d'importance
 
 Exemples : « Lumière garage », « Lampe salle d'eau » (« eau » est un mot entier après l'apostrophe) ou « Éclairage piscine » ne sont pas publiés comme lumières. Ce n'est pas un « doute » au sens du réglage « En cas de doute sur un équipement » : l'équipement reste bloqué quel que soit ce réglage.
 
-Que faire : renommez l'équipement dans Jeedom puis lancez « Relire Jeedom », ou choisissez le type vous-même avec « Corriger le type… » (l'aperçu dit s'il sera publié ; sinon, réglez aussi la publication sur « Toujours »).
+Que faire : renommez l'équipement dans Jeedom puis lancez « Relire Jeedom », ou publiez-le quand même en réglant sa publication sur « Toujours », puis « Appliquer ». Corriger le type ne suffit pas dans ce cas : le nom continue d'écarter le type, et l'équipement reste bloqué tant que sa publication n'est pas réglée sur « Toujours ».
 
 ### Annexe : durée des actions
 

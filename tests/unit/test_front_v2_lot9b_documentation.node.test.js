@@ -79,8 +79,14 @@ describe('Lot 9b — « Premiers pas » : avant de commencer', () => {
       assert.deepEqual([...cited].sort(), [...words].sort(), `${type} : mêmes mots que le démon`);
     }
     assert.match(box, /« Lumière garage »/);
-    assert.match(box, /« Corriger le type… »/);
+    // Revue #396 : pour un nom qui écarte un type, corriger le type est une impasse (reste ambigu) ; la consigne est
+    // « renommer puis Relire Jeedom » ou publication « Toujours » puis « Appliquer ».
     assert.match(box, /« Relire Jeedom »/);
+    assert.match(box, /« Toujours »\*\*, puis \*\*« Appliquer »/);
+    assert.doesNotMatch(box, /avec \*\*« Corriger le type… »\*\*/);
+    const annex = section(index, '### Annexe : nommage des équipements');
+    assert.match(annex, /« Toujours », puis « Appliquer »/);
+    assert.doesNotMatch(annex, /avec « Corriger le type… »/);
   });
 
   it('l’annexe « nommage » de index.md porte les mêmes mots', () => {
