@@ -939,11 +939,20 @@ try {
         init('ids_to_unpublish', ''),
         jeedom2ha::scenarioPublicationDeps()
       );
+      // Choix enregistré : empreinte invalidée AVANT toute extraction qui peut échouer, pour que la tâche périodique
+      // resynchronise quoi qu'il arrive à la relecture ci-dessous (revue P2 #399).
+      jeedom2ha::invalidateDecisionFingerprintBeforeSync();
+      try {
+        $rescan = _jeedom2ha_scenario_publication_rescan();
+      } catch (\Throwable $e) {
+        log::add('jeedom2ha', 'warning', '[SCENARIO] Relecture après le choix des scénarios échouée : ' . $e->getMessage());
+        $rescan = array('status' => 'error', 'message' => 'Relecture échouée : le choix est enregistré, il sera appliqué à la prochaine synchro');
+      }
       ajax::success(array(
         'saved' => true,
         'ids_to_publish' => $saved['ids_to_publish'],
         'ids_to_unpublish' => $saved['ids_to_unpublish'],
-        'rescan' => _jeedom2ha_scenario_publication_rescan(),
+        'rescan' => $rescan,
       ));
     }
     else if ($action == 'executeHaAction') {

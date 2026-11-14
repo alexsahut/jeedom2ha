@@ -477,6 +477,9 @@ class jeedom2ha extends eqLogic {
       array(
         'excludedPlugins' => config::byKey('excludedPlugins', __CLASS__, ''),
         'excludedObjects' => config::byKey('excludedObjects', __CLASS__, ''),
+        // Front v3 (Lot 4a) — choix de publication des scénarios : un changement relance la synchro de service.
+        'publishedScenarios' => config::byKey('publishedScenarios', __CLASS__, ''),
+        'knownScenarioIds' => config::byKey('knownScenarioIds', __CLASS__, ''),
       ),
       __CLASS__
     );

@@ -264,37 +264,134 @@ class J2haAjaxDone extends Exception {
 class ajax {
     public static function success($result = '') { throw new J2haAjaxDone($result); }
 }
+class log {
+    public static $lines = array();
+    public static function add($plugin, $level, $message) { self::$lines[] = "{$level}: {$message}"; }
+}
+require_once $root . '/core/php/jeedom2ha_reevaluation.php';
+
+/** Faux cœur pour la relecture : empreinte RÉELLE (jeedom2ha_decision_fingerprint) calculée sur la configuration en mémoire. */
+class FakeCore {
+    public static $topologyFails = false;
+    public static $syncs = 0;
+    public static $invalidations = 0;
+    public static function fingerprint() {
+        $read = function ($key) {
+            return isset($GLOBALS['j2ha_store'][$key]) ? json_decode($GLOBALS['j2ha_store'][$key], true) : '';
+        };
+        return jeedom2ha_decision_fingerprint(array(array('id' => 1, 'isEnable' => 1, 'eqType_name' => 'virtual')),
+            array(array('id' => 20, 'isActive' => 1), array('id' => 21, 'isActive' => 1), array('id' => 22, 'isActive' => 0)),
+            array('excludedPlugins' => '', 'excludedObjects' => '',
+                'publishedScenarios' => $read('publishedScenarios'), 'knownScenarioIds' => $read('knownScenarioIds')));
+    }
+    public static function safeDecisionFingerprint() { return self::fingerprint(); }
+    public static function getFullTopology() {
+        if (self::$topologyFails) { throw new RuntimeException('extraction impossible'); }
+        return array('scenarios' => array());
+    }
+    public static function invalidateDecisionFingerprintBeforeSync() {
+        self::$invalidations++;
+        jeedom2ha_reevaluation_invalidate_before_sync(function ($fp) { $GLOBALS['j2ha_fp'] = $fp; });
+    }
+    public static function callDaemon($path, $payload, $method, $timeout, $retries = null, $headers = array()) {
+        self::$syncs++;
+        return array('status' => 'ok', 'operation_result' => 'succes', 'scenario_availability_complete' => true);
+    }
+    public static function rememberDecisionFingerprintAfterSync($fp, $result) {
+        return jeedom2ha_reevaluation_remember_after_sync($fp, $result, function ($v) { $GLOBALS['j2ha_fp'] = $v; });
+    }
+    public static function syncStateListeners() {}
+}
+function _jeedom2ha_run_parc_relay($relais, $call) { return $call(30); }
 $GLOBALS['j2ha_params'] = array();
 $GLOBALS['j2ha_store'] = array();
-$GLOBALS['j2ha_rescans'] = 0;
+$GLOBALS['j2ha_fp'] = '';
 function init($key, $default = '') {
     return array_key_exists($key, $GLOBALS['j2ha_params']) ? $GLOBALS['j2ha_params'][$key] : $default;
 }
-function _jeedom2ha_scenario_publication_rescan() {
-    $GLOBALS['j2ha_rescans']++;
-    return array('status' => 'ok', 'scenario_availability_complete' => true);
-}
-// La branche appelle jeedom2ha::scenarioPublicationDeps() : méthode ajoutée à la fausse classe par une sous-classe nommée.
-eval(str_replace('jeedom2ha::scenarioPublicationDeps()', 'memory_deps($GLOBALS[\'j2ha_store\'], array(20, 21, 22))', 'function run_save() { $action = "saveScenarioPublication"; try { ' . $branch . ' } catch (J2haAjaxDone $done) { return $done->result; } return "NO_RESPONSE"; }'));
+// VRAIE fonction de relecture, extraite du fichier, sur le faux cœur.
+$rStart = strpos($ajax, 'function _jeedom2ha_scenario_publication_rescan(): array {');
+$rEnd = $rStart === false ? false : strpos($ajax, "\n}\n", $rStart);
+check('fonction de relecture extraite', $rStart !== false && $rEnd !== false);
+eval(str_replace('jeedom2ha::', 'FakeCore::', substr($ajax, $rStart, $rEnd - $rStart + 2)));
 check('la branche passe bien par scenarioPublicationDeps', strpos($branch, 'jeedom2ha::scenarioPublicationDeps()') !== false);
+eval(str_replace(array('jeedom2ha::scenarioPublicationDeps()', 'jeedom2ha::'),
+    array('memory_deps($GLOBALS[\'j2ha_store\'], array(20, 21, 22))', 'FakeCore::'),
+    'function run_save() { $action = "saveScenarioPublication"; try { ' . $branch . ' } catch (J2haAjaxDone $done) { return $done->result; } return "NO_RESPONSE"; }'));
+
+/** Un pas RÉEL de la tâche périodique (jeedom2ha_reevaluation_tick) sur le faux cœur. */
+function cron_tick() {
+    return jeedom2ha_reevaluation_tick(array(
+        'fingerprint' => function () { return FakeCore::fingerprint(); },
+        'stored' => function () { return $GLOBALS['j2ha_fp']; },
+        'store' => function ($fp) { $GLOBALS['j2ha_fp'] = $fp; },
+        'ready' => function () { return true; },
+        'topology' => function () { return FakeCore::getFullTopology(); },
+        'sync' => function ($topology) { return FakeCore::callDaemon('/action/sync', $topology, 'POST', 30); },
+        'listeners' => function () {},
+        'log' => function ($level, $message) {},
+    ));
+}
 
 $GLOBALS['j2ha_store'] = array('publishedScenarios' => '[20,21]', 'knownScenarioIds' => '[20,21]', 'scenarioPublicationSchema' => '1');
+$GLOBALS['j2ha_fp'] = FakeCore::fingerprint(); // dernière synchro réussie
 $GLOBALS['j2ha_params'] = array('ids_to_publish' => '[22]', 'ids_to_unpublish' => '[21]');
 $out = run_save();
 check('réponse', is_array($out) && $out['saved'] === true && $out['ids_to_publish'] === array(22) && $out['ids_to_unpublish'] === array(21)
-    && $out['rescan'] === array('status' => 'ok', 'scenario_availability_complete' => true));
+    && is_array($out['rescan']) && $out['rescan']['status'] === 'ok');
 check('les deux clés écrites', $GLOBALS['j2ha_store']['publishedScenarios'] === '[20,22]' && $GLOBALS['j2ha_store']['knownScenarioIds'] === '[20,21,22]');
-check('relecture déclenchée une fois', $GLOBALS['j2ha_rescans'] === 1);
+check('relecture faite, empreinte du nouvel état mémorisée', FakeCore::$syncs === 1 && $GLOBALS['j2ha_fp'] === FakeCore::fingerprint());
+check('cron suivant : rien à refaire (pas de boucle)', cron_tick()['status'] === 'unchanged' && FakeCore::$syncs === 1);
+
+echo "Revue P2 #399 : exception pendant la relecture, APRÈS l'écriture du choix\n";
+$GLOBALS['j2ha_fp'] = FakeCore::fingerprint();
+$stale = $GLOBALS['j2ha_fp'];
+FakeCore::$topologyFails = true;
+FakeCore::$invalidations = 0;
+$GLOBALS['j2ha_params'] = array('ids_to_publish' => '[]', 'ids_to_unpublish' => '[22]');
+$out = run_save();
+check('choix enregistré malgré l\'échec', $GLOBALS['j2ha_store']['publishedScenarios'] === '[20]');
+check('réponse : enregistré, relecture en erreur sur une ligne', is_array($out) && $out['saved'] === true
+    && $out['rescan']['status'] === 'error' && strpos($out['rescan']['message'], "\n") === false);
+check('aucune synchro envoyée', FakeCore::$syncs === 1);
+check('empreinte invalidée dès l\'enregistrement', FakeCore::$invalidations >= 1 && $GLOBALS['j2ha_fp'] === '');
+FakeCore::$topologyFails = false;
+$tick = cron_tick();
+check('cron suivant : synchro de service relancée', $tick['status'] === 'synced' && FakeCore::$syncs === 2);
+check('puis plus rien (pas de boucle)', cron_tick()['status'] === 'unchanged' && FakeCore::$syncs === 2);
+
+echo "Empreinte : le choix des scénarios en fait partie\n";
+$GLOBALS['j2ha_fp'] = $stale; // même si l'invalidation avait été perdue
+check('un retrait change l\'empreinte : le cron resynchronise de lui-même', cron_tick()['status'] === 'synced' && FakeCore::$syncs === 3);
+$eq = array(array('id' => 1, 'isEnable' => 1, 'eqType_name' => 'virtual'));
+$sc = array(array('id' => 20, 'isActive' => 1));
+$legacy = jeedom2ha_decision_fingerprint($eq, $sc, array('excludedPlugins' => '', 'excludedObjects' => ''));
+check('clés absentes : empreinte identique à celle d\'avant le Lot 4a (aucune resynchro à la mise à jour du code)',
+    jeedom2ha_decision_fingerprint($eq, $sc, array('excludedPlugins' => '', 'excludedObjects' => '', 'publishedScenarios' => '', 'knownScenarioIds' => '')) === $legacy);
+$with = jeedom2ha_decision_fingerprint($eq, $sc, array('excludedPlugins' => '', 'excludedObjects' => '', 'publishedScenarios' => array(20), 'knownScenarioIds' => array(20)));
+check('clés présentes : empreinte différente', $with !== $legacy);
+check('ordre et format sans effet (tableau ou JSON, désordre, doublons)', $with === jeedom2ha_decision_fingerprint($eq, $sc,
+    array('excludedPlugins' => '', 'excludedObjects' => '', 'publishedScenarios' => '[20,20]', 'knownScenarioIds' => array('20'))));
+check('un nouveau « connu » change aussi l\'empreinte', $with !== jeedom2ha_decision_fingerprint($eq, $sc,
+    array('excludedPlugins' => '', 'excludedObjects' => '', 'publishedScenarios' => array(20), 'knownScenarioIds' => array(20, 21))));
+$class = file_get_contents($root . '/core/class/jeedom2ha.class.php');
+check('readDecisionFingerprint lit les deux clés', strpos($class, "'publishedScenarios' => config::byKey('publishedScenarios', __CLASS__, ''),") !== false
+    && strpos($class, "'knownScenarioIds' => config::byKey('knownScenarioIds', __CLASS__, ''),") !== false);
+check('branche : invalidation avant la relecture',
+    preg_match('/jeedom2ha_save_scenario_publication\(.*?jeedom2ha::invalidateDecisionFingerprintBeforeSync\(\);.*?_jeedom2ha_scenario_publication_rescan\(\)/s', $branch) === 1);
 
 $GLOBALS['j2ha_params'] = array('ids_to_publish' => '[99]', 'ids_to_unpublish' => '[]');
 $before = $GLOBALS['j2ha_store'];
+$syncs = FakeCore::$syncs;
+$invalidations = FakeCore::$invalidations;
 $thrown = false;
 try {
     run_save();
 } catch (Exception $e) {
     $thrown = !($e instanceof J2haAjaxDone);
 }
-check('demande invalide : erreur, rien écrit, aucune relecture', $thrown && $GLOBALS['j2ha_store'] === $before && $GLOBALS['j2ha_rescans'] === 1);
+check('demande invalide : erreur, rien écrit, ni invalidation ni relecture', $thrown && $GLOBALS['j2ha_store'] === $before
+    && FakeCore::$syncs === $syncs && FakeCore::$invalidations === $invalidations);
 
 // ---------------------------------------------------------------------------------------------------------------
 // plugin_info/install.php
