@@ -415,10 +415,11 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     t.commands[1].override_types_allowed = FULL.slice();
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
     assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
-    // Les types refusés restent visibles, repliés sous « Autres types, non proposés pour cette commande » : jamais proposés.
+    // Les types refusés restent visibles, repliés sous « Types impossibles pour cet équipement » : jamais proposés.
+    // Garde levée (front v2, Lot 9a) : libellé du repli — le type vaut pour toute l'entité, pas pour une commande.
     const refused = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-list li').list.map((li) => li.attrs['data-type']);
     assert.ok(refused.includes('sensor') && refused.includes('binary_sensor'));
-    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /non proposés pour cette commande/);
+    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /Types impossibles pour cet équipement/);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

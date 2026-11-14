@@ -338,8 +338,28 @@
     return { name_word: nameWord, type_word: typeWord };
   }
 
+  /**
+   * Front v2 (Lot 9a) : mot du nom qui écarte un type, et ce type, lus dans l'arbre du démon (`entities[].reason_details
+   * .matched_keyword` + `ha_entity_type`, puis `equipment_decision`) : { matched_keyword, ha_entity_type } ou null.
+   * Aucun mot deviné ici : sans `matched_keyword` fourni par le démon, null.
+   */
+  function rejectionContext(tree) {
+    var t = isObject(tree) ? tree : {};
+    var sources = [];
+    (Array.isArray(t.entities) ? t.entities : []).forEach(function (e) { if (isObject(e)) sources.push(e); });
+    if (isObject(t.equipment_decision)) sources.push(t.equipment_decision);
+    for (var i = 0; i < sources.length; i++) {
+      var src = sources[i];
+      var word = isObject(src.reason_details) ? text(src.reason_details.matched_keyword) : null;
+      var type = text(src.ha_entity_type);
+      if (word && type) return { matched_keyword: word, ha_entity_type: type };
+    }
+    return null;
+  }
+
   return {
     version: 2,
+    rejectionContext: rejectionContext,
     describeEntity: describeEntity,
     describeHaSide: describeHaSide,
     describeJeedomSide: describeJeedomSide,

@@ -78,13 +78,45 @@ describe('Lot 1 — computeSteps : table de vérité', () => {
     assert.deepEqual(states(G.computeSteps(UP, NEVER, {}, { haSeen: true, choice: true })), ['done', 'done', 'done', 'current']);
   });
 
-  it('relu : étapes 3 et 4 faites ; une étape faite le reste même si une précédente ne l’est plus', () => {
+  // Garde levée (front v2, Lot 9a, regard neuf v2) : le guide rouvert affichait « 2. À faire » sous « 3. Fait » et « 4. Fait ».
+  // Une publication réussie rend l'étape 2 « réputée faite » (`inferred`) : plus jamais « À faire » avant « Fait ».
+  it('relu : étapes 3 et 4 faites, étape 2 réputée faite ; une étape faite le reste même si une précédente ne l’est plus', () => {
     const m = G.computeSteps(SYNCED, READ_OK, {}, {});
-    assert.deepEqual(states(m), ['done', 'current', 'done', 'done']);
+    assert.deepEqual(states(m), ['done', 'done', 'done', 'done']);
+    assert.equal(m.steps[1].inferred, true);
     assert.equal(m.synced, true);
     const down = G.computeSteps(STOPPED, { kind: 'unavailable' }, {}, { published: true, haSeen: true });
     assert.deepEqual(states(down), ['error', 'done', 'done', 'done']);
     assert.equal(G.computeSteps(SYNCED, READ_OK, {}, { haSeen: true }).complete, true);
+  });
+
+  // Front v2 (Lot 9a) : table de vérité complète — jamais une étape « À faire » (current) ni « en attente » (blocked) avant
+  // une étape « Fait ».
+  it('table de vérité : jamais « À faire » ni « en attente » avant une étape « Fait »', () => {
+    const statuses = [undefined, null, STOPPED, BROKER_DOWN, { daemon: true, broker: { state: 'connecting' } }, UP, SYNCED, FAILED,
+      Object.assign({}, UP, { ha: { birth_seen_at: null } }), Object.assign({}, UP, { ha: { birth_seen_at: '2026-11-13T20:04:00' } }),
+      Object.assign({}, SYNCED, { ha: { birth_seen_at: null } }), Object.assign({}, UP, { publication: { equipments_published: 3 } })];
+    const sums = [{}, { read: true, published: 0 }, { read: true, published: 2 }, { jeedom_equipments: 0 }];
+    const locs = [];
+    for (const haSeen of [false, true]) for (const choice of [false, true]) for (const published of [false, true]) locs.push({ haSeen, choice, published });
+    let cases = 0;
+    for (const status of statuses) {
+      for (const sum of sums) {
+        for (const loc of locs) {
+          const st = states(G.computeSteps(status, NEVER, sum, loc));
+          const lastDone = st.lastIndexOf('done');
+          st.forEach((state, i) => {
+            if (i < lastDone) assert.ok(state === 'done' || state === 'error' || state === 'checking', JSON.stringify({ status, sum, loc, st }));
+          });
+          cases += 1;
+        }
+      }
+    }
+    assert.ok(cases > 300);
+    // État pas encore lu, publication déjà constatée par ce navigateur : l'étape 1 est « en vérification », pas « À faire ».
+    assert.deepEqual(states(G.computeSteps(undefined, null, {}, { published: true })), ['checking', 'done', 'done', 'done']);
+    // Sans rien de fait, l'ordre de toujours.
+    assert.deepEqual(states(G.computeSteps(undefined, null, {}, {})), ['current', 'blocked', 'blocked', 'blocked']);
   });
 
   it('Jeedom vide : l’étape 4 le dit et ne propose pas de publier', () => {
@@ -215,15 +247,32 @@ describe('Lot 1 — checkInstall (E7)', () => {
     assert.match(plain(never[1].detail), /broker\.exemple\.test/);
   });
 
-  // Garde levée (front v2, Lot 6, retour de démo) : Home Assistant non confirmé est un état NEUTRE (« info », « Non confirmé »),
-  // plus « À vérifier » ; il n'arrête toujours pas les contrôles et garde ses trois causes.
-  it('Home Assistant non confirmé : neutre (n’arrête pas) avec trois causes ; relecture partielle : « Voir lesquels »', () => {
+  // Garde levée (front v2, Lot 9a, regard neuf v2) : cinq statuts à apprendre, c'était trop. « Non confirmé » (« info ») est
+  // fusionné dans « À vérifier » (« warn ») : il n'arrête toujours pas les contrôles ; « Je l'ai vu » le passe à « OK ».
+  it('Home Assistant non confirmé : « À vérifier » (n’arrête pas), à demander ; confirmé par vous : OK ; relecture partielle : « Voir lesquels »', () => {
     const status = Object.assign({}, SYNCED, { ha: { birth_seen_at: null }, derniere_operation_resultat: { resultat: 'partiel', intention: 'sync' } });
     const list = G.checkInstall(status, READ_OK, { read: true, blocked: 0 });
-    assert.deepEqual(titles(list), [['daemon', 'ok'], ['broker', 'ok'], ['ha', 'info'], ['reread', 'fail'], ['blocked', 'wait']]);
+    assert.deepEqual(titles(list), [['daemon', 'ok'], ['broker', 'ok'], ['ha', 'warn'], ['reread', 'fail'], ['blocked', 'wait']]);
     assert.equal(plain(list[2].title), 'Home Assistant sur le broker');
     assert.equal(list[2].help, true);
+    assert.equal(list[2].ask, true);
     assert.equal(list[3].remedy.action, 'blocked');
+    const confirmed = G.checkInstall(status, READ_OK, { read: true, blocked: 0 }, { haSeen: true });
+    assert.deepEqual(titles(confirmed).slice(0, 3), [['daemon', 'ok'], ['broker', 'ok'], ['ha', 'ok']]);
+    assert.equal(plain(confirmed[2].detail), 'Confirmé par vous');
+    assert.equal(confirmed[2].ask, undefined);
+  });
+
+  it('quatre statuts au plus dans toute la table (OK / À corriger / À vérifier / En attente)', () => {
+    const statuses = [STOPPED, BROKER_DOWN, UP, SYNCED, FAILED, null, undefined,
+      Object.assign({}, SYNCED, { ha: { birth_seen_at: null } }), Object.assign({}, SYNCED, { ha: { birth_seen_at: '2026-11-13T20:04:00' } })];
+    const seen = new Set();
+    for (const status of statuses) {
+      for (const sum of [{}, { read: true, blocked: 0 }, { read: true, blocked: 2 }]) {
+        for (const loc of [{}, { haSeen: true }]) G.checkInstall(status, READ_OK, sum, loc).forEach((c) => seen.add(c.state));
+      }
+    }
+    assert.deepEqual([...seen].sort(), ['fail', 'ok', 'wait', 'warn']);
   });
 
   it('tout va bien : tous OK ; des bloqués : à vérifier avec le lien vers le filtre', () => {
@@ -441,6 +490,69 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
   });
 });
 
+describe('Lot 9a — « Je l’ai vu » mémorisé, causes repliées, guide rouvert dans l’ordre', () => {
+  const NOT_SEEN = Object.assign({}, SYNCED, { ha: { birth_seen_at: null } });
+
+  it('barre d’état : « Confirmé par vous » après « Je l’ai vu » ; le signal du démon reste prioritaire', () => {
+    const bar = G.haBarItem(NOT_SEEN, undefined, true);
+    assert.deepEqual([bar.visible, bar.seen, bar.confirmed, plain(bar.text)], [true, false, true, 'Confirmé par vous']);
+    assert.equal(plain(G.haBarItem(NOT_SEEN, undefined, false).text), 'Non confirmé');
+    const seen = Object.assign({}, UP, { ha: { birth_seen_at: '2026-11-13T21:04:00' } });
+    const both = G.haBarItem(seen, new Date('2026-11-13T23:10:00').getTime(), true);
+    assert.deepEqual([both.seen, both.confirmed, plain(both.text)], [true, false, 'Vu à 21:04']);
+    assert.equal(G.haBarItem(Object.assign({}, NOT_SEEN, { daemon: false }), undefined, true).visible, false, 'démon arrêté : masqué');
+  });
+
+  maybe('« Vérifier l’installation… » : causes repliées sous « Je ne vois pas l’appareil… », « Je l’ai vu » passe à OK et prévient la barre', () => {
+    const ui = startGuide();
+    ui.guide.onStatus(NOT_SEEN);
+    const res = ui.guide.openCheck();
+    const modal = ui.$(ui.dom.dialogs[0].modal);
+    assert.match(plain(modal.find('.j2ha-v2-check-intro').text()), /s'arrêtent au premier point « À corriger »/);
+    const row = () => modal.find('.j2ha-v2-check[data-check="ha"]');
+    assert.equal(plain(row().find('.j2ha-v2-lbl').text()), 'À vérifier');
+    assert.equal(res.checks.filter((c) => c.key === 'ha')[0].state, 'warn');
+    const causes = row().find('.j2ha-v2-check-causes');
+    assert.equal(causes.find('li').length, 3);
+    assert.equal(causes.list[0].visible, false, 'les trois causes ne sont pas montrées d’office');
+    const help = row().find('.j2ha-v2-check-hahelp');
+    assert.equal(plain(help.text()), 'Je ne vois pas l\'appareil dans Home Assistant');
+    help.list[0].handlers.click.call(help.list[0], { preventDefault() {} });
+    assert.equal(help.attr('aria-expanded'), 'true');
+    assert.equal(causes.list[0].visible, true);
+    const seenBtn = row().find('.j2ha-v2-check-haseen');
+    seenBtn.list[0].handlers.click.call(seenBtn.list[0], { preventDefault() {} });
+    assert.equal(plain(row().find('.j2ha-v2-lbl').text()), 'OK');
+    assert.match(plain(row().text()), /Confirmé par vous/);
+    assert.equal(row().find('.j2ha-v2-check-haseen').length, 0);
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.haSeen], '1');
+    assert.equal(ui.haConfirmedCalls.length, 1);
+    assert.equal(ui.guide.haConfirmed(), true);
+    const words = modal.find('.j2ha-v2-check .j2ha-v2-lbl').list.map((n) => plain(ui.$(n).text()));
+    assert.ok(words.every((w) => ['OK', 'À corriger', 'À vérifier', 'En attente'].includes(w)), words.join(','));
+  });
+
+  maybe('stockage refusé : « Je l’ai vu » vaut quand même pour la page', () => {
+    const ui = startGuide({ brokenStorage: true });
+    ui.guide.onStatus(NOT_SEEN);
+    ui.guide.openCheck();
+    const modal = ui.$(ui.dom.dialogs[0].modal);
+    const seenBtn = modal.find('.j2ha-v2-check[data-check="ha"] .j2ha-v2-check-haseen');
+    seenBtn.list[0].handlers.click.call(seenBtn.list[0], { preventDefault() {} });
+    assert.equal(ui.guide.haConfirmed(), true);
+  });
+
+  maybe('guide rouvert après une publication réussie : quatre étapes « Fait », l’étape 2 réputée faite le dit', () => {
+    const ui = startGuide();
+    ui.guide.onStatus(NOT_SEEN);
+    ui.guide.open();
+    const labels = ui.$('#j2ha_v2_guide .j2ha-v2-step .j2ha-v2-lbl').list.map((n) => plain(ui.$(n).text()));
+    assert.deepEqual(labels, ['Fait', 'Fait', 'Fait', 'Fait']);
+    assert.doesNotMatch(ui.text('#j2ha_v2_guide'), /À faire/);
+    assert.match(plain(ui.$('#j2ha_v2_guide .j2ha-v2-guide-inferred').text()), /Réputée faite : une publication a réussi/);
+  });
+});
+
 describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', () => {
   const src = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
 
@@ -476,6 +588,22 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     ui.respond('getBridgeStatus', { state: 'ok', result: { daemon: false, ha: { birth_seen_at: null } } });
     assert.equal(ui.$('#div_healthHa').list[0].visible, false);
     assert.equal(ui.$('#div_op').list[0].visible, true);
+  });
+
+  it('Lot 9a : « Je l’ai vu » mémorisé → « Confirmé par vous » (vert pâle) au lieu de « Non confirmé »', () => {
+    const ui = bar();
+    const status = Object.assign({}, SYNCED, { ha: { birth_seen_at: null } });
+    ui.sandbox.refreshBridgeStatus();
+    ui.respond('getBridgeStatus', { state: 'ok', result: status });
+    assert.equal(plain(ui.$('#span_healthHa').text()), 'Non confirmé');
+    assert.ok(ui.$('#span_healthHa').hasClass('label-default'));
+    ui.sandbox.window.Jeedom2haGuideInstance = { onStatus() {}, haConfirmed: () => true };
+    ui.sandbox.refreshBridgeStatus();
+    ui.respond('getBridgeStatus', { state: 'ok', result: status });
+    assert.equal(plain(ui.$('#span_healthHa').text()), 'Confirmé par vous');
+    assert.ok(ui.$('#span_healthHa').hasClass('j2ha-v2-ha-confirmed'));
+    assert.ok(!ui.$('#span_healthHa').hasClass('label-success'));
+    assert.match(plain(ui.$('#span_healthHa').attr('title')), /Vous avez indiqué que Home Assistant voit l'appareil/);
   });
 
   it('le guide reçoit chaque état du pont (et null en erreur)', () => {

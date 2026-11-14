@@ -35,6 +35,21 @@
   var MSG_UNAVAILABLE = '{{Chiffres indisponibles}}';
 
   function unreadLabel(count) { return plural(count, 'non lu', 'non lus'); }
+
+  /**
+   * Front v2 (Lot 9a, regard neuf v2) : repères des équipements « inactifs » d'une pièce (désactivés dans Jeedom, rien à
+   * publier), pour que « 3 / 4 publiés » dise toujours pourquoi il en manque. Lus dans les lignes de `computeOverview`
+   * (état unique `resolveEquipmentState`) ; « Exclu » garde son propre repère. Rend [{ key, count, text }].
+   */
+  function inactiveMarks(room) {
+    var rows = room && Array.isArray(room.equipments) ? room.equipments : [];
+    var disabled = rows.filter(function (r) { return r.state === 'disabled'; }).length;
+    var nothing = rows.filter(function (r) { return r.state === 'nothing_to_publish'; }).length;
+    var marks = [];
+    if (disabled > 0) marks.push({ key: 'disabled', count: disabled, text: plural(disabled, 'désactivé', 'désactivés') });
+    if (nothing > 0) marks.push({ key: 'nothing_to_publish', count: nothing, text: nothing + ' ' + w('rien à publier') });
+    return marks;
+  }
   function blockedMentionLabel(count) { return plural(count, 'bloquée', 'bloquées'); }
 
   function houseHeadline(published, total) {
@@ -186,7 +201,7 @@
           var sheet = first && first.code && L ? L.causeSheet(first.code, context) : null;
           items.push(Object.assign(base, {
             kind: 'blocked',
-            text: sheet && sheet.known ? causeSentence(sheet.quoi) : (first ? M.buildCauseNoticeText(first) : ''),
+            text: sheet && sheet.known ? causeSentence(sheet.quoi) : (first ? (L && typeof L.causeLine === 'function' ? L.causeLine(first, null) : M.buildCauseNoticeText(first)) : ''),
             action: sheet && sheet.known && sheet.actions.length ? sheet.actions[0] : null,
           }));
         } else if (row.advice === true) {
@@ -650,6 +665,20 @@
         } else {
           $slot.append($('<div class="j2ha-room-ratio"></div>').text(c.published + ' / ' + total + ' ' + w(c.published > 1 ? 'publiés' : 'publié')));
         }
+        // Front v2 (Lot 9a, regard neuf v2) : « 1 désactivé » / « 1 rien à publier » sous le ratio — la carte dit toujours
+        // pourquoi il manque un équipement. Au-dessus de la jauge (les jauges d'une rangée restent alignées, garde 25.5) et hors
+        // des repères (comparés à ceux de l'arbre par les gardes 25.6 / 25.7) ; « N exclus » garde son repère.
+        var inactive = inactiveMarks(room);
+        var inactiveText = inactive.map(function (m) { return m.text; }).join(', ');
+        if (inactive.length) {
+          var $inactive = $('<div class="j2ha-v2-room-inactive"></div>');
+          inactive.forEach(function (mark, index) {
+            var title = mark.key === 'disabled' ? w('Désactivés dans Jeedom : jamais publiés') : w('Aucune commande n’a d’équivalent dans Home Assistant');
+            $inactive.append($('<span class="j2ha-v2-mark-inactive"></span>').attr('data-mark', mark.key).attr('title', title)
+              .text((index ? ' · ' : '') + mark.text));
+          });
+          $slot.append($inactive);
+        }
         $slot.append(buildGauge(c, total, 'j2ha-gauge-card'));
         var $marks = $('<div class="j2ha-room-marks"></div>');
         if (c.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(plural(c.blocked, 'bloqué', 'bloqués')));
@@ -667,7 +696,7 @@
         $slot.append($marks);
         if (c.blocked > 0) $card.addClass('j2ha-room-blocked');
         if (filter && filterMatchesNothing(room)) $card.addClass('j2ha-room-dim');
-        $card.attr('aria-label', room.object_name + (excluded ? ', ' + w('pièce exclue') : '') + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
+        $card.attr('aria-label', room.object_name + (excluded ? ', ' + w('pièce exclue') : '') + ', ' + gaugeLabel(c, total) + (inactiveText ? ', ' + inactiveText : '') + (excludedText ? ', ' + excludedText : ''));
       });
     }
 
@@ -733,14 +762,17 @@
     // dans la page ; les types génériques et l'équipement s'ouvrent dans Jeedom (nouvel onglet).
     function todoAction(item) {
       var key = item.action && item.action.key;
-      var href = key === 'generic_types' ? 'index.php?v=d&p=types' : (key === 'equipment' ? equipmentUrl(item) : '');
+      var href = key === 'generic_types' ? 'index.php?v=d&p=types' : (key === 'equipment' || key === 'rename' ? equipmentUrl(item) : '');
       if (href) {
         return $('<a class="btn btn-default btn-xs j2ha-v2-todo-action" target="_blank" rel="noopener"></a>')
           .attr('href', href).attr('data-action', key).text(item.action.label);
       }
-      var label = key === 'correct_type' ? item.action.label : w('Voir');
+      // Front v2 (Lot 9a, point 9) : « Publier quand même » ouvre la fiche, où le bouton du même nom règle l'équipement sur
+      // « Toujours » (aperçu et confirmation habituels, puis « Appliquer »).
+      var inPage = key === 'correct_type' || key === 'publish_anyway';
+      var label = inPage ? item.action.label : w('Voir');
       var $btn = $('<button type="button" class="btn btn-xs j2ha-v2-todo-action"></button>')
-        .addClass(key === 'correct_type' ? 'btn-primary' : 'btn-default').attr('data-action', key || 'open').text(label);
+        .addClass(inPage ? 'btn-primary' : 'btn-default').attr('data-action', key || 'open').text(label);
       $btn.attr('aria-label', label + ' : ' + item.eq_name);
       $btn.on('click', function () { openEquipmentView(item.room_id, item.eq_id); });
       return $btn;
@@ -1060,6 +1092,7 @@
     GROUP_KEYS: GROUP_KEYS,
     GROUP_OF_STATE: GROUP_OF_STATE,
     plural: plural,
+    inactiveMarks: inactiveMarks,
     unreadLabel: unreadLabel,
     blockedMentionLabel: blockedMentionLabel,
     classifyResponse: classifyResponse,

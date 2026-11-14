@@ -186,6 +186,9 @@
           object_id: id, name: room.object_name, icon: room.icon_classes, color: room.color,
           total: room.equipments.length, excluded: room.excluded === true && room.object_id > 0,
           published: counts ? counts.published : null, blocked: counts ? counts.blocked : 0, to_apply: counts ? counts.to_apply : 0,
+          // Front v2 (Lot 9a) : « 1 désactivé », « 1 rien à publier » comme sur la carte de la pièce (le repère « N exclus » de la
+          // carte reste propre à la carte : les gardes 25.6 / 25.7 le comparent hors arbre).
+          inactive: ov && O && typeof O.inactiveMarks === 'function' ? O.inactiveMarks(ov) : [],
           hasStates: !!ov, expanded: isExpanded, selected: input.selectedRoom === id && input.selectedEq == null,
           rows: isExpanded ? rows : [],
         });
@@ -213,8 +216,12 @@
       };
       if (entry) {
         var groups = M.groupBlockedCauses(entry);
+        // Front v2 (Lot 9a) : « le mot « lampe » du nom écarte le type … » quand le démon fournit le mot et le type.
+        var lx = pageModule('Jeedom2haLexique', 'causeLine');
+        var hs = pageModule('Jeedom2haHaSide', 'rejectionContext');
+        var rejection = hs ? hs.rejectionContext(entry) : null;
         item.causes = r.state === 'blocked' ? groups.map(function (g) {
-          return { text: M.buildCauseNoticeText(g), raw: g.raw_code, genericTypes: !!g.generic_types_link };
+          return { text: lx ? lx.causeLine(g, rejection) : M.buildCauseNoticeText(g), raw: g.raw_code, genericTypes: !!g.generic_types_link };
         }) : [];
         item.genericTypes = item.causes.some(function (c) { return c.genericTypes; });
         // Front v2 (Lot 7, E3) : une seule mention par ligne. Les causes disent déjà « N commandes bloquées : … » ; le
@@ -225,6 +232,13 @@
       }
       return item;
     });
+  }
+
+  // Front v2 (Lot 9a) : module de la page chargé à côté (lexique, côté Home Assistant) ; absent (node, gabarit partiel) : null.
+  function pageModule(name, fn) {
+    var g = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : null);
+    var mod = g ? g[name] : null;
+    return mod && typeof mod[fn] === 'function' ? mod : null;
   }
 
   /** « Les N équipements … n'appellent aucune action » : nombres issus de `summarizeRoom` (équipements lus). */
@@ -816,6 +830,11 @@
           .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>')).append(doc.createTextNode(' {{Pièce exclue}}')));
       } else if (room.published !== null) {
         $row.append($('<span class="text-muted j2ha-wv-ratio"></span>').text(room.published + ' / ' + room.total));
+      }
+      // Front v2 (Lot 9a) : comme sur la carte, « 1 désactivé » / « 1 rien à publier » à côté du ratio (hors des repères).
+      if ((room.inactive || []).length) {
+        $row.append($('<span class="text-muted j2ha-v2-mark-inactive j2ha-v2-wv-inactive"></span>')
+          .text(room.inactive.map(function (mark) { return mark.text; }).join(' · ')));
       }
       var $marks = $('<span class="j2ha-wv-room-marks"></span>');
       if (room.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(O.plural(room.blocked, 'bloqué', 'bloqués')));
