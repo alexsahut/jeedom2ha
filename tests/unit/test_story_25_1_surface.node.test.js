@@ -221,6 +221,40 @@ describe('25.1 / AC10 — réglage de publication segmenté', () => {
     assert.deepEqual([call.data.eqId, call.data.publicationPolicy], [1, 'force_publish']);
   });
 
+  // Front v3 (Lot 2, revue Codex #400) : « Toujours » n'est plus grisé sur un équipement « Automatique » déjà publié. Rien ne
+  // change maintenant, mais le réglage garde l'équipement publié si le plugin hésite plus tard : la confirmation est permise
+  // (aperçu d'une ligne) et enregistre « Toujours » par la même requête ; « Annuler » laisse « Automatique », sans écriture.
+  it('équipement déjà publié : « Toujours » confirmable (« Rien ne change maintenant… »), même écriture ; Annuler garde Automatique', () => {
+    const preview = { state: 'ok', result: { payload: { overridden: {
+      ha_entity_type: 'light', projection_validity: { is_valid: true }, should_publish: true, command_ids: [100],
+      entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY }],
+    } } } };
+    const start = () => {
+      const published = tree(1, [READY], { present: true, entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY, override_command_id: 100, present_in_ha: true }] });
+      const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(published)]);
+      assert.equal(ui.$(EQ + ' .j2ha-seg-auto').attr('aria-checked'), 'true');
+      assert.notEqual(ui.$(EQ + ' .j2ha-seg-always').prop('disabled'), true, '« Toujours » n’est pas grisé');
+      ui.click(EQ + ' .j2ha-seg-always');
+      assert.equal(ui.pending('previewMappingOverride')[0].data.publicationPolicy, 'force_publish');
+      ui.respond('previewMappingOverride', preview);
+      return ui;
+    };
+    // Annuler : aucune écriture, « Automatique » reste la position courante, les segments sont rendus.
+    const cancelled = start();
+    const dialog = cancelled.lastConfirmation();
+    assert.match(plain(cancelled.$(dialog.options.message).text()), /^Rien ne change maintenant · restera publié si le plugin hésite plus tard$/);
+    dialog.options.buttons.cancel.callback();
+    assert.equal(cancelled.pending('savePublicationOverride').length, 0);
+    assert.equal(cancelled.$(EQ + ' .j2ha-seg-auto').attr('aria-checked'), 'true');
+    assert.notEqual(cancelled.$(EQ + ' .j2ha-seg-always').prop('disabled'), true, 'boutons libérés après Annuler');
+    // Confirmer : la confirmation n'est pas désactivée, l'écriture est celle de « Toujours » (équipement, force_publish).
+    const confirmed = start();
+    confirmed.lastConfirmation().options.buttons.confirm.callback();
+    const call = confirmed.pending('savePublicationOverride')[0];
+    assert.ok(call, 'écriture attendue après confirmation');
+    assert.deepEqual([call.data.eqId, call.data.publicationPolicy, call.data.cmdId], [1, 'force_publish', undefined]);
+  });
+
   it('le segment actif n’écrit jamais (clic et clavier) ; « Tout remettre en automatique… » demande confirmation', () => {
     const t = tree(1, [READY], { present: true });
     t.commands[0].override_applied = true;

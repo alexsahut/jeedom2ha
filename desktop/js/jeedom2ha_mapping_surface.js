@@ -465,6 +465,12 @@
     return $wrap;
   }
 
+  // Aperçu « Toujours » d'un équipement dont toutes les entités prévues sont déjà publiées : rien ne change maintenant.
+  function keepsPublished(state) {
+    return !!state && state.can_confirm === false && Array.isArray(state.items) && state.items.length > 0
+      && state.items.every(function (item) { return item.already_published === true; });
+  }
+
   function requestPublication(eqId, target, equipment, policy, $buttons, commands, $errorSlot, entities) {
     var cmdId = equipment ? null : target.override_command_id;
     function save() { publicationRequest(eqId, cmdId, policy, $buttons, $errorSlot); }
@@ -518,6 +524,14 @@
         // (aucun changement dû à CE forçage) d'une entité qui le deviendrait réellement.
         var state = equipment ? M.equipmentForcePreviewState(view, commands, entities) : M.forcePreviewState(view, commands);
         var content = equipment ? buildEquipmentForcePreviewContent(state) : buildForcePreviewContent(state);
+        // Front v3 (Lot 2, revue Codex #400) : « Toujours » n'est plus grisé sur un équipement déjà entièrement publié. Rien ne
+        // change maintenant (`equipmentForcePreviewState` refuse faute de changement), mais le réglage a un effet plus tard : il
+        // garde l'équipement publié si le plugin hésite. La confirmation est alors permise, avec un aperçu d'une ligne, et
+        // enregistre « Toujours » par la même requête (`savePublicationOverride`, force_publish).
+        if (equipment && keepsPublished(state)) {
+          state = Object.assign({}, state, { can_confirm: true, refusal_reason: null });
+          content = $('<p class="j2ha-eq-force-keep"></p>').text('{{Rien ne change maintenant · restera publié si le plugin hésite plus tard}}');
+        }
         var dialogOptions = state.can_confirm ? null
           : { disableConfirm: state.refusal_reason || '{{« Toujours » serait refusé dans l’état actuel.}}' };
         confirmPublicationDialog(content, save, release, dialogOptions);
