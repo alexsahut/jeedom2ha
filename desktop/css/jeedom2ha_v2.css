@@ -815,3 +815,119 @@
 .j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-excluded,
 .j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-disabled,
 .j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-nothing_to_publish { color: var(--j2ha-neutral); }
+
+/* front-v3 Lot 4b — onglet Scénarios : puces (styles des puces du Lot 1), filtres, tableau, interrupteur « Publier »,
+   barre de sélection, pied « Appliquer (n) », suggestion d'une ligne. Variables --j2ha-* seulement (clair et sombre). */
+.j2ha-v3-sc-suggest[hidden],
+.j2ha-v3-sc-selbar[hidden],
+.j2ha-v3-sc-foot[hidden],
+.j2ha-v3-sc-group[hidden] { display: none !important; }
+.j2ha-v3-sc { padding-top: 14px; }
+.j2ha-v3-sc-bar { margin-top: 0; }
+.j2ha-v3-sc-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.j2ha-v3-sc-filters .form-control { width: auto; height: 28px; padding: 2px 8px; }
+.j2ha-v3-sc-filters .j2ha-v3-sc-search { width: 180px; }
+.j2ha-v3-sc-chip-ok.j2ha-v3-chip { color: var(--j2ha-ok); }
+.j2ha-v3-sc-chip-off.j2ha-v3-chip { color: var(--j2ha-neutral); }
+.j2ha-v3-sc-chip-todo.j2ha-v3-chip { color: var(--j2ha-todo); }
+.j2ha-v3-sc-suggest,
+.j2ha-v3-sc-guide-suggest {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--j2ha-todo);
+}
+.j2ha-v3-sc-suggest { margin: 0 0 10px 0; padding: 6px 10px; border-radius: var(--border-radius, 4px); background-color: var(--j2ha-todo-bg); }
+.j2ha-v3-sc-guide-suggest { margin-top: 6px; }
+.j2ha-v3-sc-table.table { width: 100%; margin: 0; border-collapse: collapse; }
+.j2ha-v3-sc-table.table > thead > tr > th {
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--j2ha-neutral);
+  border-bottom: 1px solid var(--j2ha-line);
+  white-space: nowrap;
+}
+.j2ha-v3-sc-table.table > tbody > tr > td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  border-top: 0;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-v3-sc-table > tbody > tr.j2ha-v3-sc-row:hover > td { background-color: var(--j2ha-surface); }
+.j2ha-v3-sc-table > tbody > tr.j2ha-v3-sc-row.is-pending > td { background-color: var(--j2ha-todo-bg); }
+.j2ha-v3-sc-table .j2ha-v3-sc-cb { width: 32px; text-align: center; }
+.j2ha-v3-sc-table .j2ha-v3-sc-cb input { margin: 0; cursor: pointer; }
+.j2ha-v3-sc-table .j2ha-v3-sc-pub { width: 72px; text-align: center; white-space: nowrap; }
+.j2ha-v3-sc-table .j2ha-v3-sc-modecell,
+.j2ha-v3-sc-table .j2ha-v3-sc-jeedom,
+.j2ha-v3-sc-table .j2ha-v3-sc-hacell { white-space: nowrap; }
+.j2ha-v3-sc-name { font-weight: 600; }
+.j2ha-v3-sc-group-tag { display: block; font-size: 12px; color: var(--j2ha-neutral); }
+.j2ha-v3-sc-new { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--j2ha-todo); white-space: nowrap; }
+.j2ha-v3-sc-tag { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
+.j2ha-v3-sc-tag:last-child { margin-right: 0; }
+.j2ha-v3-sc-active .fas { color: var(--j2ha-ok); }
+.j2ha-v3-sc-muted { color: var(--j2ha-neutral); }
+.j2ha-v3-sc-unavail { cursor: help; }
+.j2ha-v3-sc-entity {
+  font-size: 12px;
+  color: var(--j2ha-text);
+  background-color: var(--j2ha-surface-strong);
+}
+.j2ha-v3-sc-hawait { color: var(--j2ha-todo); cursor: help; }
+.j2ha-v3-sc .j2ha-v3-sc-copy { min-width: 28px; min-height: 28px; padding: 0 4px; color: var(--j2ha-neutral); background: transparent; border: 0; cursor: pointer; }
+.j2ha-v3-sc .j2ha-v3-sc-copy.is-copied { color: var(--j2ha-ok); }
+/* Interrupteur « Publier » : un vrai bouton role="switch" ; jamais grisé pour un scénario inactif (amendement 2). */
+.j2ha-v3-sc-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  padding: 0;
+  vertical-align: middle;
+  background-color: var(--j2ha-neutral-bg);
+  border: 1px solid var(--j2ha-neutral);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.j2ha-v3-sc-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--j2ha-neutral);
+  transition: left 0.1s;
+}
+.j2ha-v3-sc-switch[aria-checked="true"] { background-color: var(--j2ha-ok); border-color: var(--j2ha-ok); }
+.j2ha-v3-sc-switch[aria-checked="true"]::after { left: 18px; background-color: var(--j2ha-menu-bg); }
+.j2ha-v3-sc-switch:focus-visible { outline: 2px solid var(--j2ha-todo); outline-offset: 2px; }
+.j2ha-v3-sc-switch:disabled { opacity: 0.55; cursor: default; }
+.j2ha-v3-sc-wait { margin-left: 6px; font-weight: 600; color: var(--j2ha-todo); cursor: help; }
+.j2ha-v3-sc-selbar,
+.j2ha-v3-sc-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.j2ha-v3-sc-selbar { padding: 6px 10px; border-radius: var(--border-radius, 4px); background-color: var(--j2ha-surface-strong); }
+.j2ha-v3-sc-selcount { font-variant-numeric: tabular-nums; }
+.j2ha-v3-sc-spacer { flex: 1 1 auto; }
+.j2ha-v3-sc .btn.j2ha-v3-sc-apply:not(.cmdName) {
+  background-color: var(--j2ha-todo) !important;
+  color: var(--j2ha-menu-bg) !important;
+  border-color: var(--j2ha-todo);
+  font-weight: 600;
+}
+.j2ha-v3-sc .btn.j2ha-v3-sc-apply:not(.cmdName):disabled { opacity: 0.55; }
+.j2ha-v3-sc-result:empty { display: none; }
+.j2ha-v3-sc-result { margin-top: 8px; }
+.j2ha-v3-sc-result[data-kind="ok"] { color: var(--j2ha-ok); }
+.j2ha-v3-sc-result[data-kind="warn"] { color: var(--j2ha-warn); }
+.j2ha-v3-sc-result[data-kind="error"] { color: var(--j2ha-danger); }
+.j2ha-v3-sc-state,
+.j2ha-v3-sc-empty { display: flex; align-items: center; gap: 6px; padding: 18px 0; color: var(--j2ha-neutral); }
+@media (max-width: 767px) {
+  .j2ha-v3-sc-filters { margin-left: 0; }
+  .j2ha-v3-sc-filters .j2ha-v3-sc-search { width: 140px; }
+}
