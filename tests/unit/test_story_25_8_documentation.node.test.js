@@ -34,10 +34,13 @@ describe('25.8 / AC18 — documentation de l\'exclusion de pièce', () => {
     assert.match(index, /« Supprimer de Home Assistant… »\*\*, en rouge, dans le menu seulement/);
   });
 
-  it('index.md : § Filtrage et publication indique que le champ de la configuration est retiré ; famille 7 mise à jour', () => {
-    const filtering = index.slice(index.indexOf('### Filtrage et publication'), index.indexOf('## Première synchronisation'));
+  // Garde levée (front v2, Lot 8) : § « Filtrage et publication » devient « Ce qui est publié » (titre du bloc à l'écran, E8) ; la
+  // phrase sur l'ancien champ (« Il n'y a plus de champ… ») est retirée (R24 : pas de renvoi aux anciennes versions).
+  it('index.md : § « Ce qui est publié » renvoie les pièces à la page du plugin ; famille 7 mise à jour', () => {
+    const filtering = index.slice(index.indexOf('### Ce qui est publié'), index.indexOf('### Avancé et tâche planifiée'));
+    assert.ok(filtering.length > 200, 'section présente');
     assert.doesNotMatch(filtering, /\| \*\*Pièces exclues\*\* \|/);
-    assert.match(filtering, /Il n'y a plus de champ de saisie des pièces/);
+    assert.match(filtering, /Les pièces\*\* ne s'excluent pas ici/);
     assert.match(index, /exclu de Jeedom2HA \(pièce dans la liste d’exclusions\) \| Exclusion de la pièce, posée depuis sa carte ou son détail/);
     assert.match(index, /« par la pièce » correspond à l'exclusion de la pièce/);
   });

@@ -17,8 +17,10 @@ const desktop = ['desktop/js', 'desktop/php'].flatMap((dir) => fs.readdirSync(pa
 
 describe('25.7 / AC10 — documentation de la cause d\'exclusion', () => {
   it('index.md : les trois mentions, où agir, badges, détail d\'équipement, détail de pièce, carte, famille « Exclusions volontaires »', () => {
+    // Garde levée (front v2, Lot 8, R24) : « Pièces exclues » n'est plus un champ de la configuration ; la doc ne le cite plus entre
+    // guillemets comme un champ (seule la phrase de renvoi de l'écran, « Pièces exclues : elles se règlent… », reste citée).
     for (const needle of ['« par le plugin X »', '« par la pièce »', '« individuelle »', 'Exclusions volontaires', '« Exclus : »', '« N exclus »',
-      '**La cause d\'exclusion**', 'Ouvrir la configuration du plugin', '« Plugins exclus »', '« Pièces exclues »', '« par son plugin »', '« autre »']) {
+      '**La cause d\'exclusion**', 'Ouvrir la configuration du plugin', '« Plugins exclus »', '« Pièces exclues : elles se règlent', '« par son plugin »', '« autre »']) {
       assert.ok(index.includes(needle), needle);
     }
     assert.match(index, /Ce n'est pas un état de plus/);

@@ -25,8 +25,9 @@ describe('25.3 / AC14 — vocabulaire', () => {
 });
 
 describe('25.3 / AC14 — index.md décrit la nouvelle page principale', () => {
-  it('barre de santé, actions, menu « ⋯ », bloc maison et filtres, cartes, « Actualiser », « non lu », regroupement par parent', () => {
-    for (const heading of ['### La barre de santé', '### Les actions de la barre de santé', '### Le bloc de la maison', '### Les cartes de pièce']) {
+  // Garde levée (front v2, Lot 8, glossaire 3.1) : « barre de santé » devient « Barre d'état » dans la documentation.
+  it('barre d’état, actions, menu « ⋯ », bloc maison et filtres, cartes, « Actualiser », « non lu », regroupement par parent', () => {
+    for (const heading of ['### La barre d\'état', '### Les actions de la barre d\'état', '### Le bloc de la maison', '### Les cartes de pièce']) {
       assert.ok(index.includes(heading), heading);
     }
     assert.match(index, /menu « ⋯ »/);
@@ -37,11 +38,13 @@ describe('25.3 / AC14 — index.md décrit la nouvelle page principale', () => {
     assert.match(index, /au retour sur l'onglet|quand vous revenez sur l'onglet/);
   });
 
-  it('ne mentionne plus le bandeau de santé ni la zone « Actions Home Assistant » ; le bandeau bleu a disparu', () => {
-    assert.doesNotMatch(index, /bandeau de santé/);
+  // Garde levée (front v2, Lot 8, R24) : la phrase « Aucun bandeau bleu n'ouvre plus la page » parlait de l'ancienne version ;
+  // la documentation décrit l'écran actuel, sans renvoi aux versions précédentes.
+  it('ne mentionne plus le bandeau ni la barre de santé, ni la zone « Actions Home Assistant », ni le bandeau bleu', () => {
+    assert.doesNotMatch(index, /bandeau de santé|barre de santé/i);
     assert.doesNotMatch(index, /zone « Actions Home Assistant »/);
     assert.doesNotMatch(index, /\*\*« Republier dans Home Assistant »\*\*/);
-    assert.match(index, /Aucun bandeau bleu n'ouvre plus la page/);
+    assert.doesNotMatch(index, /bandeau bleu/);
     assert.match(index, /partagé avec Homebridge/, 'la note Homebridge est conservée, dans le texte');
   });
 

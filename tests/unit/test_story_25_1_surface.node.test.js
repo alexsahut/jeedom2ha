@@ -697,7 +697,7 @@ describe('25.1 / revue R1 (ClaudeBox) — P2-2, P2-3, P3-2, P3-3', () => {
     assert.deepEqual([save.data.eqId, save.data.publicationPolicy, save.data.cmdId], [1, 'force_publish', undefined]);
   });
 
-  it('P3-3 : « Voir la première commande bloquée » et l’icône « Retirer le type imposé » répondent à Entrée et Espace', () => {
+  it('P3-3 : « Voir la première commande bloquée » et l’icône « Revenir au type automatique » répondent à Entrée et Espace', () => {
     const t = tree(1, [READY, BLOCKED], { present: true });
     t.commands[0].override_applied = true;
     t.commands[0].effective_ha = 'light';

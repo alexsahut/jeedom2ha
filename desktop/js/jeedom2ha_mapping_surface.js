@@ -132,7 +132,7 @@
       // Reprise X5d (P3) : en cas d'échec, on réaffiche une cause lisible dans `$revertError` et on
       // réattache le gestionnaire pour permettre un nouvel essai.
       var $revertLink = $('<a class="mo-revert-cmd cursor" role="button" tabindex="0"></a>')
-        .attr('title', '{{Retirer le type imposé}}').attr('aria-label', '{{Retirer le type imposé}}')
+        .attr('title', '{{Revenir au type automatique}}').attr('aria-label', '{{Revenir au type automatique}}')
         .append('<i class="fas fa-undo"></i>');
       $td.append($revertLink).append($revertError);
       var attachRevertHandler = function () {
