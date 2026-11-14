@@ -15,7 +15,10 @@
  * along with Jeedom2HA. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Statut du pont MQTT et santé globale (Story 2.2) */
+/* Statut du pont MQTT et santé globale (Story 2.2).
+ * Front v3 (Lot 1) : pastilles « point + mot » (Démon, MQTT, Home Assistant), le détail en info-bulle ; « Relu HH:MM » ;
+ * « Dernière opération » seulement si elle a échoué. Rouge = panne d'infrastructure SEULEMENT (démon arrêté, broker
+ * déconnecté, Jeedom illisible) ; non confirmé = gris avec « ? ». */
 function refreshBridgeStatus() {
   // Story 25.8 : compteur d'appels, pour qu'une fin de relecture enchaînée ne relise pas deux fois la santé du pont.
   window.jeedom2haBridgeRefreshes = (window.jeedom2haBridgeRefreshes || 0) + 1;
@@ -32,9 +35,10 @@ function refreshBridgeStatus() {
     success: function(data) {
       if (data.state !== 'ok') {
         window.jeedom2haLastBridgeStatus = null;
-        $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
-        $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+        j2haSetPill($('#span_healthBridge'), 'danger', '{{Erreur Jeedom}}');
+        j2haSetPill($('#span_healthMqtt'), 'unknown', '{{Inconnu}}');
         renderHaHealth(null);
+        renderOperationHealth(null);
         applyHAGating(null);
         notifyGuideStatus(null);
         return;
@@ -45,96 +49,117 @@ function refreshBridgeStatus() {
       var $mqtt = $('#span_healthMqtt');
       var $broker = $('#span_healthMqttBroker');
       var $sync = $('#span_healthSync');
-      var $op = $('#span_healthOp');
-      var $opMsg = $('#span_healthOpMsg');
 
       // 1. Démon
       if (!r.daemon) {
         // Incident d'infrastructure -> ROUGE
-        $bridge.removeClass().addClass('label label-danger').text('{{Arrêté}}');
-        $mqtt.removeClass().addClass('label label-default').text('{{Inconnu}}');
+        j2haSetPill($bridge, 'danger', '{{Arrêté}}');
+        j2haSetPill($mqtt, 'unknown', '{{Inconnu}}');
         $broker.text('');
-        $sync.text('{{Inconnue}}');
-        $op.removeClass().addClass('label label-default').text('{{Inconnue}}');
-        $opMsg.text('');
-        $op.closest('.j2ha-health-item').show();
+        $sync.text('{{Relu}} : {{inconnu}}').attr('title', '{{Dernière relecture inconnue}}');
+        renderOperationHealth(null);
         renderHaHealth(r);
         applyHAGating(r);
         notifyGuideStatus(r);
         return;
-      } else {
-        $bridge.removeClass().addClass('label label-success').text('{{Actif}}');
       }
+      j2haSetPill($bridge, 'ok', '{{Actif}}');
 
-      // 2. MQTT
+      // 2. MQTT (le broker est donné en info-bulle)
       var brokerInfo = r.broker || r.mqtt || {};
+      var brokerName = typeof brokerInfo.broker === 'string' ? brokerInfo.broker : '';
+      $broker.text(brokerName);
+      var withBroker = function(word) { return brokerName ? word + ' (' + brokerName + ')' : word; };
       switch (brokerInfo.state) {
         case 'connected':
-          $mqtt.removeClass().addClass('label label-success').text('{{Connecté}}');
+          j2haSetPill($mqtt, 'ok', withBroker('{{Connecté}}'));
           break;
         case 'reconnecting':
-          $mqtt.removeClass().addClass('label label-warning').text('{{Reconnexion...}}');
+          j2haSetPill($mqtt, 'unknown', withBroker('{{Reconnexion...}}'));
           break;
         case 'connecting':
-          $mqtt.removeClass().addClass('label label-warning').text('{{Connexion...}}');
+          j2haSetPill($mqtt, 'unknown', withBroker('{{Connexion...}}'));
           break;
         case 'disconnected':
           // Incident d'infrastructure -> ROUGE absolument (Guardrail Story 2.2)
-          $mqtt.removeClass().addClass('label label-danger').text('{{Déconnecté}}');
+          j2haSetPill($mqtt, 'danger', withBroker('{{Déconnecté}}'));
           break;
         default:
-          $mqtt.removeClass().addClass('label label-default').text('{{Non configuré}}');
-      }
-      $broker.text(brokerInfo.broker || '');
-
-      // 3. Dernière relecture (front v2, Lot 1 : date courte, et résultat fusionné quand la dernière opération est la relecture)
-      var _fusion = relectureFusionOf(r);
-      if (r.derniere_synchro_terminee) {
-        $sync.text(_fusion.text);
-      } else {
-        $sync.text('{{Jamais}}');
+          j2haSetPill($mqtt, 'unknown', '{{Non configuré}}');
       }
 
-      // 4. Dernière opération
-      var _opObj = Jeedom2haMappingOverride.readOperationSnapshot(r.derniere_operation_resultat);
-      switch (_opObj.resultat) {
-        case 'succes':
-          $op.removeClass().addClass('label label-success').text('{{Succès}}');
-          break;
-        case 'partiel':
-          // Problème de configuration -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Partiel}}');
-          break;
-        case 'echec':
-          // Problème de configuration complet -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Échec}}');
-          break;
-        case 'aucun':
-          $op.removeClass().addClass('label label-default').text('{{Aucune}}');
-          break;
-        default:
-          $op.removeClass().addClass('label label-default').text('{{' + _opObj.resultat + '}}');
-      }
-      $opMsg.text(relectureMessage(_opObj.message, ''));
-      // « Dernière opération » reste dans le DOM ; elle est masquée quand elle répète « Dernière relecture ».
-      if (_fusion.fused) {
-        $op.closest('.j2ha-health-item').hide();
-      } else {
-        $op.closest('.j2ha-health-item').show();
-      }
+      // 3. « Relu HH:MM » (date complète et résultat en info-bulle)
+      $sync.text(relectureShort(r.derniere_synchro_terminee)).attr('title', relectureTitle(r));
+
+      // 4. Dernière opération : pastille ambre seulement si elle a échoué.
+      renderOperationHealth(r);
       renderHaHealth(r);
       applyHAGating(r);
       notifyGuideStatus(r);
     },
     error: function() {
       window.jeedom2haLastBridgeStatus = null;
-      $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
-      $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+      j2haSetPill($('#span_healthBridge'), 'danger', '{{Erreur de communication}}');
+      j2haSetPill($('#span_healthMqtt'), 'unknown', '{{Inconnu}}');
       renderHaHealth(null);
+      renderOperationHealth(null);
       applyHAGating(null);
       notifyGuideStatus(null);
     }
   });
+}
+
+/* Pastille « point + mot » : niveau (ok, unknown, warn, danger) et détail en info-bulle / nom accessible. */
+function j2haSetPill($pill, level, detail) {
+  if (!$pill || $pill.length === 0) return;
+  // Le mot (« Démon », « MQTT »…) est porté par `data-word` dans la page ; le détail ne remplace jamais le mot.
+  var word = $pill.attr('data-word') || '';
+  var text = detail ? word + ' : ' + detail : word;
+  $pill.attr('data-level', level).attr('title', text).attr('aria-label', text);
+}
+
+/* « Relu 15:58 » (aujourd'hui), « Relu le 12/11 » (avant), « Jamais relu » (aucune relecture). */
+function relectureShort(iso) {
+  var d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return '{{Jamais relu}}';
+  var now = new Date();
+  var pad = function(n) { return ('0' + n).slice(-2); };
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+    return '{{Relu}} ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  return '{{Relu le}} ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+}
+
+function relectureTitle(r) {
+  var fusion = relectureFusionOf(r);
+  return fusion.text ? '{{Dernière relecture}} : ' + fusion.text : '{{Dernière relecture}} : {{jamais}}';
+}
+
+var J2HA_OPERATION_WORDS = {
+  sync: {partiel: '{{Relecture partielle}}', echec: '{{Relecture échouée}}'},
+  publier: {partiel: '{{Publication partielle}}', echec: '{{Publication échouée}}'},
+  supprimer: {partiel: '{{Suppression partielle}}', echec: '{{Suppression échouée}}'},
+};
+
+/* « Dernière opération » : visible SEULEMENT si elle a échoué (partielle ou échouée), en ambre (erreur de configuration, jamais
+ * rouge) ; le message du démon est en info-bulle. */
+function renderOperationHealth(r) {
+  var $op = $('#span_healthOp');
+  var $item = $op.closest('.j2ha-health-item');
+  var op = r ? Jeedom2haMappingOverride.readOperationSnapshot(r.derniere_operation_resultat) : {resultat: 'aucun'};
+  var words = J2HA_OPERATION_WORDS[op.intention] || J2HA_OPERATION_WORDS.sync;
+  var word = words[op.resultat];
+  if (!word) {
+    $item.hide();
+    $('#span_healthOpMsg').text('');
+    return;
+  }
+  var message = relectureMessage(op.message, '');
+  $('#span_healthOpMsg').text(message);
+  $op.attr('data-word', word);
+  $op.find('.j2ha-v3-pill-word').text(word);
+  j2haSetPill($op, 'warn', message);
+  $item.show();
 }
 
 /* Front v2 (Lot 1) — glossaire 3.2 : « relecture » à la place des messages « synchronisation » du démon (textes du démon
@@ -175,13 +200,12 @@ function renderHaHealth(r) {
     $item.hide();
     return;
   }
-  // Front v2 (Lot 6, retour de démo) : « Vu à HH:MM » en vert ; sinon « Non confirmé » en gris (état neutre, jamais une alerte :
-  // Home Assistant qui tourne déjà ne se signale pas de nouveau), avec l'explication en infobulle.
-  // Front v2 (Lot 9a) : « Confirmé par vous » en vert pâle quand l'utilisateur a cliqué « Je l'ai vu ».
-  var cls = bar.seen ? 'label-success' : (bar.confirmed ? 'j2ha-v2-ha-confirmed' : 'label-default');
-  $('#span_healthHa').removeClass().addClass('label j2ha-health-value ' + cls).text(bar.text)
-    .attr('title', bar.seen ? '' : (bar.confirmed ? Jeedom2haGuide.HA_CONFIRMED_TOOLTIP : Jeedom2haGuide.HA_TOOLTIP));
-  if (bar.seen) $('#span_healthHa').removeAttr('title');
+  // Front v3 (Lot 1) : pastille « Home Assistant » — vert si vu (« Vu à HH:MM ») ou confirmé par l'utilisateur ; sinon gris avec
+  // « ? » (état neutre, jamais une alerte : Home Assistant qui tourne déjà ne se signale pas de nouveau). Détail en info-bulle.
+  var $ha = $('#span_healthHa');
+  var detail = bar.seen ? bar.text : bar.text + ' — ' + (bar.confirmed ? Jeedom2haGuide.HA_CONFIRMED_TOOLTIP : Jeedom2haGuide.HA_TOOLTIP);
+  j2haSetPill($ha, bar.seen || bar.confirmed ? 'ok' : 'unknown', detail);
+  $ha.toggleClass('j2ha-v3-pill-confirmed', !bar.seen && bar.confirmed === true);
   $item.show();
 }
 
@@ -523,7 +547,7 @@ function triggerTopologyRescan($button, snapshot, owner, chain) {
     },
     error: function() {
       outcome.failed = true;
-      $('#div_alert').showAlert({message: '{{Erreur de communication : vérifiez « Dernière relecture » avant de relancer.}}', level: 'danger'});
+      $('#div_alert').showAlert({message: '{{Erreur de communication : vérifiez l\'heure « Relu » de la barre d\'état avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
@@ -698,7 +722,6 @@ function startBridgeStatusAutoRefresh() {
 
 /* Front v2 (Lot 1) — démarrage guidé (E1), « Vérifier l'installation… » (E7), ligne d'aide et nouvelles entrées du menu. */
 function setupGuide() {
-  $('#j2ha_v2_helpline').html('<strong>{{Relire Jeedom}}</strong> : {{j\'ai changé quelque chose dans Jeedom.}} <strong>{{Republier tout}}</strong> : {{Home Assistant a perdu ses appareils.}}');
   if (typeof Jeedom2haGuide === 'undefined' || !Jeedom2haGuide || typeof Jeedom2haGuide.createGuide !== 'function') return;
   if ($('#j2ha_v2_guide').length === 0) return;
   var storage = null;
@@ -881,24 +904,13 @@ function openChoosePublished(opts) {
   return window.Jeedom2haExclusionsPanel.open(opts || {});
 }
 
-/* Points d'ouverture : bouton de la page, entrée du menu « ⋯ » de la barre d'état, menu « ⋯ » d'une carte (avec « Republier la
+/* Points d'ouverture : bouton près des puces de la page, menu « ⋯ » d'une carte (avec « Republier la
  * pièce », confirmation chiffrée, même route que la vue de la pièce). */
 function setupChoosePublished() {
   var $choose = $('#bt_j2haChoosePublished');
   $choose.prop('hidden', false).removeAttr('hidden');
   $choose.on('click', function() { openChoosePublished({}); });
-  var $sep = $('#j2ha_moreMenu .j2ha-menu-sep').first();
-  if ($sep.length && typeof $sep.before === 'function' && $('#bt_j2haChooseMenu').length === 0) {
-    var $item = $('<button type="button" id="bt_j2haChooseMenu" class="j2ha-menu-item" role="menuitem"></button>')
-      .append('<i class="fas fa-check-square"></i>').append($('<span></span>').text('{{Choisir ce qui est publié…}}'));
-    $item.on('click', function() {
-      // Le menu se referme par son propre bouton (même chemin qu'un second clic sur « ⋯ »).
-      var $wrap = $item.closest('.j2ha-menu-wrap');
-      if ($wrap.hasClass('j2ha-menu-open')) $wrap.find('.j2ha-menu-toggle').first().trigger('click');
-      openChoosePublished({});
-    });
-    $sep.before($('<li role="none"></li>').append($item));
-  }
+  // Front v3 (Lot 1) : une seule entrée « Choisir ce qui est publié… », le bouton près des puces (plus d'entrée dans le menu ⋯).
   var cardOf = function(el) { return $(el).closest('.j2ha-room-card'); };
   var roomIdOf = function(el) { return parseInt(cardOf(el).attr('data-object_id'), 10); };
   var roomNameOf = function(id) {
@@ -957,6 +969,37 @@ $(function() {
     }, function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
     });
+  });
+
+  // Front v3 (Lot 1) — « Appliquer (n) » : envoie à Home Assistant les n équipements « À appliquer ». Aucune action nouvelle :
+  // c'est la route de « Appliquer » de la fiche d'un équipement (`executeHaAction`, intention « publier », portée
+  // « equipement »), avec la liste des équipements en attente lue dans la copie des états (aucune requête de plus).
+  // Le démon y prend la même décision que la relecture (réglages relus au clic) : publication, mise à jour ou retrait.
+  // Confirmation chiffrée (publiés / retirés) ; même réservation, même budget client, mêmes messages que « Republier tout ».
+  $('#bt_j2haApply').on('click', function(event) {
+    event.preventDefault();
+    var $button = $(this);
+    var page = window.Jeedom2haOverviewPage;
+    if ($button.prop('disabled') || window.jeedom2haRescanInProgress === true || !page || typeof page.toApplyIds !== 'function') {
+      return;
+    }
+    var ids = page.toApplyIds();
+    if (ids.length === 0) {
+      return;
+    }
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    var dlg = page.applyDialog();
+    confirmHaPublishAction(
+      escapeRoomExclusionText(dlg.title),
+      j2haDialogMessage(dlg.lines),
+      escapeRoomExclusionText(dlg.confirmLabel),
+      function() {
+        triggerPublierAction($button, 'equipement', ids, reservation);
+      },
+      function() {
+        restoreHaActionPendingState($button, reservation);
+      }
+    );
   });
 
   // Story 20.3 (Q2b=A) — boutons globaux : confirmations sans nombre (aucune synthèse ne

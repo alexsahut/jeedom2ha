@@ -1,4 +1,4 @@
-// ARTEFACT — Front v2, Lot 7 (spec E2, E3) : la maison et la pièce. Puces à zéro masquées, « exclus ou inactifs », clic de
+// ARTEFACT — Front v2, Lot 7 (spec E2, E3), revu au front v3 (Lot 1, gardes levées signalées) : la maison et la pièce. Puces à zéro masquées, « exclus ou inactifs », clic de
 // puce = filtre SUR PLACE, phrase « Cliquez sur un chiffre… », légende repliable, bloc « À faire » (cinq lignes, cause en
 // clair et action de la fiche Jeedom2haLexique), mention des scénarios depuis `status.publication`, conseils seulement si
 // le nombre est connu sans requête de plus ; vue de travail : recherche globale groupée, bascule de portée, une seule mention
@@ -58,6 +58,8 @@ function start(options) {
 }
 
 describe('Lot 7 / E2 — puces : zéro masquées, « exclus ou inactifs », filtre sur place', () => {
+  // Garde levée (front v3, Lot 1) : puce = icône + nombre + mot (« 3 exclus ou inactifs ») ; « Bloqués » montre la liste
+  // « À faire » (plus de liste filtrée #j2ha_filterPanel) ; une ligne de « À faire » ouvre la fiche.
   maybe('aucune puce à zéro ; libellé « exclus ou inactifs » ; un clic filtre sur place sans ouvrir la vue ni lire le réseau', () => {
     const ui = start();
     const counts = ui.page.view().overview.counts;
@@ -69,24 +71,28 @@ describe('Lot 7 / E2 — puces : zéro masquées, « exclus ou inactifs », filt
     ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]');
     assert.deepEqual(ui.views, [], 'la vue de travail ne s’ouvre pas');
     assert.equal(ui.page.filter(), 'blocked');
-    assert.equal(ui.$('#j2ha_filterList .j2ha-frow').length, counts.blocked);
-    assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]').attr('aria-controls'), 'j2ha_filterPanel');
+    assert.equal(ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').length, counts.blocked);
+    assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]').attr('aria-controls'), 'j2ha_v2_todo');
     ui.click('#j2ha_houseGauge .j2ha-seg[data-filter="published"]');
     assert.equal(ui.page.filter(), 'published', 'le segment filtre de la même façon');
     assert.deepEqual(ui.views, []);
     assert.equal(ui.calls.length, before, 'aucune requête');
-    ui.click('#j2ha_filterList .j2ha-frow-btn');
-    assert.equal(ui.views.length, 1, 'une ligne de la liste ouvre la vue sur l’équipement');
+    ui.page.setFilter(null);
+    ui.click('#j2ha_v2_todo .j2ha-v2-todo-row button.j2ha-v2-todo-action');
+    assert.equal(ui.views.length, 1, 'une ligne de « À faire » ouvre la vue sur l’équipement');
     assert.ok(ui.views[0].room !== undefined && ui.views[0].eq !== undefined);
   });
 
-  maybe('« Cliquez sur un chiffre pour voir la liste. » est affiché avec les puces', () => {
+  // Garde levée (front v3, Lot 1, « zéro paragraphe ») : « Cliquez sur un chiffre pour voir la liste. » est retiré ; la puce
+  // est un vrai bouton (aria-pressed) et sa définition est en info-bulle.
+  maybe('aucune phrase « Cliquez sur un chiffre » ; chaque puce porte sa définition en info-bulle', () => {
     const ui = start();
-    assert.equal(ui.text('#j2ha_houseBlock .j2ha-v2-chips-hint'), 'Cliquez sur un chiffre pour voir la liste.');
-    assert.equal(ui.$('#j2ha_houseBlock .j2ha-v2-chips-hint').list[0].visible, true);
+    assert.equal(ui.$('#j2ha_houseBlock .j2ha-v2-chips-hint').length, 0);
+    assert.doesNotMatch(ui.text('#j2ha_houseBlock'), /Cliquez/);
+    ui.$('#j2ha_houseChips .j2ha-chip-filter').list.forEach((chip) => assert.ok(plain(chip.attrs.title).length > 0));
   });
 
-  maybe('filtre devenu vide après une relecture : « Aucun équipement dans cet état. », aucune ligne', () => {
+  maybe('filtre devenu vide après une relecture : la puce active à zéro reste pour retirer le filtre, liste vide masquée', () => {
     const ui = start();
     ui.page.setFilter('blocked');
     const equipments = clone(ui.equipments);
@@ -95,47 +101,50 @@ describe('Lot 7 / E2 — puces : zéro masquées, « exclus ou inactifs », filt
     ui.page.reader.load();
     ui.calls[ui.calls.length - 1].options.success(okBody(equipments));
     assert.equal(ui.page.view().overview.counts.blocked, 0);
-    assert.equal(ui.$('#j2ha_filterList .j2ha-frow').length, 0);
-    assert.equal(ui.text('#j2ha_filterList .j2ha-v2-filter-empty'), 'Aucun équipement dans cet état.');
+    assert.equal(ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').length, 0);
+    assert.equal(ui.$('#j2ha_v2_todo').children().length, 0, 'vide = invisible');
     assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]').length, 1, 'la puce active à zéro reste pour retirer le filtre');
   });
 });
 
 describe('Lot 7 / E2 — bloc « À faire »', () => {
-  maybe('cite la lampe hésitante et l’équipement sans type avec leur action ; « Voir les N bloqués » filtre sur place', () => {
+  // Garde levée (front v3, Lot 1) : une ligne de 40 px — icône d'état (mot en info-bulle), nom, pièce, cause en quatre mots
+  // au plus (la phrase de la fiche en info-bulle), un bouton. « Voir les N bloqués » est retiré : la puce « Bloqués » montre
+  // toute la liste ; au-delà de cinq lignes, « Tout afficher (n) ». Un seul bouton plein par écran (« Appliquer ») : les
+  // actions de ligne sont des boutons secondaires.
+  maybe('cite la lampe hésitante et l’équipement sans type avec leur action ; cause courte, phrase en info-bulle', () => {
     const ui = start();
     const rows = ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').list;
     assert.equal(ui.text('#j2ha_v2_todo .j2ha-v2-todo-title'), 'À faire');
+    assert.equal(ui.text('#j2ha_v2_todo .j2ha-v3-todo-n'), String(rows.length));
     const byId = Object.fromEntries(rows.map((row) => [row.attrs['data-eq-id'], row]));
     assert.ok(byId['102'] && byId['106'], 'les deux équipements bloqués');
-    assert.match(plain(ui.$(byId['102']).text()), /Bloqué/);
-    assert.match(plain(ui.$(byId['102']).text()), /Le plugin hésite sur le type de cet équipement\./);
-    assert.match(plain(ui.$(byId['106']).text()), /Jeedom ne sait pas à quoi servent ces commandes\./);
+    assert.equal(plain(ui.$(byId['102']).find('.j2ha-v3-todo-icon').attr('aria-label')), 'Bloqué');
+    assert.equal(plain(ui.$(byId['102']).find('.j2ha-v2-todo-cause').text()), 'Type ambigu');
+    assert.equal(plain(ui.$(byId['102']).find('.j2ha-v2-todo-cause').attr('title')), 'Le plugin hésite sur le type de cet équipement.');
+    assert.equal(plain(ui.$(byId['106']).find('.j2ha-v2-todo-cause').text()), 'Sans type générique');
+    assert.equal(plain(ui.$(byId['106']).find('.j2ha-v2-todo-cause').attr('title')), 'Jeedom ne sait pas à quoi servent ces commandes.');
     // Garde levée (front v2, Lot 9a, point 9) : l'équipement hésitant propose « Publier quand même » (le type corrigé ne
     // le débloquerait pas) ; le bouton ouvre la fiche, où l'action du même nom règle « Toujours ».
     const fix = ui.$(byId['102']).find('.j2ha-v2-todo-action');
     assert.equal(plain(fix.text()), L.ACTIONS.publish_anyway);
     assert.equal(fix.list[0].tag, 'button');
-    assert.ok(fix.hasClass('btn-primary'));
+    assert.ok(!fix.hasClass('btn-primary'), 'un seul bouton plein par écran');
     fix.list[0].handlers.click.call(fix.list[0], {});
     assert.deepEqual(ui.views, [{ room: 3, eq: 102 }], '« Publier quand même » ouvre la fiche de l’équipement');
     const link = ui.$(byId['106']).find('.j2ha-v2-todo-action');
     assert.equal(link.list[0].tag, 'a');
     assert.equal(link.attr('href'), 'index.php?v=d&p=types');
     assert.equal(link.attr('target'), '_blank');
-    assert.equal(plain(link.text()), L.ACTIONS.generic_types);
-    const blocked = ui.page.view().overview.counts.blocked;
-    assert.equal(ui.text('#j2ha_v2_todo .j2ha-v2-todo-all'), `Voir les ${blocked} bloqués`);
-    ui.click('#j2ha_v2_todo .j2ha-v2-todo-all');
-    assert.equal(ui.page.filter(), 'blocked');
-    assert.equal(ui.views.length, 1, 'la vue ne s’ouvre pas');
-    ui.click('#j2ha_v2_todo .j2ha-v2-todo-all');
-    assert.equal(ui.page.filter(), 'blocked', 'jamais de bascule : le filtre reste posé');
+    assert.equal(plain(link.text()).trim(), 'Types génériques');
+    assert.equal(plain(link.attr('title')), L.ACTIONS.generic_types);
+    assert.equal(ui.$('#j2ha_v2_todo .j2ha-v2-todo-all').length, 0, 'plus de « Voir les N bloqués »');
   });
 
-  maybe('cinq lignes au plus, dans l’ordre de la grille ; absent quand rien n’est bloqué', () => {
+  maybe('cinq lignes au plus, dans l’ordre de la grille, puis « Tout afficher (n) » ; absent quand rien n’est à faire', () => {
     const many = start({ mutate: (equipments) => { ['101', '103', '105', '107', '108', '109', '110'].forEach((id) => { equipments[id] = clone(NO_TYPE); }); } });
-    assert.ok(many.page.view().overview.counts.blocked > 5);
+    const blocked = many.page.view().overview.counts.blocked;
+    assert.ok(blocked > 5);
     assert.equal(many.$('#j2ha_v2_todo .j2ha-v2-todo-row').length, 5);
     const grid = many.$('#j2ha_roomCards .j2ha-room-card').list.map((el) => Number(el.attrs['data-object_id']));
     const rooms = many.$('#j2ha_v2_todo .j2ha-v2-todo-row').list.map((row) => {
@@ -144,6 +153,9 @@ describe('Lot 7 / E2 — bloc « À faire »', () => {
     });
     const ranks = rooms.map((id) => grid.indexOf(id));
     assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b));
+    assert.equal(many.text('#j2ha_v2_todo .j2ha-v3-todo-more'), `Tout afficher (${blocked})`);
+    many.click('#j2ha_v2_todo .j2ha-v3-todo-more');
+    assert.equal(many.$('#j2ha_v2_todo .j2ha-v2-todo-row').length, blocked);
     const none = start({ mutate: (equipments) => { equipments['102'] = clone(FIXTURE['101'].aggregated); equipments['106'] = clone(FIXTURE['101'].aggregated); } });
     assert.equal(none.page.view().overview.counts.blocked, 0);
     assert.equal(none.$('#j2ha_v2_todo').children().length, 0, 'vide = invisible (point de montage :empty)');
@@ -156,57 +168,50 @@ describe('Lot 7 / E2 — bloc « À faire »', () => {
     ] }];
     const equipments = { 1: clone(AMBIGUOUS), 2: clone(NO_TYPE) };
     const items = O.todoItems(O.computeOverview(rooms, equipments), equipments);
-    assert.deepEqual(items.map((i) => [i.eq_id, i.kind, i.action && i.action.key]), [[1, 'blocked', 'publish_anyway'], [2, 'blocked', 'generic_types']]);
+    assert.deepEqual(items.map((i) => [i.eq_id, i.kind, i.action && i.action.key, i.code]), [[1, 'blocked', 'publish_anyway', 'ambiguous_skipped'], [2, 'blocked', 'generic_types', 'no_generic_type_configured']]);
     assert.equal(items[0].text, O.causeSentence(L.causeSheet('ambiguous_skipped').quoi));
     assert.equal(O.causeSentence('Non publié : le nom dit « lampe ».'), 'Le nom dit « lampe ».');
   });
 });
 
 describe('Lot 7 / E2 — légende, titre, phrase d’accueil', () => {
-  maybe('« Que veulent dire ces mots ? » : repliée, aria-expanded, six états (mots de 25.1) puis Pilotable / Lecture seule / Conseil', () => {
+  // Garde levée (front v3, Lot 1, P1 / P9) : la légende « Que veulent dire ces mots ? », le titre et les deux phrases
+  // d'accueil sont retirés. Chaque mot d'état a sa définition en info-bulle sur sa puce ; le lien « Aide » devient l'icône
+  // `fa-question-circle` de la barre d'état.
+  maybe('ni légende, ni titre, ni phrase d’accueil ; le lien « Aide » reste (icône de la barre d’état)', () => {
     const ui = start();
-    const toggle = ui.$('#j2ha_v2_legend .j2ha-v2-legend-toggle');
-    assert.equal(plain(toggle.text()), 'Que veulent dire ces mots ?');
-    assert.equal(toggle.attr('aria-expanded'), 'false');
-    assert.equal(ui.$('#j2ha_v2_legendList').list[0].visible, false);
-    ui.click('#j2ha_v2_legend .j2ha-v2-legend-toggle');
-    assert.equal(toggle.attr('aria-expanded'), 'true');
-    assert.equal(ui.$('#j2ha_v2_legendList').list[0].visible, true);
-    const terms = ui.$('#j2ha_v2_legendList dt').list.map((dt) => plain(ui.$(dt).text()).trim());
-    assert.deepEqual(terms, [...['published', 'to_apply', 'blocked', 'excluded', 'disabled', 'nothing_to_publish'].map((s) => M.EQUIPMENT_STATE_LABELS[s]), 'Pilotable', 'Lecture seule', 'Conseil']);
-    ui.click('#j2ha_v2_legend .j2ha-v2-legend-toggle');
-    assert.equal(toggle.attr('aria-expanded'), 'false');
-  });
-
-  maybe('titre « Ce que Jeedom publie dans Home Assistant » et phrase d’accueil, sans perdre le lien « Aide »', () => {
-    const ui = start();
-    assert.equal(ui.text('#j2ha_mainView legend'), 'Ce que Jeedom publie dans Home Assistant');
-    assert.equal(ui.text('#j2ha_mainView .j2ha-v2-welcome'), 'jeedom2ha publie vos équipements Jeedom dans Home Assistant. Jeedom reste la source : rien n\'y est modifié.');
-    assert.equal(ui.$('#j2ha_mainView .j2ha-help-line a').length, 1, 'le lien « Aide » reste');
-    ui.page.render();
-    assert.equal(ui.$('#j2ha_mainView .j2ha-v2-welcome').length, 1, 'posée une seule fois');
+    assert.equal(ui.$('#j2ha_v2_legend').length, 0);
+    assert.equal(ui.$('#j2ha_mainView legend').length, 0);
+    assert.equal(ui.$('#j2ha_mainView .j2ha-v2-welcome').length, 0);
+    assert.doesNotMatch(ui.text('#j2ha_mainView'), /Que veulent dire|jeedom2ha publie vos équipements|Choisissez une pièce/);
+    assert.equal(ui.$('.j2ha-v3-help').length, 1, 'le lien « Aide » reste');
+    assert.equal(plain(ui.$('.j2ha-v3-help').attr('aria-label')), 'Aide');
   });
 });
 
 describe('Lot 7 / E2 — scénarios (status.publication, Lot 3)', () => {
-  maybe('mention « + N scénarios publiés comme boutons » si le démon fournit le nombre ; rien sinon ; suit la relecture de l’état', () => {
+  // Garde levée (front v3, Lot 1) : la mention « + N scénarios publiés comme boutons » devient l'onglet « Scénarios N »
+  // (même nombre, `status.publication.scenarios_published`) ; son contenu (#j2ha_tab_scenarios) est rempli par le Lot 4b.
+  maybe('onglet « Scénarios N » si le démon fournit le nombre ; sans nombre sinon ; suit la relecture de l’état', () => {
     const without = start();
-    assert.doesNotMatch(without.text('#j2ha_houseMeta'), /scénario/);
+    assert.equal(without.text('#j2ha_tabScenariosCount'), '');
     const ui = start({ status: { publication: { equipments_published: 9, entities_published: 20, scenarios_published: 12 } } });
-    assert.match(ui.text('#j2ha_houseMeta'), / · \+ 12 scénarios publiés comme boutons$/);
+    assert.equal(ui.text('#j2ha_tabScenariosCount'), '12');
     ui.setStatus({ publication: { scenarios_published: 1 } });
     ui.page.statusChanged();
-    assert.match(ui.text('#j2ha_houseMeta'), / · \+ 1 scénario publié comme bouton$/);
+    assert.equal(ui.text('#j2ha_tabScenariosCount'), '1');
     ui.setStatus({ publication: null });
     ui.page.statusChanged();
-    assert.doesNotMatch(ui.text('#j2ha_houseMeta'), /scénario/);
+    assert.equal(ui.text('#j2ha_tabScenariosCount'), '');
+    assert.equal(ui.$('#j2ha_tab_scenarios').length, 1, 'conteneur stable de l’onglet');
   });
 
-  it('scenarioMention : nombre absent, nul, non numérique → aucune mention', () => {
-    for (const status of [null, {}, { publication: null }, { publication: {} }, { publication: { scenarios_published: 0 } }, { publication: { scenarios_published: '3' } }]) {
-      assert.equal(O.scenarioMention(status), '', JSON.stringify(status));
+  it('scenarioCount : nombre absent, négatif ou non numérique → inconnu (null)', () => {
+    for (const status of [null, {}, { publication: null }, { publication: {} }, { publication: { scenarios_published: -1 } }, { publication: { scenarios_published: '3' } }]) {
+      assert.equal(O.scenarioCount(status), null, JSON.stringify(status));
     }
-    assert.equal(plain(O.scenarioMention({ publication: { scenarios_published: 2 } })), '+ 2 scénarios publiés comme boutons');
+    assert.equal(O.scenarioCount({ publication: { scenarios_published: 0 } }), 0);
+    assert.equal(O.scenarioCount({ publication: { scenarios_published: 2 } }), 2);
   });
 });
 
@@ -229,9 +234,10 @@ describe('Lot 7 — conseils : seulement si le nombre est connu sans requête de
     assert.equal(published.state, 'published');
     assert.equal(overview.advice, 1);
     assert.equal(ui.text('#j2ha_houseChips .j2ha-chip-filter[data-filter="advice"]'), '1 conseil');
-    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="advice"]');
-    assert.deepEqual(ui.$('#j2ha_filterList .j2ha-frow-btn').list.map((b) => plain(ui.$(b).find('.j2ha-frow-name').text())), ['Eq 101']);
     const kinds = ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').list.map((row) => row.attrs['data-kind']);
+    // Garde levée (front v3, Lot 1) : la puce « Conseils » montre la liste « À faire » réduite aux conseils.
+    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="advice"]');
+    assert.deepEqual(ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').list.map((r) => plain(ui.$(r).find('.j2ha-v3-todo-name').text())), ['Eq 101']);
     assert.equal(kinds[kinds.length - 1], 'advice');
     assert.ok(kinds.indexOf('advice') > kinds.lastIndexOf('blocked'));
   });

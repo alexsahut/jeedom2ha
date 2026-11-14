@@ -9,8 +9,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { withRealView, CORE_CSS } = require('./helpers/workview_browser');
 
-const ICON = '#j2ha_roomCards .objectDisplayCard i.j2ha-room-icon';
-const iconPx = (page) => page.evaluate((sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize), ICON);
+// Garde levée (front v3, Lot 1) : la carte de pièce ne porte plus `objectDisplayCard` (cible §1 : le cœur la figerait à
+// 130 px, overflow:hidden, icône à 38 px). La règle témoin du cœur devient `.btn { height: 32px }` (bouton « Relire Jeedom »).
+const RESCAN = '#bt_rescanTopology';
+const rescanPx = (page) => page.evaluate((sel) => parseFloat(getComputedStyle(document.querySelector(sel)).height), RESCAN);
 
 test('harnais — par défaut, le CSS du cœur est chargé AVANT celui du plugin', async (t) => {
   await withRealView(t, {}, async (page) => {
@@ -18,25 +20,31 @@ test('harnais — par défaut, le CSS du cœur est chargé AVANT celui du plugin
     const core = css.indexOf(CORE_CSS);
     assert.equal(core, 0, 'l\'extrait du cœur ouvre la feuille');
     assert.ok(css.indexOf('.j2ha-', CORE_CSS.length) > 0, 'le CSS du plugin suit');
-    // Règle connue du cœur (`.objectDisplayCard i { font-size: 38px !important }`) : elle l'emporte sur les 22 px du plugin.
-    assert.equal(await iconPx(page), 38);
+    // Front v3 (Lot 1) : les deux feuilles du plugin, dans l'ordre de la page.
+    assert.ok(css.indexOf('.j2ha-v2-') > css.indexOf('.j2ha-health-bar'), 'jeedom2ha.css puis jeedom2ha_v2.css');
+    assert.equal(await rescanPx(page), 32, 'règle `.btn` du cœur');
   });
 });
 
-test('harnais — une icône de carte mesure 38 px avec le seul CSS du cœur (sans le CSS du plugin)', async (t) => {
+test('harnais — la tuile de pièce échappe aux règles *DisplayCard du cœur (seul le CSS du cœur chargé)', async (t) => {
   await withRealView(t, { css: '', coreCss: true }, async (page) => {
-    assert.equal(await iconPx(page), 38);
-    const h = await page.evaluate(() => getComputedStyle(document.querySelector('#j2ha_roomCards .objectDisplayCard')).height);
-    assert.equal(h, '130px', 'carte figée à 130 px par le cœur');
+    assert.equal(await rescanPx(page), 32);
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('#j2ha_roomCards .j2ha-room-card');
+      return { cls: card.className, h: getComputedStyle(card).height, icon: getComputedStyle(card.querySelector('.j2ha-room-icon')).fontSize };
+    });
+    assert.doesNotMatch(r.cls, /DisplayCard/);
+    assert.notEqual(r.h, '130px', 'pas figée à 130 px par le cœur');
+    assert.notEqual(r.icon, '38px', 'icône non agrandie par le cœur');
   });
 });
 
 test('harnais — `coreCss: false` retire le cœur ; un `css` fourni sans `coreCss` ne le charge pas', async (t) => {
   await withRealView(t, { coreCss: false }, async (page) => {
-    assert.equal(await iconPx(page), 22, 'taille du plugin seule');
+    assert.notEqual(await rescanPx(page), 32, 'sans la règle du cœur');
   });
   await withRealView(t, { css: '' }, async (page) => {
-    assert.notEqual(await iconPx(page), 38);
+    assert.notEqual(await rescanPx(page), 32);
   });
 });
 
@@ -66,18 +74,26 @@ test('harnais — bootbox factice fidèle : `.modal-footer`, `bootbox-accept` / 
   });
 });
 
-// Défaut révélé par le CSS du cœur, corrigé dans desktop/css/jeedom2ha.css : la règle du cœur
-// `div[class*="ListContainer"]:not(.batteryListContainer):not(.alertListContainer) div { border: none !important; }` efface,
-// dans desktop/css/jeedom2ha.css, le filet de couleur de pièce (`.j2ha-room-groups .j2ha-room-card { border-top: 3px … }`)
-// et le liseré orange des pièces bloquées (`.j2ha-room-card.j2ha-room-blocked { border-left: 4px … }`).
-test('filet de couleur et liseré « bloqué » des cartes de pièce visibles avec le CSS du cœur', async (t) => {
+// Front v3 (Lot 1, garde levée) : la tuile 220 × 72 remplace la carte du cœur. Avec le CSS du cœur chargé, elle garde sa taille,
+// son icône de 20 px et son liseré de 4 px collé au bas ; une pièce bloquée le dit par sa marque ⚠ (plus de liseré gauche).
+test('tuile de pièce 220 × 72 avec le CSS du cœur : icône 20 px, liseré de 4 px au bas, marque ⚠ si bloquée', async (t) => {
   await withRealView(t, {}, async (page) => {
     const r = await page.evaluate(() => {
       const card = document.querySelector('.j2ha-room-groups .j2ha-room-card');
       const blocked = document.querySelector('.j2ha-room-groups .j2ha-room-card.j2ha-room-blocked');
-      return { top: getComputedStyle(card).borderTopWidth, left: blocked ? getComputedStyle(blocked).borderLeftWidth : null };
+      const box = card.getBoundingClientRect();
+      const stripe = card.querySelector('.j2ha-gauge-card').getBoundingClientRect();
+      return {
+        w: box.width, h: box.height, icon: getComputedStyle(card.querySelector('.j2ha-room-icon')).fontSize,
+        stripeH: stripe.height, stripeBottom: Math.round(box.bottom - stripe.bottom),
+        warn: blocked ? blocked.querySelectorAll('.j2ha-mark-blocked .fa-exclamation-triangle').length : null,
+      };
     });
-    assert.equal(r.top, '3px', 'filet de couleur de pièce');
-    assert.equal(r.left, '4px', 'liseré orange de la pièce bloquée');
+    assert.equal(r.w, 220);
+    assert.equal(r.h, 72);
+    assert.equal(r.icon, '20px');
+    assert.equal(r.stripeH, 4);
+    assert.ok(r.stripeBottom <= 1, 'liseré collé au bas de la tuile');
+    assert.equal(r.warn, 1, 'marque ⚠ de la pièce bloquée');
   });
 });

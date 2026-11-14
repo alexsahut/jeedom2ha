@@ -66,7 +66,8 @@ test('25.6 gate réel — le parcours adapté passe sur la page livrée et enreg
 // Gate sur la box après 25.8 (2026-10-19) : la première carte était une pièce exclue (« Pièce exclue » à la place du ratio,
 // `.j2ha-wv-excluded` dans l'arbre) et l'étape 2 échouait (`portee-piece-seule`) alors que la carte et l'arbre concordaient.
 test('25.6/25.8 gate — l\'arbre lit « Pièce exclue » quand une pièce n\'a pas de ratio (comparaison carte ↔ arbre)', () => {
-  const readers = source.match(/ratio: \(\(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-ratio'\)\?\.textContent \?\? ''\) \|\| \(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-excluded'\)\?\.textContent \?\? ''\)\)\.trim\(\),/g) || [];
+  // Front v3 (Lot 1, garde levée) : les espaces sont ignorés (la tuile écrit « n/t », l'arbre « n / t »).
+  const readers = source.match(/ratio: \(\(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-ratio'\)\?\.textContent \?\? ''\) \|\| \(room\.querySelector\(':scope > \.j2ha-wv-row \.j2ha-wv-excluded'\)\?\.textContent \?\? ''\)\)\.replace\(\/\\s\+\/g, ''\)\.trim\(\),/g) || [];
   assert.equal(readers.length, 2, 'les deux lectures d\'arbre (portée pièce et élargissement) se replient sur « Pièce exclue »');
 });
 

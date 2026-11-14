@@ -27,7 +27,8 @@ describe('25.6 / AC1 — depuis une carte : cette pièce seule', () => {
     assert.equal(room.attr('aria-expanded'), 'true');
     assert.equal(room.attr('aria-selected'), 'true');
     assert.equal(ui.$('.j2ha-wv-tree .j2ha-wv-group').length, 0, 'aucun sous-titre de groupe');
-    assert.equal(plain(ui.$('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-ratio').text()).trim(), ratio);
+    // Front v3 (Lot 1, garde levée) : la tuile écrit « n/t », l'arbre « n / t » : comparés sans les espaces.
+    assert.equal(plain(ui.$('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-ratio').text()).replace(/\s+/g, ''), ratio.replace(/\s+/g, ''));
     assert.equal(ui.$('.j2ha-wv-tree [role=treeitem][aria-level="1"]').length, 1, 'un seul treeitem de niveau 1');
   });
 
@@ -42,8 +43,8 @@ describe('25.6 / AC1 — depuis une carte : cette pièce seule', () => {
 
 // Garde levée (front v2, Lot 7, spec E2) : la puce et le segment de la jauge filtrent SUR PLACE (la vue ne s'ouvre plus) ;
 // la ligne de la liste filtrée ouvre la vue en portée « toutes », la bascule montrant « Toute la maison » enfoncé.
-describe('25.6 / AC2, Q2 — depuis une ligne de la liste filtrée : toutes les pièces', () => {
-  maybe('puce et segment : filtre sur place, vue fermée ; ligne de la liste filtrée : portée « toutes » et arbre complet', () => {
+describe('25.6 / AC2, Q2 — depuis une ligne de la liste « À faire » : toutes les pièces', () => {
+  maybe('puce et segment : filtre sur place, vue fermée ; ligne « À faire » : portée « toutes » et arbre complet', () => {
     for (const filterOnPage of [
       (ui) => ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'),
       (ui) => ui.click('#j2ha_houseGauge .j2ha-seg-published'),
@@ -52,11 +53,12 @@ describe('25.6 / AC2, Q2 — depuis une ligne de la liste filtrée : toutes les 
       filterOnPage(ui);
       assert.equal(ui.isOpen(), false);
       assert.equal(ui.page.filter(), 'published');
-      assert.ok(ui.$('#j2ha_filterList .j2ha-frow').length > 0, 'la liste est affichée sur la page');
+      // Garde levée (front v3, Lot 1, P8) : la puce filtre la grille (tuiles à 0 masquées) ; plus de liste filtrée.
+      assert.ok(ui.$('#j2ha_roomCards .j2ha-room-card').list.some((c) => !c.props.hidden), 'la grille filtrée est affichée sur la page');
     }
     const ui = startBig({ rooms: 5, equipments: 40, seed: 4 });
-    ui.page.setFilter('published');
-    ui.click('#j2ha_filterList .j2ha-frow-btn');
+    ui.page.setFilter('blocked');
+    ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
     assert.equal(ui.isOpen(), true);
     assert.equal(scope(ui), 'toutes');
     assert.equal(ui.$('.j2ha-wv-widen').attr('aria-pressed'), 'true', '« Toute la maison » enfoncé');

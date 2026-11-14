@@ -477,3 +477,341 @@
 .j2ha-v2-room-inactive { font-size: 12px; margin: -2px 0 3px 0; }
 .j2ha-v2-wv-inactive { font-size: 12px; margin-left: 6px; white-space: nowrap; }
 .j2ha-v2-excl-names { flex-basis: 100%; padding-left: 28px; }
+
+/* Front v3 — Lot 1 : page maison sans phrase. Barre d'état en pastilles, onglets, « n / m publiés » et liseré de 6 px,
+   puces-boutons qui filtrent la grille, une seule liste « À faire », tuiles de pièce 220 × 72 avec liseré de 4 px.
+   Variables --j2ha-* seulement (définies pour les deux thèmes dans jeedom2ha.css). */
+.j2ha-v3-apply[hidden],
+.j2ha-v3-tabpanel[hidden],
+#j2ha_roomCards.j2ha-v3-grid[hidden],
+#j2ha_roomCards .j2ha-v3-group[hidden],
+#j2ha_roomCards .j2ha-v3-tile[hidden] {
+  display: none !important;
+}
+
+/* --- Barre d'état --- */
+#div_bridgeHealthBanner.j2ha-v3-status {
+  margin: 6px 0 0 0;
+  padding: 6px 0;
+  min-height: 44px;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-v3-status .j2ha-health-items { gap: 6px 18px; }
+.j2ha-v3-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--txt-color, var(--j2ha-text));
+  cursor: default;
+}
+.j2ha-v3-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background-color: var(--j2ha-neutral);
+  flex: 0 0 auto;
+}
+.j2ha-v3-pill[data-level="ok"] .j2ha-v3-dot { background-color: var(--j2ha-ok); }
+.j2ha-v3-pill[data-level="warn"] .j2ha-v3-dot { background-color: var(--j2ha-warn); }
+.j2ha-v3-pill[data-level="danger"] .j2ha-v3-dot { background-color: var(--j2ha-danger); }
+.j2ha-v3-pill[data-level="danger"] { color: var(--j2ha-danger); }
+.j2ha-v3-pill[data-level="warn"] { color: var(--j2ha-warn); }
+.j2ha-v3-pill[data-level="unknown"] .j2ha-v3-dot {
+  background-color: transparent;
+  border: 2px solid var(--j2ha-neutral);
+  width: 9px;
+  height: 9px;
+}
+.j2ha-v3-pill-q { font-weight: 400; color: var(--j2ha-neutral); }
+.j2ha-v3-pill[data-level="ok"] .j2ha-v3-pill-q { display: none; }
+.j2ha-v3-relu { font-weight: 400; color: var(--j2ha-neutral); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.j2ha-v3-verdict:empty { display: none; }
+.j2ha-v3-verdict { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.j2ha-v3-verdict[data-kind="ok"] { color: var(--j2ha-ok); font-weight: 600; }
+.j2ha-v3-verdict[data-kind="unverified"] { color: var(--j2ha-neutral); }
+.j2ha-v3-verdict-q {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--j2ha-neutral);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.j2ha-v3-status .j2ha-health-actions { gap: 6px; flex-wrap: wrap; }
+#div_bridgeHealthBanner .btn.j2ha-v3-apply:not(.cmdName) {
+  background-color: var(--j2ha-todo) !important;
+  color: var(--j2ha-menu-bg) !important;
+  border-color: var(--j2ha-todo);
+  font-weight: 600;
+}
+#div_bridgeHealthBanner .btn.j2ha-v3-apply:not(.cmdName):disabled { opacity: 0.55; }
+.j2ha-v3-apply-count { font-variant-numeric: tabular-nums; }
+.btn.j2ha-v3-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 30px; text-decoration: none; }
+.j2ha-v3-house .btn.j2ha-v3-icon-btn { min-width: 26px; height: 24px; }
+.j2ha-v3-status .j2ha-menu { width: max-content; }
+.j2ha-v3-status .j2ha-menu-item { white-space: nowrap; }
+.j2ha-v3-status .j2ha-menu-item i { width: 16px; text-align: center; }
+
+/* --- Onglets Équipements / Scénarios --- */
+.nav.j2ha-v3-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 0 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.nav.j2ha-v3-tabs > li { margin-bottom: -1px; }
+.j2ha-v3-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: var(--j2ha-neutral);
+  background: transparent;
+  border: 0;
+  border-radius: var(--border-radius, 4px) var(--border-radius, 4px) 0 0;
+  cursor: pointer;
+}
+.j2ha-v3-tab[aria-selected="true"] {
+  color: var(--txt-color, var(--j2ha-text));
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--j2ha-todo);
+}
+.j2ha-v3-tab:focus-visible { outline: 2px solid var(--j2ha-todo); outline-offset: 2px; }
+.j2ha-v3-tab-n:empty { display: none; }
+.j2ha-v3-tab-n {
+  font-size: 11px;
+  font-weight: 400;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--j2ha-surface-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Bloc maison : chiffre, liseré de 6 px, puces --- */
+.j2ha-house.j2ha-v3-house { margin: 18px 0 6px 0; padding: 0; background: transparent; }
+.j2ha-v3-house .j2ha-house-main { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.j2ha-v3-house .j2ha-house-number { font-size: 26px; font-weight: 600; line-height: 1; }
+.j2ha-v3-house .j2ha-house-sub { margin-left: 0; font-size: 15px; color: var(--j2ha-neutral); }
+.j2ha-v3-house #bt_refreshStates { align-self: center; color: var(--j2ha-neutral); }
+.j2ha-v3-house .j2ha-gauge {
+  height: 6px;
+  gap: 2px;
+  border-radius: 3px;
+  background-color: transparent;
+}
+.j2ha-v3-house .j2ha-gauge.j2ha-gauge-neutral { height: 6px; background-color: var(--j2ha-neutral-bg); }
+.j2ha-v3-house .j2ha-gauge .j2ha-seg { border-radius: 0; }
+.j2ha-v3-chipbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 10px 0 14px 0; }
+.j2ha-v3-chipbar .j2ha-chips { margin: 0; }
+.j2ha-v3-chipbar .j2ha-v3-choose { margin-left: auto; }
+.j2ha-chip-filter.j2ha-v3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-weight: 400;
+  background-color: transparent;
+  border: 1px solid var(--j2ha-line);
+  cursor: pointer;
+}
+.j2ha-chip-filter.j2ha-v3-chip:hover { background-color: var(--j2ha-surface); }
+.j2ha-chip-filter.j2ha-v3-chip[aria-pressed="true"] {
+  font-weight: 400;
+  background-color: var(--j2ha-surface-strong);
+  border-color: currentColor;
+}
+.j2ha-v3-chip-n { font-weight: 600; }
+.j2ha-chip-filter-published.j2ha-v3-chip { color: var(--j2ha-ok); }
+.j2ha-chip-filter-to_apply.j2ha-v3-chip,
+.j2ha-chip-filter-advice.j2ha-v3-chip { color: var(--j2ha-todo); }
+.j2ha-chip-filter-blocked.j2ha-v3-chip { color: var(--j2ha-warn); }
+.j2ha-chip-filter-other.j2ha-v3-chip,
+.j2ha-chip-filter-unread.j2ha-v3-chip { color: var(--j2ha-neutral); }
+.j2ha-v3-house .j2ha-read-status:empty { display: none; }
+
+/* --- Liste « À faire » : une ligne de 40 px par équipement --- */
+#j2ha_v2_todo.j2ha-v2-todo { margin: 0 0 18px 0; padding: 0; border: 0; background: transparent; }
+#j2ha_v2_todo .j2ha-v2-todo-head { align-items: center; gap: 8px; margin-bottom: 8px; }
+#j2ha_v2_todo .j2ha-v2-todo-title { font-size: 15px; font-weight: 600; }
+.j2ha-v3-todo-n { font-size: 12px; color: var(--j2ha-neutral); font-variant-numeric: tabular-nums; }
+.j2ha-v3-todo-list { border-top: 1px solid var(--j2ha-line); }
+#j2ha_v2_todo .j2ha-v3-todo-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(120px, 220px) minmax(80px, 140px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  margin: 0;
+  padding: 4px 10px 4px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--j2ha-line);
+  border-radius: 0;
+  background: transparent;
+}
+#j2ha_v2_todo .j2ha-v3-todo-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background-color: var(--j2ha-warn);
+}
+#j2ha_v2_todo .j2ha-v3-todo-row.is-tip::before { background-color: var(--j2ha-todo); }
+#j2ha_v2_todo .j2ha-v3-todo-row:hover { background-color: var(--j2ha-surface); }
+.j2ha-v3-todo-row.is-warn .j2ha-v3-todo-icon { color: var(--j2ha-warn); }
+.j2ha-v3-todo-row.is-tip .j2ha-v3-todo-icon { color: var(--j2ha-todo); }
+.j2ha-v3-todo-name,
+.j2ha-v3-todo-room,
+.j2ha-v3-todo-cause { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.j2ha-v3-todo-name { font-weight: 600; }
+.j2ha-v3-todo-open { padding: 0; text-align: left; color: inherit; background: transparent; border: 0; cursor: pointer; }
+.j2ha-v3-todo-open:hover,
+.j2ha-v3-todo-open:focus-visible { text-decoration: underline; }
+.j2ha-v3-todo-room { color: var(--j2ha-neutral); }
+.j2ha-v3-todo-cause { color: var(--txt-color, var(--j2ha-text)); }
+.j2ha-v3-todo-row .j2ha-v2-todo-action { justify-self: end; white-space: nowrap; text-decoration: none; }
+.j2ha-v2-link.j2ha-v3-todo-more { background: transparent; border: 0; padding: 0; margin-top: 6px; min-height: 28px; }
+
+/* --- Tuiles de pièce : 220 × 72, liseré de 4 px collé au bas, menu ⋯ au survol --- */
+#j2ha_roomCards .j2ha-v3-group .j2ha-room-group-title {
+  margin: 18px 0 8px 0;
+  padding-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--j2ha-neutral);
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-v3-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+#j2ha_roomCards .j2ha-v3-group + .j2ha-v3-group > .j2ha-v3-tiles:first-child { margin-top: 8px; }
+#j2ha_roomCards .j2ha-room-card.j2ha-v3-tile {
+  position: relative;
+  box-sizing: border-box;
+  width: 220px;
+  height: 72px;
+  margin: 0;
+  padding: 10px 12px 12px 12px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 6px;
+  align-content: start;
+  align-items: center;
+  overflow: hidden;
+  text-align: left;
+  background-color: var(--j2ha-surface);
+  border: 1px solid var(--j2ha-line);
+  border-radius: var(--border-radius, 4px);
+}
+#j2ha_roomCards .j2ha-room-card.j2ha-v3-tile:hover { background-color: var(--j2ha-surface-strong); }
+#j2ha_roomCards .j2ha-room-card.j2ha-v3-tile.j2ha-room-blocked { border-left: 1px solid var(--j2ha-line); }
+#j2ha_roomCards .j2ha-v3-tile .j2ha-room-icon {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: start;
+  margin: 1px 0 0 0;
+  font-size: 20px;
+  line-height: 1;
+}
+#j2ha_roomCards .j2ha-v3-tile .j2ha-v3-tile-name {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+}
+#j2ha_roomCards .j2ha-v3-tile .j2ha-v3-tile-ratio {
+  grid-column: 3;
+  grid-row: 1;
+  color: var(--j2ha-neutral);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.1s;
+}
+#j2ha_roomCards .j2ha-v3-tile .j2ha-v3-tile-ratio .j2ha-room-ratio { font-size: 13px; margin: 0; }
+#j2ha_roomCards .j2ha-v3-tile .j2ha-room-state { display: contents; }
+#j2ha_roomCards .j2ha-v3-tile .j2ha-v3-marks {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 16px;
+  margin: 0;
+  font-size: 12px;
+}
+.j2ha-v3-marks .j2ha-v3-mark { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-weight: 400; font-variant-numeric: tabular-nums; }
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-blocked { color: var(--j2ha-warn); }
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-to_apply,
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-room-notyet { color: var(--j2ha-todo); }
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-unread,
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-room-homekit-kept { color: var(--j2ha-neutral); }
+#j2ha_roomCards .j2ha-v3-tile .j2ha-gauge.j2ha-gauge-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  gap: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+#j2ha_roomCards .j2ha-v3-tile .j2ha-gauge-card .j2ha-seg { border-radius: 0; }
+#j2ha_roomCards .j2ha-room-card.j2ha-v3-tile.j2ha-room-excluded { opacity: 0.6; }
+#j2ha_roomCards .j2ha-v3-tile.j2ha-v3-tile-none { border-style: dashed; background-color: transparent; }
+#j2ha_roomCards .j2ha-v3-tile.j2ha-v3-tile-none .j2ha-room-icon { color: var(--j2ha-neutral); }
+/* Menu ⋯ : en haut à droite, visible au survol, au focus ou ouvert (il prend alors la place du ratio). */
+#j2ha_roomCards .j2ha-v3-tile .j2ha-room-menu { top: 0; right: 0; opacity: 0; }
+#j2ha_roomCards .j2ha-v3-tile:hover .j2ha-room-menu,
+#j2ha_roomCards .j2ha-v3-tile:focus-within .j2ha-room-menu,
+#j2ha_roomCards .j2ha-v3-tile.j2ha-room-menu-shown .j2ha-room-menu { opacity: 1; }
+#j2ha_roomCards .j2ha-v3-tile:hover .j2ha-v3-tile-ratio,
+#j2ha_roomCards .j2ha-v3-tile:focus-within .j2ha-v3-tile-ratio,
+#j2ha_roomCards .j2ha-v3-tile.j2ha-room-menu-shown .j2ha-v3-tile-ratio { opacity: 0; }
+#j2ha_roomCards .j2ha-v3-tile.j2ha-room-has-menu.j2ha-room-menu-shown { overflow: visible; -webkit-clip-path: none; clip-path: none; }
+@media (hover: none) {
+  #j2ha_roomCards .j2ha-v3-tile .j2ha-room-menu { opacity: 1; }
+  #j2ha_roomCards .j2ha-v3-tile .j2ha-v3-tile-ratio { margin-right: 32px; }
+}
+
+/* --- Étroit : la liste « À faire » passe sur deux colonnes, la barre se replie --- */
+@media (max-width: 767px) {
+  #j2ha_v2_todo .j2ha-v3-todo-row { grid-template-columns: 18px minmax(100px, 180px) minmax(0, 1fr) auto; }
+  #j2ha_v2_todo .j2ha-v3-todo-row .j2ha-v3-todo-room { display: none; }
+  .j2ha-v3-chipbar .j2ha-v3-choose { margin-left: 0; }
+  #j2ha_roomCards .j2ha-room-card.j2ha-v3-tile { width: calc(50% - 4px); min-width: 150px; }
+}
+@media (max-width: 519px) {
+  #j2ha_v2_todo .j2ha-v3-todo-row { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  #j2ha_v2_todo .j2ha-v3-todo-row .j2ha-v3-todo-cause { display: none; }
+  #j2ha_roomCards .j2ha-room-card.j2ha-v3-tile { width: 100%; }
+}
+/* Texte lu par les lecteurs d'écran seulement (le mot d'une marque chiffrée). */
+.j2ha-v3-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-excluded,
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-disabled,
+.j2ha-v3-marks .j2ha-v3-mark.j2ha-mark-nothing_to_publish { color: var(--j2ha-neutral); }

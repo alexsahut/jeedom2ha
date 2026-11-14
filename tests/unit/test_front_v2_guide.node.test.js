@@ -615,54 +615,72 @@ describe('Lot 9a — « Je l’ai vu » mémorisé, causes repliées, guide rouv
 describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', () => {
   const src = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
 
+  // Garde levée (front v3, Lot 1) : barre d'état en pastilles « point + mot » (détail en info-bulle et nom accessible),
+  // « Relu HH:MM » (date et résultat en info-bulle), « Dernière opération » seulement si elle a échoué.
   function bar() {
     const ui = createUi([]);
     ui.sandbox.Jeedom2haGuide = G;
-    ui.dom.add('<div class="j2ha-health-item"><strong>Dernière relecture</strong><span id="span_healthSync"></span></div>');
-    ui.dom.add('<div class="j2ha-health-item" id="div_op"><strong>Dernière opération</strong><span id="span_healthOp"></span><span id="span_healthOpMsg"></span></div>');
-    ui.dom.add('<div id="div_healthHa" class="j2ha-health-item" style="display:none;"><strong>Home Assistant</strong><span id="span_healthHa"></span></div>');
+    ui.dom.add('<span class="j2ha-health-item"><span id="span_healthSync" class="j2ha-v3-relu"></span></span>');
+    ui.dom.add('<span class="j2ha-health-item" id="div_op" style="display:none;"><span id="span_healthOp" class="j2ha-v3-pill" data-word="" data-level="warn"><span class="j2ha-v3-pill-word"></span></span><span id="span_healthOpMsg"></span></span>');
+    ui.dom.add('<span id="div_healthHa" class="j2ha-health-item" style="display:none;"><span id="span_healthHa" class="j2ha-v3-pill" data-word="Home Assistant" data-level="unknown">Home Assistant</span></span>');
     return ui;
   }
 
-  it('relecture fusionnée : « 13/11 23:06 · Réussie », « Dernière opération » masquée ; item Home Assistant affiché', () => {
+  it('« Relu HH:MM » (date complète et résultat en info-bulle) ; « Dernière opération » masquée si réussie ; pastille Home Assistant verte', () => {
     const ui = bar();
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, SYNCED, { derniere_synchro_terminee: '2026-11-13T23:06:00', ha: { birth_seen_at: '2026-11-13T21:04:00' } }) });
-    assert.equal(plain(ui.$('#span_healthSync').text()), '13/11 23:06 · Réussie');
+    assert.equal(plain(ui.$('#span_healthSync').text()), 'Relu le 13/11');
+    assert.equal(plain(ui.$('#span_healthSync').attr('title')), 'Dernière relecture : 13/11 23:06 · Réussie');
     assert.equal(ui.$('#div_op').list[0].visible, false);
-    assert.equal(plain(ui.$('#span_healthOpMsg').text()), 'Relecture terminée.');
     assert.equal(ui.$('#div_healthHa').list[0].visible, true);
-    assert.equal(plain(ui.$('#span_healthHa').text()), 'Vu le 13/11 à 21:04');
-    assert.ok(ui.$('#span_healthHa').hasClass('label-success'));
+    assert.equal(plain(ui.$('#span_healthHa').text()), 'Home Assistant', 'le mot ne change pas');
+    assert.equal(ui.$('#span_healthHa').attr('data-level'), 'ok');
+    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : Vu le 13/11 à 21:04');
+    assert.equal(plain(ui.$('#span_healthHa').attr('aria-label')), 'Home Assistant : Vu le 13/11 à 21:04');
     assert.equal(ui.sandbox.window.jeedom2haBridgeInflight, false, 'lecture terminée');
   });
 
-  it('sans champ ha (démon avant Lot 3) : item masqué ; démon arrêté : item masqué, « Dernière opération » visible', () => {
+  it('« Dernière opération » : pastille ambre seulement si elle a échoué (jamais rouge), message du démon en info-bulle', () => {
+    const ui = bar();
+    ui.sandbox.refreshBridgeStatus();
+    ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'partiel', intention: 'sync', message: 'Synchronisation terminée avec avertissements.' } }) });
+    assert.equal(ui.$('#div_op').list[0].visible, true);
+    assert.equal(plain(ui.$('#span_healthOp .j2ha-v3-pill-word').text()), 'Relecture partielle');
+    assert.equal(ui.$('#span_healthOp').attr('data-level'), 'warn');
+    assert.equal(plain(ui.$('#span_healthOp').attr('title')), 'Relecture partielle : Relecture terminée avec avertissements.');
+    ui.sandbox.refreshBridgeStatus();
+    ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'echec', intention: 'publier', message: 'x' } }) });
+    assert.equal(plain(ui.$('#span_healthOp .j2ha-v3-pill-word').text()), 'Publication échouée');
+    ui.sandbox.refreshBridgeStatus();
+    ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'succes', intention: 'publier', message: 'ok' } }) });
+    assert.equal(ui.$('#div_op').list[0].visible, false);
+  });
+
+  it('sans champ ha (démon avant Lot 3) : pastille masquée ; démon arrêté : pastille masquée, « Relu » inconnu', () => {
     const ui = bar();
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'succes', intention: 'publier', message: 'ok' } }) });
     assert.equal(ui.$('#div_healthHa').list[0].visible, false);
-    assert.notEqual(ui.$('#div_op').list[0].visible, false);
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: { daemon: false, ha: { birth_seen_at: null } } });
     assert.equal(ui.$('#div_healthHa').list[0].visible, false);
-    assert.equal(ui.$('#div_op').list[0].visible, true);
+    assert.equal(plain(ui.$('#span_healthSync').text()), 'Relu : inconnu');
   });
 
-  it('Lot 9a : « Je l’ai vu » mémorisé → « Confirmé par vous » (vert pâle) au lieu de « Non confirmé »', () => {
+  it('Lot 9a : « Je l’ai vu » mémorisé → pastille verte « Confirmé par vous » au lieu de grise « ? Non confirmé »', () => {
     const ui = bar();
     const status = Object.assign({}, SYNCED, { ha: { birth_seen_at: null } });
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: status });
-    assert.equal(plain(ui.$('#span_healthHa').text()), 'Non confirmé');
-    assert.ok(ui.$('#span_healthHa').hasClass('label-default'));
+    assert.equal(ui.$('#span_healthHa').attr('data-level'), 'unknown');
+    assert.match(plain(ui.$('#span_healthHa').attr('title')), /^Home Assistant : Non confirmé — Home Assistant se signale sur le broker/);
     ui.sandbox.window.Jeedom2haGuideInstance = { onStatus() {}, haConfirmed: () => true };
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: status });
-    assert.equal(plain(ui.$('#span_healthHa').text()), 'Confirmé par vous');
-    assert.ok(ui.$('#span_healthHa').hasClass('j2ha-v2-ha-confirmed'));
-    assert.ok(!ui.$('#span_healthHa').hasClass('label-success'));
-    assert.match(plain(ui.$('#span_healthHa').attr('title')), /Vous avez indiqué que Home Assistant voit l'appareil/);
+    assert.equal(ui.$('#span_healthHa').attr('data-level'), 'ok');
+    assert.ok(ui.$('#span_healthHa').hasClass('j2ha-v3-pill-confirmed'));
+    assert.match(plain(ui.$('#span_healthHa').attr('title')), /^Home Assistant : Confirmé par vous — Vous avez indiqué que Home Assistant voit l'appareil/);
   });
 
   it('le guide reçoit chaque état du pont (et null en erreur)', () => {

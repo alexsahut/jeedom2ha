@@ -54,6 +54,7 @@ function panel(id, name, state, badgeState, badgeText, options) {
 const stateWord = (state, text) => `<span class="j2ha-wv-state"><span class="j2ha-state-word j2ha-state-${state}">${text}</span></span>`;
 const treeEq = (id, name, state, text) => `<li class="j2ha-wv-eq" data-eq-id="${id}"><div class="j2ha-wv-row">${stateWord(state, text)}<span class="j2ha-wv-name j2ha-free-name">${name}</span></div></li>`;
 
+// Front v3 (Lot 1) : la configuration s'ouvre par l'icône ⚙ de la barre d'état (plus de tuile « Gestion / Configuration »).
 function html(withDiagnosticAction, titlePrefix = '', options = {}) {
   const room25 = `<div class="j2ha-wv-roomhead"><h2 class="j2ha-wv-title" tabindex="-1">${titlePrefix}<span class="j2ha-free-name">Pièce 25</span></h2>
     <div class="j2ha-room-actions"><button class="j2ha-room-republish">Republier</button><span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-room-recreate">Supprimer de Home Assistant…</button></li></ul></span></div></div>
@@ -62,9 +63,8 @@ function html(withDiagnosticAction, titlePrefix = '', options = {}) {
     <div class="j2ha-wv-kpis">${counters([['published', '1 publié']])}</div>`;
   const panels = { 579: panel(579, 'Eq-579', 'j2ha-diag-ready', 'published', 'Publié', options), 514: panel(514, 'Eq', 'j2ha-diag-disabled', 'disabled', 'Désactivé'), 7: panel(7, 'Sans', 'j2ha-diag-ready', 'published', 'Publié') };
   return `<body><div class="row"><div class="eqLogicThumbnailDisplay">
-    <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
-    ${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
-    <div id="div_bridgeHealthBanner">Démon</div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
+    <div class="eqLogicThumbnailContainer">${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
+    <div id="div_bridgeHealthBanner">Démon<button class="eqLogicAction" data-action="gotoPluginConf" aria-label="Configuration"></button></div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
     <div id="j2ha_mainView"><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name">Sans pièce</span><span class="text-muted"> (1)</span></div>
     <div class="j2ha-room-card" data-object_id="25" id="piece-25"><span class="name j2ha-free-name">Pièce 25</span><span class="text-muted"> (2)</span></div></div></div>
     <div id="j2ha_workView" class="j2ha-wv" style="display:none"><div class="j2ha-wv-bar"><button class="j2ha-wv-back">Toutes les pièces</button></div>
@@ -161,7 +161,7 @@ test('20.3 gate simulé — une lecture de synthèse ou de diagnostic au chargem
 
 test('20.3 gate simulé — une chaîne interdite dans la page fait échouer le parcours', async (t) => {
   const parcours = await import(gate('parcours', 'decouverte-piece-25-eq-579.mjs'));
-  await withPage(t, html(false).replace('Configuration</div>', 'Mes templates</div>'), [], async (page, helpers) => {
+  await withPage(t, html(false).replace('<div id="div_bridgeHealthBanner">Démon', '<div id="div_bridgeHealthBanner">Mes templates'), [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-page/);
   });
 });

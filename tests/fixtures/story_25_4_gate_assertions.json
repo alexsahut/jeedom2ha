@@ -21,7 +21,7 @@
         "selecteur-5369-sans-explication",
         "etape ${label} : ${message}",
         "gestion-apres-surface",
-        "gestion-apres-bandeau",
+        "gestion-hors-barre-etat",
         "chaine-interdite-page-${[...pageRanks, ...editRanks].join('-')}",
         "lecture-mapping-avant-piece",
         "cartes-sans-piece-dupliquees",
@@ -49,7 +49,7 @@
         "selecteur_5369_desactive",
         "etape_${index}",
         "gestion_avant_surface",
-        "gestion_avant_bandeau",
+        "gestion_dans_barre_etat",
         "chaines_interdites_page",
         "mapping_avant_piece",
         "sans_piece_presente",
@@ -264,5 +264,6 @@
         "declaredRescan": "false"
       }
     }
-  }
+  },
+  "remplacements_front_v3_lot1": "decouverte-piece-25-eq-579 : « gestion-apres-bandeau » → « gestion-hors-barre-etat » et « gestion_avant_bandeau » → « gestion_dans_barre_etat » (la tuile Gestion / Configuration est remplacée par l'icône ⚙ de la barre d'état ; le contrôle devient plus strict : la configuration est DANS la barre et aucune tuile ne reste)."
 }

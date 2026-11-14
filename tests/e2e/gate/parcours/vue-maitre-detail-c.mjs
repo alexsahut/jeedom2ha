@@ -64,10 +64,12 @@ async function readCards(page) {
     ratio: [...(card.querySelector('.j2ha-room-ratio')?.childNodes ?? [])]
       // Story 24.4 (R1) : idem pour « · N gardés (HomeKit) » (`j2ha-room-homekit-kept`), propre à la carte.
       .filter((node) => !(node.classList && (node.classList.contains('j2ha-room-notyet') || node.classList.contains('j2ha-room-homekit-kept'))))
-      .map((node) => node.textContent ?? '').join('').replace(/ publiés?$/, '').trim(),
+      // Front v3 (Lot 1, garde levée) : la tuile écrit « 2/4 » (sans espaces ni mot) ; l'arbre « 2 / 4 » : espaces ignorés.
+      .map((node) => node.textContent ?? '').join('').replace(/ publiés?$/, '').replace(/\s+/g, '').trim(),
     excluded: Number(((card.querySelector('.j2ha-room-marks .j2ha-mark-excluded')?.textContent ?? '').match(/^\d+/) ?? ['0'])[0]),
     // Les repères « non lus » (25.3) et « N exclus » (25.7) n'ont pas d'équivalent dans les repères de l'arbre.
-    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$/.test(text)),
+    // Front v3 (Lot 1, garde levée) : ni « N désactivés » ni « N rien à publier » (marques de la tuile, cible §1).
+    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$|désactivés?$|rien à publier$/.test(text)),
   })));
 }
 
@@ -94,7 +96,7 @@ async function checkScopeAndWiden(page, helpers, cards) {
   const rooms = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-room`).evaluateAll((nodes) => nodes.map((room) => ({
     id: room.getAttribute('data-object_id'),
     // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
-    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).replace(/\s+/g, '').trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const hash = await page.evaluate(() => window.location.hash);
@@ -115,7 +117,7 @@ async function checkTree(page, helpers, cards) {
   const tree = await page.locator(`${VIEW} .j2ha-wv-room`).evaluateAll((rooms) => rooms.map((room) => ({
     id: room.getAttribute('data-object_id'),
     // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
-    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).replace(/\s+/g, '').trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());

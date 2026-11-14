@@ -26,7 +26,8 @@ test('20.4: les résultats UI distinguent succes, partiel, echec et champ absent
   assert.match(source, /Résultat inconnu, relire Dernière opération/);
   assert.match(source, /Une opération est déjà en cours ou la relecture a échoué/);
   // Garde levée (front v2, Lot 1) : glossaire 3.2 « Dernière synchro » → « Dernière relecture ».
-  assert.match(source, /Erreur de communication : vérifiez « Dernière relecture » avant de relancer/);
+  // Garde levée (front v3, Lot 1) : « Dernière relecture » devient l'heure « Relu » de la barre d'état ; le message la nomme.
+  assert.match(source, /Erreur de communication : vérifiez l\\'heure « Relu » de la barre d\\'état avant de relancer/);
   assert.doesNotMatch(source, /Dernière synchro|Synchronisation terminée\.\}\}/);
 });
 

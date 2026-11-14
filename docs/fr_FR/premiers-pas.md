@@ -49,7 +49,7 @@ Dans la page du plugin, la fiche d'un équipement rappelle ce chemin (**« Où l
 
 La page du plugin répond toujours aux mêmes trois questions, pour toute la maison, pour une pièce et pour un équipement.
 
-**1. Qu'est-ce qui est publié ?** Chaque équipement porte un seul mot : **Publié**, **À appliquer**, **Bloqué**, **Exclu**, **Désactivé** ou **Rien à publier**. Le lien « Que veulent dire ces mots ? », sous les chiffres de la maison, les explique en une ligne chacun. Dans la fiche d'un équipement, les deux côtés sont face à face : **« Dans Jeedom »** (nom, plugin, pièce, commandes) et **« Dans Home Assistant »** (les entités, leur type en français, par exemple « Lumière (light) », et **Pilotable** ou **Lecture seule**).
+**1. Qu'est-ce qui est publié ?** Chaque équipement porte un seul mot : **Publié**, **À appliquer**, **Bloqué**, **Exclu**, **Désactivé** ou **Rien à publier**. L'info-bulle de chaque puce de la maison l'explique en une ligne. Dans la fiche d'un équipement, les deux côtés sont face à face : **« Dans Jeedom »** (nom, plugin, pièce, commandes) et **« Dans Home Assistant »** (les entités, leur type en français, par exemple « Lumière (light) », et **Pilotable** ou **Lecture seule**).
 
 **2. Pourquoi pas ?** Un équipement non publié dit pourquoi, en clair, dans sa fiche : ce qui se passe, pourquoi, et comment faire, avec le bouton qui corrige (souvent **« Ouvrir les types génériques »** ou **« Corriger le type… »**). Un équipement publié mais qui pourrait faire mieux (en lecture seule alors que Jeedom a des ordres, par exemple) porte un **Conseil**, construit de la même façon. Le bloc **« À faire »** de la page du plugin rassemble ce qui a besoin de vous.
 
@@ -62,7 +62,7 @@ La page du plugin répond toujours aux mêmes trois questions, pour toute la mai
 - **« Publier quand même »** : quand le plugin hésite, ou quand le nom contredit les types. L'équipement passe sur « Toujours », puis « Appliquer » le publie.
 - **« Renommer l'équipement dans Jeedom, puis Relire Jeedom »** : quand un mot du nom écarte le type voulu.
 - **« Republier »** : quand l'envoi à Home Assistant a échoué.
-- Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier. Ce réglage est enregistré, puis attend : l'équipement passe « À appliquer », et le bouton **« Appliquer »** de sa fiche l'envoie à Home Assistant.
+- Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier. Ce réglage est enregistré, puis attend : l'équipement passe « À appliquer », et le bouton **« Appliquer »** de sa fiche l'envoie à Home Assistant (le bouton « Appliquer (n) » de la barre d'état envoie d'un coup tous les réglages en attente).
 
 ## Relire Jeedom ou Republier tout ?
 
@@ -86,7 +86,7 @@ La colonne « Type HA » affiche alors « Personnalisé : Lumière (light) ». P
 
 ## Choisir ce qui est publié
 
-Tout ce que le plugin reconnaît est publié par défaut. Pour retirer de Home Assistant un plugin, une pièce ou un équipement, au même endroit, cliquez sur **« Choisir ce qui est publié… »** (à droite du titre de la maison, ou dans le menu « ⋯ ») :
+Tout ce que le plugin reconnaît est publié par défaut. Pour retirer de Home Assistant un plugin, une pièce ou un équipement, au même endroit, cliquez sur **« Choisir ce qui est publié… »** (au bout de la ligne des puces de la maison) :
 
 1. Choisissez **« Par pièce »** ou **« Par plugin »**, puis décochez ce que vous ne voulez pas voir dans Home Assistant. Chaque ligne dit ce qui arrivera.
 2. Le pied compte en direct les équipements et les entités qui seront retirés de Home Assistant, et ceux qui y reviendront.

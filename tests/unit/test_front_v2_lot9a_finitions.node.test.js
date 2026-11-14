@@ -214,12 +214,18 @@ describe('Lot 9a — compteurs : pourquoi il manque un équipement', () => {
     assert.deepEqual(O.inactiveMarks({ equipments: [] }), []);
   });
 
-  maybe('carte de pièce : « 1 désactivé » sous le ratio, dans le nom accessible, hors des repères', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : la tuile n'a plus de ligne de texte ; « 1 désactivé » devient une marque chiffrée
+  // (icône fa-power-off + nombre, le mot en info-bulle et pour les lecteurs d'écran), toujours dans le nom accessible.
+  maybe('tuile de pièce : « 1 désactivé » en marque chiffrée, dans le nom accessible', () => {
     const ui = startPage();
     const card = ui.$('#j2ha_roomCards .j2ha-room-card[data-object_id="3"]');
-    assert.match(plain(card.find('.j2ha-v2-room-inactive').text()), /^1 désactivé( · \d+ rien à publier)?$/);
+    const mark = card.find('.j2ha-room-marks .j2ha-mark-disabled');
+    assert.equal(mark.length, 1);
+    assert.equal(plain(mark.text()), '1 désactivé');
+    assert.equal(plain(mark.attr('title')), '1 désactivé');
+    assert.equal(mark.find('.fa-power-off').length, 1);
     assert.match(plain(card.attr('aria-label')), /1 désactivé/);
-    assert.equal(card.find('.j2ha-room-marks .j2ha-v2-mark-inactive').length, 0);
+    assert.equal(card.find('.j2ha-v2-room-inactive').length, 0, 'plus de ligne de texte');
   });
 
   it('« Choisir » : « dont 1 désactivé dans Jeedom » ; par plugin, les exclus sont nommés', () => {

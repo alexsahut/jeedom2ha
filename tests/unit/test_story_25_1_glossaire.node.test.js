@@ -167,7 +167,8 @@ describe('25.1 / AC8 — libellés exacts du glossaire', () => {
 
   it('page principale : « Démon » (plus « Bridge »), « Relire Jeedom » (plus « Rescanner la topologie Jeedom »)', () => {
     const page = fs.readFileSync('desktop/php/jeedom2ha.php', 'utf8');
-    assert.match(page, /<strong>\{\{Démon\}\}<\/strong>/);
+    // Garde levée (front v3, Lot 1) : pastille « point + mot » ; le mot « Démon » est porté par `data-word` et affiché.
+    assert.match(page, /data-word="\{\{Démon\}\}"[^>]*><span class="j2ha-v3-dot" aria-hidden="true"><\/span>\{\{Démon\}\}<\/span>/);
     assert.match(page, /\{\{Relire Jeedom\}\}/);
     // Story 25.3 (AC9) : l'action globale vit dans le menu « ⋯ » sous le libellé « Supprimer tout de Home Assistant… ».
     assert.match(page, /\{\{Supprimer tout de Home Assistant…\}\}/);

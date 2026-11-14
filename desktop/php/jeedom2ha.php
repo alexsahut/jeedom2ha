@@ -112,64 +112,70 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 <div class="row row-overflow">
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
-		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
-		<div class="eqLogicThumbnailContainer">
-			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
-		</div>
+		<!-- Front v3 (Lot 1) : la tuile « Gestion / Configuration » est retirée ; la configuration du plugin s'ouvre par l'icône ⚙ de
+		     la barre d'état (même déclencheur du cœur : `.eqLogicAction[data-action="gotoPluginConf"]`). -->
 
-		<!-- Story 25.3 — Barre de santé compacte, actions courantes à droite et menu « ⋯ ». Les identifiants span_health*,
-		     bt_rescanTopology et data-ha-action sont conservés (refreshBridgeStatus, applyHAGating, gate 20-0).
-		     Front v2 (Lot 1) : Démon · MQTT · Home Assistant · Dernière relecture (+ Dernière opération, masquée quand elle
-		     répète la relecture) ; menu « Autres actions ». -->
-		<div id="div_bridgeHealthBanner" class="j2ha-health-banner j2ha-health-bar">
+		<!-- Story 25.3 — Barre d'état. Les identifiants span_health*, bt_rescanTopology et data-ha-action sont conservés
+		     (refreshBridgeStatus, applyHAGating, gate 20-0).
+		     Front v3 (Lot 1) : pastilles Démon · MQTT · Home Assistant (point + mot, détail en info-bulle), « Relu HH:MM »,
+		     « Dernière opération » seulement si elle a échoué, verdict « Rien à faire » (fail-closed), puis Appliquer (n),
+		     Relire Jeedom, ⚙ et ⋯. Aucune phrase d'aide. -->
+		<div id="div_bridgeHealthBanner" class="j2ha-health-banner j2ha-health-bar j2ha-v3-status">
 			<div class="j2ha-health-items">
-				<div class="j2ha-health-item">
-					<strong>{{Démon}}</strong>
-					<span id="span_healthBridge" class="label label-default j2ha-health-value">{{Chargement...}}</span>
-				</div>
-				<div class="j2ha-health-item">
-					<strong>{{MQTT}}</strong>
-					<span id="span_healthMqtt" class="label label-default j2ha-health-value">{{Chargement...}}</span>
-					<span id="span_healthMqttBroker" class="j2ha-health-note"></span>
-				</div>
-				<!-- Front v2 (Lot 1) : état côté Home Assistant, affiché seulement si le démon fournit ha.birth_seen_at. -->
-				<div id="div_healthHa" class="j2ha-health-item" style="display:none;">
-					<strong>{{Home Assistant}}</strong>
-					<span id="span_healthHa" class="label label-default j2ha-health-value"></span>
-				</div>
-				<div class="j2ha-health-item">
-					<strong>{{Dernière relecture}}</strong>
-					<span id="span_healthSync" class="j2ha-health-sync">{{...}}</span>
-				</div>
-				<div class="j2ha-health-item">
-					<strong>{{Dernière opération}}</strong>
-					<span id="span_healthOp" class="label label-default j2ha-health-value">{{...}}</span>
-					<span id="span_healthOpMsg" class="j2ha-health-note"></span>
-				</div>
+				<span class="j2ha-health-item j2ha-v3-pill-item">
+					<span id="span_healthBridge" class="j2ha-v3-pill" data-word="{{Démon}}" data-level="unknown" title="{{Démon}}" aria-label="{{Démon}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Démon}}</span>
+				</span>
+				<span class="j2ha-health-item j2ha-v3-pill-item">
+					<span id="span_healthMqtt" class="j2ha-v3-pill" data-word="{{MQTT}}" data-level="unknown" title="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
+					<span id="span_healthMqttBroker" class="j2ha-health-note" hidden></span>
+				</span>
+				<!-- Home Assistant : visible seulement si le démon fournit ha.birth_seen_at ; non confirmé = gris avec « ? ». -->
+				<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item" style="display:none;">
+					<span id="span_healthHa" class="j2ha-v3-pill" data-word="{{Home Assistant}}" data-level="unknown"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
+				</span>
+				<span class="j2ha-health-item j2ha-v3-relu-item">
+					<span id="span_healthSync" class="j2ha-health-sync j2ha-v3-relu">{{...}}</span>
+				</span>
+				<!-- « Dernière opération » : n'apparaît que si elle a échoué (pastille ambre). -->
+				<span class="j2ha-health-item j2ha-v3-op-item" style="display:none;">
+					<span id="span_healthOp" class="j2ha-v3-pill" data-word="" data-level="warn"><span class="j2ha-v3-dot" aria-hidden="true"></span><span class="j2ha-v3-pill-word"></span></span>
+					<span id="span_healthOpMsg" class="j2ha-health-note" hidden></span>
+				</span>
+				<!-- Verdict « Rien à faire » : seulement si la dernière relecture a réussi il y a moins de 24 h (rempli par jeedom2ha_overview.js). -->
+				<span id="j2ha_v3_verdict" class="j2ha-v3-verdict" role="status" aria-live="polite"></span>
 			</div>
 			<div id="div_haActions" class="j2ha-health-actions j2ha-ha-actions">
 				<button type="button"
-				        class="btn btn-default btn-sm j2ha-ha-action"
-				        data-ha-action="republier"
+				        id="bt_j2haApply"
+				        class="btn btn-primary btn-sm j2ha-ha-action j2ha-v3-apply"
+				        data-ha-action="appliquer"
+				        title="{{Envoyer les réglages en attente à Home Assistant}}"
+				        hidden
 				        disabled>
-					<i class="fas fa-upload"></i> {{Republier tout}}
+					<i class="fas fa-upload"></i> {{Appliquer}} <span class="j2ha-v3-apply-count"></span>
 				</button>
 				<button type="button"
 				        id="bt_rescanTopology"
 				        class="btn btn-default btn-sm j2ha-ha-action"
 				        data-ha-action="rescan"
+				        title="{{J'ai changé quelque chose dans Jeedom}}"
 				        disabled>
 					<i class="fas fa-sync-alt"></i> {{Relire Jeedom}}
 				</button>
+				<a class="btn btn-default btn-sm j2ha-v3-icon-btn j2ha-v3-help" href="<?php echo j2ha_html($j2haDocUrl); ?>" target="_blank" rel="noopener"
+				   title="{{Aide}}" aria-label="{{Aide}}"><i class="fas fa-question-circle"></i></a>
+				<button type="button" class="btn btn-default btn-sm eqLogicAction j2ha-v3-icon-btn" data-action="gotoPluginConf"
+				        title="{{Configuration}}" aria-label="{{Configuration}}">
+					<i class="fas fa-cog"></i>
+				</button>
 				<span id="j2ha_moreMenu">
 					<span class="j2ha-menu-wrap">
-						<button type="button" class="btn btn-default btn-sm j2ha-menu-toggle"
+						<button type="button" class="btn btn-default btn-sm j2ha-menu-toggle j2ha-v3-icon-btn"
 						        aria-haspopup="menu" aria-expanded="false"
 						        aria-label="{{Autres actions}}" title="{{Autres actions}}">
 							<i class="fas fa-ellipsis-h"></i>
 						</button>
 						<ul class="j2ha-menu" role="menu">
-							<!-- Front v2 (Lot 1) : les deux exports quittent ce menu pour « Vérifier l'installation… » (E7). -->
 							<li role="none">
 								<button type="button" id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">
 									<i class="fas fa-stethoscope"></i>{{Vérifier l'installation…}}
@@ -178,6 +184,17 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 							<li role="none">
 								<button type="button" id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">
 									<i class="fas fa-route"></i>{{Guide de démarrage}}
+								</button>
+							</li>
+							<!-- Front v3 (Lot 1) : « Republier tout » quitte la barre pour ce menu (geste de dépannage). -->
+							<li role="none">
+								<button type="button"
+								        class="j2ha-menu-item j2ha-ha-action"
+								        role="menuitem"
+								        data-ha-action="republier"
+								        title="{{Home Assistant a perdu ses appareils}}"
+								        disabled>
+									<i class="fas fa-redo"></i>{{Republier tout}}
 								</button>
 							</li>
 							<li class="j2ha-menu-sep" role="separator"></li>
@@ -195,8 +212,6 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 				</span>
 			</div>
 		</div>
-		<!-- Front v2 (Lot 0) : phrase d'aide sous la barre d'état (vide = invisible). -->
-		<div id="j2ha_v2_helpline" class="j2ha-v2-helpline"></div>
 		<div id="div_haGatingReason"
 		     class="text-muted j2ha-ha-gating-reason">
 		</div>
@@ -220,8 +235,9 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		     même mécanique que le diagnostic. Lecture seule, identifiants seulement. -->
 		<div id="div_decisionExportDialog" class="j2ha-diagnostic-dialog" style="display:none;">
 			<div class="form-group j2ha-export">
-				<p class="text-muted">{{Fichier JSON des décisions du plugin : identifiants seulement, aucun nom d'équipement, de pièce, de commande ni de scénario}}</p>
-				<button id="bt_exportDecision" class="btn btn-default btn-sm">
+				<!-- Front v3 (Lot 1) : la phrase d'explication passe en info-bulle du bouton. -->
+				<button id="bt_exportDecision" class="btn btn-default btn-sm"
+				        title="{{Fichier JSON des décisions du plugin : identifiants seulement, aucun nom d'équipement, de pièce, de commande ni de scénario}}">
 					<i class="fas fa-download"></i> {{Télécharger l'export de décision}}
 				</button>
 				<span id="span_decisionExportResult" class="j2ha-export-result"></span>
@@ -235,48 +251,51 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<div id="j2ha_v2_guide" class="j2ha-v2-guide"></div>
 		<div id="j2ha_v2_toast" class="j2ha-v2-toast" role="status" aria-live="polite"></div>
 		<div id="j2ha_mainView">
-		<legend><i class="fas fa-home"></i> {{Ce que Jeedom publie dans Home Assistant}}</legend>
-		<div class="j2ha-v2-choose">
-			<button type="button" id="bt_j2haChoosePublished" class="btn btn-default btn-sm" hidden>
-				<i class="fas fa-check-square"></i> {{Choisir ce qui est publié…}}
-			</button>
-		</div>
-		<p class="text-muted j2ha-help-line">{{Choisissez une pièce pour voir ses équipements et ce qui est publié dans Home Assistant.}} <a href="<?php echo j2ha_html($j2haDocUrl); ?>" target="_blank" rel="noopener">{{Aide}}</a></p>
-
-		<!-- Bloc maison : « N publiés sur M », jauge segmentée, puces = filtres globaux (sans requête réseau). -->
-		<div id="j2ha_houseBlock" class="j2ha-house">
+		<!-- Front v3 (Lot 1) : onglets Équipements / Scénarios. Le titre, les phrases d'accueil, la légende, « Cliquez sur un
+		     chiffre », la ligne de fraîcheur et la liste filtrée sont retirés (une seule liste « À faire », des puces qui filtrent
+		     la grille). Le contenu de l'onglet Scénarios est rempli par un lot ultérieur (conteneur stable #j2ha_tab_scenarios). -->
+		<ul class="nav nav-tabs j2ha-v3-tabs" role="tablist">
+			<li role="presentation" class="active">
+				<button type="button" id="j2ha_tabBtnEquipments" class="j2ha-v3-tab" role="tab" aria-selected="true" aria-controls="j2ha_tab_equipments" data-tab="equipments">
+					{{Équipements}} <span id="j2ha_tabEquipmentsCount" class="j2ha-v3-tab-n"></span>
+				</button>
+			</li>
+			<li role="presentation">
+				<button type="button" id="j2ha_tabBtnScenarios" class="j2ha-v3-tab" role="tab" aria-selected="false" aria-controls="j2ha_tab_scenarios" data-tab="scenarios" tabindex="-1">
+					<i class="fas fa-film" aria-hidden="true"></i> {{Scénarios}} <span id="j2ha_tabScenariosCount" class="j2ha-v3-tab-n"></span>
+				</button>
+			</li>
+		</ul>
+		<div id="j2ha_tab_equipments" class="j2ha-v3-tabpanel" role="tabpanel" aria-labelledby="j2ha_tabBtnEquipments">
+		<!-- Bloc maison : « n / m publiés », liseré de 6 px, puces = filtres de la grille (sans requête réseau). -->
+		<div id="j2ha_houseBlock" class="j2ha-house j2ha-v3-house">
 			<div class="j2ha-house-main">
 				<span id="j2ha_houseNumber" class="j2ha-house-number"></span>
 				<span id="j2ha_houseSub" class="j2ha-house-sub"></span>
+				<button type="button" id="bt_refreshStates" class="btn btn-default btn-xs j2ha-v3-icon-btn" title="{{Actualiser les chiffres}}" aria-label="{{Actualiser les chiffres}}"><i class="fas fa-sync-alt"></i></button>
 			</div>
-			<div id="j2ha_houseMeta" class="text-muted j2ha-house-meta"></div>
 			<div id="j2ha_houseGauge" class="j2ha-house-gauge"></div>
-			<div id="j2ha_houseChips" class="j2ha-chips"></div>
-			<div class="j2ha-house-fresh">
-				<span id="j2ha_freshness" class="text-muted"></span>
-				<button type="button" id="bt_refreshStates" class="btn btn-default btn-xs"><i class="fas fa-sync-alt"></i> {{Actualiser}}</button>
+			<div class="j2ha-v3-chipbar">
+				<div id="j2ha_houseChips" class="j2ha-chips"></div>
+				<button type="button" id="bt_j2haChoosePublished" class="btn btn-default btn-sm j2ha-v3-choose" title="{{Plugins, pièces, équipements}}" hidden>
+					<i class="fas fa-check-square"></i> {{Choisir ce qui est publié…}}
+				</button>
 			</div>
 			<div id="j2ha_readStatus" class="text-muted j2ha-read-status" role="status" aria-live="polite"></div>
 		</div>
-		<div id="j2ha_filterPanel" class="j2ha-filter-panel" style="display:none;">
-			<div class="j2ha-filter-head">
-				<strong id="j2ha_filterTitle"></strong>
-				<button type="button" id="bt_clearFilter" class="btn btn-default btn-xs">{{Tout afficher}}</button>
-			</div>
-			<ul id="j2ha_filterList" class="j2ha-filter-list"></ul>
-		</div>
-		<!-- Front v2 (Lot 0) : bloc « À faire » et légende (vides = invisibles). -->
+		<!-- Une seule liste « À faire » (bloqués puis conseils), masquée quand elle est vide. -->
 		<div id="j2ha_v2_todo" class="j2ha-v2-todo"></div>
-		<div id="j2ha_v2_legend" class="j2ha-v2-legend"></div>
 		<?php
 		if (count($j2haRoomsTree) == 0) {
 			echo '<div class="text-center j2ha-no-rooms">{{Aucune pièce avec équipement trouvée.}}</div>';
 		} else {
-			echo '<div class="j2ha-room-groups" id="j2ha_roomCards">';
+			echo '<div class="j2ha-room-groups j2ha-v3-grid" id="j2ha_roomCards">';
 			echo j2ha_render_room_groups(j2ha_group_rooms($j2haRoomsTree, $j2haAncestors));
 			echo '</div>';
 		}
 		?>
+		</div> <!-- /#j2ha_tab_equipments -->
+		<div id="j2ha_tab_scenarios" class="j2ha-v3-tabpanel" role="tabpanel" aria-labelledby="j2ha_tabBtnScenarios" hidden></div>
 		</div> <!-- /#j2ha_mainView -->
 
 		<!-- Story 25.4 — Vue de travail maître-détail (jeedom2ha_workview.js) : arbre pièces → équipements à gauche, détail
