@@ -10,6 +10,7 @@
 
 import { classifyRequest } from './policy.mjs';
 import {
+  buildFilteringConfigResponse,
   buildRoomExclusionResponse,
   buildRevertResponse,
   buildSaveResponse,
@@ -302,6 +303,9 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
           // Story 25.8 : branche EXPLICITE (jamais la branche `else` ci-dessous, qui sert le retour d'un réglage). La réponse est
           // dérivée de la configuration réelle (lue par le lanceur) et de l'écriture déclarée ; rien n'est transmis à la box.
           response = buildRoomExclusionResponse(simState, { objectId: params.objectId, excluded: params.excluded });
+        } else if (decision.action === 'saveFilteringConfig') {
+          // Front v2 (Lot 6) : branche EXPLICITE, valeur déclarée par le parcours ; rien n'est transmis à la box.
+          response = buildFilteringConfigResponse({ excludedPlugins: params.excludedPlugins, confidencePolicy: params.confidencePolicy });
         } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });

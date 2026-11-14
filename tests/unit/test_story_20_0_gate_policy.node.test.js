@@ -547,3 +547,60 @@ test('story 25-8 — saveRoomExclusion : écriture simulée si déclarée, bloqu
     assert.deepEqual(removedLines(diff), []);
   });
 });
+
+// Front v2 (Lot 6) — `saveFilteringConfig` devient une écriture SIMULÉE quand le parcours la déclare (panneau « Choisir ce qui est
+// publié… » de la page du plugin) ; sans déclaration, ou pour une autre valeur, elle reste un effet de bord BLOQUÉ. Ouverture
+// explicite et motivée de la politique (spec, point 3 à trancher) : aucune ligne existante n'est retirée.
+test('front v2 lot 6 — saveFilteringConfig : simulée si déclarée, bloquée sinon', async (t) => {
+  const { classifyRequest, ALLOWED_READS } = await loadPolicy();
+  const post = (body, extra) => req({
+    method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: body, ...extra,
+  });
+  const declared = { excludedPlugins: ['virtual', ''], confidencePolicy: 'sure_probable' };
+  const ctx = (value) => baseCtx({ declaredFilteringConfig: value });
+
+  await t.test('valeur déclarée -> simulate / plugins-exclus-declares (application puis annulation)', () => {
+    for (const value of ['virtual', '']) {
+      const result = classifyRequest(post(`action=saveFilteringConfig&excludedPlugins=${value}&confidencePolicy=sure_probable`), ctx(declared));
+      assert.equal(result.verdict, 'simulate', value);
+      assert.equal(result.reason, 'plugins-exclus-declares');
+      assert.equal(result.params.excludedPlugins, value);
+    }
+  });
+
+  await t.test('non déclarée ou différente -> block-fail / effet-de-bord', () => {
+    const cases = {
+      'ctx sans déclaration': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable'), baseCtx()],
+      'autre valeur': [post('action=saveFilteringConfig&excludedPlugins=zwave&confidencePolicy=sure_probable'), ctx(declared)],
+      'autre politique': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_only'), ctx(declared)],
+      'politique invalide': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=x'), ctx(Object.assign({}, declared, { confidencePolicy: 'x' }))],
+      'paramètre absent': [post('action=saveFilteringConfig&excludedPlugins=virtual'), ctx(declared)],
+      'paramètre en plus': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable&excludedObjects=1'), ctx(declared)],
+      'action seule': [post('action=saveFilteringConfig'), ctx(declared)],
+      'déclaration mal formée': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable'), ctx({ excludedPlugins: 'virtual', confidencePolicy: 'sure_probable' })],
+      'ctx absent': [post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable'), undefined],
+    };
+    for (const [label, [request, context]] of Object.entries(cases)) {
+      const result = classifyRequest(request, context);
+      assert.equal(result.verdict, 'block-fail', label);
+    }
+  });
+
+  await t.test('GET, autre chemin, content-type : jamais simulée', () => {
+    const get = classifyRequest(req({ method: 'GET', url: `${ORIGIN}${PLUGIN_AJAX}?action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable`, resourceType: 'xhr' }), ctx(declared));
+    assert.equal(get.verdict, 'block-fail');
+    const other = classifyRequest(post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable', { url: `${ORIGIN}/core/ajax/other.ajax.php` }), ctx(declared));
+    assert.notEqual(other.verdict, 'simulate');
+    const json = classifyRequest(post('action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable', { headers: { 'content-type': 'application/json' } }), ctx(declared));
+    assert.equal(json.verdict, 'block-fail');
+  });
+
+  await t.test('lectures autorisées inchangées ; les autres effets de bord restent bloqués même avec la déclaration', () => {
+    for (const action of ['executeHaAction', 'forceMqttManagerImport', 'testMqttConnection', 'scanTopology']) {
+      assert.equal(classifyRequest(post(`action=${action}`), ctx(declared)).verdict, 'block-fail', action);
+    }
+    const pluginReads = ALLOWED_READS.find((entry) => entry.pathname === PLUGIN_AJAX).actions;
+    assert.ok(!pluginReads.includes('saveFilteringConfig'));
+    assert.equal(ALLOWED_READS.length, 3);
+  });
+});
