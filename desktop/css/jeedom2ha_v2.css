@@ -552,7 +552,7 @@
 }
 #div_bridgeHealthBanner .btn.j2ha-v3-apply:not(.cmdName):disabled { opacity: 0.55; }
 .j2ha-v3-apply-count { font-variant-numeric: tabular-nums; }
-.btn.j2ha-v3-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 30px; text-decoration: none; }
+.btn.j2ha-v3-icon-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 30px; text-decoration: none; }
 .j2ha-v3-house .btn.j2ha-v3-icon-btn { min-width: 26px; height: 24px; }
 .j2ha-v3-status .j2ha-menu { width: max-content; }
 .j2ha-v3-status .j2ha-menu-item { white-space: nowrap; }
