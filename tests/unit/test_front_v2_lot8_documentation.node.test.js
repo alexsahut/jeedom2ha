@@ -137,10 +137,8 @@ describe('Lot 8 — index.md : glossaire cible, écrans, « dix types »', () =>
 
 describe('Lot 8 — la documentation parle exactement comme l’écran', () => {
   it('chaque libellé d’action du lexique est cité dans index.md et dans « Premiers pas »', () => {
-    // Garde levée TEMPORAIRE (front v2, Lot 9a, point 9) : deux actions nouvelles du lexique, documentées par le Lot 9b
-    // (en parallèle) ; à retirer de cette liste à la fusion du Lot 9b.
-    const PENDING_ACTIONS_LOT_9B = ['publish_anyway', 'rename'];
-    const labels = Object.entries(L.ACTIONS).filter(([key]) => !PENDING_ACTIONS_LOT_9B.includes(key)).map(([, label]) => label);
+    // Front v2, Lot 9b : l'exemption temporaire du Lot 9a (« Publier quand même », « Renommer… ») est retirée, la doc les cite.
+    const labels = Object.values(L.ACTIONS);
     assert.ok(labels.length >= 5);
     for (const label of labels) {
       assert.ok(norm(index).includes(`« ${norm(label)} »`), `index.md : « ${label} »`);
@@ -148,23 +146,10 @@ describe('Lot 8 — la documentation parle exactement comme l’écran', () => {
     }
   });
 
-  // Garde levée TEMPORAIRE (front v2, Lot 9a) : l'écran a renommé ces libellés ; la documentation (docs/, Lot 9b, mené en
-  // parallèle) les aligne. Cette liste DOIT être vidée à la fusion du Lot 9b : chaque entrée n'est tolérée que tant que la doc
-  // cite encore l'ancien libellé (le test échoue si la doc ne le cite plus, pour forcer le retrait de l'entrée).
-  const PENDING_DOC_LOT_9B = ['Autres types, non proposés pour cette commande'];
-
-  it('Lot 9a → 9b : chaque libellé en attente d’alignement de la doc est encore cité par la doc (sinon retirer l’entrée)', () => {
-    for (const label of PENDING_DOC_LOT_9B) {
-      assert.ok(!code.includes(norm(label)), `« ${label} » est revenu à l'écran : retirer l'entrée`);
-      assert.ok(Object.values(DOCS).some((text) => norm(text).includes(norm(label))), `« ${label} » n'est plus cité par la doc : retirer l'entrée`);
-    }
-  });
-
   it('aucun libellé de bouton cité en gras entre « » n’est absent du code', () => {
     for (const [name, text] of Object.entries(DOCS)) {
       for (const m of text.matchAll(/\*\*« ([^»*]+?) »\*\*/g)) {
         if (/^(N|\d+) /.test(m[1])) continue; // gabarit chiffré (« N bloqués ») : décrit dans compteurs.md, construit par le code
-        if (PENDING_DOC_LOT_9B.includes(m[1])) continue; // Lot 9a : libellé renommé à l'écran, doc alignée par le Lot 9b
         // Une bascule « A | B » cite deux libellés de l'écran.
         for (const part of m[1].split(' | ')) assert.ok(code.includes(norm(part)), `${name} : « ${part} » n'existe pas à l'écran`);
       }

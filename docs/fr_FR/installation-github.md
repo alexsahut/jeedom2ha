@@ -66,7 +66,7 @@ Saisissez l'hôte et le port du broker, puis cliquez sur « Tester, enregistrer 
 
 ## Contrôle de réussite
 
-L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Relire Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres → Appareils et services → MQTT** pour retrouver vos équipements (voir [Première publication](index.md#première-publication--le-guide-de-démarrage)).
+L'installation est réussie lorsque la page du plugin dans Jeedom **liste les équipements découverts** et propose le bouton **« Relire Jeedom »**. Dans Home Assistant, ouvrez ensuite **Paramètres › Appareils et services › MQTT** pour retrouver vos équipements (voir [Première publication](index.md#première-publication--le-guide-de-démarrage)).
 
 ---
 

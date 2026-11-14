@@ -94,7 +94,7 @@ Sur la page du plugin, le bloc de la maison reprend les mêmes états, **équipe
 
 ## Les repères d'une carte de pièce
 
-La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont **les mêmes** que ceux de l'arbre de la vue de travail (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
+La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Sous « n / t publiés », une ligne discrète dit aussi pourquoi il manque des équipements qui ne sont ni bloqués ni exclus : « 1 désactivé » ou « N désactivés » (infobulle « Désactivés dans Jeedom : jamais publiés »), « N rien à publier » (infobulle « Aucune commande n’a d’équivalent dans Home Assistant »), séparés par « · ». Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont **les mêmes** que ceux de l'arbre de la vue de travail (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
 
 ## La ligne des états (sous le titre de la pièce)
 
