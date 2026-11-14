@@ -818,12 +818,16 @@ function showExclusionToast(info, isUndo) {
   if (window.jeedom2haExclusionToastTimer) window.clearTimeout(window.jeedom2haExclusionToastTimer);
   $toast.empty();
   var text = isUndo ? '{{Changement annulé.}}' : X.resultText(info.diff) + '.';
-  $toast.append($('<span></span>').text('✔ ' + text + ' ' + '{{Home Assistant est à jour.}}'));
-  if (!isUndo) {
+  // Revue Codex (#394) : les équipements que « Annuler » ne rétablirait pas exactement sont nommés par leur nombre.
+  var blocked = info.diff && info.diff.undoBlocked ? info.diff.undoBlocked.length : 0;
+  var note = !isUndo && blocked > 0 ? ' ' + X.undoBlockedText(blocked) + '.' : '';
+  $toast.append($('<span></span>').text('✔ ' + text + ' ' + '{{Home Assistant est à jour.}}' + note));
+  var policy = window.j2haConfidencePolicy || 'sure_probable';
+  var inverse = isUndo ? [] : X.inverseWrites(info.model, info.changes, policy);
+  if (inverse.length > 0) {
     var $undo = $('<button type="button" class="j2ha-v2-excl-undo"></button>').text('{{Annuler}}');
     $undo.on('click', function() {
-      var policy = window.j2haConfidencePolicy || 'sure_probable';
-      if (applyExclusionChanges(X.inverseWrites(info.model, info.changes, policy), info, true) !== false) {
+      if (applyExclusionChanges(inverse, info, true) !== false) {
         window.clearTimeout(window.jeedom2haExclusionToastTimer);
         $toast.empty();
       }

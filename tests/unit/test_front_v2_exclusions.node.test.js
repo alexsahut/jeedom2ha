@@ -152,15 +152,22 @@ describe('Lot 6 — différence chiffrée (pied en direct)', () => {
 describe('Lot 6 — écritures : routes et corps existants, inverses pour « Annuler »', () => {
   const byAction = (name) => Object.values(reference.scenarios).flat().filter((w) => w.action === name).map((w) => w.body);
 
-  it('« Jamais » et retour en automatique : corps IDENTIQUES à la référence de 25.4', () => {
+  it('« Jamais » : corps IDENTIQUE à la référence de 25.4 ; retour : réglage d\'équipement SEUL (scope=equipment, revue Codex P1)', () => {
     const m = X.buildModel([{ object_id: 7, object_name: 'P', equipments: [{ eq_id: 1, eq_name: 'E', enabled: true, eq_type: 'zwave' }] }],
       { kind: 'ok', view: { stale: false, equipments: { 1: entry(1) }, overview: null } }, '', {});
     const exclude = X.writesFor(m, changes({ eqs: { 1: 'exclude' } }), 'sure_probable');
     assert.deepEqual(exclude.map((w) => serialize(w.data)), ['action=savePublicationOverride&eqId=1&publicationPolicy=exclude']);
     assert.ok(byAction('savePublicationOverride').includes(serialize(exclude[0].data)));
+    // Sans `scope`, la route purge aussi les types HA des commandes (CC-19) : l'annulation ne l'utilise jamais. Nouveau cas,
+    // la référence (corps existants de la fiche) reste intacte.
     const undo = X.inverseWrites(m, changes({ eqs: { 1: 'exclude' } }), 'sure_probable');
-    assert.deepEqual(undo.map((w) => serialize(w.data)), ['action=revertPublicationOverride&eqId=1']);
-    assert.ok(byAction('revertPublicationOverride').includes(serialize(undo[0].data)));
+    assert.deepEqual(undo.map((w) => serialize(w.data)), ['action=revertPublicationOverride&eqId=1&scope=equipment']);
+    assert.ok(byAction('revertPublicationOverride').every((body) => !body.includes('scope=')), 'référence inchangée');
+    // Recocher un équipement « Jamais » : même retour limité à l'équipement.
+    const never = X.buildModel([{ object_id: 7, object_name: 'P', equipments: [{ eq_id: 1, eq_name: 'E', enabled: true, eq_type: 'zwave' }] }],
+      { kind: 'ok', view: { stale: false, equipments: { 1: entry(1, { reason: 'publication_excluded_eqlogic' }) }, overview: null } }, '', {});
+    assert.deepEqual(X.writesFor(never, changes({ eqs: { 1: 'include' } }), 'sure_probable').map((w) => serialize(w.data)), ['action=revertPublicationOverride&eqId=1&scope=equipment']);
+    assert.ok(!fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha_exclusions.js'), 'utf8').match(/action: 'revertPublicationOverride', eqId: id \}/), 'jamais de retour complet');
   });
 
   it('pièce : mêmes paramètres que le menu de carte (action, objectId, excluded) ; plugins : ceux de la configuration', () => {
@@ -178,15 +185,38 @@ describe('Lot 6 — écritures : routes et corps existants, inverses pour « Ann
     assert.equal(X.writesFor(m, changes({ plugins: { virtual: true } }), 'x').at(0).data.confidencePolicy, 'sure_probable');
   });
 
-  it('annuler rend exactement la valeur d\'origine de excludedPlugins et le réglage « Toujours »', () => {
+  // Revue Codex (#394, P2) : la lecture agrégée ne dit pas si « Toujours » porte sur l'équipement ou sur une commande ; l'annulation
+  // ne le rejoue pas (elle n'écrit rien pour cet équipement) et le pied l'annonce avant d'appliquer.
+  it('annuler rend exactement la valeur d\'origine de excludedPlugins ; un « Toujours » n\'est pas rejoué, il est annoncé', () => {
     const m = X.buildModel([{ object_id: 7, object_name: 'P', equipments: [{ eq_id: 5, eq_name: 'E', enabled: true, eq_type: 'zwave' }] }],
       { kind: 'ok', view: { stale: false, equipments: { 5: entry(5, { reason: 'publication_forced' }) }, overview: null } }, ' zwave ,, enocean', {});
     const c = changes({ plugins: { zwave: false }, rooms: { 7: true }, eqs: { 5: 'exclude' } });
     assert.deepEqual(X.inverseWrites(m, c, 'sure_probable').map((w) => serialize(w.data)), [
       'action=saveFilteringConfig&confidencePolicy=sure_probable&excludedPlugins= zwave ,, enocean',
       'action=saveRoomExclusion&excluded=0&objectId=7',
-      'action=savePublicationOverride&eqId=5&publicationPolicy=force_publish',
     ]);
+    const d = X.diff(m, c);
+    assert.deepEqual(d.undoBlocked, [5]);
+    assert.match(plain(X.footText(d)), /1 équipement à rétablir depuis sa fiche si besoin : « Annuler » ne reprend pas son réglage précédent/);
+  });
+
+  it('équipement non lu ou présence inconnue : nombre d\'entités INCONNU, bouton rouge (revue Codex P2)', () => {
+    const rooms = [{ object_id: 7, object_name: 'P', equipments: [
+      { eq_id: 1, eq_name: 'Lu', enabled: true, eq_type: 'zwave' }, { eq_id: 2, eq_name: 'Non lu', enabled: true, eq_type: 'zwave' }] }];
+    const m = X.buildModel(rooms, { kind: 'ok', view: { stale: false, equipments: { 1: entry(1, { entities: 0 }) }, overview: null } }, '', {});
+    const d = X.diff(m, changes({ rooms: { 7: true } }));
+    assert.deepEqual([d.unread, d.entitiesKnown], [1, false]);
+    assert.deepEqual(d.undoBlocked, []);
+    const b = X.applyButton(d);
+    assert.equal(b.danger, true);
+    assert.equal(plain(b.label), 'Appliquer — exclure 2 équipements');
+    assert.match(plain(X.footText(d)), /nombre d'entités inconnu pour l'instant/);
+    const unknown = X.buildModel(rooms.slice(0, 1), { kind: 'ok', view: { stale: false, equipments: { 1: Object.assign(entry(1), { entities: [{ override_pending: false }] }) }, overview: null } }, '', {});
+    const du = X.diff(unknown, changes({ rooms: { 7: true } }));
+    assert.equal(du.entitiesKnown, false);
+    assert.equal(X.applyButton(du).danger, true);
+    // Exclusion individuelle d'un équipement non lu : son réglage propre est illisible, il n'est pas rejoué par « Annuler ».
+    assert.deepEqual(X.diff(m, changes({ eqs: { 2: 'exclude' } })).undoBlocked, [2]);
   });
 
   it('CSV des plugins : ordre gardé, plugins absents de la page gardés, doublons et vides retirés', () => {

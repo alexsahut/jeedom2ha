@@ -4244,12 +4244,67 @@ async def _handle_mapping_override_revert(
     })
 
 
+async def _publication_revert_equipment_only(request: web.Request) -> Optional[web.Response]:
+    """Front v2 (Lot 6) : retour en automatique du SEUL réglage de publication d'équipement.
+
+    Rend None si la requête ne porte pas `scope == "equipment"` (le chemin canonique s'applique).
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return None
+    try:
+        data = await request.json()
+    except Exception:
+        return None
+    payload = data.get("payload", {}) if isinstance(data, dict) else {}
+    if not isinstance(payload, dict) or payload.get("scope") is None:
+        return None
+    if payload.get("scope") != "equipment" or payload.get("jeedom_cmd_id") is not None:
+        return web.json_response(
+            {"status": "error", "message": "scope=equipment exige jeedom_eq_id seul"}, status=400
+        )
+    eq_id = payload.get("jeedom_eq_id")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+    data_dir = _resolve_data_dir(request)
+    removed = remove_equipment_override_fields(eq_id, ("publication_override",), data_dir)
+    _invalidate_equipment_states(request.app)
+    _LOGGER.info(
+        "[OVERRIDES] Retour mode auto (réglage d'équipement seul) eq_id=%d removed=%s", eq_id, removed,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "scope": "equipment_publication",
+            "removed": removed,
+            "removed_commands": [],
+        },
+    })
+
+
 async def _handle_publication_override_revert(request: web.Request) -> web.Response:
     """POST /action/publication_override_revert — dedicated automatic-mode endpoint.
 
     The canonical removal operation deliberately clears both override fields for
     the selected entity (or every entity of an equipment), as required by CC-19.
+
+    Front v2 (Lot 6) — ajout : `scope == "equipment"` (sans `jeedom_cmd_id`) retire SEULEMENT le
+    réglage de publication de l'équipement (`equipment_overrides[eq].publication_override`) et
+    laisse intacts les réglages des commandes (type HA, publication). Sans `scope`, comportement
+    canonique inchangé.
     """
+    scoped = await _publication_revert_equipment_only(request)
+    if scoped is not None:
+        return scoped
     return await _handle_mapping_override_revert(
         request, fields=("ha_entity_type", "publication_override"), entity_scope=True,
     )

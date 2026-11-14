@@ -269,7 +269,25 @@
         out.returned.push(id);
       }
     });
+    // Revue Codex (#394, P2) : un équipement concerné non lu, ou dont la présence d'entités est inconnue, rend le nombre
+    // d'entités INCONNU ; la confirmation reste alors destructive (rouge) et le dit.
+    if (out.unread > 0 || out.unknownEntities > 0) out.entitiesKnown = false;
+    out.undoBlocked = undoBlockers(model, c);
     return out;
+  }
+
+  /**
+   * Équipements passés à « Jamais » dont l'annulation automatique ne rétablirait pas EXACTEMENT l'état d'avant (revue Codex
+   * #394, P2) : un « Toujours » lu (sa portée réelle, équipement ou commande, n'est pas donnée par la lecture agrégée) ou un
+   * réglage propre illisible (équipement non lu). Ils sont annoncés avant d'appliquer et laissés hors de « Annuler ».
+   */
+  function undoBlockers(model, changes) {
+    var out = [];
+    Object.keys(changes.eqs || {}).forEach(function (id) {
+      var eq = model.eqs[id];
+      if (eq && changes.eqs[id] === 'exclude' && (eq.own === 'always' || !eq.ownKnown)) out.push(eq.id);
+    });
+    return out.sort(function (a, b) { return a - b; });
   }
 
   /** Écritures à envoyer, dans l'ordre : plugins (une écriture), pièces, équipements. Paramètres EXACTS des routes existantes. */
@@ -293,14 +311,17 @@
       if (c.eqs[id] === 'exclude') {
         writes.push({ kind: 'eq', id: id, data: { action: 'savePublicationOverride', eqId: id, publicationPolicy: 'exclude' } });
       } else {
-        writes.push({ kind: 'eq', id: id, data: { action: 'revertPublicationOverride', eqId: id } });
+        // Revue Codex (#394, P1) : `scope: 'equipment'` ne retire que le réglage « Jamais » de l'équipement ; sans lui, la
+        // route purge aussi les réglages des commandes (types HA corrigés). Nouveau cas, corps existants inchangés.
+        writes.push({ kind: 'eq', id: id, data: { action: 'revertPublicationOverride', eqId: id, scope: 'equipment' } });
       }
     });
     return writes;
   }
 
   /** Écritures inverses (« Annuler » du bandeau) : la valeur d'origine de `excludedPlugins` est rendue telle quelle ; une
-   * exclusion d'équipement rend son réglage d'origine (« Toujours » ou Automatique). */
+   * exclusion d'équipement retire seulement le « Jamais » posé (`scope: 'equipment'`, réglages des commandes intacts). Les
+   * équipements de `undoBlockers` (« Toujours » de portée inconnue, réglage illisible) ne sont PAS rejoués : annoncés. */
   function inverseWrites(model, changes, confidencePolicy) {
     var c = normalize(model, changes || emptyChanges());
     var writes = [];
@@ -314,10 +335,8 @@
       var eq = model.eqs[id];
       if (c.eqs[id] === 'include') {
         writes.push({ kind: 'eq', id: id, data: { action: 'savePublicationOverride', eqId: id, publicationPolicy: 'exclude' } });
-      } else if (eq.own === 'always') {
-        writes.push({ kind: 'eq', id: id, data: { action: 'savePublicationOverride', eqId: id, publicationPolicy: 'force_publish' } });
-      } else {
-        writes.push({ kind: 'eq', id: id, data: { action: 'revertPublicationOverride', eqId: id } });
+      } else if (eq.own !== 'always' && eq.ownKnown) {
+        writes.push({ kind: 'eq', id: id, data: { action: 'revertPublicationOverride', eqId: id, scope: 'equipment' } });
       }
     });
     return writes;
@@ -342,7 +361,13 @@
       }
     }
     if (d.returned.length > 0) parts.push(d.returned.length + ' ' + (d.returned.length > 1 ? '{{ne seront plus exclus}}' : '{{ne sera plus exclu}}'));
+    if (d.undoBlocked && d.undoBlocked.length > 0) parts.push(undoBlockedText(d.undoBlocked.length));
     return parts.join(' · ');
+  }
+
+  /** Annonce (pied et bandeau) des équipements que « Annuler » ne rétablira pas. */
+  function undoBlockedText(n) {
+    return eqWord(n) + ' ' + (n > 1 ? '{{à rétablir depuis leur fiche si besoin : « Annuler » ne reprend pas leur réglage précédent}}' : '{{à rétablir depuis sa fiche si besoin : « Annuler » ne reprend pas son réglage précédent}}');
   }
 
   /** Bouton d'application : rouge dès qu'une entité part, vert sinon. { label, danger, disabled } */
@@ -554,7 +579,7 @@
         if (excludedAfter !== excludedBefore) {
           var local = diff(model, (function () { var c = emptyChanges(); if (kind === 'room') c.rooms[node.id] = excludedAfter; else c.plugins[node.id] = excludedAfter; return c; })());
           var text = excludedAfter
-            ? '→ ' + (kind === 'room' ? '{{sera exclue}}' : '{{sera exclu}}') + ' · ' + eqWord(local.excluded.length) + (model.known ? ', ' + entWord(local.removedEntities) + ' ' + (local.removedEntities > 1 ? '{{retirées}}' : '{{retirée}}') : '')
+            ? '→ ' + (kind === 'room' ? '{{sera exclue}}' : '{{sera exclu}}') + ' · ' + eqWord(local.excluded.length) + (local.entitiesKnown ? ', ' + entWord(local.removedEntities) + ' ' + (local.removedEntities > 1 ? '{{retirées}}' : '{{retirée}}') : '')
             : '→ ' + (kind === 'room' ? '{{ne sera plus exclue}}' : '{{ne sera plus exclu}}') + ' · ' + eqWord(local.returned.length);
           $n.addClass('j2ha-v2-changed');
           $n.append($('<span class="j2ha-v2-small j2ha-v2-excl-change"></span>').text(text));
@@ -617,6 +642,8 @@
     diff: diff,
     writesFor: writesFor,
     inverseWrites: inverseWrites,
+    undoBlockers: undoBlockers,
+    undoBlockedText: undoBlockedText,
     footText: footText,
     applyButton: applyButton,
     resultText: resultText,
