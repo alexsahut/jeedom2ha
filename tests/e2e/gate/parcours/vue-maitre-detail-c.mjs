@@ -17,10 +17,10 @@
  *
  * Story 25.6 : une carte ouvre la vue sur la PIÈCE SEULE (`data-j2ha-scope="piece"`). L'étape 2 vérifie d'abord cette portée
  * (`portee-piece-seule` : une seule pièce dans l'arbre, ses repères égaux à ceux de la carte, `seule:1` dans l'URL), puis
- * active « Toutes les pièces » sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
+ * active « Toute la maison » (bouton `.j2ha-wv-widen`, Lot 7 ; « Toutes les pièces » en 25.6) sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
  * assertions existantes (toutes les pièces de la page, mêmes repères). Étapes 3 à 9 inchangées dans leurs exigences.
  *
- * Story 25.7 : l'étape 10 (`cause-exclusion`, lecture seule) vérifie, dans l'arbre élargi filtré sur « exclus et autres »,
+ * Story 25.7 : l'étape 10 (`cause-exclusion`, lecture seule) vérifie, dans l'arbre élargi filtré sur « exclus ou inactifs » (« exclus et autres » avant le Lot 7),
  * que chaque ligne « Exclu » porte une mention de cause de la forme du glossaire (ou aucune), qu'aucune ligne « Désactivé »
  * n'en porte, et que la somme des repères « N exclus » des cartes égale le nombre de lignes « Exclu » ; zéro requête du plugin.
  *
@@ -86,7 +86,7 @@ async function checkOpen(page, helpers) {
 
 /**
  * (2, Story 25.6) Depuis une carte : l'arbre ne contient QUE la pièce de la carte cliquée, ses repères égalent ceux de la
- * carte, l'URL porte `seule:1` ; puis « Toutes les pièces » élargit sans aucune requête du plugin.
+ * carte, l'URL porte `seule:1` ; puis « Toute la maison » élargit sans aucune requête du plugin.
  */
 async function checkScopeAndWiden(page, helpers, cards) {
   const opened = cards[0];

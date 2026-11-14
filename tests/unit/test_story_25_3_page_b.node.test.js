@@ -142,15 +142,17 @@ describe('25.3 / AC1, AC10 — bloc maison', () => {
     assert.doesNotMatch(plain(ui.dom.body.children.map((c) => ui.$(c).text()).join(' ')), /Sera publié|prête|NaN|undefined/);
   });
 
-  maybe('légende en puces : button aria-pressed, ordre fixe, puces à zéro désactivées, « non lus » seulement si > 0', () => {
+  // Garde levée (front v2, Lot 7, spec E2) : les puces à zéro ne sont plus grisées mais masquées (toutes, pas seulement
+  // « non lus ») ; l'ordre reste fixe pour celles qui sont affichées.
+  maybe('légende en puces : button aria-pressed, ordre fixe, puces à zéro masquées, « non lus » seulement si > 0', () => {
     const ui = startPage();
     const chips = ui.$('#j2ha_houseChips .j2ha-chip-filter').list;
-    assert.deepEqual(chips.map((c) => c.attrs['data-filter']), ['published', 'blocked', 'to_apply', 'other', 'unread']);
-    chips.forEach((c) => { assert.equal(c.tag, 'button'); assert.equal(c.attrs['aria-pressed'], 'false'); });
     const counts = ui.page.view().overview.counts;
-    chips.forEach((c) => assert.equal(c.props.disabled === true, counts[c.attrs['data-filter']] === 0, c.attrs['data-filter']));
+    assert.deepEqual(chips.map((c) => c.attrs['data-filter']), ['published', 'blocked', 'to_apply', 'other', 'unread'].filter((key) => counts[key] > 0));
+    chips.forEach((c) => { assert.equal(c.tag, 'button'); assert.equal(c.attrs['aria-pressed'], 'false'); });
+    chips.forEach((c) => assert.notEqual(c.props.disabled, true, c.attrs['data-filter']));
     assert.equal(counts.unread, 1);
-    assert.equal(plain(ui.$(chips[4]).text()).trim(), '1 non lu');
+    assert.equal(plain(ui.$(chips[chips.length - 1]).text()).trim(), '1 non lu');
     // Sans équipement non lu, la puce « non lus » n’existe pas.
     const rooms = ui.rooms.map((r) => Object.assign({}, r, { equipments: r.equipments.filter((e) => e.eq_id !== 998) }));
     const all = O.computeOverview(rooms, equipmentsFor(ui.rooms));
