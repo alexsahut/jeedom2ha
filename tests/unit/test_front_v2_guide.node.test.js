@@ -95,6 +95,12 @@ describe('Lot 1 — computeSteps : table de vérité', () => {
 });
 
 describe('Lot 1 — revue PR #391 : publication réussie, installation connue', () => {
+  it('première relecture « boot » en échec, rien publié : le guide s’affiche, même si la lecture des états répond', () => {
+    assert.equal(G.shouldShow(FAILED, NEVER, {}), true);
+    assert.equal(G.shouldShow(FAILED, READ_OK, {}, { read: true, published: 0 }), true);
+    assert.equal(G.shouldShow(FAILED, READ_OK, { known: true }), false, 'installation connue : jamais');
+  });
+
   it('relecture terminée en échec : pas de publication réussie, étape 4 en erreur avec « Réessayer »', () => {
     assert.equal(G.publishedOk(FAILED, null, {}), false);
     assert.equal(G.publishFailed(FAILED), true);
@@ -116,9 +122,14 @@ describe('Lot 1 — revue PR #391 : publication réussie, installation connue', 
   it('installation connue : jamais de guide sur une panne, ni sur une lecture « jamais relu » après une relecture', () => {
     assert.equal(G.shouldShow(STOPPED, { kind: 'unavailable' }, { known: true }), false);
     assert.equal(G.shouldShow(UP, NEVER, { known: true }), false);
-    assert.equal(G.shouldShow(FAILED, NEVER, {}), false, 'une relecture a déjà été tentée');
-    assert.equal(G.knownInstall(undefined, READ_OK, {}), true);
-    assert.equal(G.knownInstall(STOPPED, { kind: 'unavailable' }, {}), false);
+    // Revue ClaudeBox : « connue » = preuve de SUCCÈS, jamais une simple tentative.
+    assert.equal(G.knownInstall(FAILED, null, {}), false, 'relecture tentée mais en échec : pas connue');
+    assert.equal(G.knownInstall(undefined, { read: true, published: 0 }, {}), false, 'lecture valide sans publié : pas connue');
+    assert.equal(G.knownInstall(undefined, { read: true, published: 2 }, {}), true);
+    assert.equal(G.knownInstall(SYNCED, null, {}), true, 'relecture réussie');
+    assert.equal(G.knownInstall(Object.assign({}, UP, { publication: { equipments_published: 5 } }), null, {}), true);
+    assert.equal(G.knownInstall(STOPPED, null, {}), false);
+    assert.equal(G.shouldShow(SYNCED, READ_OK, {}, { read: true, published: 4 }), false);
   });
 });
 
@@ -126,7 +137,7 @@ describe('Lot 1 — shouldShow', () => {
   it('jamais relu : affiché ; relu : jamais ; « Ne plus afficher » l’emporte', () => {
     assert.equal(G.shouldShow(UP, NEVER, {}), true);
     assert.equal(G.shouldShow(UP, READ_OK, {}), false);
-    assert.equal(G.shouldShow(STOPPED, READ_OK, {}), false);
+    assert.equal(G.shouldShow(STOPPED, READ_OK, {}, { read: true, published: 3 }), false, 'lecture valide avec des publiés : connue');
     assert.equal(G.shouldShow(UP, NEVER, { dismissed: true }), false);
   });
 
@@ -135,7 +146,10 @@ describe('Lot 1 — shouldShow', () => {
     assert.equal(G.shouldShow(BROKER_DOWN, { kind: 'unavailable' }, {}), true);
     assert.equal(G.shouldShow(null, { kind: 'unavailable' }, {}), true);
     assert.equal(G.shouldShow(STOPPED, { kind: 'unavailable' }, { published: true }), false);
-    assert.equal(G.shouldShow(Object.assign({}, BROKER_DOWN, { derniere_synchro_terminee: '2026-11-13T10:00:00Z' }), { kind: 'unavailable' }, {}), false);
+    const succeeded = { derniere_synchro_terminee: '2026-11-13T10:00:00Z', derniere_operation_resultat: { resultat: 'succes', intention: 'sync' } };
+    assert.equal(G.shouldShow(Object.assign({}, BROKER_DOWN, succeeded), { kind: 'unavailable' }, {}), false, 'relecture réussie : connue');
+    // Une date de fin seule (tentative) ne prouve rien : le démon la pose aussi quand la publication échoue.
+    assert.equal(G.shouldShow(Object.assign({}, BROKER_DOWN, { derniere_synchro_terminee: '2026-11-13T10:00:00Z' }), { kind: 'unavailable' }, {}), true);
   });
 
   it('rien avant la première lecture des états (pas d’éclair au chargement)', () => {
@@ -240,7 +254,7 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     assert.equal(ui.dom.dialogs.length, dialogs, 'aucune confirmation');
     assert.equal(ui.$('#j2ha_v2_guide .j2ha-v2-guide-publish').prop('disabled'), true, 'pas de second envoi');
     ui.finishPublish(false);
-    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], '1', 'installation connue dès la première relecture');
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], undefined, '« connue » attend une preuve de succès');
     assert.equal(ui.storage.data[G.STORAGE_KEYS.published], undefined, 'publication réussie : attestée par l’état réel, pas par la fin de la relecture');
     assert.match(ui.text('#j2ha_v2_guide'), /C'est fait : vos équipements sont dans Home Assistant\./);
     // Relecture des états après la publication : le nombre et trois noms publiés apparaissent.
@@ -248,6 +262,7 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     ui.answer(require('./helpers/page_b_harness').okBody(require('./helpers/page_b_harness').equipmentsFor(ui.rooms)));
     const view = ui.page.view().overview;
     assert.equal(ui.storage.data[G.STORAGE_KEYS.published], view.counts.published > 0 ? '1' : undefined);
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], view.counts.published > 0 ? '1' : undefined);
     const text = ui.text('#j2ha_v2_guide');
     assert.match(text, new RegExp(`C'est fait : ${view.counts.published} équipements sont dans Home Assistant\\.`));
     assert.match(text, /Paramètres › Appareils et services › MQTT/);
@@ -307,6 +322,25 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     broken.click('#j2ha_v2_guide .j2ha-v2-guide-dismiss');
     broken.guide.onStatus(UP);
     assert.equal(broken.$('#j2ha_v2_guide').children().length, 0, '« Ne plus afficher » tenu pour la page');
+  });
+
+  // Revue ClaudeBox de f6396c6 : la relecture « boot » du premier démarrage échoue, rien n'est publié.
+  maybe('première relecture « boot » échouée, rien publié : guide affiché au chargement, étape 4 en erreur avec « Réessayer »', () => {
+    const ui = startGuide({ page: { answer: false }, storage: { [G.STORAGE_KEYS.haSeen]: '1', [G.STORAGE_KEYS.choice]: '1' } });
+    ui.guide.onStatus(FAILED);
+    ui.answer(NEVER_BODY);
+    assert.match(ui.text('#j2ha_v2_guide'), /Bienvenue dans jeedom2ha/);
+    assert.equal(ui.$('#j2ha_mainView').list[0].visible, false);
+    const step = ui.$('#j2ha_v2_guide .j2ha-v2-step[data-step="publish"]');
+    assert.ok(step.hasClass('is-blocked'), 'étape 4 en erreur');
+    assert.match(plain(step.text()), /La dernière publication a échoué/);
+    assert.equal(plain(ui.$('#j2ha_v2_guide .j2ha-v2-guide-publish').text()), 'Réessayer de publier');
+    assert.equal(ui.storage.data[G.STORAGE_KEYS.known], undefined);
+    // Le démon répond aussi à la lecture des états, sans aucun équipement publié : le guide reste.
+    const ok = startGuide({ page: { answer: false } });
+    ok.guide.onStatus(FAILED);
+    ok.answer({ state: 'ok', result: { status: 'ok', payload: { schema_version: 1, available: true, meta: { action_in_progress: false }, equipments: {}, unread: [] } } });
+    assert.match(ok.text('#j2ha_v2_guide'), /Bienvenue dans jeedom2ha/);
   });
 
   // Revue PR #391 (point 1) : une panne d'une installation connue n'affiche jamais le guide plein écran.

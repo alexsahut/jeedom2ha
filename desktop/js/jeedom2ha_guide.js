@@ -140,13 +140,14 @@
   }
 
   /**
-   * Installation déjà connue : une relecture a déjà eu lieu (même en échec), une lecture des états a réussi, ou ce
-   * navigateur l'a déjà vue publiée. Une panne d'une installation connue n'affiche JAMAIS le guide plein écran : la barre
-   * d'état et « Vérifier l'installation… » suffisent.
+   * Installation déjà connue = une publication a RÉUSSI (jamais une simple tentative : le démon renseigne la date de fin
+   * même quand la publication échoue, et il lance une relecture « boot » dès son premier démarrage). Preuves :
+   * `status.publication.equipments_published > 0`, lecture des états avec au moins un publié, relecture réussie ou
+   * partielle, ou ce navigateur l'a déjà constaté. Une panne d'une installation connue n'affiche JAMAIS le guide plein
+   * écran : la barre d'état et « Vérifier l'installation… » suffisent.
    */
-  function knownInstall(status, readState, local) {
-    return !!((local && (local.known || local.published)) || (status && status.derniere_synchro_terminee)
-      || (readState && readState.kind === 'ok') || publishedOk(status, null, null));
+  function knownInstall(status, summary, local) {
+    return !!((local && (local.known || local.published)) || publishedOk(status, summary, null));
   }
 
   /**
@@ -195,20 +196,20 @@
   }
 
   /**
-   * Le guide s'affiche seul quand rien n'a encore été publié : jamais relu, ou démon / broker indisponible sur une
-   * installation que ce navigateur n'a jamais vue publiée. Jamais avant la première lecture des états ; jamais si
-   * l'utilisateur a choisi « Ne plus afficher ».
+   * Le guide s'affiche seul tant que rien n'a encore été publié avec succès : jamais relu, démon / broker indisponible,
+   * ou dernière relecture en échec (première relecture « boot » ratée comprise). Jamais pour une installation connue
+   * (voir knownInstall), jamais avant la première lecture des états, jamais après « Ne plus afficher ».
    */
-  function shouldShow(status, readState, local) {
+  function shouldShow(status, readState, local, summary) {
     var loc = local || {};
     if (loc.dismissed) return false;
     var kind = readState && readState.kind;
     if (!kind) return false;
-    if (kind === 'ok') return false;
-    if (knownInstall(status, readState, loc)) return false;
+    if (knownInstall(status, summary, loc)) return false;
     if (kind === 'never_synced') return true;
     if (status === undefined) return false;
-    return status === null || !bridgeUp(status);
+    if (status === null || !bridgeUp(status)) return true;
+    return publishFailed(status);
   }
 
   /**
@@ -382,7 +383,7 @@
     // Ce que la page apprend de l'état réel : installation connue, publication réussie (retenu pour les pannes futures).
     function learn() {
       var loc = local();
-      if (!loc.known && knownInstall(st.status, readState(), {})) remember('known');
+      if (!loc.known && knownInstall(st.status, summary(), {})) remember('known');
       if (!loc.published && publishedOk(st.status, summary(), {})) remember('published');
     }
     function jeedomCount() {
@@ -569,7 +570,7 @@
           st.phase = 'steps';
           st.error = '{{La publication n\'a pas abouti : lisez le message affiché, puis réessayez.}}';
         } else {
-          remember('known');
+          // Pas de « connue » ici : seule une preuve de succès (état du démon, lecture des états) la pose, dans learn().
           remember('choice');
           st.phase = 'done';
         }
@@ -591,7 +592,7 @@
         if (!st.mode) st.mode = 'auto';
       }
       if (st.closed || st.mode === 'manual' || st.phase !== 'steps') { render(); return; }
-      var show = shouldShow(st.status, readState(), local());
+      var show = shouldShow(st.status, readState(), local(), summary());
       if (show && (typeof env.canAutoShow !== 'function' || env.canAutoShow())) {
         st.visible = true;
         st.mode = 'auto';
