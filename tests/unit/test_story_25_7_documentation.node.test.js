@@ -22,7 +22,7 @@ describe('25.7 / AC10 — documentation de la cause d\'exclusion', () => {
     // Garde levée (front v3, Lot 3) : la phrase de renvoi des pièces quitte la configuration (et la doc) avec le bloc « Ce qui est
     // publié » ; « Plugins exclus » reste cité, car c'est le mot de la cause d'exclusion affichée (mapping_override.js, ajouts seuls).
     for (const needle of ['« par le plugin X »', '« par la pièce »', '« individuelle »', 'Exclusions volontaires', '« Exclus : »', '« N exclus »',
-      '**La cause d\'exclusion**', 'Ouvrir la configuration du plugin', '« Plugins exclus »', '« par son plugin »', '« autre »']) {
+      '**La cause d\'exclusion**', '« Plugin exclu : X »', '« Choisir ce qui est publié »', '« par son plugin »', '« autre »']) {
       assert.ok(index.includes(needle), needle);
     }
     assert.match(index, /Ce n'est pas un état de plus/);
@@ -37,7 +37,8 @@ describe('25.7 / AC10 — documentation de la cause d\'exclusion', () => {
   });
 
   it('chaque libellé cité entre « » dans la documentation existe verbatim dans desktop/', () => {
-    for (const label of ['Exclus', 'Plugins exclus', 'Ouvrir la configuration du plugin', 'par le plugin', 'par la pièce', 'individuelle', 'par son plugin', 'autre',
+    // Garde levée (front v3, Lot 3) : cause traduite à l'affichage (« Plugin exclu ») et bouton vers le panneau « Choisir ».
+    for (const label of ['Exclus', 'Plugin exclu', 'Choisir ce qui est publié', 'par le plugin', 'par la pièce', 'individuelle', 'par son plugin', 'autre',
       'Exclu par la pièce : toute la pièce est exclue', 'Exclusion individuelle : réglage « Jamais »', 'Exclusion individuelle : « Jamais » sur ses entités',
       "Exclusion individuelle : réglage de l'équipement dans Jeedom"]) {
       assert.ok(desktop.includes(label), `« ${label} » absent de desktop/`);

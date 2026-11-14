@@ -488,6 +488,7 @@
 .j2ha-v3-excl-doubt-label { font-weight: 600; }
 .j2ha-v2-excl .j2ha-v2-excl-count { font-variant-numeric: tabular-nums; cursor: help; }
 .j2ha-v3-excl-off { cursor: help; white-space: nowrap; }
+.j2ha-v2-excl .j2ha-v3-excl-target { box-shadow: inset 4px 0 0 var(--j2ha-todo); background: var(--j2ha-todo-bg); }
 /* Guide : une ligne par étape (pastille, titre, état, action, ⓘ). */
 .j2ha-v2-step.j2ha-v3-step-line {
   grid-template-columns: 28px minmax(0, 1fr) auto;

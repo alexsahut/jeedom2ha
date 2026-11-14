@@ -629,13 +629,23 @@
     if (!cause) {
       return;
     }
-    var name = M.exclusionPluginName(roomEqTypeById()[eqId], window.j2haPluginNames);
+    var eqType = roomEqTypeById()[eqId];
+    var name = M.exclusionPluginName(eqType, window.j2haPluginNames);
     var $notice = $('<div class="j2ha-notice j2ha-notice-neutral" role="status"></div>');
     $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
-    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + M.exclusionCauseText(cause, name, 'sentence')));
+    // Front v3 (Lot 3) : la phrase de mapping_override.js (ajouts seuls) renvoyait à « Plugins exclus » de la configuration, qui
+    // ne règle plus ce qui est publié. Elle est traduite à l'affichage : libellé court + ⓘ, et le bouton mène au panneau
+    // « Choisir ce qui est publié », sur le plugin (ou la pièce) en cause.
+    var shown = cause.kind === 'plugin'
+      ? '{{Plugin exclu}}' + (name ? ' : ' + name : '')
+      : M.exclusionCauseText(cause, name, 'sentence');
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + shown));
     if (cause.kind === 'plugin') {
-      $notice.append($('<a class="btn btn-default btn-xs j2ha-open-plugin-config" target="_blank" rel="noopener"></a>')
-        .attr('href', PLUGIN_CONFIG_URL).text('{{Ouvrir la configuration du plugin}}'));
+      var tip = '{{Les équipements de ce plugin ne sont pas publiés. À rétablir dans « Choisir ce qui est publié », par plugin.}}';
+      $notice.append(document.createTextNode(' ')).append(typeInfo(tip));
+      $notice.append(choosePublishedButton({ mode: 'plugin', plugin: eqType || '' }, 'j2ha-open-plugin-config'));
+    } else if (cause.kind === 'piece') {
+      $notice.append(choosePublishedButton({ mode: 'room', roomId: roomIdOfEquipment(eqId) }, 'j2ha-open-room-choose'));
     }
     $host.append($notice);
   }
@@ -1237,6 +1247,9 @@
     var inFlight = ctx.xhr[state.cmdId];
     if (inFlight && typeof inFlight.abort === 'function') inFlight.abort();
     ctx.xhr[state.cmdId] = null;
+    // Front v3 (Lot 3, revue Codex) : l'arrière-plan redevient actif, l'écoute d'Échap au niveau du document est retirée.
+    if (state.$inert) state.$inert.removeAttr('inert');
+    $(document).off('keydown.j2haTypeModal');
     state.$row.remove();
     if (state.$origin && state.$origin.length) {
       state.$origin.attr('aria-expanded', 'false');
@@ -1295,6 +1308,52 @@
         .append(typeInfo('{{Cette entité sera retirée de Home Assistant.}}'))
         .append(document.createTextNode(' ')).append($('<code></code>').text(id)));
     });
+  }
+
+  // Tab / Maj+Tab : le focus reste dans la fenêtre « Corriger le type » (premier ↔ dernier élément atteignable).
+  function trapTypeFocus(state, event) {
+    var root = state.$row && state.$row.get ? state.$row.get(0) : null;
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    var nodes = Array.prototype.slice.call(root.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return el.offsetParent !== null || el.getClientRects().length > 0; });
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var active = typeof document !== 'undefined' ? document.activeElement : null;
+    var inside = !!active && root.contains(active);
+    if (event.shiftKey && (!inside || active === first)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (!inside || active === last)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Front v3 (Lot 3) : bouton « Choisir ce qui est publié » ouvrant le panneau de la page (fonction de jeedom2ha.js), positionné
+  // sur un plugin ou une pièce ; repli, si la page ne l'expose pas, sur la configuration (lien ↗ vers le panneau).
+  function choosePublishedButton(opts, cls) {
+    var open = typeof window !== 'undefined' && typeof window.openChoosePublished === 'function' ? window.openChoosePublished
+      : (typeof openChoosePublished === 'function' ? openChoosePublished : null);
+    if (!open) {
+      return $('<a class="btn btn-default btn-xs" target="_blank" rel="noopener"></a>').addClass(cls).attr('href', PLUGIN_CONFIG_URL)
+        .append($('<i class="fas fa-check-square" aria-hidden="true"></i>')).append(document.createTextNode(' {{Choisir ce qui est publié}}'));
+    }
+    var $b = $('<button type="button" class="btn btn-default btn-xs"></button>').addClass(cls)
+      .attr('title', '{{Ouvrir le panneau « Choisir ce qui est publié »}}')
+      .append($('<i class="fas fa-check-square" aria-hidden="true"></i>')).append(document.createTextNode(' {{Choisir ce qui est publié}}'));
+    $b.on('click', function () { open(opts || {}); });
+    return $b;
+  }
+
+  function roomIdOfEquipment(eqId) {
+    var rooms = (typeof window !== 'undefined' && window.j2haRoomsTree) || [];
+    for (var i = 0; i < rooms.length; i++) {
+      var eqs = rooms[i] && rooms[i].equipments ? rooms[i].equipments : [];
+      for (var k = 0; k < eqs.length; k++) if (eqs[k].eq_id === eqId) return rooms[i].object_id;
+    }
+    return null;
   }
 
   // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
@@ -1576,11 +1635,20 @@
     state.$cancel.on('click', function () { if (!state.busy) closeTypePanel(true); });
     state.$save.on('click', function () { saveTypeChoice(tp, state); });
     $box.append($('<div class="j2ha-v2-foot"></div>').append(state.$cancel).append(state.$save));
+    // Front v3 (Lot 3, revue Codex) : fenêtre modale au clavier. Tab / Maj+Tab bouclent dans la fenêtre ; Échap la ferme
+    // quel que soit l'élément qui a le focus (écoute au niveau du document) ; le focus revient au déclencheur.
     $box.on('keydown', function (event) {
-      if (event && event.key === 'Escape' && !state.busy) {
+      if (event && event.key === 'Tab') trapTypeFocus(state, event);
+      if (event && event.key === 'Escape' && !state.busy && ctx.typePanel === state) {
         if (event.preventDefault) event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
         closeTypePanel(true);
       }
+    });
+    $(document).off('keydown.j2haTypeModal').on('keydown.j2haTypeModal', function (event) {
+      if (!event || event.key !== 'Escape' || ctx.typePanel !== state || state.busy) return;
+      if (event.preventDefault) event.preventDefault();
+      closeTypePanel(true);
     });
 
     var $backdrop = $('<div class="j2ha-v3-type-backdrop" aria-hidden="true"></div>');
@@ -1588,6 +1656,9 @@
     state.$row = $('<div class="j2ha-v3-type-modal"></div>').attr('data-type-panel-for', cmdId).attr('data-eq-id', String(eqId))
       .append($backdrop).append($('<div class="j2ha-v3-type-dialog"></div>').append($box));
     $(document.body).append(state.$row);
+    // Arrière-plan inerte pendant l'ouverture (souris, clavier, lecteurs d'écran) ; seuls les éléments rendus inertes ici
+    // sont rétablis à la fermeture.
+    state.$inert = $(document.body).children().not('.j2ha-v3-type-modal').not('[inert]').not('script').attr('inert', '');
     ctx.typePanel = state;
     $origin.attr('aria-expanded', 'true');
     var $checked = $box.find('input[data-type="' + (state.current || 'auto') + '"]').first();
@@ -1768,9 +1839,11 @@
             .append($('<i class="fas fa-external-link-alt" aria-hidden="true"></i>')).append(document.createTextNode(' {{Ouvrir dans Jeedom}}')));
         }
       } else if (act === 'plugin_config') {
-        out.push($('<a class="btn btn-default btn-xs j2ha-v2-open-plugin-config" target="_blank" rel="noopener"></a>')
-          .attr('href', PLUGIN_CONFIG_URL).attr('title', '{{Ouvrir la configuration du plugin}}')
-          .append($('<i class="fas fa-cog" aria-hidden="true"></i>')).append(document.createTextNode(' {{Configuration}}')));
+        // Front v3 (Lot 3) : plugin exclu, réglage « En cas de doute » : tout se règle dans le panneau « Choisir ce qui est
+        // publié » (la configuration ne règle plus ce qui est publié). Plugin exclu : ouvert « Par plugin », plugin en évidence.
+        var sheetCode = sheet && sheet.code ? sheet.code : '';
+        var plugin = sheetCode === 'excluded_plugin' ? (roomEqTypeById()[eqId] || '') : null;
+        out.push(choosePublishedButton(plugin !== null ? { mode: 'plugin', plugin: plugin } : {}, 'j2ha-v2-open-plugin-config'));
       } else if (act === 'correct_type') {
         if (canCorrectType(tree, cmdIds)) {
           var $correct = $('<button type="button" class="btn btn-default btn-xs j2ha-v2-correct-type"></button>')

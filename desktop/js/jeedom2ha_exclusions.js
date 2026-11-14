@@ -509,6 +509,9 @@
       var expanded = {};
       if (o.roomId !== undefined && o.roomId !== null) expanded['room:' + o.roomId] = true;
       if (o.eqId !== undefined && o.eqId !== null && model.eqs[o.eqId]) expanded['room:' + model.eqs[o.eqId].roomId] = true;
+      // Front v3 (Lot 3) : ouvert depuis la cause « Plugin exclu » d'une fiche : « Par plugin », le plugin déplié et en évidence.
+      var target = typeof o.plugin === 'string' && o.plugin !== '' ? o.plugin : null;
+      if (target !== null) { mode = 'plugin'; expanded['plugin:' + target] = true; }
 
       // Front v3 (Lot 3) : aucune phrase d'introduction. En-tête d'une ligne : regroupement, règle d'héritage en ⓘ, puis le
       // réglage « En cas de doute » (déplacé de la configuration du plugin), qui compte comme un changement à appliquer.
@@ -642,6 +645,8 @@
           $n.addClass('j2ha-v2-changed');
           $n.append($('<span class="j2ha-v2-small j2ha-v2-excl-change"></span>').text(text));
         }
+        if (kind === 'plugin' && target !== null && node.id === target) $n.addClass('j2ha-v3-excl-target');
+        if (kind === 'room' && o.roomId !== undefined && o.roomId !== null && node.id === o.roomId && o.mode === 'room') $n.addClass('j2ha-v3-excl-target');
         var $wrap = $('<div class="j2ha-v2-excl-node"></div>').append($n);
         if (isOpen) node.eqIds.forEach(function (id) { $wrap.append(eqLine(id, 'is-l2')); });
         return $wrap;
@@ -681,6 +686,9 @@
       if (o.eqId !== undefined && o.eqId !== null) {
         var $target = $tree.find('.j2ha-v2-excl-eq[data-eq-id="' + o.eqId + '"] .j2ha-v2-excl-cb');
         if ($target.length) $target.focus();
+      } else if (target !== null) {
+        var $plugin = $tree.find('.j2ha-v2-excl-group[data-kind="plugin"][data-id="' + target + '"] .j2ha-v2-excl-cb');
+        if ($plugin.length) $plugin.focus();
       } else if (o.roomId !== undefined && o.roomId !== null) {
         var $room = $tree.find('.j2ha-v2-excl-group[data-kind="room"][data-id="' + o.roomId + '"] .j2ha-v2-excl-cb');
         if ($room.length) $room.focus();

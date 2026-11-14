@@ -244,3 +244,82 @@ test('Lot 3 (4) — [Vu] / [Pas vu] pour Home Assistant (faux DOM, code réel)',
   assert.equal(plain(row.find('.j2ha-v2-check-hahelp').text()), 'Pas vu');
   assert.match(plain(row.find('.j2ha-v3-check-info').attr('title')), /Home Assistant se signale sur le broker/);
 });
+
+// --- Revue Codex (#403, P2) : clavier dans la fenêtre « Corriger le type » ---
+
+for (const theme of ['Light', 'Dark']) {
+  test(`Lot 3 (5) réel — fenêtre modale au clavier : focus initial dedans, Tab / Maj+Tab bouclent, fond inerte, Échap partout, focus rendu (${theme})`, async (t) => {
+    await withRealView(t, options(theme, 1280), async (page, ctx) => {
+      await setTheme(page, theme);
+      const P = '.j2ha-eq-panel[data-eq-id="231"]';
+      await page.locator(`${P} .j2ha-cmd-table`).waitFor();
+      const link = page.locator(`${P} tr[data-cmd-id="2311"] .j2ha-type-link`);
+      await link.focus();
+      await page.keyboard.press('Enter');
+      await page.locator('.j2ha-v3-type-modal .j2ha-v2-type-panel').waitFor();
+      const inside = () => page.evaluate(() => !!document.activeElement && !!document.activeElement.closest('.j2ha-v3-type-modal'));
+      assert.equal(await inside(), true, 'focus initial dans la fenêtre');
+      const inert = await page.evaluate(() => [...document.body.children].filter((el) => !el.classList.contains('j2ha-v3-type-modal') && el.tagName !== 'SCRIPT')
+        .every((el) => el.inert === true));
+      assert.equal(inert, true, 'arrière-plan inerte');
+      for (let i = 0; i < 25; i += 1) { await page.keyboard.press('Tab'); assert.equal(await inside(), true, `Tab n° ${i + 1}`); }
+      for (let i = 0; i < 25; i += 1) { await page.keyboard.press('Shift+Tab'); assert.equal(await inside(), true, `Maj+Tab n° ${i + 1}`); }
+      // Échap avec le focus sorti par un script (body) : la fenêtre se ferme quand même.
+      await page.evaluate(() => document.activeElement.blur());
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.j2ha-v3-type-modal').count(), 0);
+      const after = await page.evaluate(() => ({
+        focused: document.activeElement && document.activeElement.classList.contains('j2ha-type-link')
+          && document.activeElement.closest('tr').getAttribute('data-cmd-id'),
+        inert: [...document.body.children].some((el) => el.inert === true),
+      }));
+      assert.equal(after.focused, '2311', 'focus rendu au déclencheur');
+      assert.equal(after.inert, false, 'arrière-plan rendu actif');
+      assert.deepEqual(ctx.errors, []);
+    });
+  });
+}
+
+// --- Cause « Plugin exclu » : le bouton mène au panneau, par plugin, le plugin en évidence ---
+
+function excluded(id, reason) {
+  const diag = { ha_entity_type: null, publication_reason: reason, reason_code: null, should_publish: false,
+    projection_validity: { is_valid: false, missing_capabilities: [], missing_fields: [], reason_code: reason } };
+  return { jeedom_eq_id: id, commands: [{ jeedom_cmd_id: id * 10, covered: false, diagnostic: diag, published_in_ha: false }], entities: [],
+    equipment_decision: diag, sync_status: { published_in_ha: false, synced_should_publish: false, current_should_publish: false } };
+}
+
+for (const theme of ['Light', 'Dark']) {
+  test(`Lot 3 (6) réel — « Plugin exclu » → « Choisir ce qui est publié », par plugin, plugin en évidence ; pièce exclue → panneau sur la pièce (${theme})`, async (t) => {
+    const scene = Object.assign({}, SCENE, { eqlogics: { 9: [{ id: 401, name: 'Eq plugin', type: 'plugin_alpha' }, { id: 402, name: 'Eq pièce', type: 'plugin_beta' }] },
+      plugin_names: { plugin_alpha: 'Alpha', plugin_beta: 'Beta' } });
+    const equipments = { 401: excluded(401, 'excluded_plugin'), 402: excluded(402, 'excluded_object') };
+    await withRealView(t, Object.assign(options(theme, 1280), { scene, equipments, treeFor: (id) => ({ state: 'ok', result: { status: 'ok', payload: equipments[id] } }),
+      hash: '#j2ha-vue=piece:9;eq:401' }), async (page, ctx) => {
+      await setTheme(page, theme);
+      const notice = page.locator('.j2ha-eq-panel[data-eq-id="401"] .j2ha-eq-exclusion .j2ha-notice');
+      await notice.waitFor();
+      assert.equal(plain(await notice.locator('.j2ha-notice-text').innerText()), 'Plugin exclu : Alpha');
+      assert.doesNotMatch(await notice.innerText(), /configuration du plugin/);
+      await notice.locator('.j2ha-open-plugin-config').click();
+      const panel = page.locator('.bootbox .j2ha-v2-excl');
+      await panel.waitFor();
+      assert.equal(await panel.locator('.j2ha-v2-excl-mode button[data-mode="plugin"]').getAttribute('aria-pressed'), 'true');
+      const target = panel.locator('.j2ha-v3-excl-target');
+      assert.equal(await target.count(), 1);
+      assert.equal(await target.getAttribute('data-id'), 'plugin_alpha');
+      assert.equal(await target.getAttribute('aria-expanded'), 'true');
+      assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.closest('.j2ha-v3-excl-target') !== null), true, 'focus sur la case du plugin');
+      await panel.locator('.j2ha-v2-excl-cancel').click();
+      await page.evaluate(() => { window.location.hash = '#j2ha-vue=piece:9;eq:402'; });
+      const room = page.locator('.j2ha-eq-panel[data-eq-id="402"] .j2ha-eq-exclusion .j2ha-open-room-choose');
+      await room.waitFor();
+      await room.click();
+      await panel.waitFor();
+      assert.equal(await panel.locator('.j2ha-v2-excl-group[data-kind="room"][data-id="9"]').getAttribute('aria-expanded'), 'true');
+      assert.equal(await panel.locator('.j2ha-v3-excl-target[data-kind="room"][data-id="9"]').count(), 1);
+      assert.deepEqual(ctx.journal.filter((e) => ['saveFilteringConfig', 'scanTopology', 'saveRoomExclusion'].includes(e.action)), [], 'aucune écriture');
+      assert.deepEqual(ctx.errors, []);
+    });
+  });
+}
