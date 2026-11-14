@@ -46,7 +46,7 @@ La page du plugin répond toujours aux mêmes trois questions, pour toute la mai
 - **« Corriger le type… »** : pour régler ici ce que voit Home Assistant, sans toucher à Jeedom (voir plus bas).
 - **« Ouvrir la configuration du plugin »** : quand la cause est un réglage du plugin (un plugin exclu, par exemple).
 - **« Republier »** : quand l'envoi à Home Assistant a échoué.
-- Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier.
+- Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier. Ce réglage est enregistré, puis attend : l'équipement passe « À appliquer », et le bouton **« Appliquer »** de sa fiche l'envoie à Home Assistant.
 
 ## Relire Jeedom ou Republier tout ?
 
@@ -55,7 +55,7 @@ Les deux boutons de la barre d'état, en haut de la page du plugin :
 - **« Relire Jeedom »** : *j'ai changé quelque chose dans Jeedom* (un équipement, un type générique, un nom, une pièce). Le plugin relit Jeedom, puis met Home Assistant à jour, et applique au passage les réglages en attente.
 - **« Republier tout »** : *Home Assistant a perdu ses appareils* (après un redémarrage du broker, par exemple). Le plugin renvoie à Home Assistant ce qui est déjà publié, sans relire Jeedom.
 
-Pour un seul équipement ou une seule pièce, les mêmes gestes existent dans leur menu « ⋯ » : **« Republier »** et **« Republier la pièce »**.
+Une modification faite dans Jeedom, même sur un seul équipement, demande toujours « Relire Jeedom » : les gestes « Republier » ne relisent pas Jeedom. Pour renvoyer seulement un équipement ou une pièce, leur menu « ⋯ » propose **« Republier »** et **« Republier la pièce »**.
 
 ## Corriger un type
 
@@ -72,11 +72,11 @@ La colonne « Type HA » affiche alors « Personnalisé : Lumière (light) ». P
 
 Tout ce que le plugin reconnaît est publié par défaut. Pour retirer quelque chose de Home Assistant :
 
-- **un équipement** : réglez-le sur **« Jamais »** dans sa fiche ;
+- **un équipement** : réglez-le sur **« Jamais »** dans sa fiche, puis cliquez sur **« Appliquer »** (le réglage n'est envoyé à Home Assistant qu'à ce moment) ;
 - **une pièce** : menu « ⋯ » de sa carte, ou de la pièce ouverte, **« Exclure la pièce… »** ; une confirmation dit combien d'entités quitteront Home Assistant ;
 - **tous les équipements d'un plugin** : cochez-le dans **« Plugins exclus »**, dans la configuration du plugin, puis cliquez sur **« Enregistrer et relire Jeedom »**.
 
-Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. Pour le reprendre : « Automatique », « Ne plus exclure la pièce… », ou décochez le plugin.
+Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. Pour le reprendre : « Automatique » puis « Appliquer » dans sa fiche, « Ne plus exclure la pièce… », ou décochez le plugin puis « Enregistrer et relire Jeedom ».
 
 ## Quelque chose ne va pas ? « Vérifier l'installation… »
 
