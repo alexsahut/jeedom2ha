@@ -49,7 +49,8 @@ foreach (array('Mes templates', 'Équipement Template', 'Paramètre n°1', 'Para
 foreach (array('param1', 'password', 'autorefresh') as $key) {
     check("aucun eqLogicAttr orphelin « {$key} »", strpos($rendered, 'data-l2key="' . $key . '"') === false);
 }
-check('titre « Configuration Home Assistant par pièce »', strpos($rendered, '{{Configuration Home Assistant par pièce}}') !== false);
+// Garde levée (front v2, Lot 7, glossaire 3.2) : nouveau titre de la page.
+check('titre « Ce que Jeedom publie dans Home Assistant »', strpos($rendered, '{{Ce que Jeedom publie dans Home Assistant}}') !== false);
 check('le cœur Jeedom garde plugin.template', strpos($rendered, "include_file('core', 'plugin.template', 'js')") !== false);
 
 echo "AC7 — relais conservés\n";

@@ -180,7 +180,7 @@ describe('25.3 / AC10, AC12 — segments sommant au total (invariant sur 20 fixt
     }
   });
 
-  it('ordre des segments : publiés, à appliquer, bloqués, exclus et autres, non lus', () => {
+  it('ordre des segments : publiés, à appliquer, bloqués, exclus ou inactifs, non lus', () => {
     const segments = O.gaugeSegments({ published: 1, to_apply: 2, blocked: 3, other: 4, unread: 5 }, 15);
     assert.deepEqual(segments.map((s) => s.key), ['published', 'to_apply', 'blocked', 'other', 'unread']);
     assert.deepEqual(segments.map((s) => s.pct), [1, 2, 3, 4, 5].map((n) => (n / 15) * 100));
@@ -191,7 +191,7 @@ describe('25.3 / AC10, AC12 — segments sommant au total (invariant sur 20 fixt
     assert.match(label, /5 publiés sur 11/);
     assert.match(label, /1 à appliquer/);
     assert.match(label, /2 bloqués/);
-    assert.match(label, /3 exclus et autres/);
+    assert.match(label, /3 exclus ou inactifs/);
     assert.doesNotMatch(label, /non lu/);
   });
 
@@ -213,7 +213,7 @@ describe('25.3 / AC11 — filtres globaux', () => {
     }
   });
 
-  it('« exclus et autres » regroupe exclus, désactivés et rien à publier avec leur propre état', () => {
+  it('« exclus ou inactifs » regroupe exclus, désactivés et rien à publier avec leur propre état', () => {
     const overview = O.computeOverview(sampleRooms(), sampleEquipments());
     const rows = O.filterRows(overview, 'other');
     assert.ok(rows.length > 0);

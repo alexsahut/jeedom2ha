@@ -1,7 +1,7 @@
 /** Story 25.3 : page principale B en lecture seule (barre de santé, jauge maison filtrante, cartes, menu « ⋯ »).
  *
- * Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C. Un clic sur une puce ouvre la vue avec ce filtre
- * (l'étape 4 contrôle les mêmes exigences dans la vue, mêmes étiquettes d'erreur) ; l'étape 7 vérifie que la carte ouvre la
+ * Story 25.4 : la fenêtre de pièce est remplacée par la vue de travail C. Front v2 (Lot 7) : une puce filtre sur place
+ * (l'étape 4 contrôle la liste de la page, mêmes étiquettes d'erreur) ; l'étape 7 vérifie que la carte ouvre la
  * vue (lignes d'arbre > 0), sans lecture d'état supplémentaire et sans lecture d'arbre avant sélection. Vrais clics.
  *
  * Aucune écriture : aucun clic ne confirme une action destructrice (la confirmation est annulée), la boîte du
@@ -77,9 +77,9 @@ async function checkGauges(page, helpers) {
   helpers.record('cartes_controlees', sums.cards.length);
 }
 
-/** (4) Chaque puce non vide filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé.
- * Story 25.4 : la puce de la page B ouvre la vue de travail avec ce filtre ; les lignes sont celles de l'arbre de la vue,
- * la puce pressée est celle de la vue, un second clic retire le filtre ; « Toutes les pièces » ramène à la page. */
+/** (4) Chaque puce filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé.
+ * Front v2 (Lot 7, garde levée) : la puce filtre SUR PLACE (liste #j2ha_filterPanel), la vue de travail ne s'ouvre pas ;
+ * aucune puce à zéro n'est affichée ; un second clic retire le filtre. (Story 25.4 : la puce ouvrait la vue.) */
 async function checkFilters(page, helpers) {
   // Seules les requêtes du plugin comptent : le cœur Jeedom (événements, santé) peut interroger la box
   // pendant la boucle sans lien avec les filtres (constat du gate du 2026-10-19).
@@ -94,18 +94,18 @@ async function checkFilters(page, helpers) {
     const chip = chips.nth(index);
     const key = await chip.getAttribute('data-filter');
     const announced = Number(((await chip.textContent()) ?? '').replace(/[^0-9].*$/, '').trim());
+    if (!(announced > 0)) throw new Error('puce-a-zero-affichee');
     await chip.click();
-    await page.locator('#j2ha_workView').waitFor({ state: 'visible' });
-    const viewChip = page.locator(`#j2ha_workView .j2ha-wv-chips .j2ha-chip-filter[data-filter="${key}"]`);
-    const rows = await page.locator('#j2ha_workView .j2ha-wv-tree .j2ha-wv-eq').count();
+    await page.locator('#j2ha_filterPanel').waitFor({ state: 'visible' });
+    if (await page.locator('#j2ha_workView').isVisible()) throw new Error('vue-ouverte-par-la-puce');
+    const rows = await page.locator('#j2ha_filterList .j2ha-frow').count();
     if (rows !== announced) throw new Error('lignes-filtre-differentes-du-nombre');
-    if ((await viewChip.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');
-    await viewChip.click();
-    if ((await viewChip.getAttribute('aria-pressed')) !== 'false' || (await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) {
+    const pressed = page.locator(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
+    if ((await pressed.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');
+    await pressed.click();
+    if ((await pressed.getAttribute('aria-pressed')) !== 'false' || (await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) {
       throw new Error('filtre-non-retire');
     }
-    await page.locator('#j2ha_workView .j2ha-wv-back').click();
-    await page.locator('#j2ha_houseChips').waitFor({ state: 'visible' });
   }
   if (pluginCalls() !== before) throw new Error('requete-pendant-filtre');
   helpers.record('puces_controlees', count);

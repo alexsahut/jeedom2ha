@@ -30,7 +30,8 @@ test('25.6 réel — 40 pièces, carte de la 35ᵉ : l’arbre ne contient que c
 
     await page.locator('.j2ha-wv-widen').click();
     assert.equal(await page.locator('.j2ha-wv-tree .j2ha-wv-room').count(), 40);
-    assert.equal(await page.locator('.j2ha-wv-widen').count(), 0);
+    // Garde levée (front v2, Lot 7, spec E3) : la bascule « Cette pièce | Toute la maison » reste ; « Toute la maison » est enfoncé.
+    assert.equal(await page.locator('.j2ha-wv-widen').getAttribute('aria-pressed'), 'true');
     assert.equal(await inside(page, `.j2ha-wv-room[data-object_id="${id}"]`), true, 'la sélection est ramenée dans la zone visible');
     assert.equal(await page.evaluate(() => document.activeElement.getAttribute('data-object_id')), String(id), 'focus sur la ligne sélectionnée');
     await page.goBack();
@@ -53,7 +54,7 @@ test('25.6 réel — « Précédent » depuis la pièce seule, sans rechargement
   });
 });
 
-test('25.6 réel — disposition étroite : le bouton « Toutes les pièces » est une cible ≥ 44 × 44 px dans le tiroir ; il élargit sans le refermer', async (t) => {
+test('25.6 réel — disposition étroite : le bouton « Toute la maison » est une cible ≥ 44 × 44 px dans le tiroir ; il élargit sans le refermer', async (t) => {
   await withRealView(t, { width: THRESHOLD - 200, height: 900 }, async (page, ctx) => {
     await page.locator('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]').click();
     await page.locator('.j2ha-wv-drawer-toggle').click();
