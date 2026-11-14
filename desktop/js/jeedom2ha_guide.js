@@ -28,6 +28,8 @@
     choice: 'jeedom2ha.guide.choice',
     published: 'jeedom2ha.guide.published',
     known: 'jeedom2ha.guide.known',
+    // Front v3 (Lot 3) : les quatre étapes ont été vues « Fait » ensemble (signaux observés) : le guide ne s'ouvre plus seul.
+    finished: 'jeedom2ha.guide.finished',
   };
 
   var STEP_KEYS = ['broker', 'ha', 'choice', 'publish'];
@@ -191,10 +193,11 @@
     var broker = brokerState(status);
 
     var s1 = { key: 'broker', number: 1, done: bridgeUp(status), cause: '', remedy: 'config' };
+    // Front v3 (Lot 3) : `short` = la cause en quelques mots, affichée sur la ligne de l'étape (la cause entière en info-bulle).
     if (!s1.done) {
-      if (status === null) s1.cause = '{{Jeedom n\'a pas pu lire l\'état du démon.}}';
-      else if (status && !status.daemon) s1.cause = '{{Le démon est arrêté.}}';
-      else if (broker === 'disconnected') s1.cause = '{{Le broker MQTT ne répond pas.}}';
+      if (status === null) { s1.cause = '{{Jeedom n\'a pas pu lire l\'état du démon.}}'; s1.short = '{{État du démon illisible}}'; }
+      else if (status && !status.daemon) { s1.cause = '{{Le démon est arrêté.}}'; s1.short = '{{Démon arrêté}}'; }
+      else if (broker === 'disconnected') { s1.cause = '{{Le broker MQTT ne répond pas.}}'; s1.short = '{{Broker injoignable}}'; }
       else if (broker === 'connecting' || broker === 'reconnecting') s1.note = '{{Connexion au broker en cours…}}';
     }
     var s2 = { key: 'ha', number: 2, done: !!(ha && ha.seen_at) || !!loc.haSeen, auto: !!(ha && ha.seen_at), manual: !(ha && ha.seen_at), ha_known: !!ha };
@@ -205,10 +208,13 @@
       s4.verify = true;
       if (!s3.done) s3.verify = true;
     }
-    if (s4.empty && !s4.done) s4.cause = '{{Jeedom ne contient encore aucun équipement à publier. Ajoutez des équipements dans Jeedom, puis revenez ici.}}';
-    else if (failed) {
+    if (s4.empty && !s4.done) {
+      s4.cause = '{{Jeedom ne contient encore aucun équipement à publier. Ajoutez des équipements dans Jeedom, puis revenez ici.}}';
+      s4.short = '{{Aucun équipement dans Jeedom}}';
+    } else if (failed) {
       s4.retry = true;
       s4.cause = '{{La dernière publication a échoué : rien n\'est encore dans Home Assistant. Vérifiez le broker MQTT, puis réessayez.}}';
+      s4.short = '{{La dernière publication a échoué}}';
     }
 
     // Une étape ultérieure faite (ou à revérifier) laisse penser que l'étape 2 a été franchie, sans le prouver : à vérifier.
@@ -244,7 +250,8 @@
    */
   function shouldShow(status, readState, local, summary) {
     var loc = local || {};
-    if (loc.dismissed) return false;
+    // Front v3 (Lot 3) : un guide réellement terminé (quatre étapes « Fait » observées) ne s'ouvre plus de lui-même.
+    if (loc.dismissed || loc.finished) return false;
     var kind = readState && readState.kind;
     if (!kind) return false;
     if (knownInstall(status, summary, loc)) return false;
@@ -364,6 +371,7 @@
       choice: get(STORAGE_KEYS.choice) === '1',
       published: get(STORAGE_KEYS.published) === '1',
       known: get(STORAGE_KEYS.known) === '1',
+      finished: get(STORAGE_KEYS.finished) === '1',
     };
   }
 
@@ -374,13 +382,14 @@
     } catch (e) { /* stockage indisponible (navigation privée) : le choix vaut pour cette page seulement */ }
   }
 
+  // Front v3 (Lot 3) : une ligne par étape ; `title` (3 mots) est affiché, `text` passe dans l'info-bulle ⓘ de la ligne.
   var STEP_TEXT = {
     broker: {
-      title: '{{Connecter le broker MQTT}}',
+      title: '{{Connecter le broker}}',
       text: '{{Le même broker que celui de Home Assistant. Le plugin y dépose vos équipements, Home Assistant les y lit.}}',
     },
     ha: {
-      title: '{{Vérifier que Home Assistant écoute}}',
+      title: '{{Vérifier Home Assistant}}',
       text: '{{Dans Home Assistant : Paramètres › Appareils et services › MQTT. L\'appareil « Jeedom (jeedom2ha) » doit y apparaître, avec l\'entité « État du pont ».}}',
     },
     choice: {
@@ -388,7 +397,7 @@
       text: '{{Par défaut, tout ce que le plugin reconnaît est publié. Vous pourrez changer d\'avis à tout moment.}}',
     },
     publish: {
-      title: '{{Publier dans Home Assistant}}',
+      title: '{{Publier les équipements}}',
       text: '{{Le plugin va lire Jeedom et publier ce qu\'il reconnaît. Vous verrez le détail juste après.}}',
     },
   };
@@ -436,6 +445,7 @@
     // et la barre d'état est prévenue pour passer à « Confirmé par vous ».
     function confirmHaSeen() {
       remember('haSeen');
+      learn(); // Front v3 (Lot 3) : la dernière étape confirmée peut terminer le guide.
       if (typeof env.onHaConfirmed === 'function') env.onHaConfirmed();
     }
     // Ce que la page apprend de l'état réel : installation connue, publication réussie (retenu pour les pannes futures).
@@ -443,6 +453,8 @@
       var loc = local();
       if (!loc.known && knownInstall(st.status, summary(), {})) remember('known');
       if (!loc.published && publishedOk(st.status, summary(), {})) remember('published');
+      // Front v3 (Lot 3) : guide réellement terminé (quatre « Fait » observés, jamais une mémoire) : il ne s'ouvrira plus seul.
+      if (!loc.finished && computeSteps(st.status, readState(), summary(), loc).complete) remember('finished');
     }
     function jeedomCount() {
       return (env.rooms || []).reduce(function (n, room) { return n + ((room && room.equipments) ? room.equipments.length : 0); }, 0);
@@ -465,6 +477,12 @@
       var $node = $(html);
       if (text !== undefined) $node.text(text);
       return $node;
+    }
+
+    // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+    function info(text, cls) {
+      return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').addClass(cls || '').attr('title', text).attr('aria-label', text)
+        .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
     }
 
     function button(label, cls, onClick) {
@@ -523,11 +541,11 @@
         $pub.prop('disabled', !active || publishing);
         $acts.append($pub);
       }
-      if (step.state === 'blocked' || (step.key === 'publish' && step.state === 'verify' && step.waitFor)) {
-        $acts.append(el('<span class="j2ha-v2-muted j2ha-v2-small"></span>', '{{Terminez l\'étape}} ' + step.waitFor + ' {{d\'abord.}}'));
-      }
+      // Front v3 (Lot 3) : « Terminez l'étape N d'abord » n'est plus une phrase : c'est l'info-bulle de la ligne grisée.
       return $acts.children().length ? $acts : null;
     }
+
+    function textSpan(text) { return el('<span></span>', text); }
 
     // Front v3 (Lot 4b) : onglet Scénarios de la page (jeedom2ha_scenarios.js), injectable par `env.scenarios` ; absent = rien.
     function scenarioHook() {
@@ -553,39 +571,48 @@
       return $line.append($btn);
     }
 
+    // Front v3 (Lot 3) : UNE ligne par étape — pastille, titre de 3 mots, état, action(s), ⓘ — sans phrase permanente. La cause
+    // d'un arrêt tient en quelques mots (`short`), la phrase entière est dans l'info-bulle de l'état.
     function renderStep(step, model) {
       var text = STEP_TEXT[step.key];
       var cls = { done: 'is-done', current: 'is-current', checking: 'is-current', verify: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
-      var $step = $('<div class="j2ha-v2-step" role="listitem"></div>').addClass(cls).attr('data-step', step.key);
+      var $step = $('<div class="j2ha-v2-step j2ha-v3-step-line" role="listitem"></div>').addClass(cls).attr('data-step', step.key);
+      if (step.waitFor && (step.state === 'blocked' || step.state === 'verify')) {
+        var wait = '{{Terminez l\'étape}} ' + step.waitFor + ' {{d\'abord.}}';
+        $step.attr('title', wait).attr('aria-description', wait);
+      }
       $step.append(el('<div class="j2ha-v2-step-num" aria-hidden="true"></div>', step.state === 'done' ? '✔' : String(step.number)));
       var $body = $('<div class="j2ha-v2-step-body"></div>');
       var $title = el('<div class="j2ha-v2-step-title"></div>', step.number + '. ' + text.title + ' ');
       var $lbl = stepLabel(step);
-      if ($lbl) $title.append($lbl);
-      $body.append($title);
-      $body.append(el('<div class="j2ha-v2-small"></div>', text.text));
-      if (step.cause) $body.append(el('<div class="j2ha-v2-alert is-warn j2ha-v2-step-cause"></div>', step.cause));
-      if (step.note) $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', step.note));
-      if (step.key === 'ha' && !step.done && step.ha_known) {
-        $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', '{{Home Assistant ne s\'est pas encore signalé sur le broker.}} ' + HA_TOOLTIP));
+      if ($lbl) {
+        if (step.cause) $lbl.attr('title', step.cause).attr('aria-label', step.cause);
+        $title.append($lbl);
       }
+      if (step.short) $title.append(el('<span class="j2ha-v2-small j2ha-v3-step-cause j2ha-v2-step-cause"></span>', step.short));
+      else if (step.cause) $title.append(el('<span class="j2ha-v2-small j2ha-v3-step-cause j2ha-v2-step-cause"></span>', step.cause));
+      if (step.note) $title.append(el('<span class="j2ha-v2-muted j2ha-v2-small j2ha-v3-step-note"></span>', step.note));
+      if (step.key === 'publish' && st.error && !step.done) $title.append(el('<span class="j2ha-v2-small j2ha-v3-step-cause j2ha-v3-step-error" role="alert"></span>', st.error));
+      var tip = text.text + (step.key === 'ha' && !step.done && step.ha_known ? ' ' + '{{Home Assistant ne s\'est pas encore signalé sur le broker.}} ' + HA_TOOLTIP : '');
+      $title.append(info(tip, 'j2ha-v3-step-info'));
+      $body.append($title);
       if (step.key === 'ha' && st.haHelp && !step.done) {
         var $help = $('<ul class="j2ha-v2-guide-causes j2ha-v2-small"></ul>');
         HA_CAUSES.forEach(function (cause) { $help.append(el('<li></li>', cause)); });
         $body.append($help);
       }
-      if (step.key === 'publish' && st.error && !step.done) $body.append(el('<div class="j2ha-v2-alert is-warn"></div>', st.error));
       // Front v3 (Lot 4b) : étape 3, même suggestion que l'onglet Scénarios (présélection seulement).
       if (step.key === 'choice' && step.state !== 'blocked') {
         var $scenarios = scenarioSuggestion();
         if ($scenarios) $body.append($scenarios);
       }
-      var $acts = stepActions(step, model);
-      if ($acts) $body.append($acts);
       $step.append($body);
+      var $acts = stepActions(step, model);
+      if ($acts) $step.append($acts);
       return $step;
     }
 
+    // Front v3 (Lot 3) : écran de fin d'une ligne (✓ chiffre), « où les trouver » et les exemples en info-bulle.
     function renderDone() {
       var sum = summary();
       var pub = publicationInfo(st.status);
@@ -593,17 +620,13 @@
       var count = sum.read ? sum.published : (pub && pub.equipments !== null ? pub.equipments : null);
       var headline;
       if (count === null) headline = '{{C\'est fait : vos équipements sont dans Home Assistant.}}';
-      else if (count === 0) headline = '{{La relecture est faite, mais aucun équipement n\'est publié pour l\'instant.}}';
+      else if (count === 0) headline = '{{Relecture faite : 0 publié}}';
       else if (count === 1) headline = '{{C\'est fait : 1 équipement est dans Home Assistant.}}';
       else headline = '{{C\'est fait :}} ' + count + ' {{équipements sont dans Home Assistant.}}';
-      $box.append(el('<h3 class="j2ha-v2-guide-title"></h3>', headline));
-      if (pub && pub.scenarios) {
-        $box.append(el('<p class="j2ha-v2-muted"></p>', '+ ' + pub.scenarios + ' ' + (pub.scenarios > 1 ? '{{scénarios publiés comme boutons}}' : '{{scénario publié comme bouton}}')));
-      }
-      $box.append(el('<p></p>', '{{Où les trouver : dans Home Assistant, Paramètres › Appareils et services › MQTT.}}'));
-      if (sum.names.length) {
-        $box.append(el('<p class="j2ha-v2-guide-names"></p>', '{{Par exemple :}} ' + sum.names.map(function (n) { return '« ' + n + ' »'; }).join(', ') + '.'));
-      }
+      var tip = ['{{Où les trouver : dans Home Assistant, Paramètres › Appareils et services › MQTT.}}'];
+      if (sum.names.length) tip.push('{{Par exemple :}} ' + sum.names.map(function (n) { return '« ' + n + ' »'; }).join(', ') + '.');
+      if (pub && pub.scenarios) tip.push('+ ' + pub.scenarios + ' ' + (pub.scenarios > 1 ? '{{scénarios publiés comme boutons}}' : '{{scénario publié comme bouton}}'));
+      $box.append(el('<h3 class="j2ha-v2-guide-title"></h3>', '✓ ' + headline + ' ').append(info(tip.join(' '), 'j2ha-v3-done-info')));
       var $acts = $('<div class="j2ha-v2-acts"></div>');
       $acts.append(button('{{Voir ma maison}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-home', function () { close(); }));
       if (sum.read && sum.blocked > 0) {
@@ -632,8 +655,9 @@
       } else {
         var $head = $('<div class="j2ha-v2-guide-head"></div>');
         var $intro = $('<div></div>');
-        $intro.append(el('<h3 class="j2ha-v2-guide-title"></h3>', '{{Bienvenue dans jeedom2ha}}'));
-        $intro.append(el('<p></p>', '{{jeedom2ha publie vos équipements Jeedom dans Home Assistant. Jeedom reste la source : rien n\'y est modifié.}}'));
+        // Front v3 (Lot 3) : le titre seul ; la présentation passe en info-bulle.
+        $intro.append(el('<h3 class="j2ha-v2-guide-title"></h3>', '{{Bienvenue dans jeedom2ha}} ')
+          .append(info('{{jeedom2ha publie vos équipements Jeedom dans Home Assistant. Jeedom reste la source : rien n\'y est modifié.}}')));
         $head.append($intro);
         $head.append(button('{{Fermer}}', 'btn-default j2ha-v2-guide-close', function () { close(); }));
         $root.append($head);
@@ -646,14 +670,13 @@
           remember('dismissed');
           close();
         });
+        $never.attr('title', '{{Il se rouvre par le menu ⋯ › Guide de démarrage}}');
         $foot.append($never);
-        $foot.append(textSpan(' · {{rouvrable par « Autres actions › Guide de démarrage »}}'));
         $root.append($foot);
       }
       setMainHidden(true);
     }
 
-    function textSpan(text) { return el('<span></span>', text); }
 
     function publish() {
       if (st.phase === 'publishing' || typeof actions.publish !== 'function') return;
@@ -663,7 +686,7 @@
       var started = actions.publish(function (failed) {
         if (failed) {
           st.phase = 'steps';
-          st.error = '{{La publication n\'a pas abouti : lisez le message affiché, puis réessayez.}}';
+          st.error = '{{La publication n\'a pas abouti.}}';
         } else {
           // Pas de « connue » ici : seule une preuve de succès (état du démon, lecture des états) la pose, dans learn().
           remember('choice');
@@ -673,7 +696,7 @@
       });
       if (started === false) {
         st.phase = 'steps';
-        st.error = '{{Une opération est déjà en cours : réessayez dans un instant.}}';
+        st.error = '{{Une opération est déjà en cours.}}';
         render();
       }
     }
@@ -730,30 +753,37 @@
       var $row = $('<div class="j2ha-v2-row j2ha-v2-check" role="listitem"></div>').attr('data-check', check.key).addClass('is-' + check.state);
       $row.append(el('<span class="j2ha-v2-lbl"></span>', word).addClass(lbl));
       var $grow = $('<div class="j2ha-v2-grow"></div>');
-      $grow.append(el('<div class="j2ha-v2-check-title"></div>', check.title));
-      if (check.detail && check.state !== 'wait') $grow.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', check.detail));
-      if (check.state === 'wait') $grow.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', '{{Corrigez d\'abord le point ci-dessus.}}'));
+      // Front v3 (Lot 3) : le titre du contrôle, puis un détail court sur la même ligne (date, broker) ; un détail long passe en
+      // info-bulle ⓘ ; « En attente » le dit par l'info-bulle de la ligne grisée.
+      var $head = el('<div class="j2ha-v2-check-title"></div>', check.title);
+      if (check.detail && check.state !== 'wait') {
+        if (check.detail.replace(/\{\{|\}\}/g, '').length <= 48) $head.append(el('<span class="j2ha-v2-muted j2ha-v2-small j2ha-v3-check-detail"></span>', ' · ' + check.detail));
+        else $head.append($('<span></span>').text(' ')).append(info(check.detail, 'j2ha-v3-check-info'));
+      }
+      $grow.append($head);
+      if (check.state === 'wait') $row.attr('title', '{{Corrigez d\'abord le point ci-dessus.}}');
       if (check.ask && check.state !== 'wait') {
         // « Je l'ai vu » mémorise le constat ; les trois causes n'apparaissent qu'en dépliant « Je ne vois pas… ».
         var $askActs = $('<div class="j2ha-v2-acts j2ha-v2-check-ask"></div>');
         var $help = $('<ul class="j2ha-v2-guide-causes j2ha-v2-small j2ha-v2-check-causes"></ul>').hide();
         HA_CAUSES.forEach(function (cause) { $help.append(el('<li></li>', cause)); });
-        $askActs.append(button('{{Je l\'ai vu}}', 'btn-default j2ha-v2-check-haseen', function () {
+        // Front v3 (Lot 3) : [Vu] / [Pas vu], même style ; la question est dans l'info-bulle.
+        $askActs.append(button('{{Vu}}', 'btn-default j2ha-v2-check-haseen', function () {
           confirmHaSeen();
           if (typeof rerender === 'function') rerender();
-        }));
-        var $notSeen = button('{{Je ne vois pas l\'appareil dans Home Assistant}}', 'btn-link j2ha-v2-link j2ha-v2-check-hahelp', function () {
+        }).attr('title', '{{Je vois l\'appareil « Jeedom (jeedom2ha) » dans Home Assistant}}'));
+        var $notSeen = button('{{Pas vu}}', 'btn-default j2ha-v2-check-hahelp', function () {
           var open = $notSeen.attr('aria-expanded') !== 'true';
           $notSeen.attr('aria-expanded', open ? 'true' : 'false');
           if (open) $help.show(); else $help.hide();
-        }).attr('aria-expanded', 'false');
+        }).attr('aria-expanded', 'false').attr('title', '{{Je ne vois pas l\'appareil dans Home Assistant}}');
         $askActs.append($notSeen);
         $grow.append($askActs);
         $grow.append($help);
       }
       $row.append($grow);
       if (check.remedy && check.state !== 'wait') {
-        $row.append(button(check.remedy.label, check.state === 'fail' ? 'btn-primary j2ha-v2-btn-primary j2ha-v2-check-remedy' : 'btn-default j2ha-v2-check-remedy', function () {
+        $row.append(button(check.remedy.label, 'btn-default j2ha-v2-check-remedy', function () {
           $dialogHolder.close();
           var fn = { config: actions.openConfig, rescan: actions.rescan, blocked: function () { if (actions.openFilter) actions.openFilter('blocked'); } }[check.remedy.action];
           if (typeof fn === 'function') fn();
@@ -767,7 +797,8 @@
       var checks = checkInstall(st.status, readState(), summary(), local());
       var holder = { close: function () {} };
       var $content = $('<div class="j2ha-v2 j2ha-v2-checkbox"></div>');
-      $content.append(el('<p class="j2ha-v2-small j2ha-v2-muted j2ha-v2-check-intro"></p>', '{{Les contrôles s\'arrêtent au premier point « À corriger » : les suivants restent « En attente ». Un point « À vérifier » ne les arrête pas.}}'));
+      // Front v3 (Lot 3) : plus de phrase d'introduction ; les mots d'état se lisent seuls (l'ordre d'arrêt est dans l'info-bulle
+      // de chaque ligne « En attente »).
       var $list = $('<div class="j2ha-v2-checks" role="list"></div>');
       function renderChecks() {
         checks = checkInstall(st.status, readState(), summary(), local());
@@ -780,8 +811,8 @@
       // Pied « Pour le support » : le contenu existant de l'export du diagnostic (case et bouton, identifiants et
       // gestionnaire inchangés) est déplacé ici, puis rendu à sa place à la fermeture. Idem pour l'export de décision.
       var $support = $('<div class="j2ha-v2-check-support"></div>');
-      $support.append(el('<h4 class="j2ha-v2-check-head"></h4>', '{{Pour le support}}'));
-      $support.append(el('<p class="j2ha-v2-small"></p>', '{{Un fichier qui décrit votre installation jeedom2ha. À joindre à votre message sur le forum.}}'));
+      $support.append(el('<h4 class="j2ha-v2-check-head"></h4>', '{{Pour le support}} ')
+        .append(info('{{Un fichier qui décrit votre installation jeedom2ha. À joindre à votre message sur le forum.}}', 'j2ha-v3-support-info')));
       var $diagHolder = $('#div_diagnosticDialog');
       var $diag = $diagHolder.children();
       $support.append($diag);
@@ -793,11 +824,11 @@
       var $logs = $('<ul class="j2ha-v2-small j2ha-v2-check-logs"></ul>');
       LOGS.forEach(function (log) {
         var $li = $('<li></li>');
-        $li.append($('<a target="_blank" rel="noopener"></a>').attr('href', 'index.php?v=d&p=log&logfile=' + log[0]).text(log[0]));
-        $li.append(textSpan(' : ' + log[1]));
+        // Front v3 (Lot 3) : un seul style de lien (j2ha-v2-link) ; le rôle du journal en info-bulle.
+        $li.append($('<a class="j2ha-v2-link" target="_blank" rel="noopener"></a>').attr('href', 'index.php?v=d&p=log&logfile=' + log[0]).attr('title', log[1]).text(log[0]));
         $logs.append($li);
       });
-      $adv.append(el('<p class="j2ha-v2-small"></p>', '{{Journaux du plugin :}}'));
+      $adv.append(el('<div class="j2ha-v2-small j2ha-v3-check-logs-head"></div>', '{{Journaux du plugin :}}'));
       $adv.append($logs);
       $advToggle.on('click', function () {
         var open = $advToggle.attr('aria-expanded') !== 'true';

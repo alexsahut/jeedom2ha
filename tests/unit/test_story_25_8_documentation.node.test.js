@@ -40,7 +40,9 @@ describe('25.8 / AC18 — documentation de l\'exclusion de pièce', () => {
     const filtering = index.slice(index.indexOf('### Ce qui est publié'), index.indexOf('### Avancé et tâche planifiée'));
     assert.ok(filtering.length > 200, 'section présente');
     assert.doesNotMatch(filtering, /\| \*\*Pièces exclues\*\* \|/);
-    assert.match(filtering, /Les pièces\*\* ne s'excluent pas ici/);
+    // Garde levée (front v3, Lot 3) : la configuration ne règle plus rien de ce qui est publié ; le § renvoie au panneau unique.
+    assert.match(filtering, /La configuration ne règle pas ce qui est publié/);
+    assert.match(filtering, /\[Choisir ce qui est publié\]\(#choisir-ce-qui-est-publié\)/);
     assert.match(index, /exclu de Jeedom2HA \(pièce dans la liste d’exclusions\) \| Exclusion de la pièce, posée depuis sa carte ou son détail/);
     assert.match(index, /« par la pièce » correspond à l'exclusion de la pièce/);
   });

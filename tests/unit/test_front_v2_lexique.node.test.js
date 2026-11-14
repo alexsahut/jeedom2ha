@@ -70,7 +70,8 @@ describe('Lot 2 — une fiche pour chaque cause', () => {
     assert.equal(mismatch.quoi, 'Non publié : le nom dit « lampe », les types Jeedom disent « prise ».');
     // Garde levée (front v2, Lot 9a, regard neuf v2) : « Le plugin ne tranche pas à votre place » contredisait le réglage
     // « En cas de doute : Publier quand même » ; la fiche dit maintenant que c'est une contradiction, non publiée même ainsi.
-    assert.equal(mismatch.pourquoi, 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute sur un équipement » de la configuration ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.');
+    // Garde levée (front v3, Lot 3) : « En cas de doute » quitte la configuration pour le panneau « Choisir ce qui est publié ».
+    assert.equal(mismatch.pourquoi, 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute » ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.');
     assert.equal(L.causeSheet('name_type_mismatch', { name_word: 'lampe', type_word: 'prise' }).pourquoi, 'Le plugin ne tranche pas à votre place.', 'conseil (équipement publié) inchangé');
     // Garde levée (front v2, Lot 9a, point 9) : « Corriger le type… » ne lève pas ce blocage (le démon garde la confiance
     // « ambiguë » quand le type change) : « Publier quand même » (réglage « Toujours ») et « Renommer… » à la place.

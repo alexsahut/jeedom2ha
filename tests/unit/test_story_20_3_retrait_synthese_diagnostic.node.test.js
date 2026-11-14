@@ -72,9 +72,10 @@ describe('20.3 / AC2 — modale Diagnostic supprimée, export support conservé'
     assert.doesNotMatch(page, /eqLogicThumbnailContainer|logoSecondary/);
   });
 
-  it('« Télécharger le diagnostic support » est conservé, avec son action exportDiagnostic', () => {
+  // Garde levée (front v3, Lot 3) : libellé court « ⬇ Diagnostic » (l'explication en info-bulle) ; le bouton et son action restent.
+  it('le bouton du diagnostic support est conservé (« Diagnostic »), avec son action exportDiagnostic', () => {
     assert.match(page, /id="bt_exportDiagnostic"/);
-    assert.match(page, /\{\{Télécharger le diagnostic support\}\}/);
+    assert.match(page, /<i class="fas fa-download"><\/i> \{\{Diagnostic\}\}/);
     assert.match(jsSources['jeedom2ha.js'], /action:\s+'exportDiagnostic'/);
   });
 });

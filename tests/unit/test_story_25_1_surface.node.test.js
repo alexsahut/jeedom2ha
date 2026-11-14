@@ -521,7 +521,7 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
     assert.deepEqual(links, ['Automatique', 'Personnalisé : Capteur (sensor)']);
     assert.ok(ui.$(PANEL + '.j2ha-type-forced').length === 1, 'surligné quand un type est imposé');
     assert.equal(ui.$(PANEL + 'select').length, 0, 'aucun sélecteur dans la cellule');
-    assert.equal(ui.$(PANEL + '.j2ha-v2-type-panel').length, 0, 'panneau non rendu en permanence');
+    assert.equal(ui.$('.j2ha-v3-type-modal .j2ha-v2-type-panel').length, 0, 'panneau non rendu en permanence');
     const ignored = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY, IGNORED], { entities: [entity('light', [100])] }))]);
     assert.equal(ignored.$(PANEL + '.j2ha-type-link').length, 1, 'aucun réglage de type pour la commande ignorée');
   });

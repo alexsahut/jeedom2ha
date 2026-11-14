@@ -221,11 +221,12 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<div id="div_diagnosticDialog" class="j2ha-diagnostic-dialog" style="display:none;">
 			<div class="form-group j2ha-export">
 				<label class="j2ha-export-label">
+					<!-- Front v3 (Lot 3) : libellés courts, explications en info-bulles. -->
 					<input type="checkbox" id="cb_pseudonymize" class="j2ha-export-check"/>
-					{{Pseudonymiser les noms d'équipements}}
+					<span title="{{Remplace les noms d'équipements, de pièces et de commandes par des alias}}">{{Pseudonymiser}}</span>
 				</label>
-				<button id="bt_exportDiagnostic" class="btn btn-default btn-sm">
-					<i class="fas fa-download"></i> {{Télécharger le diagnostic support}}
+				<button id="bt_exportDiagnostic" class="btn btn-default btn-sm" title="{{Diagnostic pour le forum : un fichier qui décrit votre installation}}">
+					<i class="fas fa-download"></i> {{Diagnostic}}
 				</button>
 				<span id="span_exportResult" class="j2ha-export-result"></span>
 			</div>

@@ -629,13 +629,23 @@
     if (!cause) {
       return;
     }
-    var name = M.exclusionPluginName(roomEqTypeById()[eqId], window.j2haPluginNames);
+    var eqType = roomEqTypeById()[eqId];
+    var name = M.exclusionPluginName(eqType, window.j2haPluginNames);
     var $notice = $('<div class="j2ha-notice j2ha-notice-neutral" role="status"></div>');
     $notice.append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'));
-    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + M.exclusionCauseText(cause, name, 'sentence')));
+    // Front v3 (Lot 3) : la phrase de mapping_override.js (ajouts seuls) renvoyait à « Plugins exclus » de la configuration, qui
+    // ne règle plus ce qui est publié. Elle est traduite à l'affichage : libellé court + ⓘ, et le bouton mène au panneau
+    // « Choisir ce qui est publié », sur le plugin (ou la pièce) en cause.
+    var shown = cause.kind === 'plugin'
+      ? '{{Plugin exclu}}' + (name ? ' : ' + name : '')
+      : M.exclusionCauseText(cause, name, 'sentence');
+    $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + shown));
     if (cause.kind === 'plugin') {
-      $notice.append($('<a class="btn btn-default btn-xs j2ha-open-plugin-config" target="_blank" rel="noopener"></a>')
-        .attr('href', PLUGIN_CONFIG_URL).text('{{Ouvrir la configuration du plugin}}'));
+      var tip = '{{Les équipements de ce plugin ne sont pas publiés. À rétablir dans « Choisir ce qui est publié », par plugin.}}';
+      $notice.append(document.createTextNode(' ')).append(typeInfo(tip));
+      $notice.append(choosePublishedButton({ mode: 'plugin', plugin: eqType || '' }, 'j2ha-open-plugin-config'));
+    } else if (cause.kind === 'piece') {
+      $notice.append(choosePublishedButton({ mode: 'room', roomId: roomIdOfEquipment(eqId) }, 'j2ha-open-room-choose'));
     }
     $host.append($notice);
   }
@@ -1237,6 +1247,9 @@
     var inFlight = ctx.xhr[state.cmdId];
     if (inFlight && typeof inFlight.abort === 'function') inFlight.abort();
     ctx.xhr[state.cmdId] = null;
+    // Front v3 (Lot 3, revue Codex) : l'arrière-plan redevient actif, l'écoute d'Échap au niveau du document est retirée.
+    if (state.$inert) state.$inert.removeAttr('inert');
+    $(document).off('keydown.j2haTypeModal');
     state.$row.remove();
     if (state.$origin && state.$origin.length) {
       state.$origin.attr('aria-expanded', 'false');
@@ -1275,20 +1288,78 @@
     if (!diff.publishable && diff.publishAnyway && onPublishAnyway) {
       var $anyway = $('<button type="button" class="btn btn-primary btn-xs j2ha-v2-type-anyway"></button>').text('{{Publier quand même}}');
       $anyway.on('click', function () { onPublishAnyway(); });
+      // Front v3 (Lot 3) : une ligne ; l'explication passe dans l'info-bulle ⓘ.
       $preview.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-box"></div>')
-        .append(document.createTextNode('{{Changer le type ne suffit pas ici : le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » garde le type choisi et ajoute le réglage « Toujours » : l’aperçu se met à jour, rien n’est enregistré avant votre validation.}} '))
-        .append($anyway));
+        .append(document.createTextNode('{{Le type seul ne suffit pas}} '))
+        .append(typeInfo('{{Le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » garde le type choisi et ajoute le réglage « Toujours » : l’aperçu se met à jour, rien n’est enregistré avant votre validation.}}'))
+        .append(document.createTextNode(' ')).append($anyway));
     }
+    // Front v3 (Lot 3) : changement d'identifiant = étiquette « ID modifié » + ⓘ (la conséquence est dans l'info-bulle).
     diff.changes.forEach(function (c) {
-      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
-        .append(document.createTextNode('{{Attention : l’identifiant passe de}} ')).append($('<code></code>').text(c.from))
-        .append(document.createTextNode(' {{à}} ')).append($('<code></code>').text(c.to))
-        .append(document.createTextNode('. {{Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien seront à reprendre.}}')));
+      $preview.append($('<div class="j2ha-v2-type-idchange"></div>')
+        .append($('<span class="j2ha-v2-lbl is-warn j2ha-v3-type-idlabel"></span>').text('{{ID modifié}}')).append(document.createTextNode(' '))
+        .append(typeInfo('{{Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien identifiant seront à reprendre.}}'))
+        .append(document.createTextNode(' ')).append($('<code></code>').text(c.from))
+        .append(document.createTextNode(' → ')).append($('<code></code>').text(c.to)));
     });
     diff.removed.forEach(function (id) {
-      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
-        .append(document.createTextNode('{{Cette entité sera retirée de Home Assistant :}} ')).append($('<code></code>').text(id)));
+      $preview.append($('<div class="j2ha-v2-type-idchange"></div>')
+        .append($('<span class="j2ha-v2-lbl is-warn j2ha-v3-type-idlabel"></span>').text('{{Entité retirée}}')).append(document.createTextNode(' '))
+        .append(typeInfo('{{Cette entité sera retirée de Home Assistant.}}'))
+        .append(document.createTextNode(' ')).append($('<code></code>').text(id)));
     });
+  }
+
+  // Tab / Maj+Tab : le focus reste dans la fenêtre « Corriger le type » (premier ↔ dernier élément atteignable).
+  function trapTypeFocus(state, event) {
+    var root = state.$row && state.$row.get ? state.$row.get(0) : null;
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    var nodes = Array.prototype.slice.call(root.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return el.offsetParent !== null || el.getClientRects().length > 0; });
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var active = typeof document !== 'undefined' ? document.activeElement : null;
+    var inside = !!active && root.contains(active);
+    if (event.shiftKey && (!inside || active === first)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (!inside || active === last)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Front v3 (Lot 3) : bouton « Choisir ce qui est publié » ouvrant le panneau de la page (fonction de jeedom2ha.js), positionné
+  // sur un plugin ou une pièce ; repli, si la page ne l'expose pas, sur la configuration (lien ↗ vers le panneau).
+  function choosePublishedButton(opts, cls) {
+    var open = typeof window !== 'undefined' && typeof window.openChoosePublished === 'function' ? window.openChoosePublished
+      : (typeof openChoosePublished === 'function' ? openChoosePublished : null);
+    if (!open) {
+      return $('<a class="btn btn-default btn-xs" target="_blank" rel="noopener"></a>').addClass(cls).attr('href', PLUGIN_CONFIG_URL)
+        .append($('<i class="fas fa-check-square" aria-hidden="true"></i>')).append(document.createTextNode(' {{Choisir ce qui est publié}}'));
+    }
+    var $b = $('<button type="button" class="btn btn-default btn-xs"></button>').addClass(cls)
+      .attr('title', '{{Ouvrir le panneau « Choisir ce qui est publié »}}')
+      .append($('<i class="fas fa-check-square" aria-hidden="true"></i>')).append(document.createTextNode(' {{Choisir ce qui est publié}}'));
+    $b.on('click', function () { open(opts || {}); });
+    return $b;
+  }
+
+  function roomIdOfEquipment(eqId) {
+    var rooms = (typeof window !== 'undefined' && window.j2haRoomsTree) || [];
+    for (var i = 0; i < rooms.length; i++) {
+      var eqs = rooms[i] && rooms[i].equipments ? rooms[i].equipments : [];
+      for (var k = 0; k < eqs.length; k++) if (eqs[k].eq_id === eqId) return rooms[i].object_id;
+    }
+    return null;
+  }
+
+  // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+  function typeInfo(text) {
+    return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').attr('title', text).attr('aria-label', text)
+      .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
   }
 
   // Choix possibles en boutons radio (« Automatique » et le choix courant toujours visibles) ; types refusés par le démon
@@ -1362,7 +1433,7 @@
     }
     if (value === '') {
       state.$preview.empty().append($('<div class="j2ha-v2-type-auto"></div>')
-        .text('{{Après : le plugin choisira seul le type de cette commande, comme si aucun réglage n’avait été fait.}}'));
+        .text('{{Après : le plugin choisira seul}}').attr('title', '{{Comme si aucun réglage n’avait été fait.}}'));
       setTypeSaveEnabled(state, true);
       return;
     }
@@ -1409,7 +1480,8 @@
       renderTypeDiff(tp, state.$preview, diff, null);
       if (diff.publishable) {
         state.$preview.prepend($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-on"></div>')
-          .text('{{Aperçu avec le type choisi et le réglage « Toujours » : les deux seront enregistrés ensemble, puis l’équipement sera publié.}}'));
+          .text('{{Aperçu : type choisi + « Toujours »}} ')
+          .append(typeInfo('{{Les deux seront enregistrés ensemble, puis l’équipement sera publié.}}')));
         setTypeAnyway(state, true);
       }
       setTypeSaveEnabled(state, diff.publishable);
@@ -1530,7 +1602,9 @@
     var state = { eqId: eqId, cmdId: cmdId, seq: typePanelSeq, current: built.current, choice: undefined, timer: null, busy: false,
       $origin: $origin };
 
-    var $box = $('<div class="j2ha-v2 j2ha-v2-panel j2ha-v2-type-panel" role="region"></div>').attr('aria-labelledby', titleId);
+    // Front v3 (Lot 3) : le panneau s'ouvre en fenêtre posée sur `body` (plus sous la ligne de la commande) : l'en-tête collant
+    // de la fiche ne peut plus passer dessus ni transparaître. Rôle « dialog », Échap et clic sur le fond referment.
+    var $box = $('<div class="j2ha-v2 j2ha-v2-panel j2ha-v2-type-panel" role="dialog" aria-modal="true"></div>').attr('aria-labelledby', titleId);
     // Front v2 (Lot 9a, regard neuf v2) : le choix vaut pour toute l'ENTITÉ Home Assistant, pas pour une commande : le titre
     // nomme l'entité et la ligne suivante liste les commandes qu'elle regroupe.
     var scope = typeof tp.scopeOf === 'function'
@@ -1538,40 +1612,53 @@
       : { name: equipmentName(eqId), commands: [], known: false };
     var $title = $('<h4 class="j2ha-v2-type-title" tabindex="-1"></h4>').attr('id', titleId)
       .text('{{Type dans Home Assistant de}} « ' + (scope.name || equipmentName(eqId)) + ' »');
-    $box.append($title);
-    var scopeText = scope.known && scope.commands.length > 1
-      ? '{{Ce choix vaut pour les commandes :}} ' + scope.commands.join(', ')
-      : (scope.known && scope.commands.length === 1
-        ? '{{Ce choix vaut pour la commande :}} ' + scope.commands[0]
-        : '{{Ce choix vaut pour toute l’entité Home Assistant de cet équipement, pas pour une commande seule.}}');
-    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-cmd j2ha-v2-type-scope"></div>').text(scopeText));
-    $box.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-ways"></div>')
-      .append(document.createTextNode('{{Le plus durable est de corriger les types génériques dans Jeedom. Ici, vous réglez seulement ce que voit Home Assistant.}} '))
-      .append($('<a class="j2ha-open-generic-types" target="_blank" rel="noopener"></a>').attr('href', GENERIC_TYPES_URL)
-        .text('{{Ouvrir les types génériques}}')));
+    // Front v3 (Lot 3) : le bandeau bleu « Le plus durable… » devient un lien icône « Types génériques » dans le coin du titre.
+    var waysTip = '{{Le plus durable est de corriger les types génériques dans Jeedom. Ici, vous réglez seulement ce que voit Home Assistant.}}';
+    $box.append($('<div class="j2ha-v3-type-head"></div>').append($title)
+      .append($('<a class="j2ha-open-generic-types j2ha-v3-type-generic" target="_blank" rel="noopener"></a>').attr('href', GENERIC_TYPES_URL)
+        .attr('title', waysTip).attr('aria-label', '{{Types génériques}}')
+        .append($('<i class="fas fa-tags" aria-hidden="true"></i>')).append(document.createTextNode(' {{Types génériques}}'))));
+    var scopeText = scope.known && scope.commands.length > 0
+      ? '{{Pour :}} ' + scope.commands.join(', ')
+      : '{{Pour toute l’entité de cet équipement}}';
+    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-cmd j2ha-v2-type-scope"></div>').text(scopeText)
+      .attr('title', '{{Le type se règle pour toute l’entité Home Assistant, pas pour une commande seule.}}'));
     $box.append(buildTypeChoices(tp, state, built.choices));
     state.$preview = $('<div class="j2ha-v2-type-preview" aria-live="polite"></div>');
     $box.append(state.$preview);
-    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-note"></div>')
-      .text('{{Aperçu calculé par le plugin. Rien n’est enregistré tant que vous n’avez pas validé.}}'));
     state.$error = $('<div class="j2ha-v2-type-error text-danger" role="alert"></div>').hide();
     $box.append(state.$error);
     state.$cancel = $('<button type="button" class="btn btn-default btn-sm j2ha-v2-type-cancel"></button>').text('{{Annuler}}');
-    state.$save = $('<button type="button" class="btn btn-success btn-sm j2ha-v2-type-save"></button>').text('{{Enregistrer et publier}}');
+    state.$save = $('<button type="button" class="btn btn-success btn-sm j2ha-v2-type-save"></button>').text('{{Enregistrer et publier}}')
+      .attr('title', '{{Rien n’est enregistré avant ce clic}}');
     setTypeSaveEnabled(state, false);
     state.$cancel.on('click', function () { if (!state.busy) closeTypePanel(true); });
     state.$save.on('click', function () { saveTypeChoice(tp, state); });
     $box.append($('<div class="j2ha-v2-foot"></div>').append(state.$cancel).append(state.$save));
+    // Front v3 (Lot 3, revue Codex) : fenêtre modale au clavier. Tab / Maj+Tab bouclent dans la fenêtre ; Échap la ferme
+    // quel que soit l'élément qui a le focus (écoute au niveau du document) ; le focus revient au déclencheur.
     $box.on('keydown', function (event) {
-      if (event && event.key === 'Escape' && !state.busy) {
+      if (event && event.key === 'Tab') trapTypeFocus(state, event);
+      if (event && event.key === 'Escape' && !state.busy && ctx.typePanel === state) {
         if (event.preventDefault) event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
         closeTypePanel(true);
       }
     });
+    $(document).off('keydown.j2haTypeModal').on('keydown.j2haTypeModal', function (event) {
+      if (!event || event.key !== 'Escape' || ctx.typePanel !== state || state.busy) return;
+      if (event.preventDefault) event.preventDefault();
+      closeTypePanel(true);
+    });
 
-    state.$row = $('<tr class="j2ha-v2-type-row"></tr>').attr('data-type-panel-for', cmdId)
-      .append($('<td colspan="4"></td>').append($box));
-    $tr.after(state.$row);
+    var $backdrop = $('<div class="j2ha-v3-type-backdrop" aria-hidden="true"></div>');
+    $backdrop.on('click', function () { if (!state.busy && ctx.typePanel === state) closeTypePanel(true); });
+    state.$row = $('<div class="j2ha-v3-type-modal"></div>').attr('data-type-panel-for', cmdId).attr('data-eq-id', String(eqId))
+      .append($backdrop).append($('<div class="j2ha-v3-type-dialog"></div>').append($box));
+    $(document.body).append(state.$row);
+    // Arrière-plan inerte pendant l'ouverture (souris, clavier, lecteurs d'écran) ; seuls les éléments rendus inertes ici
+    // sont rétablis à la fermeture.
+    state.$inert = $(document.body).children().not('.j2ha-v3-type-modal').not('[inert]').not('script').attr('inert', '');
     ctx.typePanel = state;
     $origin.attr('aria-expanded', 'true');
     var $checked = $box.find('input[data-type="' + (state.current || 'auto') + '"]').first();
@@ -1752,9 +1839,11 @@
             .append($('<i class="fas fa-external-link-alt" aria-hidden="true"></i>')).append(document.createTextNode(' {{Ouvrir dans Jeedom}}')));
         }
       } else if (act === 'plugin_config') {
-        out.push($('<a class="btn btn-default btn-xs j2ha-v2-open-plugin-config" target="_blank" rel="noopener"></a>')
-          .attr('href', PLUGIN_CONFIG_URL).attr('title', '{{Ouvrir la configuration du plugin}}')
-          .append($('<i class="fas fa-cog" aria-hidden="true"></i>')).append(document.createTextNode(' {{Configuration}}')));
+        // Front v3 (Lot 3) : plugin exclu, réglage « En cas de doute » : tout se règle dans le panneau « Choisir ce qui est
+        // publié » (la configuration ne règle plus ce qui est publié). Plugin exclu : ouvert « Par plugin », plugin en évidence.
+        var sheetCode = sheet && sheet.code ? sheet.code : '';
+        var plugin = sheetCode === 'excluded_plugin' ? (roomEqTypeById()[eqId] || '') : null;
+        out.push(choosePublishedButton(plugin !== null ? { mode: 'plugin', plugin: plugin } : {}, 'j2ha-v2-open-plugin-config'));
       } else if (act === 'correct_type') {
         if (canCorrectType(tree, cmdIds)) {
           var $correct = $('<button type="button" class="btn btn-default btn-xs j2ha-v2-correct-type"></button>')

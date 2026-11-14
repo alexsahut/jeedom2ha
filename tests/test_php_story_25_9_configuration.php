@@ -164,36 +164,35 @@ $fixture = array(
     'config' => array('excludedPlugins' => 'plugin_beta,plugin_gone', 'excludedObjects' => '5,12,abc,999999'),
 );
 $page = render_configuration($root, $fixture);
-// Front v2 / Lot 4 — garde levée : légende « Filtrage & Publication » → « Ce qui est publié » (E8, bloc 2).
-check('la page se rend (faux cœur)', strpos($page, '{{Ce qui est publié}}') !== false && strpos($page, '{{Connexion au broker MQTT}}') !== false);
+// Garde levée (front v3, Lot 3) : le bloc « Ce qui est publié » (liste à cocher, renvoi et nombre de pièces exclues, « En cas de
+// doute », « Enregistrer et relire Jeedom ») quitte la configuration ; une seule source : le panneau « Choisir ce qui est publié »
+// de la page du plugin (mêmes clés, même route). Garde inverse : aucun configKey de ces clés, aucune requête de filtrage ici.
+check('la page se rend (faux cœur), sans bloc « Ce qui est publié »', strpos($page, '{{Connexion au broker MQTT}}') !== false && strpos($page, '{{Ce qui est publié}}') === false);
 check('aucun élément .configKey[data-l1key=excludedObjects] ni champ de saisie des pièces', strpos($page, 'excludedObjects') === false && strpos($page, '{{Pièces exclues}}') === false);
-check('« Sauvegarder » du cœur n\'écrit plus excludedObjects : plus aucun configKey ne porte la clé', preg_match('/data-l1key="excludedObjects"/', $page) === 0);
-check('renvoi : texte, lien vers la page du plugin', strpos($page, '{{Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d\'une carte de pièce, ou détail de la pièce).}}') !== false && strpos($page, 'index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha') !== false);
-check('le nombre de pièces exclues est calculé depuis la clé (« 3 pièces exclues », sans noms)', strpos($page, '3 {{pièces exclues}}') !== false && strpos($page, 'Pièce fictive') === false);
-$one = render_configuration($root, array_merge($fixture, array('config' => array('excludedPlugins' => '', 'excludedObjects' => '5'))));
-check('« 1 pièce exclue » au singulier', strpos($one, '1 {{pièce exclue}}') !== false);
-$none = render_configuration($root, array_merge($fixture, array('config' => array('excludedPlugins' => '', 'excludedObjects' => ''))));
-check('aucune pièce exclue : pas de nombre, mais le renvoi reste', strpos($none, '{{Pièces exclues : elles se règlent depuis la page du plugin') !== false && strpos($none, '{{pièce exclue}}') === false && strpos($none, '{{pièces exclues}}') === false);
-check('liste : alpha, beta (cochée), gamma, plugin_html échappé, plugin_gone coché « absent de Jeedom »', preg_match('/value="plugin_beta"[^>]*checked/', $page) === 1 && preg_match('/value="plugin_gone"[^>]*checked/', $page) === 1 && strpos($page, '<img src=x') === false && strpos($page, 'jeedom2ha</small>') === false);
-check('champ porteur masqué configKey excludedPlugins, valeur chargée conservée verbatim', preg_match('/<input type="hidden" class="configKey" data-l1key="excludedPlugins" value="plugin_beta,plugin_gone"/', $page) === 1);
-// Front v2 / Lot 4 — garde levée : libellés renommés (« En cas de doute sur un équipement », « Enregistrer et relire Jeedom ») ; clé et identifiant inchangés.
-check('« En cas de doute sur un équipement » (clé confidencePolicy) et « Enregistrer et relire Jeedom » (bt_applyAndRescan)', strpos($page, 'data-l1key="confidencePolicy"') !== false && strpos($page, '{{En cas de doute sur un équipement}}') !== false && preg_match('/id="bt_applyAndRescan"[^>]*>\s*<i class="fas fa-sync"><\/i> \{\{Enregistrer et relire Jeedom\}\}/', $page) === 1);
-check('les deux valeurs de la politique sont conservées, libellés de E8', strpos($page, '<option value="sure_probable">{{Publier quand même (recommandé)}}</option>') !== false && strpos($page, '<option value="sure_only">{{Ne publier que les équipements reconnus avec certitude}}</option>') !== false);
+check('« Sauvegarder » du cœur n\'écrit plus excludedObjects, excludedPlugins ni confidencePolicy', preg_match('/data-l1key="(excludedObjects|excludedPlugins|confidencePolicy)"/', $page) === 0);
+check('lien « Choisir ce qui est publié ↗ » vers le panneau de la page du plugin', preg_match('/<a href="index\.php\?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha#j2ha-choisir" id="lnk_j2haChoosePublished">.*\{\{Choisir ce qui est publié\}\} <i class="fas fa-external-link-alt"><\/i><\/a>/', $page) === 1);
+check('aucune case de plugin, aucun bouton « Enregistrer et relire Jeedom »', strpos($page, 'j2ha-excluded-plugin') === false && strpos($page, 'bt_applyAndRescan') === false && strpos($page, '<img src=x') === false);
 check('plus d\'exemple « virtual,zwave,rfxcom » ni de texte libre pour les plugins', strpos($page, 'virtual,zwave,rfxcom') === false && strpos($page, '(eq_type_name)') === false);
 
 echo "Front v2 / Lot 4 (E8) — connexion guidée, MQTT Manager et HomeKit conditionnels, glossaire\n";
 check('bouton principal « Tester, enregistrer et redémarrer le démon », « Tester seulement » en lien secondaire', strpos($page, 'id="bt_mqttTestSaveRestart"') !== false && strpos($page, '{{Tester, enregistrer et redémarrer le démon}}') !== false && preg_match('/<a href="#" id="bt_testMqttConnection">\{\{Tester seulement\}\}<\/a>/', $page) === 1);
 check('trois coches de progression dans l\'ordre', preg_match('/data-step="test"[^>]*>.*\{\{Connexion testée\}\}.*data-step="save"[^>]*>.*\{\{Réglages enregistrés\}\}.*data-step="restart"[^>]*>.*\{\{Démon redémarré\}\}/s', $page) === 1);
-check('phrase d\'en-tête sur le broker commun avec Home Assistant', strpos($page, '{{Indiquez le broker que Home Assistant utilise déjà : le broker MQTT est le serveur de messages que Home Assistant écoute aussi.}}') !== false);
+// Garde levée (front v3, Lot 3) : la phrase d'en-tête passe en info-bulle ⓘ du titre du bloc.
+check('en-tête sur le broker commun avec Home Assistant, en info-bulle', preg_match('/id="i_mqttBrokerIntro"[^>]*title="\{\{Indiquez le broker que Home Assistant utilise déjà : le broker MQTT est le serveur de messages que Home Assistant écoute aussi\./', $page) === 1 && strpos($page, '<p class="help-block" id="p_mqttBrokerIntro">') === false);
+check('« Une seule installation par broker » : avertissement d\'une ligne, conséquence en info-bulle', preg_match('/<p class="text-warning" id="p_mqttOneInstance"><i class="fas fa-exclamation-triangle"><\/i> \{\{Une seule installation jeedom2ha par broker MQTT\.\}\}\s*<i class="fas fa-info-circle tooltips" tabindex="0" title="\{\{Une deuxième installation/', $page) === 1);
 check('repli : bouton vers le bloc Démon présent', strpos($page, 'id="bt_mqttGoToDaemon"') !== false);
-check('« Retour à la page du plugin » en tête et en fin', substr_count($page, '{{Retour à la page du plugin}}') === 2 && strpos($page, 'id="p_j2haBackTop"') < strpos($page, 'id="div_mqtt_autodetect_status"') && strpos($page, 'id="p_j2haBackBottom"') > strpos($page, 'id="bt_applyAndRescan"'));
-check('note cron5', strpos($page, '{{Dans le bloc « Fonctionnalités » de Jeedom, ne décochez pas cron5 : il maintient la publication à jour.}}') !== false);
+check('« Retour à la page du plugin » en tête et en fin', substr_count($page, '{{Retour à la page du plugin}}') === 2 && strpos($page, 'id="p_j2haBackTop"') < strpos($page, 'id="div_mqtt_autodetect_status"') && strpos($page, 'id="p_j2haBackBottom"') > strpos($page, 'id="details_j2haAdvanced"'));
+// Garde levée (front v3, Lot 3) : la note cron5 devient un avertissement d'une ligne, rendu visible SEULEMENT si cron5 est décoché.
+check('cron5 actif (défaut) : avertissement masqué', preg_match('/<p class="text-warning" id="p_cron5Note" style="display:none;"><i class="fas fa-exclamation-triangle"><\/i> \{\{cron5 désactivé : mises à jour manuelles\}\}/', $page) === 1);
+$cronOff = render_configuration($root, array_merge($fixture, array('config' => array_merge($fixture['config'], array('functionality::cron5::enable' => 0)))));
+check('cron5 décoché : avertissement visible', preg_match('/<p class="text-warning" id="p_cron5Note"><i class="fas fa-exclamation-triangle"><\/i> \{\{cron5 désactivé : mises à jour manuelles\}\}/', $cronOff) === 1);
 check('bloc « Avancé » replié', preg_match('/<details id="details_j2haAdvanced"[^>]*>\s*<summary>\{\{Avancé\}\}<\/summary>/', $page) === 1 && strpos($page, '<details id="details_j2haAdvanced" open') === false);
 check('MQTT Manager absent : pas de bouton « Récupérer depuis MQTT Manager »', strpos($page, 'id="bt_importMqttManager"') === false);
 check('aucun plugin HomeKit : pas de phrase HomeKit', strpos($page, 'id="p_homekitRoomNote"') === false);
 $withPlugins = render_configuration($root, array_merge($fixture, array('active_plugins' => array('mqtt2', 'homebridge'))));
-check('MQTT Manager actif : bouton rendu, avec l\'avertissement de confirmation', strpos($withPlugins, 'id="bt_importMqttManager"') !== false && strpos($withPlugins, '{{Remplace les réglages ci-dessous par ceux de MQTT Manager et les enregistre aussitôt. Une confirmation est demandée avant.}}') !== false);
-check('plugin HomeKit actif : phrase HomeKit rendue', strpos($withPlugins, 'id="p_homekitRoomNote"') !== false);
+check('MQTT Manager actif : bouton rendu, avec l\'avertissement de confirmation (info-bulle)', preg_match('/id="bt_importMqttManager" title="\{\{Remplace les réglages ci-dessous par ceux de MQTT Manager et les enregistre aussitôt\. Une confirmation est demandée avant\.\}\}"/', $withPlugins) === 1);
+// Garde levée (front v3, Lot 3) : la phrase HomeKit des pièces exclues part avec le bloc « Ce qui est publié ».
+check('plugin HomeKit actif : plus de phrase HomeKit sur cette page', strpos($withPlugins, 'id="p_homekitRoomNote"') === false);
 $inactive = render_configuration($root, array_merge($fixture, array('active_plugins' => array())));
 check('plugins installés mais inactifs : ni bouton ni phrase', strpos($inactive, 'id="bt_importMqttManager"') === false && strpos($inactive, 'id="p_homekitRoomNote"') === false);
 preg_match_all('/\{\{([^}]*)\}\}/', $config, $labels);

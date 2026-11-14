@@ -54,10 +54,10 @@ const SCENARIOS = [
       // Mêmes requêtes, même ordre et mêmes corps qu'avant ; la publication qui suit l'enregistrement n'est émise qu'après
       // la réponse du démon, à laquelle ce scénario ne répond pas (elle est couverte par « appliquer-equipement »).
       ui.click(`${EQ} tr[data-cmd-id="100"] .j2ha-type-link`);
-      ui.$(`${EQ} .j2ha-v2-type-panel input[data-type="cover"]`).trigger('change');
+      ui.$('.j2ha-v3-type-modal[data-eq-id="1"] .j2ha-v2-type-panel input[data-type="cover"]').trigger('change');
       await sleep(450);
       ui.respond('previewMappingOverride', PREVIEW_READY);
-      ui.click(`${EQ} .j2ha-v2-type-save`);
+      ui.click('.j2ha-v3-type-modal[data-eq-id="1"] .j2ha-v2-type-save'); // front v3 (Lot 3) : fenêtre posée sur body
       return writesOf(ui);
     },
   },

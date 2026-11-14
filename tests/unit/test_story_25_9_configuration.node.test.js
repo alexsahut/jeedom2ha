@@ -15,56 +15,20 @@ const assert = require('node:assert/strict');
 const root = path.join(__dirname, '..', '..');
 const config = fs.readFileSync(path.join(root, 'plugin_info/configuration.php'), 'utf8');
 
-function loadCompute() {
-  const begin = config.indexOf('/* j2ha-excluded-plugins:begin */');
-  const end = config.indexOf('/* j2ha-excluded-plugins:end */');
-  assert.ok(begin > 0 && end > begin, 'bloc balisé présent');
-  const sandbox = {};
-  vm.runInNewContext(config.slice(begin, end), sandbox);
-  return (...args) => sandbox.j2haComputeExcludedPlugins(...args);
-}
-
-test('25.9 / AC2 — valeur écrite : ordre conservé, ajout en fin, retrait', () => {
-  const compute = loadCompute();
-  // Cas de l'AC : plugin_beta et plugin_gone exclus ; on coche plugin_alpha et on décoche plugin_beta.
-  assert.equal(compute('plugin_beta,plugin_gone', ['plugin_beta', 'plugin_gone'], ['plugin_gone', 'plugin_alpha']), 'plugin_gone,plugin_alpha');
-  // Décocher un plugin absent de Jeedom le retire.
-  assert.equal(compute('plugin_beta,plugin_gone', ['plugin_beta', 'plugin_gone'], ['plugin_beta']), 'plugin_beta');
-  // Ajouts en fin, dans l'ordre des cases cochées.
-  assert.equal(compute('plugin_beta', ['plugin_beta'], ['plugin_beta', 'plugin_alpha', 'plugin_gamma']), 'plugin_beta,plugin_alpha,plugin_gamma');
-  // Liste vide : chaîne vide ; premier ajout sur une liste vide.
-  assert.equal(compute('plugin_beta', ['plugin_beta'], []), '');
-  assert.equal(compute('', [], ['plugin_alpha']), 'plugin_alpha');
-  // Les identifiants déjà présents gardent leur ordre, les espaces des autres jetons sont normalisés à l'écriture seulement.
-  assert.equal(compute(' plugin_c , plugin_a ,plugin_b', ['plugin_c', 'plugin_a', 'plugin_b'], ['plugin_c', 'plugin_b']), 'plugin_c,plugin_b');
-  // Toutes les occurrences d'un identifiant décoché sont retirées.
-  assert.equal(compute('plugin_a,plugin_b,plugin_a', ['plugin_a', 'plugin_b'], ['plugin_b']), 'plugin_b');
-  // Un jeton inconnu des cases (donnée héritée) est conservé.
-  assert.equal(compute('plugin_a,0,plugin_b', ['plugin_a', 'plugin_b'], ['plugin_a', 'plugin_b', 'plugin_c']), 'plugin_a,0,plugin_b,plugin_c');
-});
-
-test('25.9 / AC2 — ne rien toucher renvoie la valeur chargée IDENTIQUE, verbatim (aucune normalisation, Q4)', () => {
-  const compute = loadCompute();
-  for (const value of ['', 'plugin_beta,plugin_gone', ' plugin_beta , plugin_gone ', 'plugin_a,,plugin_a', 'plugin_b,plugin_a']) {
-    const ids = value.split(',').map((t) => t.trim()).filter((t) => t !== '');
-    const unique = [...new Set(ids)];
-    assert.equal(compute(value, unique, unique.slice().reverse()), value, JSON.stringify(value));
-  }
-});
-
-test('25.9 / AC7 — « Enregistrer et relire Jeedom » : exactement action, excludedPlugins, confidencePolicy ; budgets et messages inchangés', () => {
-  assert.doesNotMatch(config, /excludedObjects/);
-  const save = config.match(/data: \{\s*action:\s*'saveFilteringConfig',([\s\S]*?)\},\s*dataType: 'json',\s*timeout: 10000,/);
-  assert.ok(save, 'bloc de sauvegarde');
-  const keys = [...('action' + save[0]).matchAll(/^\s*(action|excludedPlugins|excludedObjects|confidencePolicy):/gm)].map((m) => m[1]);
-  assert.deepEqual(keys, ['action', 'excludedPlugins', 'confidencePolicy']);
-  assert.match(config, /excludedPlugins:\s+j2haExcludedPluginsValue\(\),/);
-  assert.match(config, /confidencePolicy: \$\('\.configKey\[data-l1key=confidencePolicy\]'\)\.val\(\)/);
-  assert.match(config, /data: \{action: 'scanTopology'\},\s*dataType: 'json',\s*timeout: 90000,/);
-  assert.match(config, /r\.status !== 'ok' \|\| r\.operation_result !== 'succes'/);
-  // Front v2 / Lot 4 — garde levée : « Appliqué & Rescan terminé » → « Relecture terminée : N équipements publiés » (glossaire 3.1).
-  assert.match(config, /\$status\.addClass\('label-success'\)\.text\(j2haRereadDoneLabel\(published\)\);/);
-  assert.match(config, /'\{\{Relecture terminée\}\} : '/);
+// Garde levée (front v3, Lot 3) : la liste à cocher des plugins, le réglage « En cas de doute » et « Enregistrer et relire
+// Jeedom » quittent la configuration (une seule source : le panneau « Choisir ce qui est publié » de la page du plugin, qui écrit
+// les MÊMES clés par la MÊME route, `saveFilteringConfig`). Les tests de la valeur D2 écrite par les cases (ordre, ajout en fin,
+// verbatim) sont remplacés par la garde inverse : la configuration n'écrit plus ces clés, ni par sa propre requête, ni par
+// « Sauvegarder » du cœur (aucun champ `configKey` de ces clés). La valeur D2 reste couverte côté panneau
+// (test_front_v2_exclusions : serializePluginList, inverseWrites).
+test('front v3 (Lot 3) — la configuration ne règle plus ce qui est publié : une seule source, le panneau', () => {
+  assert.doesNotMatch(config, /data-l1key="?(excludedPlugins|confidencePolicy|excludedObjects)/);
+  assert.doesNotMatch(config, /saveFilteringConfig|scanTopology|j2haComputeExcludedPlugins|bt_applyAndRescan/);
+  assert.match(config, /href="index\.php\?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha#j2ha-choisir"[^>]*>.*\{\{Choisir ce qui est publié\}\} <i class="fas fa-external-link-alt"><\/i><\/a>/);
+  const panel = fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha_exclusions.js'), 'utf8');
+  assert.match(panel, /action: 'saveFilteringConfig',\s*excludedPlugins: serializePluginList\(model\.base\.pluginsCsv, c\.plugins\),\s*confidencePolicy: cleanPolicy\(c\.policy \|\| confidencePolicy\),/);
+  const home = fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha.js'), 'utf8');
+  assert.match(home, /window\.location\.hash === '#j2ha-choisir'/);
 });
 
 test('25.9 / AC4 — le JS reste EN LIGNE dans configuration.php (jamais dans desktop/js)', () => {
@@ -163,61 +127,38 @@ async function withConfigurationPage(t, fixture, fn, options = {}) {
   }
 }
 
-test('25.9 réel — la liste reflète excludedPlugins ; cocher / décocher puis « Appliquer » envoie la valeur D2 sans excludedObjects', async (t) => {
+// Garde levée (front v3, Lot 3) : la liste à cocher, le renvoi des pièces et leur nombre quittent la page (voir plus haut).
+test('front v3 (Lot 3) réel — aucune case de plugin ; lien « Choisir ce qui est publié ↗ » ; « Sauvegarder » du cœur ne lit plus ces clés', async (t) => {
   await withConfigurationPage(t, FIXTURE, async (page, ctx) => {
-    const state = () => page.locator('#div_excludedPluginsList input.j2ha-excluded-plugin').evaluateAll((boxes) => boxes.map((b) => `${b.value}:${b.checked}`));
-    assert.deepEqual(await state(), ['plugin_alpha:false', 'plugin_beta:true', 'plugin_gamma:false', 'plugin_gone:true']);
-    assert.equal(await page.locator('.configKey[data-l1key=excludedPlugins]').inputValue(), 'plugin_beta,plugin_gone', 'champ porteur = valeur chargée');
-    assert.equal(await page.locator('.configKey[data-l1key=excludedObjects]').count(), 0, 'plus de champ des pièces');
-    await page.locator('input[value="plugin_alpha"]').check();
-    await page.locator('input[value="plugin_beta"]').uncheck();
-    assert.equal(await page.locator('.configKey[data-l1key=excludedPlugins]').inputValue(), 'plugin_gone,plugin_alpha', '« Sauvegarder » du cœur lit la même valeur');
-    await page.locator('#bt_applyAndRescan').click();
-    await page.waitForFunction(() => /Relecture terminée/.test(document.querySelector('#span_rescanResult').textContent));
-    const save = ctx.requests.find((r) => r.action === 'saveFilteringConfig');
-    assert.deepEqual(Object.keys(save).sort(), ['action', 'confidencePolicy', 'excludedPlugins']);
-    assert.equal(save.excludedPlugins, 'plugin_gone,plugin_alpha');
-    assert.ok(!('excludedObjects' in save));
-    assert.deepEqual(ctx.requests.map((r) => r.action).filter((a) => a !== 'getMqttConfig'), ['saveFilteringConfig', 'scanTopology']);
+    assert.equal(await page.locator('#div_excludedPluginsList, input.j2ha-excluded-plugin, #bt_applyAndRescan').count(), 0);
+    assert.equal(await page.locator('.configKey[data-l1key=excludedPlugins], .configKey[data-l1key=confidencePolicy], .configKey[data-l1key=excludedObjects]').count(), 0);
+    const link = page.locator('#lnk_j2haChoosePublished');
+    assert.equal((await link.innerText()).trim(), 'Choisir ce qui est publié');
+    assert.equal(await link.getAttribute('href'), 'index.php?v=d&m=jeedom2ha&p=jeedom2ha#j2ha-choisir');
+    assert.match(await page.locator('#p_j2haChoosePublished .fa-info-circle').getAttribute('title'), /En cas de doute/);
+    const keys = await page.evaluate(() => [...document.querySelectorAll('#div_plugin_configuration .configKey')].map((el) => el.getAttribute('data-l1key')));
+    assert.ok(keys.every((k) => /^mqtt/.test(k)), keys.join(','));
+    assert.deepEqual(ctx.requests.map((r) => r.action), ['getMqttConfig']);
     assert.deepEqual(ctx.errors, []);
   });
 });
 
-test('25.9 réel — rien de touché : « Appliquer » renvoie la valeur chargée identique, espaces compris', async (t) => {
-  const fixture = Object.assign({}, FIXTURE, { config: { excludedPlugins: ' plugin_beta , plugin_gone ', excludedObjects: '5' } });
-  await withConfigurationPage(t, fixture, async (page, ctx) => {
-    await page.locator('#bt_applyAndRescan').click();
-    await page.waitForFunction(() => /Relecture terminée/.test(document.querySelector('#span_rescanResult').textContent));
-    assert.equal(ctx.requests.find((r) => r.action === 'saveFilteringConfig').excludedPlugins, ' plugin_beta , plugin_gone ');
-  });
-});
-
-test('25.9 réel — décocher un plugin absent de Jeedom le retire ; le cœur qui remplit le champ resynchronise les cases', async (t) => {
-  await withConfigurationPage(t, FIXTURE, async (page, ctx) => {
-    await page.locator('input[value="plugin_gone"]').uncheck();
-    await page.locator('#bt_applyAndRescan').click();
-    await page.waitForFunction(() => /Relecture terminée/.test(document.querySelector('#span_rescanResult').textContent));
-    assert.equal(ctx.requests.find((r) => r.action === 'saveFilteringConfig').excludedPlugins, 'plugin_beta');
-  });
+test('front v3 (Lot 3) réel — avertissement cron5 d\'une ligne, seulement si cron5 est décoché', async (t) => {
   await withConfigurationPage(t, FIXTURE, async (page) => {
-    // Le cœur remplit les `configKey` après le chargement : la valeur chargée devient la référence et les cases la suivent.
-    await page.evaluate(() => { $('.configKey[data-l1key=excludedPlugins]').val('plugin_alpha').trigger('change'); });
-    const state = await page.locator('#div_excludedPluginsList input.j2ha-excluded-plugin').evaluateAll((boxes) => boxes.map((b) => `${b.value}:${b.checked}`));
-    assert.deepEqual(state, ['plugin_alpha:true', 'plugin_beta:false', 'plugin_gamma:false', 'plugin_gone:false']);
-    assert.equal(await page.locator('.configKey[data-l1key=excludedPlugins]').inputValue(), 'plugin_alpha');
+    assert.equal(await page.locator('#p_cron5Note').isVisible(), false, 'cron5 actif (défaut) : rien');
   });
-});
-
-test('25.9 réel — le renvoi vers la page du plugin et le nombre de pièces exclues sont rendus, sans nom de pièce', async (t) => {
-  await withConfigurationPage(t, FIXTURE, async (page) => {
-    const text = (await page.locator('#div_plugin_configuration').innerText()).replace(/\s+/g, ' ');
-    assert.match(text, /Pièces exclues : elles se règlent depuis la page du plugin \(menu « ⋯ » d'une carte de pièce, ou détail de la pièce\)\./);
-    assert.match(text, /2 pièces exclues/);
-    // Front v2 / Lot 4 — garde levée : 1 → 3 liens (« Retour à la page du plugin » en tête et en fin, renvoi des pièces conservé).
-    assert.equal(await page.locator('a[href="index.php?v=d&m=jeedom2ha&p=jeedom2ha"]').count(), 3);
-    assert.equal(await page.locator('[role=group][aria-labelledby=lbl_excludedPlugins]').count(), 1);
-    assert.match(text, /\(absent de Jeedom\)/);
-    assert.match(text, /Les équipements des plugins cochés ne sont pas publiés dans Home Assistant\./);
+  const off = Object.assign({}, FIXTURE, { config: Object.assign({}, FIXTURE.config, { 'functionality::cron5::enable': 0 }) });
+  await withConfigurationPage(t, off, async (page) => {
+    const note = page.locator('#p_cron5Note');
+    assert.equal(await note.isVisible(), true);
+    assert.equal((await note.innerText()).trim(), 'cron5 désactivé : mises à jour manuelles');
+    assert.match(await note.locator('.fa-info-circle').getAttribute('title'), /Toutes les 5 minutes/);
+    // La case du cœur (bloc « Fonctionnalités ») recochée sur la même page : l'avertissement disparaît.
+    await page.evaluate(() => {
+      $('body').append('<input type="checkbox" class="configKey" data-l1key="functionality::cron5::enable">');
+      $('[data-l1key="functionality::cron5::enable"]').prop('checked', true).trigger('change');
+    });
+    assert.equal(await note.isVisible(), false);
   });
 });
 
@@ -233,7 +174,6 @@ function loadMessages() {
   return {
     describe: (data) => { const o = sandbox.j2haDescribeMqttTest(data); return { kind: o.kind, code: o.code, message: strip(o.message), remedy: strip(o.remedy) }; },
     check: (h, p) => sandbox.j2haCheckMqttForm(h, p),
-    done: (n) => strip(sandbox.j2haRereadDoneLabel(n)),
     normalize: (c) => sandbox.j2haNormalizeMqttConfiguration(c),
   };
 }
@@ -262,16 +202,14 @@ test('Lot 4 / E8 — un message et un remède par error_code du test de connexio
   assert.equal(m.describe(null).kind, 'no_daemon');
 });
 
-test('Lot 4 / E8 — contrôle local du formulaire (mêmes règles que le démon) et libellé de fin de relecture', () => {
+// Garde levée (front v3, Lot 3) : le libellé de fin de relecture part avec « Enregistrer et relire Jeedom ».
+test('Lot 4 / E8 — contrôle local du formulaire (mêmes règles que le démon)', () => {
   const m = loadMessages();
   assert.equal(m.check('', '1883'), 'missing_host');
   assert.equal(m.check('   ', ''), 'missing_host');
   assert.equal(m.check('broker.test', ''), null);
   assert.equal(m.check('broker.test', '8883'), null);
   for (const bad of ['0', '65536', 'abc', '-1', '18.83']) assert.equal(m.check('broker.test', bad), 'invalid_port', bad);
-  assert.equal(m.done(0), 'Relecture terminée : 0 équipement publié');
-  assert.equal(m.done(1), 'Relecture terminée : 1 équipement publié');
-  assert.equal(m.done(12), 'Relecture terminée : 12 équipements publiés');
 });
 
 test('Lot 4 / E8 — le mot de passe n\'est jamais affiché, journalisé ni recopié', () => {
@@ -289,13 +227,8 @@ test('Lot 4 / E8 — le mot de passe n\'est jamais affiché, journalisé ni reco
 test('Lot 4 / glossaire — plus de « rescanner » ni de « Rescan » dans les textes de la page ; identifiants DOM conservés', () => {
   const texts = [...config.matchAll(/\{\{([^}]*)\}\}/g)].map((m) => m[1]).join('\n');
   assert.doesNotMatch(texts, /rescan|synchro/i);
-  assert.match(texts, /Enregistrer et relire Jeedom/);
-  assert.match(texts, /Relecture en cours…/);
-  assert.match(texts, /En cas de doute sur un équipement/);
-  assert.match(texts, /Publier quand même \(recommandé\)/);
-  assert.match(texts, /Ne publier que les équipements reconnus avec certitude/);
-  assert.match(config, /id="bt_applyAndRescan"/);
-  assert.match(config, /id="span_rescanResult"/);
+  // Garde levée (front v3, Lot 3) : « Enregistrer et relire Jeedom » et « En cas de doute » quittent la page (panneau « Choisir… »).
+  assert.match(texts, /Tester, enregistrer et redémarrer le démon/);
 });
 
 test('Lot 4 / E8 — chaîne du cœur : jeedom.config.save puis jeedom.plugin.deamonStart({forceRestart: 1}) ; aucune action ajax ajoutée', () => {
@@ -303,7 +236,8 @@ test('Lot 4 / E8 — chaîne du cœur : jeedom.config.save puis jeedom.plugin.de
   assert.match(config, /configuration = j2haNormalizeMqttConfiguration\(container\.getJeeValues\('\.configKey'\)\[0\]\);/);
   assert.match(config, /jeedom\.plugin\.deamonStart\(\{\s*id: J2HA_PLUGIN_ID,\s*forceRestart: 1,/);
   const actions = [...new Set([...config.matchAll(/action:\s*'([A-Za-z]+)'/g)].map((m) => m[1]))].sort();
-  assert.deepEqual(actions, ['forceMqttManagerImport', 'getMqttConfig', 'saveFilteringConfig', 'scanTopology', 'testMqttConnection']);
+  // Garde levée (front v3, Lot 3) : saveFilteringConfig et scanTopology quittent la page (panneau « Choisir… » de la page du plugin).
+  assert.deepEqual(actions, ['forceMqttManagerImport', 'getMqttConfig', 'testMqttConnection']);
 });
 
 // Faux cœur JS : getJeeValues (domUtils 4.4+), jeedom.config.save, jeedom.plugin.deamonStart, bloc Démon. Les appels sont consignés.
@@ -412,21 +346,7 @@ test('Lot 4 réel — hôte vide : « Adresse manquante » sans appel au démon'
   }, { initScript: FAKE_CORE_JS('ok') });
 });
 
-test('Lot 4 réel — « Enregistrer et relire Jeedom » : annuler la confirmation n\'envoie rien', async (t) => {
-  await withConfigurationPage(t, FIXTURE, async (page, ctx) => {
-    await page.locator('#bt_applyAndRescan').click();
-    assert.equal(ctx.dialogs.length, 1);
-    assert.match(ctx.dialogs[0], /Une relecture complète peut publier ou retirer des entités Home Assistant/);
-    assert.deepEqual(ctx.requests.map((r) => r.action).filter((a) => a !== 'getMqttConfig'), []);
-    assert.equal(await page.locator('#bt_applyAndRescan').isDisabled(), false);
-  }, { dismissDialogs: true });
-  await withConfigurationPage(t, FIXTURE, async (page) => {
-    await page.locator('#bt_applyAndRescan').click();
-    await page.waitForFunction(() => /Relecture terminée/.test(document.querySelector('#span_rescanResult').textContent));
-    assert.equal(await page.locator('#span_rescanResult').innerText(), 'Relecture terminée : 2 équipements publiés');
-  });
-});
-
+// Garde levée (front v3, Lot 3) : « Enregistrer et relire Jeedom » n'existe plus sur cette page.
 test('Lot 4 réel — « Récupérer depuis MQTT Manager » : absent sans le plugin ; avec lui, confirmation avant d\'écraser', async (t) => {
   await withConfigurationPage(t, FIXTURE, async (page) => {
     assert.equal(await page.locator('#bt_importMqttManager').count(), 0);
@@ -445,20 +365,25 @@ test('Lot 4 réel — « Récupérer depuis MQTT Manager » : absent sans le plu
   });
 });
 
-test('Lot 4 réel — en-tête, retour à la page du plugin, phrase HomeKit conditionnelle, note cron5', async (t) => {
-  await withConfigurationPage(t, FIXTURE, async (page) => {
-    const text = (await page.locator('#div_plugin_configuration').innerText()).replace(/\s+/g, ' ');
-    assert.match(text, /Indiquez le broker que Home Assistant utilise déjà/);
-    assert.match(text, /Tester, enregistrer et redémarrer le démon/);
-    assert.match(text, /Tester seulement/);
-    assert.match(text, /ne décochez pas cron5 : il maintient la publication à jour\./);
-    assert.equal(await page.locator('#p_j2haBackTop a, #p_j2haBackBottom a').count(), 2);
-    assert.equal(await page.locator('#p_homekitRoomNote').count(), 0, 'sans plugin HomeKit, pas de phrase HomeKit');
-    assert.doesNotMatch(text, /rescan/i);
-  });
-  await withConfigurationPage(t, Object.assign({}, FIXTURE, { active_plugins: ['homebridge'] }), async (page) => {
-    assert.match(await page.locator('#p_homekitRoomNote').innerText(), /exposés à HomeKit/);
-  });
+// Garde levée (front v3, Lot 3) : zéro phrase permanente. L'intro du broker passe en info-bulle ⓘ du titre ; « Une seule
+// installation par broker » devient un avertissement d'une ligne (sa conséquence en ⓘ) ; la phrase HomeKit des pièces exclues
+// part avec le bloc « Ce qui est publié » (le panneau dit « Reste publié : exposé à HomeKit » équipement par équipement).
+test('Lot 4 réel — en-tête, retour à la page du plugin, avertissement d\'une ligne, aucune phrase permanente', async (t) => {
+  for (const fixture of [FIXTURE, Object.assign({}, FIXTURE, { active_plugins: ['homebridge', 'mqtt2'] })]) {
+    await withConfigurationPage(t, fixture, async (page) => {
+      const text = (await page.locator('#div_plugin_configuration').innerText()).replace(/\s+/g, ' ');
+      assert.doesNotMatch(text, /Indiquez le broker que Home Assistant utilise déjà/);
+      assert.match(await page.locator('#i_mqttBrokerIntro').getAttribute('title'), /Indiquez le broker que Home Assistant utilise déjà/);
+      assert.equal((await page.locator('#p_mqttOneInstance').innerText()).trim(), 'Une seule installation jeedom2ha par broker MQTT.');
+      assert.match(await page.locator('#p_mqttOneInstance .fa-info-circle').getAttribute('title'), /retirerait les boutons de scénario/);
+      assert.match(text, /Tester, enregistrer et redémarrer le démon/);
+      assert.match(text, /Tester seulement/);
+      assert.equal(await page.locator('#p_j2haBackTop a, #p_j2haBackBottom a').count(), 2);
+      assert.equal(await page.locator('#p_homekitRoomNote, #p_mqttSaveHint, #p_mqttBrokerIntro, .help-block:not(#span_mqttPasswordStatus)').count(), 0, 'aucune phrase d\'aide');
+      assert.equal(await page.locator('.btn-primary').count(), 1, 'un bouton principal (bloc du broker)');
+      assert.doesNotMatch(text, /rescan/i);
+    });
+  }
 });
 
 test('Lot 4 / revue — port vide enregistré à 1883 (comme le test), instantané non modifié', () => {

@@ -38,7 +38,8 @@ describe('Lot 8 — « Premiers pas »', () => {
 
   it('les quatre étapes du guide de démarrage sont citées avec les titres de l’écran, dans l’ordre', () => {
     const guide = norm(read('desktop/js/jeedom2ha_guide.js'));
-    const steps = ['Connecter le broker MQTT', 'Vérifier que Home Assistant écoute', 'Choisir ce qui est publié', 'Publier dans Home Assistant'];
+    // Garde levée (front v3, Lot 3) : titres d'étape de 3 mots (une ligne par étape) ; la doc suit l'écran.
+    const steps = ['Connecter le broker', 'Vérifier Home Assistant', 'Choisir ce qui est publié', 'Publier les équipements'];
     let from = 0;
     steps.forEach((title, i) => {
       assert.ok(guide.includes(title), `« ${title} » absent du guide`);
@@ -123,10 +124,11 @@ describe('Lot 8 — index.md : glossaire cible, écrans, « dix types »', () =>
 
   it('la configuration (E8), le guide (E1) et « Vérifier l’installation » (E7) sont décrits avec les libellés de l’écran', () => {
     for (const label of ['Tester, enregistrer et redémarrer le démon', 'Tester seulement', 'Connexion testée', 'Réglages enregistrés', 'Démon redémarré',
-      'En cas de doute sur un équipement', 'Publier quand même (recommandé)', 'Ne publier que les équipements reconnus avec certitude',
-      'Enregistrer et relire Jeedom', 'Récupérer depuis MQTT Manager', 'Réinitialiser le formulaire', 'Bienvenue dans jeedom2ha', 'Guide de démarrage',
+      // Garde levée (front v3, Lot 3) : « En cas de doute » passe dans le panneau « Choisir » (« Publier | Ne pas publier ») ;
+      // « Enregistrer et relire Jeedom » quitte la configuration ; « Diagnostic » et « Pseudonymiser », libellés courts.
+      'En cas de doute', 'Ne pas publier', 'cron5 désactivé : mises à jour manuelles', 'Récupérer depuis MQTT Manager', 'Réinitialiser le formulaire', 'Bienvenue dans jeedom2ha', 'Guide de démarrage',
       'Le démon tourne', 'Le broker MQTT répond', 'Home Assistant sur le broker', 'Non confirmé', 'Dernière relecture réussie', 'Pour le support',
-      'Télécharger le diagnostic support', 'Télécharger l\'export de décision', 'Journaux du plugin :']) {
+      'Diagnostic', 'Pseudonymiser', 'Télécharger l\'export de décision', 'Journaux du plugin :']) {
       assert.ok(index.includes(label), `« ${label} » décrit dans index.md`);
       assert.ok(code.includes(norm(label)), `« ${label} » absent du code`);
     }
@@ -169,7 +171,10 @@ describe('Lot 8 — la documentation parle exactement comme l’écran', () => {
       'Dernière synchro', 'Synchronisation terminée', 'exclus et autres', 'Configuration Home Assistant par pièce', 'imposé (', 'neuf types',
       'barre de santé', 'Télécharger le diagnostic…', 'Toutes les pièces »', 'Rechercher une pièce ou un équipement', 'Appliquer les filtres et rescanner',
       'enregistré automatiquement', 'Actions de la pièce', 'configuration par pièce', 'Retirer le type imposé', 'Pas encore vu',
-      'Republier tous les équipements inclus', 'Home Assistant a été vu sur ce broker'];
+      'Republier tous les équipements inclus', 'Home Assistant a été vu sur ce broker',
+      // Front v3 (Lot 3) : libellés retirés de l'écran (configuration réduite au broker, panneau de type, diagnostic).
+      'Enregistrer et relire Jeedom', 'Télécharger le diagnostic support', 'Pseudonymiser les noms', 'Ce choix vaut pour',
+      'Aperçu calculé par le plugin', 'Attention : l\'identifiant passe', 'Tout est publié par défaut. Décochez'];
     for (const [name, raw] of Object.entries(DOCS)) {
       const text = raw.replace(/<!--[\s\S]*?-->/g, ''); // l'en-tête de maintenance de compteurs.md peut nommer l'ancien libellé
       for (const stale of STALE) {

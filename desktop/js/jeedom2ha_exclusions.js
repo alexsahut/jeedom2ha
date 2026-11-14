@@ -114,7 +114,7 @@
     var excludedList = parsePluginList(excludedPlugins);
     var model = {
       known: view.known, rooms: [], plugins: [], eqs: {}, order: [],
-      base: { pluginsCsv: String(excludedPlugins === undefined || excludedPlugins === null ? '' : excludedPlugins), plugins: {}, rooms: {} },
+      base: { pluginsCsv: String(excludedPlugins === undefined || excludedPlugins === null ? '' : excludedPlugins), plugins: {}, rooms: {}, policy: null },
     };
     var rooms = Array.isArray(roomsTree) ? roomsTree : [];
     var fathers = {};
@@ -167,6 +167,13 @@
   }
 
   function emptyChanges() { return { plugins: {}, rooms: {}, eqs: {} }; }
+
+  // Front v3 (Lot 3) : réglage « En cas de doute » (`confidencePolicy`), déplacé de la configuration vers l'en-tête du panneau.
+  // Valeur d'origine dans `model.base.policy` (posée par le panneau) ; `changes.policy` = nouvelle valeur, absente si inchangée.
+  function cleanPolicy(value) { return value === 'sure_only' ? 'sure_only' : 'sure_probable'; }
+  function policyChanged(model, changes) {
+    return !!changes && typeof changes.policy === 'string' && cleanPolicy(changes.policy) !== cleanPolicy(model.base.policy);
+  }
 
   function pluginExcluded(model, changes, plugin) {
     if (plugin === '') return false;
@@ -224,12 +231,13 @@
   /** Nombre de changements réellement en attente (un retour à l'état d'origine n'en est pas un). */
   function changeCount(model, changes) {
     var c = normalize(model, changes);
-    return Object.keys(c.plugins).length + Object.keys(c.rooms).length + Object.keys(c.eqs).length;
+    return Object.keys(c.plugins).length + Object.keys(c.rooms).length + Object.keys(c.eqs).length + (policyChanged(model, c) ? 1 : 0);
   }
 
   /** Retire les changements qui reviennent à l'état d'origine (la case recochée efface son changement). */
   function normalize(model, changes) {
     var out = emptyChanges();
+    if (policyChanged(model, changes)) out.policy = cleanPolicy(changes.policy);
     // Seules les portées excluables comptent : jamais « Sans pièce » (0), jamais un plugin inconnu, jamais l'ancien réglage.
     Object.keys(changes.plugins || {}).forEach(function (id) {
       var p = pluginOf(model, id);
@@ -254,7 +262,7 @@
     var c = normalize(model, changes || emptyChanges());
     var out = {
       changes: changeCount(model, c), excluded: [], returned: [], removedEquipments: 0, removedEntities: 0,
-      unknownEntities: 0, unread: 0, entitiesKnown: model.known,
+      unknownEntities: 0, unread: 0, entitiesKnown: model.known, policy: policyChanged(model, c) ? c.policy : null,
     };
     model.order.forEach(function (id) {
       var before = effectOf(model, id, null);
@@ -294,13 +302,13 @@
   function writesFor(model, changes, confidencePolicy) {
     var c = normalize(model, changes || emptyChanges());
     var writes = [];
-    if (Object.keys(c.plugins).length > 0) {
+    if (Object.keys(c.plugins).length > 0 || c.policy) {
       writes.push({
         kind: 'plugins',
         data: {
           action: 'saveFilteringConfig',
           excludedPlugins: serializePluginList(model.base.pluginsCsv, c.plugins),
-          confidencePolicy: confidencePolicy === 'sure_only' ? 'sure_only' : 'sure_probable',
+          confidencePolicy: cleanPolicy(c.policy || confidencePolicy),
         },
       });
     }
@@ -325,8 +333,10 @@
   function inverseWrites(model, changes, confidencePolicy) {
     var c = normalize(model, changes || emptyChanges());
     var writes = [];
-    if (Object.keys(c.plugins).length > 0) {
-      writes.push({ kind: 'plugins', data: { action: 'saveFilteringConfig', excludedPlugins: model.base.pluginsCsv, confidencePolicy: confidencePolicy === 'sure_only' ? 'sure_only' : 'sure_probable' } });
+    if (Object.keys(c.plugins).length > 0 || c.policy) {
+      // Front v3 (Lot 3) : la valeur d'origine du réglage « En cas de doute » est rendue telle quelle (connue du panneau).
+      var basePolicy = typeof model.base.policy === 'string' ? model.base.policy : confidencePolicy;
+      writes.push({ kind: 'plugins', data: { action: 'saveFilteringConfig', excludedPlugins: model.base.pluginsCsv, confidencePolicy: cleanPolicy(basePolicy) } });
     }
     Object.keys(c.rooms).map(Number).sort(function (a, b) { return a - b; }).forEach(function (id) {
       writes.push({ kind: 'room', id: id, data: { action: 'saveRoomExclusion', objectId: String(id), excluded: c.rooms[id] ? '0' : '1' } });
@@ -361,8 +371,14 @@
       }
     }
     if (d.returned.length > 0) parts.push(d.returned.length + ' ' + (d.returned.length > 1 ? '{{ne seront plus exclus}}' : '{{ne sera plus exclu}}'));
+    if (d.policy) parts.push(policyText(d.policy));
     if (d.undoBlocked && d.undoBlocked.length > 0) parts.push(undoBlockedText(d.undoBlocked.length));
     return parts.join(' · ');
+  }
+
+  /** « En cas de doute : Ne pas publier » (pied et bandeau). */
+  function policyText(policy) {
+    return '{{En cas de doute :}} ' + (policy === 'sure_only' ? '{{Ne pas publier}}' : '{{Publier}}');
   }
 
   /** Annonce (pied et bandeau) des équipements que « Annuler » ne rétablira pas. */
@@ -375,8 +391,9 @@
     if (d.changes === 0) return { label: '{{Appliquer}}', danger: false, disabled: true };
     if (d.excluded.length > 0 && !d.entitiesKnown) return { label: '{{Appliquer — exclure}} ' + eqWord(d.excluded.length), danger: true, disabled: false };
     if (d.removedEntities > 0) return { label: '{{Appliquer — retirer}} ' + entWord(d.removedEntities), danger: true, disabled: false };
-    if (d.returned.length > 0 && d.excluded.length === 0) return { label: '{{Appliquer — publier}} ' + eqWord(d.returned.length), danger: false, disabled: false };
-    return { label: '{{Appliquer}}', danger: false, disabled: false };
+    if (d.returned.length > 0 && d.excluded.length === 0 && !d.policy) return { label: '{{Appliquer — publier}} ' + eqWord(d.returned.length), danger: false, disabled: false };
+    // « Ne pas publier » en cas de doute peut retirer des entités (nombre inconnu avant la relecture) : bouton rouge.
+    return { label: '{{Appliquer}}', danger: d.policy === 'sure_only', disabled: false };
   }
 
   /** Bandeau de résultat : « 7 équipements exclus » / « 2 équipements ne sont plus exclus ». */
@@ -384,6 +401,7 @@
     var parts = [];
     if (d.excluded.length > 0) parts.push(eqWord(d.excluded.length) + ' ' + (d.excluded.length > 1 ? '{{exclus}}' : '{{exclu}}'));
     if (d.returned.length > 0) parts.push(eqWord(d.returned.length) + ' ' + (d.returned.length > 1 ? '{{ne sont plus exclus}}' : '{{n\'est plus exclu}}'));
+    if (d.policy) parts.push(policyText(d.policy));
     return parts.length ? parts.join(' · ') : '{{Réglages enregistrés}}';
   }
 
@@ -476,24 +494,45 @@
   function createPanel(env) {
     var $ = env.$;
 
+    // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+    function info(text, cls) {
+      return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').addClass(cls || '').attr('title', text).attr('aria-label', text)
+        .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
+    }
+
     function open(opts) {
       var o = opts || {};
       var model = buildModel(env.rooms(), env.snapshot(), env.excludedPlugins(), env.pluginNames);
+      model.base.policy = cleanPolicy(env.confidencePolicy ? env.confidencePolicy() : 'sure_probable');
       var changes = emptyChanges();
       var mode = o.mode === 'plugin' ? 'plugin' : 'room';
       var expanded = {};
       if (o.roomId !== undefined && o.roomId !== null) expanded['room:' + o.roomId] = true;
       if (o.eqId !== undefined && o.eqId !== null && model.eqs[o.eqId]) expanded['room:' + model.eqs[o.eqId].roomId] = true;
+      // Front v3 (Lot 3) : ouvert depuis la cause « Plugin exclu » d'une fiche : « Par plugin », le plugin déplié et en évidence.
+      var target = typeof o.plugin === 'string' && o.plugin !== '' ? o.plugin : null;
+      if (target !== null) { mode = 'plugin'; expanded['plugin:' + target] = true; }
 
+      // Front v3 (Lot 3) : aucune phrase d'introduction. En-tête d'une ligne : regroupement, règle d'héritage en ⓘ, puis le
+      // réglage « En cas de doute » (déplacé de la configuration du plugin), qui compte comme un changement à appliquer.
       var $root = $('<div class="j2ha-v2 j2ha-v2-excl"></div>');
-      $root.append($('<p class="j2ha-v2-small"></p>').text('{{Tout est publié par défaut. Décochez ce que vous ne voulez pas voir dans Home Assistant.}}'));
+      var $head = $('<div class="j2ha-v3-excl-head"></div>');
       var $seg = $('<div class="j2ha-v2-seg j2ha-v2-excl-mode" role="group"></div>').attr('aria-label', '{{Regrouper}}');
       var $byRoom = $('<button type="button" data-mode="room"></button>').text('{{Par pièce}}');
       var $byPlugin = $('<button type="button" data-mode="plugin"></button>').text('{{Par plugin}}');
       $seg.append($byRoom).append($byPlugin);
-      $root.append($seg);
-      $root.append($('<p class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-rule"></p>').text('{{Un équipement est publié s\'il n\'est exclu ni lui-même, ni par sa pièce, ni par son plugin.}}'));
-      if (!model.known) $root.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-excl-unknown"></div>').text(UNKNOWN_LINE));
+      $head.append($seg);
+      $head.append(info('{{Un équipement est publié s\'il n\'est exclu ni lui-même, ni par sa pièce, ni par son plugin. « Non exclu » ne veut pas dire « publié » : un équipement désactivé dans Jeedom ou bloqué ne l\'est pas.}}', 'j2ha-v2-excl-rule'));
+      $head.append($('<span class="j2ha-v2-grow"></span>'));
+      var $doubt = $('<div class="j2ha-v2-seg j2ha-v3-excl-doubt" role="group"></div>').attr('aria-label', '{{En cas de doute}}');
+      var $doubtYes = $('<button type="button" data-policy="sure_probable"></button>').text('{{Publier}}');
+      var $doubtNo = $('<button type="button" data-policy="sure_only"></button>').text('{{Ne pas publier}}');
+      $doubt.append($doubtYes).append($doubtNo);
+      $head.append($('<span class="j2ha-v3-excl-doubt-label"></span>').text('{{En cas de doute}}'));
+      $head.append($doubt);
+      $head.append(info('{{Que faire d\'un équipement que le plugin reconnaît avec un léger doute. Un équipement dont le nom contredit ses types Jeedom n\'est pas un doute : il reste bloqué, et sa fiche dit comment faire.}}', 'j2ha-v3-excl-doubt-info'));
+      $root.append($head);
+      if (!model.known) $root.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-excl-unknown"></div>').text('{{Entités : ?}} ').append(info(UNKNOWN_LINE)));
       var $tree = $('<div class="j2ha-v2-tree j2ha-v2-excl-tree" role="tree"></div>');
       $root.append($tree);
       var $sum = $('<span class="j2ha-v2-grow j2ha-v2-excl-sum" role="status" aria-live="polite"></span>');
@@ -502,13 +541,14 @@
       $root.append($('<div class="j2ha-v2-foot"></div>').append($sum).append($cancel).append($apply));
 
       var dialog = env.bootbox.dialog({
-        title: '{{Choisir ce qui est publié dans Home Assistant}}', message: $root, onEscape: true, backdrop: true, size: 'large',
+        title: '{{Choisir ce qui est publié}}', message: $root, onEscape: true, backdrop: true, size: 'large',
         className: 'j2ha-v2-excl-dialog',
       });
       function close() { if (dialog && typeof dialog.modal === 'function') dialog.modal('hide'); else if (dialog && typeof dialog.remove === 'function') dialog.remove(); }
 
       function setRoom(id, excluded) { changes.rooms[id] = excluded; changes = normalize(model, changes); }
       function setPlugin(id, excluded) { changes.plugins[id] = excluded; changes = normalize(model, changes); }
+      function setPolicy(value) { changes.policy = value; changes = normalize(model, changes); }
       function setEq(id, excluded) { changes.eqs[id] = excluded ? 'exclude' : 'include'; changes = normalize(model, changes); }
 
       function checkbox(checked, mixed, disabled, label) {
@@ -536,7 +576,7 @@
           $n.append($('<span class="j2ha-v2-lbl is-off"></span>').text('{{Non lu}}'));
         }
         var why = reasonText(model, id, changes);
-        if (why) $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-why"></span>').text(why));
+        if (why) $n.append(info(why, 'j2ha-v2-excl-why'));
         if (!before.excluded && after.excluded) {
           $n.addClass('j2ha-v2-changed');
           $n.append($('<span class="j2ha-v2-small j2ha-v2-excl-change"></span>').text('→ {{sera exclu}}' + (eq.present > 0 ? ' · ' + entWord(eq.present) + ' ' + (eq.present > 1 ? '{{retirées}}' : '{{retirée}}') : '')));
@@ -575,8 +615,18 @@
         if (excludedAfter) $n.append($('<span class="j2ha-v2-lbl is-off"></span>').text(kind === 'room' ? '{{Exclue}}' : '{{Exclu}}'));
         // Front v2 (Lot 9a, regard neuf v2) : « non exclu » ne veut pas dire « publié » : les désactivés dans Jeedom sont dits.
         var disabledKept = node.eqIds.filter(function (id) { return !effectOf(model, id, changes).excluded && model.eqs[id].enabled === false; }).length;
-        $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-count"></span>').text(eqWord(count) + ' · ' + publishedAfter + ' ' + (publishedAfter > 1 ? '{{non exclus}}' : '{{non exclu}}')
-          + (disabledKept > 0 ? ' ' + (disabledKept > 1 ? '{{dont}} ' + disabledKept + ' {{désactivés dans Jeedom}}' : '{{dont 1 désactivé dans Jeedom}}') : '')));
+        // Front v3 (Lot 3) : compteur « n/m » (non exclus / total) ; le détail, dont les désactivés, passe en info-bulle ; marque
+        // « ⏻ k » seulement s'il y a des désactivés.
+        var countTip = eqWord(count) + ' · ' + publishedAfter + ' ' + (publishedAfter > 1 ? '{{non exclus}}' : '{{non exclu}}')
+          + (disabledKept > 0 ? ' ' + (disabledKept > 1 ? '{{dont}} ' + disabledKept + ' {{désactivés dans Jeedom}}' : '{{dont 1 désactivé dans Jeedom}}') : '')
+          + ' · {{« Non exclu » ne veut pas dire « publié »}}';
+        $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-count"></span>').text(publishedAfter + '/' + count)
+          .attr('title', countTip).attr('aria-label', countTip));
+        if (disabledKept > 0) {
+          var offTip = disabledKept > 1 ? disabledKept + ' {{désactivés dans Jeedom}}' : '{{1 désactivé dans Jeedom}}';
+          $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v3-excl-off"></span>').attr('title', offTip).attr('aria-label', offTip)
+            .append($('<i class="fas fa-power-off" aria-hidden="true"></i>')).append($('<span></span>').text(' ' + disabledKept)));
+        }
         // Par plugin : la ligne dit LESQUELS sont exclus (sans avoir à déplier un plugin de quarante équipements).
         if (kind === 'plugin' && !excludedAfter) {
           var excludedNames = node.eqIds.filter(function (id) { return effectOf(model, id, changes).excluded; }).map(function (id) { return model.eqs[id].name; });
@@ -585,8 +635,8 @@
             $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-names"></span>').text((excludedNames.length > 1 ? '{{Exclus :}} ' : '{{Exclu :}} ') + shown));
           }
         }
-        if (kind === 'room' && !node.excludable) $n.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text('{{Sans pièce ne peut pas être exclue en bloc}}'));
-        if (kind === 'room' && node.hasChildren) $n.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text('{{Exclure une pièce n\'exclut pas ses sous-pièces}}'));
+        if (kind === 'room' && !node.excludable) $cb.attr('title', '{{Sans pièce ne peut pas être exclue en bloc}}');
+        if (kind === 'room' && node.hasChildren) $n.append(info('{{Exclure une pièce n\'exclut pas ses sous-pièces}}', 'j2ha-v3-excl-sub'));
         if (excludedAfter !== excludedBefore) {
           var local = diff(model, (function () { var c = emptyChanges(); if (kind === 'room') c.rooms[node.id] = excludedAfter; else c.plugins[node.id] = excludedAfter; return c; })());
           var text = excludedAfter
@@ -595,6 +645,8 @@
           $n.addClass('j2ha-v2-changed');
           $n.append($('<span class="j2ha-v2-small j2ha-v2-excl-change"></span>').text(text));
         }
+        if (kind === 'plugin' && target !== null && node.id === target) $n.addClass('j2ha-v3-excl-target');
+        if (kind === 'room' && o.roomId !== undefined && o.roomId !== null && node.id === o.roomId && o.mode === 'room') $n.addClass('j2ha-v3-excl-target');
         var $wrap = $('<div class="j2ha-v2-excl-node"></div>').append($n);
         if (isOpen) node.eqIds.forEach(function (id) { $wrap.append(eqLine(id, 'is-l2')); });
         return $wrap;
@@ -603,13 +655,16 @@
       function render() {
         $byRoom.toggleClass('is-on', mode === 'room').attr('aria-pressed', mode === 'room' ? 'true' : 'false');
         $byPlugin.toggleClass('is-on', mode === 'plugin').attr('aria-pressed', mode === 'plugin' ? 'true' : 'false');
+        var policyNow = changes.policy || model.base.policy;
+        $doubtYes.toggleClass('is-on', policyNow === 'sure_probable').attr('aria-pressed', policyNow === 'sure_probable' ? 'true' : 'false');
+        $doubtNo.toggleClass('is-on', policyNow === 'sure_only').attr('aria-pressed', policyNow === 'sure_only' ? 'true' : 'false');
         $tree.empty();
         (mode === 'room' ? model.rooms : model.plugins).forEach(function (node) { $tree.append(groupLine(mode, node)); });
         var d = diff(model, changes);
         var text = footText(d);
         if (!text) {
           var nothing = model.order.every(function (id) { return !effectOf(model, id, null).excluded; });
-          text = nothing ? '{{Rien n\'est exclu : tout ce que le plugin reconnaît est publié.}}' : '{{Aucun changement.}}';
+          text = nothing ? '{{Rien d\'exclu}}' : '{{Aucun changement}}';
         }
         $sum.text(text);
         var b = applyButton(d);
@@ -618,6 +673,8 @@
 
       $byRoom.on('click', function () { mode = 'room'; render(); });
       $byPlugin.on('click', function () { mode = 'plugin'; render(); });
+      $doubtYes.on('click', function () { setPolicy('sure_probable'); render(); });
+      $doubtNo.on('click', function () { setPolicy('sure_only'); render(); });
       $cancel.on('click', function () { close(); });
       $apply.on('click', function () {
         var d = diff(model, changes);
@@ -629,6 +686,9 @@
       if (o.eqId !== undefined && o.eqId !== null) {
         var $target = $tree.find('.j2ha-v2-excl-eq[data-eq-id="' + o.eqId + '"] .j2ha-v2-excl-cb');
         if ($target.length) $target.focus();
+      } else if (target !== null) {
+        var $plugin = $tree.find('.j2ha-v2-excl-group[data-kind="plugin"][data-id="' + target + '"] .j2ha-v2-excl-cb');
+        if ($plugin.length) $plugin.focus();
       } else if (o.roomId !== undefined && o.roomId !== null) {
         var $room = $tree.find('.j2ha-v2-excl-group[data-kind="room"][data-id="' + o.roomId + '"] .j2ha-v2-excl-cb');
         if ($room.length) $room.focus();
@@ -656,6 +716,7 @@
     undoBlockers: undoBlockers,
     undoBlockedText: undoBlockedText,
     footText: footText,
+    policyText: policyText,
     applyButton: applyButton,
     resultText: resultText,
     presence: presence,

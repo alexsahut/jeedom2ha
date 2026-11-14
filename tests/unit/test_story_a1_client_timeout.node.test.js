@@ -34,10 +34,10 @@ describe('A1 — délais clients des relais de parc > budget R du relais PHP', (
     assert.doesNotMatch(b, /timeout:\s*30000/);
   });
 
-  it('scanTopology (configuration) a un délai de 90 s, plus de 20 s', () => {
-    const b = block(configPhp, "data: {action: 'scanTopology'}");
-    assert.match(b, /timeout: 90000/);
-    assert.doesNotMatch(b, /timeout: 20000/);
+  // Garde levée (front v3, Lot 3) : la configuration ne lance plus scanTopology (relecture du panneau « Choisir… » : budget
+  // client de la page, vérifié ci-dessus).
+  it('scanTopology : plus aucun appel depuis la configuration ; budget client de la page à 90 s', () => {
+    assert.doesNotMatch(configPhp, /scanTopology/);
     assert.equal(Budget.CLIENT_TIMEOUT_MS, 90000);
   });
 });

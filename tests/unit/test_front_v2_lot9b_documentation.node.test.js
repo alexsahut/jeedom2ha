@@ -115,9 +115,13 @@ describe('Lot 9b — exactitude doc / écran', () => {
     assert.match(index, /quand chacune de ses commandes est bloquée, il n'y a rien d'autre à montrer et le lien est absent/);
   });
 
-  it('le nombre de pièces exclues n’est promis que s’il y en a', () => {
-    assert.match(config, /\$j2haExcludedRoomsCount > 0/);
-    assert.match(index, /Quand au moins une pièce est exclue, leur nombre est rappelé dessous/);
+  // Garde levée (front v3, Lot 3) : la configuration ne montre plus le nombre de pièces exclues (ni rien de ce qui est publié) ;
+  // la doc ne le promet donc plus. Même règle « dit seulement si vrai » pour cron5 : l'avertissement n'est rendu que s'il est décoché.
+  it('rien de ce qui est publié n’est promis dans la configuration ; cron5 seulement s’il est décoché', () => {
+    assert.doesNotMatch(config, /j2haExcludedRoomsCount/);
+    assert.doesNotMatch(index, /Quand au moins une pièce est exclue, leur nombre est rappelé dessous/);
+    assert.match(config, /\$j2haCron5Enabled \? ' style="display:none;"' : ''/);
+    assert.match(index, /« cron5 désactivé : mises à jour manuelles » s'affiche seulement si la tâche cron5 est décochée/);
   });
 
   it('les deux règles qui piquent sont en tête de leur section', () => {
@@ -145,7 +149,9 @@ describe('Lot 9b — libellés du Lot 9a, tels que le code les affiche', () => {
   const docs = (index + premiers).replace(/[’‘]/g, "'");
   for (const label of ['Publier quand même', "Renommer l'équipement dans Jeedom, puis Relire Jeedom", 'Confirmé par vous',
     'Types impossibles pour cet équipement', 'Type dans Home Assistant de', 'Dans Home Assistant, cette entité est :',
-    'Ce choix vaut pour les commandes :', 'Enregistrer et publier quand même', 'Je ne vois pas l\'appareil dans Home Assistant',
+    // Garde levée (front v3, Lot 3) : « Ce choix vaut pour les commandes : » → « Pour : » ; « Je ne vois pas l'appareil… » → « Pas vu »
+    // (la phrase reste l'info-bulle du bouton) ; « dont 1 désactivé dans Jeedom » reste, dans l'info-bulle du compteur n/m.
+    'Pour :', 'Enregistrer et publier quand même', 'Pas vu', 'ID modifié', 'Le type seul ne suffit pas', 'Types génériques',
     // Front v3 (Lot 0) : « Réputée faite… » a disparu de l'écran (guide fail-closed) ; son remplaçant est vérifié ici.
     'Vérification en cours', 'Vérifier la publication', "Ce n'est pas un doute mais une contradiction",
     "Cette entité ne se règle pas seule : réglez l'équipement entier.", 'Ce type Home Assistant est invalide pour cette entité.',
@@ -174,8 +180,9 @@ describe('Lot 9b — configuration', () => {
 
   it('un bouton principal par bloc, « Sauvegarder » de Jeedom expliqué, plus de mention d’une ancienne version', () => {
     assert.doesNotMatch(config, /Anciennement/);
-    assert.equal((config.match(/class="btn btn-primary"/g) || []).length, 2, 'un bouton bleu par bloc');
-    assert.match(config, /Le bouton « Sauvegarder » de Jeedom enregistre aussi ce bloc mais ne relit pas Jeedom/);
-    assert.match(config, /Un équipement dont le nom contredit ses types Jeedom n'est pas un doute/);
+    // Garde levée (front v3, Lot 3) : un seul bloc à bouton (le broker) ; « Sauvegarder » de Jeedom n'a plus rien à expliquer ici
+    // (aucun champ de ce qui est publié) ; la distinction doute / blocage suit « En cas de doute » dans le panneau « Choisir ».
+    assert.equal((config.match(/class="btn btn-primary"/g) || []).length, 1, 'un bouton bleu, celui du bloc du broker');
+    assert.match(read('desktop/js/jeedom2ha_exclusions.js'), /Un équipement dont le nom contredit ses types Jeedom n\\'est pas un doute/);
   });
 });
