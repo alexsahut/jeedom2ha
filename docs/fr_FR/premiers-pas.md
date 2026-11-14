@@ -70,17 +70,17 @@ La colonne « Type HA » affiche alors « Personnalisé : Lumière (light) ». P
 
 ## Choisir ce qui est publié
 
-Tout ce que le plugin reconnaît est publié par défaut. Pour retirer quelque chose de Home Assistant :
+Tout ce que le plugin reconnaît est publié par défaut. Pour retirer de Home Assistant un plugin, une pièce ou un équipement, au même endroit, cliquez sur **« Choisir ce qui est publié… »** (à droite du titre de la maison, ou dans le menu « ⋯ ») :
 
-- **un équipement** : réglez-le sur **« Jamais »** dans sa fiche, puis cliquez sur **« Appliquer »** (le réglage n'est envoyé à Home Assistant qu'à ce moment) ;
-- **une pièce** : menu « ⋯ » de sa carte, ou de la pièce ouverte, **« Exclure la pièce… »** ; une confirmation dit combien d'entités quitteront Home Assistant ;
-- **tous les équipements d'un plugin** : cochez-le dans **« Plugins exclus »**, dans la configuration du plugin, puis cliquez sur **« Enregistrer et relire Jeedom »**.
+1. Choisissez **« Par pièce »** ou **« Par plugin »**, puis décochez ce que vous ne voulez pas voir dans Home Assistant. Chaque ligne dit ce qui arrivera.
+2. Le pied compte en direct les équipements et les entités qui seront retirés de Home Assistant, et ceux qui y reviendront.
+3. Cliquez sur le bouton d'application, qui dit ce qu'il fera (par exemple « Appliquer — retirer N entités », en rouge). Le plugin relit Jeedom une seule fois, et un bandeau propose **« Annuler »** pendant quelques secondes.
 
-Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. Pour le reprendre : « Automatique » puis « Appliquer » dans sa fiche, « Ne plus exclure la pièce… », ou décochez le plugin puis « Enregistrer et relire Jeedom ».
+Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. Pour un seul équipement, le réglage **« Jamais »** de sa fiche, suivi de **« Appliquer »**, fait la même chose ; pour une pièce, son menu « ⋯ » propose aussi **« Exclure la pièce… »**.
 
 ## Quelque chose ne va pas ? « Vérifier l'installation… »
 
-Dans le menu **« ⋯ » (« Autres actions »)** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre : le démon tourne, le broker MQTT répond, Home Assistant a été vu sur ce broker, la dernière relecture a réussi, les équipements bloqués. Elle s'arrête au premier point **« À corriger »** et propose le bouton qui le corrige.
+Dans le menu **« ⋯ » (« Autres actions »)** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre : le démon tourne, le broker MQTT répond, Home Assistant s'est signalé sur le broker (« Non confirmé » n'est pas une erreur), la dernière relecture a réussi, les équipements bloqués. Elle s'arrête au premier point **« À corriger »** et propose le bouton qui le corrige.
 
 Pour demander de l'aide, la partie **« Pour le support »** de la même boîte télécharge un fichier qui décrit votre installation (**« Télécharger le diagnostic support »**), à joindre à votre message sur le forum ; la case **« Pseudonymiser les noms d'équipements »** remplace vos noms par des alias.
 

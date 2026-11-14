@@ -125,7 +125,7 @@ describe('Lot 8 — index.md : glossaire cible, écrans, « dix types »', () =>
     for (const label of ['Tester, enregistrer et redémarrer le démon', 'Tester seulement', 'Connexion testée', 'Réglages enregistrés', 'Démon redémarré',
       'En cas de doute sur un équipement', 'Publier quand même (recommandé)', 'Ne publier que les équipements reconnus avec certitude',
       'Enregistrer et relire Jeedom', 'Récupérer depuis MQTT Manager', 'Réinitialiser le formulaire', 'Bienvenue dans jeedom2ha', 'Guide de démarrage',
-      'Le démon tourne', 'Le broker MQTT répond', 'Home Assistant a été vu sur ce broker', 'Dernière relecture réussie', 'Pour le support',
+      'Le démon tourne', 'Le broker MQTT répond', 'Home Assistant sur le broker', 'Non confirmé', 'Dernière relecture réussie', 'Pour le support',
       'Télécharger le diagnostic support', 'Télécharger l\'export de décision', 'Journaux du plugin :']) {
       assert.ok(index.includes(label), `« ${label} » décrit dans index.md`);
       assert.ok(code.includes(norm(label)), `« ${label} » absent du code`);
@@ -149,7 +149,8 @@ describe('Lot 8 — la documentation parle exactement comme l’écran', () => {
     for (const [name, text] of Object.entries(DOCS)) {
       for (const m of text.matchAll(/\*\*« ([^»*]+?) »\*\*/g)) {
         if (/^(N|\d+) /.test(m[1])) continue; // gabarit chiffré (« N bloqués ») : décrit dans compteurs.md, construit par le code
-        assert.ok(code.includes(norm(m[1])), `${name} : « ${m[1]} » n'existe pas à l'écran`);
+        // Une bascule « A | B » cite deux libellés de l'écran.
+        for (const part of m[1].split(' | ')) assert.ok(code.includes(norm(part)), `${name} : « ${part} » n'existe pas à l'écran`);
       }
     }
   });
@@ -166,7 +167,8 @@ describe('Lot 8 — la documentation parle exactement comme l’écran', () => {
     const STALE = ['Type Jeedom', 'Plus d\'actions', 'Tester la connexion', 'Publier les équipements sûrs et probables', 'Publier uniquement les équipements sûrs',
       'Dernière synchro', 'Synchronisation terminée', 'exclus et autres', 'Configuration Home Assistant par pièce', 'imposé (', 'neuf types',
       'barre de santé', 'Télécharger le diagnostic…', 'Toutes les pièces »', 'Rechercher une pièce ou un équipement', 'Appliquer les filtres et rescanner',
-      'enregistré automatiquement', 'Actions de la pièce', 'configuration par pièce'];
+      'enregistré automatiquement', 'Actions de la pièce', 'configuration par pièce', 'Retirer le type imposé', 'Pas encore vu',
+      'Republier tous les équipements inclus', 'Home Assistant a été vu sur ce broker'];
     for (const [name, raw] of Object.entries(DOCS)) {
       const text = raw.replace(/<!--[\s\S]*?-->/g, ''); // l'en-tête de maintenance de compteurs.md peut nommer l'ancien libellé
       for (const stale of STALE) {
