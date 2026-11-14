@@ -120,13 +120,15 @@
   /**
    * Une publication a-t-elle RÉUSSI ? Une relecture terminée ne suffit pas : le démon renseigne
    * `derniere_synchro_terminee` même quand la publication échoue (échec MQTT total). Sources, de la plus sûre à la moins
-   * sûre : `status.publication.equipments_published` (Lot 3, autoritaire s'il est présent), une lecture des états qui
+   * sûre : `status.publication.equipments_published > 0` (Lot 3), une lecture des états qui
    * compte au moins un équipement publié, le résultat de la dernière opération (réussie ou partielle), la mémoire du
    * navigateur.
    */
   function publishedOk(status, summary, local) {
     var pub = publicationInfo(status);
-    if (pub && pub.equipments !== null) return pub.equipments > 0;
+    // Lot 3 : compté sur la mémoire vive du démon. > 0 prouve la publication ; 0 ne prouve rien seul (juste après un
+    // redémarrage du démon, avant sa relecture « boot ») : les autres preuves décident alors.
+    if (pub && pub.equipments !== null && pub.equipments > 0) return true;
     if (summary && summary.read && summary.published > 0) return true;
     var op = lastOperation(status);
     if (status && status.derniere_synchro_terminee && op && (op.resultat === 'succes' || op.resultat === 'partiel')) return true;

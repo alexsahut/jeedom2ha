@@ -19,6 +19,9 @@ const { createFakeWindow } = require('./fake_browser');
 const M = require('../../../desktop/js/jeedom2ha_mapping_override.js');
 const O = require('../../../desktop/js/jeedom2ha_overview.js');
 const W = require('../../../desktop/js/jeedom2ha_workview.js');
+// Front v2 (Lot 2) : modules purs chargés avant la surface dans la page (lexique, côté Home Assistant).
+const LEX = require('../../../desktop/js/jeedom2ha_lexique.js');
+const HA_SIDE = require('../../../desktop/js/jeedom2ha_ha_side.js');
 const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
 const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
 const homeSlice = home.slice(home.indexOf('function refreshBridgeStatus'), home.indexOf('/* Permet la réorganisation'));
@@ -126,6 +129,8 @@ function createUi(rooms, options) {
   // `window` est le faux navigateur (location / history / matchMedia / tailles) ; le code testé y pose ses globales.
   Object.assign(win, {
     Jeedom2haMappingOverride: M,
+    Jeedom2haLexique: LEX,
+    Jeedom2haHaSide: HA_SIDE,
     j2haRoomsTree: rooms || [],
     j2haAncestors: opts.ancestors || [],
     j2haPluginNames: opts.pluginNames || {},

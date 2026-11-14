@@ -44,7 +44,8 @@ $.fn.sortable = function () { return this; };
 $.fn.showAlert = function () { return this; };
 `;
 
-const SCRIPTS = ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', 'jeedom2ha_workview', 'jeedom2ha_guide', 'jeedom2ha'];
+// Ordre réel de la page (include_file de jeedom2ha.php).
+const SCRIPTS = ['jeedom2ha_mapping_override', 'jeedom2ha_lexique', 'jeedom2ha_ha_side', 'jeedom2ha_mapping_surface', 'jeedom2ha_type_panel', 'jeedom2ha_action_budget', 'jeedom2ha_overview', 'jeedom2ha_workview', 'jeedom2ha_guide', 'jeedom2ha_exclusions', 'jeedom2ha'];
 
 /** Corps d'un arbre unitaire pour `eqId` (le contrôleur exige que l'identifiant corresponde). */
 function treeBody(eqId, source) {

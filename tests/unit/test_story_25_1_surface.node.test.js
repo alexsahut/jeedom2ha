@@ -431,10 +431,11 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
   }
   const PANEL = '.j2ha-eq-panel[data-eq-id="1"] ';
 
-  it('colonnes Commande | Dans Home Assistant | Type Jeedom | Type HA, en-têtes sans majuscules forcées', () => {
+  // Front v2 (Lot 2) : « Type Jeedom » devient « Rôle dans Jeedom » (libellé français du type générique, code en infobulle).
+  it('colonnes Commande | Dans Home Assistant | Rôle dans Jeedom | Type HA, en-têtes sans majuscules forcées', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(multi())]);
     assert.deepEqual(ui.$(PANEL + '.j2ha-cmd-table th').list.map((el) => plain(ui.$(el).text())),
-      ['Commande', 'Dans Home Assistant', 'Type Jeedom', 'Type HA']);
+      ['Commande', 'Dans Home Assistant', 'Rôle dans Jeedom', 'Type HA']);
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     assert.doesNotMatch(css, /text-transform:\s*uppercase/);
   });
@@ -482,7 +483,7 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
     assert.equal(ignored.$(PANEL + '.j2ha-type-link').length, 1, 'aucun réglage de type pour la commande ignorée');
   });
 
-  it('« Type Jeedom » en texte normal (pas de monospace)', () => {
+  it('« Rôle dans Jeedom » en texte normal (pas de monospace)', () => {
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     assert.doesNotMatch(css, /font-family:\s*monospace/);
   });

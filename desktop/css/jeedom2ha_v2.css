@@ -359,3 +359,30 @@
 }
 .j2ha-v2-check-advanced { padding: 0; margin-top: 6px; }
 .j2ha-v2-check-logs { padding-left: 18px; margin: 4px 0 0; }
+
+/* Lot 2 — Fiche équipement : mentions de l'en-tête, deux côtés, fiches de cause, rôle dans Jeedom. */
+.j2ha-v2-mentions { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 6px; vertical-align: middle; }
+.j2ha-v2-mentions:empty { display: none; }
+.j2ha-v2-mentions .j2ha-v2-lbl { font-size: 12px; font-weight: 600; }
+.j2ha-v2-seg-help { margin-top: 4px; flex-basis: 100%; }
+.j2ha-v2-two { margin: 10px 0; }
+.j2ha-v2-entity { margin-top: 4px; overflow-wrap: anywhere; }
+.j2ha-v2-entity-type { font-weight: 600; }
+.j2ha-v2-entity-id code { font-size: 12px; }
+.j2ha-v2-copy,
+.j2ha-v2-tech-toggle,
+.j2ha-v2-where-toggle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-height: 24px;
+  font-size: 12px;
+}
+.j2ha-v2-tech { margin-top: 4px; overflow-wrap: anywhere; }
+.j2ha-v2-cause .j2ha-v2-cause-line { flex: 1 1 100%; margin: 2px 0; }
+.j2ha-v2-cause .j2ha-v2-cause-title { color: var(--j2ha-v2-text); }
+.j2ha-v2-cause .j2ha-v2-cause-why,
+.j2ha-v2-cause .j2ha-v2-cause-how { color: var(--j2ha-v2-text); }
+.j2ha-v2-cause .j2ha-v2-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.j2ha-v2-role-missing { color: var(--j2ha-warn); font-style: italic; }
+.j2ha-v2-retry { margin: 4px 0; }

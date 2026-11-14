@@ -109,9 +109,23 @@ describe('Lot 1 — revue PR #391 : publication réussie, installation connue', 
     assert.equal(m.steps[3].retry, true);
   });
 
-  it('status.publication (Lot 3) fait foi : 0 équipement publié = pas encore publié, même après une relecture réussie', () => {
-    const zero = Object.assign({}, SYNCED, { publication: { equipments_published: 0, entities_published: 0, scenarios_published: 0 } });
-    assert.equal(G.publishedOk(zero, { read: true, published: 3 }, { published: true }), false);
+  // Forme réelle du Lot 3 (resources/daemon/models/ha_side.py) : publication.{equipments,entities,scenarios}_published,
+  // comptés sur la mémoire vive du démon (0 juste après un redémarrage).
+  it('status.publication (Lot 3) : > 0 prouve la publication ; 0 seul ne prouve rien (les autres preuves décident)', () => {
+    const zero = { publication: { equipments_published: 0, entities_published: 0, scenarios_published: 0 } };
+    assert.equal(G.publishedOk(Object.assign({}, FAILED, zero), null, {}), false, 'échec MQTT total : 0 et « echec »');
+    assert.equal(G.publishedOk(Object.assign({}, UP, zero), null, {}), false);
+    assert.equal(G.publishedOk(Object.assign({}, UP, zero), null, { published: true }), true, 'démon redémarré : mémoire du navigateur');
+    assert.equal(G.publishedOk(Object.assign({}, SYNCED, zero), null, {}), true, 'relecture réussie, rien d’éligible');
+    // Relais PHP getBridgeStatus, démon injoignable : ha et publication à null → item masqué, aucun compteur.
+    const relayDown = { daemon: false, broker: { state: 'unknown' }, derniere_synchro_terminee: null, ha: null, publication: null, derniere_operation_resultat: 'aucun' };
+    assert.equal(G.haBarItem(relayDown).visible, false);
+    assert.equal(G.publicationInfo(relayDown), null);
+    assert.equal(G.haInfo(relayDown), null);
+    const relayUp = Object.assign({}, UP, { ha: { birth_seen_at: null, discovery_prefix: 'homeassistant' }, publication: { equipments_published: 29, entities_published: 41, scenarios_published: 12 } });
+    assert.equal(plain(G.haBarItem(relayUp).text), 'Pas encore vu');
+    assert.deepEqual(G.publicationInfo(relayUp), { equipments: 29, entities: 41, scenarios: 12 });
+    assert.equal(G.publishedOk(relayUp, null, {}), true);
     const some = Object.assign({}, FAILED, { publication: { equipments_published: 12 } });
     assert.equal(G.publishedOk(some, null, {}), true);
     assert.equal(G.publishedOk(UP, { read: true, published: 1 }, {}), true, 'lecture des états avec un publié');
