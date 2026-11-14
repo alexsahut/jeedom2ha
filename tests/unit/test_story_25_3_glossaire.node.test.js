@@ -34,22 +34,20 @@ describe('25.3 / AC14 — glossaire de la page B', () => {
     assert.deepEqual(found, []);
   });
 
-  maybe('les mots d’état de la liste filtrée sont ceux de 25.1 (une seule table de libellés)', () => {
+  // Garde levée (front v3, Lot 1) : la liste filtrée est retirée (P8) ; le mot d'état des lignes « À faire » (icône, nom
+  // accessible) vient de la même table de 25.1 (« Conseil » est une mention, jamais un état).
+  maybe('les mots d’état de la liste « À faire » sont ceux de 25.1 (une seule table de libellés)', () => {
     const ui = startPage();
     const seen = new Set();
-    for (const key of ['published', 'blocked', 'to_apply', 'other']) {
-      ui.page.setFilter(key);
-      ui.$('#j2ha_filterList .j2ha-state-text').list.forEach((el) => seen.add(plain(ui.$(el).text()).trim()));
-      ui.page.setFilter(null);
-    }
+    ui.$('#j2ha_v2_todo .j2ha-v3-todo-icon').list.forEach((el) => seen.add(plain(el.attrs['aria-label']).trim()));
     assert.ok(seen.size > 0);
-    const labels = Object.values(M.EQUIPMENT_STATE_LABELS);
+    const labels = Object.values(M.EQUIPMENT_STATE_LABELS).concat(['Conseil']);
     seen.forEach((label) => assert.ok(labels.includes(label), label));
   });
 
   maybe('aucune étiquette de bouton, de puce ou de repère ne se termine par un point', () => {
     const ui = startPage();
-    for (const selector of ['.j2ha-chip-filter', '.j2ha-mark', '#bt_refreshStates', '#bt_clearFilter', '.j2ha-menu-item', '.j2ha-health-actions .btn', '.j2ha-room-ratio']) {
+    for (const selector of ['.j2ha-chip-filter', '.j2ha-mark', '#bt_refreshStates', '.j2ha-menu-item', '.j2ha-health-actions .btn', '.j2ha-room-ratio', '.j2ha-v2-todo-action', '.j2ha-v2-todo-cause']) {
       ui.$(selector).list.forEach((el) => assert.doesNotMatch(plain(ui.$(el).text()).trim(), /\.$/, selector));
     }
   });

@@ -45,13 +45,14 @@ describe('front v3 (Lot 2) — un seul arbre : la carte ouvre toute la maison su
     assert.ok(roomIds(ui).length > 1);
   });
 
-  maybe('ligne de la liste filtrée : même arbre complet, filtre gardé', () => {
+  maybe('ligne de la liste « À faire » : même arbre complet, filtre gardé', () => {
     const ui = startBig({ rooms: 5, equipments: 40, seed: 4 });
-    ui.page.setFilter('published');
-    ui.click('#j2ha_filterList .j2ha-frow-btn');
+    // Garde levée (front v3, Lot 1, P8) : plus de liste filtrée ; la vue s'ouvre depuis une ligne « À faire » (puce « Bloqués »).
+    ui.page.setFilter('blocked');
+    ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
     assert.equal(ui.isOpen(), true);
     assert.equal(scope(ui), 'toutes');
-    assert.equal(ui.page.filter(), 'published');
+    assert.equal(ui.page.filter(), 'blocked');
     assert.ok(roomIds(ui).length > 1);
   });
 

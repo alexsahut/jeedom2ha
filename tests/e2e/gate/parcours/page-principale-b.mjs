@@ -43,15 +43,18 @@ async function checkLoad(page, helpers) {
   helpers.record('lectures_par_equipement_chargement', perEquipment);
 }
 
-/** (2) Le bandeau bleu a disparu, la ligne d'aide existe. */
+/** (2) Le bandeau bleu a disparu, le lien « Aide » existe.
+ * Front v3 (Lot 1, garde levée) : plus de ligne d'aide (« zéro paragraphe ») ; le lien « Aide » est l'icône de la barre d'état. */
 async function checkNoBanner(page, helpers) {
   const dom = await page.evaluate(() => ({
     bandeau: document.querySelectorAll('.alert.alert-info.j2ha-surface-intro').length,
-    aide: document.querySelectorAll('.j2ha-help-line a').length,
+    aide: document.querySelectorAll('#div_bridgeHealthBanner a.j2ha-v3-help[href]').length,
+    phrases: document.querySelectorAll('.j2ha-help-line, #j2ha_v2_helpline, #j2ha_v2_legend, .j2ha-v2-welcome').length,
     barre: document.querySelectorAll('#div_bridgeHealthBanner').length,
   }));
   if (dom.bandeau !== 0) throw new Error('bandeau-bleu-present');
   if (dom.aide !== 1) throw new Error('ligne-aide-absente');
+  if (dom.phrases !== 0) throw new Error('phrase-aide-presente');
   if (dom.barre !== 1) throw new Error('barre-sante-absente');
   helpers.record('bandeau_bleu_absent', true);
 }
@@ -62,7 +65,8 @@ async function checkGauges(page, helpers) {
     const grow = (el) => Number(el.style.flexGrow || '0');
     const houseSegments = [...document.querySelectorAll('#j2ha_houseGauge .j2ha-seg')].map(grow);
     const cards = [...document.querySelectorAll('#j2ha_roomCards .j2ha-room-card')].map((card) => ({
-      total: Number((card.querySelector('.j2ha-room-count')?.textContent ?? '').replace(/[^0-9]/g, '')),
+      // Front v3 (Lot 1) : la tuile porte son nombre d'équipements dans `data-total` (plus de « (n) » affiché).
+      total: Number(card.getAttribute('data-total') ?? ''),
       segments: [...card.querySelectorAll('.j2ha-seg')].map(grow),
     }));
     return { houseSegments, cards };
@@ -77,9 +81,11 @@ async function checkGauges(page, helpers) {
   helpers.record('cartes_controlees', sums.cards.length);
 }
 
-/** (4) Chaque puce filtre sans requête réseau ; le nombre de lignes égale le nombre annoncé.
- * Front v2 (Lot 7, garde levée) : la puce filtre SUR PLACE (liste #j2ha_filterPanel), la vue de travail ne s'ouvre pas ;
- * aucune puce à zéro n'est affichée ; un second clic retire le filtre. (Story 25.4 : la puce ouvrait la vue.) */
+/** (4) Chaque puce filtre sans requête réseau ; le nombre affiché égale le nombre annoncé.
+ * Front v2 (Lot 7, garde levée) : la puce filtre SUR PLACE, la vue de travail ne s'ouvre pas ; aucune puce à zéro n'est
+ * affichée ; un second clic retire le filtre. (Story 25.4 : la puce ouvrait la vue.)
+ * Front v3 (Lot 1, garde levée) : plus de liste filtrée. « Bloqués » (et « Conseils ») montrent la liste « À faire » : son nombre
+ * de lignes égale la puce ; les autres puces filtrent la GRILLE : la somme des compteurs des tuiles visibles égale la puce. */
 async function checkFilters(page, helpers) {
   // Seules les requêtes du plugin comptent : le cœur Jeedom (événements, santé) peut interroger la box
   // pendant la boucle sans lien avec les filtres (constat du gate du 2026-10-19).
@@ -96,14 +102,20 @@ async function checkFilters(page, helpers) {
     const announced = Number(((await chip.textContent()) ?? '').replace(/[^0-9].*$/, '').trim());
     if (!(announced > 0)) throw new Error('puce-a-zero-affichee');
     await chip.click();
-    await page.locator('#j2ha_filterPanel').waitFor({ state: 'visible' });
+    const todo = (await chip.getAttribute('aria-controls')) === 'j2ha_v2_todo';
+    if (todo) await page.locator('#j2ha_v2_todo .j2ha-v2-todo-row').first().waitFor({ state: 'visible' });
     if (await page.locator('#j2ha_workView').isVisible()) throw new Error('vue-ouverte-par-la-puce');
-    const rows = await page.locator('#j2ha_filterList .j2ha-frow').count();
+    const rows = todo
+      ? await page.locator('#j2ha_v2_todo .j2ha-v2-todo-row').count()
+      // Compteur de la tuile dans `data-count` : une pièce exclue n'affiche que ⊘ (« Pièce exclue »), jamais un nombre lisible.
+      : await page.locator('#j2ha_roomCards .j2ha-room-card:not([hidden])').evaluateAll((cards) => cards
+        .reduce((n, card) => n + Number(card.getAttribute('data-count') ?? 'NaN'), 0));
     if (rows !== announced) throw new Error('lignes-filtre-differentes-du-nombre');
     const pressed = page.locator(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
     if ((await pressed.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');
     await pressed.click();
-    if ((await pressed.getAttribute('aria-pressed')) !== 'false' || (await page.locator('#j2ha_filterList .j2ha-frow').count()) !== 0) {
+    if ((await pressed.getAttribute('aria-pressed')) !== 'false' || (await page.locator('#j2ha_roomCards .j2ha-room-card[hidden]').count()) !== 0
+      || (await page.locator('#j2ha_roomCards[hidden]').count()) !== 0) {
       throw new Error('filtre-non-retire');
     }
   }
@@ -133,17 +145,17 @@ async function checkRefresh(page, helpers) {
   helpers.record('refresh_emis', refreshed);
 }
 
-/** (6) Le menu « ⋯ Autres actions » (front v2, Lots 1 et 6) : « Vérifier l'installation… », « Guide de démarrage », « Choisir ce
- * qui est publié… », puis la
- * suppression ; les exports (24.2) sont portés par la boîte « Vérifier l'installation… ». Fermer la boîte et la
+/** (6) Le menu « ⋯ Autres actions » (front v2, Lots 1 et 6 ; front v3, Lot 1) : « Vérifier l'installation… », « Guide de
+ * démarrage », « Republier tout », puis la suppression ; les exports (24.2) sont portés par la boîte « Vérifier l'installation… ». Fermer la boîte et la
  * confirmation n'écrit rien. */
 async function checkMenu(page, helpers) {
   const toggle = page.locator('#j2ha_moreMenu .j2ha-menu-toggle');
   await toggle.click();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') throw new Error('menu-non-ouvert');
   const items = await page.locator('#j2ha_moreMenu .j2ha-menu-item').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  // Front v2 (Lot 6) : « Choisir ce qui est publié… » (panneau E6) rejoint le menu, avant le séparateur.
-  if (items.length !== 4 || items[0] !== 'Vérifier l\'installation…' || items[1] !== 'Guide de démarrage' || items[2] !== 'Choisir ce qui est publié…'
+  // Front v3 (Lot 1, garde levée) : « Choisir ce qui est publié… » n'a plus qu'une entrée (le bouton près des puces) ;
+  // « Republier tout » quitte la barre pour ce menu, avant le séparateur.
+  if (items.length !== 4 || items[0] !== 'Vérifier l\'installation…' || items[1] !== 'Guide de démarrage' || items[2] !== 'Republier tout'
     || items[3] !== 'Supprimer tout de Home Assistant…') {
     throw new Error('entrees-menu-inattendues');
   }

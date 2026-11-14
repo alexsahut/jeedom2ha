@@ -13,16 +13,14 @@ const { startGuide } = require('./helpers/guide_harness');
 const maybe = phpAvailable ? it : it.skip;
 
 describe('25.3 / AC8 — le bandeau bleu disparaît, une ligne d’aide le remplace', () => {
-  maybe('aucun .alert.alert-info.j2ha-surface-intro ; ligne d’aide ≤ 20 mots avec lien « Aide »', () => {
+  // Garde levée (front v3, Lot 1, « zéro paragraphe permanent ») : la ligne d'aide disparaît ; le lien « Aide » devient une
+  // icône `fa-question-circle` de la barre d'état (title et aria-label « Aide »), même URL.
+  maybe('aucun .alert.alert-info.j2ha-surface-intro ; aucune ligne d’aide ; lien « Aide » en icône dans la barre d’état', () => {
     const { html } = renderPhp(SCENE);
     const main = mainPart(html);
     assert.doesNotMatch(main, /j2ha-surface-intro|alert-info/);
-    const help = main.match(/<p class="text-muted j2ha-help-line">([\s\S]*?)<\/p>/);
-    assert.ok(help, 'ligne d’aide');
-    const sentence = plain(help[1].replace(/<a [\s\S]*?<\/a>/, ''));
-    assert.ok(sentence.trim().split(/\s+/).length <= 20, sentence);
-    assert.doesNotMatch(sentence, /prêt|bloquant/i);
-    assert.match(help[1], /<a href="https:\/\/doc\.example\.test\/plugin" target="_blank" rel="noopener">\{\{Aide\}\}<\/a>/);
+    assert.doesNotMatch(main, /j2ha-help-line/);
+    assert.match(main, /<a class="btn btn-default btn-sm j2ha-v3-icon-btn j2ha-v3-help" href="https:\/\/doc\.example\.test\/plugin" target="_blank" rel="noopener"\s+title="\{\{Aide\}\}" aria-label="\{\{Aide\}\}"><i class="fas fa-question-circle"><\/i><\/a>/);
     assert.equal(fs.existsSync('desktop/css/jeedom2ha.css'), true);
     assert.doesNotMatch(fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8'), /j2ha-surface-intro/);
     assert.doesNotMatch(fs.readFileSync('desktop/php/jeedom2ha.php', 'utf8').replace(/<!--[\s\S]*?-->/g, ''), /j2ha-surface-intro/);
@@ -47,12 +45,18 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     for (const id of ['span_healthBridge', 'span_healthMqtt', 'span_healthMqttBroker', 'span_healthSync', 'span_healthOp', 'span_healthOpMsg', 'bt_rescanTopology', 'div_haGatingReason', 'div_haActions']) {
       assert.ok(main.includes(`id="${id}"`), id);
     }
-    // Garde levée (front v2, Lot 1) : glossaire 3.2 « Dernière synchro » → « Dernière relecture », et l'item
-    // « Home Assistant » (masqué tant que le démon ne fournit pas ha.birth_seen_at) entre MQTT et la relecture (spec E0).
-    const labels = [...main.matchAll(/<strong>(\{\{[^}]+\}\})<\/strong>/g)].map((m) => plain(m[1]));
-    assert.deepEqual(labels, ['Démon', 'MQTT', 'Home Assistant', 'Dernière relecture', 'Dernière opération']);
-    assert.match(main, /data-ha-action="republier"[\s\S]*?\{\{Republier tout\}\}/);
+    // Garde levée (front v3, Lot 1) : pastilles « point + mot » (Démon, MQTT, Home Assistant), le mot porté par `data-word`
+    // et le détail en info-bulle ; « Relu HH:MM » ; « Dernière opération » masquée sauf échec ; plus d'intitulés <strong>.
+    const words = [...main.matchAll(/class="j2ha-v3-pill" data-word="([^"]*)"/g)].map((m) => plain(m[1]));
+    assert.deepEqual(words, ['Démon', 'MQTT', 'Home Assistant', '']);
+    assert.doesNotMatch(main, /<strong>\{\{(Dernière relecture|Dernière opération)\}\}<\/strong>/);
+    // « Republier tout » passe dans le menu ⋯ ; « Appliquer (n) » (masqué tant que n = 0) précède « Relire Jeedom ».
+    assert.match(main, /id="bt_j2haApply"[\s\S]*?data-ha-action="appliquer"[\s\S]*?hidden[\s\S]*?id="bt_rescanTopology"/);
+    assert.match(main, /<ul class="j2ha-menu" role="menu">[\s\S]*?data-ha-action="republier"[\s\S]*?\{\{Republier tout\}\}/);
     assert.match(main, /data-ha-action="rescan"/);
+    // ⚙ : la configuration du plugin, même déclencheur du cœur que l'ancienne tuile « Gestion / Configuration ».
+    assert.match(main, /class="btn btn-default btn-sm eqLogicAction j2ha-v3-icon-btn" data-action="gotoPluginConf"\s+title="\{\{Configuration\}\}" aria-label="\{\{Configuration\}\}"/);
+    assert.doesNotMatch(main, /\{\{Gestion\}\}|logoSecondary/);
     // Garde levée (front v2, Lot 1) : glossaire 3.2 « Plus d'actions » → « Autres actions ».
     assert.match(main, /aria-label="\{\{Autres actions\}\}"/);
     assert.match(main, /aria-haspopup="menu" aria-expanded="false"/);
@@ -60,9 +64,9 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     assert.ok(!main.includes('{{Actions Home Assistant}}'), 'plus de zone « Actions Home Assistant »');
   });
 
-  // Garde levée (front v2, Lot 1) : les deux exports quittent le menu pour « Vérifier l'installation… » (E7) ; le menu
-  // porte « Vérifier l'installation… » et « Guide de démarrage » (spec E0). « Choisir ce qui est publié… » viendra au Lot 6.
-  maybe('menu : « Vérifier l’installation… », « Guide de démarrage », séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
+  // Garde levée (front v2, Lot 1) : les deux exports quittent le menu pour « Vérifier l'installation… » (E7).
+  // Garde levée (front v3, Lot 1) : « Republier tout » rejoint le menu (geste de dépannage), avant le séparateur.
+  maybe('menu : « Vérifier l’installation… », « Guide de démarrage », « Republier tout », séparateur, « Supprimer tout de Home Assistant… » seul rouge, gating conservé', () => {
     const ui = startPage();
     const items = ui.$('#j2ha_moreMenu .j2ha-menu li').list.map((li) => ({
       role: li.attrs.role, text: plain(ui.$(li).text()).trim(),
@@ -70,6 +74,7 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     assert.deepEqual(items, [
       { role: 'none', text: 'Vérifier l\'installation…' },
       { role: 'none', text: 'Guide de démarrage' },
+      { role: 'none', text: 'Republier tout' },
       { role: 'separator', text: '' },
       { role: 'none', text: 'Supprimer tout de Home Assistant…' },
     ]);
@@ -132,32 +137,42 @@ describe('25.3 / AC1, AC10 — bloc maison', () => {
     assert.equal(ui.calls.filter((c) => c.action === 'getMappingOverrides').length, 0);
   });
 
-  maybe('« N publiés sur M », équipements Jeedom et pièces, jauge role="img" qui somme à M', () => {
+  // Garde levée (front v3, Lot 1) : chiffre « n / m » + « publiés » ; la ligne « 12 équipements Jeedom, 4 pièces » est retirée
+  // (le nombre d'équipements est dans l'onglet) ; chaque segment du liseré porte `title` et `aria-label` avec son compte.
+  maybe('« n / m publiés », onglet « Équipements m », liseré qui somme à m, segments étiquetés', () => {
     const ui = startPage();
     const overview = ui.page.view().overview;
-    assert.equal(ui.text('#j2ha_houseNumber'), String(overview.counts.published));
-    assert.equal(ui.text('#j2ha_houseSub'), `${overview.counts.published > 1 ? 'publiés' : 'publié'} sur ${overview.total}`);
+    assert.equal(ui.text('#j2ha_houseNumber'), `${overview.counts.published} / ${overview.total}`);
+    assert.equal(ui.text('#j2ha_houseSub'), overview.counts.published > 1 ? 'publiés' : 'publié');
     assert.equal(overview.total, 12);
-    assert.equal(ui.text('#j2ha_houseMeta'), '12 équipements Jeedom, 4 pièces');
+    assert.equal(ui.text('#j2ha_tabEquipmentsCount'), '12');
+    assert.equal(ui.$('#j2ha_houseMeta').length, 0);
     const gauge = ui.$('#j2ha_houseGauge .j2ha-gauge');
     assert.equal(gauge.length, 1);
-    assert.equal(gauge.attr('role'), 'img');
+    assert.equal(gauge.attr('role'), 'group');
     assert.equal(plain(gauge.attr('aria-label')).startsWith(`${overview.counts.published} publié`), true);
     const segs = ui.$('#j2ha_houseGauge .j2ha-seg').list;
     assert.equal(segs.reduce((n, el) => n + Number(/flex-grow:(\d+)/.exec(el.attrs.style)[1]), 0), overview.total);
-    segs.forEach((el) => assert.equal(el.attrs['aria-hidden'], 'true'));
+    segs.forEach((el) => {
+      const count = Number(/flex-grow:(\d+)/.exec(el.attrs.style)[1]);
+      assert.equal(el.attrs.role, 'img');
+      assert.equal(plain(el.attrs.title), plain(el.attrs['aria-label']));
+      assert.match(plain(el.attrs.title), new RegExp('^' + count + ' '));
+    });
     assert.doesNotMatch(plain(ui.dom.body.children.map((c) => ui.$(c).text()).join(' ')), /Sera publié|prête|NaN|undefined/);
   });
 
-  // Garde levée (front v2, Lot 7, spec E2) : les puces à zéro ne sont plus grisées mais masquées (toutes, pas seulement
-  // « non lus ») ; l'ordre reste fixe pour celles qui sont affichées.
-  maybe('légende en puces : button aria-pressed, ordre fixe, puces à zéro masquées, « non lus » seulement si > 0', () => {
+  // Garde levée (front v2, Lot 7, spec E2) : les puces à zéro ne sont plus grisées mais masquées.
+  // Garde levée (front v3, Lot 1) : ordre du liseré (publiés, à appliquer, bloqués, exclus) ; une puce = icône + nombre + mot,
+  // la définition en info-bulle.
+  maybe('puces : button aria-pressed, ordre du liseré, puces à zéro masquées, « non lus » seulement si > 0, définition en info-bulle', () => {
     const ui = startPage();
     const chips = ui.$('#j2ha_houseChips .j2ha-chip-filter').list;
     const counts = ui.page.view().overview.counts;
-    assert.deepEqual(chips.map((c) => c.attrs['data-filter']), ['published', 'blocked', 'to_apply', 'other', 'unread'].filter((key) => counts[key] > 0));
+    assert.deepEqual(chips.map((c) => c.attrs['data-filter']), ['published', 'to_apply', 'blocked', 'other', 'unread'].filter((key) => counts[key] > 0));
     chips.forEach((c) => { assert.equal(c.tag, 'button'); assert.equal(c.attrs['aria-pressed'], 'false'); });
     chips.forEach((c) => assert.notEqual(c.props.disabled, true, c.attrs['data-filter']));
+    chips.forEach((c) => { assert.ok(c.attrs.title, 'définition en info-bulle'); assert.equal(ui.$(c).find('i.fas').length, 1, 'icône'); });
     assert.equal(counts.unread, 1);
     assert.equal(plain(ui.$(chips[chips.length - 1]).text()).trim(), '1 non lu');
     // Sans équipement non lu, la puce « non lus » n’existe pas.
@@ -166,12 +181,15 @@ describe('25.3 / AC1, AC10 — bloc maison', () => {
     assert.equal(all.counts.unread, 0);
   });
 
-  maybe('« Actualiser » et « Chiffres relus à HH:MM » (heure locale de la lecture)', () => {
+  // Garde levée (front v3, Lot 1) : « Chiffres relus à… / Actualiser » devient l'icône ↻, l'heure de lecture en info-bulle.
+  maybe('↻ « Actualiser les chiffres » : heure locale de la lecture en info-bulle, aucune phrase', () => {
     const ui = startPage();
     const at = ui.page.reader.state().readAt;
     const hhmm = ('0' + at.getHours()).slice(-2) + ':' + ('0' + at.getMinutes()).slice(-2);
-    assert.equal(ui.text('#j2ha_freshness'), `Chiffres relus à ${hhmm}`);
-    assert.equal(plain(ui.$('#bt_refreshStates').text()).trim(), 'Actualiser');
+    assert.equal(plain(ui.$('#bt_refreshStates').attr('title')), `Actualiser les chiffres (relus à ${hhmm})`);
+    assert.equal(plain(ui.$('#bt_refreshStates').attr('aria-label')), `Actualiser les chiffres (relus à ${hhmm})`);
+    assert.equal(plain(ui.$('#bt_refreshStates').text()).trim(), '');
+    assert.equal(ui.$('#j2ha_freshness').length, 0);
   });
 
   maybe('« Actualiser » : un appel refresh=1, bouton désactivé pendant l’attente, puis réactivé', () => {
@@ -182,7 +200,8 @@ describe('25.3 / AC1, AC10 — bloc maison', () => {
     assert.equal(refresh[0].data.refresh, '1');
     assert.equal(ui.$('#bt_refreshStates').prop('disabled'), true);
     assert.equal(ui.$('#bt_refreshStates').attr('aria-busy'), 'true');
-    assert.match(plain(ui.$('#bt_refreshStates').text()), /Actualisation/);
+    assert.match(plain(ui.$('#bt_refreshStates').attr('title')), /Actualisation/);
+    assert.equal(ui.$('#bt_refreshStates .fa-spin').length, 1);
     ui.answer(okBody(equipmentsFor(ui.rooms)));
     assert.equal(ui.$('#bt_refreshStates').prop('disabled'), false);
     assert.equal(ui.calls.filter((c) => c.data.refresh === '1').length, 1, 'le seul refresh=1 de la session');
@@ -190,97 +209,93 @@ describe('25.3 / AC1, AC10 — bloc maison', () => {
 });
 
 describe('25.3 / AC11 — filtres globaux sans requête réseau', () => {
-  maybe('chaque puce non vide affiche la liste ; le nombre de lignes égale le nombre annoncé ; 0 appel ajax', () => {
+  // Garde levée (front v3, Lot 1, P8) : plus de liste filtrée (#j2ha_filterPanel). Les puces Publiés, À appliquer, Exclus et
+  // Non lus filtrent la GRILLE (pièces à 0 masquées, compteurs filtrés) ; Bloqués (et Conseils) montrent la liste « À faire »
+  // (la grille est alors masquée : une seule représentation à la fois). Second clic = filtre retiré.
+  maybe('chaque puce de grille masque les pièces à 0 et filtre les compteurs ; second clic : tout revient ; 0 appel ajax', () => {
     const ui = startPage();
     const before = ui.calls.length;
-    const counts = ui.page.view().overview.counts;
-    for (const key of ['published', 'blocked', 'to_apply', 'other', 'unread']) {
-      if (counts[key] === 0) continue;
+    const o = ui.page.view().overview;
+    for (const key of ['published', 'to_apply', 'other', 'unread']) {
+      if (o.counts[key] === 0) continue;
       ui.click(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
-      assert.equal(ui.$('#j2ha_filterList .j2ha-frow').length, counts[key], key);
       assert.equal(ui.$(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`).attr('aria-pressed'), 'true');
+      assert.equal(ui.$(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`).attr('aria-controls'), 'j2ha_roomCards');
+      o.rooms.forEach((room) => {
+        const card = ui.$(`#j2ha_roomCards .j2ha-room-card[data-object_id="${room.object_id}"]`);
+        assert.equal(card.prop('hidden'), room.counts[key] === 0, `${key} / pièce ${room.object_id}`);
+        if (room.counts[key] > 0) assert.equal(plain(card.find('.j2ha-room-ratio').text()), `${room.counts[key]}/${room.summary.equipments_total}`);
+      });
+      const shown = ui.$('#j2ha_roomCards .j2ha-room-card').list.filter((c) => !c.props.hidden)
+        .reduce((n, c) => n + Number(plain(ui.$(c).find('.j2ha-room-ratio').text()).split('/')[0]), 0);
+      assert.equal(shown, o.counts[key], 'la somme des tuiles visibles égale la puce');
       ui.click(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
-      assert.equal(ui.$('#j2ha_filterList .j2ha-frow').length, 0, 'second clic = filtre retiré');
+      assert.equal(ui.page.filter(), null, 'second clic = filtre retiré');
+      assert.equal(ui.$('#j2ha_roomCards .j2ha-room-card').list.filter((c) => c.props.hidden).length, 0);
     }
     assert.equal(ui.calls.length, before, 'aucune requête réseau');
   });
 
-  maybe('l’ordre de la liste est celui de la grille (pièces regroupées par parent), puis l’ordre natif', () => {
+  maybe('« Bloqués » montre la liste « À faire » (bloqués seulement, tous) et masque la grille ; second clic : retour', () => {
     const ui = startPage();
-    const grid = ui.$('#j2ha_roomCards .j2ha-room-card').list.map((el) => Number(el.attrs['data-object_id']));
-    assert.deepEqual(grid, [5, 2, 3, 4, 0], 'la grille regroupe : isolées, groupe du parent, Sans pièce');
-    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]');
-    const roomIds = ui.$('#j2ha_filterList .j2ha-frow-btn').list.map((el) => Number(el.attrs['data-room-id']));
-    assert.ok(roomIds.length > 2);
-    const ranks = roomIds.map((id) => grid.indexOf(id));
-    assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), 'ordre de la grille');
-    // Au sein d'une pièce, l'ordre natif de j2haRoomsTree est conservé.
-    const inRoom = (id) => ui.$('#j2ha_filterList .j2ha-frow-btn').list.filter((el) => Number(el.attrs['data-room-id']) === id)
-      .map((el) => plain(ui.$(el).find('.j2ha-frow-name').text()));
-    for (const id of grid) {
-      const names = inRoom(id);
-      assert.deepEqual(names, [...names].sort((a, b) => Number(a.slice(3)) - Number(b.slice(3))), 'ordre natif dans la pièce ' + id);
-    }
+    const o = ui.page.view().overview;
+    assert.ok(o.counts.blocked > 0);
+    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]');
+    assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]').attr('aria-controls'), 'j2ha_v2_todo');
+    assert.equal(ui.$('#j2ha_roomCards').prop('hidden'), true);
+    const rows = ui.$('#j2ha_v2_todo .j2ha-v2-todo-row').list;
+    assert.equal(rows.length, o.counts.blocked);
+    rows.forEach((r) => assert.equal(r.attrs['data-kind'], 'blocked'));
+    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="blocked"]');
+    assert.equal(ui.$('#j2ha_roomCards').prop('hidden'), false);
   });
 
-  maybe('un segment de la jauge et la puce partagent le même gestionnaire', () => {
+  maybe('un filtre de grille masque la liste « À faire » et les titres de groupe vides', () => {
+    const ui = startPage();
+    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="unread"]');
+    assert.equal(ui.$('#j2ha_v2_todo').children().length, 0);
+    const groups = ui.$('#j2ha_roomCards .j2ha-room-group').list;
+    groups.forEach((g) => {
+      const visible = ui.$(g).find('.j2ha-room-card').list.filter((c) => !c.props.hidden).length;
+      assert.equal(!!g.props.hidden, visible === 0);
+    });
+  });
+
+  maybe('un segment du liseré et la puce partagent le même gestionnaire', () => {
     const ui = startPage();
     ui.click('#j2ha_houseGauge .j2ha-seg[data-filter="published"]');
     assert.equal(ui.page.filter(), 'published');
     assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]').attr('aria-pressed'), 'true');
   });
 
-  maybe('Échap et « Tout afficher » retirent le filtre ; le texte des lignes est échappé (nom libre)', () => {
+  maybe('Échap sur une puce retire le filtre', () => {
     const ui = startPage();
     ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]');
     assert.ok(ui.page.filter());
-    ui.key('#j2ha_filterPanel', 'Escape');
+    ui.key('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]', 'Escape');
     assert.equal(ui.page.filter(), null);
-    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]');
-    ui.click('#bt_clearFilter');
-    assert.equal(ui.page.filter(), null);
-    for (const key of ['published', 'other', 'to_apply', 'blocked']) {
-      const chip = ui.$(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
-      if (chip.prop('disabled')) continue;
-      ui.page.setFilter(key);
-      ui.$('#j2ha_filterList .j2ha-frow-name').list.forEach((n) => assert.doesNotMatch(ui.$(n).html(), /<b>|<i>/));
-      ui.page.setFilter(null);
-    }
-  });
-
-  maybe('une ligne porte état (mot + icône), nom, pièce ; un clic ouvre la fenêtre de la pièce ; cartes sans correspondance atténuées', () => {
-    const ui = startPage();
-    ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="unread"]');
-    const row = ui.$('#j2ha_filterList .j2ha-frow-btn').first();
-    assert.match(plain(row.text()), /Non lu/);
-    assert.match(plain(row.text()), /Eq 998/);
-    assert.match(plain(row.text()), /Salle B/);
-    assert.ok(row.find('.fa-question-circle').length === 1, 'icône + mot');
-    row.list[0].handlers.click.call(row.list[0], {});
-    assert.deepEqual(ui.opened, [4]);
-    const cards = ui.$('#j2ha_roomCards .j2ha-room-card').list;
-    const dimmed = cards.filter((c) => c.classes.has('j2ha-room-dim')).map((c) => c.attrs['data-object_id']);
-    assert.deepEqual(dimmed.sort(), ['0', '2', '3', '5'], 'seule la pièce B contient un équipement non lu');
-    assert.equal(ui.$('#j2ha_roomCards .j2ha-room-card').length, 5, 'aucune carte masquée');
   });
 
   maybe('après une relecture, un filtre actif est réappliqué aux nouveaux chiffres', () => {
     const ui = startPage();
     ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]');
-    const before = ui.$('#j2ha_filterList .j2ha-frow').length;
     const equipments = equipmentsFor(ui.rooms);
     Object.values(equipments).forEach((entry) => { entry.sync_status.published_in_ha = false; });
     ui.page.reader.trigger();
     ui.timers.splice(0).forEach((t) => t.fn());
     ui.answer(okBody(equipments));
     assert.equal(ui.page.filter(), 'published');
-    assert.equal(ui.$('#j2ha_filterList .j2ha-frow').length, ui.page.view().overview.counts.published);
-    assert.ok(before >= 0);
+    const o = ui.page.view().overview;
+    o.rooms.forEach((room) => {
+      assert.equal(ui.$(`#j2ha_roomCards .j2ha-room-card[data-object_id="${room.object_id}"]`).prop('hidden'), room.counts.published === 0);
+    });
   });
 });
 
 describe('25.3 / AC12 — cartes de pièce', () => {
-  maybe('jauge, « n / t publiés », repères non nuls seulement, liseré orange si bloqué ; somme des cartes = maison', () => {
+  // Garde levée (front v3, Lot 1) : tuile 220 × 72 — ratio « n/t » (sans mot, détail en info-bulle), marques icône + nombre
+  // (le mot est lu par les lecteurs d'écran), liseré de 4 px étiqueté (role="group", segments role="img").
+  maybe('liseré, « n/t », marques non nulles seulement, classe « bloquée » si bloqué ; somme des tuiles = maison', () => {
     const ui = startPage();
     const o = ui.page.view().overview;
     const sum = (key) => o.rooms.reduce((n, r) => n + r.counts[key], 0);
@@ -289,10 +304,11 @@ describe('25.3 / AC12 — cartes de pièce', () => {
       const card = ui.$(`#j2ha_roomCards .j2ha-room-card[data-object_id="${room.object_id}"]`);
       assert.equal(card.length, 1);
       const ratio = plain(card.find('.j2ha-room-ratio').text());
-      assert.equal(ratio, `${room.counts.published} / ${room.summary.equipments_total} ${room.counts.published > 1 ? 'publiés' : 'publié'}`);
+      assert.equal(ratio, `${room.counts.published}/${room.summary.equipments_total}`);
+      assert.match(plain(card.find('.j2ha-v3-tile-ratio').attr('title')), new RegExp(`${room.counts.published} publiés? sur ${room.summary.equipments_total}$`));
       const gauge = card.find('.j2ha-gauge');
       assert.equal(gauge.length, 1);
-      assert.equal(gauge.attr('role'), 'img');
+      assert.equal(gauge.attr('role'), 'group');
       assert.equal(card.find('.j2ha-seg').list.reduce((n, el) => n + Number(/flex-grow:(\d+)/.exec(el.attrs.style)[1]), 0), room.summary.equipments_total);
       assert.equal(card.find('.j2ha-mark-blocked').length, room.counts.blocked > 0 ? 1 : 0);
       assert.equal(card.find('.j2ha-mark-to_apply').length, room.counts.to_apply > 0 ? 1 : 0);
@@ -303,9 +319,13 @@ describe('25.3 / AC12 — cartes de pièce', () => {
     assert.equal(ui.$('#j2ha_roomCards .j2ha-mark-unread').text().replace(/\{\{|\}\}/g, ''), '1 non lu');
   });
 
-  maybe('contrat de la carte conservé : objectDisplayCard, cursor, j2ha-room-card, data-object_id, onclick, jamais eqLogicDisplayCard', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : le CSS du cœur impose `div[class*="DisplayCard"] { height:130px; overflow:hidden }`
+  // et `div[class*="ListContainer"] > div.cursor { width:130px }` : la tuile ne porte plus `objectDisplayCard` et n'est dans
+  // aucun `*ListContainer`. Le reste du contrat (cursor, j2ha-room-card, data-object_id, onclick, clavier) est conservé.
+  maybe('contrat de la tuile : cursor, j2ha-room-card, data-object_id, onclick ; aucune classe *DisplayCard ni conteneur *ListContainer', () => {
     const { html } = renderPhp(SCENE);
-    const cards = [...html.matchAll(/<div class="objectDisplayCard cursor j2ha-room-card"[^>]*>/g)].map((m) => m[0]);
+    assert.doesNotMatch(mainPart(html), /DisplayCard|ListContainer/);
+    const cards = [...html.matchAll(/<div class="cursor j2ha-room-card j2ha-v3-tile[^"]*"[^>]*>/g)].map((m) => m[0]);
     assert.equal(cards.length, 5);
     cards.forEach((tag) => {
       assert.match(tag, /data-object_id="\d+"/);
@@ -409,11 +429,12 @@ describe('25.3 / AC13 — icône, couleur Jeedom, regroupement par objet parent'
 
   maybe('cartes regroupées par parent : isolées sans sous-titre, groupe du parent (sa carte en tête), « Sans pièce » en dernier', () => {
     const { html } = renderPhp(SCENE);
-    const groups = [...html.matchAll(/<div class="j2ha-room-group">(?:<h4 class="j2ha-room-group-title j2ha-free-name">([^<]*)<\/h4>)?([\s\S]*?)<\/div><\/div>(?=<div class="j2ha-room-group">|<\/div>)/g)]
+    const groups = [...html.matchAll(/<div class="j2ha-room-group j2ha-v3-group">(?:<h4 class="j2ha-room-group-title j2ha-free-name">([^<]*)<\/h4>)?([\s\S]*?)<\/div><\/div>(?=<div class="j2ha-room-group j2ha-v3-group">|<\/div>)/g)]
       .map((m) => ({ title: m[1] || null, ids: [...m[2].matchAll(/data-object_id="(\d+)"/g)].map((x) => Number(x[1])) }));
+    // Garde levée (front v3, Lot 1) : le titre de groupe ne garde que le nom du parent direct (plus de « Maison › »).
     assert.deepEqual(groups, [
       { title: null, ids: [5] },
-      { title: 'Maison fictive › Étage fictif', ids: [2, 3, 4] },
+      { title: 'Étage fictif', ids: [2, 3, 4] },
       { title: null, ids: [0] },
     ]);
   });

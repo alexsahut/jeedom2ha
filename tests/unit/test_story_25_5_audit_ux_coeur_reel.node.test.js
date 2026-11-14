@@ -26,7 +26,9 @@ function sceneOptions(width) {
 }
 
 for (const width of [980, 1440]) {
-  test(`audit UX réel ${width} px — carte au nom sur deux lignes : jauge et repères entiers, jauges alignées sur la rangée`, async (t) => {
+  // Garde levée (front v3, Lot 1) : la tuile garde une hauteur fixe de 72 px ; un nom long tient sur UNE ligne, coupé par une
+  // ellipse, le nom entier en info-bulle. Le reste de l'audit (liseré et repères entiers, liserés alignés) est inchangé.
+  test(`audit UX réel ${width} px — tuile au nom long : une ligne (ellipse au besoin), liseré et repères entiers, liserés alignés sur la rangée`, async (t) => {
     const options = sceneOptions(width);
     if (!options) { t.skip('PHP indisponible'); return; }
     await withRealView(t, options, async (page) => {
@@ -41,6 +43,9 @@ for (const width of [980, 1440]) {
         const gaugeOf = (sel) => card(sel).querySelector('.j2ha-gauge');
         return {
           nameHeight: box(card(long).querySelector('.name')).height,
+          nameEllipsis: getComputedStyle(card(long).querySelector('.name')).textOverflow,
+          nameTitle: card(long).querySelector('.name').getAttribute('title'),
+          nameText: card(long).querySelector('.name').textContent,
           gaugeInside: box(gaugeOf(long)).bottom <= box(card(long)).bottom,
           gaugeVisible: visible(gaugeOf(long)),
           gaugeTops: [box(gaugeOf(long)).top, box(gaugeOf(short)).top],
@@ -48,7 +53,9 @@ for (const width of [980, 1440]) {
             text: el.textContent, height: box(el).height, inside: box(el).bottom <= box(el.closest('.j2ha-room-card')).bottom })),
         };
       }, [CARD(3), CARD(4)]);
-      assert.ok(m.nameHeight > 20, `le nom de la scène tient bien sur deux lignes (${m.nameHeight}px)`);
+      assert.ok(m.nameHeight <= 20, `le nom long tient sur une ligne (${m.nameHeight}px)`);
+      assert.equal(m.nameEllipsis, 'ellipsis', 'un nom trop long est coupé par une ellipse');
+      assert.equal(m.nameTitle, m.nameText, 'le nom entier en info-bulle');
       assert.ok(m.gaugeInside && m.gaugeVisible, 'la jauge de la carte au nom long est dans la carte et visible');
       assert.ok(Math.abs(m.gaugeTops[0] - m.gaugeTops[1]) <= 1, `jauges de la rangée alignées (${m.gaugeTops.join(' / ')})`);
       assert.ok(m.marks.length > 0, 'la scène a des repères');

@@ -24,9 +24,9 @@ const SEGMENT = '#j2ha_houseGauge .j2ha-seg-published';
 // Garde levée (front v2, Lot 7, spec E2) : la puce et le segment filtrent sur place ; ils n'ouvrent plus la vue et n'écrivent
 // donc aucune entrée d'historique. L'exigence de P2-1 (l'entrée de base n'est jamais réécrite, « Précédent » revient à la
 // page principale) est contrôlée sur le chemin qui ouvre désormais la vue depuis un filtre : une ligne de la liste filtrée.
-describe('25.4 / R1 P2-1 — filtre sur place ; la vue ouverte depuis la liste filtrée crée une entrée d’historique', () => {
+describe('25.4 / R1 P2-1 — filtre sur place ; la vue ouverte depuis la liste « À faire » crée une entrée d’historique', () => {
   for (const [name, selector] of [['puce', CHIP], ['segment de jauge', SEGMENT]]) {
-    maybe(`${name} → filtre sur place, aucune entrée ni fragment ; une ligne de la liste ouvre la vue, « Précédent » revient`, () => {
+    maybe(`${name} → filtre sur place, aucune entrée ni fragment ; une ligne « À faire » ouvre la vue, « Précédent » revient`, () => {
       const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
       assert.equal(ui.win.location.hash, '');
       const pushes = ui.win.historyWrites.push;
@@ -35,9 +35,12 @@ describe('25.4 / R1 P2-1 — filtre sur place ; la vue ouverte depuis la liste f
       assert.equal(ui.page.filter(), 'published');
       assert.equal(ui.win.location.hash, '');
       assert.equal(ui.win.historyWrites.push, pushes, 'aucune entrée poussée par le filtre');
-      ui.click('#j2ha_filterList .j2ha-frow-btn');
+      // Garde levée (front v3, Lot 1, P8) : plus de liste filtrée ; la vue s'ouvre depuis une ligne « À faire » (puce « Bloqués »).
+      ui.page.setFilter('blocked');
+      assert.equal(ui.win.historyWrites.push, pushes, 'aucune entrée poussée par le filtre');
+      ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
       assert.equal(ui.isOpen(), true);
-      assert.match(ui.win.location.hash, /^#j2ha-vue=piece:\d+;eq:\d+;f:published$/);
+      assert.match(ui.win.location.hash, /^#j2ha-vue=piece:\d+;eq:\d+;f:blocked$/);
       ui.win.history.back();
       assert.equal(ui.isOpen(), false, 'la page du plugin n’est pas quittée : on revient à la page principale');
       assert.equal(ui.win.location.hash, '', 'l’entrée de base n’a pas été réécrite');

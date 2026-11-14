@@ -27,9 +27,11 @@ describe('25.4 / D2, AC10 — chaque événement et ses lectures réseau', () =>
     ['clic sur une carte de pièce', (ui) => openCardWide(ui, 10), { states: 0, trees: 0 }],
     ['clic sur une puce du bloc maison', (ui) => ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'), { states: 0, trees: 0 }],
     ['clic sur un segment de la jauge maison', (ui) => ui.click('#j2ha_houseGauge .j2ha-seg-published'), { states: 0, trees: 0 }],
-    ['clic sur une ligne de la liste filtrée', (ui) => {
-      ui.page.setFilter('published');
-      ui.click('#j2ha_filterList .j2ha-frow-btn');
+    // Garde levée (front v3, Lot 1, P8) : plus de liste filtrée ; une ligne de la liste « À faire » (puce « Bloqués ») ouvre la
+    // fiche de l'équipement, avec les mêmes lectures (aucun état, un arbre).
+    ['clic sur une ligne de la liste « À faire »', (ui) => {
+      ui.page.setFilter('blocked');
+      ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
     }, { states: 0, trees: 1 }],
     ['sélection d’une pièce dans l’arbre', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row'); }, { states: 0, trees: 0 }],
     ['dépliage d’une pièce', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle'); }, { states: 0, trees: 0 }],

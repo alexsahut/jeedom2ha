@@ -94,7 +94,10 @@ async function withRealView(t, options, fn) {
     const bodies = [];
     const errors = [];
     const withCore = opts.coreCss !== undefined ? opts.coreCss !== false : opts.css === undefined;
-    const css = (withCore ? CORE_CSS : '') + (opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css')) + (opts.extraCss || '');
+    // Front v3 (Lot 1) : par défaut, les DEUX feuilles du plugin, dans l'ordre de la page (jeedom2ha.css puis jeedom2ha_v2.css,
+    // `include_file` de jeedom2ha.php) — la page maison v3 est stylée par la seconde.
+    const pluginCss = opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css') + read('desktop/css/jeedom2ha_v2.css');
+    const css = (withCore ? CORE_CSS : '') + pluginCss + (opts.extraCss || '');
     // Les scripts sont SERVIS (balises <script src>) pour que `page.reload()` rejoue la page entière, lien profond compris.
     const scriptTags = ['/assets/jquery.js', '/assets/bootbox-stub.js', ...SCRIPTS.map((file) => `/assets/${file}.js`)]
       .map((src) => `<script src="${src}"></script>`).join('');

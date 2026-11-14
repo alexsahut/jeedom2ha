@@ -63,8 +63,10 @@ const BOOTSTRAP_RULES = `
 const CORE_CSS = CORE_VARS + CORE_RULES + BOOTSTRAP_RULES;
 
 /** CSS complet de la page du plugin : cœur d'abord (le plugin est chargé après lui sur la box), puis le CSS du plugin. */
+// Front v3 (Lot 1) : les deux feuilles du plugin, dans l'ordre de la page (jeedom2ha.css puis jeedom2ha_v2.css).
 function pageCss() {
-  return CORE_CSS + fs.readFileSync(path.join(ROOT, 'desktop/css/jeedom2ha.css'), 'utf8');
+  return CORE_CSS + fs.readFileSync(path.join(ROOT, 'desktop/css/jeedom2ha.css'), 'utf8')
+    + fs.readFileSync(path.join(ROOT, 'desktop/css/jeedom2ha_v2.css'), 'utf8');
 }
 
 function diag(reason) {

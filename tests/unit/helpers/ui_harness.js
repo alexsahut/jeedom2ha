@@ -104,14 +104,17 @@ function tree(id, diagnostics, extra) {
 }
 const ok = (payload) => ({ state: 'ok', result: { payload } });
 
-/** Squelette minimal de la page (ids et classes lus par B et C) : cartes regroupées dans l'ordre des pièces. */
+/** Squelette minimal de la page (ids et classes lus par B et C) : cartes regroupées dans l'ordre des pièces.
+ * Front v3 (Lot 1) : même structure que la page (onglets, bloc maison sans phrase, liste « À faire », tuiles sans
+ * `objectDisplayCard` ni `*ListContainer`) ; plus de liste filtrée (#j2ha_filterPanel). */
 function skeletonFor(rooms) {
-  const cards = (rooms || []).map((room) => `<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="${room.object_id}"><span class="name">${room.object_name}</span><span class="text-muted j2ha-room-count"> (${room.equipments.length})</span><div class="j2ha-room-state"></div></div>`).join('');
-  return '<div id="j2ha_mainView"><div id="j2ha_houseBlock"><span id="j2ha_houseNumber"></span><span id="j2ha_houseSub"></span>'
-    + '<div id="j2ha_houseMeta"></div><div id="j2ha_houseGauge"></div><div id="j2ha_houseChips"></div><span id="j2ha_freshness"></span>'
-    + '<button id="bt_refreshStates"></button><div id="j2ha_readStatus"></div></div>'
-    + '<div id="j2ha_filterPanel"><strong id="j2ha_filterTitle"></strong><button id="bt_clearFilter"></button><ul id="j2ha_filterList"></ul></div>'
-    + `<div id="j2ha_roomCards" class="j2ha-room-groups"><div class="j2ha-room-group"><div class="objectListContainer">${cards}</div></div></div></div>`
+  const cards = (rooms || []).map((room) => `<div class="cursor j2ha-room-card j2ha-v3-tile" data-object_id="${room.object_id}" data-total="${room.equipments.length}"><i class="fas fa-door-open j2ha-room-icon"></i><span class="name j2ha-v3-tile-name">${room.object_name}</span><div class="j2ha-room-state"></div></div>`).join('');
+  return '<div id="j2ha_mainView"><span id="j2ha_tabEquipmentsCount"></span><span id="j2ha_tabScenariosCount"></span>'
+    + '<div id="j2ha_tab_equipments"><div id="j2ha_houseBlock"><span id="j2ha_houseNumber"></span><span id="j2ha_houseSub"></span>'
+    + '<button id="bt_refreshStates"></button><div id="j2ha_houseGauge"></div><div id="j2ha_houseChips"></div><div id="j2ha_readStatus"></div></div>'
+    + '<div id="j2ha_v2_todo" class="j2ha-v2-todo"></div>'
+    + `<div id="j2ha_roomCards" class="j2ha-room-groups j2ha-v3-grid"><div class="j2ha-room-group j2ha-v3-group"><div class="j2ha-v3-tiles">${cards}</div></div></div></div>`
+    + '<div id="j2ha_tab_scenarios" hidden></div></div>'
     + '<div id="j2ha_workView" class="j2ha-wv"></div>';
 }
 

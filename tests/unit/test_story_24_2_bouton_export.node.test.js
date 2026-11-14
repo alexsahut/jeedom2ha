@@ -40,7 +40,8 @@ describe('24.2 / AC3 — entrée de l\'export de décision', () => {
     assert.equal(plain(dialog.options.title), 'Vérifier l\'installation');
     const modal = ui.$(dialog.modal);
     assert.equal(modal.find('.j2ha-v2-check-advanced-body #bt_exportDecision').length, 1);
-    assert.match(plain(modal.text()), /identifiants seulement/);
+    // Garde levée (front v3, Lot 1, critique 2.1) : la phrase « identifiants seulement… » passe en info-bulle du bouton.
+    assert.match(plain(modal.find('#bt_exportDecision').attr('title')), /identifiants seulement/);
     dialog.close();
     assert.equal(ui.calls.length, before, 'fermer ne déclenche aucune requête');
     assert.equal(ui.$('#div_decisionExportDialog #bt_exportDecision').length, 1, 'le contenu retourne à sa place');

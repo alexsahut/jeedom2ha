@@ -40,12 +40,13 @@ describe('25.8 / AC6 — balisage des cartes', () => {
     assert.equal(ui.$(`${CARD(0)} .j2ha-room-exclude`).length, 0);
   });
 
-  maybe('les cartes conservent objectDisplayCard, .j2ha-room-card, data-object_id, onclick, role et tabindex', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : la tuile ne porte plus `objectDisplayCard` (règles *DisplayCard du cœur).
+  maybe('les cartes conservent .j2ha-room-card, data-object_id, onclick, role et tabindex ; aucune classe *DisplayCard', () => {
     const ui = startPage({ scene: SCENE_EXCLUDED });
     for (const room of ui.rooms) {
       const card = ui.$(CARD(room.object_id));
       assert.equal(card.length, 1);
-      assert.ok(card.hasClass('objectDisplayCard') && card.hasClass('j2ha-room-card'));
+      assert.ok(card.hasClass('j2ha-room-card') && !card.hasClass('objectDisplayCard'));
       assert.equal(card.attr('onclick'), `j2haOpenRoom(${room.object_id})`);
       assert.equal(card.attr('role'), 'button');
       assert.equal(card.attr('tabindex'), '0');

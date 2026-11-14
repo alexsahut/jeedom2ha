@@ -147,7 +147,8 @@ function j2ha_group_rooms(array $rooms, array $ancestors) {
 			$seen[$cur] = true;
 			$cur = $knownFather($cur);
 		}
-		return implode(' › ', $chain);
+		// Front v3 (Lot 1) : seul le nom du parent direct ; le préfixe « Maison › » est retiré (c'est toujours la maison).
+		return count($chain) > 0 ? $chain[count($chain) - 1] : '';
 	};
 
 	$isolated = array();
@@ -223,22 +224,27 @@ function j2ha_render_room_menu(array $room) {
 	return $html;
 }
 
-/** Carte de pièce : conserve `objectDisplayCard`, `j2ha-room-card`, `data-object_id` et `onclick` (jamais `eqLogicDisplayCard`). */
+/**
+ * Tuile de pièce (front v3, Lot 1) : 220 × 72 px, icône, nom sur une ligne, ratio `n/m` à droite, marques (icône + nombre),
+ * liseré de 4 px collé au bas, menu « ⋯ » au survol. Conserve `j2ha-room-card`, `data-object_id` et `onclick`.
+ * Compatibilité avec le CSS du cœur : `div[class*="DisplayCard"]` impose `height:130px; overflow:hidden` — la tuile ne porte
+ * AUCUNE classe contenant `DisplayCard` et n'est dans aucun conteneur `*ListContainer`.
+ */
 function j2ha_render_room_card(array $room) {
 	$id = (int) $room['object_id'];
 	$icon = isset($room['icon_classes']) ? j2ha_icon_classes('<i class="' . $room['icon_classes'] . '"></i>') : J2HA_ICON_FALLBACK;
 	$color = isset($room['color']) ? j2ha_color_hex($room['color']) : '';
-	$html = '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $id . '" tabindex="0" role="button"'
+	$html = '<div class="cursor j2ha-room-card j2ha-v3-tile' . ($id > 0 ? '' : ' j2ha-v3-tile-none') . '" data-object_id="' . $id
+		. '" data-total="' . count($room['equipments']) . '" tabindex="0" role="button"'
 		. ($color !== '' ? ' data-color="' . j2ha_html($color) . '"' : '')
 		. ' onclick="j2haOpenRoom(' . $id . ')">';
+	$html .= '<i class="' . j2ha_html($icon) . ' j2ha-room-icon" aria-hidden="true"></i>';
+	$html .= '<span class="name j2ha-v3-tile-name' . ($id > 0 ? ' j2ha-free-name' : '') . '" title="' . j2ha_html($room['object_name']) . '">'
+		. j2ha_html($room['object_name']) . '</span>';
+	$html .= '<div class="j2ha-room-state"></div>';
 	if ($id > 0) {
 		$html .= j2ha_render_room_menu($room);
 	}
-	$html .= '<i class="' . j2ha_html($icon) . ' j2ha-room-icon"></i>';
-	$html .= '<br>';
-	$html .= '<span class="name' . ($id > 0 ? ' j2ha-free-name' : '') . '">' . j2ha_html($room['object_name']) . '</span>';
-	$html .= '<span class="text-muted j2ha-room-count"> (' . count($room['equipments']) . ')</span>';
-	$html .= '<div class="j2ha-room-state"></div>';
 	$html .= '</div>';
 	return $html;
 }
@@ -247,11 +253,11 @@ function j2ha_render_room_card(array $room) {
 function j2ha_render_room_groups(array $groups) {
 	$html = '';
 	foreach ($groups as $group) {
-		$html .= '<div class="j2ha-room-group">';
+		$html .= '<div class="j2ha-room-group j2ha-v3-group">';
 		if ($group['title'] !== null && $group['title'] !== '') {
 			$html .= '<h4 class="j2ha-room-group-title j2ha-free-name">' . j2ha_html($group['title']) . '</h4>';
 		}
-		$html .= '<div class="objectListContainer">';
+		$html .= '<div class="j2ha-v3-tiles">';
 		foreach ($group['rooms'] as $room) {
 			$html .= j2ha_render_room_card($room);
 		}

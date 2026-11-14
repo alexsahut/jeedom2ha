@@ -148,12 +148,14 @@ describe('25.3 / AC15 — contrastes des nouveaux éléments dans les deux thèm
     });
   }
 
-  it('les segments portent un mot dans la légende et un aria-label : l’état n’est jamais porté par la seule couleur', () => {
+  // Garde levée (front v3, Lot 1) : la légende est retirée ; chaque segment porte son compte en `title` et `aria-label`, chaque
+  // puce associe une icône FA5, un nombre et un mot (plus de point de couleur seul).
+  it('les segments portent leur compte (title, aria-label) et les puces une icône + un mot : l’état n’est jamais porté par la seule couleur', () => {
     const js = newSources['jeedom2ha_overview.js'];
     assert.match(js, /role="img"/);
-    assert.match(js, /aria-label/);
+    assert.match(js, /\.attr\('title', label\)\.attr\('aria-label', label\)/);
     assert.match(js, /aria-pressed/);
-    assert.match(js, /j2ha-chip-dot/);
+    assert.match(js, /j2ha-v3-chip-word/);
   });
 });
 

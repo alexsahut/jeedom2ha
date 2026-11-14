@@ -33,7 +33,8 @@ echo "AC2 — action Diagnostic supprimée, squelette Jeedom et export conservé
 check('aucune action data-action="diagnostic"', strpos($rendered, 'data-action="diagnostic"') === false);
 check('« Ajouter » est retiré de la page principale (décision d\'Alex du 2026-10-11)', preg_match('/eqLogicAction[^>]*data-action="add"/', $rendered) === 0 && strpos($rendered, '{{Ajouter}}') === false);
 check('« Configuration » garde eqLogicAction et data-action="gotoPluginConf"', preg_match('/eqLogicAction[^>]*data-action="gotoPluginConf"/', $rendered) === 1);
-check('le conteneur eqLogicThumbnailContainer est conservé', strpos($rendered, 'eqLogicThumbnailContainer') !== false);
+// Front v3 (Lot 1, garde levée) : la tuile « Gestion / Configuration » est remplacée par l'icône ⚙ de la barre d'état.
+check('la configuration est dans la barre d\'état (icône ⚙)', preg_match('/id="div_bridgeHealthBanner"[\s\S]*?eqLogicAction[^>]*data-action="gotoPluginConf"/', $rendered) === 1);
 check('« Télécharger le diagnostic support » est conservé', strpos($rendered, 'bt_exportDiagnostic') !== false);
 
 echo "R1-I — nom de pièce échappé\n";
@@ -50,7 +51,8 @@ foreach (array('param1', 'password', 'autorefresh') as $key) {
     check("aucun eqLogicAttr orphelin « {$key} »", strpos($rendered, 'data-l2key="' . $key . '"') === false);
 }
 // Garde levée (front v2, Lot 7, glossaire 3.2) : nouveau titre de la page.
-check('titre « Ce que Jeedom publie dans Home Assistant »', strpos($rendered, '{{Ce que Jeedom publie dans Home Assistant}}') !== false);
+// Front v3 (Lot 1, garde levée) : le titre est retiré (« zéro paragraphe ») ; les onglets Équipements / Scénarios le remplacent.
+check('onglets « Équipements » et « Scénarios » à la place du titre', strpos($rendered, '{{Équipements}}') !== false && strpos($rendered, '{{Scénarios}}') !== false);
 check('le cœur Jeedom garde plugin.template', strpos($rendered, "include_file('core', 'plugin.template', 'js')") !== false);
 
 echo "AC7 — relais conservés\n";
