@@ -15,62 +15,203 @@
     {
       "id": 1,
       "file": "page-principale.png",
-      "sha256": "80dcc27c776611933296edc0c9c40bfe15762c07e2c9afb16b3df8f89172d931",
-      "bytes": 59699
+      "sha256": "4b589c89f9de08d6f894dcde68de31ecf622c63446f526223c4a496cd08ac967",
+      "bytes": 76407,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 2,
       "file": "cartes-de-piece.png",
-      "sha256": "d7f6e1d110bc50e689fe88f0e9eebd96123cefb3dc265d6667efe670e30d86b1",
-      "bytes": 18094
-    },
-    {
-      "id": "2b",
-      "file": "cartes-de-piece-garage.png",
-      "sha256": "a69298e3fa3a8e445fb5a418cd659622d5e13c350ba65b3c107904a4f1337167",
-      "bytes": 3645
+      "sha256": "68b83eb826cb1991f4d013a3506e2449c065ebfe4078b7617944971380327d2f",
+      "bytes": 17962,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 3,
       "file": "vue-de-travail.png",
-      "sha256": "e047d3f58c69fdd0d7fa75ca3127e9b76d3e12a813e1d1a68a9c4d0ae8603800",
-      "bytes": 76220
+      "sha256": "0c643196f90960f7df058421969c8c1e253d5da4c807ef66fbbcb6ead071038a",
+      "bytes": 93253,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 4,
       "file": "detail-equipement.png",
-      "sha256": "08b01b1b09bab4a12b8522fa28e9f0032bf342078e8bd287dbd1370f552aa1b7",
-      "bytes": 27393
+      "sha256": "fce7040b6d665da86272325b76c7f7eedd8f31f6f131f47e16384dd9d701ab8c",
+      "bytes": 47927,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 5,
       "file": "tableau-des-commandes.png",
-      "sha256": "fb514c78c4ca79be6aa98222d5d34692d4c6058884def3456d90b82b1003fd41",
-      "bytes": 80136
+      "sha256": "487a6ac89339a1098debb52badcd37c2d811c8a7b94edb70d8ea86147d263a8a",
+      "bytes": 92879,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 6,
       "file": "compteurs-detail-piece.png",
-      "sha256": "a15d0e5c8f303304616b44062b87a2a192120e82b8b3f57f16f72a7ec27f57f8",
-      "bytes": 54576
+      "sha256": "869bca7464ba9d679bbce250098c9d9a98fc1c78b262bae9e1a6437b0442dcd4",
+      "bytes": 89484,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 7,
       "file": "compteurs-equipement-deplie.png",
-      "sha256": "cd075427bf10959f9ad9ac0c59ad5a9265a74374e2c081310df34722719e0153",
-      "bytes": 65423
+      "sha256": "861b71899a415362b750afc499924c1b87d28e9d26b60b7c64db655e8422c25e",
+      "bytes": 36026,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 8,
       "file": "configuration.png",
-      "sha256": "a884093c8e99800d006fc7f38cc6e7862e58c9b467b14ece69571eea0a4d27d8",
-      "bytes": 49729
+      "sha256": "e9eb853a74b7af576badac3ca8cefda3748bb51a17bfad285702e6242963b975",
+      "bytes": 48291,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     },
     {
       "id": 9,
       "file": "home-assistant-appareils.png",
       "sha256": "c2b4e0ade51424a1786a27d56361b490ff0a20a27c99aaabf506214f91723924",
       "bytes": 70388
+    },
+    {
+      "id": "barre-etat",
+      "file": "barre-etat.png",
+      "sha256": "0359d8457612d783202c41b61394dca5a631e88b13fb0942d8b8c8abfc1a7e4d",
+      "bytes": 26701,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "a-faire",
+      "file": "a-faire.png",
+      "sha256": "4bbc5cf36230c0af1e13ef71fd19bedb727f5d219e5eecef12cab224dce15273",
+      "bytes": 28553,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "corriger-le-type",
+      "file": "corriger-le-type.png",
+      "sha256": "7b85c23b27f2390abb366196195a069e20a5892f827d9fcd0f04732631aed2d9",
+      "bytes": 102676,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "choisir-ce-qui-est-publie",
+      "file": "choisir-ce-qui-est-publie.png",
+      "sha256": "72c3c575d920cae1066865644874f20de59c3a29e84575a1ced8437cca3a27e3",
+      "bytes": 48801,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "scenarios",
+      "file": "scenarios.png",
+      "sha256": "283585dec084327f465537420ab3a65f4f1d01a5ff0af23bb597bbdcf947e81f",
+      "bytes": 84004,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "verifier-installation",
+      "file": "verifier-installation.png",
+      "sha256": "2edef4d8c3039f5424a8f64ad125ef46d77a1b7d78664bdf0961d00c1c9b4d50",
+      "bytes": 39908,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
+    },
+    {
+      "id": "guide-demarrage",
+      "file": "guide-demarrage.png",
+      "sha256": "8685ec310fc188df03182264e2220f4d2b67a76f23eb09b9789a05fe35f82e14",
+      "bytes": 31541,
+      "generated": {
+        "tool": "scripts/doc-captures.js",
+        "data": "banc réel, données fictives (CC-48)",
+        "source_commit": "9e12a92",
+        "generated_on": "2026-11-14",
+        "width": 1280
+      }
     }
   ],
   "video": {
@@ -83,5 +224,6 @@
       "source_commit": "2a247c5",
       "generated_on": "2026-10-31"
     }
-  }
+  },
+  "regenerate_doc": "node scripts/doc-captures.js"
 }

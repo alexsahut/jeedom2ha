@@ -33,29 +33,23 @@ describe('25.4 / AC30 — vocabulaire', () => {
 
 describe('25.4 / AC30 — index.md décrit la vue de travail', () => {
 // Garde levée (front v2, Lot 7, spec E2/E3) : la puce filtre sur place, « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », la recherche est « Rechercher dans toute la maison » ; index.md suit.
+  // Garde levée (front v3, Lot 5) : doc réécrite par écran ; « La vue de travail », « Le détail d'un équipement », « Le
+  // tableau des commandes », « Réglages en attente et Appliquer » et « Les actions de publication » deviennent une seule section
+  // courte « La pièce et la fiche ». Les faits vérifiés restent les mêmes, sous leur nouvelle forme.
   it('section dédiée : ouverture, retour, adresse, arbre, recherche, filtres, détail de pièce, détail d’équipement, tablette', () => {
-    assert.ok(index.includes('\n### La vue de travail\n'));
-    // Garde levée (front v3, Lot 2) : un seul arbre (plus de bascule ni de « Dans les autres pièces »), fil d'Ariane `Maison ›
-    // Niveau › Pièce`, recherche « Rechercher » avec « n résultats », pièce saine « Rien à faire » ; index.md suit.
-    for (const needle of ['**La vue de travail**'.replace(/\*\*/g, '**'), 'Maison › Niveau › Pièce', '« Précédent »', '#j2ha-vue=', '« Rechercher »', '« n résultats »', 'Aucun résultat',
+    assert.ok(index.includes('\n### La pièce et la fiche\n'));
+    for (const needle of ['Maison › Niveau › Pièce', '« Précédent »', '« Rechercher »', '« n résultats »', 'Aucun résultat',
       'À traiter dans cette pièce', 'Rien à faire', 'Republier la pièce', 'Ouvrir les types génériques', '« Pièces »', 'Échap']) {
-      assert.ok(index.includes(needle.replace('**La vue de travail**', 'vue de travail')), needle);
+      assert.ok(index.includes(needle), needle);
     }
-    assert.match(index, /carte de pièce ou sur une ligne de la liste filtrée ouvre la \*\*vue de travail\*\*/);
-    assert.match(index, /La lecture de la configuration|ne lit la configuration \*\*que de cet équipement\*\*/);
-    // Garde levée (front v2, Lot 8, glossaire 3.1) : « page principale » devient « page du plugin » (seul le bouton de retour,
-    // libellé « Page principale » à l'écran, est encore cité sous ce nom).
-    assert.match(index, /partagé\*\* avec la page du plugin/);
-    assert.match(index, new RegExp(`en dessous de ${W.LAYOUT_SPLIT_MIN_WIDTH} pixels`));
+    assert.match(index, /Un clic ouvre \[la pièce\]\(#la-pièce-et-la-fiche\)/);
+    assert.match(index, /pour cet équipement seulement/);
+    assert.match(index, /les mêmes puces que la page maison/);
+    assert.match(index, new RegExp(`En dessous de ${W.LAYOUT_SPLIT_MIN_WIDTH} pixels`));
   });
 
-  it('la liste filtrée et les cartes décrivent l’ouverture de la vue', () => {
-    assert.match(index, /ouvre la \[vue de travail\]\(#la-vue-de-travail\)/);
-    assert.match(index, /ouvre la vue de travail sur la pièce/);
-  });
-
-  it('le détail d’équipement est décrit sous son nouveau titre ; les anciennes sections sont conservées', () => {
-    for (const heading of ['### Le détail d\'un équipement', '### Le tableau des commandes', '### Les causes de blocage', '### Réglages en attente et Appliquer', '### Les actions de publication']) {
+  it('le détail d’équipement est décrit dans sa section ; les sections de référence sont conservées', () => {
+    for (const heading of ['### La pièce et la fiche', '#### Quand un bouton est grisé', '### Les causes de blocage', '### Les conseils']) {
       assert.ok(index.includes('\n' + heading + '\n'), heading);
     }
   });

@@ -136,19 +136,22 @@ describe('25.1 / AC23 — compteurs.md', () => {
 });
 
 describe('25.1 / AC23 — index.md décrit le détail réorganisé (Story 25.4 : dans la vue de travail)', () => {
-  it('contrôle segmenté, menu « ⋯ », encart de cause, « Appliquer » conditionnel', () => {
-    assert.match(index, /« Automatique », « Toujours », « Jamais »/);
-    assert.match(index, /Le menu « ⋯ »/);
-    assert.match(index, /Les encarts de cause/);
-    assert.match(index, /seulement quand l'état est « À appliquer »/);
+  // Garde levée (front v3, Lot 5) : la doc est réécrite par écran, en version courte (« La pièce et la fiche ») ; les phrases
+  // « Les encarts de cause », « Un seul équipement est affiché à la fois », « sans autre barre de défilement » et les titres
+  // « Les badges de synthèse », « Réglages en attente et Appliquer », « Les actions de publication », « Relire Jeedom »
+  // disparaissent avec leurs sections. Les mêmes faits sont vérifiés ci-dessous sous leur nouvelle forme.
+  it('contrôle segmenté, menu « ⋯ », bande de cause, « Appliquer » conditionnel', () => {
+    assert.match(index, /\*\*« Automatique \| Toujours \| Jamais »\*\*/);
+    assert.match(index, /le menu « ⋯ » : « Republier », « Tout remettre en automatique… »/);
+    assert.match(index, /\*\*La bande de cause\*\*, une ligne par cause/);
+    assert.match(index, /\*\*« Appliquer »\*\* quand l'état est « À appliquer »/);
     assert.match(index, /Ouvrir les types génériques/);
-    assert.match(index, /Un seul équipement est affiché à la fois/);
-    assert.match(index, /sans autre barre de défilement dans le détail/);
+    assert.match(index, /L'en-tête\*\*, collé en haut quand vous faites défiler/);
   });
 
   it('les sections renommées existent ; la page principale n’annonce plus de recréation', () => {
-    for (const heading of ['### Les badges de synthèse', '### Les causes de blocage', '### Réglages en attente et Appliquer',
-      '### Les actions de publication', '#### Quand un bouton est grisé', '### Relire Jeedom']) {
+    for (const heading of ['## Glossaire des états', '### Les causes de blocage', '### La pièce et la fiche', '#### Quand un bouton est grisé',
+      '#### Relire Jeedom ou Republier tout ?']) {
       assert.ok(index.includes('\n' + heading + '\n'), heading);
     }
     assert.doesNotMatch(index, /Supprimer puis recréer|puis recréer/);

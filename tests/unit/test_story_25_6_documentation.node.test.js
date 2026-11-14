@@ -13,7 +13,8 @@ const index = read('docs/fr_FR/index.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const desktop = ['desktop/js', 'desktop/php'].flatMap((dir) => fs.readdirSync(path.join(root, dir)).filter((f) => /\.(js|php)$/.test(f)).map((f) => read(path.join(dir, f))))
   .join('\n').replace(/\{\{|\}\}/g, '');
-const section = index.slice(index.indexOf('### La vue de travail'), index.indexOf('**Le détail d\'une pièce**'));
+// Garde levée (front v3, Lot 5) : la section « La vue de travail » devient « La pièce et la fiche » (doc réécrite par écran).
+const section = index.slice(index.indexOf('### La pièce et la fiche'), index.indexOf('**La fiche d\'un équipement**'));
 
 // Garde levée (front v3, Lot 2) : la portée « pièce seule », la bascule « Cette pièce | Toute la maison » et « Page principale »
 // sont supprimées. index.md décrit l'arbre unique, le fil d'Ariane et le sort des anciens liens `seule:1` ; chaque libellé cité

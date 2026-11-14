@@ -125,7 +125,8 @@ describe('Lot 9b — exactitude doc / écran', () => {
   });
 
   it('les deux règles qui piquent sont en tête de leur section', () => {
-    const broker = section(index, '### Connexion au broker MQTT').trim();
+    // Garde levée (front v3, Lot 5) : « Connexion au broker MQTT » devient une sous-section (####) de « Configuration ».
+    const broker = section(index, '#### Connexion au broker MQTT').trim();
     assert.ok(broker.startsWith('> **Une seule installation jeedom2ha par broker MQTT.**'), 'broker');
     const zone = section(index, '### Annexe : pièces dans Home Assistant (zone suggérée)').trim();
     assert.ok(zone.startsWith('> **La zone Home Assistant est fixée à la création de l\'appareil.**'), 'zone');

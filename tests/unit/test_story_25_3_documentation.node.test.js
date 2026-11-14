@@ -27,11 +27,15 @@ describe('25.3 / AC14 — vocabulaire', () => {
 describe('25.3 / AC14 — index.md décrit la nouvelle page principale', () => {
   // Garde levée (front v2, Lot 8, glossaire 3.1) : « barre de santé » devient « Barre d'état » dans la documentation.
   it('barre d’état, actions, menu « ⋯ », bloc maison et filtres, cartes, « Actualiser », « non lu », regroupement par parent', () => {
-    for (const heading of ['### La barre d\'état', '### Les actions de la barre d\'état', '### Le bloc de la maison', '### Les cartes de pièce']) {
+    // Garde levée (front v3, Lot 5) : doc réécrite par écran ; « Les actions de la barre d'état », « Le bloc de la maison » et
+    // « Les cartes de pièce » deviennent « La barre d'état » (actions comprises) et « La page maison et les puces » (tuiles
+    // comprises) ; le liseré remplace le mot « jauge » à l'écran comme dans la doc.
+    for (const heading of ['### La barre d\'état', '### La page maison et les puces', '### À faire']) {
       assert.ok(index.includes(heading), heading);
     }
     assert.match(index, /menu « ⋯ »/);
-    assert.match(index, /Chaque puce \(et chaque segment de la jauge\) est un filtre/);
+    assert.match(index, /Chaque puce \(et chaque segment du liseré\) est un filtre/);
+    assert.match(index, /\*\*Une tuile de pièce\*\*/);
     assert.match(index, /« Actualiser »/);
     assert.match(index, /« non lu »/);
     assert.match(index, /regroupées par objet parent/);
