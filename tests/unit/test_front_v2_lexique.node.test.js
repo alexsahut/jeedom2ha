@@ -68,8 +68,13 @@ describe('Lot 2 — une fiche pour chaque cause', () => {
 
     const mismatch = L.causeSheet('name_heuristic_rejection', { name_word: 'lampe', type_word: 'prise' });
     assert.equal(mismatch.quoi, 'Non publié : le nom dit « lampe », les types Jeedom disent « prise ».');
-    assert.equal(mismatch.pourquoi, 'Le plugin ne tranche pas à votre place.');
-    assert.deepEqual(mismatch.actions.map((a) => a.key), ['correct_type', 'generic_types']);
+    // Garde levée (front v2, Lot 9a, regard neuf v2) : « Le plugin ne tranche pas à votre place » contredisait le réglage
+    // « En cas de doute : Publier quand même » ; la fiche dit maintenant que c'est une contradiction, non publiée même ainsi.
+    assert.equal(mismatch.pourquoi, 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute sur un équipement » de la configuration ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.');
+    assert.equal(L.causeSheet('name_type_mismatch', { name_word: 'lampe', type_word: 'prise' }).pourquoi, 'Le plugin ne tranche pas à votre place.', 'conseil (équipement publié) inchangé');
+    // Garde levée (front v2, Lot 9a, point 9) : « Corriger le type… » ne lève pas ce blocage (le démon garde la confiance
+    // « ambiguë » quand le type change) : « Publier quand même » (réglage « Toujours ») et « Renommer… » à la place.
+    assert.deepEqual(mismatch.actions.map((a) => a.key), ['publish_anyway', 'rename']);
     // Sans les deux mots, la phrase générale (jamais un mot deviné).
     assert.match(L.causeSheet('name_heuristic_rejection', {}).quoi, /ne disent pas la même chose/);
     assert.deepEqual(L.causeSheet('name_type_mismatch', { name_word: 'lampe', type_word: 'prise' }).quoi, mismatch.quoi);

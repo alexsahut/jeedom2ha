@@ -20,6 +20,10 @@
     correct_type: 'Corriger le type…',
     plugin_config: 'Ouvrir la configuration du plugin',
     republish: 'Republier',
+    // Front v2 (Lot 9a, point 9) : un blocage par CONFIANCE (le plugin hésite, ou le nom contredit les types) ne se lève pas
+    // en changeant le type (la confiance est gardée par le démon) : seul le réglage « Toujours » de l'équipement le lève.
+    publish_anyway: 'Publier quand même',
+    rename: 'Renommer l’équipement dans Jeedom, puis Relire Jeedom',
   };
 
   function action(key) {
@@ -45,6 +49,31 @@
   var GENERIC_TYPES_HELP = 'C’est la voie durable : elle sert aussi aux autres plugins.';
   var RELOAD_HELP = 'Une fois la correction faite dans Jeedom, cliquez sur Relire Jeedom.';
 
+  // Front v2 (Lot 9a, point 9) : ce que fait « Publier quand même » (réglage « Toujours » de l'équipement, puis « Appliquer »).
+  var PUBLISH_ANYWAY_HELP = 'Cliquez sur « Publier quand même » : l’équipement passe sur « Toujours » et sera publié avec le type '
+    + 'que lui donnent ses types génériques, après « Appliquer ».';
+
+  // Codes dont le blocage se lève par « Publier quand même » (réglage « Toujours ») et non en changeant le type.
+  var PUBLISH_ANYWAY_CODES = ['ambiguous_skipped', 'name_heuristic_rejection', 'switch_state_orphan', 'probable_skipped', 'low_confidence'];
+
+  // Front v2 (Lot 9a) : phrase qui lève la contradiction apparente avec le réglage « En cas de doute : Publier quand même ».
+  var NAME_CONTRADICTION_SENTENCE = 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute sur un équipement » '
+    + 'de la configuration ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.';
+
+  // Gabarit commun du blocage par le nom (cause) et du conseil « le nom dit… » (équipement publié).
+  function nameTypeSheet(context) {
+    var c = context || {};
+    var quoi = c.name_word && c.type_word
+      ? 'Non publié : le nom dit ' + quoted(c.name_word) + ', les types Jeedom disent ' + quoted(c.type_word) + '.'
+      : 'Non publié : le nom de l’équipement et ses types Jeedom ne disent pas la même chose.';
+    return {
+      quoi: quoi,
+      pourquoi: 'Le plugin ne tranche pas à votre place.',
+      actions: ['correct_type', 'generic_types'],
+      aide: 'Choisissez le type voulu, ou corrigez les types génériques dans Jeedom.',
+    };
+  }
+
   // --- Fiches des causes (codes de REASON_LABELS, raisons sans libellé, conseils) ---
   // Chaque entrée : function (context) → { quoi, pourquoi, actions: [clé…], aide }.
   // `context` (facultatif) : { count, name_word, type_word, plugin_name }.
@@ -54,22 +83,20 @@
       return {
         quoi: 'Non publié : le plugin hésite sur le type de cet équipement.',
         pourquoi: 'Les types génériques de ses commandes peuvent correspondre à plusieurs types Home Assistant. '
-          + 'Le plugin ne tranche pas à votre place.',
-        actions: ['correct_type', 'generic_types'],
-        aide: 'Précisez les types génériques dans Jeedom, ou choisissez le type ici.',
+          + 'Le plugin ne tranche pas à votre place : le réglage de la configuration « En cas de doute » ne s’applique pas à ce cas.',
+        actions: ['publish_anyway', 'generic_types'],
+        aide: PUBLISH_ANYWAY_HELP + ' Ou précisez les types génériques dans Jeedom, puis cliquez sur Relire Jeedom.',
       };
     },
     name_heuristic_rejection: function (context) {
-      var c = context || {};
-      var quoi = c.name_word && c.type_word
-        ? 'Non publié : le nom dit ' + quoted(c.name_word) + ', les types Jeedom disent ' + quoted(c.type_word) + '.'
-        : 'Non publié : le nom de l’équipement et ses types Jeedom ne disent pas la même chose.';
-      return {
-        quoi: quoi,
-        pourquoi: 'Le plugin ne tranche pas à votre place.',
-        actions: ['correct_type', 'generic_types'],
-        aide: 'Choisissez le type voulu, ou corrigez les types génériques dans Jeedom.',
-      };
+      var sheet = nameTypeSheet(context);
+      // Front v2 (Lot 9a, regard neuf v2) : la configuration annonce « En cas de doute : Publier quand même » ; ce cas n'est
+      // pas un doute mais une contradiction, que ce réglage ne publie pas. Une phrase, puis quoi faire.
+      sheet.pourquoi = NAME_CONTRADICTION_SENTENCE;
+      // Point 9 : « Corriger le type… » ne lève pas ce blocage (la contradiction reste) : il n'est plus proposé ici.
+      sheet.actions = ['publish_anyway', 'rename'];
+      sheet.aide = PUBLISH_ANYWAY_HELP + ' Ou retirez ce mot du nom de l’équipement dans Jeedom, puis cliquez sur Relire Jeedom.';
+      return sheet;
     },
     duplicate_generic_types: function () {
       return {
@@ -91,24 +118,24 @@
       return {
         quoi: 'Non publié : un état existe, mais aucun ordre On / Off.',
         pourquoi: 'Sans ordre, il n’y a rien à piloter. Il peut être publié en lecture seule.',
-        actions: ['correct_type', 'equipment'],
-        aide: 'Choisissez « Capteur binaire (binary_sensor) » comme type, ou ajoutez les ordres dans Jeedom.',
+        actions: ['correct_type', 'publish_anyway', 'equipment'],
+        aide: 'Choisissez « Capteur binaire (binary_sensor) » comme type, puis « Publier quand même » ; ou ajoutez les ordres dans Jeedom.',
       };
     },
     probable_skipped: function () {
       return {
         quoi: 'Non publié : le plugin n’est pas assez sûr du type.',
         pourquoi: 'La configuration du plugin ne publie que les types sûrs.',
-        actions: ['correct_type', 'plugin_config'],
-        aide: 'Choisissez le type ici, ou acceptez les types probables dans la configuration du plugin.',
+        actions: ['publish_anyway', 'plugin_config'],
+        aide: PUBLISH_ANYWAY_HELP + ' Ou choisissez « Publier quand même (recommandé) » sous « En cas de doute sur un équipement » dans la configuration du plugin.',
       };
     },
     low_confidence: function () {
       return {
         quoi: 'Non publié : le plugin n’est pas assez sûr du type.',
         pourquoi: 'La confiance obtenue est inférieure à celle demandée par la configuration du plugin.',
-        actions: ['correct_type', 'plugin_config'],
-        aide: 'Choisissez le type ici, ou précisez les types génériques dans Jeedom.',
+        actions: ['publish_anyway', 'plugin_config'],
+        aide: PUBLISH_ANYWAY_HELP + ' Ou précisez les types génériques dans Jeedom.',
       };
     },
     no_generic_type_configured: function () {
@@ -326,7 +353,7 @@
       };
     },
     name_type_mismatch: function (context) {
-      return SHEETS.name_heuristic_rejection(context);
+      return nameTypeSheet(context);
     },
   };
 
@@ -359,6 +386,57 @@
       actions: sheet.actions.map(action),
       aide: sheet.aide || '',
     };
+  }
+
+  /**
+   * Front v2 (Lot 9a, point 8) : mots techniques encore présents dans des libellés figés (`REASON_LABELS`) ou dans des textes
+   * du démon (intouchable). Traduits AU MOMENT DE L'AFFICHAGE ; le texte d'origine reste disponible (« Détails techniques »).
+   * Chaque entrée : [texte cherché, texte affiché] ; ordre = priorité (le plus long d'abord).
+   */
+  var USER_WORDS = [
+    ['confiance « probable » exclue par la politique « sûr uniquement »',
+      'reconnu avec un léger doute, non publié avec le réglage « Ne publier que les équipements reconnus avec certitude »'],
+    ['politique « sûr uniquement »', 'réglage « Ne publier que les équipements reconnus avec certitude »'],
+    ['type non couvert par la V1 du plugin', 'type pas encore pris en charge par le plugin'],
+    ['dans la V1 du plugin', 'dans cette version du plugin'],
+    ['la V1 du plugin', 'cette version du plugin'],
+    ['échec de publication MQTT au dernier sync', 'échec de la publication MQTT à la dernière relecture'],
+    ['lors du dernier sync', 'lors de la dernière relecture'],
+    ['au dernier sync', 'à la dernière relecture'],
+    ['Parc global', 'Toute la maison'],
+    // Raisons de `publicationActionState` (jeedom2ha_mapping_override.js, ajouts seuls : texte d'origine gardé à la source).
+    ['Aucune commande clé propre à cette entité.', 'Cette entité ne se règle pas seule : réglez l’équipement entier.'],
+    ['Projection invalide pour ce type HA.', 'Ce type Home Assistant est invalide pour cette entité.'],
+  ];
+
+  /** Texte affichable : mots techniques remplacés (voir USER_WORDS) ; un texte sans ces mots est rendu tel quel. */
+  function userWords(text) {
+    if (typeof text !== 'string' || text === '') return typeof text === 'string' ? text : '';
+    var out = text;
+    USER_WORDS.forEach(function (pair) {
+      if (out.indexOf(pair[0]) !== -1) out = out.split(pair[0]).join(pair[1]);
+    });
+    return out;
+  }
+
+  /**
+   * Front v2 (Lot 9a, regard neuf v2) : ligne « N commandes bloquées : … » d'un groupe de `groupBlockedCauses`, enrichie
+   * quand la cause nomme un mot et un type connus. Les libellés figés de `REASON_LABELS` ne sont pas modifiés : seul le
+   * rendu change. `context` : { matched_keyword, ha_entity_type } (lus dans l'arbre du démon, voir
+   * `Jeedom2haHaSide.rejectionContext`) ; sans eux, le libellé du groupe tel quel.
+   */
+  function causeLine(group, context) {
+    var g = group || {};
+    var n = typeof g.count === 'number' && g.count > 0 ? Math.floor(g.count) : 0;
+    var label = typeof g.label === 'string' ? g.label : '';
+    var c = context || {};
+    if (g.code === 'name_heuristic_rejection' && typeof c.matched_keyword === 'string' && c.matched_keyword
+      && typeof c.ha_entity_type === 'string' && c.ha_entity_type) {
+      label = 'le mot ' + quoted(c.matched_keyword) + ' du nom écarte le type ' + haTypeLabel(c.ha_entity_type);
+    } else {
+      label = userWords(label);
+    }
+    return n + ' ' + plural(n, 'commande bloquée', 'commandes bloquées') + ' : ' + label;
   }
 
   function knownCodes() {
@@ -532,6 +610,11 @@
     GENERIC_TYPE_LABELS: GENERIC_TYPE_LABELS,
     HA_TYPE_LABELS: HA_TYPE_LABELS,
     causeSheet: causeSheet,
+    causeLine: causeLine,
+    PUBLISH_ANYWAY_CODES: PUBLISH_ANYWAY_CODES.slice(),
+    canPublishAnyway: function (code) { return PUBLISH_ANYWAY_CODES.indexOf(code) !== -1; },
+    userWords: userWords,
+    USER_WORDS: USER_WORDS,
     knownCodes: knownCodes,
     isHintCode: isHintCode,
     genericTypeLabel: genericTypeLabel,

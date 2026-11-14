@@ -487,7 +487,8 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
     assert.equal(options.buttons.cancel.className, 'btn-default');
-    for (const word of ['Attention', 'historique', 'dashboards', 'automatisations', 'entity_id']) {
+    // Garde levée (front v2, Lot 9a, point 8) : « dashboards » → « tableaux de bord », « entity_id » → « identifiant » (glossaire 3.1).
+    for (const word of ['Attention', 'historique', 'tableaux de bord', 'automatisations', 'identifiant']) {
       assert.ok(options.message.includes(word), word);
     }
   });

@@ -220,7 +220,9 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
   });
 
   // Front v2 (Lot 5) : « Corriger le type… » ouvre désormais le panneau E5 (plus le sélecteur de la cellule).
-  it('4. lampe typée prise : « Bloqué », fiche « le nom dit « lampe »… », « Corriger le type… » ouvre le panneau', () => {
+  // Garde levée (front v2, Lot 9a, point 9) : pour ce blocage par le nom, la fiche propose « Publier quand même » et
+  // « Renommer l’équipement dans Jeedom, puis Relire Jeedom » ; le panneau de type reste ouvrable par la colonne « Type HA ».
+  it('4. lampe typée prise : « Bloqué », fiche « le nom dit « lampe »… », « Publier quand même », panneau par la colonne', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.lampePrise(withDaemon));
       assert.equal(text('.j2ha-eq-publish-badge'), 'Bloqué', label);
@@ -229,7 +231,11 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
       assert.match(text('.j2ha-eq-notices'), /Non publié : le nom dit « lampe », les types Jeedom disent « prise »\./, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice').text(), '', label + ' : le conseil « nom ≠ type » n’est pas répété');
       assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 0);
-      ui.click(P + '.j2ha-v2-correct-type');
+      assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-correct-type').length, 0, label + ' : « Corriger le type… » ne débloquerait pas');
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway').text()), 'Publier quand même', label);
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').text()), 'Renommer l’équipement dans Jeedom, puis Relire Jeedom', label);
+      assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=231', label);
+      ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
       assert.equal(ui.$(P + 'tr[data-type-panel-for="2311"] .j2ha-v2-type-panel').length, 1, label + ' : le panneau est ouvert sous la première commande');
       assert.ok(ui.calls.every((c) => ['getBridgeStatus', 'getEquipmentStates', 'getMappingOverrides'].includes(c.action)), 'rien n’est écrit');
     }
