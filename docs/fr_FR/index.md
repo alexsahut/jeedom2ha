@@ -197,7 +197,7 @@ Ce fichier est un outil d'assistance. Pour comprendre l'état d'un équipement, 
 
 ## La configuration par pièce
 
-Sous la barre de santé, la section **« Configuration Home Assistant par pièce »** commence par une ligne d'aide discrète, avec un lien **« Aide »** vers cette documentation. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin.
+Sous la barre de santé, la section **« Ce que Jeedom publie dans Home Assistant »** commence par la phrase d'accueil et une ligne d'aide discrète, avec un lien **« Aide »** vers cette documentation. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin.
 
 ### Le bloc de la maison
 

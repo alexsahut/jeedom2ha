@@ -815,13 +815,8 @@
       $host.append($toggle).append($list);
     }
 
-    // --- Front v2 (Lot 7) : titre et phrase d'accueil (E2). Le balisage reste celui de la page PHP ; seul le texte change. ---
+    // --- Front v2 (Lot 7) : phrase d'accueil (E2) ; le titre « Ce que Jeedom publie dans Home Assistant » est dans la page PHP. ---
     function renderWelcome() {
-      var $legend = $('#j2ha_mainView legend').first();
-      if ($legend.length && !$legend.hasClass('j2ha-v2-title')) {
-        $legend.addClass('j2ha-v2-title').empty().append($('<i class="fas fa-home" aria-hidden="true"></i>'))
-          .append(document_text(' ' + w('Ce que Jeedom publie dans Home Assistant')));
-      }
       // Phrase d'accueil en tête de la ligne d'aide (bloc à part, texte normal ; la consigne et le lien « Aide » suivent).
       var $help = $('#j2ha_mainView .j2ha-help-line').first();
       if ($help.length && $('#j2ha_mainView .j2ha-v2-welcome').length === 0) {

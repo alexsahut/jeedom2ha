@@ -235,7 +235,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<div id="j2ha_v2_guide" class="j2ha-v2-guide"></div>
 		<div id="j2ha_v2_toast" class="j2ha-v2-toast" role="status" aria-live="polite"></div>
 		<div id="j2ha_mainView">
-		<legend><i class="fas fa-home"></i> {{Configuration Home Assistant par pièce}}</legend>
+		<legend><i class="fas fa-home"></i> {{Ce que Jeedom publie dans Home Assistant}}</legend>
 		<div class="j2ha-v2-choose">
 			<button type="button" id="bt_j2haChoosePublished" class="btn btn-default btn-sm" hidden>
 				<i class="fas fa-check-square"></i> {{Choisir ce qui est publié…}}
@@ -395,7 +395,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 
 			<!-- Story 16.8 — L'onglet override par commande (16.5) est retiré : point d'entrée
 			     inatteignable (0 eqLogic jeedom2ha). Le triptyque + diagnostic vivent désormais
-			     dans la surface « Configuration Home Assistant par pièce » (vue de travail maître-détail). -->
+			     dans la surface « Ce que Jeedom publie dans Home Assistant » (vue de travail maître-détail). -->
 
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
