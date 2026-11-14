@@ -1278,29 +1278,48 @@
     });
   }
 
+  // Choix possibles en boutons radio (« Automatique » et le choix courant toujours visibles) ; types refusés par le démon
+  // repliés sous une seule ligne dépliable, noms seulement (la raison est la même pour tous : dite une fois).
+  var refusedSeq = 0;
   function buildTypeChoices(tp, state, choices) {
     var $fieldset = $('<fieldset class="j2ha-v2-type-choices"></fieldset>');
     $fieldset.append($('<legend class="j2ha-v2-type-legend"></legend>').text('{{Dans Home Assistant, cette commande est :}}'));
     var name = 'j2haType_' + state.seq;
     state.enabledInputs = [];
+    var refused = [];
     choices.forEach(function (choice) {
+      if (choice.disabled) {
+        refused.push(choice);
+        return;
+      }
       var $label = $('<label class="j2ha-v2-radio"></label>');
       var $input = $('<input type="radio">').attr('name', name).attr('value', choice.value)
         .attr('data-type', choice.value === '' ? 'auto' : choice.value);
       if (choice.checked) $input.prop('checked', true);
-      if (choice.disabled) {
-        $input.prop('disabled', true);
-        $label.addClass('is-disabled');
-      } else {
-        state.enabledInputs.push($input);
-      }
+      state.enabledInputs.push($input);
       var $text = $('<span class="j2ha-v2-type-choice"></span>').text(choice.value === '' ? '{{Automatique}}' : choice.label);
       if (choice.hint) $text.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text(' — ' + choice.hint));
-      if (choice.reason) $text.append($('<span class="j2ha-v2-small"></span>').text(' — ' + choice.reason));
       $input.on('change', function () { chooseType(tp, state, choice.value); });
       $label.append($input).append($text);
       $fieldset.append($label);
     });
+    if (refused.length > 0) {
+      refusedSeq += 1;
+      var listId = 'j2haTypeRefused_' + refusedSeq;
+      var $list = $('<ul class="j2ha-v2-type-refused-list j2ha-v2-small j2ha-v2-muted"></ul>').attr('id', listId).hide();
+      refused.forEach(function (choice) {
+        $list.append($('<li></li>').attr('data-type', choice.value).text(choice.label));
+      });
+      var $toggle = $('<button type="button" class="j2ha-v2-type-refused-toggle j2ha-v2-small" aria-expanded="false"></button>')
+        .attr('aria-controls', listId).text('{{Autres types, non proposés pour cette commande}} (' + refused.length + ') ▸');
+      $toggle.on('click', function () {
+        var open = $toggle.attr('aria-expanded') === 'true';
+        $toggle.attr('aria-expanded', open ? 'false' : 'true')
+          .text('{{Autres types, non proposés pour cette commande}} (' + refused.length + ') ' + (open ? '▸' : '▾'));
+        if (open) $list.hide(); else $list.show();
+      });
+      $fieldset.append($('<div class="j2ha-v2-type-refused"></div>').append($toggle).append($list));
+    }
     return $fieldset;
   }
 

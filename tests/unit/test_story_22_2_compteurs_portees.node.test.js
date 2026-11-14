@@ -415,10 +415,10 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     t.commands[1].override_types_allowed = FULL.slice();
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
     assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
-    // Les types refusés restent visibles, grisés avec leur raison (spec E5) : jamais proposés.
-    const greyed = panelInputs(ui, 100).filter((o) => o.props.disabled === true).map((o) => o.attrs.value);
-    assert.ok(greyed.includes('sensor') && greyed.includes('binary_sensor'));
-    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-radio.is-disabled').text(), /non proposé par le plugin pour cette commande/);
+    // Les types refusés restent visibles, repliés sous « Autres types, non proposés pour cette commande » : jamais proposés.
+    const refused = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-list li').list.map((li) => li.attrs['data-type']);
+    assert.ok(refused.includes('sensor') && refused.includes('binary_sensor'));
+    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /non proposés pour cette commande/);
     assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

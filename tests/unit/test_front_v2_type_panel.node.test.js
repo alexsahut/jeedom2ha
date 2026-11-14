@@ -199,7 +199,21 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     assert.match(plain(box.text()), /Le plus durable est de corriger les types génériques dans Jeedom/);
     const offered = box.find('input').list.filter((i) => i.props.disabled !== true).map((i) => i.attrs['data-type']);
     assert.deepEqual(offered, ['auto', 'light', 'switch']);
-    assert.match(plain(box.find('.j2ha-v2-radio.is-disabled').text()), /Bouton \(button\) — non proposé par le plugin pour cette commande/);
+    // Types refusés : repliés sous une ligne unique, noms seulement (revue du Lot 5).
+    const toggle = box.find('.j2ha-v2-type-refused-toggle');
+    assert.equal(plain(toggle.text()), 'Autres types, non proposés pour cette commande (8) ▸');
+    assert.equal(toggle.attr('aria-expanded'), 'false');
+    const list = box.find('.j2ha-v2-type-refused-list');
+    assert.equal(list.list[0].visible, false, 'replié par défaut');
+    assert.equal(box.find('input[data-type="button"]').length, 0, 'un type refusé n’est pas un choix');
+    ui.click(`${panel(2311)}.j2ha-v2-type-refused-toggle`);
+    assert.equal(toggle.attr('aria-expanded'), 'true');
+    assert.equal(list.list[0].visible, true);
+    assert.equal(plain(toggle.text()), 'Autres types, non proposés pour cette commande (8) ▾');
+    assert.deepEqual(list.find('li').list.map((li) => plain(ui.$(li).text())), [
+      'Alarme (alarm_control_panel)', 'Capteur binaire (binary_sensor)', 'Bouton (button)', 'Thermostat (climate)',
+      'Volet (cover)', 'Serrure (lock)', 'Capteur (sensor)', 'Vanne (valve)']);
+    assert.equal((plain(box.text()).match(/non proposé/g) || []).length, 1, 'la phrase n’est dite qu’une fois');
     assert.doesNotMatch(plain(box.text()), /il faut une commande d’état|impossible :/, 'aucune raison devinée');
     assert.equal(ui.$(`${panel(2311)}.j2ha-v2-type-save`).prop('disabled'), true);
 
@@ -379,7 +393,7 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     for (const type of ['auto', 'light', 'switch']) assert.equal(ui.$(`${panel(2311)}input[data-type="${type}"]`).prop('disabled'), true, type);
     ui.fail('saveMappingOverride');
     for (const type of ['auto', 'light', 'switch']) assert.equal(ui.$(`${panel(2311)}input[data-type="${type}"]`).prop('disabled'), false, type);
-    assert.equal(ui.$(`${panel(2311)}input[data-type="button"]`).prop('disabled'), true, 'un type refusé reste grisé');
+    assert.equal(ui.$(`${panel(2311)}input[data-type="button"]`).length, 0, 'un type refusé n’est jamais un choix');
     ui.click(`${panel(2311)}.j2ha-v2-type-save`);
     assert.equal(ui.pending('saveMappingOverride')[0].data.haEntityType, 'light');
     done();
@@ -458,12 +472,27 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     done();
   });
 
-  it('acceptation 3 : sur une commande d’état, « Bouton (button) » refusé par le démon est grisé, avec la seule raison connue', () => {
+  it('acceptation 3 : sur une commande d’état, « Bouton (button) » refusé par le démon est listé sous « Autres types, non proposés… »', () => {
     const { ui, P, panel, done } = openFiche(lampe());
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
-    const input = ui.$(`${panel(2311)}input[data-type="button"]`);
-    assert.equal(input.prop('disabled'), true);
-    assert.match(plain(input.closest('.j2ha-v2-radio').text()), /— non proposé par le plugin pour cette commande/);
+    assert.equal(ui.$(`${panel(2311)}input[data-type="button"]`).length, 0);
+    assert.equal(plain(ui.$(`${panel(2311)}.j2ha-v2-type-refused-list li[data-type="button"]`).text()), 'Bouton (button)');
+    done();
+  });
+
+  it('choix courant toujours visible, même s’il n’est plus annoncé ; aucun type refusé : pas de ligne repliée', () => {
+    const t = lampe(['switch']);
+    Object.assign(t.commands[0], { override_applied: true, effective_ha: 'light' });
+    const { ui, P, panel, done } = openFiche(t);
+    ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
+    assert.equal(ui.$(`${panel(2311)}input[data-type="light"]`).prop('checked'), true);
+    assert.equal(ui.$(`${panel(2311)}input[data-type="auto"]`).length, 1);
+    assert.match(plain(ui.$(`${panel(2311)}.j2ha-v2-type-refused-toggle`).text()), /\(8\)/);
+    ui.win.Jeedom2haSurface.clearEquipment();
+    const full = openFiche(DEMO.lampePrise(true));
+    full.ui.click(`${full.P}tr[data-cmd-id="2311"] .j2ha-type-link`);
+    assert.equal(full.ui.$(`${full.panel(2311)}.j2ha-v2-type-refused`).length, 0, 'démon sans liste : tout est proposé');
+    full.done();
     done();
   });
 
@@ -575,8 +604,12 @@ describe('Lot 5 — vrai navigateur', () => {
           await page.locator(`${P} tr[data-cmd-id="2311"] .j2ha-type-link`).click();
           const box = page.locator(`${P} tr.j2ha-v2-type-row[data-type-panel-for="2311"] .j2ha-v2-type-panel`);
           await box.waitFor({ state: 'visible' });
-          assert.equal(await box.locator('input[data-type="button"]').isDisabled(), true);
           assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-type')), 'auto', 'focus sur le choix actuel');
+          assert.equal(await box.locator('input[data-type="button"]').count(), 0);
+          assert.equal(await box.locator('.j2ha-v2-type-refused-list').isVisible(), false);
+          await box.locator('.j2ha-v2-type-refused-toggle').click();
+          assert.equal(await box.locator('.j2ha-v2-type-refused-list').isVisible(), true);
+          await box.locator('.j2ha-v2-type-refused-toggle').click();
           await box.locator('input[data-type="light"]').check();
           await box.locator('.j2ha-v2-diff').waitFor({ state: 'visible' });
           await page.waitForFunction(() => !document.querySelector('.j2ha-v2-type-save').disabled);
