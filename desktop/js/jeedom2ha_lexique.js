@@ -57,8 +57,9 @@
   var PUBLISH_ANYWAY_CODES = ['ambiguous_skipped', 'name_heuristic_rejection', 'switch_state_orphan', 'probable_skipped', 'low_confidence'];
 
   // Front v2 (Lot 9a) : phrase qui lève la contradiction apparente avec le réglage « En cas de doute : Publier quand même ».
-  var NAME_CONTRADICTION_SENTENCE = 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute sur un équipement » '
-    + 'de la configuration ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.';
+  // Front v3 (Lot 3) : le réglage « En cas de doute » est dans le panneau « Choisir ce qui est publié », plus dans la configuration.
+  var NAME_CONTRADICTION_SENTENCE = 'Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute » '
+    + 'ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même.';
 
   // Gabarit commun du blocage par le nom (cause) et du conseil « le nom dit… » (équipement publié).
   function nameTypeSheet(context) {
@@ -125,15 +126,15 @@
     probable_skipped: function () {
       return {
         quoi: 'Non publié : le plugin n’est pas assez sûr du type.',
-        pourquoi: 'La configuration du plugin ne publie que les types sûrs.',
+        pourquoi: 'Le réglage « En cas de doute » est sur « Ne pas publier ».',
         actions: ['publish_anyway', 'plugin_config'],
-        aide: PUBLISH_ANYWAY_HELP + ' Ou choisissez « Publier quand même (recommandé) » sous « En cas de doute sur un équipement » dans la configuration du plugin.',
+        aide: PUBLISH_ANYWAY_HELP + ' Ou choisissez « Publier » sous « En cas de doute », dans « Choisir ce qui est publié ».',
       };
     },
     low_confidence: function () {
       return {
         quoi: 'Non publié : le plugin n’est pas assez sûr du type.',
-        pourquoi: 'La confiance obtenue est inférieure à celle demandée par la configuration du plugin.',
+        pourquoi: 'La confiance obtenue est inférieure à celle demandée par le réglage « En cas de doute ».',
         actions: ['publish_anyway', 'plugin_config'],
         aide: PUBLISH_ANYWAY_HELP + ' Ou précisez les types génériques dans Jeedom.',
       };
@@ -267,7 +268,7 @@
         quoi: 'Exclu par son plugin' + name + '.',
         pourquoi: 'Les équipements de ce plugin ne sont pas publiés dans Home Assistant.',
         actions: ['plugin_config'],
-        aide: 'Retirez ce plugin de « Plugins exclus » dans la configuration du plugin.',
+        aide: 'Recochez ce plugin dans « Choisir ce qui est publié » (Par plugin).',
       };
     },
     excluded_object: function () {

@@ -468,7 +468,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background: rgb(var(--bg-color, var(--j2ha-page-rgb)));
+  background: var(--j2ha-menu-bg);
   opacity: 0.8;
 }
 .j2ha-v3-type-dialog { position: relative; width: 100%; max-width: 640px; }
@@ -488,6 +488,30 @@
 .j2ha-v3-excl-doubt-label { font-weight: 600; }
 .j2ha-v2-excl .j2ha-v2-excl-count { font-variant-numeric: tabular-nums; cursor: help; }
 .j2ha-v3-excl-off { cursor: help; white-space: nowrap; }
+/* Guide : une ligne par étape (pastille, titre, état, action, ⓘ). */
+.j2ha-v2-step.j2ha-v3-step-line {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.j2ha-v3-step-line .j2ha-v2-step-num { width: 24px; height: 24px; font-size: 13px; }
+.j2ha-v3-step-line .j2ha-v2-step-title { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.j2ha-v3-step-line .j2ha-v2-acts { margin-top: 0; justify-content: flex-end; }
+.j2ha-v3-step-line .j2ha-v2-guide-causes { margin: 4px 0 0; }
+.j2ha-v3-step-cause { font-weight: 400; color: var(--j2ha-warn); margin: 0; }
+.j2ha-v3-step-note { font-weight: 400; }
+.j2ha-v2-step.is-wait[title] { cursor: help; }
+@media (max-width: 767px) {
+  .j2ha-v2-step.j2ha-v3-step-line { grid-template-columns: 28px minmax(0, 1fr); }
+  .j2ha-v3-step-line .j2ha-v2-acts { grid-column: 2; justify-content: flex-start; }
+}
+/* « Vérifier l'installation » : un style par rôle (boutons d'action par défaut, liens soulignés). */
+.j2ha-v2-checkbox .j2ha-v2-check-ask { margin-top: 4px; }
+.j2ha-v2-checkbox .j2ha-v3-check-detail { font-weight: 400; }
+.j2ha-v2-checkbox .j2ha-v2-check.is-wait[title] { cursor: help; }
+.j2ha-v2-checkbox .j2ha-v2-check-advanced { background: transparent; border: 0; }
+.j2ha-v3-check-logs-head { margin-top: 8px; }
 
 /* Lot 7 — Maison et pièce : phrase d'accueil, aide des puces, bloc « À faire », légende, bascule de portée, recherche groupée. */
 .j2ha-v2-welcome { display: block; margin: 4px 0 2px; color: var(--txt-color, var(--j2ha-text)); }

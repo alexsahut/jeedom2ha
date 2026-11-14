@@ -340,7 +340,10 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     assert.equal(steps.length, 4);
     assert.ok(steps[0].classes.has('is-blocked'));
     assert.ok(steps.slice(1).every((s) => s.classes.has('is-wait')));
-    assert.match(ui.text('#j2ha_v2_guide'), /Terminez l'étape 1 d'abord/);
+    // Garde levée (front v3, Lot 3) : « Terminez l'étape 1 d'abord. » n'est plus une phrase affichée : c'est l'info-bulle de
+    // chaque ligne grisée ; aucune phrase permanente sur les étapes.
+    assert.doesNotMatch(ui.text('#j2ha_v2_guide'), /Terminez l'étape|Le même broker que celui|rouvrable par/);
+    assert.ok(steps.slice(1).every((s) => plain(s.attrs.title || '') === "Terminez l'étape 1 d'abord."));
     ui.click('#j2ha_v2_guide .j2ha-v2-btn-primary');
     assert.deepEqual(ui.actions.calls, ['config']);
   });
@@ -372,8 +375,11 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     assert.equal(ui.storage.data[G.STORAGE_KEYS.known], view.counts.published > 0 ? '1' : undefined);
     const text = ui.text('#j2ha_v2_guide');
     assert.match(text, new RegExp(`C'est fait : ${view.counts.published} équipements sont dans Home Assistant\\.`));
-    assert.match(text, /Paramètres › Appareils et services › MQTT/);
-    assert.match(text, /Par exemple : « [^»]+ », « [^»]+ », « [^»]+ »\./);
+    // Garde levée (front v3, Lot 3) : « où les trouver » et les exemples passent dans l'info-bulle ⓘ de la ligne de fin.
+    assert.doesNotMatch(text, /Paramètres › Appareils et services › MQTT/);
+    const tip = plain(ui.$('#j2ha_v2_guide .j2ha-v3-done-info').attr('title'));
+    assert.match(tip, /Paramètres › Appareils et services › MQTT/);
+    assert.match(tip, /Par exemple : « [^»]+ », « [^»]+ », « [^»]+ »\./);
     if (view.counts.blocked > 0) {
       ui.click('#j2ha_v2_guide .j2ha-v2-guide-blocked');
       assert.equal(ui.actions.calls[ui.actions.calls.length - 1], 'filter:blocked');
@@ -545,7 +551,8 @@ describe('Lot 9a — « Je l’ai vu » mémorisé, causes repliées, guide rouv
     ui.guide.onStatus(NOT_SEEN);
     const res = ui.guide.openCheck();
     const modal = ui.$(ui.dom.dialogs[0].modal);
-    assert.match(plain(modal.find('.j2ha-v2-check-intro').text()), /s'arrêtent au premier point « À corriger »/);
+    // Garde levée (front v3, Lot 3) : plus de phrase d'introduction ; [Vu] / [Pas vu] remplacent « Je l'ai vu » et le lien.
+    assert.equal(modal.find('.j2ha-v2-check-intro').length, 0);
     const row = () => modal.find('.j2ha-v2-check[data-check="ha"]');
     assert.equal(plain(row().find('.j2ha-v2-lbl').text()), 'À vérifier');
     assert.equal(res.checks.filter((c) => c.key === 'ha')[0].state, 'warn');
@@ -553,7 +560,10 @@ describe('Lot 9a — « Je l’ai vu » mémorisé, causes repliées, guide rouv
     assert.equal(causes.find('li').length, 3);
     assert.equal(causes.list[0].visible, false, 'les trois causes ne sont pas montrées d’office');
     const help = row().find('.j2ha-v2-check-hahelp');
-    assert.equal(plain(help.text()), 'Je ne vois pas l\'appareil dans Home Assistant');
+    assert.equal(plain(help.text()), 'Pas vu');
+    assert.equal(plain(help.attr('title')), 'Je ne vois pas l\'appareil dans Home Assistant');
+    assert.equal(plain(row().find('.j2ha-v2-check-haseen').text()), 'Vu');
+    assert.ok(help.hasClass('btn-default') && row().find('.j2ha-v2-check-haseen').hasClass('btn-default'), 'un seul style pour la paire');
     help.list[0].handlers.click.call(help.list[0], { preventDefault() {} });
     assert.equal(help.attr('aria-expanded'), 'true');
     assert.equal(causes.list[0].visible, true);

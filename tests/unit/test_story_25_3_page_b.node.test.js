@@ -114,7 +114,9 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     const modal = ui.$(dialog.modal);
     assert.equal(modal.find('#cb_pseudonymize').length, 1, 'la case « Pseudonymiser »');
     assert.equal(modal.find('#bt_exportDiagnostic').length, 1);
-    assert.match(plain(modal.text()), /Pseudonymiser les noms d'équipements/);
+    // Garde levée (front v3, Lot 3) : libellés courts « Pseudonymiser » et « Diagnostic ».
+    assert.match(plain(modal.text()), /Pseudonymiser/);
+    assert.match(plain(modal.find('#bt_exportDiagnostic').text()), /Diagnostic/);
     dialog.close();
     assert.equal(ui.calls.length, before, 'fermer ne déclenche aucune requête');
     assert.equal(ui.$('#div_diagnosticDialog #bt_exportDiagnostic').length, 1, 'le contenu retourne à sa place');
