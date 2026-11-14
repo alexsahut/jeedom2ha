@@ -369,6 +369,47 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     done();
   });
 
+  it('revue Codex : choix figés pendant l’enregistrement, rendus après un échec ; le nouvel essai écrit le choix affiché', async () => {
+    const { ui, P, panel, choose, done } = openFiche(lampe());
+    ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
+    choose(2311, 'light');
+    await sleep(450);
+    ui.respond('previewMappingOverride', previewLight());
+    ui.click(`${panel(2311)}.j2ha-v2-type-save`);
+    for (const type of ['auto', 'light', 'switch']) assert.equal(ui.$(`${panel(2311)}input[data-type="${type}"]`).prop('disabled'), true, type);
+    ui.fail('saveMappingOverride');
+    for (const type of ['auto', 'light', 'switch']) assert.equal(ui.$(`${panel(2311)}input[data-type="${type}"]`).prop('disabled'), false, type);
+    assert.equal(ui.$(`${panel(2311)}input[data-type="button"]`).prop('disabled'), true, 'un type refusé reste grisé');
+    ui.click(`${panel(2311)}.j2ha-v2-type-save`);
+    assert.equal(ui.pending('saveMappingOverride')[0].data.haEntityType, 'light');
+    done();
+  });
+
+  it('revue Codex : la réponse d’un enregistrement sur A ne ferme ni le panneau ni le bandeau de B', async () => {
+    const other = DEMO.lampePrise(true);
+    other.jeedom_eq_id = 200;
+    other.eq_name = 'Plafonnier Séjour';
+    other.commands.forEach((c, i) => { c.jeedom_cmd_id = 2001 + i; c.override_types_allowed = ['light', 'switch']; });
+    other.entities[0].command_ids = [2001, 2002, 2003];
+    other.entities[0].override_command_id = 2001;
+    const ui = createUi([demoRoom()], { pluginNames: { virtual: 'Virtuel' } });
+    ui.respond('getBridgeStatus', { state: 'ok', result: BRIDGE_UP });
+    ui.openRoomWith(9, [{ state: 'ok', result: { payload: lampe() } }, { state: 'ok', result: { payload: other } }]);
+    ui.click('.j2ha-eq-panel[data-eq-id="231"] tr[data-cmd-id="2311"] .j2ha-type-link');
+    ui.$('tr[data-type-panel-for="2311"] input[data-type="light"]').trigger('change');
+    await sleep(450);
+    ui.respond('previewMappingOverride', previewLight());
+    ui.click('tr[data-type-panel-for="2311"] .j2ha-v2-type-save');
+    ui.show(200);
+    ui.click('.j2ha-eq-panel[data-eq-id="200"] tr[data-cmd-id="2001"] .j2ha-type-link');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="200"] .j2ha-v2-type-panel').length, 1);
+    ui.respond('saveMappingOverride', { state: 'ok', result: { status: 'ok' } });
+    ui.respond('executeHaAction', ACTION_OK);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="200"] .j2ha-v2-type-panel').length, 1, 'le panneau de B reste ouvert');
+    assert.equal(ui.$('.j2ha-v2-type-toast').length, 0, 'aucun bandeau de A sur B');
+    ui.win.Jeedom2haSurface.clearEquipment();
+  });
+
   it('minuteur annulé à la fermeture : aucun aperçu ne part après « Annuler » ou Échap', async () => {
     const { ui, P, panel, choose, done } = openFiche(lampe());
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);

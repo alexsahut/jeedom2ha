@@ -1171,8 +1171,9 @@
 
   // Bandeau de résultat dans l'en-tête de l'équipement (collant, annoncé par aria-live). `undo` : action « Annuler ».
   function showTypeToast(eqId, text, warn, undo) {
-    clearTypeToast();
+    // Revue Codex (#393) : une réponse qui concerne un équipement qui n'est plus affiché ne touche pas au bandeau courant.
     if (!isCurrent(eqId)) return;
+    clearTypeToast();
     var $toast = $('<div class="j2ha-v2-toast j2ha-v2-type-toast" role="status" aria-live="polite" tabindex="-1"></div>');
     if (warn) $toast.addClass('is-warn');
     $toast.append($('<span class="j2ha-v2-type-toast-text"></span>').text(text));
@@ -1281,6 +1282,7 @@
     var $fieldset = $('<fieldset class="j2ha-v2-type-choices"></fieldset>');
     $fieldset.append($('<legend class="j2ha-v2-type-legend"></legend>').text('{{Dans Home Assistant, cette commande est :}}'));
     var name = 'j2haType_' + state.seq;
+    state.enabledInputs = [];
     choices.forEach(function (choice) {
       var $label = $('<label class="j2ha-v2-radio"></label>');
       var $input = $('<input type="radio">').attr('name', name).attr('value', choice.value)
@@ -1289,6 +1291,8 @@
       if (choice.disabled) {
         $input.prop('disabled', true);
         $label.addClass('is-disabled');
+      } else {
+        state.enabledInputs.push($input);
       }
       var $text = $('<span class="j2ha-v2-type-choice"></span>').text(choice.value === '' ? '{{Automatique}}' : choice.label);
       if (choice.hint) $text.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text(' — ' + choice.hint));
@@ -1298,6 +1302,11 @@
       $fieldset.append($label);
     });
     return $fieldset;
+  }
+
+  // Revue Codex (#393) : pendant l'enregistrement, les choix sont figés (le choix affiché reste celui qui est écrit).
+  function setTypeChoicesLocked(state, locked) {
+    state.enabledInputs.forEach(function ($input) { $input.prop('disabled', locked); });
   }
 
   function setTypeSaveEnabled(state, enabled) {
@@ -1351,17 +1360,20 @@
     var name = equipmentName(state.eqId);
     state.$error.text('').hide();
     state.$cancel.prop('disabled', true);
+    setTypeChoicesLocked(state, true);
     state.$save.prop('disabled', true).html('<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> {{Enregistrement…}}');
     writeTypeThenPublish(state.eqId, state.cmdId, type, function (error, outcome) {
       if (error) {
         if (ctx.typePanel !== state) return;
         state.busy = false;
+        setTypeChoicesLocked(state, false);
         state.$cancel.prop('disabled', false);
         state.$save.prop('disabled', false).text('{{Enregistrer et publier}}');
         state.$error.text('{{Le réglage n’a pas été enregistré :}} ' + error).show();
         return;
       }
-      closeTypePanel(false);
+      // Revue Codex (#393) : ne ferme que le panneau qui a lancé l'opération (un autre a pu être ouvert entre-temps).
+      if (ctx.typePanel === state) closeTypePanel(false);
       var undo = undoType(state.eqId, state.cmdId, previous);
       if (outcome.ok) showTypeToast(state.eqId, tp.resultMessage(name, type), false, undo);
       else showTypeToast(state.eqId, publicationProblem(outcome), true, undo);
