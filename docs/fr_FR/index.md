@@ -136,7 +136,7 @@ La barre tient sur une ligne (elle se replie sur les petits écrans) : quatre in
 |---|---|
 | **Démon** | « Actif » (vert) ; « Arrêté » (rouge : le démon ne répond pas) ; « Erreur Jeedom » ou « Erreur de communication » (rouge). |
 | **MQTT** (la liaison avec le broker) | « Connecté » (vert) ; « Reconnexion... » ou « Connexion... » (orange) ; « Déconnecté » (rouge) ; « Non configuré » ; « Inconnu » (démon arrêté ou erreur). L'adresse du broker s'affiche à côté. |
-| **Home Assistant** | « Vu le 13/11 à 21:04 » (vert) ou « Pas encore vu » : Home Assistant se signale sur le broker quand il démarre ; s'il n'a pas redémarré depuis l'installation, « Pas encore vu » est normal. Affiché seulement si le démon fournit cette information. |
+| **Home Assistant** | « Vu à 21:04 » (vert, « Vu le 13/11 à 21:04 » si ce n'est pas aujourd'hui) ou « Non confirmé » (gris) : Home Assistant se signale sur le broker quand il démarre ; s'il tourne déjà, « Non confirmé » est normal. Vérifiez alors qu'il voit l'appareil « Jeedom (jeedom2ha) ». Affiché seulement si le démon fournit cette information. |
 | **Dernière relecture** | La date et l'heure (jour/mois et heures:minutes) de la dernière lecture complète, suivie de son résultat (« Réussie », « Partielle » ou « Échouée ») quand c'est la dernière opération ; « Jamais » si aucune n'a eu lieu, « Inconnue » si le démon est arrêté. |
 | **Dernière opération** | Affichée seulement quand la dernière opération n'est pas la relecture (par exemple « Republier tout ») : « Succès » (vert) ; « Partiel » ou « Échec » (orange : c'est un problème de configuration, pas une panne d'infrastructure) ; « Aucune » ; « Inconnue » si le démon est arrêté. Le message de l'opération s'affiche à côté. |
 

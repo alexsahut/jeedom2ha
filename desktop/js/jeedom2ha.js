@@ -175,8 +175,11 @@ function renderHaHealth(r) {
     $item.hide();
     return;
   }
+  // Front v2 (Lot 6, retour de démo) : « Vu à HH:MM » en vert ; sinon « Non confirmé » en gris (état neutre, jamais une alerte :
+  // Home Assistant qui tourne déjà ne se signale pas de nouveau), avec l'explication en infobulle.
   $('#span_healthHa').removeClass().addClass('label j2ha-health-value ' + (bar.seen ? 'label-success' : 'label-default')).text(bar.text)
-    .attr('title', Jeedom2haGuide.HA_TOOLTIP);
+    .attr('title', bar.seen ? '' : Jeedom2haGuide.HA_TOOLTIP);
+  if (bar.seen) $('#span_healthHa').removeAttr('title');
   $item.show();
 }
 
