@@ -52,7 +52,7 @@ describe('front v3 (Lot 2) — un seul arbre : la carte ouvre toute la maison su
     ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
     assert.equal(ui.isOpen(), true);
     assert.equal(scope(ui), 'toutes');
-    assert.equal(ui.page.filter(), 'published');
+    assert.equal(ui.page.filter(), 'blocked');
     assert.ok(roomIds(ui).length > 1);
   });
 
