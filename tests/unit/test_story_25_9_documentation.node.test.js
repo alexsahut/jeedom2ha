@@ -44,10 +44,12 @@ describe('25.9 / AC8 — documentation de la configuration', () => {
     assert.doesNotMatch(index, /au champ « Pièces exclues »/);
   });
 
+  // Garde levée (front v2, Lot 9b, regard neuf v2 G6/G8) : la mention « Anciennement « Politique de publication ». » parlait d'une
+  // version que l'utilisateur n'a jamais connue ; elle est remplacée par la distinction doute / blocage. Le libellé n'est plus exigé.
   it('chaque libellé cité existe verbatim dans la page de configuration', () => {
     for (const label of ['Plugins exclus', '(absent de Jeedom)', 'Aucun plugin avec des équipements.', 'Les équipements des plugins cochés ne sont pas publiés dans Home Assistant.',
       "Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce).", 'pièces exclues', 'pièce exclue',
-      'Ouvrir la page du plugin', 'Politique de publication']) {
+      'Ouvrir la page du plugin', 'Une seule installation jeedom2ha par broker MQTT.']) {
       assert.ok(page.includes(label), `« ${label} » absent de la page de configuration`);
     }
   });

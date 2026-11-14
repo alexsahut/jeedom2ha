@@ -8,9 +8,23 @@ Cette page suffit pour démarrer. La [documentation complète](index.md) détail
 
 ## Ce qu'il vous faut
 
-- Jeedom 4.5 ou plus récent, avec le plugin installé et ses dépendances (page du plugin, bloc « Dépendances »).
+- Jeedom 4.5 ou plus récent, sur Debian 12, avec le plugin installé et ses dépendances (page du plugin, bloc « Dépendances »).
 - Le **broker MQTT** que Home Assistant utilise déjà : le serveur de messages que Home Assistant écoute aussi (par exemple celui du plugin MQTT Manager de Jeedom, ou Mosquitto).
 - Dans Home Assistant, l'intégration **MQTT**, avec la découverte activée (c'est son réglage par défaut).
+
+## Avant de commencer : trois règles à connaître
+
+> **1. Un seul broker MQTT, partagé avec Home Assistant, et une seule installation jeedom2ha par broker.** jeedom2ha et Home Assistant doivent utiliser le même broker. Si une deuxième installation jeedom2ha (une box de test, une sauvegarde restaurée sur une autre machine) se branche sur ce même broker, chacune retire les boutons de scénario de l'autre. Branchez une box de test sur un autre broker.
+>
+> **2. Certains mots du nom d'un équipement écartent un type.** Le plugin lit aussi le nom de l'équipement. Si le nom contient l'un de ces mots, en entier (majuscules ou non), le type correspondant est écarté et l'équipement est **Bloqué** :
+>
+> - pour une **lumière** : chauffage, radiateur, thermostat, heater, chaudiere, chaudière, poele, poêle, chauffe-eau, eau, water, cumulus, ballon, piscine, pool, filtration, filtre, pompe, prise, plug, socket, fumée, smoke, incendie, feu, fire, alarme, sirene, sirène, volet, store, cover, blind, shutter, garage, portail ;
+> - pour une **prise ou un interrupteur** : lumière, lumiere, light, lampe, ampoule, volet, store, cover, blind, shutter, portail, garage, chauffage, radiateur, thermostat, heater, fumée, smoke, alarme, sirene ;
+> - pour un **volet** : lumière, lumiere, light, lampe, ampoule, chauffage, radiateur, thermostat, heater, prise, plug, socket, fumée, smoke, alarme, sirene.
+>
+> « Lumière garage », « Lampe salle d'eau » ou « Éclairage piscine » ne sont donc pas publiés comme lumières ; « Lampe tableau » l'est (« eau » n'y est pas un mot entier). Que faire : renommez l'équipement dans Jeedom puis cliquez sur **« Relire Jeedom »**, ou choisissez le type vous-même avec **« Corriger le type… »** (voir plus bas).
+>
+> **3. La pièce dans Home Assistant est fixée à la création.** Home Assistant range chaque appareil dans la zone de sa pièce Jeedom **une seule fois**, quand il le découvre. Déplacer ensuite l'équipement dans une autre pièce de Jeedom ne le déplace pas dans Home Assistant : changez sa zone dans Home Assistant (la [documentation complète](index.md#annexe--pièces-dans-home-assistant-zone-suggérée) donne les deux façons de faire).
 
 ## Le guide de démarrage, en quatre étapes
 
@@ -25,11 +39,11 @@ Le guide se ferme par **« Fermer »**. **« Ne plus afficher ce guide »** l'em
 
 ## Où trouver vos équipements dans Home Assistant
 
-Dans Home Assistant, ouvrez **Paramètres › Appareils et services**, onglet **Appareils**, et tapez « Jeedom » dans la recherche : chaque équipement Jeedom publié est un appareil, sous **son nom Jeedom**, rangé dans la zone qui porte le nom de sa pièce Jeedom (« zone » dans Home Assistant, « objet » dans Jeedom). Tous sont « connectés via » l'appareil « Jeedom (jeedom2ha) ».
+Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT** : c'est le même chemin qu'à l'étape 2 du guide. Chaque équipement Jeedom publié y est un appareil, sous **son nom Jeedom**, rangé dans la zone qui porte le nom de sa pièce Jeedom (« zone » dans Home Assistant, « objet » dans Jeedom). Tous sont « connectés via » l'appareil « Jeedom (jeedom2ha) ».
 
 ![Les appareils publiés par jeedom2ha dans Home Assistant, avec leur pièce](images/home-assistant-appareils.png)
 
-Dans la page du plugin, la fiche d'un équipement rappelle le chemin (**« Où le trouver dans Home Assistant ? »**) et donne l'identifiant de chaque entité, par exemple `light.jeedom2ha_142` (**« copier »** le met dans le presse-papiers). Une **entité** est une ligne pilotable ou lisible dans Home Assistant : un équipement Jeedom peut en donner plusieurs (une prise et sa consommation, par exemple).
+Dans la page du plugin, la fiche d'un équipement rappelle ce chemin (**« Où le trouver dans Home Assistant ? »**) et donne l'identifiant de chaque entité, par exemple `light.jeedom2ha_142` (**« copier »** le met dans le presse-papiers). Cet identifiant est technique et stable : il ne change pas si vous renommez l'équipement. Une **entité** est une ligne pilotable ou lisible dans Home Assistant : un équipement Jeedom peut en donner plusieurs (une prise et sa consommation, par exemple).
 
 ## Trois questions, pour chaque équipement
 
@@ -61,8 +75,8 @@ Une modification faite dans Jeedom, même sur un seul équipement, demande toujo
 
 Quand le plugin hésite (une lampe branchée sur une prise, par exemple) ou se trompe de type :
 
-1. Ouvrez l'équipement (cliquez sur sa pièce, puis sur son nom), et cliquez sur **« Corriger le type… »** dans sa fiche, ou sur le lien de la colonne **« Type HA »** de la commande (« auto » tant que le plugin choisit seul).
-2. Le panneau rappelle que le plus durable est de corriger les types génériques dans Jeedom, puis propose les types possibles en français (« Automatique », « Lumière (light) », « Interrupteur (switch) »…). Les autres types sont listés à part, grisés, sous « Autres types, non proposés pour cette commande ».
+1. Ouvrez l'équipement (cliquez sur sa pièce, puis sur son nom), et cliquez sur **« Corriger le type… »** dans sa fiche, ou sur le lien de la colonne **« Type HA »** de la commande (il affiche « Automatique » tant que le plugin choisit seul).
+2. Le panneau rappelle que le plus durable est de corriger les types génériques dans Jeedom, puis propose les types possibles en français (« Automatique », « Lumière (light) », « Interrupteur (switch) »…). Les types qui ne peuvent pas convenir à cet équipement sont listés à part, repliés et grisés.
 3. Choisissez un type : un aperçu **« Avant » / « Après »** montre ce que deviendra l'équipement dans Home Assistant, et prévient si l'identifiant change (les automatisations qui utilisent l'ancien seront à reprendre). Rien n'est enregistré à ce stade.
 4. Cliquez sur **« Enregistrer et publier »**. Un bandeau confirme le changement et propose **« Annuler »** pendant quelques secondes.
 
@@ -76,11 +90,11 @@ Tout ce que le plugin reconnaît est publié par défaut. Pour retirer de Home A
 2. Le pied compte en direct les équipements et les entités qui seront retirés de Home Assistant, et ceux qui y reviendront.
 3. Cliquez sur le bouton d'application, qui dit ce qu'il fera (par exemple « Appliquer — retirer N entités », en rouge). Le plugin relit Jeedom une seule fois, et un bandeau propose **« Annuler »** pendant quelques secondes.
 
-Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. Pour un seul équipement, le réglage **« Jamais »** de sa fiche, suivi de **« Appliquer »**, fait la même chose ; pour une pièce, son menu « ⋯ » propose aussi **« Exclure la pièce… »**.
+Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. **« Non exclu » ne veut pas dire « publié »** : un équipement non exclu peut rester hors de Home Assistant parce qu'il est désactivé dans Jeedom, bloqué ou sans rien à publier ; son badge sur la page du plugin dit lequel. Pour un seul équipement, le réglage **« Jamais »** de sa fiche, suivi de **« Appliquer »**, fait la même chose ; pour une pièce, son menu « ⋯ » propose aussi **« Exclure la pièce… »**.
 
 ## Quelque chose ne va pas ? « Vérifier l'installation… »
 
-Dans le menu **« ⋯ » (« Autres actions »)** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre : le démon tourne, le broker MQTT répond, Home Assistant s'est signalé sur le broker (« Non confirmé » n'est pas une erreur), la dernière relecture a réussi, les équipements bloqués. Elle s'arrête au premier point **« À corriger »** et propose le bouton qui le corrige.
+Dans le menu **« ⋯ » (« Autres actions »)** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre : le démon tourne, le broker MQTT répond, Home Assistant s'est signalé sur le broker, la dernière relecture a réussi, les équipements bloqués. Chaque contrôle dit « OK », « À corriger », « À vérifier » ou « En attente ». Seul un point « À corriger » arrête la liste (les suivants restent « En attente ») ; un point « À vérifier » vous demande un contrôle, sans arrêter la liste. Chaque point à reprendre propose le bouton qui le corrige.
 
 Pour demander de l'aide, la partie **« Pour le support »** de la même boîte télécharge un fichier qui décrit votre installation (**« Télécharger le diagnostic support »**), à joindre à votre message sur le forum ; la case **« Pseudonymiser les noms d'équipements »** remplace vos noms par des alias.
 

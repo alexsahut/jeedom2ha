@@ -68,6 +68,8 @@ $j2haHasHomekit = $j2haPluginActive('homebridge');
   <fieldset>
     <legend><i class="fas fa-network-wired"></i> {{Connexion au broker MQTT}}</legend>
     <p class="help-block" id="p_mqttBrokerIntro">{{Indiquez le broker que Home Assistant utilise déjà : le broker MQTT est le serveur de messages que Home Assistant écoute aussi.}}</p>
+    <p class="help-block" id="p_mqttOneInstance"><i class="fas fa-exclamation-triangle"></i> <strong>{{Une seule installation jeedom2ha par broker MQTT.}}</strong> {{Une deuxième installation branchée sur ce broker (box de test, sauvegarde restaurée ailleurs) retirerait les boutons de scénario de celle-ci, et inversement.}}</p>
+    <p class="help-block" id="p_mqttSaveHint">{{Pour ce bloc, utilisez le bouton « Tester, enregistrer et redémarrer le démon » ci-dessous : le démon ne lit ces réglages qu'à son démarrage.}}</p>
 
     <?php if ($j2haHasMqttManager) { ?>
     <div class="form-group">
@@ -181,6 +183,7 @@ $j2haHasHomekit = $j2haPluginActive('homebridge');
       <div class="col-md-offset-4 col-md-6">
         <p class="form-control-static">
           {{Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce).}}
+          {{Le panneau « Choisir ce qui est publié… » de la page du plugin règle aussi, au même endroit, les plugins, les pièces et les équipements.}}
           <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha">{{Ouvrir la page du plugin}}</a>
         </p>
         <?php if ($j2haHasHomekit) { ?>
@@ -201,7 +204,7 @@ $j2haHasHomekit = $j2haPluginActive('homebridge');
           <option value="sure_probable">{{Publier quand même (recommandé)}}</option>
           <option value="sure_only">{{Ne publier que les équipements reconnus avec certitude}}</option>
         </select>
-        <p class="help-block">{{Anciennement « Politique de publication ».}}</p>
+        <p class="help-block">{{Ce réglage ne concerne que les équipements reconnus avec un léger doute. Un équipement dont le nom contredit ses types Jeedom n'est pas un doute : il reste bloqué, et sa fiche dit comment faire.}}</p>
       </div>
     </div>
 
@@ -212,6 +215,7 @@ $j2haHasHomekit = $j2haPluginActive('homebridge');
         </button>
         <span id="span_rescanResult" class="label" style="display:none; margin-left:10px;"></span>
         <p class="help-block">{{Enregistre les plugins exclus et le réglage ci-dessus, puis relit Jeedom. N'enregistre pas la connexion au broker.}}</p>
+        <p class="help-block" id="p_coreSaveHint">{{Le bouton « Sauvegarder » de Jeedom enregistre aussi ce bloc mais ne relit pas Jeedom : préférez le bouton bleu de chaque bloc.}}</p>
       </div>
     </div>
   </fieldset>
@@ -225,7 +229,7 @@ $j2haHasHomekit = $j2haPluginActive('homebridge');
   </p>
 </details>
 
-<p class="help-block" id="p_cron5Note"><i class="fas fa-info-circle"></i> {{Dans le bloc « Fonctionnalités » de Jeedom, ne décochez pas cron5 : il maintient la publication à jour.}}</p>
+<p class="help-block" id="p_cron5Note"><i class="fas fa-info-circle"></i> {{Dans le bloc « Fonctionnalités » de Jeedom, ne décochez pas cron5 : il maintient la publication à jour.}} {{Toutes les 5 minutes, il republie ce qui a changé sans relecture de votre part (scénario ou équipement activé ou désactivé, exclusion) ; décoché, ces changements attendent un « Relire Jeedom ».}}</p>
 
 <p id="p_j2haBackBottom">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha"><i class="fas fa-arrow-left"></i> {{Retour à la page du plugin}}</a>
@@ -640,7 +644,7 @@ $(function() {
         // Sécurité : le mot de passe n'est JAMAIS chargé dans le DOM
         $('#div_mqtt_autodetect_status')
           .removeClass().addClass('alert alert-info')
-          .html('<i class="fas fa-user-cog"></i> {{Configuration manuelle}}')
+          .html('<i class="fas fa-user-cog"></i> {{Broker déjà configuré : les réglages enregistrés sont affichés ci-dessous.}}')
           .show();
       } else if (result.source === 'none') {
         // Pas de config manuelle stockée — afficher le guidage
