@@ -103,10 +103,11 @@ describe('Lot 8 — index.md : glossaire cible, écrans, « dix types »', () =>
     assert.match(index, /« objet » dans Jeedom, « zone » dans Home Assistant/);
   });
 
+  // Garde levée (front v3, Lot 5) : la doc est réécrite avec une section par écran ; les ancres suivent les nouveaux titres.
   it('une ancre par écran, listée en tête', () => {
-    for (const anchor of ['#la-barre-détat', '#première-publication--le-guide-de-démarrage', '#le-bloc-de-la-maison', '#la-vue-de-travail',
-      '#le-détail-dun-équipement', '#corriger-le-type-dune-commande', '#exclure-une-pièce', '#vérifier-linstallation', '#configuration',
-      '#les-causes-de-blocage', '#les-conseils']) {
+    for (const anchor of ['#la-barre-détat', '#le-guide-de-démarrage', '#la-page-maison-et-les-puces', '#à-faire', '#la-pièce-et-la-fiche',
+      '#corriger-le-type', '#choisir-ce-qui-est-publié', '#exclure-une-pièce', '#les-scénarios', '#vérifier-linstallation', '#configuration',
+      '#glossaire-des-états', '#les-causes-de-blocage', '#les-conseils']) {
       assert.ok(index.includes(`](${anchor})`), anchor);
     }
   });

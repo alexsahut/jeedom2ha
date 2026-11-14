@@ -29,11 +29,11 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Quand la sémantique change de nouveau, remplacer tout ce fichier ; rien d'autre dans la documentation n'est à modifier.
 -->
 
-# Les états et les compteurs de la vue de travail
+# Les états et les compteurs
 
-Retour à la [documentation](index.md#la-vue-de-travail).
+Retour à la [documentation](index.md#la-pièce-et-la-fiche).
 
-Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la vue de travail, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
+Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la pièce, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
 <!-- CAPTURE: compteurs du détail de pièce -->
 ![Compteurs du détail de pièce](images/compteurs-detail-piece.png)
 
@@ -89,12 +89,12 @@ Les commandes **ignorées** ne sont jamais comptées comme un défaut et ne sont
 Sur la page du plugin, le bloc de la maison reprend les mêmes états, **équipement par équipement**, pour toutes les pièces : « N / M publiés » où M est le nombre d'équipements Jeedom de toutes les tuiles (la tuile « Sans pièce » comprise) et N ceux à l'état **Publié**. La jauge (le liseré) est découpée, dans cet ordre, en **publiés** (vert), **à appliquer** (bleu), **bloqués** (orange), **exclus ou inactifs** (gris : exclus, désactivés et rien à publier) et **non lus** (hachuré). Chaque segment donne son compte en info-bulle. La somme des segments est toujours M, et celle des tuiles de pièce est toujours celle de la maison.
 
 - **Non lu** n'est pas un septième état : c'est un équipement de Jeedom dont les chiffres n'ont pas pu être lus (le démon ne le connaît pas encore, ou sa lecture a échoué). Il n'est jamais compté publié, bloqué, exclu ni désactivé, et la jauge ne devient jamais « pleine de non lus » quand la lecture n'a pas eu lieu : elle reste neutre avec un message.
-- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît dans l'arbre de la vue de travail et dans le détail de l'équipement, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés. De même, la puce **« conseils »** (affichée seulement si leur nombre est connu sans lire chaque fiche) compte des équipements publiés qui pourraient faire mieux : un conseil n'est pas un état, ces équipements restent comptés dans leur état (« publié » ou « à appliquer »).
+- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît dans l'arbre de la pièce et dans le détail de l'équipement, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés. De même, la puce **« conseils »** (affichée seulement si leur nombre est connu sans lire chaque fiche) compte des équipements publiés qui pourraient faire mieux : un conseil n'est pas un état, ces équipements restent comptés dans leur état (« publié » ou « à appliquer »).
 - Les chiffres sont relus à l'ouverture de la page, après chaque action, au retour sur l'onglet après plus d'une minute et par ↻ (« Actualiser les chiffres »), dont l'info-bulle donne l'heure de la dernière lecture par la page.
 
 ## Les repères d'une carte de pièce
 
-La tuile d'une pièce affiche « n/t » (n publiés, t = équipements de la pièce), un liseré de 4 px construit comme celui de la maison, puis, **seulement s'ils sont non nuls**, des repères faits d'une icône et d'un nombre, le mot dans l'info-bulle : **bloqués** (orange), **à appliquer** (bleu), **désactivés**, **rien à publier**, **non lus** et **exclus** (gris). Sous un filtre de la maison, la tuile ne compte plus que l'état filtré. Ces chiffres sont **les mêmes** que ceux de l'arbre de la vue de travail (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
+La tuile d'une pièce affiche « n/t » (n publiés, t = équipements de la pièce), un liseré de 4 px construit comme celui de la maison, puis, **seulement s'ils sont non nuls**, des repères faits d'une icône et d'un nombre, le mot dans l'info-bulle : **bloqués** (orange), **à appliquer** (bleu), **désactivés**, **rien à publier**, **non lus** et **exclus** (gris). Sous un filtre de la maison, la tuile ne compte plus que l'état filtré. Ces chiffres sont **les mêmes** que ceux de l'arbre de la pièce (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
 
 ## La ligne des états (sous le titre de la pièce)
 
@@ -112,9 +112,9 @@ Sous les compteurs, la vue liste les équipements **bloqués** et **à appliquer
 
 ## La ligne d'un équipement affiché
 
-Quand vous choisissez un équipement, une ligne s'affiche au début de son détail : **son état** (le même mot que le badge), puis le détail de **ses commandes**, par exemple :
+Quand vous choisissez un équipement, **son état** est le badge de la ligne 1 de sa fiche (le même mot que partout), et la ligne 2 donne le plugin, le nombre de commandes puis le détail de **ses commandes**, par exemple :
 
-> Publié · 3 publiées · 1 bloquée · 5 ignorées
+> Virtuel · 9 commandes · 3 publiées · 1 bloquée · 5 ignorées
 
 Les zéros sont masqués, les pluriels accordés (« 1 publiée », « 3 publiées »). Les catégories apparaissent dans cet ordre : publiées, à appliquer (publiables mais pas encore dans Home Assistant), bloquées, ignorées, exclues. Seules les commandes **bloquées** comptent comme défaut : dans l'exemple, le défaut de l'équipement vaut 1, et les 5 commandes ignorées n'y comptent pas.
 <!-- CAPTURE: ligne de compteurs d'un équipement déplié -->

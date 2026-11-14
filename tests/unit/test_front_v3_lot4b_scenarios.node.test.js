@@ -399,8 +399,10 @@ test('Lot 4b réel — rendu : aucun débordement horizontal à 1280 et 760 px, 
 
 test('Lot 4b — doc : section « Les scénarios » avec les libellés de l’écran, mot pour mot', () => {
   const doc = require('node:fs').readFileSync('docs/fr_FR/index.md', 'utf8');
-  const section = doc.slice(doc.indexOf('### Les scénarios'), doc.indexOf('### Le bloc de la maison'));
-  for (const label of ['Publiés', 'Non publiés', 'Inactifs', 'Nouveaux ✱', 'Tous les groupes', 'Tous les modes', 'Lancé à la main', 'Programmé', 'Déclenché',
+  // Front v3 (Lot 5) : la doc est réécrite par écran ; la section suivante est « Configuration ».
+  const section = doc.slice(doc.indexOf('### Les scénarios'), doc.indexOf('### Configuration'));
+  // Front v3 (Lot 5) : la puce s'affiche « ✱ 3 Nouveaux » (icône, nombre, mot) : la doc cite le mot, après l'icône.
+  for (const label of ['Publiés', 'Non publiés', 'Inactifs', '✱ « Nouveaux »', 'Tous les groupes', 'Tous les modes', 'Lancé à la main', 'Programmé', 'Déclenché',
     'Rechercher', 'Dans Home Assistant', 'Indisponible', 'Publier (n)', 'Ne pas publier (n)', 'Appliquer (n)', 'Annuler', 'Retirer n boutons de Home Assistant ?',
     'lancés à la main → Publier ces n', 'Aucun scénario dans Jeedom', 'Liste indisponible · Relire', '◷', 'En attente de Home Assistant',
     'Choix enregistré · n boutons pas encore à jour dans Home Assistant · Réessayer']) {

@@ -1090,9 +1090,14 @@
   }
 
   // Lien « En savoir plus » : la documentation déjà liée par la page (« Aide »), jamais une adresse construite ici.
+  // Front v3 (Lot 5) : le lien « Aide » est l'icône ? de la barre d'état (`.j2ha-v3-help`) depuis le Lot 1 ; l'ancienne ligne
+  // d'aide (`.j2ha-help-line`) n'existe plus, le lien ne s'affichait donc jamais. Il vise la section des causes de la doc.
+  var HELP_ANCHOR = '#les-causes-de-blocage';
   function helpUrl() {
-    var href = $('.j2ha-help-line a').first().attr('href');
-    return typeof href === 'string' && href.indexOf('https://') === 0 ? href : null;
+    var href = $('.j2ha-v3-help').first().attr('href');
+    if (typeof href !== 'string' || href.indexOf('https://') !== 0) href = $('.j2ha-help-line a').first().attr('href');
+    if (typeof href !== 'string' || href.indexOf('https://') !== 0) return null;
+    return href.indexOf('#') < 0 ? href + HELP_ANCHOR : href;
   }
 
   function pluginNameOf(eqId) {

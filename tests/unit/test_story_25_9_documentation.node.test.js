@@ -13,7 +13,8 @@ const index = read('docs/fr_FR/index.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const page = [read('plugin_info/configuration.php'), read('core/php/jeedom2ha_excluded_plugins.php')].join('\n').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'");
 // Garde levée (front v2, Lot 8) : le § « Filtrage et publication » suit le titre du bloc à l'écran, « Ce qui est publié » (E8).
-const filtering = index.slice(index.indexOf('### Ce qui est publié'), index.indexOf('### Avancé et tâche planifiée'));
+// Garde levée (front v3, Lot 5) : le § devient « Ce qui est publié, Avancé » (sous « Configuration »), jusqu'à « Vérifier l'installation ».
+const filtering = index.slice(index.indexOf('#### Ce qui est publié, Avancé'), index.indexOf('### Vérifier l\'installation'));
 
 describe('25.9 / AC8 — documentation de la configuration', () => {
   // Garde levée (front v3, Lot 3) : la liste à cocher « Plugins exclus » quitte la configuration (une seule source : le panneau

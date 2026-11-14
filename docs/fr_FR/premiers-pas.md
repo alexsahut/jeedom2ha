@@ -2,7 +2,7 @@
 
 **jeedom2ha publie vos équipements Jeedom dans Home Assistant.** Jeedom reste la source : rien n'y est modifié.
 
-Cette page suffit pour démarrer. La [documentation complète](index.md) détaille chaque écran.
+Cette page suffit pour démarrer. L'écran n'a pas de phrase d'aide : survolez une icône pour son info-bulle, ou suivez « En savoir plus » vers la [documentation complète](index.md).
 
 ---
 
@@ -28,76 +28,65 @@ Cette page suffit pour démarrer. La [documentation complète](index.md) détail
 
 ## Le guide de démarrage, en quatre étapes
 
-Ouvrez la page du plugin (**Plugins › Communication › jeedom2ha**). Tant que rien n'est publié, elle affiche **« Bienvenue dans jeedom2ha »** et quatre étapes, une ligne chacune ; l'info-bulle ⓘ de chaque ligne dit quoi faire. Chaque étape se coche seule quand elle est faite ; une étape pas encore atteinte est grisée.
+Ouvrez la page du plugin (**Plugins › Communication › jeedom2ha**). Tant que rien n'est publié, elle affiche **« Bienvenue dans jeedom2ha »** et quatre étapes, une ligne chacune. Une étape n'est « Fait » que si le plugin l'a constaté ; sinon elle dit « À vérifier », avec un bouton.
 
-1. **« Connecter le broker »** — Cliquez sur **« Ouvrir la configuration MQTT »**. Dans la configuration du plugin, saisissez l'adresse du broker (« Hôte MQTT »), son port (1883 en général, 8883 avec TLS), l'utilisateur et le mot de passe, puis cliquez sur **« Tester, enregistrer et redémarrer le démon »**. Trois coches s'allument l'une après l'autre : « Connexion testée », « Réglages enregistrés », « Démon redémarré ». Si le test échoue, rien n'est enregistré et le message dit quoi vérifier. Revenez ensuite par **« Retour à la page du plugin »**.
-2. **« Vérifier Home Assistant »** — Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT**. L'appareil « Jeedom (jeedom2ha) » doit y apparaître, avec l'entité « État du pont ». Cliquez sur **« Je l'ai vu »**. Sinon, **« Je ne le vois pas »** affiche les trois causes habituelles : l'intégration MQTT n'est pas installée, Home Assistant utilise un autre broker, ou la découverte MQTT est désactivée.
-3. **« Choisir ce qui est publié »** — Par défaut, tout ce que le plugin reconnaît est publié. Cliquez sur **« Tout publier (recommandé) »**, ou sur **« Choisir… »** pour retirer d'emblée un plugin, une pièce ou un équipement. Vous pourrez changer d'avis à tout moment.
-4. **« Publier les équipements »** — Cliquez sur **« Publier dans Home Assistant »** : le plugin lit Jeedom et publie ce qu'il reconnaît. Une ligne de fin dit combien d'équipements sont dans Home Assistant (où les trouver : info-bulle ⓘ) et propose **« Voir ma maison »** ; si des équipements ne peuvent pas être publiés, un second bouton les liste.
+![Le guide de démarrage : quatre étapes, une ligne chacune](images/guide-demarrage.png)
 
-Le guide se ferme par **« Fermer »**. **« Ne plus afficher ce guide »** l'empêche de revenir seul, et une fois les quatre étapes faites il ne revient plus de lui-même ; il reste disponible dans le menu **« ⋯ » (« Autres actions ») › « Guide de démarrage »**.
+1. **« Connecter le broker »** — **« Ouvrir la configuration MQTT »**, saisissez l'adresse du broker (« Hôte MQTT »), son port (1883 en général, 8883 avec TLS), l'utilisateur et le mot de passe, puis **« Tester, enregistrer et redémarrer le démon »**. Trois coches s'allument : « Connexion testée », « Réglages enregistrés », « Démon redémarré ». Si le test échoue, rien n'est enregistré et le message dit quoi vérifier. Revenez par **« Retour à la page du plugin »**.
+2. **« Vérifier Home Assistant »** — Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT** : l'appareil « Jeedom (jeedom2ha) » doit y apparaître, avec l'entité « État du pont ». Cliquez sur **« Je l'ai vu »**. Sinon, **« Je ne le vois pas »** affiche les trois causes habituelles : l'intégration MQTT n'est pas installée, Home Assistant utilise un autre broker, ou la découverte MQTT est désactivée.
+3. **« Choisir ce qui est publié »** — Tout ce que le plugin reconnaît est publié par défaut : **« Tout publier (recommandé) »**, ou **« Choisir… »** pour retirer d'emblée un plugin, une pièce ou un équipement. Les scénarios, eux, ne sont publiés que si vous les choisissez : « Publier ces 3 » prépare ceux que vous lancez à la main.
+4. **« Publier les équipements »** — **« Publier dans Home Assistant »** : le plugin lit Jeedom et publie ce qu'il reconnaît, puis propose **« Voir ma maison »**.
+
+« Fermer » cache le guide ; **« Ne plus afficher ce guide »** l'empêche de revenir. Une fois les quatre étapes faites, il ne revient plus de lui-même ; il reste dans le menu **« ⋯ » › « Guide de démarrage »**.
 
 ## Où trouver vos équipements dans Home Assistant
 
-Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT** : c'est le même chemin qu'à l'étape 2 du guide. Chaque équipement Jeedom publié y est un appareil, sous **son nom Jeedom**, rangé dans la zone qui porte le nom de sa pièce Jeedom (« zone » dans Home Assistant, « objet » dans Jeedom). Tous sont « connectés via » l'appareil « Jeedom (jeedom2ha) ».
+Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT** : c'est le même chemin qu'à l'étape 2. Chaque équipement Jeedom publié y est un appareil, sous **son nom Jeedom**, rangé dans la zone de sa pièce Jeedom (« zone » dans Home Assistant, « objet » dans Jeedom). Tous sont « connectés via » l'appareil « Jeedom (jeedom2ha) ».
 
 ![Les appareils publiés par jeedom2ha dans Home Assistant, avec leur pièce](images/home-assistant-appareils.png)
 
-Dans la page du plugin, la fiche d'un équipement rappelle ce chemin (info-bulle de « Home Assistant », sous son nom) et donne l'identifiant de chaque entité, par exemple `light.jeedom2ha_142` (l'icône à côté le copie). Cet identifiant est technique et stable : il ne change pas si vous renommez l'équipement. Une **entité** est une ligne pilotable ou lisible dans Home Assistant : un équipement Jeedom peut en donner plusieurs (une prise et sa consommation, par exemple).
+Dans la fiche d'un équipement, le bloc « Dans Home Assistant » donne l'identifiant de chaque **entité** (une ligne pilotable ou lisible dans Home Assistant), par exemple `light.jeedom2ha_142`, avec une icône pour le copier. Il ne change pas si vous renommez l'équipement.
 
 ## Trois questions, pour chaque équipement
 
-La page du plugin répond toujours aux mêmes trois questions, pour toute la maison, pour une pièce et pour un équipement.
+![La page du plugin : barre d'état, puces, « À faire » et pièces](images/page-principale.png)
 
-**1. Qu'est-ce qui est publié ?** Chaque équipement porte un seul mot : **Publié**, **À appliquer**, **Bloqué**, **Exclu**, **Désactivé** ou **Rien à publier**. L'info-bulle de chaque puce de la maison l'explique en une ligne. Dans la fiche d'un équipement, les deux côtés sont face à face : **« Dans Jeedom »** (nom, plugin, pièce, commandes) et **« Dans Home Assistant »** (les entités, leur type en français, par exemple « Lumière (light) », et **Pilotable** ou **Lecture seule**).
+**1. Qu'est-ce qui est publié ?** Le chiffre de la maison (publiés sur le total) et ses puces le disent. Chaque équipement porte un seul mot, avec sa couleur et son icône : **Publié** (vert), **À appliquer** (bleu), **Bloqué** (orange), **Exclu**, **Désactivé** ou **Rien à publier** (gris). Le [glossaire des états](index.md#glossaire-des-états) les définit.
 
-**2. Pourquoi pas ?** Un équipement non publié dit pourquoi, en clair, dans sa fiche : ce qui se passe, pourquoi, et comment faire, avec le bouton qui corrige (souvent **« Ouvrir les types génériques »** ou **« Corriger le type… »**). Un équipement publié mais qui pourrait faire mieux (en lecture seule alors que Jeedom a des ordres, par exemple) porte un **Conseil**, construit de la même façon. Le bloc **« À faire »** de la page du plugin rassemble ce qui a besoin de vous.
+**2. Pourquoi pas ?** La liste **« À faire »** rassemble ce qui a besoin de vous. Dans la fiche d'un équipement bloqué, une bande d'une ligne dit la cause en quelques mots (l'info-bulle ⓘ dit pourquoi), avec le bouton qui corrige et « En savoir plus ». Un équipement publié qui pourrait faire mieux porte un **Conseil**, en bleu.
+
+![La fiche d'un équipement bloqué : la cause en une ligne et le bouton qui corrige](images/detail-equipement.png)
 
 **3. Comment changer ?** Chaque fiche propose l'action qui convient :
 
-- **« Ouvrir les types génériques »** : la voie durable. Dans Jeedom, chaque commande peut porter un « type générique » qui dit son rôle (par exemple « Lumière État », « Lumière Bouton On ») ; sans lui, le plugin ne peut rien en déduire. Corrigez-le dans Jeedom, puis cliquez sur **« Relire Jeedom »**.
-- **« Ouvrir l'équipement dans Jeedom »** : pour compléter ses commandes dans Jeedom, puis **« Relire Jeedom »**.
+- **« Ouvrir les types génériques »** : la voie durable. Dans Jeedom, chaque commande porte un « type générique » qui dit son rôle (« Lumière État », « Lumière Bouton On ») ; corrigez-le, puis **« Relire Jeedom »**.
+- **« Ouvrir l'équipement dans Jeedom »** : pour compléter ses commandes, puis « Relire Jeedom ».
 - **« Corriger le type… »** : pour régler ici ce que voit Home Assistant, sans toucher à Jeedom (voir plus bas).
-- **« Ouvrir la configuration du plugin »** : quand la cause est un réglage du plugin (un plugin exclu, par exemple).
-- **« Publier quand même »** : quand le plugin hésite, ou quand le nom contredit les types. L'équipement passe sur « Toujours », puis « Appliquer » le publie.
+- **« Ouvrir la configuration du plugin »** : quand la cause est un réglage du plugin.
+- **« Publier quand même »** : quand le plugin hésite, ou quand le nom contredit les types.
 - **« Renommer l'équipement dans Jeedom, puis Relire Jeedom »** : quand un mot du nom écarte le type voulu.
 - **« Republier »** : quand l'envoi à Home Assistant a échoué.
-- Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier. Ce réglage est enregistré, puis attend : l'équipement passe « À appliquer », et le bouton **« Appliquer »** de sa fiche l'envoie à Home Assistant (le bouton « Appliquer (n) » de la barre d'état envoie d'un coup tous les réglages en attente).
+- **« Automatique | Toujours | Jamais »** : laisser le plugin décider, publier même s'il hésite, ou ne jamais publier. Le réglage attend : l'équipement passe « À appliquer », et **« Appliquer »** l'envoie (le bouton « Appliquer (n) » de la barre d'état envoie tous les réglages en attente d'un coup).
 
 ## Relire Jeedom ou Republier tout ?
 
-Les deux boutons de la barre d'état, en haut de la page du plugin :
+- **« Relire Jeedom »** (barre d'état) : *j'ai changé quelque chose dans Jeedom* (un équipement, un type générique, un nom, une pièce). Le plugin relit Jeedom, met Home Assistant à jour et applique les réglages en attente.
+- **« Republier tout »** (menu « ⋯ ») : *Home Assistant a perdu ses appareils*. Le plugin renvoie ce qui est déjà publié, sans relire Jeedom.
 
-- **« Relire Jeedom »** : *j'ai changé quelque chose dans Jeedom* (un équipement, un type générique, un nom, une pièce). Le plugin relit Jeedom, puis met Home Assistant à jour, et applique au passage les réglages en attente.
-- **« Republier tout »** : *Home Assistant a perdu ses appareils* (après un redémarrage du broker, par exemple). Le plugin renvoie à Home Assistant ce qui est déjà publié, sans relire Jeedom.
-
-Une modification faite dans Jeedom, même sur un seul équipement, demande toujours « Relire Jeedom » : les gestes « Republier » ne relisent pas Jeedom. Pour renvoyer seulement un équipement ou une pièce, leur menu « ⋯ » propose **« Republier »** et **« Republier la pièce »**.
+Une modification faite dans Jeedom demande toujours « Relire Jeedom ».
 
 ## Corriger un type
 
-Quand le plugin hésite (une lampe branchée sur une prise, par exemple) ou se trompe de type :
-
-1. Ouvrez l'équipement (cliquez sur sa pièce, puis sur son nom), et cliquez sur **« Corriger le type… »** dans sa fiche, ou sur le lien de la colonne **« Type HA »** de la commande (il affiche « Automatique » tant que le plugin choisit seul).
-2. Le panneau « Type dans Home Assistant de « Nom » » s'ouvre par-dessus la page. « Pour : … » liste les commandes de l'entité : le type choisi vaut pour toute l'entité. Le lien « Types génériques », dans son coin, mène à la voie la plus durable. Il propose les types possibles en français (« Automatique », « Lumière (light) », « Interrupteur (switch) »…). Les types qui ne peuvent pas convenir sont repliés sous « Types impossibles pour cet équipement (N) ».
-3. Choisissez un type : un aperçu **« Avant » / « Après »** montre ce que deviendra l'équipement dans Home Assistant, et marque **« ID modifié »** si l'identifiant change (les automatisations qui utilisent l'ancien seront à reprendre, dit l'info-bulle). Rien n'est enregistré à ce stade.
-4. Cliquez sur **« Enregistrer et publier »**. Un bandeau confirme le changement et propose **« Annuler »** pendant quelques secondes. Si le plugin hésite sur cet équipement, changer le type ne suffit pas : l'aperçu le dit et propose **« Publier quand même »**, qui garde le type choisi et ajoute « Toujours » ; le bouton devient alors **« Enregistrer et publier quand même »**.
-
-La colonne « Type HA » affiche alors « Personnalisé : Lumière (light) ». Pour revenir au choix du plugin, rouvrez le panneau et choisissez « Automatique ».
+Depuis la fiche, **« Corriger le type… »** ou le lien de la colonne **« Type HA »** (« Automatique » tant que le plugin choisit seul) ouvre le panneau « Type dans Home Assistant de « Nom » ». « Pour : … » liste les commandes de l'entité : le type choisi vaut pour toute l'entité. Choisissez un type (« Lumière (light) »…) : l'aperçu « Avant » / « Après » s'affiche, avec **« ID modifié »** si l'identifiant change. Puis **« Enregistrer et publier »** ; un bandeau propose « Annuler » pendant quelques secondes. Si le plugin hésite, « Le type seul ne suffit pas » propose « Publier quand même », et le bouton devient « Enregistrer et publier quand même ». Les types impossibles sont repliés sous « Types impossibles pour cet équipement (N) » ; le lien « Types génériques » mène à la voie durable.
 
 ## Choisir ce qui est publié
 
-Tout ce que le plugin reconnaît est publié par défaut. Pour retirer de Home Assistant un plugin, une pièce ou un équipement, au même endroit, cliquez sur **« Choisir ce qui est publié… »** (au bout de la ligne des puces de la maison) :
+Le bouton **« Choisir ce qui est publié… »**, au bout des puces, règle au même endroit les plugins, les pièces et les équipements : **« Par pièce »** ou **« Par plugin »**, décochez, le pied compte ce qui sera retiré, puis cliquez sur le bouton qui dit ce qu'il fera. Dans l'en-tête, **« En cas de doute »** (**« Publier | Ne pas publier »**). **« Non exclu » ne veut pas dire « publié »** : un équipement désactivé dans Jeedom, bloqué ou sans rien à publier reste hors de Home Assistant. Pour un seul équipement : « Jamais » dans sa fiche, puis « Appliquer ».
 
-1. Choisissez **« Par pièce »** ou **« Par plugin »**, puis décochez ce que vous ne voulez pas voir dans Home Assistant. Chaque groupe montre `n/m` (non exclus sur le total) et une case à trois états. Dans l'en-tête, **« En cas de doute »** (**« Publier | Ne pas publier »**) décide du sort des équipements que le plugin reconnaît avec un léger doute.
-2. Le pied compte en direct les équipements et les entités qui seront retirés de Home Assistant, et ceux qui y reviendront.
-3. Cliquez sur le bouton d'application, qui dit ce qu'il fera (par exemple « Appliquer — retirer N entités », en rouge). Le plugin relit Jeedom une seule fois, et un bandeau propose **« Annuler »** pendant quelques secondes.
-
-Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. **« Non exclu » ne veut pas dire « publié »** : un équipement non exclu peut rester hors de Home Assistant parce qu'il est désactivé dans Jeedom, bloqué ou sans rien à publier ; son badge sur la page du plugin dit lequel. Pour un seul équipement, le réglage **« Jamais »** de sa fiche, suivi de **« Appliquer »**, fait la même chose ; pour une pièce, son menu « ⋯ » propose aussi **« Exclure la pièce… »**.
+**Les scénarios** ont leur onglet : un interrupteur « Publier » par scénario, puis **« Appliquer »**. Les scénarios déjà publiés le restent ; un nouveau scénario arrive non publié, marqué ✱.
 
 ## Quelque chose ne va pas ? « Vérifier l'installation… »
 
-Dans le menu **« ⋯ » (« Autres actions »)** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre : le démon tourne, le broker MQTT répond, Home Assistant s'est signalé sur le broker, la dernière relecture a réussi, les équipements bloqués. Chaque contrôle dit « OK », « À corriger », « À vérifier » ou « En attente ». Seul un point « À corriger » arrête la liste (les suivants restent « En attente ») ; un point « À vérifier » vous demande un contrôle, sans arrêter la liste (pour Home Assistant : **« Vu »** ou **« Pas vu »**). Chaque point à reprendre propose le bouton qui le corrige.
-
-Pour demander de l'aide, la partie **« Pour le support »** de la même boîte télécharge un fichier qui décrit votre installation (**« Diagnostic »**), à joindre à votre message sur le forum ; la case **« Pseudonymiser »** remplace vos noms par des alias.
+Dans le menu **« ⋯ »** de la barre d'état, **« Vérifier l'installation… »** passe les contrôles dans l'ordre et s'arrête au premier point « À corriger », avec le bouton qui le corrige. Pour Home Assistant, **« Vu »** ou **« Pas vu »**. Pour demander de l'aide, **« Pour le support »** télécharge un **« Diagnostic »** à joindre à votre message sur le forum ; la case **« Pseudonymiser »** remplace vos noms par des alias.
 
 Pour aller plus loin : la [documentation complète](index.md).
