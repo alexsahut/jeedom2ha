@@ -28,8 +28,10 @@ describe('25.4 / AC26 — libellés de la vue', () => {
     const found = labels(source);
     // Garde levée (front v2, Lot 7, spec E3) : « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », et la
     // recherche, toujours globale, s'annonce « Rechercher dans toute la maison » (groupe « Dans les autres pièces »).
-    for (const label of ['Toute la maison', 'Cette pièce', 'Dans les autres pièces', 'Conseils dans cette pièce', 'Page principale', 'Exclus', 'Pièces', 'Masquer les pièces', 'Rechercher dans toute la maison', 'À traiter dans cette pièce',
-      'Rien à traiter dans cette pièce', 'Aucun résultat', 'Sélectionnez une pièce ou un équipement', 'Pièces et équipements', 'Indicateurs de la pièce',
+    // Garde levée (front v3, Lot 2) : la bascule et « Page principale » disparaissent (fil d'Ariane « Maison »), la recherche
+    // s'appelle « Rechercher » et dit « résultats », une pièce saine dit « Rien à faire ».
+    for (const label of ['Maison', 'Non lu', 'résultats', 'Résultats', 'Dans les autres pièces', 'Conseils dans cette pièce', 'Exclus', 'Pièces', 'Masquer les pièces', 'Rechercher', 'À traiter dans cette pièce',
+      'Rien à faire', 'Aucun résultat', 'Sélectionnez une pièce ou un équipement', 'Pièces et équipements', 'Indicateurs de la pièce',
       "Fil d'Ariane", 'Replier', 'Déplier', 'Appliquer', 'Ouvrir les types génériques']) {
       assert.ok(found.includes(label), label);
     }

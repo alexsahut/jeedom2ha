@@ -186,54 +186,68 @@ function openFiche(tree) {
   return { ui, P, text };
 }
 
+// Garde levée (front v3, Lot 2) : la fiche est refaite (en-tête sur deux lignes, bande de cause d'une ligne, bloc « Dans Home
+// Assistant » d'une ligne par entité, « Détails techniques » dans le menu ⋯). Les cinq constats de la démo restent vérifiés, sur
+// le nouveau rendu : la phrase longue de chaque cause passe dans l'info-bulle ⓘ, le « comment faire » dans « Détails techniques ».
 describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo', () => {
-  it('1. multiprise : « Publié · Lecture seule », 3 capteurs binaires, conseil « 3 sorties… » avec le remède du champ « Valeur »', () => {
+  const info = (ui, P, scope) => plain(ui.$(P + scope + ' .j2ha-eq-band-info').attr('title') || '');
+  const tech = (ui, P) => plain(ui.$(P + '.j2ha-eq-tech').text()).replace(/\s+/g, ' ');
+
+  it('1. multiprise : « Publié », 3 capteurs binaires en lecture seule, conseil « 3 sorties pilotables » avec le remède du champ « Valeur »', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.multiprise(withDaemon));
       assert.equal(text('.j2ha-eq-publish-badge'), 'Publié', label + ' : un seul badge, mot d’état inchangé');
-      assert.equal(text('.j2ha-eq-capacity'), 'Lecture seule', label);
-      assert.equal(text('.j2ha-eq-advice-mention'), 'Conseil', label);
       assert.equal(ui.$(P + '.j2ha-eq-ha-entity').length, 3, label);
-      assert.ok(ui.$(P + '.j2ha-eq-ha-entity').list.every((el) => plain(ui.$(el).text()).includes('Capteur binaire (binary_sensor)')), label);
-      assert.match(text('.j2ha-eq-advice'), /3 sorties pourraient être pilotables\./, label);
-      assert.match(text('.j2ha-eq-advice'), /champ « Valeur »/, label);
+      assert.ok(ui.$(P + '.j2ha-eq-ha-entity').list.every((el) => plain(ui.$(el).text()).includes('Capteur binaire')), label);
+      assert.ok(ui.$(P + '.j2ha-eq-ha-entity .j2ha-eq-capacity').list.every((el) => plain(ui.$(el).text()).trim() === 'Lecture seule'), label);
+      assert.equal(text('.j2ha-eq-ha-count'), '3 entités', label);
+      assert.equal(text('.j2ha-eq-advice .j2ha-eq-band-what'), '3 sorties pilotables', label);
+      assert.match(info(ui, P, '.j2ha-eq-advice'), /3 sorties pourraient être pilotables\./, label);
+      assert.match(tech(ui, P), /champ « Valeur »/, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice .j2ha-v2-open-equipment').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=142', label);
       assert.equal(ui.$(P + '.j2ha-eq-entity-id').length, withDaemon ? 3 : 0, label + ' : identifiant seulement du démon');
     }
   });
 
-  it('2. portail : conseil « Publié comme capteur d’ouverture » avec « Ouvrir les types génériques »', () => {
+  it('2. portail : conseil « Ouverture en lecture seule » avec « Types génériques »', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.portail(withDaemon));
-      assert.match(text('.j2ha-eq-advice'), /Publié comme capteur d’ouverture\./, label);
+      assert.equal(text('.j2ha-eq-advice .j2ha-eq-band-what'), 'Ouverture en lecture seule', label);
+      assert.match(info(ui, P, '.j2ha-eq-advice'), /Publié comme capteur d’ouverture\./, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice .j2ha-open-generic-types').attr('href'), 'index.php?v=d&p=types', label);
     }
   });
 
-  it('3. ventilateur : « Pilotable (allumer, éteindre) », conseil sur la vitesse, sans bouton', () => {
+  it('3. ventilateur : « Pilotable » (verbes en info-bulle), conseil sur la vitesse, sans bouton', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.ventilateur(withDaemon));
-      assert.equal(text('.j2ha-eq-capacity'), 'Pilotable (allumer, éteindre)', label);
-      assert.match(text('.j2ha-eq-advice'), /La vitesse n’est pas reprise\./, label);
+      assert.equal(text('.j2ha-eq-capacity'), 'Pilotable', label);
+      assert.equal(ui.$(P + '.j2ha-eq-capacity').attr('title'), 'allumer, éteindre', label);
+      assert.equal(text('.j2ha-eq-advice .j2ha-eq-band-what'), 'Vitesse non reprise', label);
+      assert.match(info(ui, P, '.j2ha-eq-advice'), /La vitesse n’est pas reprise\./, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice .btn').length, 0, label + ' : aucune action');
     }
   });
 
   // Front v2 (Lot 5) : « Corriger le type… » ouvre désormais le panneau E5 (plus le sélecteur de la cellule).
-  // Garde levée (front v2, Lot 9a, point 9) : pour ce blocage par le nom, la fiche propose « Publier quand même » et
-  // « Renommer l’équipement dans Jeedom, puis Relire Jeedom » ; le panneau de type reste ouvrable par la colonne « Type HA ».
-  it('4. lampe typée prise : « Bloqué », fiche « le nom dit « lampe »… », « Publier quand même », panneau par la colonne', () => {
+  // Front v2 (Lot 9a, point 9) puis front v3 (Lot 2) : pour ce blocage par le nom, la bande propose « Publier en interrupteur ▾ »
+  // (« Publier quand même », type dit) et « Renommer » ; le panneau de type reste ouvrable par la colonne « Type HA ».
+  it('4. lampe typée prise : « Bloqué », bande « Nom « lampe » ≠ type « prise » », « Publier en interrupteur », aperçu, panneau par la colonne', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.lampePrise(withDaemon));
       assert.equal(text('.j2ha-eq-publish-badge'), 'Bloqué', label);
-      assert.equal(ui.$(P + '.j2ha-eq-capacity').length, 0, label + ' : pas de capacité pour un équipement non publié');
       assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-notice').length, 1, label);
-      assert.match(text('.j2ha-eq-notices'), /Non publié : le nom dit « lampe », les types Jeedom disent « prise »\./, label);
+      assert.equal(text('.j2ha-eq-notices .j2ha-eq-band-what'), 'Nom « lampe » ≠ type « prise »', label);
+      assert.match(info(ui, P, '.j2ha-eq-notices'), /Non publié : le nom dit « lampe », les types Jeedom disent « prise »\./, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice').text(), '', label + ' : le conseil « nom ≠ type » n’est pas répété');
+      assert.equal(text('.j2ha-eq-ha-empty'), 'Rien', label);
+      assert.equal(ui.$(P + '.j2ha-eq-ha-entity.is-preview').length, 1, label + ' : aperçu de ce que publierait « Toujours »');
+      assert.match(text('.j2ha-eq-ha-entity.is-preview'), /Interrupteur \(aperçu\)/, label);
       assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 0);
-      assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-correct-type').length, 0, label + ' : « Corriger le type… » ne débloquerait pas');
-      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway').text()), 'Publier quand même', label);
-      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').text()), 'Renommer l’équipement dans Jeedom, puis Relire Jeedom', label);
+      assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-correct-type').length, 0, label + ' : « Changer le type » ne débloquerait pas');
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway').text()), 'Publier en interrupteur', label);
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').text()).trim(), 'Renommer', label);
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').attr('title')), 'Renommer l’équipement dans Jeedom, puis Relire Jeedom', label);
       assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-rename').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=231', label);
       ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
       assert.equal(ui.$(P + 'tr[data-type-panel-for="2311"] .j2ha-v2-type-panel').length, 1, label + ' : le panneau est ouvert sous la première commande');
@@ -241,22 +255,24 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
     }
   });
 
-  it('5. équipement sans type : fiche avec la phrase des types génériques et « Ouvrir les types génériques »', () => {
+  it('5. équipement sans type : bande « Sans type générique », phrase des types génériques en info-bulle, « Types génériques »', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.sansType(withDaemon));
-      assert.match(text('.j2ha-eq-notices'), /Jeedom ne sait pas à quoi servent ces commandes/, label);
-      assert.match(text('.j2ha-eq-notices'), /« Lumière État », « Lumière Bouton On »/, label);
-      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-open-generic-types').text()), 'Ouvrir les types génériques', label);
+      assert.equal(text('.j2ha-eq-notices .j2ha-eq-band-what'), 'Sans type générique', label);
+      assert.match(info(ui, P, '.j2ha-eq-notices'), /Jeedom ne sait pas à quoi servent ces commandes/, label);
+      assert.match(info(ui, P, '.j2ha-eq-notices'), /« Lumière État », « Lumière Bouton On »/, label);
+      assert.equal(plain(ui.$(P + '.j2ha-eq-notices .j2ha-open-generic-types').text()).trim(), 'Types génériques', label);
       assert.deepEqual(ui.$(P + '.mo-native-value').list.map((el) => plain(ui.$(el).text())), ['non renseigné', 'non renseigné'], label);
       assert.ok(ui.$(P + '.j2ha-v2-role-missing').length === 2, label + ' : en orange');
     }
   });
 
-  it('6. lumière publiée : « Pilotable (allumer, éteindre) » et, avec le démon, son identifiant copiable', () => {
+  it('6. lumière publiée : « Pilotable » (allumer, éteindre en info-bulle) et, avec le démon, son identifiant copiable', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.lumiere(withDaemon));
-      assert.equal(text('.j2ha-eq-capacity'), 'Pilotable (allumer, éteindre)', label);
-      assert.equal(ui.$(P + '.j2ha-eq-advice-mention').length, 0, label);
+      assert.equal(text('.j2ha-eq-capacity'), 'Pilotable', label);
+      assert.equal(ui.$(P + '.j2ha-eq-capacity').attr('title'), 'allumer, éteindre', label);
+      assert.equal(ui.$(P + '.j2ha-eq-advice .j2ha-eq-band').length, 0, label);
       if (withDaemon) {
         assert.equal(text('.j2ha-eq-entity-id'), 'light.jeedom2ha_eq_200');
         assert.equal(ui.$(P + '.j2ha-v2-copy').attr('aria-label'), '{{Copier l’identifiant}}');
@@ -267,27 +283,41 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
   });
 });
 
-describe('Lot 2 — fiche rendue : bandeau, tableau, réglage, erreurs', () => {
-  it('bandeau deux côtés : Jeedom (plugin, pièce, commandes, lien) → Home Assistant', () => {
+describe('Lot 2 — fiche rendue : en-tête, bloc Home Assistant, tableau, réglage, erreurs', () => {
+  it('ligne 2 de l’en-tête : plugin · n commandes (répartition en info-bulle) · ↗ Jeedom · Home Assistant (où le trouver en info-bulle)', () => {
     const { ui, P, text } = openFiche(DEMO.multiprise(true));
-    assert.match(text('.j2ha-eq-side-jeedom'), /Multiprise Bureau/);
-    assert.match(text('.j2ha-eq-side-jeedom'), /Plugin Virtuel · pièce Bureau · 9 commandes/);
-    assert.match(text('.j2ha-eq-side-jeedom'), /3 états, 3 ordres On, 3 ordres Off/);
-    assert.match(text('.j2ha-eq-side-ha'), /3 entités, en lecture seule/);
-    assert.match(text('.j2ha-eq-side-ha'), /Home Assistant peut ajuster cet identifiant/);
-    assert.equal(ui.$(P + '.j2ha-v2-arrow').attr('aria-hidden'), 'true');
+    assert.equal(text('.j2ha-eq-meta-facts'), 'Virtuel · 9 commandes');
+    assert.equal(ui.$(P + '.j2ha-eq-meta-facts').attr('title'), '3 états, 3 ordres On, 3 ordres Off');
+    assert.equal(ui.$(P + '.j2ha-eq-open-jeedom').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=142');
+    assert.match(plain(ui.$(P + '.j2ha-v2-where-toggle').attr('title')), /Paramètres › Appareils et services › MQTT, puis l’appareil « Multiprise Bureau »/);
+    assert.equal(text('.j2ha-eq-ha-title').replace(/3 entités$/, '').trim(), 'Dans Home Assistant');
+    assert.match(plain(ui.$(P + '.j2ha-eq-entity-id').attr('title')), /Home Assistant peut ajuster cet identifiant/);
   });
 
-  it('« Détails techniques » et « Où le trouver » repliés par défaut, dépliés au clic (aria-expanded)', () => {
+  it('« Détails techniques » : replié par défaut, ouvert par le menu ⋯ (numéro Jeedom, identifiants uniques, code de la cause)', () => {
     const { ui, P } = openFiche(DEMO.multiprise(true));
-    const toggle = ui.$(P + '.j2ha-eq-side-ha .j2ha-v2-tech-toggle');
-    assert.equal(toggle.attr('aria-expanded'), 'false');
-    const content = ui.$('#' + toggle.attr('aria-controls'));
+    const content = ui.$(P + '.j2ha-eq-tech .j2ha-v2-tech');
     assert.equal(content.list[0].visible, false);
-    ui.click(P + '.j2ha-eq-side-ha .j2ha-v2-tech-toggle');
-    assert.equal(ui.$(P + '.j2ha-eq-side-ha .j2ha-v2-tech-toggle').attr('aria-expanded'), 'true');
+    assert.match(plain(content.text()), /Équipement Jeedom #142/);
+    assert.match(plain(content.text()), /jeedom2ha_142_871/);
+    ui.click(P + '.j2ha-eq-tech-toggle');
     assert.equal(content.list[0].visible, true);
-    assert.equal(ui.$(P + '.j2ha-v2-where-toggle').attr('aria-expanded'), 'false');
+  });
+
+  it('au-delà de 3 entités : 3 lignes visibles, « + n autres » déplie le reste', () => {
+    const tree = DEMO.multiprise(true);
+    const extra = JSON.parse(JSON.stringify(tree.entities[2]));
+    extra.command_ids = [874]; extra.ha_default_entity_id = 'binary_sensor.jeedom2ha_142_874'; extra.ha_name = 'Sortie 4';
+    tree.entities.push(extra);
+    tree.commands.push(Object.assign({}, tree.commands[0], { jeedom_cmd_id: 874, cmd_name: 'État 4' }));
+    const { ui, P, text } = openFiche(tree);
+    assert.equal(text('.j2ha-eq-ha-count'), '4 entités');
+    assert.equal(ui.$(P + '.j2ha-eq-ha-more').list[0].visible, false);
+    assert.equal(ui.$(P + '.j2ha-eq-ha-more .j2ha-eq-ha-entity').length, 1);
+    assert.equal(text('.j2ha-eq-ha-toggle'), '+ 1 autre');
+    ui.click(P + '.j2ha-eq-ha-toggle');
+    assert.equal(ui.$(P + '.j2ha-eq-ha-more').list[0].visible, true);
+    assert.equal(ui.$(P + '.j2ha-eq-ha-toggle').attr('aria-expanded'), 'true');
   });
 
   it('colonne « Rôle dans Jeedom » : libellé français, code en infobulle', () => {
@@ -297,22 +327,24 @@ describe('Lot 2 — fiche rendue : bandeau, tableau, réglage, erreurs', () => {
     assert.deepEqual(cells.map((el) => el.attrs.title), ['LIGHT_STATE', 'LIGHT_ON', 'LIGHT_OFF']);
   });
 
-  it('ligne d’explication sous le contrôle segmenté, selon la position active', () => {
-    const { text } = openFiche(DEMO.lumiere(true));
-    assert.equal(text('.j2ha-eq-seg-help'), 'Automatique : le plugin décide (ici : publié).');
-    const forced = DEMO.lumiere(true);
-    forced.entities[0].publication_override = 'force_publish';
-    forced.equipment_publication_override = 'force_publish';
-    assert.equal(openFiche(forced).text('.j2ha-eq-seg-help'), 'Toujours : publier même si le plugin hésite.');
+  it('réglage segmenté : plus de phrase sous le contrôle, une info-bulle par position ; « Toujours » jamais grisé', () => {
+    const { ui, P } = openFiche(DEMO.lumiere(true));
+    assert.equal(ui.$(P + '.j2ha-eq-seg-help').length, 0);
+    const seg = (key) => ui.$(P + '.j2ha-eq-controls .j2ha-seg-' + key);
+    assert.equal(plain(seg('auto').attr('title')), 'Le plugin décide');
+    assert.equal(plain(seg('always').attr('title')), 'Publier même si le plugin hésite, maintenant ou plus tard');
+    assert.equal(plain(seg('never').attr('title')), 'Ne jamais publier');
+    assert.notEqual(seg('always').prop('disabled'), true, 'équipement publié : « Toujours » reste une vraie action');
   });
 
-  it('menu « ⋯ » : « Ouvrir l’équipement dans Jeedom » (lien, sans gating), entre « Tout remettre… » et la suppression', () => {
+  it('menu « ⋯ » : « Ouvrir l’équipement dans Jeedom » (lien, sans gating), « Détails techniques », puis la suppression', () => {
     const { ui, P } = openFiche(DEMO.lumiere(true));
     const entries = ui.$(P + '.j2ha-menu li').list.map((li) => plain(ui.$(li).text()));
-    assert.deepEqual(entries, ['Republier', 'Tout remettre en automatique…', 'Ouvrir l’équipement dans Jeedom', '', 'Supprimer de Home Assistant…']);
+    assert.deepEqual(entries, ['Republier', 'Tout remettre en automatique…', 'Ouvrir l’équipement dans Jeedom', 'Détails techniques', '', 'Supprimer de Home Assistant…']);
     const link = ui.$(P + '.j2ha-menu a.j2ha-menu-item');
     assert.equal(link.attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=200');
     assert.equal(link.attr('data-ha-action'), undefined);
+    assert.equal(ui.$(P + '.j2ha-eq-tech-toggle').attr('data-ha-action'), undefined, '« Détails techniques » n’écrit rien : jamais grisé');
   });
 
   it('lecture impossible : message existant et « Réessayer » (même lecture) ; aucune donnée périmée', () => {
@@ -326,11 +358,12 @@ describe('Lot 2 — fiche rendue : bandeau, tableau, réglage, erreurs', () => {
     const P = '.j2ha-eq-panel[data-eq-id="142"] ';
     assert.match(ui.$(P + '.j2ha-eq-status').text(), /démon indisponible/);
     assert.equal(ui.$(P + '.j2ha-eq-sides').text(), '');
+    assert.equal(ui.$(P + '.j2ha-eq-meta-facts').text(), '');
     assert.equal(ui.$(P + '.j2ha-eq-mentions').text(), '');
     ui.click(P + '.j2ha-v2-retry');
     ui.respond('getMappingOverrides', { state: 'ok', result: { payload: tree } });
     assert.equal(ui.$(P + '.j2ha-v2-retry').length, 0);
-    assert.equal(plain(ui.$(P + '.j2ha-eq-capacity').text()), 'Lecture seule');
+    assert.equal(plain(ui.$(P + '.j2ha-eq-capacity').first().text()).trim(), 'Lecture seule');
   });
 
   it('parité du mot d’état : le badge reste le seul mot d’état ; capacité et conseil sont hors du badge', () => {

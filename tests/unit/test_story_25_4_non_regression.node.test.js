@@ -388,7 +388,8 @@ describe('25.4 / AC15 — parité d’état entre l’arbre (entrée agrégée) 
     openCard(ui, 10);
     for (const id of ids) {
       ui.selectEquipment(Number(id), ok(clone(FIXTURE[id].tree)));
-      const treeWord = ui.text(`.j2ha-wv-eq[data-eq-id="${id}"] .j2ha-state-word`).trim();
+      // Garde levée (front v3, Lot 2) : l'arbre montre l'icône seule ; le mot d'état est son nom accessible (premier segment).
+      const treeWord = String(ui.$(`.j2ha-wv-eq[data-eq-id="${id}"] .j2ha-state-word`).attr('aria-label') || '').split(' · ')[0].trim();
       const badge = ui.text(`.j2ha-eq-panel[data-eq-id="${id}"] .j2ha-eq-publish-badge`).trim();
       assert.equal(treeWord, badge, 'équipement ' + id);
       assert.equal(treeWord, M.EQUIPMENT_STATE_LABELS[M.resolveEquipmentState(equipments[id], FIXTURE[id].enabled !== false).state]);

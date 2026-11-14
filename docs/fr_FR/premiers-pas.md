@@ -43,7 +43,7 @@ Dans Home Assistant, ouvrez **Paramètres › Appareils et services › MQTT** :
 
 ![Les appareils publiés par jeedom2ha dans Home Assistant, avec leur pièce](images/home-assistant-appareils.png)
 
-Dans la page du plugin, la fiche d'un équipement rappelle ce chemin (**« Où le trouver dans Home Assistant ? »**) et donne l'identifiant de chaque entité, par exemple `light.jeedom2ha_142` (**« copier »** le met dans le presse-papiers). Cet identifiant est technique et stable : il ne change pas si vous renommez l'équipement. Une **entité** est une ligne pilotable ou lisible dans Home Assistant : un équipement Jeedom peut en donner plusieurs (une prise et sa consommation, par exemple).
+Dans la page du plugin, la fiche d'un équipement rappelle ce chemin (info-bulle de « Home Assistant », sous son nom) et donne l'identifiant de chaque entité, par exemple `light.jeedom2ha_142` (l'icône à côté le copie). Cet identifiant est technique et stable : il ne change pas si vous renommez l'équipement. Une **entité** est une ligne pilotable ou lisible dans Home Assistant : un équipement Jeedom peut en donner plusieurs (une prise et sa consommation, par exemple).
 
 ## Trois questions, pour chaque équipement
 

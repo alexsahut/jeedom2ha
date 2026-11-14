@@ -135,7 +135,9 @@ describe('25.1 / AC5 — commandes ignorées hors des défauts', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const panel = ui.$('.j2ha-eq-panel[data-eq-id="1"]');
     assert.equal(panel.find('.j2ha-eq-counter').list.map((el) => ui.$(el).text()).join(' · '), '3 publiées · 1 bloquée · 5 ignorées');
-    assert.match(panel.find('.j2ha-eq-blocked-mention').text(), /1 bloquée/);
+    // Garde levée (front v3, Lot 2) : la mention n'est plus un texte de l'en-tête ; une icône la porte (info-bulle, nom accessible),
+    // le décompte reste sur la ligne 2 (« 3 publiées · 1 bloquée · 5 ignorées »).
+    assert.match(panel.find('.j2ha-eq-blocked-mention i').attr('aria-label'), /1 bloquée/);
     assert.equal(M.summarizeEquipmentCounters(t).defects, 1);
   });
 
@@ -359,6 +361,8 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
     assert.deepEqual(entries, [
       { role: 'none', text: 'Republier', danger: false },
       { role: 'none', text: 'Tout remettre en automatique…', danger: false },
+      // Front v3 (Lot 2) : « Détails techniques » passe dans le menu (aucune écriture).
+      { role: 'none', text: 'Détails techniques', danger: false },
       { role: 'separator', text: '', danger: false },
       { role: 'none', text: 'Supprimer de Home Assistant…', danger: true },
     ]);
@@ -503,9 +507,13 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const notices = ui.$(PANEL + '.j2ha-notice');
     assert.equal(notices.length, 1);
-    assert.match(notices.find('.j2ha-notice-text').text(), /11 commandes bloquées : types génériques non configurés dans Jeedom/);
+    // Garde levée (front v3, Lot 2) : la bande dit la cause en 4 mots au plus ; la phrase avec le nombre de commandes est dans
+    // « Détails techniques » (menu ⋯), une seule fois. Le bouton s'appelle « Types génériques » (« Ouvrir… » en info-bulle).
+    assert.equal(plain(notices.find('.j2ha-eq-band-what').text()).trim(), 'Sans type générique');
+    assert.match(ui.$(PANEL + '.j2ha-eq-tech').text(), /11 commandes bloquées : types génériques non configurés dans Jeedom/);
     const button = notices.find('.j2ha-open-generic-types');
-    assert.equal(plain(button.text()), 'Ouvrir les types génériques');
+    assert.equal(plain(button.text()).trim(), 'Types génériques');
+    assert.equal(plain(button.attr('title')), 'Ouvrir les types génériques');
     assert.equal(button.attr('href'), 'index.php?v=d&p=types');
     const occurrences = ui.$(PANEL).text().split(CAUSE).length - 1;
     assert.equal(occurrences, 1, 'la phrase de cause apparaît exactement une fois');
@@ -518,8 +526,13 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const t = tree(1, [BLOCKED, BLOCKED, view('ha_missing_state_topic', false, false), READY], { present: true });
     t.commands[3].published_in_ha = true;
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
-    const notices = ui.$(PANEL + '.j2ha-notice-text').list.map((el) => ui.$(el).text().trim());
-    assert.deepEqual(notices, ['2 commandes bloquées : types génériques non configurés dans Jeedom', '1 commande bloquée : pas de retour d’état exploitable']);
+    // Garde levée (front v3, Lot 2) : une bande par cause (libellé court), le décompte de chacune dans « Détails techniques ».
+    const notices = ui.$(PANEL + '.j2ha-eq-band-what').list.map((el) => plain(ui.$(el).text()).trim());
+    assert.deepEqual(notices, ['Sans type générique', 'Pas d’état']);
+    const tech = ui.$(PANEL + '.j2ha-eq-tech').text();
+    for (const line of ['2 commandes bloquées : types génériques non configurés dans Jeedom', '1 commande bloquée : pas de retour d’état exploitable']) {
+      assert.equal(tech.split(line).length - 1, 1, line);
+    }
     assert.equal(ui.$(PANEL + '.j2ha-open-generic-types').length, 1, 'le lien seulement pour la cause qui le justifie');
   });
 
@@ -529,7 +542,8 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const mixed = tree(1, [READY, BLOCKED], { present: true });
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(mixed)]);
     assert.equal(ui.$(PANEL + '.j2ha-goto-blocking').length, 1);
-    assert.match(ui.$(PANEL + '.j2ha-goto-blocking').text(), /Voir la première commande bloquée/);
+    // Front v3 (Lot 2) : icône seule dans la bande, le libellé en nom accessible et en info-bulle.
+    assert.match(ui.$(PANEL + '.j2ha-goto-blocking').attr('aria-label'), /Voir la première commande bloquée/);
   });
 });
 

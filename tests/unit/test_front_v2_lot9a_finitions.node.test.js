@@ -173,11 +173,15 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
 });
 
 describe('Lot 9a — fiche de cause : « Publier quand même »', () => {
+  // Garde levée (front v3, Lot 2) : la bande dit le mot et le type en 4 mots ; le décompte et le libellé d'origine passent dans
+  // « Détails techniques » (menu ⋯). Le bouton « Publier quand même » dit sa conséquence : « Publier en interrupteur ».
   it('la fiche nomme le mot et le type, et « Publier quand même » passe par l’aperçu « Toujours » de l’équipement', () => {
     const { ui, P, text, done } = openFiche(lampeValide());
-    assert.match(text('.j2ha-eq-notices'), /3 commandes bloquées : le mot « lampe » du nom écarte le type Interrupteur \(switch\)/);
-    assert.match(text('.j2ha-eq-notices'), /Libellé d’origine : 3 commandes bloquées : un mot du nom de l’équipement écarte ce type/);
+    assert.equal(text('.j2ha-eq-notices .j2ha-eq-band-what'), 'Nom « lampe » ≠ type « prise »');
+    assert.match(text('.j2ha-eq-tech'), /3 commandes bloquées : le mot « lampe » du nom écarte le type Interrupteur \(switch\)/);
+    assert.match(text('.j2ha-eq-tech'), /Libellé d’origine : 3 commandes bloquées : un mot du nom de l’équipement écarte ce type/);
     assert.doesNotMatch(text('.j2ha-eq-notices'), /Le plugin ne tranche pas à votre place/);
+    assert.equal(text('.j2ha-eq-notices .j2ha-v2-publish-anyway'), 'Publier en interrupteur');
     assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-v2-correct-type').length, 0);
     ui.click(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway');
     const preview = ui.pending('previewMappingOverride').slice(-1)[0];
@@ -187,21 +191,36 @@ describe('Lot 9a — fiche de cause : « Publier quand même »', () => {
     done();
   });
 
-  it('« Toujours » indisponible : la raison est dite, rien n’est demandé', () => {
+  // Garde levée (front v3, Lot 2) : « Toujours » n'est jamais grisé. Le bouton passe toujours par l'aperçu du démon (lecture
+  // seule) ; c'est l'aperçu qui dit un refus, avant toute écriture. Déjà sur « Toujours » : la raison est dite, rien n'est demandé.
+  it('« Publier en … » : toujours l’aperçu « Toujours » d’abord (jamais grisé) ; déjà « Toujours » : la raison est dite', () => {
     const { ui, P, done } = openFiche(DEMO.lampePrise(true));
-    const before = ui.calls.length;
+    assert.notEqual(ui.$(P + '.j2ha-eq-controls .j2ha-seg-always').prop('disabled'), true);
     ui.click(P + '.j2ha-eq-notices .j2ha-v2-publish-anyway');
-    assert.equal(ui.calls.length, before);
-    assert.match(plain(ui.$(P + '.j2ha-eq-notices .j2ha-publication-error').text()), /« Publier quand même » est indisponible/);
+    const preview = ui.pending('previewMappingOverride').slice(-1)[0];
+    assert.ok(preview, 'aperçu demandé');
+    assert.equal(preview.data.publicationPolicy, 'force_publish');
+    assert.ok(!ui.calls.some((c) => c.action === 'savePublicationOverride'), 'rien n’est écrit avant la confirmation');
     done();
+    const forced = DEMO.lampePrise(true);
+    forced.entities[0].publication_override = 'force_publish';
+    forced.equipment_publication_override = 'force_publish';
+    const second = openFiche(forced);
+    const before = second.ui.calls.length;
+    second.ui.click(second.P + '.j2ha-eq-notices .j2ha-v2-publish-anyway');
+    assert.equal(second.ui.calls.length, before);
+    assert.match(plain(second.ui.$(second.P + '.j2ha-eq-notices .j2ha-publication-error').text()), /déjà sur « Toujours »/);
+    second.done();
   });
 
   it('un seul libellé « Pilotable » sur la fiche (sans « lire l’état ») ', () => {
     const t = DEMO.lumiere(true);
     t.entities[0].ha_capabilities = ['on_off', 'read'];
-    const { text, done } = openFiche(t);
-    assert.equal(text('.j2ha-eq-capacity'), 'Pilotable (allumer, éteindre)');
-    assert.match(text('.j2ha-eq-ha-entity'), /— Pilotable \(allumer, éteindre\)/);
+    const { ui, P, text, done } = openFiche(t);
+    // Garde levée (front v3, Lot 2) : « Pilotable » est dit une fois, sur la ligne de l'entité ; les verbes vont en info-bulle.
+    assert.equal(text('.j2ha-eq-capacity'), 'Pilotable');
+    assert.equal(ui.$(P + '.j2ha-eq-capacity').length, 1);
+    assert.equal(ui.$(P + '.j2ha-eq-capacity').attr('title'), 'allumer, éteindre');
     assert.doesNotMatch(text('.j2ha-eq-sides'), /lire l’état/);
     done();
   });

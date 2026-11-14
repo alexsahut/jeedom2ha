@@ -600,7 +600,8 @@ describe('G — rendu du détail de pièce et d’équipement de la vue C (ex-fe
     assert.equal(ui.$('.j2ha-eq-name').text(), '<i>Nom</i>');
     assert.equal(ui.$('.j2ha-eq-name i').length, 0);
     assert.ok(ui.$('.j2ha-eq-panel').hasClass('j2ha-eq-disabled'));
-    assert.match(ui.$('.j2ha-eq-panel').text(), /désactivé dans Jeedom/);
+    // Garde levée (front v3, Lot 2) : « désactivé dans Jeedom » est l'info-bulle et le nom accessible d'une icône de l'en-tête.
+    assert.match(ui.$('.j2ha-eq-panel .j2ha-eq-off').attr('aria-label'), /désactivé dans Jeedom/);
   });
 
   it('KPI de pièce : un chiffre et un mot par état non nul, issus du dénombrement des entrées agrégées', () => {

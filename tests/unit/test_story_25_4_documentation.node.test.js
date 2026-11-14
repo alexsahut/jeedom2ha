@@ -35,8 +35,10 @@ describe('25.4 / AC30 — index.md décrit la vue de travail', () => {
 // Garde levée (front v2, Lot 7, spec E2/E3) : la puce filtre sur place, « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », la recherche est « Rechercher dans toute la maison » ; index.md suit.
   it('section dédiée : ouverture, retour, adresse, arbre, recherche, filtres, détail de pièce, détail d’équipement, tablette', () => {
     assert.ok(index.includes('\n### La vue de travail\n'));
-    for (const needle of ['**La vue de travail**'.replace(/\*\*/g, '**'), '« Cette pièce | Toute la maison »', '« Précédent »', '#j2ha-vue=', 'Rechercher dans toute la maison', 'Dans les autres pièces', 'Aucun résultat',
-      'À traiter dans cette pièce', 'Rien à traiter dans cette pièce', 'Republier la pièce', 'Ouvrir les types génériques', '« Pièces »', 'Échap']) {
+    // Garde levée (front v3, Lot 2) : un seul arbre (plus de bascule ni de « Dans les autres pièces »), fil d'Ariane `Maison ›
+    // Niveau › Pièce`, recherche « Rechercher » avec « n résultats », pièce saine « Rien à faire » ; index.md suit.
+    for (const needle of ['**La vue de travail**'.replace(/\*\*/g, '**'), 'Maison › Niveau › Pièce', '« Précédent »', '#j2ha-vue=', '« Rechercher »', '« n résultats »', 'Aucun résultat',
+      'À traiter dans cette pièce', 'Rien à faire', 'Republier la pièce', 'Ouvrir les types génériques', '« Pièces »', 'Échap']) {
       assert.ok(index.includes(needle.replace('**La vue de travail**', 'vue de travail')), needle);
     }
     assert.match(index, /carte de pièce ou sur une ligne de la liste filtrée ouvre la \*\*vue de travail\*\*/);
@@ -85,9 +87,11 @@ describe('25.4 / AC30 — libellés cités = libellés du code', () => {
     .map((file) => fs.readFileSync(file, 'utf8').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'")).join('\n');
 
   it('chaque libellé de la vue cité entre « » dans index.md existe tel quel dans desktop/ ou core/', () => {
-    for (const label of ['Toute la maison', 'Cette pièce', 'Rechercher dans toute la maison', 'Dans les autres pièces', 'À traiter dans cette pièce', 'Rien à traiter dans cette pièce',
+    // Garde levée (front v3, Lot 2) : « Toute la maison », « Cette pièce », « Rechercher dans toute la maison », « Dans les autres
+    // pièces », « Rien à traiter dans cette pièce », « (désactivé dans Jeedom) » et « non lu » ont quitté l'écran ; leurs successeurs.
+    for (const label of ['Maison', 'Rechercher', 'résultats', 'À traiter dans cette pièce', 'Rien à faire',
       'Pièces', 'Aucun résultat', 'Republier la pièce', 'Supprimer de Home Assistant…', 'Ouvrir les types génériques', 'Appliquer',
-      '(désactivé dans Jeedom)', 'non lu', 'Chargement…', 'Impossible de lire la configuration de cet équipement.',
+      'désactivé dans Jeedom', 'Non lu', 'Chargement…', 'Impossible de lire la configuration de cet équipement.',
       'Impossible de charger la configuration HA (démon indisponible).',
       'Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement.']) {
       assert.ok(index.includes(label), `« ${label} » cité dans index.md`);
