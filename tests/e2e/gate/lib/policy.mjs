@@ -18,6 +18,9 @@
  *   - ctx.declaredRescan : true seulement si le parcours déclare le rescan (AC7).
  *   - ctx.declaredRoomExclusions : { [objectId]: { excluded: '1' | '0' } } — exclusions de pièce déclarées par le
  *     parcours (Story 25.8, AC14) : `saveRoomExclusion` n'est simulée que pour un objectId et un sens déclarés.
+ *   - ctx.declaredFilteringConfig : { excludedPlugins: [valeurs CSV acceptées], confidencePolicy } — front v2 (Lot 6) : écriture
+ *     `saveFilteringConfig` depuis le panneau « Choisir ce qui est publié… » de la page du plugin, SIMULÉE seulement pour une
+ *     valeur déclarée (application puis annulation) ; sans déclaration, elle reste un effet de bord bloqué.
  *   - ctx.declaredEquipmentPublications : { [eqId]: true } — front v2 (Lot 5) : équipements dont la publication
  *     (`executeHaAction` publier / equipement / [eqId], le second temps de « Enregistrer et publier ») est SIMULÉE,
  *     jamais transmise. Tout autre `executeHaAction` reste un effet de bord refusé.
@@ -74,6 +77,10 @@ const SIDE_EFFECT_ACTIONS = [
 // Paramètres de core/ajax/jeedom2ha.ajax.php:877-920 (previewMappingOverride,
 // saveMappingOverride, revertMappingOverride) : eqId, cmdId, haEntityType.
 const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride'];
+
+// Front v2 (Lot 6) : plugins exclus écrits depuis la page du plugin (panneau d'exclusion unifiée) — écriture SIMULÉE déclarée.
+const FILTERING_CONFIG_ACTION = 'saveFilteringConfig';
+const FILTERING_CONFIG_PARAMS = 'action,confidencePolicy,excludedPlugins';
 
 // Story 25.8 : exclusion d'une pièce depuis la surface — écriture de configuration SIMULÉE, jamais transmise à la box.
 const ROOM_EXCLUSION_ACTION = 'saveRoomExclusion';
@@ -226,6 +233,18 @@ function validateRoomExclusion(req, params, ctx) {
   return !!entry && typeof entry === 'object' && entry.excluded === params.excluded;
 }
 
+// Front v2 (Lot 6) : POST, exactement action + excludedPlugins + confidencePolicy ; `excludedPlugins` = une des valeurs déclarées
+// par le parcours (liste de chaînes), `confidencePolicy` = la valeur déclarée (sure_only ou sure_probable).
+function validateFilteringConfig(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== FILTERING_CONFIG_PARAMS) return false;
+  const declared = ctx.declaredFilteringConfig;
+  if (!declared || typeof declared !== 'object' || !Array.isArray(declared.excludedPlugins)) return false;
+  if (params.confidencePolicy !== 'sure_only' && params.confidencePolicy !== 'sure_probable') return false;
+  if (params.confidencePolicy !== declared.confidencePolicy) return false;
+  return declared.excludedPlugins.some((value) => typeof value === 'string' && value === params.excludedPlugins);
+}
+
 // Front v2 (Lot 5) : POST, exactement action + intention + portee + selection, `publier` / `equipement` / `[eqId]`, eqId
 // déclaré par le parcours dans `declaredEquipmentPublications`. Simulée : rien n'est transmis à la box.
 const EQUIPMENT_PUBLICATION_PARAMS = 'action,intention,portee,selection';
@@ -303,6 +322,10 @@ export function classifyRequest(req, ctx) {
         return { verdict: 'simulate', reason: 'exclusion-piece-declaree', action, params };
       }
       return { verdict: 'block-fail', reason: 'exclusion-piece-non-declaree', action };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === FILTERING_CONFIG_ACTION && validateFilteringConfig(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'plugins-exclus-declares', action, params };
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && action === 'executeHaAction'

@@ -193,9 +193,12 @@ function j2ha_group_rooms(array $rooms, array $ancestors) {
 }
 
 /**
- * Menu « ⋯ » d'une carte de pièce (Story 25.8, AC6) : une seule entrée, « Exclure la pièce… » ou « Ne plus exclure la
- * pièce… ». Réutilise le composant `.j2ha-menu-*` de 25.1 sans en modifier les règles. L'entrée porte `data-ha-action` : elle est
- * grisée par le même gating que les autres actions (pont indisponible, relecture en cours). Jamais pour « Sans pièce ».
+ * Menu « ⋯ » d'une carte de pièce (Story 25.8, AC6 ; front v2, Lot 6) : « Choisir ce qui est publié… » (ouvre le panneau
+ * d'exclusion unifiée positionné sur la pièce, aucune écriture), « Republier la pièce » (même route que la vue de la pièce), puis,
+ * après un séparateur, « Exclure la pièce… » ou « Ne plus exclure la pièce… ». Réutilise le composant `.j2ha-menu-*` de 25.1
+ * sans en modifier les règles. Les entrées qui écrivent portent `data-ha-action` : elles sont grisées par le même gating que les
+ * autres actions (pont indisponible, relecture en cours). Libellé du bouton : « Autres actions » (glossaire 3.1). Jamais pour
+ * « Sans pièce ».
  */
 function j2ha_render_room_menu(array $room) {
 	$name = j2ha_html($room['object_name']);
@@ -203,9 +206,15 @@ function j2ha_render_room_menu(array $room) {
 	$label = $excluded ? '{{Ne plus exclure la pièce…}}' : '{{Exclure la pièce…}}';
 	$html = '<span class="j2ha-menu-wrap j2ha-room-menu">';
 	$html .= '<button type="button" class="j2ha-menu-toggle j2ha-room-menu-toggle" aria-haspopup="menu" aria-expanded="false"'
-		. ' aria-label="{{Actions de la pièce}} ' . $name . '" title="{{Actions de la pièce}}">'
+		. ' aria-label="{{Autres actions}} ' . $name . '" title="{{Autres actions}}">'
 		. '<i class="fas fa-ellipsis-h"></i></button>';
-	$html .= '<ul class="j2ha-menu j2ha-room-menu-list" role="menu"><li role="none">'
+	$html .= '<ul class="j2ha-menu j2ha-room-menu-list" role="menu">'
+		. '<li role="none"><button type="button" class="j2ha-menu-item j2ha-room-choose" role="menuitem">'
+		. '<i class="fas fa-check-square"></i><span>{{Choisir ce qui est publié…}}</span></button></li>'
+		. '<li role="none"><button type="button" class="j2ha-menu-item j2ha-card-republish" role="menuitem" data-ha-action="republier-piece" disabled>'
+		. '<i class="fas fa-upload"></i><span>{{Republier la pièce}}</span></button></li>'
+		. '<li class="j2ha-menu-sep" role="separator"></li>'
+		. '<li role="none">'
 		. '<button type="button" class="j2ha-menu-item j2ha-room-exclude" role="menuitem" data-ha-action="exclure-piece"'
 		. ' data-excluded="' . ($excluded ? '1' : '0') . '" disabled>'
 		. '<i class="fas fa-eye-slash"></i><span class="j2ha-room-exclude-label">' . $label . '</span></button>'

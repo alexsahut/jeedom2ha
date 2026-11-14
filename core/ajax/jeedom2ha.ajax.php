@@ -1102,6 +1102,15 @@ try {
       if ($cmdId !== '') {
         $payload['jeedom_cmd_id'] = (int)$cmdId;
       }
+      // Front v2 (Lot 6) : `scope=equipment` (sans cmdId) ne retire que le réglage de publication de l'équipement ;
+      // absent, comportement inchangé (retour complet en automatique, CC-19).
+      $revertScope = init('scope', '');
+      if ($revertScope !== '') {
+        if ($revertScope !== 'equipment' || $cmdId !== '') {
+          throw new Exception(__('Override de publication invalide', __FILE__));
+        }
+        $payload['scope'] = 'equipment';
+      }
       $result = jeedom2ha::callDaemon('/action/publication_override_revert', $payload, 'POST', 15);
       if ($result === null) {
         throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));

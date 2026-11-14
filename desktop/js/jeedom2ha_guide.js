@@ -66,19 +66,25 @@
     return { equipments: num(p.equipments_published), entities: num(p.entities_published), scenarios: num(p.scenarios_published) };
   }
 
-  /** Item « Home Assistant » de la barre d'état : masqué si le démon ne fournit pas le champ, ou s'il est arrêté. */
-  function haBarItem(status) {
+  /** Item « Home Assistant » de la barre d'état : masqué si le démon ne fournit pas le champ, ou s'il est arrêté.
+   * Front v2 (Lot 6, retour de démo) : sans signal de démarrage depuis le dernier démarrage du démon (`birth_seen_at` null),
+   * l'état est NEUTRE, « Non confirmé » (Home Assistant qui tourne déjà ne se signale pas de nouveau) ; vu : « Vu à HH:MM »
+   * (« Vu le JJ/MM à HH:MM » si ce n'est pas aujourd'hui). `now` (ms) : facultatif, pour les tests. */
+  function haBarItem(status, now) {
     var ha = haInfo(status);
     if (!ha || !status.daemon) return { visible: false, text: '', seen: false };
     if (ha.seen_at) {
-      var at = shortDate(ha.seen_at);
-      var parts = at.split(' ');
-      return { visible: true, seen: true, text: parts.length === 2 ? '{{Vu le}} ' + parts[0] + ' {{à}} ' + parts[1] : '{{Vu}}' };
+      var parts = shortDate(ha.seen_at).split(' ');
+      if (parts.length !== 2) return { visible: true, seen: true, text: '{{Vu}}' };
+      var seen = new Date(ha.seen_at);
+      var today = new Date(typeof now === 'number' ? now : Date.now());
+      var sameDay = seen.getFullYear() === today.getFullYear() && seen.getMonth() === today.getMonth() && seen.getDate() === today.getDate();
+      return { visible: true, seen: true, text: sameDay ? '{{Vu à}} ' + parts[1] : '{{Vu le}} ' + parts[0] + ' {{à}} ' + parts[1] };
     }
-    return { visible: true, seen: false, text: '{{Pas encore vu}}' };
+    return { visible: true, seen: false, text: '{{Non confirmé}}' };
   }
 
-  var HA_TOOLTIP = '{{Home Assistant se signale sur le broker quand il démarre. S\'il n\'a pas redémarré depuis l\'installation, c\'est normal.}}';
+  var HA_TOOLTIP = '{{Home Assistant se signale sur le broker quand il démarre ; s\'il tourne déjà, c\'est normal. Vérifiez qu\'il voit l\'appareil « Jeedom (jeedom2ha) ».}}';
 
   var RESULT_WORDS = { succes: '{{Réussie}}', partiel: '{{Partielle}}', echec: '{{Échouée}}' };
 
@@ -248,12 +254,13 @@
     list.push(mqtt);
 
     var ha = haInfo(status);
-    var haCheck = { key: 'ha', title: '{{Home Assistant a été vu sur ce broker}}', state: 'skip', detail: '' };
+    // Front v2 (Lot 6) : sans signal de démarrage, le contrôle est NEUTRE (« Non confirmé »), jamais une alerte.
+    var haCheck = { key: 'ha', title: '{{Home Assistant sur le broker}}', state: 'skip', detail: '' };
     if (ha && ha.seen_at) {
       haCheck.state = 'ok';
       haCheck.detail = haBarItem(status).text;
     } else if (ha) {
-      haCheck.state = 'warn';
+      haCheck.state = 'info';
       haCheck.detail = HA_TOOLTIP;
       haCheck.help = true;
     }
@@ -629,8 +636,8 @@
     // --- E7 : Vérifier l'installation ---
 
     function checkRow(check, $dialogHolder) {
-      var word = { ok: '{{OK}}', fail: '{{À corriger}}', warn: '{{À vérifier}}', wait: '{{En attente}}' }[check.state];
-      var lbl = { ok: 'is-ok', fail: 'is-warn', warn: 'is-todo', wait: 'is-off' }[check.state];
+      var word = { ok: '{{OK}}', fail: '{{À corriger}}', warn: '{{À vérifier}}', wait: '{{En attente}}', info: '{{Non confirmé}}' }[check.state];
+      var lbl = { ok: 'is-ok', fail: 'is-warn', warn: 'is-todo', wait: 'is-off', info: 'is-off' }[check.state];
       var $row = $('<div class="j2ha-v2-row j2ha-v2-check" role="listitem"></div>').attr('data-check', check.key).addClass('is-' + check.state);
       $row.append(el('<span class="j2ha-v2-lbl"></span>', word).addClass(lbl));
       var $grow = $('<div class="j2ha-v2-grow"></div>');

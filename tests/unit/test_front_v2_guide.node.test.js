@@ -123,7 +123,7 @@ describe('Lot 1 — revue PR #391 : publication réussie, installation connue', 
     assert.equal(G.publicationInfo(relayDown), null);
     assert.equal(G.haInfo(relayDown), null);
     const relayUp = Object.assign({}, UP, { ha: { birth_seen_at: null, discovery_prefix: 'homeassistant' }, publication: { equipments_published: 29, entities_published: 41, scenarios_published: 12 } });
-    assert.equal(plain(G.haBarItem(relayUp).text), 'Pas encore vu');
+    assert.equal(plain(G.haBarItem(relayUp).text), 'Non confirmé');
     assert.deepEqual(G.publicationInfo(relayUp), { equipments: 29, entities: 41, scenarios: 12 });
     assert.equal(G.publishedOk(relayUp, null, {}), true);
     const some = Object.assign({}, FAILED, { publication: { equipments_published: 12 } });
@@ -173,14 +173,18 @@ describe('Lot 1 — shouldShow', () => {
 });
 
 describe('Lot 1 — barre d’état : item Home Assistant et « Dernière relecture »', () => {
-  it('item Home Assistant masqué sans le champ (repli Lot 3) ou démon arrêté ; « Vu le … à … » / « Pas encore vu »', () => {
+  // Garde levée (front v2, Lot 6, retour de démo) : sans signal de démarrage, l'état est NEUTRE « Non confirmé » (Home Assistant
+  // qui tourne déjà ne se signale pas de nouveau) au lieu de « Pas encore vu » ; vu aujourd'hui : « Vu à HH:MM ».
+  it('item Home Assistant masqué sans le champ (repli Lot 3) ou démon arrêté ; « Vu à … » / « Vu le … à … » / « Non confirmé »', () => {
     assert.equal(G.haBarItem(UP).visible, false);
     assert.equal(G.haBarItem({ daemon: false, ha: { birth_seen_at: null } }).visible, false);
     const notSeen = G.haBarItem(Object.assign({}, UP, { ha: { birth_seen_at: null } }));
-    assert.deepEqual([notSeen.visible, notSeen.seen, plain(notSeen.text)], [true, false, 'Pas encore vu']);
-    const seen = G.haBarItem(Object.assign({}, UP, { ha: { birth_seen_at: '2026-11-13T21:04:00' } }));
-    assert.equal(seen.seen, true);
-    assert.equal(plain(seen.text), 'Vu le 13/11 à 21:04');
+    assert.deepEqual([notSeen.visible, notSeen.seen, plain(notSeen.text)], [true, false, 'Non confirmé']);
+    assert.match(plain(G.HA_TOOLTIP), /s'il tourne déjà, c'est normal\. Vérifiez qu'il voit l'appareil « Jeedom \(jeedom2ha\) »/);
+    const status = Object.assign({}, UP, { ha: { birth_seen_at: '2026-11-13T21:04:00' } });
+    const today = G.haBarItem(status, new Date('2026-11-13T23:10:00').getTime());
+    assert.deepEqual([today.seen, plain(today.text)], [true, 'Vu à 21:04']);
+    assert.equal(plain(G.haBarItem(status, new Date('2026-11-15T08:00:00').getTime()).text), 'Vu le 13/11 à 21:04');
   });
 
   it('fusion : date courte + résultat quand la dernière opération est la relecture ; date seule sinon', () => {
@@ -211,10 +215,13 @@ describe('Lot 1 — checkInstall (E7)', () => {
     assert.match(plain(never[1].detail), /broker\.exemple\.test/);
   });
 
-  it('Home Assistant pas encore vu : à vérifier (n’arrête pas) avec trois causes ; relecture partielle : « Voir lesquels »', () => {
+  // Garde levée (front v2, Lot 6, retour de démo) : Home Assistant non confirmé est un état NEUTRE (« info », « Non confirmé »),
+  // plus « À vérifier » ; il n'arrête toujours pas les contrôles et garde ses trois causes.
+  it('Home Assistant non confirmé : neutre (n’arrête pas) avec trois causes ; relecture partielle : « Voir lesquels »', () => {
     const status = Object.assign({}, SYNCED, { ha: { birth_seen_at: null }, derniere_operation_resultat: { resultat: 'partiel', intention: 'sync' } });
     const list = G.checkInstall(status, READ_OK, { read: true, blocked: 0 });
-    assert.deepEqual(titles(list), [['daemon', 'ok'], ['broker', 'ok'], ['ha', 'warn'], ['reread', 'fail'], ['blocked', 'wait']]);
+    assert.deepEqual(titles(list), [['daemon', 'ok'], ['broker', 'ok'], ['ha', 'info'], ['reread', 'fail'], ['blocked', 'wait']]);
+    assert.equal(plain(list[2].title), 'Home Assistant sur le broker');
     assert.equal(list[2].help, true);
     assert.equal(list[3].remedy.action, 'blocked');
   });

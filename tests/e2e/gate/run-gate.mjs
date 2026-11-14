@@ -507,6 +507,8 @@ async function main() {
       declaredPublicationOverrides: parcours.declaredPublicationOverrides || {},
       // Story 25.8 : exclusions de pièce déclarées par le parcours ({ [objectId]: { excluded: '1' | '0' } }), défaut {}.
       declaredRoomExclusions: parcours.declaredRoomExclusions || {},
+      // Front v2 (Lot 6) : plugins exclus déclarés par le parcours ({ excludedPlugins: [valeurs], confidencePolicy }), défaut null.
+      declaredFilteringConfig: parcours.declaredFilteringConfig || null,
       declaredRescan: parcours.declaredRescan === true,
       // Front v2 (Lot 5) : publications d'équipement simulées déclarées par le parcours ({ [eqId]: true }), défaut {}.
       declaredEquipmentPublications: parcours.declaredEquipmentPublications || {},
