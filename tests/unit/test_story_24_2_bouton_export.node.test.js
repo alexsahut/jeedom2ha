@@ -112,6 +112,9 @@ describe('24.2 / AC9 — séparation avec getEquipmentStates et gardes « diff v
       const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim();
       removed = execFileSync('git', ['diff', '--numstat', base, '--', 'desktop/js/jeedom2ha_mapping_override.js'], { cwd: root, encoding: 'utf8' });
     } catch { return; } // pas d'historique git (archive) : garde sans objet
-    assert.equal(removed.trim(), '');
+    // Garde levée (front v2, Lot 5) : le plan front v2 autorise des AJOUTS dans ce fichier (types `lock` / `valve`) ;
+    // la garde exige désormais « aucune ligne retirée ni modifiée » (une ligne modifiée compte comme retirée).
+    const deleted = removed.trim() === '' ? 0 : Number(removed.trim().split(/\s+/)[1]);
+    assert.equal(deleted, 0, removed);
   });
 });

@@ -250,7 +250,10 @@ const INITIAL_BADGE = 'Bloqué';
 const READY_BADGE = 'À appliquer';
 
 function html380(journal, { sensorOffered = false } = {}) {
-  const options = `<option value="">auto</option>${sensorOffered ? '<option value="sensor">sensor</option><option value="binary_sensor">binary_sensor</option>' : ''}<option value="cover">cover</option>`;
+  // Front v2 (Lot 5) : panneau « Corriger le type » (radios ; types refusés grisés) au lieu du sélecteur de la cellule.
+  const radio = (type, value, disabled) => `<label class="j2ha-v2-radio"><input type="radio" name="t2971" value="${value}" data-type="${type}"${disabled ? ' disabled' : ''}>${type}</label>`;
+  const options = radio('auto', '', false) + radio('sensor', 'sensor', !sensorOffered) + radio('binary_sensor', 'binary_sensor', !sensorOffered)
+    + radio('cover', 'cover', false);
   // Story 25.4 : vue de travail C — l'équipement 380 est une ligne de l'arbre ; son détail s'affiche à la sélection.
   const detail = `<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="380"><div class="j2ha-eq-head"><span class="j2ha-eq-name">Eq</span>
       <span class="j2ha-eq-publish-badge j2ha-badge">${INITIAL_BADGE}</span></div>
@@ -288,16 +291,22 @@ function html380(journal, { sensorOffered = false } = {}) {
         };
       }
       function wire() {
-        // Le sélecteur n'existe qu'après un clic sur le lien « auto » de la colonne « Type HA ».
+        // Front v2 (Lot 5) : le lien « auto » ouvre le panneau sous la ligne ; choix → aperçu ; « Enregistrer et publier ».
         document.getElementById('link2971').onclick = function () {
-          var select = document.createElement('select');
-          select.id = 'sel2971';
-          select.innerHTML = ${JSON.stringify(options)};
-          select.onchange = function () {
-            window.__push('previewMappingOverride', 'apercu-simule'); window.__push('saveMappingOverride', 'simulee');
-            window.__push('getMappingOverrides', 'lecture-derivee'); setReady(true);
+          var row = document.createElement('tr');
+          row.className = 'j2ha-v2-type-row';
+          row.setAttribute('data-type-panel-for', '2971');
+          row.innerHTML = '<td colspan="4"><div class="j2ha-v2-type-panel">' + ${JSON.stringify(options)}
+            + '<button type="button" class="j2ha-v2-type-save" disabled>Enregistrer et publier</button></div></td>';
+          document.querySelector('tr[data-cmd-id="2971"]').after(row);
+          var save = row.querySelector('.j2ha-v2-type-save');
+          row.querySelectorAll('input').forEach(function (input) {
+            input.onchange = function () { window.__push('previewMappingOverride', 'apercu-simule'); save.disabled = false; };
+          });
+          save.onclick = function () {
+            window.__push('saveMappingOverride', 'simulee'); window.__push('executeHaAction', 'simulee');
+            window.__push('getMappingOverrides', 'lecture-derivee'); row.remove(); setReady(true);
           };
-          document.getElementById('type2971').appendChild(select);
           return false;
         };
       }

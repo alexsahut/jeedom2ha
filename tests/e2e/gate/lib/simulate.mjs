@@ -366,3 +366,15 @@ export function deriveOverrideTree(state, eqId, realResponse) {
 
   return copy;
 }
+
+// Front v2 (Lot 5) : réponse SIMULÉE de la publication d'un équipement déclaré (second temps de « Enregistrer et
+// publier »). Forme d'un succès du démon ; rien n'est transmis à la box.
+export function buildEquipmentPublicationResponse() {
+  return {
+    state: 'ok',
+    result: {
+      status: 'ok',
+      payload: { resultat: 'succes', message: 'Publication simulée par le gate.' },
+    },
+  };
+}
