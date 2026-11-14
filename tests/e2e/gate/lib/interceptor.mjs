@@ -18,6 +18,7 @@ import {
   buildEquipmentPublicationResponse,
   buildPublicationRevertResponse,
   buildPublicationSaveResponse,
+  buildScenarioPublicationResponse,
   deriveOverrideTree,
   derivePublicationOverrideTree,
   hasActiveSimulation,
@@ -307,6 +308,9 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         } else if (decision.action === 'saveFilteringConfig') {
           // Front v2 (Lot 6) : branche EXPLICITE, valeur déclarée par le parcours ; rien n'est transmis à la box.
           response = buildFilteringConfigResponse({ excludedPlugins: params.excludedPlugins, confidencePolicy: params.confidencePolicy });
+        } else if (decision.action === 'saveScenarioPublication') {
+          // Front v3 (Lot 4a) : choix de publication de scénarios déclarés, simulé (branche explicite, jamais le `else`).
+          response = buildScenarioPublicationResponse({ idsToPublish: params.ids_to_publish, idsToUnpublish: params.ids_to_unpublish });
         } else if (decision.action === 'executeHaAction') {
           // Front v2 (Lot 5) : publication d'un équipement déclaré, simulée (branche explicite, jamais le `else`).
           response = buildEquipmentPublicationResponse();

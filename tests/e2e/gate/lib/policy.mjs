@@ -24,6 +24,9 @@
  *   - ctx.declaredEquipmentPublications : { [eqId]: true } — front v2 (Lot 5) : équipements dont la publication
  *     (`executeHaAction` publier / equipement / [eqId], le second temps de « Enregistrer et publier ») est SIMULÉE,
  *     jamais transmise. Tout autre `executeHaAction` reste un effet de bord refusé.
+ *   - ctx.declaredScenarioPublications : { [scenarioId]: true } — front v3 (Lot 4a) : choix de publication des scénarios
+ *     (`saveScenarioPublication`, publier / ne plus publier) SIMULÉ seulement si tous les identifiants des deux listes sont
+ *     déclarés ; sans déclaration, il reste un effet de bord bloqué (il écrit la configuration et relit Jeedom).
  *   - ctx.lastPreviewType : { [`${eqId}:${cmdId}`]: haEntityType } — dernier type
  *     prévisualisé par previewMappingOverride pour ce couple, exigé identique par
  *     saveMappingOverride (AC2).
@@ -72,6 +75,7 @@ const SIDE_EFFECT_ACTIONS = [
   'saveFilteringConfig',
   'forceMqttManagerImport',
   'testMqttConnection',
+  'saveScenarioPublication',
 ];
 
 // Paramètres de core/ajax/jeedom2ha.ajax.php:877-920 (previewMappingOverride,
@@ -257,6 +261,28 @@ function validateDeclaredEquipmentPublication(req, params, ctx) {
   return hasOwnSafe(ctx.declaredEquipmentPublications, match[1]) && ctx.declaredEquipmentPublications[match[1]] === true;
 }
 
+// Front v3 (Lot 4a) : POST, exactement action + ids_to_publish + ids_to_unpublish ; chaque liste au format strict de la route
+// (`[12,15]` ou `[]`, entiers positifs sans zéro initial ni doublon), au moins un identifiant, aucun dans les deux listes, et
+// chaque identifiant déclaré par le parcours dans `declaredScenarioPublications`. Simulée : rien n'est transmis à la box.
+const SCENARIO_PUBLICATION_ACTION = 'saveScenarioPublication';
+const SCENARIO_PUBLICATION_PARAMS = 'action,ids_to_publish,ids_to_unpublish';
+const SCENARIO_ID_LIST = /^\[(?:[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9})*)?\]$/;
+function scenarioIdList(value) {
+  if (typeof value !== 'string' || !SCENARIO_ID_LIST.test(value)) return null;
+  const ids = value.slice(1, -1).split(',').filter((id) => id !== '');
+  return new Set(ids).size === ids.length ? ids : null;
+}
+function validateDeclaredScenarioPublication(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== SCENARIO_PUBLICATION_PARAMS) return false;
+  const toPublish = scenarioIdList(params.ids_to_publish);
+  const toUnpublish = scenarioIdList(params.ids_to_unpublish);
+  if (!toPublish || !toUnpublish || toPublish.length + toUnpublish.length === 0) return false;
+  if (toPublish.some((id) => toUnpublish.includes(id))) return false;
+  return [...toPublish, ...toUnpublish].every((id) => hasOwnSafe(ctx.declaredScenarioPublications, id)
+    && ctx.declaredScenarioPublications[id] === true);
+}
+
 function validateDeclaredRescan(req, ctx) {
   return req.method === 'POST' && ctx && ctx.declaredRescan === true;
 }
@@ -331,6 +357,11 @@ export function classifyRequest(req, ctx) {
     if (url.pathname === PLUGIN_AJAX_PATH && action === 'executeHaAction'
       && validateDeclaredEquipmentPublication(req, params, ctx)) {
       return { verdict: 'simulate', reason: 'publication-equipement-declaree', action, params };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === SCENARIO_PUBLICATION_ACTION
+      && validateDeclaredScenarioPublication(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'publication-scenarios-declaree', action, params };
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {

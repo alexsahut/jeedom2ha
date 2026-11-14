@@ -79,7 +79,20 @@ check('daemon vrai', is_array($out) && $out['daemon'] === true);
 foreach ($historical as $key) {
     check("clé historique « {$key} » conservée", is_array($out) && array_key_exists($key, $out));
 }
-check('aucune autre clé ajoutée', is_array($out) && array_keys($out) === array('daemon', 'mqtt', 'demon', 'broker', 'derniere_synchro_terminee', 'ha', 'publication', 'derniere_operation_resultat'));
+// Front v3 (Lot 4a) : clé additive `scenarios` (liste des scénarios du statut), seule ajoutée depuis le Lot 3.
+check('aucune autre clé ajoutée', is_array($out) && array_keys($out) === array('daemon', 'mqtt', 'demon', 'broker', 'derniere_synchro_terminee', 'ha', 'publication', 'scenarios', 'derniere_operation_resultat'));
+check('front v3 lot 4a : scenarios null quand le démon ne la fournit pas', is_array($out) && array_key_exists('scenarios', $out) && $out['scenarios'] === null);
+
+echo "Front v3 (Lot 4a) : liste des scénarios relayée\n";
+$scenarios = array(array('id' => 12, 'name' => 'Scène fictive', 'group' => '', 'mode' => 'provoke', 'has_trigger' => false,
+    'has_schedule' => false, 'manual' => true, 'is_active' => true, 'published' => true, 'is_new' => false, 'in_ha' => true,
+    'ha_entity_id' => 'button.jeedom2ha_scenario_12'));
+$out = run_branch($branch, array('status' => 'ok', 'payload' => array('scenarios' => $scenarios)));
+check('scenarios relayée telle quelle', is_array($out) && $out['scenarios'] === $scenarios);
+$out = run_branch($branch, array('status' => 'ok', 'payload' => array('scenarios' => 'non')));
+check('scenarios non tableau -> null', is_array($out) && $out['scenarios'] === null);
+$out = run_branch($branch, null);
+check('démon injoignable : scenarios null', is_array($out) && array_key_exists('scenarios', $out) && $out['scenarios'] === null);
 
 echo "Démon ancien (sans ha ni publication)\n";
 $out = run_branch($branch, array('status' => 'ok', 'payload' => array(
