@@ -876,7 +876,7 @@
   color: var(--j2ha-text);
   background-color: var(--j2ha-surface-strong);
 }
-.j2ha-v3-sc-entity.j2ha-v3-sc-notyet { opacity: 0.6; }
+.j2ha-v3-sc-hawait { color: var(--j2ha-todo); cursor: help; }
 .j2ha-v3-sc .j2ha-v3-sc-copy { min-width: 28px; min-height: 28px; padding: 0 4px; color: var(--j2ha-neutral); background: transparent; border: 0; cursor: pointer; }
 .j2ha-v3-sc .j2ha-v3-sc-copy.is-copied { color: var(--j2ha-ok); }
 /* Interrupteur « Publier » : un vrai bouton role="switch" ; jamais grisé pour un scénario inactif (amendement 2). */

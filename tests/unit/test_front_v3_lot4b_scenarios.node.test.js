@@ -58,6 +58,27 @@ describe('Lot 4b — lecture et compte de l’onglet', () => {
   });
 });
 
+describe('Lot 4b — issue de l’enregistrement et état réel côté Home Assistant', () => {
+  const ok = (rescan) => ({ state: 'ok', result: { saved: true, ids_to_publish: [52], ids_to_unpublish: [], rescan } });
+  it('saveOutcome : succès, partiel (operation_result partiel ou scenario_availability_complete false), échec, rien d’enregistré', () => {
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'succes', scenario_availability_complete: true })), 'ok');
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'succes' })), 'ok', 'champ absent : succès');
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'partiel', scenario_availability_complete: false })), 'partial');
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'partiel' })), 'partial');
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'succes', scenario_availability_complete: false })), 'partial');
+    assert.equal(S.saveOutcome(ok({ status: 'ok', operation_result: 'echec' })), 'failed');
+    assert.equal(S.saveOutcome(ok({ status: 'error', message: 'x' })), 'failed');
+    assert.equal(S.saveOutcome(ok(undefined)), 'failed');
+    assert.equal(S.saveOutcome({ state: 'error', result: 'refus' }), 'error');
+    assert.equal(S.saveOutcome({ state: 'ok', result: { saved: false } }), 'error');
+  });
+  it('haMismatchIds : choix enregistré et bouton réel (in_ha) en désaccord, dans les deux sens', () => {
+    const list = [sc(1, 'a', { published: true, in_ha: true }), sc(2, 'b', { published: true, in_ha: false }), sc(3, 'c', { published: false, in_ha: true }), sc(4, 'd')];
+    assert.deepEqual(S.haMismatchIds(list), [2, 3]);
+    assert.deepEqual(S.haMismatchIds(null), []);
+  });
+});
+
 describe('Lot 4b — filtres', () => {
   const list = fixture();
   const ids = (filter) => S.filterList(list, filter).map((s) => s.id).sort((a, b) => a - b);
@@ -247,6 +268,61 @@ test('Lot 4b réel — liste, filtres, sélection groupée, confirmation de retr
   });
 });
 
+test('Lot 4b réel — échec partiel : ligne ambre « Choix enregistré · n boutons pas encore à jour… · Réessayer », colonne HA d’après in_ha', async (t) => {
+  let scenarios = fixture();
+  const real = await scenarioGate({ 52: true, 62: true });
+  const answers = [
+    { status: 'ok', operation_result: 'partiel', operation_message: 'Synchronisation partielle.', scenario_availability_complete: false },
+    { status: 'ok', operation_result: 'succes', operation_message: 'Synchronisation terminée.', scenario_availability_complete: true },
+  ];
+  const g = {
+    isWrite: real.isWrite,
+    handleWrite(action, request) {
+      const out = real.handleWrite(action, request);
+      if (out.verdict === 'simulee') out.body.result.rescan = answers.shift();
+      return out;
+    },
+  };
+  await withRealView(t, { gate: g, bridgeStatus: () => UP(scenarios) }, async (page, ctx) => {
+    await page.click('#j2ha_tabBtnScenarios');
+    await page.click('tr[data-id="52"] .j2ha-v3-sc-switch');
+    await page.click('tr[data-id="62"] .j2ha-v3-sc-switch');
+    // Choix enregistré, mais seul 62 a son bouton : 52 reste en retard.
+    scenarios = fixture().map((s) => (s.id === 52 ? Object.assign(s, { published: true, in_ha: false, ha_entity_id: 'button.jeedom2ha_scenario_52' })
+      : (s.id === 62 ? Object.assign(s, pub(62)) : s)));
+    await page.click('.j2ha-v3-sc-apply');
+    await page.waitForFunction(() => /1 bouton pas encore/.test(document.querySelector('.j2ha-v3-sc-result').textContent));
+    assert.equal(await page.getAttribute('.j2ha-v3-sc-result', 'data-kind'), 'warn', 'ambre, jamais vert');
+    assert.equal(await txt(page, '.j2ha-v3-sc-result'), 'Choix enregistré · 1 bouton pas encore à jour dans Home Assistant · Réessayer');
+    assert.equal(await txt(page, 'tr[data-id="52"] .j2ha-v3-sc-hacell'), '◷ En attente de Home Assistant', 'publié mais pas dans HA : pas de button.…');
+    assert.equal(await page.$('tr[data-id="52"] .j2ha-v3-sc-hacell code'), null);
+    assert.equal(await txt(page, 'tr[data-id="62"] .j2ha-v3-sc-hacell'), 'button.jeedom2ha_scenario_62');
+    assert.equal(await page.isHidden('.j2ha-v3-sc-foot'), true, 'le choix est enregistré : plus rien en attente côté écran');
+
+    // Réessayer : le même corps, une seconde fois ; le démon rattrape le bouton.
+    scenarios = scenarios.map((s) => (s.id === 52 ? Object.assign({}, s, { in_ha: true }) : s));
+    await page.click('.j2ha-v3-sc-retry');
+    await page.waitForFunction(() => document.querySelector('.j2ha-v3-sc-result').getAttribute('data-kind') === 'ok');
+    assert.equal(await txt(page, '.j2ha-v3-sc-result'), 'Choix appliqué : 2 publiés');
+    const writes = ctx.journal.filter((e) => e.action === 'saveScenarioPublication');
+    assert.equal(writes.length, 2);
+    const raws = writes.map((w) => ctx.bodies[ctx.journal.indexOf(w)]);
+    assert.deepEqual(raws, Array(2).fill('action=saveScenarioPublication&ids_to_publish=%5B52%2C62%5D&ids_to_unpublish=%5B%5D'));
+    assert.deepEqual(writes.map((w) => w.verdict), ['simulee', 'simulee']);
+    assert.equal(await txt(page, 'tr[data-id="52"] .j2ha-v3-sc-hacell'), 'button.jeedom2ha_scenario_52');
+    assert.equal(ctx.journal.filter((e) => e.action === 'scanTopology').length, 0);
+  });
+});
+
+test('Lot 4b réel — retrait pas encore fait dans Home Assistant : « En attente de Home Assistant » au lieu de « — »', async (t) => {
+  const scenarios = fixture().map((s) => (s.id === 31 ? Object.assign(s, { published: false, ha_entity_id: null, in_ha: true }) : s));
+  await withRealView(t, { bridgeStatus: () => UP(scenarios) }, async (page) => {
+    await page.click('#j2ha_tabBtnScenarios');
+    assert.equal(await txt(page, 'tr[data-id="31"] .j2ha-v3-sc-hacell'), '◷ En attente de Home Assistant');
+    assert.equal(await txt(page, 'tr[data-id="40"] .j2ha-v3-sc-hacell'), 'Indisponible', 'inactif publié et présent : inchangé');
+  });
+});
+
 test('Lot 4b réel — écriture non déclarée : bloquée par la politique du gate, message d’erreur, attente conservée', async (t) => {
   const g = await scenarioGate({ 99: true });
   await withRealView(t, { gate: g, bridgeStatus: () => UP(fixture()) }, async (page, ctx) => {
@@ -326,7 +402,8 @@ test('Lot 4b — doc : section « Les scénarios » avec les libellés de l’é
   const section = doc.slice(doc.indexOf('### Les scénarios'), doc.indexOf('### Le bloc de la maison'));
   for (const label of ['Publiés', 'Non publiés', 'Inactifs', 'Nouveaux ✱', 'Tous les groupes', 'Tous les modes', 'Lancé à la main', 'Programmé', 'Déclenché',
     'Rechercher', 'Dans Home Assistant', 'Indisponible', 'Publier (n)', 'Ne pas publier (n)', 'Appliquer (n)', 'Annuler', 'Retirer n boutons de Home Assistant ?',
-    'lancés à la main → Publier ces n', 'Aucun scénario dans Jeedom', 'Liste indisponible · Relire', '◷']) {
+    'lancés à la main → Publier ces n', 'Aucun scénario dans Jeedom', 'Liste indisponible · Relire', '◷', 'En attente de Home Assistant',
+    'Choix enregistré · n boutons pas encore à jour dans Home Assistant · Réessayer']) {
     assert.ok(section.includes(label), label);
   }
   assert.doesNotMatch(doc, /Chaque scénario Jeedom est publié comme un bouton/);

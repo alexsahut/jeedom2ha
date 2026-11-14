@@ -177,6 +177,26 @@
     };
   }
 
+  /**
+   * Issue de `saveScenarioPublication` : 'ok' (relecture réussie et boutons à jour), 'partial' (choix enregistré, relecture
+   * partielle ou boutons de scénario pas tous publiés ou retirés : `operation_result: 'partiel'` ou
+   * `scenario_availability_complete: false`), 'failed' (choix enregistré, relecture en échec), 'error' (rien d'enregistré).
+   */
+  function saveOutcome(data) {
+    var res = data && data.result;
+    if (!data || data.state !== 'ok' || !res || typeof res !== 'object' || res.saved !== true) return 'error';
+    var rescan = res.rescan;
+    if (!rescan || typeof rescan !== 'object' || rescan.status !== 'ok' || rescan.operation_result === 'echec') return 'failed';
+    if (rescan.operation_result !== 'succes' || rescan.scenario_availability_complete === false) return 'partial';
+    return 'ok';
+  }
+
+  /** Scénarios dont le bouton dans Home Assistant ne suit pas encore le choix enregistré (`in_ha` lu du démon). */
+  function haMismatchIds(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (s) { return (s.published === true) !== (s.in_ha === true); }).map(function (s) { return s.id; });
+  }
+
   function buttonsWord(n) { return n + ' ' + (n > 1 ? '{{boutons}}' : '{{bouton}}'); }
 
   /** Confirmation chiffrée d'un retrait ; null si rien n'est retiré (pas de confirmation). */
@@ -226,6 +246,7 @@
       pending: {},
       selected: {},
       busy: false,
+      statusSeq: 0, // relectures de l'état du démon observées (une issue partielle attend la suivante)
       result: null, // { kind: 'ok' | 'warn' | 'error', text }
       built: false,
     };
@@ -326,6 +347,12 @@
 
     function haCell(s) {
       var $cell = $('<td class="j2ha-v3-sc-hacell"></td>');
+      // État réel côté Home Assistant (`in_ha`), pas seulement le choix enregistré.
+      if ((s.published === true) !== (s.in_ha === true)) {
+        return $cell.append($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-hawait"></span>')
+          .attr('title', s.published === true ? '{{Choisi, mais le bouton n’est pas encore dans Home Assistant}}' : '{{Retiré de vos choix, mais le bouton est encore dans Home Assistant}}')
+          .append($('<span aria-hidden="true">◷</span>'), textNode(' {{En attente de Home Assistant}}')));
+      }
       if (s.published !== true) return $cell.append($('<span class="j2ha-v3-sc-muted"></span>').text('—').attr('title', '{{Pas publié}}'));
       if (s.is_active !== true) {
         return $cell.append($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-muted j2ha-v3-sc-unavail"></span>')
@@ -336,7 +363,6 @@
         return $cell.append($('<span class="j2ha-v3-sc-muted"></span>').text('—').attr('title', '{{Identifiant pas encore connu}}'));
       }
       var $code = $('<code class="j2ha-v3-sc-entity"></code>').text(s.ha_entity_id);
-      if (s.in_ha === false) $code.addClass('j2ha-v3-sc-notyet').attr('title', '{{Pas encore confirmé dans Home Assistant}}');
       var $copy = $('<button type="button" class="j2ha-v2-link j2ha-v2-copy j2ha-v3-sc-copy"></button>')
         .attr('title', '{{Copier l’identifiant}}').attr('aria-label', '{{Copier l’identifiant}}').append(icon('fa-copy'));
       $copy.on('click', function () { if (typeof env.copy === 'function') env.copy(s.ha_entity_id, $copy); });
@@ -461,11 +487,28 @@
       $foot.append($('<span class="j2ha-v3-sc-spacer"></span>'), $cancel, $apply);
     }
 
-    function renderResult() {
+    function renderResult(items) {
       var $line = root().find('.j2ha-v3-sc-result').empty().removeAttr('data-kind');
-      if (!st.result) return;
+      var result = st.result;
+      if (!result) return;
+      if (result.kind === 'partial') {
+        // Avant la relecture de l'état qui suit l'enregistrement : le nombre demandé ; après : les boutons réellement en retard.
+        var fresh = st.statusSeq > result.seq;
+        var n = fresh ? haMismatchIds(items).length : result.request.publish.length + result.request.unpublish.length;
+        if (fresh && n === 0) {
+          st.result = result = { kind: 'ok', text: successLine(result.request) };
+        } else {
+          var request = result.request;
+          var $retry = $('<button type="button" class="btn btn-default btn-xs j2ha-v3-sc-retry"></button>').text('{{Réessayer}}')
+            .attr('title', '{{Renvoie le même choix et relit Jeedom}}').prop('disabled', st.busy);
+          $retry.on('click', function () { send(request); });
+          $line.attr('data-kind', 'warn').append(icon('fa-exclamation-triangle'),
+            textNode(' {{Choix enregistré}} · ' + buttonsWord(n) + ' {{pas encore à jour dans Home Assistant}} · '), $retry);
+          return;
+        }
+      }
       var icons = { ok: 'fa-check-circle', warn: 'fa-exclamation-triangle', error: 'fa-exclamation-triangle' };
-      $line.attr('data-kind', st.result.kind).append(icon(icons[st.result.kind]), textNode(' ' + st.result.text));
+      $line.attr('data-kind', result.kind).append(icon(icons[result.kind]), textNode(' ' + result.text));
     }
 
     function renderState(kind) {
@@ -500,7 +543,7 @@
       renderTable(items, filterList(items, st.filter));
       renderSelbar(items);
       renderFoot(items);
-      renderResult();
+      renderResult(items);
     }
 
     function preselectSuggested() {
@@ -533,16 +576,15 @@
       render();
       env.post({ action: request.action, ids_to_publish: request.ids_to_publish, ids_to_unpublish: request.ids_to_unpublish }, {
         success: function (data) {
-          var res = data && data.result;
-          if (!data || data.state !== 'ok' || !res || res.saved !== true) {
+          var outcome = saveOutcome(data);
+          if (outcome === 'error') {
             var why = data && typeof data.result === 'string' && data.result ? data.result : '{{Le choix n’a pas été enregistré.}}';
             finish({ kind: 'error', text: why });
             return;
           }
-          var rescan = res.rescan;
-          var reread = rescan && rescan.status === 'ok' && rescan.operation_result !== 'echec';
-          finish(reread ? { kind: 'ok', text: successLine(request) }
-            : { kind: 'warn', text: '{{Choix enregistré, mais la relecture a échoué : lancez « Relire Jeedom ».}}' });
+          if (outcome === 'ok') finish({ kind: 'ok', text: successLine(request) });
+          else if (outcome === 'partial') finish({ kind: 'partial', request: request, seq: st.statusSeq });
+          else finish({ kind: 'warn', text: '{{Choix enregistré, mais la relecture a échoué : lancez « Relire Jeedom ».}}' });
           if (typeof env.afterSave === 'function') env.afterSave();
         },
         error: function () {
@@ -564,6 +606,8 @@
 
     return {
       render: render,
+      /** Une réponse de getBridgeStatus vient d'arriver. */
+      statusChanged: function () { st.statusSeq += 1; render(); },
       apply: apply,
       preselectSuggested: preselectSuggested,
       /** Nombre de scénarios que la suggestion présélectionnerait (0 = pas de suggestion). */
@@ -589,6 +633,8 @@
     requestFor: requestFor,
     removalDialog: removalDialog,
     successLine: successLine,
+    saveOutcome: saveOutcome,
+    haMismatchIds: haMismatchIds,
     suggestionIds: suggestionIds,
     suggestionText: suggestionText,
     createPanel: createPanel,
@@ -672,7 +718,7 @@
       // Chaque réponse de getBridgeStatus (lue par jeedom2ha.js) met la liste à jour ; aucune requête ajoutée.
       $(document).on('ajaxComplete', function (_event, _xhr, settings) {
         var data = settings && settings.data;
-        if (typeof data === 'string' && data.indexOf('action=getBridgeStatus') !== -1) panel.render();
+        if (typeof data === 'string' && data.indexOf('action=getBridgeStatus') !== -1) panel.statusChanged();
       });
       panel.render();
     });
