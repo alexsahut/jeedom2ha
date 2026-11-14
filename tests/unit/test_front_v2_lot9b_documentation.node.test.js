@@ -146,7 +146,8 @@ describe('Lot 9b — libellés du Lot 9a, tels que le code les affiche', () => {
   for (const label of ['Publier quand même', "Renommer l'équipement dans Jeedom, puis Relire Jeedom", 'Confirmé par vous',
     'Types impossibles pour cet équipement', 'Type dans Home Assistant de', 'Dans Home Assistant, cette entité est :',
     'Ce choix vaut pour les commandes :', 'Enregistrer et publier quand même', 'Je ne vois pas l\'appareil dans Home Assistant',
-    'Vérification en cours', 'Réputée faite : une publication a réussi.', "Ce n'est pas un doute mais une contradiction",
+    // Front v3 (Lot 0) : « Réputée faite… » a disparu de l'écran (guide fail-closed) ; son remplaçant est vérifié ici.
+    'Vérification en cours', 'Vérifier la publication', "Ce n'est pas un doute mais une contradiction",
     "Cette entité ne se règle pas seule : réglez l'équipement entier.", 'Ce type Home Assistant est invalide pour cette entité.',
     'Erreur de communication avec le démon du plugin.', 'dont 1 désactivé dans Jeedom']) {
     it(`« ${label} » : à l’écran et dans la doc`, () => {
@@ -154,6 +155,10 @@ describe('Lot 9b — libellés du Lot 9a, tels que le code les affiche', () => {
       assert.ok(docs.includes(label), `« ${label} » absent de la doc`);
     });
   }
+  it('front v3 (Lot 0) : plus aucune étape « réputée faite », ni à l’écran ni dans la doc', () => {
+    assert.doesNotMatch(code, /[Rr]éputée faite/);
+    assert.doesNotMatch(docs, /[Rr]éputée faite/);
+  });
   it('plus aucun ancien libellé du panneau de type ni « auto » dans la colonne « Type HA »', () => {
     assert.doesNotMatch(docs, /Autres types, non proposés|non proposé par le plugin pour cette commande|Corriger le type de « /);
     assert.doesNotMatch(docs, /« auto »/);

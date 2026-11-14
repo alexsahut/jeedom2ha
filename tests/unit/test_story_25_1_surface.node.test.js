@@ -617,7 +617,11 @@ describe('25.1 / AC16 — un seul détail d’équipement, en-tête collant, un 
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /max-height|overflow-y|aria-multiselectable/, file);
     }
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
-    assert.match(css, /\.j2ha-wv \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0[^}]*background-color:\s*var\(--bg-color, var\(--j2ha-menu-bg\)\)/);
+    // Garde ajustée (front v3, Lot 0) : `var(--bg-color, …)` était un fond TRANSPARENT (--bg-color du cœur est un triplet,
+    // valeur invalide à l'exécution). Le fond opaque s'écrit rgb(var(--bg-color, var(--j2ha-page-rgb))) ; vérifié en vrai
+    // Chromium par test_front_v3_lot0_correctifs.
+    assert.match(css, /\.j2ha-wv \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0[^}]*background-color:\s*rgb\(var\(--bg-color, var\(--j2ha-page-rgb\)\)\)/);
+    assert.doesNotMatch(css, /background-color:\s*var\(--bg-color/);
     assert.doesNotMatch(css, /\.j2ha-eq-cmdlist[^{]*\{[^}]*overflow/);
   });
 });

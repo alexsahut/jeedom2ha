@@ -82,7 +82,10 @@ describe('25.8 / AC6 — balisage des cartes', () => {
   it('le CSS du composant de menu et des cartes n\'est pas modifié : ajouts seulement (leçon #296)', () => {
     const diff = diffAgainstBase(['-U0'], ['desktop/css/jeedom2ha.css']);
     if (diff === null) return;
-    assert.deepEqual(removedLines(diff), [], 'aucune ligne de CSS existante modifiée ou retirée');
+    // Garde levée (front v3, Lot 0) : une seule ligne modifiée, HORS du composant de menu et des cartes — le fond de
+    // l'en-tête collant de la fiche (`.j2ha-wv .j2ha-eq-head`), transparent à cause du triplet --bg-color du cœur.
+    const FV3_LOT0 = new Set(['-  background-color: var(--bg-color, var(--j2ha-menu-bg));']);
+    assert.deepEqual(removedLines(diff).filter((l) => !FV3_LOT0.has(l)), [], 'aucune ligne de CSS existante modifiée ou retirée');
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     for (const selector of ['.j2ha-room-has-menu', '.j2ha-room-excluded-line']) {
       assert.ok(css.includes(selector), selector);

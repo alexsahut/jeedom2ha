@@ -169,15 +169,24 @@
    * `readState` : { kind } de la lecture des états ; `summary` : summaryFrom() ; `local` : préférences du navigateur.
    * État d'une étape : `done`, `current` (la première non faite), `blocked` (les suivantes), `error` (la première non faite,
    * avec une cause). Une étape faite reste faite, même si une précédente ne l'est plus.
-   * Front v2 (Lot 9a, regard neuf v2) : jamais une étape « À faire » avant une étape « Fait ». Une publication réussie (ou
-   * un choix déjà fait) rend l'étape 2 « réputée faite » (`inferred`) : elle ne bloque plus l'ordre. L'étape 1 non faite
-   * suivie d'une étape faite est soit en erreur (cause connue), soit « en vérification » (`checking`, état pas encore lu).
+   * Front v2 (Lot 9a, regard neuf v2) : jamais une étape « À faire » avant une étape « Fait ». L'étape 1 non faite suivie
+   * d'une étape faite est soit en erreur (cause connue), soit « en vérification » (`checking`, état pas encore lu).
+   * Front v3 (Lot 0, « fail-closed ») : une étape n'est « Fait » (`done`) que si le signal qu'elle nomme est OBSERVÉ :
+   *   1. démon et broker en marche (état du démon) ;
+   *   2. Home Assistant confirmé (signal de démarrage vu par le démon, ou « Je l'ai vu » de l'utilisateur) ;
+   *   3. choix fait par l'utilisateur, ou publication réussie observée (le choix par défaut a été appliqué) ;
+   *   4. publication réussie observée (état du démon, lecture des états, dernière relecture réussie ou partielle).
+   * Rien n'est plus « réputé fait » : une étape dont le signal n'est que déduit (étape 2 alors qu'une étape suivante est
+   * faite) ou seulement mémorisé par ce navigateur (publication constatée hier, démon redémarré depuis) est « À vérifier »
+   * (`verify`), avec un bouton qui lance la vérification. « À vérifier » ne bloque pas l'ordre des étapes.
    */
   function computeSteps(status, readState, summary, local) {
     var loc = local || {};
     var sum = summary || {};
     var ha = haInfo(status);
-    var isSynced = publishedOk(status, sum, loc);
+    // Observé seulement : la mémoire du navigateur (`loc.published`) ne fait plus cocher l'étape 4.
+    var isSynced = publishedOk(status, sum, null);
+    var remembered = !isSynced && !!loc.published;
     var failed = !isSynced && publishFailed(status);
     var broker = brokerState(status);
 
@@ -191,23 +200,31 @@
     var s2 = { key: 'ha', number: 2, done: !!(ha && ha.seen_at) || !!loc.haSeen, auto: !!(ha && ha.seen_at), manual: !(ha && ha.seen_at), ha_known: !!ha };
     var s3 = { key: 'choice', number: 3, done: !!loc.choice || isSynced };
     var s4 = { key: 'publish', number: 4, done: isSynced, empty: sum.jeedom_equipments === 0 };
+    // Publication seulement mémorisée par ce navigateur : à revérifier (relecture), sauf échec observé ou Jeedom vide.
+    if (remembered && !failed && !s4.empty) {
+      s4.verify = true;
+      if (!s3.done) s3.verify = true;
+    }
     if (s4.empty && !s4.done) s4.cause = '{{Jeedom ne contient encore aucun équipement à publier. Ajoutez des équipements dans Jeedom, puis revenez ici.}}';
     else if (failed) {
       s4.retry = true;
       s4.cause = '{{La dernière publication a échoué : rien n\'est encore dans Home Assistant. Vérifiez le broker MQTT, puis réessayez.}}';
     }
 
-    // Une étape ultérieure faite prouve que l'étape 2 a été franchie : elle est réputée faite.
-    if (!s2.done && (s3.done || s4.done)) {
-      s2.done = true;
-      s2.inferred = true;
-    }
+    // Une étape ultérieure faite (ou à revérifier) laisse penser que l'étape 2 a été franchie, sans le prouver : à vérifier.
+    if (!s2.done && (s3.done || s4.done || s3.verify || s4.verify)) s2.verify = true;
 
     var steps = [s1, s2, s3, s4];
-    var laterDone = s2.done || s3.done || s4.done;
+    var laterDone = steps.slice(1).some(function (step) { return step.done || step.verify; });
     var firstOpen = -1;
     steps.forEach(function (step, index) {
       if (step.done) { step.state = 'done'; return; }
+      if (step.verify) {
+        // N'arrête pas l'ordre ; `waitFor` : une étape précédente reste ouverte (la relecture de l'étape 4 l'attend).
+        step.state = 'verify';
+        if (firstOpen !== -1) step.waitFor = steps[firstOpen].number;
+        return;
+      }
       if (firstOpen === -1) {
         firstOpen = index;
         step.state = step.cause ? 'error' : (index === 0 && laterDone ? 'checking' : 'current');
@@ -216,7 +233,8 @@
         step.waitFor = steps[firstOpen].number;
       }
     });
-    return { steps: steps, current: firstOpen, complete: firstOpen === -1, synced: isSynced };
+    // Complet = toutes les étapes « Fait » : une étape « À vérifier » ne compte pas comme faite.
+    return { steps: steps, current: firstOpen, complete: steps.every(function (step) { return step.done; }), synced: isSynced };
   }
 
   /**
@@ -456,7 +474,8 @@
     }
 
     function stepLabel(step) {
-      if (step.state === 'done') return el('<span class="j2ha-v2-lbl is-ok"></span>', step.auto === false && step.key === 'ha' && !step.inferred ? '{{Fait (vu par vous)}}' : '{{Fait}}');
+      if (step.state === 'done') return el('<span class="j2ha-v2-lbl is-ok"></span>', step.auto === false && step.key === 'ha' ? '{{Fait (vu par vous)}}' : '{{Fait}}');
+      if (step.state === 'verify') return el('<span class="j2ha-v2-lbl is-todo"></span>', '{{À vérifier}}');
       if (step.state === 'checking') return el('<span class="j2ha-v2-lbl is-off"></span>', '{{Vérification en cours}}');
       if (step.state === 'error') return el('<span class="j2ha-v2-lbl is-warn"></span>', '{{À corriger}}');
       if (step.state === 'current') return el('<span class="j2ha-v2-lbl is-todo"></span>', '{{À faire}}');
@@ -465,12 +484,15 @@
 
     function stepActions(step, model) {
       var $acts = $('<div class="j2ha-v2-acts"></div>');
-      var active = step.state === 'current' || step.state === 'error';
+      var active = step.state === 'current' || step.state === 'error' || (step.state === 'verify' && !step.waitFor);
       if (step.key === 'broker' && !step.done) {
         $acts.append(button('{{Ouvrir la configuration MQTT}}', active ? 'btn-primary j2ha-v2-btn-primary' : 'btn-default', function () { if (actions.openConfig) actions.openConfig(); }));
       }
+      // « À vérifier » : le bouton principal de l'étape porte aussi la classe j2ha-v2-guide-verify (il lance la vérification).
+      var verifyCls = step.state === 'verify' ? ' j2ha-v2-guide-verify' : '';
       if (step.key === 'ha' && !step.done && step.state !== 'blocked') {
-        $acts.append(button('{{Je l\'ai vu}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-haseen', function () {
+        // Le seul témoin possible ici est l'utilisateur : il regarde dans Home Assistant et le confirme.
+        $acts.append(button('{{Je l\'ai vu}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-haseen' + verifyCls, function () {
           confirmHaSeen();
           st.haHelp = false;
           render();
@@ -481,7 +503,7 @@
         }).attr('aria-expanded', st.haHelp ? 'true' : 'false'));
       }
       if (step.key === 'choice' && !step.done && step.state !== 'blocked') {
-        $acts.append(button('{{Tout publier (recommandé)}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-all', function () {
+        $acts.append(button('{{Tout publier (recommandé)}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-all' + verifyCls, function () {
           remember('choice');
           render();
         }));
@@ -493,12 +515,15 @@
       }
       if (step.key === 'publish' && !step.done && !step.empty) {
         var publishing = st.phase === 'publishing';
-        var $pub = button(publishing ? '{{Publication en cours…}}' : (step.retry ? '{{Réessayer de publier}}' : '{{Publier dans Home Assistant}}'), active ? 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-publish' : 'btn-default j2ha-v2-guide-publish', publish);
+        // « À vérifier » : relire Jeedom (relecture existante) observe de nouveau la publication.
+        var pubLabel = step.retry ? '{{Réessayer de publier}}' : (step.state === 'verify' ? '{{Vérifier la publication}}' : '{{Publier dans Home Assistant}}');
+        var $pub = button(publishing ? '{{Publication en cours…}}' : pubLabel, (active ? 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-publish' : 'btn-default j2ha-v2-guide-publish') + verifyCls, publish);
+        if (step.state === 'verify') $pub.attr('title', '{{Relit Jeedom et confirme ce qui est dans Home Assistant}}');
         if (publishing) $pub.prepend(' ').prepend($('<i class="fas fa-spinner fa-spin"></i>'));
         $pub.prop('disabled', !active || publishing);
         $acts.append($pub);
       }
-      if (step.state === 'blocked') {
+      if (step.state === 'blocked' || (step.key === 'publish' && step.state === 'verify' && step.waitFor)) {
         $acts.append(el('<span class="j2ha-v2-muted j2ha-v2-small"></span>', '{{Terminez l\'étape}} ' + step.waitFor + ' {{d\'abord.}}'));
       }
       return $acts.children().length ? $acts : null;
@@ -506,7 +531,7 @@
 
     function renderStep(step, model) {
       var text = STEP_TEXT[step.key];
-      var cls = { done: 'is-done', current: 'is-current', checking: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
+      var cls = { done: 'is-done', current: 'is-current', checking: 'is-current', verify: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
       var $step = $('<div class="j2ha-v2-step" role="listitem"></div>').addClass(cls).attr('data-step', step.key);
       $step.append(el('<div class="j2ha-v2-step-num" aria-hidden="true"></div>', step.state === 'done' ? '✔' : String(step.number)));
       var $body = $('<div class="j2ha-v2-step-body"></div>');
@@ -517,9 +542,6 @@
       $body.append(el('<div class="j2ha-v2-small"></div>', text.text));
       if (step.cause) $body.append(el('<div class="j2ha-v2-alert is-warn j2ha-v2-step-cause"></div>', step.cause));
       if (step.note) $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', step.note));
-      if (step.key === 'ha' && step.inferred) {
-        $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small j2ha-v2-guide-inferred"></div>', '{{Réputée faite : une publication a réussi. Si vos équipements n\'apparaissent pas dans Home Assistant, ouvrez « Autres actions › Vérifier l\'installation… ».}}'));
-      }
       if (step.key === 'ha' && !step.done && step.ha_known) {
         $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', '{{Home Assistant ne s\'est pas encore signalé sur le broker.}} ' + HA_TOOLTIP));
       }

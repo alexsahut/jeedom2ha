@@ -31,7 +31,9 @@ describe('25.3 / AC15 — aucune couleur littérale ajoutée', () => {
   it('lignes CSS ajoutées : ni #hex, ni rgb()/rgba()/hsl(), ni nom de couleur', () => {
     const added = addedCssLines();
     if (added === null) return;
-    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+    // Garde levée (front v3, Lot 0) : `rgb(var(--bg-color, …))` n'est pas une couleur littérale ; c'est la seule façon de lire
+    // le TRIPLET --bg-color du cœur (« 245, 245, 245 »). Un rgb() qui ne commence pas par var( reste interdit.
+    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\((?!var\()|\bhsla?\(/;
     const named = /(?<![\w-])(red|blue|green|yellow|orange|purple|pink|black|white|gray|grey|silver|maroon|navy|teal|olive|lime|aqua|fuchsia|brown|gold|crimson|coral|salmon)(?![\w-])/i;
     const code = stripComments(added.join('\n'));
     assert.doesNotMatch(code, literal);

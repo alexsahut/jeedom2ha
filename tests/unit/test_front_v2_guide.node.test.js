@@ -79,15 +79,50 @@ describe('Lot 1 — computeSteps : table de vérité', () => {
   });
 
   // Garde levée (front v2, Lot 9a, regard neuf v2) : le guide rouvert affichait « 2. À faire » sous « 3. Fait » et « 4. Fait ».
-  // Une publication réussie rend l'étape 2 « réputée faite » (`inferred`) : plus jamais « À faire » avant « Fait ».
-  it('relu : étapes 3 et 4 faites, étape 2 réputée faite ; une étape faite le reste même si une précédente ne l’est plus', () => {
+  // Garde levée (front v3, Lot 0, fail-closed) : l'étape 2 n'est plus « réputée faite » (`inferred`, « Fait ») quand seule une
+  // publication a réussi — aucun signal de Home Assistant n'a été observé. Elle est « À vérifier » (`verify`), jamais
+  // « À faire » ; l'installation n'est complète qu'une fois Home Assistant confirmé. La mémoire du navigateur
+  // (`published`) ne coche plus l'étape 4 quand le démon ne le confirme pas : « À vérifier » aussi.
+  it('relu : étapes 3 et 4 faites, étape 2 « À vérifier » (pas de signal HA) ; une étape faite le reste si une précédente ne l’est plus', () => {
     const m = G.computeSteps(SYNCED, READ_OK, {}, {});
-    assert.deepEqual(states(m), ['done', 'done', 'done', 'done']);
-    assert.equal(m.steps[1].inferred, true);
+    assert.deepEqual(states(m), ['done', 'verify', 'done', 'done']);
+    assert.equal(m.steps[1].inferred, undefined, 'plus jamais « réputée faite »');
     assert.equal(m.synced, true);
-    const down = G.computeSteps(STOPPED, { kind: 'unavailable' }, {}, { published: true, haSeen: true });
-    assert.deepEqual(states(down), ['error', 'done', 'done', 'done']);
+    assert.equal(m.complete, false, 'Home Assistant non confirmé : pas complet');
+    const down = G.computeSteps(STOPPED, { kind: 'unavailable' }, {}, { published: true, haSeen: true, choice: true });
+    assert.deepEqual(states(down), ['error', 'done', 'done', 'verify']);
+    assert.equal(down.steps[3].waitFor, 1, 'la vérification de la publication attend l’étape 1');
     assert.equal(G.computeSteps(SYNCED, READ_OK, {}, { haSeen: true }).complete, true);
+  });
+
+  // Front v3 (Lot 0) : table de vérité « fail-closed » — une étape n'est « Fait » que si son signal est OBSERVÉ.
+  it('fail-closed : « Fait » seulement sur signal observé ; mémoire ou déduction = « À vérifier »', () => {
+    const statuses = [undefined, null, STOPPED, BROKER_DOWN, UP, SYNCED, FAILED,
+      Object.assign({}, UP, { ha: { birth_seen_at: null } }), Object.assign({}, UP, { ha: { birth_seen_at: '2026-11-13T20:04:00' } }),
+      Object.assign({}, SYNCED, { ha: { birth_seen_at: null } }), Object.assign({}, UP, { publication: { equipments_published: 3 } }),
+      Object.assign({}, UP, { publication: { equipments_published: 0 } })];
+    const sums = [{}, { read: true, published: 0 }, { read: true, published: 2 }];
+    let cases = 0;
+    for (const status of statuses) {
+      for (const sum of sums) {
+        for (const haSeen of [false, true]) for (const choice of [false, true]) for (const published of [false, true]) {
+          const loc = { haSeen, choice, published };
+          const m = G.computeSteps(status, NEVER, sum, loc);
+          const ctx = JSON.stringify({ status, sum, loc, st: states(m) });
+          const observed = G.publishedOk(status, sum, null);
+          const haSignal = !!(status && status.ha && status.ha.birth_seen_at);
+          if (m.steps[0].state === 'done') assert.ok(!!(status && status.daemon && status.broker && status.broker.state === 'connected'), ctx);
+          if (m.steps[1].state === 'done') assert.ok(haSignal || haSeen, ctx);
+          if (m.steps[2].state === 'done') assert.ok(choice || observed, ctx);
+          if (m.steps[3].state === 'done') assert.ok(observed, ctx);
+          // Mémoire seule (aucune observation) : jamais « Fait » à l'étape 4, toujours « À vérifier » sauf échec observé.
+          if (published && !observed && !G.publishFailed(status)) assert.equal(m.steps[3].state, 'verify', ctx);
+          for (const step of m.steps) assert.equal(step.inferred, undefined, ctx);
+          cases += 1;
+        }
+      }
+    }
+    assert.ok(cases >= 288);
   });
 
   // Front v2 (Lot 9a) : table de vérité complète — jamais une étape « À faire » (current) ni « en attente » (blocked) avant
@@ -106,15 +141,17 @@ describe('Lot 1 — computeSteps : table de vérité', () => {
           const st = states(G.computeSteps(status, NEVER, sum, loc));
           const lastDone = st.lastIndexOf('done');
           st.forEach((state, i) => {
-            if (i < lastDone) assert.ok(state === 'done' || state === 'error' || state === 'checking', JSON.stringify({ status, sum, loc, st }));
+            // Front v3 (Lot 0) : « À vérifier » (verify) n'est ni « À faire » ni « en attente » : admis avant « Fait ».
+            if (i < lastDone) assert.ok(state === 'done' || state === 'error' || state === 'checking' || state === 'verify', JSON.stringify({ status, sum, loc, st }));
           });
           cases += 1;
         }
       }
     }
     assert.ok(cases > 300);
-    // État pas encore lu, publication déjà constatée par ce navigateur : l'étape 1 est « en vérification », pas « À faire ».
-    assert.deepEqual(states(G.computeSteps(undefined, null, {}, { published: true })), ['checking', 'done', 'done', 'done']);
+    // État pas encore lu, publication déjà constatée par ce navigateur : l'étape 1 est « en vérification », pas « À faire » ;
+    // front v3 (Lot 0, fail-closed) : la mémoire du navigateur ne coche plus rien, les étapes 2 à 4 sont « À vérifier ».
+    assert.deepEqual(states(G.computeSteps(undefined, null, {}, { published: true })), ['checking', 'verify', 'verify', 'verify']);
     // Sans rien de fait, l'ordre de toujours.
     assert.deepEqual(states(G.computeSteps(undefined, null, {}, {})), ['current', 'blocked', 'blocked', 'blocked']);
   });
@@ -542,14 +579,36 @@ describe('Lot 9a — « Je l’ai vu » mémorisé, causes repliées, guide rouv
     assert.equal(ui.guide.haConfirmed(), true);
   });
 
-  maybe('guide rouvert après une publication réussie : quatre étapes « Fait », l’étape 2 réputée faite le dit', () => {
+  // Garde levée (front v3, Lot 0, fail-closed) : l'étape 2 était « Fait » + « Réputée faite… » sans aucun signal de Home
+  // Assistant. Elle est maintenant « À vérifier », avec le bouton qui lance la vérification (« Je l'ai vu »).
+  maybe('guide rouvert après une publication réussie, HA non confirmé : étape 2 « À vérifier » avec son bouton, puis « Fait »', () => {
     const ui = startGuide();
     ui.guide.onStatus(NOT_SEEN);
     ui.guide.open();
+    const labels = () => ui.$('#j2ha_v2_guide .j2ha-v2-step .j2ha-v2-lbl').list.map((n) => plain(ui.$(n).text()));
+    assert.deepEqual(labels(), ['Fait', 'À vérifier', 'Fait', 'Fait']);
+    assert.doesNotMatch(ui.text('#j2ha_v2_guide'), /À faire|Réputée/);
+    const verify = ui.$('#j2ha_v2_guide .j2ha-v2-step[data-step="ha"] .j2ha-v2-guide-verify');
+    assert.equal(verify.length, 1);
+    assert.equal(plain(verify.text()), 'Je l’ai vu'.replace('’', "'"));
+    verify.list[0].handlers.click.call(verify.list[0], { preventDefault() {} });
+    assert.deepEqual(labels(), ['Fait', 'Fait (vu par vous)', 'Fait', 'Fait']);
+    assert.equal(ui.$('#j2ha_v2_guide .j2ha-v2-guide-verify').length, 0);
+  });
+
+  // Front v3 (Lot 0) : publication seulement mémorisée par ce navigateur (démon redémarré, rien observé) : l'étape 4 est
+  // « À vérifier » et son bouton relance la relecture (la même que « Publier dans Home Assistant »).
+  maybe('publication seulement mémorisée : étape 4 « À vérifier », « Vérifier la publication » relance la relecture', () => {
+    const ui = startGuide({ page: { answer: false }, storage: { [G.STORAGE_KEYS.published]: '1', [G.STORAGE_KEYS.choice]: '1', [G.STORAGE_KEYS.haSeen]: '1' } });
+    ui.guide.onStatus(Object.assign({}, UP, { publication: { equipments_published: 0 } }));
+    ui.guide.open();
     const labels = ui.$('#j2ha_v2_guide .j2ha-v2-step .j2ha-v2-lbl').list.map((n) => plain(ui.$(n).text()));
-    assert.deepEqual(labels, ['Fait', 'Fait', 'Fait', 'Fait']);
-    assert.doesNotMatch(ui.text('#j2ha_v2_guide'), /À faire/);
-    assert.match(plain(ui.$('#j2ha_v2_guide .j2ha-v2-guide-inferred').text()), /Réputée faite : une publication a réussi/);
+    assert.equal(labels[3], 'À vérifier');
+    const btn = ui.$('#j2ha_v2_guide .j2ha-v2-step[data-step="publish"] .j2ha-v2-guide-verify');
+    assert.equal(plain(btn.text()), 'Vérifier la publication');
+    assert.notEqual(btn.prop('disabled'), true);
+    btn.list[0].handlers.click.call(btn.list[0], { preventDefault() {} });
+    assert.deepEqual(ui.actions.calls, ['publish']);
   });
 });
 

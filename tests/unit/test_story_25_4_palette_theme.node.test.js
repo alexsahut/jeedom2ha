@@ -20,7 +20,9 @@ const js = stripComments(fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha_w
 describe('25.4 / AC23 — aucune couleur littérale ajoutée', () => {
   it('règles CSS ajoutées : ni #hex, ni rgb()/rgba()/hsl(), ni nom de couleur', () => {
     assert.ok(added.length > 20);
-    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+    // Garde levée (front v3, Lot 0) : `rgb(var(--bg-color, …))` n'est pas une couleur littérale ; c'est la seule façon de lire
+    // le TRIPLET --bg-color du cœur (« 245, 245, 245 »). Un rgb() qui ne commence pas par var( reste interdit.
+    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\((?!var\()|\bhsla?\(/;
     const named = /(?<![\w-])(red|blue|green|yellow|orange|purple|pink|black|white|gray|grey|silver|maroon|navy|teal|olive|lime|aqua|fuchsia|brown|gold|crimson|coral|salmon)(?![\w-])/i;
     for (const [key, declarations] of added) {
       assert.doesNotMatch(declarations, literal, key);
@@ -29,8 +31,11 @@ describe('25.4 / AC23 — aucune couleur littérale ajoutée', () => {
   });
 
   it('les variables --j2ha-* ne sont ni ajoutées ni modifiées : la vue lit celles de 25.1 / 25.3', () => {
+    // Garde levée (front v3, Lot 0) : UNE variable ajoutée aux deux blocs de thème, --j2ha-page-rgb (triplet de repli de
+    // --bg-color, que le cœur Jeedom 4.4 peut ne pas définir). Toute autre variable ajoutée ou modifiée reste interdite.
+    const withoutPageRgb = (decls) => decls.replace(/(^|;)--j2ha-page-rgb:[^;]*/, '');
     for (const key of Object.keys(baseline.selectors).filter((k) => /^(:root|body\[data-theme)/.test(k.replace(/^.*\| /, '')))) {
-      assert.equal(table[key], baseline.selectors[key], key);
+      assert.equal(withoutPageRgb(table[key]), baseline.selectors[key], key);
     }
     for (const [, declarations] of added) assert.doesNotMatch(declarations, /(^|;)--j2ha-[a-z-]+:(?!.*var\()/);
   });
@@ -41,7 +46,8 @@ describe('25.4 / AC23 — aucune couleur littérale ajoutée', () => {
         const [property, ...rest] = decl.split(':');
         const value = rest.join(':').trim();
         if (!/^(color|background(-color)?|border(-(top|right|bottom|left))?(-color)?|outline|box-shadow|fill|stroke)$/.test(property.trim())) continue;
-        let flat = value;
+        // Front v3 (Lot 0) : rgb( devant var( lit un triplet du cœur (voir plus haut) ; ce n'est pas une couleur en dur.
+        let flat = value.replace(/^rgb\((var\(.*\))\)$/, '$1');
         for (let i = 0; i < 6; i += 1) flat = flat.replace(/var\(--[a-z0-9-]+(?:,\s*[^()]*)?\)/gi, '');
         const leftover = flat
           .replace(/\b(solid|dashed|none|transparent|inherit|currentColor|\d+px|0|\(|\)|,|\s|!important)+/gi, ' ').trim();
