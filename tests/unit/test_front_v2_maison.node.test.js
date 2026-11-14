@@ -111,11 +111,14 @@ describe('Lot 7 / E2 — bloc « À faire »', () => {
     assert.match(plain(ui.$(byId['102']).text()), /Bloqué/);
     assert.match(plain(ui.$(byId['102']).text()), /Le plugin hésite sur le type de cet équipement\./);
     assert.match(plain(ui.$(byId['106']).text()), /Jeedom ne sait pas à quoi servent ces commandes\./);
+    // Garde levée (front v2, Lot 9a, point 9) : l'équipement hésitant propose « Publier quand même » (le type corrigé ne
+    // le débloquerait pas) ; le bouton ouvre la fiche, où l'action du même nom règle « Toujours ».
     const fix = ui.$(byId['102']).find('.j2ha-v2-todo-action');
-    assert.equal(plain(fix.text()), L.ACTIONS.correct_type);
+    assert.equal(plain(fix.text()), L.ACTIONS.publish_anyway);
     assert.equal(fix.list[0].tag, 'button');
+    assert.ok(fix.hasClass('btn-primary'));
     fix.list[0].handlers.click.call(fix.list[0], {});
-    assert.deepEqual(ui.views, [{ room: 3, eq: 102 }], '« Corriger le type… » ouvre la fiche de l’équipement');
+    assert.deepEqual(ui.views, [{ room: 3, eq: 102 }], '« Publier quand même » ouvre la fiche de l’équipement');
     const link = ui.$(byId['106']).find('.j2ha-v2-todo-action');
     assert.equal(link.list[0].tag, 'a');
     assert.equal(link.attr('href'), 'index.php?v=d&p=types');
@@ -153,7 +156,7 @@ describe('Lot 7 / E2 — bloc « À faire »', () => {
     ] }];
     const equipments = { 1: clone(AMBIGUOUS), 2: clone(NO_TYPE) };
     const items = O.todoItems(O.computeOverview(rooms, equipments), equipments);
-    assert.deepEqual(items.map((i) => [i.eq_id, i.kind, i.action && i.action.key]), [[1, 'blocked', 'correct_type'], [2, 'blocked', 'generic_types']]);
+    assert.deepEqual(items.map((i) => [i.eq_id, i.kind, i.action && i.action.key]), [[1, 'blocked', 'publish_anyway'], [2, 'blocked', 'generic_types']]);
     assert.equal(items[0].text, O.causeSentence(L.causeSheet('ambiguous_skipped').quoi));
     assert.equal(O.causeSentence('Non publié : le nom dit « lampe ».'), 'Le nom dit « lampe ».');
   });

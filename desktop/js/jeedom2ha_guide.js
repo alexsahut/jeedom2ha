@@ -69,22 +69,28 @@
   /** Item « Home Assistant » de la barre d'état : masqué si le démon ne fournit pas le champ, ou s'il est arrêté.
    * Front v2 (Lot 6, retour de démo) : sans signal de démarrage depuis le dernier démarrage du démon (`birth_seen_at` null),
    * l'état est NEUTRE, « Non confirmé » (Home Assistant qui tourne déjà ne se signale pas de nouveau) ; vu : « Vu à HH:MM »
-   * (« Vu le JJ/MM à HH:MM » si ce n'est pas aujourd'hui). `now` (ms) : facultatif, pour les tests. */
-  function haBarItem(status, now) {
+   * (« Vu le JJ/MM à HH:MM » si ce n'est pas aujourd'hui). `now` (ms) : facultatif, pour les tests.
+   * Front v2 (Lot 9a, regard neuf v2) : `confirmed` = l'utilisateur a cliqué « Je l'ai vu » (guide ou « Vérifier
+   * l'installation… ») ; sans signal du démon, l'item dit alors « Confirmé par vous » (vert pâle) au lieu de « Non confirmé ».
+   * Le signal du démon reste prioritaire (« Vu à HH:MM »). */
+  function haBarItem(status, now, confirmed) {
     var ha = haInfo(status);
-    if (!ha || !status.daemon) return { visible: false, text: '', seen: false };
+    if (!ha || !status.daemon) return { visible: false, text: '', seen: false, confirmed: false };
     if (ha.seen_at) {
       var parts = shortDate(ha.seen_at).split(' ');
-      if (parts.length !== 2) return { visible: true, seen: true, text: '{{Vu}}' };
+      if (parts.length !== 2) return { visible: true, seen: true, confirmed: false, text: '{{Vu}}' };
       var seen = new Date(ha.seen_at);
       var today = new Date(typeof now === 'number' ? now : Date.now());
       var sameDay = seen.getFullYear() === today.getFullYear() && seen.getMonth() === today.getMonth() && seen.getDate() === today.getDate();
-      return { visible: true, seen: true, text: sameDay ? '{{Vu à}} ' + parts[1] : '{{Vu le}} ' + parts[0] + ' {{à}} ' + parts[1] };
+      return { visible: true, seen: true, confirmed: false, text: sameDay ? '{{Vu à}} ' + parts[1] : '{{Vu le}} ' + parts[0] + ' {{à}} ' + parts[1] };
     }
-    return { visible: true, seen: false, text: '{{Non confirmé}}' };
+    if (confirmed === true) return { visible: true, seen: false, confirmed: true, text: '{{Confirmé par vous}}' };
+    return { visible: true, seen: false, confirmed: false, text: '{{Non confirmé}}' };
   }
 
   var HA_TOOLTIP = '{{Home Assistant se signale sur le broker quand il démarre ; s\'il tourne déjà, c\'est normal. Vérifiez qu\'il voit l\'appareil « Jeedom (jeedom2ha) ».}}';
+  // Front v2 (Lot 9a) : infobulle de « Confirmé par vous ».
+  var HA_CONFIRMED_TOOLTIP = '{{Vous avez indiqué que Home Assistant voit l\'appareil « Jeedom (jeedom2ha) ». Home Assistant se signalera de lui-même à son prochain démarrage.}}';
 
   var RESULT_WORDS = { succes: '{{Réussie}}', partiel: '{{Partielle}}', echec: '{{Échouée}}' };
 
@@ -163,6 +169,9 @@
    * `readState` : { kind } de la lecture des états ; `summary` : summaryFrom() ; `local` : préférences du navigateur.
    * État d'une étape : `done`, `current` (la première non faite), `blocked` (les suivantes), `error` (la première non faite,
    * avec une cause). Une étape faite reste faite, même si une précédente ne l'est plus.
+   * Front v2 (Lot 9a, regard neuf v2) : jamais une étape « À faire » avant une étape « Fait ». Une publication réussie (ou
+   * un choix déjà fait) rend l'étape 2 « réputée faite » (`inferred`) : elle ne bloque plus l'ordre. L'étape 1 non faite
+   * suivie d'une étape faite est soit en erreur (cause connue), soit « en vérification » (`checking`, état pas encore lu).
    */
   function computeSteps(status, readState, summary, local) {
     var loc = local || {};
@@ -188,13 +197,20 @@
       s4.cause = '{{La dernière publication a échoué : rien n\'est encore dans Home Assistant. Vérifiez le broker MQTT, puis réessayez.}}';
     }
 
+    // Une étape ultérieure faite prouve que l'étape 2 a été franchie : elle est réputée faite.
+    if (!s2.done && (s3.done || s4.done)) {
+      s2.done = true;
+      s2.inferred = true;
+    }
+
     var steps = [s1, s2, s3, s4];
+    var laterDone = s2.done || s3.done || s4.done;
     var firstOpen = -1;
     steps.forEach(function (step, index) {
       if (step.done) { step.state = 'done'; return; }
       if (firstOpen === -1) {
         firstOpen = index;
-        step.state = step.cause ? 'error' : 'current';
+        step.state = step.cause ? 'error' : (index === 0 && laterDone ? 'checking' : 'current');
       } else {
         step.state = 'blocked';
         step.waitFor = steps[firstOpen].number;
@@ -223,9 +239,13 @@
   /**
    * Contrôles de E7, dans l'ordre. État : `ok`, `fail` (le premier arrête la liste : les suivants passent à `wait`),
    * `warn` (à vérifier, n'arrête pas), `skip` (non vérifiable avec ce démon : non affiché).
+   * Front v2 (Lot 9a) : quatre statuts au plus à l'écran (OK / À corriger / À vérifier / En attente). Home Assistant sans
+   * signal de démarrage est « À vérifier » (`ask` : boutons « Je l'ai vu » / « Je ne vois pas l'appareil… », causes
+   * repliées) ; confirmé par l'utilisateur (`local.haSeen`) : « OK », « Confirmé par vous ».
    */
-  function checkInstall(status, readState, summary) {
+  function checkInstall(status, readState, summary, local) {
     var sum = summary || {};
+    var loc = local || {};
     var list = [];
     var broker = brokerState(status);
     var daemon = { key: 'daemon', title: '{{Le démon tourne}}', state: 'ok', detail: '' };
@@ -254,15 +274,20 @@
     list.push(mqtt);
 
     var ha = haInfo(status);
-    // Front v2 (Lot 6) : sans signal de démarrage, le contrôle est NEUTRE (« Non confirmé »), jamais une alerte.
+    // Front v2 (Lot 9a) : sans signal de démarrage, « À vérifier » (n'arrête pas la liste) avec « Je l'ai vu » ; les trois
+    // causes ne sont montrées qu'en dépliant « Je ne vois pas l'appareil dans Home Assistant ».
     var haCheck = { key: 'ha', title: '{{Home Assistant sur le broker}}', state: 'skip', detail: '' };
     if (ha && ha.seen_at) {
       haCheck.state = 'ok';
       haCheck.detail = haBarItem(status).text;
+    } else if (ha && loc.haSeen) {
+      haCheck.state = 'ok';
+      haCheck.detail = '{{Confirmé par vous}}';
     } else if (ha) {
-      haCheck.state = 'info';
+      haCheck.state = 'warn';
       haCheck.detail = HA_TOOLTIP;
       haCheck.help = true;
+      haCheck.ask = true;
     }
     list.push(haCheck);
 
@@ -389,6 +414,12 @@
       mem[key] = true;
       writeLocal(env.storage, key, true);
     }
+    // Front v2 (Lot 9a) : « Je l'ai vu » (guide ou « Vérifier l'installation… ») est mémorisé (page + stockage local au mieux)
+    // et la barre d'état est prévenue pour passer à « Confirmé par vous ».
+    function confirmHaSeen() {
+      remember('haSeen');
+      if (typeof env.onHaConfirmed === 'function') env.onHaConfirmed();
+    }
     // Ce que la page apprend de l'état réel : installation connue, publication réussie (retenu pour les pannes futures).
     function learn() {
       var loc = local();
@@ -425,7 +456,8 @@
     }
 
     function stepLabel(step) {
-      if (step.state === 'done') return el('<span class="j2ha-v2-lbl is-ok"></span>', step.auto === false && step.key === 'ha' ? '{{Fait (vu par vous)}}' : '{{Fait}}');
+      if (step.state === 'done') return el('<span class="j2ha-v2-lbl is-ok"></span>', step.auto === false && step.key === 'ha' && !step.inferred ? '{{Fait (vu par vous)}}' : '{{Fait}}');
+      if (step.state === 'checking') return el('<span class="j2ha-v2-lbl is-off"></span>', '{{Vérification en cours}}');
       if (step.state === 'error') return el('<span class="j2ha-v2-lbl is-warn"></span>', '{{À corriger}}');
       if (step.state === 'current') return el('<span class="j2ha-v2-lbl is-todo"></span>', '{{À faire}}');
       return null;
@@ -439,7 +471,7 @@
       }
       if (step.key === 'ha' && !step.done && step.state !== 'blocked') {
         $acts.append(button('{{Je l\'ai vu}}', 'btn-primary j2ha-v2-btn-primary j2ha-v2-guide-haseen', function () {
-          remember('haSeen');
+          confirmHaSeen();
           st.haHelp = false;
           render();
         }));
@@ -474,7 +506,7 @@
 
     function renderStep(step, model) {
       var text = STEP_TEXT[step.key];
-      var cls = { done: 'is-done', current: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
+      var cls = { done: 'is-done', current: 'is-current', checking: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
       var $step = $('<div class="j2ha-v2-step" role="listitem"></div>').addClass(cls).attr('data-step', step.key);
       $step.append(el('<div class="j2ha-v2-step-num" aria-hidden="true"></div>', step.state === 'done' ? '✔' : String(step.number)));
       var $body = $('<div class="j2ha-v2-step-body"></div>');
@@ -485,6 +517,9 @@
       $body.append(el('<div class="j2ha-v2-small"></div>', text.text));
       if (step.cause) $body.append(el('<div class="j2ha-v2-alert is-warn j2ha-v2-step-cause"></div>', step.cause));
       if (step.note) $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', step.note));
+      if (step.key === 'ha' && step.inferred) {
+        $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small j2ha-v2-guide-inferred"></div>', '{{Réputée faite : une publication a réussi. Si vos équipements n\'apparaissent pas dans Home Assistant, ouvrez « Autres actions › Vérifier l\'installation… ».}}'));
+      }
       if (step.key === 'ha' && !step.done && step.ha_known) {
         $body.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', '{{Home Assistant ne s\'est pas encore signalé sur le broker.}} ' + HA_TOOLTIP));
       }
@@ -635,18 +670,34 @@
 
     // --- E7 : Vérifier l'installation ---
 
-    function checkRow(check, $dialogHolder) {
-      var word = { ok: '{{OK}}', fail: '{{À corriger}}', warn: '{{À vérifier}}', wait: '{{En attente}}', info: '{{Non confirmé}}' }[check.state];
-      var lbl = { ok: 'is-ok', fail: 'is-warn', warn: 'is-todo', wait: 'is-off', info: 'is-off' }[check.state];
+    // Front v2 (Lot 9a) : quatre statuts au plus (OK / À corriger / À vérifier / En attente).
+    var CHECK_WORDS = { ok: '{{OK}}', fail: '{{À corriger}}', warn: '{{À vérifier}}', wait: '{{En attente}}' };
+
+    function checkRow(check, $dialogHolder, rerender) {
+      var word = CHECK_WORDS[check.state];
+      var lbl = { ok: 'is-ok', fail: 'is-warn', warn: 'is-todo', wait: 'is-off' }[check.state];
       var $row = $('<div class="j2ha-v2-row j2ha-v2-check" role="listitem"></div>').attr('data-check', check.key).addClass('is-' + check.state);
       $row.append(el('<span class="j2ha-v2-lbl"></span>', word).addClass(lbl));
       var $grow = $('<div class="j2ha-v2-grow"></div>');
       $grow.append(el('<div class="j2ha-v2-check-title"></div>', check.title));
       if (check.detail && check.state !== 'wait') $grow.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', check.detail));
       if (check.state === 'wait') $grow.append(el('<div class="j2ha-v2-muted j2ha-v2-small"></div>', '{{Corrigez d\'abord le point ci-dessus.}}'));
-      if (check.help && check.state !== 'wait') {
-        var $help = $('<ul class="j2ha-v2-guide-causes j2ha-v2-small"></ul>');
+      if (check.ask && check.state !== 'wait') {
+        // « Je l'ai vu » mémorise le constat ; les trois causes n'apparaissent qu'en dépliant « Je ne vois pas… ».
+        var $askActs = $('<div class="j2ha-v2-acts j2ha-v2-check-ask"></div>');
+        var $help = $('<ul class="j2ha-v2-guide-causes j2ha-v2-small j2ha-v2-check-causes"></ul>').hide();
         HA_CAUSES.forEach(function (cause) { $help.append(el('<li></li>', cause)); });
+        $askActs.append(button('{{Je l\'ai vu}}', 'btn-default j2ha-v2-check-haseen', function () {
+          confirmHaSeen();
+          if (typeof rerender === 'function') rerender();
+        }));
+        var $notSeen = button('{{Je ne vois pas l\'appareil dans Home Assistant}}', 'btn-link j2ha-v2-link j2ha-v2-check-hahelp', function () {
+          var open = $notSeen.attr('aria-expanded') !== 'true';
+          $notSeen.attr('aria-expanded', open ? 'true' : 'false');
+          if (open) $help.show(); else $help.hide();
+        }).attr('aria-expanded', 'false');
+        $askActs.append($notSeen);
+        $grow.append($askActs);
         $grow.append($help);
       }
       $row.append($grow);
@@ -662,11 +713,17 @@
 
     function openCheck() {
       if (!env.bootbox || typeof env.bootbox.dialog !== 'function') return null;
-      var checks = checkInstall(st.status, readState(), summary());
+      var checks = checkInstall(st.status, readState(), summary(), local());
       var holder = { close: function () {} };
       var $content = $('<div class="j2ha-v2 j2ha-v2-checkbox"></div>');
+      $content.append(el('<p class="j2ha-v2-small j2ha-v2-muted j2ha-v2-check-intro"></p>', '{{Les contrôles s\'arrêtent au premier point « À corriger » : les suivants restent « En attente ». Un point « À vérifier » ne les arrête pas.}}'));
       var $list = $('<div class="j2ha-v2-checks" role="list"></div>');
-      checks.forEach(function (check) { $list.append(checkRow(check, holder)); });
+      function renderChecks() {
+        checks = checkInstall(st.status, readState(), summary(), local());
+        $list.empty();
+        checks.forEach(function (check) { $list.append(checkRow(check, holder, renderChecks)); });
+      }
+      renderChecks();
       $content.append($list);
 
       // Pied « Pour le support » : le contenu existant de l'export du diagnostic (case et bouton, identifiants et
@@ -719,7 +776,7 @@
         if (dialog && typeof dialog.modal === 'function') dialog.modal('hide');
         restore();
       };
-      return { checks: checks, dialog: dialog, close: holder.close };
+      return { checks: checks, dialog: dialog, close: holder.close, rerender: renderChecks };
     }
 
     return {
@@ -729,6 +786,8 @@
       close: close,
       openCheck: openCheck,
       render: render,
+      // Front v2 (Lot 9a) : l'utilisateur a-t-il confirmé voir l'appareil dans Home Assistant (mémoire de la page ou stockage) ?
+      haConfirmed: function () { return local().haSeen === true; },
       state: function () { return { visible: st.visible, mode: st.mode, phase: st.phase, error: st.error }; },
     };
   }
@@ -738,6 +797,7 @@
     STORAGE_KEYS: STORAGE_KEYS,
     STEP_KEYS: STEP_KEYS,
     HA_TOOLTIP: HA_TOOLTIP,
+    HA_CONFIRMED_TOOLTIP: HA_CONFIRMED_TOOLTIP,
     shortDate: shortDate,
     haInfo: haInfo,
     publicationInfo: publicationInfo,

@@ -61,6 +61,8 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
       const ratio = plain(item.find('.j2ha-wv-ratio').first().text());
       assert.equal(ratio, plain(card.find('.j2ha-room-ratio').text()).replace(/ publiés?$/, ''), 'ratio ' + room.object_id);
       const treeMarks = item.find('.j2ha-wv-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text()));
+      // Front v2 (Lot 9a) : les repères « N désactivés » / « N rien à publier » de la carte sont aussi dans l'arbre (le filtre
+      // ci-dessous ne les retire pas) ; « non lu » et « N exclus » restent propres à la carte.
       const cardMarks = card.find('.j2ha-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text())).filter((t) => !/non lu|exclus?$/.test(t));
       assert.deepEqual(treeMarks, cardMarks, 'repères ' + room.object_id);
       if (room.counts.blocked === 0) assert.ok(!treeMarks.some((t) => /bloqué/.test(t)));

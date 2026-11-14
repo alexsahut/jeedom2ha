@@ -26,6 +26,17 @@ function lampe(allowed) {
   return t;
 }
 
+/** Même lampe, bloquée cette fois par « un état sans ordre On / Off » (cause qui garde « Corriger le type… »). */
+function orphan() {
+  const t = lampe();
+  const d = () => diag('ambiguous_skipped', { code: 'switch_state_orphan', type: 'switch', validity: 'ha_missing_command_topic' });
+  t.commands.forEach((c) => { c.diagnostic = d(); });
+  t.entities[0].decision = d();
+  t.equipment_decision = d();
+  t.hints = [];
+  return t;
+}
+
 /** Avant PUBLIÉ (un interrupteur et un capteur dans Home Assistant), pour les cas de changement d'identifiant. */
 const PUBLISHED_BEFORE = [
   { ha_entity_type: 'switch', ha_unique_id: 'jeedom2ha_eq_231', ha_default_entity_id: 'switch.jeedom2ha_eq_231',
@@ -98,6 +109,7 @@ describe('Lot 5 — module pur : choix possibles et impossibles', () => {
     assert.ok(TP.buildChoices(row).choices.every((c) => !c.disabled));
   });
 
+  // Garde levée (front v2, Lot 9a, regard neuf v2) : « auto » ne se devinait pas cliquable ; le lien dit « Automatique ».
   it('type déjà personnalisé : coché, et proposé même s’il n’est plus annoncé', () => {
     const row = Object.assign(lampe(['switch']).commands[0], { override_applied: true, effective_ha: 'light' });
     const built = TP.buildChoices(row);
@@ -105,7 +117,7 @@ describe('Lot 5 — module pur : choix possibles et impossibles', () => {
     assert.ok(built.choices.find((c) => c.value === 'light').checked);
     assert.equal(built.choices.find((c) => c.value === 'light').disabled, false);
     assert.equal(TP.cellLabel(row), 'Personnalisé : Lumière (light)');
-    assert.equal(TP.cellLabel({ override_applied: false }), 'auto');
+    assert.equal(TP.cellLabel({ override_applied: false }), 'Automatique');
   });
 
   it('vanne et serrure proposées quand le démon les autorise', () => {
@@ -195,13 +207,17 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     ui.click(`${P}tr[data-cmd-id="2311"] .j2ha-type-link`);
     const box = ui.$(`${panel(2311)}.j2ha-v2-type-panel`);
     assert.equal(box.length, 1);
-    assert.equal(plain(box.find('.j2ha-v2-type-title').text()), 'Corriger le type de « Lampe Chevet » pour Home Assistant');
+    // Garde levée (front v2, Lot 9a, regard neuf v2) : le choix vaut pour toute l'ENTITÉ, pas pour la commande « État » :
+    // le titre nomme l'entité, la ligne suivante liste ses commandes, les types refusés sont « impossibles pour cet équipement ».
+    assert.equal(plain(box.find('.j2ha-v2-type-title').text()), 'Type dans Home Assistant de « Lampe Chevet »');
+    assert.equal(plain(box.find('.j2ha-v2-type-scope').text()), 'Ce choix vaut pour les commandes : État, On, Off');
+    assert.equal(plain(box.find('.j2ha-v2-type-legend').text()), 'Dans Home Assistant, cette entité est :');
     assert.match(plain(box.text()), /Le plus durable est de corriger les types génériques dans Jeedom/);
     const offered = box.find('input').list.filter((i) => i.props.disabled !== true).map((i) => i.attrs['data-type']);
     assert.deepEqual(offered, ['auto', 'light', 'switch']);
     // Types refusés : repliés sous une ligne unique, noms seulement (revue du Lot 5).
     const toggle = box.find('.j2ha-v2-type-refused-toggle');
-    assert.equal(plain(toggle.text()), 'Autres types, non proposés pour cette commande (8) ▸');
+    assert.equal(plain(toggle.text()), 'Types impossibles pour cet équipement (8) ▸');
     assert.equal(toggle.attr('aria-expanded'), 'false');
     const list = box.find('.j2ha-v2-type-refused-list');
     assert.equal(list.list[0].visible, false, 'replié par défaut');
@@ -209,11 +225,11 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     ui.click(`${panel(2311)}.j2ha-v2-type-refused-toggle`);
     assert.equal(toggle.attr('aria-expanded'), 'true');
     assert.equal(list.list[0].visible, true);
-    assert.equal(plain(toggle.text()), 'Autres types, non proposés pour cette commande (8) ▾');
+    assert.equal(plain(toggle.text()), 'Types impossibles pour cet équipement (8) ▾');
     assert.deepEqual(list.find('li').list.map((li) => plain(ui.$(li).text())), [
       'Alarme (alarm_control_panel)', 'Capteur binaire (binary_sensor)', 'Bouton (button)', 'Thermostat (climate)',
       'Volet (cover)', 'Serrure (lock)', 'Capteur (sensor)', 'Vanne (valve)']);
-    assert.equal((plain(box.text()).match(/non proposé/g) || []).length, 1, 'la phrase n’est dite qu’une fois');
+    assert.equal((plain(box.text()).match(/impossibles pour cet équipement/g) || []).length, 1, 'la phrase n’est dite qu’une fois');
     assert.doesNotMatch(plain(box.text()), /il faut une commande d’état|impossible :/, 'aucune raison devinée');
     assert.equal(ui.$(`${panel(2311)}.j2ha-v2-type-save`).prop('disabled'), true);
 
@@ -463,8 +479,10 @@ describe('Lot 5 — surface : erreurs, minuteur, clavier, point d’entrée', ()
     done();
   });
 
+  // Garde levée (front v2, Lot 9a, point 9) : la lampe bloquée par son nom ne propose plus « Corriger le type… » (le type ne
+  // lève pas ce blocage) ; la cause « état sans ordre » le garde (premier pas avant « Publier quand même »).
   it('« Corriger le type… » de la fiche de cause ouvre le panneau via la surface (point d’entrée du Lot 2)', () => {
-    const { ui, P, done } = openFiche(lampe());
+    const { ui, P, done } = openFiche(orphan());
     ui.click(`${P}.j2ha-v2-correct-type`);
     assert.equal(ui.$(`${P}tr[data-type-panel-for="2311"] .j2ha-v2-type-panel`).length, 1);
     ui.win.Jeedom2haSurface.clearEquipment();

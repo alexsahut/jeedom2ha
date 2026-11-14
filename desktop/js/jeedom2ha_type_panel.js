@@ -72,10 +72,37 @@
     return M().formatHaDomain(type);
   }
 
-  /** « Personnalisé : Lumière (light) » ou « auto » : texte du lien de la colonne « Type HA ». */
+  /** « Personnalisé : Lumière (light) » ou « Automatique » : texte du lien de la colonne « Type HA ».
+   * Front v2 (Lot 9a, regard neuf v2) : « Automatique » (le mot du réglage) au lieu de « auto », illisible comme lien. */
   function cellLabel(row) {
     var r = row || {};
-    return r.override_applied === true ? 'Personnalisé : ' + typeLabel(r.effective_ha) : 'auto';
+    return r.override_applied === true ? 'Personnalisé : ' + typeLabel(r.effective_ha) : 'Automatique';
+  }
+
+  /**
+   * Front v2 (Lot 9a) : portée réelle du choix. Le type se règle pour toute l'ENTITÉ Home Assistant qui porte la commande,
+   * jamais pour une commande seule. `tree` : arbre normalisé (entities[].command_ids, commands[]) ; `raw` : arbre brut du
+   * démon (facultatif, pour `entities[].ha_name`). Rend { name, commands: [noms], known } — `known` faux si aucune entité
+   * ne porte la commande (le panneau dit alors seulement que le choix vaut pour toute l'entité de l'équipement).
+   */
+  function scopeOf(tree, raw, cmdId, eqName) {
+    var t = isObject(tree) ? tree : {};
+    var entities = Array.isArray(t.entities) ? t.entities : [];
+    var at = -1;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (isObject(e) && Array.isArray(e.command_ids) && e.command_ids.indexOf(cmdId) !== -1) { at = i; break; }
+    }
+    var fallbackName = typeof eqName === 'string' && eqName ? eqName : (typeof t.eq_name === 'string' ? t.eq_name : '');
+    if (at === -1) return { name: fallbackName, commands: [], known: false };
+    var rawEntities = isObject(raw) && Array.isArray(raw.entities) ? raw.entities : [];
+    var rawEntity = isObject(rawEntities[at]) ? rawEntities[at] : null;
+    var name = rawEntity && typeof rawEntity.ha_name === 'string' && rawEntity.ha_name ? rawEntity.ha_name : fallbackName;
+    var ids = entities[at].command_ids;
+    var commands = (Array.isArray(t.commands) ? t.commands : []).filter(function (row) {
+      return isObject(row) && ids.indexOf(row.jeedom_cmd_id) !== -1;
+    }).map(function (row) { return typeof row.cmd_name === 'string' && row.cmd_name ? row.cmd_name : '#' + row.jeedom_cmd_id; });
+    return { name: name, commands: commands, known: true };
   }
 
   /** Raison affichée pour un type refusé par le démon (toujours la même : la raison exacte n'est pas fournie). */
@@ -198,6 +225,8 @@
       var sheet = l && code && typeof l.causeSheet === 'function' ? l.causeSheet(code) : null;
       label = sheet && sheet.known ? sheet.quoi : '';
     }
+    var l2 = lx();
+    if (label && l2 && typeof l2.userWords === 'function') label = l2.userWords(label);
     return label || 'le plugin refuse ce type pour cette commande';
   }
 
@@ -244,9 +273,19 @@
       if (to && from !== to) changes.push({ from: from, to: to });
       else if (!to) removed.push(from);
     });
+    // Front v2 (Lot 9a, point 9) : refus dû à la confiance (le démon garde la confiance d'origine quand le type change) : seul
+    // « Publier quand même » (réglage « Toujours » de l'équipement) le lève.
+    var publishAnyway = false;
+    if (!publishable && over !== null) {
+      var d = M().readDiagnosticView(over);
+      var l = lx();
+      var codes = d ? [M().resolveCauseCode(over), d.publication_reason, d.reason_code] : [];
+      publishAnyway = !!(l && typeof l.canPublishAnyway === 'function' && codes.some(function (c) { return c && l.canPublishAnyway(c); }));
+    }
     return {
       ok: true,
       publishable: publishable,
+      publishAnyway: publishAnyway,
       refusal: refusal,
       before: side(beforeLines),
       after: side(publishable ? afterLines : []),
@@ -288,6 +327,7 @@
     TYPE_NOUNS: TYPE_NOUNS,
     typeLabel: typeLabel,
     cellLabel: cellLabel,
+    scopeOf: scopeOf,
     impossibleReason: impossibleReason,
     buildChoices: buildChoices,
     buildDiff: buildDiff,

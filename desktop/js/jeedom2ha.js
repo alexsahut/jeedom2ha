@@ -169,7 +169,7 @@ function renderHaHealth(r) {
   var $item = $('#div_healthHa');
   if ($item.length === 0) return;
   var bar = (typeof Jeedom2haGuide !== 'undefined' && Jeedom2haGuide && typeof Jeedom2haGuide.haBarItem === 'function')
-    ? Jeedom2haGuide.haBarItem(r)
+    ? Jeedom2haGuide.haBarItem(r, undefined, haConfirmedByUser())
     : {visible: false};
   if (!bar.visible) {
     $item.hide();
@@ -177,10 +177,22 @@ function renderHaHealth(r) {
   }
   // Front v2 (Lot 6, retour de démo) : « Vu à HH:MM » en vert ; sinon « Non confirmé » en gris (état neutre, jamais une alerte :
   // Home Assistant qui tourne déjà ne se signale pas de nouveau), avec l'explication en infobulle.
-  $('#span_healthHa').removeClass().addClass('label j2ha-health-value ' + (bar.seen ? 'label-success' : 'label-default')).text(bar.text)
-    .attr('title', bar.seen ? '' : Jeedom2haGuide.HA_TOOLTIP);
+  // Front v2 (Lot 9a) : « Confirmé par vous » en vert pâle quand l'utilisateur a cliqué « Je l'ai vu ».
+  var cls = bar.seen ? 'label-success' : (bar.confirmed ? 'j2ha-v2-ha-confirmed' : 'label-default');
+  $('#span_healthHa').removeClass().addClass('label j2ha-health-value ' + cls).text(bar.text)
+    .attr('title', bar.seen ? '' : (bar.confirmed ? Jeedom2haGuide.HA_CONFIRMED_TOOLTIP : Jeedom2haGuide.HA_TOOLTIP));
   if (bar.seen) $('#span_healthHa').removeAttr('title');
   $item.show();
+}
+
+/* Front v2 (Lot 9a) : « Je l'ai vu » mémorisé par le guide (mémoire de la page), sinon lu dans le stockage local (au mieux). */
+function haConfirmedByUser() {
+  var guide = typeof window !== 'undefined' ? window.Jeedom2haGuideInstance : null;
+  if (guide && typeof guide.haConfirmed === 'function') return guide.haConfirmed();
+  if (typeof Jeedom2haGuide === 'undefined' || !Jeedom2haGuide || typeof Jeedom2haGuide.readLocal !== 'function') return false;
+  var storage = null;
+  try { storage = window.localStorage; } catch (e) { storage = null; }
+  return Jeedom2haGuide.readLocal(storage).haSeen === true;
 }
 
 /* Le guide de démarrage suit l'état du pont (instance créée au chargement de la page, absente sinon). */
@@ -296,6 +308,12 @@ function buildHaActionUserMessage(payload) {
   var impactedName = payload && payload.perimetre_impacte && typeof payload.perimetre_impacte.nom === 'string'
     ? payload.perimetre_impacte.nom
     : '';
+  // Front v2 (Lot 9a, point 8) : mots du démon traduits à l'affichage (« Parc global » → « Toute la maison »…).
+  var L = typeof window !== 'undefined' && window.Jeedom2haLexique && typeof window.Jeedom2haLexique.userWords === 'function' ? window.Jeedom2haLexique : null;
+  if (L) {
+    impactedName = L.userWords(impactedName);
+    message = L.userWords(message);
+  }
   return impactedName !== '' ? (impactedName + ' — ' + message) : message;
 }
 
@@ -446,7 +464,7 @@ function executeHaAction(intention, portee, selection, handlers) {
         : null;
       if (!payload) {
         if (handlers && typeof handlers.onError === 'function') {
-          handlers.onError('{{Réponse backend incomplète pour l\'action Home Assistant.}}');
+          handlers.onError('{{Réponse incomplète du démon pour l\'action Home Assistant.}}');
         }
         return;
       }
@@ -455,7 +473,7 @@ function executeHaAction(intention, portee, selection, handlers) {
       }
     },
     error: function(request, status, error) {
-      var message = '{{Erreur de communication avec le backend Home Assistant.}}';
+      var message = '{{Erreur de communication avec le démon du plugin.}}';
       if (handlers && typeof handlers.onError === 'function') {
         handlers.onError(message);
       }
@@ -697,6 +715,10 @@ function setupGuide() {
     // Une vue de travail ouverte par l'adresse (#j2ha-vue=…) n'est jamais recouverte par le guide.
     canAutoShow: function() {
       return !(window.location && typeof window.location.hash === 'string' && window.location.hash.indexOf('j2ha-vue=') !== -1);
+    },
+    // Front v2 (Lot 9a) : « Je l'ai vu » → la barre d'état passe à « Confirmé par vous » sans attendre la prochaine lecture.
+    onHaConfirmed: function() {
+      if (window.jeedom2haLastBridgeStatus !== undefined) renderHaHealth(window.jeedom2haLastBridgeStatus);
     },
     actions: {
       openConfig: openConfig,

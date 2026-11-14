@@ -465,3 +465,16 @@
 .j2ha-v2-scope > .btn[aria-pressed="true"] { font-weight: 700; box-shadow: inset 0 -2px 0 var(--j2ha-ok); }
 .j2ha-v2-group-others { font-style: italic; }
 .j2ha-v2-advice:empty { display: none; }
+
+/* Lot 9a — Finitions écran (regard neuf v2) : « Confirmé par vous » (vert pâle), guide et boîte de contrôle, repères des cartes. */
+#span_healthHa.j2ha-v2-ha-confirmed { background: var(--j2ha-ok-bg); color: var(--j2ha-ok); border: 1px solid var(--j2ha-ok); }
+.j2ha-v2-check-intro { margin: 0 0 6px 0; }
+.j2ha-v2-check-ask { margin-top: 4px; }
+.j2ha-v2-check-ask .btn-link { padding-left: 0; padding-right: 0; }
+.j2ha-v2-check-causes { margin: 4px 0 0 0; padding-left: 20px; }
+.j2ha-v2-guide-inferred { margin-top: 2px; }
+.j2ha-v2-type-scope { margin: 2px 0 6px 0; }
+.j2ha-v2-mark-inactive { color: var(--j2ha-neutral); }
+.j2ha-v2-room-inactive { font-size: 12px; margin: -2px 0 3px 0; }
+.j2ha-v2-wv-inactive { font-size: 12px; margin-left: 6px; white-space: nowrap; }
+.j2ha-v2-excl-names { flex-basis: 100%; padding-left: 28px; }

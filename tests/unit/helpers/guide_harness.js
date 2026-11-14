@@ -24,6 +24,7 @@ function startGuide(options) {
   const ui = startPage(opts.page);
   const storage = memoryStorage(opts.storage, { broken: opts.brokenStorage });
   const done = [];
+  const haConfirmedCalls = [];
   const actions = {
     calls: [],
     openConfig() { actions.calls.push('config'); },
@@ -40,10 +41,11 @@ function startGuide(options) {
   const guide = G.createGuide({
     $: ui.$, bootbox: ui.dom.bootbox, storage, rooms: ui.rooms, actions,
     canAutoShow: () => opts.canAutoShow !== false,
+    onHaConfirmed: () => { haConfirmedCalls.push(true); },
   });
   ui.page.subscribe(() => guide.onSnapshot(ui.page.snapshot()));
   guide.onSnapshot(ui.page.snapshot());
-  return Object.assign(ui, { guide, storage, actions, finishPublish: (failed) => done.shift()(failed) });
+  return Object.assign(ui, { guide, storage, actions, haConfirmedCalls, finishPublish: (failed) => done.shift()(failed) });
 }
 
 module.exports = { G, memoryStorage, startGuide };

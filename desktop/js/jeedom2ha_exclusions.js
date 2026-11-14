@@ -573,7 +573,18 @@
         $n.append($cb);
         $n.append($('<b class="j2ha-free-name"></b>').text(label));
         if (excludedAfter) $n.append($('<span class="j2ha-v2-lbl is-off"></span>').text(kind === 'room' ? '{{Exclue}}' : '{{Exclu}}'));
-        $n.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text(eqWord(count) + ' · ' + publishedAfter + ' ' + (publishedAfter > 1 ? '{{non exclus}}' : '{{non exclu}}')));
+        // Front v2 (Lot 9a, regard neuf v2) : « non exclu » ne veut pas dire « publié » : les désactivés dans Jeedom sont dits.
+        var disabledKept = node.eqIds.filter(function (id) { return !effectOf(model, id, changes).excluded && model.eqs[id].enabled === false; }).length;
+        $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-count"></span>').text(eqWord(count) + ' · ' + publishedAfter + ' ' + (publishedAfter > 1 ? '{{non exclus}}' : '{{non exclu}}')
+          + (disabledKept > 0 ? ' ' + (disabledKept > 1 ? '{{dont}} ' + disabledKept + ' {{désactivés dans Jeedom}}' : '{{dont 1 désactivé dans Jeedom}}') : '')));
+        // Par plugin : la ligne dit LESQUELS sont exclus (sans avoir à déplier un plugin de quarante équipements).
+        if (kind === 'plugin' && !excludedAfter) {
+          var excludedNames = node.eqIds.filter(function (id) { return effectOf(model, id, changes).excluded; }).map(function (id) { return model.eqs[id].name; });
+          if (excludedNames.length > 0) {
+            var shown = excludedNames.slice(0, 3).join(', ') + (excludedNames.length > 3 ? ' {{et}} ' + (excludedNames.length - 3) + ' {{autres}}' : '');
+            $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-names"></span>').text((excludedNames.length > 1 ? '{{Exclus :}} ' : '{{Exclu :}} ') + shown));
+          }
+        }
         if (kind === 'room' && !node.excludable) $n.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text('{{Sans pièce ne peut pas être exclue en bloc}}'));
         if (kind === 'room' && node.hasChildren) $n.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text('{{Exclure une pièce n\'exclut pas ses sous-pièces}}'));
         if (excludedAfter !== excludedBefore) {

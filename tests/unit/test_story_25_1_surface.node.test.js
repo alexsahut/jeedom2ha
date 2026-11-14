@@ -413,7 +413,8 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
       if (selector === '.j2ha-room-recreate') showRoom(ui); else ui.show(1);
       ui.click(selector);
       const { options } = ui.lastConfirmation();
-      for (const word of ['historique', 'dashboards', 'automatisations', 'Rien n\'est recréé automatiquement']) {
+      // Garde levée (front v2, Lot 9a, point 8) : « dashboards » → « tableaux de bord » (glossaire, mot d'utilisateur).
+      for (const word of ['historique', 'tableaux de bord', 'automatisations', 'Rien n\'est recréé automatiquement']) {
         assert.ok(options.message.includes(word), word);
       }
       options.buttons.cancel.callback();
@@ -472,13 +473,14 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
 
   // Garde levée (front v2, Lot 5, spec 3.2) : « imposé (sensor) » devient « Personnalisé : Capteur (sensor) » ; le clic
   // ouvre le panneau « Corriger le type » (jamais rendu en permanence).
-  it('« Type HA » : lien « auto » / « Personnalisé : Capteur (sensor) » ; panneau seulement après clic ; jamais pour une ignorée', () => {
+  // Garde levée (front v2, Lot 9a, regard neuf v2) : « auto » devient « Automatique » (mot du réglage, lisible comme lien).
+  it('« Type HA » : lien « Automatique » / « Personnalisé : Capteur (sensor) » ; panneau seulement après clic ; jamais pour une ignorée', () => {
     const t = tree(1, [READY, READY], { entities: [entity('sensor', [100, 101])] });
     t.commands[1].override_applied = true;
     t.commands[1].effective_ha = 'sensor';
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const links = ui.$(PANEL + '.j2ha-type-link').list.map((el) => plain(ui.$(el).text()));
-    assert.deepEqual(links, ['auto', 'Personnalisé : Capteur (sensor)']);
+    assert.deepEqual(links, ['Automatique', 'Personnalisé : Capteur (sensor)']);
     assert.ok(ui.$(PANEL + '.j2ha-type-forced').length === 1, 'surligné quand un type est imposé');
     assert.equal(ui.$(PANEL + 'select').length, 0, 'aucun sélecteur dans la cellule');
     assert.equal(ui.$(PANEL + '.j2ha-v2-type-panel').length, 0, 'panneau non rendu en permanence');
