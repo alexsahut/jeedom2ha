@@ -19,11 +19,11 @@ function sumPublishedCounters(summary) {
   }, 0);
 }
 
-test('9.0 / AC1+AC5 — configuration.php utilise un calcul dynamique *_published', () => {
+// Garde levée (front v3, Lot 3) : configuration.php ne relit plus Jeedom, donc ne lit plus mapping_summary ; la garde reste qu'il
+// n'additionne jamais de compteurs codés en dur.
+test('9.0 / AC1+AC5 — configuration.php ne somme aucun compteur *_published codé en dur', () => {
   const phpPath = path.resolve(__dirname, '../../plugin_info/configuration.php');
   const source = fs.readFileSync(phpPath, 'utf8');
-
-  assert.match(source, /endsWith\('_published'\)|endsWith\("_published"\)/);
   assert.doesNotMatch(source, /summary\.lights_published/);
   assert.doesNotMatch(source, /summary\.covers_published/);
   assert.doesNotMatch(source, /summary\.switches_published/);

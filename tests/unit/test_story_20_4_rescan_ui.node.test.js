@@ -36,13 +36,12 @@ test('20.4: une erreur terminale du démon affiche operation_message et rafraîc
   assert.match(source, /if \(result && typeof result\.operation_result === 'string'\) \{\s*refreshBridgeStatus\(\);\s*\}/);
 });
 
-test('20.4: annulation ne lance aucune requête et la configuration emploie le même succès', () => {
+// Garde levée (front v3, Lot 3) : la configuration ne relit plus Jeedom (« Enregistrer et relire Jeedom » est retiré ; ce qui est
+// publié se règle dans le panneau « Choisir… », dont la relecture passe par triggerTopologyRescan, couvert ci-dessus). Garde
+// inverse : plus aucune relecture lancée depuis la configuration.
+test('20.4: annulation ne lance aucune requête ; la configuration ne relit plus Jeedom', () => {
   assert.match(source, /else if \(typeof onCancel === 'function'\) onCancel\(\);/);
-  assert.match(config, /r\.status !== 'ok' \|\| r\.operation_result !== 'succes'/);
-});
-
-test('20.4: la page de configuration affiche aussi le message du 409 en priorité', () => {
-  assert.match(config, /\$status\.addClass\('label-warning'\)\.text\(r\.message \|\| r\.operation_message \|\| '\{\{Résultat inconnu, relire Dernière opération\}\}'\);/);
+  assert.doesNotMatch(config, /scanTopology|operation_result/);
 });
 
 test('20.4: le rescan a le délai client du budget relais (A1, ex-20s) et affiche le résultat chaîne du démon injoignable', () => {

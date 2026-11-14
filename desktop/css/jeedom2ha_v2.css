@@ -482,6 +482,12 @@
 .j2ha-v3-type-modal .j2ha-v2-type-idchange { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 0; }
 .j2ha-v3-info { display: inline-block; cursor: help; color: var(--j2ha-neutral); padding: 0 2px; }
 .j2ha-v3-info:focus { outline: 2px solid var(--j2ha-todo); outline-offset: 1px; }
+/* « Choisir ce qui est publié » : en-tête d'une ligne (regroupement, ⓘ, « En cas de doute »), compteur n/m, marque ⏻. */
+.j2ha-v3-excl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+.j2ha-v3-excl-head .j2ha-v2-seg { margin: 0; }
+.j2ha-v3-excl-doubt-label { font-weight: 600; }
+.j2ha-v2-excl .j2ha-v2-excl-count { font-variant-numeric: tabular-nums; cursor: help; }
+.j2ha-v3-excl-off { cursor: help; white-space: nowrap; }
 
 /* Lot 7 — Maison et pièce : phrase d'accueil, aide des puces, bloc « À faire », légende, bascule de portée, recherche groupée. */
 .j2ha-v2-welcome { display: block; margin: 4px 0 2px; color: var(--txt-color, var(--j2ha-text)); }

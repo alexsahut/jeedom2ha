@@ -267,7 +267,13 @@ describe('Lot 9a — compteurs : pourquoi il manque un équipement', () => {
       pluginNames: { virtual: 'Virtuel' }, apply: () => true });
     const res = panel.open({});
     const count = () => plain(res.root.find('.j2ha-v2-excl-group .j2ha-v2-excl-count').text());
-    assert.equal(count(), '3 équipements · 2 non exclus dont 1 désactivé dans Jeedom');
+    // Garde levée (front v3, Lot 3) : compteur « n/m » ; le détail (dont les désactivés) passe en info-bulle, et une marque
+    // « ⏻ 1 » dit le désactivé.
+    assert.equal(count(), '2/3');
+    const countNode = res.root.find('.j2ha-v2-excl-group .j2ha-v2-excl-count');
+    assert.equal(plain(countNode.attr('title')), '3 équipements · 2 non exclus dont 1 désactivé dans Jeedom · « Non exclu » ne veut pas dire « publié »');
+    assert.equal(plain(res.root.find('.j2ha-v2-excl-group .j2ha-v3-excl-off').text()), '1');
+    assert.equal(plain(res.root.find('.j2ha-v2-excl-group .j2ha-v3-excl-off').attr('title')), '1 désactivé dans Jeedom');
     res.root.find('.j2ha-v2-excl-mode button[data-mode="plugin"]').list[0].handlers.click.call(null, {});
     assert.equal(plain(res.root.find('.j2ha-v2-excl-group[data-kind="plugin"] .j2ha-v2-excl-names').text()), 'Exclu : Sèche-linge');
   });

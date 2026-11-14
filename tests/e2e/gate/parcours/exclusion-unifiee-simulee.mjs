@@ -83,7 +83,8 @@ export async function run(page, { helpers }) {
   // (1) Le panneau s'ouvre depuis la page ; rien n'est écrit à l'ouverture.
   await atStep(helpers, 1, 'panneau-absent', async () => {
     await openPanel(page);
-    const rule = (await page.locator(`${PANEL} .j2ha-v2-excl-rule`).innerText()).replace(/\s+/g, ' ');
+    // Front v3 (Lot 3) : la règle d'héritage passe en info-bulle ⓘ (title) ; elle doit toujours être là.
+    const rule = String(await page.locator(`${PANEL} .j2ha-v2-excl-rule`).getAttribute('title') || '').replace(/\s+/g, ' ');
     if (!/ni lui-même, ni par sa pièce, ni par son plugin/.test(rule)) throw new Error('panneau-absent');
     if (!(await page.locator(`${PANEL} .j2ha-v2-excl-apply`).isDisabled())) throw new Error('panneau-absent');
     if (writesSince(helpers, origin).length > 0) throw new Error('panneau-absent');

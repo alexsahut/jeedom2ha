@@ -850,7 +850,11 @@ function applyExclusionChanges(writes, info, isUndo) {
         var error = j2haExclusionWriteError(write, data);
         if (error) { fail(error); return; }
         if (write.kind === 'room') excludedObjects = data.result.excluded_objects;
-        if (write.kind === 'plugins') window.j2haExcludedPlugins = write.data.excludedPlugins;
+        if (write.kind === 'plugins') {
+          window.j2haExcludedPlugins = write.data.excludedPlugins;
+          // Front v3 (Lot 3) : « En cas de doute » se règle dans le panneau ; la page garde la valeur enregistrée.
+          window.j2haConfidencePolicy = write.data.confidencePolicy;
+        }
         done += 1;
         next();
       },
@@ -915,6 +919,23 @@ function setupChoosePublished() {
   var $choose = $('#bt_j2haChoosePublished');
   $choose.prop('hidden', false).removeAttr('hidden');
   $choose.on('click', function() { openChoosePublished({}); });
+  // Front v3 (Lot 3) : lien « Choisir ce qui est publié ↗ » de la configuration (`#j2ha-choisir`) : le panneau s'ouvre une fois,
+  // dès la première lecture des états (les nombres du pied en dépendent), puis l'adresse redevient celle de la page.
+  if (typeof window !== 'undefined' && window.location && window.location.hash === '#j2ha-choisir') {
+    var page = window.Jeedom2haOverviewPage;
+    var opened = false;
+    var openOnce = function() {
+      var snap = j2haPageSnapshot();
+      if (opened || !snap || !snap.kind || snap.kind === 'loading') return;
+      opened = true;
+      if (window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      openChoosePublished({});
+    };
+    if (page && typeof page.subscribe === 'function') page.subscribe(openOnce);
+    openOnce();
+  }
   // Front v3 (Lot 1) : une seule entrée « Choisir ce qui est publié… », le bouton près des puces (plus d'entrée dans le menu ⋯).
   var cardOf = function(el) { return $(el).closest('.j2ha-room-card'); };
   var roomIdOf = function(el) { return parseInt(cardOf(el).attr('data-object_id'), 10); };

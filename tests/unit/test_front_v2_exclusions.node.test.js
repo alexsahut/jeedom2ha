@@ -179,8 +179,12 @@ describe('Lot 6 — écritures : routes et corps existants, inverses pour « Ann
     ]);
     const home = fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha.js'), 'utf8');
     assert.match(home, /data: \{action: 'saveRoomExclusion', objectId: String\(roomId\), excluded: excluded \? '1' : '0'\}/);
+    // Garde levée (front v3, Lot 3) : la configuration n'écrit plus ces clés ; le panneau est la seule source (mêmes paramètres
+    // que la route, lus par core/ajax : excludedPlugins et confidencePolicy).
     const conf = fs.readFileSync(path.join(root, 'plugin_info/configuration.php'), 'utf8');
-    assert.match(conf, /action:\s+'saveFilteringConfig',\s+excludedPlugins:[^\n]+\n\s+confidencePolicy:/);
+    assert.doesNotMatch(conf, /saveFilteringConfig/);
+    const ajax = fs.readFileSync(path.join(root, 'core/ajax/jeedom2ha.ajax.php'), 'utf8');
+    assert.match(ajax, /saveFilteringConfig/);
     // Politique inconnue : jamais transmise telle quelle (la route la ramènerait à sure_probable).
     assert.equal(X.writesFor(m, changes({ plugins: { virtual: true } }), 'x').at(0).data.confidencePolicy, 'sure_probable');
   });
