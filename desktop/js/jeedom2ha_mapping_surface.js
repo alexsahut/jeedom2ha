@@ -211,7 +211,9 @@
   // Aperçu d'un type (lecture seule, rien n'est enregistré) : même corps qu'avant (`previewMappingOverride`, eqId, cmdId,
   // haEntityType). Une seule requête en vol par commande ; une requête remplacée ou annulée (fermeture) ne rappelle rien.
   // `done(error, data)` : `error` = message lisible (réseau ou refus), `data` = corps ajax.
-  function runDryRun(eqId, cmdId, type, done) {
+  // Front v2 (Lot 9a, revue #397) : `policy` (facultatif) ajoute `publicationPolicy` à l'aperçu — la route d'aperçu du démon
+  // accepte le type ET le réglage de publication ensemble (lecture seule). Sans `policy`, corps inchangé.
+  function runDryRun(eqId, cmdId, type, done, policy) {
     if (ctx.xhr[cmdId] && typeof ctx.xhr[cmdId].abort === 'function') {
       ctx.xhr[cmdId].abort();
     }
@@ -225,7 +227,8 @@
     slot.request = $.ajax({
       type: 'POST',
       url: AJAX_URL,
-      data: { action: 'previewMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type },
+      data: policy ? { action: 'previewMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type, publicationPolicy: policy }
+        : { action: 'previewMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type },
       dataType: 'json',
       success: function (data) {
         if (slot.cancelled) return;
@@ -1273,7 +1276,7 @@
       var $anyway = $('<button type="button" class="btn btn-primary btn-xs j2ha-v2-type-anyway"></button>').text('{{Publier quand même}}');
       $anyway.on('click', function () { onPublishAnyway(); });
       $preview.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-box"></div>')
-        .append(document.createTextNode('{{Changer le type ne suffit pas ici : le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » règle l’équipement sur « Toujours » ; il sera publié après « Appliquer ».}} '))
+        .append(document.createTextNode('{{Changer le type ne suffit pas ici : le plugin ne publie pas de lui-même un équipement dont il doute ou dont le nom contredit les types. « Publier quand même » garde le type choisi et ajoute le réglage « Toujours » : l’aperçu se met à jour, rien n’est enregistré avant votre validation.}} '))
         .append($anyway));
     }
     diff.changes.forEach(function (c) {
@@ -1352,6 +1355,7 @@
     state.choice = value;
     state.$error.text('').hide();
     setTypeSaveEnabled(state, false);
+    if (state.$save) setTypeAnyway(state, false);
     if (value === (state.current || '')) {
       state.$preview.empty().append($('<div class="j2ha-v2-small"></div>').text('{{C’est le réglage actuel : rien ne change.}}'));
       return;
@@ -1374,16 +1378,81 @@
           return;
         }
         var diff = tp.buildDiff(data);
-        renderTypeDiff(tp, state.$preview, diff, function () {
-          var $panel = ctx.current && ctx.current.$panel ? ctx.current.$panel : null;
-          if (!$panel) return;
-          closeTypePanel(false);
-          publishAnyway($panel, $panel.find('.j2ha-publication-error').first());
-        });
+        renderTypeDiff(tp, state.$preview, diff, function () { previewTypeAnyway(tp, state, value); });
         maybeShowReassurance(!diff.publishable);
         setTypeSaveEnabled(state, diff.publishable);
       });
     }, DEBOUNCE_MS);
+  }
+
+  // Front v2 (Lot 9a, revue #397) : « Publier quand même » DANS le panneau garde le type choisi : aperçu du type ET de
+  // « Toujours » ensemble (lecture seule) ; publiable → « Enregistrer et publier quand même » enregistrera les deux.
+  function setTypeAnyway(state, on) {
+    state.anyway = on === true;
+    state.$save.text(state.anyway ? '{{Enregistrer et publier quand même}}' : '{{Enregistrer et publier}}');
+  }
+
+  function previewTypeAnyway(tp, state, value) {
+    if (ctx.typePanel !== state || state.busy || state.choice !== value) return;
+    state.$error.text('').hide();
+    setTypeSaveEnabled(state, false);
+    state.$preview.empty().append($('<div class="j2ha-v2-small j2ha-v2-muted"></div>')
+      .append('<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>').append(document.createTextNode(' {{Calcul de l’aperçu…}}')));
+    runDryRun(state.eqId, state.cmdId, value, function (error, data) {
+      if (ctx.typePanel !== state || state.choice !== value) return;
+      if (error) {
+        state.$preview.empty();
+        state.$error.text('{{L’aperçu n’a pas pu être calculé :}} ' + error).show();
+        return;
+      }
+      var diff = tp.buildDiff(data);
+      renderTypeDiff(tp, state.$preview, diff, null);
+      if (diff.publishable) {
+        state.$preview.prepend($('<div class="j2ha-v2-alert is-info j2ha-v2-type-anyway-on"></div>')
+          .text('{{Aperçu avec le type choisi et le réglage « Toujours » : les deux seront enregistrés ensemble, puis l’équipement sera publié.}}'));
+        setTypeAnyway(state, true);
+      }
+      setTypeSaveEnabled(state, diff.publishable);
+    }, 'force_publish');
+  }
+
+  // Type PUIS « Toujours » (même portée que l'aperçu : la commande du panneau), puis publication comme « Enregistrer et
+  // publier ». Corps inchangés : `saveMappingOverride`, puis `savePublicationOverride` (eqId, cmdId, force_publish).
+  function writeTypeForceThenPublish(eqId, cmdId, type, done) {
+    saveOverride(eqId, cmdId, type, function (error) {
+      if (error) { done(error, null, false); return; }
+      $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: 'force_publish', cmdId: cmdId }, dataType: 'json' })
+        .done(function (resp) {
+          var refused = M.readPublicationRequestError(resp);
+          if (refused) { reloadEquipment(eqId); done(refused, null, true); return; }
+          publishAfterType(eqId, function (outcome) {
+            refreshBridgeStatus();
+            reloadEquipment(eqId);
+            done(null, outcome, true);
+          });
+        })
+        .fail(function () { reloadEquipment(eqId); done('{{Le démon ne répond pas.}}', null, true); });
+    });
+  }
+
+  // « Annuler » du bandeau après « Publier quand même » : retire « Toujours » (revertPublicationOverride, même commande),
+  // puis rétablit le type précédent et republie (chemin de l'annulation existante).
+  function undoTypeAnyway(eqId, cmdId, previous) {
+    var undoTypeOnly = undoType(eqId, cmdId, previous);
+    return function ($toast, $undo) {
+      if ($undo.prop('disabled')) return;
+      $undo.prop('disabled', true);
+      if (ctx.typeToast && ctx.typeToast.timer) { clearTimeout(ctx.typeToast.timer); ctx.typeToast.timer = null; }
+      $toast.find('.j2ha-v2-type-toast-text').first().text('{{Retour au réglage précédent…}}');
+      $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'revertPublicationOverride', eqId: eqId, cmdId: cmdId }, dataType: 'json' })
+        .done(function (resp) {
+          var error = M.readPublicationRequestError(resp);
+          if (error) { showTypeToast(eqId, '{{Le réglage précédent n’a pas pu être rétabli :}} ' + error, true, null); return; }
+          $undo.prop('disabled', false);
+          undoTypeOnly($toast, $undo);
+        })
+        .fail(function () { showTypeToast(eqId, '{{Le réglage précédent n’a pas pu être rétabli :}} {{Le démon ne répond pas.}}', true, null); });
+    };
   }
 
   function saveTypeChoice(tp, state) {
@@ -1396,6 +1465,29 @@
     state.$cancel.prop('disabled', true);
     setTypeChoicesLocked(state, true);
     state.$save.prop('disabled', true).html('<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> {{Enregistrement…}}');
+    if (state.anyway && type) {
+      writeTypeForceThenPublish(state.eqId, state.cmdId, type, function (error, outcome, typeSaved) {
+        if (error && !typeSaved) {
+          if (ctx.typePanel !== state) return;
+          state.busy = false;
+          setTypeChoicesLocked(state, false);
+          state.$cancel.prop('disabled', false);
+          state.$save.prop('disabled', false).text('{{Enregistrer et publier quand même}}');
+          state.$error.text('{{Le réglage n’a pas été enregistré :}} ' + error).show();
+          return;
+        }
+        if (ctx.typePanel === state) closeTypePanel(false);
+        if (error) {
+          // Type enregistré, « Toujours » refusé : on le dit, et l'annulation rétablit le type précédent.
+          showTypeToast(state.eqId, '{{Type enregistré, mais « Toujours » a été refusé :}} ' + error, true, undoType(state.eqId, state.cmdId, previous));
+          return;
+        }
+        var undoBoth = undoTypeAnyway(state.eqId, state.cmdId, previous);
+        if (outcome.ok) showTypeToast(state.eqId, tp.resultMessage(name, type), false, undoBoth);
+        else showTypeToast(state.eqId, publicationProblem(outcome), true, undoBoth);
+      });
+      return;
+    }
     writeTypeThenPublish(state.eqId, state.cmdId, type, function (error, outcome) {
       if (error) {
         if (ctx.typePanel !== state) return;

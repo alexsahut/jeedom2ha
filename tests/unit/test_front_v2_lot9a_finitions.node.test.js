@@ -15,6 +15,7 @@ const O = require('../../desktop/js/jeedom2ha_overview.js');
 const X = require('../../desktop/js/jeedom2ha_exclusions.js');
 const { createDom } = require('./helpers/fake_dom');
 const { createUi, BRIDGE_UP } = require('./helpers/ui_harness');
+const { ACTION_OK } = require('./helpers/write_scenarios');
 const { DEMO, demoRoom, diag } = require('./helpers/front_v2_demo_trees');
 const { startPage, phpAvailable } = require('./helpers/page_b_harness');
 
@@ -97,28 +98,76 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     assert.equal(TP.cellLabel({ override_applied: false }), 'Automatique');
   });
 
-  it('aperçu refusé pour cause de confiance : phrase + « Publier quand même » qui règle « Toujours » (aperçu existant)', async () => {
+  // Revue #397 (Codex + coordinateur) : depuis le panneau, « Publier quand même » GARDE le type choisi (lampe typée prise →
+  // lumière) : aperçu type + « Toujours » ensemble, puis saveMappingOverride, savePublicationOverride, publication ;
+  // « Annuler » défait les deux.
+  it('aperçu refusé pour cause de confiance : « Publier quand même » garde le type, enregistre type PUIS « Toujours »', async () => {
     const { ui, P, done } = openFiche(lampeValide());
     const link = ui.$(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
     assert.equal(plain(link.text()), 'Automatique');
     ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
     const panel = `${P}tr[data-type-panel-for="2311"] `;
     assert.equal(plain(ui.$(panel + '.j2ha-v2-type-title').text()), 'Type dans Home Assistant de « Lampe Chevet »');
-    ui.$(`${panel}input[data-type="light"]`).trigger('change');
+    ui.$(`${panel}input[data-type="light"]`).prop('checked', true).trigger('change');
     await sleep(450);
     const refused = diag('ambiguous_skipped', { code: 'name_heuristic_rejection', type: 'light', valid: true });
-    ui.pending('previewMappingOverride')[0].respond({ state: 'ok', result: { status: 'ok', payload: {
+    const first = ui.pending('previewMappingOverride')[0];
+    assert.deepEqual({ ...first.data }, { action: 'previewMappingOverride', eqId: 231, cmdId: 2311, haEntityType: 'light' }, 'corps inchangé');
+    first.respond({ state: 'ok', result: { status: 'ok', payload: {
       jeedom_eq_id: 231, mapped: true, covered: true, auto: lampeValide().equipment_decision, overridden: refused } } });
     assert.equal(ui.$(panel + '.j2ha-v2-type-save').prop('disabled'), true, 'enregistrer reste impossible');
     const box = ui.$(panel + '.j2ha-v2-type-anyway-box');
     assert.equal(box.length, 1, 'jamais un bouton grisé muet');
     assert.match(plain(box.text()), /Changer le type ne suffit pas ici/);
     ui.click(panel + '.j2ha-v2-type-anyway');
-    assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 0, 'le panneau se ferme');
-    const preview = ui.pending('previewMappingOverride').slice(-1)[0];
-    assert.deepEqual({ ...preview.data }, { action: 'previewMappingOverride', eqId: 231, publicationPolicy: 'force_publish' },
-      'même aperçu que le segment « Toujours » de l’équipement, sans commande');
-    assert.ok(!ui.calls.some((c) => c.action === 'savePublicationOverride'), 'rien n’est écrit avant la confirmation');
+    assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 1, 'le panneau reste ouvert, le type choisi aussi');
+    assert.equal(ui.$(`${panel}input[data-type="light"]`).prop('checked'), true);
+    const both = ui.pending('previewMappingOverride').slice(-1)[0];
+    assert.deepEqual({ ...both.data }, { action: 'previewMappingOverride', eqId: 231, cmdId: 2311, haEntityType: 'light', publicationPolicy: 'force_publish' },
+      'un seul aperçu : le type choisi ET « Toujours »');
+    const forced = diag('publication_forced', { type: 'light', valid: true, publish: true, code: 'name_heuristic_rejection' });
+    both.respond({ state: 'ok', result: { status: 'ok', payload: { jeedom_eq_id: 231, mapped: true, covered: true,
+      auto: lampeValide().equipment_decision, overridden: forced,
+      entities_before: [{ ha_entity_type: 'switch', ha_default_entity_id: 'switch.jeedom2ha_eq_231', will_publish: false }],
+      entities_after: [{ ha_entity_type: 'light', ha_default_entity_id: 'light.jeedom2ha_eq_231', ha_controllable: true, ha_capabilities: ['on_off'], will_publish: true }] } } });
+    assert.match(plain(ui.$(panel + '.j2ha-v2-diff').text()), /Après\s*1 lumière/);
+    assert.match(plain(ui.$(panel + '.j2ha-v2-type-anyway-on').text()), /type choisi et le réglage « Toujours »/);
+    const save = ui.$(panel + '.j2ha-v2-type-save');
+    assert.equal(plain(save.text()), 'Enregistrer et publier quand même');
+    assert.equal(save.prop('disabled'), false);
+    assert.ok(!ui.calls.some((c) => ['saveMappingOverride', 'savePublicationOverride'].includes(c.action)), 'rien n’est écrit avant la validation');
+    ui.click(panel + '.j2ha-v2-type-save');
+    const t1 = ui.respond('saveMappingOverride', { state: 'ok', result: { status: 'ok' } });
+    assert.deepEqual({ ...t1.data }, { action: 'saveMappingOverride', eqId: 231, cmdId: 2311, haEntityType: 'light' });
+    const t2 = ui.respond('savePublicationOverride', { state: 'ok', result: { status: 'ok' } });
+    assert.deepEqual({ ...t2.data }, { action: 'savePublicationOverride', eqId: 231, publicationPolicy: 'force_publish', cmdId: 2311 });
+    ui.respond('executeHaAction', ACTION_OK);
+    assert.match(plain(ui.$(P + '.j2ha-v2-type-toast').text()), /^Lampe Chevet est maintenant une lumière dans Home Assistant\.\s*Annuler$/);
+    // « Annuler » défait les deux : « Toujours » retiré, puis retour au type précédent (automatique) et publication.
+    ui.click(P + '.j2ha-v2-type-undo');
+    const r1 = ui.respond('revertPublicationOverride', { state: 'ok', result: { status: 'ok' } });
+    assert.deepEqual({ ...r1.data }, { action: 'revertPublicationOverride', eqId: 231, cmdId: 2311 });
+    const r2 = ui.respond('revertMappingOverride', { state: 'ok', result: { status: 'ok' } });
+    assert.deepEqual({ ...r2.data }, { action: 'revertMappingOverride', eqId: 231, cmdId: 2311 });
+    ui.respond('executeHaAction', ACTION_OK);
+    assert.match(plain(ui.$(P + '.j2ha-v2-type-toast').text()), /Réglage précédent rétabli\./);
+    done();
+  });
+
+  it('changer de choix après « Publier quand même » revient à l’enregistrement simple', async () => {
+    const { ui, P, done } = openFiche(lampeValide());
+    ui.click(P + 'tr[data-cmd-id="2311"] .j2ha-type-link');
+    const panel = `${P}tr[data-type-panel-for="2311"] `;
+    ui.$(`${panel}input[data-type="light"]`).trigger('change');
+    await sleep(450);
+    const refused = diag('ambiguous_skipped', { code: 'name_heuristic_rejection', type: 'light', valid: true });
+    ui.pending('previewMappingOverride')[0].respond({ state: 'ok', result: { status: 'ok', payload: { jeedom_eq_id: 231, mapped: true, covered: true, auto: refused, overridden: refused } } });
+    ui.click(panel + '.j2ha-v2-type-anyway');
+    ui.pending('previewMappingOverride').slice(-1)[0].respond({ state: 'ok', result: { status: 'ok', payload: { jeedom_eq_id: 231, mapped: true, covered: true, auto: refused,
+      overridden: diag('publication_forced', { type: 'light', valid: true, publish: true }) } } });
+    assert.equal(plain(ui.$(panel + '.j2ha-v2-type-save').text()), 'Enregistrer et publier quand même');
+    ui.$(`${panel}input[data-type="auto"]`).trigger('change');
+    assert.equal(plain(ui.$(panel + '.j2ha-v2-type-save').text()), 'Enregistrer et publier');
     done();
   });
 });
