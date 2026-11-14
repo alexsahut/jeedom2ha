@@ -40,6 +40,7 @@ SCHEMA_VERSION = 1
 # Raisons propres à l'export (aucune n'existe dans le pipeline de décision).
 REASON_SCENARIO_BUTTON = "scenario_button"      # code déjà produit par le sync pour un scénario actif
 REASON_SCENARIO_INACTIVE = "scenario_inactive"  # appui refusé sur un scénario inactif (24.14 : plus une raison d'export)
+REASON_SCENARIO_NOT_SELECTED = "scenario_not_selected"  # front v3 (Lot 4a) : l'utilisateur ne l'a pas choisi
 REASON_NO_SYNC_DECISION = "no_sync_decision"    # équipement sans verdict mémorisé (jamais synchronisé)
 REASON_SCOPE_EXCLUDED = "excluded"              # hors périmètre publié (identique à `_scope_excluded_decision`)
 STEP_SCOPE = "scope"                            # filtre de périmètre publié, appliqué après étape 4
@@ -447,6 +448,12 @@ def build_decision_export(
         _scenario_row(snapshot.scenarios[sc_id], scenario_publications.get(sc_id), snapshot, publisher)
         for sc_id in sorted(snapshot.scenarios)
     ]
+    # Front v3 (Lot 4a, option B) — un scénario explicitement non choisi (`published: false`) n'a pas de
+    # bouton : verdict « non publié ». Champ absent ou vrai : ligne inchangée.
+    for row in scenarios:
+        if not snapshot.scenarios[row["scenario_id"]].publication_selected:
+            row["decision"] = DECISION_NOT_PUBLISHED
+            row["reason"] = REASON_SCENARIO_NOT_SELECTED
     config = memo.config
     return {
         "schema_version": SCHEMA_VERSION,

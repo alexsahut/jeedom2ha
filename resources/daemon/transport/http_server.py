@@ -1633,6 +1633,8 @@ async def _handle_system_status(request: web.Request) -> web.Response:
             "publication": ha_side.publication_counts(
                 _present_discovery_entries_by_eq(request.app), request.app.get("scenario_publications"),
             ),
+            # Front v3 (Lot 4a, additif) : scénarios et leur publication, pour l'onglet Scénarios.
+            "scenarios": _scenario_status_rows(request.app),
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -2130,6 +2132,77 @@ def _sync_origin(request: web.Request) -> str:
     return mode if mode in _SYNC_ORIGINS else "service"
 
 
+# Front v3 (Lot 4a) — raisons de la décision d'un scénario non choisi : retiré confirmé / à retirer.
+SCENARIO_NOT_SELECTED = "scenario_not_selected"
+SCENARIO_NOT_SELECTED_PENDING = "scenario_not_selected_pending"
+
+
+async def _withdraw_unselected_scenario(publisher, scenario_mapper, scenario, previous, failed_ids: Set[int]):
+    """Front v3 (Lot 4a, option B) — décision d'un scénario non choisi, et retrait de son bouton.
+
+    Le retrait passe par `DiscoveryPublisher.unpublish` (config et disponibilité retenues vidées).
+    Il n'est rejoué que si l'état du broker est inconnu : première synchro du démon, bouton publié à
+    la synchro précédente, ou retrait précédent non confirmé. Un retrait déjà confirmé n'émet rien.
+    Broker injoignable ou retrait en échec : l'identifiant rejoint `failed_ids`, la synchro n'est pas
+    complète et le cron du plugin la rejoue.
+    """
+    mapping = scenario_mapper.map(scenario)
+    decision = PublicationDecision(
+        should_publish=False,
+        reason=SCENARIO_NOT_SELECTED,
+        mapping_result=mapping,
+        active_or_alive=bool(scenario.is_active),
+        discovery_published=False,
+    )
+    mapping.publication_decision_ref = decision
+    if previous is not None and getattr(previous, "reason", None) == SCENARIO_NOT_SELECTED:
+        return decision
+    ok = False
+    if publisher is not None:
+        try:
+            ok = bool(await publisher.unpublish(f"jeedom2ha_scenario_{scenario.id}"))
+        except Exception as exc:  # pragma: no cover - défensif : le pont ne lève pas
+            _LOGGER.error("[SCENARIO] scenario_id=%d : retrait en échec — %s", scenario.id, exc)
+    if ok:
+        _LOGGER.info("[SCENARIO] scenario_id=%d non publié (choix de l'utilisateur) : bouton retiré", scenario.id)
+    else:
+        decision.reason = SCENARIO_NOT_SELECTED_PENDING
+        failed_ids.add(scenario.id)
+        _LOGGER.warning("[SCENARIO] scenario_id=%d non publié : retrait du bouton à rejouer", scenario.id)
+    return decision
+
+
+def _scenario_status_rows(app) -> list:
+    """Front v3 (Lot 4a) — liste des scénarios pour le statut (lecture seule, aucune publication).
+
+    `published` : choix de l'utilisateur (absent = publié, comme avant) ; `in_ha` : bouton publié à la
+    dernière synchro ; `ha_entity_id` : identifiant attendu dans HA, seulement si le scénario est publié.
+    """
+    topology = app.get("topology")
+    if topology is None:
+        return []
+    decisions = app.get("scenario_publications") or {}
+    rows = []
+    for scenario_id in sorted(topology.scenarios):
+        scenario = topology.scenarios[scenario_id]
+        published = scenario.publication_selected
+        rows.append({
+            "id": scenario_id,
+            "name": scenario.name,
+            "group": scenario.group,
+            "mode": scenario.mode,
+            "has_trigger": scenario.has_trigger,
+            "has_schedule": scenario.has_schedule,
+            "manual": scenario.manual,
+            "is_active": bool(scenario.is_active),
+            "published": published,
+            "is_new": bool(scenario.is_new),
+            "in_ha": bool(getattr(decisions.get(scenario_id), "discovery_published", False)),
+            "ha_entity_id": f"button.jeedom2ha_scenario_{scenario_id}" if published else None,
+        })
+    return rows
+
+
 def _publish_scenario_availability(mqtt_bridge: MqttBridge, scenario_id: int, is_active: bool) -> bool:
     """Story 24.14 (D1 A) — disponibilité retenue du bouton d'un scénario (`online` / `offline`)."""
     topic = build_scenario_availability_topic(scenario_id)
@@ -2535,6 +2608,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     # alors pas son empreinte, pour réessayer à l'échéance suivante.
     scenario_publication_failed_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
+        # Front v3 (Lot 4a, option B) — scénario que l'utilisateur n'a pas choisi de publier
+        # (`published: false`) : pas de bouton ; retiré par le chemin `unpublish` existant s'il a pu
+        # l'être. Champ absent = publié comme avant. La purge ci-dessous reçoit toujours TOUS les
+        # identifiants lisibles (`scenario_publications`), elle ne retire donc que les supprimés.
+        if not scenario.publication_selected:
+            scenario_publications[scenario_id] = await _withdraw_unselected_scenario(
+                publisher if broker_ready else None, scenario_mapper, scenario,
+                request.app["scenario_publications"].get(scenario_id), scenario_publication_failed_ids,
+            )
+            continue
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
             should_publish=True,
