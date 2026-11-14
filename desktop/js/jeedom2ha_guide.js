@@ -529,6 +529,30 @@
       return $acts.children().length ? $acts : null;
     }
 
+    // Front v3 (Lot 4b) : onglet Scénarios de la page (jeedom2ha_scenarios.js), injectable par `env.scenarios` ; absent = rien.
+    function scenarioHook() {
+      if (env.scenarios) return env.scenarios;
+      var g = typeof globalThis !== 'undefined' ? globalThis : null;
+      return g && g.Jeedom2haScenariosPage ? g.Jeedom2haScenariosPage : null;
+    }
+
+    // « n scénarios lancés à la main → [Publier ces n] » : ferme le guide et présélectionne ces scénarios dans l'onglet
+    // Scénarios ; rien n'est publié avant « Appliquer ». Jamais un scénario programmé ou déclenché (voir suggestionIds).
+    function scenarioSuggestion() {
+      var hook = scenarioHook();
+      var n = hook && typeof hook.suggestionCount === 'function' ? hook.suggestionCount() : 0;
+      if (!n || typeof hook.preselectSuggested !== 'function') return null;
+      var $line = $('<div class="j2ha-v2-small j2ha-v3-sc-guide-suggest"></div>');
+      $line.append($('<i class="fas fa-hand-pointer" aria-hidden="true"></i>'));
+      $line.append(textSpan(' ' + n + ' ' + (n > 1 ? '{{scénarios lancés à la main}}' : '{{scénario lancé à la main}}') + ' → '));
+      var $btn = button(n > 1 ? '{{Publier ces}} ' + n : '{{Publier ce scénario}}', 'btn-default btn-xs j2ha-v2-guide-scenarios', function () {
+        close();
+        hook.preselectSuggested();
+      });
+      $btn.attr('title', '{{Prépare la publication ; rien n’est envoyé avant « Appliquer »}}');
+      return $line.append($btn);
+    }
+
     function renderStep(step, model) {
       var text = STEP_TEXT[step.key];
       var cls = { done: 'is-done', current: 'is-current', checking: 'is-current', verify: 'is-current', error: 'is-blocked', blocked: 'is-wait' }[step.state];
@@ -551,6 +575,11 @@
         $body.append($help);
       }
       if (step.key === 'publish' && st.error && !step.done) $body.append(el('<div class="j2ha-v2-alert is-warn"></div>', st.error));
+      // Front v3 (Lot 4b) : étape 3, même suggestion que l'onglet Scénarios (présélection seulement).
+      if (step.key === 'choice' && step.state !== 'blocked') {
+        var $scenarios = scenarioSuggestion();
+        if ($scenarios) $body.append($scenarios);
+      }
       var $acts = stepActions(step, model);
       if ($acts) $body.append($acts);
       $step.append($body);
