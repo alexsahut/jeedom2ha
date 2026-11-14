@@ -119,7 +119,9 @@ test('audit UX réel — fil d\'Ariane : la pièce cliquable est un lien (pas de
   });
 });
 
-test('audit UX réel — configuration : 42 plugins, les cochés résumés au-dessus, au moins 24 cases visibles sans défiler', async (t) => {
+// Garde levée (front v3, Lot 3) : la liste des 42 plugins quitte la configuration (une seule source : le panneau « Choisir ce qui
+// est publié » de la page du plugin). Même scène de 42 plugins : la page tient sans défilement interne ni liste, aucune phrase.
+test('audit UX réel — configuration (42 plugins) : plus de liste ni de phrase, un lien vers « Choisir ce qui est publié »', async (t) => {
   if (!phpAvailable || !JQUERY) { t.skip('PHP ou jQuery indisponible'); return; }
   let playwright;
   try {
@@ -143,26 +145,16 @@ test('audit UX réel — configuration : 42 plugins, les cochés résumés au-de
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('http://cfg.test/');
-    const measure = () => page.evaluate(() => {
-      const list = document.querySelector('#div_excludedPluginsList');
-      const lb = list.getBoundingClientRect();
-      const labels = [...list.querySelectorAll('.checkbox')];
-      const shown = labels.filter((el) => { const b = el.getBoundingClientRect(); return b.top >= lb.top - 1 && b.bottom <= lb.bottom + 1; }).length;
-      const summary = document.querySelector('#p_excludedPluginsSummary');
-      return { total: labels.length, shown, hscroll: list.scrollWidth > list.clientWidth, summary: summary.textContent,
-        summaryAbove: summary.getBoundingClientRect().bottom <= lb.top };
-    });
-    const before = await measure();
-    assert.equal(before.total, 42);
-    assert.ok(before.shown >= 24, `${before.shown} cases visibles sans défiler sur 42`);
-    assert.equal(before.hscroll, false, 'aucun défilement horizontal');
-    assert.ok(before.summaryAbove, 'résumé au-dessus de la liste');
-    assert.equal(before.summary, 'Plugins cochés (6) : Plugin fictif 07, Plugin fictif 15, Plugin fictif 23, Plugin fictif 31, Plugin fictif 38, Plugin fictif 41.');
-    await page.locator('input[value="plugin_15"]').uncheck();
-    await page.locator('input[value="plugin_02"]').check();
-    assert.equal((await measure()).summary, 'Plugins cochés (6) : Plugin fictif 02, Plugin fictif 07, Plugin fictif 23, Plugin fictif 31, Plugin fictif 38, Plugin fictif 41.');
-    await page.evaluate(() => { $('.configKey[data-l1key=excludedPlugins]').val('').trigger('change'); });
-    assert.equal((await measure()).summary, 'Aucun plugin coché.', 'le remplissage du champ par le cœur met le résumé à jour');
+    const m = await page.evaluate(() => ({
+      lists: document.querySelectorAll('#div_excludedPluginsList, input.j2ha-excluded-plugin').length,
+      helps: document.querySelectorAll('.help-block:not(#span_mqttPasswordStatus)').length,
+      link: (document.querySelector('#lnk_j2haChoosePublished') || {}).textContent || '',
+      hscroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+    }));
+    assert.equal(m.lists, 0);
+    assert.equal(m.helps, 0, 'aucune phrase d’aide permanente');
+    assert.match(m.link, /Choisir ce qui est publié/);
+    assert.equal(m.hscroll, false, 'aucun défilement horizontal');
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();
