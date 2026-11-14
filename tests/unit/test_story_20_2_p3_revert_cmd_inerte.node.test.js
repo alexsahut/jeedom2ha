@@ -87,7 +87,9 @@ function fakeAjax(responses) {
 // Charge l'extrait réel (buildOptions..clearRequestError), donc `renderCommandRow`
 // et `revertCommand` tels quels, avec `ctx` réinitialisé comme en tête de fichier.
 function loadHarness(ajax) {
-  const start = source.indexOf('function buildOptions');
+  // Front v2 (Lot 5) : `buildOptions` (sélecteur dans la cellule) est retiré au profit du panneau « Corriger le type » ;
+  // l'extrait commence désormais aux constantes qui le suivaient (mêmes fonctions chargées : renderCommandRow, revertCommand).
+  const start = source.indexOf("var GENERIC_TYPES_URL = 'index.php?v=d&p=types';");
   const end = source.indexOf('function disableButtons');
   const sandbox = {
     $: Object.assign((arg) => (typeof arg === 'string' ? fakeEl(arg) : arg), { ajax: ajax }),

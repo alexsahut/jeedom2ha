@@ -22,8 +22,11 @@
     'climate',
     'cover',
     'light',
+    // Front v2 (Lot 5) : serrure et vanne, déjà publiées par le démon (PRODUCT_SCOPE, stories 24.8 / 24.9).
+    'lock',
     'sensor',
     'switch',
+    'valve',
   ];
 
   function getHaEntityTypeOptions() {
@@ -1110,8 +1113,10 @@
     climate: 'Thermostat',
     cover: 'Volet',
     light: 'Lumière',
+    lock: 'Serrure',
     sensor: 'Capteur',
     switch: 'Interrupteur',
+    valve: 'Vanne',
   };
 
   function translateHaDomain(type) {

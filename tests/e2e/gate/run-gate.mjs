@@ -508,6 +508,8 @@ async function main() {
       // Story 25.8 : exclusions de pièce déclarées par le parcours ({ [objectId]: { excluded: '1' | '0' } }), défaut {}.
       declaredRoomExclusions: parcours.declaredRoomExclusions || {},
       declaredRescan: parcours.declaredRescan === true,
+      // Front v2 (Lot 5) : publications d'équipement simulées déclarées par le parcours ({ [eqId]: true }), défaut {}.
+      declaredEquipmentPublications: parcours.declaredEquipmentPublications || {},
       lastPreviewType: simState.lastPreviewType,
     };
     // Story 24.11 : un parcours à cible dynamique part de déclarations vides, propres à cette exécution.

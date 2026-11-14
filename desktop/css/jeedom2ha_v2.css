@@ -387,6 +387,34 @@
 .j2ha-v2-role-missing { color: var(--j2ha-warn); font-style: italic; }
 .j2ha-v2-retry { margin: 4px 0; }
 
+/* Lot 5 — Panneau « Corriger le type » (E5) sous la ligne de la commande, aperçu avant / après, bandeau « … · Annuler ». */
+.j2ha-v2-type-row > td { padding: 6px 0 10px 0; }
+.j2ha-v2-type-panel { margin: 0; }
+.j2ha-v2-type-title { margin: 0 0 2px 0; font-size: 15px; font-weight: 700; }
+.j2ha-v2-type-ways { margin: 8px 0; }
+.j2ha-v2-type-ways a { margin-left: 4px; text-decoration: underline; }
+.j2ha-v2-type-choices { border: 0; margin: 8px 0 0 0; padding: 0; min-width: 0; }
+.j2ha-v2-type-legend { border: 0; margin: 0 0 4px 0; font-size: 13.5px; font-weight: 700; color: var(--j2ha-v2-text); width: auto; }
+.j2ha-v2-type-choices .j2ha-v2-radio { margin: 0; padding: 2px 0; font-weight: 400; cursor: pointer; min-height: 32px; align-items: center; }
+.j2ha-v2-type-choices .j2ha-v2-radio.is-disabled { cursor: not-allowed; }
+.j2ha-v2-type-choices input[type="radio"] { margin: 0; flex: 0 0 auto; }
+.j2ha-v2-type-refused { margin-top: 2px; }
+.j2ha-v2-type-refused-toggle { background: transparent; border: 0; padding: 0; min-height: 32px; color: var(--j2ha-v2-muted); text-decoration: underline; cursor: pointer; }
+.j2ha-v2-type-refused-list { margin: 0 0 4px 0; padding-left: 22px; }
+.j2ha-v2-type-preview:empty { display: none; }
+.j2ha-v2-type-preview { margin-top: 8px; }
+.j2ha-v2-type-headline { font-weight: 600; margin-top: 2px; }
+.j2ha-v2-type-line { margin-top: 3px; overflow-wrap: anywhere; }
+.j2ha-v2-type-line code { font-size: 12px; }
+.j2ha-v2-diff > .is-refused { border: 1px solid var(--j2ha-warn); background: var(--j2ha-warn-bg); color: var(--j2ha-warn); }
+.j2ha-v2-type-idchange { margin: 6px 0 0 0; padding: 6px 10px; overflow-wrap: anywhere; }
+.j2ha-v2-type-error { margin-top: 6px; }
+.j2ha-v2-type-panel .j2ha-v2-foot .btn { min-height: 32px; }
+.j2ha-v2-type-toast { margin: 6px 0 0 0; flex-basis: 100%; }
+.j2ha-v2-type-toast.is-warn { background: var(--j2ha-warn-bg); color: var(--j2ha-warn); }
+.j2ha-v2-type-toast button { min-height: 32px; }
+.j2ha-v2-type-toast button[disabled] { opacity: 0.6; text-decoration: none; }
+
 /* Lot 7 — Maison et pièce : phrase d'accueil, aide des puces, bloc « À faire », légende, bascule de portée, recherche groupée. */
 .j2ha-v2-welcome { display: block; margin: 4px 0 2px; color: var(--txt-color, var(--j2ha-text)); }
 .j2ha-v2-chips-hint { margin-right: 10px; }

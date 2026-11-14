@@ -470,15 +470,18 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
     assert.doesNotMatch(ui.$(PANEL + '.j2ha-cmd-table').text(), /Sera publié|dans Home Assistant\./);
   });
 
-  it('« Type HA » : lien « auto » / « imposé (sensor) » ; sélecteur seulement après clic ; jamais pour une ignorée', () => {
+  // Garde levée (front v2, Lot 5, spec 3.2) : « imposé (sensor) » devient « Personnalisé : Capteur (sensor) » ; le clic
+  // ouvre le panneau « Corriger le type » (jamais rendu en permanence).
+  it('« Type HA » : lien « auto » / « Personnalisé : Capteur (sensor) » ; panneau seulement après clic ; jamais pour une ignorée', () => {
     const t = tree(1, [READY, READY], { entities: [entity('sensor', [100, 101])] });
     t.commands[1].override_applied = true;
     t.commands[1].effective_ha = 'sensor';
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const links = ui.$(PANEL + '.j2ha-type-link').list.map((el) => plain(ui.$(el).text()));
-    assert.deepEqual(links, ['auto', 'imposé (sensor)']);
+    assert.deepEqual(links, ['auto', 'Personnalisé : Capteur (sensor)']);
     assert.ok(ui.$(PANEL + '.j2ha-type-forced').length === 1, 'surligné quand un type est imposé');
-    assert.equal(ui.$(PANEL + 'select').length, 0, 'sélecteur non rendu en permanence');
+    assert.equal(ui.$(PANEL + 'select').length, 0, 'aucun sélecteur dans la cellule');
+    assert.equal(ui.$(PANEL + '.j2ha-v2-type-panel').length, 0, 'panneau non rendu en permanence');
     const ignored = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY, IGNORED], { entities: [entity('light', [100])] }))]);
     assert.equal(ignored.$(PANEL + '.j2ha-type-link').length, 1, 'aucun réglage de type pour la commande ignorée');
   });
