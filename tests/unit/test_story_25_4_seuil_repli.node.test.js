@@ -110,10 +110,9 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
     assert.equal(ui.calls.length, before);
   });
 
-  maybe('compact : bouton « Pièces » (aria-expanded, aria-controls), replié si une sélection existe, ouvert sinon ; sélectionner referme', () => {
+  maybe('compact : bouton du tiroir (icône « Pièces », aria-expanded, aria-controls), replié si une sélection existe, ouvert sinon ; sélectionner referme', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 800, height: 1000 } });
     ui.openRoom(10);
-    ui.click('.j2ha-wv-widen'); // Story 25.6 : la carte ouvre la pièce seule ; l'arbre complet s'obtient en élargissant
     const toggle = ui.$('.j2ha-wv-drawer-toggle');
     const nav = ui.$('.j2ha-wv-nav');
     assert.equal(toggle.length, 1);

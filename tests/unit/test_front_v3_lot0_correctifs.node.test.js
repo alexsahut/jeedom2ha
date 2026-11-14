@@ -2,7 +2,9 @@
 //  (1) En-tête collant de la fiche opaque : `--bg-color` du cœur est un TRIPLET (« 25, 25, 25 »), pas une couleur ; la
 //      règle `var(--bg-color, …)` donnait un fond transparent et le texte défilait dessous (panneau « Corriger le type »).
 //  (2) Menu ⋯ de l'équipement rogné : ancré à droite sur un bouton placé à gauche, il sortait du panneau de détail
-//      (overflow-x: hidden) ; 35 px visibles sur 232.
+//      (overflow-x: hidden) ; 35 px visibles sur 232. Front v3 (Lot 2) : le ⋯ passe à DROITE de la ligne 1 de l'en-tête ;
+//      l'ancrage générique `right: 0` redevient le bon (la règle `left: 0` du Lot 0 est retirée). Le test vérifie toujours que
+//      les 232 px du menu sont visibles, et en plus que le menu est ancré à droite et le ⋯ au bout de la ligne 1.
 //  (3) Guide « fail-closed » : sans signal de Home Assistant, l'étape 2 est « À vérifier » avec son bouton, jamais « Fait ».
 // Chaque test échoue sur le code d'avant le correctif. Ignoré sans Playwright / jQuery / PHP. Données fictives (CC-48).
 'use strict';
@@ -77,9 +79,14 @@ for (const [theme, width] of [['Light', 1280], ['Dark', 1280], ['Light', 980], [
           const at = document.elementFromPoint(b.left + 12, b.top + b.height / 2);
           return !!at && (at === el || el.contains(at));
         };
+        const line1 = menu.closest('.j2ha-eq-line1').getBoundingClientRect();
+        const toggle = menu.closest('.j2ha-menu-wrap').querySelector('.j2ha-menu-toggle').getBoundingClientRect();
         return { width: Math.round(r.width), visible: Math.round(Math.min(r.right, d.right) - Math.max(r.left, d.left)),
-          items: items.length, clickable: items.filter(hit).length };
+          items: items.length, clickable: items.filter(hit).length, right: getComputedStyle(menu).right,
+          toggleAtEnd: Math.abs(toggle.right - line1.right) <= 2 };
       });
+      assert.equal(m.right, '0px', 'ancrage à droite (Lot 2 : le ⋯ est à droite de la ligne 1)');
+      assert.ok(m.toggleAtEnd, '⋯ au bout de la ligne 1 de l’en-tête');
       assert.ok(m.width >= 200, `largeur du menu (${m.width} px)`);
       assert.equal(m.visible, m.width, `menu entièrement visible dans le panneau (${m.visible}/${m.width} px)`);
       assert.ok(m.items >= 3);

@@ -102,12 +102,16 @@ describe('25.7 / AC4 — encart de cause du détail d\'équipement', () => {
   maybe('les lignes d\'arbre portent la mention courte de la cause, nom du plugin compris', () => {
     const ui = startWorkview({ scene: SCENE, equipments: ENTRIES });
     openCard(ui, 2);
-    const mention = (eqId) => plain(ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-cause`).text()).trim();
+    // Garde levée (front v3, Lot 2) : l'arbre n'affiche plus que l'icône d'état ; la mention courte de la cause est portée par
+    // son info-bulle et son nom accessible (« Exclu · par le plugin Alpha »), toujours absente pour un désactivé.
+    const label = (eqId) => plain(ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-state-icon`).attr('aria-label') || '');
+    const mention = (eqId) => label(eqId).split(' · ').slice(1).join(' · ');
     assert.equal(mention(201), 'par le plugin Alpha');
     assert.equal(mention(202), 'par la pièce');
     assert.equal(mention(203), 'individuelle');
     assert.equal(mention(204), 'par le plugin plugin_gone');
-    assert.equal(ui.$('.j2ha-wv-eq[data-eq-id="205"] .j2ha-wv-cause').length, 0, 'un désactivé n\'a jamais de mention');
+    assert.equal(ui.$(`.j2ha-wv-eq[data-eq-id="201"] .j2ha-wv-state-icon`).attr('title'), ui.$(`.j2ha-wv-eq[data-eq-id="201"] .j2ha-wv-state-icon`).attr('aria-label'));
+    assert.doesNotMatch(label(205), /plugin|pièce|individuelle/, 'un désactivé n\'a jamais de mention');
     const exclusion = plain(ui.$('.j2ha-wv-exclusion').text()).trim();
     assert.match(exclusion, /^Exclus : /);
     assert.match(exclusion, /par le plugin Alpha/);

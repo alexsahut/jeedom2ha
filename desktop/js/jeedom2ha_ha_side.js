@@ -167,6 +167,19 @@
     return { entities: entities, mention: mention, verbs: verbs };
   }
 
+  /**
+   * Front v3 (Lot 2) : aperçu d'un équipement bloqué — les entités que le démon a évaluées (type connu) mais qui ne sont pas
+   * dans Home Assistant, décrites comme `describeEntity`. Rien n'est deviné : une entité sans type n'est pas montrée, et
+   * l'identifiant n'apparaît que si le démon le fournit.
+   */
+  function describePreview(tree) {
+    var t = isObject(tree) ? tree : {};
+    var commands = Array.isArray(t.commands) ? t.commands : [];
+    return (Array.isArray(t.entities) ? t.entities : []).filter(function (entity) {
+      return isObject(entity) && !entityInHa(entity) && text(entity.ha_entity_type) !== null;
+    }).map(function (entity) { return describeEntity(entity, commands); });
+  }
+
   /** Côté Jeedom : nombre de commandes et répartition « 3 états, 3 ordres On, 3 ordres Off » (vide si non typé). */
   function describeJeedomSide(tree) {
     var commands = isObject(tree) && Array.isArray(tree.commands) ? tree.commands : [];
@@ -362,6 +375,7 @@
     rejectionContext: rejectionContext,
     describeEntity: describeEntity,
     describeHaSide: describeHaSide,
+    describePreview: describePreview,
     describeJeedomSide: describeJeedomSide,
     computeHints: computeHints,
     nameTypeWords: nameTypeWords,

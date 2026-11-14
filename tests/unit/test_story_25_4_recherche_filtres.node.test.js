@@ -69,7 +69,9 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
     }
   });
 
-  maybe('lignes d’équipement : état avant le nom (mot + icône), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
+  // Garde levée (front v3, Lot 2) : l'état se lit à l'icône seule ; le mot, « non lu », « désactivé dans Jeedom » et « N bloquées »
+  // sont dans l'info-bulle et le nom accessible de l'icône (toujours avant le nom).
+  maybe('lignes d’équipement : état avant le nom (icône, mot en nom accessible), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 21, unread: 3 });
     openCardWide(ui, 10);
     for (const id of [11, 12]) ui.click('.j2ha-wv-room[data-object_id="' + id + '"] .j2ha-wv-toggle');
@@ -82,19 +84,23 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
       const node = ui.$(el);
       const children = node.find('.j2ha-wv-row').children().list;
       const word = node.find('.j2ha-wv-state').first();
+      const label = plain(word.attr('aria-label') || '');
       assert.ok(children.length > 0);
+      assert.ok(children[0].classes.has('j2ha-wv-state'), 'icône avant le nom ' + eqId);
+      assert.equal(word.attr('title'), word.attr('aria-label'));
+      assert.equal(plain(word.text()).trim(), '', 'aucun mot affiché ' + eqId);
       if (model.state) {
-        assert.equal(plain(word.text()).trim(), M.EQUIPMENT_STATE_LABELS[model.state], 'mot d’état ' + eqId);
-        assert.ok(word.find('.j2ha-state-word').hasClass('j2ha-state-' + model.state));
-        if (model.blocked_mention > 0) assert.match(plain(node.find('.j2ha-mark-blocked').text()), /^\d+ bloquées?$/);
+        assert.equal(label.split(' · ')[0], M.EQUIPMENT_STATE_LABELS[model.state], 'mot d’état ' + eqId);
+        assert.ok(word.hasClass('j2ha-state-word') && word.hasClass('j2ha-state-' + model.state));
+        if (model.blocked_mention > 0) assert.match(label, /· \d+ bloquées?$/);
       } else {
-        assert.equal(word.find('.j2ha-state-word').length, 0, 'non lu : sans état');
-        assert.match(plain(node.find('.j2ha-wv-unread').text()), /non lu/);
+        assert.ok(!word.hasClass('j2ha-state-word'), 'non lu : sans état');
+        assert.match(label, /Non lu/);
       }
     }
     const disabled = ui.$('.j2ha-wv-eq-disabled');
     assert.ok(disabled.length > 0, 'au moins un équipement désactivé dans la scène');
-    assert.match(plain(disabled.first().text()), /\(désactivé dans Jeedom\)/);
+    assert.match(plain(disabled.first().find('.j2ha-wv-state').attr('aria-label')), /désactivé dans Jeedom/);
   });
 });
 
