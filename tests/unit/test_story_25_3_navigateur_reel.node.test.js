@@ -84,7 +84,7 @@ async function withRealPage(t, fn, options) {
     await page.addScriptTag({ content: read(JQUERY) });
     await page.evaluate((vars) => { window.j2haRoomsTree = vars.j2haRoomsTree; window.j2haAncestors = vars.j2haAncestors; }, rendered.vars);
     await page.addScriptTag({ content: BOOTBOX_STUB });
-    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', ...(withView ? ['jeedom2ha_workview'] : []), 'jeedom2ha']) {
+    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_lexique', 'jeedom2ha_ha_side', 'jeedom2ha_mapping_surface', 'jeedom2ha_type_panel', 'jeedom2ha_action_budget', 'jeedom2ha_overview', ...(withView ? ['jeedom2ha_workview'] : []), 'jeedom2ha_guide', 'jeedom2ha_exclusions', 'jeedom2ha']) {
       await page.addScriptTag({ content: read(`desktop/js/${file}.js`).replace(/\{\{([^}]*)\}\}/g, '$1') });
     }
     await page.waitForFunction(() => (document.querySelector('#j2ha_houseNumber')?.textContent ?? '').trim() !== '');

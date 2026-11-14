@@ -117,9 +117,10 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"><i class="fas fa-wrench"></i><br><span>{{Configuration}}</span></div>
 		</div>
 
-		<!-- Story 25.3 — Barre de santé compacte (Démon, MQTT, Dernière synchro, Dernière opération), actions
-		     courantes à droite et menu « ⋯ ». Les identifiants span_health*, bt_rescanTopology et data-ha-action
-		     sont conservés (refreshBridgeStatus, applyHAGating, gate 20-0). -->
+		<!-- Story 25.3 — Barre de santé compacte, actions courantes à droite et menu « ⋯ ». Les identifiants span_health*,
+		     bt_rescanTopology et data-ha-action sont conservés (refreshBridgeStatus, applyHAGating, gate 20-0).
+		     Front v2 (Lot 1) : Démon · MQTT · Home Assistant · Dernière relecture (+ Dernière opération, masquée quand elle
+		     répète la relecture) ; menu « Autres actions ». -->
 		<div id="div_bridgeHealthBanner" class="j2ha-health-banner j2ha-health-bar">
 			<div class="j2ha-health-items">
 				<div class="j2ha-health-item">
@@ -131,18 +132,19 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 					<span id="span_healthMqtt" class="label label-default j2ha-health-value">{{Chargement...}}</span>
 					<span id="span_healthMqttBroker" class="j2ha-health-note"></span>
 				</div>
+				<!-- Front v2 (Lot 1) : état côté Home Assistant, affiché seulement si le démon fournit ha.birth_seen_at. -->
+				<div id="div_healthHa" class="j2ha-health-item" style="display:none;">
+					<strong>{{Home Assistant}}</strong>
+					<span id="span_healthHa" class="label label-default j2ha-health-value"></span>
+				</div>
 				<div class="j2ha-health-item">
-					<strong>{{Dernière synchro}}</strong>
+					<strong>{{Dernière relecture}}</strong>
 					<span id="span_healthSync" class="j2ha-health-sync">{{...}}</span>
 				</div>
 				<div class="j2ha-health-item">
 					<strong>{{Dernière opération}}</strong>
 					<span id="span_healthOp" class="label label-default j2ha-health-value">{{...}}</span>
 					<span id="span_healthOpMsg" class="j2ha-health-note"></span>
-				</div>
-				<!-- Front v2 (Lot 0) : état côté Home Assistant, masqué tant que le Lot 1 ne le remplit pas. -->
-				<div id="div_healthHa" class="j2ha-health-item" style="display:none;">
-					<span id="span_healthHa" class="label label-default j2ha-health-value"></span>
 				</div>
 			</div>
 			<div id="div_haActions" class="j2ha-health-actions j2ha-ha-actions">
@@ -163,18 +165,19 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 					<span class="j2ha-menu-wrap">
 						<button type="button" class="btn btn-default btn-sm j2ha-menu-toggle"
 						        aria-haspopup="menu" aria-expanded="false"
-						        aria-label="{{Plus d'actions}}" title="{{Plus d'actions}}">
+						        aria-label="{{Autres actions}}" title="{{Autres actions}}">
 							<i class="fas fa-ellipsis-h"></i>
 						</button>
 						<ul class="j2ha-menu" role="menu">
+							<!-- Front v2 (Lot 1) : les deux exports quittent ce menu pour « Vérifier l'installation… » (E7). -->
 							<li role="none">
-								<button type="button" id="bt_openDiagnostic" class="j2ha-menu-item" role="menuitem">
-									<i class="fas fa-download"></i>{{Télécharger le diagnostic…}}
+								<button type="button" id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">
+									<i class="fas fa-stethoscope"></i>{{Vérifier l'installation…}}
 								</button>
 							</li>
 							<li role="none">
-								<button type="button" id="bt_openDecisionExport" class="j2ha-menu-item" role="menuitem">
-									<i class="fas fa-file-code"></i>{{Télécharger l'export de décision…}}
+								<button type="button" id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">
+									<i class="fas fa-route"></i>{{Guide de démarrage}}
 								</button>
 							</li>
 							<li class="j2ha-menu-sep" role="separator"></li>
@@ -192,27 +195,13 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 				</span>
 			</div>
 		</div>
-		<!-- Front v2 (Lot 0) : entrées réservées au menu « ⋯ », masquées et inactives. Le Lot 1 les déplace dans
-		     #j2ha_moreMenu en même temps qu'il réordonne le menu (et met à jour le parcours du gate qui l'énumère). -->
-		<ul id="j2ha_v2_menuReserved" class="j2ha-v2-reserved" hidden>
-			<li role="none">
-				<button type="button" id="bt_j2haCheckInstall" class="j2ha-v2-menu-item" role="menuitem" disabled>
-					<i class="fas fa-stethoscope"></i>{{Vérifier l'installation…}}
-				</button>
-			</li>
-			<li role="none">
-				<button type="button" id="bt_j2haOpenGuide" class="j2ha-v2-menu-item" role="menuitem" disabled>
-					<i class="fas fa-route"></i>{{Guide de démarrage}}
-				</button>
-			</li>
-		</ul>
 		<!-- Front v2 (Lot 0) : phrase d'aide sous la barre d'état (vide = invisible). -->
 		<div id="j2ha_v2_helpline" class="j2ha-v2-helpline"></div>
 		<div id="div_haGatingReason"
 		     class="text-muted j2ha-ha-gating-reason">
 		</div>
 
-		<!-- Export du diagnostic support : contenu de la boîte ouverte par « Télécharger le diagnostic… »
+		<!-- Export du diagnostic support : contenu déplacé dans la boîte « Vérifier l'installation… » (front v2, Lot 1)
 		     (même action ajax, mêmes paramètres, même gestionnaire qu'avant ; seul l'emplacement change). -->
 		<div id="div_diagnosticDialog" class="j2ha-diagnostic-dialog" style="display:none;">
 			<div class="form-group j2ha-export">
@@ -227,7 +216,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 			</div>
 		</div>
 
-		<!-- Export de décision (story 24.2) : contenu de la boîte ouverte par « Télécharger l'export de décision… »,
+		<!-- Export de décision (story 24.2) : contenu déplacé dans « Vérifier l'installation… › Avancé » (front v2, Lot 1),
 		     même mécanique que le diagnostic. Lecture seule, identifiants seulement. -->
 		<div id="div_decisionExportDialog" class="j2ha-diagnostic-dialog" style="display:none;">
 			<div class="form-group j2ha-export">

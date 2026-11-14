@@ -133,18 +133,21 @@ async function checkRefresh(page, helpers) {
   helpers.record('refresh_emis', refreshed);
 }
 
-/** (6) Le menu « ⋯ » : trois entrées dans l'ordre (24.2 ajoute l'export de décision) ; fermer la boîte et la confirmation n'écrit rien. */
+/** (6) Le menu « ⋯ Autres actions » (front v2, Lot 1) : « Vérifier l'installation… », « Guide de démarrage », puis la
+ * suppression ; les exports (24.2) sont portés par la boîte « Vérifier l'installation… ». Fermer la boîte et la
+ * confirmation n'écrit rien. */
 async function checkMenu(page, helpers) {
   const toggle = page.locator('#j2ha_moreMenu .j2ha-menu-toggle');
   await toggle.click();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') throw new Error('menu-non-ouvert');
   const items = await page.locator('#j2ha_moreMenu .j2ha-menu-item').evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-  if (items.length !== 3 || items[0] !== 'Télécharger le diagnostic…' || items[1] !== 'Télécharger l\'export de décision…' || items[2] !== 'Supprimer tout de Home Assistant…') {
+  if (items.length !== 3 || items[0] !== 'Vérifier l\'installation…' || items[1] !== 'Guide de démarrage' || items[2] !== 'Supprimer tout de Home Assistant…') {
     throw new Error('entrees-menu-inattendues');
   }
-  await page.locator('#bt_openDiagnostic').click();
+  await page.locator('#bt_j2haCheckInstall').click();
   const dialog = page.locator('.bootbox').filter({ has: page.locator('#cb_pseudonymize') });
   await dialog.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => { throw new Error('boite-diagnostic-absente'); });
+  if ((await dialog.locator('#bt_exportDecision').count()) !== 1) throw new Error('export-decision-absent');
   // Fermeture par un VRAI clic sur « Fermer » (contrôles d'actionnabilité de Playwright : un bouton masqué,
   // recouvert ou écrasé par une règle CSS fait échouer le parcours). Échap dépend du focus posé par Bootstrap
   // en fin d'animation et n'est pas exigé par la story.
