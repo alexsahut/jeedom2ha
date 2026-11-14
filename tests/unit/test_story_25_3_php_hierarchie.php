@@ -47,9 +47,10 @@ function room($id, $name, $father) {
 $ancestors = array(array('object_id' => 1, 'name' => 'Maison', 'father_id' => 0));
 $groups = j2ha_group_rooms(array(room(2, 'Étage', 1), room(3, 'Salle A', 2), room(4, 'Salle B', 2), room(5, 'Isolée', 0)), $ancestors);
 $summary = array_map(function ($g) { return array($g['title'], array_map(function ($r) { return $r['object_id']; }, $g['rooms'])); }, $groups);
-check('isolées sans titre, puis groupe du parent (sa carte en tête), titre « Parent › Enfant »', $summary === array(
+// Front v3 (Lot 1, garde levée) : le titre de groupe ne garde que le nom du parent direct (plus de « Maison › »).
+check('isolées sans titre, puis groupe du parent (sa carte en tête), titre = nom du parent direct', $summary === array(
     array(null, array(5)),
-    array('Maison › Étage', array(2, 3, 4)),
+    array('Étage', array(2, 3, 4)),
 ));
 $groups = j2ha_group_rooms(array(room(12, 'Zèbre', 10), room(11, 'Abeille', 10)), array(array('object_id' => 10, 'name' => 'Parent sans équipement', 'father_id' => 0)));
 check('ordre natif conservé dans le groupe ; parent sans équipement : sous-titre seulement', count($groups) === 1 && $groups[0]['title'] === 'Parent sans équipement' && $groups[0]['rooms'][0]['object_id'] === 12 && $groups[0]['rooms'][1]['object_id'] === 11);
@@ -66,7 +67,9 @@ check('cycle de parents : terminaison garantie', count($groups) >= 1);
 echo "Rendu des cartes\n";
 $html = j2ha_render_room_groups(j2ha_group_rooms(array(room(2, 'Nom <b>x</b> & "q"', 0)), array()));
 check('nom échappé', strpos($html, '<b>') === false && strpos($html, '&lt;b&gt;x&lt;/b&gt; &amp; &quot;q&quot;') !== false);
-check('contrat de la carte conservé', strpos($html, 'class="objectDisplayCard cursor j2ha-room-card"') !== false && strpos($html, 'data-object_id="2"') !== false && strpos($html, 'onclick="j2haOpenRoom(2)"') !== false);
+// Front v3 (Lot 1, garde levée) : la tuile ne porte plus `objectDisplayCard` ni de conteneur `*ListContainer` (cible §1).
+check('contrat de la carte conservé', strpos($html, 'class="cursor j2ha-room-card j2ha-v3-tile"') !== false && strpos($html, 'data-object_id="2"') !== false && strpos($html, 'onclick="j2haOpenRoom(2)"') !== false
+    && strpos($html, 'DisplayCard') === false && strpos($html, 'ListContainer') === false);
 check('jamais eqLogicDisplayCard', strpos($html, 'eqLogicDisplayCard') === false);
 $card = j2ha_render_room_card(array('object_id' => 3, 'object_name' => 'C', 'icon_classes' => 'fas fa-bed" onmouseover="x', 'color' => '#abc;x', 'equipments' => array()));
 check('classes d\'icône re-filtrées au rendu, couleur invalide absente', strpos($card, 'onmouseover') === false && strpos($card, 'data-color') === false);
