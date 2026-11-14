@@ -31,6 +31,8 @@ body[data-theme*="Light"] {
   --j2ha-line: rgba(0, 0, 0, 0.2);
   --j2ha-menu-bg: #ffffff;
   --j2ha-highlight: rgba(255, 193, 7, 0.35);
+  /* Triplet R, G, B (même forme que --bg-color du cœur) : repli de rgb(var(--bg-color, …)) quand le cœur ne le définit pas. */
+  --j2ha-page-rgb: 255, 255, 255;
 }
 
 /* Thème sombre (angles droits, fonds proches de rgb(25, 25, 25) relevé sur Jeedom 4.6.1). */
@@ -50,6 +52,7 @@ body[data-theme*="Dark"] {
   --j2ha-line: rgba(255, 255, 255, 0.28);
   --j2ha-menu-bg: #2a2a2a;
   --j2ha-highlight: rgba(255, 193, 7, 0.3);
+  --j2ha-page-rgb: 42, 42, 42;
 }
 
 /* color-mix() absent (vieux Safari, iPad mural) : fonds translucides équivalents en rgba(). */
@@ -1109,7 +1112,9 @@ body[data-theme*="Dark"] {
   top: 0;
   z-index: 3;
   padding: 8px 0 6px 0;
-  background-color: var(--bg-color, var(--j2ha-menu-bg));
+  /* Front v3 (Lot 0) : --bg-color du cœur est un TRIPLET (« 245, 245, 245 »), pas une couleur. var(--bg-color, …) seul
+   * donnait une valeur invalide à l'exécution, donc un fond transparent : le texte défilait sous l'en-tête collant. */
+  background-color: rgb(var(--bg-color, var(--j2ha-page-rgb)));
   border-bottom: 1px solid var(--j2ha-line);
 }
 .j2ha-wv .j2ha-eq-title {
@@ -1126,6 +1131,13 @@ body[data-theme*="Dark"] {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+}
+/* Front v3 (Lot 0) : le ⋯ d'un équipement est à GAUCHE de la fiche (sous le réglage de publication) ; ancré à droite, son menu
+ * s'ouvrait vers la gauche et le panneau de détail (overflow-x: hidden) le rognait à ~35 px sur 232. La règle générique
+ * .j2ha-menu n'est pas touchée : le menu de la barre d'état et celui des cartes gardent l'ancrage à droite. */
+.j2ha-wv .j2ha-eq-controls .j2ha-menu {
+  right: auto;
+  left: 0;
 }
 .j2ha-wv .j2ha-eq-body {
   padding-top: 8px;

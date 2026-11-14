@@ -54,7 +54,9 @@ const NAMED_COLORS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pin
 
 describe('25.1 / AC17 — aucune couleur en dur hors des blocs de variables --j2ha-*', () => {
   it('CSS : aucun littéral (#hex, rgb(), rgba(), hsl(), nom de couleur) hors blocs de variables', () => {
-    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+    // Garde levée (front v3, Lot 0) : `rgb(var(--bg-color, …))` n'est pas une couleur littérale ; c'est la seule façon de lire
+    // le TRIPLET --bg-color du cœur (« 245, 245, 245 »). Un rgb() qui ne commence pas par var( reste interdit.
+    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\((?!var\()|\bhsla?\(/;
     const named = new RegExp('(?<![\\w-])(' + NAMED_COLORS.join('|') + ')(?![\\w-])', 'i');
     const offenders = [];
     for (const rule of rules) {
@@ -169,7 +171,7 @@ describe('25.1 / AC18 — quatre teintes sémantiques, fonds translucides, repli
       if (isVariableBlock(rule)) continue;
       for (const d of declarations(rule.body)) {
         if (!/^background(-color)?$/.test(d.property)) continue;
-        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|var\(--(bg-modal-color|bg-color), var\(--j2ha-menu-bg\)\)|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
+        assert.match(d.value, /^(transparent|var\(--j2ha-(ok|todo|warn|neutral)-bg\)|var\(--j2ha-surface(-strong)?\)|var\(--j2ha-menu-bg\)|var\(--j2ha-line\)|var\(--j2ha-highlight\)( !important)?|rgb\(var\(--bg-color, var\(--j2ha-page-rgb\)\)\)|var\(--j2ha-(ok|todo|warn|neutral|danger)\))$/, `${rule.selector} { ${d.property}: ${d.value} }`);
       }
     }
   });
