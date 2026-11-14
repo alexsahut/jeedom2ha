@@ -24,7 +24,6 @@ const word = (w) => new RegExp('(?<![\\p{L}\\p{N}_])' + w.replace(/\s+/g, '\\s+'
 const JARGON = ['projection', 'commande clé', 'forçage', 'V1 du plugin', 'Parc global', 'backend', 'dashboards', 'sync',
   'sûr uniquement', 'confiance « probable »', 'jeedom2ha_excluded'];
 
-const ANNEX = '### Annexe : mots techniques encore affichés';
 const section = (text, heading) => {
   const start = text.indexOf('\n' + heading + '\n');
   assert.ok(start >= 0, heading);
@@ -50,13 +49,10 @@ describe('Lot 9b — jargon', () => {
     for (const j of JARGON) assert.doesNotMatch(premiers, word(j), `premiers-pas.md : « ${j} »`);
   });
 
-  it('index.md ne contient aucun mot de la liste de jargon hors de l’annexe qui les explique', () => {
-    const annex = section(index, ANNEX);
-    const outside = index.replace(annex, '');
-    for (const j of JARGON) {
-      assert.doesNotMatch(outside, word(j), `index.md hors annexe : « ${j} »`);
-      if (j !== 'jeedom2ha_excluded') assert.match(annex, word(j), `annexe : « ${j} » expliqué`);
-    }
+  // Le Lot 9a traduit ces mots à l'affichage (USER_WORDS du lexique) : la doc cite les textes affichés, sans annexe de jargon.
+  it('index.md ne contient aucun mot de la liste de jargon', () => {
+    for (const j of JARGON) assert.doesNotMatch(index, word(j), `index.md : « ${j} »`);
+    assert.ok(!index.includes('mots techniques encore affichés'), 'plus d’annexe de jargon');
   });
 });
 
@@ -139,6 +135,28 @@ describe('Lot 9b — exactitude doc / écran', () => {
     }
     assert.ok(fs.existsSync(path.join(root, 'docs/fr_FR/compteurs.md')), 'compteurs.md présent');
     assert.ok(head.includes('](compteurs.md)'));
+  });
+});
+
+describe('Lot 9b — libellés du Lot 9a, tels que le code les affiche', () => {
+  const code = ['desktop/js/jeedom2ha_lexique.js', 'desktop/js/jeedom2ha_mapping_surface.js', 'desktop/js/jeedom2ha_guide.js',
+    'desktop/js/jeedom2ha_exclusions.js', 'desktop/js/jeedom2ha.js'].map(read).join('\n')
+    .replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'").replace(/[’‘]/g, "'");
+  const docs = (index + premiers).replace(/[’‘]/g, "'");
+  for (const label of ['Publier quand même', "Renommer l'équipement dans Jeedom, puis Relire Jeedom", 'Confirmé par vous',
+    'Types impossibles pour cet équipement', 'Type dans Home Assistant de', 'Dans Home Assistant, cette entité est :',
+    'Ce choix vaut pour les commandes :', 'Enregistrer et publier quand même', 'Je ne vois pas l\'appareil dans Home Assistant',
+    'Vérification en cours', 'Réputée faite : une publication a réussi.', "Ce n'est pas un doute mais une contradiction",
+    "Cette entité ne se règle pas seule : réglez l'équipement entier.", 'Ce type Home Assistant est invalide pour cette entité.',
+    'Erreur de communication avec le démon du plugin.', 'dont 1 désactivé dans Jeedom']) {
+    it(`« ${label} » : à l’écran et dans la doc`, () => {
+      assert.ok(code.includes(label), `« ${label} » absent du code`);
+      assert.ok(docs.includes(label), `« ${label} » absent de la doc`);
+    });
+  }
+  it('plus aucun ancien libellé du panneau de type ni « auto » dans la colonne « Type HA »', () => {
+    assert.doesNotMatch(docs, /Autres types, non proposés|non proposé par le plugin pour cette commande|Corriger le type de « /);
+    assert.doesNotMatch(docs, /« auto »/);
   });
 });
 

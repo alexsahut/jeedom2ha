@@ -22,7 +22,7 @@ Cette page suffit pour démarrer. La [documentation complète](index.md) détail
 > - pour une **prise ou un interrupteur** : lumière, lumiere, light, lampe, ampoule, volet, store, cover, blind, shutter, portail, garage, chauffage, radiateur, thermostat, heater, fumée, smoke, alarme, sirene ;
 > - pour un **volet** : lumière, lumiere, light, lampe, ampoule, chauffage, radiateur, thermostat, heater, prise, plug, socket, fumée, smoke, alarme, sirene.
 >
-> « Lumière garage », « Lampe salle d'eau » ou « Éclairage piscine » ne sont donc pas publiés comme lumières ; « Lampe tableau » l'est (« eau » n'y est pas un mot entier). Que faire : renommez l'équipement dans Jeedom puis cliquez sur **« Relire Jeedom »**, ou publiez-le quand même en réglant sa publication sur **« Toujours »**, puis **« Appliquer »**. Corriger le type ne suffit pas dans ce cas : le nom continue d'écarter le type.
+> « Lumière garage », « Lampe salle d'eau » ou « Éclairage piscine » ne sont donc pas publiés comme lumières ; « Lampe tableau » l'est (« eau » n'y est pas un mot entier). Que faire : sa fiche propose **« Publier quand même »** (la publication de l'équipement passe sur **« Toujours »**, puis **« Appliquer »** l'envoie), ou **« Renommer l'équipement dans Jeedom, puis Relire Jeedom »** (retirez ce mot du nom, puis cliquez sur « Relire Jeedom »). Corriger le type ne suffit pas dans ce cas : le nom continue d'écarter le type.
 >
 > **3. La pièce dans Home Assistant est fixée à la création.** Home Assistant range chaque appareil dans la zone de sa pièce Jeedom **une seule fois**, quand il le découvre. Déplacer ensuite l'équipement dans une autre pièce de Jeedom ne le déplace pas dans Home Assistant : changez sa zone dans Home Assistant (la [documentation complète](index.md#annexe--pièces-dans-home-assistant-zone-suggérée) donne les deux façons de faire).
 
@@ -59,6 +59,8 @@ La page du plugin répond toujours aux mêmes trois questions, pour toute la mai
 - **« Ouvrir l'équipement dans Jeedom »** : pour compléter ses commandes dans Jeedom, puis **« Relire Jeedom »**.
 - **« Corriger le type… »** : pour régler ici ce que voit Home Assistant, sans toucher à Jeedom (voir plus bas).
 - **« Ouvrir la configuration du plugin »** : quand la cause est un réglage du plugin (un plugin exclu, par exemple).
+- **« Publier quand même »** : quand le plugin hésite, ou quand le nom contredit les types. L'équipement passe sur « Toujours », puis « Appliquer » le publie.
+- **« Renommer l'équipement dans Jeedom, puis Relire Jeedom »** : quand un mot du nom écarte le type voulu.
 - **« Republier »** : quand l'envoi à Home Assistant a échoué.
 - Le réglage **« Automatique | Toujours | Jamais »** de l'équipement : laisser le plugin décider, publier même si le plugin hésite, ou ne jamais le publier. Ce réglage est enregistré, puis attend : l'équipement passe « À appliquer », et le bouton **« Appliquer »** de sa fiche l'envoie à Home Assistant.
 
@@ -76,9 +78,9 @@ Une modification faite dans Jeedom, même sur un seul équipement, demande toujo
 Quand le plugin hésite (une lampe branchée sur une prise, par exemple) ou se trompe de type :
 
 1. Ouvrez l'équipement (cliquez sur sa pièce, puis sur son nom), et cliquez sur **« Corriger le type… »** dans sa fiche, ou sur le lien de la colonne **« Type HA »** de la commande (il affiche « Automatique » tant que le plugin choisit seul).
-2. Le panneau rappelle que le plus durable est de corriger les types génériques dans Jeedom, puis propose les types possibles en français (« Automatique », « Lumière (light) », « Interrupteur (switch) »…). Les types qui ne peuvent pas convenir à cet équipement sont listés à part, repliés et grisés.
+2. Le panneau « Type dans Home Assistant de « Nom » » dit à quelles commandes le choix s'applique (« Ce choix vaut pour les commandes : … ») : le type choisi vaut pour toute l'entité. Il rappelle que le plus durable est de corriger les types génériques dans Jeedom, puis propose les types possibles en français (« Automatique », « Lumière (light) », « Interrupteur (switch) »…). Les types qui ne peuvent pas convenir sont repliés sous « Types impossibles pour cet équipement (N) ».
 3. Choisissez un type : un aperçu **« Avant » / « Après »** montre ce que deviendra l'équipement dans Home Assistant, et prévient si l'identifiant change (les automatisations qui utilisent l'ancien seront à reprendre). Rien n'est enregistré à ce stade.
-4. Cliquez sur **« Enregistrer et publier »**. Un bandeau confirme le changement et propose **« Annuler »** pendant quelques secondes.
+4. Cliquez sur **« Enregistrer et publier »**. Un bandeau confirme le changement et propose **« Annuler »** pendant quelques secondes. Si le plugin hésite sur cet équipement, changer le type ne suffit pas : l'aperçu le dit et propose **« Publier quand même »**, qui garde le type choisi et ajoute « Toujours » ; le bouton devient alors **« Enregistrer et publier quand même »**.
 
 La colonne « Type HA » affiche alors « Personnalisé : Lumière (light) ». Pour revenir au choix du plugin, rouvrez le panneau et choisissez « Automatique ».
 
