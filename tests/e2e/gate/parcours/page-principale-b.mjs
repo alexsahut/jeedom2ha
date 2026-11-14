@@ -107,8 +107,9 @@ async function checkFilters(page, helpers) {
     if (await page.locator('#j2ha_workView').isVisible()) throw new Error('vue-ouverte-par-la-puce');
     const rows = todo
       ? await page.locator('#j2ha_v2_todo .j2ha-v2-todo-row').count()
+      // Compteur de la tuile dans `data-count` : une pièce exclue n'affiche que ⊘ (« Pièce exclue »), jamais un nombre lisible.
       : await page.locator('#j2ha_roomCards .j2ha-room-card:not([hidden])').evaluateAll((cards) => cards
-        .reduce((n, card) => n + Number(((card.querySelector('.j2ha-room-ratio')?.textContent ?? '').split('/')[0] || '0').trim()), 0));
+        .reduce((n, card) => n + Number(card.getAttribute('data-count') ?? 'NaN'), 0));
     if (rows !== announced) throw new Error('lignes-filtre-differentes-du-nombre');
     const pressed = page.locator(`#j2ha_houseChips .j2ha-chip-filter[data-filter="${key}"]`);
     if ((await pressed.getAttribute('aria-pressed')) !== 'true') throw new Error('puce-non-pressee');

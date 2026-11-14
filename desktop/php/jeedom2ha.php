@@ -129,9 +129,9 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 					<span id="span_healthMqtt" class="j2ha-v3-pill" data-word="{{MQTT}}" data-level="unknown" title="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
 					<span id="span_healthMqttBroker" class="j2ha-health-note" hidden></span>
 				</span>
-				<!-- Home Assistant : visible seulement si le démon fournit ha.birth_seen_at ; non confirmé = gris avec « ? ». -->
-				<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item" style="display:none;">
-					<span id="span_healthHa" class="j2ha-v3-pill" data-word="{{Home Assistant}}" data-level="unknown"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
+				<!-- Home Assistant : toujours visible ; non confirmé ou inconnu = gris avec « ? » (raison en info-bulle). -->
+				<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">
+					<span id="span_healthHa" class="j2ha-v3-pill" data-word="{{Home Assistant}}" data-level="unknown" title="{{Home Assistant}} : {{état inconnu}}" aria-label="{{Home Assistant}} : {{état inconnu}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
 				</span>
 				<span class="j2ha-health-item j2ha-v3-relu-item">
 					<span id="span_healthSync" class="j2ha-health-sync j2ha-v3-relu">{{...}}</span>

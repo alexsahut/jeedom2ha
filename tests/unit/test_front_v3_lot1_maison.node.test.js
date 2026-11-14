@@ -31,7 +31,8 @@ describe('Lot 1 — verdict de la barre d’état, fail-closed', () => {
       [UP(SYNC_OK, old), CLEAN],
       [UP({ intention: 'sync', resultat: 'partiel' }, recent), CLEAN],
       [UP({ intention: 'sync', resultat: 'echec' }, recent), CLEAN],
-      [UP({ intention: 'publier', resultat: 'succes' }, recent), CLEAN],
+      [UP({ intention: 'publier', resultat: 'succes' }, recent), CLEAN], // relecture précédente jamais observée
+      [UP({ intention: 'publier', resultat: 'partiel' }, recent), CLEAN],
       [UP('aucun', null), CLEAN],
       [UP(SYNC_OK, 'pas une date'), CLEAN],
       [UP(SYNC_OK, recent), null],
@@ -39,6 +40,25 @@ describe('Lot 1 — verdict de la barre d’état, fail-closed', () => {
     ]) {
       assert.equal(O.statusVerdict(status, overview, NOW).kind, 'unverified', JSON.stringify([status, overview]));
     }
+  });
+
+  it('après un « Appliquer » ou un « Republier » RÉUSSI : ✓ si la relecture réussie observée avant (même date de fin) a moins de 24 h', () => {
+    const at = new Date(NOW - 3600e3).toISOString();
+    let memory = O.rememberSync(null, UP(SYNC_OK, at));
+    assert.deepEqual(memory, { at, ok: true });
+    const applied = UP({ intention: 'publier', resultat: 'succes' }, at);
+    memory = O.rememberSync(memory, applied);
+    assert.deepEqual(memory, { at, ok: true }, 'la mémoire survit à l’opération suivante');
+    assert.equal(O.statusVerdict(applied, CLEAN, NOW, memory).kind, 'ok');
+    assert.equal(O.statusVerdict(UP({ intention: 'publier', resultat: 'succes' }, at), CLEAN, NOW, null).kind, 'unverified', 'sans relecture observée');
+    assert.equal(O.statusVerdict(UP({ intention: 'publier', resultat: 'echec' }, at), CLEAN, NOW, memory).kind, 'unverified', 'dernière opération en échec');
+    assert.equal(O.statusVerdict(UP({ intention: 'supprimer', resultat: 'partiel' }, at), CLEAN, NOW, memory).kind, 'unverified', 'dernière opération partielle');
+    const failed = O.rememberSync(null, UP({ intention: 'sync', resultat: 'partiel' }, at));
+    assert.equal(O.statusVerdict(applied, CLEAN, NOW, failed).kind, 'unverified', 'la relecture retenue n’a pas réussi');
+    const later = new Date(NOW - 60e3).toISOString();
+    assert.equal(O.rememberSync(memory, UP({ intention: 'publier', resultat: 'succes' }, later)), null, 'autre date de fin : la mémoire ne vaut plus');
+    const old = new Date(NOW - 25 * 3600e3).toISOString();
+    assert.equal(O.statusVerdict(UP({ intention: 'publier', resultat: 'succes' }, old), CLEAN, NOW, { at: old, ok: true }).kind, 'unverified', 'plus de 24 h');
   });
 
   it('rien quand il y a quelque chose à faire (Appliquer / À faire le disent) ou quand le pont est en panne (les pastilles le disent)', () => {
@@ -158,5 +178,45 @@ test('Lot 1 réel — barre d’état : pastilles, ⚙ (gotoPluginConf), tuiles 
     assert.ok(r.conf);
     assert.deepEqual(r.tile, [220, 72]);
     assert.equal(r.sync, 'Jamais relu');
+  });
+});
+
+test('Lot 1 réel — parcours page-principale-b avec une pièce exclue visible sous un filtre : compteur lu dans data-count', async (t) => {
+  const { gate } = require('./helpers/workview_browser');
+  const scene = Object.assign({}, SCENE, { config: { excludedObjects: '4' } });
+  await withRealView(t, { scene }, async (page, ctx) => {
+    const visibleExcluded = [];
+    for (const key of ['published', 'to_apply', 'other', 'unread']) {
+      await page.evaluate((k) => window.Jeedom2haOverviewPage.setFilter(k), key);
+      const r = await page.evaluate(() => {
+        const card = document.querySelector('#j2ha_roomCards .j2ha-room-card[data-object_id="4"]');
+        return { hidden: card.hidden, text: card.querySelector('.j2ha-room-ratio').textContent, count: card.getAttribute('data-count') };
+      });
+      if (!r.hidden) visibleExcluded.push(r);
+      await page.evaluate(() => window.Jeedom2haOverviewPage.setFilter(null));
+    }
+    assert.ok(visibleExcluded.length > 0, 'la pièce exclue reste visible sous au moins un filtre');
+    visibleExcluded.forEach((r) => { assert.equal(r.text, 'Pièce exclue'); assert.match(r.count, /^\d+$/); });
+    const parcours = await import(gate('parcours', 'page-principale-b.mjs'));
+    const recorded = {};
+    await parcours.run(page, { helpers: { record: (k, v) => { recorded[k] = v; }, journalEntries: () => ctx.journal } });
+    assert.ok(recorded.puces_controlees >= 3);
+    assert.deepEqual(ctx.errors, []);
+  });
+});
+
+test('Lot 1 réel — pastille Home Assistant toujours visible : grise avec « ? » et raison en info-bulle quand l’état est inconnu', async (t) => {
+  await withRealView(t, {}, async (page) => {
+    // Le banc répond à getBridgeStatus sans champ `ha` : état inconnu.
+    await page.waitForFunction(() => document.querySelector('#span_healthBridge').getAttribute('data-level') === 'ok');
+    const r = await page.evaluate(() => {
+      const ha = document.querySelector('#span_healthHa');
+      return { visible: ha.getBoundingClientRect().width > 0 && getComputedStyle(document.querySelector('#div_healthHa')).display !== 'none',
+        level: ha.getAttribute('data-level'), title: ha.getAttribute('title'), q: getComputedStyle(ha.querySelector('.j2ha-v3-pill-q')).display };
+    });
+    assert.equal(r.visible, true);
+    assert.equal(r.level, 'unknown');
+    assert.notEqual(r.q, 'none', '« ? » affiché');
+    assert.equal(r.title, 'Home Assistant : état inconnu (le démon ne fournit pas cette information)');
   });
 });

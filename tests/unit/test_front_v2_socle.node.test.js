@@ -83,14 +83,14 @@ describe('Front v2 — Lot 0 : points de montage', () => {
 
   // Garde levée au Lot 1 : les entrées réservées sont branchées dans le menu « Autres actions » (actives) et l'item
   // « Home Assistant » porte son libellé ; le conteneur réservé n'existe plus.
-  it('bouton réservé masqué ; entrées du Lot 1 branchées dans le menu ; item Home Assistant libellé et masqué par défaut', () => {
+  it('bouton réservé masqué ; entrées du Lot 1 branchées dans le menu ; item Home Assistant libellé et visible (gris) par défaut', () => {
     assert.match(php, /<button type="button" id="bt_j2haChoosePublished"[^>]* hidden>/);
     assert.ok(!php.includes('j2ha_v2_menuReserved'), 'plus de conteneur réservé');
     const menu = php.slice(php.indexOf('id="j2ha_moreMenu"'), php.indexOf('j2ha-menu-sep'));
     assert.match(menu, /id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">/);
     assert.match(menu, /id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">/);
-    // Garde levée (front v3, Lot 1) : pastille « point + mot », le mot porté par `data-word`.
-    assert.match(php, /<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item" style="display:none;">\s*<span id="span_healthHa" class="j2ha-v3-pill" data-word="\{\{Home Assistant\}\}"/);
+    // Garde levée (front v3, Lot 1) : pastille « point + mot », le mot porté par `data-word`, toujours visible (grise si inconnue).
+    assert.match(php, /<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">\s*<span id="span_healthHa" class="j2ha-v3-pill" data-word="\{\{Home Assistant\}\}" data-level="unknown"/);
   });
 
   it('CSS : les conteneurs vides ne s\'affichent pas', () => {

@@ -196,8 +196,13 @@ function renderHaHealth(r) {
   var bar = (typeof Jeedom2haGuide !== 'undefined' && Jeedom2haGuide && typeof Jeedom2haGuide.haBarItem === 'function')
     ? Jeedom2haGuide.haBarItem(r, undefined, haConfirmedByUser())
     : {visible: false};
+  // Front v3 (Lot 1) : la pastille est TOUJOURS visible. État inconnu (démon arrêté, démon qui ne fournit pas l'information,
+  // état illisible) : gris avec « ? », la raison en info-bulle.
   if (!bar.visible) {
-    $item.hide();
+    var unknown = !r ? '{{état inconnu (état du démon illisible)}}' : (!r.daemon ? '{{état inconnu (démon arrêté)}}' : '{{état inconnu (le démon ne fournit pas cette information)}}');
+    j2haSetPill($('#span_healthHa'), 'unknown', unknown);
+    $('#span_healthHa').removeClass('j2ha-v3-pill-confirmed');
+    $item.show();
     return;
   }
   // Front v3 (Lot 1) : pastille « Home Assistant » — vert si vu (« Vu à HH:MM ») ou confirmé par l'utilisateur ; sinon gris avec

@@ -339,12 +339,28 @@
   var VERDICT_MAX_AGE_MS = 24 * 3600 * 1000;
 
   /**
-   * Verdict de la barre d'état, FAIL-CLOSED : `ok` (« ✓ Rien à faire ») seulement si le démon et le broker tournent, si les
-   * états sont lus sans rien d'ouvert (ni à appliquer, ni bloqué, ni non lu) ET si la dernière opération est une relecture
-   * RÉUSSIE terminée il y a moins de 24 h. Quelque chose à faire : `null` (le bouton « Appliquer » et la liste « À faire » le
-   * disent). Sinon `unverified` (« ? Non vérifié » + [Relire]). `now` (ms) : facultatif, pour les tests.
+   * Mémoire de la dernière relecture OBSERVÉE par la page : quand la dernière opération du démon est une relecture, son
+   * résultat est retenu avec sa date de fin (`derniere_synchro_terminee`). Elle survit à une opération suivante (« Appliquer »,
+   * « Republier ») tant que la date de fin de relecture ne change pas. Pure : rend la mémoire à jour.
    */
-  function statusVerdict(status, overview, now) {
+  function rememberSync(memory, status) {
+    var op = status && typeof status === 'object' ? status.derniere_operation_resultat : null;
+    var at = status && typeof status.derniere_synchro_terminee === 'string' ? status.derniere_synchro_terminee : null;
+    if (op && typeof op === 'object' && op.intention === 'sync' && at) return { at: at, ok: op.resultat === 'succes' };
+    return memory && memory.at === at ? memory : null;
+  }
+
+  /**
+   * Verdict de la barre d'état, FAIL-CLOSED. `ok` (« ✓ Rien à faire ») seulement si TOUT est prouvé :
+   *   - démon et broker en marche ;
+   *   - états lus, rien à appliquer, rien de bloqué, rien de non lu ;
+   *   - la dernière opération, quelle qu'elle soit (relecture, « Appliquer », « Republier »…), a RÉUSSI (aucune en échec) ;
+   *   - une relecture RÉUSSIE terminée il y a moins de 24 h : la dernière opération elle-même, ou la relecture retenue par
+   *     `rememberSync` (même date de fin) quand une opération réussie l'a suivie.
+   * Quelque chose à faire : `null` (« Appliquer (n) » et « À faire » le disent). Sinon `unverified` (« ? Non vérifié »
+   * + [Relire]). `memory` : rendu de `rememberSync` ; `now` (ms) : facultatif, pour les tests.
+   */
+  function statusVerdict(status, overview, now, memory) {
     if (!status || typeof status !== 'object' || !status.daemon) return null;
     var broker = status.broker || status.mqtt || {};
     if (broker.state !== 'connected') return null;
@@ -353,11 +369,14 @@
     var unverified = { kind: 'unverified', text: w('Non vérifié'), title: w('Dernière relecture réussie inconnue ou de plus de 24 h') };
     if (!c || (c.unread || 0) > 0) return unverified;
     var op = status.derniere_operation_resultat;
-    if (!op || typeof op !== 'object' || op.intention !== 'sync' || op.resultat !== 'succes') return unverified;
-    var at = typeof status.derniere_synchro_terminee === 'string' ? new Date(status.derniere_synchro_terminee).getTime() : NaN;
+    if (!op || typeof op !== 'object' || op.resultat !== 'succes') return unverified;
+    var at = typeof status.derniere_synchro_terminee === 'string' ? status.derniere_synchro_terminee : null;
+    var syncOk = op.intention === 'sync' || (!!memory && memory.ok === true && memory.at === at);
+    if (!syncOk || !at) return unverified;
+    var atMs = new Date(at).getTime();
     var t = typeof now === 'number' ? now : Date.now();
-    if (!isFinite(at) || t - at > VERDICT_MAX_AGE_MS || at - t > 5 * 60 * 1000) return unverified;
-    var d = new Date(at);
+    if (!isFinite(atMs) || t - atMs > VERDICT_MAX_AGE_MS || atMs - t > 5 * 60 * 1000) return unverified;
+    var d = new Date(atMs);
     return { kind: 'ok', text: w('Rien à faire'), title: w('Relu à') + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) };
   }
 
@@ -730,6 +749,7 @@
       $('#j2ha_tab_scenarios').prop('hidden', activeTab !== 'scenarios');
     }
 
+    var syncMemory = null;
     // Barre d'état, partie « page » : bouton « Appliquer (n) » (visible si n > 0) et verdict « Rien à faire » fail-closed.
     function renderStatus() {
       var o = lastView && lastView.overview;
@@ -741,7 +761,8 @@
         $apply.attr('title', n + ' ' + w(n > 1 ? 'réglages à envoyer à Home Assistant' : 'réglage à envoyer à Home Assistant'));
       }
       var $verdict = $('#j2ha_v3_verdict').empty().removeAttr('data-kind').removeAttr('title');
-      var verdict = statusVerdict(currentStatus(), o && !lastView.stale ? o : null, env.now());
+      syncMemory = rememberSync(syncMemory, currentStatus());
+      var verdict = statusVerdict(currentStatus(), o && !lastView.stale ? o : null, env.now(), syncMemory);
       if (!verdict) return;
       $verdict.attr('data-kind', verdict.kind).attr('title', verdict.title);
       if (verdict.kind === 'ok') {
@@ -801,7 +822,9 @@
       return out;
     }
 
-    // Ratio « n/m » de la tuile, en tête de `.j2ha-room-state` (placé dans la grille de la tuile par le CSS).
+    // Ratio « n/m » de la tuile, en tête de `.j2ha-room-state` (placé dans la grille de la tuile par le CSS). Le compteur affiché
+    // (publiés, ou l'état filtré) est aussi exposé en `data-count` sur la tuile : une pièce exclue n'affiche que ⊘, son
+    // compteur reste lisible par les parcours.
     function setRatio($slot, text, title, excluded) {
       var $ratio = $('<span class="j2ha-v3-tile-ratio"></span>');
       $slot.append($ratio);
@@ -832,7 +855,7 @@
         var room = o ? o.rooms.filter(function (r) { return r.object_id === id; })[0] : null;
         var excluded = isRoomExcluded(id);
         syncRoomMenu($card, excluded);
-        $card.removeClass('j2ha-room-blocked j2ha-room-dim j2ha-room-excluded').prop('hidden', false);
+        $card.removeClass('j2ha-room-blocked j2ha-room-dim j2ha-room-excluded').prop('hidden', false).removeAttr('data-count');
         if (!room) {
           $card.removeAttr('aria-label').removeAttr('title');
           if (excluded) setRatio($slot, '', '', true);
@@ -851,6 +874,7 @@
         var ratioTitle = gf ? segmentLabel(gf, shown) + ' ' + w('sur') + ' ' + total : room.object_name + ' : ' + c.published + ' ' + w(c.published > 1 ? 'publiés' : 'publié') + ' ' + w('sur') + ' ' + total;
         if (excluded) $card.addClass('j2ha-room-excluded');
         setRatio($slot, shown + '/' + total, ratioTitle, excluded);
+        $card.attr('data-count', String(shown));
         var $marks = $('<div class="j2ha-room-marks j2ha-v3-marks"></div>');
         tileMarks(room, gf).forEach(function (mark) {
           $marks.append(markNode('j2ha-mark-' + mark.key, mark.icon, mark.count, mark.word));
@@ -1223,6 +1247,7 @@
     toApplyIds: toApplyIds,
     applyDialog: applyDialog,
     statusVerdict: statusVerdict,
+    rememberSync: rememberSync,
     scenarioCount: scenarioCount,
     shortCause: shortCause,
     adviceCount: adviceCount,

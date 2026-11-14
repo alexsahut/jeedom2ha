@@ -657,14 +657,18 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     assert.equal(ui.$('#div_op').list[0].visible, false);
   });
 
-  it('sans champ ha (démon avant Lot 3) : pastille masquée ; démon arrêté : pastille masquée, « Relu » inconnu', () => {
+  // Front v3 (Lot 1) : la pastille Home Assistant est TOUJOURS visible ; état inconnu = gris (« ? ») avec la raison en info-bulle.
+  it('sans champ ha (démon avant Lot 3) ou démon arrêté : pastille visible, grise, raison en info-bulle ; « Relu » inconnu', () => {
     const ui = bar();
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'succes', intention: 'publier', message: 'ok' } }) });
-    assert.equal(ui.$('#div_healthHa').list[0].visible, false);
+    assert.notEqual(ui.$('#div_healthHa').list[0].visible, false);
+    assert.equal(ui.$('#span_healthHa').attr('data-level'), 'unknown');
+    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : état inconnu (le démon ne fournit pas cette information)');
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: { daemon: false, ha: { birth_seen_at: null } } });
-    assert.equal(ui.$('#div_healthHa').list[0].visible, false);
+    assert.notEqual(ui.$('#div_healthHa').list[0].visible, false);
+    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : état inconnu (démon arrêté)');
     assert.equal(plain(ui.$('#span_healthSync').text()), 'Relu : inconnu');
   });
 
