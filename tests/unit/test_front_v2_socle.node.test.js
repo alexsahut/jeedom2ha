@@ -79,12 +79,15 @@ describe('Front v2 — Lot 0 : points de montage', () => {
     assert.ok(at('id="j2ha_v2_legend"') < at('/#j2ha_mainView'));
   });
 
-  it('bouton, entrées de menu et item de barre réservés, masqués tant qu\'un lot ne les branche pas', () => {
+  // Garde levée au Lot 1 : les entrées réservées sont branchées dans le menu « Autres actions » (actives) et l'item
+  // « Home Assistant » porte son libellé ; le conteneur réservé n'existe plus.
+  it('bouton réservé masqué ; entrées du Lot 1 branchées dans le menu ; item Home Assistant libellé et masqué par défaut', () => {
     assert.match(php, /<button type="button" id="bt_j2haChoosePublished"[^>]* hidden>/);
-    assert.match(php, /<ul id="j2ha_v2_menuReserved" class="j2ha-v2-reserved" hidden>[\s\S]*?id="bt_j2haCheckInstall"[^>]* disabled>[\s\S]*?id="bt_j2haOpenGuide"[^>]* disabled>[\s\S]*?<\/ul>/);
-    assert.match(php, /<div id="div_healthHa" class="j2ha-health-item" style="display:none;">\s*<span id="span_healthHa"/);
+    assert.ok(!php.includes('j2ha_v2_menuReserved'), 'plus de conteneur réservé');
     const menu = php.slice(php.indexOf('id="j2ha_moreMenu"'), php.indexOf('j2ha-menu-sep'));
-    assert.ok(!menu.includes('bt_j2haCheckInstall') && !menu.includes('bt_j2haOpenGuide'), 'menu « ⋯ » inchangé au Lot 0 (gate page-principale-b)');
+    assert.match(menu, /id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">/);
+    assert.match(menu, /id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">/);
+    assert.match(php, /<div id="div_healthHa" class="j2ha-health-item" style="display:none;">\s*<strong>\{\{Home Assistant\}\}<\/strong>\s*<span id="span_healthHa"/);
   });
 
   it('CSS : les conteneurs vides ne s\'affichent pas', () => {

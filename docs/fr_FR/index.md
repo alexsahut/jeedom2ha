@@ -130,24 +130,26 @@ La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « 
 
 ### La barre de santé
 
-La barre tient sur une ligne (elle se replie sur les petits écrans) : quatre indicateurs, chacun avec un point d'état et un mot, puis les actions à droite. Elle est lue **à l'ouverture de la page**, puis relue après « Republier tout », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après « Relire Jeedom ». Il n'est pas relu après un changement du réglage de publication, et elle ne se rafraîchit pas toute seule : rechargez la page pour l'actualiser. Les quatre indicateurs :
+La barre tient sur une ligne (elle se replie sur les petits écrans) : quatre indicateurs, chacun avec un point d'état et un mot, puis les actions à droite. Elle est lue **à l'ouverture de la page**, puis **relue toute seule toutes les 30 secondes** tant que l'onglet est visible, et aussi après « Republier tout », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après « Relire Jeedom ». Les indicateurs :
 
 | Indicateur | Valeurs possibles |
 |---|---|
 | **Démon** | « Actif » (vert) ; « Arrêté » (rouge : le démon ne répond pas) ; « Erreur Jeedom » ou « Erreur de communication » (rouge). |
 | **MQTT** (la liaison avec le broker) | « Connecté » (vert) ; « Reconnexion... » ou « Connexion... » (orange) ; « Déconnecté » (rouge) ; « Non configuré » ; « Inconnu » (démon arrêté ou erreur). L'adresse du broker s'affiche à côté. |
-| **Dernière synchro** | La date et l'heure (jour/mois et heures:minutes:secondes) de la dernière lecture complète, « Jamais » si aucune n'a eu lieu, « Inconnue » si le démon est arrêté. |
-| **Dernière opération** | « Succès » (vert) ; « Partiel » ou « Échec » (orange : c'est un problème de configuration, pas une panne d'infrastructure) ; « Aucune » ; « Inconnue » si le démon est arrêté. Le message de l'opération s'affiche à côté. |
+| **Home Assistant** | « Vu le 13/11 à 21:04 » (vert) ou « Pas encore vu » : Home Assistant se signale sur le broker quand il démarre ; s'il n'a pas redémarré depuis l'installation, « Pas encore vu » est normal. Affiché seulement si le démon fournit cette information. |
+| **Dernière relecture** | La date et l'heure (jour/mois et heures:minutes) de la dernière lecture complète, suivie de son résultat (« Réussie », « Partielle » ou « Échouée ») quand c'est la dernière opération ; « Jamais » si aucune n'a eu lieu, « Inconnue » si le démon est arrêté. |
+| **Dernière opération** | Affichée seulement quand la dernière opération n'est pas la relecture (par exemple « Republier tout ») : « Succès » (vert) ; « Partiel » ou « Échec » (orange : c'est un problème de configuration, pas une panne d'infrastructure) ; « Aucune » ; « Inconnue » si le démon est arrêté. Le message de l'opération s'affiche à côté. |
 
 ### Les actions de la barre de santé
 
-Deux boutons de poids normal agissent sur **l'ensemble du parc** ; les actions moins courantes sont rangées dans le menu « ⋯ » (« Plus d'actions »), à droite :
+Deux boutons de poids normal agissent sur **l'ensemble du parc** ; les actions moins courantes sont rangées dans le menu « ⋯ » (« Autres actions »), à droite. Une ligne d'aide, sous les boutons, rappelle lequel choisir : « **Relire Jeedom** : j'ai changé quelque chose dans Jeedom. **Republier tout** : Home Assistant a perdu ses appareils. »
 
 | Action | Ce qu'elle fait |
 |---|---|
 | **« Republier tout »** | Après confirmation (« Republier tous les équipements inclus ? »), republie dans Home Assistant les équipements inclus et applique leurs réglages en attente. Les équipements « inclus » sont ceux que le plugin ne met pas d'office de côté (par exemple par une exclusion de la configuration ou parce qu'ils sont désactivés). « Republier tout » travaille sur ce que la dernière lecture complète a lu : il ne relit pas Jeedom. |
 | **« Relire Jeedom »** | Relit tout Jeedom. Voir [Relire Jeedom](#relire-jeedom). |
-| **« Télécharger le diagnostic… »** (menu « ⋯ ») | Ouvre une boîte qui propose le téléchargement du diagnostic support. Voir [Télécharger le diagnostic support](#télécharger-le-diagnostic-support). |
+| **« Vérifier l'installation… »** (menu « ⋯ ») | Ouvre une boîte qui déroule les contrôles dans l'ordre (le démon tourne, le broker MQTT répond, Home Assistant a été vu, dernière relecture réussie, équipements bloqués), s'arrête au premier qui échoue et propose son remède. Elle porte aussi le téléchargement du diagnostic support. Voir [Télécharger le diagnostic support](#télécharger-le-diagnostic-support). |
+| **« Guide de démarrage »** (menu « ⋯ ») | Rouvre le guide en quatre étapes affiché au premier lancement (connecter le broker, vérifier que Home Assistant écoute, choisir ce qui est publié, publier). |
 | **« Supprimer tout de Home Assistant… »** (menu « ⋯ », en rouge, séparé par un trait) | Retire de Home Assistant tout le parc publié, après une confirmation forte. Rien n'est recréé ensuite : « Republier » remet les équipements. Voir [Les actions de publication](#les-actions-de-publication). |
 
 Le menu « ⋯ » s'ouvre au clic ou au clavier, se ferme par Échap ou par un clic à l'extérieur, et rend le focus à son bouton. Aucune action destructrice n'est visible hors de ce menu.
@@ -169,7 +171,7 @@ Pendant une relecture de Jeedom, ces mêmes boutons sont aussi grisés. Le régl
 - **Scénarios** : chaque scénario Jeedom a son bouton dans Home Assistant, qu'il soit actif ou non. Un scénario **désactivé** garde son bouton, **grisé** (« indisponible ») : l'appui est refusé et rien n'est lancé dans Jeedom ; le bouton redevient utilisable dès que le scénario est réactivé. L'entité, son identifiant et ses réglages dans Home Assistant ne changent pas, et les automatisations qui la citent restent valides. Seul un scénario **supprimé** de Jeedom voit son bouton retiré. **Une seule installation jeedom2ha par broker MQTT** : le plugin considère le broker comme la référence des boutons de scénario, donc une deuxième instance (box de test, clone restauré) qui y serait connectée verrait ses boutons de scénario retirés par l'autre, et inversement.
 - **Réévaluation automatique** : vous n'avez pas besoin de relire Jeedom quand un scénario est activé ou désactivé, quand un équipement est activé ou désactivé, ou quand une exclusion change (par exemple par un agenda, un mode ou un autre scénario). Toutes les 5 minutes, le plugin vérifie si cet état a changé et, seulement dans ce cas, relit Jeedom et met Home Assistant à jour (bouton de scénario grisé ou non, équipement publié ou retiré, raison affichée). Rien n'est relu si rien n'a changé, si le démon n'est pas démarré ou si une autre opération est en cours (nouvel essai 5 minutes plus tard). Comme une relecture, cette réévaluation applique aussi les réglages en attente (voir [Réglages en attente](#réglages-en-attente-et-appliquer)). Cette tâche apparaît dans la page du plugin (« Fonctionnalités », `cron5`) et peut y être désactivée.
 - **Pendant l'opération** : le bouton affiche « Relecture en cours… » et les autres boutons d'action sont grisés.
-- **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. La barre de santé est ensuite relue.
+- **Résultat** : un message « Relecture terminée. » (vert), « Relecture terminée avec avertissements. » (orange) ou « Relecture échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un autre. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : vérifiez « Dernière relecture » avant de relancer. » indique que la réponse n'est pas arrivée. La barre de santé est ensuite relue.
 
 ### Exclure une pièce
 
@@ -184,7 +186,7 @@ Une pièce entière peut être exclue de Home Assistant **depuis sa carte** (men
 
 ### Télécharger le diagnostic support
 
-Le menu « ⋯ » de la barre de santé propose **« Télécharger le diagnostic… »**. Une boîte s'ouvre ; son bouton **« Télécharger le diagnostic support »** produit un fichier `jeedom2ha-diagnostic-AAAA-MM-JJ.json` à joindre à une demande d'aide. Fermer la boîte n'envoie rien.
+Le menu « ⋯ » de la barre de santé propose **« Vérifier l'installation… »**. Dans la boîte qui s'ouvre, la partie « Pour le support » porte le bouton **« Télécharger le diagnostic support »**, qui produit un fichier `jeedom2ha-diagnostic-AAAA-MM-JJ.json` à joindre à une demande d'aide. La partie « Avancé », repliée, porte l'export de décision et les liens vers les trois journaux du plugin. Fermer la boîte n'envoie rien.
 
 - La case **« Pseudonymiser les noms d'équipements »** remplace les noms d'équipements par « Équipement_N », les noms de pièces par « Pièce_M » et les noms de commandes par « Cmd_ » suivi de leur numéro, et masque l'adresse du broker.
 - Messages : « Export en cours... », puis « Diagnostic téléchargé » ; en cas de problème, « Erreur export » ou « Erreur de communication », ou le message du démon (par exemple « Démon indisponible ou timeout — relancez le démon et réessayez. »).
@@ -630,7 +632,7 @@ Si un encart affiche un texte technique ou une liste de codes à la place d'une 
 | Un équipement manque dans Home Assistant | Ouvrez sa pièce : badge de l'équipement et encart de cause | Appliquez la correction de la [famille de causes](#les-causes-de-blocage) correspondante. |
 | Un réglage n'a pas d'effet dans Home Assistant | Badge « À appliquer » et bouton « Appliquer » dans l'en-tête de l'équipement | Cliquez sur « Appliquer », ou lancez « Relire Jeedom ». |
 | Les états ne se mettent pas à jour | Bandeau de santé | Vérifiez le démon et MQTT, puis le journal `jeedom2ha`. |
-| La barre de santé semble figée | Elle n'est lue qu'à l'ouverture de la page et après chaque action | Rechargez la page. |
+| La barre de santé semble figée | Elle est relue toutes les 30 secondes seulement quand l'onglet est visible, et après chaque action | Revenez sur l'onglet, ou rechargez la page. |
 
 Journaux : **Jeedom → Analyse → Logs → `jeedom2ha`**. Pour signaler un problème : [github.com/alexsahut/jeedom2ha/issues](https://github.com/alexsahut/jeedom2ha/issues).
 

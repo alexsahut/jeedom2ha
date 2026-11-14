@@ -25,7 +25,9 @@ test('20.4: les résultats UI distinguent succes, partiel, echec et champ absent
   assert.match(source, /typeof result\.operation_result === 'string'[\s\S]*level: 'warning'/);
   assert.match(source, /Résultat inconnu, relire Dernière opération/);
   assert.match(source, /Une opération est déjà en cours ou la relecture a échoué/);
-  assert.match(source, /Erreur de communication : relire Dernière synchro/);
+  // Garde levée (front v2, Lot 1) : glossaire 3.2 « Dernière synchro » → « Dernière relecture ».
+  assert.match(source, /Erreur de communication : vérifiez « Dernière relecture » avant de relancer/);
+  assert.doesNotMatch(source, /Dernière synchro|Synchronisation terminée\.\}\}/);
 });
 
 test('20.4: une erreur terminale du démon affiche operation_message et rafraîchit la santé', () => {
