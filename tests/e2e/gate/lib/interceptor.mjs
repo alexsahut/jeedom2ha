@@ -15,6 +15,7 @@ import {
   buildRevertResponse,
   buildSaveResponse,
   buildEmptyChangesResponse,
+  buildEquipmentPublicationResponse,
   buildPublicationRevertResponse,
   buildPublicationSaveResponse,
   deriveOverrideTree,
@@ -306,6 +307,9 @@ export async function installInterceptor(context, { ctx, simState, journal, decl
         } else if (decision.action === 'saveFilteringConfig') {
           // Front v2 (Lot 6) : branche EXPLICITE, valeur déclarée par le parcours ; rien n'est transmis à la box.
           response = buildFilteringConfigResponse({ excludedPlugins: params.excludedPlugins, confidencePolicy: params.confidencePolicy });
+        } else if (decision.action === 'executeHaAction') {
+          // Front v2 (Lot 5) : publication d'un équipement déclaré, simulée (branche explicite, jamais le `else`).
+          response = buildEquipmentPublicationResponse();
         } else if (decision.action === 'saveMappingOverride') {
           recordSave(simState, { eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });
           response = buildSaveResponse({ eqId: params.eqId, cmdId: params.cmdId, type: params.haEntityType });

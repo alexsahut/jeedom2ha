@@ -22,7 +22,8 @@
 
   // État volatil de la surface courante (un seul équipement affiché à la fois, dans la vue de travail).
   // `current` : l'équipement sélectionné { eqId, $panel } ; `reads` : lectures d'arbre en vol, par eqId.
-  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null, current: null, reads: {}, raw: {} };
+  var ctx = { reassurance: M.initReassuranceState(), timers: {}, xhr: {}, trees: {}, treeErrors: {}, room: null, current: null, reads: {}, raw: {},
+    typePanel: null, typeToast: null };
 
   // La vue de travail dit si la pièce est toujours affichée (retour d'une action, R1-D de 20.3).
   var host = { isRoomShown: function () { return false; } };
@@ -30,22 +31,6 @@
   // --- Tableau des commandes (16.8, 25.1, front v2) : colonnes
   //     Commande | Dans Home Assistant | Rôle dans Jeedom | Type HA, regroupées par entité.
   //     Les commandes ignorées ne sont pas des lignes : elles sont repliées sous le tableau. ---
-
-  // `row` : la ligne de commande (types proposés filtrés par le démon, AC6) ; sans lui, liste complète.
-  function buildOptions(selected, row) {
-    var opts = row ? M.getOverrideTypeOptions(row) : M.getHaEntityTypeOptions();
-    var $sel = $('<select class="form-control input-sm mapping-override-select"></select>');
-    $sel.attr('aria-label', '{{Type HA}}');
-    $sel.append($('<option value="">{{auto}}</option>'));
-    for (var i = 0; i < opts.length; i++) {
-      var $o = $('<option></option>').attr('value', opts[i]).text(opts[i]);
-      if (opts[i] === selected) {
-        $o.prop('selected', true);
-      }
-      $sel.append($o);
-    }
-    return $sel;
-  }
 
   // Q5 (décision 2026-10-18) : écran « Types d'équipement » du core Jeedom, ouvert sans rien écrire (D10).
   var GENERIC_TYPES_URL = 'index.php?v=d&p=types';
@@ -72,37 +57,6 @@
       $cell.append($('<i class="fas"></i>').addClass(icon)).append(document.createTextNode(' '));
     }
     $cell.append($('<span></span>').text(text));
-  }
-
-  // Aperçu d'un type imposé (dry-run, 16.8) : « À appliquer → Capteur (sensor) », « Bloquée → cause »,
-  // ou « Ignorée → … » ; jamais une cellule vide.
-  // AC12 « jamais vide » : commande non couverte par un mapping → état factuel dédié.
-  // Story 19.3 (P1, relecture ClaudeBox PR #176 tour 2) : `covered:false` ne signifie PAS
-  // systématiquement « aucun mapping ne couvre cette commande » — une exclusion/inéligibilité
-  // amont (I1/I4) porte aussi `covered:false` avec un VRAI diagnostic à afficher. Le libellé
-  // générique ne sort que si `shouldShowUncoveredLabel` confirme l'absence de cause réelle.
-  function renderPreviewCell($cell, view, covered) {
-    if (covered === false && M.shouldShowUncoveredLabel(view)) {
-      iconTextCell($cell, 'j2ha-diag-uncovered', 'fa-ban', M.buildUncoveredLabel());
-      return;
-    }
-    if (M.isExcludedDiagnostic(view)) {
-      iconTextCell($cell, 'j2ha-diag-excluded', 'fa-eye-slash', M.buildExcludedLabel(view));
-      return;
-    }
-    if (M.isDisabledDiagnostic(view)) {
-      iconTextCell($cell, 'j2ha-diag-disabled', 'fa-pause-circle', M.buildDisabledLabel(view));
-      return;
-    }
-    var state = M.diagnosticState(view);
-    var msg = M.buildPublishCellLabel(view);
-    if (state === 'ready') {
-      iconTextCell($cell, 'j2ha-diag-todo', 'fa-clock', msg);
-    } else if (state === 'blocking') {
-      iconTextCell($cell, 'j2ha-diag-blocking', 'fa-exclamation-triangle', msg);
-    } else {
-      iconTextCell($cell, 'j2ha-diag-unknown', null, msg);
-    }
   }
 
   // Cellule « Dans Home Assistant » d'une ligne du tableau (catégorie D2). Une commande bloquée ne
@@ -137,14 +91,15 @@
     }
   }
 
-  // Colonne « Type HA » : lien discret « auto » / « imposé (sensor) ». Le sélecteur n'existe qu'après
-  // un clic sur le lien (jamais rendu en permanence, jamais proposé quand le réglage est indisponible).
+  // Colonne « Type HA » : lien discret « auto » / « Personnalisé : Lumière (light) » (front v2, Lot 5). Le clic ouvre le
+  // panneau « Corriger le type » (E5) sous la ligne : choix, aperçu, puis « Enregistrer et publier ». Rien n'est écrit au
+  // clic ni au choix (fin de l'enregistrement automatique après 400 ms). Jamais proposé quand le réglage est indisponible.
   function renderTypeCell(eqId, row, entities, $haCell) {
     var cmdId = row.jeedom_cmd_id;
     var $td = $('<td class="mo-td-override"></td>');
     var selectorState = M.getOverrideSelectorState(row, entities);
     var forced = row.override_applied;
-    var linkText = forced ? '{{imposé}} (' + (row.effective_ha || '') + ')' : '{{auto}}';
+    var linkText = forced ? '{{Personnalisé :}} ' + M.formatHaDomain(row.effective_ha) : '{{auto}}';
     var $revertError = $('<span class="mo-revert-error text-danger"></span>').hide();
 
     if (!selectorState.active) {
@@ -152,53 +107,24 @@
         .attr('title', selectorState.reason).text(linkText));
     } else {
       var $link = $('<a class="j2ha-type-link cursor" role="button" tabindex="0"></a>')
-        .attr('title', '{{Choisir le type HA de cette commande}}').text(linkText);
+        .attr('title', '{{Corriger le type HA de cette commande}}').attr('aria-expanded', 'false').text(linkText);
       if (forced) {
         $link.addClass('j2ha-type-forced');
       }
-      var $spinner = $('<span class="mo-spinner"><i class="fas fa-spinner fa-spin"></i></span>').hide();
-      var opened = false;
-      var openSelector = function () {
-        if (opened) {
-          return;
-        }
-        opened = true;
-        var $select = buildOptions(forced ? row.effective_ha : '', row);
-        $link.hide();
-        $td.append($select);
-        $select.on('change', function () {
-          var type = $(this).val();
-          if (ctx.timers[cmdId]) {
-            clearTimeout(ctx.timers[cmdId]);
-          }
-          if (!type) {
-            revertCommand(eqId, cmdId);
-            return;
-          }
-          ctx.timers[cmdId] = setTimeout(function () {
-            runDryRun(eqId, cmdId, type, $haCell, $spinner);
-          }, DEBOUNCE_MS);
-        });
-        $select.on('keydown', function (event) {
-          if (event && event.key === 'Escape') {
-            $select.remove();
-            $link.show();
-            opened = false;
-          }
-        });
-        $select.focus();
+      var openPanel = function () {
+        openTypePanel({ eqId: eqId, cmdIds: [cmdId], origin: $link });
       };
       $link.on('click', function (event) {
         if (event && event.preventDefault) event.preventDefault();
-        openSelector();
+        openPanel();
       });
       $link.on('keydown', function (event) {
         if (event && (event.key === 'Enter' || event.key === ' ')) {
           if (event.preventDefault) event.preventDefault();
-          openSelector();
+          openPanel();
         }
       });
-      $td.append($link).append($spinner);
+      $td.append($link);
     }
     if (forced) {
       // Story 20-2 (P1, relecture indépendante PR #210) : ce lien ne porte que sur le type de cette seule
@@ -281,51 +207,52 @@
     return $value;
   }
 
-  function runDryRun(eqId, cmdId, type, $diagCell, $spinner) {
-    if (ctx.xhr[cmdId]) {
+  // Aperçu d'un type (lecture seule, rien n'est enregistré) : même corps qu'avant (`previewMappingOverride`, eqId, cmdId,
+  // haEntityType). Une seule requête en vol par commande ; une requête remplacée ou annulée (fermeture) ne rappelle rien.
+  // `done(error, data)` : `error` = message lisible (réseau ou refus), `data` = corps ajax.
+  function runDryRun(eqId, cmdId, type, done) {
+    if (ctx.xhr[cmdId] && typeof ctx.xhr[cmdId].abort === 'function') {
       ctx.xhr[cmdId].abort();
     }
-    $spinner.show();
-    ctx.xhr[cmdId] = $.ajax({
+    // Jeton de la requête en vol : posé AVANT l'appel, il rend muette une réponse remplacée ou annulée.
+    var slot = { cancelled: false, request: null };
+    slot.abort = function () {
+      slot.cancelled = true;
+      if (slot.request && typeof slot.request.abort === 'function') slot.request.abort();
+    };
+    ctx.xhr[cmdId] = slot;
+    slot.request = $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'previewMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type },
       dataType: 'json',
       success: function (data) {
-        var result = data && data.result ? data.result : data;
-        var covered = M.readPreviewCovered(result);
-        // Commande non couverte : aucun mapping à projeter. On affiche l'état factuel et on
-        // NE persiste PAS (un override sur une commande non couverte est un no-op qui, après
-        // reload, laisse la cellule vide — la cause exacte du #871).
-        // Story 19.3 (P1) : on transmet la vue `auto` (raison réelle éventuelle — exclusion,
-        // inéligibilité amont) plutôt que `null`, pour que `renderPreviewCell` puisse
-        // distinguer « vraiment non couverte » d'une cause amont à afficher (I4).
-        if (!covered) {
-          renderPreviewCell($diagCell, M.readPreviewAuto(result), false);
-          return;
-        }
-        var view = M.readPreviewOverridden(result);
-        renderPreviewCell($diagCell, view, true);
-        maybeShowReassurance(M.isBlockingDiagnostic(view) && !M.isExcludedDiagnostic(view));
-        if (M.shouldAutoValidate(view)) {
-          saveOverride(eqId, cmdId, type);
-        }
+        if (slot.cancelled) return;
+        done(M.readPublicationRequestError(data), data);
+      },
+      error: function () {
+        if (slot.cancelled) return;
+        done('{{Le démon ne répond pas.}}', null);
       },
       complete: function () {
-        $spinner.hide();
-        ctx.xhr[cmdId] = null;
+        if (ctx.xhr[cmdId] === slot) ctx.xhr[cmdId] = null;
       },
     });
   }
 
-  function saveOverride(eqId, cmdId, type) {
+  // Écriture du type d'une commande, seulement sur « Enregistrer et publier » (front v2, Lot 5) : même corps qu'avant
+  // (`saveMappingOverride`, eqId, cmdId, haEntityType). `done(error)` : `null` si le démon a enregistré.
+  function saveOverride(eqId, cmdId, type, done) {
     $.ajax({
       type: 'POST',
       url: AJAX_URL,
       data: { action: 'saveMappingOverride', eqId: eqId, cmdId: cmdId, haEntityType: type },
       dataType: 'json',
-      success: function () {
-        reloadEquipment(eqId);
+      success: function (resp) {
+        done(M.readPublicationRequestError(resp));
+      },
+      error: function () {
+        done('{{Le démon ne répond pas.}}');
       },
     });
   }
@@ -1159,27 +1086,393 @@
     return { $toggle: $toggle, $content: $content };
   }
 
-  // « Corriger le type… » : panneau du Lot 5 s'il est livré ; sinon le sélecteur actuel de la première commande concernée.
-  function openTypeCorrection($panel, eqId, cmdIds) {
-    var panel = window.Jeedom2haTypePanel;
-    if (panel && typeof panel.open === 'function') {
-      panel.open({ eqId: eqId, cmdIds: cmdIds.slice(), $panel: $panel });
+  // --- Front v2 (Lot 5) : panneau « Corriger le type » (écran E5) ---
+  // Sous la ligne de la commande : choix (types possibles, types impossibles grisés avec leur raison), aperçu avant / après
+  // en entités (lecture seule), puis un seul geste « Enregistrer et publier » = `saveMappingOverride` (ou
+  // `revertMappingOverride` pour « Automatique ») puis publication de l'équipement (`executeHaAction` publier / equipement,
+  // la fonction de la page, avec son délai client). Rien n'est écrit avant ce clic. Après : bandeau « … · Annuler » pendant
+  // 10 s, qui rétablit le réglage précédent puis republie. Les corps des requêtes sont ceux d'avant (contrat 25.4).
+  var TYPE_TOAST_MS = 10000;
+  var typePanelSeq = 0;
+
+  function typePanelModule() {
+    var tp = typeof window !== 'undefined' ? window.Jeedom2haTypePanel : null;
+    return tp && typeof tp.buildChoices === 'function' && typeof tp.buildDiff === 'function' ? tp : null;
+  }
+
+  function equipmentName(eqId) {
+    var raw = ctx.raw[eqId];
+    if (raw && typeof raw.eq_name === 'string' && raw.eq_name) return raw.eq_name;
+    var tree = ctx.trees[eqId];
+    if (tree && tree.eq_name) return tree.eq_name;
+    var eq = roomEquipment(eqId);
+    return eq && eq.eq_name ? eq.eq_name : '#' + eqId;
+  }
+
+  // Première commande de `cmdIds` dont le type peut être réglé ici (sinon le panneau n'est pas proposé).
+  function typePanelTarget(eqId, cmdIds) {
+    var tree = ctx.trees[eqId];
+    if (!tree) return null;
+    for (var i = 0; i < cmdIds.length; i++) {
+      for (var k = 0; k < tree.commands.length; k++) {
+        var row = tree.commands[k];
+        if (row.jeedom_cmd_id === cmdIds[i] && M.getOverrideSelectorState(row, tree.entities).active) return row;
+      }
+    }
+    return null;
+  }
+
+  function revertType(eqId, cmdId, done) {
+    $.ajax({
+      type: 'POST',
+      url: AJAX_URL,
+      data: { action: 'revertMappingOverride', eqId: eqId, cmdId: cmdId },
+      dataType: 'json',
+      success: function (resp) { done(M.readPublicationRequestError(resp)); },
+      error: function () { done('{{Le démon ne répond pas.}}'); },
+    });
+  }
+
+  // Publication de l'équipement après un réglage : la fonction de la page (`executeHaAction`, délai client inclus) ;
+  // repli, si elle manque, sur la même requête que « Republier ». `done({ ok, message, level })`.
+  function publishAfterType(eqId, done) {
+    var settle = function (payload) {
+      done({ ok: shouldRefreshPublishedScopeAfterHaAction(payload), message: buildHaActionUserMessage(payload),
+        level: getHaActionAlertLevel(payload) });
+    };
+    if (typeof executeHaAction === 'function') {
+      executeHaAction('publier', 'equipement', [eqId], {
+        onSuccess: settle,
+        onError: function (message) { done({ ok: false, message: message, level: 'danger' }); },
+      });
       return;
     }
-    for (var i = 0; i < cmdIds.length; i++) {
-      var $link = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + cmdIds[i] + '"] a.j2ha-type-link').first();
-      if ($link.length > 0) {
-        scrollToCommand($panel, cmdIds[i]);
-        $link.trigger('click');
-        return;
-      }
+    $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'executeHaAction', intention: 'publier', portee: 'equipement',
+      selection: JSON.stringify([eqId]) }, dataType: 'json' })
+      .done(function (resp) {
+        var error = M.readPublicationRequestError(resp);
+        var payload = resp && resp.result && typeof resp.result === 'object' ? resp.result.payload : null;
+        if (error || !payload || typeof payload !== 'object') {
+          done({ ok: false, message: error || '{{Réponse incomplète du démon.}}', level: 'danger' });
+          return;
+        }
+        settle(payload);
+      })
+      .fail(function () { done({ ok: false, message: '{{Le démon ne répond pas.}}', level: 'danger' }); });
+  }
+
+  function clearTypeToast() {
+    var toast = ctx.typeToast;
+    ctx.typeToast = null;
+    if (!toast) return;
+    if (toast.timer) clearTimeout(toast.timer);
+    toast.$el.remove();
+  }
+
+  // Bandeau de résultat dans l'en-tête de l'équipement (collant, annoncé par aria-live). `undo` : action « Annuler ».
+  function showTypeToast(eqId, text, warn, undo) {
+    // Revue Codex (#393) : une réponse qui concerne un équipement qui n'est plus affiché ne touche pas au bandeau courant.
+    if (!isCurrent(eqId)) return;
+    clearTypeToast();
+    var $toast = $('<div class="j2ha-v2-toast j2ha-v2-type-toast" role="status" aria-live="polite" tabindex="-1"></div>');
+    if (warn) $toast.addClass('is-warn');
+    $toast.append($('<span class="j2ha-v2-type-toast-text"></span>').text(text));
+    if (undo) {
+      var $undo = $('<button type="button" class="j2ha-v2-type-undo"></button>').text('{{Annuler}}');
+      $undo.on('click', function () { undo($toast, $undo); });
+      $toast.append($undo);
+    }
+    ctx.current.$panel.find('.j2ha-eq-head').first().append($toast);
+    var toast = { $el: $toast, timer: null };
+    toast.timer = setTimeout(function () { if (ctx.typeToast === toast) clearTypeToast(); }, TYPE_TOAST_MS);
+    ctx.typeToast = toast;
+    $toast.focus();
+  }
+
+  // Réglage puis publication (« Enregistrer et publier » et « Annuler » du bandeau). `type` null = automatique.
+  // `done(error, outcome)` : `error` = l'écriture a échoué (rien n'a été publié) ; sinon `outcome` de la publication.
+  function writeTypeThenPublish(eqId, cmdId, type, done) {
+    var afterWrite = function (error) {
+      if (error) { done(error, null); return; }
+      publishAfterType(eqId, function (outcome) {
+        refreshBridgeStatus();
+        reloadEquipment(eqId);
+        done(null, outcome);
+      });
+    };
+    if (type) saveOverride(eqId, cmdId, type, afterWrite);
+    else revertType(eqId, cmdId, afterWrite);
+  }
+
+  function publicationProblem(outcome) {
+    return '{{Réglage enregistré, mais la publication n’a pas abouti :}} ' + outcome.message
+      + ' {{Utilisez « Republier » pour réessayer.}}';
+  }
+
+  function undoType(eqId, cmdId, previous) {
+    return function ($toast, $undo) {
+      if ($undo.prop('disabled')) return;
+      $undo.prop('disabled', true);
+      if (ctx.typeToast && ctx.typeToast.timer) { clearTimeout(ctx.typeToast.timer); ctx.typeToast.timer = null; }
+      $toast.find('.j2ha-v2-type-toast-text').first().text('{{Retour au réglage précédent…}}');
+      writeTypeThenPublish(eqId, cmdId, previous, function (error, outcome) {
+        if (error) {
+          showTypeToast(eqId, '{{Le réglage précédent n’a pas pu être rétabli :}} ' + error, true, null);
+          return;
+        }
+        showTypeToast(eqId, outcome.ok ? '{{Réglage précédent rétabli.}}' : publicationProblem(outcome), !outcome.ok, null);
+      });
+    };
+  }
+
+  function closeTypePanel(restoreFocus) {
+    var state = ctx.typePanel;
+    if (!state) return;
+    ctx.typePanel = null;
+    if (state.timer) clearTimeout(state.timer);
+    var inFlight = ctx.xhr[state.cmdId];
+    if (inFlight && typeof inFlight.abort === 'function') inFlight.abort();
+    ctx.xhr[state.cmdId] = null;
+    state.$row.remove();
+    if (state.$origin && state.$origin.length) {
+      state.$origin.attr('aria-expanded', 'false');
+      if (restoreFocus) state.$origin.focus();
     }
   }
 
-  // Le sélecteur de type est-il proposé pour au moins une de ces commandes (sinon « Corriger le type… » n'est pas offert) ?
+  function typeLine(tp, line) {
+    var $line = $('<div class="j2ha-v2-type-line"></div>');
+    $line.append($('<span class="j2ha-v2-entity-type"></span>').text(line.label));
+    var caps = tp.capabilityText(line);
+    if (caps) $line.append(document.createTextNode(' · ' + caps));
+    if (line.entity_id) $line.append(document.createTextNode(' · ')).append($('<code></code>').text(line.entity_id));
+    return $line;
+  }
+
+  function renderTypeDiff(tp, $preview, diff) {
+    $preview.empty();
+    var $grid = $('<div class="j2ha-v2-diff"></div>');
+    var $before = $('<div class="is-before"></div>').append($('<strong></strong>').text('{{Avant}}'))
+      .append($('<div class="j2ha-v2-type-headline"></div>').text(diff.before.headline));
+    if (diff.before.empty) $before.append($('<div class="j2ha-v2-small j2ha-v2-muted"></div>').text('{{Rien dans Home Assistant}}'));
+    diff.before.published.forEach(function (line) { $before.append(typeLine(tp, line)); });
+    var $after = $('<div></div>').append($('<strong></strong>').text('{{Après}}'));
+    if (diff.publishable) {
+      $after.addClass('is-after').append($('<div class="j2ha-v2-type-headline"></div>').text(diff.after.headline));
+      diff.after.published.forEach(function (line) { $after.append(typeLine(tp, line)); });
+    } else {
+      $after.addClass('is-refused').append($('<div class="j2ha-v2-type-refusal"></div>')
+        .text('{{Ce choix ne peut pas être publié :}} ' + diff.refusal + '.'));
+    }
+    $grid.append($before).append($after);
+    $preview.append($grid);
+    diff.changes.forEach(function (c) {
+      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
+        .append(document.createTextNode('{{Attention : l’identifiant passe de}} ')).append($('<code></code>').text(c.from))
+        .append(document.createTextNode(' {{à}} ')).append($('<code></code>').text(c.to))
+        .append(document.createTextNode('. {{Les automatisations et tableaux de bord Home Assistant qui utilisent l’ancien seront à reprendre.}}')));
+    });
+    diff.removed.forEach(function (id) {
+      $preview.append($('<div class="j2ha-v2-alert is-warn j2ha-v2-type-idchange"></div>')
+        .append(document.createTextNode('{{Cette entité sera retirée de Home Assistant :}} ')).append($('<code></code>').text(id)));
+    });
+  }
+
+  // Choix possibles en boutons radio (« Automatique » et le choix courant toujours visibles) ; types refusés par le démon
+  // repliés sous une seule ligne dépliable, noms seulement (la raison est la même pour tous : dite une fois).
+  var refusedSeq = 0;
+  function buildTypeChoices(tp, state, choices) {
+    var $fieldset = $('<fieldset class="j2ha-v2-type-choices"></fieldset>');
+    $fieldset.append($('<legend class="j2ha-v2-type-legend"></legend>').text('{{Dans Home Assistant, cette commande est :}}'));
+    var name = 'j2haType_' + state.seq;
+    state.enabledInputs = [];
+    var refused = [];
+    choices.forEach(function (choice) {
+      if (choice.disabled) {
+        refused.push(choice);
+        return;
+      }
+      var $label = $('<label class="j2ha-v2-radio"></label>');
+      var $input = $('<input type="radio">').attr('name', name).attr('value', choice.value)
+        .attr('data-type', choice.value === '' ? 'auto' : choice.value);
+      if (choice.checked) $input.prop('checked', true);
+      state.enabledInputs.push($input);
+      var $text = $('<span class="j2ha-v2-type-choice"></span>').text(choice.value === '' ? '{{Automatique}}' : choice.label);
+      if (choice.hint) $text.append($('<span class="j2ha-v2-small j2ha-v2-muted"></span>').text(' — ' + choice.hint));
+      $input.on('change', function () { chooseType(tp, state, choice.value); });
+      $label.append($input).append($text);
+      $fieldset.append($label);
+    });
+    if (refused.length > 0) {
+      refusedSeq += 1;
+      var listId = 'j2haTypeRefused_' + refusedSeq;
+      var $list = $('<ul class="j2ha-v2-type-refused-list j2ha-v2-small j2ha-v2-muted"></ul>').attr('id', listId).hide();
+      refused.forEach(function (choice) {
+        $list.append($('<li></li>').attr('data-type', choice.value).text(choice.label));
+      });
+      var $toggle = $('<button type="button" class="j2ha-v2-type-refused-toggle j2ha-v2-small" aria-expanded="false"></button>')
+        .attr('aria-controls', listId).text('{{Autres types, non proposés pour cette commande}} (' + refused.length + ') ▸');
+      $toggle.on('click', function () {
+        var open = $toggle.attr('aria-expanded') === 'true';
+        $toggle.attr('aria-expanded', open ? 'false' : 'true')
+          .text('{{Autres types, non proposés pour cette commande}} (' + refused.length + ') ' + (open ? '▸' : '▾'));
+        if (open) $list.hide(); else $list.show();
+      });
+      $fieldset.append($('<div class="j2ha-v2-type-refused"></div>').append($toggle).append($list));
+    }
+    return $fieldset;
+  }
+
+  // Revue Codex (#393) : pendant l'enregistrement, les choix sont figés (le choix affiché reste celui qui est écrit).
+  function setTypeChoicesLocked(state, locked) {
+    state.enabledInputs.forEach(function ($input) { $input.prop('disabled', locked); });
+  }
+
+  function setTypeSaveEnabled(state, enabled) {
+    state.$save.prop('disabled', !enabled);
+    if (enabled) state.$save.removeAttr('aria-disabled'); else state.$save.attr('aria-disabled', 'true');
+  }
+
+  // Un choix ne fait QU'un aperçu (lecture) : jamais d'écriture ici.
+  function chooseType(tp, state, value) {
+    if (ctx.typePanel !== state || state.busy) return;
+    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    var inFlight = ctx.xhr[state.cmdId];
+    if (inFlight && typeof inFlight.abort === 'function') inFlight.abort();
+    state.choice = value;
+    state.$error.text('').hide();
+    setTypeSaveEnabled(state, false);
+    if (value === (state.current || '')) {
+      state.$preview.empty().append($('<div class="j2ha-v2-small"></div>').text('{{C’est le réglage actuel : rien ne change.}}'));
+      return;
+    }
+    if (value === '') {
+      state.$preview.empty().append($('<div class="j2ha-v2-type-auto"></div>')
+        .text('{{Après : le plugin choisira seul le type de cette commande, comme si aucun réglage n’avait été fait.}}'));
+      setTypeSaveEnabled(state, true);
+      return;
+    }
+    state.$preview.empty().append($('<div class="j2ha-v2-small j2ha-v2-muted"></div>')
+      .append('<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>').append(document.createTextNode(' {{Calcul de l’aperçu…}}')));
+    state.timer = setTimeout(function () {
+      state.timer = null;
+      runDryRun(state.eqId, state.cmdId, value, function (error, data) {
+        if (ctx.typePanel !== state || state.choice !== value) return;
+        if (error) {
+          state.$preview.empty();
+          state.$error.text('{{L’aperçu n’a pas pu être calculé :}} ' + error).show();
+          return;
+        }
+        var diff = tp.buildDiff(data);
+        renderTypeDiff(tp, state.$preview, diff);
+        maybeShowReassurance(!diff.publishable);
+        setTypeSaveEnabled(state, diff.publishable);
+      });
+    }, DEBOUNCE_MS);
+  }
+
+  function saveTypeChoice(tp, state) {
+    if (ctx.typePanel !== state || state.busy || state.$save.prop('disabled') || state.choice === undefined) return;
+    state.busy = true;
+    var type = state.choice || null;
+    var previous = state.current;
+    var name = equipmentName(state.eqId);
+    state.$error.text('').hide();
+    state.$cancel.prop('disabled', true);
+    setTypeChoicesLocked(state, true);
+    state.$save.prop('disabled', true).html('<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> {{Enregistrement…}}');
+    writeTypeThenPublish(state.eqId, state.cmdId, type, function (error, outcome) {
+      if (error) {
+        if (ctx.typePanel !== state) return;
+        state.busy = false;
+        setTypeChoicesLocked(state, false);
+        state.$cancel.prop('disabled', false);
+        state.$save.prop('disabled', false).text('{{Enregistrer et publier}}');
+        state.$error.text('{{Le réglage n’a pas été enregistré :}} ' + error).show();
+        return;
+      }
+      // Revue Codex (#393) : ne ferme que le panneau qui a lancé l'opération (un autre a pu être ouvert entre-temps).
+      if (ctx.typePanel === state) closeTypePanel(false);
+      var undo = undoType(state.eqId, state.cmdId, previous);
+      if (outcome.ok) showTypeToast(state.eqId, tp.resultMessage(name, type), false, undo);
+      else showTypeToast(state.eqId, publicationProblem(outcome), true, undo);
+    });
+  }
+
+  /** Ouvre le panneau sous la ligne de la première commande réglable de `cmdIds` ; rend `true` s'il est ouvert. */
+  function openTypePanel(options) {
+    var o = options || {};
+    var tp = typePanelModule();
+    var eqId = o.eqId;
+    if (!tp || !isCurrent(eqId)) return false;
+    var row = typePanelTarget(eqId, Array.isArray(o.cmdIds) ? o.cmdIds : []);
+    if (!row) return false;
+    var cmdId = row.jeedom_cmd_id;
+    var $panel = ctx.current.$panel;
+    var $tr = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + cmdId + '"]').first();
+    if (!$tr.length) return false;
+    if (ctx.typePanel && ctx.typePanel.eqId === eqId && ctx.typePanel.cmdId === cmdId) {
+      closeTypePanel(true);
+      return true;
+    }
+    closeTypePanel(false);
+    typePanelSeq += 1;
+    var $origin = o.origin && o.origin.length ? o.origin : $tr.find('a.j2ha-type-link').first();
+    var built = tp.buildChoices(row);
+    var titleId = 'j2haTypeTitle_' + typePanelSeq;
+    var state = { eqId: eqId, cmdId: cmdId, seq: typePanelSeq, current: built.current, choice: undefined, timer: null, busy: false,
+      $origin: $origin };
+
+    var $box = $('<div class="j2ha-v2 j2ha-v2-panel j2ha-v2-type-panel" role="region"></div>').attr('aria-labelledby', titleId);
+    var $title = $('<h4 class="j2ha-v2-type-title" tabindex="-1"></h4>').attr('id', titleId)
+      .text('{{Corriger le type de}} « ' + equipmentName(eqId) + ' » {{pour Home Assistant}}');
+    $box.append($title);
+    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-cmd"></div>')
+      .text('{{Commande :}} ' + (row.cmd_name || ('#' + cmdId))));
+    $box.append($('<div class="j2ha-v2-alert is-info j2ha-v2-type-ways"></div>')
+      .append(document.createTextNode('{{Le plus durable est de corriger les types génériques dans Jeedom. Ici, vous réglez seulement ce que voit Home Assistant.}} '))
+      .append($('<a class="j2ha-open-generic-types" target="_blank" rel="noopener"></a>').attr('href', GENERIC_TYPES_URL)
+        .text('{{Ouvrir les types génériques}}')));
+    $box.append(buildTypeChoices(tp, state, built.choices));
+    state.$preview = $('<div class="j2ha-v2-type-preview" aria-live="polite"></div>');
+    $box.append(state.$preview);
+    $box.append($('<div class="j2ha-v2-small j2ha-v2-muted j2ha-v2-type-note"></div>')
+      .text('{{Aperçu calculé par le plugin. Rien n’est enregistré tant que vous n’avez pas validé.}}'));
+    state.$error = $('<div class="j2ha-v2-type-error text-danger" role="alert"></div>').hide();
+    $box.append(state.$error);
+    state.$cancel = $('<button type="button" class="btn btn-default btn-sm j2ha-v2-type-cancel"></button>').text('{{Annuler}}');
+    state.$save = $('<button type="button" class="btn btn-success btn-sm j2ha-v2-type-save"></button>').text('{{Enregistrer et publier}}');
+    setTypeSaveEnabled(state, false);
+    state.$cancel.on('click', function () { if (!state.busy) closeTypePanel(true); });
+    state.$save.on('click', function () { saveTypeChoice(tp, state); });
+    $box.append($('<div class="j2ha-v2-foot"></div>').append(state.$cancel).append(state.$save));
+    $box.on('keydown', function (event) {
+      if (event && event.key === 'Escape' && !state.busy) {
+        if (event.preventDefault) event.preventDefault();
+        closeTypePanel(true);
+      }
+    });
+
+    state.$row = $('<tr class="j2ha-v2-type-row"></tr>').attr('data-type-panel-for', cmdId)
+      .append($('<td colspan="4"></td>').append($box));
+    $tr.after(state.$row);
+    ctx.typePanel = state;
+    $origin.attr('aria-expanded', 'true');
+    var $checked = $box.find('input[data-type="' + (state.current || 'auto') + '"]').first();
+    if ($checked.length) $checked.focus(); else $title.focus();
+    return true;
+  }
+
+  // « Corriger le type… » d'une fiche de cause (Lot 2) : le panneau de la première commande réglable, ligne amenée à l'écran.
+  function openTypeCorrection($panel, eqId, cmdIds, $origin) {
+    var row = typePanelTarget(eqId, cmdIds);
+    if (!row) return;
+    scrollToCommand($panel, row.jeedom_cmd_id);
+    openTypePanel({ eqId: eqId, cmdIds: [row.jeedom_cmd_id], origin: $origin });
+  }
+
+  // Le type est-il réglable pour au moins une de ces commandes (sinon « Corriger le type… » n'est pas offert) ?
   function canCorrectType(tree, cmdIds) {
-    var panel = window.Jeedom2haTypePanel;
-    if (panel && typeof panel.open === 'function') return cmdIds.length > 0;
     return tree.commands.some(function (row) {
       return cmdIds.indexOf(row.jeedom_cmd_id) !== -1 && M.getOverrideSelectorState(row, tree.entities).active;
     });
@@ -1205,7 +1498,7 @@
         if (canCorrectType(tree, cmdIds)) {
           var $correct = $('<button type="button" class="btn btn-default btn-xs j2ha-v2-correct-type"></button>')
             .text('{{Corriger le type…}}');
-          $correct.on('click', function () { openTypeCorrection($panel, eqId, cmdIds); });
+          $correct.on('click', function () { openTypeCorrection($panel, eqId, cmdIds, $correct); });
           $acts.append($correct);
         }
       } else if (act.key === 'republish') {
@@ -1837,6 +2130,8 @@
         '{{Impossible de lire la configuration de cet équipement.}}');
       return;
     }
+    // Front v2 (Lot 5) : le tableau est redessiné, le panneau « Corriger le type » ouvert sous une ligne est fermé.
+    closeTypePanel(false);
     var $list = $panel.find('.j2ha-eq-cmdlist').first().empty();
 
     ctx.trees[eqId] = normalized;
@@ -1978,6 +2273,9 @@
 
   function clearEquipment() {
     closeMenu();
+    // Front v2 (Lot 5) : panneau « Corriger le type » fermé (minuteur et aperçu en vol annulés), bandeau retiré.
+    closeTypePanel(false);
+    clearTypeToast();
     Object.keys(ctx.timers).forEach(function (cmdId) {
       if (ctx.timers[cmdId]) clearTimeout(ctx.timers[cmdId]);
     });
@@ -2036,5 +2334,7 @@
     setRoom: function (room) { ctx.room = room; },
     setHost: function (next) { host = next; },
     genericTypesUrl: GENERIC_TYPES_URL,
+    // Front v2 (Lot 5) : point d'entrée du panneau « Corriger le type », appelé par `Jeedom2haTypePanel.open`.
+    openTypePanel: openTypePanel,
   };
 })();

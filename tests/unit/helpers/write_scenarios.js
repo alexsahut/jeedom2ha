@@ -50,12 +50,14 @@ const SCENARIOS = [
     name: 'type-impose-apercu-puis-enregistrement',
     async run(open) {
       const ui = open(ROOMS, 7, [ok(tree(1, [BLOCKED], { present: false }))]);
+      // Front v2 (Lot 5) : choix dans le panneau « Corriger le type » (aperçu seul), puis « Enregistrer et publier ».
+      // Mêmes requêtes, même ordre et mêmes corps qu'avant ; la publication qui suit l'enregistrement n'est émise qu'après
+      // la réponse du démon, à laquelle ce scénario ne répond pas (elle est couverte par « appliquer-equipement »).
       ui.click(`${EQ} tr[data-cmd-id="100"] .j2ha-type-link`);
-      const select = ui.$(`${EQ} tr[data-cmd-id="100"] select`).list[0];
-      select.props.value = 'cover';
-      select.handlers.change.call(select);
+      ui.$(`${EQ} .j2ha-v2-type-panel input[data-type="cover"]`).trigger('change');
       await sleep(450);
       ui.respond('previewMappingOverride', PREVIEW_READY);
+      ui.click(`${EQ} .j2ha-v2-type-save`);
       return writesOf(ui);
     },
   },

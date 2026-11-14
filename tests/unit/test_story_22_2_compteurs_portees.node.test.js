@@ -240,9 +240,10 @@ describe('22.2 / AC5 (CC-58) — réglage « Type HA » d’une commande portée
     assert.doesNotMatch(shared.attr('title'), /celle qui est publiée/);
     const own = typeLink(ui, 106);
     assert.ok(!own.hasClass('j2ha-type-unavailable'));
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select').length, 0, 'le sélecteur n’est pas rendu en permanence');
+    // Front v2 (Lot 5) : le lien ouvre le panneau « Corriger le type » sous la ligne (plus de sélecteur dans la cellule).
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0, 'le panneau n’est pas rendu en permanence');
     ui.click('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] .j2ha-type-link');
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="106"] select').length, 1, 'ouvert par le lien');
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="106"] .j2ha-v2-type-panel').length, 1, 'ouvert par le lien');
   });
 
   it('R1 : indisponible aussi quand l’entité principale est elle-même publiée, avec la même explication', () => {
@@ -262,7 +263,7 @@ describe('22.2 / AC5 (CC-58) — réglage « Type HA » d’une commande portée
     const ui = openRoomWith([ok(tree579()), ok(tree(2, [READY]))]);
     const shared = typeLink(ui, 105).list[0];
     assert.equal(shared.handlers.click, undefined);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="105"] select').length, 0);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
     assert.equal(ui.pending('previewMappingOverride').length + ui.pending('saveMappingOverride').length, 0);
   });
 
@@ -340,9 +341,11 @@ describe('22.2 / CC-60 — cause lisible d’un type refusé sur la forme « 380
       'Bloquée → type Home Assistant ambigu — précisez les types génériques dans Jeedom');
   });
 
+  // Garde levée (front v2, Lot 5) : 8 → 10 types ; `lock` et `valve` sont dans le périmètre du démon (stories 24.8 / 24.9)
+  // et étaient cachés par l'interface (critère G4 de l'audit 26-0). Le filtre reste fait par le démon.
   it('la liste complète de l’interface reste celle du registre (le filtre est fait par le démon)', () => {
     assert.deepEqual(M.getHaEntityTypeOptions(), [
-      'alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'sensor', 'switch',
+      'alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'lock', 'sensor', 'switch', 'valve',
     ]);
   });
 });
@@ -369,14 +372,17 @@ describe('22.2 / AC7 — actions globales du bandeau (relecture Codex)', () => {
 });
 
 describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
-  const FULL = ['alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'sensor', 'switch'];
+  // Front v2 (Lot 5) : 10 types (serrure et vanne ajoutées, voir 16.5).
+  const FULL = ['alarm_control_panel', 'binary_sensor', 'button', 'climate', 'cover', 'light', 'lock', 'sensor', 'switch', 'valve'];
   const row = (extra) => Object.assign({
     jeedom_cmd_id: 2971, cmd_name: 'Etat', covered: true, diagnostic: REFUSED, generic_type: 'FLAP_STATE',
   }, extra || {});
-  // Le sélecteur n'existe qu'après un clic sur le lien « auto » / « imposé (…) » de la commande.
+  // Front v2 (Lot 5) : le panneau « Corriger le type » n'existe qu'après un clic sur le lien « auto » / « Personnalisé : … » ;
+  // les types PROPOSÉS sont ses choix actifs (« Automatique » = ''), les autres y restent visibles mais grisés.
+  const panelInputs = (ui, cmdId) => ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="${cmdId}"] input`).list;
   const optionValues = (ui, cmdId) => {
     ui.click(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] .j2ha-type-link`);
-    return ui.$(`.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="${cmdId}"] option`).list.map((o) => o.attrs.value);
+    return panelInputs(ui, cmdId).filter((o) => o.props.disabled !== true).map((o) => o.attrs.value);
   };
 
   it('pur : seuls les types annoncés sont proposés, dans l’ordre de la liste d’interface', () => {
@@ -409,9 +415,12 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     t.commands[1].override_types_allowed = FULL.slice();
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
     assert.deepEqual(optionValues(ui, 100), ['', 'cover']);
+    // Les types refusés restent visibles, repliés sous « Autres types, non proposés pour cette commande » : jamais proposés.
+    const refused = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-list li').list.map((li) => li.attrs['data-type']);
+    assert.ok(refused.includes('sensor') && refused.includes('binary_sensor'));
+    assert.match(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-refused-toggle').text(), /non proposés pour cette commande/);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-type-panel-for="100"] .j2ha-v2-type-choice').list[0].children[0].text, '{{Automatique}}');
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
-    assert.notEqual(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select').prop('disabled'), true);
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] option').list[0].children[0].text, '{{auto}}');
   });
 
   it('rendu : liste vide → réglage indisponible avec l’explication ; champ absent → liste d’avant', () => {
@@ -420,7 +429,7 @@ describe('22.2 R2 / AC6 — liste « Type HA » filtrée par le démon', () => {
     const ui = openRoomWith([ok(t), ok(tree(2, [READY]))]);
     const disabled = ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] .j2ha-type-link');
     assert.ok(disabled.hasClass('j2ha-type-unavailable'));
-    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] tr[data-cmd-id="100"] select').length, 0);
+    assert.equal(ui.$('.j2ha-eq-panel[data-eq-id="1"] .j2ha-v2-type-panel').length, 0);
     assert.match(disabled.attr('title'), /précisez les types génériques dans Jeedom/);
     assert.deepEqual(optionValues(ui, 101), ['', ...FULL]);
   });

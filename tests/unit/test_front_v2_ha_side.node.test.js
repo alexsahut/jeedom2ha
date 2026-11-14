@@ -219,7 +219,8 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
     }
   });
 
-  it('4. lampe typée prise : « Bloqué », fiche « le nom dit « lampe »… », « Corriger le type… » ouvre le sélecteur actuel', () => {
+  // Front v2 (Lot 5) : « Corriger le type… » ouvre désormais le panneau E5 (plus le sélecteur de la cellule).
+  it('4. lampe typée prise : « Bloqué », fiche « le nom dit « lampe »… », « Corriger le type… » ouvre le panneau', () => {
     for (const [label, withDaemon] of BOTH) {
       const { ui, P, text } = openFiche(DEMO.lampePrise(withDaemon));
       assert.equal(text('.j2ha-eq-publish-badge'), 'Bloqué', label);
@@ -227,9 +228,9 @@ describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo
       assert.equal(ui.$(P + '.j2ha-eq-notices .j2ha-notice').length, 1, label);
       assert.match(text('.j2ha-eq-notices'), /Non publié : le nom dit « lampe », les types Jeedom disent « prise »\./, label);
       assert.equal(ui.$(P + '.j2ha-eq-advice').text(), '', label + ' : le conseil « nom ≠ type » n’est pas répété');
-      assert.equal(ui.$(P + 'select').length, 0);
+      assert.equal(ui.$(P + '.j2ha-v2-type-panel').length, 0);
       ui.click(P + '.j2ha-v2-correct-type');
-      assert.equal(ui.$(P + 'select').length, 1, label + ' : le sélecteur actuel est ouvert (Lot 5 non livré)');
+      assert.equal(ui.$(P + 'tr[data-type-panel-for="2311"] .j2ha-v2-type-panel').length, 1, label + ' : le panneau est ouvert sous la première commande');
       assert.ok(ui.calls.every((c) => ['getBridgeStatus', 'getEquipmentStates', 'getMappingOverrides'].includes(c.action)), 'rien n’est écrit');
     }
   });

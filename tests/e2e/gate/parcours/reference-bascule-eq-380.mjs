@@ -5,6 +5,9 @@ export const declaredEquipments = {
   '380': { commands: ['2971', '2968', '2969', '2970'] },
 };
 export const declaredPublicationOverrides = {};
+// Front v2 (Lot 5) : « Enregistrer et publier » enchaîne l'enregistrement (simulé) et la publication de l'équipement,
+// simulée elle aussi (policy.mjs, `declaredEquipmentPublications`) : rien n'est transmis à la box.
+export const declaredEquipmentPublications = { '380': true };
 
 // La seule commande bloquée de l'équipement 380 est la cible de l'ancre.
 // Story 22.2 (R2) : `cover` est le seul type encore proposé pour 2971 (sensor et binary_sensor sont
@@ -128,10 +131,13 @@ export async function run(page, { helpers }) {
   // automatique, valide mais refusé pour ambiguïté) reste. Plus d'aperçu réel d'un type refusé :
   // le parcours vérifie la liste et la cause lisible, puis bascule simulée sur `cover`.
   const journalA = helpers.journalEntries().length;
-  // Story 25.1 : le sélecteur n'existe qu'après un clic sur le lien « auto » de la colonne « Type HA ».
+  // Front v2 (Lot 5) : le clic sur le lien « auto » de la colonne « Type HA » ouvre le panneau « Corriger le type » sous la
+  // ligne. Les types PROPOSÉS sont ses choix actifs (« Automatique » = '') ; les types refusés y restent visibles, grisés.
+  const typePanel = panel.locator(`tr.j2ha-v2-type-row[data-type-panel-for="${cmdId}"]`);
   const offered = await atStep(helpers, 9, 'liste-types-filtree', async () => {
     await target.locator('.j2ha-type-link').click();
-    return target.locator('select option').evaluateAll((options) => options.map((option) => option.getAttribute('value') ?? ''));
+    await typePanel.locator('.j2ha-v2-type-panel').waitFor({ state: 'visible' });
+    return typePanel.locator('input[type="radio"]:not([disabled])').evaluateAll((inputs) => inputs.map((input) => input.getAttribute('value') ?? ''));
   });
   helpers.record('etape_a_types_proposes', offered.filter(Boolean).join(','));
   if (offered[0] !== '') throw new Error('mode-automatique-absent'); // l'option « auto »
@@ -153,10 +159,22 @@ export async function run(page, { helpers }) {
 
   const journalB = helpers.journalEntries().length;
   await atStep(helpers, 10, 'bascule-simulee', async () => {
-    await target.locator('select').selectOption(BASCULE_TYPE);
+    // Front v2 (Lot 5) : choix → aperçu (aucune écriture) → « Enregistrer et publier ».
+    await typePanel.locator(`input[data-type="${BASCULE_TYPE}"]`).check();
+    await waitForJournal(helpers.journalEntries, journalB, [
+      { action: 'previewMappingOverride', verdict: 'apercu-simule' },
+    ]);
+    const save = typePanel.locator('.j2ha-v2-type-save');
+    await page.waitForFunction((id) => {
+      const button = document.querySelector(`tr.j2ha-v2-type-row[data-type-panel-for="${id}"] .j2ha-v2-type-save`);
+      return Boolean(button) && !button.disabled;
+    }, cmdId);
+    if (writesSince(helpers.journalEntries, journalB).length !== 0) throw new Error('ecriture-avant-validation');
+    await save.click();
     await waitForJournal(helpers.journalEntries, journalB, [
       { action: 'previewMappingOverride', verdict: 'apercu-simule' },
       { action: 'saveMappingOverride', verdict: 'simulee' },
+      { action: 'executeHaAction', verdict: 'simulee' },
       { action: 'getMappingOverrides', verdict: 'lecture-derivee' },
     ]);
     await page.waitForFunction((id) => {

@@ -604,3 +604,19 @@ test('front v2 lot 6 — saveFilteringConfig : simulée si déclarée, bloquée 
     assert.equal(ALLOWED_READS.length, 3);
   });
 });
+
+// Front v2 (Lots 5 et 6) : les deux simulations déclarées sont INDÉPENDANTES — déclarer l'une n'autorise jamais l'autre.
+test('front v2 lots 5 et 6 — plugins exclus et publication d\'équipement : déclarations indépendantes', async () => {
+  const { classifyRequest } = await loadPolicy();
+  const post = (body) => req({ method: 'POST', url: `${ORIGIN}${PLUGIN_AJAX}`, resourceType: 'xhr', postData: body });
+  const filtering = 'action=saveFilteringConfig&excludedPlugins=virtual&confidencePolicy=sure_probable';
+  const publication = 'action=executeHaAction&intention=publier&portee=equipement&selection=[380]';
+  const onlyFiltering = baseCtx({ declaredFilteringConfig: { excludedPlugins: ['virtual'], confidencePolicy: 'sure_probable' } });
+  const onlyPublication = baseCtx({ declaredEquipmentPublications: { 380: true } });
+  assert.equal(classifyRequest(post(filtering), onlyFiltering).verdict, 'simulate');
+  assert.equal(classifyRequest(post(publication), onlyFiltering).verdict, 'block-fail');
+  assert.equal(classifyRequest(post(publication), onlyPublication).verdict, 'simulate');
+  assert.equal(classifyRequest(post(filtering), onlyPublication).verdict, 'block-fail');
+  assert.equal(classifyRequest(post(filtering), baseCtx()).verdict, 'block-fail');
+  assert.equal(classifyRequest(post(publication), baseCtx()).verdict, 'block-fail');
+});

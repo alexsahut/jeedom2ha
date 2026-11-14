@@ -510,6 +510,8 @@ async function main() {
       // Front v2 (Lot 6) : plugins exclus déclarés par le parcours ({ excludedPlugins: [valeurs], confidencePolicy }), défaut null.
       declaredFilteringConfig: parcours.declaredFilteringConfig || null,
       declaredRescan: parcours.declaredRescan === true,
+      // Front v2 (Lot 5) : publications d'équipement simulées déclarées par le parcours ({ [eqId]: true }), défaut {}.
+      declaredEquipmentPublications: parcours.declaredEquipmentPublications || {},
       lastPreviewType: simState.lastPreviewType,
     };
     // Story 24.11 : un parcours à cible dynamique part de déclarations vides, propres à cette exécution.

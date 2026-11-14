@@ -21,6 +21,9 @@
  *   - ctx.declaredFilteringConfig : { excludedPlugins: [valeurs CSV acceptées], confidencePolicy } — front v2 (Lot 6) : écriture
  *     `saveFilteringConfig` depuis le panneau « Choisir ce qui est publié… » de la page du plugin, SIMULÉE seulement pour une
  *     valeur déclarée (application puis annulation) ; sans déclaration, elle reste un effet de bord bloqué.
+ *   - ctx.declaredEquipmentPublications : { [eqId]: true } — front v2 (Lot 5) : équipements dont la publication
+ *     (`executeHaAction` publier / equipement / [eqId], le second temps de « Enregistrer et publier ») est SIMULÉE,
+ *     jamais transmise. Tout autre `executeHaAction` reste un effet de bord refusé.
  *   - ctx.lastPreviewType : { [`${eqId}:${cmdId}`]: haEntityType } — dernier type
  *     prévisualisé par previewMappingOverride pour ce couple, exigé identique par
  *     saveMappingOverride (AC2).
@@ -242,6 +245,18 @@ function validateFilteringConfig(req, params, ctx) {
   return declared.excludedPlugins.some((value) => typeof value === 'string' && value === params.excludedPlugins);
 }
 
+// Front v2 (Lot 5) : POST, exactement action + intention + portee + selection, `publier` / `equipement` / `[eqId]`, eqId
+// déclaré par le parcours dans `declaredEquipmentPublications`. Simulée : rien n'est transmis à la box.
+const EQUIPMENT_PUBLICATION_PARAMS = 'action,intention,portee,selection';
+function validateDeclaredEquipmentPublication(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== EQUIPMENT_PUBLICATION_PARAMS) return false;
+  if (params.intention !== 'publier' || params.portee !== 'equipement') return false;
+  const match = /^\[([1-9][0-9]{0,9})\]$/.exec(params.selection);
+  if (!match) return false;
+  return hasOwnSafe(ctx.declaredEquipmentPublications, match[1]) && ctx.declaredEquipmentPublications[match[1]] === true;
+}
+
 function validateDeclaredRescan(req, ctx) {
   return req.method === 'POST' && ctx && ctx.declaredRescan === true;
 }
@@ -311,6 +326,11 @@ export function classifyRequest(req, ctx) {
 
     if (url.pathname === PLUGIN_AJAX_PATH && action === FILTERING_CONFIG_ACTION && validateFilteringConfig(req, params, ctx)) {
       return { verdict: 'simulate', reason: 'plugins-exclus-declares', action, params };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === 'executeHaAction'
+      && validateDeclaredEquipmentPublication(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'publication-equipement-declaree', action, params };
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {
